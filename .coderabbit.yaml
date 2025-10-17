@@ -1,0 +1,170 @@
+# CodeRabbit Configuration
+# Documentation: https://docs.coderabbit.ai/
+
+# Project Knowledge Base - Provides context about development stage and priorities
+knowledge_base:
+  - "Currently in early development/scaffolding phase - no functional app yet!"
+  - "Focus on architectural patterns, not implementation details"
+  - "Skip reviews for incomplete features and TODOs"
+  - "This is an Nx monorepo using TypeScript"
+  - "Prefer constructive feedback on critical issues over minor style suggestions"
+
+# Review Configuration
+reviews:
+  # High-level summary without excessive detail
+  high_level_summary: true
+
+  # Disable auto-request changes workflow to reduce noise
+  request_changes_workflow: false
+
+  # Disable review poems (optional aesthetic feature)
+  poem: false
+
+  # Auto-review settings
+  auto_review:
+    enabled: true
+    drafts: false  # Skip draft PRs during scaffolding
+
+  # Branch filtering - ignore WIP and experimental branches
+  # ignore_branches:
+  #   - "wip/**"
+  #   - "draft/**"
+  #   - "experimental/**"
+  #   - "poc/**"
+
+  # Project-wide review instructions
+  instructions: |
+    This is an NX monorepo in early development/scaffolding phase.
+
+    FOCUS reviews on:
+    1. Package and dependency compatibility issues, especially between apps in apps/ and shared components in packages/
+    2. Critical bugs and security vulnerabilities
+    3. Architectural pattern violations
+    4. Breaking changes to established APIs
+    5. Logic errors and incorrect implementations
+    6. Race conditions and concurrency issues
+
+    SKIP or DEFER:
+    - Style/formatting issues (handled by ESLint/Prettier)
+    - TODOs and incomplete implementations
+    - Premature performance optimizations
+    - Missing documentation (until features are complete)
+    - Minor naming suggestions
+    - Trivial refactoring suggestions
+
+    Be constructive and focus on high-impact issues only.
+
+  # Path-based review instructions for targeted reviews
+  path_instructions:
+    - path: "**/*.ts"
+      instructions: |
+        Focus only on:
+        - Critical bugs and security vulnerabilities
+        - Performance issues that impact user experience
+        - Breaking API changes
+        - Logic errors
+        Skip style/formatting issues if code follows existing patterns in the file.
+
+    - path: "**/*.tsx"
+      instructions: |
+        Focus on:
+        - Component architecture and patterns
+        - React best practices (hooks, state management)
+        - Accessibility concerns
+        - Security issues (XSS, injection)
+        Skip minor style suggestions.
+
+    - path: "**/*.test.ts"
+      instructions: |
+        Review test coverage and correctness only.
+        Skip minor naming suggestions.
+        Focus on test logic and edge cases.
+
+    - path: "**/*.spec.ts"
+      instructions: |
+        Review test coverage and correctness only.
+        Skip minor naming suggestions.
+        Focus on test logic and edge cases.
+
+    - path: "apps/**/*"
+      instructions: |
+        Focus on application-level concerns:
+        - Architecture and structure
+        - Security vulnerabilities
+        - Performance bottlenecks
+        - Dependency compatibility issues between apps and with shared components in packages/
+        Skip trivial issues during scaffolding phase.
+
+    - path: "packages/**/*"
+      instructions: |
+        Focus on package/library design:
+        - API design and contracts
+        - Reusability patterns
+        - Breaking changes
+        - Dependency compatibility issues between in packages/ and with apps in apps/
+        Skip incomplete implementations.
+
+    - path: "**/project.json"
+      instructions: |
+        Review Nx project configuration for correctness.
+        Check target configurations and dependencies.
+
+    - path: "nx.json"
+      instructions: |
+        Review workspace-level Nx configuration.
+        Focus on task pipeline and caching configuration.
+
+  # File path filters - exclude generated and build artifacts
+  path_filters:
+    exclude:
+      - "**/node_modules/**"
+      - "**/dist/**"
+      - "**/build/**"
+      - "**/.next/**"
+      - "**/.nx/**"
+      - "**/coverage/**"
+      - "**/*.generated.*"
+      - "**/migrations/**"
+      - "**/*.min.js"
+      - "**/*.bundle.js"
+  #    - "**/package-lock.json"
+      - "**/yarn.lock"
+  #    - "**/pnpm-lock.yaml"
+
+  # Change size thresholds - skip auto-review for very large PRs
+  change_threshold:
+    max_files: 50      # Don't auto-review PRs touching more than 50 files
+    max_lines: 1000    # Don't auto-review PRs with more than 1000 lines changed
+
+# Review filtering by severity
+review_filters:
+  # Only report warnings and errors, skip info-level suggestions
+  severity_threshold: "warning"
+
+  # Ignore trivial issues
+  ignore_trivial: true
+
+# Language-specific settings
+language_settings:
+  typescript:
+    # Use existing TypeScript, ESLint, and Prettier configurations
+    use_existing_config: true
+
+  javascript:
+    use_existing_config: true
+
+# Static Analysis Integration
+static_analysis:
+  # Respect existing linter and tool configurations
+  respect_existing_rules: true
+
+  # Tools to integrate with (CodeRabbit will respect their configs)
+  tools:
+    - eslint
+    - prettier
+    - typescript
+
+# Chat settings
+chat:
+  # Allow interactive refinement of reviews
+  auto_reply: false
