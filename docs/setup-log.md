@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-16T19:01
-Modified: 2025-10-17T12:47
+Modified: 2025-10-17T15:56
 ---
 # NX Monorepo Template Setup
 
@@ -14,10 +14,11 @@ Modified: 2025-10-17T12:47
     - TestSprite
 - [x] Configure Dependabot
 - [x] Configure Cursor BugBot
-- [ ] Configure CodeRabbit to not trigger wildly during PoC build
+- [X] Install & configure Ruler
+- [X] Configure CodeRabbit to not trigger wildly during PoC build
 - [ ] Merge in stack discussion from
 - [ ] Merge in AgentOS
-- [ ] Create scaffolding plan
+- [P] Create scaffolding plan
 - [ ] Create PoC PRD
 - [ ] Create PoC Plan
 

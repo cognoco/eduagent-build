@@ -1,0 +1,829 @@
+---
+Created: 2025-10-17
+Modified: 2025-10-17T16:11
+Version: 1
+---
+
+# Phase 1: Walking Skeleton
+
+## Introduction
+
+### Purpose
+
+This phase addresses a critical challenge in monorepo development: **how do you validate that all your infrastructure, tooling, and package versions are compatible before investing time in feature development?**
+
+The answer is a **walking skeleton** - a minimal, end-to-end implementation that exercises the entire technical stack without implementing real features. Think of it as the monorepo equivalent of a "Hello World" that touches every layer of your architecture.
+
+### The Problem We're Solving
+
+It's easy to:
+- ✅ Set up a Next.js app that works in isolation
+- ✅ Configure Supabase and Prisma independently
+- ✅ Create a Node.js server with perfect linting
+
+But when you connect them together during actual feature development, you discover:
+- ❌ Package version conflicts between web and server
+- ❌ Prisma and Supabase have incompatible configurations
+- ❌ Shared packages don't transpile correctly for different targets
+- ❌ Build pipeline breaks when dependencies span multiple apps
+- ❌ TypeScript paths don't resolve across workspace boundaries
+
+**This phase front-loads those discoveries** so we fix infrastructure issues once, not repeatedly during POC development.
+
+### The Walking Skeleton Approach
+
+By the end of Phase 1, we will have:
+
+1. **Two applications generated and validated**: Server (Express), Web (Next.js)
+2. **All shared packages created**: database, schemas, api-client, supabase-client
+3. **Minimal integration implemented**: One trivial feature (health check) that flows through every layer:
+   - Web app → API client → Server → Database (via Prisma) → Supabase
+4. **Complete QA infrastructure**: Husky, pre-commit hooks, comprehensive testing
+5. **External services configured**: Sentry, NX Cloud, CodeRabbit, TestSprite (optional)
+
+The "health check" feature is throwaway code - its only purpose is to prove the plumbing works. Once validated, we can confidently build the POC knowing the foundation is solid.
+
+**Mobile app is deferred to Phase 2** - we validate web + server + database first, then add mobile complexity.
+
+### Estimated Timeline
+
+**Total: 7-11 hours** (1-1.5 days)
+
+---
+
+## Architecture Decisions
+
+Before starting implementation, we need to understand the architectural relationships and make key technology choices.
+
+### Prisma + Supabase Relationship
+
+**Why both Prisma AND Supabase client?**
+
+- **Prisma**: Server-side ORM for type-safe database access from Express API
+  - Used exclusively in `apps/server` and `packages/database`
+  - Provides schema management, migrations, and query builder
+  - Connects to Supabase PostgreSQL database via connection string
+
+- **Supabase Client**: Client-side SDK for authentication and realtime features
+  - Used in `apps/web` and eventually `apps/mobile`
+  - Provides authentication (login, signup, session management)
+  - Provides realtime subscriptions (optional for POC)
+  - **Does NOT handle CRUD operations** - those go through our API server
+
+**Package responsibilities:**
+- `packages/database`: Exports Prisma client singleton for server use
+- `packages/supabase-client`: Exports auth client factory for web/mobile
+
+### oRPC Type Flow
+
+**How types flow from server to client:**
+
+1. Server defines oRPC router with typed procedures in `apps/server/src/router.ts`
+2. Server exports router type: `export type AppRouter = typeof router`
+3. API client package imports the router type: `import type { AppRouter } from '@nx-monorepo/server/router'`
+4. Client creates typed client: `createClient<AppRouter>(config)`
+5. Web/mobile apps get full TypeScript autocomplete for all server endpoints
+
+**Dependency flow:**
+```
+apps/web → packages/api-client → (type import only) apps/server
+apps/server → packages/database → packages/schemas
+packages/api-client → packages/schemas
+```
+
+**Note:** api-client depends on server for TYPE information only, not runtime code. This is safe.
+
+### Architecture Decisions to Make
+
+During Stage 4, we will explicitly decide:
+
+- ☐ **API Architecture**: oRPC vs tRPC vs REST vs gRPC
+- ☐ **Supabase Strategy**: Local CLI vs cloud project
+- ☐ **Migration Strategy**: Prisma Migrate vs db push
+- ☐ **Connection Strategy**: Service role vs anon key for Prisma
+- ☐ **RLS Policy Approach**: How to handle Row Level Security
+
+These decisions will be documented before proceeding with implementation.
+
+---
+
+## Stage 0: Current State Audit
+
+### Goal
+
+Verify that the out-of-the-box Nx setup works correctly and meets all prerequisites before making any changes.
+
+### Sub-stages
+
+- [ ] **0.1: Verify prerequisites**
+  - [x] 0.1.1: Check Node.js version (recommended: v20.x or later) - v22.20.0 ✅
+  - [ ] 0.1.2: Check pnpm version (should be v8.x or later)
+  - [ ] 0.1.3: Verify pnpm is set as package manager (not npm)
+  - [ ] 0.1.4: Clean up any npm artifacts (package-lock.json) if present
+  - [ ] 0.1.5: Verify Playwright browsers installed
+  - [ ] 0.1.6: Document prerequisite versions in `docs/prerequisites.md`
+
+- [ ] **0.2: Verify existing web app builds and runs**
+  - [ ] 0.2.1: Run `pnpm install` and verify no errors
+  - [ ] 0.2.2: Run `nx run web:build` and verify success
+  - [ ] 0.2.3: Run `nx run web:dev` and verify dev server starts
+  - [ ] 0.2.4: Access http://localhost:4200 and verify app loads
+
+- [ ] **0.3: Test existing QA tooling**
+  - [ ] 0.3.1: Run `nx run web:lint` and verify passes
+  - [ ] 0.3.2: Run `nx run web:test` and verify all tests pass
+  - [ ] 0.3.3: Run `nx run web-e2e:e2e` and verify Playwright E2E tests pass (smoke tests)
+  - [ ] 0.3.4: Verify Prettier formatting works
+
+- [ ] **0.4: Validate CI pipeline**
+  - [ ] 0.4.1: Confirm GitHub Actions workflow passes on latest commit
+  - [ ] 0.4.2: Verify Nx Cloud integration shows task results
+  - [ ] 0.4.3: Test cache hits by running build twice: `nx run web:build` (second run should be cached)
+
+- [ ] **0.5: Validate workspace scripts**
+  - [ ] 0.5.1: Verify package.json scripts are set up correctly
+  - [ ] 0.5.2: Test workspace-level commands work
+  - [ ] 0.5.3: Document available commands
+
+- [ ] **0.6: Document current package versions**
+  - [ ] 0.6.1: Run `pnpm list --depth=0 > docs/package-versions-baseline.txt`
+  - [ ] 0.6.2: Create `docs/package-versions-baseline.md` with key versions
+  - [ ] 0.6.3: Capture Next.js, React, TypeScript, Nx versions
+
+### Success Criteria
+
+- [ ] Prerequisites documented and verified
+- [ ] pnpm is confirmed as package manager (no package-lock.json)
+- [ ] `pnpm install` completes without errors or warnings
+- [ ] `nx run web:build` succeeds
+- [ ] `nx run web:dev` starts development server successfully
+- [ ] `nx run web:lint` passes with no errors
+- [ ] `nx run web:test` passes all tests
+- [ ] `nx run web-e2e:e2e` passes all Playwright tests
+- [ ] GitHub Actions CI workflow passes on latest commit
+- [ ] Nx Cloud shows successful task caching (cache hit on second build)
+- [ ] Package version baseline documented in `docs/package-versions-baseline.md`
+- [ ] Prerequisites documented in `docs/prerequisites.md`
+
+**Stage 0 Estimated Time:** 45 minutes - 1 hour
+
+---
+
+## Stage 1: Generate Server Application
+
+### Goal
+
+Create the server application using Nx generators, ensuring it builds and runs independently with proper QA tooling before proceeding.
+
+### Sub-stages
+
+- [ ] **1.1: Generate server application**
+  - [ ] 1.1.1: Run: `nx g @nx/node:app server --directory=apps/server --framework=express`
+  - [ ] 1.1.2: Review generated files and structure
+  - [ ] 1.1.3: Verify TypeScript paths in tsconfig.base.json updated
+
+- [ ] **1.2: Immediate validation**
+  - [ ] 1.2.1: Run `nx run server:build` and verify success
+  - [ ] 1.2.2: Run `nx run server:serve` and verify server starts on expected port
+  - [ ] 1.2.3: Verify server responds to default route (curl or browser)
+  - [ ] 1.2.4: Run `nx run server:lint` and verify passes
+  - [ ] 1.2.5: Run `nx run server:test` and verify default tests pass
+
+- [ ] **1.3: Update workspace scripts**
+  - [ ] 1.3.1: Add server dev script to root package.json (if needed)
+  - [ ] 1.3.2: Document how to run server in development
+
+- [ ] **1.4: Verify workspace health**
+  - [ ] 1.4.1: Run `nx graph` and verify clean dependency structure
+  - [ ] 1.4.2: Run `nx run-many -t build` and verify both web and server build
+  - [ ] 1.4.3: Verify Nx cache works for server tasks
+
+### Success Criteria
+
+- [ ] Server application generated in `apps/server/`
+- [ ] `nx run server:build` succeeds
+- [ ] `nx run server:serve` starts server on expected port
+- [ ] Server responds to health check endpoint (default Express route)
+- [ ] `nx run server:lint` passes
+- [ ] `nx run server:test` passes (with default tests)
+- [ ] `nx graph` shows both web and server apps with no circular dependencies
+- [ ] `nx run-many -t build` builds both apps successfully
+- [ ] Nx cache hits work for server tasks (run build twice)
+
+**Stage 1 Estimated Time:** 30-45 minutes
+
+---
+
+## Stage 2: Generate Shared Packages
+
+### Goal
+
+Create all shared libraries following Nx conventions, ensuring each package builds and tests correctly immediately after generation.
+
+### Sub-stages
+
+- [ ] **2.1: Generate database package**
+  - [ ] 2.1.1: Run: `nx g @nx/node:lib database --directory=packages/database --buildable`
+  - [ ] 2.1.2: Install Prisma dependencies: `pnpm add -D prisma --filter @nx-monorepo/database`
+  - [ ] 2.1.3: Install Prisma client: `pnpm add @prisma/client --filter @nx-monorepo/database`
+  - [ ] 2.1.4: Set up basic Prisma configuration structure
+  - [ ] 2.1.5: **Immediate test**: Run `nx run database:build` and verify success
+  - [ ] 2.1.6: **Immediate test**: Run `nx run database:lint` and verify passes
+  - [ ] 2.1.7: **Immediate test**: Run `nx run database:test` and verify passes
+
+- [ ] **2.2: Generate schemas package**
+  - [ ] 2.2.1: Run: `nx g @nx/js:lib schemas --directory=packages/schemas --buildable`
+  - [ ] 2.2.2: Install Zod: `pnpm add zod --filter @nx-monorepo/schemas`
+  - [ ] 2.2.3: Create placeholder schema exports
+  - [ ] 2.2.4: **Immediate test**: Run `nx run schemas:build` and verify success
+  - [ ] 2.2.5: **Immediate test**: Run `nx run schemas:lint` and verify passes
+  - [ ] 2.2.6: **Immediate test**: Run `nx run schemas:test` and verify passes
+
+- [ ] **2.3: Generate api-client package**
+  - [ ] 2.3.1: Run: `nx g @nx/js:lib api-client --directory=packages/api-client --buildable`
+  - [ ] 2.3.2: Install oRPC client: `pnpm add @orpc/client --filter @nx-monorepo/api-client`
+  - [ ] 2.3.3: Set up basic client factory structure
+  - [ ] 2.3.4: **Immediate test**: Run `nx run api-client:build` and verify success
+  - [ ] 2.3.5: **Immediate test**: Run `nx run api-client:lint` and verify passes
+  - [ ] 2.3.6: **Immediate test**: Run `nx run api-client:test` and verify passes
+
+- [ ] **2.4: Generate supabase-client package**
+  - [ ] 2.4.1: Run: `nx g @nx/js:lib supabase-client --directory=packages/supabase-client --buildable`
+  - [ ] 2.4.2: Install Supabase client: `pnpm add @supabase/supabase-js --filter @nx-monorepo/supabase-client`
+  - [ ] 2.4.3: Install Supabase SSR: `pnpm add @supabase/ssr --filter @nx-monorepo/supabase-client`
+  - [ ] 2.4.4: Set up client factory structure
+  - [ ] 2.4.5: **Immediate test**: Run `nx run supabase-client:build` and verify success
+  - [ ] 2.4.6: **Immediate test**: Run `nx run supabase-client:lint` and verify passes
+  - [ ] 2.4.7: **Immediate test**: Run `nx run supabase-client:test` and verify passes
+
+- [ ] **2.5: Verify package dependency graph and cross-package integration**
+  - [ ] 2.5.1: Run `nx graph` and verify clean dependency structure
+  - [ ] 2.5.2: Ensure proper library boundaries (no circular dependencies)
+  - [ ] 2.5.3: Verify build order is correct
+  - [ ] 2.5.4: Test that apps can import from packages (TypeScript paths resolve)
+  - [ ] 2.5.5: Run `nx run-many -t build` and verify all packages build
+  - [ ] 2.5.6: Test incremental builds: change one package, verify only dependents rebuild
+
+### Success Criteria
+
+- [ ] All four packages generated and build successfully
+- [ ] Each package passed lint immediately after generation
+- [ ] Each package passed tests immediately after generation
+- [ ] `nx run-many -t build --projects=tag:type:lib` succeeds
+- [ ] All packages build: database, schemas, api-client, supabase-client
+- [ ] All packages pass lint: `nx run-many -t lint --projects=tag:type:lib`
+- [ ] All packages pass tests: `nx run-many -t test --projects=tag:type:lib`
+- [ ] `nx graph` shows clean dependency structure (no circular dependencies)
+- [ ] Apps can import from packages (TypeScript paths resolve correctly)
+- [ ] Incremental builds work (changing one package only rebuilds dependents)
+- [ ] All necessary dependencies installed and documented
+
+**Stage 2 Estimated Time:** 1-1.5 hours
+
+---
+
+## Stage 3: QA Infrastructure Setup
+
+### Goal
+
+Establish quality assurance tooling and testing scaffolding early to create a safety net before building the walking skeleton. This ensures all subsequent development happens with quality gates active.
+
+### Sub-stages
+
+- [ ] **3.1: Install and configure Husky**
+  - [ ] 3.1.1: Install Husky: `pnpm add -D husky`
+  - [ ] 3.1.2: Initialize Husky: `pnpm exec husky init`
+  - [ ] 3.1.3: Set up Git hooks infrastructure
+  - [ ] 3.1.4: Configure pre-commit hook for linting and formatting
+  - [ ] 3.1.5: Configure commit-msg hook for conventional commits (optional)
+  - [ ] 3.1.6: Test hook triggers on commit attempt
+
+- [ ] **3.2: Add pre-commit validation with lint-staged**
+  - [ ] 3.2.1: Install lint-staged: `pnpm add -D lint-staged`
+  - [ ] 3.2.2: Create `.lintstagedrc.json` configuration
+  - [ ] 3.2.3: Configure to run ESLint and Prettier on staged files only
+  - [ ] 3.2.4: Ensure it respects Nx project boundaries
+  - [ ] 3.2.5: Test by staging files and committing
+
+- [ ] **3.3: Set up test scaffolding structure**
+  - [ ] 3.3.1: Review Jest configuration patterns for all package types
+  - [ ] 3.3.2: Create example unit tests for at least one shared package
+  - [ ] 3.3.3: Set up test utilities and helpers directory
+  - [ ] 3.3.4: Document testing patterns
+
+- [ ] **3.4: Configure test coverage reporting**
+  - [ ] 3.4.1: Set up Jest coverage configuration (no threshold yet, just reporting)
+  - [ ] 3.4.2: Configure coverage reporting format (lcov, text)
+  - [ ] 3.4.3: Set up coverage reports directory: `coverage/`
+  - [ ] 3.4.4: Test coverage generation: `nx run-many -t test --coverage`
+  - [ ] 3.4.5: Document how to view coverage reports
+
+- [ ] **3.5: Add type checking to CI**
+  - [ ] 3.5.1: Ensure TypeScript compilation is part of CI pipeline
+  - [ ] 3.5.2: Configure typecheck target for projects (if not auto-configured)
+  - [ ] 3.5.3: Test: `nx run-many -t typecheck`
+  - [ ] 3.5.4: Update `.github/workflows/ci.yml` to include typecheck step
+
+### Success Criteria
+
+- [ ] Husky installed and Git hooks directory created (`.husky/`)
+- [ ] Pre-commit hook runs automatically on `git commit`
+- [ ] Pre-commit hook blocks commits with lint/format errors
+- [ ] Pre-commit hook only checks staged files (fast execution < 10s)
+- [ ] Commit message validation enforces conventional commits format (if configured)
+- [ ] lint-staged configuration exists and respects Nx workspace structure
+- [ ] Example unit tests exist and pass for at least one package
+- [ ] Coverage reporting configured (0% threshold, just report)
+- [ ] Coverage reports are generated in `coverage/` directory
+- [ ] CI workflow includes typecheck step
+- [ ] Attempting to commit code with lint errors is blocked locally
+- [ ] Documentation exists for testing patterns and coverage
+
+**Stage 3 Estimated Time:** 1-2 hours
+
+---
+
+## Stage 4: Architecture Decisions & Infrastructure
+
+### Goal
+
+Make explicit architecture decisions about API framework and database strategy, then configure infrastructure based on those decisions.
+
+### Sub-stages
+
+- [ ] **4.1: API Architecture Decision**
+  - [ ] 4.1.1: Review options: oRPC vs tRPC vs REST vs gRPC
+  - [ ] 4.1.2: Consider: Type safety, learning curve, ecosystem maturity, team familiarity
+  - [ ] 4.1.3: Document decision with rationale in `docs/architecture-decisions.md`
+  - [ ] 4.1.4: Install chosen framework dependencies in server and api-client
+
+- [ ] **4.2: Supabase Architecture Decision**
+  - [ ] 4.2.1: Decide: Local Supabase CLI vs cloud project
+  - [ ] 4.2.2: Decide: Prisma Migrate (SQL migrations) vs db push (schema sync)
+  - [ ] 4.2.3: Decide: Service role vs anon key for Prisma connections
+  - [ ] 4.2.4: Decide: RLS policy approach for this phase
+  - [ ] 4.2.5: Document decisions in `docs/architecture-decisions.md`
+
+- [ ] **4.3: Set up Supabase project (based on 4.2 decision)**
+  - [ ] 4.3.1: Create Supabase project (cloud or initialize local)
+  - [ ] 4.3.2: Configure environment variables (`.env.local`, `.env`)
+  - [ ] 4.3.3: Document environment variable setup in `docs/environment-setup.md`
+  - [ ] 4.3.4: Test connectivity from local machine
+
+- [ ] **4.4: Configure Prisma in database package**
+  - [ ] 4.4.1: Set up `packages/database/prisma/schema.prisma`
+  - [ ] 4.4.2: Configure Supabase PostgreSQL connection string
+  - [ ] 4.4.3: Create minimal test model: HealthCheck table
+    - id: uuid (primary key)
+    - timestamp: DateTime
+    - message: String
+  - [ ] 4.4.4: Run: `pnpm --filter @nx-monorepo/database prisma generate`
+  - [ ] 4.4.5: Run: `pnpm --filter @nx-monorepo/database prisma db push` (or migrate)
+  - [ ] 4.4.6: Verify table appears in Supabase dashboard
+
+- [ ] **4.5: Configure Supabase client factory**
+  - [ ] 4.5.1: Implement client factory in `packages/supabase-client/src/index.ts`
+  - [ ] 4.5.2: Support both web (Next.js) and native (Expo) configurations
+  - [ ] 4.5.3: Export createSupabaseClient factory function
+  - [ ] 4.5.4: Test client initialization with dummy code
+
+- [ ] **4.6: Set up API framework (based on 4.1 decision)**
+  - [ ] 4.6.1: Configure API server structure in `apps/server/src/main.ts`
+  - [ ] 4.6.2: Set up router/controller structure
+  - [ ] 4.6.3: Configure API client factory in `packages/api-client`
+  - [ ] 4.6.4: Verify type inference works (if applicable to chosen framework)
+  - [ ] 4.6.5: Test basic API request/response
+
+### Success Criteria
+
+- [ ] Architecture decisions documented in `docs/architecture-decisions.md`
+- [ ] API framework choice documented with rationale
+- [ ] Supabase strategy documented with rationale
+- [ ] Supabase project created and accessible via dashboard
+- [ ] Environment variables configured and documented in `docs/environment-setup.md`
+- [ ] `packages/database/prisma/schema.prisma` contains valid schema
+- [ ] HealthCheck model defined with correct fields
+- [ ] `pnpm --filter @nx-monorepo/database prisma generate` succeeds
+- [ ] `pnpm --filter @nx-monorepo/database prisma db push` succeeds
+- [ ] Supabase dashboard shows HealthCheck table with correct schema
+- [ ] Can manually insert/query data via Prisma Studio or Supabase dashboard
+- [ ] Supabase client factory exports working initialization function
+- [ ] API server can be initialized with chosen framework
+- [ ] API client can be initialized in web app
+- [ ] TypeScript shows type inference for API methods (if applicable)
+
+**Stage 4 Estimated Time:** 2-3 hours
+
+---
+
+## Stage 5: Implement Walking Skeleton (Web Only)
+
+### Goal
+
+Create a minimal vertical slice that exercises the entire stack: web → API client → server → database → Supabase. This is the critical validation step that proves all components work together. **With QA infrastructure active, tests will be written alongside each layer of implementation.**
+
+### Sub-stages
+
+- [ ] **5.1: Implement database layer + tests**
+  - [ ] 5.1.1: Export Prisma client singleton from `packages/database/src/index.ts`
+  - [ ] 5.1.2: Create query functions: `getHealthChecks()`, `createHealthCheck(message)`
+  - [ ] 5.1.3: Write unit tests for query functions
+  - [ ] 5.1.4: Run tests and verify they pass
+
+- [ ] **5.2: Implement schemas layer + tests**
+  - [ ] 5.2.1: Create Zod schema for health check operations in `packages/schemas/src/health.ts`
+  - [ ] 5.2.2: Define: `healthPingSchema` (input validation)
+  - [ ] 5.2.3: Export types derived from schemas
+  - [ ] 5.2.4: Write unit tests for schema validation
+  - [ ] 5.2.5: Run tests and verify they pass
+
+- [ ] **5.3: Implement server endpoints + tests**
+  - [ ] 5.3.1: Create health check router/controller in `apps/server/src/routes/health.ts`
+  - [ ] 5.3.2: Implement: `getHealth()` - reads all health checks from DB
+  - [ ] 5.3.3: Implement: `pingHealth(message)` - writes new health check to DB
+  - [ ] 5.3.4: Use Zod schemas for request validation
+  - [ ] 5.3.5: Export router type for client (if using typed framework)
+  - [ ] 5.3.6: Write integration tests for endpoints
+  - [ ] 5.3.7: Run tests and verify they pass
+
+- [ ] **5.4: Implement API client + tests**
+  - [ ] 5.4.1: Export typed client factory in `packages/api-client/src/index.ts`
+  - [ ] 5.4.2: Import server router type (if applicable)
+  - [ ] 5.4.3: Create client initialization function
+  - [ ] 5.4.4: Ensure type safety from server to client
+  - [ ] 5.4.5: Write unit tests for client initialization
+  - [ ] 5.4.6: Run tests and verify they pass
+
+- [ ] **5.5: Implement web UI**
+  - [ ] 5.5.1: Create `/health` page in `apps/web/src/app/health/page.tsx`
+  - [ ] 5.5.2: Initialize API client
+  - [ ] 5.5.3: Fetch and display health check data from server
+  - [ ] 5.5.4: Add button to ping server (write to DB)
+  - [ ] 5.5.5: Show real-time data updates after ping
+  - [ ] 5.5.6: Add basic styling with Tailwind
+  - [ ] 5.5.7: Test manually in browser
+
+- [ ] **5.6: Manual validation**
+  - [ ] 5.6.1: Start server: `nx run server:serve`
+  - [ ] 5.6.2: Start web: `nx run web:dev`
+  - [ ] 5.6.3: Navigate to http://localhost:4200/health
+  - [ ] 5.6.4: Verify health checks display
+  - [ ] 5.6.5: Click ping button and verify new entry appears
+  - [ ] 5.6.6: Check Supabase dashboard to confirm data persistence
+  - [ ] 5.6.7: Test error scenarios (server down, invalid input)
+
+- [ ] **5.7: Update coverage thresholds**
+  - [ ] 5.7.1: Update Jest configuration to set 60% coverage threshold
+  - [ ] 5.7.2: Run: `nx run-many -t test --coverage`
+  - [ ] 5.7.3: Verify >= 60% coverage achieved
+  - [ ] 5.7.4: Document any intentional coverage gaps
+
+### Success Criteria
+
+- [ ] Server endpoint `getHealth()` returns data from Supabase
+- [ ] Server endpoint `pingHealth(message)` writes to Supabase
+- [ ] TypeScript autocomplete works in client for server endpoints (if applicable)
+- [ ] Web app loads `/health` page successfully
+- [ ] Web app displays data fetched from server/database
+- [ ] Web app can trigger write operation (ping button)
+- [ ] Changes appear immediately in web UI after ping
+- [ ] Data persists in Supabase database
+- [ ] All apps build successfully: `nx run-many -t build`
+- [ ] No TypeScript errors in any project
+- [ ] Nx cache works for all build tasks
+- [ ] Unit tests pass for database package
+- [ ] Unit tests pass for schemas package
+- [ ] Integration tests pass for server endpoints
+- [ ] Unit tests pass for api-client package
+- [ ] All tests pass: `nx run-many -t test`
+- [ ] Test coverage is >= 60% across shared packages
+- [ ] Pre-commit hooks allow commits (code quality is good)
+
+**Stage 5 Estimated Time:** 3-4 hours
+
+---
+
+## Stage 6: E2E Testing
+
+### Goal
+
+Complete end-to-end testing for the walking skeleton, validating the complete user journey. Evaluate E2E testing tools and write comprehensive tests.
+
+### Sub-stages
+
+- [ ] **6.1: Evaluate E2E Testing Tools (Exploratory)**
+  - [ ] 6.1.1: Research Chrome DevTools MCP for E2E testing
+  - [ ] 6.1.2: Trial Chrome DevTools approach with health check flow
+  - [ ] 6.1.3: Research TestSprite MCP for E2E testing
+  - [ ] 6.1.4: Trial TestSprite with health check flow
+  - [ ] 6.1.5: Compare experience with existing Playwright setup
+  - [ ] 6.1.6: Document findings and tool recommendations
+  - [ ] 6.1.7: Decide: Use Playwright, switch tools, or use multiple tools
+  - [ ] 6.1.8: **Note**: This is exploratory - success = tried the tools and formed an opinion
+
+- [ ] **6.2: Write comprehensive E2E tests (using chosen tool)**
+  - [ ] 6.2.1: Create E2E test for complete health check flow
+  - [ ] 6.2.2: Test: Load /health page → see existing data
+  - [ ] 6.2.3: Test: Click ping button → see new data appear
+  - [ ] 6.2.4: Test: Verify data persists across page refresh
+  - [ ] 6.2.5: Test: Error handling when server is down
+  - [ ] 6.2.6: Run E2E tests and verify they pass
+
+- [ ] **6.3: Verify test coverage**
+  - [ ] 6.3.1: Run coverage report: `nx run-many -t test --coverage`
+  - [ ] 6.3.2: Update coverage threshold to 80%
+  - [ ] 6.3.3: Ensure >= 80% coverage threshold is met
+  - [ ] 6.3.4: Document any intentional coverage gaps
+  - [ ] 6.3.5: Generate coverage report for documentation
+
+- [ ] **6.4: Complete documentation**
+  - [ ] 6.4.1: Document walking skeleton architecture (diagram or markdown)
+  - [ ] 6.4.2: Create `docs/walking-skeleton.md` explaining the flow
+  - [ ] 6.4.3: Document how to run the walking skeleton
+  - [ ] 6.4.4: Document how to run all tests
+  - [ ] 6.4.5: Add troubleshooting guide for common issues
+
+### Success Criteria
+
+**Testing:**
+- [ ] E2E testing tool evaluation completed and documented
+- [ ] Decision made about E2E testing approach
+- [ ] E2E tests exist for web health check flow
+- [ ] E2E test: Load /health page → see data from database
+- [ ] E2E test: Click ping button → see new data appear
+- [ ] E2E test: Data persists across page refresh
+- [ ] E2E test: Error handling works when server is down
+- [ ] All E2E tests pass
+- [ ] `nx run-many -t test --coverage` shows >= 80% coverage
+- [ ] Coverage report generated and documented
+
+**Documentation:**
+- [ ] Walking skeleton architecture documented in `docs/walking-skeleton.md`
+- [ ] E2E testing approach documented
+- [ ] How to run guide exists
+- [ ] Troubleshooting guide exists for common issues
+
+**Stage 6 Estimated Time:** 2-3 hours
+
+---
+
+## Stage 7: External Services (Optional)
+
+### Goal
+
+Integrate external services that improve code quality, monitoring, and developer experience. This stage is non-blocking - Phase 1 can be considered complete without it.
+
+### Sub-stages
+
+- [ ] **7.1: Optimize Nx Cloud configuration**
+  - [ ] 7.1.1: Review current caching strategy
+  - [ ] 7.1.2: Configure distributed task execution (if needed)
+  - [ ] 7.1.3: Set up remote caching for team
+  - [ ] 7.1.4: Verify cache hit rates (target: > 50% after second run)
+  - [ ] 7.1.5: Document Nx Cloud setup
+
+- [ ] **7.2: Set up Sentry**
+  - [ ] 7.2.1: Create Sentry project
+  - [ ] 7.2.2: Install Sentry SDK in server: `pnpm add @sentry/node --filter @nx-monorepo/server`
+  - [ ] 7.2.3: Install Sentry SDK in web: `pnpm add @sentry/nextjs --filter @nx-monorepo/web`
+  - [ ] 7.2.4: Configure error tracking and performance monitoring
+  - [ ] 7.2.5: Test error reporting with intentional error
+  - [ ] 7.2.6: Verify error appears in Sentry dashboard
+
+- [ ] **7.3: Configure TestSprite (optional)**
+  - [ ] 7.3.1: Research TestSprite integration requirements
+  - [ ] 7.3.2: Set up TestSprite account/project
+  - [ ] 7.3.3: Configure TestSprite for the project
+  - [ ] 7.3.4: Test basic TestSprite functionality
+  - [ ] 7.3.5: Document TestSprite setup
+
+- [ ] **7.4: Configure CodeRabbit**
+  - [ ] 7.4.1: Review `.coderabbit.yaml` configuration
+  - [ ] 7.4.2: Adjust settings to minimize noise during POC development
+  - [ ] 7.4.3: Set up appropriate review triggers
+  - [ ] 7.4.4: Configure to respect Nx structure
+  - [ ] 7.4.5: Test by creating a PR
+
+- [ ] **7.5: Verify Dependabot configuration**
+  - [ ] 7.5.1: Review Dependabot configuration
+  - [ ] 7.5.2: Ensure Dependabot is monitoring all manifests
+  - [ ] 7.5.3: Configure appropriate update schedule
+  - [ ] 7.5.4: Test that PR creation works (if updates available)
+
+- [ ] **7.6: Complete external services documentation**
+  - [ ] 7.6.1: Create `docs/external-services.md` with all service configurations
+  - [ ] 7.6.2: Document API keys and access (in secure location)
+  - [ ] 7.6.3: Document how to access each service
+  - [ ] 7.6.4: Add setup instructions for new team members
+
+### Success Criteria
+
+**Nx Cloud:**
+- [ ] Nx Cloud shows optimized cache hit rates (> 50% after second run)
+- [ ] Remote caching works for team members
+- [ ] Nx Cloud configuration documented
+
+**Sentry:**
+- [ ] Sentry project created and accessible
+- [ ] Sentry SDK installed in `apps/server` and `apps/web`
+- [ ] Test error appears in Sentry dashboard when triggered
+- [ ] Sentry performance monitoring captures transactions
+- [ ] Sentry setup documented
+
+**TestSprite (optional):**
+- [ ] TestSprite integration explored and documented
+- [ ] Decision made about TestSprite usage
+
+**CodeRabbit:**
+- [ ] CodeRabbit reviews PRs appropriately
+- [ ] CodeRabbit settings documented in `.coderabbit.yaml`
+- [ ] CodeRabbit setup documented
+
+**Dependabot:**
+- [ ] Dependabot configuration verified
+- [ ] Dependabot creates test PR for known outdated dependency
+- [ ] Dependabot setup documented
+
+**Documentation:**
+- [ ] All service configurations documented in `docs/external-services.md`
+- [ ] Team can access and use all services
+- [ ] Setup instructions exist for new team members
+
+**Stage 7 Estimated Time:** 2-3 hours (optional)
+
+---
+
+## DECISION POINT: Mobile App Timing
+
+At this point, the web walking skeleton is complete and validated. We have proven:
+- ✅ Web app connects to server
+- ✅ Server connects to database
+- ✅ Type safety works across the stack
+- ✅ All QA infrastructure works
+- ✅ Package versions are compatible
+- ✅ CI/CD pipeline passes
+
+**Decision to make:** When do we add the mobile app?
+
+### Option A: Add Mobile Now (Stage 8)
+**Pros:**
+- Complete full-stack validation before POC
+- Mobile-specific issues discovered early
+- Template is truly complete
+
+**Cons:**
+- Delays POC implementation
+- Mobile adds significant complexity
+- POC might not need mobile immediately
+
+### Option B: Defer Mobile to Phase 2
+**Pros:**
+- Move faster to POC features
+- Validate POC idea on web first
+- Add mobile once POC is proven valuable
+
+**Cons:**
+- Mobile integration issues surface later
+- Might need to refactor POC for mobile
+
+**Recommendation:** Discuss this decision point before proceeding.
+
+---
+
+## Stage 8: Mobile App (Conditional - Likely Phase 2)
+
+### Goal
+
+Add mobile application to complete the full cross-platform walking skeleton. This stage is conditional based on the decision point above.
+
+**Note:** This stage may become Phase 2 instead of Phase 1.
+
+### Sub-stages
+
+- [ ] **8.1: Generate mobile application**
+  - [ ] 8.1.1: Run: `nx g @nx/expo:app mobile --directory=apps/mobile`
+  - [ ] 8.1.2: Review generated files and structure
+  - [ ] 8.1.3: **Immediate test**: Run `nx run mobile:build` and verify success
+  - [ ] 8.1.4: **Immediate test**: Run `nx run mobile:start` and verify Expo dev server starts
+  - [ ] 8.1.5: **Immediate test**: Run `nx run mobile:lint` and verify passes
+  - [ ] 8.1.6: **Immediate test**: Run `nx run mobile:test` and verify passes
+
+- [ ] **8.2: Configure mobile-to-server connectivity**
+  - [ ] 8.2.1: Decide: Expo tunnel vs ngrok vs local network IP
+  - [ ] 8.2.2: Configure API base URL for mobile environment
+  - [ ] 8.2.3: Document mobile networking setup
+  - [ ] 8.2.4: Test connectivity from mobile device/simulator to server
+
+- [ ] **8.3: Implement mobile UI**
+  - [ ] 8.3.1: Set up Supabase client for React Native
+  - [ ] 8.3.2: Create health check screen
+  - [ ] 8.3.3: Initialize API client
+  - [ ] 8.3.4: Display health check data from server
+  - [ ] 8.3.5: Add button to ping server
+  - [ ] 8.3.6: Test on Expo Go or development build
+
+- [ ] **8.4: Cross-platform integration testing**
+  - [ ] 8.4.1: Test that mobile and web can both read same data
+  - [ ] 8.4.2: Test that data created on web appears on mobile (after refresh)
+  - [ ] 8.4.3: Test that data created on mobile appears on web (after refresh)
+  - [ ] 8.4.4: Verify data synchronization
+
+- [ ] **8.5: Mobile-specific considerations**
+  - [ ] 8.5.1: Decide: Expo Go sufficient or need development build?
+  - [ ] 8.5.2: Document mobile E2E testing approach (or defer to Phase 3)
+  - [ ] 8.5.3: Document offline scenarios handling (or defer to Phase 3)
+
+### Success Criteria
+
+- [ ] Mobile application generated in `apps/mobile/`
+- [ ] Mobile app builds successfully
+- [ ] Mobile app starts in Expo dev server
+- [ ] Mobile app loads on device/simulator
+- [ ] Mobile-to-server connectivity working (networking configured)
+- [ ] Mobile app displays data from server/database
+- [ ] Mobile app can write data to server/database
+- [ ] Data syncs between web and mobile
+- [ ] Changes made on web appear on mobile (after refresh)
+- [ ] Changes made on mobile appear on web (after refresh)
+- [ ] All tests pass including mobile tests
+- [ ] Mobile setup documented
+
+**Stage 8 Estimated Time:** 3-4 hours (if executed)
+
+---
+
+## Overall Success Criteria
+
+Phase 1 is complete when ALL of the following are true:
+
+### Functional Requirements
+- [ ] Two applications exist and run: server, web
+- [ ] Four shared packages exist and build: database, schemas, api-client, supabase-client
+- [ ] Walking skeleton feature works end-to-end:
+  - [ ] Web app displays data from Supabase via server
+  - [ ] Web app can write data to Supabase via server
+  - [ ] Data persists correctly in database
+
+### Technical Requirements
+- [ ] All package versions are documented and verified compatible
+- [ ] All projects build successfully: `nx run-many -t build`
+- [ ] All linting passes: `nx run-many -t lint`
+- [ ] All tests pass: `nx run-many -t test`
+- [ ] Test coverage is >= 80% across shared packages
+- [ ] Type checking passes: `nx run-many -t typecheck`
+- [ ] Nx dependency graph is clean (no circular dependencies)
+- [ ] Nx caching works correctly (demonstrated by cache hits)
+
+### QA Infrastructure Requirements
+- [ ] Husky Git hooks are active and working
+- [ ] Pre-commit hooks block bad commits
+- [ ] CI pipeline passes on main branch
+- [ ] E2E tests exist and pass for critical flows
+
+### External Services Requirements (Optional)
+- [ ] Sentry error tracking configured (optional)
+- [ ] Nx Cloud is optimized and remote caching works
+- [ ] CodeRabbit is configured appropriately
+- [ ] Dependabot is actively monitoring dependencies
+- [ ] TestSprite evaluated and configured if chosen (optional)
+
+### Documentation Requirements
+- [ ] Package version baseline exists in `docs/package-versions-baseline.md`
+- [ ] Prerequisites documented in `docs/prerequisites.md`
+- [ ] Environment setup documented in `docs/environment-setup.md`
+- [ ] Architecture decisions documented in `docs/architecture-decisions.md`
+- [ ] Walking skeleton architecture documented in `docs/walking-skeleton.md`
+- [ ] External services documented in `docs/external-services.md`
+- [ ] Troubleshooting guide exists
+- [ ] Any deviations from plan are documented with rationale
+
+### Validation Test (The Final Proof)
+The ultimate test that Phase 1 is complete:
+
+**A new developer should be able to:**
+1. Clone the repository
+2. Review prerequisites and install required tools
+3. Run `pnpm install`
+4. Set up environment variables (following documented steps)
+5. Run `nx run-many -t build`
+6. Run `nx run web:dev` and `nx run server:serve` concurrently
+7. Access the web app and see the walking skeleton working
+8. Make a change to a shared package
+9. See only affected apps rebuild
+10. Commit their change and see Git hooks enforce quality
+11. Push and see CI pass
+
+**If all 11 steps work flawlessly, Phase 1 is complete.**
+
+---
+
+## Next Steps After Phase 1
+
+Once Phase 1 is complete, we will:
+
+1. **Decide on mobile timing** - Add mobile now (Stage 8) or defer to later?
+2. **Create Phase 2: POC PRD** - Define the exact functionality of the task management POC
+3. **Create Phase 3: POC Implementation Plan** - Plan how to build the POC on top of our validated foundation
+4. **Execute POC Implementation** - Build the POC with confidence that infrastructure works
+
+The walking skeleton code (health check) can remain in the codebase as a reference implementation or be removed once the POC is complete.
