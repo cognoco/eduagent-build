@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-17
-Modified: 2025-10-17T22:24
+Modified: 2025-10-17T22:34
 Version: 1
 ---
 
@@ -148,6 +148,7 @@ Verify that the out-of-the-box Nx setup works correctly and meets all prerequisi
   - [x] 0.3.3: Run `pnpm exec nx run web-e2e:e2e` and verify Playwright E2E tests pass (smoke tests) - 3/3 tests passed ✅
     - [x] Added test timeouts to playwright.config.ts (30s test, 5s assertions)
   - [x] 0.3.4: Verify Prettier formatting works ✅
+    - [x] Updated .prettierignore to exclude build artifacts (.next, test-output, etc)
 
 - [ ] **0.4: Validate CI pipeline**
   - [ ] 0.4.1: Confirm GitHub Actions workflow passes on latest commit

@@ -3,11 +3,11 @@
 
 # Project Knowledge Base - Provides context about development stage and priorities
 knowledge_base:
-  - "Currently in early development/scaffolding phase - no functional app yet!"
-  - "Focus on architectural patterns, not implementation details"
-  - "Skip reviews for incomplete features and TODOs"
-  - "This is an Nx monorepo using TypeScript"
-  - "Prefer constructive feedback on critical issues over minor style suggestions"
+  - 'Currently in early development/scaffolding phase - no functional app yet!'
+  - 'Focus on architectural patterns, not implementation details'
+  - 'Skip reviews for incomplete features and TODOs'
+  - 'This is an Nx monorepo using TypeScript'
+  - 'Prefer constructive feedback on critical issues over minor style suggestions'
 
 # Review Configuration
 reviews:
@@ -23,7 +23,7 @@ reviews:
   # Auto-review settings
   auto_review:
     enabled: true
-    drafts: false  # Skip draft PRs during scaffolding
+    drafts: false # Skip draft PRs during scaffolding
 
   # Branch filtering - ignore WIP and experimental branches
   # ignore_branches:
@@ -56,7 +56,7 @@ reviews:
 
   # Path-based review instructions for targeted reviews
   path_instructions:
-    - path: "**/*.ts"
+    - path: '**/*.ts'
       instructions: |
         Focus only on:
         - Critical bugs and security vulnerabilities
@@ -65,7 +65,7 @@ reviews:
         - Logic errors
         Skip style/formatting issues if code follows existing patterns in the file.
 
-    - path: "**/*.tsx"
+    - path: '**/*.tsx'
       instructions: |
         Focus on:
         - Component architecture and patterns
@@ -74,19 +74,19 @@ reviews:
         - Security issues (XSS, injection)
         Skip minor style suggestions.
 
-    - path: "**/*.test.ts"
+    - path: '**/*.test.ts'
       instructions: |
         Review test coverage and correctness only.
         Skip minor naming suggestions.
         Focus on test logic and edge cases.
 
-    - path: "**/*.spec.ts"
+    - path: '**/*.spec.ts'
       instructions: |
         Review test coverage and correctness only.
         Skip minor naming suggestions.
         Focus on test logic and edge cases.
 
-    - path: "apps/**/*"
+    - path: 'apps/**/*'
       instructions: |
         Focus on application-level concerns:
         - Architecture and structure
@@ -95,7 +95,7 @@ reviews:
         - Dependency compatibility issues between apps and with shared components in packages/
         Skip trivial issues during scaffolding phase.
 
-    - path: "packages/**/*"
+    - path: 'packages/**/*'
       instructions: |
         Focus on package/library design:
         - API design and contracts
@@ -104,12 +104,12 @@ reviews:
         - Dependency compatibility issues between in packages/ and with apps in apps/
         Skip incomplete implementations.
 
-    - path: "**/project.json"
+    - path: '**/project.json'
       instructions: |
         Review Nx project configuration for correctness.
         Check target configurations and dependencies.
 
-    - path: "nx.json"
+    - path: 'nx.json'
       instructions: |
         Review workspace-level Nx configuration.
         Focus on task pipeline and caching configuration.
@@ -117,29 +117,29 @@ reviews:
   # File path filters - exclude generated and build artifacts
   path_filters:
     exclude:
-      - "**/node_modules/**"
-      - "**/dist/**"
-      - "**/build/**"
-      - "**/.next/**"
-      - "**/.nx/**"
-      - "**/coverage/**"
-      - "**/*.generated.*"
-      - "**/migrations/**"
-      - "**/*.min.js"
-      - "**/*.bundle.js"
-  #    - "**/package-lock.json"
-      - "**/yarn.lock"
+      - '**/node_modules/**'
+      - '**/dist/**'
+      - '**/build/**'
+      - '**/.next/**'
+      - '**/.nx/**'
+      - '**/coverage/**'
+      - '**/*.generated.*'
+      - '**/migrations/**'
+      - '**/*.min.js'
+      - '**/*.bundle.js'
+      #    - "**/package-lock.json"
+      - '**/yarn.lock'
   #    - "**/pnpm-lock.yaml"
 
   # Change size thresholds - skip auto-review for very large PRs
   change_threshold:
-    max_files: 50      # Don't auto-review PRs touching more than 50 files
-    max_lines: 1000    # Don't auto-review PRs with more than 1000 lines changed
+    max_files: 50 # Don't auto-review PRs touching more than 50 files
+    max_lines: 1000 # Don't auto-review PRs with more than 1000 lines changed
 
 # Review filtering by severity
 review_filters:
   # Only report warnings and errors, skip info-level suggestions
-  severity_threshold: "warning"
+  severity_threshold: 'warning'
 
   # Ignore trivial issues
   ignore_trivial: true
