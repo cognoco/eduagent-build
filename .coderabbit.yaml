@@ -107,21 +107,6 @@ reviews:
         Review workspace-level Nx configuration.
         Focus on task pipeline and caching configuration.
 
-  # File path filters - exclude generated and build artifacts
-  path_filters:
-    - '**/node_modules/**'
-    - '**/dist/**'
-    - '**/build/**'
-    - '**/.next/**'
-    - '**/.nx/**'
-    - '**/coverage/**'
-    - '**/*.generated.*'
-    - '**/migrations/**'
-    - '**/*.min.js'
-    - '**/*.bundle.js'
-    - '**/yarn.lock'
-    - '**/pnpm-lock.yaml'
-
   # Change size thresholds - skip auto-review for very large PRs
   change_threshold:
     max_files: 50 # Don't auto-review PRs touching more than 50 files
