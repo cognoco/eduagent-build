@@ -25,10 +25,8 @@ jobs:
       # Uncomment this line to enable task distribution
       # - run: npx nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="e2e-ci"
 
-      # Setup pnpm
+      # Setup pnpm (version read from packageManager field in package.json)
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       # Cache node_modules
       - uses: actions/setup-node@v4

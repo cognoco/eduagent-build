@@ -2,12 +2,12 @@
 # Documentation: https://docs.coderabbit.ai/
 
 # Project Knowledge Base - Provides context about development stage and priorities
-knowledge_base:
-  - 'Currently in early development/scaffolding phase - no functional app yet!'
-  - 'Focus on architectural patterns, not implementation details'
-  - 'Skip reviews for incomplete features and TODOs'
-  - 'This is an Nx monorepo using TypeScript'
-  - 'Prefer constructive feedback on critical issues over minor style suggestions'
+knowledge_base: |
+  Currently in early development/scaffolding phase - no functional app yet!
+  Focus on architectural patterns, not implementation details.
+  Skip reviews for incomplete features and TODOs.
+  This is an Nx monorepo using TypeScript.
+  Prefer constructive feedback on critical issues over minor style suggestions.
 
 # Review Configuration
 reviews:
@@ -116,20 +116,18 @@ reviews:
 
   # File path filters - exclude generated and build artifacts
   path_filters:
-    exclude:
-      - '**/node_modules/**'
-      - '**/dist/**'
-      - '**/build/**'
-      - '**/.next/**'
-      - '**/.nx/**'
-      - '**/coverage/**'
-      - '**/*.generated.*'
-      - '**/migrations/**'
-      - '**/*.min.js'
-      - '**/*.bundle.js'
-      #    - "**/package-lock.json"
-      - '**/yarn.lock'
-  #    - "**/pnpm-lock.yaml"
+    - '**/node_modules/**'
+    - '**/dist/**'
+    - '**/build/**'
+    - '**/.next/**'
+    - '**/.nx/**'
+    - '**/coverage/**'
+    - '**/*.generated.*'
+    - '**/migrations/**'
+    - '**/*.min.js'
+    - '**/*.bundle.js'
+    - '**/yarn.lock'
+    - '**/pnpm-lock.yaml'
 
   # Change size thresholds - skip auto-review for very large PRs
   change_threshold:
