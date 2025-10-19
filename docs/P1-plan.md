@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-17
-Modified: 2025-10-19T20:40
+Modified: 2025-10-19T20:41
 Version: 1
 ---
 
@@ -203,7 +203,7 @@ Verify that the out-of-the-box Nx setup works correctly and meets all prerequisi
     - Result: Single, consistent test location pattern following Next.js 15 best practices
     - Note: Testing infrastructure enhancements (jest-dom, type isolation) deferred to Stage 3 (see 3.3) for workspace-level, reusable implementation
 
-- [ ] **0.5: Validate workspace scripts**
+- [x] **0.5: Validate workspace scripts**
   - [x] 0.5.1: Verify package.json scripts are set up correctly ✅
     - Confirmed package.json has scripts: dev, build, test, lint, e2e
     - All scripts use proper pnpm/nx commands
@@ -248,7 +248,7 @@ Verify that the out-of-the-box Nx setup works correctly and meets all prerequisi
 - [ ] `pnpm exec nx run web-e2e:e2e` passes all Playwright tests
 - [ ] GitHub Actions CI workflow passes on latest commit
 - [ ] Nx Cloud shows successful task caching (cache hit on second build)
-- [ ] Package version baseline documented in `docs/package-versions-baseline.md`
+- [x] Package version baseline documented in `docs/package-versions-baseline.md` ✅
 - [ ] Prerequisites documented in `docs/prerequisites.md`
 
 **Stage 0 Estimated Time:** 45 minutes - 1 hour

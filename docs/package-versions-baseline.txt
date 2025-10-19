@@ -1,0 +1,512 @@
+Legend: production dependency, optional only, dev only
+
+@nx-monorepo/source@0.0.0 C:\Dev\Projects\Products\Apps\Sandbox\nx-monorepo (PRIVATE)
+
+dependencies:
+next 15.2.5
+├── @next/env 15.2.5
+├── @next/swc-darwin-arm64 15.2.5
+├── @next/swc-darwin-x64 15.2.5
+├── @next/swc-linux-arm64-gnu 15.2.5
+├── @next/swc-linux-arm64-musl 15.2.5
+├── @next/swc-linux-x64-gnu 15.2.5
+├── @next/swc-linux-x64-musl 15.2.5
+├── @next/swc-win32-arm64-msvc 15.2.5
+├── @next/swc-win32-x64-msvc 15.2.5
+├── @playwright/test 1.56.1 peer
+├── @swc/counter 0.1.3
+├── @swc/helpers 0.5.15
+├── busboy 1.6.0
+├── caniuse-lite 1.0.30001751
+├── postcss 8.4.31
+├── react 19.0.0 peer
+├── react-dom 19.0.0 peer
+├── sass 1.93.2 peer
+├── sharp 0.33.5
+└── styled-jsx 5.1.6
+react 19.0.0
+react-dom 19.0.0
+├── react 19.0.0 peer
+└── scheduler 0.25.0
+
+devDependencies:
+@eslint/compat 1.4.0
+├── @eslint/core 0.16.0
+└── eslint 9.37.0 peer
+@eslint/eslintrc 2.1.4
+├── ajv 6.12.6
+├── debug 4.4.3
+├── espree 9.6.1
+├── globals 13.24.0
+├── ignore 5.3.2
+├── import-fresh 3.3.1
+├── js-yaml 4.1.0
+├── minimatch 3.1.2
+└── strip-json-comments 3.1.1
+@eslint/js 9.37.0
+@next/eslint-plugin-next 15.5.6
+└── fast-glob 3.3.1
+@nx/devkit 21.6.5
+├── ejs 3.1.10
+├── enquirer 2.3.6
+├── ignore 5.3.2
+├── minimatch 9.0.3
+├── nx 21.6.5 peer
+├── semver 7.7.3
+├── tslib 2.8.1
+└── yargs-parser 21.1.1
+@nx/eslint 21.6.5
+├── @nx/devkit 21.6.5
+├── @nx/js 21.6.5
+├── @zkochan/js-yaml 0.0.7 peer
+├── eslint 9.37.0 peer
+├── semver 7.7.3
+├── tslib 2.8.1
+└── typescript 5.9.3
+@nx/eslint-plugin 21.6.5
+├── @nx/devkit 21.6.5
+├── @nx/js 21.6.5
+├── @phenomnomnominal/tsquery 5.0.1
+├── @typescript-eslint/parser 8.46.1 peer
+├── @typescript-eslint/type-utils 8.46.1
+├── @typescript-eslint/utils 8.46.1
+├── chalk 4.1.2
+├── confusing-browser-globals 1.0.11
+├── eslint-config-prettier 10.1.8 peer
+├── globals 15.15.0
+├── jsonc-eslint-parser 2.4.1
+├── semver 7.7.3
+└── tslib 2.8.1
+@nx/jest 21.6.5
+├── @jest/reporters 30.2.0
+├── @jest/test-result 30.2.0
+├── @nx/devkit 21.6.5
+├── @nx/js 21.6.5
+├── @phenomnomnominal/tsquery 5.0.1
+├── identity-obj-proxy 3.0.0
+├── jest-config 30.2.0
+├── jest-resolve 30.2.0
+├── jest-util 30.2.0
+├── minimatch 9.0.3
+├── picocolors 1.1.1
+├── resolve.exports 2.0.3
+├── semver 7.7.3
+├── tslib 2.8.1
+└── yargs-parser 21.1.1
+@nx/js 21.6.5
+├── @babel/core 7.28.4
+├── @babel/plugin-proposal-decorators 7.28.0
+├── @babel/plugin-transform-class-properties 7.27.1
+├── @babel/plugin-transform-runtime 7.28.3
+├── @babel/preset-env 7.28.3
+├── @babel/preset-typescript 7.27.1
+├── @babel/runtime 7.28.4
+├── @nx/devkit 21.6.5
+├── @nx/workspace 21.6.5
+├── @zkochan/js-yaml 0.0.7
+├── babel-plugin-const-enum 1.2.0
+├── babel-plugin-macros 3.1.0
+├── babel-plugin-transform-typescript-metadata 0.3.2
+├── chalk 4.1.2
+├── columnify 1.6.0
+├── detect-port 1.6.1
+├── enquirer 2.3.6
+├── ignore 5.3.2
+├── js-tokens 4.0.0
+├── jsonc-parser 3.2.0
+├── npm-package-arg 11.0.1
+├── npm-run-path 4.0.1
+├── ora 5.3.0
+├── picocolors 1.1.1
+├── picomatch 4.0.2
+├── semver 7.7.3
+├── source-map-support 0.5.19
+├── tinyglobby 0.2.15
+└── tslib 2.8.1
+@nx/next 21.6.5
+├── @babel/plugin-proposal-decorators 7.28.0
+├── @nx/devkit 21.6.5
+├── @nx/eslint 21.6.5
+├── @nx/js 21.6.5
+├── @nx/react 21.6.5
+├── @nx/web 21.6.5
+├── @nx/webpack 21.6.5
+├── @phenomnomnominal/tsquery 5.0.1
+├── @svgr/webpack 8.1.0
+├── copy-webpack-plugin 10.2.4
+├── file-loader 6.2.0
+├── ignore 5.3.2
+├── next 15.2.5 peer
+├── semver 7.7.3
+├── tslib 2.8.1
+└── webpack-merge 5.10.0
+@nx/playwright 21.6.5
+├── @nx/devkit 21.6.5
+├── @nx/eslint 21.6.5
+├── @nx/js 21.6.5
+├── @phenomnomnominal/tsquery 5.0.1
+├── @playwright/test 1.56.1 peer
+├── minimatch 9.0.3
+└── tslib 2.8.1
+@nx/react 21.6.5
+├── @nx/devkit 21.6.5
+├── @nx/eslint 21.6.5
+├── @nx/js 21.6.5
+├── @nx/module-federation 21.6.5
+├── @nx/rollup 21.6.5
+├── @nx/vite 21.6.5
+├── @nx/web 21.6.5
+├── @phenomnomnominal/tsquery 5.0.1
+├── @svgr/webpack 8.1.0
+├── express 4.21.2
+├── file-loader 6.2.0
+├── http-proxy-middleware 3.0.5
+├── minimatch 9.0.3
+├── picocolors 1.1.1
+├── semver 7.7.3
+└── tslib 2.8.1
+@nx/workspace 21.6.5
+├── @nx/devkit 21.6.5
+├── @zkochan/js-yaml 0.0.7
+├── chalk 4.1.2
+├── enquirer 2.3.6
+├── nx 21.6.5
+├── picomatch 4.0.2
+├── semver 7.7.3
+├── tslib 2.8.1
+└── yargs-parser 21.1.1
+@playwright/test 1.56.1
+└── playwright 1.56.1
+@swc-node/register 1.9.2
+├── @swc-node/core 1.14.1
+├── @swc-node/sourcemap-support 0.5.1
+├── @swc/core 1.13.5 peer
+├── colorette 2.0.20
+├── debug 4.4.3
+├── pirates 4.0.7
+├── tslib 2.8.1
+└── typescript 5.9.3 peer
+@swc/cli 0.6.0
+├── @swc/core 1.13.5 peer
+├── @swc/counter 0.1.3
+├── @xhmikosr/bin-wrapper 13.2.0
+├── chokidar 4.0.3 peer
+├── commander 8.3.0
+├── fast-glob 3.3.3
+├── minimatch 9.0.5
+├── piscina 4.9.2
+├── semver 7.7.3
+├── slash 3.0.0
+└── source-map 0.7.6
+@swc/core 1.13.5
+├── @swc/core-darwin-arm64 1.13.5
+├── @swc/core-darwin-x64 1.13.5
+├── @swc/core-linux-arm-gnueabihf 1.13.5
+├── @swc/core-linux-arm64-gnu 1.13.5
+├── @swc/core-linux-arm64-musl 1.13.5
+├── @swc/core-linux-x64-gnu 1.13.5
+├── @swc/core-linux-x64-musl 1.13.5
+├── @swc/core-win32-arm64-msvc 1.13.5
+├── @swc/core-win32-ia32-msvc 1.13.5
+├── @swc/core-win32-x64-msvc 1.13.5
+├── @swc/counter 0.1.3
+├── @swc/helpers 0.5.17 peer
+└── @swc/types 0.1.25
+@swc/helpers 0.5.17
+└── tslib 2.8.1
+@testing-library/dom 10.4.0
+├── @babel/code-frame 7.27.1
+├── @babel/runtime 7.28.4
+├── @types/aria-query 5.0.4
+├── aria-query 5.3.0
+├── chalk 4.1.2
+├── dom-accessibility-api 0.5.16
+├── lz-string 1.5.0
+└── pretty-format 27.5.1
+@testing-library/react 16.1.0
+├── @babel/runtime 7.28.4
+├── @testing-library/dom 10.4.0 peer
+├── @types/react 19.0.0 peer
+├── @types/react-dom 19.0.0 peer
+├── react 19.0.0 peer
+└── react-dom 19.0.0 peer
+@types/jest 30.0.0
+├── expect 30.2.0
+└── pretty-format 30.2.0
+@types/node 20.19.9
+└── undici-types 6.21.0
+@types/react 19.0.0
+└── csstype 3.1.3
+@types/react-dom 19.0.0
+└── @types/react 19.0.0
+autoprefixer 10.4.13
+├── browserslist 4.26.3
+├── caniuse-lite 1.0.30001751
+├── fraction.js 4.3.7
+├── normalize-range 0.1.2
+├── picocolors 1.1.1
+├── postcss 8.4.38 peer
+└── postcss-value-parser 4.2.0
+babel-jest 30.2.0
+├── @babel/core 7.28.4 peer
+├── @jest/transform 30.2.0
+├── @types/babel__core 7.20.5
+├── babel-plugin-istanbul 7.0.1
+├── babel-preset-jest 30.2.0
+├── chalk 4.1.2
+├── graceful-fs 4.2.11
+└── slash 3.0.0
+eslint 9.37.0
+├── @eslint-community/eslint-utils 4.9.0
+├── @eslint-community/regexpp 4.12.1
+├── @eslint/config-array 0.21.0
+├── @eslint/config-helpers 0.4.0
+├── @eslint/core 0.16.0
+├── @eslint/eslintrc 3.3.1
+├── @eslint/js 9.37.0
+├── @eslint/plugin-kit 0.4.0
+├── @humanfs/node 0.16.7
+├── @humanwhocodes/module-importer 1.0.1
+├── @humanwhocodes/retry 0.4.3
+├── @types/estree 1.0.8
+├── @types/json-schema 7.0.15
+├── ajv 6.12.6
+├── chalk 4.1.2
+├── cross-spawn 7.0.6
+├── debug 4.4.3
+├── escape-string-regexp 4.0.0
+├── eslint-scope 8.4.0
+├── eslint-visitor-keys 4.2.1
+├── espree 10.4.0
+├── esquery 1.6.0
+├── esutils 2.0.3
+├── fast-deep-equal 3.1.3
+├── file-entry-cache 8.0.0
+├── find-up 5.0.0
+├── glob-parent 6.0.2
+├── ignore 5.3.2
+├── imurmurhash 0.1.4
+├── is-glob 4.0.3
+├── jiti 1.21.7 peer
+├── json-stable-stringify-without-jsonify 1.0.1
+├── lodash.merge 4.6.2
+├── minimatch 3.1.2
+├── natural-compare 1.4.0
+└── optionator 0.9.4
+eslint-config-next 15.5.6
+├── @next/eslint-plugin-next 15.5.6
+├── @rushstack/eslint-patch 1.14.0
+├── @typescript-eslint/eslint-plugin 8.46.1
+├── @typescript-eslint/parser 8.46.1
+├── eslint 9.37.0 peer
+├── eslint-import-resolver-node 0.3.9
+├── eslint-import-resolver-typescript 3.10.1
+├── eslint-plugin-import 2.31.0
+├── eslint-plugin-jsx-a11y 6.10.1
+├── eslint-plugin-react 7.37.5
+├── eslint-plugin-react-hooks 5.0.0
+└── typescript 5.9.3 peer
+eslint-config-prettier 10.1.8
+└── eslint 9.37.0 peer
+eslint-plugin-import 2.31.0
+├── @rtsao/scc 1.1.0
+├── @typescript-eslint/parser 8.46.1 peer
+├── array-includes 3.1.9
+├── array.prototype.findlastindex 1.2.6
+├── array.prototype.flat 1.3.3
+├── array.prototype.flatmap 1.3.3
+├── debug 3.2.7
+├── doctrine 2.1.0
+├── eslint 9.37.0 peer
+├── eslint-import-resolver-node 0.3.9
+├── eslint-module-utils 2.12.1
+├── hasown 2.0.2
+├── is-core-module 2.16.1
+├── is-glob 4.0.3
+├── minimatch 3.1.2
+├── object.fromentries 2.0.8
+├── object.groupby 1.0.3
+├── object.values 1.2.1
+├── semver 6.3.1
+├── string.prototype.trimend 1.0.9
+└── tsconfig-paths 3.15.0
+eslint-plugin-jsx-a11y 6.10.1
+├── aria-query 5.3.2
+├── array-includes 3.1.9
+├── array.prototype.flatmap 1.3.3
+├── ast-types-flow 0.0.8
+├── axe-core 4.11.0
+├── axobject-query 4.1.0
+├── damerau-levenshtein 1.0.8
+├── emoji-regex 9.2.2
+├── es-iterator-helpers 1.2.1
+├── eslint 9.37.0 peer
+├── hasown 2.0.2
+├── jsx-ast-utils 3.3.5
+├── language-tags 1.0.9
+├── minimatch 3.1.2
+├── object.fromentries 2.0.8
+├── safe-regex-test 1.1.0
+└── string.prototype.includes 2.0.1
+eslint-plugin-playwright 1.8.3
+├── eslint 9.37.0 peer
+└── globals 13.24.0
+eslint-plugin-react 7.35.0
+├── array-includes 3.1.9
+├── array.prototype.findlast 1.2.5
+├── array.prototype.flatmap 1.3.3
+├── array.prototype.tosorted 1.1.4
+├── doctrine 2.1.0
+├── es-iterator-helpers 1.2.1
+├── eslint 9.37.0 peer
+├── estraverse 5.3.0
+├── hasown 2.0.2
+├── jsx-ast-utils 3.3.5
+├── minimatch 3.1.2
+├── object.entries 1.1.9
+├── object.fromentries 2.0.8
+├── object.values 1.2.1
+├── prop-types 15.8.1
+├── resolve 2.0.0-next.5
+├── semver 6.3.1
+├── string.prototype.matchall 4.0.12
+└── string.prototype.repeat 1.0.0
+eslint-plugin-react-hooks 5.0.0
+└── eslint 9.37.0 peer
+jest 30.2.0
+├── @jest/core 30.2.0
+├── @jest/types 30.2.0
+├── import-local 3.2.0
+└── jest-cli 30.2.0
+jest-environment-jsdom 30.2.0
+├── @jest/environment 30.2.0
+├── @jest/environment-jsdom-abstract 30.2.0
+├── @types/jsdom 21.1.7
+├── @types/node 20.19.9
+└── jsdom 26.1.0
+jest-util 30.2.0
+├── @jest/types 30.2.0
+├── @types/node 20.19.9
+├── chalk 4.1.2
+├── ci-info 4.3.1
+├── graceful-fs 4.2.11
+└── picomatch 4.0.3
+nx 21.6.5
+├── @napi-rs/wasm-runtime 0.2.4
+├── @nx/nx-darwin-arm64 21.6.5
+├── @nx/nx-darwin-x64 21.6.5
+├── @nx/nx-freebsd-x64 21.6.5
+├── @nx/nx-linux-arm-gnueabihf 21.6.5
+├── @nx/nx-linux-arm64-gnu 21.6.5
+├── @nx/nx-linux-arm64-musl 21.6.5
+├── @nx/nx-linux-x64-gnu 21.6.5
+├── @nx/nx-linux-x64-musl 21.6.5
+├── @nx/nx-win32-arm64-msvc 21.6.5
+├── @nx/nx-win32-x64-msvc 21.6.5
+├── @swc-node/register 1.9.2 peer
+├── @swc/core 1.13.5 peer
+├── @yarnpkg/lockfile 1.1.0
+├── @yarnpkg/parsers 3.0.2
+├── @zkochan/js-yaml 0.0.7
+├── axios 1.12.2
+├── chalk 4.1.2
+├── cli-cursor 3.1.0
+├── cli-spinners 2.6.1
+├── cliui 8.0.1
+├── dotenv 16.4.7
+├── dotenv-expand 11.0.7
+├── enquirer 2.3.6
+├── figures 3.2.0
+├── flat 5.0.2
+├── front-matter 4.0.2
+├── ignore 5.3.2
+├── jest-diff 30.2.0
+├── jsonc-parser 3.2.0
+├── lines-and-columns 2.0.3
+├── minimatch 9.0.3
+├── node-machine-id 1.1.12
+├── npm-run-path 4.0.1
+├── open 8.4.2
+├── ora 5.3.0
+├── resolve.exports 2.0.3
+├── semver 7.7.3
+├── string-width 4.2.3
+├── tar-stream 2.2.0
+├── tmp 0.2.5
+├── tree-kill 1.2.2
+├── tsconfig-paths 4.2.0
+├── tslib 2.8.1
+├── yaml 2.8.1
+├── yargs 17.7.2
+└── yargs-parser 21.1.1
+postcss 8.4.38
+├── nanoid 3.3.11
+├── picocolors 1.1.1
+└── source-map-js 1.2.1
+prettier 2.8.8
+tailwindcss 3.4.3
+├── @alloc/quick-lru 5.2.0
+├── arg 5.0.2
+├── chokidar 3.6.0
+├── didyoumean 1.2.2
+├── dlv 1.1.3
+├── fast-glob 3.3.3
+├── glob-parent 6.0.2
+├── is-glob 4.0.3
+├── jiti 1.21.7
+├── lilconfig 2.1.0
+├── micromatch 4.0.8
+├── normalize-path 3.0.0
+├── object-hash 3.0.0
+├── picocolors 1.1.1
+├── postcss 8.4.38
+├── postcss-import 15.1.0
+├── postcss-js 4.1.0
+├── postcss-load-config 4.0.2
+├── postcss-nested 6.2.0
+├── postcss-selector-parser 6.1.2
+├── resolve 1.22.10
+└── sucrase 3.35.0
+ts-jest 29.4.5
+├── @babel/core 7.28.4 peer
+├── @jest/transform 30.2.0 peer
+├── @jest/types 30.2.0 peer
+├── babel-jest 30.2.0 peer
+├── bs-logger 0.2.6
+├── fast-json-stable-stringify 2.1.0
+├── handlebars 4.7.8
+├── jest 30.2.0 peer
+├── jest-util 30.2.0 peer
+├── json5 2.2.3
+├── lodash.memoize 4.1.2
+├── make-error 1.3.6
+├── semver 7.7.3
+├── type-fest 4.41.0
+├── typescript 5.9.3 peer
+└── yargs-parser 21.1.1
+ts-node 10.9.1
+├── @cspotcode/source-map-support 0.8.1
+├── @swc/core 1.13.5 peer
+├── @tsconfig/node10 1.0.11
+├── @tsconfig/node12 1.0.11
+├── @tsconfig/node14 1.0.3
+├── @tsconfig/node16 1.0.4
+├── @types/node 20.19.9 peer
+├── acorn 8.15.0
+├── acorn-walk 8.3.4
+├── arg 4.1.3
+├── create-require 1.1.1
+├── diff 4.0.2
+├── make-error 1.3.6
+├── typescript 5.9.3 peer
+├── v8-compile-cache-lib 3.0.1
+└── yn 3.1.1
+tslib 2.8.1
+typescript 5.9.3
+typescript-eslint 8.46.1
+├── @typescript-eslint/eslint-plugin 8.46.1
+├── @typescript-eslint/parser 8.46.1
+├── @typescript-eslint/typescript-estree 8.46.1
+├── @typescript-eslint/utils 8.46.1
+├── eslint 9.37.0 peer
+└── typescript 5.9.3 peer
