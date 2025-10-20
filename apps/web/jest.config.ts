@@ -8,9 +8,7 @@ const createJestConfig = nextJest({
 const config: Config = {
   displayName: '@nx-monorepo/web',
   preset: '../../jest.preset.js',
-  testMatch: [
-    '<rootDir>/src/**/*.(spec|test).[jt]s?(x)',
-  ],
+  testMatch: ['<rootDir>/src/**/*.(spec|test).[jt]s?(x)'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx,js,jsx}',
     '!src/**/*.spec.{ts,tsx,js,jsx}',

@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-17
-Modified: 2025-10-20T08:11
+Modified: 2025-10-20T17:26
 Version: 1
 ---
 
@@ -263,26 +263,38 @@ Create the server application using Nx generators, ensuring it builds and runs i
 
 ### Sub-stages
 
-- [ ] **1.1: Generate server application**
-  - [ ] 1.1.1: Run: `pnpm exec nx g @nx/node:app server --directory=apps/server --framework=express`
-  - [ ] 1.1.2: Review generated files and structure
-  - [ ] 1.1.3: Verify TypeScript paths in tsconfig.base.json updated
+- [x] **1.1: Generate server application**
+  - [x] 1.1.1a: Install @nx/node plugin: `pnpm exec nx add @nx/node`
+  - [x] 1.1.1b: Run: `pnpm exec nx g @nx/node:app server --directory=apps/server --framework=express`
+  - [x] 1.1.2: Review generated files and structure
+  - [x] 1.1.3: Verify TypeScript project reference added to root tsconfig.json
+    - Note: Apps use TypeScript Project References, not path aliases (libraries use path aliases)
 
-- [ ] **1.2: Immediate validation**
-  - [ ] 1.2.1: Run `pnpm exec nx run server:build` and verify success
-  - [ ] 1.2.2: Run `pnpm exec nx run server:serve` and verify server starts on expected port
-  - [ ] 1.2.3: Verify server responds to default route (curl or browser)
-  - [ ] 1.2.4: Run `pnpm exec nx run server:lint` and verify passes
-  - [ ] 1.2.5: Run `pnpm exec nx run server:test` and verify default tests pass
+- [x] **1.2: Immediate validation**
+  - [x] 1.2.1: Run `pnpm exec nx run server:build` and verify success
+  - [x] 1.2.2: Run `pnpm exec nx run server:serve` and verify server starts on expected port
+  - [x] 1.2.3: Verify server responds to default route (curl or browser)
+  - [x] 1.2.4: Run `pnpm exec nx run server:lint` and verify passes
+  - [x] 1.2.5: Configure and run server tests
+    - [x] 1.2.5a: Generate Jest config: `pnpm exec nx g @nx/jest:configuration --project=server`
+    - [x] 1.2.5b: Run `pnpm exec nx run server:test` and verify default tests pass
+    - Note: @nx/node:app with Express doesn't create Jest config by default
 
-- [ ] **1.3: Update workspace scripts**
-  - [ ] 1.3.1: Add server dev script to root package.json (if needed)
-  - [ ] 1.3.2: Document how to run server in development
+- [x] **1.3: Update workspace scripts**
+  - [x] 1.3.1: Do NOT add server-specific scripts to root package.json
+    - Rationale: Keep workspace scripts focused on workspace-wide operations
+    - Developers will use `pnpm exec nx run server:serve` directly for server-specific work
+  - [x] 1.3.2: Document how to run server in development
+    - Add to .ruler/AGENTS.md: "Start server: `pnpm exec nx run server:serve`"
 
-- [ ] **1.4: Verify workspace health**
-  - [ ] 1.4.1: Run `pnpm exec nx graph` and verify clean dependency structure
-  - [ ] 1.4.2: Run `pnpm exec nx run-many -t build` and verify both web and server build
-  - [ ] 1.4.3: Verify Nx cache works for server tasks
+- [x] **1.4: Verify workspace health**
+  - [x] 1.4.1: Run `pnpm exec nx graph` and verify clean dependency structure
+  - [x] 1.4.2: Run `pnpm exec nx run-many -t build` and verify both web and server build
+  - [x] 1.4.3: Verify Nx cache works for server tasks
+    - [x] Run `pnpm exec nx reset` to clear cache
+    - [x] Run `pnpm exec nx run server:build` (first build, should execute)
+    - [x] Run `pnpm exec nx run server:build` again (should use cache)
+    - [x] Verify second run shows "[local cache]" or similar cache hit message
 
 ### Success Criteria
 
@@ -309,16 +321,19 @@ Create all shared libraries following Nx conventions, ensuring each package buil
 ### Sub-stages
 
 - [ ] **2.1: Generate database package**
-  - [ ] 2.1.1: Run: `pnpm exec nx g @nx/node:lib database --directory=packages/database --buildable`
+  - [ ] 2.1.1: Run: `pnpm exec nx g @nx/js:lib database --directory=packages/database --bundler=none`
+    - **Note**: Uses `--bundler=none` because Prisma generates code at runtime (see `docs/tech-findings-log.md`)
   - [ ] 2.1.2: Install Prisma dependencies: `pnpm add -D prisma --filter @nx-monorepo/database`
   - [ ] 2.1.3: Install Prisma client: `pnpm add @prisma/client --filter @nx-monorepo/database`
   - [ ] 2.1.4: Set up basic Prisma configuration structure
-  - [ ] 2.1.5: **Immediate test**: Run `pnpm exec nx run database:build` and verify success
+  - [ ] 2.1.5: **Immediate test**: Verify NO build target exists (expected with `--bundler=none`)
+    - Run `pnpm exec nx show project database` and confirm build target is absent
+    - This is correct behavior - database package has no pre-build step
   - [ ] 2.1.6: **Immediate test**: Run `pnpm exec nx run database:lint` and verify passes
   - [ ] 2.1.7: **Immediate test**: Run `pnpm exec nx run database:test` and verify passes
 
 - [ ] **2.2: Generate schemas package**
-  - [ ] 2.2.1: Run: `pnpm exec nx g @nx/js:lib schemas --directory=packages/schemas --buildable`
+  - [ ] 2.2.1: Run: `pnpm exec nx g @nx/js:lib schemas --directory=packages/schemas --bundler=tsc`
   - [ ] 2.2.2: Install Zod: `pnpm add zod --filter @nx-monorepo/schemas`
   - [ ] 2.2.3: Create placeholder schema exports
   - [ ] 2.2.4: **Immediate test**: Run `pnpm exec nx run schemas:build` and verify success
@@ -326,7 +341,7 @@ Create all shared libraries following Nx conventions, ensuring each package buil
   - [ ] 2.2.6: **Immediate test**: Run `pnpm exec nx run schemas:test` and verify passes
 
 - [ ] **2.3: Generate api-client package**
-  - [ ] 2.3.1: Run: `pnpm exec nx g @nx/js:lib api-client --directory=packages/api-client --buildable`
+  - [ ] 2.3.1: Run: `pnpm exec nx g @nx/js:lib api-client --directory=packages/api-client --bundler=tsc`
   - [ ] 2.3.2: Install oRPC client: `pnpm add @orpc/client --filter @nx-monorepo/api-client`
   - [ ] 2.3.3: Set up basic client factory structure
   - [ ] 2.3.4: **Immediate test**: Run `pnpm exec nx run api-client:build` and verify success
@@ -334,7 +349,7 @@ Create all shared libraries following Nx conventions, ensuring each package buil
   - [ ] 2.3.6: **Immediate test**: Run `pnpm exec nx run api-client:test` and verify passes
 
 - [ ] **2.4: Generate supabase-client package**
-  - [ ] 2.4.1: Run: `pnpm exec nx g @nx/js:lib supabase-client --directory=packages/supabase-client --buildable`
+  - [ ] 2.4.1: Run: `pnpm exec nx g @nx/js:lib supabase-client --directory=packages/supabase-client --bundler=tsc`
   - [ ] 2.4.2: Install Supabase client: `pnpm add @supabase/supabase-js --filter @nx-monorepo/supabase-client`
   - [ ] 2.4.3: Install Supabase SSR: `pnpm add @supabase/ssr --filter @nx-monorepo/supabase-client`
   - [ ] 2.4.4: Set up client factory structure
@@ -391,89 +406,42 @@ Establish quality assurance tooling and testing scaffolding early to create a sa
   - [ ] 3.2.4: Ensure it respects Nx project boundaries
   - [ ] 3.2.5: Test by staging files and committing
 
-- [ ] **3.3: Establish workspace-level testing infrastructure**
+- [ ] **3.3: Verify and document existing testing infrastructure**
 
-  **Rationale**: The monorepo will contain multiple app types (Next.js web, Express/Nest server, Expo React Native) and shared libraries. Testing ergonomics and TypeScript type isolation are cross-cutting concerns best solved once, centrally, to avoid rework.
+  **Rationale**: Nx auto-generates proper Jest configurations for each project with workspace-level preset management. Rather than creating custom infrastructure, verify the standard Nx patterns work correctly and document them for future reference.
 
-  **Key Insights**:
-  - `@testing-library/jest-dom` is web-only (React/Next.js apps)
-  - Server apps (Express/Nest) shouldn't load DOM test utilities
-  - React Native apps will need `@testing-library/jest-native` instead
-  - Type isolation (separating Jest/Node types from production types) should be standardized workspace-wide
-  - Implementing app-specific solutions now means repeating work for each new app/package
+  **Current Reality**:
+  - ✅ Workspace preset exists: `jest.preset.js` (from `@nx/jest/preset`)
+  - ✅ Web app extends workspace preset: `apps/web/jest.config.ts`
+  - ✅ TypeScript test config works: `apps/web/tsconfig.spec.json` extends `tsconfig.base.json`
+  - ✅ Tests pass with standard configuration (no custom setup needed yet)
 
-  **Strategy**: Create reusable, platform-specific Jest presets and centralized TypeScript spec configuration that can be applied to any new project in seconds.
+  **Approach**: Validate existing patterns, document for consistency, add optional enhancements only when actually needed.
 
-  - [ ] 3.3.1: Create platform-specific Jest presets in `tools/testing/jest/`
-    - [ ] Create `tools/testing/jest/react.preset.js` for React/Next.js apps
-      - Extends base Nx preset
-      - Adds `setupFilesAfterEnv: ['<rootDir>/../../tools/testing/jest/react.setup.ts']`
-      - Configures React Testing Library environment
-    - [ ] Create `tools/testing/jest/react.setup.ts`
-      - Imports `@testing-library/jest-dom` (install as workspace dev dependency)
-      - Provides DOM-specific matchers: `toBeInTheDocument()`, `toHaveClass()`, etc.
-    - [ ] Create `tools/testing/jest/node.preset.js` for Node/Express/Nest apps
-      - Extends base Nx preset
-      - No DOM utilities, pure Node environment
-      - Jest config optimized for server-side testing
-    - [ ] Create `tools/testing/jest/react-native.preset.js` for Expo apps (deferred if mobile in Phase 2)
-      - Extends base Nx preset
-      - Adds setup for `@testing-library/jest-native/extend-expect`
-      - React Native-specific test environment
+  - [ ] 3.3.1: Verify web app Jest configuration follows Nx standards
+    - [ ] Confirm `apps/web/jest.config.ts` extends `../../jest.preset.js`
+    - [ ] Confirm tests run successfully with current setup
+    - [ ] Review test configuration for any necessary adjustments
+    - [ ] Document current pattern for future projects
 
-  - [ ] 3.3.2: Create root TypeScript spec configuration
-    - [ ] Create `tsconfig.spec.base.json` at workspace root
-      - Extends `tsconfig.base.json`
-      - Includes Jest types: `@types/jest`, `@types/node`
-      - Includes testing library types
-      - Sets `compilerOptions` appropriate for test files
-    - [ ] Update each project's `tsconfig.spec.json` to extend the root spec base
-      - Example: `"extends": "../../tsconfig.spec.base.json"`
-    - [ ] Remove Jest/Node types from app `tsconfig.json` files
-      - Keep production `tsconfig.json` clean (only DOM/app types)
-      - Verify production builds don't include test types
+  - [ ] 3.3.2: Verify TypeScript test configuration follows Nx standards
+    - [ ] Confirm `apps/web/tsconfig.spec.json` extends `../../tsconfig.base.json`
+    - [ ] Confirm Jest types are included: `"types": ["jest", "node"]`
+    - [ ] Verify production `tsconfig.json` doesn't include test types
+    - [ ] Document pattern for future projects
 
-  - [ ] 3.3.3: Apply presets to existing web project
-    - [ ] Update `apps/web/jest.config.ts` to use `tools/testing/jest/react.preset.js`
-    - [ ] Verify `apps/web/tsconfig.spec.json` extends root spec base
-    - [ ] Clean `apps/web/tsconfig.json` of test-specific types
-    - [ ] Run tests and verify all pass with new configuration
-    - [ ] Verify production build excludes test types
+  - [ ] 3.3.3: Document how to add Jest to new projects
+    - [ ] Add to CLAUDE.md: "To add Jest to a project: `pnpm exec nx g @nx/jest:configuration <project>`"
+    - [ ] Document that Nx auto-generates proper configs extending workspace preset
+    - [ ] Note: No manual setup required - Nx handles it automatically
 
-  - [ ] 3.3.4: Create workspace utilities and test helpers
-    - [ ] Create `tools/testing/utils/` directory
-    - [ ] Add common test utilities (mocks, fixtures, helpers)
-    - [ ] Create example test data factories
-    - [ ] Document utilities in `tools/testing/README.md`
-
-  - [ ] 3.3.5: Create normalization strategy for future projects
-    - [ ] **Option A**: Create Nx workspace generator `@nx-monorepo/normalize-testing`
-      - Generator reads project type (React, Node, React Native)
-      - Updates `jest.config.ts` to use appropriate preset
-      - Updates `tsconfig.spec.json` to extend root spec base
-      - Cleans `tsconfig.json` of test types
-      - Run: `pnpm exec nx g @nx-monorepo/normalize-testing --project=my-app`
-    - [ ] **Option B**: Document post-generation checklist in `CLAUDE.md`
-      - Step-by-step instructions to apply presets
-      - Copy-paste examples for each app type
-      - Validation commands to verify correct setup
-    - [ ] **Decision**: Choose Option A (generator) or Option B (documentation) based on team preference
-    - [ ] Implement chosen option
-
-  - [ ] 3.3.6: Create example tests showcasing best practices
-    - [ ] Add second test to `apps/web/src/app/page.spec.tsx` using jest-dom
-      - Example: Assert specific heading text is in document
-      - Demonstrate user interaction testing (if applicable)
-      - Show proper use of Testing Library queries
-    - [ ] Create example tests for shared package
-      - Unit test for pure functions
-      - Schema validation tests (Zod schemas)
-      - Document patterns in test files
-    - [ ] Document testing best practices in `tools/testing/README.md`
-      - When to use different testing library matchers
-      - How to structure test files
-      - Naming conventions
-      - Common patterns and anti-patterns
+  - [ ] 3.3.4: Document optional testing library enhancements (for future use)
+    - [ ] Create `docs/testing-enhancements.md` with optional patterns:
+      - How to add `@testing-library/jest-dom` to a React project (when DOM matchers are needed)
+      - How to add custom setup files (`setupFilesAfterEnv`) per-project
+      - Example: Creating project-specific `jest.setup.ts` for special needs
+    - [ ] Note: These are optional - add only when specific projects need them
+    - [ ] Emphasize: Start simple, add complexity only when justified
 
 - [ ] **3.4: Configure test coverage reporting**
   - [ ] 3.4.1: Set up Jest coverage configuration (no threshold yet, just reporting)
@@ -496,21 +464,17 @@ Establish quality assurance tooling and testing scaffolding early to create a sa
 - [ ] Pre-commit hook only checks staged files (fast execution < 10s)
 - [ ] Commit message validation enforces conventional commits format (if configured)
 - [ ] lint-staged configuration exists and respects Nx workspace structure
-- [ ] Platform-specific Jest presets created: react, node, (react-native if applicable)
-- [ ] Root `tsconfig.spec.base.json` created and projects extend it
-- [ ] Production `tsconfig.json` files are clean of test-specific types
-- [ ] Web app uses React preset with jest-dom matchers available
-- [ ] Workspace test utilities directory exists with documented helpers
-- [ ] Normalization strategy implemented (generator or documentation)
-- [ ] Example tests exist showcasing jest-dom and best practices
+- [ ] Web app Jest configuration verified to extend workspace preset
+- [ ] Web app TypeScript test config verified to follow Nx standards
+- [ ] Documentation added to CLAUDE.md for adding Jest to new projects
+- [ ] Optional testing enhancements documented in `docs/testing-enhancements.md`
 - [ ] Coverage reporting configured (0% threshold, just report)
 - [ ] Coverage reports are generated in `coverage/` directory
 - [ ] CI workflow includes typecheck step
 - [ ] Attempting to commit code with lint errors is blocked locally
-- [ ] Documentation exists for testing patterns, presets, and utilities
-- [ ] Future projects can adopt testing standards in < 5 minutes
+- [ ] Standard Nx testing patterns are documented for future reference
 
-**Stage 3 Estimated Time:** 2-3 hours (increased due to comprehensive testing infrastructure)
+**Stage 3 Estimated Time:** 45-60 minutes (simplified - validates existing Nx patterns)
 
 ---
 
@@ -554,8 +518,11 @@ Make explicit architecture decisions about API framework and database strategy, 
 
 - [ ] **4.5: Configure Supabase client factory**
   - [ ] 4.5.1: Implement client factory in `packages/supabase-client/src/index.ts`
-  - [ ] 4.5.2: Support both web (Next.js) and native (Expo) configurations
-  - [ ] 4.5.3: Export createSupabaseClient factory function
+  - [ ] 4.5.2: Support Next.js configurations using `@supabase/ssr`
+    - Implement `createServerClient()` for Server Components and Route Handlers
+    - Implement `createBrowserClient()` for Client Components
+    - Note: Expo/React Native support deferred to Stage 8 (Phase 2)
+  - [ ] 4.5.3: Export createSupabaseClient factory functions
   - [ ] 4.5.4: Test client initialization with dummy code
 
 - [ ] **4.6: Set up API framework (based on 4.1 decision)**
@@ -620,6 +587,10 @@ Create a minimal vertical slice that exercises the entire stack: web → API cli
 - [ ] **5.4: Implement API client + tests**
   - [ ] 5.4.1: Export typed client factory in `packages/api-client/src/index.ts`
   - [ ] 5.4.2: Import server router type (if applicable)
+    - Note: Use relative import since apps don't have tsconfig path aliases
+    - Implementation: `import type { AppRouter } from '../../../apps/server/src/router'`
+    - This is type-only import (safe, no circular runtime dependency)
+    - Alternative: Extract router types to separate package if circular dependency issues arise
   - [ ] 5.4.3: Create client initialization function
   - [ ] 5.4.4: Ensure type safety from server to client
   - [ ] 5.4.5: Write unit tests for client initialization

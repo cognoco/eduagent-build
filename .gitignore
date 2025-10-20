@@ -43,6 +43,10 @@ Thumbs.db
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
+# Nx graph output
+nx-graph.html
+static/
+
 # Next.js
 .next
 out
