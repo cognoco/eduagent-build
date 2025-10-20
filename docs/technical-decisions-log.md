@@ -6,7 +6,7 @@ created: 2025-10-20
 last-updated: 2025-10-20
 Last-Modified: 2025-10-20T14:45
 Created: 2025-10-20T13:31
-Modified: 2025-10-20T14:31
+Modified: 2025-10-20T15:50
 ---
 
 # Technical Decisions Log
@@ -313,6 +313,116 @@ The `api-client` library package needs to import the `AppRouter` type from the `
 - [oRPC Type Inference](https://orpc.unnoq.com/docs/concepts/type-safety)
 - [TypeScript Type-Only Imports](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-8.html#type-only-imports-and-export)
 - Discussion: P1-plan.md Stage 5.4.2 validation (2025-10-20)
+
+---
+
+### [TypeScript Configuration] - Jest Test Module Resolution Strategy - 2025-10-20
+
+**Decision:** Use `module: "nodenext"` and `moduleResolution: "nodenext"` in test TypeScript configurations (tsconfig.spec.json files)
+
+**Context:**
+After generating Jest configuration for the server application, TypeScript compilation failed with: `"Option 'customConditions' can only be used when 'moduleResolution' is set to 'node16', 'nodenext', or 'bundler'"`
+
+The workspace's `tsconfig.base.json` uses `customConditions: ["@nx-monorepo/source"]` for modern monorepo package resolution, but the Nx Jest generator created test configuration with outdated settings (`module: "commonjs"`, `moduleResolution: "node10"`).
+
+**Alternatives Considered:**
+
+1. **Keep `moduleResolution: "node10"` and remove `customConditions` from base config**
+   - Rejected: Would break workspace package resolution for entire monorepo
+   - Problem: All projects inherit from tsconfig.base.json and need customConditions
+   - Result: Not viable - breaks production code
+
+2. **Use `moduleResolution: "bundler"` for tests**
+   - Rejected: Requires `module: "preserve"` or ESM modules
+   - Problem: Jest runs in CommonJS mode via ts-jest transpilation
+   - Result: Incompatible with Jest's runtime environment
+
+3. **Keep tests on `node10`, remove base config inheritance**
+   - Rejected: Creates divergence between test and production type checking
+   - Problem: Tests would resolve imports differently than production code
+   - Result: "Works in tests, breaks in production" scenarios
+
+**Chosen Approach:** Update test configs to `module: "nodenext"` and `moduleResolution: "nodenext"`
+
+**Technical Rationale:**
+
+**Why `nodenext` is required:**
+
+1. **Workspace Package Resolution:**
+   - `customConditions: ["@nx-monorepo/source"]` in base config requires modern module resolution
+   - Only `node16`, `nodenext`, or `bundler` support customConditions
+   - This feature is essential for resolving `@nx-monorepo/database`, `@nx-monorepo/schemas`, etc.
+
+2. **Consistency with Production Code:**
+   - Production config (`tsconfig.app.json`): uses `module: "nodenext"` and `moduleResolution: "nodenext"`
+   - Test config should match to ensure identical import resolution
+   - Prevents subtle bugs where tests pass but production code fails
+
+3. **Modern Package Compatibility:**
+   - Many modern npm packages use package.json `exports` field for dual ESM/CJS builds
+   - `node10` resolver only reads `main` field (deprecated pattern)
+   - `nodenext` resolver reads `exports` first, then falls back to `main`
+   - Critical for packages like Prisma, modern testing libraries
+
+**Why this doesn't break Jest:**
+
+- TypeScript's `module` setting only affects type-checking, not runtime
+- Jest uses `ts-jest` or `babel-jest` to transpile code at runtime
+- Transpilation always produces CommonJS regardless of TypeScript setting
+- `nodenext` is **detection-based** - it doesn't force ESM, it understands both
+
+**Implementation Details:**
+
+- **Location:** `apps/server/tsconfig.spec.json` (and future test configs)
+- **Configuration:**
+  ```json
+  {
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+      "module": "nodenext",
+      "moduleResolution": "nodenext",
+      "types": ["jest", "node"]
+    }
+  }
+  ```
+- **When to apply:** Every time `nx g @nx/jest:configuration` is run, manually update generated file
+
+**Warning Signs (for AI agents):**
+
+❌ **Do not suggest** reverting to `moduleResolution: "node10"` to "simplify" configuration
+- **Why:** Breaks workspace package resolution via customConditions
+
+❌ **Do not suggest** removing `customConditions` from tsconfig.base.json to avoid this
+- **Why:** Breaks monorepo package resolution for all projects
+
+❌ **Do not suggest** using `moduleResolution: "bundler"` for test configs
+- **Why:** Incompatible with Jest's CommonJS runtime (requires ESM `module` setting)
+
+❌ **Do not worry** if this seems inconsistent with Jest's CommonJS runtime
+- **Why:** TypeScript module setting only affects type-checking, Jest transpilation is independent
+
+✅ **Do recognize** this is a known limitation of `@nx/jest:configuration` generator (v21.6.5)
+- Generator uses outdated defaults (`node10`) incompatible with modern Nx workspaces
+- Not a bug in our configuration - it's a generator limitation
+
+✅ **Do apply** this pattern to all test configurations in the workspace
+- When generating Jest config for web app, mobile app, or libraries
+- Always update `moduleResolution` from `node10` to `nodenext`
+- Keep `module` aligned (`nodenext` for server/Node projects, may vary for browser projects)
+
+✅ **Do verify** tests still pass after making this change
+- Run `nx run <project>:test` to verify Jest still works
+- Run `nx run <project>:typecheck` to verify TypeScript compilation succeeds
+
+**Root Cause:**
+The `@nx/jest:configuration` generator in Nx v21.6.5 uses outdated TypeScript defaults that are incompatible with modern Nx workspace patterns using `customConditions`. This should ideally be fixed upstream in the Nx plugin.
+
+**References:**
+- [TypeScript Module Resolution](https://www.typescriptlang.org/docs/handbook/modules/reference.html#the-moduleresolution-compiler-option)
+- [TypeScript customConditions](https://www.typescriptlang.org/tsconfig#customConditions)
+- [Package.json Exports Field](https://nodejs.org/api/packages.html#exports)
+- Issue discovered: Stage 1.2 server validation (2025-10-20)
+- Commit: 85603fc "fix(P1-S1): update server test TypeScript config for modern module resolution"
 
 ---
 
