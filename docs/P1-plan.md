@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-17
-Modified: 2025-10-20T08:11
+Modified: 2025-10-20T13:32
 Version: 1
 ---
 
@@ -264,7 +264,8 @@ Create the server application using Nx generators, ensuring it builds and runs i
 ### Sub-stages
 
 - [ ] **1.1: Generate server application**
-  - [ ] 1.1.1: Run: `pnpm exec nx g @nx/node:app server --directory=apps/server --framework=express`
+  - [ ] 1.1.1a: Install @nx/node plugin: `pnpm exec nx add @nx/node`
+  - [ ] 1.1.1b: Run: `pnpm exec nx g @nx/node:app server --directory=apps/server --framework=express`
   - [ ] 1.1.2: Review generated files and structure
   - [ ] 1.1.3: Verify TypeScript paths in tsconfig.base.json updated
 
@@ -309,16 +310,16 @@ Create all shared libraries following Nx conventions, ensuring each package buil
 ### Sub-stages
 
 - [ ] **2.1: Generate database package**
-  - [ ] 2.1.1: Run: `pnpm exec nx g @nx/node:lib database --directory=packages/database --buildable`
+  - [ ] 2.1.1: Run: `pnpm exec nx g @nx/js:lib database --directory=packages/database --bundler=none`
+    - **Note**: Uses `--bundler=none` because Prisma generates code at runtime (see `docs/technical-decisions-log.md`)
   - [ ] 2.1.2: Install Prisma dependencies: `pnpm add -D prisma --filter @nx-monorepo/database`
   - [ ] 2.1.3: Install Prisma client: `pnpm add @prisma/client --filter @nx-monorepo/database`
   - [ ] 2.1.4: Set up basic Prisma configuration structure
-  - [ ] 2.1.5: **Immediate test**: Run `pnpm exec nx run database:build` and verify success
-  - [ ] 2.1.6: **Immediate test**: Run `pnpm exec nx run database:lint` and verify passes
-  - [ ] 2.1.7: **Immediate test**: Run `pnpm exec nx run database:test` and verify passes
+  - [ ] 2.1.5: **Immediate test**: Run `pnpm exec nx run database:lint` and verify passes
+  - [ ] 2.1.6: **Immediate test**: Run `pnpm exec nx run database:test` and verify passes
 
 - [ ] **2.2: Generate schemas package**
-  - [ ] 2.2.1: Run: `pnpm exec nx g @nx/js:lib schemas --directory=packages/schemas --buildable`
+  - [ ] 2.2.1: Run: `pnpm exec nx g @nx/js:lib schemas --directory=packages/schemas --bundler=tsc`
   - [ ] 2.2.2: Install Zod: `pnpm add zod --filter @nx-monorepo/schemas`
   - [ ] 2.2.3: Create placeholder schema exports
   - [ ] 2.2.4: **Immediate test**: Run `pnpm exec nx run schemas:build` and verify success
@@ -326,7 +327,7 @@ Create all shared libraries following Nx conventions, ensuring each package buil
   - [ ] 2.2.6: **Immediate test**: Run `pnpm exec nx run schemas:test` and verify passes
 
 - [ ] **2.3: Generate api-client package**
-  - [ ] 2.3.1: Run: `pnpm exec nx g @nx/js:lib api-client --directory=packages/api-client --buildable`
+  - [ ] 2.3.1: Run: `pnpm exec nx g @nx/js:lib api-client --directory=packages/api-client --bundler=tsc`
   - [ ] 2.3.2: Install oRPC client: `pnpm add @orpc/client --filter @nx-monorepo/api-client`
   - [ ] 2.3.3: Set up basic client factory structure
   - [ ] 2.3.4: **Immediate test**: Run `pnpm exec nx run api-client:build` and verify success
@@ -334,7 +335,7 @@ Create all shared libraries following Nx conventions, ensuring each package buil
   - [ ] 2.3.6: **Immediate test**: Run `pnpm exec nx run api-client:test` and verify passes
 
 - [ ] **2.4: Generate supabase-client package**
-  - [ ] 2.4.1: Run: `pnpm exec nx g @nx/js:lib supabase-client --directory=packages/supabase-client --buildable`
+  - [ ] 2.4.1: Run: `pnpm exec nx g @nx/js:lib supabase-client --directory=packages/supabase-client --bundler=tsc`
   - [ ] 2.4.2: Install Supabase client: `pnpm add @supabase/supabase-js --filter @nx-monorepo/supabase-client`
   - [ ] 2.4.3: Install Supabase SSR: `pnpm add @supabase/ssr --filter @nx-monorepo/supabase-client`
   - [ ] 2.4.4: Set up client factory structure
