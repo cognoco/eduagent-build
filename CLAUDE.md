@@ -29,87 +29,110 @@ This is an Nx monorepo implementing a multi-platform PoC using a "walking skelet
 
 ## Common Commands
 
-### Development
+### Workspace Scripts (Recommended for Daily Development)
+
+These convenience scripts are defined in the root `package.json` and run tasks across all projects:
 
 ```bash
 # Start web dev server
-nx run web:dev
-# or: nx dev web
+pnpm run dev
+
+# Build all projects
+pnpm run build
+
+# Run all tests
+pnpm run test
+
+# Lint all projects
+pnpm run lint
+
+# Run E2E tests
+pnpm run e2e
+```
+
+### Development (Direct Nx Commands)
+
+Use these for project-specific or advanced tasks:
+
+```bash
+# Start web dev server
+pnpm exec nx run web:dev
+# or: pnpm exec nx dev web
 
 # Start server (when implemented)
-nx run server:serve
+pnpm exec nx run server:serve
 
 # Start mobile (when implemented)
-nx run mobile:start
+pnpm exec nx run mobile:start
 
 # Run multiple apps concurrently
-nx run-many -t serve --projects=web,server
+pnpm exec nx run-many -t serve --projects=web,server
 ```
 
 ### Building
 
 ```bash
 # Build single project
-nx run web:build
+pnpm exec nx run web:build
 
 # Build all apps
-nx run-many -t build --projects=tag:type:app
+pnpm exec nx run-many -t build --projects=tag:type:app
 
 # Build all libraries
-nx run-many -t build --projects=tag:type:lib
+pnpm exec nx run-many -t build --projects=tag:type:lib
 
-# Build everything
-nx run-many -t build
+# Build everything (or use: pnpm run build)
+pnpm exec nx run-many -t build
 
 # Build only affected projects (after changes)
-nx affected -t build
+pnpm exec nx affected -t build
 ```
 
 ### Testing & Quality
 
 ```bash
-# Run all unit tests
-nx run-many -t test
+# Run all unit tests (or use: pnpm run test)
+pnpm exec nx run-many -t test
 
 # Run specific project tests
-nx run web:test
+pnpm exec nx run web:test
 
 # Run tests with coverage
-nx run web:test --coverage
+pnpm exec nx run web:test --coverage
 
-# Run E2E tests
-nx run web-e2e:e2e
+# Run E2E tests (or use: pnpm run e2e)
+pnpm exec nx run web-e2e:e2e
 
-# Lint all projects
-nx run-many -t lint
+# Lint all projects (or use: pnpm run lint)
+pnpm exec nx run-many -t lint
 
 # Lint specific project
-nx run web:lint
+pnpm exec nx run web:lint
 
 # Type checking (when typecheck target is configured)
-nx run-many -t typecheck
+pnpm exec nx run-many -t typecheck
 
 # Run full CI validation locally
-nx run-many -t lint test build typecheck e2e
+pnpm exec nx run-many -t lint test build typecheck e2e
 ```
 
 ### Nx Workspace
 
 ```bash
 # View dependency graph
-nx graph
+pnpm exec nx graph
 
 # Show project details
-nx show project web
+pnpm exec nx show project web
 
 # List all available plugins
-nx list
+pnpm exec nx list
 
 # View affected projects
-nx affected:graph
+pnpm exec nx affected:graph
 
 # Clear Nx cache
-nx reset
+pnpm exec nx reset
 ```
 
 ### Database (when implemented)
@@ -216,7 +239,7 @@ The project uses Husky pre-commit hooks (when configured):
 
 If hooks aren't yet configured, manually run:
 ```bash
-nx affected -t lint test
+pnpm exec nx affected -t lint test
 ```
 
 ### Creating Shared Code
@@ -226,14 +249,42 @@ When you need to share code between projects:
 1. **Determine package location**: Does it belong in an existing package or need a new one?
 2. **Generate library if needed**:
    ```bash
-   nx g @nx/js:library my-new-lib --directory=packages/my-new-lib --buildable
+   pnpm exec nx g @nx/js:library my-new-lib --directory=packages/my-new-lib --buildable
    ```
 3. **Implement and export**: Add code and export via `index.ts`
 4. **Update dependents**: Import from `@nx-monorepo/my-new-lib`
-5. **Verify build**: Run `nx run my-new-lib:build` to ensure it compiles
-6. **Check graph**: Run `nx graph` to verify dependency structure
+5. **Verify build**: Run `pnpm exec nx run my-new-lib:build` to ensure it compiles
+6. **Check graph**: Run `pnpm exec nx graph` to verify dependency structure
 
 ## Testing Strategy
+
+### Test File Location
+
+Tests are co-located with their source files in the `src/` directory, following Next.js 15 best practices:
+
+**Pattern**: Place test files next to the code they test
+- `src/app/page.tsx` → `src/app/page.spec.tsx`
+- `src/components/Button.tsx` → `src/components/Button.spec.tsx`
+
+**Naming**: Use `.spec.tsx` or `.test.tsx` suffix
+
+**Jest Configuration** (`apps/web/jest.config.ts`):
+```typescript
+testMatch: [
+  '<rootDir>/src/**/*.(spec|test).[jt]s?(x)',
+],
+collectCoverageFrom: [
+  'src/**/*.{ts,tsx,js,jsx}',
+  '!src/**/*.spec.{ts,tsx,js,jsx}',
+  '!src/**/*.test.{ts,tsx,js,jsx}',
+],
+```
+
+**Rationale**:
+- Aligns with Next.js 15 App Router conventions
+- Improves developer experience (tests near code)
+- Simplifies imports (relative paths shorter)
+- Industry standard for component-based architectures (2025)
 
 ### Unit Tests (Jest)
 
@@ -337,7 +388,7 @@ To enable distributed task execution in CI, uncomment the `nx start-ci-run` line
 ### Nx Cache Issues
 ```bash
 # Clear cache and reinstall
-nx reset
+pnpm exec nx reset
 rm -rf node_modules
 pnpm install
 ```
@@ -345,31 +396,41 @@ pnpm install
 ### TypeScript Path Resolution
 - Ensure `tsconfig.base.json` includes paths for all packages
 - Nx manages these automatically via generators
-- If paths are missing, run `nx g @nx/js:library <name>` to regenerate
+- If paths are missing, run `pnpm exec nx g @nx/js:library <name>` to regenerate
 
 ### Build Failures
 ```bash
 # Build in dependency order (Nx handles this automatically)
-nx run-many -t build
+pnpm exec nx run-many -t build
 
 # Build only affected projects
-nx affected -t build
+pnpm exec nx affected -t build
 
 # Show affected dependency graph
-nx affected:graph
+pnpm exec nx affected:graph
 ```
 
 ### Test Failures
 ```bash
 # Run single test file
-nx run web:test --testFile=path/to/spec.ts
+pnpm exec nx run web:test --testFile=path/to/spec.ts
 
 # Run tests in watch mode
-nx run web:test --watch
+pnpm exec nx run web:test --watch
 
 # Clear Jest cache
-nx run web:test --clearCache
+pnpm exec nx run web:test --clearCache
 ```
+
+### Jest exits slowly or appears to hang (Windows)
+
+- Symptom: Jest prints "did not exit one second after the test run" or the console shows "Terminate batch job (Y/N)?".
+- Likely cause: environment/tooling sockets lingering briefly (e.g., background runners), not a test leak.
+- What to try (non-committal):
+  - Disable helpers for the run: `NX_DAEMON=false pnpm exec nx run web:test --no-cloud`
+  - Or run Jest directly: `pnpm --filter @nx-monorepo/web exec jest -- --runInBand --detectOpenHandles`
+  - If you need a crisp local exit while diagnosing, add `--forceExit` to the command (do not commit it).
+  - Only use `--detectOpenHandles` during diagnosis; it does not list handles by itself. Use a temporary teardown or `why-is-node-running` if you need details.
 
 ### Prisma Issues
 ```bash
@@ -385,7 +446,8 @@ pnpm --filter @nx-monorepo/database prisma studio
 
 ## Important Notes
 
-- **Always use Nx commands** (`nx run`, `nx run-many`, `nx affected`) instead of direct tool invocation (e.g., use `nx run web:build` not `cd apps/web && next build`)
+- **Always use pnpm and Nx commands** (`pnpm exec nx run`, `pnpm exec nx run-many`, `pnpm exec nx affected`) instead of direct tool invocation (e.g., use `pnpm exec nx run web:build` not `cd apps/web && next build`)
+- **Use workspace scripts for common tasks**: Prefer `pnpm run dev`, `pnpm run build`, etc. for daily development
 - **Respect project boundaries**: Don't import from `apps/*` into `packages/*`
 - **Use Nx MCP tools**: When working with Claude Code, use `nx_workspace`, `nx_project_details`, and `nx_docs` tools for up-to-date information
 - **Phase 1 priority**: Validate infrastructure before adding features - don't implement POC features until walking skeleton is complete

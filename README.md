@@ -4,7 +4,7 @@
 
 ✨ Your new, shiny [Nx workspace](https://nx.dev) is almost ready ✨.
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/next?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+[Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/next?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `pnpm exec nx graph` to visually explore what was created. Now, let's get you up to speed!
 
 ## Finish your CI setup
 
@@ -13,22 +13,46 @@
 
 ## Run tasks
 
-To run the dev server for your app, use:
+### Workspace-level commands (recommended)
+
+The project provides convenient workspace scripts that run tasks across all projects:
 
 ```sh
-npx nx dev web
+# Start web dev server
+pnpm run dev
+
+# Build all projects
+pnpm run build
+
+# Run all tests
+pnpm run test
+
+# Lint all projects
+pnpm run lint
+
+# Run E2E tests
+pnpm run e2e
 ```
 
-To create a production bundle:
+### Project-specific commands
+
+To run tasks for a specific project, use:
 
 ```sh
-npx nx build web
+# Run dev server for web app
+pnpm exec nx dev web
+
+# Create production bundle
+pnpm exec nx build web
+
+# Run tests for specific project
+pnpm exec nx test web
 ```
 
 To see all available targets to run for a project, run:
 
 ```sh
-npx nx show project web
+pnpm exec nx show project web
 ```
 
 These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
@@ -44,16 +68,16 @@ Use the plugin's generator to create new projects.
 To generate a new application, use:
 
 ```sh
-npx nx g @nx/next:app demo
+pnpm exec nx g @nx/next:app demo
 ```
 
 To generate a new library, use:
 
 ```sh
-npx nx g @nx/react:lib mylib
+pnpm exec nx g @nx/react:lib mylib
 ```
 
-You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
+You can use `pnpm exec nx list` to get a list of installed plugins. Then, run `pnpm exec nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
 
 [Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
 

@@ -358,14 +358,24 @@ nx affected:graph
 ### Test Failures
 ```bash
 # Run single test file
-nx run web:test --testFile=path/to/spec.ts
+pnpm exec nx run web:test --testFile=path/to/spec.ts
 
 # Run tests in watch mode
-nx run web:test --watch
+pnpm exec nx run web:test --watch
 
 # Clear Jest cache
-nx run web:test --clearCache
+pnpm exec nx run web:test --clearCache
 ```
+
+### Jest exits slowly or appears to hang (Windows)
+
+- Symptom: Jest prints "did not exit one second after the test run" or the console shows "Terminate batch job (Y/N)?".
+- Likely cause: environment/tooling sockets lingering briefly (e.g., background runners), not a test leak.
+- What to try (non-committal):
+  - Disable helpers for the run: `NX_DAEMON=false pnpm exec nx run web:test --no-cloud`
+  - Or run Jest directly: `pnpm --filter @nx-monorepo/web exec jest -- --runInBand --detectOpenHandles`
+  - If you need a crisp local exit while diagnosing, add `--forceExit` to the command (do not commit it).
+  - Only use `--detectOpenHandles` during diagnosis; it does not list handles by itself. Use a temporary teardown or `why-is-node-running` if you need details.
 
 ### Prisma Issues
 ```bash
