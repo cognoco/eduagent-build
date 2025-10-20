@@ -1,6 +1,7 @@
 {
   "name": "@nx-monorepo/server",
   "version": "0.0.1",
+  "description": "Express API server with oRPC for type-safe endpoints",
   "private": true,
   "nx": {
     "targets": {
