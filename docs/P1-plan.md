@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-17
-Modified: 2025-10-20T17:18
+Modified: 2025-10-20T17:26
 Version: 1
 ---
 
@@ -270,31 +270,31 @@ Create the server application using Nx generators, ensuring it builds and runs i
   - [x] 1.1.3: Verify TypeScript project reference added to root tsconfig.json
     - Note: Apps use TypeScript Project References, not path aliases (libraries use path aliases)
 
-- [ ] **1.2: Immediate validation**
-  - [ ] 1.2.1: Run `pnpm exec nx run server:build` and verify success
-  - [ ] 1.2.2: Run `pnpm exec nx run server:serve` and verify server starts on expected port
-  - [ ] 1.2.3: Verify server responds to default route (curl or browser)
-  - [ ] 1.2.4: Run `pnpm exec nx run server:lint` and verify passes
-  - [ ] 1.2.5: Configure and run server tests
-    - [ ] 1.2.5a: Generate Jest config: `pnpm exec nx g @nx/jest:configuration --project=server`
-    - [ ] 1.2.5b: Run `pnpm exec nx run server:test` and verify default tests pass
+- [x] **1.2: Immediate validation**
+  - [x] 1.2.1: Run `pnpm exec nx run server:build` and verify success
+  - [x] 1.2.2: Run `pnpm exec nx run server:serve` and verify server starts on expected port
+  - [x] 1.2.3: Verify server responds to default route (curl or browser)
+  - [x] 1.2.4: Run `pnpm exec nx run server:lint` and verify passes
+  - [x] 1.2.5: Configure and run server tests
+    - [x] 1.2.5a: Generate Jest config: `pnpm exec nx g @nx/jest:configuration --project=server`
+    - [x] 1.2.5b: Run `pnpm exec nx run server:test` and verify default tests pass
     - Note: @nx/node:app with Express doesn't create Jest config by default
 
-- [ ] **1.3: Update workspace scripts**
-  - [ ] 1.3.1: Do NOT add server-specific scripts to root package.json
+- [x] **1.3: Update workspace scripts**
+  - [x] 1.3.1: Do NOT add server-specific scripts to root package.json
     - Rationale: Keep workspace scripts focused on workspace-wide operations
     - Developers will use `pnpm exec nx run server:serve` directly for server-specific work
-  - [ ] 1.3.2: Document how to run server in development
-    - Add to CLAUDE.md: "Start server: `pnpm exec nx run server:serve`"
+  - [x] 1.3.2: Document how to run server in development
+    - Add to .ruler/AGENTS.md: "Start server: `pnpm exec nx run server:serve`"
 
-- [ ] **1.4: Verify workspace health**
-  - [ ] 1.4.1: Run `pnpm exec nx graph` and verify clean dependency structure
-  - [ ] 1.4.2: Run `pnpm exec nx run-many -t build` and verify both web and server build
-  - [ ] 1.4.3: Verify Nx cache works for server tasks
-    - [ ] Run `pnpm exec nx reset` to clear cache
-    - [ ] Run `pnpm exec nx run server:build` (first build, should execute)
-    - [ ] Run `pnpm exec nx run server:build` again (should use cache)
-    - [ ] Verify second run shows "[local cache]" or similar cache hit message
+- [x] **1.4: Verify workspace health**
+  - [x] 1.4.1: Run `pnpm exec nx graph` and verify clean dependency structure
+  - [x] 1.4.2: Run `pnpm exec nx run-many -t build` and verify both web and server build
+  - [x] 1.4.3: Verify Nx cache works for server tasks
+    - [x] Run `pnpm exec nx reset` to clear cache
+    - [x] Run `pnpm exec nx run server:build` (first build, should execute)
+    - [x] Run `pnpm exec nx run server:build` again (should use cache)
+    - [x] Verify second run shows "[local cache]" or similar cache hit message
 
 ### Success Criteria
 
