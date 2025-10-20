@@ -15,6 +15,7 @@ const config: Config = {
     'src/**/*.{ts,tsx,js,jsx}',
     '!src/**/*.spec.{ts,tsx,js,jsx}',
     '!src/**/*.test.{ts,tsx,js,jsx}',
+    '!src/**/*.d.ts',
   ],
   transform: {
     '^(?!.*\\.(js|jsx|ts|tsx|css|json)$)': '@nx/react/plugins/jest',
