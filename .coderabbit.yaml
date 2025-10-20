@@ -13,6 +13,9 @@ reviews:
   # Disable review poems (optional aesthetic feature)
   poem: false
 
+  # Review entire PR diff on every push (not just new commits)
+  incremental_review: false
+
   # Auto-review settings
   auto_review:
     enabled: true
