@@ -7,7 +7,9 @@
     "build": "nx run-many -t build",
     "test": "nx run-many -t test",
     "lint": "nx run-many -t lint",
-    "e2e": "nx run-many -t e2e"
+    "e2e": "nx run-many -t e2e",
+    "format:check": "nx run-many -t format:check",
+    "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,scss,html}\""
   },
   "private": true,
   "dependencies": {
@@ -57,6 +59,7 @@
     "eslint-plugin-react-hooks": "5.0.0",
     "jest": "^30.0.2",
     "jest-environment-jsdom": "^30.0.2",
+    "jest-environment-node": "^30.0.2",
     "jest-util": "^30.0.2",
     "nx": "21.6.5",
     "postcss": "8.4.38",

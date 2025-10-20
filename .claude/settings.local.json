@@ -1,12 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "mcp__plugin_default_Sequential_Thinking_MCP",
-      "mcp__plugin_dev-core_Context7_MCP",
-      "mcp__plugin_dev-core_Context7_MCP__get-library-docs",
       "Bash",
       "WebSearch",
-      "mcp__plugin_dev-core_Vibe-Check_MCP__vibe_check"
+      "mcp__plugin_default_Sequential_Thinking_MCP",
+      "mcp__plugin_dev-core_Context7_MCP",
+      "mcp__plugin_dev-core_Vibe-Check_MCP",
+      "mcp__plugin_dev-additional_NX_MCP"
     ],
     "deny": [],
     "ask": []
