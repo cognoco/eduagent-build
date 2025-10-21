@@ -177,7 +177,7 @@ Example consequences:
 When editing any file in `docs/` or its subfolders:
 
 ❌ **NEVER edit these frontmatter fields:**
-- `Modified:` - Automatically managed by Git and Obsidian
+- `Modified:` - Automatically managed by Git
 - `Created:` - Set once, never changed
 
 
@@ -434,13 +434,27 @@ When creating shared packages:
 
 ### Before Committing
 
-The project uses Husky pre-commit hooks (when configured):
-- Linting and formatting run automatically on staged files
-- TypeScript compilation is validated
-- Tests run for affected projects
-- Commits are blocked if quality checks fail
+The project uses Husky pre-commit hooks to maintain code quality:
 
-If hooks aren't yet configured, manually run:
+**What runs automatically:**
+- **lint-staged**: Runs ESLint and Prettier on staged files only
+- **Affected tests**: Runs tests only for projects affected by your changes (via `nx affected -t test --base=HEAD~1`)
+- Commits are blocked if any checks fail
+
+**Pre-commit hook optimization:**
+```bash
+# .husky/pre-commit
+pnpm exec lint-staged
+pnpm exec nx affected -t test --base=HEAD~1
+```
+
+**Why `nx affected` instead of all tests:**
+- ✅ Faster commits: Only runs tests for changed code
+- ✅ Scales with monorepo growth: Performance stays consistent as projects are added
+- ✅ Immediate feedback: Catches regressions before commit
+- ✅ CI safety net: Full test suite still runs in GitHub Actions
+
+**Manual quality checks (if hooks disabled):**
 ```bash
 pnpm exec nx affected -t lint test
 ```

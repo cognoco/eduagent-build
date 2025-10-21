@@ -3,10 +3,10 @@ title: Technical Findings Log
 purpose: Record technical decisions, empirical findings, troubleshooting patterns, and non-obvious constraints to guide AI agents and developers
 audience: AI agents, developers, architects
 created: 2025-10-20
-last-updated: 2025-10-20
-Last-Modified: 2025-10-20T17:15
+last-updated: 2025-10-21
+Last-Modified: 2025-10-21T17:45
 Created: 2025-10-20T13:31
-Modified: 2025-10-21T13:58
+Modified: 2025-10-21T17:45
 ---
 
 # Technical Findings Log
@@ -686,6 +686,113 @@ If this issue recurs, document:
 - [Nx Flaky Tasks](https://nx.dev/ci/features/flaky-tasks)
 - Investigation: P1-S1 substage 1.2 validation (2025-10-20)
 - Nx flake detection: https://cloud.nx.app/runs/Jj7HeO4RIe
+
+---
+
+### [TypeScript Configuration] - Next.js TypeScript Project References Incompatibility - 2025-10-21
+
+**Finding:** Next.js applications cannot use TypeScript Project References due to fundamental incompatibility between `noEmit: true` (required by Next.js) and `composite: true` (required by Project References)
+
+**Context:**
+During implementation of CI typecheck infrastructure (Stage 3.5), discovered that web app lacks auto-inferred typecheck target despite having `tsconfig.json`. Investigation revealed that the `@nx/js/typescript` plugin only auto-infers typecheck for projects using TypeScript Project References structure (`tsconfig.app.json` or `tsconfig.lib.json`), not for apps with single `tsconfig.json`.
+
+Further research uncovered that Next.js apps **cannot** use Project References even if we wanted to restructure them.
+
+**Root Cause Investigation:**
+
+**TypeScript Project References requirements:**
+- `composite: true` enables project references
+- `declaration: true` generates .d.ts files (enforced by composite)
+- `noEmit: false` allows TypeScript to emit files (required for .d.ts)
+
+**Next.js requirements:**
+- `noEmit: true` because Next.js handles compilation via SWC/Turbopack
+- TypeScript only used for type-checking, not code generation
+- Build outputs managed by Next.js build system, not tsc
+
+**The incompatibility:**
+```
+TypeScript Project References: composite: true → requires noEmit: false
+Next.js:                       requires noEmit: true
+Result:                        Cannot use both
+```
+
+**Alternatives Investigated:**
+
+1. **Force Next.js to use Project References**
+   - Tested: Setting `composite: true` with `noEmit: true`
+   - Result: TypeScript compilation error - "composite projects must have declaration: true and noEmit: false"
+   - Rejected: Fundamental incompatibility
+
+2. **Remove noEmit: true from Next.js apps**
+   - Problem: Next.js compilation would conflict with TypeScript outputs
+   - Problem: Next.js build system expects to manage all outputs
+   - Rejected: Breaks Next.js build pipeline
+
+3. **Convert entire workspace away from Project References**
+   - Problem: Lose significant build performance for Node.js apps and libraries
+   - Problem: Against Nx 20+ best practices
+   - Rejected: Degrades workspace for all projects to accommodate one framework
+
+**Chosen Approach:**
+Framework-specific patterns - Next.js apps use single tsconfig.json with manual typecheck target, Node.js apps use Project References with auto-inferred typecheck.
+
+**Implementation:**
+- Next.js apps: Add `project.json` with manual typecheck target (`tsc --noEmit`)
+- Node.js apps: Use Project References (auto-inferred by plugin)
+- Documented in `adopted-patterns.md` as Pattern 4
+
+**Why This Works:**
+
+This is not pattern drift - it's **intentional framework-specific configuration**:
+- Pattern determined by app framework (Next.js vs Node.js)
+- Clear boundaries (compilation model differences)
+- Minimal variations (only 2 patterns needed)
+- Well-documented rationale (prevents confusion)
+
+**Empirical Findings:**
+
+**From StackOverflow (Aug 2024):**
+> "NextJS needs `noEmit: true` because it handles code transpilation internally, but TypeScript only allows `noEmit: false` when using project references with `composite: true`"
+
+**From GitHub TypeScript Issues (Nov 2024):**
+Discussion of Vite and other bundler-based tools having same issue - any framework that handles its own compilation cannot use Project References.
+
+**From Vercel Community:**
+Confirms Next.js + TypeScript monorepo best practices avoid Project References, use single tsconfig.json per app.
+
+**Warning Signs (for AI agents):**
+
+❌ **Do not suggest** converting Next.js apps to use TypeScript Project References
+- **Why:** Incompatible with `noEmit: true` - will cause compilation errors
+- **What will happen:** TypeScript error: "composite projects must emit declaration files"
+
+❌ **Do not suggest** this is pattern drift that needs "fixing"
+- **Why:** Different frameworks have different compilation models
+- **What's correct:** Framework-specific patterns are intentional
+
+❌ **Do not suggest** removing `noEmit: true` from Next.js apps
+- **Why:** Breaks Next.js build pipeline
+- **What will happen:** Build conflicts, duplicate outputs, broken production builds
+
+✅ **Do recognize** that future Next.js apps need manual typecheck configuration
+- Check post-generation-checklist.md after running `nx g @nx/next:app`
+
+✅ **Do recognize** that React Native (Expo) will likely follow same pattern
+- Expo uses Metro bundler, similar compilation model to Next.js
+- Will validate in Phase 2 when mobile app is added
+
+✅ **Do apply** Project References pattern to Node.js/Express apps
+- Node.js apps benefit from Project References build performance
+- Auto-inferred typecheck works correctly
+
+**References:**
+- StackOverflow: [TypeScript composite project with NextJS](https://stackoverflow.com/questions/78907727/typescript-composite-project-with-nextjs) (Aug 2024)
+- GitHub: [TypeScript #60465 - Referenced projects composite requirement](https://github.com/microsoft/TypeScript/issues/60465) (Nov 2024)
+- Vercel Community: [Next.js in TypeScript monorepo best practices](https://community.vercel.com/t/best-practices-on-using-next-js-in-a-typescript-monorepo/7131)
+- Nx Blog: [Nx 20 TypeScript Project References](https://edbzn.dev/nx-20-exploring-the-new-ts-preset-and-typescript-project-references/)
+- Research: Sequential Thinking + Exa + Context7 + Nx MCP deep investigation (2025-10-21)
+- Implementation: `apps/web/project.json` (2025-10-21)
 
 ---
 
