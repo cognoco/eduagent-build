@@ -1,23 +1,151 @@
-# NxMonorepo
+# Gold Standard Nx Monorepo Template
 
 <a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is almost ready ✨.
+A production-ready Nx monorepo template demonstrating best practices for building type-safe, full-stack applications with shared business logic across web, server, and mobile platforms.
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/next?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `pnpm exec nx graph` to visually explore what was created. Now, let's get you up to speed!
+## What is this?
 
-## Finish your CI setup
+This is a **walking skeleton** implementation - a minimal, fully-integrated system that exercises all major architectural layers and infrastructure. It validates that:
 
-[Click here to finish setting up your workspace!](https://cloud.nx.app/connect/FAL9UeRYFl)
+- Multiple applications can share code through buildable libraries
+- Type safety flows end-to-end from database to UI
+- Testing strategy covers all levels (unit, integration, E2E)
+- CI/CD pipeline ensures quality gates
+- Development workflow is smooth and productive
 
+**Current Status**: Phase 1 Stage 2 Complete
+- ✅ Next.js 15 web application with Playwright E2E tests
+- ✅ Express server with oRPC for type-safe APIs
+- ✅ Four shared packages: database (Prisma), schemas (Zod), api-client (oRPC), supabase-client
+- ✅ Complete QA infrastructure: Jest, ESLint, Prettier, CI/CD
+- ⏳ In progress: QA hooks (Husky, lint-staged), Supabase configuration
 
-## Run tasks
+## Technology Stack
 
-### Workspace-level commands (recommended)
+### Applications
+- **Web**: Next.js 15.2, React 19, Tailwind CSS
+- **Server**: Express with oRPC for type-safe RPC
+- **Mobile** (deferred to Phase 2): Expo React Native
 
-The project provides convenient workspace scripts that run tasks across all projects:
+### Shared Libraries
+- **Database**: Prisma + Supabase (PostgreSQL)
+- **Schemas**: Zod validation schemas with TypeScript type inference
+- **API Client**: oRPC client factory for type-safe API calls
+- **Supabase Client**: Browser and server Supabase client factories
 
-```sh
+### Infrastructure
+- **Monorepo**: Nx 21.6 with remote caching and distributed task execution
+- **Language**: TypeScript 5.9 (strict mode)
+- **Testing**: Jest (unit), Playwright (E2E)
+- **Linting**: ESLint 9 with flat config
+- **Formatting**: Prettier
+- **CI/CD**: GitHub Actions with Nx Cloud integration
+- **Code Review**: CodeRabbit automated PR reviews
+- **Dependencies**: Dependabot for automated updates
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js 18+ and pnpm 8+
+- Git
+
+### Installation
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd nx-monorepo
+
+# Install dependencies
+pnpm install
+
+# Start development server
+pnpm run dev
+```
+
+### Verify Setup
+
+```bash
+# Run all tests
+pnpm run test
+
+# Run linting
+pnpm run lint
+
+# Build all projects
+pnpm run build
+
+# Run E2E tests
+pnpm run e2e
+```
+
+## Project Structure
+
+```
+nx-monorepo/
+├── apps/
+│   ├── web/              # Next.js web application
+│   ├── web-e2e/          # Playwright E2E tests
+│   └── server/           # Express API server
+├── packages/             # Shared libraries
+│   ├── database/         # Prisma client + utilities
+│   ├── schemas/          # Zod schemas + TypeScript types
+│   ├── api-client/       # oRPC client factory
+│   └── supabase-client/  # Supabase client configuration
+├── docs/                 # Project documentation
+│   ├── P1-plan.md       # Phase 1 implementation plan
+│   └── tech-findings-log.md  # Technical decisions log
+└── .ruler/              # AI agent instructions
+```
+
+## Architecture
+
+### Dependency Flow
+
+The architecture follows strict unidirectional dependencies:
+
+```
+apps (web, mobile) → api-client → schemas
+                      ↓
+apps (server) → database → schemas
+                ↓
+            supabase-client
+```
+
+**Key Principles**:
+- Applications depend on packages, never the reverse
+- Packages can depend on other packages, but no circular dependencies
+- All packages are buildable libraries with proper TypeScript compilation
+- Use `pnpm exec nx graph` to visualize dependencies
+
+### Type Safety
+
+- **Database → TypeScript**: Prisma generates types from schema
+- **Validation → Types**: Zod schemas with `z.infer<typeof schema>`
+- **Server → Client**: oRPC provides end-to-end type inference
+- **Shared Types**: All types centralized in `@nx-monorepo/schemas`
+
+### Package Naming
+
+All packages use the scoped naming pattern: `@nx-monorepo/<package-name>`
+
+```typescript
+// Import from shared packages
+import { createApiClient } from '@nx-monorepo/api-client';
+import { exampleSchema } from '@nx-monorepo/schemas';
+import { prisma } from '@nx-monorepo/database';
+import { createSupabaseBrowserClient } from '@nx-monorepo/supabase-client';
+```
+
+## Common Commands
+
+### Workspace Scripts (Recommended)
+
+These convenience scripts run tasks across all projects:
+
+```bash
 # Start web dev server
 pnpm run dev
 
@@ -32,75 +160,205 @@ pnpm run lint
 
 # Run E2E tests
 pnpm run e2e
+
+# Check code formatting
+pnpm run format:check
+
+# Format all code files
+pnpm run format:write
 ```
 
-### Project-specific commands
+### Project-Specific Commands
 
-To run tasks for a specific project, use:
-
-```sh
+```bash
 # Run dev server for web app
 pnpm exec nx dev web
 
-# Create production bundle
+# Run server
+pnpm exec nx serve server
+
+# Build specific project
 pnpm exec nx build web
 
-# Run tests for specific project
-pnpm exec nx test web
-```
+# Test specific project
+pnpm exec nx test schemas
 
-To see all available targets to run for a project, run:
-
-```sh
+# Show project details
 pnpm exec nx show project web
 ```
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
+### Advanced Nx Commands
 
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```bash
+# Build all apps
+pnpm exec nx run-many -t build --projects=tag:type:app
 
-## Add new projects
+# Test all libraries
+pnpm exec nx run-many -t test --projects=tag:type:lib
 
-While you could add new projects to your workspace manually, you might want to leverage [Nx plugins](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) and their [code generation](https://nx.dev/features/generate-code?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) feature.
+# Build only affected projects
+pnpm exec nx affected -t build
 
-Use the plugin's generator to create new projects.
+# View dependency graph
+pnpm exec nx graph
 
-To generate a new application, use:
-
-```sh
-pnpm exec nx g @nx/next:app demo
+# Clear Nx cache
+pnpm exec nx reset
 ```
 
-To generate a new library, use:
+## Development Workflow
 
-```sh
-pnpm exec nx g @nx/react:lib mylib
+### Adding a New Feature
+
+1. **Define schemas first**: Add Zod schemas to `@nx-monorepo/schemas`
+2. **Implement database layer**: Add Prisma models to `@nx-monorepo/database`
+3. **Create server endpoints**: Add oRPC routes in `apps/server`
+4. **Update API client**: Client types auto-update via oRPC
+5. **Implement UI**: Build features in `apps/web`
+6. **Write tests**: Add unit tests (packages), integration tests (server), E2E tests (apps)
+
+### Creating a Shared Library
+
+```bash
+# Generate buildable TypeScript library
+pnpm exec nx g @nx/js:library my-lib --directory=packages/my-lib --bundler=tsc
+
+# For Prisma packages (special case)
+pnpm exec nx g @nx/js:library my-lib --directory=packages/my-lib --bundler=none
 ```
 
-You can use `pnpm exec nx list` to get a list of installed plugins. Then, run `pnpm exec nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
+### Before Committing
 
-[Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+The project uses Husky pre-commit hooks (when configured):
+- Linting and formatting run automatically
+- TypeScript compilation validated
+- Tests run for affected projects
 
+Manual validation:
+```bash
+pnpm exec nx affected -t lint test build
+```
 
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## Testing Strategy
 
-## Install Nx Console
+### Unit Tests (Jest)
 
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
+- Co-located with source files: `src/**/*.spec.ts`
+- Test individual functions, classes, components
+- Fast execution (< 5 seconds per suite)
+- Target: >= 80% code coverage
 
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```bash
+# Run all unit tests
+pnpm exec nx run-many -t test
 
-## Useful links
+# Run with coverage
+pnpm exec nx run web:test --coverage
 
-Learn more:
+# Watch mode
+pnpm exec nx run web:test --watch
+```
 
-- [Learn more about this workspace setup](https://nx.dev/nx-api/next?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+### Integration Tests
 
-And join the Nx community:
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+- Test interactions between layers (server → database)
+- Located in `apps/server/src/**/*.spec.ts`
+- May use test database or mocks
+
+### E2E Tests (Playwright)
+
+- Full browser-based user journey tests
+- Located in `apps/web-e2e/src/`
+- Test complete flows: page load → interaction → data persistence
+
+```bash
+# Run E2E tests
+pnpm exec nx run web-e2e:e2e
+
+# Run in UI mode
+pnpm exec nx run web-e2e:e2e --ui
+```
+
+## CI/CD
+
+GitHub Actions workflow runs on all PRs and main branch commits:
+
+1. Install dependencies
+2. Install Playwright browsers
+3. Run: `nx run-many -t lint test build e2e`
+4. Execute `nx fix-ci` if failures occur (self-healing)
+
+**Nx Cloud Integration**: Enabled for distributed caching and task execution across team and CI.
+
+## Documentation
+
+- **[P1-plan.md](docs/P1-plan.md)**: Phase 1 implementation plan with stage breakdowns
+- **[tech-findings-log.md](docs/tech-findings-log.md)**: Technical decisions and empirical findings
+- **[CLAUDE.md](CLAUDE.md)**: AI agent instructions (auto-generated from `.ruler/AGENTS.md`)
+
+## External Services
+
+- **Nx Cloud**: Remote caching, distributed execution, CI analytics
+- **CodeRabbit**: Automated PR reviews
+- **Dependabot**: Automated dependency updates
+- **Sentry** (planned): Error tracking and performance monitoring
+
+## Troubleshooting
+
+### Nx Cache Issues
+
+```bash
+pnpm exec nx reset
+rm -rf node_modules
+pnpm install
+```
+
+### Build Failures
+
+```bash
+# Build in dependency order
+pnpm exec nx run-many -t build
+
+# Build only affected
+pnpm exec nx affected -t build
+```
+
+### Jest Slow Exit (Windows)
+
+If Jest hangs after tests complete:
+
+```bash
+# Disable Nx daemon
+NX_DAEMON=false pnpm exec nx run-many -t test
+
+# Or disable Nx Cloud
+pnpm exec nx run-many -t test --no-cloud
+```
+
+See `docs/tech-findings-log.md` for detailed diagnosis.
+
+## Contributing
+
+This is a template project. To use it:
+
+1. Clone the repository
+2. Remove git history: `rm -rf .git && git init`
+3. Update package names in `package.json` files
+4. Update scoped package names throughout the codebase
+5. Configure external services (Nx Cloud, Sentry, etc.)
+
+## Learn More
+
+- [Nx Documentation](https://nx.dev)
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Prisma Documentation](https://www.prisma.io/docs)
+- [oRPC Documentation](https://orpc.dev)
+- [Playwright Documentation](https://playwright.dev)
+
+## License
+
+MIT
+
+---
+
+Built with [Nx](https://nx.dev) - Smart Monorepos · Fast CI
