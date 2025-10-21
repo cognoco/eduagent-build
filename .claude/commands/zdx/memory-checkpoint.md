@@ -104,19 +104,54 @@ Provide a summary:
 - ❌ Personal preference without technical requirement
 - ❌ Work completed smoothly following existing patterns
 
+## Documentation Length Guidelines
+
+**CRITICAL: Keep entries concise and use cross-references**
+
+Each memory file has a different purpose and appropriate length:
+
+**adopted-patterns.md** - **Target: 50-80 lines per pattern**
+- Purpose: Quick reference for "how we do it"
+- What to include: Pattern description, when to apply, brief rationale
+- What to omit: Deep technical explanations (link to tech-findings-log instead)
+- Example: "Use `moduleResolution: nodenext` for all projects. See tech-findings-log.md for rationale."
+
+**post-generation-checklist.md** - **Target: 30-50 lines per checklist**
+- Purpose: Step-by-step fix instructions
+- What to include: Issue description, required actions, validation commands
+- What to omit: Why the issue exists (link to tech-findings-log instead)
+- Example: "Change `moduleResolution: node10` → `nodenext`. See adopted-patterns.md Pattern 2."
+
+**tech-findings-log.md** - **Target: 80-150 lines per entry**
+- Purpose: Deep dive technical rationale
+- What to include: Context, alternatives, technical constraints, research references
+- What to omit: Step-by-step instructions (link to post-generation-checklist instead)
+- Example: Full explanation of TypeScript Project References incompatibility with Next.js
+
+**Cross-reference instead of repeating:**
+- ✅ "See tech-findings-log.md - [Entry Title] for rationale"
+- ❌ Copy-pasting same explanation into multiple files
+
+**Warning: If total documentation exceeds 200 lines across all files:**
+- You're probably repeating yourself
+- Consider: Can this be split with cross-references?
+- Ask: Is the deep dive really necessary, or is a brief explanation sufficient?
+
 ## Smell Tests
 
 **Red flags that suggest NOTHING should be documented:**
 - "I'm documenting how we generally do X" → Check if already in AGENTS.md
-- Entry would be >100 lines → Too general, probably duplicating existing docs
+- **Entry would be >100 lines in adopted-patterns.md** → Too verbose, move detail to tech-findings-log
+- **Entry would be >50 lines in post-generation-checklist.md** → Too verbose, simplify to steps only
+- **Total documentation >200 lines across all files** → Repetitive, use cross-references
 - "This worked fine without any issues" → Then nothing needs documenting
 - "Here's how to use [framework feature]" → Link to official docs instead
 
 **Green lights that suggest something SHOULD be documented:**
-- "We chose X instead of framework default Y because..." → adopted-patterns.md
-- "Generator created Z, I had to change it to W" → post-generation-checklist.md
-- "I discovered constraint C through troubleshooting" → tech-findings-log.md
-- "This decision prevents future problem P" → Appropriate memory file
+- "We chose X instead of framework default Y because..." → adopted-patterns.md (~60 lines)
+- "Generator created Z, I had to change it to W" → post-generation-checklist.md (~40 lines)
+- "I discovered constraint C through troubleshooting" → tech-findings-log.md (~100 lines)
+- "This decision prevents future problem P" → Appropriate memory file, appropriate length
 
 ## Quality Check
 
@@ -126,7 +161,41 @@ Before finishing, verify:
 - [ ] Added validation/verification steps
 - [ ] Updated "last-updated" date in frontmatter
 - [ ] Cross-referenced related documentation
+- [ ] **Length check**: Each entry within target range for its file type
+- [ ] **Redundancy check**: Not repeating same information across files
+- [ ] **Cross-reference check**: Using links instead of duplicating explanations
+
+## Documentation Length Examples
+
+**❌ Too Verbose** (avoid this):
+```
+adopted-patterns.md: 150 lines explaining TypeScript Project References incompatibility
+post-generation-checklist.md: 100 lines explaining same incompatibility + steps
+tech-findings-log.md: 160 lines explaining same incompatibility + research
+Total: 410 lines with massive repetition
+```
+
+**✅ Just Right** (do this):
+```
+adopted-patterns.md: 60 lines
+  - Brief: "Next.js uses single tsconfig.json; Node.js uses Project References"
+  - When: "Apply X to Next.js, Y to Node.js"
+  - Reference: "See tech-findings-log.md - TypeScript Project References for rationale"
+
+post-generation-checklist.md: 40 lines
+  - Issue: "Generator doesn't create typecheck target"
+  - Steps: Concrete actions to fix
+  - Reference: "See adopted-patterns.md Pattern 4"
+
+tech-findings-log.md: 100 lines
+  - Full technical explanation with research
+  - Alternatives considered
+  - References to external docs
+  - Cross-refs: "See adopted-patterns.md Pattern 4, post-generation-checklist.md"
+
+Total: 200 lines, no repetition, clear separation of concerns
+```
 
 ---
 
-**Remember**: The memory system prevents pattern drift. Quality documentation now saves hours of debugging later.
+**Remember**: The memory system prevents pattern drift. Quality documentation now saves hours of debugging later. **Brevity with cross-references beats verbose repetition.**

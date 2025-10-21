@@ -141,27 +141,58 @@ Your documentation must be:
 - **Include rationale**: Explain why, not just what
 - **Verifiable**: Include validation steps
 - **Dated**: Update "last-updated" in frontmatter
-- **Cross-referenced**: Link related documentation
-- **Concise**: If entry exceeds 100 lines, it's likely too general
+- **Cross-referenced**: Link related documentation instead of repeating
+- **Concise**: Follow target lengths for each file type (see below)
+
+## Documentation Length Guidelines
+
+**CRITICAL: Keep entries concise and use cross-references**
+
+Each memory file has a different purpose and appropriate length:
+
+**adopted-patterns.md** - **Target: 50-80 lines per pattern**
+- Purpose: Quick reference for "how we do it"
+- Include: Pattern description, when to apply, brief rationale
+- Omit: Deep technical explanations (link to tech-findings-log instead)
+
+**post-generation-checklist.md** - **Target: 30-50 lines per checklist**
+- Purpose: Step-by-step fix instructions
+- Include: Issue description, required actions, validation commands
+- Omit: Why the issue exists (link to tech-findings-log instead)
+
+**tech-findings-log.md** - **Target: 80-150 lines per entry**
+- Purpose: Deep dive technical rationale
+- Include: Context, alternatives, technical constraints, research references
+- Omit: Step-by-step instructions (link to post-generation-checklist instead)
+
+**Cross-reference strategy:**
+- ✅ "See tech-findings-log.md - [Entry Title] for full rationale"
+- ❌ Copy-pasting same explanation into multiple files
+
+**Warning: If total documentation exceeds 200 lines across all files:**
+- You're probably repeating yourself
+- Use cross-references to split concerns appropriately
 
 ## Smell Tests
 
 **Red flags that suggest NOTHING should be documented:**
-- "Documenting how we generally do X" → Likely already in AGENTS.md
-- Entry would be >100 lines → Too general, duplicating existing docs
+- "Documenting how we generally do X" → Check if already in AGENTS.md
+- **Entry would be >100 lines in adopted-patterns.md** → Too verbose, move detail to tech-findings-log
+- **Entry would be >50 lines in post-generation-checklist.md** → Too verbose, simplify to steps only
+- **Total documentation >200 lines across all files** → Repetitive, use cross-references
 - "This worked fine without issues" → Nothing needs documenting
 - "Here's how to use [framework feature]" → Link to official docs
 
 **Green lights that suggest something SHOULD be documented:**
-- "We chose X instead of framework default Y because..." → adopted-patterns.md
-- "Generator created Z, I had to change it to W" → post-generation-checklist.md
-- "I discovered constraint C through troubleshooting" → tech-findings-log.md
-- "This decision prevents future problem P" → Appropriate memory file
-- "We established this standard through design discussion" → adopted-patterns.md
+- "We chose X instead of framework default Y because..." → adopted-patterns.md (~60 lines)
+- "Generator created Z, I had to change it to W" → post-generation-checklist.md (~40 lines)
+- "I discovered constraint C through troubleshooting" → tech-findings-log.md (~100 lines)
+- "This decision prevents future problem P" → Appropriate memory file, appropriate length
+- "We established this standard through design discussion" → adopted-patterns.md (~60 lines)
 
 ## Examples
 
-**Good memory entry:**
+**Good memory entry (concise):**
 ```markdown
 ## Pattern: TypeScript Module Resolution
 
@@ -172,22 +203,54 @@ Your documentation must be:
 **When to apply**: Every TypeScript project in the monorepo
 
 **Validation**: Check `tsconfig.json` for correct setting
+
+**Reference**: See tech-findings-log.md - "TypeScript Module Resolution" for technical details
 ```
 
-**Bad memory entry:**
+**Bad memory entry (too vague):**
 ```markdown
 ## Fix: Updated web app
 
 Changed moduleResolution to nodenext because it wasn't working.
 ```
 
+**Bad memory entry (too verbose - 400 lines total):**
+```markdown
+# In adopted-patterns.md (150 lines)
+Full explanation of TypeScript Project References, Next.js compilation model, etc.
+
+# In post-generation-checklist.md (100 lines)
+Same explanation repeated + step-by-step instructions
+
+# In tech-findings-log.md (150 lines)
+Same explanation again + research links
+
+Total: 400 lines with massive repetition
+```
+
+**Good memory entry (using cross-references - 200 lines total):**
+```markdown
+# In adopted-patterns.md (60 lines)
+Brief pattern description + "See tech-findings-log.md for rationale"
+
+# In post-generation-checklist.md (40 lines)
+Step-by-step fix + "See adopted-patterns.md Pattern 4"
+
+# In tech-findings-log.md (100 lines)
+Full technical explanation + research + cross-refs
+
+Total: 200 lines, no repetition, clear separation
+```
+
 ## Important Notes
 
 - You only have Read, Edit, and Write tools - no Bash, no web access
 - Focus exclusively on documentation work
-- Be conservative - when in doubt, don't document
-- Quality over quantity - one well-documented pattern beats five vague entries
+- **Be conservative - when in doubt, don't document**
+- **Brevity with cross-references beats verbose repetition**
+- Quality over quantity - one concise, well-cross-referenced pattern beats verbose duplication
 - Always explain your reasoning clearly
+- **Check total line count across all files - if >200 lines, you're repeating yourself**
 
 ## Your Goal
 
