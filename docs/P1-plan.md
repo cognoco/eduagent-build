@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-17
-Modified: 2025-10-21T13:32
+Modified: 2025-10-21T14:00
 Version: 1
 ---
 
@@ -322,7 +322,7 @@ Create all shared libraries following Nx conventions, ensuring each package buil
 
 - [x] **2.1: Generate database package**
   - [x] 2.1.1: Run: `pnpm exec nx g @nx/js:lib database --directory=packages/database --bundler=none`
-    - **Note**: Uses `--bundler=none` because Prisma generates code at runtime (see `docs/tech-findings-log.md`)
+    - **Note**: Uses `--bundler=none` because Prisma generates code at runtime (see `docs/memories/tech-findings-log.md`)
   - [x] 2.1.2: Install Prisma dependencies: `pnpm add -D prisma --filter @nx-monorepo/database`
   - [x] 2.1.3: Install Prisma client: `pnpm add @prisma/client --filter @nx-monorepo/database`
   - [x] 2.1.4: Set up basic Prisma configuration structure
@@ -409,7 +409,7 @@ Establish quality assurance tooling and testing scaffolding early to create a sa
   - [x] 3.2.4: Ensure it respects Nx project boundaries
   - [x] 3.2.5: Test by staging files and committing
 
-- [ ] **3.3: Verify and document existing testing infrastructure**
+- [x] **3.3: Verify and document existing testing infrastructure** ✅
 
   **Rationale**: Nx auto-generates proper Jest configurations for each project with workspace-level preset management. Rather than creating custom infrastructure, verify the standard Nx patterns work correctly and document them for future reference.
 
@@ -421,30 +421,38 @@ Establish quality assurance tooling and testing scaffolding early to create a sa
 
   **Approach**: Validate existing patterns, document for consistency, add optional enhancements only when actually needed.
 
-  - [ ] 3.3.1: Verify web app Jest configuration follows Nx standards
-    - [ ] Confirm `apps/web/jest.config.ts` extends `../../jest.preset.js`
-    - [ ] Confirm tests run successfully with current setup
-    - [ ] Review test configuration for any necessary adjustments
-    - [ ] Document current pattern for future projects
+  - [x] 3.3.1: Verify web app Jest configuration follows Nx standards ✅
+    - [x] Confirm `apps/web/jest.config.ts` extends `../../jest.preset.js` ✅
+    - [x] Confirm tests run successfully with current setup ✅
+    - [x] Review test configuration for any necessary adjustments ✅
+      - Fixed type isolation issue: Removed jest types from production `tsconfig.json`
+      - Validated tests still pass after configuration adjustment
+    - [x] Document current pattern for future projects ✅
+      - Added "Jest Configuration Patterns" section to `.ruler/AGENTS.md`
 
-  - [ ] 3.3.2: Verify TypeScript test configuration follows Nx standards
-    - [ ] Confirm `apps/web/tsconfig.spec.json` extends `../../tsconfig.base.json`
-    - [ ] Confirm Jest types are included: `"types": ["jest", "node"]`
-    - [ ] Verify production `tsconfig.json` doesn't include test types
-    - [ ] Document pattern for future projects
+  - [x] 3.3.2: Verify TypeScript test configuration follows Nx standards ✅
+    - [x] Confirm `apps/web/tsconfig.spec.json` extends `../../tsconfig.base.json` ✅
+    - [x] Confirm Jest types are included: `"types": ["jest", "node"]` ✅
+    - [x] Verify production `tsconfig.json` doesn't include test types ✅
+      - Fixed: Removed test types from production config for proper type isolation
+    - [x] Document pattern for future projects ✅
+      - Documented TypeScript test configuration pattern in `.ruler/AGENTS.md`
 
-  - [ ] 3.3.3: Document how to add Jest to new projects
-    - [ ] Add to CLAUDE.md: "To add Jest to a project: `pnpm exec nx g @nx/jest:configuration <project>`"
-    - [ ] Document that Nx auto-generates proper configs extending workspace preset
-    - [ ] Note: No manual setup required - Nx handles it automatically
+  - [x] 3.3.3: Document how to add Jest to new projects ✅
+    - [x] Add to .ruler/AGENTS.md: "To add Jest to a project: `pnpm exec nx g @nx/jest:configuration <project>`" ✅
+    - [x] Document that Nx auto-generates proper configs extending workspace preset ✅
+    - [x] Note: No manual setup required - Nx handles it automatically ✅
 
-  - [ ] 3.3.4: Document optional testing library enhancements (for future use)
-    - [ ] Create `docs/testing-enhancements.md` with optional patterns:
-      - How to add `@testing-library/jest-dom` to a React project (when DOM matchers are needed)
-      - How to add custom setup files (`setupFilesAfterEnv`) per-project
-      - Example: Creating project-specific `jest.setup.ts` for special needs
-    - [ ] Note: These are optional - add only when specific projects need them
-    - [ ] Emphasize: Start simple, add complexity only when justified
+  - [x] 3.3.4: Document optional testing library enhancements (for future use) ✅
+    - [x] Create `docs/testing-enhancements.md` with optional patterns: ✅
+      - @testing-library/jest-dom setup and usage
+      - setupFilesAfterEnv configuration pattern
+      - @testing-library/user-event for realistic user interactions
+      - Test ID best practices with namespaced conventions
+      - MSW (Mock Service Worker) for API mocking
+      - Custom render function with providers
+    - [x] Note: These are optional - add only when specific projects need them ✅
+    - [x] Emphasize: Start simple, add complexity only when justified ✅
 
 - [ ] **3.4: Configure test coverage reporting**
   - [ ] 3.4.1: Set up Jest coverage configuration (no threshold yet, just reporting)
