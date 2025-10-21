@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-17
-Modified: 2025-10-21T13:21
+Modified: 2025-10-21T13:25
 Version: 1
 ---
 
@@ -397,8 +397,10 @@ Establish quality assurance tooling and testing scaffolding early to create a sa
   - [x] 3.1.2: Initialize Husky: `pnpm exec husky init`
   - [x] 3.1.3: Set up Git hooks infrastructure
   - [x] 3.1.4: Configure pre-commit hook for linting and formatting
-  - [ ] 3.1.5: Configure commit-msg hook for conventional commits (optional)
-  - [ ] 3.1.6: Test hook triggers on commit attempt
+  - [x] 3.1.5: Install commitlint: `pnpm add -D -w @commitlint/cli @commitlint/config-conventional`
+  - [x] 3.1.6: Create `commitlint.config.js` with custom type prefixes (feat, fix, docs, chore, cfg, plan, zdx)
+  - [x] 3.1.7: Configure commit-msg hook for conventional commits
+  - [ ] 3.1.8: Test hook triggers on commit attempt
 
 - [ ] **3.2: Add pre-commit validation with lint-staged**
   - [ ] 3.2.1: Install lint-staged: `pnpm add -D lint-staged`
