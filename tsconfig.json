@@ -17,6 +17,9 @@
     },
     {
       "path": "./packages/schemas"
+    },
+    {
+      "path": "./packages/api-client"
     }
   ]
 }
