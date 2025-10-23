@@ -1,7 +1,7 @@
 {
   "name": "@nx-monorepo/server",
   "version": "0.0.1",
-  "description": "Express API server with oRPC for type-safe endpoints",
+  "description": "Express API server with REST API",
   "private": true,
   "nx": {
     "targets": {
@@ -75,6 +75,23 @@
           "copy-workspace-modules"
         ],
         "executor": "nx:noop"
+      },
+      "dev": {
+        "continuous": true,
+        "executor": "@nx/js:node",
+        "defaultConfiguration": "development",
+        "dependsOn": [
+          "build"
+        ],
+        "options": {
+          "buildTarget": "@nx-monorepo/server:build",
+          "runBuildTargetDependencies": false
+        },
+        "configurations": {
+          "development": {
+            "buildTarget": "@nx-monorepo/server:build:development"
+          }
+        }
       },
       "serve": {
         "continuous": true,
