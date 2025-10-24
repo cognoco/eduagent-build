@@ -64,37 +64,6 @@ This project uses [Ruler](https://github.com/intellectronica/ruler) to manage AI
 
 **If you catch yourself about to run `git commit`**: STOP and ask the user if they want you to commit.
 
----
-
-## 🚧 ACTIVE MIGRATION NOTICE 🚧
-
-**Status:** Currently migrating from oRPC to REST+OpenAPI (Started: 2025-10-23)
-
-**What this means for AI agents:**
-
-⚠️ **Mixed References Expected** ⚠️
-- Documentation being updated to REST+OpenAPI
-- Code still contains oRPC dependencies (will be removed)
-- Some files may reference oRPC during transition
-
-**Current Architecture:**
-- ✅ **CHOSEN:** REST+OpenAPI with Zod schemas
-- ❌ **DEPRECATED:** oRPC (being removed)
-
-**Do NOT:**
-- Suggest using oRPC for new features
-- Assume oRPC is current architecture
-- Add new oRPC dependencies
-
-**DO:**
-- Use REST+OpenAPI patterns for new work
-- Follow OpenAPI type generation patterns
-- Reference docs/architecture-decisions.md for latest architecture
-
-**Migration Progress:** Phase 0 (Safety) → Phase 1 (Documentation) → Phase 2 (Code) → Phase 3 (Validation)
-
----
-
 ## Sub-Agent Usage Policy
 
 **Applies ONLY to agents capable of sub-agent use**, eg. **Claude Code**!
