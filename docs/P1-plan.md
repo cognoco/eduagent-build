@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-17
-Modified: 2025-10-24T16:35
+Modified: 2025-10-24T17:54
 Version: 1
 ---
 Ø
@@ -591,11 +591,14 @@ Make explicit architecture decisions about API framework and database strategy, 
     - Create endpoint to serve OpenAPI spec: `GET /api/docs/openapi.json`
     - Verify spec validates as OpenAPI 3.x using online validator
 
-  - [ ] 4.1.8: Generate TypeScript types from OpenAPI spec
-    - Configure openapi-typescript in packages/api-client
-    - Add npm script: `"generate:types": "openapi-typescript <spec-url> -o src/generated/api.types.ts"`
-    - Run type generation and verify output matches server endpoint definitions
-    - Add `src/generated/` to .gitignore (or commit generated files based on team decision)
+  - [x] 4.1.8: Generate TypeScript types from OpenAPI spec (Completed 2025-10-24)
+    - ✅ Refactored server:spec-write to use TypeScript script (apps/server/scripts/write-openapi.ts)
+    - ✅ Configured openapi-typescript in packages/api-client
+    - ✅ Added Nx target: api-client:generate-types with proper dependencies (server:spec-write)
+    - ✅ Generated types to src/gen/openapi.d.ts with --export-type flag
+    - ✅ Added src/gen/ to .gitignore (build artifact strategy)
+    - ✅ Verified type generation, Nx caching, and build dependency chain
+    - ✅ Documented as Pattern 7 in docs/memories/adopted-patterns.md
 
   - [ ] 4.1.9: Configure API client factory with generated types
     - Implement createApiClient() factory in `packages/api-client/src/index.ts`
@@ -622,7 +625,7 @@ Make explicit architecture decisions about API framework and database strategy, 
 - [ ] **4.2: Supabase Architecture Decision**
   - [ ] 4.2.1: Decide: Local Supabase CLI vs cloud project
   - [ ] 4.2.2: Decide: Prisma Migrate (SQL migrations) vs db push (schema sync)
-  - [ ] 4.2.3: Decide: Service role vs anon key for Prisma connections
+  - [ ] 4.2.3: Decide: Database connection for Prisma (DATABASE_URL) vs Supabase JS keys (anon/service) — clarify usage boundaries.
   - [ ] 4.2.4: Decide: RLS policy approach for this phase
   - [ ] 4.2.5: Document decisions in `docs/architecture-decisions.md`
 

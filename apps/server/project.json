@@ -8,13 +8,12 @@
     "spec-write": {
       "executor": "nx:run-commands",
       "options": {
-        "commands": [
-          "node -e \"const fs = require('fs'); const path = require('path'); const specPath = path.join(process.cwd(), 'dist', 'apps', 'server'); fs.mkdirSync(specPath, { recursive: true }); const { getOpenApiSpec } = require('./apps/server/dist/apps/server/src/openapi/index.js'); const spec = getOpenApiSpec(); fs.writeFileSync(path.join(specPath, 'openapi.json'), JSON.stringify(spec, null, 2));\""
-        ],
+        "command": "tsx apps/server/scripts/write-openapi.ts",
         "cwd": "{workspaceRoot}"
       },
       "dependsOn": ["build"],
-      "outputs": ["{workspaceRoot}/dist/apps/server/openapi.json"]
+      "outputs": ["{workspaceRoot}/dist/apps/server/openapi.json"],
+      "cache": true
     },
     "spec-validate": {
       "executor": "nx:run-commands",
