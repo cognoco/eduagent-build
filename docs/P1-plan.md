@@ -1,9 +1,8 @@
 ---
 Created: 2025-10-17
-Modified: 2025-10-24T17:54
+Modified: 2025-10-25T11:42
 Version: 1
 ---
-Ø
 # Phase 1: Walking Skeleton
 
 ## Introduction
@@ -591,21 +590,22 @@ Make explicit architecture decisions about API framework and database strategy, 
     - Create endpoint to serve OpenAPI spec: `GET /api/docs/openapi.json`
     - Verify spec validates as OpenAPI 3.x using online validator
 
-  - [x] 4.1.8: Generate TypeScript types from OpenAPI spec (Completed 2025-10-24)
-    - ✅ Refactored server:spec-write to use TypeScript script (apps/server/scripts/write-openapi.ts)
-    - ✅ Configured openapi-typescript in packages/api-client
-    - ✅ Added Nx target: api-client:generate-types with proper dependencies (server:spec-write)
-    - ✅ Generated types to src/gen/openapi.d.ts with --export-type flag
-    - ✅ Added src/gen/ to .gitignore (build artifact strategy)
-    - ✅ Verified type generation, Nx caching, and build dependency chain
-    - ✅ Documented as Pattern 7 in docs/memories/adopted-patterns.md
+  - [x] 4.1.8: Generate TypeScript types from OpenAPI spec
+    - Refactor server:spec-write to use TypeScript script (apps/server/scripts/write-openapi.ts)
+    - Configure openapi-typescript in packages/api-client
+    - Add Nx target: api-client:generate-types with proper dependencies (server:spec-write)
+    - Generate types to src/gen/openapi.d.ts with --export-type flag
+    - Add src/gen/ to .gitignore (build artifact strategy)
+    - Verify type generation, Nx caching, and build dependency chain
+    - Document as Pattern 7 in docs/memories/adopted-patterns.md
 
-  - [ ] 4.1.9: Configure API client factory with generated types
-    - Implement createApiClient() factory in `packages/api-client/src/index.ts`
-    - Integrate chosen HTTP client with generated types for full type safety
-    - Configure: base URL, default headers, error handling, interceptors
-    - Export typed client interface with full endpoint autocomplete
-    - Write unit tests for client factory initialization
+  - [x] 4.1.9: Configure API client factory with generated types ✅ COMPLETED 2025-10-24
+    - Implemented createApiClient() factory using openapi-fetch
+    - Integrated with generated OpenAPI types for full type safety
+    - Configured: baseUrl (defaults to '/api'), headers via middleware, custom fetch
+    - Exported typed client with full endpoint autocomplete
+    - Wrote 3 minimal unit tests for Phase 1 (runtime tests deferred to 4.1.10)
+    - Validation: All tests pass, build succeeds, lint clean, typecheck passes
 
   - [ ] 4.1.10: Verify type-safe client functionality
     - Create test endpoint in server: `GET /api/hello` → `{ message: string, timestamp: number }`

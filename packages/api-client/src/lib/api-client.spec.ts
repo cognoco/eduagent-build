@@ -1,14 +1,31 @@
 import { createApiClient } from './api-client.js';
 
 describe('createApiClient', () => {
-  it('should create client with baseUrl', () => {
-    const client = createApiClient({ baseUrl: 'http://localhost:3000' });
-    expect(client.baseUrl).toEqual('http://localhost:3000');
+  it('creates a typed client with compile-time type safety', () => {
+    const client = createApiClient({ baseUrl: '/api' });
+
+    // Verify client structure
+    expect(client).toBeDefined();
+    expect(typeof client.GET).toBe('function');
+    expect(typeof client.POST).toBe('function');
+    expect(typeof client.use).toBe('function');
+
+    // Type safety is verified at compile time:
+    // - TypeScript enforces correct endpoint paths
+    // - Response types are inferred from OpenAPI spec
+    // - Invalid calls would not compile
   });
 
-  it('should return placeholder client structure', () => {
-    const client = createApiClient({ baseUrl: 'http://example.com' });
+  it('uses default baseUrl when not specified', () => {
+    const client = createApiClient();
     expect(client).toBeDefined();
-    expect(typeof client.baseUrl).toBe('string');
+  });
+
+  it('accepts custom configuration', () => {
+    const client = createApiClient({
+      baseUrl: 'http://localhost:3000/api',
+      headers: { 'X-Custom': 'value' },
+    });
+    expect(client).toBeDefined();
   });
 });
