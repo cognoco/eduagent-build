@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-21
-Modified: 2025-10-24T13:08
+Modified: 2025-10-26T16:34
 Version: 1
 ---
 
@@ -997,6 +997,431 @@ Trigger events:
 - **NestJS built-in REST**: NestJS adoption requires replacing Express
 
 **Rationale:** These frameworks either don't fit the Express + Next.js + React Native stack or add unnecessary complexity for the walking skeleton phase.
+
+---
+
+## Stage 4.2: Supabase & Database Architecture Decisions
+
+**Decision Date:** October 26, 2025
+
+After completing REST+OpenAPI infrastructure (Stage 4.1), we now formalize architectural decisions for Supabase and Prisma integration in the monorepo.
+
+---
+
+### Decision Summary
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| **Development Environment** | Cloud Supabase Project | Faster setup, lower barrier to entry, production-like from day one |
+| **Schema Management** | Prisma Migrate | Production-ready patterns, full migration history, reproducible schemas |
+| **Database Connection** | Prisma (server) + Supabase SDK (client auth only) | Clear separation of concerns, security boundary at API layer |
+| **RLS Policy** | Disabled for Phase 1 | API server is security boundary, defer RLS complexity to Phase 2+ |
+
+---
+
+### Decision 1: Development Environment - Cloud Supabase Project
+
+**Decision:** Use **Supabase Cloud** (supabase.com hosted project) for Phase 1 walking skeleton
+
+**Alternatives Considered:**
+- ❌ **Local Supabase CLI** (Docker containers): Requires Docker Desktop, more setup complexity, uses ~2GB RAM
+
+**Rationale:**
+
+1. **Phase 1 Priority = Validate Infrastructure**
+   - Goal: Prove Supabase + Prisma + REST API work together
+   - Cloud project achieves this faster (5 min setup vs 15-30 min for local)
+
+2. **Lower Barrier to Entry**
+   - No Docker knowledge required
+   - Works on Windows/Mac/Linux without configuration
+   - Template users can clone and run immediately
+
+3. **Production-Like Environment**
+   - Cloud is where real app will live
+   - No "local works, cloud broken" surprises later
+
+4. **Template Flexibility**
+   - Document cloud setup (quick start)
+   - Add local CLI instructions later as "Advanced Setup"
+
+**Migration Path:**
+- Can switch to local Supabase CLI in Phase 2+ if offline development becomes critical
+- Environment variables stay the same, just swap connection URL
+
+**Consequences:**
+- ✅ Faster Phase 1 completion
+- ✅ Better template documentation (quick start guide)
+- ⚠️ Requires internet connection for development
+- ⚠️ Free tier performance limits (acceptable for walking skeleton)
+
+---
+
+### Decision 2: Schema Management - Prisma Migrate
+
+**Decision:** Use **Prisma Migrate** for all schema changes (migration-based workflow)
+
+**Alternatives Considered:**
+- ❌ **db push** (schema sync): Faster iteration but no history, not production-safe
+
+**Rationale:**
+
+1. **Gold Standard Template = Production Patterns**
+   - Migrations are industry standard for schema management
+   - Teaching `db push` would undermine "production-ready" goal
+
+2. **Walking Skeleton Validates the RIGHT Workflow**
+   - Even though walking skeleton code is throwaway, infrastructure patterns are permanent
+   - Prove that schema changes → migrations → git → CI/CD works seamlessly
+
+3. **Minimal Overhead for Phase 1**
+   - Health check table requires 2-3 migrations total
+   - Small price for establishing best practices
+
+4. **Full Audit Trail**
+   - Every schema change documented in SQL migration files
+   - Can see how database evolved over time
+   - Reproducible: anyone can recreate database from scratch
+
+5. **No Future Migration Cost**
+   - Start with migrations, keep migrations forever
+   - No "prototype with db push, switch to migrate for production" confusion
+
+**Workflow:**
+```bash
+# Edit schema
+vim packages/database/prisma/schema.prisma
+
+# Generate migration
+pnpm --filter @nx-monorepo/database prisma migrate dev --name create_health_check
+
+# Commit migration file
+git add packages/database/prisma/migrations/
+git commit -m "feat: add HealthCheck table"
+```
+
+**Consequences:**
+- ✅ Production-ready patterns from day one
+- ✅ Full schema history in version control
+- ✅ Team collaboration (migrations visible in PRs)
+- ⚠️ Slightly more ceremony than db push (acceptable tradeoff)
+
+---
+
+### Decision 3: Database Connection Approach - Clear Separation
+
+**Decision:**
+- **Server** uses **Prisma** (via `DATABASE_URL`) for all database operations
+- **Web/Mobile** use **Supabase SDK** (via `SUPABASE_URL` + keys) for authentication ONLY
+- **Data operations** flow through Express API (never direct client → database)
+
+**Architecture Diagram:**
+```
+┌─────────────────────────────────────────────────────────┐
+│ Supabase Cloud Project                                  │
+│  ├─ PostgreSQL Database (data storage)                 │
+│  └─ Auth Service (login/signup/sessions)               │
+└─────────────────────────────────────────────────────────┘
+           ↑                           ↑
+           │                           │
+    DATABASE_URL               SUPABASE_URL + Keys
+    (PostgreSQL)               (HTTP API)
+           │                           │
+    ┌──────┴─────┐            ┌────────┴──────┐
+    │   Prisma   │            │ Supabase SDK  │
+    │    (ORM)   │            │   (Auth)      │
+    └──────┬─────┘            └────────┬──────┘
+           │                           │
+    ┌──────┴──────────┐       ┌────────┴──────────┐
+    │  apps/server    │       │  apps/web         │
+    │  (Express API)  │       │  (Next.js)        │
+    │                 │       │                   │
+    │  CRUD via       │←──────│  Calls API via    │
+    │  Prisma         │  HTTP │  openapi-fetch    │
+    └─────────────────┘       └───────────────────┘
+```
+
+**Connection Methods Explained:**
+
+#### 1. DATABASE_URL (Prisma → PostgreSQL)
+
+**What it is:** Direct PostgreSQL connection string
+
+**Format:**
+```bash
+DATABASE_URL="postgresql://postgres.xxx:[password]@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+```
+
+**Used by:**
+- `apps/server` (Express API)
+- `packages/database` (Prisma client)
+
+**Purpose:**
+- All CRUD operations (Create, Read, Update, Delete)
+- Complex queries, joins, transactions
+- Database migrations
+
+**Important:** This is a **PostgreSQL database credential** (username/password), NOT the Supabase service role key.
+
+---
+
+#### 2. SUPABASE_URL + SUPABASE_ANON_KEY (Supabase SDK)
+
+**What it is:** HTTP API credentials for Supabase services
+
+**Format:**
+```bash
+NEXT_PUBLIC_SUPABASE_URL="https://xxx.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGc..."  # JWT token
+```
+
+**Used by:**
+- `apps/web` (Next.js)
+- `apps/mobile` (Expo - Phase 2)
+- `packages/supabase-client` (client factory)
+
+**Purpose:**
+- **Authentication only** (login, signup, password reset, session management)
+- NOT for data operations (those go through Express API)
+
+**Important:** The anon key and service role key are **Supabase HTTP API keys** (JWT tokens), completely separate from `DATABASE_URL` PostgreSQL credentials.
+
+---
+
+**Rationale:**
+
+1. **Security**
+   - ❌ Never give browsers direct database access (huge risk)
+   - ✅ All database logic in server API (controlled environment)
+   - ✅ Supabase SDK in browser is safe (designed for client-side auth)
+
+2. **Architecture**
+   - ✅ Single source of truth for business logic (server API)
+   - ✅ Web and mobile apps identical (both call same API)
+   - ✅ Easy to add validation, rate limiting, caching at API layer
+
+3. **Flexibility**
+   - ✅ Can switch databases without touching client apps
+   - ✅ Testing is easier (mock API, not database)
+
+**Example Flow:**
+```
+User wants health check data:
+
+1. Web app → GET /api/health (via openapi-fetch)
+2. Server API → Prisma query: prisma.healthCheck.findMany()
+3. Server → JSON response to web app
+4. Web app displays data
+```
+
+**Environment Variables Required:**
+
+**Server** (`.env` in workspace root):
+```bash
+DATABASE_URL="postgresql://postgres.xxx:[password]@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+```
+
+**Web** (`.env.local` in workspace root):
+```bash
+NEXT_PUBLIC_SUPABASE_URL="https://xxx.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGc..."
+NEXT_PUBLIC_API_URL="http://localhost:3001/api"
+```
+
+**Consequences:**
+- ✅ Clear security boundary at API layer
+- ✅ Consistent data access pattern for web and mobile
+- ✅ Easy to test and mock
+- ⚠️ Requires understanding of two separate authentication systems
+
+---
+
+### Decision 4: RLS Policy Approach - Disabled for Phase 1
+
+**Decision:** **Disable Row Level Security (RLS)** for Phase 1 walking skeleton tables
+
+**Alternatives Considered:**
+- ❌ **Enable RLS with policies**: Defense in depth but adds complexity
+- ❌ **Service role bypass**: Misleading (RLS "enabled" but not enforced)
+
+**What is RLS:**
+
+Row Level Security is a PostgreSQL feature that enforces access control at the database row level.
+
+**Example:** With RLS enabled + policies, Alice sees only her posts, Bob sees only his posts, even if both query the same table.
+
+**Why Supabase Emphasizes RLS:**
+
+Supabase's default architecture assumes **clients talk directly to database**:
+```
+Browser → Supabase SDK → PostgreSQL
+                         ↑
+                    RLS protects here
+```
+
+In this model, RLS is critical because browsers have database credentials.
+
+---
+
+**Why Our Architecture is Different:**
+
+**Our architecture has API server as security boundary**:
+```
+Browser → Express API → Prisma → PostgreSQL
+          ↑
+     Security enforced HERE
+     - Authentication checks
+     - Authorization logic
+     - Validation
+```
+
+**Key difference:**
+- ❌ Browser does NOT have direct database access
+- ✅ Browser calls Express API only
+- ✅ API server validates before querying database
+
+---
+
+**Rationale for Disabling RLS:**
+
+1. **Phase 1 = Infrastructure Validation, Not Security Hardening**
+   - Walking skeleton proves: Supabase → Prisma → Express → Next.js works
+   - Security policies can be added in Phase 2+ with real features
+
+2. **Architecture Doesn't Need RLS**
+   - API server is the security boundary
+   - Browser never touches database directly
+   - RLS would be redundant
+
+3. **Avoids Complexity Without Value**
+   - Learning RLS policy syntax is 2-4 hour rabbit hole
+   - Phase 1 goal: validate plumbing, not implement production security
+
+4. **Clear Documentation Opportunity**
+   - Document WHY RLS is disabled (architectural decision, not laziness)
+   - Provides template users with clear security model
+
+---
+
+**Important Technical Clarification:**
+
+**Two Separate Authentication Systems Exist:**
+
+1. **Prisma (SQL connection)**
+   - Uses `DATABASE_URL` with PostgreSQL credentials (username/password)
+   - Connects as database role (typically `postgres` superuser)
+   - Superusers bypass RLS by default in PostgreSQL
+   - RLS policies with `TO authenticated`, `TO anon` don't apply here
+
+2. **Supabase SDK (HTTP API)**
+   - Uses `SUPABASE_URL` + anon/service role keys (JWT tokens)
+   - Goes through Supabase's PostgREST layer
+   - RLS policies DO apply to PostgREST connections (when enabled)
+
+**Why this matters:**
+- Prisma connects via PostgreSQL protocol (SQL), not Supabase HTTP API
+- Standard RLS policies targeting `authenticated`/`anon` roles won't affect Prisma queries
+- If enabling RLS to protect Prisma queries later, you'd need:
+  - Non-superuser PostgreSQL role for Prisma
+  - Policies written for that SQL role
+  - Understanding of `FORCE ROW LEVEL SECURITY` behavior
+
+This complexity is not warranted for Phase 1.
+
+---
+
+**Implementation:**
+
+```sql
+-- Disable RLS on walking skeleton table
+ALTER TABLE health_checks DISABLE ROW LEVEL SECURITY;
+```
+
+**When to Enable RLS Later:**
+
+Consider enabling RLS in Phase 2+ if you add:
+- Real user authentication (login system with multi-user data)
+- Direct client database access (Supabase Realtime subscriptions)
+- Compliance requirements for defense-in-depth security
+- Multi-tenant data (user A shouldn't see user B's data)
+
+**Migration Guide:**
+```sql
+-- Enable RLS
+ALTER TABLE user_posts ENABLE ROW LEVEL SECURITY;
+
+-- Create policy for authenticated users
+CREATE POLICY "Users can read own posts"
+ON user_posts
+FOR SELECT
+TO authenticated
+USING (auth.uid() = user_id);
+```
+
+**Consequences:**
+- ✅ Simpler Phase 1 development (no policy syntax learning)
+- ✅ Clear security model (API server handles all auth/validation)
+- ✅ Documented decision (not security oversight)
+- ⚠️ Supabase dashboard will show "RLS not enabled" warnings (acceptable)
+- ⚠️ If architecture changes (direct client access), need to retrofit RLS
+
+---
+
+## Implementation Checklist for Stage 4.2-4.5
+
+Based on the decisions above, here's the execution plan:
+
+### Stage 4.3: Set up Supabase Project (Cloud)
+
+- [ ] Create free Supabase project at supabase.com
+- [ ] Copy `DATABASE_URL` from project settings
+- [ ] Copy `SUPABASE_URL` and `SUPABASE_ANON_KEY` from project settings
+- [ ] Create `.env` in workspace root with `DATABASE_URL`
+- [ ] Create `.env.local` in workspace root with Supabase public keys
+- [ ] Add `.env` and `.env.local` to `.gitignore` (if not already)
+- [ ] Create `.env.example` template for other developers
+- [ ] Test connectivity: `psql $DATABASE_URL -c "SELECT 1"`
+
+### Stage 4.4: Configure Prisma in Database Package
+
+- [ ] Create `packages/database/prisma/schema.prisma`
+- [ ] Configure PostgreSQL datasource with `env("DATABASE_URL")`
+- [ ] Define minimal HealthCheck model:
+  ```prisma
+  model HealthCheck {
+    id        String   @id @default(uuid())
+    message   String
+    timestamp DateTime @default(now())
+  }
+  ```
+- [ ] Run: `pnpm --filter @nx-monorepo/database prisma generate`
+- [ ] Run: `pnpm --filter @nx-monorepo/database prisma migrate dev --name create_health_check`
+- [ ] Verify migration file created in `packages/database/prisma/migrations/`
+- [ ] Verify table exists in Supabase dashboard
+- [ ] Disable RLS: Run SQL in Supabase SQL Editor: `ALTER TABLE "HealthCheck" DISABLE ROW LEVEL SECURITY;`
+- [ ] Commit migration files to git
+
+### Stage 4.5: Configure Supabase Client Factory
+
+- [ ] Implement `createSupabaseBrowserClient()` in `packages/supabase-client/src/lib/supabase-client.ts`
+- [ ] Implement `createSupabaseServerClient()` for Next.js Server Components
+- [ ] Export client factories from `packages/supabase-client/src/index.ts`
+- [ ] Add placeholder documentation: "Auth only, data operations go through API"
+- [ ] Test client initialization with dummy environment variables
+
+---
+
+## Changelog
+
+- **2025-10-26**: Stage 4.2 - Supabase & Database Architecture Decisions
+  - **Decision 1**: Cloud Supabase project (not local CLI) for Phase 1
+  - **Decision 2**: Prisma Migrate (not db push) for schema management
+  - **Decision 3**: Prisma for server database operations, Supabase SDK for client auth only
+  - **Decision 4**: Disable RLS for Phase 1, defer to Phase 2+ when real auth is implemented
+  - Rationale: Walking skeleton validates production-ready patterns with minimal complexity
+  - Documented: Implementation checklist for Stage 4.3-4.5 with exact steps
+  - Clarified: Two separate authentication systems (PostgreSQL credentials vs Supabase API keys)
+  - Corrected: Technical details about RLS policy scope and Prisma connection behavior
 
 ---
 

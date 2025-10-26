@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-17
-Modified: 2025-10-25T21:03
+Modified: 2025-10-26T16:53
 Version: 1
 ---
 # Phase 1: Walking Skeleton
@@ -644,18 +644,34 @@ Make explicit architecture decisions about API framework and database strategy, 
     - Validation: All server tests pass, type safety verified, build succeeds
     - Note: Deferred error handling tests (500, timeouts) to Phase 2 - walking skeleton validated
 
-- [ ] **4.2: Supabase Architecture Decision**
-  - [ ] 4.2.1: Decide: Local Supabase CLI vs cloud project
-  - [ ] 4.2.2: Decide: Prisma Migrate (SQL migrations) vs db push (schema sync)
-  - [ ] 4.2.3: Decide: Database connection for Prisma (DATABASE_URL) vs Supabase JS keys (anon/service) — clarify usage boundaries.
-  - [ ] 4.2.4: Decide: RLS policy approach for this phase
-  - [ ] 4.2.5: Document decisions in `docs/architecture-decisions.md`
+- [x] **4.2: Supabase Architecture Decision** ✅ COMPLETED 2025-10-26
+  - [x] 4.2.1: Decide: Local Supabase CLI vs cloud project
+  - [x] 4.2.2: Decide: Prisma Migrate (SQL migrations) vs db push (schema sync)
+  - [x] 4.2.3: Decide: Database connection for Prisma (DATABASE_URL) vs Supabase JS keys (anon/service) — clarify usage boundaries.
+  - [x] 4.2.4: Decide: RLS policy approach for this phase
+  - [x] 4.2.5: Document decisions in `docs/architecture-decisions.md`
+    - Added comprehensive "Stage 4.2: Supabase & Database Architecture Decisions" section
+    - Documented all 4 decisions with detailed rationale, alternatives considered, consequences
+    - Included implementation checklists for Stage 4.3-4.5
+    - Clarified technical details: PostgreSQL credentials vs Supabase API keys, RLS policy scope
 
-- [ ] **4.3: Set up Supabase project (based on 4.2 decision)**
-  - [ ] 4.3.1: Create Supabase project (cloud or initialize local)
-  - [ ] 4.3.2: Configure environment variables (`.env.local`, `.env`)
-  - [ ] 4.3.3: Document environment variable setup in `docs/environment-setup.md`
-  - [ ] 4.3.4: Test connectivity from local machine
+- [x] **4.3: Set up Supabase project (based on 4.2 decision)** ✅ COMPLETED 2025-10-26
+  - [x] 4.3.1: Create Supabase project (cloud or initialize local)
+    - Created cloud project "nx-monorepo" in ZIX-DEV organization
+    - Region: North EU (Stockholm)
+    - Connection type: Data API + Connection String
+  - [x] 4.3.2: Configure environment variables (`.env.local`, `.env`)
+    - Created `.env` with DATABASE_URL for Prisma
+    - Created `.env.local` with Supabase public credentials (URL, anon key, API URL)
+    - Created `.env.example` template for other developers
+    - Updated `.gitignore` to ignore `.env` and `.env.local`
+  - [x] 4.3.3: Document environment variable setup in `docs/environment-setup.md`
+    - Comprehensive documentation with architecture diagram
+    - Explained both connection methods (Prisma vs Supabase SDK)
+    - Security best practices and troubleshooting guide
+  - [x] 4.3.4: Test connectivity from local machine - SKIPPED - testing in 4.4
+    - Verified credentials collected correctly from Supabase dashboard
+    - Environment files created and confirmed gitignored
 
 - [ ] **4.4: Configure Prisma in database package**
   - [ ] 4.4.1: Set up `packages/database/prisma/schema.prisma`
@@ -683,16 +699,16 @@ Make explicit architecture decisions about API framework and database strategy, 
 - [x] Architecture decisions documented in `docs/architecture-decisions.md` ✅
 - [x] API framework choice (REST+OpenAPI) documented with detailed rationale ✅
 - [x] oRPC completely removed from codebase (dependencies, imports, documentation) ✅
-- [ ] REST+OpenAPI tooling stack selected and documented
-- [ ] REST+OpenAPI dependencies installed (server and client)
-- [ ] Express routes structure configured in `apps/server/src/routes/`
-- [ ] OpenAPI spec generation configured and working
-- [ ] OpenAPI spec endpoint accessible: `GET /api/docs/openapi.json`
-- [ ] TypeScript type generation from OpenAPI spec working
-- [ ] API client factory configured with generated types
-- [ ] Type-safe client demonstrates autocomplete for endpoints
-- [ ] TypeScript enforces request/response types at compile time
-- [ ] End-to-end infrastructure test passes (dummy endpoint via type-safe client)
+- [x] REST+OpenAPI tooling stack selected and documented
+- [x] REST+OpenAPI dependencies installed (server and client)
+- [x] Express routes structure configured in `apps/server/src/routes/`
+- [x] OpenAPI spec generation configured and working
+- [x] OpenAPI spec endpoint accessible: `GET /api/docs/openapi.json`
+- [x] TypeScript type generation from OpenAPI spec working
+- [x] API client factory configured with generated types
+- [x] Type-safe client demonstrates autocomplete for endpoints
+- [x] TypeScript enforces request/response types at compile time
+- [x] End-to-end infrastructure test passes (dummy endpoint via type-safe client)
 
 **4.2-4.5: Supabase & Database Configuration**
 - [ ] Supabase strategy documented with rationale

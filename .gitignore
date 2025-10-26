@@ -53,6 +53,11 @@ out
 
 test-output
 
+# Environment variables
+.env
+.env.local
+.env*.local
+
 
 # START Ruler Generated Files
 /.codex/config.toml
