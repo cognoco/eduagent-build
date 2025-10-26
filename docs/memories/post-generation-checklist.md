@@ -5,7 +5,7 @@ audience: AI agents, developers
 created: 2025-10-21
 last-updated: 2025-10-21
 Created: 2025-10-21T14:40
-Modified: 2025-10-21T17:57
+Modified: 2025-10-23T16:36
 ---
 
 # Post-Generation Checklist

@@ -1,0 +1,9 @@
+extends: spectral:oas
+
+rules:
+  operation-success-response: error
+  operation-operationId: error
+  operation-description: warn
+  info-contact: error
+  info-license: error
+  tag-description: warn

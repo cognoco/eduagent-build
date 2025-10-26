@@ -5,7 +5,7 @@ audience: AI agents, developers, architects
 created: 2025-10-21
 last-updated: 2025-10-21
 Created: 2025-10-21T14:41
-Modified: 2025-10-23T16:03
+Modified: 2025-10-23T16:36
 ---
 
 # Memory System Documentation
@@ -34,7 +34,7 @@ This directory contains the monorepo's **institutional knowledge** - the pattern
 
 ### Scenario: Architectural Regression
 
-**Month 1**: Decide on `moduleResolution: nodenext` for workspace compatibility
+**Month 1**: Decide on `moduleResolution: bundler` for base config, `nodenext` for test configs
 **Month 6**: Agent sees generated `node10`, thinks "this is the new standard"
 **Result**: Workspace configuration breaks, tests fail ❌
 
@@ -52,7 +52,7 @@ This directory captures **transferable knowledge** that applies across multiple 
 
 **Content**:
 - Test file locations (co-located in `src/`)
-- TypeScript configuration standards (`moduleResolution: nodenext`)
+- TypeScript configuration standards (`moduleResolution: bundler` for base, `nodenext` for tests)
 - Jest configuration patterns (workspace preset inheritance)
 - Code organization conventions
 - Dependency version standards
@@ -307,7 +307,7 @@ Memory captures **transferable patterns** that apply to **multiple similar conte
 
 ✅ **DO capture**:
 - "When you generate ANY package with Jest, update moduleResolution to nodenext"
-- "How to integrate oRPC client in React-based apps (web, mobile)"
+- "How to integrate REST API client in React-based apps (web, mobile)"
 - "TypeScript configuration standards for ALL projects"
 
 ❌ **DON'T capture**:

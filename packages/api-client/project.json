@@ -1,0 +1,41 @@
+{
+  "name": "@nx-monorepo/api-client",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/api-client/src",
+  "projectType": "library",
+  "targets": {
+    "generate-types": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec openapi-typescript dist/apps/server/openapi.json -o packages/api-client/src/gen/openapi.d.ts --export-type",
+        "cwd": "{workspaceRoot}"
+      },
+      "outputs": ["{projectRoot}/src/gen/openapi.d.ts"],
+      "dependsOn": ["@nx-monorepo/server:spec-write"],
+      "cache": true
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "packages/api-client",
+        "command": "tsc --build tsconfig.lib.json"
+      },
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/dist"],
+      "dependsOn": ["generate-types", "^build"],
+      "syncGenerators": ["@nx/js:typescript-sync"],
+      "metadata": {
+        "technologies": ["typescript"],
+        "description": "Builds the project with `tsc`.",
+        "help": {
+          "command": "pnpm exec tsc --build --help",
+          "example": {
+            "args": ["--force"]
+          }
+        }
+      }
+    }
+  },
+  "tags": ["npm:private"]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@nx-monorepo/server",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/server/src",
+  "projectType": "application",
+  "tags": ["type:app"],
+  "targets": {
+    "spec-write": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsx apps/server/scripts/write-openapi.ts",
+        "cwd": "{workspaceRoot}"
+      },
+      "dependsOn": ["build"],
+      "outputs": ["{workspaceRoot}/dist/apps/server/openapi.json"],
+      "cache": true
+    },
+    "spec-validate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm --filter @nx-monorepo/server exec spectral lint ../../dist/apps/server/openapi.json --ruleset ../../.spectral.yaml",
+        "cwd": "apps/server"
+      },
+      "dependsOn": ["spec-write"]
+    }
+  }
+}

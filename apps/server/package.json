@@ -13,7 +13,7 @@
         "defaultConfiguration": "production",
         "options": {
           "platform": "node",
-          "outputPath": "apps/server/dist",
+          "outputPath": "dist/apps/server",
           "format": [
             "cjs"
           ],
@@ -27,7 +27,8 @@
             "sourcemap": true,
             "outExtension": {
               ".js": ".js"
-            }
+            },
+            "outbase": "apps/server/src"
           }
         },
         "configurations": {
@@ -49,8 +50,8 @@
         "cache": true,
         "executor": "@nx/js:prune-lockfile",
         "outputs": [
-          "{workspaceRoot}/apps/server/dist/package.json",
-          "{workspaceRoot}/apps/server/dist/pnpm-lock.yaml"
+          "{workspaceRoot}/dist/apps/server/package.json",
+          "{workspaceRoot}/dist/apps/server/pnpm-lock.yaml"
         ],
         "options": {
           "buildTarget": "build"
@@ -62,7 +63,7 @@
         ],
         "cache": true,
         "outputs": [
-          "{workspaceRoot}/apps/server/dist/workspace_modules"
+          "{workspaceRoot}/dist/apps/server/workspace_modules"
         ],
         "executor": "@nx/js:copy-workspace-modules",
         "options": {
@@ -116,6 +117,17 @@
     }
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "@asteasolutions/zod-to-openapi": "^8.1.0",
+    "@nx-monorepo/schemas": "workspace:*",
+    "express": "^4.21.2",
+    "openapi3-ts": "^4.5.0",
+    "swagger-ui-express": "^5.0.1",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@stoplight/spectral-cli": "^6.15.0",
+    "@types/supertest": "^6.0.3",
+    "@types/swagger-ui-express": "^4.1.8",
+    "supertest": "^7.1.4"
   }
 }
