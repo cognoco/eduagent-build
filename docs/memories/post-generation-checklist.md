@@ -3,9 +3,9 @@ title: Post-Generation Checklist
 purpose: Mandatory steps after running Nx generators
 audience: AI agents, developers
 created: 2025-10-21
-last-updated: 2025-10-21
+last-updated: 2025-10-27
 Created: 2025-10-21T14:40
-Modified: 2025-10-23T16:36
+Modified: 2025-10-27T13:24
 ---
 
 # Post-Generation Checklist
@@ -219,6 +219,78 @@ pnpm exec nx run-many -t build --projects=tag:type:app
 Prisma generates code at runtime (`prisma generate`), not build time. Using `--bundler=tsc` or other bundlers breaks Prisma client imports due to path resolution issues.
 
 **Reference**: `docs/memories/tech-findings-log.md` - "Database Package Bundler Strategy"
+
+---
+
+## After: `prisma migrate dev --create-only` (Prisma Migration Generation)
+
+### Issue
+Prisma generates migration SQL files but does not include Row Level Security (RLS) configuration. For API-secured applications, RLS must be manually disabled after table creation.
+
+### Required Actions
+
+**1. Edit the generated migration SQL file**
+
+Location: `packages/database/prisma/migrations/<timestamp>_<name>/migration.sql`
+
+After each CREATE TABLE statement, add:
+```sql
+-- Disable Row Level Security (API server is security boundary)
+-- Architecture: docs/architecture-decisions.md - Stage 4.2, Decision 4
+ALTER TABLE "table_name" DISABLE ROW LEVEL SECURITY;
+```
+
+Example:
+```sql
+-- CreateTable
+CREATE TABLE "health_checks" (
+    "id" UUID NOT NULL,
+    "message" TEXT NOT NULL,
+    "timestamp" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "health_checks_pkey" PRIMARY KEY ("id")
+);
+
+-- Disable Row Level Security (API server is security boundary)
+-- Architecture: docs/architecture-decisions.md - Stage 4.2, Decision 4
+ALTER TABLE "health_checks" DISABLE ROW LEVEL SECURITY;
+```
+
+**2. Format the migration with Prisma**
+
+```bash
+pnpm --filter @nx-monorepo/database prisma format
+```
+
+**3. Apply the migration**
+
+```bash
+pnpm --filter @nx-monorepo/database prisma migrate dev
+```
+
+**4. Verify RLS is disabled**
+
+Query the database to confirm:
+```sql
+SELECT tablename, rowsecurity
+FROM pg_tables
+WHERE schemaname = 'public'
+  AND tablename = 'your_table_name';
+```
+
+Expected: `rowsecurity = f` (false)
+
+### Validation
+
+Verify in Supabase dashboard:
+1. Navigate to Table Editor
+2. Select your table
+3. Check that RLS is disabled
+
+### Why This Matters
+
+Our architecture uses the API server as the security boundary (not database RLS). Enabling RLS would block API server queries and break functionality. This manual step ensures migrations align with our security model.
+
+**Reference**: `docs/memories/adopted-patterns.md` - Pattern 8: Prisma Schema Conventions
 
 ---
 
