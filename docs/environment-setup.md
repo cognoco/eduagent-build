@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-26
-Modified: 2025-10-26T16:50
+Modified: 2025-10-27T15:46
 Version: 1
 ---
 
@@ -55,7 +55,7 @@ Each connection method requires different credentials stored in separate environ
 DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres"
 ```
 
-**Create `.env.local` in workspace root:**
+**Create `.env.local` in workspace root (use `.env.example` as a template):**
 ```bash
 # Client-side Supabase credentials
 NEXT_PUBLIC_SUPABASE_URL="https://[PROJECT-REF].supabase.co"
@@ -65,7 +65,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 NEXT_PUBLIC_API_URL="http://localhost:3001/api"
 ```
 
-**Both files are gitignored** - they will never be committed to version control.
+**Both files are gitignored** - they will never be committed to version control. See `.env.example` for placeholders you can copy.
 
 ---
 

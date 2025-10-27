@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-16T20:18
-Modified: 2025-10-23T16:00
+Modified: 2025-10-27T15:51
 ---
 # PoC Plan: Nx Monorepo with Functional Parity to bts-test
 
@@ -41,12 +41,12 @@ We are **NOT** recreating bts-test's architecture. We are recreating its **funct
 - ✅ Todo CRUD operations
 - ✅ User authentication (Supabase Auth instead of Better-Auth)
 - ✅ Database operations (Prisma with Supabase)
-- ✅ Type-safe API (oRPC)
+- ✅ Type-safe API (REST+OpenAPI)
 - ✅ Web UI (Next.js)
 - ✅ Mobile UI (React Native/Expo with Expo Router)
 - ✅ Shared validation (Zod schemas)
 - ✅ Shared database client (Prisma)
-- ✅ Shared API client (oRPC client factory)
+- ✅ Shared API client (REST+OpenAPI client factory)
 
 #### Testing Checklist
 
