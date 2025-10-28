@@ -1,12 +1,25 @@
 ---
 Created: 2025-10-21T13:59
-Modified: 2025-10-21T13:59
+Modified: 2025-10-28T13:23
 ---
-# Optional Testing Enhancements
+# Testing Enhancements (Optional)
 
-This document describes optional testing library enhancements for React/Next.js projects in this Nx monorepo.
+## Prerequisites
 
-## When to Use These Patterns
+This guide assumes familiarity with the baseline testing infrastructure documented in [../memories/testing-reference.md](../memories/testing-reference.md):
+- Jest configuration patterns
+- TypeScript test configuration
+- Coverage thresholds
+- Co-located test file conventions
+
+## When to Use These Enhancements
+
+**Phase 1 (Current)**: Optional - Core testing works without these patterns.
+
+**Phase 2+ (Recommended)**: Adopt these patterns as feature complexity increases:
+- **jest-dom**: When UI components need semantic assertions
+- **user-event**: When simulating realistic user interactions
+- **MSW**: When testing components that fetch external data
 
 **Start simple. Add complexity only when justified.**
 

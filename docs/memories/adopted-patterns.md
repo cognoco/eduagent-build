@@ -3,9 +3,9 @@ title: Adopted Patterns
 purpose: Monorepo-specific standards that override framework defaults
 audience: AI agents, developers
 created: 2025-10-21
-last-updated: 2025-10-27
+last-updated: 2025-10-28
 Created: 2025-10-21T14:39
-Modified: 2025-10-27T13:23
+Modified: 2025-10-28T13:25
 ---
 
 # Adopted Patterns
@@ -1530,6 +1530,281 @@ cat packages/database/prisma/migrations/*/migration.sql
 - docs/architecture-decisions.md (Stage 4.2, Decision 4 - RLS strategy)
 - docs_archive/research/stage-4.4a-research-findings.md (Track 1-3 research)
 - packages/database/PLATFORM-NOTES.md (Windows ARM64 limitation)
+
+---
+
+## Pattern 9: Prisma Client Singleton
+
+**Our Standard**: Use globalThis singleton pattern to prevent connection pool exhaustion in development hot-reload
+
+### Pattern
+
+**Prisma Client Singleton (`packages/database/src/lib/prisma-client.ts`):**
+```typescript
+import { PrismaClient } from '@prisma/client';
+
+const prismaClientSingleton = () => {
+  return new PrismaClient();
+};
+
+declare global {
+  // eslint-disable-next-line no-var
+  var prismaGlobal: PrismaClient | undefined;
+}
+
+export const prisma = globalThis.prismaGlobal ?? prismaClientSingleton();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalThis.prismaGlobal = prisma;
+}
+```
+
+**Export from package index (`packages/database/src/index.ts`):**
+```typescript
+export * from './lib/database.js';
+export { prisma } from './lib/prisma-client.js';
+```
+
+### Applies To
+
+All packages containing Prisma Client (`packages/database/` and any future database packages)
+
+### Rationale
+
+**Why globalThis singleton in development:**
+- Next.js hot reload creates new module instances on every change
+- Each new PrismaClient() creates a new connection pool
+- Connection pools have limits (default: 10 connections)
+- Hot reload without singleton exhausts connections quickly → "too many clients" errors
+
+**Why fresh instances in production:**
+- Production deployments don't have hot reload
+- Fresh instance per deployment ensures clean state
+- No memory leaks from persistent global variables
+
+**Why this pattern over alternatives:**
+- ✅ **Prisma official recommendation** for Next.js applications
+- ✅ **Type-safe** with proper TypeScript declarations
+- ✅ **Simple** - no complex dependency injection needed
+- ✅ **Automatic** - works without manual initialization
+
+**Alternatives rejected:**
+- ❌ **No singleton**: Exhausts connection pool in development
+- ❌ **Module-level singleton only**: Still creates new instances on hot reload
+- ❌ **Class-based singleton**: More complex, same behavior
+- ❌ **Dependency injection container**: Overkill for this use case
+
+### When Adding New Database Packages
+
+**Required actions:**
+1. Create `src/lib/prisma-client.ts` with the singleton pattern
+2. Export `prisma` from `src/index.ts`
+3. Use `@nx/js:lib` with `--bundler=none` (see tech-findings-log.md)
+4. Test hot reload behavior in development:
+   ```bash
+   # Start dev server
+   pnpm exec nx dev web
+
+   # Make changes and verify no "too many clients" errors
+   # in server logs during hot reload
+   ```
+
+**Validation:**
+```typescript
+// Test import in consuming package
+import { prisma } from '@nx-monorepo/database';
+
+// Verify singleton behavior
+const client1 = prisma;
+const client2 = prisma;
+console.assert(client1 === client2, 'Should be same instance');
+```
+
+### Last Validated
+
+2025-10-27 (Prisma 6.17.1, Next.js 15.2, Node.js 22)
+
+**References**:
+- [Prisma Best Practices for Next.js](https://www.prisma.io/docs/guides/other/troubleshooting-orm/help-articles/nextjs-prisma-client-dev-practices)
+- docs/memories/tech-findings-log.md (Database Package Bundler Strategy)
+- packages/database/src/lib/prisma-client.ts (implementation)
+
+---
+
+## Pattern 10: Testing Enhancement Libraries (Mandatory)
+
+**Our Standard**: UI packages MUST use jest-dom, user-event, and MSW for consistent, high-quality testing patterns
+
+### Pattern
+
+**Package Requirements by Type:**
+
+| Package Type | jest-dom | user-event | MSW | Rationale |
+|-------------|----------|------------|-----|-----------|
+| **UI (web, future mobile)** | ✅ Required | ✅ Required | ✅ Required | Full testing stack for React components |
+| **Node (server, APIs)** | ✅ Required | ❌ N/A | ⚠️ Conditional | Consistent assertions; MSW only if testing HTTP endpoints |
+| **Pure Logic (schemas, utils)** | ❌ N/A | ❌ N/A | ❌ N/A | Basic Jest sufficient for logic tests |
+
+**Installation (UI packages):**
+```bash
+pnpm add --save-dev @testing-library/jest-dom @testing-library/user-event msw
+```
+
+**Setup Files After Env (`apps/web/jest.config.ts`):**
+```typescript
+export default {
+  // ... other config
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+};
+```
+
+**Jest Setup File (`apps/web/jest.setup.ts`):**
+```typescript
+import '@testing-library/jest-dom';
+```
+
+**Testing Standards:**
+
+1. **Interactions**: Use `user-event` for ALL user interactions (clicks, typing, keyboard). NEVER use `fireEvent` directly.
+   ```typescript
+   // ✅ Correct
+   await userEvent.click(screen.getByRole('button'));
+
+   // ❌ Wrong
+   fireEvent.click(screen.getByRole('button'));
+   ```
+
+2. **Assertions**: Use jest-dom matchers for semantic assertions
+   ```typescript
+   // ✅ Correct
+   expect(element).toBeInTheDocument();
+   expect(button).toBeDisabled();
+
+   // ❌ Wrong
+   expect(element).toBeTruthy();
+   expect(button.disabled).toBe(true);
+   ```
+
+3. **API Mocking**: Use MSW for ALL API mocking in component tests. No fetch mocks, no axios mocks.
+   ```typescript
+   // ✅ Correct
+   import { http, HttpResponse } from 'msw';
+   import { setupServer } from 'msw/node';
+
+   const server = setupServer(
+     http.get('/api/users', () => HttpResponse.json([]))
+   );
+
+   beforeAll(() => server.listen());
+   afterEach(() => server.resetHandlers());
+   afterAll(() => server.close());
+   ```
+
+4. **Test IDs**: Use `data-testid` ONLY when semantic queries fail. Prefer `getByRole`, `getByLabelText`, `getByText`.
+   ```typescript
+   // ✅ Correct (semantic query)
+   screen.getByRole('button', { name: /submit/i });
+
+   // ⚠️ Use only when semantic query impossible
+   screen.getByTestId('custom-widget');
+   ```
+
+5. **Async Operations**: Always use `await` with user-event. Always use `findBy*` for elements appearing after async operations.
+   ```typescript
+   // ✅ Correct
+   await userEvent.click(button);
+   const result = await screen.findByText(/success/i);
+
+   // ❌ Wrong
+   userEvent.click(button); // Missing await
+   const result = screen.getByText(/success/i); // Should be findBy for async
+   ```
+
+### Applies To
+
+- **Mandatory**: All UI packages (web, future mobile apps)
+- **Conditional**: Node packages with HTTP endpoint testing (server APIs)
+- **Not Applicable**: Pure logic packages (schemas, utilities)
+
+### Rationale
+
+**Why mandatory for AI-driven development:**
+- ✅ **Reduces AI decision overhead**: Eliminates "which testing approach?" questions on every test
+- ✅ **Consistent test generation**: AI agents follow explicit patterns instead of making choices
+- ✅ **Industry standard alignment**: React Testing Library official recommendations (2025)
+- ✅ **Better test quality**: Semantic assertions, real user interactions, actual API contracts
+- ✅ **Monorepo consistency**: All UI packages use identical testing patterns
+
+**Why these specific libraries:**
+- **jest-dom**: Semantic matchers provide better error messages for non-technical reviewers
+- **user-event**: Simulates real browser interactions (click propagation, focus management)
+- **MSW**: Tests actual HTTP contracts, not implementation details (fetch/axios internals)
+
+**Why package-type conditionals:**
+- **UI packages**: Need full stack (DOM assertions, user interactions, API mocking)
+- **Node packages**: Need consistent assertions (jest-dom) but not browser interactions
+- **Logic packages**: Complex patterns would be overkill for pure function tests
+
+**Research validation:**
+- All patterns verified as 2025 React best practices (Context7 MCP)
+- Used in official React Testing Library examples
+- Next.js official testing guide includes these by default
+- AI agent testing standardization (AGENTS.md research, 2025)
+
+### When Adding New Projects
+
+**UI Packages (web, mobile):**
+
+1. Install testing enhancements:
+   ```bash
+   pnpm add --save-dev @testing-library/jest-dom @testing-library/user-event msw
+   ```
+
+2. Create `jest.setup.ts`:
+   ```typescript
+   import '@testing-library/jest-dom';
+   ```
+
+3. Update `jest.config.ts`:
+   ```typescript
+   export default {
+     // ... existing config
+     setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+   };
+   ```
+
+4. Verify setup:
+   ```bash
+   pnpm exec nx run <project>:test
+   ```
+
+**Node Packages (conditional MSW):**
+
+Only install MSW if package tests HTTP endpoints:
+```bash
+pnpm add --save-dev @testing-library/jest-dom msw
+```
+
+**Logic Packages:**
+
+No testing enhancements needed - use basic Jest.
+
+### Implementation Reference
+
+For detailed setup instructions, API documentation, and examples:
+- **Setup guide**: `docs/guides/testing-enhancements.md`
+- **Baseline config**: `docs/memories/testing-reference.md`
+- **Post-generation**: `docs/memories/post-generation-checklist.md`
+
+### Last Validated
+
+2025-10-28 (React Testing Library 15.0.0, user-event 14.5.0, jest-dom 6.6.3, MSW 2.0.0)
+
+**References**:
+- React Testing Library documentation (official patterns)
+- Next.js testing guide (includes these by default)
+- Testing patterns research (2025-10-28 Context7/Exa validation)
+- AI-driven development best practices (AGENTS.md standard)
 
 ---
 

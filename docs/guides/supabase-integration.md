@@ -1,9 +1,28 @@
 ---
 Created: 2025-10-27
-Modified: 2025-10-27T15:20
+Modified: 2025-10-28T13:22
 ---
 
 # Supabase Integration Guide
+
+## Related Documentation
+
+- **Environment Setup**: [environment-setup.md](./environment-setup.md) - DATABASE_URL, DIRECT_URL, and Supabase credentials
+- **Tech Stack**: [../tech-stack.md](../tech-stack.md) - Current @supabase/ssr version and upgrade policy
+- **Agent Rules**: [../.ruler/AGENTS.md](../.ruler/AGENTS.md) - Supabase client usage patterns for AI agents
+
+## Implementation Status
+
+✅ **Currently Implemented**:
+- Server-side client with admin privileges (`packages/supabase-client`)
+- Browser client factory for Next.js 15 App Router (`createSupabaseBrowserClient`)
+- Server client factory with async cookies support (`createSupabaseServerClient`)
+
+⏳ **Planned (Phase 2+)**:
+- Authentication flows (sign-up, sign-in, password reset)
+- Session refresh middleware
+- Row-level security (RLS) policies
+- Real-time subscriptions
 
 ## Architecture Boundaries
 - Prisma (DATABASE_URL) for data access from API server
@@ -38,7 +57,3 @@ export default async function Page() {
 - Missing envs → set in `.env.local`
 - Invalid URL → must look like `https://YOUR-PROJECT.supabase.co`
 - Cookie write blocked → use Route Handler/Middleware for session refresh
-
-## Roadmap (Phase 2+)
-- Auth flows, session refresh middleware, realtime channels
-

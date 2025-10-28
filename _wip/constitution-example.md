@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-16T20:18
-Modified: 2025-10-17T10:45
+Modified: 2025-10-28T10:03
 ---
 # Study Buddy Constitution
 

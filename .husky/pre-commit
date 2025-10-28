@@ -1,2 +1,2 @@
 pnpm exec lint-staged
-pnpm exec nx affected -t test --base=HEAD~1
+NX_DAEMON=false pnpm exec nx affected -t test --base=HEAD~1
