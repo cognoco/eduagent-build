@@ -40,14 +40,19 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
-            Please review this pull request and provide feedback on:
-            - Code quality and best practices
-            - Potential bugs or issues
-            - Performance considerations
-            - Security concerns
-            - Test coverage
+            **First**: Read CLAUDE.md thoroughly to understand project context, architecture, and current phase. Follow documentation references within CLAUDE.md, especially:
+            - docs/P1-plan.md (current implementation stage and progress)
+            - docs/memories/adopted-patterns.md (established patterns that prevent drift)
+            - docs/memories/tech-findings-log.md (technical decisions and constraints)
 
-            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+            **Review priorities**:
+            1. **Architectural Adherence**: Verify against monorepo structure, dependency flow, and architectural blueprints in CLAUDE.md
+            2. **Pattern Consistency**: Flag divergent implementation approaches across components, even when both are technically correct
+            3. **Code Quality**: Bugs, security vulnerabilities, performance issues
+            4. **Best Practices**: Test coverage, type safety, proper imports, test file location
+            5. **Standards & Regressions**: Note if code falls below project standards or contradicts documented decisions
+
+            Be constructive and specific. Acknowledge strengths concisely and in measured terms, focus review time on issues and improvements. Avoid nit-picking or preemptively propose improvements that are likely to be part of work planned later.
 
             Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
 
