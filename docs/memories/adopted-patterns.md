@@ -3,9 +3,9 @@ title: Adopted Patterns
 purpose: Monorepo-specific standards that override framework defaults
 audience: AI agents, developers
 created: 2025-10-21
-last-updated: 2025-10-24
+last-updated: 2025-10-27
 Created: 2025-10-21T14:39
-Modified: 2025-10-25T13:20
+Modified: 2025-10-27T13:23
 ---
 
 # Adopted Patterns
@@ -1439,6 +1439,97 @@ When should you add a new pattern?
 2. Update `docs/memories/post-generation-checklist.md` if it's a post-generation step
 3. Test the pattern with a new component to verify it works
 4. Update `last-updated` date in frontmatter
+
+---
+
+## Pattern 8: Prisma Schema Conventions
+
+**Our Standard**: Use PostgreSQL-specific types, snake_case plural table names, and disable RLS for API-secured applications
+
+### Pattern
+
+**Prisma Schema Configuration:**
+```prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // NO directUrl needed for port 5432 (direct connection)
+}
+
+generator client {
+  provider = "prisma-client-js"
+  // binaryTargets defaults to ["native"] for auto-detection
+}
+
+model HealthCheck {
+  id        String   @id @default(uuid()) @db.Uuid
+  message   String
+  timestamp DateTime @default(now()) @db.Timestamptz
+
+  @@map("health_checks")  // snake_case plural table names
+}
+```
+
+**Key Conventions:**
+- **Database types**: Use PostgreSQL-specific types (`@db.Uuid`, `@db.Timestamptz`)
+- **Table naming**: snake_case plural (`health_checks`, not `HealthCheck` or `healthChecks`)
+- **Connection**: Port 5432 (direct connection), no `directUrl` needed
+- **Binary targets**: Omit `binaryTargets` field to use implicit "native" (auto-detection)
+- **RLS (Row Level Security)**: Disable for API server implementations (see post-generation checklist)
+
+### Applies To
+
+All Prisma packages in the monorepo (currently `packages/database/`)
+
+### Rationale
+
+**PostgreSQL-specific types**:
+- `@db.Uuid`: Ensures proper UUID validation at database level
+- `@db.Timestamptz`: Timezone-aware timestamps, DST-safe
+
+**snake_case plural table naming**:
+- PostgreSQL convention (matches common practices)
+- Explicit with `@@map()` prevents ambiguity
+- Consistent with Supabase dashboard expectations
+
+**No directUrl for port 5432**:
+- Port 5432 is direct PostgreSQL connection (not pooler)
+- `directUrl` only needed for connection pooler scenarios (port 6543)
+
+**Implicit binaryTargets**:
+- Prisma auto-detects platform ("native")
+- Reduces bundle size
+- Avoids version mismatch errors
+
+**RLS disabled**:
+- API server acts as security boundary (not database)
+- Simplifies Phase 1 implementation
+- See tech-findings-log.md for full architectural rationale
+
+### When Adding New Models
+
+**Required actions:**
+1. Use PostgreSQL-specific types (`@db.Uuid`, `@db.Timestamptz`, etc.)
+2. Add `@@map("table_name")` with snake_case plural
+3. Follow migration checklist (see post-generation-checklist.md)
+
+**Validation:**
+```bash
+# Validate schema
+npx prisma validate --schema=packages/database/prisma/schema.prisma
+
+# Check generated migration
+cat packages/database/prisma/migrations/*/migration.sql
+```
+
+### Last Validated
+
+2025-10-27 (Prisma 6.17.1, Supabase PostgreSQL 15)
+
+**References**:
+- docs/architecture-decisions.md (Stage 4.2, Decision 4 - RLS strategy)
+- docs_archive/research/stage-4.4a-research-findings.md (Track 1-3 research)
+- packages/database/PLATFORM-NOTES.md (Windows ARM64 limitation)
 
 ---
 

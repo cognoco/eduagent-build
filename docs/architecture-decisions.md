@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-21
-Modified: 2025-10-26T16:34
+Modified: 2025-10-27T08:37
 Version: 1
 ---
 
@@ -1145,12 +1145,18 @@ git commit -m "feat: add HealthCheck table"
 
 #### 1. DATABASE_URL (Prisma → PostgreSQL)
 
-**What it is:** Direct PostgreSQL connection string
+**What it is:** Direct PostgreSQL connection string (port 5432)
 
 **Format:**
 ```bash
-DATABASE_URL="postgresql://postgres.xxx:[password]@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+DATABASE_URL="postgresql://postgres:[password]@db.xxx.supabase.co:5432/postgres"
 ```
+
+**Connection Strategy (Stage 4.4a):**
+- Uses **port 5432** (direct PostgreSQL connection)
+- **NO** `directUrl` field in Prisma schema (unnecessary - port 5432 is already direct)
+- Supabase Connection Pooler (port 6543) intentionally NOT used for this implementation
+- Rationale: Simplicity for Phase 1 walking skeleton, pooling can be added later if needed
 
 **Used by:**
 - `apps/server` (Express API)
