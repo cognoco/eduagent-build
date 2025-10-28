@@ -2,10 +2,23 @@
 Created: 2025-10-19
 Purpose: Document baseline package versions for Phase 1 walking skeleton
 Status: Stage 0 baseline (before additional apps/packages)
-Modified: 2025-10-19T20:39
+Modified: 2025-10-28T13:24
 ---
 
 # Package Versions Baseline
+
+---
+⚠️ **HISTORICAL SNAPSHOT - READ ONLY**
+
+This document captures the exact package versions at **Phase 1, Stage 0 completion** (2025-10-18).
+
+**Do NOT use these versions for new work.** For current versions and upgrade policy, see [../tech-stack.md](../tech-stack.md).
+
+To view the original `pnpm-lock.yaml` from this milestone:
+```bash
+git show 464830451eb:pnpm-lock.yaml
+```
+---
 
 This document captures the baseline package versions at the completion of Stage 0 (Current State Audit). These versions represent the validated, working configuration before adding server, mobile apps, and shared packages in subsequent stages.
 
