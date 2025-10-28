@@ -391,13 +391,22 @@ The project uses Husky pre-commit hooks to maintain code quality:
 **What runs automatically:**
 - **lint-staged**: Runs ESLint and Prettier on staged files only
 - **Affected tests**: Runs tests only for projects affected by your changes (via `nx affected -t test --base=HEAD~1`)
+- **OS-conditional test execution**: Web app tests excluded on Windows due to Jest hanging issue
 - Commits are blocked if any checks fail
 
 **Pre-commit hook optimization:**
 ```bash
 # .husky/pre-commit
 pnpm exec lint-staged
-pnpm exec nx affected -t test --base=HEAD~1
+
+# OS-conditional test execution
+if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
+  # Windows: Skip web tests due to Jest hanging issue
+  pnpm exec nx affected -t test --base=HEAD~1 --exclude=web
+else
+  # Linux/Mac: Run all tests
+  pnpm exec nx affected -t test --base=HEAD~1
+fi
 ```
 
 **Why `nx affected` instead of all tests:**
@@ -405,6 +414,11 @@ pnpm exec nx affected -t test --base=HEAD~1
 - ✅ Scales with monorepo growth: Performance stays consistent as projects are added
 - ✅ Immediate feedback: Catches regressions before commit
 - ✅ CI safety net: Full test suite still runs in GitHub Actions
+
+**Windows-specific behavior:**
+- Web app tests are excluded from pre-commit due to Jest hanging issue (see Troubleshooting section)
+- Developers should manually run `pnpm exec nx run web:test` before pushing
+- CI runs full test suite (including web) on Linux, providing safety net
 
 **Manual quality checks (if hooks disabled):**
 ```bash
