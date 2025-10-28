@@ -406,10 +406,11 @@ NX_DAEMON=false pnpm exec nx affected -t test --base=HEAD~1
 - ✅ Immediate feedback: Catches regressions before commit
 - ✅ CI safety net: Full test suite still runs in GitHub Actions
 
-**Windows-specific behavior:**
-- Web app tests are excluded from pre-commit due to Jest hanging issue (see Troubleshooting section)
-- Developers should manually run `pnpm exec nx run web:test` before pushing
-- CI runs full test suite (including web) on Linux, providing safety net
+**Pre-commit hook reliability:**
+- Uses `NX_DAEMON=false` to prevent Jest hanging on Windows
+- Applies to all platforms for consistency (5-10 second overhead acceptable)
+- All developers run the same tests before commit (no platform-specific behavior)
+- CI runs full test suite with daemon enabled (no performance compromise in CI)
 
 **Manual quality checks (if hooks disabled):**
 ```bash
