@@ -395,20 +395,26 @@ The project uses Husky pre-commit hooks to maintain code quality:
 **What runs automatically:**
 - **lint-staged**: Runs ESLint and Prettier on staged files only
 - **Affected tests**: Runs tests only for projects affected by your changes (via `nx affected -t test --base=HEAD~1`)
+- **OS-conditional test execution**: Web app tests excluded on Windows due to Jest hanging issue
 - Commits are blocked if any checks fail
 
 **Pre-commit hook optimization:**
 ```bash
 # .husky/pre-commit
 pnpm exec lint-staged
-pnpm exec nx affected -t test --base=HEAD~1
-```
+NX_DAEMON=false pnpm exec nx affected -t test --base=HEAD~1
 
 **Why `nx affected` instead of all tests:**
 - ✅ Faster commits: Only runs tests for changed code
 - ✅ Scales with monorepo growth: Performance stays consistent as projects are added
 - ✅ Immediate feedback: Catches regressions before commit
 - ✅ CI safety net: Full test suite still runs in GitHub Actions
+
+**Pre-commit hook reliability:**
+- Uses `NX_DAEMON=false` to prevent Jest hanging on Windows
+- Applies to all platforms for consistency (5-10 second overhead acceptable)
+- All developers run the same tests before commit (no platform-specific behavior)
+- CI runs full test suite with daemon enabled (no performance compromise in CI)
 
 **Manual quality checks (if hooks disabled):**
 ```bash
@@ -475,8 +481,8 @@ GitHub Actions workflow (`.github/workflows/ci.yml`) runs on all PRs and main br
 
 1. Install dependencies with `npm ci --legacy-peer-deps`
 2. Install Playwright browsers
-3. Run: `nx run-many -t lint test build typecheck e2e`
-4. Execute `nx fix-ci` if failures occur (self-healing CI)
+3. Run: `pnpm exec nx run-many -t lint test build typecheck e2e`
+4. Execute `pnpm exec nx fix-ci` if failures occur (self-healing CI)
 
 **Nx Cloud Integration**: Enabled (`nxCloudId` in `nx.json`) for distributed caching and task distribution.
 
