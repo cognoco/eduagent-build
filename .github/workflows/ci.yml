@@ -37,6 +37,9 @@ jobs:
       - run: pnpm install
       - run: pnpm exec playwright install --with-deps
 
+      # Generate Prisma Client (postinstall script is ignored by pnpm security)
+      - run: pnpm --filter @nx-monorepo/database db:generate
+
       # Prepend any command with "nx-cloud record --" to record its logs to Nx Cloud
       # - run: pnpm exec nx-cloud record -- echo Hello World
       # When you enable task distribution, run the e2e-ci task instead of e2e
