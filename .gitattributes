@@ -1,0 +1,2 @@
+# Husky hooks must always use LF line endings (not CRLF) for Git Bash compatibility
+.husky/* text eol=lf
