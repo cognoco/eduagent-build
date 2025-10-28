@@ -2,6 +2,21 @@
 
 This file provides guidance to all AI agents when working with code in this repository.
 
+## ⚠️ CRITICAL RULES - READ FIRST
+
+**These rules are NON-NEGOTIABLE. Violations cause immediate failures.**
+
+1. **NEVER edit `CLAUDE.md`** - Only edit `.ruler/AGENTS.md` (see: Agent Rules File Management)
+2. **NEVER commit unless explicitly requested** - Users control commit timing (see: Git Commit Policy)
+3. **ALWAYS use `pnpm exec nx` commands** - Never npm, never yarn (see: Essential Commands)
+4. **ALWAYS use sub-agents for research** - Preserves context AND provides diverse perspectives that enrich analysis and improve decisions through orchestrated intra-agent discussion (see: Sub-Agent Usage Policy)
+5. **ALWAYS read memory system before `nx g` commands** - Prevent pattern drift (see: Memory System)
+6. **MANDATORY READ before testing work** - Jest is very problematic (see: Jest & Testing Configuration)
+
+Violating these rules leads to: broken commits, pattern drift, version conflicts, CI failures, and rework.
+
+---
+
 ## CRITICAL: Agent Rules File Management
 
 **🚨 STRICT RULE - DO NOT VIOLATE 🚨**
@@ -184,9 +199,12 @@ When editing any file in `docs/` or its subfolders:
 ```yaml
 ---
 title: Some Document
+purpose: Brief description of document purpose
+audience: AI agents, developers, architects
 created: 2025-10-21
 last-updated: 2025-10-21  # ✅ Update this when making semantic changes
-Modified: 2025-10-21T14:39  # ❌ NEVER touch this - auto-managed
+Created: 2025-10-21T14:39  # ❌ NEVER touch - auto-managed
+Modified: 2025-10-21T14:39  # ❌ NEVER touch - auto-managed
 ---
 ```
 
@@ -198,15 +216,15 @@ This is a **gold standard Nx monorepo template** designed as a production-ready 
 
 **Current State**: Phase 1 Stage 2 complete - Full infrastructure validated:
 - ✅ Next.js web application with Playwright E2E tests
-- ✅ Express server application with oRPC
-- ✅ Four shared packages: database (Prisma), schemas (Zod), api-client (oRPC), supabase-client
+- ✅ Express server application with REST+OpenAPI
+- ✅ Four shared packages: database (Prisma), schemas (Zod), api-client (REST+OpenAPI), supabase-client
 - ✅ Complete QA infrastructure: Jest, ESLint, Prettier, CI/CD
 - ⏳ In progress: QA infrastructure (Husky, lint-staged), Supabase configuration
 
 **Architecture Goal**: Production-ready monorepo template demonstrating best practices for:
 - Cross-platform type safety (web, server, future mobile)
 - Shared business logic via buildable libraries
-- End-to-end type safety with oRPC
+- End-to-end type safety with REST+OpenAPI
 - Database-first development with Prisma + Supabase
 - Comprehensive testing strategy (unit, integration, E2E)
 
@@ -214,155 +232,95 @@ This is a **gold standard Nx monorepo template** designed as a production-ready 
 
 ## Technology Stack
 
+**CRITICAL: Agents must use pinned versions or will go off the rails.**
+
+### Core Stack
 - **Web**: Next.js 15.2, React 19, Tailwind CSS
-- **Server**: Express with oRPC
-- **Mobile** (deferred to Phase 2): Expo React Native
-- **Database**: Prisma + Supabase (PostgreSQL)
-- **API**: oRPC (type-safe RPC framework)
-- **Validation**: Zod schemas
-- **Testing**: Jest (unit), Playwright (E2E)
+- **Server**: Express with REST+OpenAPI
+- **Database**: Prisma 6.17.1 (CLI) / 6.18.0 (Client), Supabase PostgreSQL
+- **Testing**: Jest 30 (unit), Playwright (E2E)
 - **Tooling**: Nx 21.6, TypeScript 5.9, ESLint 9, Prettier
 
-## Common Commands
+**Detailed Versions & Compatibility**: See `docs/tech-stack.md`
 
-### Workspace Scripts (Recommended for Daily Development)
+### Version Pinning Policy
 
-These convenience scripts are defined in the root `package.json` and run tasks across all projects:
+**Agents MUST**:
+- Use exact versions specified in `package.json`
+- Read `docs/tech-stack.md` before suggesting version changes
+- Verify version compatibility using Context7 MCP and web search
 
-```bash
-# Start web dev server
-pnpm run dev
+**Agents MAY**:
+- Suggest version updates with rationale
+- Flag outdated dependencies
+- Propose compatibility improvements
 
-# Build all projects
-pnpm run build
+**Approval Cycle**: Version changes require architectural review and explicit user approval.
 
-# Run all tests
-pnpm run test
+## Essential Commands
 
-# Lint all projects
-pnpm run lint
+**CRITICAL: This is an Nx monorepo using pnpm**
+- Always use `pnpm exec nx` commands (never npm, never yarn)
+- Workspace scripts: See root `package.json` for `pnpm run` shortcuts
+- Full command reference: See `README.md` section "Common Commands"
 
-# Run E2E tests
-pnpm run e2e
-```
-
-### Development (Direct Nx Commands)
-
-Use these for project-specific or advanced tasks:
-
-```bash
-# Start web dev server
-pnpm exec nx run web:dev
-# or: pnpm exec nx dev web
-
-# Start server
-pnpm exec nx run server:serve
-
-# Start mobile (when implemented)
-pnpm exec nx run mobile:start
-
-# Run multiple apps concurrently
-pnpm exec nx run-many -t serve --projects=web,server
-```
-
-### Building
-
-```bash
-# Build single project
-pnpm exec nx run web:build
-
-# Build all apps
-pnpm exec nx run-many -t build --projects=tag:type:app
-
-# Build all libraries
-pnpm exec nx run-many -t build --projects=tag:type:lib
-
-# Build everything (or use: pnpm run build)
-pnpm exec nx run-many -t build
-
-# Build only affected projects (after changes)
-pnpm exec nx affected -t build
-```
-
-### Testing & Quality
-
-```bash
-# Run all unit tests (or use: pnpm run test)
-pnpm exec nx run-many -t test
-
-# Run specific project tests
-pnpm exec nx run web:test
-
-# Run tests with coverage
-pnpm exec nx run web:test --coverage
-
-# Run E2E tests (or use: pnpm run e2e)
-pnpm exec nx run web-e2e:e2e
-
-# Lint all projects (or use: pnpm run lint)
-pnpm exec nx run-many -t lint
-
-# Lint specific project
-pnpm exec nx run web:lint
-
-# Type checking (when typecheck target is configured)
-pnpm exec nx run-many -t typecheck
-
-# Run full CI validation locally
-pnpm exec nx run-many -t lint test build typecheck e2e
-```
-
-### Nx Workspace
-
-```bash
-# View dependency graph
-pnpm exec nx graph
-
-# Show project details
-pnpm exec nx show project web
-
-# List all available plugins
-pnpm exec nx list
-
-# View affected projects
-pnpm exec nx affected:graph
-
-# Clear Nx cache
-pnpm exec nx reset
-```
-
-### Database (when implemented)
-
-```bash
-# Generate Prisma client
-pnpm --filter @nx-monorepo/database prisma generate
-
-# Push schema to database
-pnpm --filter @nx-monorepo/database prisma db push
-
-# Run migrations
-pnpm --filter @nx-monorepo/database prisma migrate dev
-
-# Open Prisma Studio
-pnpm --filter @nx-monorepo/database prisma studio
-```
+**Key patterns**:
+- Single project: `pnpm exec nx run <project>:<target>`
+- Multiple projects: `pnpm exec nx run-many -t <target>`
+- Affected only: `pnpm exec nx affected -t <target>`
 
 ## Architecture Guidelines
 
-### Monorepo Structure
+### Monorepo Structure (ARCHITECTURAL BLUEPRINT)
+
+**IMPORTANT**: This structure is a constraint/blueprint, not documentation. Generated projects MUST follow this architecture.
 
 ```
 apps/
-  web/           # Next.js web application
-  web-e2e/       # Playwright E2E tests for web
-  server/        # Express API server
-  mobile/        # (deferred to Phase 2) Expo React Native app
+  web/                    # Next.js web application
+    src/
+      app/                # Next.js App Router pages
+        page.tsx          # Home page
+        layout.tsx        # Root layout
+      components/         # React components (co-located tests)
+        *.spec.tsx        # Component tests
+    project.json          # Nx project configuration
+    jest.config.ts        # Jest configuration
+    tsconfig.json         # TypeScript config (production)
+    tsconfig.spec.json    # TypeScript config (tests)
+    next.config.js        # Next.js configuration
+  web-e2e/                # Playwright E2E tests for web
+    src/
+      *.spec.ts           # E2E test specs
+    playwright.config.ts  # Playwright configuration
+  server/                 # Express API server
+    src/
+      main.ts             # Server entry point
+      routes/             # REST+OpenAPI endpoints
+    project.json
+    jest.config.ts
+    tsconfig.json
 
-packages/        # (planned) Shared libraries
-  database/      # Prisma client + database utilities
-  schemas/       # Zod schemas + TypeScript types
-  api-client/    # oRPC client factory
-  supabase-client/ # Supabase client configuration
+packages/                 # Shared libraries (buildable)
+  database/               # Prisma client + database utilities
+    src/
+      index.ts            # Public API
+      client.ts           # Prisma client instance
+    prisma/
+      schema.prisma       # Database schema
+      migrations/         # Migration history
+    project.json
+  schemas/                # Zod schemas + TypeScript types
+    src/
+      index.ts            # Barrel exports
+      *.schema.ts         # Individual schemas
+    project.json
+  api-client/             # REST API client
+    src/index.ts
+    project.json
+  supabase-client/        # Supabase client configuration
+    src/index.ts
+    project.json
 ```
 
 ### Dependency Flow
@@ -411,7 +369,7 @@ When creating shared packages:
 
 - **Strict TypeScript**: All projects use `strict: true`
 - **Schema-first**: Define Zod schemas in `@nx-monorepo/schemas`, derive TypeScript types
-- **End-to-end types**: oRPC provides type inference from server to client
+- **End-to-end types**: REST+OpenAPI provides type safety via generated TypeScript types from OpenAPI spec
 - **No type assertions**: Prefer proper typing and validation over `as` casting
 - **Shared types**: Never duplicate type definitions - centralize in `schemas` package
 
@@ -421,8 +379,8 @@ When creating shared packages:
 
 1. **Define schemas first**: Add Zod schemas to `@nx-monorepo/schemas`
 2. **Implement database layer**: Add Prisma models and queries to `@nx-monorepo/database`
-3. **Create server endpoints**: Add oRPC routes in `apps/server`
-4. **Update API client**: Ensure client types auto-update via oRPC
+3. **Create server endpoints**: Add REST endpoints with OpenAPI spec in `apps/server`
+4. **Update API client**: Regenerate TypeScript types from OpenAPI spec using `openapi-typescript`
 5. **Implement UI**: Build features in `apps/web` and/or `apps/mobile`
 6. **Write tests**: Add unit tests (packages), integration tests (server), E2E tests (apps)
 
@@ -450,7 +408,7 @@ pnpm exec nx affected -t test --base=HEAD~1
 
 **Manual quality checks (if hooks disabled):**
 ```bash
-pnpm exec nx affected -t lint test
+pnpm exec nx affected -t lint test build
 ```
 
 ### Creating Shared Code
@@ -460,281 +418,52 @@ When you need to share code between projects:
 1. **Determine package location**: Does it belong in an existing package or need a new one?
 2. **Generate library if needed**:
    ```bash
-   pnpm exec nx g @nx/js:library my-new-lib --directory=packages/my-new-lib --buildable
+   pnpm exec nx g @nx/js:library my-new-lib --directory=packages/my-new-lib --bundler=tsc
    ```
 3. **Implement and export**: Add code and export via `index.ts`
 4. **Update dependents**: Import from `@nx-monorepo/my-new-lib`
 5. **Verify build**: Run `pnpm exec nx run my-new-lib:build` to ensure it compiles
 6. **Check graph**: Run `pnpm exec nx graph` to verify dependency structure
 
-## Testing Strategy
+## Testing & Quality
 
-### Test File Location
+**⚠️ MANDATORY READ BEFORE ANY TESTING WORK ⚠️**
 
-Tests are co-located with their source files in the `src/` directory, following Next.js 15 best practices:
+Testing (especially Jest) is a **very problematic area** with version compatibility issues and complex configuration interactions.
 
-**Pattern**: Place test files next to the code they test
-- `src/app/page.tsx` → `src/app/page.spec.tsx`
-- `src/components/Button.tsx` → `src/components/Button.spec.tsx`
+**BEFORE you:**
+- Add Jest to a new project
+- Modify any `jest.config.ts`
+- Modify any `tsconfig.spec.json`
+- Write any tests (unit, integration, E2E)
+- Troubleshoot test failures
+- Change test tooling versions
 
-**Naming**: Use `.spec.tsx` or `.test.tsx` suffix
+**YOU MUST:**
+1. **READ**: `docs/memories/testing-reference.md` - comprehensive Jest reference
+2. **READ**: `docs/memories/adopted-patterns.md` - test file location standards
+3. **VERIFY**: Use Context7 MCP to fetch latest official docs
+4. **CROSS-CHECK**: Use web search to verify version compatibility
+5. **FOLLOW**: All patterns in memory files
 
-**Jest Configuration** (`apps/web/jest.config.ts`):
-```typescript
-testMatch: [
-  '<rootDir>/src/**/*.(spec|test).[jt]s?(x)',
-],
-collectCoverageFrom: [
-  'src/**/*.{ts,tsx,js,jsx}',
-  '!src/**/*.spec.{ts,tsx,js,jsx}',
-  '!src/**/*.test.{ts,tsx,js,jsx}',
-],
-```
+**Consequences of skipping**: Test failures, version conflicts, broken CI, pattern drift across projects.
 
-**Rationale**:
-- Aligns with Next.js 15 App Router conventions
-- Improves developer experience (tests near code)
-- Simplifies imports (relative paths shorter)
-- Industry standard for component-based architectures (2025)
+---
 
-### Unit Tests (Jest)
+### Testing Strategy Overview
 
-- Located in `*.spec.ts` files alongside source code
-- Test individual functions, classes, and components in isolation
-- Target: >= 80% code coverage
-- Run fast (< 5 seconds per test suite)
+**CRITICAL CONSTRAINT**: Tests are co-located in `src/` next to source files (`.spec.ts` or `.test.tsx`). This is OUR adopted standard following Next.js 15 conventions, NOT framework default.
 
-**Example**:
-```typescript
-// packages/schemas/src/user.schema.spec.ts
-import { userSchema } from './user.schema';
+**Three-tier approach**:
+- **Unit Tests (Jest)**: Isolated component/function testing in `src/` (target: ≥80% coverage)
+- **Integration Tests (Jest)**: Cross-layer interactions (e.g., endpoint → database) in `src/`
+- **E2E Tests (Playwright)**: Full browser-based user journeys in `apps/web-e2e/src/`
 
-describe('userSchema', () => {
-  it('should validate correct user data', () => {
-    expect(() => userSchema.parse({ id: '123', name: 'Alice' })).not.toThrow();
-  });
-});
-```
-
-### Integration Tests (Jest)
-
-- Test interactions between layers (e.g., server endpoint → database)
-- Located in `apps/server/src/**/*.spec.ts`
-- May use test database or mocks
-- Slower than unit tests but faster than E2E
-
-### E2E Tests (Playwright)
-
-- Full browser-based user journey tests
-- Located in `apps/web-e2e/src/`
-- Test complete flows: page load → interaction → data persistence
-- Run in CI with headless browsers
-
-**Example**:
-```typescript
-// apps/web-e2e/src/health-check.spec.ts
-test('health check flow', async ({ page }) => {
-  await page.goto('/health');
-  await expect(page.getByText('Health Status')).toBeVisible();
-  await page.click('button:has-text("Ping")');
-  await expect(page.getByText('Pong')).toBeVisible();
-});
-```
-
-### Jest Configuration Patterns
-
-This project follows Nx best practices for Jest configuration with a workspace-level preset pattern.
-
-#### Workspace Preset
-
-All projects extend a shared `jest.preset.js` at the workspace root:
-
-```javascript
-// jest.preset.js
-const nxPreset = require('@nx/jest/preset').default;
-module.exports = { ...nxPreset };
-```
-
-This ensures consistent Jest behavior across all projects while allowing per-project customization.
-
-#### Project-Level Configuration
-
-Each project has its own `jest.config.ts` that extends the workspace preset:
-
-```typescript
-// apps/web/jest.config.ts
-export default {
-  displayName: '@nx-monorepo/web',
-  preset: '../../jest.preset.js',  // Extend workspace preset
-  testEnvironment: 'jsdom',         // or 'node' for Node.js projects
-  testMatch: ['<rootDir>/src/**/*.(spec|test).[jt]s?(x)'],
-  coverageDirectory: '../../coverage/apps/web',
-  // ... project-specific settings
-};
-```
-
-**Note**: Next.js projects (like `apps/web`) use the `next/jest` wrapper with `testEnvironment: 'jsdom'` for browser-like testing. The Next.js Jest configuration also includes the `@nx/react/plugins/jest` transform for handling static assets and other Next.js-specific features.
-
-#### TypeScript Test Configuration
-
-**Type Isolation Pattern**: Test types are separated from production types using `tsconfig.spec.json`:
-
-```json
-// apps/web/tsconfig.spec.json
-{
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "outDir": "./out-tsc/jest",
-    "types": ["jest", "node"]  // Test-specific types
-  },
-  "include": [
-    "src/**/*.test.ts",
-    "src/**/*.spec.ts",
-    "src/**/*.test.tsx",
-    "src/**/*.spec.tsx"
-  ],
-  "references": [
-    { "path": "./tsconfig.json" }  // Reference to production config
-  ]
-}
-```
-
-**Important**: Production `tsconfig.json` should NOT include test types. Keep test types isolated to `tsconfig.spec.json`.
-
-#### Adding Jest to New Projects
-
-To add Jest testing to a new project:
-
-```bash
-# Generate Jest configuration for a project
-pnpm exec nx g @nx/jest:configuration <project-name>
-```
-
-Nx automatically:
-- Creates `jest.config.ts` extending the workspace preset
-- Creates `tsconfig.spec.json` with proper type isolation
-- Adds test target to `project.json`
-- Configures coverage directory
-
-**No manual setup required** - Nx handles all configuration automatically.
-
-#### Optional Testing Enhancements
-
-For advanced testing patterns (jest-dom, user-event, MSW, custom render), see [`docs/testing-enhancements.md`](../docs/testing-enhancements.md).
-
-These enhancements are optional - start simple and add complexity only when needed.
-
-### Coverage Testing
-
-#### Coverage Scripts
-
-The workspace provides convenient scripts for running tests with coverage reporting:
-
-```bash
-# Run coverage for all projects
-pnpm run test:coverage
-
-# Run coverage for specific projects
-pnpm run test:coverage:web
-pnpm run test:coverage:server
-```
-
-#### Coverage Thresholds
-
-All projects use standardized coverage thresholds to ensure code quality:
-
-```typescript
-// apps/web/jest.config.ts
-coverageThreshold: {
-  global: {
-    branches: 10,    // Target: 80% (Phase 2+)
-    functions: 10,   // Target: 80% (Phase 2+)
-    lines: 10,       // Target: 80% (Phase 2+)
-    statements: 10   // Target: 80% (Phase 2+)
-  }
-}
-```
-
-**Current thresholds (10%)**: Permissive during Phase 1 walking skeleton - establishes infrastructure without blocking development.
-
-**Target thresholds (80%)**: Will be enforced starting in Phase 2 when feature development begins.
-
-**Coverage metrics explained**:
-- **Statements**: Individual lines of code executed
-- **Lines**: Physical lines in the file that were executed
-- **Functions**: Whether each function was called
-- **Branches**: Decision points tested (if/else, switch, ternaries, &&, ||)
-
-#### Coverage Reports
-
-After running coverage, HTML reports are generated in `coverage/<project>/index.html`:
-
-```bash
-# Run coverage for web app
-pnpm run test:coverage:web
-
-# Open the HTML report (manual)
-# Windows: start coverage/apps/web/index.html
-# Mac: open coverage/apps/web/index.html
-# Linux: xdg-open coverage/apps/web/index.html
-```
-
-Reports show:
-- Per-file coverage percentages
-- Highlighted uncovered lines
-- Branch coverage visualization
-- Drilldown from project → file → line level
-
-#### Coverage Directory Structure
-
-Coverage reports follow a consistent pattern across all projects:
-
-```
-coverage/
-  apps/
-    web/
-      index.html          # HTML report entry point
-      app/                # Per-directory coverage
-      page.tsx.html       # Per-file coverage details
-      lcov.info           # LCOV format for CI/tooling
-      coverage-final.json # Raw coverage data
-    server/
-      index.html
-      lcov.info
-      coverage-final.json
-  packages/
-    database/
-      index.html
-      lcov.info
-      coverage-final.json
-```
-
-**Pattern**: `coverageDirectory: '../../coverage/<type>/<name>'` in each project's `jest.config.ts`
-
-The `/coverage` directory is gitignored - reports are generated locally and in CI but not committed.
-
-#### Adding Coverage to New Projects
-
-When generating a new project with Jest:
-
-```bash
-pnpm exec nx g @nx/jest:configuration <project-name>
-```
-
-Then manually add coverage threshold to the generated `jest.config.ts`:
-
-```typescript
-coverageThreshold: {
-  global: {
-    branches: 10,    // Target: 80% (Phase 2+)
-    functions: 10,   // Target: 80% (Phase 2+)
-    lines: 10,       // Target: 80% (Phase 2+)
-    statements: 10   // Target: 80% (Phase 2+)
-  }
-}
-```
-
-And ensure `coverageDirectory` follows the pattern: `'../../coverage/<apps|packages>/<project-name>'`
+**For complete details**, see `docs/memories/testing-reference.md`:
+- Test file location patterns and configuration examples
+- Unit/Integration/E2E guidelines with code examples
+- Jest configuration patterns (workspace preset, project-level, TypeScript)
+- Coverage testing (scripts, thresholds, reports, directory structure)
 
 ## CI/CD Pipeline
 
@@ -742,8 +471,8 @@ GitHub Actions workflow (`.github/workflows/ci.yml`) runs on all PRs and main br
 
 1. Install dependencies with `npm ci --legacy-peer-deps`
 2. Install Playwright browsers
-3. Run: `nx run-many -t lint test build typecheck e2e`
-4. Execute `nx fix-ci` if failures occur (self-healing CI)
+3. Run: `pnpm exec nx run-many -t lint test build typecheck e2e`
+4. Execute `pnpm exec nx fix-ci` if failures occur (self-healing CI)
 
 **Nx Cloud Integration**: Enabled (`nxCloudId` in `nx.json`) for distributed caching and task distribution.
 
@@ -791,46 +520,9 @@ To enable distributed task execution in CI, uncomment the `nx start-ci-run` line
 
 ## Troubleshooting
 
-### Nx Cache Issues
-```bash
-# Clear cache and reinstall
-pnpm exec nx reset
-rm -rf node_modules
-pnpm install
-```
+### Jest Exits Slowly or Hangs (Windows)
 
-### TypeScript Path Resolution
-- Ensure `tsconfig.base.json` includes paths for all packages
-- Nx manages these automatically via generators
-- If paths are missing, run `pnpm exec nx g @nx/js:library <name>` to regenerate
-
-### Build Failures
-```bash
-# Build in dependency order (Nx handles this automatically)
-pnpm exec nx run-many -t build
-
-# Build only affected projects
-pnpm exec nx affected -t build
-
-# Show affected dependency graph
-pnpm exec nx affected:graph
-```
-
-### Test Failures
-```bash
-# Run single test file
-pnpm exec nx run web:test --testFile=path/to/spec.ts
-
-# Run tests in watch mode
-pnpm exec nx run web:test --watch
-
-# Clear Jest cache
-pnpm exec nx run web:test --clearCache
-```
-
-### Jest exits slowly or appears to hang (Windows)
-
-**Symptom**: Jest prints "did not exit one second after the test run" or the console shows "Terminate batch job (Y/N)?". Tests complete successfully but the process doesn't exit cleanly.
+**Symptom**: Jest prints "did not exit one second after the test run" or shows "Terminate batch job (Y/N)?".
 
 **Important**: The root cause is not fully understood. Multiple factors may contribute to this issue, and different combinations of flags may both cause AND resolve the hanging behavior. What works today may not work tomorrow if other factors change.
 
@@ -882,21 +574,23 @@ When tests hang, try solutions in this order:
 - Linux/Mac environments typically don't exhibit this issue
 - Use standard commands in CI: `pnpm exec nx run-many -t test`
 
-### Prisma Issues
-```bash
-# Regenerate Prisma client after schema changes
-pnpm --filter @nx-monorepo/database prisma generate
+---
 
-# Reset database (WARNING: deletes all data)
-pnpm --filter @nx-monorepo/database prisma migrate reset
+### Other Issues
 
-# View database schema
-pnpm --filter @nx-monorepo/database prisma studio
-```
+For comprehensive troubleshooting of:
+- Nx cache issues
+- TypeScript path resolution
+- Build failures
+- Test failures (non-Jest-specific)
+- Prisma issues
+
+**READ**: `docs/memories/troubleshooting.md`
 
 ## Important Notes
 
 - **Check technical findings first**: Before suggesting architecture, tooling, or configuration changes, review `docs/memories/tech-findings-log.md` for documented decisions, known issues, and empirical findings that may prevent rework
+- **Check architecture decisions**: Before suggesting framework or technology changes, review `docs/architecture-decisions.md` for strategic choices with rationale (REST+OpenAPI, Supabase+Prisma, monorepo structure, etc.)
 - **Always use pnpm and Nx commands** (`pnpm exec nx run`, `pnpm exec nx run-many`, `pnpm exec nx affected`) instead of direct tool invocation (e.g., use `pnpm exec nx run web:build` not `cd apps/web && next build`)
 - **Use workspace scripts for common tasks**: Prefer `pnpm run dev`, `pnpm run build`, etc. for daily development
 - **Respect project boundaries**: Don't import from `apps/*` into `packages/*`

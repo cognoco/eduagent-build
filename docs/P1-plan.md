@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-17
-Modified: 2025-10-27T13:36
+Modified: 2025-10-28T11:07
 Version: 1
 ---
 # Phase 1: Walking Skeleton
@@ -718,6 +718,27 @@ Make explicit architecture decisions about API framework and database strategy, 
   - [x] Verify in Supabase dashboard: table exists with correct schema ✅
   - [x] Verify RLS disabled: Query `pg_class` shows `relrowsecurity = f` ✅
   - [x] Test connectivity: Simple SELECT query succeeds ✅
+
+- [x] **4.4c: Add Prisma Convenience Scripts** ✅ COMPLETED 2025-10-27
+  - [x] Added scripts to `packages/database/package.json`: ✅
+    - `db:generate`: Generate Prisma Client from schema
+    - `db:migrate`: Create and apply migrations (development)
+    - `db:deploy`: Apply migrations (production/CI)
+    - `db:push`: Sync schema without migrations (prototyping)
+    - `db:studio`: Launch Prisma Studio GUI
+  - [x] Scripts follow Prisma monorepo best practices (db: prefix, no --schema flag needed) ✅
+  - [x] Validated db:generate succeeds, other scripts require DATABASE_URL (documented) ✅
+  - **PR #10 Review Note**: Additional enhancements identified but intentionally deferred:
+    - **Environment validation (Issue 3)**: Defer to Stage 5 for Zod-based implementation
+      - Rationale: Implement gold-standard pattern (Zod env validation) once in Stage 5 vs simple if-check now + proper implementation later
+      - Will implement during walking skeleton with proper error handling and type safety
+    - **Database testing (Issue 4)**: Defer to Phase 2+ when custom logic exists
+      - Rationale: Prisma client singleton is boilerplate from official docs, testing adds complexity without value for template
+      - Template should demonstrate testing patterns for business logic, not infrastructure boilerplate
+    - **Supabase docs enhancements (Issue 5)**: Defer to Phase 2 planning
+      - Rationale: Documentation should reflect current state, not speculative future work
+      - Phase 2 checklist can be added when actually planning auth implementation with up-to-date best practices
+  - **Meta-rationale**: Gold standard template prioritizes production-ready infrastructure that survives walking skeleton deletion over convenience enhancements or forward-looking documentation
 
 - [ ] **4.5: Configure Supabase client factory**
   - [ ] 4.5.1: Implement client factory in `packages/supabase-client/src/index.ts`

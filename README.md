@@ -141,6 +141,8 @@ import { createSupabaseBrowserClient } from '@nx-monorepo/supabase-client';
 
 ## Common Commands
 
+> **Note**: This documentation uses short-form Nx commands (`nx dev web`) for readability. AI agents and automated tools use the equivalent long-form syntax (`nx run web:dev`) for clarity and explicitness. Both forms are functionally identical.
+
 ### Workspace Scripts (Recommended)
 
 These convenience scripts run tasks across all projects:
@@ -285,7 +287,7 @@ GitHub Actions workflow runs on all PRs and main branch commits:
 
 1. Install dependencies
 2. Install Playwright browsers
-3. Run: `nx run-many -t lint test build e2e`
+3. Run: `pnpm exec nx run-many -t lint test build typecheck e2e`
 4. Execute `nx fix-ci` if failures occur (self-healing)
 
 **Nx Cloud Integration**: Enabled for distributed caching and task execution across team and CI.
@@ -293,6 +295,8 @@ GitHub Actions workflow runs on all PRs and main branch commits:
 ## Documentation
 
 - **[P1-plan.md](docs/P1-plan.md)**: Phase 1 implementation plan with stage breakdowns
+- **[testing-reference.md](docs/memories/testing-reference.md)**: Comprehensive Jest and testing configuration reference
+- **[troubleshooting.md](docs/memories/troubleshooting.md)**: Common development troubleshooting solutions
 - **[tech-findings-log.md](docs/memories/tech-findings-log.md)**: Technical decisions and empirical findings
 - **[CLAUDE.md](CLAUDE.md)**: AI agent instructions (auto-generated from `.ruler/AGENTS.md`)
 

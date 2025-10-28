@@ -6,7 +6,7 @@ created: 2025-10-20
 last-updated: 2025-10-27
 Last-Modified: 2025-10-21T17:45
 Created: 2025-10-20T13:31
-Modified: 2025-10-27T13:25
+Modified: 2025-10-28T11:38
 ---
 
 # Technical Findings Log
@@ -198,8 +198,8 @@ The `api-client` library package needs TypeScript types that match the server AP
 
 **Alternatives Considered:**
 
-1. **Import types from server using relative paths (oRPC/tRPC pattern)**
-   - Rejected: Only works for RPC frameworks with shared router type
+1. **Import types from server using relative paths (RPC framework pattern)**
+   - Rejected: Only works for RPC frameworks (like tRPC) with shared router type
    - REST APIs don't export single router type - they have individual route handlers
 
 2. **Manually duplicate types in api-client**
@@ -893,6 +893,387 @@ No blocking issue. Database setup is validated and functional. Prisma CLI operat
 - binaryTarget detected: "windows" (should be "windows-arm64" if supported)
 - Implementation: Stage 4.4b Phase 7.5 (2025-10-27)
 - Documentation: packages/database/PLATFORM-NOTES.md
+
+---
+
+## [Build Configuration] - Library Package Module Resolution for Next.js Imports - 2025-10-27
+
+**Finding:** Library packages (tsconfig.lib.json) that import from Next.js must inherit `moduleResolution: "bundler"` from base config, not override with `"nodenext"`.
+
+**Context:**
+During PR #10 remediation, the `supabase-client` package failed to build with errors:
+- `TS2307: Cannot find module 'next/headers'` (after adding 'next' dependency)
+- `TS2304: Cannot find name 'window'`
+
+The package imported from `next/headers` but TypeScript couldn't resolve the module even though 'next' was properly installed as a dependency.
+
+**Root Cause:**
+The package's `tsconfig.lib.json` explicitly set `"moduleResolution": "nodenext"`, overriding the base config's `"bundler"` setting. Next.js 15 uses legacy package structure (files at root like `headers.js`, `headers.d.ts`) without modern package.json "exports" field. The `"nodenext"` resolution is stricter and couldn't resolve Next.js's structure, while `"bundler"` resolution is more lenient and compatible.
+
+**Technical Details:**
+
+**What didn't work:**
+```typescript
+// packages/supabase-client/tsconfig.lib.json (BEFORE)
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",           // ❌ Override
+    "moduleResolution": "nodenext", // ❌ Override
+    "types": ["node"]
+  }
+}
+```
+
+**What works:**
+```typescript
+// packages/supabase-client/tsconfig.lib.json (AFTER)
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // ✅ Inherit "bundler" from base
+    // (no module/moduleResolution override)
+    "types": ["node"]
+  }
+}
+```
+
+**Why "bundler" resolution works:**
+- More lenient with package structures
+- Compatible with both modern exports and legacy file-based packages
+- Matches our bundler-everywhere architecture (Next.js, esbuild, Metro)
+- Allows extension-less imports
+
+**Why "nodenext" resolution failed:**
+- Stricter about ESM package structure
+- Expects modern package.json "exports" field
+- Next.js 15 uses legacy structure → resolution fails
+
+**Additional Fix Required:**
+Added type declaration for browser global:
+```typescript
+// Type declaration for browser global (package runs in both contexts)
+declare const window: unknown | undefined;
+```
+
+This was needed because `"types": ["node"]` doesn't include DOM types, but the code checks `typeof window` for server/client detection.
+
+**Pattern Alignment:**
+This fix aligns with our documented Pattern 2 in `adopted-patterns.md`:
+- **Base config**: `moduleResolution: "bundler"`
+- **Production configs** (tsconfig.lib.json): Inherit from base (no override)
+- **Test configs** (tsconfig.spec.json): `moduleResolution: "nodenext"`
+
+**Applies To:**
+Any library package that imports from Next.js or other packages with legacy structure:
+- `packages/supabase-client/` (uses `next/headers`)
+- Any future packages that import from Next.js APIs
+
+**Warning Signs (for AI agents):**
+
+❌ **Do not override** moduleResolution in tsconfig.lib.json unless there's specific need
+- **Why**: Base "bundler" setting works for vast majority of cases
+
+❌ **Do not add** DOM lib types to fix 'window' errors in library packages
+- **Why**: Pollutes Node.js environment with browser globals
+- **Instead**: Add local `declare const window` type declaration
+
+✅ **Do inherit** moduleResolution from base config in production type configs
+- Consistent with documented Pattern 2
+- Compatible with modern and legacy package structures
+
+✅ **Do add** 'next' as dependency if importing from Next.js
+- Nx dependency-checks will enforce this
+- Required even if 'next' exists in workspace root
+
+**References:**
+- PR #10 Issue #1 and #2 remediation
+- docs/memories/adopted-patterns.md - Pattern 2 (TypeScript Module Resolution)
+- packages/supabase-client/tsconfig.lib.json (corrected configuration)
+- packages/supabase-client/src/lib/client.ts (window type declaration)
+
+---
+
+## [Git Configuration] - Husky Hook Line Endings on Windows - 2025-10-28
+
+**Decision:** Force LF line endings for all files in `.husky/` directory using `.gitattributes`
+
+**Context:**
+On Windows with Git Bash, Husky pre-commit hooks were failing with exit code 127 ("command not found") even though lint-staged and tests completed successfully. Investigation revealed that `.husky/pre-commit` and `.husky/commit-msg` had CRLF line endings, causing Git Bash to interpret commands with trailing carriage return characters (`\r`), which don't exist as commands.
+
+**Root Cause Analysis:**
+
+1. **File encoding check** revealed: `.husky/pre-commit: ASCII text, with CRLF line terminators`
+2. **Hex dump** showed `\r\n` at end of each line instead of just `\n`
+3. **Git's core.autocrlf=true** on Windows was converting LF→CRLF on checkout
+4. **Git Bash requires LF** for shell scripts to execute properly
+5. Result: Shell tries to execute `pnpm\r` instead of `pnpm` → command not found
+
+**Alternatives Considered:**
+
+1. **Manually run dos2unix after each git pull**
+   - Rejected: Not sustainable, requires manual intervention every time
+   - Problem: Other developers would hit the same issue
+   - Result: Doesn't scale, error-prone
+
+2. **Disable core.autocrlf globally**
+   - Rejected: Affects all repositories, not just this one
+   - Problem: May break other projects that expect CRLF
+   - Result: Too invasive
+
+3. **Add shebang to hooks**
+   - Rejected: Husky v9 format doesn't use shebangs
+   - Problem: Would revert to deprecated v4 format
+   - Result: Doesn't align with Husky best practices
+
+**Chosen Approach:** Create `.gitattributes` with LF enforcement for Husky hooks
+
+**Technical Rationale:**
+
+**Why .gitattributes:**
+- Repository-specific solution (doesn't affect other repos)
+- Committed to version control (all developers get the fix)
+- Git-native solution (no external tools required)
+- Overrides core.autocrlf for specified paths
+
+**Why LF is required:**
+- Git Bash on Windows uses Unix-style LF line endings for shell scripts
+- CRLF causes shell to append `\r` to commands, resulting in "command not found"
+- This is a fundamental shell script requirement on Unix-like environments
+
+**Implementation Details:**
+
+**Location:** `.gitattributes` (workspace root)
+
+**Configuration:**
+```
+# Husky hooks must always use LF line endings (not CRLF) for Git Bash compatibility
+.husky/* text eol=lf
+```
+
+**Fix Commands:**
+```bash
+# Convert existing hooks to LF
+dos2unix .husky/pre-commit
+dos2unix .husky/commit-msg
+
+# Or using sed
+sed -i 's/\r$//' .husky/pre-commit
+sed -i 's/\r$//' .husky/commit-msg
+
+# Verify conversion
+file .husky/pre-commit  # Should show "ASCII text" (not "with CRLF")
+od -c .husky/pre-commit  # Should show \n (not \r\n)
+```
+
+**Verification:**
+After fix, hooks execute successfully:
+- lint-staged completes
+- Nx affected tests complete
+- Hook exits cleanly (no exit code 127)
+
+**Warning Signs (for AI agents):**
+
+❌ **Do not** suggest adding shebangs to Husky v9 hooks
+- **Why**: Husky v9 uses simple command files without shebangs
+- **Result**: Deprecated pattern, goes against Husky docs
+
+❌ **Do not** suggest changing core.autocrlf globally
+- **Why**: Affects all repositories system-wide
+- **Result**: May break other projects
+
+❌ **Do not** suggest manual dos2unix as a solution
+- **Why**: Not sustainable, doesn't persist
+- **Result**: Every developer hits the same issue
+
+✅ **Do use** `.gitattributes` for path-specific line ending rules
+- Committed to repo, applies to all developers
+- Git-native, no external tools required
+
+✅ **Do verify** line endings after creating Husky hooks
+- Run `file .husky/pre-commit` to check
+- Should show "ASCII text" (not "with CRLF")
+
+**Symptoms to watch for:**
+- Husky hooks fail with exit code 127
+- Error message: "command not found" or similar
+- Hooks work on Linux/Mac but fail on Windows
+- Commands succeed individually but fail in hook
+
+**Applies To:**
+- Any shell scripts in the repository (`.sh` files)
+- Git hooks (especially Husky hooks in `.husky/`)
+- Any executable scripts intended for Git Bash on Windows
+
+**References:**
+- Husky v9 documentation: https://typicode.github.io/husky/
+- Git attributes documentation: https://git-scm.com/docs/gitattributes
+- Vibe-check MCP analysis (exit code 127 diagnosis)
+- Context7 Husky docs (/typicode/husky)
+
+---
+
+## Related Documentation
+
+**Referenced by**:
+- `.ruler/AGENTS.md` - Memory System section - **MUST CHECK before changing build/test/TypeScript configs**
+- `.ruler/AGENTS.md` - Important Notes - Read before suggesting architecture/tooling/configuration changes
+
+**Related Memory Files**:
+- `adopted-patterns.md` - Configuration standards derived from technical findings
+- `post-generation-checklist.md` - Post-generation fixes based on discovered constraints
+- `README.md` - Memory system overview and workflows
+
+---
+
+## [Testing] - Jest Hanging on Windows in Pre-Commit Hooks - 2025-10-28
+
+**Decision:** Use `NX_DAEMON=false` environment variable when running tests in pre-commit hooks
+
+**Context:**
+After fixing the line endings issue (previous entry), Jest tests still hung after successful completion on Windows when run via Husky pre-commit hooks. Tests passed successfully but the Jest/Nx process wouldn't exit cleanly, blocking the commit indefinitely.
+
+**Root Cause Analysis:**
+
+1. **Nx daemon IPC connections**: Nx daemon maintains persistent IPC socket connections (named pipes on Windows)
+2. **Process cleanup on Windows**: Windows handles lingering socket connections differently than Linux/Mac
+3. **Jest process**: Even after tests complete, Node process has open handles to daemon communication
+4. **Result**: Process waits indefinitely for handles to close (they never do on Windows)
+
+**Empirically Verified Solutions** (from 2025-10-20 troubleshooting):
+- ✅ `NX_DAEMON=false pnpm exec nx run-many -t test` (Works - disables daemon)
+- ✅ `pnpm exec nx run-many -t test --no-cloud` (Works - disables Nx Cloud)
+- Both work independently
+
+**Alternatives Considered:**
+
+1. **Move tests entirely to CI** (Approach 2)
+   - Pro: Fastest commits (3-8 seconds), no platform issues
+   - Pro: Industry standard (React, Vue, Angular use this pattern)
+   - Con: No local quality gate, delayed feedback (5-10 minutes)
+   - Con: Developers can commit broken tests
+   - Rejected: Team values immediate local feedback
+
+2. **Conditional execution (skip on Windows)** (Approach 3)
+   - Pro: Windows developers get fast commits, others keep local tests
+   - Con: Team inconsistency - different experience by OS
+   - Con: Windows devs lose quality gate (can push broken code)
+   - Con: Creates "second-class developer" perception
+   - Rejected: Team division unacceptable
+
+3. **Use --no-cloud flag instead**
+   - Pro: Also empirically verified to work
+   - Pro: Retains daemon for workspace graph operations
+   - Con: Disables remote caching (slower on cache miss)
+   - Rejected: Daemon is the primary hang source per research
+
+4. **Use --forceExit Jest flag**
+   - Pro: Guaranteed exit
+   - Con: Masks real issues (violates codebase policy)
+   - Con: Against Jest best practices
+   - Rejected: Documented in tech-findings as "never commit"
+
+**Chosen Approach:** Use `NX_DAEMON=false` in pre-commit hook (Approach 1)
+
+**Technical Rationale:**
+
+**Why NX_DAEMON=false works:**
+- Disables persistent Nx daemon process
+- Forces synchronous, single-process execution
+- No IPC socket connections = no lingering handles
+- Process can exit cleanly as soon as tests complete
+
+**Why it's appropriate for pre-commit:**
+- Pre-commit runs affected tests only (small subset, fast even without daemon)
+- Daemon overhead minimal for affected detection (2-5 seconds typical)
+- Retains Nx Cloud remote caching (daemon and cloud are separate)
+- Maintains consistent developer experience (all platforms same behavior)
+- Preserves local quality gate (tests run before commit)
+
+**Implementation Details:**
+
+**Location:** `.husky/pre-commit`
+
+**Configuration:**
+```bash
+# .husky/pre-commit
+pnpm exec lint-staged
+NX_DAEMON=false pnpm exec nx affected -t test --base=HEAD~1
+```
+
+**Performance Impact:**
+- With daemon: 5-15 seconds (but hangs on Windows)
+- Without daemon: 10-20 seconds (exits cleanly on all platforms)
+- Trade-off: 5-10 seconds slower for reliability and consistency
+
+**Verification:**
+```bash
+# Test pre-commit hook manually
+./.husky/pre-commit
+
+# Should exit cleanly with output like:
+# ✓ lint-staged completed
+# ✓ nx affected tests completed (or "No tasks were run")
+# ✓ Hook exits immediately (no hanging)
+```
+
+**How `nx affected` Works:**
+
+**Project-level detection**, not file-level:
+- Compares git diff between commits
+- Determines which **projects** are affected by changes
+- Runs tests for entire affected projects
+
+**Files that trigger all tests:**
+- `.gitattributes` - Could affect any file's Git handling
+- `.husky/*` - Changes hooks that run tests
+- `nx.json` - Workspace configuration
+- `tsconfig.base.json` - Affects all TypeScript projects
+- `package.json` (root) - Workspace dependencies
+
+**Files that don't trigger tests:**
+- `docs/*.md` - Pure documentation
+- `README.md` - Documentation
+- Most files in `docs/` directory
+
+**Example behavior:**
+- Commit only `docs/some-file.md` → No tests run (exits <1 second)
+- Commit `.gitattributes` → All tests run (workspace config)
+- Commit `apps/web/src/page.tsx` → Only `web` project tests run
+
+**Warning Signs (for AI agents):**
+
+❌ **Do not** suggest removing `NX_DAEMON=false` to "improve performance"
+- **Why**: Re-introduces hanging issue on Windows
+- **Result**: Developers will bypass hooks with --no-verify
+
+❌ **Do not** suggest using `--forceExit` as alternative
+- **Why**: Violates codebase policy, masks real issues
+- **Result**: May hide test code leaks
+
+❌ **Do not** suggest conditional execution (Windows vs Linux)
+- **Why**: Creates team division and inconsistency
+- **Result**: Different developer experience by OS
+
+✅ **Do preserve** `NX_DAEMON=false` when modifying pre-commit hook
+- Essential for Windows compatibility
+- Minimal performance cost for affected tests
+
+✅ **Do use** standard Nx commands in CI (daemon + cloud enabled)
+- CI doesn't have the Windows hanging issue
+- Full optimization appropriate in CI environment
+
+**Applies To:**
+- Nx monorepos with Husky pre-commit hooks
+- Windows development environments (Git Bash, MSYS2)
+- Any scenario where Jest hangs after test completion
+- Pre-commit hooks running `nx affected -t test`
+
+**References:**
+- Sub-agent research report (2025-10-28): Three approaches analyzed
+- Industry best practices: Nx community standard workaround
+- Empirical validation: tech-findings-log.md (2025-10-20)
+- Vibe-check MCP guidance on systematic troubleshooting
 
 ---
 

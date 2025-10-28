@@ -3,9 +3,9 @@ title: Memory System Documentation
 purpose: Comprehensive guide to the monorepo's institutional knowledge system
 audience: AI agents, developers, architects
 created: 2025-10-21
-last-updated: 2025-10-21
+last-updated: 2025-10-27
 Created: 2025-10-21T14:41
-Modified: 2025-10-23T16:36
+Modified: 2025-10-28T16:27
 ---
 
 # Memory System Documentation
@@ -46,7 +46,7 @@ This directory captures **transferable knowledge** that applies across multiple 
 
 ## Memory Files
 
-### 1. `adopted-patterns.md`
+### `adopted-patterns.md`
 
 **Purpose**: "This is how WE do it in THIS monorepo" - overrides framework defaults
 
@@ -81,7 +81,7 @@ This directory captures **transferable knowledge** that applies across multiple 
 
 ---
 
-### 2. `post-generation-checklist.md`
+### `post-generation-checklist.md`
 
 **Purpose**: Mandatory steps after running Nx generators
 
@@ -115,7 +115,7 @@ This directory captures **transferable knowledge** that applies across multiple 
 
 ---
 
-### 3. `tech-findings-log.md`
+### `tech-findings-log.md`
 
 **Purpose**: Technical decisions, empirical findings, known constraints
 
@@ -143,7 +143,72 @@ This directory captures **transferable knowledge** that applies across multiple 
 
 ---
 
-### 4. `known-issues.md` *(Future - Phase 2)*
+### Reference Documentation
+
+Comprehensive lookup material for specific technical domains. Consult these when you need detailed specifications, configuration patterns, or troubleshooting solutions.
+
+#### `testing-reference.md`
+
+**Purpose**: Comprehensive Jest and testing configuration reference for the nx-monorepo
+
+**Content**:
+- Test file location standards (co-located in `src/`)
+- Unit tests (Jest), integration tests, E2E tests (Playwright)
+- Jest configuration patterns (workspace preset, project-level, TypeScript config)
+- Coverage testing (scripts, thresholds, reports, directory structure)
+- Adding Jest to new projects
+- Testing enhancements and best practices
+
+**When to read**:
+- Before configuring Jest for new projects
+- When troubleshooting test failures or configuration issues
+- When setting up coverage thresholds and reporting
+- When Jest or testing tools are updated
+- When onboarding developers to testing standards
+
+**When to update**:
+- When discovering new testing patterns or configurations
+- When Jest version changes require configuration updates
+- When adding new testing tools or frameworks
+- When establishing new testing conventions
+
+**Difference from troubleshooting.md**:
+- Testing reference = comprehensive Jest/testing configuration guide
+- Troubleshooting = quick solutions for common errors (all domains)
+
+---
+
+#### `troubleshooting.md`
+
+**Purpose**: Common troubleshooting solutions for nx-monorepo development issues
+
+**Content**:
+- Nx cache issues and resolution
+- TypeScript path resolution problems
+- Build failures and dependency ordering
+- Test failures (general, non-Windows)
+- Prisma client and migration issues
+- Links to related documentation
+
+**When to read**:
+- When encountering build, test, or runtime errors
+- Before suggesting fixes to recurring issues
+- When new developers face common setup problems
+- When troubleshooting Nx, TypeScript, or Prisma issues
+
+**When to update**:
+- When discovering new workarounds for common issues
+- When resolving recurring problems that affect multiple developers
+- When tooling updates change troubleshooting approaches
+- When identifying new error patterns
+
+**Important note**:
+- Jest hanging on Windows (most frequent test issue) remains in `.ruler/AGENTS.md` for immediate visibility
+- General test failures are documented here; Windows-specific Jest hanging is in AGENTS.md
+
+---
+
+### `known-issues.md` *(Future - Phase 2)*
 
 **Purpose**: Active bugs, workarounds, temporary solutions
 
@@ -170,7 +235,7 @@ This directory captures **transferable knowledge** that applies across multiple 
 
 ---
 
-### 5. `integration-recipes.md` *(Future - Phase 2)*
+### `integration-recipes.md` *(Future - Phase 2)*
 
 **Purpose**: How to connect component A to component B
 
@@ -193,16 +258,18 @@ This directory captures **transferable knowledge** that applies across multiple 
 
 ---
 
-### 6. `architecture-decisions.md` *(Future - Phase 2)*
+### `architecture-decisions.md`
 
 **Purpose**: High-level strategic choices with rationale
 
 **Content**:
-- Why oRPC instead of tRPC, REST, or gRPC
+- Why REST+OpenAPI instead of oRPC, tRPC or gRPC
 - Why Supabase + Prisma instead of alternatives
 - Why monorepo instead of polyrepo
 - Why pnpm instead of npm/yarn
 - Why Nx instead of Turborepo
+
+**Note**: Created in Phase 1 Stage 4.1 to document API architecture decision
 
 **When to read**:
 - Before suggesting alternative architectures
@@ -220,7 +287,7 @@ This directory captures **transferable knowledge** that applies across multiple 
 
 ---
 
-### 7. `current-task.md` *(Future - as needed)*
+### `current-task.md` *(Future - as needed)*
 
 **Purpose**: Active work state for cross-session continuity
 
@@ -259,7 +326,7 @@ This directory captures **transferable knowledge** that applies across multiple 
 ```
 1. Read adopted-patterns.md - what patterns must I follow?
 2. Read post-generation-checklist.md - what will I need to fix?
-3. Run: nx g <command>
+3. Run: pnpm exec nx g <command>
 ```
 
 ### After Generating Components
@@ -278,9 +345,11 @@ This directory captures **transferable knowledge** that applies across multiple 
 
 ### When Troubleshooting
 ```
-1. Read known-issues.md - is this a known problem with a workaround?
-2. Read tech-findings-log.md - any empirical findings related to this?
-3. Search for similar symptoms
+1. Read troubleshooting.md - common solutions for development issues
+2. Read testing-reference.md - if issue is test-related (configuration, coverage, Jest setup)
+3. Read known-issues.md - is this a known problem with a workaround?
+4. Read tech-findings-log.md - any empirical findings related to this?
+5. Search for similar symptoms
 ```
 
 ### Before Suggesting Changes
@@ -387,12 +456,14 @@ Memory captures **solutions to prevent future problems**.
 - Has validation steps
 - Links to related docs
 - Dated with "Last Validated"
+- Complete frontmatter (title, purpose, audience, dates)
 
 **Bad memory entry**:
 - Vague or ambiguous
 - No explanation of why
 - No way to verify if applied correctly
 - Orphaned (no context for when to use it)
+- Missing or incomplete frontmatter
 
 ---
 
@@ -430,15 +501,21 @@ Use the decision tree:
 ## Memory System Status
 
 **Phase 1 (Current)** - Core Foundation:
-- ✅ `adopted-patterns.md` - 3 patterns documented
+- ✅ `adopted-patterns.md` - 10 patterns documented
 - ✅ `post-generation-checklist.md` - 5 checklists documented
 - ✅ `tech-findings-log.md` - Migrated and enhanced
+- ✅ `testing-reference.md` - Comprehensive Jest and testing configuration reference
+- ✅ `troubleshooting.md` - Common development troubleshooting solutions
 - ✅ `README.md` - This file
+
+**Phase 1 Complete (Canonical Docs)**:
+- ✅ `docs/architecture-decisions.md` - Stage 4.1 (REST+OpenAPI), Stage 4.2 (Supabase+Prisma+RLS)
+- ✅ `docs/tech-stack.md` - Complete version inventory with pinning strategy
+- ✅ `docs/P1-plan.md` - Walking skeleton implementation plan
 
 **Phase 2 (Planned)** - Expansion:
 - ⏳ `known-issues.md` - Active bugs and workarounds
 - ⏳ `integration-recipes.md` - Cross-component integration patterns
-- ⏳ `architecture-decisions.md` - Strategic technology choices
 - ⏳ `current-task.md` - Active work state
 
 **Phase 3 (Future)** - Advanced:

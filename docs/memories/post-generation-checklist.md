@@ -3,9 +3,9 @@ title: Post-Generation Checklist
 purpose: Mandatory steps after running Nx generators
 audience: AI agents, developers
 created: 2025-10-21
-last-updated: 2025-10-27
+last-updated: 2025-10-28
 Created: 2025-10-21T14:40
-Modified: 2025-10-27T13:24
+Modified: 2025-10-28T13:42
 ---
 
 # Post-Generation Checklist
@@ -25,7 +25,48 @@ Nx generator creates `tsconfig.spec.json` with outdated TypeScript module resolu
 
 ### Required Actions
 
-**1. Update TypeScript module resolution**
+**1. Install testing enhancement packages (UI projects only)**
+
+For UI projects (web, future mobile):
+```bash
+pnpm add --save-dev @testing-library/jest-dom @testing-library/user-event msw
+```
+
+For Node projects with HTTP endpoint testing:
+```bash
+pnpm add --save-dev @testing-library/jest-dom msw
+```
+
+For pure logic packages (schemas, utils):
+```bash
+# No additional packages needed - skip this step
+```
+
+**2. Create Jest setup file (UI projects only)**
+
+File: `<project>/jest.setup.ts`
+
+```typescript
+import '@testing-library/jest-dom';
+```
+
+**3. Update jest.config.ts (UI projects only)**
+
+File: `<project>/jest.config.ts`
+
+Add `setupFilesAfterEnv`:
+```typescript
+export default {
+  displayName: '@nx-monorepo/<project>',
+  preset: '../../jest.preset.js',
+  testEnvironment: 'jsdom',
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'], // ✅ Add this
+  testMatch: ['<rootDir>/src/**/*.(spec|test).[jt]s?(x)'],
+  coverageDirectory: '../../coverage/apps/<project>',
+};
+```
+
+**4. Update TypeScript module resolution**
 
 File: `<project>/tsconfig.spec.json`
 
@@ -49,7 +90,7 @@ To:
 }
 ```
 
-**2. Verify Jest types are included**
+**5. Verify Jest types are included**
 
 File: `<project>/tsconfig.spec.json`
 
@@ -62,7 +103,7 @@ Ensure types array exists:
 }
 ```
 
-**3. Verify production config is clean**
+**6. Verify production config is clean**
 
 File: `<project>/tsconfig.json`
 
@@ -84,9 +125,13 @@ pnpm exec nx run <project>:test
 
 ### Why This Matters
 
-Our workspace uses `customConditions` in `tsconfig.base.json`, which requires modern module resolution (`nodenext`). The generator's default (`node10`) causes TypeScript compilation errors.
+**Testing enhancements**: Our monorepo uses mandatory testing patterns (jest-dom, user-event, MSW) for consistent, high-quality tests across all UI packages. This eliminates AI decision overhead and ensures industry-standard testing practices.
 
-**Reference**: `docs/memories/adopted-patterns.md` - Pattern 2
+**Module resolution**: Our workspace uses `customConditions` in `tsconfig.base.json`, which requires modern module resolution (`nodenext`). The generator's default (`node10`) causes TypeScript compilation errors.
+
+**References**:
+- `docs/memories/adopted-patterns.md` - Pattern 2 (Module Resolution)
+- `docs/memories/adopted-patterns.md` - Pattern 10 (Testing Enhancement Libraries)
 
 ---
 
@@ -505,3 +550,15 @@ File: `<location>`
 
 **Reference**: [Link to related docs]
 ```
+
+---
+
+## Related Documentation
+
+**Referenced by**:
+- `.ruler/AGENTS.md` - Memory System section - **MANDATORY READ after all `nx g` commands**
+
+**Related Memory Files**:
+- `adopted-patterns.md` - Monorepo standards that generated code must match
+- `tech-findings-log.md` - Technical constraints affecting generated code
+- `README.md` - Memory system overview and usage workflows

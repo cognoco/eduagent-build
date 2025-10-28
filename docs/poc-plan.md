@@ -1,7 +1,18 @@
 ---
 Created: 2025-10-16T20:18
-Modified: 2025-10-27T15:51
+Modified: 2025-10-28T16:27
 ---
+
+---
+⚠️ **LEGACY DOCUMENT - HISTORICAL REFERENCE ONLY**
+
+This document describes the original PoC approach (functional parity with bts-test).
+
+**Current Implementation Plan**: See [P1-plan.md](./P1-plan.md) for the active "walking skeleton" approach.
+
+**Command Format Note**: This document uses `npx nx` commands from the original draft. Current standard is `pnpm exec nx` (see `.ruler/AGENTS.md` Critical Rule #3).
+---
+
 # PoC Plan: Nx Monorepo with Functional Parity to bts-test
 
 ## Overview
