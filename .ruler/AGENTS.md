@@ -398,16 +398,7 @@ The project uses Husky pre-commit hooks to maintain code quality:
 ```bash
 # .husky/pre-commit
 pnpm exec lint-staged
-
-# OS-conditional test execution
-if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
-  # Windows: Skip web tests due to Jest hanging issue
-  pnpm exec nx affected -t test --base=HEAD~1 --exclude=web
-else
-  # Linux/Mac: Run all tests
-  pnpm exec nx affected -t test --base=HEAD~1
-fi
-```
+NX_DAEMON=false pnpm exec nx affected -t test --base=HEAD~1
 
 **Why `nx affected` instead of all tests:**
 - ✅ Faster commits: Only runs tests for changed code
