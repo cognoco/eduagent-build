@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-27
-Modified: 2025-10-28T13:22
+Modified: 2025-10-28T20:30
 ---
 
 # Supabase Integration Guide

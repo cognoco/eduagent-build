@@ -6,7 +6,7 @@ tags: jest, testing, configuration, coverage, typescript, playwright
 created: 2025-10-27
 last-updated: 2025-10-27
 Created: 2025-10-28T10:18
-Modified: 2025-10-28T10:18
+Modified: 2025-10-29T13:00
 ---
 
 # Testing Reference
@@ -197,7 +197,7 @@ Nx automatically:
 
 **No manual setup required** - Nx handles all configuration automatically.
 
-**Optional Testing Enhancements**: For advanced testing patterns (jest-dom, user-event, MSW, custom render), see `docs/testing-enhancements.md`. These enhancements are optional - start simple and add complexity only when needed.
+**Mandatory Testing Enhancements for UI Packages**: UI packages (web, mobile) MUST use jest-dom, user-event, and MSW as documented in Pattern 10 (`adopted-patterns.md`). This is constitutional requirement (Principle I) to ensure consistent testing quality and eliminate decision overhead for AI agents. See post-generation checklist for setup steps. Non-UI packages (Node.js libraries, pure logic) use basic Jest without these enhancements.
 
 ---
 

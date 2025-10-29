@@ -75,6 +75,70 @@ This project uses [Ruler](https://github.com/intellectronica/ruler) to manage AI
 
 **If you catch yourself about to run `git commit`**: STOP and ask the user if they want you to commit.
 
+## External Tools & MCP Servers
+
+**CRITICAL**: You have access to specialized MCP servers that extend your capabilities significantly. **Actively consider MCP servers BEFORE defaulting to base tools.** Two servers in particular should be used proactively:
+
+### Primary Cognitive Tools (Use Proactively)
+
+**Sequential Thinking MCP** ⭐ **USE FOR ALL PLANNING**
+- **When to use**: ANY multi-step task, planning sessions, problem analysis, architectural decisions
+- **Not just for**: "Complex" tasks - use for ALL planning work, even seemingly simple tasks
+- **What it does**: Structures thinking into explicit numbered steps, allows branching and revision
+- **Why critical**: Makes reasoning transparent, reviewable, and helps catch assumptions early
+- **Example usage**:
+  - User asks to add feature → Start with sequential thinking to plan approach
+  - Before writing code → Sequential thinking to break down implementation
+  - Debugging issue → Sequential thinking to trace root cause
+
+**Vibe-Check MCP** ⭐ **USE BEFORE WRITING CODE**
+- **When to use**:
+  - BEFORE starting any code implementation (validate approach)
+  - BEFORE writing significant code (check assumptions)
+  - AFTER completing work (capture learnings via vibe_learn)
+  - When making architectural decisions (surface hidden assumptions)
+- **Frequency**: Pretty much every time you write code, not just "complex" tasks
+- **What it does**: Asks probing questions to surface assumptions, validates approach, captures patterns
+- **Why critical**: Prevents tunnel vision, catches flawed assumptions before implementation, builds institutional memory
+- **Example usage**:
+  - User: "Add health check endpoint" → vibe_check validates approach before coding
+  - After implementing feature → vibe_learn to capture patterns discovered
+  - Constitution changes → vibe_check for metacognitive review
+
+**If these servers are unavailable:**
+1. Immediately inform user: "I attempted to use [Sequential Thinking/Vibe-Check] MCP but it appears disabled."
+2. Explain what you were trying to accomplish
+3. Ask if user wants you to proceed without it (acknowledge reduced quality/visibility)
+
+### Additional MCP Servers (Examples)
+
+The following servers are commonly applicable. This list is **not exhaustive** - check available tools for other specialized servers.
+
+**Context7 MCP** - Library Documentation
+- **When**: BEFORE suggesting version changes, researching framework features
+- **What**: Fetches up-to-date official documentation
+- **Why**: Base knowledge has cutoff date; Context7 provides current docs
+
+**Exa MCP** - Code Examples & Patterns
+- **When**: Researching implementations, debugging common issues
+- **What**: Searches web for code snippets, Stack Overflow solutions
+- **Why**: Real-world examples show battle-tested patterns
+
+**NX MCP** - Workspace Intelligence
+- **When**: Understanding workspace structure, checking dependencies
+- **What**: Nx-specific workspace analysis and documentation
+- **Why**: Direct access to workspace graph and project metadata
+
+### MCP Server Unavailability Protocol
+
+**If you attempt to use ANY MCP server and receive an error:**
+1. Immediately inform user: "I attempted to use [MCP Server Name] but it appears disabled or unavailable."
+2. Explain what you were trying to accomplish with the server
+3. Suggest alternatives (base tools, manual research, or alternative MCP servers)
+4. Ask user if they want you to proceed with alternatives or enable the server
+
+---
+
 ## Sub-Agent Usage Policy
 
 **Applies ONLY to agents capable of sub-agent use**, eg. **Claude Code**!

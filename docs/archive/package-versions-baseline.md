@@ -2,7 +2,7 @@
 Created: 2025-10-19
 Purpose: Document baseline package versions for Phase 1 walking skeleton
 Status: Stage 0 baseline (before additional apps/packages)
-Modified: 2025-10-28T13:24
+Modified: 2025-10-28T20:30
 ---
 
 # Package Versions Baseline

@@ -6,7 +6,7 @@ tags: technology, versions, compatibility, dependencies, pinning
 created: 2025-10-28
 last-updated: 2025-10-28
 Created: 2025-10-28T11:36
-Modified: 2025-10-28T11:36
+Modified: 2025-10-28T20:30
 ---
 
 # Technology Stack Reference
