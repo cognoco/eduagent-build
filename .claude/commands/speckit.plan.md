@@ -20,7 +20,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Fill Technical Context (mark unknowns as "NEEDS CLARIFICATION")
    - Fill Constitution Check section from constitution
    - Evaluate gates (ERROR if violations unjustified)
-   - Phase 0: Generate research.md (resolve all NEEDS CLARIFICATION)
+   - Phase 0: MCP Research Gate (validate material changes, create research-validation.md)
    - Phase 1: Generate data-model.md, contracts/, quickstart.md
    - Phase 1: Update agent context by running the agent script
    - Re-evaluate Constitution Check post-design
@@ -29,32 +29,94 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Phases
 
-### Phase 0: Outline & Research
+### Phase 0: MCP Research Gate (MANDATORY - DO NOT SKIP)
 
-1. **Extract unknowns from Technical Context** above:
-   - For each NEEDS CLARIFICATION → research task
-   - For each dependency → best practices task
-   - For each integration → patterns task
+**Purpose**: External validation of implementation patterns using MCP servers to prevent anti-patterns and production bugs.
 
-2. **Generate and dispatch research agents**:
+**Gate Status Required**: ✅ before proceeding to Phase 1
 
-   ```text
-   For each unknown in Technical Context:
-     Task: "Research {unknown} for {feature context}"
-   For each technology choice:
-     Task: "Find best practices for {tech} in {domain}"
-   ```
+#### Step 1: Identify Research Areas
 
-3. **Consolidate findings** in `research.md` using format:
-   - Decision: [what was chosen]
-   - Rationale: [why chosen]
-   - Alternatives considered: [what else evaluated]
+Analyze the feature spec and Technical Context for **material changes**:
 
-**Output**: research.md with all NEEDS CLARIFICATION resolved
+- [ ] New external libraries/frameworks
+- [ ] Cross-project architecture/build/test/config changes
+- [ ] Public API contracts or data models
+- [ ] Security or infrastructure decisions
+- [ ] Database schema or ORM configuration
+- [ ] NEEDS CLARIFICATION items in Technical Context
+
+**If NO material changes detected**: Mark gate as "⚠️ No material changes - research skipped" and proceed to Phase 1.
+
+**If material changes detected**: MUST complete Steps 2-4 before proceeding.
+
+#### Step 2: Dispatch Parallel Research Agents
+
+For each material change or technology area, dispatch specialized research agents with MCP server access:
+
+**Agent Template**:
+```text
+Task: "Use MCP servers (Context7, Exa, web search) to validate {technology/pattern} for {feature context}"
+
+Requirements:
+- Context7: Fetch official documentation for {library/framework}
+- Exa: Search production code examples showing {pattern}
+- Web Search: Research industry best practices for {use case}
+
+Report:
+- Status: [✅ VALIDATED | ⚠️ CHANGES REQUIRED | ❌ ANTI-PATTERN]
+- Findings: [What did you discover?]
+- Sources: [Specific docs, examples, articles]
+- Recommendation: [Changes needed or confirmation]
+```
+
+**Dispatch Strategy**: Launch all research agents in parallel using single message with multiple Task tool calls.
+
+**MCP Server Unavailability Protocol**:
+- If Context7/Exa/web search unavailable: Immediately inform user
+- DO NOT proceed without external validation
+- DO NOT implement fallback mechanisms
+- Ask user for guidance before continuing
+
+#### Step 3: Create research-validation.md
+
+Consolidate all agent findings into `specs/{feature-name}/research-validation.md` using template from `.specify/templates/research-validation.md`.
+
+**Required Sections**:
+- Executive Summary (key findings count)
+- Research Methodology (MCP servers used)
+- Agent findings for each technology area
+- Critical Findings Summary (priority 1/2/3)
+- Validated Patterns (no changes needed)
+- Action Plan (documentation + implementation changes)
+- Lessons Learned (impact of research)
+
+**Output**: `research-validation.md` with complete findings and recommendations
+
+#### Step 4: Gate Check
+
+**BLOCKER - Cannot proceed to Phase 1 without**:
+- [ ] research-validation.md exists in specs directory
+- [ ] All material changes have corresponding agent findings
+- [ ] Critical findings (Priority 1) addressed in plan
+- [ ] Gate status marked as ✅ in plan.md Research Validation section
+
+**Update plan.md**: Fill Research Validation section with:
+- Status: ✅ Complete
+- MCP servers used: [Context7/Exa/Web]
+- Material changes validated: [checked items]
+- Research areas: [summary of each agent's status]
+- Critical findings: [P1 items]
+- Validated patterns: [no-change items]
+- Gate status: ✅ External validation complete
+
+**If gate check fails**: ERROR and report blockers to user. Do not proceed to Phase 1.
+
+**Output**: Gate cleared, research-validation.md created, plan.md Research Validation section completed
 
 ### Phase 1: Design & Contracts
 
-**Prerequisites:** `research.md` complete
+**Prerequisites:** Phase 0 gate cleared (research-validation.md complete)
 
 1. **Extract entities from feature spec** → `data-model.md`:
    - Entity name, fields, relationships

@@ -1,5 +1,8 @@
 pnpm exec lint-staged
 
+# Validate research documentation exists for material spec changes
+pnpm run validate:research
+
 NX_DAEMON=false pnpm exec nx affected -t test --base=HEAD~1
 
 

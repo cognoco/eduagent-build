@@ -206,6 +206,21 @@ const userCanAccessResource = validateUserPermissions(user, resource);
 
 **Rationale:** Code is documentation. Business stakeholders should be able to read implementation and understand logic without reverse-engineering. Technical explanations educate less technical users while maintaining precision. Reduces communication overhead between engineering and product teams.
 
+### X. External Validation is Mandatory (NON-NEGOTIABLE)
+
+- All material planning and architecture decisions MUST be validated against external best practices using MCP servers (Context7, Exa, web search)
+- Material changes include: new external libraries/frameworks, cross-project architecture/build/test/config changes, public API contracts or data models, security/infrastructure decisions, database schema or ORM configuration
+- Plans without `research-validation.md` covering material changes are INCOMPLETE and must not proceed to implementation
+- If MCP servers or web search are unavailable: immediately inform user, ask for guidance, do NOT proceed without external validation or explicit user approval
+
+**Implementation:**
+- MCP research gate in `/speckit.plan` command (Phase 0 mandatory blocker)
+- Research Validation section required in `plan.md` for material changes
+- Standard artifact: `specs/[feature-name]/research-validation.md` created by research agents
+- CI validation enforces research-validation.md existence when spec documents modified
+
+**Rationale:** Examining existing code alone misses critical issues. The walking skeleton retrospective proved 3 production bugs were prevented only through MCP research (REST error format anti-pattern, Prisma + Supabase configuration, error handling patterns). MCP servers provide: (1) Context7 - current official documentation, (2) Exa - real production code examples, (3) Web search - industry standards and consensus.
+
 ## Development Workflow
 
 ### Scope of Application

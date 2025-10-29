@@ -13,6 +13,7 @@
     "e2e": "nx run-many -t e2e",
     "format:check": "nx run-many -t format:check",
     "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,scss,html}\"",
+    "validate:research": "node tools/scripts/validate-research.js",
     "prepare": "husky"
   },
   "private": true,

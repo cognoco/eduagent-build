@@ -228,23 +228,27 @@ To make MCP server usage structurally impossible to skip:
 ```markdown
 ## External Validation is Mandatory
 
-**Principle**: All planning and architecture decisions MUST be validated against external best practices using MCP servers.
+**Principle**: All material planning and architecture decisions MUST be validated against external best practices using MCP servers (Context7, Exa, web search).
 
-**Rule**: Before writing any implementation plan, you MUST:
-1. Dispatch research agents for each major technology decision
-2. Use Context7 MCP for official documentation
-3. Use Exa MCP for production code examples
-4. Use web search for industry standards
-5. Document findings in `research-validation.md`
+**Scope - Material Changes Requiring Validation**:
+- New external libraries or frameworks
+- Cross-project architecture, build, test, or configuration changes
+- Public API contracts or data model changes
+- Security or infrastructure decisions
+- Database schema or ORM configuration changes
 
-**Blocking Gate**: Plans without research-validation.md are INCOMPLETE and must not proceed to implementation.
+**If MCP servers or web search are unavailable**: Immediately inform the user and ask for guidance. Do NOT proceed without external validation or explicit user approval.
 
-**Rationale**: Examining existing code alone misses critical issues. This session proved 3 production bugs were prevented only through MCP research.
+**Blocking Gate**: Plans without `research-validation.md` covering material changes are INCOMPLETE and must not proceed to implementation.
 
-**Enforcement**: This principle overrides any command that suggests MCP usage is "optional."
+**Rationale**: Examining existing code alone misses critical issues. The walking skeleton retrospective proved 3 production bugs were prevented only through MCP research (REST error format anti-pattern, Prisma configuration, error handling).
 ```
 
-**Why This Works**: Constitution is the highest-level authority. All commands must comply with constitutional principles.
+**Why This Works**:
+- Constitution establishes the principle at the highest level (WHAT must be done)
+- Clear scope prevents over-gating on trivial changes
+- Simple escalation path when tools are unavailable (ask user)
+- No complex fallback mechanisms—just inform and ask
 
 ---
 
@@ -288,6 +292,12 @@ Use the Task tool with `subagent_type=general-purpose` to dispatch one research 
 - Use web search to find industry standards and consensus
 - Document findings: What's validated? What needs changes? What's an anti-pattern?
 
+**If any MCP server or web search is unavailable**:
+1. Immediately inform the user: "I attempted to use [tool name] but received error: [error message]"
+2. Ask the user: "How would you like me to proceed? Options: (a) Wait and retry, (b) Continue with available tools, (c) Pause research until tool is available"
+3. Do NOT proceed without user guidance
+4. Do NOT create complex fallback mechanisms or workarounds
+
 ### Step 3: Create research-validation.md
 
 After all research agents complete, create `specs/[feature-name]/research-validation.md`:
@@ -327,16 +337,26 @@ After all research agents complete, create `specs/[feature-name]/research-valida
 
 ### Layer 3: Plan Template (Structural Enforcement)
 
-**File**: `.specify/templates/plan.md`
+**File**: `.specify/templates/plan-template.md`
 
-**Add Required Section** (after Technical Context):
+**Add Required Section** (after Technical Context, before Constitution Check):
 ```markdown
 ## Research Validation
+
+**Status**: [✅ Complete | ❌ Required but not yet performed | ⚠️ Partial - tool unavailable]
 
 **MCP Servers Used**:
 - [ ] Context7 (official documentation)
 - [ ] Exa (production code examples)
 - [ ] Web search (industry standards)
+
+**Material Changes Validated** (check all that apply):
+- [ ] New external libraries/frameworks
+- [ ] Cross-project architecture/build/test/config
+- [ ] Public API contracts or data model
+- [ ] Security or infrastructure
+- [ ] Database schema or ORM configuration
+- [ ] None - no material changes in this plan
 
 **Research Areas Validated**:
 1. [Technology/Pattern 1] - [✅ Validated | ⚠️ Changes Required | ❌ Anti-pattern]
@@ -358,14 +378,19 @@ After all research agents complete, create `specs/[feature-name]/research-valida
 - [Pattern 1] - Validated by [Context7/Exa/Web]
 - [Pattern 2] - Validated by [Context7/Exa/Web]
 
-**Research Document**: See `research-validation.md` for complete findings with code examples.
+**Research Document**: See `specs/[feature-name]/research-validation.md` for complete findings with code examples.
 
 **Gate Status**:
 - [ ] ✅ External validation complete - Ready for implementation
 - [ ] ❌ Research incomplete - BLOCKER (must complete before implementation)
+- [ ] ⚠️ Tool unavailable - User notified and provided guidance
 ```
 
-**Why This Works**: The plan template has a section that MUST be filled. An empty "Research Validation" section makes the plan visibly incomplete.
+**Why This Works**:
+- Plan template has a section that MUST be filled for material changes
+- Visible "Material Changes" checklist prevents accidental skipping
+- Empty "Research Validation" section makes the plan visibly incomplete
+- No complex fallback—just document tool unavailability if it occurs
 
 ---
 
@@ -381,6 +406,8 @@ After all research agents complete, create `specs/[feature-name]/research-valida
 **Feature**: [Feature Name]
 **Branch**: [Branch Name]
 **Purpose**: External validation of implementation patterns using MCP servers
+
+**Note**: This file is in `specs/` directory, not `docs/`. Frontmatter timestamp rules do NOT apply here.
 
 ---
 
@@ -500,40 +527,74 @@ After all research agents complete, create `specs/[feature-name]/research-valida
 
 ### Enforcement Hierarchy
 
-1. **Constitution** (Layer 1): Establishes principle - "External validation is mandatory"
+1. **Constitution** (Layer 1): Establishes principle - "External validation is mandatory for material changes"
 2. **Command** (Layer 2): Creates execution gate - "STOP until research-validation.md exists"
-3. **Template** (Layer 3): Requires filled section - "Research Validation" cannot be empty
+3. **Template** (Layer 3): Requires filled section - "Research Validation" cannot be empty for material changes
 4. **Artifact** (Layer 4): Makes research visible - Standard deliverable alongside plan.md
+5. **Automated CI** (Layer 5): Validates research-validation.md exists when spec documents are modified
 
 ### Why This is Bulletproof
 
-**If AI agent tries to skip MCP research**:
+**If AI agent tries to skip MCP research for material changes**:
 - ❌ Violates constitution (Layer 1)
 - ❌ Cannot pass command gate (Layer 2)
 - ❌ Leaves empty template section (Layer 3)
 - ❌ Missing standard artifact (Layer 4)
+- ❌ CI validation fails (Layer 5)
 
-**Result**: Skipping is structurally impossible because all 4 layers block forward progress.
+**Result**: Skipping is structurally impossible because all 5 layers block forward progress.
 
-### Most Critical Layer
+### Handling Tool Unavailability
 
-**Layer 2 (Command)** is the most important because:
-- It executes in the moment when the agent is doing the work
-- It has an explicit BLOCKER that prevents proceeding
-- It's the only layer the agent sees during execution
+**If MCP server or web search is unavailable**:
+1. Agent immediately informs user: "I attempted to use [tool] but received error: [error]"
+2. Agent asks user for guidance: "How would you like me to proceed?"
+3. Agent does NOT create workarounds or fallback mechanisms
+4. Agent waits for explicit user guidance before proceeding
 
-**However, all 4 layers are recommended** for defense-in-depth.
+**No complex fallback logic**—just inform and ask.
+
+### Most Critical Layers
+
+**Layer 2 (Command)** is most important for agent execution:
+- Executes in the moment when the agent is doing the work
+- Has explicit BLOCKER that prevents proceeding
+- The layer the agent sees during execution
+
+**Layer 5 (CI Validation)** is most important for team enforcement:
+- Automated check that runs on every PR
+- Catches missing research-validation.md before merge
+- Makes the gate REAL, not just documentation
+
+**All 5 layers are recommended** for defense-in-depth.
 
 ---
 
 ## Recommended Next Steps
 
-1. **Implement Layer 2 IMMEDIATELY** - Update `.claude/commands/speckit.plan.md` with MCP research gate
-2. **Add Layer 1** - Update constitution to establish principle
-3. **Add Layer 3** - Update plan template with Research Validation section
-4. **Add Layer 4** - Create research-validation.md template
+### Immediate Implementation (Critical)
 
-**Priority**: Layer 2 is highest priority (execution-level gate). Layers 1, 3, 4 reinforce it.
+1. **Layer 2 - Plan Command** - Update `.claude/commands/speckit.plan.md` with mandatory MCP research gate
+2. **Layer 1 - Constitution** - Add "External Validation is Mandatory" principle to `.specify/memory/constitution.md`
+3. **Layer 3 - Plan Template** - Add "Research Validation" section to `.specify/templates/plan-template.md`
+4. **Layer 4 - Artifact Template** - Create `.specify/templates/research-validation.md` template
+
+### Follow-Up Implementation (Automation)
+
+5. **Layer 5 - CI Validation** - Add Nx task to validate research-validation.md exists:
+   - Create `tools/scripts/validate-research.js` (or similar)
+   - Detect changes to `specs/**/(plan|spec|contracts|data-model|quickstart).md`
+   - Fail if `specs/**/research-validation.md` is missing
+   - Add to `.github/workflows/ci.yml`
+   - Add to pre-commit hook for doc-only changes
+
+### Implementation Priority
+
+**Phase 1** (Layers 1-4): Immediate - These establish the workflow and gates
+**Phase 2** (Layer 5): Follow-up - This automates enforcement
+
+**Most Critical**: Layer 2 (command gate) because it executes during agent work.
+**Most Valuable**: Layer 5 (CI validation) because it catches gaps before merge.
 
 ---
 
@@ -541,6 +602,10 @@ After all research agents complete, create `specs/[feature-name]/research-valida
 
 This retrospective revealed a **critical gap in planning methodology**: Relying on existing codebase examination alone is insufficient. External validation via MCP servers caught 3 production-critical issues that internal knowledge missed.
 
-**Key Takeaway**: MCP server usage must transition from "optional" to "mandatory" through structural enforcement. The 4-layer system makes this enforcement bulletproof.
+**Key Takeaway**: MCP server usage must transition from "optional" to "mandatory" through structural enforcement. The 5-layer system (Constitution + Command + Template + Artifact + CI) makes this enforcement bulletproof.
 
-**Expected Outcome**: Future planning workflows will ALWAYS include external validation, preventing anti-patterns and misconfigurations from shipping to production.
+**Scope**: Validation is required for **material changes only** (new libraries, architecture, API contracts, security, database schema). This prevents over-gating on trivial changes while ensuring critical decisions are validated.
+
+**Simplicity**: When MCP tools are unavailable, agents inform the user and ask for guidance. No complex fallback mechanisms—just escalate to the user.
+
+**Expected Outcome**: Future planning workflows will ALWAYS include external validation for material changes, preventing anti-patterns and misconfigurations from shipping to production.

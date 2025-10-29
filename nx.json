@@ -90,6 +90,18 @@
       "options": {
         "command": "prettier --check \"{projectRoot}/**/*.{ts,tsx,js,jsx,json,css,scss,html}\""
       }
+    },
+    "validate-research": {
+      "cache": true,
+      "inputs": [
+        "{workspaceRoot}/specs/**/*.md",
+        "{workspaceRoot}/tools/scripts/validate-research.js"
+      ],
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node tools/scripts/validate-research.js",
+        "cwd": "{workspaceRoot}"
+      }
     }
   },
   "generators": {

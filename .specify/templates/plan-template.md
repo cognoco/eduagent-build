@@ -27,6 +27,50 @@
 **Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
 **Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
 
+## Research Validation
+
+**Status**: [✅ Complete | ❌ Required but not yet performed | ⚠️ Partial - tool unavailable]
+
+**MCP Servers Used**:
+- [ ] Context7 (official documentation)
+- [ ] Exa (production code examples)
+- [ ] Web search (industry standards)
+
+**Material Changes Validated** (check all that apply):
+- [ ] New external libraries/frameworks
+- [ ] Cross-project architecture/build/test/config
+- [ ] Public API contracts or data model
+- [ ] Security or infrastructure
+- [ ] Database schema or ORM configuration
+- [ ] None - no material changes in this plan
+
+**Research Areas Validated**:
+1. [Technology/Pattern 1] - [✅ Validated | ⚠️ Changes Required | ❌ Anti-pattern]
+   - Source: [Context7/Exa/Web]
+   - Finding: [Brief summary]
+
+2. [Technology/Pattern 2] - [Validation status]
+   - Source: [Context7/Exa/Web]
+   - Finding: [Brief summary]
+
+[Continue for all technology areas...]
+
+**Critical Findings**:
+- [Any anti-patterns discovered]
+- [Missing configurations]
+- [Required changes to original assumptions]
+
+**Validated Patterns** (no changes needed):
+- [Pattern 1] - Validated by [Context7/Exa/Web]
+- [Pattern 2] - Validated by [Context7/Exa/Web]
+
+**Research Document**: See `specs/[feature-name]/research-validation.md` for complete findings with code examples.
+
+**Gate Status**:
+- [ ] ✅ External validation complete - Ready for implementation
+- [ ] ❌ Research incomplete - BLOCKER (must complete before implementation)
+- [ ] ⚠️ Tool unavailable - User notified and provided guidance
+
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
