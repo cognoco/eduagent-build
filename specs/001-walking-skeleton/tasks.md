@@ -3,7 +3,9 @@
 **Input**: Design documents from `/specs/001-walking-skeleton/`
 **Prerequisites**: plan.md, spec.md, data-model.md, research.md, contracts/health-endpoints.md, quickstart.md
 
-**Tests**: Included - Phase 1 requires minimum 60% test coverage per project requirements
+**Tests**: Included - 60% coverage target for walking skeleton (elevated from constitutional 10% Phase 1 minimum)
+
+**Coverage Rationale**: This walking skeleton serves as reference implementation demonstrating best practices for all future features. The 60% target balances thoroughness (proves infrastructure works) with efficiency (avoids over-testing temporary validation code). This is above the constitutional Phase 1 minimum (10%) but below the Phase 2+ production standard (80%).
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -99,7 +101,7 @@
 
 - [ ] T036 [P] [US1] Create `apps/web/src/components/HealthCheckList.tsx` component to display health checks
 - [ ] T037 [P] [US1] Create `apps/web/src/app/health/page.tsx` with server component fetching health checks
-- [ ] T038 [US1] Implement empty state message ("No health checks yet. Click 'Ping' to create one")
+- [ ] T038 [US1] Implement empty state message: **"No health checks yet. Click 'Ping' to create one."** (exact wording per spec.md)
 - [ ] T039 [US1] Verify component tests for HealthCheckList now pass
 - [ ] T040 [US1] Verify page tests for /health route now pass
 
@@ -140,7 +142,10 @@
 
 - [ ] T051 [US2] Create `apps/web/src/components/PingButton.tsx` client component with onClick handler
 - [ ] T052 [US2] Implement optimistic UI update in PingButton (show new record immediately)
-- [ ] T053 [US2] Add error handling and error message display to PingButton component
+- [ ] T053 [US2] Add error handling and error message display to PingButton component (implements FR-010)
+  - Display inline error message (red text) below button when POST fails
+  - Show validation errors from Zod schema (e.g., "Message too long (maximum 500 characters)")
+  - Show network errors (e.g., "Unable to connect to server. Please try again.")
 - [ ] T054 [US2] Update `apps/web/src/app/health/page.tsx` to include PingButton component
 - [ ] T055 [US2] Verify component tests for PingButton now pass
 
