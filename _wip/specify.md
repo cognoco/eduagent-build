@@ -1,0 +1,1 @@
+/specify Create the baseline spec for the walking skeleton described in Stage 5 in docs\P1-plan.md. Make sure you consult the constitution and all of the relevant documentation referenced from CLAUDE.md
