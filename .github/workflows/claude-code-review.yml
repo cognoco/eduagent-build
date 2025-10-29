@@ -45,6 +45,8 @@ jobs:
             - docs/memories/adopted-patterns.md (established patterns that prevent drift)
             - docs/memories/tech-findings-log.md (technical decisions and constraints)
 
+            **Note**: Ignore `Modified:` and `Created:` timestamp changes in `docs/` frontmatter - these are automatically managed by Git tooling and are expected.
+
             **Review priorities**:
             1. **Architectural Adherence**: Verify against monorepo structure, dependency flow, and architectural blueprints in CLAUDE.md
             2. **Pattern Consistency**: Flag divergent implementation approaches across components, even when both are technically correct
