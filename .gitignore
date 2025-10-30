@@ -59,6 +59,7 @@ test-output
 .env*.local
 
 nul
+temp/*
 
 # START Ruler Generated Files
 /.codex/config.toml
