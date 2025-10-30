@@ -452,6 +452,20 @@ When creating shared packages:
 5. **Implement UI**: Build features in `apps/web` and/or `apps/mobile`
 6. **Write tests**: Add unit tests (packages), integration tests (server), E2E tests (apps)
 
+### Spec‑Kit Compliance (MANDATORY)
+
+- Planning via Spec‑Kit MUST execute two gates in order:
+  1) Internal Governance Alignment (Phase -1): Verify alignment with `docs/architecture-decisions.md`, `docs/memories/adopted-patterns.md`, `docs/tech-stack.md`, and `docs/P1-plan.md`.
+  2) External Research Validation (Phase 0): Validate material changes via MCP servers.
+- Use a per-feature exceptions docket (`specs/<feature>/exceptions.md`) to document any approved deviations. Each exception must cite a constitution principle, scope, approval, and expiry.
+
+### Policy‑as‑Code Enforcement
+
+- CI and pre‑commit must run a generic gate runner that loads project-owned governance and policy (no project rules inside Spec‑Kit):
+  - Governance index: `governance/index.json` (authoritative docs and artifact paths)
+  - Gate runner: `node tools/gates/run-internal-alignment.mjs`
+- Commits/PRs are blocked on violations unless waived by documented exceptions.
+
 ### Before Committing
 
 The project uses Husky pre-commit hooks to maintain code quality:

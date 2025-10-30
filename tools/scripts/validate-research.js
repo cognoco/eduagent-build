@@ -6,9 +6,14 @@
  * Usage: node tools/scripts/validate-research.js
  *
  * Checks:
- * 1. Detects changes to specs/**\/(plan|spec|contracts|data-model|quickstart).md
- * 2. For each changed spec directory, checks if research-validation.md exists
- * 3. Fails if research-validation.md is missing
+ * 1. Detects changes to material spec documents:
+ *    - specs/FEATURE/(plan|spec|quickstart).md
+ *    - specs/FEATURE/contracts/`**`/`*`.md
+ *    - specs/FEATURE/data-model/`**`/`*`.md
+ *    (excludes specs/FEATURE/(research.md|research-validation.md|exceptions.md))
+ * 2. For each changed spec directory, checks if research-validation.md exists,
+ *    or allows research.md alone when no material changes require external validation
+ * 3. Fails if neither research-validation.md nor research.md is present as appropriate
  *
  * Exit codes:
  * 0 - Success (all validations passed)
@@ -46,13 +51,52 @@ function getChangedFiles(base = 'main') {
 // Extract spec directories that have material document changes
 function getAffectedSpecDirs(changedFiles) {
   const specDirs = new Set();
-  const materialDocPattern =
-    /^specs\/([^/]+)\/(plan|spec|contracts|data-model|quickstart)\.md$/;
+
+  const isMaterial = (file) => {
+    const p = file.replace(/\\/g, '/');
+    if (!p.startsWith('specs/')) return false;
+    const parts = p.split('/');
+    if (parts.length < 3) return false;
+    const rest = parts.slice(2);
+    const fileName = rest[rest.length - 1];
+
+    // Exclude research artifacts and exceptions
+    if (
+      fileName === 'research.md' ||
+      fileName === 'research-validation.md' ||
+      fileName === 'exceptions.md'
+    ) {
+      return false;
+    }
+
+    // Top-level material files under a feature
+    if (
+      rest.length === 1 &&
+      (fileName === 'plan.md' ||
+        fileName === 'spec.md' ||
+        fileName === 'quickstart.md')
+    ) {
+      return true;
+    }
+
+    // Nested material under contracts/ or data-model/
+    if (rest.length >= 2) {
+      const firstDir = rest[0];
+      if (
+        (firstDir === 'contracts' || firstDir === 'data-model') &&
+        fileName.endsWith('.md')
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  };
 
   changedFiles.forEach((file) => {
-    const match = file.match(materialDocPattern);
-    if (match) {
-      specDirs.add(`specs/${match[1]}`);
+    if (isMaterial(file)) {
+      const feature = file.replace(/\\/g, '/').split('/')[1];
+      specDirs.add(`specs/${feature}`);
     }
   });
 
