@@ -555,6 +555,8 @@ screen.getByTestId('auth.login.button-submit'); // ✅ Good fallback
 
 A library that intercepts network requests at the service worker level (browser) or http/https modules (Node), enabling realistic API mocking without modifying application code.
 
+**Version**: MSW 2.0+ (breaking changes from v1.x - see notes below)
+
 ### Why
 
 When you want to:
@@ -570,6 +572,21 @@ When you want to:
 ```bash
 pnpm add --save-dev msw
 ```
+
+#### MSW 2.0 Migration Notes
+
+**If you see old examples online (MSW v1.x), here are the key breaking changes:**
+
+| MSW v1.x (OLD ❌) | MSW 2.0 (NEW ✅) |
+|-------------------|------------------|
+| `import { rest } from 'msw'` | `import { http } from 'msw'` |
+| `rest.get(url, (req, res, ctx) => ...)` | `http.get(url, ({ request }) => ...)` |
+| `res(ctx.json(data))` | `HttpResponse.json(data)` |
+| `res(ctx.status(404), ctx.json(data))` | `HttpResponse.json(data, { status: 404 })` |
+| `req.body` | `await request.json()` |
+| `ctx.set('Header', 'value')` | `HttpResponse.json(data, { headers: { 'Header': 'value' } })` |
+
+**All examples below use MSW 2.0 syntax.**
 
 #### Setup for Node (Jest) Environment
 

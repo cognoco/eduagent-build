@@ -1,5 +1,5 @@
-export * from './lib/api-client.js';
-export type { ApiClientConfig, ApiClient } from './lib/api-client.js';
+export * from './lib/api-client';
+export type { ApiClientConfig, ApiClient } from './lib/api-client';
 
 // Export OpenAPI types for consumers
-export type { paths, components } from './gen/openapi.js';
+export type { paths, components } from './gen/openapi';

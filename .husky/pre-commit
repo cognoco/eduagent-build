@@ -6,7 +6,13 @@ pnpm run validate:research
 # Validate internal governance alignment (generic, project-owned policy)
 pnpm run validate:governance
 
-NX_DAEMON=false pnpm exec nx affected -t test --base=HEAD~1
+# Run affected tests; on Windows ARM64 skip Prisma runtime projects (unsupported engine)
+if node -e "process.platform==='win32' && process.arch==='arm64' ? process.exit(0) : process.exit(1)"; then
+  echo "Windows ARM64 detected: skipping @nx-monorepo/server and @nx-monorepo/database tests"
+  NX_DAEMON=false pnpm exec nx affected -t test --base=HEAD~1 --exclude=@nx-monorepo/server,@nx-monorepo/database
+else
+  NX_DAEMON=false pnpm exec nx affected -t test --base=HEAD~1
+fi
 
 
 # Alternative OS-conditional test execution

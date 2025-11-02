@@ -19,5 +19,14 @@
 - approval: Phase 1 architectural decision / 2025-10-30
 - expiry: Phase 1 Stage 5 completion (walking skeleton implementation)
 
+### Exception 2: PRISMA_DIRECTURL
+
+- rule: PRISMA_DIRECTURL
+- principle: XI. Governance Alignment is Mandatory
+- rationale: Canon updated to require Supavisor + Prisma `directUrl` (Pattern 8, Stage 4.2). Gate still enforces old rule; waiver needed until gate is updated.
+- scope: packages/database/prisma/schema.prisma
+- approval: Phase 1 steering / 2025-10-31
+- expiry: End of Stage 5 (Walking Skeleton completion) or upon gate rule update, whichever comes first
+
 
 

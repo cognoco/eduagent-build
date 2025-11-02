@@ -1,1 +1,1 @@
-/specify Create the baseline spec for the walking skeleton described in Stage 5 in docs\P1-plan.md. Make sure you consult the constitution and all of the relevant documentation referenced from CLAUDE.md
+/specify Create the spec for the walking skeleton described in Stage 5 in docs\P1-plan.md. Make sure you consult the constitution and all of the relevant documentation referenced from CLAUDE.md. Make ABSOLUTELY CERTAIN that you understand the existing architecture and constraints as described in the documents in docs/memories/ and at the root of docs/.

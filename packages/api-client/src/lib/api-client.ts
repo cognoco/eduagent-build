@@ -1,5 +1,5 @@
 import createClient, { type Middleware } from 'openapi-fetch';
-import type { paths } from '../gen/openapi.js';
+import type { paths } from '../gen/openapi';
 
 /**
  * Configuration for the API client factory

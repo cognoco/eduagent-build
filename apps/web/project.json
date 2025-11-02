@@ -6,6 +6,7 @@
   "targets": {
     "typecheck": {
       "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
       "options": {
         "cwd": "apps/web",
         "command": "tsc --noEmit"

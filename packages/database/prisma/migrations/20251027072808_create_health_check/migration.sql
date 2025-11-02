@@ -7,7 +7,9 @@ CREATE TABLE "health_checks" (
     CONSTRAINT "health_checks_pkey" PRIMARY KEY ("id")
 );
 
--- Disable Row Level Security (API server is security boundary)
+-- Enable Row Level Security (defense-in-depth on API path)
+-- PostgREST: service_role can bypass RLS if used
+-- Prisma: bypass via SQL database role (superuser in Phase 1)
 -- Architecture: docs/architecture-decisions.md - Stage 4.2, Decision 4
--- Research: docs/research/stage-4.4a-research-findings.md - Track 2
-ALTER TABLE "health_checks" DISABLE ROW LEVEL SECURITY;
+-- Research: specs/001-walking-skeleton/research-validation.md - Agent 1 findings
+ALTER TABLE "health_checks" ENABLE ROW LEVEL SECURITY;

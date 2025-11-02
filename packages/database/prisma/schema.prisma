@@ -1,31 +1,17 @@
-// Prisma schema for nx-monorepo walking skeleton
-// Research: docs/research/stage-4.4a-research-findings.md
-// Documentation: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
-  // binaryTargets defaults to ["native"] - auto-detects platform
-  // Explicit targets only needed for cross-platform build scenarios
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  // Single URL configuration (Stage 4.4a Track 1: port 5432 direct connection)
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-// Walking skeleton: Minimal health check model
-// Demonstrates end-to-end: Web → API → Prisma → PostgreSQL
 model HealthCheck {
-  // UUID primary key (Track 3: client-side generation, PG validation)
-  id String @id @default(uuid()) @db.Uuid
+  id        String   @id @default(uuid()) @db.Uuid
+  message   String
+  timestamp DateTime @default(now()) @db.Timestamptz(6)
 
-  // Health check message
-  message String
-
-  // Timestamp (Track 3: timezone-aware, DST-safe)
-  timestamp DateTime @default(now()) @db.Timestamptz
-
-  // PostgreSQL table name (Track 3: snake_case plural)
   @@map("health_checks")
 }

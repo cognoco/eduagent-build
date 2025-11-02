@@ -121,12 +121,12 @@ Verify that the out-of-the-box Nx setup works correctly and meets all prerequisi
 ### Sub-stages
 
 - [x] **0.1: Verify prerequisites** ✅
-  - [x] 0.1.1: Check Node.js version (recommended: v20.x or later) - v22.20.0 ✅
-  - [x] 0.1.2: Check pnpm version (should be v8.x or later) - v10.13.1, upgraded to v10.18.3 ✅
+  - [x] 0.1.1: Check Node.js version (required: 20.19.9+) - 20.19.9 ✅
+  - [x] 0.1.2: Check pnpm version - 10.19.0 ✅
     - [x] 0.1.2.1: Run `pnpm setup` to configure global bin directory
     - [x] 0.1.2.2: Restart terminal to apply PATH changes
     - [x] 0.1.2.3: Run `pnpm self-update` to upgrade to latest version
-    - [x] 0.1.2.4: Update packageManager in package.json to pnpm@10.18.3
+    - [x] 0.1.2.4: Update packageManager in package.json to pnpm@10.19.0
   - [x] 0.1.3: Verify pnpm is set as package manager (not npm) - Added to package.json ✅
   - [x] 0.1.4: Clean up any npm artifacts (package-lock.json) if present - Deleted ✅
   - [x] 0.1.5: Verify Playwright browsers installed - v1.56.0 ✅
@@ -237,8 +237,8 @@ Verify that the out-of-the-box Nx setup works correctly and meets all prerequisi
     - React: 19.0.0
     - TypeScript: 5.9.3
     - Nx: 21.6.5
-    - Node.js: v22.20.0
-    - pnpm: 10.18.3
+    - Node.js: v20.19.9
+    - pnpm: 10.19.0
     - Additional key versions: Jest 30.2.0, Playwright 1.56.1, ESLint 9.37.0, Prettier 2.8.8
 
 ### Success Criteria
@@ -790,90 +790,91 @@ Create a minimal vertical slice that exercises the entire stack: web → API cli
 
 ### Sub-stages
 
-- [ ] **5.1: Implement database layer + tests**
-  - [ ] 5.1.1: Export Prisma client singleton from `packages/database/src/index.ts`
-  - [ ] 5.1.2: Create query functions: `getHealthChecks()`, `createHealthCheck(message)`
-  - [ ] 5.1.3: Write unit tests for query functions
-  - [ ] 5.1.4: Run tests and verify they pass
+- [x] **5.1: Implement database layer + tests**
+  - [x] 5.1.1: Export Prisma client singleton from `packages/database/src/index.ts`
+  - [x] 5.1.2: Create query functions: `getHealthChecks()`, `createHealthCheck(message)`
+  - [x] 5.1.3: Write unit tests for query functions
+  - [x] 5.1.4: Run tests and verify they pass
 
-- [ ] **5.2: Implement schemas layer + tests**
-  - [ ] 5.2.1: Create Zod schema for health check operations in `packages/schemas/src/health.ts`
-  - [ ] 5.2.2: Define: `healthPingSchema` (input validation)
-  - [ ] 5.2.3: Export types derived from schemas
-  - [ ] 5.2.4: Write unit tests for schema validation
-  - [ ] 5.2.5: Run tests and verify they pass
+- [x] **5.2: Implement schemas layer + tests**
+  - [x] 5.2.1: Create Zod schema for health check operations in `packages/schemas/src/health.ts`
+  - [x] 5.2.2: Define: `healthPingSchema` (input validation)
+  - [x] 5.2.3: Export types derived from schemas
+  - [x] 5.2.4: Write unit tests for schema validation
+  - [x] 5.2.5: Run tests and verify they pass
 
-- [ ] **5.3: Implement server endpoints + tests**
-  - [ ] 5.3.1: Create health check REST endpoints in `apps/server/src/routes/health.ts`
-    - `GET /api/health` - Fetch all health checks from DB
-    - `POST /api/health/ping` - Create new health check with message
-  - [ ] 5.3.2: Add Zod schema validation middleware for request bodies
-  - [ ] 5.3.3: Update OpenAPI spec with new endpoints
-  - [ ] 5.3.4: Regenerate TypeScript client types from OpenAPI spec
-  - [ ] 5.3.5: Write integration tests for both endpoints
-  - [ ] 5.3.6: Run tests and verify they pass
+- [x] **5.3: Implement server endpoints + tests**
+  - [x] 5.3.1: Create health check REST endpoints in `apps/server/src/routes/health.ts`
+    - HTTP: `GET /api/health` (OpenAPI path: `/health`) - Fetch all health checks from DB
+    - HTTP: `POST /api/health/ping` (OpenAPI path: `/health/ping`) - Create new health check with message
+    - OpenAPI spec uses `servers: [{ url: '/api' }]` to define base path
+  - [x] 5.3.2: Add Zod schema validation middleware for request bodies
+  - [x] 5.3.3: Update OpenAPI spec with new endpoints
+  - [x] 5.3.4: Regenerate TypeScript client types from OpenAPI spec
+  - [x] 5.3.5: Write integration tests for both endpoints
+  - [x] 5.3.6: Run tests and verify they pass
 
-- [ ] **5.4: Implement API client + tests**
-  - [ ] 5.4.1: Generate TypeScript types from OpenAPI spec
+- [x] **5.4: Implement API client + tests**
+  - [x] 5.4.1: Generate TypeScript types from OpenAPI spec
     - Run code generation: `openapi-typescript openapi.yaml -o packages/api-client/src/generated/api.types.ts`
     - Verify generated types match server endpoints
-  - [ ] 5.4.2: Create type-safe HTTP client factory in `packages/api-client/src/index.ts`
+  - [x] 5.4.2: Create type-safe HTTP client factory in `packages/api-client/src/index.ts`
     - Wrap fetch/axios with generated types
     - Export `createApiClient(config)` factory function
     - Include error handling and response validation
-  - [ ] 5.4.3: Test type safety in client code
+  - [x] 5.4.3: Test type safety in client code
     - Verify autocomplete works for endpoint paths
     - Verify request/response types are enforced
     - Test invalid requests caught at compile time
-  - [ ] 5.4.4: Write unit tests for client factory
+  - [x] 5.4.4: Write unit tests for client factory
     - Test client initialization with various configs
     - Mock fetch to test request formation
-  - [ ] 5.4.5: Run tests and verify they pass
+  - [x] 5.4.5: Run tests and verify they pass
 
-- [ ] **5.5: Implement web UI**
-  - [ ] 5.5.1: Create `/health` page in `apps/web/src/app/health/page.tsx`
-  - [ ] 5.5.2: Initialize API client
-  - [ ] 5.5.3: Fetch and display health check data from server
-  - [ ] 5.5.4: Add button to ping server (write to DB)
-  - [ ] 5.5.5: Show real-time data updates after ping
-  - [ ] 5.5.6: Add basic styling with Tailwind
-  - [ ] 5.5.7: Test manually in browser
+- [x] **5.5: Implement web UI**
+  - [x] 5.5.1: Create `/health` page in `apps/web/src/app/health/page.tsx`
+  - [x] 5.5.2: Initialize API client
+  - [x] 5.5.3: Fetch and display health check data from server
+  - [x] 5.5.4: Add button to ping server (write to DB)
+  - [x] 5.5.5: Show real-time data updates after ping
+  - [x] 5.5.6: Add basic styling with Tailwind
+  - [x] 5.5.7: Test manually in browser
 
-- [ ] **5.6: Manual validation**
-  - [ ] 5.6.1: Start server: `pnpm exec nx run server:serve`
-  - [ ] 5.6.2: Start web: `pnpm exec nx run web:dev`
-  - [ ] 5.6.3: Navigate to http://localhost:3000/health
-  - [ ] 5.6.4: Verify health checks display
-  - [ ] 5.6.5: Click ping button and verify new entry appears
-  - [ ] 5.6.6: Check Supabase dashboard to confirm data persistence
-  - [ ] 5.6.7: Test error scenarios (server down, invalid input)
+- [x] **5.6: Manual validation**
+  - [x] 5.6.1: Start server: `pnpm exec nx run server:serve`
+  - [x] 5.6.2: Start web: `pnpm exec nx run web:dev`
+  - [x] 5.6.3: Navigate to http://localhost:3000/health
+  - [x] 5.6.4: Verify health checks display
+  - [x] 5.6.5: Click ping button and verify new entry appears
+  - [x] 5.6.6: Check Supabase dashboard to confirm data persistence
+  - [x] 5.6.7: Test error scenarios (server down, invalid input)
 
-- [ ] **5.7: Update coverage thresholds**
-  - [ ] 5.7.1: Update Jest configuration to set 60% coverage threshold
-  - [ ] 5.7.2: Run: `pnpm exec nx run-many -t test --coverage`
-  - [ ] 5.7.3: Verify >= 60% coverage achieved
-  - [ ] 5.7.4: Document any intentional coverage gaps
+- [x] **5.7: Update coverage thresholds**
+  - [x] 5.7.1: Update Jest configuration to set 60% coverage threshold
+  - [x] 5.7.2: Run: `pnpm exec nx run-many -t test --coverage`
+  - [x] 5.7.3: Verify >= 60% coverage achieved
+  - [x] 5.7.4: Document any intentional coverage gaps
 
 ### Success Criteria
 
-- [ ] Server endpoint `getHealth()` returns data from Supabase
-- [ ] Server endpoint `pingHealth(message)` writes to Supabase
-- [ ] TypeScript autocomplete works in client for server endpoints (if applicable)
-- [ ] Web app loads `/health` page successfully
-- [ ] Web app displays data fetched from server/database
-- [ ] Web app can trigger write operation (ping button)
-- [ ] Changes appear immediately in web UI after ping
-- [ ] Data persists in Supabase database
-- [ ] All apps build successfully: `pnpm exec nx run-many -t build`
-- [ ] No TypeScript errors in any project
-- [ ] Nx cache works for all build tasks
-- [ ] Unit tests pass for database package
-- [ ] Unit tests pass for schemas package
-- [ ] Integration tests pass for server endpoints
-- [ ] Unit tests pass for api-client package
-- [ ] All tests pass: `pnpm exec nx run-many -t test`
-- [ ] Test coverage is >= 60% across shared packages
-- [ ] Pre-commit hooks allow commits (code quality is good)
+- [x] Server endpoint `getHealth()` returns data from Supabase
+- [x] Server endpoint `pingHealth(message)` writes to Supabase
+- [x] TypeScript autocomplete works in client for server endpoints (if applicable)
+- [x] Web app loads `/health` page successfully
+- [x] Web app displays data fetched from server/database
+- [x] Web app can trigger write operation (ping button)
+- [x] Changes appear immediately in web UI after ping
+- [x] Data persists in Supabase database
+- [x] All apps build successfully: `pnpm exec nx run-many -t build`
+- [x] No TypeScript errors in any project
+- [x] Nx cache works for all build tasks
+- [x] Unit tests pass for database package
+- [x] Unit tests pass for schemas package
+- [x] Integration tests pass for server endpoints
+- [x] Unit tests pass for api-client package
+- [x] All tests pass: `pnpm exec nx run-many -t test`
+- [x] Test coverage is >= 60% across shared packages
+- [x] Pre-commit hooks allow commits (code quality is good)
 
 **Stage 5 Estimated Time:** 3-4 hours
 

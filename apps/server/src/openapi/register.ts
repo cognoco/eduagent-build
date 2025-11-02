@@ -1,4 +1,4 @@
-import { registerHealthOpenApi } from '../routes/health.openapi';
+import { registerHealthOpenApi } from '../routes/health.openapi.js';
 import { registerHelloOpenApi } from '../routes/hello.openapi.js';
 
 /**

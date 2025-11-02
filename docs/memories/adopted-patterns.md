@@ -5,7 +5,7 @@ audience: AI agents, developers
 created: 2025-10-21
 last-updated: 2025-10-28
 Created: 2025-10-21T14:39
-Modified: 2025-10-28T13:25
+Modified: 2025-10-28T20:29
 ---
 
 # Adopted Patterns
@@ -146,6 +146,19 @@ rm -rf apps/my-app/__tests__/
 ### Known Issue
 
 The `@nx/jest:configuration` generator in Nx 21.6 uses outdated TypeScript defaults (`node10`). This is a known limitation - not a bug in our config.
+
+### Workspace dependency and imports (cross‑package)
+
+- Do not use manual TypeScript `paths` in `tsconfig.base.json` for workspace packages.
+- Consumers MUST declare workspace dependencies in their `package.json` when importing workspace packages, e.g.:
+  ```json
+  {
+    "dependencies": {
+      "@nx-monorepo/api-client": "workspace:*"
+    }
+  }
+  ```
+- When using `moduleResolution: "nodenext"` (Node apps/tests), use explicit `.js` extensions on relative imports.
 
 ### Last Validated
 
@@ -350,7 +363,8 @@ app.use('/api', apiRouter);
 - Router: `get('/')`
 - Aggregator: `/health`
 - App: `/api`
-- **Final path**: `/api/health`
+- **Final HTTP path**: `/api/health`
+- **OpenAPI representation**: Path `/health` with `servers: [{ url: '/api' }]`
 
 ### Directory Structure
 
@@ -559,6 +573,8 @@ app.use('/api', apiRouter);
 ## Pattern 6: OpenAPI Spec Generation
 
 **Our Standard**: Runtime OpenAPI 3.1.0 generation from Zod schemas with Nx build artifacts
+
+Policy note (authoritative source): Code-first is canonical in this monorepo. Zod schemas (in `packages/schemas`) are the single source of truth for both runtime validation and API documentation. The OpenAPI specification is generated from these schemas and treated as a build artifact. Any YAML files placed under `specs/*/contracts/` are reference-only and must not be used as an authoritative source.
 
 ### Pattern
 
@@ -1175,11 +1191,15 @@ type HealthCheckResponse = HealthCheckEndpoint['responses']['200']['content']['a
 // Extract component schemas
 type HealthCheck = components['schemas']['HealthCheckResponse'];
 
-// Use in fetch client
+// Use in native fetch client (requires full HTTP path)
 async function getHealth(): Promise<HealthCheckResponse> {
   const response = await fetch('/api/health');
   return response.json();
 }
+
+// Or with openapi-fetch (uses relative path + baseUrl)
+// const client = createClient<paths>({ baseUrl: 'http://localhost:3001/api' })
+// await client.GET('/health') // Resolves to /api/health automatically
 ```
 
 ### Dependencies Required
@@ -1451,9 +1471,12 @@ When should you add a new pattern?
 **Prisma Schema Configuration:**
 ```prisma
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  // NO directUrl needed for port 5432 (direct connection)
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  // Supavisor connection pooler strategy:
+  // - url: Transaction mode (port 6543) for queries
+  // - directUrl: Session mode (port 5432) for migrations
 }
 
 generator client {
@@ -1473,9 +1496,9 @@ model HealthCheck {
 **Key Conventions:**
 - **Database types**: Use PostgreSQL-specific types (`@db.Uuid`, `@db.Timestamptz`)
 - **Table naming**: snake_case plural (`health_checks`, not `HealthCheck` or `healthChecks`)
-- **Connection**: Port 5432 (direct connection), no `directUrl` needed
+- **Connection**: Supavisor connection pooler (ports 6543 + 5432), `directUrl` required (updated 2025)
 - **Binary targets**: Omit `binaryTargets` field to use implicit "native" (auto-detection)
-- **RLS (Row Level Security)**: Disable for API server implementations (see post-generation checklist)
+- **RLS (Row Level Security)**: Enable for defense-in-depth on the API path (PostgREST). Prisma bypasses RLS via its SQL database role (superuser in Phase 1). The service_role key applies to PostgREST requests, not Prisma SQL connections.
 
 ### Applies To
 
@@ -1492,19 +1515,22 @@ All Prisma packages in the monorepo (currently `packages/database/`)
 - Explicit with `@@map()` prevents ambiguity
 - Consistent with Supabase dashboard expectations
 
-**No directUrl for port 5432**:
-- Port 5432 is direct PostgreSQL connection (not pooler)
-- `directUrl` only needed for connection pooler scenarios (port 6543)
+**Supavisor connection pooler strategy** (updated 2025):
+- `url`: Transaction mode (port 6543) with connection pooling for better scalability
+- `directUrl`: Session mode (port 5432) required for migrations
+- Recommended by Supabase + Prisma official documentation (2025)
+- See research: `specs/001-walking-skeleton/research-validation.md` - Agent 1 findings
 
 **Implicit binaryTargets**:
 - Prisma auto-detects platform ("native")
 - Reduces bundle size
 - Avoids version mismatch errors
 
-**RLS disabled**:
-- API server acts as security boundary (not database)
-- Simplifies Phase 1 implementation
-- See tech-findings-log.md for full architectural rationale
+**RLS enabled (scope clarified, updated 2025):**
+- Defense-in-depth on API path: PostgREST calls with service_role bypass RLS
+- Prisma path: bypass via SQL role (superuser in Phase 1), not via service_role
+- Protects against accidental Data API exposure on the API path
+- See research: `specs/001-walking-skeleton/research-validation.md`
 
 ### When Adding New Models
 
@@ -1685,20 +1711,49 @@ import '@testing-library/jest-dom';
    expect(button.disabled).toBe(true);
    ```
 
-3. **API Mocking**: Use MSW for ALL API mocking in component tests. No fetch mocks, no axios mocks.
+3. **API Mocking**: Use MSW 2.0 for ALL API mocking in component tests. No fetch mocks, no axios mocks.
    ```typescript
-   // ✅ Correct
-   import { http, HttpResponse } from 'msw';
+   // ✅ Correct (MSW 2.0 syntax)
+   import { http, HttpResponse } from 'msw';  // Note: 'http' not 'rest', 'HttpResponse' not 'res'+'ctx'
    import { setupServer } from 'msw/node';
 
-   const server = setupServer(
-     http.get('/api/users', () => HttpResponse.json([]))
-   );
+   // Define handlers
+   const handlers = [
+     http.get('/api/users', () => {
+       return HttpResponse.json([  // HttpResponse.json() not res(ctx.json())
+         { id: '1', name: 'Alice' },
+         { id: '2', name: 'Bob' }
+       ]);
+     }),
+     http.post('/api/users', async ({ request }) => {
+       const body = await request.json();
+       return HttpResponse.json(body, { status: 201 });  // Status in options
+     }),
+     // Error responses
+     http.get('/api/error', () => {
+       return HttpResponse.json(
+         { error: 'Not found' },
+         { status: 404 }
+       );
+     })
+   ];
 
+   // Create server
+   const server = setupServer(...handlers);
+
+   // Jest lifecycle hooks
    beforeAll(() => server.listen());
    afterEach(() => server.resetHandlers());
    afterAll(() => server.close());
    ```
+
+   **MSW 2.0 Breaking Changes** (migrated from v1.x in 2024):
+   - ❌ OLD: `import { rest } from 'msw'` → ✅ NEW: `import { http } from 'msw'`
+   - ❌ OLD: `rest.get(url, (req, res, ctx) => res(ctx.json(data)))` → ✅ NEW: `http.get(url, () => HttpResponse.json(data))`
+   - ❌ OLD: `res(ctx.status(404), ctx.json({...}))` → ✅ NEW: `HttpResponse.json({...}, { status: 404 })`
+   - Handler signature: `({ request, params, cookies })` not `(req, res, ctx)`
+   - Request body: `await request.json()` not `req.body`
+   - No more `ctx.set()`, `ctx.delay()` - use HttpResponse options
 
 4. **Test IDs**: Use `data-testid` ONLY when semantic queries fail. Prefer `getByRole`, `getByLabelText`, `getByText`.
    ```typescript

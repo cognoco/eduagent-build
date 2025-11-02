@@ -1,5 +1,5 @@
 import { Router, type Router as RouterType } from 'express';
-import { healthRouter } from './health';
+import { healthRouter } from './health.js';
 import { helloRouter } from './hello.js';
 
 /**
@@ -10,7 +10,8 @@ import { helloRouter } from './hello.js';
 export const apiRouter: RouterType = Router();
 
 // Mount health routes at /health
-// Combined with /api prefix = /api/health
+// Combined with /api prefix = HTTP path /api/health
+// OpenAPI spec shows path /health with servers: [{ url: '/api' }]
 apiRouter.use('/health', healthRouter);
 
 // DEV: Temporary infrastructure validation route (tasks 4.1.10 & 4.1.11)

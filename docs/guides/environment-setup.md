@@ -73,23 +73,26 @@ NEXT_PUBLIC_API_URL="http://localhost:3001/api"
 
 ### SERVER-SIDE (.env)
 
-#### `DATABASE_URL`
+#### `DATABASE_URL` + `DIRECT_URL`
 
-**Purpose**: Direct PostgreSQL connection for Prisma ORM
+**Purpose**: Supavisor connection pooler strategy (recommended 2025)
 
 **Format**:
 ```
-postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
+# Transaction mode (port 6543) - Used by Prisma Client for queries
+DATABASE_URL="postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres"
+
+# Session mode (port 5432) - Used by Prisma Migrate for migrations
+DIRECT_URL="postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
 ```
 
 **Used by**:
-- `apps/server` (Express API server)
-- `packages/database` (Prisma client)
+- `DATABASE_URL`: apps/server (Prisma queries), packages/database
+- `DIRECT_URL`: Prisma Migrate commands only (migrate deploy, migrate dev, db push)
 
 **What it's for**:
-- All CRUD database operations
-- Running migrations
-- Complex queries and transactions
+- `DATABASE_URL`: All CRUD operations, queries, transactions (connection pooling)
+- `DIRECT_URL`: Schema migrations (direct connection required)
 
 **Security**:
 - ⚠️ **NEVER expose to browser/client**
@@ -98,8 +101,9 @@ postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
 
 **Technical Notes**:
 - This is a **PostgreSQL credential** (username/password)
-- NOT the same as Supabase service role key
-- Connects via PostgreSQL protocol (port 5432 or 6543 for pooler)
+- NOT the same as the Supabase service role key (which applies to the HTTP API path)
+- Uses Supavisor connection pooler for better scalability
+- See: `.env.example` for detailed comments and setup instructions
 
 ---
 

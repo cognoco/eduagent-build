@@ -12,7 +12,8 @@ module.exports = {
   displayName: '@nx-monorepo/server',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
-  coverageDirectory: 'test-output/jest/coverage',
+  testMatch: ['<rootDir>/src/**/*.(spec|test).[jt]s?(x)'],
+  coverageDirectory: '../../coverage/apps/server',
   testEnvironmentOptions: {
     customExportConditions: ['@nx-monorepo/source', 'node', 'require', 'default'],
   },
@@ -20,4 +21,9 @@ module.exports = {
     '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig],
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx,js,jsx}',
+    '!src/**/*.spec.{ts,tsx,js,jsx}',
+    '!src/**/*.test.{ts,tsx,js,jsx}',
+  ],
 };

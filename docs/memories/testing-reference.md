@@ -197,7 +197,16 @@ Nx automatically:
 
 **No manual setup required** - Nx handles all configuration automatically.
 
-**Mandatory Testing Enhancements for UI Packages**: UI packages (web, mobile) MUST use jest-dom, user-event, and MSW as documented in Pattern 10 (`adopted-patterns.md`). This is constitutional requirement (Principle I) to ensure consistent testing quality and eliminate decision overhead for AI agents. See post-generation checklist for setup steps. Non-UI packages (Node.js libraries, pure logic) use basic Jest without these enhancements.
+**Mandatory Testing Enhancements for UI Packages**: UI packages (web, mobile) MUST use jest-dom, user-event, and MSW 2.0 as documented in Pattern 10 (`adopted-patterns.md`). This is constitutional requirement (Principle I) to ensure consistent testing quality and eliminate decision overhead for AI agents.
+
+**Testing Enhancement Versions**:
+- `@testing-library/jest-dom` - Latest (v6.0+, no `extend-expect` needed)
+- `@testing-library/user-event` - v14.5.0+ (all methods return `Promise<void>`)
+- `msw` - **v2.0+** (breaking changes from v1.x: use `http` not `rest`, `HttpResponse` not `ctx`)
+
+See Pattern 10 in `adopted-patterns.md` for MSW 2.0 setup examples and breaking changes documentation. See `post-generation-checklist.md` for setup steps after generating new UI packages.
+
+Non-UI packages (Node.js libraries, pure logic) use basic Jest without these enhancements.
 
 ---
 
@@ -218,7 +227,7 @@ pnpm run test:coverage:server
 
 ### Coverage Thresholds
 
-All projects use standardized coverage thresholds to ensure code quality:
+All projects use standardized coverage thresholds that ramp during Phase 1:
 
 ```typescript
 // apps/web/jest.config.ts
@@ -232,7 +241,9 @@ coverageThreshold: {
 }
 ```
 
-**Current thresholds (10%)**: Permissive during Phase 1 walking skeleton - establishes infrastructure without blocking development.
+**Until Stage 5 (Walking Skeleton implementation)**: 10% — permissive while establishing infrastructure (Stages 0–4).
+
+**Stage 5 (Walking Skeleton)**: 60% — raise coverage for the end-to-end slice to validate testing pipeline quality.
 
 **Target thresholds (80%)**: Will be enforced starting in Phase 2 when feature development begins.
 

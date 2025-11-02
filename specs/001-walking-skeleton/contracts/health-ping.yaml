@@ -1,0 +1,190 @@
+openapi: 3.1.0
+info:
+  title: Health Check - Ping Endpoint
+  version: 1.0.0
+  description: |
+    Creates a new health check record to validate end-to-end data write pipeline
+    (Web UI → API Client → Express → Zod Validation → Prisma → Supabase).
+
+    **Walking Skeleton**: This is throwaway validation code marked for deletion
+    after infrastructure testing is complete.
+
+servers:
+  - url: /api
+    description: API base path
+
+paths:
+  /health/ping:
+    post:
+      operationId: createHealthCheck
+      summary: Create a new health check record
+      description: |
+        Creates a new health check record with an optional custom message.
+        If no message is provided, defaults to "Health check ping".
+
+        **Success Criteria**:
+        - Response time < 1 second
+        - Returns newly created health check with generated UUID and timestamp
+        - Proves Zod validation → Prisma → Supabase persistence works
+        - Validates type safety for write operations
+      tags:
+        - Health Check
+      requestBody:
+        description: Optional health check message
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Custom message for the health check (optional)
+                  example: "Custom ping message"
+            examples:
+              withMessage:
+                summary: Custom message provided
+                value:
+                  message: "Custom ping message"
+              withoutMessage:
+                summary: No message (uses default)
+                value: {}
+      responses:
+        '201':
+          description: Health check created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - healthCheck
+                properties:
+                  healthCheck:
+                    $ref: '#/components/schemas/HealthCheck'
+              examples:
+                customMessage:
+                  summary: Created with custom message
+                  value:
+                    healthCheck:
+                      id: "770e8400-e29b-41d4-a716-446655440002"
+                      message: "Custom ping message"
+                      timestamp: "2025-10-30T14:30:00.123Z"
+                defaultMessage:
+                  summary: Created with default message
+                  value:
+                    healthCheck:
+                      id: "880e8400-e29b-41d4-a716-446655440003"
+                      message: "Health check ping"
+                      timestamp: "2025-10-30T14:31:15.456Z"
+        '400':
+          description: Bad request (validation error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              examples:
+                invalidMessageType:
+                  summary: Message is not a string
+                  value:
+                    error: "Validation error"
+                    message: "Invalid request body"
+                    statusCode: 400
+                    details:
+                      - field: "message"
+                        issue: "Expected string, received number"
+        '500':
+          description: Internal server error (database connection or write failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                databaseWriteError:
+                  summary: Database write failed
+                  value:
+                    error: "Database error"
+                    message: "Failed to create health check record"
+                    statusCode: 500
+
+components:
+  schemas:
+    HealthCheck:
+      type: object
+      required:
+        - id
+        - message
+        - timestamp
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the health check record (auto-generated)
+          example: "770e8400-e29b-41d4-a716-446655440002"
+        message:
+          type: string
+          description: Descriptive message for the health check event
+          default: "Health check ping"
+          example: "Custom ping message"
+        timestamp:
+          type: string
+          format: date-time
+          description: When the health check was created (ISO 8601 format, UTC timezone)
+          example: "2025-10-30T14:30:00.123Z"
+      description: |
+        Represents a single health check record in the system.
+        Immutable after creation (no updates or deletes).
+
+    Error:
+      type: object
+      required:
+        - error
+        - statusCode
+      properties:
+        error:
+          type: string
+          description: Error type or category
+          example: "Database error"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Failed to create health check record"
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 500
+      description: Standard error response format
+
+    ValidationError:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+          description: Error type
+          example: "Validation error"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Invalid request body"
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 400
+        details:
+          type: array
+          description: Detailed validation errors from Zod schema validation
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: Field name that failed validation
+                example: "message"
+              issue:
+                type: string
+                description: Validation issue description
+                example: "Expected string, received number"
+      description: Validation error response with detailed field-level errors

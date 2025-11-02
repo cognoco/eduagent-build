@@ -1,0 +1,1 @@
+Phase 2 and 3. Make sure to leverage your sequential thinking and vibe-check MCP servers throughout execution. Consult Context7 and/or EXA MCP service to ensure that your implementation follows best practices. Make absolutely sure that the implementation does not deviate from the canonical documentation (docs/memories/* and root of docs/) and @plan.md.

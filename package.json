@@ -2,6 +2,11 @@
   "name": "@nx-monorepo/source",
   "version": "0.0.0",
   "license": "MIT",
+  "engines": {
+    "node": ">=20.19.9 <21.0.0",
+    "npm": "please-use-pnpm",
+    "pnpm": ">=9.0.0"
+  },
   "scripts": {
     "dev": "nx run web:dev",
     "build": "nx run-many -t build",

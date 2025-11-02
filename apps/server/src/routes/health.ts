@@ -1,5 +1,5 @@
 import { Router, type Router as RouterType } from 'express';
-import { healthController } from '../controllers/health.controller';
+import { healthController } from '../controllers/health.controller.js';
 
 /**
  * Health check routes
@@ -12,5 +12,6 @@ export const healthRouter: RouterType = Router();
 // Will be accessible at /api/health when mounted
 healthRouter.get('/', healthController.check);
 
-// Future routes would be added here:
-// healthRouter.get('/detailed', healthController.detailed);
+// POST /ping (relative to mount point)
+// Will be accessible at /api/health/ping when mounted
+healthRouter.post('/ping', healthController.ping);

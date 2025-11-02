@@ -1,0 +1,121 @@
+openapi: 3.1.0
+info:
+  title: Health Check - List Endpoint
+  version: 1.0.0
+  description: |
+    Retrieves all health check records from the database to validate end-to-end
+    data retrieval pipeline (Supabase → Prisma → Express → API Client → Web UI).
+
+    **Walking Skeleton**: This is throwaway validation code marked for deletion
+    after infrastructure testing is complete.
+
+servers:
+  - url: /api
+    description: API base path
+
+paths:
+  /health:
+    get:
+      operationId: listHealthChecks
+      summary: List all health check records
+      description: |
+        Retrieves all health check records ordered by timestamp descending.
+        No pagination is implemented (Phase 1 simplification).
+
+        **Success Criteria**:
+        - Response time < 2 seconds
+        - Returns correctly typed array of health check objects
+        - Proves Prisma → Supabase connection works
+        - Validates type safety from database to UI
+      tags:
+        - Health Check
+      responses:
+        '200':
+          description: Successfully retrieved health check records
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - healthChecks
+                properties:
+                  healthChecks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/HealthCheck'
+              examples:
+                withRecords:
+                  summary: Database contains health checks
+                  value:
+                    healthChecks:
+                      - id: "550e8400-e29b-41d4-a716-446655440000"
+                        message: "Health check ping"
+                        timestamp: "2025-10-30T14:23:45.678Z"
+                      - id: "660e8400-e29b-41d4-a716-446655440001"
+                        message: "Custom ping message"
+                        timestamp: "2025-10-30T14:20:12.345Z"
+                emptyDatabase:
+                  summary: Database is empty
+                  value:
+                    healthChecks: []
+        '500':
+          description: Internal server error (database connection failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                databaseConnectionError:
+                  summary: Database connection failed
+                  value:
+                    error: "Database connection error"
+                    message: "Unable to connect to Supabase database"
+                    statusCode: 500
+
+components:
+  schemas:
+    HealthCheck:
+      type: object
+      required:
+        - id
+        - message
+        - timestamp
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the health check record
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        message:
+          type: string
+          description: Descriptive message for the health check event
+          default: "Health check ping"
+          example: "Health check ping"
+        timestamp:
+          type: string
+          format: date-time
+          description: When the health check was created (ISO 8601 format, UTC timezone)
+          example: "2025-10-30T14:23:45.678Z"
+      description: |
+        Represents a single health check record in the system.
+        Immutable after creation (no updates or deletes).
+
+    Error:
+      type: object
+      required:
+        - error
+        - statusCode
+      properties:
+        error:
+          type: string
+          description: Error type or category
+          example: "Database connection error"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Unable to connect to Supabase database"
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 500
+      description: Standard error response format

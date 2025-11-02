@@ -1,6 +1,6 @@
 ---
 Created: 2025-10-21
-Modified: 2025-10-27T08:37
+Modified: 2025-10-28T20:29
 Version: 1
 ---
 
@@ -522,29 +522,28 @@ Rationale:
 
 ### CI/CD Workflow
 
-**Generated Files Strategy:** ✅ **Commit to version control**
+**Generated Files Strategy:** ✅ **Gitignore generated OpenAPI types; treat generated artifacts as build outputs**
 
-**Why commit generated files:**
-- Faster CI builds (no generation step)
-- Git diffs show API changes explicitly
-- Works offline
-- Deterministic builds
-- Better Nx caching
+**Why gitignore generated types:**
+- Avoid PR noise and merge conflicts from machine-generated diffs
+- Preserve clear source of truth (Zod schemas → OpenAPI → generated types)
+- Nx targets generate artifacts deterministically during builds and in CI
+- CI benefits from Nx caching; no need to commit generated files
 
 **Workflow Diagram:**
 
 ```
 Developer edits Zod schema (packages/schemas/src/health.schema.ts)
     ↓
-Nx target: schemas:generate-openapi
+Nx target: server:spec-write (from schemas registrations)
     ↓
-Output: apps/server/public/openapi.yaml ✅ COMMITTED
+Output: dist/apps/server/openapi.json
     ↓
-Nx target: api-client:generate-types (depends on ^generate-openapi)
+Nx target: api-client:generate-types (depends on server:spec-write)
     ↓
-Output: packages/api-client/src/generated/api.d.ts ✅ COMMITTED
+Output: packages/api-client/src/gen/openapi.d.ts (gitignored)
     ↓
-Apps import: import { api } from '@nx-monorepo/api-client'
+Apps import types from @nx-monorepo/api-client
     ↓
 Full type safety across web + mobile!
 ```
@@ -563,11 +562,7 @@ apps/web + apps/mobile (build, depends on api-client)
 # .github/workflows/ci.yml
 - name: Build all projects
   run: pnpm exec nx run-many -t build
-  # Nx automatically runs generation in correct order
-
-- name: Verify no uncommitted changes
-  run: git diff --exit-code
-  # Ensures developers committed generated files
+  # Nx automatically runs generation in correct order and produces artifacts
 ```
 
 ---
@@ -630,7 +625,7 @@ VibeCheck validation identified four uncertainties that were systematically addr
 - ✅ OpenAPI spec generation approach: Code-first with @asteasolutions/zod-to-openapi
 - ✅ TypeScript type generation: openapi-typescript
 - ✅ HTTP client library: openapi-fetch
-- ✅ Git strategy: Commit generated files
+- ✅ Git strategy: Gitignore generated OpenAPI types (build artifacts)
 - ✅ Build integration: Nx targets with dependency graph
 
 **Proceed to Task 4.1.5**: Install dependencies and begin infrastructure configuration.
@@ -665,6 +660,8 @@ Based on comprehensive research in Task 4.1.3, we hereby formalize the following
 - ✅ Fast iteration during walking skeleton phase
 - ⚠️ OpenAPI spec is derivative (cannot edit spec directly, must change Zod schemas)
 - ⚠️ Some advanced OpenAPI features may not have Zod schema equivalents
+
+Policy note (canonical workflow): This repository uses a code-first approach. Zod schemas are the single source of truth; the OpenAPI document is generated from code and treated as a build artifact. Any design-first YAML kept under `specs/*/contracts/` is for reference only and is non-authoritative.
 
 **Implementation:**
 ```bash
@@ -775,33 +772,31 @@ const { data, error } = await client.GET("/health");
 
 ### Decision 4: Git Strategy for Generated Files
 
-**Decision:** **Commit generated files to version control**
+**Decision:** **Gitignore generated OpenAPI types; treat generated artifacts as build outputs**
 
-**Files to Commit:**
-- ✅ `apps/server/public/openapi.yaml` (generated OpenAPI spec)
-- ✅ `packages/api-client/src/generated/api.d.ts` (generated TypeScript types)
+**Files generated (not committed):**
+- `dist/apps/server/openapi.json` (OpenAPI spec artifact)
+- `packages/api-client/src/gen/openapi.d.ts` (TypeScript types)
 
 **Rationale:**
-- **Faster CI Builds**: No generation step required in CI pipeline
-- **Deterministic Builds**: Types match exact schema version in git
-- **Git Diffs Show API Changes**: Reviewers can see type changes in pull requests
-- **Offline Development**: No build step required for consumers
-- **Nx Caching**: Cached outputs are versioned, improving cache hit rates
+- Prevent PR noise and merge conflicts from generated diffs
+- Preserve clear source of truth (Zod schemas drive spec and types)
+- Deterministic outputs via Nx task graph + caching; CI regenerates consistently
+- Aligns with `docs/memories/adopted-patterns.md` Pattern 7
 
 **Alternatives Considered:**
-- ❌ **Gitignore Generated Files**: Requires generation on every install, slower CI, can't work offline
+- ❌ Commit generated files: increases PR noise; requires extra CI guardrails
 
 **Consequences:**
-- ✅ Faster development workflow
-- ✅ Better code review experience (see API changes in diffs)
-- ⚠️ Generated code in version control (minor downside)
-- ⚠️ Developers must remember to regenerate and commit changes
+- ✅ Cleaner reviews and simpler developer workflow
+- ✅ Artifacts reproducible on demand via Nx targets
+- ⚠️ Requires generation in CI and local builds (handled by Nx)
 
 **CI Validation:**
 ```yaml
 # .github/workflows/ci.yml
-- name: Verify no uncommitted changes
-  run: git diff --exit-code || (echo "Generated files uncommitted!" && exit 1)
+- name: Build all projects
+  run: pnpm exec nx run-many -t build
 ```
 
 ---
@@ -816,11 +811,11 @@ Developer edits Zod schema (packages/schemas/src/*.schema.ts)
     ↓
 Nx target: schemas:generate-openapi
     ↓
-Output: apps/server/public/openapi.yaml ✅ COMMITTED
+Output: dist/apps/server/openapi.json
     ↓
 Nx target: api-client:generate-types (dependsOn: ^generate-openapi)
     ↓
-Output: packages/api-client/src/generated/api.d.ts ✅ COMMITTED
+Output: packages/api-client/src/gen/openapi.d.ts (gitignored)
     ↓
 Apps import from @nx-monorepo/api-client
     ↓
@@ -1145,18 +1140,24 @@ git commit -m "feat: add HealthCheck table"
 
 #### 1. DATABASE_URL (Prisma → PostgreSQL)
 
-**What it is:** Direct PostgreSQL connection string (port 5432)
+**What it is:** Supavisor connection pooler with dual-connection strategy (recommended 2025)
 
 **Format:**
 ```bash
-DATABASE_URL="postgresql://postgres:[password]@db.xxx.supabase.co:5432/postgres"
+# Transaction Mode (Port 6543) - Used by Prisma Client for queries
+DATABASE_URL="postgresql://postgres.[PROJECT-REF]:[password]@aws-0-[REGION].pooler.supabase.com:6543/postgres"
+
+# Session Mode (Port 5432) - Used by Prisma Migrate for schema changes
+DIRECT_URL="postgresql://postgres.[PROJECT-REF]:[password]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
 ```
 
-**Connection Strategy (Stage 4.4a):**
-- Uses **port 5432** (direct PostgreSQL connection)
-- **NO** `directUrl` field in Prisma schema (unnecessary - port 5432 is already direct)
-- Supabase Connection Pooler (port 6543) intentionally NOT used for this implementation
-- Rationale: Simplicity for Phase 1 walking skeleton, pooling can be added later if needed
+**Connection Strategy (Updated 2025-10-30):**
+- Uses **Supavisor connection pooler** (recommended by Supabase + Prisma official documentation)
+- `DATABASE_URL` (port 6543): Transaction mode with connection pooling for all queries
+- `DIRECT_URL` (port 5432): Session mode for migrations (direct connection required)
+- Prisma schema includes `directUrl = env("DIRECT_URL")` field
+- **Rationale**: Better scalability, connection pooling, follows 2025 best practices
+- **Research**: See `specs/001-walking-skeleton/research-validation.md` - Agent 1 findings
 
 **Used by:**
 - `apps/server` (Express API)
@@ -1242,13 +1243,14 @@ NEXT_PUBLIC_API_URL="http://localhost:3001/api"
 
 ---
 
-### Decision 4: RLS Policy Approach - Disabled for Phase 1
+### Decision 4: RLS Policy Approach - Enabled with Service Role Bypass (Updated 2025-10-30)
 
-**Decision:** **Disable Row Level Security (RLS)** for Phase 1 walking skeleton tables
+**Decision:** **Enable Row Level Security (RLS)** with service_role key bypass for defense-in-depth protection
 
 **Alternatives Considered:**
-- ❌ **Enable RLS with policies**: Defense in depth but adds complexity
-- ❌ **Service role bypass**: Misleading (RLS "enabled" but not enforced)
+- ❌ **Disable RLS entirely**: Simpler but no protection against accidental Data API exposure
+- ❌ **Enable RLS with complex policies**: Adds unnecessary complexity for server-side architecture
+- ✅ **Enable RLS + service_role bypass**: Defense-in-depth without complexity (chosen approach)
 
 **What is RLS:**
 
@@ -1288,24 +1290,29 @@ Browser → Express API → Prisma → PostgreSQL
 
 ---
 
-**Rationale for Disabling RLS:**
+**Rationale for Enabling RLS with Service Role Bypass (API path):**
 
-1. **Phase 1 = Infrastructure Validation, Not Security Hardening**
-   - Walking skeleton proves: Supabase → Prisma → Express → Next.js works
-   - Security policies can be added in Phase 2+ with real features
+1. **Defense-in-Depth Security (Updated 2025-10-30)**
+   - Protects against accidental exposure via Supabase Data API
+   - RLS acts as database-level safety net if API keys leak
+   - Follows Supabase + Prisma best practices (research validated)
 
-2. **Architecture Doesn't Need RLS**
-   - API server is the security boundary
-   - Browser never touches database directly
-   - RLS would be redundant
+2. **Architecture Still Uses API Server as Primary Security Boundary**
+   - API server validates all requests before database operations
+   - On the API path (PostgREST), the service_role key bypasses RLS
+   - No complex RLS policies needed for the API path (RLS enabled, no policy logic)
 
-3. **Avoids Complexity Without Value**
-   - Learning RLS policy syntax is 2-4 hour rabbit hole
-   - Phase 1 goal: validate plumbing, not implement production security
+3. **Minimal Complexity Increase**
+   - Simply enable RLS (one line: `ENABLE ROW LEVEL SECURITY`)
+   - No policy syntax to learn (service_role bypasses all policies)
+   - Best of both worlds: protection without complexity
 
-4. **Clear Documentation Opportunity**
-   - Document WHY RLS is disabled (architectural decision, not laziness)
-   - Provides template users with clear security model
+4. **Production-Ready Template**
+   - Demonstrates security best practices from Phase 1
+   - Supabase dashboard won't show RLS warnings
+   - Template users inherit defense-in-depth by default
+
+**Research Source:** See `specs/001-walking-skeleton/research-validation.md` - Agent 1 findings (Supabase official docs + Prisma best practices validate this approach)
 
 ---
 
@@ -1324,38 +1331,46 @@ Browser → Express API → Prisma → PostgreSQL
    - Goes through Supabase's PostgREST layer
    - RLS policies DO apply to PostgREST connections (when enabled)
 
-**Why this matters:**
-- Prisma connects via PostgreSQL protocol (SQL), not Supabase HTTP API
-- Standard RLS policies targeting `authenticated`/`anon` roles won't affect Prisma queries
-- If enabling RLS to protect Prisma queries later, you'd need:
-  - Non-superuser PostgreSQL role for Prisma
-  - Policies written for that SQL role
-  - Understanding of `FORCE ROW LEVEL SECURITY` behavior
-
-This complexity is not warranted for Phase 1.
+**Why this matters for our RLS strategy:**
+- **Prisma (server-side)**: Connects as superuser → bypasses RLS automatically → full access ✅
+- **Supabase Data API (if accidentally exposed)**: Goes through PostgREST → RLS blocks access ✅
+- **Service role key (when needed)**: Bypasses RLS through PostgREST → full access ✅
+- Result: API server gets full access, but accidental Data API exposure is blocked by RLS
 
 ---
 
-**Implementation:**
+**Implementation (API path):**
 
 ```sql
--- Disable RLS on walking skeleton table
-ALTER TABLE health_checks DISABLE ROW LEVEL SECURITY;
+-- Enable RLS on walking skeleton table (defense-in-depth)
+ALTER TABLE health_checks ENABLE ROW LEVEL SECURITY;
+
+-- No policies needed for PostgREST when using service_role
+-- Protects against accidental Data API exposure on the API path
 ```
 
-**When to Enable RLS Later:**
+**Configuration Note (scope):**
 
-Consider enabling RLS in Phase 2+ if you add:
+When using the Supabase SDK (HTTP API path via PostgREST), you may initialize a server-side client with the service_role key to bypass RLS for API operations. This does not apply to Prisma, which connects via PostgreSQL and uses a SQL database role.
+```typescript
+// packages/supabase-client/src/index.ts (API path only)
+export const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+```
+
+Prisma uses a PostgreSQL role (typically superuser in Phase 1), which bypasses RLS at the SQL layer. The service_role key does not affect Prisma connections.
+
+**When to Add RLS Policies Later:**
+
+Consider adding explicit RLS policies in Phase 2+ if you add:
 - Real user authentication (login system with multi-user data)
 - Direct client database access (Supabase Realtime subscriptions)
-- Compliance requirements for defense-in-depth security
-- Multi-tenant data (user A shouldn't see user B's data)
+- Row-level multi-tenant data isolation (user A shouldn't see user B's data)
 
-**Migration Guide:**
+**Policy Example (Phase 2+):**
 ```sql
--- Enable RLS
-ALTER TABLE user_posts ENABLE ROW LEVEL SECURITY;
-
 -- Create policy for authenticated users
 CREATE POLICY "Users can read own posts"
 ON user_posts
@@ -1365,11 +1380,12 @@ USING (auth.uid() = user_id);
 ```
 
 **Consequences:**
-- ✅ Simpler Phase 1 development (no policy syntax learning)
-- ✅ Clear security model (API server handles all auth/validation)
-- ✅ Documented decision (not security oversight)
-- ⚠️ Supabase dashboard will show "RLS not enabled" warnings (acceptable)
-- ⚠️ If architecture changes (direct client access), need to retrofit RLS
+- ✅ Defense-in-depth security from Phase 1
+- ✅ No RLS warnings in Supabase dashboard
+- ✅ Minimal complexity (no policy logic needed)
+- ✅ API server still has full access via service_role key
+- ✅ Protection against accidental Data API exposure
+- ⚠️ Must use service_role key (not anon key) for API server
 
 ---
 
@@ -1423,7 +1439,7 @@ Based on the decisions above, here's the execution plan:
   - **Decision 1**: Cloud Supabase project (not local CLI) for Phase 1
   - **Decision 2**: Prisma Migrate (not db push) for schema management
   - **Decision 3**: Prisma for server database operations, Supabase SDK for client auth only
-  - **Decision 4**: Disable RLS for Phase 1, defer to Phase 2+ when real auth is implemented
+  - **Decision 4**: Enable RLS with service_role bypass for defense-in-depth (updated 2025-10-30)
   - Rationale: Walking skeleton validates production-ready patterns with minimal complexity
   - Documented: Implementation checklist for Stage 4.3-4.5 with exact steps
   - Clarified: Two separate authentication systems (PostgreSQL credentials vs Supabase API keys)
@@ -1437,7 +1453,7 @@ Based on the decisions above, here's the execution plan:
   - Decided: @asteasolutions/zod-to-openapi for OpenAPI spec generation (code-first, Zod schemas as source of truth)
   - Decided: openapi-typescript for TypeScript type generation (type-only approach, zero runtime overhead)
   - Decided: openapi-fetch for HTTP client (5-6KB bundle, compile-time type safety, cross-platform)
-  - Decided: Commit generated files to git (faster CI, better code review, offline support)
+  - Decided: Gitignore generated OpenAPI types (build artifacts; Nx regenerates deterministically)
   - Decided: Nx dependency graph for build orchestration (automatic ordering, caching)
   - Documented: Implementation checklist for Task 4.1.5+ with exact commands and configurations
   - Rationale: Zod-first architecture with minimal bundle size and maximum type safety

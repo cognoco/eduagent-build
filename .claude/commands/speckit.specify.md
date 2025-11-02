@@ -18,7 +18,7 @@ Given that feature description, do this:
 
 0. **Internal Governance Check (MANDATORY)**
    - Execute: `node tools/gates/run-internal-alignment.mjs`
-   - If violations exist (and no approved exceptions in `specs/<feature>/exceptions.md`): ERROR and stop
+   - If violations exist (and no approved exceptions in `specs/exceptions.md`): ERROR and stop
    - Note key alignment assumptions in the generated spec under a short "Design Conformance" note.
 
 1. **Generate a concise short name** (2-4 words) for the branch:

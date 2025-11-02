@@ -16,8 +16,7 @@
     }
   },
   "dependencies": {
-    "openapi-fetch": "^0.15.0",
-    "tslib": "^2.3.0"
+    "openapi-fetch": "^0.15.0"
   },
   "devDependencies": {
     "openapi-typescript": "^7.10.1"

@@ -4,6 +4,9 @@
   "include": [],
   "references": [
     {
+      "path": "../../packages/database"
+    },
+    {
       "path": "../../packages/schemas"
     },
     {

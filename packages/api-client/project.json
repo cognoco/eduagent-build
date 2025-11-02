@@ -18,7 +18,11 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": "packages/api-client",
-        "command": "tsc --build tsconfig.lib.json"
+        "commands": [
+          "tsc --build tsconfig.lib.json",
+          "tsx scripts/copy-gen.ts"
+        ],
+        "parallel": false
       },
       "cache": true,
       "inputs": ["production", "^production"],

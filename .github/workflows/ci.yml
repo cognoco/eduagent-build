@@ -13,6 +13,24 @@ permissions:
 jobs:
   main:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14-alpine
+        env:
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+          POSTGRES_DB: tests
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://prisma:prisma@localhost:5432/tests?schema=public
+      DIRECT_URL: postgresql://prisma:prisma@localhost:5432/tests?schema=public
+      CI: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,6 +58,10 @@ jobs:
       # Generate Prisma Client (postinstall script is ignored by pnpm security)
       - run: pnpm --filter @nx-monorepo/database db:generate
 
+      # Apply database migrations
+      - name: Apply database migrations
+        run: pnpm --filter @nx-monorepo/database db:migrate
+
       # Validate research documentation exists for material spec changes
       - name: Validate Research Documentation
         run: pnpm run validate:research
@@ -52,6 +74,3 @@ jobs:
       # - run: pnpm exec nx-cloud record -- echo Hello World
       # When you enable task distribution, run the e2e-ci task instead of e2e
       - run: pnpm exec nx run-many -t lint test build typecheck e2e
-      # Nx Cloud recommends fixes for failures to help you get CI green faster. Learn more: https://nx.dev/ci/features/self-healing-ci
-      - run: pnpm exec nx fix-ci
-        if: always()
