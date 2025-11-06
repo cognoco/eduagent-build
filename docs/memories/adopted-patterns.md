@@ -3,7 +3,7 @@ title: Adopted Patterns
 purpose: Monorepo-specific standards that override framework defaults
 audience: AI agents, developers
 created: 2025-10-21
-last-updated: 2025-11-05
+last-updated: 2025-11-06
 Created: 2025-10-21T14:39
 Modified: 2025-10-28T20:29
 ---
@@ -2594,15 +2594,28 @@ import { resolve } from 'path';
 import { existsSync } from 'fs';
 
 export function loadDatabaseEnv(workspaceRoot: string): void {
-  const env = process.env.NODE_ENV || 'development';
-  const envFile = `.env.${env}.local`;
-  const envPath = resolve(workspaceRoot, envFile);
-
-  if (!existsSync(envPath)) {
-    throw new Error(`Environment file not found: ${envFile}`);
+  // If DATABASE_URL already exists (CI, Docker, cloud platforms), skip file loading
+  if (process.env.DATABASE_URL) {
+    console.log('✅ DATABASE_URL already set (CI or pre-configured environment)');
+    return;
   }
 
-  config({ path: envPath });
+  // Otherwise, load from .env file (local development)
+  try {
+    const env = process.env.NODE_ENV || 'development';
+    const envFile = `.env.${env}.local`;
+    const envPath = resolve(workspaceRoot, envFile);
+
+    if (!existsSync(envPath)) {
+      throw new Error(`Environment file not found: ${envFile}\nSee: docs/environment-setup.md`);
+    }
+
+    config({ path: envPath });
+    console.log(`✅ Loaded environment variables from: ${envFile}`);
+  } catch (error) {
+    console.error('❌ Failed to load environment variables for tests');
+    process.exit(1);
+  }
 }
 ```
 
