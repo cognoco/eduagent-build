@@ -1,0 +1,116 @@
+{
+  "adopted-patterns": {
+    "core": "docs/memories/adopted-patterns/adopted-patterns.core.md",
+    "manifest": "docs/memories/adopted-patterns/manifest.yaml",
+    "chunks": [
+      "ap-pattern-01-test-file-location",
+      "ap-pattern-02-typescript-module-resolution",
+      "ap-pattern-03-jest-configuration",
+      "ap-pattern-04-typescript-config-apps",
+      "ap-pattern-05-express-route-organization",
+      "ap-pattern-06-openapi-spec-generation",
+      "ap-pattern-07-openapi-type-generation",
+      "ap-how-to-update-document",
+      "ap-pattern-08-prisma-schema-conventions",
+      "ap-pattern-09-prisma-client-singleton",
+      "ap-pattern-10-testing-enhancements",
+      "ap-pattern-11-format-check",
+      "ap-pattern-12-windows-jest",
+      "ap-pattern-13-database-env-management",
+      "ap-pattern-14-migration-management",
+      "ap-pattern-15-per-project-jest-setup",
+      "ap-pattern-template",
+      "ap-pattern-template-example"
+    ]
+  },
+  "post-generation-checklist": {
+    "core": "docs/memories/post-generation-checklist/post-generation-checklist.core.md",
+    "manifest": "docs/memories/post-generation-checklist/manifest.yaml",
+    "chunks": [
+      "pgc-after-jest-configuration",
+      "pgc-after-js-lib-or-react-app",
+      "pgc-after-js-lib-prisma",
+      "pgc-after-prisma-migrate-create-only",
+      "pgc-after-node-app",
+      "pgc-after-next-app",
+      "pgc-after-react-app-mobile",
+      "pgc-after-any-project-generation",
+      "pgc-how-to-use",
+      "pgc-how-to-update",
+      "pgc-checklist-template",
+      "pgc-after-generator-options",
+      "pgc-related-documentation"
+    ]
+  },
+  "memory-system-readme": {
+    "core": "docs/memories/README.md",
+    "manifest": null,
+    "chunks": []
+  },
+  "zdx-cogno-architecture": {
+    "core": "docs/memories/zdx-cogno-architecture.md",
+    "manifest": null,
+    "chunks": []
+  },
+  "memory-sync-backlog": {
+    "core": "docs/memories/memory-sync-backlog.md",
+    "manifest": null,
+    "chunks": []
+  },
+  "tech-findings-log": {
+    "core": "docs/memories/tech-findings-log/tech-findings-log.core.md",
+    "manifest": "docs/memories/tech-findings-log/manifest.yaml",
+    "chunks": [
+      "tfl-entry-template",
+      "tfl-entry-example",
+      "tfl-decisions-log-overview",
+      "tfl-testing-jest-workspace-20251025",
+      "tfl-platform-windows-arm64-20251027",
+      "tfl-build-nextjs-imports-20251027",
+      "tfl-git-husky-line-endings-20251028",
+      "tfl-related-documentation",
+      "tfl-testing-jest-hanging-20251028",
+      "tfl-typescript-nx-modern-pattern-20251101",
+      "tfl-database-supabase-url-encoding-20251101",
+      "tfl-nx-dependson-syntax-20251102",
+      "tfl-web-api-url-overrides-20251102",
+      "tfl-server-express-cors-20251103",
+      "tfl-database-supabase-pooler-host-20251104",
+      "tfl-database-ipv6-workaround-20251104",
+      "tfl-phase-5-migration-sync",
+      "tfl-environment-validation-issue-23-20251105",
+      "tfl-future-entries"
+    ]
+  },
+  "testing-reference": {
+    "core": "docs/memories/testing-reference/testing-reference.core.md",
+    "manifest": "docs/memories/testing-reference/manifest.yaml",
+    "chunks": [
+      "tr-overview",
+      "tr-table-of-contents",
+      "tr-test-file-location",
+      "tr-unit-tests-jest",
+      "tr-integration-tests",
+      "tr-e2e-tests-playwright",
+      "tr-jest-configuration-patterns",
+      "tr-coverage-testing",
+      "tr-related-documentation"
+    ]
+  },
+  "troubleshooting": {
+    "core": "docs/memories/troubleshooting/troubleshooting.core.md",
+    "manifest": "docs/memories/troubleshooting/manifest.yaml",
+    "chunks": [
+      "ts-overview",
+      "ts-table-of-contents",
+      "ts-jest-hanging-windows",
+      "ts-nx-cache-issues",
+      "ts-typescript-path-resolution",
+      "ts-build-failures",
+      "ts-test-failures",
+      "ts-prisma-issues",
+      "ts-related-documentation"
+    ]
+  }
+}
+

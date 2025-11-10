@@ -1,0 +1,88 @@
+version: 1
+memory: troubleshooting
+core:
+  file: troubleshooting.core.md
+  summary: "Symptom-based troubleshooting guides for common monorepo issues"
+chunks:
+  - id: ts-overview
+    title: Overview
+    file: module-01-overview.md
+    tags: [troubleshooting, overview]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ts-table-of-contents
+    title: Table of Contents
+    file: module-02-table-of-contents.md
+    tags: [troubleshooting, index]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ts-jest-hanging-windows
+    title: Jest Hanging on Windows
+    file: module-03-jest-hanging-on-windows.md
+    tags: [troubleshooting, jest, windows]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ts-nx-cache-issues
+    title: Nx Cache Issues
+    file: module-04-nx-cache-issues.md
+    tags: [troubleshooting, nx, cache]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ts-typescript-path-resolution
+    title: TypeScript Path Resolution
+    file: module-05-typescript-path-resolution.md
+    tags: [troubleshooting, typescript, resolution]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ts-build-failures
+    title: Build Failures
+    file: module-06-build-failures.md
+    tags: [troubleshooting, build]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ts-test-failures
+    title: Test Failures
+    file: module-07-test-failures.md
+    tags: [troubleshooting, testing]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ts-prisma-issues
+    title: Prisma Issues
+    file: module-08-prisma-issues.md
+    tags: [troubleshooting, prisma]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ts-related-documentation
+    title: Related Documentation
+    file: module-09-related-documentation.md
+    tags: [troubleshooting, references]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+

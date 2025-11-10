@@ -107,12 +107,15 @@ Related updates:
 - Link patterns to architectural decisions for traceability
 - Update memory files when patterns evolve or new constraints are discovered
 - NEVER edit `CLAUDE.md` directly; only update `.ruler/AGENTS.md` (source file for Ruler generation)
+- Each new or updated memory MUST cite the governing `docs/` artefact (document + section) and explain how the content aligns with that canonical guidance before it is proposed or merged
 
 **Implementation:**
-- Memory system located in `docs/memories/` directory (complete structure documented in `docs/memories/README.md`)
+- Memory system - ZDX Cogno - located in `docs/memories/` directory (complete structure documented in `docs/memories/README.md`)
+- Use `docs/index.md` to locate the governing artefact(s) in `docs/` before drafting or updating memories.
 - Each file has specific purpose: patterns, checklists, technical findings, testing reference, troubleshooting
 - Agent instructions: `.ruler/AGENTS.md` (source, editable) → `CLAUDE.md` (generated, read-only)
 - Document WHY (rationale, constraints) not just WHAT (patterns, checklists)
+- When proposing memory updates, include the canonical reference (document + section) and alignment rationale in delivery notes or review comments
 - Operational procedures for memory system usage in AGENTS.md
 
 **Rationale:** Memory system prevents pattern drift across monorepo components as project evolves. Continuous knowledge capture ensures institutional knowledge survives team changes and context loss. Makes AI agents more effective by providing persistent, searchable context that eliminates repeated discovery of same constraints.

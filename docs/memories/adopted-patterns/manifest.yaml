@@ -1,0 +1,169 @@
+version: 1
+memory: adopted-patterns
+core:
+  file: adopted-patterns.core.md
+  summary: "Index of adopted patterns and critical guardrails"
+chunks:
+  - id: ap-pattern-01-test-file-location
+    title: Pattern 1: Test File Location
+    file: module-01-pattern-1-test-file-location.md
+    tags: [pattern, testing, structure]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-02-typescript-module-resolution
+    title: Pattern 2: TypeScript Module Resolution
+    file: module-02-pattern-2-typescript-module-resolution.md
+    tags: [pattern, typescript, resolution]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-03-jest-configuration
+    title: Pattern 3: Jest Configuration
+    file: module-03-pattern-3-jest-configuration.md
+    tags: [pattern, jest, configuration]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-04-typescript-config-apps
+    title: Pattern 4: TypeScript Configuration for Applications
+    file: module-04-pattern-4-typescript-configuration-for-applications.md
+    tags: [pattern, typescript, applications]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-05-express-route-organization
+    title: Pattern 5: Express Route Organization (Path-Agnostic Routers)
+    file: module-05-pattern-5-express-route-organization-path-agnostic-routers.md
+    tags: [pattern, express, routing]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-06-openapi-spec-generation
+    title: Pattern 6: OpenAPI Spec Generation
+    file: module-06-pattern-6-openapi-spec-generation.md
+    tags: [pattern, openapi, generation]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-07-openapi-type-generation
+    title: Pattern 7: OpenAPI Type Generation
+    file: module-07-pattern-7-openapi-type-generation.md
+    tags: [pattern, openapi, types]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-how-to-update-document
+    title: How to Update This Document
+    file: module-08-how-to-update-this-document.md
+    tags: [process, documentation]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-08-prisma-schema-conventions
+    title: Pattern 8: Prisma Schema Conventions
+    file: module-09-pattern-8-prisma-schema-conventions.md
+    tags: [pattern, prisma, schema]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-09-prisma-client-singleton
+    title: Pattern 9: Prisma Client Singleton
+    file: module-10-pattern-9-prisma-client-singleton.md
+    tags: [pattern, prisma, client]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-10-testing-enhancements
+    title: Pattern 10: Testing Enhancement Libraries (Mandatory)
+    file: module-11-pattern-10-testing-enhancement-libraries-mandatory.md
+    tags: [pattern, testing, tooling]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-11-format-check
+    title: Pattern 11: Format Check Target Configuration
+    file: module-12-pattern-11-format-check-target-configuration.md
+    tags: [pattern, formatting, nx]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-12-windows-jest
+    title: Pattern 12: Windows Jest Hanging - Per-Project Environment Variables
+    file: module-13-pattern-12-windows-jest-hanging-per-project-environment-variables.md
+    tags: [pattern, jest, windows]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-13-database-env-management
+    title: Pattern 13: Database Environment Management
+    file: module-14-pattern-13-database-environment-management.md
+    tags: [pattern, database, environment]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-14-migration-management
+    title: Pattern 14: Migration Management and Rollback
+    file: module-15-pattern-14-migration-management-and-rollback.md
+    tags: [pattern, database, migrations]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-15-per-project-jest-setup
+    title: Pattern 15: Per-Project Jest Setup Files (Principle of Least Privilege)
+    file: module-16-pattern-15-per-project-jest-setup-files-principle-of-least-privilege.md
+    tags: [pattern, jest, environment]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-template
+    title: Pattern Template
+    file: module-17-pattern-template.md
+    tags: [template, documentation]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: ap-pattern-template-example
+    title: Pattern N: Pattern Name (Template Example)
+    file: module-18-pattern-n-pattern-name.md
+    tags: [template, example]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+

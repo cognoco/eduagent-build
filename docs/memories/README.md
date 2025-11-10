@@ -1,20 +1,88 @@
 ---
 title: Memory System Documentation
-purpose: Comprehensive guide to the monorepo's institutional knowledge system
+purpose: Comprehensive guide to the monorepo's institutional knowledge system and its dual memory architecture
 audience: AI agents, developers, architects
 created: 2025-10-21
-last-updated: 2025-10-27
-Created: 2025-10-21T14:41
-Modified: 2025-10-28T20:29
+last-updated: 2025-01-10
+cascade-source: docs/memories/zdx-cogno-architecture.md
+cascade-version: 2025-01-10
+propagated-from: zdx-cogno-architecture.md
+propagated-to: [".ruler/AGENTS.md"]
 ---
 
 # Memory System Documentation
 
+## TL;DR
+- ZDX Cogno (short: **Cogno**) is the operational memory system that lives in `docs/memories/`. It translates the canonical governance artefacts in `docs/` into actionable guidance. Architecture/Product own the governance layer; Engineering owns Cogno.
+- Cogno is layered: each memory area ships with a concise `*.core.md` summary, optional deep-dive modules, and a `manifest.yaml` listing those modules.
+- `docs/memories/zdx-cogno-architecture.md` is the canonical specification for Cogno; this README is the quick reference.
+- `.ruler/AGENTS.md` mirrors this information for agents. Whenever you change Cogno, keep the cascade aligned (governance doc → architecture spec → this README → agent rules).
+
+## Quick Links
+- `docs/index.md` – Canonical governance index (start here to find the right upstream artefact).
+- `docs/` governance artefacts – project brief, PRD, architecture, tech stack, ADRs (canonical strategy/constraints).
+- `docs/memories/zdx-cogno-architecture.md` – canonical architecture spec for Cogno.
+- `docs/memories/memory-index.json` – generated lookup table for manifest metadata (do not edit manually).
+- `docs/memories/topics.md` – topical index mapping common task keywords to memory areas and synonyms.
+- `.ruler/AGENTS.md` – source of agent rules that reference Cogno (generated copies live at `AGENTS.md` and `CLAUDE.md`).
+- `docs/constitution.md` – symlink to the governance constitution (must be read before modifying code).
+
+## Feature Implementation Intake Checklist
+
+Follow this lightweight intake before starting substantial implementation or memory updates:
+
+1. `docs/index.md` → open the relevant canonical artefact(s) and note the governing section(s).
+2. Cogno steering → skim this README, check `docs/memories/topics.md` for relevant areas, then open the pertinent `*.core.md` summary.
+3. Planning hygiene → run Sequential Thinking MCP to outline your approach.
+4. Assumption check → run Vibe-Check MCP to surface risks or hidden dependencies.
+5. Traceability → capture the canonical reference and alignment rationale (you’ll need it when updating manifests or proposing changes).
+
+## Upstream Governance (Canonical Layer)
+
+- Strategic documentation lives in the root `docs/` directory (e.g. `project-brief.md`, `prd.md`, `architecture.md`, `architecture-decisions.md`, `tech-stack.md`). Architects and product managers are accountable for keeping these current.
+- Cogno derives its guidance from these artefacts. When governance docs change, Cogno stewards must update the relevant modules to stay aligned.
+- Use `docs/index.md` to locate the appropriate governance document, then read it fully before editing Cogno. Cite it in the module’s references or checklist.
+- When proposing a new memory, explicitly explain how it supports the referenced canonical document (include doc name + rationale).
+
+---
+
 ## Overview
 
-This directory contains the monorepo's **institutional knowledge** - the patterns, decisions, and discoveries that define how this codebase works. It serves as long-term memory for AI agents and documentation for developers.
+This directory contains the monorepo's **institutional knowledge** – the patterns, decisions, and discoveries that define how this codebase works. It serves as long-term memory for AI agents and documentation for developers.
 
 **Purpose**: Prevent pattern drift, avoid rework, and ensure consistency as the monorepo evolves.
+
+---
+
+## Cogno Steering Snapshot
+
+- **Cascade**: Governance docs (`docs/`) → `zdx-cogno-architecture.md` → `README.md` → `.ruler/AGENTS.md`.
+- **Structure**: Each memory area provides a `*.core.md` summary, optional modules, and a manifest. Modules stay small and topical.
+- **Manifests**: Track `id`, `title`, `file`, `tags`, optional `checksum`, `validation_status`, `last_updated_by`, `last_updated_at`. No remote sync fields.
+- **Future integrations**: Any external tooling must ingest from Cogno; nothing else is authoritative.
+
+### Cascade Flow Diagram
+
+```mermaid
+graph TD
+    A[Governance Docs<br/>docs/*.md<br/><i>Strategy & Constraints</i>] --> B[Cogno Architecture Spec<br/>zdx-cogno-architecture.md<br/><i>System Design</i>]
+    B --> C[Cogno README + Modules<br/>docs/memories/**<br/><i>Operational Guidance</i>]
+    C --> D[AGENTS.md<br/>.ruler/AGENTS.md<br/><i>Agent Execution Rules</i>]
+    D --> E[Agent Execution]
+    E --> F[Tool Caches<br/>.serena/, etc.<br/><i>Navigation Data</i>]
+    C -.reads on-demand.-> E
+
+    style A fill:#e1f5ff
+    style B fill:#ffe1e1
+    style C fill:#fff4e1
+    style D fill:#e1ffe1
+    style F fill:#f0f0f0
+```
+
+**What this shows:**
+- **Solid arrows**: Cascade propagation (updates flow top-down)
+- **Dotted line**: On-demand reading (agents read Cogno during execution)
+- **Colors**: Each layer has distinct purpose and audience
 
 ---
 
@@ -40,7 +108,7 @@ This directory contains the monorepo's **institutional knowledge** - the pattern
 
 ### The Solution: Memory System
 
-This directory captures **transferable knowledge** that applies across multiple components, ensuring consistency and preventing rework.
+This directory captures **transferable knowledge** that applies across multiple components, ensuring consistency and preventing rework. Cogno’s manifests and index make this knowledge fast to discover without leaving the repo.
 
 ---
 
@@ -48,7 +116,7 @@ This directory captures **transferable knowledge** that applies across multiple 
 
 ### `adopted-patterns.md`
 
-**Purpose**: "This is how WE do it in THIS monorepo" - overrides framework defaults
+**Purpose**: "This is how WE do it in THIS monorepo" – overrides framework defaults.
 
 **Content**:
 - Test file locations (co-located in `src/`)
@@ -68,22 +136,11 @@ This directory captures **transferable knowledge** that applies across multiple 
 - When framework defaults conflict with our monorepo standards
 - When solving a problem that will recur in similar components
 
-**Example entry**:
-```markdown
-## Pattern: Test File Location
-
-**Our Standard**: Co-located tests in `src/` directory
-
-**When adding new apps**:
-- ⚠️ Generators may create `__tests__/` directory
-- ✅ Required action: Move tests to `src/` to match our standard
-```
-
 ---
 
 ### `post-generation-checklist.md`
 
-**Purpose**: Mandatory steps after running Nx generators
+**Purpose**: Mandatory steps after running Nx generators.
 
 **Content**:
 - After `nx g @nx/jest:configuration`: Update TypeScript module resolution
@@ -100,24 +157,11 @@ This directory captures **transferable knowledge** that applies across multiple 
 - When the fix is required for consistency with adopted patterns
 - When the fix will apply to future uses of the same generator
 
-**Example entry**:
-```markdown
-## After: `nx g @nx/jest:configuration`
-
-### Required Actions
-
-1. Update `tsconfig.spec.json`:
-   - Change `"moduleResolution": "node10"` → `"nodenext"`
-
-2. Validation:
-   - Run `pnpm exec nx run <project>:test`
-```
-
 ---
 
 ### `tech-findings-log.md`
 
-**Purpose**: Technical decisions, empirical findings, known constraints
+**Purpose**: Technical decisions, empirical findings, known constraints.
 
 **Content**:
 - Why Prisma packages use `--bundler=none` (architectural constraint)
@@ -143,38 +187,9 @@ This directory captures **transferable knowledge** that applies across multiple 
 
 ---
 
-### Reference Documentation
+### Reference Documentation (`testing-reference`, `troubleshooting`, …)
 
-Comprehensive lookup material for specific technical domains. Consult these when you need detailed specifications, configuration patterns, or troubleshooting solutions.
-
-#### `testing-reference.md`
-
-**Purpose**: Comprehensive Jest and testing configuration reference for the nx-monorepo
-
-**Content**:
-- Test file location standards (co-located in `src/`)
-- Unit tests (Jest), integration tests, E2E tests (Playwright)
-- Jest configuration patterns (workspace preset, project-level, TypeScript config)
-- Coverage testing (scripts, thresholds, reports, directory structure)
-- Adding Jest to new projects
-- Testing enhancements and best practices
-
-**When to read**:
-- Before configuring Jest for new projects
-- When troubleshooting test failures or configuration issues
-- When setting up coverage thresholds and reporting
-- When Jest or testing tools are updated
-- When onboarding developers to testing standards
-
-**When to update**:
-- When discovering new testing patterns or configurations
-- When Jest version changes require configuration updates
-- When adding new testing tools or frameworks
-- When establishing new testing conventions
-
-**Difference from troubleshooting.md**:
-- Testing reference = comprehensive Jest/testing configuration guide
-- Troubleshooting = quick solutions for common errors (all domains)
+These directories follow the layered pattern: a `*.core.md` summary plus focused modules stored in dedicated directories. Use the manifest to locate the modules you need—no remote sync required. Maintenance checklists inside each area describe the authoring expectations.
 
 ---
 
@@ -197,200 +212,65 @@ Guidance for agents:
 
 ---
 
-#### `troubleshooting.md`
-
-**Purpose**: Common troubleshooting solutions for nx-monorepo development issues
-
-**Content**:
-- Nx cache issues and resolution
-- TypeScript path resolution problems
-- Build failures and dependency ordering
-- Test failures (general, non-Windows)
-- Prisma client and migration issues
-- Links to related documentation
-
-**When to read**:
-- When encountering build, test, or runtime errors
-- Before suggesting fixes to recurring issues
-- When new developers face common setup problems
-- When troubleshooting Nx, TypeScript, or Prisma issues
-
-**When to update**:
-- When discovering new workarounds for common issues
-- When resolving recurring problems that affect multiple developers
-- When tooling updates change troubleshooting approaches
-- When identifying new error patterns
-
-**Important note**:
-- Jest hanging on Windows (most frequent test issue) remains in `.ruler/AGENTS.md` for immediate visibility
-- General test failures are documented here; Windows-specific Jest hanging is in AGENTS.md
-
----
-
-### `known-issues.md` *(Future - Phase 2)*
-
-**Purpose**: Active bugs, workarounds, temporary solutions
-
-**Content**:
-- Jest hanging on Windows (workaround: `NX_DAEMON=false`)
-- Nx cache corruption (fix: `nx reset`)
-- Temporary patches waiting for upstream fixes
-
-**When to read**:
-- When encountering errors that match symptom patterns
-- Before suggesting "fixes" that might conflict with known workarounds
-
-**When to update**:
-- When discovering a temporary fix for a recurring issue
-- When finding a workaround that helps troubleshooting
-
-**When to remove**:
-- When issues are permanently resolved upstream
-- When workarounds are no longer needed
-
-**Difference from tech-findings-log.md**:
-- Known issues = temporary problems with workarounds
-- Tech findings = permanent architectural decisions
-
----
-
-### `integration-recipes.md` *(Future - Phase 2)*
-
-**Purpose**: How to connect component A to component B
-
-**Content**:
-- How web app calls REST API server (client initialization, error handling)
-- How server connects to Prisma database (singleton pattern, pooling)
-- How to use Supabase auth in Next.js (server vs client components)
-- How to use Supabase auth in Expo (session persistence)
-- How to share Zod schemas between server and client
-
-**When to read**:
-- When implementing features that cross architectural boundaries
-- When adding new apps that need to integrate with existing services
-- When refactoring integration code
-
-**When to update**:
-- When figuring out how to connect two layers for the first time
-- When discovering better integration approaches
-- When solving integration problems that will apply to other components
-
----
-
-### `architecture-decisions.md`
-
-**Purpose**: High-level strategic choices with rationale
-
-**Content**:
-- Why REST+OpenAPI instead of oRPC, tRPC or gRPC
-- Why Supabase + Prisma instead of alternatives
-- Why monorepo instead of polyrepo
-- Why pnpm instead of npm/yarn
-- Why Nx instead of Turborepo
-
-**Note**: Created in Phase 1 Stage 4.1 to document API architecture decision
-
-**When to read**:
-- Before suggesting alternative architectures
-- When explaining project decisions to stakeholders
-- When evaluating technology migrations
-
-**When to update**:
-- When making major architectural decisions
-- When choosing between competing technologies
-- When rejecting alternatives for documented reasons
-
-**Difference from tech-findings-log.md**:
-- Architecture decisions = strategic "what" and "why" (business/tech trade-offs)
-- Tech findings = tactical "how" (implementation details)
-
----
-
-### `current-task.md` *(Future - as needed)*
-
-**Purpose**: Active work state for cross-session continuity
-
-**Content**:
-- What stage/substage is in progress
-- What was just completed
-- What's next
-- Blockers or open questions
-- Context for next agent session
-
-**When to read**:
-- At the start of every AI agent session
-- When resuming work after interruption
-
-**When to update**:
-- Frequently during long tasks (every 30-60 minutes)
-- Before reaching context limits
-- When completing substages
-- When encountering blockers
-
-**When to clear**:
-- When phase/stage is complete
-- When starting entirely new work
-
----
-
 ## Agent Workflow Integration
 
 ### Session Start
 ```
-1. Read current-task.md (if exists) - where did we leave off?
-2. Read relevant sections of adopted-patterns.md - what are our standards?
+1. Read current-task.md (if exists) – where did we leave off?
+2. Read relevant sections of adopted-patterns.md – what are our standards?
 ```
 
 ### Before Generating Components
 ```
-1. Read adopted-patterns.md - what patterns must I follow?
-2. Read post-generation-checklist.md - what will I need to fix?
+1. Read adopted-patterns.md – what patterns must I follow?
+2. Read post-generation-checklist.md – what will I need to fix?
 3. Run: pnpm exec nx g <command>
 ```
 
 ### After Generating Components
 ```
-1. Execute post-generation-checklist.md - apply mandatory fixes
-2. Validate against adopted-patterns.md - does it match our standards?
+1. Execute post-generation-checklist.md – apply mandatory fixes
+2. Validate against adopted-patterns.md – does it match our standards?
 3. Test: build, lint, test targets work correctly
 ```
 
 ### When Implementing Features
 ```
-1. Read integration-recipes.md - how do components connect?
-2. Read tech-findings-log.md - any constraints I should know about?
+1. Read integration-recipes.md – how do components connect?
+2. Read tech-findings-log.md – any constraints I should know about?
 3. Implement following established patterns
 ```
 
 ### When Troubleshooting
 ```
-1. Read troubleshooting.md - common solutions for development issues
-2. Read testing-reference.md - if issue is test-related (configuration, coverage, Jest setup)
-3. Read known-issues.md - is this a known problem with a workaround?
-4. Read tech-findings-log.md - any empirical findings related to this?
+1. Read troubleshooting.md – common solutions for development issues
+2. Read testing-reference.md – if issue is test-related (configuration, coverage, Jest setup)
+3. Read known-issues.md – is this a known problem with a workaround?
+4. Read tech-findings-log.md – any empirical findings related to this?
 5. Search for similar symptoms
 ```
 
 ### Before Suggesting Changes
 ```
-1. Read architecture-decisions.md - why did we choose our current approach?
-2. Read adopted-patterns.md - does this conflict with established patterns?
-3. Read tech-findings-log.md - were alternatives already rejected?
+1. Read architecture-decisions.md – why did we choose our current approach?
+2. Read adopted-patterns.md – does this conflict with established patterns?
+3. Read tech-findings-log.md – were alternatives already rejected?
 ```
 
 ### During Long Tasks
 ```
-1. Update current-task.md - checkpoint progress every 30-60 minutes
-2. Update adopted-patterns.md - if discovering new cross-component patterns
-3. Update tech-findings-log.md - if discovering new constraints
+1. Update current-task.md – checkpoint progress every 30-60 minutes
+2. Update adopted-patterns.md – if discovering new cross-component patterns
+3. Update tech-findings-log.md – if discovering new constraints
 ```
 
 ---
 
 ## Memory System Principles
 
-### 1. Cross-Component Knowledge
+These principles continue to govern what belongs in memory. See `zdx-cogno-architecture.md` for lifecycle mechanics, manifests, and sync triggers.
 
+### 1. Cross-Component Knowledge
 Memory captures **transferable patterns** that apply to **multiple similar contexts**.
 
 ✅ **DO capture**:
@@ -404,7 +284,6 @@ Memory captures **transferable patterns** that apply to **multiple similar conte
 - Already well-documented patterns (standard Next.js routing)
 
 ### 2. Non-Obvious Knowledge
-
 Memory captures what ISN'T obvious from official documentation.
 
 ✅ **DO capture**:
@@ -418,7 +297,6 @@ Memory captures what ISN'T obvious from official documentation.
 - Generic programming concepts
 
 ### 3. Recurring Patterns
-
 Memory captures knowledge you'll need **again when adding similar components**.
 
 ✅ **DO capture**:
@@ -432,7 +310,6 @@ Memory captures knowledge you'll need **again when adding similar components**.
 - Deprecated patterns no longer in use
 
 ### 4. Preventive Knowledge
-
 Memory captures **solutions to prevent future problems**.
 
 ✅ **DO capture**:
@@ -447,66 +324,102 @@ Memory captures **solutions to prevent future problems**.
 
 ---
 
+## Operational Artifacts
+
+- **Memory System Architecture** – authoritative reference for Cogno’s state model and workflow.
+- **Memory Index (`docs/memories/memory-index.json`)** – generated map from manifest data to support tooling. Never hand edit this file.
+
+---
+
 ## How to Maintain the Memory System
 
 ### Regular Maintenance
 
 **Monthly review** (recommended):
-1. Review `known-issues.md` - remove resolved issues
-2. Review `current-task.md` - clear if stale
-3. Review `adopted-patterns.md` - update "Last Validated" dates
-4. Check for patterns that should be moved between files
+1. Review `known-issues.md` – remove resolved issues.
+2. Review `current-task.md` – clear if stale.
+3. Review `adopted-patterns.md` – update "Last Validated" dates.
+4. Check for patterns that should be moved between files.
 
 **When updating frameworks**:
-1. Test post-generation-checklist.md with new generator versions
-2. Update "Last Validated" dates in adopted-patterns.md
-3. Document any new generator issues discovered
+1. Test post-generation-checklist.md with new generator versions.
+2. Update "Last Validated" dates in adopted-patterns.md.
+3. Document any new generator issues discovered.
 
 **When adding new apps/packages**:
-1. Follow existing patterns from memory files
-2. Document any NEW patterns discovered
-3. Update checklists if generators behave differently
+1. Follow existing patterns from memory files.
+2. Document any NEW patterns discovered.
+3. Update checklists if generators behave differently.
+
+### Cascade Maintenance
+
+**When governance docs change** (`docs/architecture-decisions.md`, `docs/tech-stack.md`, etc.):
+1. Identify which Cogno modules are affected
+2. Update `zdx-cogno-architecture.md` first (if system design changes)
+3. Update affected `*.core.md` files and modules
+4. Update `README.md` (if quick-reference changes)
+5. Update `.ruler/AGENTS.md` with minimal execution rules (≤50 lines per cycle)
+6. Update `cascade-version` frontmatter fields to match
+
+**Cascade health checks**:
+- Frontmatter `cascade-version` dates synchronized across files
+- Links between documents remain valid
+- No duplication (each concept documented once at appropriate layer)
+- AGENTS.md remains concise (loaded every chat session)
+
+**Tools**: Use `.claude/commands/zdx/memory-checkpoint.md` to validate alignment after updates.
 
 ### Quality Standards
 
 **Good memory entry**:
-- Clear, concise, actionable
-- Includes rationale (why, not just what)
-- Has validation steps
-- Links to related docs
-- Dated with "Last Validated"
-- Complete frontmatter (title, purpose, audience, dates)
+- Clear, concise, actionable.
+- Includes rationale (why, not just what).
+- Has validation steps.
+- Links to related docs.
+- Dated with "Last Validated".
+- Complete frontmatter (title, purpose, audience, dates).
 
 **Bad memory entry**:
-- Vague or ambiguous
-- No explanation of why
-- No way to verify if applied correctly
-- Orphaned (no context for when to use it)
-- Missing or incomplete frontmatter
+- Vague or ambiguous.
+- No explanation of why.
+- No way to verify if applied correctly.
+- Orphaned (no context for when to use it).
+- Missing or incomplete frontmatter.
 
 ---
 
 ## FAQ
 
 ### Why not just use code comments?
-
 Code comments explain **individual files**. Memory files explain **cross-component patterns** and **monorepo-wide decisions**.
 
 ### Why not use external documentation tools?
-
 External tools require context switching. Memory files live in the repo, are version-controlled, and are immediately accessible to AI agents.
 
 ### How is this different from CLAUDE.md?
-
-- `CLAUDE.md` = general agent behavior and project overview
-- `docs/memories/` = specific patterns, decisions, and discoveries
+- `CLAUDE.md` = general agent behavior and project overview.
+- `docs/memories/` = specific patterns, decisions, and discoveries.
 
 ### What if a pattern changes?
-
 Update the relevant memory file, document the change, update "Last Validated" date, and notify the team. Memory evolves with the project.
 
-### How do I know which file to update?
+### How does Cogno relate to code navigation tools like Serena?
 
+**Different layers, complementary purposes.**
+
+- **Cogno**: Governance layer (patterns, decisions, standards) - "WHAT and WHY"
+- **Serena/etc**: Navigation layer (symbols, structure, locations) - "WHERE and HOW"
+
+Think of Cogno as the architectural blueprint and building codes, while tools like Serena are the site maps and GPS. You need both.
+
+**When working with both:**
+1. Consult Cogno for standards and patterns (before implementing)
+2. Use navigation tools to explore and implement efficiently
+3. Validate implementation against Cogno (before committing)
+
+Cogno remains tool-agnostic by focusing on governance, not navigation.
+
+### How do I know which file to update?
 Use the decision tree:
 - Monorepo-wide standard → `adopted-patterns.md`
 - Post-generator fix → `post-generation-checklist.md`
@@ -519,25 +432,25 @@ Use the decision tree:
 
 ## Memory System Status
 
-**Phase 1 (Current)** - Core Foundation:
-- ✅ `adopted-patterns.md` - 10 patterns documented
-- ✅ `post-generation-checklist.md` - 5 checklists documented
-- ✅ `tech-findings-log.md` - Migrated and enhanced
-- ✅ `testing-reference.md` - Comprehensive Jest and testing configuration reference
-- ✅ `troubleshooting.md` - Common development troubleshooting solutions
-- ✅ `README.md` - This file
+**Phase 1 (Current)** – Core Foundation:
+- ✅ `adopted-patterns.md` – 10 patterns documented
+- ✅ `post-generation-checklist.md` – 5 checklists documented
+- ✅ `tech-findings-log.md` – Migrated and enhanced
+- ✅ `testing-reference.md` – Comprehensive Jest and testing configuration reference
+- ✅ `troubleshooting.md` – Common development troubleshooting solutions
+- ✅ `README.md` – This file (now consolidated; see architecture spec for chunking rules)
 
 **Phase 1 Complete (Canonical Docs)**:
-- ✅ `docs/architecture-decisions.md` - Stage 4.1 (REST+OpenAPI), Stage 4.2 (Supabase+Prisma+RLS)
-- ✅ `docs/tech-stack.md` - Complete version inventory with pinning strategy
-- ✅ `docs/P1-plan.md` - Walking skeleton implementation plan
+- ✅ `docs/architecture-decisions.md` – Stage 4.1 (REST+OpenAPI), Stage 4.2 (Supabase+Prisma+RLS)
+- ✅ `docs/tech-stack.md` – Complete version inventory with pinning strategy
+- ✅ `docs/P1-plan.md` – Walking skeleton implementation plan
 
-**Phase 2 (Planned)** - Expansion:
-- ⏳ `known-issues.md` - Active bugs and workarounds
-- ⏳ `integration-recipes.md` - Cross-component integration patterns
-- ⏳ `current-task.md` - Active work state
+**Phase 2 (Planned)** – Expansion:
+- ⏳ `known-issues.md` – Active bugs and workarounds
+- ⏳ `integration-recipes.md` – Cross-component integration patterns
+- ⏳ `current-task.md` – Active work state
 
-**Phase 3 (Future)** - Advanced:
+**Phase 3 (Future)** – Advanced:
 - Automated validation scripts
 - Memory quality metrics
 - Memory search/indexing tools
@@ -549,11 +462,11 @@ Use the decision tree:
 
 When you discover new patterns, constraints, or solutions:
 
-1. **Determine which file** the knowledge belongs in
-2. **Use the template** provided in that file
-3. **Test the pattern** with a fresh generation/implementation
-4. **Link related docs** for cross-reference
-5. **Update dates** in frontmatter
+1. **Determine which file** the knowledge belongs in.
+2. **Use the template** provided in that file (or copy an existing section).
+3. **Test the pattern** with a fresh generation/implementation.
+4. **Link related docs** for cross-reference.
+5. **Update dates** in frontmatter.
 
 **Quality checklist**:
 - [ ] Clear and actionable
@@ -565,6 +478,7 @@ When you discover new patterns, constraints, or solutions:
 
 ---
 
-**Last Updated**: 2025-10-21
-**Status**: Phase 1 Complete
+**Last Updated**: 2025-11-06
+**Status**: Phase 1 Complete – Cogno file-based system operational
 **Maintainer**: Development Team
+

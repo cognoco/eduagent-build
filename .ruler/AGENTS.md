@@ -1,3 +1,11 @@
+---
+cascade-source: docs/memories/README.md
+cascade-version: 2025-01-10
+propagated-from: README.md → zdx-cogno-architecture.md
+---
+
+<!-- Cascade: docs/memories/zdx-cogno-architecture.md → README.md → THIS FILE -->
+
 # AI AGENT RULES
 
 This file provides guidance to all AI agents when working with code in this repository.
@@ -129,6 +137,25 @@ The following servers are commonly applicable. This list is **not exhaustive** -
 - **What**: Nx-specific workspace analysis and documentation
 - **Why**: Direct access to workspace graph and project metadata
 
+**Serena MCP** - Code Navigation & Symbol Exploration
+- **When**: Finding symbol definitions, understanding code structure, navigating unfamiliar code
+- **What**: Semantic code navigation with symbolic tools (`find_symbol`, `get_symbols_overview`, `find_referencing_symbols`)
+- **Why**: Efficient exploration without reading entire files; preserves context for implementation work
+- **Relationship to Cogno**:
+  - **Cogno (`docs/memories/`)** = Governance layer (patterns, standards, "WHAT and WHY")
+  - **Serena (`.serena/`)** = Navigation layer (symbols, structure, "WHERE and HOW")
+  - **Workflow**: Check Cogno for standards → Use Serena to navigate → Validate against Cogno
+  - **Priority**: Cogno governance takes precedence over Serena cache
+  - **Critical**: Use symbolic tools (`get_symbols_overview`, `find_symbol`) before reading full files
+  - **Never**: Modify Cogno memories using Serena's `write_memory` tool
+- **Maintenance**:
+  | When | Action |
+  |------|--------|
+  | Daily use | Use navigation tools (`find_symbol`, etc.) |
+  | Major refactor | Consider `serena project index` |
+  | Cogno updates | None (reads on-demand) |
+  | Setup/troubleshooting | See `docs/tooling/serena-workflow.md` |
+
 ### MCP Server Unavailability Protocol
 
 **If you attempt to use ANY MCP server and receive an error:**
@@ -206,7 +233,9 @@ Before using Grep, Glob, Read, or WebSearch yourself, ask: "Could a sub-agent do
 
 **Purpose**: Prevent pattern drift across components and ensure consistency as the monorepo evolves.
 
-**Location**: `docs/memories/` directory
+**Location**: `docs/memories/` directory  
+**System Name**: ZDX Cogno (or simply “Cogno”) – the layered, file-based memory system for this repo.  
+**Upstream Canonical Docs**: Strategic artefacts live in `docs/` (see `docs/index.md` for the curated list). These are owned by architecture/product leadership. Cogno content **MUST** align with them.
 
 ### Mandatory Memory Checks
 
@@ -230,7 +259,32 @@ Before using Grep, Glob, Read, or WebSearch yourself, ask: "Could a sub-agent do
 - **`adopted-patterns.md`**: How WE do it (test location, TypeScript config, Jest patterns)
 - **`post-generation-checklist.md`**: Mandatory fixes after Nx generators
 - **`tech-findings-log.md`**: Technical decisions, constraints, troubleshooting findings
-- **`README.md`**: Comprehensive memory system documentation
+- **`README.md`**: Cogno quick reference (layered structure, manifest usage)
+- **`zdx-cogno-architecture.md`**: Authoritative Cogno specification (state model, manifests, read/write guidance)
+- **`topics.md`**: Task keyword → memory area index for fast discovery
+
+**Retrieval order (Cogno)**:
+1. Open `docs/index.md` and identify the relevant governance artefact (plan, architecture decision, tech stack, constitution, environment guidance etc.). Review the document/section for intent and constraints.
+2. Skim `docs/memories/zdx-cogno-architecture.md` when adjusting the memory framework.
+3. For task work, start with `docs/memories/README.md`, then consult `docs/memories/topics.md` to pinpoint relevant memory areas and synonyms.
+4. Read the `*.core.md` summary; consult the manifest to load only the modules you need.
+
+**Write workflow expectations (Cogno)**:
+- Confirm you’re implementing the latest guidance from the relevant governance artefact(s) in `docs/`.
+- When proposing a new memory to a user or reviewer, explicitly name the governing document/section and describe why the addition supports it; include this rationale in your message.
+- Update or create the Markdown module, then update the manifest entry (`id`, `title`, `file`, `tags`).
+- When you touch content, reset `checksum: null`, set `validation_status: needs_review`, and update `last_updated_by` / `last_updated_at`.
+- Refresh the `*.core.md` summary if the quick reference needs the new information.
+- Follow the maintenance checklist in that memory area (e.g., run validation commands, note verification steps).
+- Regenerate `docs/memories/memory-index.json` if tooling does not do it for you.
+
+### Cascade Awareness
+
+Cogno documentation flows through a cascade: **governance docs → architecture spec → README → AGENTS.md**.
+
+When Cogno updates, this file reflects those changes. See diagram and full workflow: `docs/memories/README.md`.
+
+**Validation tool**: Use `.claude/commands/zdx/memory-checkpoint.md` after completing tasks to check documentation alignment.
 
 ### Critical Warning
 
@@ -242,6 +296,26 @@ Example consequences:
 - Same problem solved differently in different components (wasted time)
 
 **For comprehensive memory system documentation**: Read `docs/memories/README.md`
+
+### Tool-Specific Operational Caches
+
+**Cogno is governance, not navigation tooling.**
+
+Some AI tools (like Serena MCP) maintain separate operational caches for code navigation and symbol exploration. These complement Cogno and serve different purposes:
+
+**Cogno (`docs/memories/`):**
+- Governance layer: patterns, decisions, standards
+- Human-maintained with AI assistance
+- Source of truth for WHAT and WHY
+- Long-lived, carefully curated
+
+**Tool caches (e.g., `.serena/`):**
+- Operational layer: symbol locations, code structure
+- AI-maintained from code exploration
+- Navigation aid for WHERE and HOW
+- Regenerated as needed
+
+**Priority**: Cogno governance takes precedence over tool caches.
 
 ### Documentation File Editing Rules
 
@@ -278,12 +352,14 @@ Modified: 2025-10-21T14:39  # ❌ NEVER touch - auto-managed
 
 This is a **gold standard Nx monorepo template** designed as a production-ready foundation for multi-platform applications. The project uses a "walking skeleton" approach to validate infrastructure and tooling before feature development.
 
-**Current State**: Phase 1 Stage 2 complete - Full infrastructure validated:
-- ✅ Next.js web application with Playwright E2E tests
+**Current State**: Phase 1 Stage 5 complete - Walking skeleton fully implemented:
+- ✅ Next.js web application with Playwright E2E infrastructure
 - ✅ Express server application with REST+OpenAPI
 - ✅ Four shared packages: database (Prisma), schemas (Zod), api-client (REST+OpenAPI), supabase-client
-- ✅ Complete QA infrastructure: Jest, ESLint, Prettier, CI/CD
-- ⏳ In progress: QA infrastructure (Husky, lint-staged), Supabase configuration
+- ✅ Complete QA infrastructure: Jest, ESLint, Prettier, Husky, lint-staged, CI/CD
+- ✅ Supabase + Prisma configured and validated
+- ✅ Walking skeleton: Health check feature working end-to-end (web → API → server → database)
+- ⏳ Next: Stage 6 - Comprehensive E2E tests and documentation
 
 **Architecture Goal**: Production-ready monorepo template demonstrating best practices for:
 - Cross-platform type safety (web, server, future mobile)
@@ -509,6 +585,23 @@ When you need to share code between projects:
 5. **Verify build**: Run `pnpm exec nx run my-new-lib:build` to ensure it compiles
 6. **Check graph**: Run `pnpm exec nx graph` to verify dependency structure
 
+### Common Workflow Checklists
+
+**Before Architecture Changes:**
+- Read `docs/architecture-decisions.md` for strategic context
+- Check `docs/memories/tech-findings-log.md` for technical constraints
+- Run `vibe_check` MCP to surface assumptions
+
+**When Troubleshooting:**
+- Check `docs/memories/troubleshooting.md` for common solutions
+- Check `docs/memories/testing-reference.md` if test-related
+- Search memory files for similar symptoms
+
+**After Major Refactor:**
+- Update affected Cogno memory files if patterns changed
+- Consider Serena re-index if structure changed significantly
+- Run: `pnpm run validate:governance`
+
 ## Testing & Quality
 
 **⚠️ MANDATORY READ BEFORE ANY TESTING WORK ⚠️**
@@ -593,10 +686,11 @@ To enable distributed task execution in CI, uncomment the `nx start-ci-run` line
 0. ✅ Current State Audit - Verify existing web app works
 1. ✅ Generate Server Application
 2. ✅ Generate Shared Packages - Create database, schemas, api-client, supabase-client
-3. ⏳ [In progress] QA Infrastructure - Set up Husky, lint-staged, pre-commit hooks
-4. ⏳ Configure Infrastructure - Set up Supabase + Prisma
-5. ⏳ Implement Walking Skeleton - Minimal health check feature end-to-end
-6. ⏳ Complete Testing & External Services - E2E tests, Sentry, final validation
+3. ✅ QA Infrastructure - Set up Husky, lint-staged, pre-commit hooks, coverage reporting
+4. ✅ Configure Infrastructure - Set up Supabase + Prisma, REST+OpenAPI implementation
+5. ✅ Implement Walking Skeleton - Health check feature end-to-end (web → API → server → database)
+6. ⏳ [Next] E2E Testing - Comprehensive tests for walking skeleton, raise coverage to 80%, documentation
+7. ⏳ [Optional] External Services - Sentry, Nx Cloud optimization, TestSprite evaluation
 
 **Success Criteria**: A new developer can clone, install, build, and run the full stack with a working health check feature flowing through all layers.
 

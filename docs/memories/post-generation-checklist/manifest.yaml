@@ -1,0 +1,124 @@
+version: 1
+memory: post-generation-checklist
+core:
+  file: post-generation-checklist.core.md
+  summary: "Mandatory fixes after running Nx generators or Prisma commands"
+chunks:
+  - id: pgc-after-jest-configuration
+    title: After: nx g @nx/jest:configuration <project>
+    file: module-01-after-nx-g-nx-jest-configuration-project.md
+    tags: [post-generation, jest, typescript]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: pgc-after-js-lib-or-react-app
+    title: After: nx g @nx/js:lib <name> or nx g @nx/react:app <name>
+    file: module-02-after-nx-g-nx-js-lib-name-or-nx-g-nx-react-app-name.md
+    tags: [post-generation, libraries, react]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: pgc-after-js-lib-prisma
+    title: After: nx g @nx/js:lib <name> --bundler=none (Prisma packages)
+    file: module-03-after-nx-g-nx-js-lib-name-bundler-none-prisma-packages.md
+    tags: [post-generation, prisma, libraries]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: pgc-after-prisma-migrate-create-only
+    title: After: prisma migrate dev --create-only (migration generation)
+    file: module-04-after-prisma-migrate-dev-create-only-prisma-migration-generation.md
+    tags: [post-generation, prisma, migrations]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: pgc-after-node-app
+    title: After: nx g @nx/node:app <name>
+    file: module-05-after-nx-g-nx-node-app-name.md
+    tags: [post-generation, node, applications]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: pgc-after-next-app
+    title: After: nx g @nx/next:app <name> (Next.js applications)
+    file: module-06-after-nx-g-nx-next-app-name-next-js-applications.md
+    tags: [post-generation, nextjs, applications]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: pgc-after-react-app-mobile
+    title: After: nx g @nx/react:app <name> (future mobile apps)
+    file: module-07-after-nx-g-nx-react-app-name-future-mobile-apps.md
+    tags: [post-generation, react, mobile]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: pgc-after-any-project-generation
+    title: After: any project generation (apps or libraries)
+    file: module-08-after-any-project-generation-apps-or-libraries.md
+    tags: [post-generation, validation]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: pgc-how-to-use
+    title: How to Use This Checklist
+    file: module-09-how-to-use-this-checklist.md
+    tags: [process, guidance]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: pgc-how-to-update
+    title: How to Update This Document
+    file: module-10-how-to-update-this-document.md
+    tags: [process, documentation]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: pgc-checklist-template
+    title: Checklist Template
+    file: module-11-checklist-template.md
+    tags: [template, checklist]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: pgc-after-generator-options
+    title: After: nx g <generator> --options
+    file: module-12-after-nx-g-generator-options.md
+    tags: [post-generation, generators]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+  - id: pgc-related-documentation
+    title: Related Documentation
+    file: module-13-related-documentation.md
+    tags: [references, documentation]
+    checksum: null
+    sync_status: pending
+    last_updated_by: gpt-5-codex
+    last_updated_at: 2025-11-06
+    last_synced_at: null
+
