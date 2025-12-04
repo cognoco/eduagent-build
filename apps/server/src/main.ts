@@ -26,17 +26,30 @@ if (existsSync(envPath)) {
   );
 }
 
-import { createApp } from './app.js';
+// Initialize Sentry AFTER environment variables are loaded but BEFORE any other application code
+// This ensures all errors are captured, including those during app initialization
+import { initSentry } from './instrumentation.js';
+initSentry();
 
-const host = process.env.HOST ?? 'localhost';
-const port = process.env.PORT ? Number(process.env.PORT) : 4000;
+// IMPORTANT: Use dynamic import for app.js to ensure Sentry.init() runs BEFORE Express is loaded
+// ES module static imports are hoisted, so static import would load Express before Sentry initializes
+// Wrapped in async IIFE because CommonJS doesn't support top-level await
+(async () => {
+  const { createApp } = await import('./app.js');
 
-const app = createApp();
+  const host = process.env.HOST ?? 'localhost';
+  const port = process.env.PORT ? Number(process.env.PORT) : 4000;
 
-app.listen(port, host, () => {
-  console.log(`[ ready ] http://${host}:${port}`);
-  console.log(`[ health ] http://${host}:${port}/api/health`);
-  console.log(`[ hello ] http://${host}:${port}/api/hello`);
-  console.log(`[ docs ] http://${host}:${port}/api/docs`);
-  console.log(`[ spec ] http://${host}:${port}/api/docs/openapi.json`);
-});
+  const app = createApp();
+
+  app.listen(port, host, () => {
+    console.log(`[ ready ] http://${host}:${port}`);
+    console.log(`[ health ] http://${host}:${port}/api/health`);
+    console.log(`[ hello ] http://${host}:${port}/api/hello`);
+    console.log(`[ docs ] http://${host}:${port}/api/docs`);
+    console.log(`[ spec ] http://${host}:${port}/api/docs/openapi.json`);
+    if (env !== 'production') {
+      console.log(`[ debug ] http://${host}:${port}/api/debug/sentry-test`);
+    }
+  });
+})();

@@ -374,7 +374,7 @@ GitHub Actions workflow runs on all PRs and main branch commits:
 - **Nx Cloud**: Remote caching, distributed execution, CI analytics
 - **CodeRabbit**: Automated PR reviews
 - **Dependabot**: Automated dependency updates
-- **Sentry** (planned): Error tracking and performance monitoring
+- **Sentry**: Error tracking and performance monitoring ([setup guide](docs/guides/observability.md))
 
 ## Troubleshooting
 

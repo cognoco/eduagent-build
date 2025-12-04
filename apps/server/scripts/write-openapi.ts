@@ -1,3 +1,12 @@
+/**
+ * OpenAPI Spec Generator Script
+ *
+ * This script generates the OpenAPI JSON specification from the Express app
+ * and writes it to dist/apps/server/openapi.json for consumption by api-client.
+ *
+ * Cache Note: This file is an input to the spec-write Nx target. Any changes
+ * here will invalidate the Nx cache, forcing regeneration of the OpenAPI spec.
+ */
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { createRequire } from 'node:module';

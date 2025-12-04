@@ -35,7 +35,7 @@
           "development": {},
           "production": {
             "esbuildOptions": {
-              "sourcemap": false,
+              "sourcemap": true,
               "outExtension": {
                 ".js": ".js"
               }
@@ -120,6 +120,7 @@
     "@asteasolutions/zod-to-openapi": "^8.1.0",
     "@nx-monorepo/database": "workspace:*",
     "@nx-monorepo/schemas": "workspace:*",
+    "@sentry/node": "^10.28.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "openapi3-ts": "^4.5.0",
@@ -128,6 +129,7 @@
   },
   "devDependencies": {
     "@nx-monorepo/test-utils": "workspace:*",
+    "@sentry/cli": "^2.58.2",
     "@stoplight/spectral-cli": "^6.15.0",
     "@types/cors": "^2.8.19",
     "@types/supertest": "^6.0.3",

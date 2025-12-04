@@ -153,11 +153,11 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: Observability Baseline
-  epic-3: backlog
-  3-1-set-up-sentry-project-and-configuration: backlog
-  3-2-integrate-sentry-with-express-server: backlog
-  3-3-integrate-sentry-with-nextjs-web-app: backlog
-  3-4-verify-observability-end-to-end: backlog
+  epic-3: contexted  # Stories drafted 2025-12-04
+  3-1-set-up-sentry-project-and-configuration: done  # Completed 2025-12-04
+  3-2-integrate-sentry-with-express-server: done  # Completed 2025-12-04 (Sentry v8+ API)
+  3-3-integrate-sentry-with-nextjs-web-app: done  # Completed 2025-12-04 (Sentry v8+ API)
+  3-4-verify-observability-end-to-end: done  # Completed 2025-12-04
   epic-3-retrospective: optional
 
   # Epic 4: Authentication Infrastructure Wiring

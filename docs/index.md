@@ -99,6 +99,7 @@ Use this index to locate the authoritative artefacts that drive governance, arch
 | Artifact | Domain | Purpose & Role |
 |----------|--------|----------------|
 | `environment-setup.md` | Tooling | Environment variable configuration and workstation bootstrap. |
+| `observability.md` | Operations | Sentry error tracking and performance monitoring setup, verification, and troubleshooting. |
 | `server-deployment.md` | Delivery | Server deployment patterns, configuration, and validation. |
 | `supabase-integration.md` | Tooling | Supabase setup, configuration, and integration patterns. |
 | `testing-enhancements.md` | Quality | Optional testing library enhancements (jest-dom, MSW, user-event). |

@@ -115,69 +115,9 @@ reviews:
     max_files: 50 # Don't auto-review PRs touching more than 50 files
     max_lines: 1000 # Don't auto-review PRs with more than 1000 lines changed
 
-# Review filtering by severity
-review_filters:
-  # Only report warnings and errors, skip info-level suggestions
-  severity_threshold: 'warning'
-
-  # Ignore trivial issues
-  ignore_trivial: true
-
-# Language-specific settings
-language_settings:
-  typescript:
-    # Use existing TypeScript, ESLint, and Prettier configurations
-    use_existing_config: true
-
-  javascript:
-    use_existing_config: true
-
-# Static Analysis Integration
-static_analysis:
-  # Respect existing linter and tool configurations
-  respect_existing_rules: true
-
-  # Tools to integrate with (CodeRabbit will respect their configs)
-  tools:
-    - eslint
-    - prettier
-    - typescript
-
-  # Security: Secret Detection Patterns
-  # NOTE: CodeRabbit uses Gitleaks which includes 100+ built-in patterns
-  # Custom patterns below add project-specific detection for Supabase and database credentials
-  security:
-    secrets:
-      enabled: true
-      patterns:
-        # Database credentials (PostgreSQL-specific for this project)
-        - pattern: "(?i)(database_url|direct_url)\\s*=\\s*[\"\\']?postgresql://"
-          message: "⚠️ Potential database credential detected. Ensure this is in .env files, not committed code."
-          severity: high
-
-        # Supabase credentials (project-specific patterns)
-        - pattern: "(?i)(supabase.*key|anon.*key|service.*role.*key)\\s*=\\s*[\"\\']?[a-zA-Z0-9_-]{20,}"
-          message: "⚠️ Potential Supabase API key detected. API keys should only be in .env files."
-          severity: high
-
-        # Generic API keys/tokens
-        # Note: Gitleaks also detects generic secrets, but this provides custom message
-        - pattern: "(?i)(api.*key|api.*token|access.*token)\\s*=\\s*[\"\\']?[a-zA-Z0-9_-]{20,}"
-          message: "⚠️ Potential API key/token detected. Credentials should be in .env files."
-          severity: medium
-
-        # Password patterns
-        # Note: Gitleaks has password detection, but this catches project-specific patterns
-        - pattern: "(?i)(password|passwd|pwd)\\s*=\\s*[\"\\']?[^\"\\s]{8,}"
-          message: "⚠️ Potential hardcoded password detected."
-          severity: high
-
-  # Path-based security filters
-  path_filters:
-    # Ignore .env.example files (templates are OK)
-    - path: "**/.env*.example"
-      exclude_patterns:
-        - "(?i)(database_url|supabase.*key)"
+# Note: Properties like review_filters, language_settings, and static_analysis are not
+# recognized by CodeRabbit's schema. CodeRabbit uses existing ESLint/Prettier/TypeScript
+# configs automatically. For secrets detection, CodeRabbit integrates with Gitleaks.
 
 # Chat settings
 chat:
