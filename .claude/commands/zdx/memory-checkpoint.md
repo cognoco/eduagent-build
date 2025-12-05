@@ -1,6 +1,7 @@
 # Memory Checkpoint
 
-> **Note**: This command applies to Cogno memories in `docs/memories/`. Tool-specific operational caches (like `.serena/memories/`) are maintained separately by their respective tools.
+> **System**: ZDX Cogno (the file-based memory system in `docs/memories/`)
+> **Purpose**: Validate documentation alignment after completing tasks to prevent pattern drift.
 
 ## ⚡ TL;DR - Quick Exit
 
@@ -13,7 +14,7 @@
 
 ---
 
-You have just completed a task. Now reflect on whether anything from this work should be documented in the memory system to prevent future rework or pattern drift.
+You have just completed a task. Now reflect on whether anything from this work should be documented in the Cogno memory system to prevent future rework or pattern drift.
 
 ## Step 1: Review What You Just Did
 
@@ -25,29 +26,76 @@ Briefly summarize the work you just completed:
 
 ## Step 2: Check Existing Documentation
 
-**FIRST - Check if already documented:**
-1. `.ruler/AGENTS.md` or `CLAUDE.md` - General project practices, workflows, technology choices
-2. Official framework documentation (Next.js, Nx, Prisma, etc.)
-3. Open `docs/index.md` to locate the governing artefact (plan, architecture decision, tech stack, constitution, etc.) and confirm whether the intent/constraint is already captured upstream
+### 2.1 Check Governance Layer First (Tier 1 & 2)
 
-**If NOT already covered there, read ALL memory system files:**
-1. `docs/memories/README.md` - Understand the memory system structure and principles
-2. `docs/memories/adopted-patterns.md` - Current monorepo architectural standards
-3. `docs/memories/post-generation-checklist.md` - Current post-generation steps
-4. `docs/memories/tech-findings-log.md` - Current technical findings
+Before touching Cogno, verify the information isn't already in governance docs:
 
-**CRITICAL - Search for existing references to your topic:**
-- Use grep/search across ALL memory files for keywords related to your work
-- Consult `docs/memories/topics.md` for canonical keywords and mapped memory areas before searching
-- Check if similar patterns, fixes, or findings already exist
-- Look for related entries that might need updating instead of adding new ones
-- Example: If documenting TypeScript config, search for "TypeScript", "tsconfig", "Project References"
+1. **`.ruler/AGENTS.md` or `CLAUDE.md`** - General project practices, workflows, technology choices
+2. **`docs/index.md`** - Start here to locate the governing artefact (PRD, architecture, ADRs, tech-stack, constitution, roadmap)
+3. **Official framework documentation** - Next.js, Nx, Prisma, etc.
 
-**Purpose**: Avoid duplicating existing documentation. Memory system captures GAPS, not general practices.
+**If already covered in governance or official docs → STOP (nothing to add to Cogno)**
+
+### 2.2 Navigate Cogno (Tier 3)
+
+If NOT covered in governance docs, use Cogno's discovery workflow:
+
+1. **Start with `docs/memories/README.md`** - Understand the memory system structure
+2. **Consult `docs/memories/topics.md`** - Map your task keywords to relevant memory areas
+3. **Navigate to the memory area directory** (e.g., `docs/memories/adopted-patterns/`)
+4. **Read the `*.core.md` summary** for that area
+5. **Check the `manifest.yaml`** for specific module listings
+6. **Read relevant modules** only as needed
+
+### Cogno Directory Structure
+
+```
+docs/memories/
+  README.md                     # Steering overview (no manifest)
+  zdx-cogno-architecture.md     # Canonical architecture spec
+  topics.md                     # Topic-to-area index for discovery
+  memory-index.json             # Generated lookup (do not edit)
+
+  adopted-patterns/             # "How WE do it in THIS monorepo"
+    adopted-patterns.core.md    # Summary of all patterns
+    manifest.yaml               # Module inventory
+    module-*.md                 # Detailed pattern modules
+
+  post-generation-checklist/    # Mandatory fixes after Nx generators
+    post-generation-checklist.core.md
+    manifest.yaml
+    module-*.md
+
+  tech-findings-log/            # Technical decisions & constraints
+    tech-findings-log.core.md
+    manifest.yaml
+    module-*.md
+
+  testing-reference/            # Jest, MSW, Playwright, coverage
+    testing-reference.core.md
+    manifest.yaml
+    module-*.md
+
+  troubleshooting/              # Common development issues
+    troubleshooting.core.md
+    manifest.yaml
+    module-*.md
+```
+
+### 2.3 Search for Existing References
+
+**CRITICAL**: Before adding anything new:
+- Use grep/search across ALL memory areas for keywords related to your work
+- Check `topics.md` synonyms for alternative search terms
+- Look for existing entries that might need updating (not adding new ones)
+
+**Example**: If documenting TypeScript config, search for "TypeScript", "tsconfig", "moduleResolution", "Project References"
 
 ## Step 2.5: Cascade Validation (If Documenting Governance Changes)
 
 **When to use this step**: If your work involved governance documents (`docs/architecture-decisions.md`, `docs/tech-stack.md`, etc.)
+
+**Cascade order**: Governance docs → `zdx-cogno-architecture.md` → `README.md` → `.ruler/AGENTS.md`
 
 **Cascade check:**
 1. Did governance documents change?
@@ -60,13 +108,12 @@ Briefly summarize the work you just completed:
 
 3. Cascade propagation needed?
    - Architecture spec: Does `zdx-cogno-architecture.md` need updating?
-   - README: Does quick-reference in `README.md` need updating?
+   - README: Does `docs/memories/README.md` quick-reference need updating?
    - AGENTS.md: Do execution rules in `.ruler/AGENTS.md` need updating?
 
 4. Update frontmatter tracking:
    - Set `cascade-version` to current date
    - Update `propagated-to` / `propagated-from` fields
-   - Maintain cascade synchronization
 
 **Reference**: See `docs/memories/README.md` - "Cascade Maintenance" section for full workflow.
 
@@ -75,7 +122,7 @@ Briefly summarize the work you just completed:
 Work through these checkpoints in order:
 
 ### ❓ Checkpoint 1: Already Documented?
-Already covered in `.ruler/AGENTS.md`, official framework docs, or `docs/` governance?
+Already covered in governance docs (`docs/`), `.ruler/AGENTS.md`, official framework docs, or existing Cogno modules?
 - ✅ **Yes** → 🛑 **STOP** (nothing to add)
 - ❌ **No** → Continue to Checkpoint 2
 
@@ -86,17 +133,17 @@ One-time fix or unlikely to recur in similar work?
 
 ### ❓ Checkpoint 3: Technical Constraint?
 Discovered a technical constraint/limitation or version incompatibility through troubleshooting?
-- ✅ **Yes** → 📝 Document in `tech-findings-log.md` (see Step 4)
+- ✅ **Yes** → 📝 Document in `tech-findings-log/` (see Step 4)
 - ❌ **No** → Continue to Checkpoint 4
 
 ### ❓ Checkpoint 4: Generator Issue?
 Generator output conflicted with our adopted patterns or required mandatory fixes?
-- ✅ **Yes** → 📝 Document in `post-generation-checklist.md` (see Step 4)
+- ✅ **Yes** → 📝 Document in `post-generation-checklist/` (see Step 4)
 - ❌ **No** → Continue to Checkpoint 5
 
 ### ❓ Checkpoint 5: New Standard?
 Established or confirmed a standard that should apply across similar components?
-- ✅ **Yes** → 📝 Document in `adopted-patterns.md` (see Step 4)
+- ✅ **Yes** → 📝 Document in `adopted-patterns/` (see Step 4)
 - ❌ **No** → Continue to Checkpoint 6
 
 ### ❓ Checkpoint 6: None of the Above?
@@ -106,57 +153,84 @@ Established or confirmed a standard that should apply across similar components?
 
 **For every "Yes" outcome (Checkpoints 3-5):**
 - Identify the governing document/section via `docs/index.md`
-- Capture the canonical reference and alignment rationale when updating manifests or proposing the change
-- Check cascade implications (see Step 2.5 below)
+- Capture the canonical reference and alignment rationale
+- Check cascade implications (see Step 2.5)
 
-## Step 4: Update Memory Files (If Applicable)
+## Step 4: Update Cogno Memory Files (If Applicable)
 
 If you identified knowledge that should be documented:
 
-**CRITICAL RULES - Minimize Overlap:**
+### Memory Area Selection Guide
 
-1. **Each piece of information should live in ONE primary location**
-   - Adopted-patterns: Quick reference pattern description
-   - Post-generation-checklist: Step-by-step fix instructions
-   - Tech-findings-log: Deep technical rationale
+| Memory Area | Purpose | Target Length |
+|-------------|---------|---------------|
+| `adopted-patterns/` | "How WE do it" - standards overriding defaults | 50-80 lines per pattern |
+| `post-generation-checklist/` | Step-by-step generator fixes | 30-50 lines per checklist |
+| `tech-findings-log/` | Technical rationale & constraints | 80-150 lines per entry |
+| `testing-reference/` | Jest, MSW, Playwright, coverage | As needed for testing docs |
+| `troubleshooting/` | Common development issue solutions | 30-50 lines per issue |
 
-2. **Use cross-references instead of repeating**
-   - ✅ "See tech-findings-log.md - [Entry Name] for rationale"
-   - ❌ Copy-pasting same explanation into multiple files
+### Module Authoring Rules (from Cogno Architecture Spec)
 
-3. **Limited acceptable redundancy:**
-   - Brief context (1-2 sentences) if agents might only read one file
-   - Example: Post-generation-checklist can say "This is needed because X" (1 sentence) then "See adopted-patterns.md for full rationale"
+1. **Keep `*.core.md` scannable** - summaries only, link to deeper modules
+2. **Create module file** when:
+   - Guidance exceeds ~50 lines
+   - Includes detailed workflows/code
+   - Represents a distinct reusable scenario
+3. **Add to core summary** when:
+   - Brief update (<50 lines)
+   - Global principle needing immediate visibility
+4. **Split patterns/modules** when entry exceeds ~100 lines or covers multiple independent scenarios
 
-**For Adopted Patterns:**
-1. Add a new pattern section using the template in `adopted-patterns.md`
-2. Include: pattern description, when to apply, **brief** rationale
-3. **Omit**: Deep technical explanations (link to tech-findings-log instead)
-4. Update the "last-updated" date in frontmatter
-5. Record the governing `docs/` artefact (document + section) and add a one-sentence alignment rationale within the entry
+### Updating a Memory Area
 
-**For Post-Generation Checklist:**
-1. Add a new checklist section using the template in `post-generation-checklist.md`
-2. Include: issue description, required actions, validation commands
-3. **Omit**: Why the issue exists (link to tech-findings-log instead), detailed pattern explanation (link to adopted-patterns instead)
-4. Update the "last-updated" date in frontmatter
-5. Capture the governing `docs/` artefact and briefly explain why the fix preserves that canonical guidance
+**Step 4.1: Update or create module file**
+```
+docs/memories/<area>/module-XX-topic.md
+```
 
-**For Tech Findings Log:**
-1. Add a new entry using the template in `tech-findings-log.md`
-2. Include: decision, context, alternatives considered, technical rationale
-3. **Omit**: Step-by-step instructions (link to post-generation-checklist instead)
-4. Update the "last-updated" date in frontmatter
-5. Cite the governing `docs/` artefact and describe how the finding clarifies or supports it
+**Step 4.2: Update the manifest**
+Edit `docs/memories/<area>/manifest.yaml`:
+```yaml
+- id: <area>-XX-topic
+  title: "Human-readable Title"
+  file: module-XX-topic.md
+  tags: [relevant, tags, for, search]
+  checksum: null                    # Leave null (tooling sets this)
+  validation_status: needs_review   # Always set this when editing
+  last_updated_by: "claude"         # Or your identifier
+  last_updated_at: "2025-01-15T10:00:00Z"  # ISO 8601 UTC
+```
 
-**After Adding Content - Check for Ambiguities:**
+**Step 4.3: Update the `*.core.md` summary** if the quick reference needs the new information
 
-1. **Re-read the ENTIRE memory file** (not just your additions)
+**Step 4.4: Run validation steps** from the area's maintenance checklist (if any)
+
+**Step 4.5: Cross-reference** - link to related entries in other areas (no duplication)
+
+### Cross-Reference Strategy
+
+**Each piece of information lives in ONE primary location:**
+- `adopted-patterns/` → Quick reference pattern description
+- `post-generation-checklist/` → Step-by-step fix instructions
+- `tech-findings-log/` → Deep technical rationale
+
+**Use cross-references instead of repeating:**
+- ✅ "See tech-findings-log module TFL-10 for rationale"
+- ❌ Copy-pasting same explanation into multiple files
+
+**Limited acceptable redundancy:**
+- Brief context (1-2 sentences) if agents might only read one file
+- Example: "This is needed because X. See adopted-patterns module AP-02 for full rationale."
+
+### After Adding Content - Check for Ambiguities
+
+1. **Re-read the ENTIRE `*.core.md`** (not just your additions)
 2. Look for:
    - Contradictions with existing entries
    - Unclear boundaries between patterns
-   - Ambiguous terminology that could confuse agents
-   - Missing cross-references to related entries
+   - Ambiguous terminology
+   - Missing cross-references
 3. Update existing entries if your new content creates ambiguity
 4. Add clarifying notes to distinguish similar patterns
 
@@ -165,9 +239,10 @@ If you identified knowledge that should be documented:
 Provide a summary:
 
 **If you documented something:**
-- Which file(s) did you update?
-- What pattern/checklist/finding did you add?
+- Which memory area did you update?
+- What module/pattern/checklist/finding did you add or modify?
 - Which canonical `docs/` artefact (document + section) it aligns with and why
+- What manifest fields did you update?
 - Why is this important for future work?
 
 **If nothing needs documenting:**
@@ -175,130 +250,67 @@ Provide a summary:
 
 ## Common Checkpoint Mistakes
 
-### ❌ Don’t Document:
-- Framework basics already covered in official docs (e.g., “How to use Next.js App Router”)
-- Component-specific one-offs that won’t recur
-- Personal preferences without technical rationale (tabs vs. spaces)
-- Routine implementations that followed existing patterns without surprises
+### ❌ Don't Document:
+- Framework basics already covered in official docs
+- Component-specific one-offs that won't recur
+- Personal preferences without technical rationale
+- Routine implementations that followed existing patterns
+- Information already in governance docs (`docs/`)
 
 ### ✅ Do Document:
 - Version constraints or incompatibilities discovered via troubleshooting
 - Generator outputs that consistently violate our standards
-- Cross-component conventions we expect to reuse (state management approach, theming strategy)
-
-## Guidelines
-
-**DO document** when:
-- ✅ Intentional architectural decision from design discussion
-- ✅ Pattern that emerged from solving cross-component problems
-- ✅ Generator output conflicts with our architectural choices
-- ✅ Technical constraint or limitation discovered
-- ✅ Decision with non-obvious rationale that prevents future rework
-
-**DON'T document** when:
-- ❌ Already documented in AGENTS.md or official framework docs
-- ❌ General project practice without monorepo-specific nuance
-- ❌ One-time fix or edge case
-- ❌ Specific to single component
-- ❌ Personal preference without technical requirement
-- ❌ Work completed smoothly following existing patterns
+- Cross-component conventions we expect to reuse
+- Integration patterns combining multiple technologies
+- Solutions that prevent future problems
 
 ## Documentation Length Guidelines
 
 **CRITICAL: Keep entries concise and use cross-references**
 
-Each memory file has a different purpose and appropriate length:
-
-**adopted-patterns.md** - **Target: 50-80 lines per pattern**
-- Purpose: Quick reference for "how we do it"
-- What to include: Pattern description, when to apply, brief rationale
-- What to omit: Deep technical explanations (link to tech-findings-log instead)
-- Example: "Use `moduleResolution: nodenext` for all projects. See tech-findings-log.md for rationale."
-
-**post-generation-checklist.md** - **Target: 30-50 lines per checklist**
-- Purpose: Step-by-step fix instructions
-- What to include: Issue description, required actions, validation commands
-- What to omit: Why the issue exists (link to tech-findings-log instead)
-- Example: "Change `moduleResolution: node10` → `nodenext`. See adopted-patterns.md Pattern 2."
-
-**tech-findings-log.md** - **Target: 80-150 lines per entry**
-- Purpose: Deep dive technical rationale
-- What to include: Context, alternatives, technical constraints, research references
-- What to omit: Step-by-step instructions (link to post-generation-checklist instead)
-- Example: Full explanation of TypeScript Project References incompatibility with Next.js
-
-**Cross-reference instead of repeating:**
-- ✅ "See tech-findings-log.md - [Entry Title] for rationale"
-- ❌ Copy-pasting same explanation into multiple files
+| File Type | Target Length | What to Include | What to Omit |
+|-----------|---------------|-----------------|--------------|
+| `*.core.md` | Brief summary | Scope, links to modules | Detailed content |
+| Pattern module | 50-80 lines | Pattern description, when to apply, brief rationale | Deep technical explanations |
+| Checklist module | 30-50 lines | Issue description, steps, validation commands | Why the issue exists |
+| Tech finding module | 80-150 lines | Context, alternatives, constraints, research | Step-by-step instructions |
 
 **Warning: If total documentation exceeds 200 lines across all files:**
 - You're probably repeating yourself
 - Consider: Can this be split with cross-references?
-- Ask: Is the deep dive really necessary, or is a brief explanation sufficient?
+- Ask: Is the deep dive really necessary?
 
 ## Smell Tests
 
-**Red flags that suggest NOTHING should be documented:**
-- "I'm documenting how we generally do X" → Check if already in AGENTS.md
-- **Entry would be >100 lines in adopted-patterns.md** → Too verbose, move detail to tech-findings-log
-- **Entry would be >50 lines in post-generation-checklist.md** → Too verbose, simplify to steps only
-- **Total documentation >200 lines across all files** → Repetitive, use cross-references
-- "This worked fine without any issues" → Then nothing needs documenting
+**Red flags (STOP - nothing to document):**
+- "I'm documenting how we generally do X" → Check if already in AGENTS.md or governance
+- "This worked fine without issues" → Nothing needs documenting
 - "Here's how to use [framework feature]" → Link to official docs instead
+- Entry would exceed target length → Too verbose, use cross-references
 
-**Green lights that suggest something SHOULD be documented:**
-- "We chose X instead of framework default Y because..." → adopted-patterns.md (~60 lines)
-- "Generator created Z, I had to change it to W" → post-generation-checklist.md (~40 lines)
-- "I discovered constraint C through troubleshooting" → tech-findings-log.md (~100 lines)
-- "This decision prevents future problem P" → Appropriate memory file, appropriate length
+**Green lights (DO document):**
+- "We chose X instead of framework default Y because..." → `adopted-patterns/`
+- "Generator created Z, I had to change it to W" → `post-generation-checklist/`
+- "I discovered constraint C through troubleshooting" → `tech-findings-log/`
+- "This decision prevents future problem P" → Appropriate memory area
 
-## Quality Check
+## Quality Checklist
 
 Before finishing, verify:
-- [ ] **Search check**: Searched ALL memory files for existing references to this topic
-- [ ] **Update vs. Add**: Confirmed this needs a NEW entry (not updating existing one)
-- [ ] Used the appropriate template from the target file
+- [ ] **Search check**: Searched ALL memory areas and `topics.md` for existing references
+- [ ] **Update vs. Add**: Confirmed this needs a NEW module (not updating existing one)
+- [ ] Used the appropriate module naming pattern (`module-XX-topic.md`)
 - [ ] Included clear rationale (why, not just what)
 - [ ] Added validation/verification steps
-- [ ] Updated "last-updated" date in frontmatter
-- [ ] **Cross-reference check**: Each file links to others (no duplicated explanations)
+- [ ] **Updated manifest**: `id`, `title`, `file`, `tags`, `validation_status`, `last_updated_by`, `last_updated_at`
+- [ ] **Updated `*.core.md`** if summary needs the new information
+- [ ] **Cross-reference check**: Links to related modules (no duplicated explanations)
 - [ ] **Length check**: Each entry within target range for its file type
-- [ ] **Redundancy check**: Each piece of info lives in ONE primary location
-- [ ] **Overlap check**: Only minimal context redundancy (1-2 sentences max)
-- [ ] **Ambiguity check**: Re-read ENTIRE memory file for contradictions/unclear boundaries
-- [ ] **Related entries check**: Updated or cross-referenced similar existing patterns
-
-## Documentation Length Examples
-
-**❌ Too Verbose** (avoid this):
-```
-adopted-patterns.md: 150 lines explaining TypeScript Project References incompatibility
-post-generation-checklist.md: 100 lines explaining same incompatibility + steps
-tech-findings-log.md: 160 lines explaining same incompatibility + research
-Total: 410 lines with massive repetition
-```
-
-**✅ Just Right** (do this):
-```
-adopted-patterns.md: 60 lines
-  - Brief: "Next.js uses single tsconfig.json; Node.js uses Project References"
-  - When: "Apply X to Next.js, Y to Node.js"
-  - Reference: "See tech-findings-log.md - TypeScript Project References for rationale"
-
-post-generation-checklist.md: 40 lines
-  - Issue: "Generator doesn't create typecheck target"
-  - Steps: Concrete actions to fix
-  - Reference: "See adopted-patterns.md Pattern 4"
-
-tech-findings-log.md: 100 lines
-  - Full technical explanation with research
-  - Alternatives considered
-  - References to external docs
-  - Cross-refs: "See adopted-patterns.md Pattern 4, post-generation-checklist.md"
-
-Total: 200 lines, no repetition, clear separation of concerns
-```
+- [ ] **Cascade check**: Governance docs → architecture spec → README → AGENTS.md aligned
+- [ ] **Ambiguity check**: Re-read core summary for contradictions/unclear boundaries
 
 ---
 
-**Remember**: The memory system prevents pattern drift. Quality documentation now saves hours of debugging later. **Brevity with cross-references beats verbose repetition.**
+**Remember**: Cogno prevents pattern drift. Quality documentation now saves hours of debugging later. **Brevity with cross-references beats verbose repetition.**
+
+**Canonical Reference**: See `docs/memories/zdx-cogno-architecture.md` for the authoritative Cogno specification.

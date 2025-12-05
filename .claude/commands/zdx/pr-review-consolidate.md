@@ -96,14 +96,33 @@ gh api repos/:owner/:repo/pulls/<pr-number>/comments
 gh api repos/:owner/:repo/issues/<pr-number>/comments
 ```
 
+⚠️ CRITICAL: HANDLING MULTIPLE REVIEW CYCLES ⚠️
+
+PRs often have multiple push/review cycles. Review bots (CodeRabbit, Claude PR Review, Cursor BugBot, etc.) post NEW comments for EACH commit/push. You MUST:
+
+1. **Sort ALL comments by timestamp** (createdAt/updatedAt field, descending - newest first)
+2. **For each review bot, identify ALL their comments** and prioritize the MOST RECENT ones
+3. **Look for review cycle indicators** such as:
+   - "Walkthrough" sections (CodeRabbit posts these for each review)
+   - Timestamps indicating when comments were posted
+   - References to specific commits or "latest changes"
+4. **Do NOT stop reading after the first comment** from a bot - keep reading to find newer comments
+5. **When a bot has multiple top-level comments**, the LATEST one contains feedback for the most recent push
+
+COMMON PITFALL TO AVOID:
+- A PR with 2 pushes will have 2 separate CodeRabbit/Claude comments
+- The FIRST comment (chronologically) addresses the FIRST push - this may be OUTDATED
+- The SECOND/LATER comment addresses the LATEST push - this is what we need
+- ALWAYS read ALL comments and extract issues from the MOST RECENT ones per reviewer
+
 ANALYSIS REQUIREMENTS:
 
-Parse the JSON output and extract:
-- Review comments from CodeRabbit (author contains "coderabbitai" or similar)
-- Review comments from Claude Code PR review workflow (check for bot indicators)
-- Review comments from Cursor BugBot (author or patterns indicating Cursor)
-- Review comments from Codex or other AI reviewers
-- Human reviewer comments (for context)
+Parse the JSON output and extract feedback, PRIORITIZING THE LATEST COMMENTS from each source:
+- Review comments from CodeRabbit (author contains "coderabbitai" or similar) - GET THE LATEST
+- Review comments from Claude Code PR review workflow (check for bot indicators) - GET THE LATEST
+- Review comments from Cursor BugBot (author or patterns indicating Cursor) - GET THE LATEST
+- Review comments from Codex or other AI reviewers - GET THE LATEST
+- Human reviewer comments (for context) - include recent ones
 
 For each comment, extract:
 - Source: Which reviewer/bot (CodeRabbit, Claude PR Review, Cursor BugBot, Codex, Human)
@@ -113,6 +132,7 @@ For each comment, extract:
 - Line number: If inline comment
 - Message: The actual feedback text
 - Category: Lint, test, type error, security, performance, style, architecture, etc.
+- Timestamp: When the comment was created (IMPORTANT for identifying latest)
 
 FILTERING REQUIREMENTS:
 
@@ -126,6 +146,11 @@ EXCLUDE:
 - Neutral observations without actionable items
 - General discussion without specific change requests
 - Acknowledged/resolved comments
+- Issues from OLDER review cycles that were already addressed (compare timestamps to determine which comments are stale)
+
+IMPORTANT: When the same issue appears in both an old and new comment from the same reviewer:
+- If it's still present in the LATEST comment → include it (issue not yet fixed)
+- If it's ONLY in an older comment but NOT in the latest → exclude it (issue was fixed)
 
 REPORT FORMAT:
 
@@ -142,10 +167,14 @@ Return a structured JSON array with this schema:
     "message": "The feedback message",
     "category": "lint|test|type|security|performance|style|architecture|other",
     "author": "username or bot name",
-    "body": "full comment body for context"
+    "body": "full comment body for context",
+    "timestamp": "2025-01-15T10:30:00Z",
+    "isLatestFromSource": true
   }
 ]
 ```
+
+IMPORTANT: Set `isLatestFromSource: true` ONLY for issues extracted from the MOST RECENT comment by each reviewer. This helps the orchestrator identify which feedback is current.
 
 If there are no actionable comments, return an empty array: `[]`
 
@@ -255,7 +284,11 @@ Combine the two JSON arrays from both sub-agents into a single list.
 
 Use Sequential Thinking MCP to reason through deduplication:
 
-Identify duplicate issues that appear in both PR reviews and CI results. Strategy:
+**FIRST: Filter to Latest Feedback Only**
+
+Before deduplication, verify that all PR review issues have `isLatestFromSource: true`. If any issues have `isLatestFromSource: false`, they should be excluded as they represent feedback from older review cycles that may have already been addressed.
+
+**THEN: Identify duplicate issues** that appear in both PR reviews and CI results. Strategy:
 1. Exact matches: Same file + same line + similar message
 2. Semantic matches: Same issue type + same category + same file (line may differ slightly)
 3. Cross-source validation: CI failure confirms review comment
@@ -265,6 +298,7 @@ For each potential duplicate:
 - Compare line numbers (within 5 lines = likely same issue)
 - Compare messages (use fuzzy matching, >80% similarity = duplicate)
 - Compare categories (must match)
+- **Compare timestamps** - when merging duplicates, use the most recent timestamp
 
 When consolidating duplicates:
 - Keep the most detailed message
@@ -559,6 +593,7 @@ Based on user choice:
 - Return ONLY structured JSON as specified
 - Be thorough in fetching all available sources
 - Handle errors gracefully (missing data, API failures)
+- **CRITICAL**: For PR Review Fetcher - always read ALL comments from each reviewer and extract issues ONLY from the MOST RECENT comment per reviewer. Do NOT stop after finding the first comment from a bot.
 
 ### Quality Standards:
 
