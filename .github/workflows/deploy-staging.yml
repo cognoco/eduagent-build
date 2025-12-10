@@ -1,11 +1,19 @@
 # =============================================================================
 # Staging Deployment Workflow (Railway API + Web)
 # =============================================================================
-# Triggers: PR to main, push to non-main branches, manual dispatch
+# Triggers:
+#   - Automatic: When PR is opened or reopened (NOT on subsequent commits)
+#   - Manual: Via workflow_dispatch for re-deployments
+#
 # Target: Railway staging environment (API and Web services)
 #
 # NOTE: Vercel ALSO handles web deployments automatically (Preview on every push).
 #       This workflow deploys BOTH API and Web to Railway staging for dual frontend.
+#
+# DEPLOYMENT STRATEGY:
+#   - First deployment happens automatically when PR is created
+#   - Subsequent deployments require manual trigger (Actions tab → Run workflow)
+#   - This reduces unnecessary staging deployments and Railway costs
 # =============================================================================
 #
 # SECRETS REQUIRED (configure in GitHub Settings → Environments → staging):
@@ -20,17 +28,12 @@
 name: Deploy to Staging (Railway API + Web)
 
 on:
-  # Trigger on PRs to main
+  # Trigger automatically when PR is opened or reopened (NOT on subsequent commits)
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened]
+    types: [opened, reopened]
 
-  # Trigger on push to non-main branches
-  push:
-    branches-ignore:
-      - main
-
-  # Allow manual deployment trigger
+  # Manual deployment trigger for subsequent deploys
   workflow_dispatch:
     inputs:
       skip_health_check:
