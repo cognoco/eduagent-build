@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context Document
+  Generated: 2025-12-09
+  Story: 5-8-validate-production-deployment
+  Epic: 5 - CI/CD Staging & Production Deployment
+-->
+<story-context story-id="5-8" version="1.0">
+  <metadata>
+    <title>Validate Production Deployment</title>
+    <epic>Epic 5: CI/CD Staging & Production Deployment</epic>
+    <status>drafted</status>
+    <generated-date>2025-12-09</generated-date>
+    <dependencies>
+      <dependency story-id="5-7" status="drafted">Production Deployment Pipeline</dependency>
+    </dependencies>
+  </metadata>
+
+  <story-summary>
+    <user-story>
+      As a stakeholder, I want to verify the production environment works correctly,
+      so that I have confidence in the full CI/CD pipeline.
+    </user-story>
+    <acceptance-criteria>
+      <criterion id="AC1">Application deployed to production URL within 10 minutes of merge to main</criterion>
+      <criterion id="AC2">Walking skeleton health check works</criterion>
+      <criterion id="AC3">Observability captures production events</criterion>
+      <criterion id="AC4">Production URLs documented in README</criterion>
+      <criterion id="AC5">Deployment badge shows status</criterion>
+    </acceptance-criteria>
+  </story-summary>
+
+  <validation-procedures>
+    <procedure id="1" name="Production Deployment Timing">
+      <steps>
+        <step>Merge a PR to main branch</step>
+        <step>Monitor CI workflow completion</step>
+        <step>Monitor production deployment workflow</step>
+        <step>Note total time from merge to deployment complete</step>
+      </steps>
+      <success-criteria>Under 10 minutes total</success-criteria>
+    </procedure>
+
+    <procedure id="2" name="Health Check Validation">
+      <steps>
+        <step>Navigate to production web URL /health</step>
+        <step>Verify page loads without errors</step>
+        <step>Click "Ping" button</step>
+        <step>Verify record created and displayed</step>
+      </steps>
+      <success-criteria>End-to-end health check works</success-criteria>
+    </procedure>
+
+    <procedure id="3" name="API Health Check">
+      <steps>
+        <step>curl production API /api/health</step>
+        <step>Verify 200 OK response</step>
+        <step>Verify JSON response is valid</step>
+      </steps>
+      <success-criteria>API responds correctly</success-criteria>
+    </procedure>
+
+    <procedure id="4" name="Observability Verification">
+      <steps>
+        <step>Trigger test actions on production</step>
+        <step>Check Sentry dashboard</step>
+        <step>Verify events tagged with production environment</step>
+      </steps>
+      <success-criteria>Events appear in Sentry with correct environment</success-criteria>
+    </procedure>
+
+    <procedure id="5" name="Documentation Update">
+      <steps>
+        <step>Add production URLs to README</step>
+        <step>Add deployment status badge</step>
+        <step>Document any production-specific quirks</step>
+      </steps>
+    </procedure>
+  </validation-procedures>
+
+  <validation-checklist>
+    <section name="Deployment">
+      <item id="V1">Merge to main triggers production deployment</item>
+      <item id="V2">Deployment completes within 10 minutes</item>
+      <item id="V3">Both web and API deploy successfully</item>
+    </section>
+
+    <section name="Functionality">
+      <item id="V4">Production web URL accessible via HTTPS</item>
+      <item id="V5">/health page works</item>
+      <item id="V6">API /api/health returns 200</item>
+      <item id="V7">Database operations work</item>
+    </section>
+
+    <section name="Observability">
+      <item id="V8">Sentry receives production events</item>
+      <item id="V9">Environment correctly tagged</item>
+    </section>
+
+    <section name="Documentation">
+      <item id="V10">README updated with production URLs</item>
+      <item id="V11">Deployment badge added</item>
+    </section>
+  </validation-checklist>
+
+  <references>
+    <doc path="docs/environment-strategy.md">Environment architecture</doc>
+    <doc path="docs/epics.md" section="Story 5.8">Story definition</doc>
+  </references>
+</story-context>
+

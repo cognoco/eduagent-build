@@ -501,7 +501,7 @@ See `docs/memories/tech-findings-log/module-21-deployment-vercel-railway-nx-mono
 
 This section documents the Supabase Authentication settings configured for this project.
 
-### Configured Settings (nx-monorepo-DEV and nx-monorepo-TEST)
+### Configured Settings (nx-monorepo-DEV and nx-monorepo-STAGING)
 
 | Setting | Value | Rationale |
 |---------|-------|-----------|
@@ -509,14 +509,16 @@ This section documents the Supabase Authentication settings configured for this 
 | **Minimum password length** | 8 characters | Standard security baseline (NIST recommendation) |
 | **Password requirements** | No required characters | Sufficient for dev; tighten for production |
 | **Email confirmation** | OFF | Faster testing during development |
-| **Secure email change** | ON | Requires confirmation on both old and new email |
+| **Secure email change** | OFF | Simpler UX for MVP |
 | **Secure password change** | OFF | Users can change password anytime |
+| **Email OTP expiration** | 3600s (1 hour) | Supabase default |
+| **Email OTP length** | 6 digits | Supabase default |
 | **JWT access token expiry** | 3600s (1 hour) | Supabase default; good balance |
 | **Refresh token expiry** | 7 days | Supabase default; reasonable session persistence |
 | **Detect compromised tokens** | ON | Security feature enabled |
 | **Refresh token reuse interval** | 10 seconds | Supabase recommended default |
 
-### Redirect URLs (nx-monorepo-DEV and nx-monorepo-TEST)
+### Redirect URLs (nx-monorepo-DEV and nx-monorepo-STAGING)
 
 Configured redirect URLs for authentication callbacks:
 

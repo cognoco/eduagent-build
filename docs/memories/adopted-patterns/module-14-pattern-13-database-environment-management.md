@@ -6,10 +6,13 @@
 
 **Environment Files Structure:**
 ```
-.env.development.local   # Development database credentials (gitignored)
-.env.test.local          # Test database credentials (gitignored)
+.env.development.local   # DEV Supabase - for local development (gitignored)
+.env.test.local          # STAGING Supabase - loaded when NODE_ENV=test (gitignored)
 .env.example             # Template for new developers (committed)
 ```
+
+> **Naming Convention**: File names follow `NODE_ENV`, not database environment.
+> `.env.test.local` connects to STAGING because tests run with `NODE_ENV=test`.
 
 **Database Command Scripts** (`package.json`):
 ```json

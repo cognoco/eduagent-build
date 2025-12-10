@@ -94,6 +94,13 @@ Use this index to locate the authoritative artefacts that drive governance, arch
 |----------|--------|----------------|
 | `supabase.md` | Tooling | Supabase project inventory, credentials, setup guide, troubleshooting. |
 
+### Infrastructure (`docs/`)
+
+| Artifact | Domain | Purpose & Role |
+|----------|--------|----------------|
+| `environment-strategy.md` | Infrastructure | Environment architecture, platform mapping, CI database strategy. |
+| `environment-variables-matrix.md` | Infrastructure | Environment variable traceability across all platforms and environments. |
+
 ### Guides (`docs/guides/`)
 
 | Artifact | Domain | Purpose & Role |

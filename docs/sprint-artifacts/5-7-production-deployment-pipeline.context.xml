@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context Document
+  Generated: 2025-12-09
+  Story: 5-7-production-deployment-pipeline
+  Epic: 5 - CI/CD Staging & Production Deployment
+-->
+<story-context story-id="5-7" version="1.0">
+  <metadata>
+    <title>Production Deployment Pipeline</title>
+    <epic>Epic 5: CI/CD Staging & Production Deployment</epic>
+    <status>drafted</status>
+    <generated-date>2025-12-09</generated-date>
+    <dependencies>
+      <dependency story-id="5-6" status="drafted">Validate Staging Deployment</dependency>
+    </dependencies>
+  </metadata>
+
+  <story-summary>
+    <user-story>
+      As a DevOps engineer, I want a production deployment pipeline,
+      so that merges to main automatically deploy to production.
+    </user-story>
+    <acceptance-criteria>
+      <criterion id="AC1">Workflow triggers on push to main (after CI passes), deploys web and API, runs health checks</criterion>
+      <criterion id="AC2">Workflow uses GitHub production environment secrets</criterion>
+      <criterion id="AC3">Database connects to Supabase STAGING (temporary until PROD exists)</criterion>
+      <criterion id="AC4">Rollback possible via Vercel/Railway dashboard</criterion>
+    </acceptance-criteria>
+  </story-summary>
+
+  <architectural-context>
+    <deployment-strategy>
+      <trigger>Push to main branch (after CI workflow completes)</trigger>
+      <web platform="Vercel">Production deployment</web>
+      <api platform="Railway">production environment</api>
+      <database>Supabase STAGING (temporary until PROD exists)</database>
+    </deployment-strategy>
+  </architectural-context>
+
+  <technical-specifications>
+    <workflow-structure>
+      <file>.github/workflows/deploy-production.yml</file>
+      <triggers>
+        <trigger type="workflow_run">CI workflow on main, completed</trigger>
+        <trigger type="workflow_dispatch">Manual trigger</trigger>
+      </triggers>
+      <jobs>
+        <job name="deploy-web" environment="production">Deploy to Vercel production</job>
+        <job name="deploy-api" environment="production">Deploy to Railway production</job>
+        <job name="post-deploy">Health checks and notifications</job>
+      </jobs>
+    </workflow-structure>
+
+    <environment-variables>
+      <vercel>
+        <variable name="NEXT_PUBLIC_SUPABASE_URL">STAGING project URL (temporary)</variable>
+        <variable name="NEXT_PUBLIC_SUPABASE_ANON_KEY">STAGING anon key</variable>
+        <variable name="BACKEND_URL">Railway production URL</variable>
+        <variable name="SENTRY_DSN">Sentry DSN</variable>
+      </vercel>
+      <railway>
+        <variable name="DATABASE_URL">STAGING pooler connection</variable>
+        <variable name="DIRECT_URL">STAGING direct connection</variable>
+        <variable name="SUPABASE_URL">STAGING project URL</variable>
+        <variable name="SUPABASE_SERVICE_ROLE_KEY">STAGING service key</variable>
+        <variable name="NODE_ENV">production</variable>
+        <variable name="CORS_ORIGIN">Vercel production URL</variable>
+        <variable name="SENTRY_DSN_API">Sentry API DSN</variable>
+      </railway>
+    </environment-variables>
+
+    <temporary-database-strategy>
+      <note>Production uses STAGING database until Supabase PROD is created</note>
+      <migration-plan>When PROD exists, only change environment variables</migration-plan>
+    </temporary-database-strategy>
+  </technical-specifications>
+
+  <implementation-tasks>
+    <task id="1" name="Create production deployment workflow" agent="true">
+      <file>.github/workflows/deploy-production.yml</file>
+      <steps>
+        <step>Create workflow file with workflow_run trigger</step>
+        <step>Add Vercel production deployment job</step>
+        <step>Add Railway production deployment job</step>
+        <step>Add health check verification</step>
+      </steps>
+    </task>
+
+    <task id="2" name="Configure GitHub production environment" manual="true">
+      <steps>
+        <step>Create/verify production environment in GitHub</step>
+        <step>Add required secrets</step>
+        <step>Optionally configure approval gate</step>
+      </steps>
+    </task>
+
+    <task id="3" name="Configure Railway production environment" manual="true">
+      <steps>
+        <step>Create/verify production environment in Railway</step>
+        <step>Set DATABASE_URL to Supabase STAGING</step>
+        <step>Set all required environment variables</step>
+      </steps>
+    </task>
+
+    <task id="4" name="Verify Vercel production" manual="true">
+      <steps>
+        <step>Verify Vercel production settings</step>
+        <step>Set BACKEND_URL to Railway production URL</step>
+        <step>Verify environment variables</step>
+      </steps>
+    </task>
+
+    <task id="5" name="Document rollback procedures" agent="true">
+      <steps>
+        <step>Document Vercel rollback via dashboard</step>
+        <step>Document Railway rollback via dashboard</step>
+      </steps>
+    </task>
+  </implementation-tasks>
+
+  <references>
+    <doc path="docs/environment-strategy.md">Environment architecture</doc>
+    <doc path="docs/environment-variables-matrix.md">Variable traceability</doc>
+    <doc path="docs/epics.md" section="Story 5.7">Story definition</doc>
+  </references>
+</story-context>
+

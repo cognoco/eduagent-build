@@ -11,7 +11,10 @@
  * - Registering global instrumentation
  *
  * Docs: https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
+ * Sentry: https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
  */
+
+import * as Sentry from '@sentry/nextjs';
 
 export async function register() {
   // Only run on the server (Node.js runtime)
@@ -26,3 +29,18 @@ export async function register() {
     await import('./sentry.edge.config');
   }
 }
+
+/**
+ * Capture errors from React Server Components and other server-side requests.
+ *
+ * This hook is called for all server-side errors including:
+ * - React Server Component rendering errors
+ * - Route handlers
+ * - Server Actions
+ *
+ * Requires @sentry/nextjs >= 8.28.0 and Next.js 15+
+ *
+ * Docs: https://nextjs.org/docs/app/api-reference/file-conventions/instrumentation#onrequesterror-optional
+ * Sentry: https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/#errors-from-nested-react-server-components
+ */
+export const onRequestError = Sentry.captureRequestError;

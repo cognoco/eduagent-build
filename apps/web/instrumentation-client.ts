@@ -1,7 +1,14 @@
 /**
- * Sentry Client-Side Configuration
+ * Next.js Client Instrumentation File
  *
- * This configuration runs in the browser and captures:
+ * This file is automatically loaded by Next.js in the browser before the
+ * application starts. It's the recommended place to initialize client-side
+ * monitoring and instrumentation tools in Next.js 15+.
+ *
+ * This replaces the legacy sentry.client.config.ts approach for better
+ * Turbopack compatibility and follows the standard Next.js instrumentation pattern.
+ *
+ * What this captures:
  * - JavaScript runtime errors
  * - React component errors
  * - Unhandled promise rejections
@@ -11,6 +18,9 @@
  * - NEXT_PUBLIC_SENTRY_DSN: Sentry project DSN (must have NEXT_PUBLIC_ prefix)
  * - NEXT_PUBLIC_VERCEL_ENV: Vercel environment (or falls back to NODE_ENV)
  * - VERCEL_GIT_COMMIT_SHA: Git commit SHA for release tracking (optional)
+ *
+ * Docs: https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
+ * Sentry: https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
  */
 
 import * as Sentry from '@sentry/nextjs';
@@ -52,11 +62,11 @@ Sentry.init({
     // }),
   ],
 
-  // Only enable Sentry in production or when DSN is explicitly provided
-  // Prevents noise during local development without DSN configured
-  enabled:
-    process.env.NODE_ENV === 'production' ||
-    !!process.env.NEXT_PUBLIC_SENTRY_DSN,
+  // Only enable Sentry when DSN is explicitly provided
+  // This ensures Sentry doesn't run with overhead but no destination
+  // In development: disabled unless DSN is set for testing
+  // In production: disabled if DSN is missing (avoids silent failure)
+  enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
 
   // Debugging (disabled in production)
   debug: false,
@@ -67,3 +77,13 @@ Sentry.init({
   // Attach stack traces to captured messages (not just errors)
   attachStacktrace: true,
 });
+
+/**
+ * Capture client-side route transitions for performance monitoring.
+ *
+ * This hook is called when the Next.js App Router transitions between routes,
+ * allowing Sentry to track navigation performance metrics.
+ *
+ * Docs: https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
+ */
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

@@ -117,11 +117,14 @@ app.use((err, req, res, next) => {
 
 | File | Purpose |
 |------|---------|
-| `apps/web/sentry.client.config.ts` | Browser-side Sentry initialization |
+| `apps/web/instrumentation-client.ts` | Browser-side Sentry initialization (Next.js 15+ Turbopack pattern) |
 | `apps/web/sentry.server.config.ts` | Server-side Sentry initialization |
 | `apps/web/sentry.edge.config.ts` | Edge runtime Sentry initialization |
-| `apps/web/instrumentation.ts` | Next.js instrumentation hook |
+| `apps/web/instrumentation.ts` | Next.js instrumentation hook + `onRequestError` for RSC errors |
+| `apps/web/src/app/global-error.tsx` | Global error boundary for App Router |
 | `apps/web/next.config.js` | Wraps config with `withSentryConfig` |
+
+> **Note (2025-12-10):** `sentry.client.config.ts` was replaced by `instrumentation-client.ts` for Turbopack compatibility. See `docs/memories/tech-findings-log/module-22-*.md` for details.
 
 ### Next.js Config Integration
 

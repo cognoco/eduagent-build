@@ -4,8 +4,27 @@
 
 [![CI](https://github.com/jojorgen/nx-monorepo/actions/workflows/ci.yml/badge.svg)](https://github.com/jojorgen/nx-monorepo/actions/workflows/ci.yml)
 [![Deploy to Staging](https://github.com/jojorgen/nx-monorepo/actions/workflows/deploy-staging.yml/badge.svg)](https://github.com/jojorgen/nx-monorepo/actions/workflows/deploy-staging.yml)
+[![Deploy to Production](https://github.com/jojorgen/nx-monorepo/actions/workflows/deploy-production.yml/badge.svg)](https://github.com/jojorgen/nx-monorepo/actions/workflows/deploy-production.yml)
 
 A production-ready Nx monorepo template demonstrating best practices for building type-safe, full-stack applications with shared business logic across web, server, and mobile platforms.
+
+## 🚀 Live Demo
+
+### Dual Frontend Architecture (Deployment Portability Proof)
+
+| Environment | Platform | Web App | API |
+|-------------|----------|---------|-----|
+| **Production** | Vercel | [nx-monorepo-web-zwizzly.vercel.app](https://nx-monorepo-web-zwizzly.vercel.app) | [nx-monoreposerver-production.up.railway.app](https://nx-monoreposerver-production.up.railway.app/api/health) |
+| **Production** | Railway | [nx-monorepoweb-production.up.railway.app](https://nx-monorepoweb-production.up.railway.app) | (same API) |
+| **Staging** | Vercel | [nx-monorepo-web-git-e5-2-zwizzly.vercel.app](https://nx-monorepo-web-git-e5-2-zwizzly.vercel.app) | [nx-monoreposerver-staging.up.railway.app](https://nx-monoreposerver-staging.up.railway.app/api/health) |
+| **Staging** | Railway | [nx-monorepoweb-staging.up.railway.app](https://nx-monorepoweb-staging.up.railway.app) | (same API) |
+
+> **Why two frontends?** Both Vercel (native Next.js builder) and Railway (Docker container) serve the **same application**, demonstrating deployment portability. Both connect to the same backend and database.
+
+**Walking Skeleton Features:**
+- `/health` - Health check page demonstrating end-to-end connectivity (web → API → database)
+- `/api/health` - API health endpoint with database connectivity status
+- `/sentry-test` - Test page for Sentry error tracking validation
 
 ## What is this?
 
@@ -241,9 +260,11 @@ pnpm run db:generate          # Generate Prisma Client (after schema changes)
 - ❌ **Never commit .env files** - Only `.env.example` should be in git
 
 **Environment files** (gitignored):
-- `.env.development.local` - Development database credentials
-- `.env.test.local` - Test database credentials
+- `.env.development.local` - Development database credentials (DEV Supabase)
+- `.env.test.local` - Test context credentials (STAGING Supabase, loaded when `NODE_ENV=test`)
 - `.env.example` - Template for setting up new environments
+
+> **Note**: File names follow `NODE_ENV` convention, not database naming. `.env.test.local` connects to STAGING because it's loaded when running tests.
 
 **Required environment variables:**
 ```env

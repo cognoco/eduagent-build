@@ -8,8 +8,12 @@
  * - NEXT_PUBLIC_SUPABASE_ANON_KEY
  *
  * Environment file loaded depends on NODE_ENV:
- * - NODE_ENV=test → .env.test.local
- * - NODE_ENV=development → .env.development.local
+ * - NODE_ENV=test → .env.test.local (connects to STAGING Supabase)
+ * - NODE_ENV=development → .env.development.local (connects to DEV Supabase)
+ *
+ * Note: File names follow NODE_ENV convention, not database naming.
+ * The "test" in .env.test.local refers to the execution context (running tests),
+ * not the database environment (which is STAGING).
  *
  * @param workspaceRoot - Absolute path to workspace root. Callers MUST use
  *                        resolve(__dirname, '../..') to compute this from their

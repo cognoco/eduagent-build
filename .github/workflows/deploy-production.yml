@@ -1,34 +1,30 @@
 # =============================================================================
-# Staging Deployment Workflow (Railway API + Web)
+# Production Deployment Workflow (Railway API + Web)
 # =============================================================================
-# Triggers: PR to main, push to non-main branches, manual dispatch
-# Target: Railway staging environment (API and Web services)
+# Triggers: Push to main (after CI passes), manual dispatch
+# Target: Railway production environment (API and Web services)
 #
-# NOTE: Vercel ALSO handles web deployments automatically (Preview on every push).
-#       This workflow deploys BOTH API and Web to Railway staging for dual frontend.
+# NOTE: Vercel ALSO handles web deployments automatically (Production on main merge).
+#       This workflow deploys BOTH API and Web to Railway production for dual frontend.
 # =============================================================================
 #
-# SECRETS REQUIRED (configure in GitHub Settings → Environments → staging):
+# SECRETS REQUIRED (configure in GitHub Settings → Environments → production):
 #   RAILWAY_TOKEN       - Railway API token (Dashboard → Account → Tokens)
 #
-# ENVIRONMENT VARIABLES (configure in GitHub Settings → Environments → staging):
-#   STAGING_API_URL     - Railway staging server URL (e.g., https://nx-monoreposerver-staging.up.railway.app)
-#   STAGING_WEB_URL     - Railway staging web URL (e.g., https://nx-monorepoweb-staging.up.railway.app)
+# ENVIRONMENT VARIABLES (configure in GitHub Settings → Environments → production):
+#   PRODUCTION_API_URL  - Railway production server URL (e.g., https://nx-monoreposerver-production.up.railway.app)
+#   PRODUCTION_WEB_URL  - Railway production web URL (e.g., https://nx-monorepoweb-production.up.railway.app)
 #
 # =============================================================================
 
-name: Deploy to Staging (Railway API + Web)
+name: Deploy to Production (Railway API + Web)
 
 on:
-  # Trigger on PRs to main
-  pull_request:
+  # Trigger after CI workflow completes successfully on main
+  workflow_run:
+    workflows: ["CI"]
     branches: [main]
-    types: [opened, synchronize, reopened]
-
-  # Trigger on push to non-main branches
-  push:
-    branches-ignore:
-      - main
+    types: [completed]
 
   # Allow manual deployment trigger
   workflow_dispatch:
@@ -39,26 +35,49 @@ on:
         default: false
         type: boolean
 
-# Ensure only one staging deployment runs at a time
+# Ensure only one production deployment runs at a time
 concurrency:
-  group: staging-deployment-${{ github.ref }}
-  cancel-in-progress: true
+  group: production-deployment
+  cancel-in-progress: false
 
 # Required permissions for deployment status updates
 permissions:
   contents: read
   deployments: write
   statuses: write
-  pull-requests: write
 
 jobs:
   # ==========================================================================
-  # Deploy API Server to Railway Staging
+  # Gate: Only deploy if CI passed (for workflow_run trigger)
+  # ==========================================================================
+  check-ci:
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
+    steps:
+      - name: Check CI result
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+            echo "✅ Manual trigger - proceeding with production deployment"
+          elif [ "${{ github.event.workflow_run.conclusion }}" = "success" ]; then
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+            echo "✅ CI passed - proceeding with production deployment"
+          else
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+            echo "❌ CI did not pass (conclusion: ${{ github.event.workflow_run.conclusion }}) - skipping deployment"
+          fi
+
+  # ==========================================================================
+  # Deploy API Server to Railway Production
   # ==========================================================================
   deploy-api:
+    needs: check-ci
+    if: needs.check-ci.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     environment:
-      name: staging
+      name: production
       url: ${{ steps.get-url.outputs.url }}
     outputs:
       url: ${{ steps.get-url.outputs.url }}
@@ -69,35 +88,35 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Deploy to Railway Staging
+      - name: Deploy to Railway Production
         run: |
-          echo "🚀 Deploying API server to Railway staging environment..."
-          railway up --environment staging --service @nx-monorepo/server --detach
+          echo "🚀 Deploying API server to Railway production environment..."
+          railway up --environment production --service @nx-monorepo/server --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
       - name: Get Deployment URL
         id: get-url
         run: |
-          # Use configured staging URL from environment variables
-          RAILWAY_URL="${{ vars.STAGING_API_URL }}"
+          # Use configured production URL from environment variables
+          RAILWAY_URL="${{ vars.PRODUCTION_API_URL }}"
 
           if [ -z "$RAILWAY_URL" ]; then
-            echo "❌ ERROR: STAGING_API_URL not configured in GitHub environment"
-            echo "Please configure STAGING_API_URL in GitHub Settings → Environments → staging → Variables"
-            echo "Expected format: https://nx-monoreposerver-staging.up.railway.app"
+            echo "❌ ERROR: PRODUCTION_API_URL not configured in GitHub environment"
+            echo "Please configure PRODUCTION_API_URL in GitHub Settings → Environments → production → Variables"
+            echo "Expected format: https://nx-monoreposerver-production.up.railway.app"
             exit 1
           fi
 
           echo "url=$RAILWAY_URL" >> $GITHUB_OUTPUT
-          echo "📍 Staging API URL: $RAILWAY_URL"
+          echo "📍 Production API URL: $RAILWAY_URL"
 
       - name: Verify API Health Check
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_health_check != 'true' }}
         run: |
           API_URL="${{ steps.get-url.outputs.url }}"
           HEALTH_URL="${API_URL}/api/health"
-          MAX_ATTEMPTS=18
+          MAX_ATTEMPTS=24
           INTERVAL=10
           echo "🔍 Polling health at: $HEALTH_URL"
           echo "⏳ Will check every ${INTERVAL}s for up to $((MAX_ATTEMPTS * INTERVAL))s..."
@@ -107,7 +126,7 @@ jobs:
 
             if [ "$HTTP_STATUS" = "200" ]; then
               RESPONSE=$(curl -s "$HEALTH_URL" || echo "{}")
-              echo "✅ API health check passed (attempt $i/$MAX_ATTEMPTS)"
+              echo "✅ Production API health check passed (attempt $i/$MAX_ATTEMPTS)"
               echo "📊 Response: $RESPONSE"
               exit 0
             fi
@@ -124,16 +143,18 @@ jobs:
             sleep $INTERVAL
           done
 
-          echo "❌ API health check failed after $MAX_ATTEMPTS attempts ($((MAX_ATTEMPTS * INTERVAL))s timeout)"
+          echo "❌ Production API health check failed after $MAX_ATTEMPTS attempts ($((MAX_ATTEMPTS * INTERVAL))s timeout)"
           exit 1
 
   # ==========================================================================
-  # Deploy Web Frontend to Railway Staging
+  # Deploy Web Frontend to Railway Production
   # ==========================================================================
   deploy-web:
+    needs: check-ci
+    if: needs.check-ci.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     environment:
-      name: staging
+      name: production
       url: ${{ steps.get-url.outputs.url }}
     outputs:
       url: ${{ steps.get-url.outputs.url }}
@@ -144,35 +165,35 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Deploy Web to Railway Staging
+      - name: Deploy Web to Railway Production
         run: |
-          echo "🚀 Deploying web frontend to Railway staging environment..."
-          railway up --environment staging --service @nx-monorepo/web --detach
+          echo "🚀 Deploying web frontend to Railway production environment..."
+          railway up --environment production --service @nx-monorepo/web --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
       - name: Get Deployment URL
         id: get-url
         run: |
-          # Use configured staging URL from environment variables
-          RAILWAY_URL="${{ vars.STAGING_WEB_URL }}"
+          # Use configured production URL from environment variables
+          RAILWAY_URL="${{ vars.PRODUCTION_WEB_URL }}"
 
           if [ -z "$RAILWAY_URL" ]; then
-            echo "❌ ERROR: STAGING_WEB_URL not configured in GitHub environment"
-            echo "Please configure STAGING_WEB_URL in GitHub Settings → Environments → staging → Variables"
-            echo "Expected format: https://nx-monorepoweb-staging.up.railway.app"
+            echo "❌ ERROR: PRODUCTION_WEB_URL not configured in GitHub environment"
+            echo "Please configure PRODUCTION_WEB_URL in GitHub Settings → Environments → production → Variables"
+            echo "Expected format: https://nx-monorepoweb-production.up.railway.app"
             exit 1
           fi
 
           echo "url=$RAILWAY_URL" >> $GITHUB_OUTPUT
-          echo "📍 Staging Web URL: $RAILWAY_URL"
+          echo "📍 Production Web URL: $RAILWAY_URL"
 
       - name: Verify Web Health Check
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_health_check != 'true' }}
         run: |
           WEB_URL="${{ steps.get-url.outputs.url }}"
           HEALTH_URL="${WEB_URL}/health"
-          MAX_ATTEMPTS=24
+          MAX_ATTEMPTS=30
           INTERVAL=10
           echo "🔍 Polling health at: $HEALTH_URL"
           echo "⏳ Will check every ${INTERVAL}s for up to $((MAX_ATTEMPTS * INTERVAL))s..."
@@ -181,7 +202,7 @@ jobs:
             HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "$HEALTH_URL" 2>/dev/null || echo "000")
 
             if [ "$HTTP_STATUS" = "200" ]; then
-              echo "✅ Web health check passed (attempt $i/$MAX_ATTEMPTS)"
+              echo "✅ Production Web health check passed (attempt $i/$MAX_ATTEMPTS)"
               exit 0
             fi
 
@@ -197,25 +218,25 @@ jobs:
             sleep $INTERVAL
           done
 
-          echo "❌ Web health check failed after $MAX_ATTEMPTS attempts ($((MAX_ATTEMPTS * INTERVAL))s timeout)"
+          echo "❌ Production Web health check failed after $MAX_ATTEMPTS attempts ($((MAX_ATTEMPTS * INTERVAL))s timeout)"
           exit 1
 
   # ==========================================================================
   # Post-Deployment Summary
   # ==========================================================================
   deployment-summary:
-    needs: [deploy-api, deploy-web]
-    if: always()
+    needs: [check-ci, deploy-api, deploy-web]
+    if: always() && needs.check-ci.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Deployment Summary
         run: |
-          echo "# 🚀 Staging Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "# 🚀 Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Component | Status | URL |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|-----|" >> $GITHUB_STEP_SUMMARY
 
-          # Web status (Vercel auto-deploys)
+          # Web status (Vercel auto-deploys on main)
           echo "| Web (Vercel) | ✅ Auto-deployed | See Vercel dashboard |" >> $GITHUB_STEP_SUMMARY
 
           # Web status (Railway)
@@ -234,35 +255,15 @@ jobs:
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "_Note: This is a dual frontend deployment. Vercel and Railway both serve the same app._" >> $GITHUB_STEP_SUMMARY
 
-      - name: Comment on PR
-        if: github.event_name == 'pull_request' && needs.deploy-api.result == 'success' && needs.deploy-web.result == 'success'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## 🚀 Staging Deployment Ready
-
-            | Component | URL |
-            |-----------|-----|
-            | **API (Railway)** | ${{ needs.deploy-api.outputs.url }} |
-            | **Web (Railway)** | ${{ needs.deploy-web.outputs.url }} |
-            | **Web (Vercel)** | Check Vercel bot comment for Preview URL |
-
-            _Deployed from commit \`${context.sha.substring(0, 7)}\`_`
-            })
-
       - name: Check Overall Status
         if: needs.deploy-api.result != 'success' || needs.deploy-web.result != 'success'
         run: |
-          echo "❌ Staging deployment failed"
+          echo "❌ Production deployment failed"
           exit 1
+

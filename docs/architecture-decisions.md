@@ -1601,61 +1601,77 @@ TestSprite evaluation (15 frontend tests, 66.67% pass rate) demonstrated clear s
 
 ---
 
-### Decision Summary
+### Decision Summary (Updated 2025-12-08)
 
 | Aspect | Decision |
 |--------|----------|
-| **Primary Target** | Vercel (web) + Railway (API) |
-| **Secondary Target** | Railway (both web + API in containers) |
-| **Database** | Supabase TEST project for both targets |
-| **Strategy** | PoC both approaches; primary first, secondary if time permits |
+| **Architecture** | Dual Frontend (Vercel + Railway) → Single Backend (Railway) |
+| **Web Frontend 1** | Vercel (auto-deploy on push, native Next.js builder) |
+| **Web Frontend 2** | Railway (controlled via Actions, Docker container) |
+| **API Backend** | Railway (Docker container, serves both frontends) |
+| **Database** | Supabase STAGING project |
+| **Strategy** | Deploy BOTH frontends simultaneously, not choose between them |
 
 ---
 
-### Decision 1: Two-Target Deployment Strategy
+### Decision 1: Dual Frontend Deployment Architecture (Updated 2025-12-08)
 
-**Decision:** Implement **two staging deployment targets** to demonstrate deployment portability as required by PRD.
+**Decision:** Implement **dual frontend architecture** - both Vercel AND Railway host the web frontend, pointing to the same Railway backend.
 
-**Primary Target (Implement First):**
-- **Web App**: Vercel (zero-config Next.js deployment)
-- **API Server**: Railway (Docker container, long-running process)
-- **Approach**: Best-of-breed platform selection
+**Architecture:**
+```
+┌────────────────────┐     ┌────────────────────┐
+│  Vercel Frontend   │     │  Railway Frontend  │
+│  (auto-deploy)     │     │  (controlled)      │
+│  Vercel builder    │     │  Docker container  │
+└─────────┬──────────┘     └─────────┬──────────┘
+          │    Same BACKEND_URL      │
+          └────────────┬─────────────┘
+                       ▼
+            ┌──────────────────┐
+            │  Railway Backend │
+            └────────┬─────────┘
+                     ▼
+            ┌──────────────────┐
+            │ Supabase STAGING │
+            └──────────────────┘
+```
 
-**Secondary Target (Implement Second, if time permits):**
-- **Web App**: Railway (Docker container)
-- **API Server**: Railway (Docker container)
-- **Approach**: Single-platform containerized deployment
+**Key Insight:** We're NOT choosing between deployment targets - we deploy to BOTH simultaneously. This proves deployment portability more effectively than a decision gate.
 
 **Rationale:**
 
 1. **Deployment Portability Proof (PRD FR19)**
-   - Two targets prove apps can deploy to multiple platforms
+   - Two frontends prove the same app runs on different platforms
    - Validates "no vendor lock-in" architecture principle
-   - Different approaches demonstrate flexibility
+   - Demonstrates both Vercel's optimized builder AND Docker containerization
 
-2. **Primary Target Rationale (Vercel + Railway)**
-   - Vercel: Best Next.js DX (created by Vercel), preview URLs, instant rollbacks
-   - Railway: Native Docker support, no cold starts (critical for mobile dev)
-   - Fastest time-to-first-deployment (Vercel needs no Docker)
-   - Validates "best tool for each job" philosophy
+2. **Vercel Frontend Rationale**
+   - Best Next.js DX (created by Vercel), instant preview URLs
+   - Auto-deploys on every push (fast developer feedback)
+   - Edge network for global performance
 
-3. **Secondary Target Rationale (Railway + Railway)**
-   - Simpler operations (one dashboard, one billing)
-   - Pure Docker approach (production-realistic)
+3. **Railway Frontend Rationale**
+   - Pure Docker approach (production-realistic containers)
    - Validates container portability (could move to Fly.io, Render, etc.)
+   - Controlled deployments via GitHub Actions
+
+4. **Single Backend Simplicity**
+   - One API to manage, one set of environment variables
+   - Both frontends share the same data
+   - CORS configuration accepts both origins
 
 **Alternatives Considered:**
-- ❌ **Vercel for both**: Express requires serverless adaptation, cold starts
-- ❌ **Fly.io**: More complex setup, CLI-focused workflow
-- ❌ **Render**: Free tier cold starts affect mobile DX
-- ❌ **Single target only**: Doesn't prove deployment portability
+- ❌ **Choose one target**: Doesn't prove deployment portability
+- ❌ **Separate backends per frontend**: Unnecessary complexity, data sync issues
+- ❌ **Vercel for API**: Express requires serverless adaptation, cold starts
 
 **Consequences:**
-- ✅ Proves deployment portability with two distinct approaches
-- ✅ Best DX for both Next.js (Vercel) and Express (Railway)
-- ✅ No cold starts for API (critical for mobile development)
-- ✅ Docker work for primary enables secondary target
-- ⚠️ Two platforms to manage for primary target (acceptable for staging)
+- ✅ Proves deployment portability with both approaches simultaneously
+- ✅ Best DX for Vercel (auto-deploy) + Railway flexibility (controlled)
+- ✅ Single backend simplifies operations
+- ✅ CORS configuration enables both frontends
+- ⚠️ Two frontend deployments to monitor (acceptable for template demonstration)
 
 ---
 
@@ -1740,24 +1756,30 @@ app.use(cors({
 
 ---
 
-### Decision 4: Environment Strategy
+### Decision 4: Environment Strategy (Updated 2025-12-08)
 
-**Decision:** Use **Supabase TEST project** for staging (no 4th Supabase project needed)
+**Decision:** Use **Supabase STAGING project** (renamed from TEST) for staging AND temporary production.
 
 **Environment Mapping:**
 
 | Environment | Supabase Project | Hosting | Purpose |
 |-------------|------------------|---------|---------|
 | Development | DEV (`pjbnwtsufqpgsdlxydbo`) | localhost | Local development |
-| CI/Testing | TEST (`uvhnqtzufwvaqvbdgcnn`) | GitHub Actions | Automated tests |
-| **Staging** | **TEST** (`uvhnqtzufwvaqvbdgcnn`) | **Vercel + Railway** | **Demo, validation, mobile dev** |
-| Production | PROD (TBD) | TBD (Phase 2) | Live users |
+| CI/Testing | **Local PostgreSQL** | GitHub Actions | Automated tests (isolated) |
+| **Staging** | **STAGING** (`uvhnqtzufwvaqvbdgcnn`) | **Vercel Preview + Railway staging** | **Demo, validation, mobile dev** |
+| **Production** | **STAGING** (temp) → **PROD** | **Vercel Production + Railway production** | **Live system** |
+
+**Key Updates (2025-12-08):**
+1. **CI uses local PostgreSQL**, not Supabase - for test isolation, speed, and cost
+2. **Production pipeline enabled NOW** - uses STAGING database temporarily
+3. **Renamed TEST → STAGING** - clearer naming reflecting actual purpose
+4. **Full documentation** - See `docs/environment-strategy.md` and `docs/environment-variables-matrix.md`
 
 **Rationale:**
-- TEST project already isolated from DEV
-- Schema synchronized via migrations
-- Staging and CI can share database (different purposes, same schema)
-- Avoids managing 4th Supabase project
+- CI must be hermetic (parallel PRs can't conflict)
+- Production infrastructure needed for MVP (not Phase 2 deferred)
+- STAGING serves dual purpose until PROD Supabase is created
+- Easy migration: just update env vars when PROD exists
 
 **Environment Variables (Staging):**
 
@@ -1862,12 +1884,55 @@ module.exports = {
 
 ---
 
+### Story 5.10: Dual Frontend Validation Results
+
+**Validation Date:** December 10, 2025
+
+**All Frontends Validated Successfully:**
+
+| Platform | Environment | URL | Status |
+|----------|-------------|-----|--------|
+| Vercel | Staging | `nx-monorepo-web-git-e5-2-zwizzly.vercel.app` | ✅ Working |
+| Vercel | Production | `nx-monorepo-web-zwizzly.vercel.app` | ✅ Working |
+| Railway | Staging | `nx-monorepoweb-staging.up.railway.app` | ✅ Working |
+| Railway | Production | `nx-monorepoweb-production.up.railway.app` | ✅ Working |
+
+**Shared Database Verification:**
+- Records created on Vercel appear on Railway ✅
+- Records created on Railway appear on Vercel ✅
+- Both platforms share the same STAGING database ✅
+
+**Performance Comparison:**
+
+| Metric | Vercel | Railway | Notes |
+|--------|--------|---------|-------|
+| Initial page load | Fast | Fast | Both under 2s |
+| Health check API response | ~100ms | ~100ms | Same backend |
+| Record creation (Ping) | ~200ms | ~200ms | Same database |
+
+**Platform Differences (Observations):**
+- **Build system**: Vercel uses native Next.js builder; Railway uses Docker
+- **Deploy triggers**: Vercel auto-deploys on push; Railway via GitHub Actions
+- **Output artifacts**: Both produce identical functionality
+- **No functional differences detected** between platforms
+
+**Conclusion:** Dual frontend architecture successfully proves deployment portability (PRD FR19).
+
+---
+
 ### Changelog
+
+- **2025-12-10**: Story 5.10 - Dual Frontend Architecture Validation
+  - Validated: All 4 frontends (Vercel staging/prod, Railway staging/prod)
+  - Verified: Cross-platform database sync working correctly
+  - Documented: Performance comparison (no significant differences)
+  - Evidence: Screenshots and network logs captured during validation
+  - Updated: README.md with correct deployment URLs
 
 - **2025-12-04**: Epic 5 - CI/CD Staging Platform Selection
   - Decision: Two-target strategy (Vercel+Railway primary, Railway+Railway secondary)
   - Rationale: Proves deployment portability, best DX for each platform
   - Mobile compatibility: Both targets provide stable HTTPS URLs, no cold starts
-  - Environment: Supabase TEST project for staging (reuse existing)
+  - Environment: Supabase STAGING project for staging (renamed from TEST)
   - Cost: $0-10/month acceptable for staging
   - Implementation: Primary first, secondary if time permits

@@ -85,12 +85,36 @@ planning_notes:
       depends_on: 5-1  # SATISFIED
 
     - story: 5-3-configure-docker-containerization
-      notes: "READY - Context generated 2025-12-05. Partial impl exists (Dockerfiles created). Tasks 5-6 blocked (Docker unavailable in WSL)"
+      notes: "DONE - Dockerfiles created and validated"
       depends_on: 5-1  # SATISFIED
 
-    - story: 5-4-validate-staging-deployment
-      notes: "READY - Context generated 2025-12-05. Validation story - execute after 5-2 and 5-3 complete"
-      depends_on: [5-2, 5-3]
+    - story: 5-4-environment-strategy-documentation
+      notes: "IN PROGRESS - Creating environment strategy and traceability matrix"
+      depends_on: [5-1, 5-2, 5-3]
+
+    - story: 5-5-environment-infrastructure-alignment
+      notes: "READY AFTER 5-4 - Align GitHub/Railway/Vercel with strategy"
+      depends_on: 5-4
+
+    - story: 5-6-validate-staging-deployment
+      notes: "READY - Context exists. Validation story - execute after 5-5 complete"
+      depends_on: [5-2, 5-3, 5-5]
+
+    - story: 5-7-production-deployment-pipeline
+      notes: "READY AFTER 5-6 - Create production deployment workflow"
+      depends_on: 5-6
+
+    - story: 5-8-validate-production-deployment
+      notes: "READY AFTER 5-7 - Validate production environment"
+      depends_on: 5-7
+
+    - story: 5-9-configure-railway-web-frontend
+      notes: "Deploy web frontend to Railway (dual frontend architecture)"
+      depends_on: 5-8
+
+    - story: 5-10-validate-dual-frontend-architecture
+      notes: "Validate both Vercel and Railway frontends work against same backend"
+      depends_on: 5-9
 
   # Key dependency chains to understand sequencing
   dependency_chains:
@@ -108,12 +132,12 @@ planning_notes:
       parallelizable: [4-1, 4-2, 4-3]
 
     staging_deployment:
-      sequence: [5-1, 5-2, 5-3, 5-4, 5-4b]
-      notes: "Platform choice → CI/CD → Docker → Validate Primary → Decision Gate for Secondary"
+      sequence: [5-1, 5-2, 5-3, 5-4, 5-5, 5-6, 5-7, 5-8, 5-9, 5-10]
+      notes: "Platform → CI/CD → Docker → Env Strategy → Infra Alignment → Validate Staging → Prod Pipeline → Validate Prod → Railway Web → Validate Dual Frontend"
 
     mobile:
-      sequence: [6-1, 6-2, 6-3, 6-4, 6-5]
-      notes: "Generate → Configure → Implement → Validate → Document"
+      sequence: [6-1, 6-2, 6-3, 6-4, 6-5, 6-6, 6-7]
+      notes: "Generate → Configure → Implement → Validate → Document → CI/CD Integration → Validate CI/CD"
 
 # STATUS DEFINITIONS:
 # ==================
@@ -173,27 +197,34 @@ development_status:
   # Epic 4: Authentication Infrastructure Wiring
   epic-4: contexted  # Stories to be drafted 2025-12-04
   4-1-create-server-auth-middleware-structure: done  # Completed 2025-12-04
-  4-2-configure-supabase-auth-project-settings: ready-for-dev
+  4-2-configure-supabase-auth-project-settings: done  # Completed 2025-12-09
   4-3-create-web-auth-state-management-patterns: done  # Completed 2025-12-04
   4-4-validate-auth-infrastructure-readiness: done  # Completed 2025-12-04
   epic-4-retrospective: done  # Completed 2025-12-05
 
-  # Epic 5: CI/CD Staging Deployment
-  epic-5: contexted  # Stories drafted 2025-12-04
+  # Epic 5: CI/CD Staging & Production Deployment (Extended 2025-12-08)
+  epic-5: contexted  # Stories extended 2025-12-08 to include production pipeline
   5-1-select-staging-platform: done  # Completed 2025-12-04 - Two-target strategy selected
   5-2-configure-github-actions-deployment-workflow: done  # COMPLETED 2025-12-08 - Vercel + Railway working via Git integrations
   5-3-configure-docker-containerization: done  # APPROVED 2025-12-06 - All ACs verified, security reviewed, production-ready
-  5-4-validate-staging-deployment: ready-for-dev  # Context generated 2025-12-05 - Depends on 5-2, 5-3 completion
-  5-4b-secondary-target-decision-gate: drafted  # Decision gate - no context needed, executes after 5-4 validation
+  5-4-environment-strategy-documentation: done  # COMPLETED 2025-12-08 - Created docs/environment-strategy.md and docs/environment-variables-matrix.md
+  5-5-environment-infrastructure-alignment: done  # COMPLETED 2025-12-09 - GitHub/Railway/Vercel/Supabase aligned
+  5-6-validate-staging-deployment: done  # APPROVED 2025-12-10 - Senior Developer Review passed, all ACs verified
+  5-7-production-deployment-pipeline: done  # COMPLETED 2025-12-10 - Production CI/CD workflow verified
+  5-8-validate-production-deployment: done  # APPROVED 2025-12-10 - Production validated, Sentry working
+  5-9-configure-railway-web-frontend: done  # APPROVED 2025-12-10 - Railway web frontend deployed, dual frontend complete
+  5-10-validate-dual-frontend-architecture: done  # COMPLETED 2025-12-10 - All frontends validated, documentation updated
   epic-5-retrospective: optional
 
-  # Epic 6: Mobile Walking Skeleton
+  # Epic 6: Mobile Walking Skeleton (Extended 2025-12-08)
   epic-6: contexted  # Tech context completed 2025-12-05 - see epic-6-design-decisions.md
   6-1-generate-expo-mobile-application: ready-for-dev  # Context generated 2025-12-05
   6-2-configure-api-client-for-mobile: ready-for-dev  # Context generated 2025-12-05
   6-3-implement-mobile-health-check-screen: ready-for-dev  # Context generated 2025-12-05
   6-4-validate-cross-platform-sync: ready-for-dev  # Context generated 2025-12-05
   6-5-document-mobile-development-setup: ready-for-dev  # Context generated 2025-12-05
+  6-6-mobile-cicd-pipeline-integration: drafted  # NEW 2025-12-08 - Integrate mobile into CI/CD
+  6-7-validate-mobile-deployment-pipeline: drafted  # NEW 2025-12-08 - Validate mobile CI/CD
   epic-6-retrospective: optional
 
   # Epic 7: MVP Documentation

@@ -2,18 +2,21 @@
 <!--
   Story Context Document
   Generated: 2025-12-05
-  Story: 5-4-validate-staging-deployment
-  Epic: 5 - CI/CD Staging Deployment
+  Updated: 2025-12-09 (renumbered from 5-4 to 5-6)
+  Story: 5-6-validate-staging-deployment
+  Epic: 5 - CI/CD Staging & Production Deployment
 -->
-<story-context story-id="5-4" version="1.0">
+<story-context story-id="5-6" version="1.1">
   <metadata>
     <title>Validate Staging Deployment</title>
-    <epic>Epic 5: CI/CD Staging Deployment</epic>
+    <epic>Epic 5: CI/CD Staging & Production Deployment</epic>
     <status>drafted</status>
     <generated-date>2025-12-05</generated-date>
+    <updated-date>2025-12-09</updated-date>
     <dependencies>
-      <dependency story-id="5-2" status="drafted">Configure GitHub Actions Deployment Workflow</dependency>
-      <dependency story-id="5-3" status="drafted">Configure Docker Containerization</dependency>
+      <dependency story-id="5-2" status="done">Configure GitHub Actions Deployment Workflow</dependency>
+      <dependency story-id="5-3" status="done">Configure Docker Containerization</dependency>
+      <dependency story-id="5-5" status="done">Environment Infrastructure Alignment</dependency>
     </dependencies>
   </metadata>
 
@@ -23,7 +26,7 @@
       so that I can demo and validate features.
     </user-story>
     <acceptance-criteria>
-      <criterion id="AC1">Application is deployed to staging URL within 10 minutes of merge to main</criterion>
+      <criterion id="AC1">Application is deployed to staging URL within 10 minutes of PR/feature branch push (Vercel Preview + Railway staging)</criterion>
       <criterion id="AC2">Walking skeleton health check works (web /health page)</criterion>
       <criterion id="AC3">API health check endpoint responds correctly (/api/health)</criterion>
       <criterion id="AC4">Database connectivity verified (health check writes to database)</criterion>
@@ -49,9 +52,10 @@
     </decision-reference>
 
     <environment-configuration>
-      <database>Supabase TEST project (uvhnqtzufwvaqvbdgcnn)</database>
-      <purpose>Shared between CI testing and staging deployment</purpose>
-      <rationale>Avoids managing 4th Supabase project, schema synchronized via migrations</rationale>
+      <database>Supabase STAGING project (uvhnqtzufwvaqvbdgcnn)</database>
+      <purpose>Staging deployments and local integration tests</purpose>
+      <rationale>CI uses local PostgreSQL for isolation; STAGING validates infrastructure</rationale>
+      <note>Merges to main trigger PRODUCTION deployment (Story 5.7), not staging</note>
     </environment-configuration>
   </architectural-context>
 
@@ -350,7 +354,9 @@
 
   <references>
     <doc path="docs/architecture-decisions.md" section="Epic 5">Deployment platform decisions</doc>
-    <doc path="docs/epics.md" section="Story 5.4">Story definition and acceptance criteria</doc>
+    <doc path="docs/epics.md" section="Story 5.6">Story definition and acceptance criteria</doc>
+    <doc path="docs/environment-strategy.md">Environment architecture and CI database strategy</doc>
+    <doc path="docs/environment-variables-matrix.md">Environment variable traceability</doc>
     <doc path=".github/workflows/deploy-staging.yml" note="Created in Story 5-2">Deployment workflow</doc>
     <doc path="apps/server/src/routes/health.ts">Health check endpoint implementation</doc>
     <doc path="apps/web/src/app/health/page.tsx">Health page implementation</doc>

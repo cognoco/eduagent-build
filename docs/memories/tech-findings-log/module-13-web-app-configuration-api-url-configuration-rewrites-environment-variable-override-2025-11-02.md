@@ -144,6 +144,43 @@ curl http://localhost:3000/api/health  # Should call server directly
 - CORS errors in development → Missing rewrites configuration
 - Hardcoded localhost URLs → Missing environment variable override pattern
 - "API not found" after deployment → No NEXT_PUBLIC_API_URL set in production
+- **CORS errors in Vercel production** → `NEXT_PUBLIC_API_URL` set to direct backend URL (see below)
+
+---
+
+## **Critical: Vercel Deployment Configuration (2025-12-09)**
+
+**Finding:** When deploying to Vercel with a separate backend (e.g., Railway), `NEXT_PUBLIC_API_URL` must be `/api`, NOT the backend URL directly.
+
+**Problem Discovered:**
+- `NEXT_PUBLIC_API_URL=https://nx-monoreposerver-production.up.railway.app` ❌
+- Browser tries to fetch directly from Railway
+- CORS policy blocks the request (no `Access-Control-Allow-Origin` header)
+- Result: "Loading health checks..." indefinitely, API calls silently fail
+
+**Correct Configuration:**
+- `NEXT_PUBLIC_API_URL=/api` ✅
+- `BACKEND_URL=https://nx-monoreposerver-production.up.railway.app` ✅
+- Browser fetches from `/api/*` (same-origin, no CORS)
+- Next.js rewrites forward to Railway via `BACKEND_URL` (server-side)
+
+**Why Two Variables?**
+| Variable | Runs Where | Purpose |
+|----------|------------|---------|
+| `NEXT_PUBLIC_API_URL` | Client (browser) | Where client code makes fetch requests |
+| `BACKEND_URL` | Server (Next.js) | Where rewrites proxy those requests to |
+
+**Vercel Environment Variables:**
+```bash
+# Both Preview (staging) and Production
+NEXT_PUBLIC_API_URL=/api                          # Client uses same-origin proxy
+BACKEND_URL=https://your-railway-url.railway.app  # Server proxies to Railway
+```
+
+**Warning Signs:**
+- Console shows: `Access to fetch at '...' blocked by CORS policy`
+- Page shows loading state indefinitely
+- Network tab shows failed requests to backend URL directly
 
 **References:**
 - Next.js Rewrites: https://nextjs.org/docs/app/api-reference/next-config-js/rewrites

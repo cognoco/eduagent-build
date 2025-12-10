@@ -95,7 +95,7 @@ This document provides the complete epic and story breakdown for the AI-Native N
 | Epic 2: E2E Testing & Quality Gates | FR13, FR14, FR15 | MVP |
 | Epic 3: Observability Baseline | FR17 | MVP |
 | Epic 4: Authentication Infrastructure | FR10 (completion) | MVP |
-| Epic 5: CI/CD Staging Deployment | FR16, FR18 | MVP |
+| Epic 5: CI/CD Staging & Production Deployment | FR16, FR18, FR19 | MVP |
 | Epic 6: Mobile Walking Skeleton | FR20, FR21, FR22 | MVP |
 | Epic 7: MVP Documentation | FR5 | MVP |
 | Epic 8: Task Data Model & CRUD | FR23, FR25 | PoC |
@@ -505,19 +505,38 @@ So that authentication work can proceed without infrastructure blockers.
 
 ---
 
-## Epic 5: CI/CD Staging Deployment
+## Epic 5: CI/CD Multi-Platform Deployment
 
-**User Value Statement:** Code merged to main automatically deploys to an accessible staging environment, enabling continuous validation and stakeholder demos.
+**User Value Statement:** Code changes automatically deploy to multiple platforms, demonstrating deployment portability with dual frontend architecture (Vercel + Railway) pointing to a single Railway backend.
 
-**PRD Coverage:** FR16, FR18
+**PRD Coverage:** FR16, FR18, FR19
 
 **Technical Context from Architecture:**
-- GitHub Actions for CI/CD
-- Docker containerization for consistent deployment
-- Staging environment with secrets management
+- **Dual Frontend Architecture**: Both Vercel AND Railway host the web frontend, both pointing to the same Railway backend
+- **Hybrid Deployment Triggers**: Vercel auto-deploys on push; Railway controlled via GitHub Actions
+- **Single Backend**: Railway hosts the Express API for both frontends
+- Environment strategy documentation and traceability
 - Health check endpoints for deployment validation
 
-**Dependencies:** Epic 1 complete, Epic 3 recommended (observability for staging)
+**Architecture:**
+```
+┌────────────────────┐     ┌────────────────────┐
+│  Vercel Frontend   │     │  Railway Frontend  │
+│  (auto-deploy)     │     │  (controlled)      │
+└─────────┬──────────┘     └─────────┬──────────┘
+          │    Same BACKEND_URL      │
+          └────────────┬─────────────┘
+                       ▼
+            ┌──────────────────┐
+            │  Railway Backend │
+            └────────┬─────────┘
+                     ▼
+            ┌──────────────────┐
+            │ Supabase STAGING │
+            └──────────────────┘
+```
+
+**Dependencies:** Epic 1 complete, Epic 3 recommended (observability for staging/production)
 
 ### Story 5.1: Select Staging Platform
 
@@ -596,7 +615,65 @@ So that deployments are consistent and portable.
 
 ---
 
-### Story 5.4: Validate Staging Deployment
+### Story 5.4: Environment Strategy Documentation
+
+As a DevOps engineer,
+I want a formal environment strategy document,
+So that all deployment environments are clearly defined and traceable.
+
+**Acceptance Criteria:**
+
+**Given** the project has multiple deployment targets (local, staging, production)
+**When** I create the environment strategy document
+**Then** documentation covers:
+  - Environment architecture (local dev → staging → production)
+  - Platform mapping (Vercel, Railway, Supabase per environment)
+  - Environment variable matrix (all vars, all platforms, all environments)
+  - CI database strategy (local Postgres vs Supabase)
+  - Naming conventions (staging vs preview)
+
+**And** document is in `docs/environment-strategy.md`
+**And** traceability matrix is in `docs/environment-variables-matrix.md`
+
+**Prerequisites:** Stories 5.1, 5.2, 5.3 complete
+
+**Technical Notes:**
+- Formalizes decisions made during Stories 5.1-5.3
+- Enables consistent environment management across platforms
+- Reference for future infrastructure work
+
+---
+
+### Story 5.5: Environment Infrastructure Alignment
+
+As a DevOps engineer,
+I want infrastructure aligned with the environment strategy,
+So that all platforms match our documented architecture.
+
+**Acceptance Criteria:**
+
+**Given** environment strategy is documented
+**When** I align infrastructure
+**Then** the following are configured:
+  - GitHub environments: `staging`, `production` (cruft removed)
+  - Railway environments: `staging`, `production`
+  - Vercel: Preview (staging) and Production configured
+  - Supabase: DEV renamed if needed, STAGING (was TEST), PROD (future)
+
+**And** GitHub secrets are in correct environments
+**And** deploy workflows reference correct environments
+
+**Prerequisites:** Story 5.4 complete
+
+**Technical Notes:**
+- Delete unused auto-created GitHub environments (Railway placeholders, empty environments)
+- Keep Vercel status-tracking environments (`nx-monorepo / staging`, `nx-monorepo / production`) - they are separate from our secret-holding environments
+- Create proper environment protection rules
+- Update workflow files to match environment naming
+
+---
+
+### Story 5.6: Validate Staging Deployment
 
 As a stakeholder,
 I want to verify the staging environment works correctly,
@@ -604,8 +681,8 @@ So that I can demo and validate features.
 
 **Acceptance Criteria:**
 
-**Given** staging deployment is configured
-**When** a change is merged to main
+**Given** staging deployment is configured (Stories 5.2, 5.3, 5.5)
+**When** a PR is created or non-main branch is pushed
 **Then** within 10 minutes:
   - Application is deployed to staging URL
   - Walking skeleton health check works
@@ -614,12 +691,124 @@ So that I can demo and validate features.
 **And** staging URL is documented in README
 **And** environment-specific configuration is correct (API URLs, etc.)
 
-**Prerequisites:** Stories 5.2, 5.3 complete
+**Prerequisites:** Stories 5.2, 5.3, 5.5 complete
 
 **Technical Notes:**
 - Manual validation checklist
 - Document any staging-specific quirks
-- Verify database connectivity (staging may use same Supabase or separate)
+- Verify database connectivity to Supabase STAGING
+
+---
+
+### Story 5.7: Production Deployment Pipeline
+
+As a DevOps engineer,
+I want a production deployment pipeline,
+So that merges to main automatically deploy to production.
+
+**Acceptance Criteria:**
+
+**Given** staging deployment is validated
+**When** I configure production deployment workflow
+**Then** the workflow:
+  - Triggers on push to main branch (after CI passes)
+  - Deploys web to Vercel production
+  - Deploys API to Railway production environment
+  - Runs health checks after deployment
+  - Reports deployment status
+
+**And** workflow uses GitHub `production` environment secrets
+**And** database points to Supabase STAGING (temporary until PROD exists)
+**And** rollback is possible via Vercel/Railway dashboard
+
+**Prerequisites:** Story 5.6 complete
+
+**Technical Notes:**
+- Create `deploy-production.yml` workflow (separate from staging)
+- Configure environment protection rules (approval if desired)
+- Document temporary STAGING→PROD database mapping
+
+---
+
+### Story 5.8: Validate Production Deployment
+
+As a stakeholder,
+I want to verify the production environment works correctly,
+So that I have confidence in the full CI/CD pipeline.
+
+**Acceptance Criteria:**
+
+**Given** production deployment is configured
+**When** a PR is merged to main
+**Then** within 10 minutes:
+  - Application is deployed to production URL
+  - Walking skeleton health check works
+  - Observability captures production events
+
+**And** production URLs are documented in README
+**And** deployment badge shows status
+
+**Prerequisites:** Story 5.7 complete
+
+**Technical Notes:**
+- Execute full validation checklist
+- Document any production-specific quirks
+- Verify end-to-end flow: web → API → database
+
+---
+
+### Story 5.9: Configure Railway Web Frontend
+
+As a DevOps engineer,
+I want the web frontend deployed to Railway,
+So that we demonstrate dual frontend architecture with deployment portability.
+
+**Acceptance Criteria:**
+
+**Given** Vercel frontend is validated (Story 5.8)
+**When** I deploy the web frontend to Railway
+**Then**:
+  - Railway web service uses `apps/web/Dockerfile`
+  - Environment variables point to same Railway backend
+  - CORS on backend accepts both Vercel and Railway origins
+
+**And** both frontends (Vercel + Railway) can access the same API
+**And** deployment workflow updated for Railway web
+
+**Prerequisites:** Story 5.8 complete, `apps/web/Dockerfile` exists
+
+**Technical Notes:**
+- Uses existing Docker standalone output (`output: 'standalone'` in next.config.js)
+- Both frontends use same `BACKEND_URL` pointing to Railway API
+- Backend CORS must include both frontend origins
+- No code changes to frontend - just deployment configuration
+
+---
+
+### Story 5.10: Validate Dual Frontend Architecture
+
+As a stakeholder,
+I want to verify both frontends work correctly,
+So that I have confidence in deployment portability.
+
+**Acceptance Criteria:**
+
+**Given** both frontends are deployed (Vercel + Railway)
+**When** I test each frontend
+**Then**:
+  - Vercel frontend: health check works end-to-end
+  - Railway frontend: health check works end-to-end
+  - Both create records in same database
+
+**And** documentation includes both frontend URLs
+**And** architecture decision updated to reflect dual frontend (not two-target choice)
+
+**Prerequisites:** Story 5.9 complete
+
+**Technical Notes:**
+- Manual validation of both paths
+- Document any differences in performance or behavior
+- Update README with both staging URLs
 
 ---
 
@@ -778,6 +967,60 @@ So that I can get started quickly.
 - Include common troubleshooting
 - Document Expo Go vs dev client
 - Reference Supabase mobile auth patterns (for Phase 2)
+
+---
+
+### Story 6.6: Mobile CI/CD Pipeline Integration
+
+As a DevOps engineer,
+I want the mobile app integrated into the CI/CD pipeline,
+So that mobile builds and tests run automatically.
+
+**Acceptance Criteria:**
+
+**Given** mobile app is generated and working locally
+**When** I configure CI/CD for mobile
+**Then** the following run on PR/push:
+  - Mobile lint: `pnpm exec nx run mobile:lint`
+  - Mobile test: `pnpm exec nx run mobile:test`
+  - Mobile type check: included in typecheck target
+
+**And** CI workflow is updated to include mobile targets
+**And** EAS Build is configured for preview builds (optional)
+**And** mobile-specific secrets are documented
+
+**Prerequisites:** Stories 6.1-6.4 complete, Epic 5 CI/CD infrastructure
+
+**Technical Notes:**
+- Update `.github/workflows/ci.yml` with mobile targets
+- Consider EAS Build for actual mobile builds (staging/production)
+- Document Expo credentials management
+- Mobile doesn't need separate deployment workflow (EAS handles it)
+
+---
+
+### Story 6.7: Validate Mobile Deployment Pipeline
+
+As a stakeholder,
+I want to verify mobile CI/CD works correctly,
+So that mobile app quality is maintained automatically.
+
+**Acceptance Criteria:**
+
+**Given** mobile CI/CD is configured
+**When** a PR touches mobile code
+**Then** mobile lint, test, and typecheck run automatically
+
+**And** failures block PR merge
+**And** EAS Build can be triggered manually or automatically (if configured)
+**And** mobile CI is documented in README or docs
+
+**Prerequisites:** Story 6.6 complete
+
+**Technical Notes:**
+- Manual validation of CI pipeline
+- Test with intentional lint/test failure
+- Document EAS Build workflow if configured
 
 ---
 
@@ -1855,10 +2098,10 @@ So that we're ready for real user traffic.
 |------|-------|-------|---------|--------|
 | 1 | Foundation & Walking Skeleton | MVP | - | ✅ Complete |
 | 2 | E2E Testing & Quality Gates | MVP | 4 | Pending |
-| 3 | Observability Baseline | MVP | 4 | Pending |
-| 4 | Authentication Infrastructure | MVP | 4 | Pending |
-| 5 | CI/CD Staging Deployment | MVP | 4 | Pending |
-| 6 | Mobile Walking Skeleton | MVP | 5 | Pending |
+| 3 | Observability Baseline | MVP | 4 | ✅ Complete |
+| 4 | Authentication Infrastructure | MVP | 4 | ✅ Complete |
+| 5 | CI/CD Multi-Platform Deployment | MVP | 10 | In Progress |
+| 6 | Mobile Walking Skeleton | MVP | 7 | Pending |
 | 7 | MVP Documentation | MVP | 4 | Pending |
 | 8 | Task Data Model & CRUD | PoC | 5 | Pending |
 | 9 | User Authentication Flows | PoC | 5 | Pending |
@@ -1870,9 +2113,9 @@ So that we're ready for real user traffic.
 
 ### Totals
 
-- **Phase 1 MVP:** 7 Epics, 25 Stories (Epic 1 complete, 24 remaining)
+- **Phase 1 MVP:** 7 Epics, 33 Stories (Epics 1, 3, 4 complete; Epic 5 in progress)
 - **Phase 2 PoC:** 7 Epics, 30 Stories
-- **Total:** 14 Epics, 55 Stories
+- **Total:** 14 Epics, 63 Stories
 
 ### Key Milestones
 

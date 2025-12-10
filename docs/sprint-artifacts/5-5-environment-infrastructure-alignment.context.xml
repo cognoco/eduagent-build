@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context Document
+  Generated: 2025-12-09
+  Story: 5-5-environment-infrastructure-alignment
+  Epic: 5 - CI/CD Staging & Production Deployment
+-->
+<story-context story-id="5-5" version="1.0">
+  <metadata>
+    <title>Environment Infrastructure Alignment</title>
+    <epic>Epic 5: CI/CD Staging & Production Deployment</epic>
+    <status>drafted</status>
+    <generated-date>2025-12-09</generated-date>
+    <dependencies>
+      <dependency story-id="5-4" status="done">Environment Strategy Documentation</dependency>
+    </dependencies>
+  </metadata>
+
+  <story-summary>
+    <user-story>
+      As a DevOps engineer, I want infrastructure aligned with the environment strategy,
+      so that all platforms match our documented architecture.
+    </user-story>
+    <acceptance-criteria>
+      <criterion id="AC1">GitHub environments configured: staging and production with correct secrets</criterion>
+      <criterion id="AC2">Railway environments configured: staging and production with variables</criterion>
+      <criterion id="AC3">Vercel configuration verified: Preview auto-deploy, Production for main</criterion>
+      <criterion id="AC4">Deployment workflows implement hybrid trigger approach</criterion>
+      <criterion id="AC5">Supabase project renamed from TEST to STAGING</criterion>
+    </acceptance-criteria>
+  </story-summary>
+
+  <architectural-context>
+    <decision-reference doc="docs/environment-strategy.md">
+      <summary>Formal environment architecture for the nx-monorepo template</summary>
+      <environments>
+        <environment name="Local Dev" database="Supabase DEV" config=".env.development.local"/>
+        <environment name="CI Testing" database="Local PostgreSQL" config="workflow inline"/>
+        <environment name="Staging" database="Supabase STAGING" trigger="PR/feature branch"/>
+        <environment name="Production" database="Supabase STAGING (temp)" trigger="merge to main"/>
+      </environments>
+    </decision-reference>
+
+    <hybrid-deployment-approach>
+      <platform name="Vercel">
+        <trigger>Auto-deploy on every push (platform default)</trigger>
+        <control>Vercel platform</control>
+        <benefit>Instant preview URLs, fast feedback</benefit>
+      </platform>
+      <platform name="Railway">
+        <trigger>Controlled deployment via GitHub Actions</trigger>
+        <control>GitHub Actions with workflow_dispatch</control>
+        <benefit>More control, avoid unnecessary deployments</benefit>
+      </platform>
+    </hybrid-deployment-approach>
+  </architectural-context>
+
+  <technical-specifications>
+    <github-environments>
+      <environment name="staging">
+        <secrets>
+          <secret name="VERCEL_TOKEN"/>
+          <secret name="VERCEL_ORG_ID"/>
+          <secret name="VERCEL_PROJECT_ID"/>
+          <secret name="RAILWAY_TOKEN"/>
+        </secrets>
+        <protection-rules>None (auto-deploy)</protection-rules>
+      </environment>
+      <environment name="production">
+        <secrets>
+          <secret name="VERCEL_TOKEN" note="can share with staging"/>
+          <secret name="VERCEL_ORG_ID" note="can share with staging"/>
+          <secret name="VERCEL_PROJECT_ID" note="can share with staging"/>
+          <secret name="RAILWAY_TOKEN" note="can share - different env in Railway"/>
+        </secrets>
+        <protection-rules>Optional approval gate</protection-rules>
+      </environment>
+      <cleanup>
+        <delete status="done">Preview (Vercel auto-created placeholder)</delete>
+        <delete status="done">Production (empty placeholder)</delete>
+        <delete status="done">@nx-monorepo/server (nx-monorepo / production) - Railway auto-created</delete>
+        <delete status="done">@nx-monorepo/web (nx-monorepo / production) - Railway auto-created</delete>
+        <delete status="done">@nx-monorepo/web-e2e (nx-monorepo / production) - Railway auto-created</delete>
+        <keep reason="Vercel status tracking">nx-monorepo / staging - Vercel auto-creates for PR status</keep>
+        <keep reason="Vercel status tracking">nx-monorepo / production - Vercel auto-creates for main status</keep>
+        <note>Vercel automatically recreates its status-tracking environments. These are separate from our secret-holding environments and should be left alone.</note>
+      </cleanup>
+    </github-environments>
+
+    <railway-environments>
+      <environment name="staging">
+        <variables>
+          <variable name="DATABASE_URL">Supabase STAGING connection pooler</variable>
+          <variable name="DIRECT_URL">Supabase STAGING direct connection</variable>
+          <variable name="SUPABASE_URL">Supabase STAGING URL</variable>
+          <variable name="SUPABASE_SERVICE_ROLE_KEY">STAGING service key</variable>
+          <variable name="NODE_ENV">production</variable>
+          <variable name="CORS_ORIGIN">staging web URL</variable>
+          <variable name="SENTRY_DSN_API">Sentry DSN</variable>
+        </variables>
+        <auto-deploy>Disabled (controlled via Actions)</auto-deploy>
+      </environment>
+      <environment name="production">
+        <variables>Same as staging with production URLs</variables>
+        <auto-deploy>Disabled (controlled via Actions)</auto-deploy>
+      </environment>
+    </railway-environments>
+
+    <vercel-configuration>
+      <preview>
+        <auto-deploy>Enabled (default behavior)</auto-deploy>
+        <trigger>Every push to non-production branches</trigger>
+      </preview>
+      <production>
+        <auto-deploy>Enabled for main branch</auto-deploy>
+        <variables>
+          <variable name="NEXT_PUBLIC_SUPABASE_URL">STAGING project URL</variable>
+          <variable name="NEXT_PUBLIC_SUPABASE_ANON_KEY">STAGING anon key</variable>
+          <variable name="BACKEND_URL">Railway API URL</variable>
+        </variables>
+      </production>
+    </vercel-configuration>
+
+    <supabase-rename>
+      <current-name>nx-monorepo-TEST</current-name>
+      <new-name>nx-monorepo-STAGING</new-name>
+      <project-ref>uvhnqtzufwvaqvbdgcnn</project-ref>
+      <note>Project ref does not change, only display name</note>
+    </supabase-rename>
+  </technical-specifications>
+
+  <implementation-tasks>
+    <task id="1" name="Clean up GitHub environments" manual="true">
+      <steps>
+        <step>Go to GitHub repo Settings → Environments</step>
+        <step>Delete unused environments (Preview, Production placeholders, Railway auto-created)</step>
+        <step>Verify staging environment has correct secrets</step>
+        <step>Create production environment with same secrets</step>
+        <step>Optionally configure production approval gate</step>
+      </steps>
+    </task>
+
+    <task id="2" name="Align Railway environments" manual="true">
+      <steps>
+        <step>Go to Railway dashboard</step>
+        <step>Verify/create staging environment</step>
+        <step>Verify/create production environment</step>
+        <step>Set environment variables for each</step>
+        <step>Disable auto-deploy (controlled via Actions)</step>
+      </steps>
+    </task>
+
+    <task id="3" name="Verify Vercel configuration" manual="true">
+      <steps>
+        <step>Go to Vercel dashboard</step>
+        <step>Verify Preview auto-deploy is enabled</step>
+        <step>Verify Production deployment is enabled for main</step>
+        <step>Set environment variables for Preview and Production</step>
+      </steps>
+    </task>
+
+    <task id="4" name="Update deployment workflows" agent="true">
+      <steps>
+        <step>Update deploy-staging.yml - Railway only (Vercel auto-deploys)</step>
+        <step>Add workflow_dispatch for manual Railway staging deployment</step>
+        <step>Create deploy-production.yml for production deployments</step>
+        <step>Verify Railway deployments only trigger via Actions</step>
+      </steps>
+    </task>
+
+    <task id="5" name="Rename Supabase project" manual="true" required="true">
+      <steps>
+        <step>Go to Supabase dashboard</step>
+        <step>Navigate to project uvhnqtzufwvaqvbdgcnn</step>
+        <step>Go to Settings → General</step>
+        <step>Rename from nx-monorepo-TEST to nx-monorepo-STAGING</step>
+      </steps>
+    </task>
+  </implementation-tasks>
+
+  <validation-checklist>
+    <section name="GitHub Environments">
+      <item id="V1">Our environments exist: staging and production (for secrets)</item>
+      <item id="V2">staging has VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID, RAILWAY_TOKEN</item>
+      <item id="V3">production has same secrets</item>
+      <item id="V4">Unused environments deleted (Railway auto-created, empty placeholders)</item>
+      <item id="V4b">Vercel status-tracking environments left intact (nx-monorepo / staging, nx-monorepo / production)</item>
+    </section>
+
+    <section name="Railway">
+      <item id="V5">staging environment exists with correct variables</item>
+      <item id="V6">production environment exists with correct variables</item>
+      <item id="V7">Auto-deploy is disabled</item>
+    </section>
+
+    <section name="Vercel">
+      <item id="V8">Preview deployments auto-trigger on push</item>
+      <item id="V9">Production deployment works for main</item>
+      <item id="V10">Environment variables set correctly</item>
+    </section>
+
+    <section name="Workflows">
+      <item id="V11">deploy-staging.yml triggers Railway staging deployment</item>
+      <item id="V12">deploy-production.yml exists and uses production environment</item>
+      <item id="V13">workflow_dispatch available for manual triggers</item>
+    </section>
+
+    <section name="Supabase">
+      <item id="V14">Project renamed to nx-monorepo-STAGING</item>
+    </section>
+  </validation-checklist>
+
+  <references>
+    <doc path="docs/environment-strategy.md">Environment architecture document</doc>
+    <doc path="docs/environment-variables-matrix.md">Variable traceability matrix</doc>
+    <doc path="docs/architecture-decisions.md" section="Epic 5">Platform selection rationale</doc>
+    <doc path=".github/workflows/deploy-staging.yml">Staging deployment workflow</doc>
+  </references>
+</story-context>
+

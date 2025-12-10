@@ -1,6 +1,6 @@
 # Story 4.2: Configure Supabase Auth Project Settings
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -31,48 +31,48 @@ So that **authentication is ready for user implementation in Phase 2**.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Access Supabase Auth Settings** (AC: #1)
-  - [ ] Navigate to Supabase Dashboard → Authentication → Settings
-  - [ ] Review current authentication provider settings
-  - [ ] Document initial state before changes
+- [x] **Task 1: Access Supabase Auth Settings** (AC: #1)
+  - [x] Navigate to Supabase Dashboard → Authentication → Settings
+  - [x] Review current authentication provider settings
+  - [x] Document initial state before changes
 
-- [ ] **Task 2: Enable Email/Password Authentication** (AC: #1)
-  - [ ] Verify Email provider is enabled
-  - [ ] Configure password requirements (minimum length, complexity)
-  - [ ] Document chosen password policy
+- [x] **Task 2: Enable Email/Password Authentication** (AC: #1)
+  - [x] Verify Email provider is enabled
+  - [x] Configure password requirements (minimum length, complexity)
+  - [x] Document chosen password policy
 
-- [ ] **Task 3: Configure Email Confirmation** (AC: #2)
-  - [ ] Decide: Enable or disable email confirmation for MVP
-  - [ ] If disabled for dev: Document security implications
-  - [ ] If enabled: Configure email templates (use Supabase defaults)
-  - [ ] Document decision rationale
+- [x] **Task 3: Configure Email Confirmation** (AC: #2)
+  - [x] Decide: Enable or disable email confirmation for MVP
+  - [x] If disabled for dev: Document security implications
+  - [x] If enabled: Configure email templates (use Supabase defaults)
+  - [x] Document decision rationale
 
-- [ ] **Task 4: Configure JWT Settings** (AC: #2)
-  - [ ] Review JWT expiration defaults
-  - [ ] Set appropriate token expiration (recommended: 1 hour access, 7 days refresh)
-  - [ ] Document JWT configuration
+- [x] **Task 4: Configure JWT Settings** (AC: #2)
+  - [x] Review JWT expiration defaults
+  - [x] Set appropriate token expiration (recommended: 1 hour access, 7 days refresh)
+  - [x] Document JWT configuration
 
-- [ ] **Task 5: Configure Redirect URLs** (AC: #2)
-  - [ ] Add localhost redirect URLs for development:
+- [x] **Task 5: Configure Redirect URLs** (AC: #2)
+  - [x] Add localhost redirect URLs for development:
     - `http://localhost:3000/**` (web dev)
     - `http://localhost:4200/**` (alternative port)
-  - [ ] Add placeholder for staging URL (update when staging deployed)
-  - [ ] Document redirect URL patterns
+  - [x] Add placeholder for staging URL (update when staging deployed)
+  - [x] Document redirect URL patterns
 
-- [ ] **Task 6: Document Provider Configuration** (AC: #4)
-  - [ ] Note how to enable OAuth providers (Google, GitHub) for future
-  - [ ] Document required environment variables per provider
-  - [ ] Create provider enablement checklist
+- [x] **Task 6: Document Provider Configuration** (AC: #4)
+  - [x] Note how to enable OAuth providers (Google, GitHub) for future
+  - [x] Document required environment variables per provider
+  - [x] Create provider enablement checklist
 
-- [ ] **Task 7: Update environment-setup.md** (AC: #3)
-  - [ ] Add "Supabase Auth Configuration" section to `docs/environment-setup.md`
-  - [ ] Document all settings with screenshots or configuration values
-  - [ ] Include troubleshooting tips for common auth issues
+- [x] **Task 7: Update environment-setup.md** (AC: #3)
+  - [x] Add "Supabase Auth Configuration" section to `docs/environment-setup.md`
+  - [x] Document all settings with screenshots or configuration values
+  - [x] Include troubleshooting tips for common auth issues
 
-- [ ] **Task 8: Document RLS Interaction** (AC: #4)
-  - [ ] Note which RLS policies interact with `auth.uid()`
-  - [ ] Document how auth context flows to database policies
-  - [ ] Reference security architecture from architecture.md
+- [x] **Task 8: Document RLS Interaction** (AC: #4)
+  - [x] Note which RLS policies interact with `auth.uid()`
+  - [x] Document how auth context flows to database policies
+  - [x] Reference security architecture from architecture.md
 
 ## Dev Notes
 
@@ -139,11 +139,17 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-key (server only)
 
 ### Completion Notes List
 
-<!-- To be filled after implementation -->
+- 2025-12-09: Configured both DEV and STAGING Supabase projects
+- Email confirmation OFF for both (faster testing)
+- Password min 8 chars, no complexity requirements
+- Refresh token detection enabled
+- JWT defaults accepted (1hr access, 7d refresh)
+- Redirect URLs configured for localhost:3000-3003
+- Documentation already existed in environment-setup.md, updated for accuracy
 
 ### File List
 
-<!-- To be filled after implementation -->
+- `docs/guides/environment-setup.md` - Updated auth configuration section
 
 ---
 

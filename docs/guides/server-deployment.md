@@ -1,8 +1,8 @@
 ---
 title: Server Deployment Guide
-purpose: Comprehensive guide for deploying the Express API server application
+purpose: Comprehensive guide for deploying the Express API server and web frontend applications
 audience: DevOps engineers, developers deploying to production
-last-updated: 2025-12-08
+last-updated: 2025-12-10
 ---
 
 # Server Deployment Guide
@@ -470,6 +470,104 @@ Example: `https://nx-monoreposerver-production.up.railway.app`
 **Connection refused:**
 - Server must bind to `HOST=0.0.0.0`
 - Check `PORT` environment variable is being used
+
+---
+
+## Railway Web Frontend Deployment
+
+In addition to the API server, we also deploy the Next.js web application to Railway as a **secondary frontend** (Vercel is primary).
+
+### Why Dual Frontend?
+
+| Platform | Purpose | Build Method |
+|----------|---------|--------------|
+| **Vercel** | Primary frontend (auto-preview, fast) | Vercel native builder |
+| **Railway** | Secondary frontend (deployment portability) | Docker (`apps/web/Dockerfile`) |
+
+This demonstrates that the same application can be deployed to different platforms without code changes.
+
+### Configuration File
+
+Create `apps/web/railway.json`:
+
+```json
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "apps/web/Dockerfile"
+  },
+  "deploy": {
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 120,
+    "restartPolicyMaxRetries": 3
+  }
+}
+```
+
+**Important:** If you have a root `railway.json`, move it to `apps/server/railway.json` to avoid config conflicts.
+
+### Environment Variables (Railway Dashboard)
+
+| Variable | Required | Value | Notes |
+|----------|----------|-------|-------|
+| `NEXT_PUBLIC_API_URL` | ✅ | `/api` | **MUST be `/api`** - not the server URL! |
+| `BACKEND_URL` | ✅ | `https://nx-monoreposerver-[env].up.railway.app` | Target for Next.js rewrites |
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | `https://xxx.supabase.co` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | `eyJ...` | Supabase anonymous key |
+| `NEXT_PUBLIC_SENTRY_DSN` | — | `https://...` | Sentry DSN (optional) |
+
+### Critical: Build-Time vs Runtime Variables
+
+**Next.js bakes `NEXT_PUBLIC_*` and rewrite configuration at build time**, not runtime.
+
+For Docker builds, `BACKEND_URL` must be passed as a build ARG:
+
+```dockerfile
+# apps/web/Dockerfile (required section)
+ARG BACKEND_URL
+ENV BACKEND_URL=$BACKEND_URL
+```
+
+Railway automatically passes environment variables as build ARGs for `NEXT_PUBLIC_*` variables, but `BACKEND_URL` needs explicit handling in the Dockerfile.
+
+### Common Mistake: Direct API URL
+
+❌ **WRONG:**
+```
+NEXT_PUBLIC_API_URL=https://nx-monoreposerver-staging.up.railway.app
+```
+This causes:
+- Client-side requests hit `/health` instead of `/api/health`
+- 404 errors because the server expects `/api/` prefix
+
+✅ **CORRECT:**
+```
+NEXT_PUBLIC_API_URL=/api
+```
+This ensures:
+- Client-side uses same-origin proxy
+- Next.js rewrites forward to `BACKEND_URL`
+- No CORS issues
+
+### Deployment URLs
+
+| Environment | API URL | Web URL |
+|-------------|---------|---------|
+| **Staging** | `nx-monoreposerver-staging.up.railway.app` | `nx-monorepoweb-staging.up.railway.app` |
+| **Production** | `nx-monoreposerver-production.up.railway.app` | `nx-monorepoweb-production.up.railway.app` |
+
+### Verification
+
+```bash
+# Test Railway web staging via API proxy
+curl https://nx-monorepoweb-staging.up.railway.app/api/health | jq
+
+# Test Railway web production
+curl https://nx-monorepoweb-production.up.railway.app/api/health | jq
+```
+
+Both should return the same data as Vercel deployments.
 
 ---
 

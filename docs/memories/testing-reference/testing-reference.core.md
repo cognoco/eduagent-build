@@ -21,6 +21,7 @@
 - [Jest Configuration Patterns](module-07-jest-configuration-patterns.md)
 - [Coverage Testing](module-08-coverage-testing.md)
 - [Related Documentation](module-09-related-documentation.md)
+- [CI Database Strategy](module-10-ci-database-strategy.md)
 
 ## Usage Notes
 - Consult configuration modules before modifying project-level Jest or Playwright settings.

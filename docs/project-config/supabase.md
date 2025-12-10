@@ -8,11 +8,13 @@
 
 This project uses **two separate Supabase PostgreSQL databases**:
 
-| Environment | Project ID | Purpose | Env File |
-|-------------|------------|---------|----------|
-| **Development** | `pjbnwtsufqpgsdlxydbo` | Local development, rapid iteration | `.env.development.local` |
-| **Test** | `uvhnqtzufwvaqvbdgcnn` | CI/CD testing, clean isolated data | `.env.test.local` |
-| **Production** | *Deferred* | Real production (post-walking skeleton) | `.env.production.local` |
+| Supabase Project | Project ID | Purpose | Env File | NODE_ENV |
+|------------------|------------|---------|----------|----------|
+| **DEV** | `pjbnwtsufqpgsdlxydbo` | Local development | `.env.development.local` | `development` |
+| **STAGING** | `uvhnqtzufwvaqvbdgcnn` | Staging + local tests | `.env.test.local` | `test` |
+| **PROD** | *Deferred* | Real production | `.env.production.local` | `production` |
+
+> **Why `.env.test.local` connects to STAGING:** The env file naming follows `NODE_ENV` convention (test, development, production), not the database naming. When running tests (`NODE_ENV=test`), the code loads `.env.test.local`, which points to our STAGING database for integration testing.
 
 **Organization**: ZIX-DEV
 **Region**: `eu-north-1`
@@ -60,11 +62,11 @@ cp .env.example .env.test.local
    NEXT_PUBLIC_API_URL="http://localhost:4000/api"
    ```
 
-### Step 3: Get Test Credentials
+### Step 3: Get STAGING Credentials
 
-Repeat for test project: https://supabase.com/dashboard/project/uvhnqtzufwvaqvbdgcnn
+Repeat for STAGING project: https://supabase.com/dashboard/project/uvhnqtzufwvaqvbdgcnn
 
-**Note**: Test project may have a DIFFERENT hostname than dev!
+**Note**: STAGING project may have a DIFFERENT hostname than dev!
 
 ### Step 4: Verify Setup
 
@@ -100,13 +102,14 @@ NEXT_PUBLIC_SUPABASE_URL="https://pjbnwtsufqpgsdlxydbo.supabase.co"
 
 ---
 
-### Test Project
+### STAGING Project (loaded via `.env.test.local`)
 
 - **Project ID**: `uvhnqtzufwvaqvbdgcnn`
 - **Organization ID**: `cispguvwukegvvxmeyzt`
 - **Pooler Hostname**: `aws-1-eu-north-1.pooler.supabase.com`
 - **Dashboard**: https://supabase.com/dashboard/project/uvhnqtzufwvaqvbdgcnn
-- **Purpose**: Automated testing, CI/CD pipelines, clean test data
+- **Purpose**: Staging deployments + local integration tests
+- **Loaded when**: `NODE_ENV=test` (via `.env.test.local`)
 
 **Connection Details**:
 ```env
@@ -235,10 +238,12 @@ ls packages/database/prisma/migrations/
 
 ## References
 
+- **Environment architecture**: `docs/environment-strategy.md` (platform mapping, CI database strategy)
+- **Variable matrix**: `docs/environment-variables-matrix.md` (all variables across all platforms)
 - **Generic setup pattern**: `docs/guides/environment-setup.md` (for template users)
 - **Environment patterns**: `docs/memories/adopted-patterns.md` Pattern 13, 14
 - **Technical findings**: `docs/memories/tech-findings-log.md` (pooler hostname, IPv6)
 
 ---
 
-**Last Updated**: 2025-12-02
+**Last Updated**: 2025-12-09

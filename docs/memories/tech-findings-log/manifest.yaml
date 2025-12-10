@@ -113,13 +113,13 @@ chunks:
     last_updated_at: 2025-11-06
     last_synced_at: null
   - id: tfl-web-api-url-overrides-20251102
-    title: Web App Configuration – API URL Overrides (2025-11-02)
+    title: Web App Configuration – API URL Overrides (2025-11-02, updated 2025-12-09)
     file: module-13-web-app-configuration-api-url-configuration-rewrites-environment-variable-override-2025-11-02.md
-    tags: [web, configuration, api]
+    tags: [web, configuration, api, vercel, cors]
     checksum: null
-    sync_status: pending
-    last_updated_by: gpt-5-codex
-    last_updated_at: 2025-11-06
+    validation_status: needs_review
+    last_updated_by: claude-opus-4-5
+    last_updated_at: 2025-12-09
     last_synced_at: null
   - id: tfl-server-express-cors-20251103
     title: Server Configuration – Express CORS Configuration (2025-11-03)
@@ -183,6 +183,24 @@ chunks:
     validation_status: needs_review
     last_updated_by: claude-opus-4-5
     last_updated_at: 2025-12-08
+    last_synced_at: null
+  - id: tfl-sentry-nextjs-turbopack-20251210
+    title: Sentry – Next.js 15+ Turbopack Client Configuration Migration (2025-12-10)
+    file: module-22-sentry-nextjs-15-turbopack-client-configuration-2025-12-10.md
+    tags: [sentry, nextjs, turbopack, configuration, breaking-change]
+    checksum: null
+    validation_status: needs_review
+    last_updated_by: claude-opus-4-5
+    last_updated_at: 2025-12-10
+    last_synced_at: null
+  - id: tfl-deployment-railway-web-frontend-20251210
+    title: Deployment Configuration – Railway Web Frontend Docker Build (2025-12-10)
+    file: module-23-deployment-railway-web-frontend-configuration-2025-12-10.md
+    tags: [deployment, railway, docker, nextjs, configuration]
+    checksum: null
+    validation_status: needs_review
+    last_updated_by: claude-opus-4-5
+    last_updated_at: 2025-12-10
     last_synced_at: null
   - id: tfl-future-entries
     title: Future Entries

@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context Document
+  Generated: 2025-12-09
+  Story: 5-10-validate-dual-frontend-architecture
+  Epic: 5 - CI/CD Staging & Production Deployment
+-->
+<story-context story-id="5-10" version="1.0">
+  <metadata>
+    <title>Validate Dual Frontend Architecture</title>
+    <epic>Epic 5: CI/CD Staging & Production Deployment</epic>
+    <status>drafted</status>
+    <generated-date>2025-12-09</generated-date>
+    <dependencies>
+      <dependency story-id="5-9" status="drafted">Configure Railway Web Frontend</dependency>
+    </dependencies>
+  </metadata>
+
+  <story-summary>
+    <user-story>
+      As a stakeholder, I want to verify both frontends work correctly,
+      so that I have confidence in deployment portability.
+    </user-story>
+    <acceptance-criteria>
+      <criterion id="AC1">Both frontends pass health check end-to-end, both create records in same database</criterion>
+      <criterion id="AC2">README includes both frontend URLs, architecture decision documented</criterion>
+      <criterion id="AC3">Performance differences between platforms documented</criterion>
+    </acceptance-criteria>
+  </story-summary>
+
+  <validation-procedures>
+    <procedure id="1" name="Validate Vercel frontend">
+      <steps>
+        <step>Navigate to Vercel staging URL</step>
+        <step>Verify health check page loads</step>
+        <step>Click "Ping" button</step>
+        <step>Verify record created in database</step>
+      </steps>
+    </procedure>
+
+    <procedure id="2" name="Validate Railway frontend">
+      <steps>
+        <step>Navigate to Railway web URL</step>
+        <step>Verify health check page loads</step>
+        <step>Click "Ping" button</step>
+        <step>Verify record created in database</step>
+      </steps>
+    </procedure>
+
+    <procedure id="3" name="Verify shared database">
+      <steps>
+        <step>Create record via Vercel frontend</step>
+        <step>Refresh Railway frontend</step>
+        <step>Verify record appears</step>
+        <step>Vice versa (create on Railway, see on Vercel)</step>
+      </steps>
+    </procedure>
+
+    <procedure id="4" name="Performance comparison">
+      <metrics>
+        <metric name="Initial load (cold)">Vercel edge vs Railway container</metric>
+        <metric name="Initial load (warm)">Subsequent page loads</metric>
+        <metric name="API response time">Same backend, should be similar</metric>
+        <metric name="Time to interactive">Full page ready</metric>
+      </metrics>
+    </procedure>
+  </validation-procedures>
+
+  <validation-checklist>
+    <section name="Vercel Frontend">
+      <item id="V1">Page loads</item>
+      <item id="V2">Health check list displays</item>
+      <item id="V3">Ping button works</item>
+      <item id="V4">Record persists</item>
+    </section>
+
+    <section name="Railway Frontend">
+      <item id="V5">Page loads</item>
+      <item id="V6">Health check list displays</item>
+      <item id="V7">Ping button works</item>
+      <item id="V8">Record persists</item>
+    </section>
+
+    <section name="Cross-Platform">
+      <item id="V9">Record created on Vercel appears on Railway</item>
+      <item id="V10">Record created on Railway appears on Vercel</item>
+      <item id="V11">No CORS errors on either platform</item>
+    </section>
+
+    <section name="Documentation">
+      <item id="V12">README includes both frontend URLs</item>
+      <item id="V13">architecture-decisions.md updated with dual frontend decision</item>
+      <item id="V14">Performance comparison documented</item>
+    </section>
+  </validation-checklist>
+
+  <expected-urls>
+    <url platform="Vercel" environment="Staging">https://[project]-[branch].vercel.app</url>
+    <url platform="Vercel" environment="Production">https://[project].vercel.app</url>
+    <url platform="Railway Web" environment="Staging">https://[web-service]-staging.railway.app</url>
+    <url platform="Railway Web" environment="Production">https://[web-service]-production.railway.app</url>
+    <url platform="Railway API" environment="Both">https://[api-service].railway.app</url>
+  </expected-urls>
+
+  <documentation-requirements>
+    <item>README.md - Add "Deployed Environments" section with all URLs</item>
+    <item>docs/architecture-decisions.md - Document dual frontend decision</item>
+    <item>docs/environment-strategy.md - Ensure dual frontend is reflected</item>
+  </documentation-requirements>
+
+  <references>
+    <doc path="docs/architecture-decisions.md" section="Dual Frontend Strategy">Architecture decision</doc>
+    <doc path="docs/epics.md" section="Story 5.10">Story definition</doc>
+  </references>
+</story-context>
+
