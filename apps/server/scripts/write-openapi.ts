@@ -4,10 +4,17 @@
  * This script generates the OpenAPI JSON specification from the Express app
  * and writes it to dist/apps/server/openapi.json for consumption by api-client.
  *
- * Cache Note: This file is an input to the spec-write Nx target. Any changes
- * here will invalidate the Nx cache, forcing regeneration of the OpenAPI spec.
+ * Note: Caching is disabled for this task (spec-write) because the output file
+ * must physically exist for downstream tasks (generate-types) to succeed.
+ * Remote cache restoration of outputs can be unreliable for critical file dependencies.
  */
-import { writeFileSync, mkdirSync } from 'node:fs';
+import {
+  writeFileSync,
+  mkdirSync,
+  existsSync,
+  statSync,
+  readdirSync,
+} from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -26,7 +33,18 @@ const openapiPath = resolve(
 );
 const { getOpenApiSpec } = require(openapiPath);
 
+// Write to packages/api-client/src/gen/ to avoid server:build cache restoration conflicts
+// The dist/apps/server/ directory can be overwritten by Nx remote cache restoration
 const out = resolve(workspaceRoot, 'packages/api-client/src/gen/openapi.json');
 mkdirSync(dirname(out), { recursive: true });
 writeFileSync(out, JSON.stringify(getOpenApiSpec(), null, 2));
-console.log('✓ Wrote OpenAPI spec:', out);
+
+// Verify file was written successfully (CI debugging)
+if (existsSync(out)) {
+  const stats = statSync(out);
+  console.log('✓ Wrote OpenAPI spec:', out);
+  console.log('  File size:', stats.size, 'bytes');
+} else {
+  console.error('✗ ERROR: File not found after write:', out);
+  process.exit(1);
+}
