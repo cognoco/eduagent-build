@@ -1,5 +1,7 @@
 import type { Config } from 'jest';
-import nextJest from 'next/jest.js';
+
+const nextJestModule = require('next/jest.js');
+const nextJest = nextJestModule.default ?? nextJestModule;
 
 const createJestConfig = nextJest({
   dir: './',
@@ -32,4 +34,7 @@ const config: Config = {
   forceExit: false, // Redundant but kept for easy manual toggle
 };
 
-export default createJestConfig(config);
+// CommonJS export required: Jest + Next.js 16 have ESM interop issues.
+// Using `export default` causes "TypeError: nextJest is not a function".
+// See: docs/memories/tech-findings-log/module-24-nx-22-upgrade-breaking-changes-2025-12-12.md
+module.exports = createJestConfig(config);

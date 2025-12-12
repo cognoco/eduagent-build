@@ -1936,3 +1936,182 @@ module.exports = {
   - Environment: Supabase STAGING project for staging (renamed from TEST)
   - Cost: $0-10/month acceptable for staging
   - Implementation: Primary first, secondary if time permits
+
+---
+
+## Epic 5b: Nx 22 Upgrade and Expo SDK 54 Alignment
+
+**Decision Date:** December 12, 2025
+**Story Reference:** Epic 5b - Nx Upgrade for Expo SDK 54 Support
+
+---
+
+### Decision Summary
+
+| Aspect | Decision |
+|--------|----------|
+| **Nx Version** | 22.2.0 (upgraded from 21.6.5) |
+| **React Version** | 19.1.0 (upgraded from 19.0.1) |
+| **@nx/expo Plugin** | 22.2.0 (newly installed) |
+| **Expo SDK** | 54.0.x (aligned with React 19.1) |
+| **React Native** | 0.81.5 (Expo SDK 54 requirement) |
+
+---
+
+### Decision 1: Upgrade to Nx 22.2.0
+
+**Decision:** Upgrade Nx from 21.6.5 to 22.2.0 to enable @nx/expo plugin installation and Expo SDK 54 support.
+
+**Rationale:**
+
+1. **@nx/expo Requires Matching Nx Core Version**
+   - All @nx/* plugins must match the core nx version exactly
+   - @nx/expo 22.2.0 requires nx 22.2.0
+   - Cannot install @nx/expo 21.6.5 (SDK version incompatibility)
+
+2. **Expo SDK 54 Alignment**
+   - Expo SDK 54 requires React 19.x
+   - React 19.1.0 is the recommended version for SDK 54
+   - Nx 22 supports React 19.1 ecosystem
+
+3. **Breaking Change Assessment**
+   - Full test suite passed after upgrade
+   - All lint checks passed
+   - CI/CD pipeline validated
+   - No functional regressions detected
+
+**Migration Path:**
+```bash
+# Executed during Epic 5b
+pnpm exec nx migrate 22.2.0
+pnpm install
+pnpm exec nx migrate --run-migrations
+```
+
+**Consequences:**
+- ✅ Enables Expo SDK 54 mobile development
+- ✅ All @nx/* plugins aligned at 22.2.0
+- ✅ Access to latest Nx features and bug fixes
+- ⚠️ Breaking changes documented in `docs/memories/tech-findings-log.md`
+
+---
+
+### Decision 2: Upgrade React to 19.1.0
+
+**Decision:** Upgrade React and React DOM from 19.0.1 to 19.1.0 for Expo SDK 54 compatibility.
+
+**Rationale:**
+
+1. **Expo SDK 54 Compatibility**
+   - Expo SDK 54 officially supports React 19.1.x
+   - React 19.0.1 is outside the recommended range
+   - Prevents potential runtime issues in mobile app
+
+2. **Next.js 16 Compatibility**
+   - Next.js 16.0.x supports React 19.1
+   - Verified working combination in walking skeleton
+
+3. **Cross-Platform Consistency**
+   - Web (Next.js) and Mobile (Expo) share same React version
+   - Single React version simplifies dependency management
+
+**Consequences:**
+- ✅ Aligned with Expo SDK 54 requirements
+- ✅ Cross-platform React version consistency
+- ✅ Access to React 19.1 bug fixes and improvements
+
+---
+
+### Decision 3: Install @nx/expo Plugin
+
+**Decision:** Install @nx/expo 22.2.0 as the official Nx plugin for Expo/React Native development.
+
+**Rationale:**
+
+1. **Nx Integration**
+   - Official plugin from Nx team
+   - Provides generators for app, library, component creation
+   - Integrates with Nx task graph and caching
+
+2. **Expo SDK 54 Support**
+   - @nx/expo 22.2.0 supports Expo SDK 54
+   - Includes executors for build, run, start, prebuild
+   - Provides EAS integration executors
+
+3. **Alternative Evaluation**
+   - Evaluated standalone Expo without @nx/expo
+   - Determined Nx integration provides superior monorepo DX
+   - @nx/expo handles Metro bundler + Nx task coordination
+
+**Available Generators:**
+- `@nx/expo:application` - Create mobile app
+- `@nx/expo:library` - Create shared mobile library
+- `@nx/expo:component` - Create component
+
+**Available Executors:**
+- `@nx/expo:build` - EAS cloud builds
+- `@nx/expo:run` - Run on simulator/device
+- `@nx/expo:start` - Start Metro bundler
+- `@nx/expo:prebuild` - Generate native directories
+
+**Consequences:**
+- ✅ Full Nx integration for mobile development
+- ✅ Shared package dependencies work seamlessly
+- ✅ Nx Cloud caching for mobile builds
+- ⚠️ Requires Node.js 22+ (already satisfied)
+
+---
+
+### Decision 4: CLI Installation Strategy
+
+**Decision:** Use global EAS CLI installation for local development, with CI using `npx eas-cli` or EXPO_TOKEN authentication.
+
+**Rationale:**
+
+1. **Local Development**
+   - Global `eas-cli` (16.28.0) provides best DX
+   - `npx expo` uses bundled CLI (no global install needed)
+   - `npx expo-doctor` for project health checks
+
+2. **CI/CD**
+   - Use `EXPO_TOKEN` for authentication
+   - Can use `npx eas-cli` (no global install) or global install
+   - `--non-interactive` flag for automated builds
+
+**CLI Matrix:**
+
+| CLI | Installation | Purpose |
+|-----|--------------|---------|
+| `npx expo` | Bundled with expo package | Local development, Metro bundler |
+| `eas` (global) | `npm install -g eas-cli` | EAS builds, updates, submissions |
+| `npx eas-cli` | npx (no install) | CI/CD alternative |
+
+**Consequences:**
+- ✅ No additional devDependencies needed
+- ✅ CI works without global installs
+- ✅ Documented in `docs/tech-stack.md`
+
+---
+
+### Research Document Reference
+
+**Complete Analysis:** `docs/sprint-artifacts/epic-5b-nx-upgrade-analysis.md`
+
+Contains:
+- Nx 21.6.5 → 22.2.0 migration path analysis
+- React 19.0.1 → 19.1.0 compatibility research
+- @nx/expo plugin capabilities
+- Breaking changes assessment
+- Risk mitigation strategies
+
+---
+
+### Changelog
+
+- **2025-12-12**: Epic 5b - Nx 22 Upgrade for Expo SDK 54 Support
+  - Decision: Upgrade Nx 21.6.5 → 22.2.0, React 19.0.1 → 19.1.0
+  - Installed: @nx/expo 22.2.0 plugin
+  - Installed: expo ~54.0.0, react-native 0.81.5
+  - CLIs: eas-cli 16.28.0 (global), expo 54.0.19 (bundled)
+  - Validated: Full test suite, lint, CI/CD pipeline
+  - Documented: tech-stack.md Mobile Stack section, CLI references

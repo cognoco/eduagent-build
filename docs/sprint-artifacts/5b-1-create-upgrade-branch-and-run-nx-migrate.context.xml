@@ -1,0 +1,130 @@
+<story-context id="5b-1-create-upgrade-branch-and-run-nx-migrate" v="1.0">
+  <metadata>
+    <epicId>5b</epicId>
+    <storyId>1</storyId>
+    <title>Create Upgrade Branch and Run Nx Migrate</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-12-11</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/5b-1-create-upgrade-branch-and-run-nx-migrate.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>DevOps engineer</asA>
+    <iWant>to initiate the Nx upgrade in an isolated branch</iWant>
+    <soThat>we can safely test the upgrade without affecting main</soThat>
+    <tasks>
+      <task id="1" acs="1">Verify main branch is stable - confirm all tests pass on main, CI green, pull latest</task>
+      <task id="2" acs="1">Create upgrade branch - git checkout -b e5b/expo-prep (or checkout existing)</task>
+      <task id="3" acs="2,3">Run Nx migrate command - pnpm exec nx migrate 22.2.0</task>
+      <task id="4" acs="2">Analyze migrations.json - review generated migrations, document which will be applied</task>
+      <task id="5" acs="3">Document migration plan - create summary of migration impact</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Branch e5b/expo-prep exists and is pushed to remote</criterion>
+    <criterion id="2">pnpm exec nx migrate 22.2.0 completes successfully with migrations.json generated</criterion>
+    <criterion id="3">No immediate breaking errors in migration output</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/epic-5b-nx-upgrade-analysis.md</path>
+        <title>Epic 5b Nx Upgrade Analysis</title>
+        <section>Implementation Plan, Target State</section>
+        <snippet>Comprehensive research on SDK 54 requirements. Nx 22.2.0+ required for SDK 54 support. Complete version compatibility matrix and risk assessment.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-stack.md</path>
+        <title>Technology Stack Reference</title>
+        <section>Core Stack, Version Pinning Policy</section>
+        <snippet>Current Nx 21.6.5, React 19.0.1. All @nx/* packages must match core nx version.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture-decisions.md</path>
+        <title>Architecture Decisions</title>
+        <section>Monorepo Tooling</section>
+        <snippet>Strategic decisions on Nx monorepo structure and tooling.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>package.json</path>
+        <kind>manifest</kind>
+        <symbol>dependencies, devDependencies</symbol>
+        <reason>Contains current Nx version 21.6.5 and all @nx/* packages to be upgraded</reason>
+      </file>
+      <file>
+        <path>nx.json</path>
+        <kind>workspace-config</kind>
+        <symbol>Nx workspace configuration</symbol>
+        <reason>May be modified by migrations; contains nxCloudId and target defaults</reason>
+      </file>
+      <file>
+        <path>pnpm-lock.yaml</path>
+        <kind>lockfile</kind>
+        <symbol>Dependency lock</symbol>
+        <reason>Will be regenerated after migrate command updates package.json</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <ecosystem name="node-current">
+        <package name="nx" version="21.6.5" />
+        <package name="@nx/devkit" version="21.6.5" />
+        <package name="@nx/eslint" version="21.6.5" />
+        <package name="@nx/eslint-plugin" version="21.6.5" />
+        <package name="@nx/jest" version="21.6.5" />
+        <package name="@nx/js" version="21.6.5" />
+        <package name="@nx/next" version="21.6.5" />
+        <package name="@nx/node" version="21.6.5" />
+        <package name="@nx/playwright" version="21.6.5" />
+        <package name="@nx/react" version="21.6.5" />
+        <package name="@nx/workspace" version="21.6.5" />
+      </ecosystem>
+      <ecosystem name="node-target">
+        <package name="nx" version="22.2.0+" note="Target version" />
+        <package name="@nx/*" version="22.2.0+" note="All packages must match" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="version-match">All @nx/* packages MUST be updated together to matching version</constraint>
+    <constraint type="branch">Work MUST be done on isolated branch e5b/expo-prep, not main</constraint>
+    <constraint type="command">Use pnpm exec nx commands, never npm or yarn</constraint>
+    <constraint type="process">Do NOT install dependencies yet - that happens in Story 5b.2</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Nx Migrate Command</name>
+      <kind>CLI command</kind>
+      <signature>pnpm exec nx migrate 22.2.0</signature>
+      <path>node_modules/nx/bin/nx.js</path>
+    </interface>
+    <interface>
+      <name>Git Branch Command</name>
+      <kind>CLI command</kind>
+      <signature>git checkout -b e5b/expo-prep</signature>
+      <path>N/A</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Infrastructure story - no unit tests. Validation is via command output analysis.
+    </standards>
+    <locations>
+      <location>N/A - infrastructure story</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Verify branch exists: git branch --list e5b/expo-prep</idea>
+      <idea ac="2">Verify migrations.json exists and contains migration entries</idea>
+      <idea ac="3">Check nx migrate output for errors or warnings</idea>
+    </ideas>
+  </tests>
+</story-context>

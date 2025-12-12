@@ -4,7 +4,7 @@ purpose: Comprehensive version inventory, pinning strategy, and compatibility ma
 audience: AI agents, developers, architects
 tags: technology, versions, compatibility, dependencies, pinning
 created: 2025-10-28
-last-updated: 2025-12-04
+last-updated: 2025-12-12
 Created: 2025-10-28T11:36
 Modified: 2025-10-28T20:30
 ---
@@ -38,9 +38,9 @@ This document provides the complete technology stack inventory for the nx-monore
 
 | Package | Version | Pinning | Purpose |
 |---------|---------|---------|---------|
-| **next** | ~15.2.6 | Tilde (~) | React framework for web app |
-| **react** | 19.0.0 | Exact | UI library |
-| **react-dom** | 19.0.0 | Exact | React DOM renderer |
+| **next** | 16.0.8 | Exact | React framework for web app |
+| **react** | 19.1.0 | Exact | UI library |
+| **react-dom** | 19.1.0 | Exact | React DOM renderer |
 | **@types/react** | 19.0.1 | Exact | TypeScript types for React |
 | **@types/react-dom** | 19.0.1 | Exact | TypeScript types for React DOM |
 | **tailwindcss** | 3.4.3 | Exact | Utility-first CSS framework |
@@ -48,9 +48,10 @@ This document provides the complete technology stack inventory for the nx-monore
 | **postcss** | 8.4.38 | Exact | CSS transformation tool |
 
 **Rationale**:
-- **Next.js 15.2**: Latest stable with App Router, RSC, and React 19 support
-- **React 19**: Latest major version with improved concurrent features
-- **Tilde (~) on Next.js**: Allows patch updates (15.2.x) for security fixes while preventing minor version bumps
+- **Next.js 16.0**: Latest stable with App Router, RSC, Turbopack production builds, and React 19 support
+- **React 19.1**: Aligned with Expo SDK 54 for mobile parity; minor update from 19.0 with bug fixes and performance improvements
+- **Tilde (~) on Next.js**: Allows patch updates (16.0.x) for security fixes while preventing minor version bumps
+- **pnpm overrides**: Force React 19.1.0 across all dependencies to prevent version mismatch in monorepo
 
 ### Server Stack
 
@@ -102,12 +103,76 @@ This document provides the complete technology stack inventory for the nx-monore
 - **ts-jest as alternative**: Available but not mixed with @swc/jest in same project
 - **Playwright 1.56.1**: Latest stable for E2E browser testing
 
+### Mobile Stack (Expo)
+
+| Package | Version | Pinning | Purpose |
+|---------|---------|---------|---------|
+| **expo** | ~54.0.0 | Tilde (~) | Expo SDK and bundled CLI |
+| **@nx/expo** | 22.2.0 | Exact | Nx plugin for Expo projects |
+| **eas-cli** | 16.28.0 | Global | EAS Build/Update/Submit CLI |
+| **expo-doctor** | latest | npx | Project health diagnostics |
+
+**Rationale**:
+- **Expo SDK 54**: Latest stable SDK aligned with React 19.1 and React Native 0.81.5
+- **Expo CLI bundled**: Use `npx expo <command>` (no separate global install needed)
+- **EAS CLI global**: Installed globally for local dev; can use `npx eas-cli` in CI
+- **expo-doctor**: Run via `npx expo-doctor` to validate project setup
+
+**CLI Commands Reference**:
+```bash
+# Expo CLI (bundled with expo package)
+npx expo --version       # Check CLI version
+npx expo start           # Start Metro bundler
+npx expo install         # Install compatible packages
+npx expo prebuild        # Generate native directories
+npx expo-doctor          # Diagnose project issues
+
+# EAS CLI (separate install)
+eas --version            # Check EAS CLI version
+eas login                # Authenticate with Expo account
+eas whoami               # Check logged-in user
+eas init                 # Initialize EAS project (requires app)
+eas build                # Create cloud builds
+eas update               # Push OTA updates
+eas submit               # Submit to app stores
+```
+
+**CI/CD Configuration**:
+
+For CI environments (GitHub Actions, etc.), EAS CLI requires token-based authentication:
+
+```yaml
+# GitHub Actions example
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+steps:
+  # Option 1: Use npx (no install needed)
+  - run: npx eas-cli whoami
+  - run: npx eas-cli build --platform all --non-interactive
+
+  # Option 2: Global install (faster for multiple commands)
+  - run: npm install -g eas-cli
+  - run: eas whoami
+  - run: eas build --platform all --non-interactive
+```
+
+**Setting up EXPO_TOKEN**:
+1. Go to https://expo.dev/settings/access-tokens
+2. Create a new access token with appropriate permissions
+3. Add `EXPO_TOKEN` to GitHub repository secrets
+
+**EAS Build flags for CI**:
+- `--non-interactive` - Disable interactive prompts
+- `--no-wait` - Don't wait for build completion (async)
+- `--platform all|ios|android` - Target platform(s)
+
 ### Tooling & Build
 
 | Package | Version | Pinning | Purpose |
 |---------|---------|---------|---------|
-| **nx** | 21.6.5 | Exact | Monorepo build system |
-| **@nx/*** | 21.6.5 | Exact | Nx plugins (must match core) |
+| **nx** | 22.2.0 | Exact | Monorepo build system |
+| **@nx/*** | 22.2.0 | Exact | Nx plugins (must match core) |
 | **typescript** | ~5.9.2 | Tilde (~) | TypeScript compiler |
 | **eslint** | 9.37.0 | Exact | JavaScript/TypeScript linter |
 | **prettier** | ^2.6.2 | Caret (^) | Code formatter |
@@ -115,7 +180,7 @@ This document provides the complete technology stack inventory for the nx-monore
 | **lint-staged** | ^16.2.5 | Caret (^) | Run linters on staged files |
 
 **Rationale**:
-- **Nx 21.6.5**: All Nx packages must use same exact version for compatibility
+- **Nx 22.2.0**: Latest Nx major version with @nx/expo support for mobile development
 - **TypeScript ~5.9**: Allows patch updates (5.9.x) but not minor bumps (5.10.x)
 - **ESLint 9**: Latest major version with flat config support
 - **Exact pins on Nx**: Critical for task graph and caching to work correctly
@@ -168,10 +233,10 @@ This document provides the complete technology stack inventory for the nx-monore
 **Critical Rule**: All `@nx/*` packages must match the core `nx` version:
 ```json
 {
-  "nx": "21.6.5",
-  "@nx/jest": "21.6.5",
-  "@nx/next": "21.6.5",
-  "@nx/react": "21.6.5"
+  "nx": "22.2.0",
+  "@nx/jest": "22.2.0",
+  "@nx/next": "22.2.0",
+  "@nx/react": "22.2.0"
 }
 ```
 
@@ -243,12 +308,13 @@ This document provides the complete technology stack inventory for the nx-monore
 | **React ecosystem** | `react` and `react-dom` must match exactly |
 | **TypeScript ecosystem** | `typescript` version must be compatible with all `@types/*` packages |
 | **Prisma ecosystem** | `prisma` CLI and `@prisma/client` should match (both use ^6.17.1) |
+| **Expo ecosystem** | `expo` SDK version determines compatible `react-native`, `react` versions |
 
 ### Verified Working Combinations
 
 | Next.js | React | TypeScript | Node.js | Status |
 |---------|-------|------------|---------|--------|
-| ~15.2.4 | 19.0.0 | ~5.9.2 | 22.16.0 | ✅ Tested & Working |
+| 16.0.8 | 19.1.0 | ~5.9.2 | 22.16.0 | ✅ Tested & Working |
 
 | Jest | @swc/jest | TypeScript | Node.js | Status |
 |------|-----------|------------|---------|--------|
@@ -256,17 +322,22 @@ This document provides the complete technology stack inventory for the nx-monore
 
 | Nx | @nx/jest | Jest | TypeScript | Status |
 |----|----------|------|------------|--------|
-| 21.6.5 | 21.6.5 | 30.2.0 | ~5.9.2 | ✅ Tested & Working |
+| 22.2.0 | 22.2.0 | 30.2.0 | ~5.9.2 | ✅ Tested & Working |
 
 | Playwright | Node.js | TypeScript | Status |
 |------------|---------|------------|--------|
 | 1.56.1 | 22.16.0 | ~5.9.2 | ✅ Tested & Working |
+
+| Expo SDK | React | React Native | EAS CLI | Status |
+|----------|-------|--------------|---------|--------|
+| 54.0.x | 19.1.0 | 0.81.5 | 16.28.0 | ✅ Tested & Working |
 
 ### Known Incompatibilities
 
 - **Jest 30 + ts-jest + @swc/jest**: ❌ Do not mix `ts-jest` and `@swc/jest` in the same project (transformer conflict)
 - **Nx plugins version mismatch**: ❌ Never run `nx` 21.6.5 with `@nx/jest` 21.5.x or different version
 - **React 19 + older Next.js**: ❌ Next.js < 15 does not support React 19
+- **Expo SDK + mismatched React**: ❌ Expo SDK 54 requires React 19.x; SDK 53 requires React 18.x
 
 ---
 
@@ -379,6 +450,9 @@ Before approving version changes:
 - [Prisma Documentation](https://www.prisma.io/docs)
 - [TypeScript Documentation](https://www.typescriptlang.org/docs/)
 - [Supabase Documentation](https://supabase.com/docs)
+- [Expo Documentation](https://docs.expo.dev)
+- [EAS Documentation](https://docs.expo.dev/eas)
+- [Expo CLI Reference](https://docs.expo.dev/more/expo-cli)
 
 **Project Documentation**:
 - `.ruler/AGENTS.md` - AI agent rules and monorepo overview
@@ -403,6 +477,6 @@ Before approving version changes:
 - When platform-specific issues are identified
 - When upgrade guidelines need refinement
 
-**Last Updated**: 2025-12-04
-**Last Major Audit**: 2025-12-04 (Node.js 22 upgrade)
-**Next Review Due**: 2026-03-04 (quarterly review recommended)
+**Last Updated**: 2025-12-12
+**Last Major Audit**: 2025-12-12 (Nx 22.2 + React 19.1 + Expo SDK 54 + EAS CLI 16.28)
+**Next Review Due**: 2026-03-12 (quarterly review recommended)

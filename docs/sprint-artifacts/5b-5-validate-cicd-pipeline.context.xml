@@ -1,0 +1,107 @@
+<story-context id="5b-5-validate-cicd-pipeline" v="1.0">
+  <metadata>
+    <epicId>5b</epicId>
+    <storyId>5</storyId>
+    <title>Validate CI/CD Pipeline</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-12-11</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/5b-5-validate-cicd-pipeline.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>DevOps engineer</asA>
+    <iWant>CI/CD to pass with the upgraded tooling</iWant>
+    <soThat>automated quality gates work correctly</soThat>
+    <tasks>
+      <task id="1" acs="1">Push branch to GitHub - ensure all changes committed</task>
+      <task id="2" acs="1,2">Monitor CI execution - watch GitHub Actions workflow</task>
+      <task id="3" acs="2">Verify lint job passes</task>
+      <task id="4" acs="2">Verify test job passes</task>
+      <task id="5" acs="2">Verify build job passes</task>
+      <task id="6" acs="2">Verify E2E job passes</task>
+      <task id="7" acs="3">Verify Nx Cloud integration - check cache hits</task>
+      <task id="8" acs="2">Document CI results</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">CI workflow completes successfully on e5b/expo-prep branch</criterion>
+    <criterion id="2">All existing CI jobs pass (lint, test, build, typecheck, e2e)</criterion>
+    <criterion id="3">Nx Cloud caching still works (if enabled)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/epic-5b-nx-upgrade-analysis.md</path>
+        <title>Epic 5b Nx Upgrade Analysis</title>
+        <section>Risk Assessment, CI/CD Risk</section>
+        <snippet>CI/CD pipeline disruption risk is Low-Medium. Nx Cloud integration may need verification.</snippet>
+      </doc>
+      <doc>
+        <path>docs/environment-strategy.md</path>
+        <title>Environment Strategy</title>
+        <section>CI/CD Pipeline</section>
+        <snippet>GitHub Actions workflow configuration and deployment targets.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>.github/workflows/ci.yml</path>
+        <kind>ci-config</kind>
+        <symbol>CI workflow definition</symbol>
+        <reason>Primary CI workflow to verify passes with Nx 22.x</reason>
+      </file>
+      <file>
+        <path>nx.json</path>
+        <kind>workspace-config</kind>
+        <symbol>nxCloudId</symbol>
+        <reason>Contains Nx Cloud configuration for remote caching</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <ecosystem name="ci">
+        <package name="nx" version="22.2.0+" note="Core CI tool" />
+        <package name="@nx/workspace" version="22.2.0+" note="Workspace commands" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="validation">This is a validation-only story - no code changes expected</constraint>
+    <constraint type="ci">All CI jobs must pass before proceeding to next story</constraint>
+    <constraint type="cache">Verify Nx Cloud remote cache is working</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>GitHub Actions</name>
+      <kind>CI/CD platform</kind>
+      <signature>Push to branch triggers .github/workflows/ci.yml</signature>
+      <path>.github/workflows/ci.yml</path>
+    </interface>
+    <interface>
+      <name>Nx Cloud Dashboard</name>
+      <kind>Web interface</kind>
+      <signature>https://cloud.nx.app</signature>
+      <path>N/A</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Validation story - verification via CI pipeline execution.
+    </standards>
+    <locations>
+      <location>N/A - CI validation</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Monitor GitHub Actions workflow status</idea>
+      <idea ac="2">Verify all job steps complete successfully</idea>
+      <idea ac="3">Check Nx Cloud dashboard for cache statistics</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -1,0 +1,122 @@
+<story-context id="5b-4-update-react-to-19.1.0" v="1.0">
+  <metadata>
+    <epicId>5b</epicId>
+    <storyId>4</storyId>
+    <title>Update React to 19.1.0</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-12-11</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/5b-4-update-react-to-19.1.0.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>React aligned at 19.1.0 across the monorepo</iWant>
+    <soThat>web and mobile share the same React version</soThat>
+    <tasks>
+      <task id="1" acs="1">Research React 19.1 changes - review release notes, breaking changes</task>
+      <task id="2" acs="1,2">Update React dependencies - react and react-dom to 19.1.0</task>
+      <task id="3" acs="3">Update TypeScript types if needed - @types/react, @types/react-dom</task>
+      <task id="4" acs="4">Verify web app - build and run, check health check page</task>
+      <task id="5" acs="5">Run tests - verify no React-related regressions</task>
+      <task id="6" acs="1">Update documentation - docs/tech-stack.md</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">package.json has react: 19.1.0 and react-dom: 19.1.0</criterion>
+    <criterion id="2">pnpm install completes without peer dependency errors</criterion>
+    <criterion id="3">@types/react and @types/react-dom are compatible</criterion>
+    <criterion id="4">Web app builds and runs correctly</criterion>
+    <criterion id="5">All tests still pass</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/epic-5b-nx-upgrade-analysis.md</path>
+        <title>Epic 5b Nx Upgrade Analysis</title>
+        <section>React Version Compatibility, Alignment Strategy</section>
+        <snippet>SDK 54 uses React 19.1.0. Aligning now prevents version conflicts when mobile app is added. Minor version bump (19.0.1 to 19.1.0) is low risk.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-stack.md</path>
+        <title>Technology Stack Reference</title>
+        <section>Core Stack, Version Pinning</section>
+        <snippet>React uses exact pins. Current: 19.0.1. Target: 19.1.0 for SDK 54 alignment.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>package.json</path>
+        <kind>manifest</kind>
+        <symbol>dependencies</symbol>
+        <reason>Contains react and react-dom version pins to be updated</reason>
+      </file>
+      <file>
+        <path>apps/web/src/app/page.tsx</path>
+        <kind>react-component</kind>
+        <symbol>Home page component</symbol>
+        <reason>React component to verify still works after upgrade</reason>
+      </file>
+      <file>
+        <path>apps/web/src/components/HealthCheck.tsx</path>
+        <kind>react-component</kind>
+        <symbol>Health check component</symbol>
+        <reason>Walking skeleton component to verify functionality</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <ecosystem name="react-current">
+        <package name="react" version="19.0.1" />
+        <package name="react-dom" version="19.0.1" />
+        <package name="@types/react" version="19.0.1" />
+        <package name="@types/react-dom" version="19.0.1" />
+      </ecosystem>
+      <ecosystem name="react-target">
+        <package name="react" version="19.1.0" note="Target for SDK 54 alignment" />
+        <package name="react-dom" version="19.1.0" note="Must match react version" />
+        <package name="@types/react" version="TBD" note="Check compatibility" />
+        <package name="@types/react-dom" version="TBD" note="Check compatibility" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="version-match">React version MUST be 19.1.0 exact to match Expo SDK 54</constraint>
+    <constraint type="version-match">react and react-dom versions MUST match exactly</constraint>
+    <constraint type="documentation">Update docs/tech-stack.md with new version</constraint>
+    <constraint type="testing">Run full test suite after update to verify no regressions</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Web App Dev Server</name>
+      <kind>CLI command</kind>
+      <signature>pnpm exec nx run web:dev</signature>
+      <path>apps/web</path>
+    </interface>
+    <interface>
+      <name>Web App Build</name>
+      <kind>CLI command</kind>
+      <signature>pnpm exec nx run web:build</signature>
+      <path>apps/web</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Run full test suite after React version update. Focus on React component tests.
+    </standards>
+    <locations>
+      <location>apps/web/src/**/*.spec.tsx</location>
+    </locations>
+    <ideas>
+      <idea ac="1,2">Verify package.json shows correct React versions</idea>
+      <idea ac="4">Verify web app loads health check page without errors</idea>
+      <idea ac="5">Run all web tests: pnpm exec nx run web:test</idea>
+    </ideas>
+  </tests>
+</story-context>

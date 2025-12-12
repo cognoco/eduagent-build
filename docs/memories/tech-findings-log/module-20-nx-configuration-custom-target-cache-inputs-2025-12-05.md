@@ -88,6 +88,7 @@ pnpm exec nx run server:spec-write --verbose
 - Nx Caching Documentation: https://nx.dev/concepts/how-caching-works
 - Pattern 6 (OpenAPI Spec Generation): `docs/memories/adopted-patterns/module-06-pattern-6-openapi-spec-generation.md`
 - Governing Document: `docs/architecture-decisions.md` → Stage 4.1 (REST+OpenAPI infrastructure)
+- Related Finding: `module-24-nx-configuration-nx-cloud-cache-invalidation-after-major-upgrades-2025-12-12.md` (when correct config still hits stale remote cache)
 
 **Alignment Rationale:** This finding supports the REST+OpenAPI architecture by ensuring the `spec-write` pipeline (which generates OpenAPI specs from Zod schemas) correctly invalidates cache. Without proper inputs, the OpenAPI spec can become stale, breaking type generation downstream.
 

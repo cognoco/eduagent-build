@@ -1,0 +1,149 @@
+<story-context id="5b-3-run-full-test-suite-and-fix-breaking-changes" v="1.0">
+  <metadata>
+    <epicId>5b</epicId>
+    <storyId>3</storyId>
+    <title>Run Full Test Suite and Fix Breaking Changes</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-12-11</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/5b-3-run-full-test-suite-and-fix-breaking-changes.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>all existing tests to pass after the Nx upgrade</iWant>
+    <soThat>we have confidence the upgrade didn't break functionality</soThat>
+    <tasks>
+      <task id="1" acs="3">Run lint checks - pnpm exec nx run-many -t lint</task>
+      <task id="2" acs="4">Run TypeScript typechecks - pnpm exec nx run-many -t typecheck</task>
+      <task id="3" acs="2">Run build - pnpm exec nx run-many -t build</task>
+      <task id="4" acs="1">Run unit tests - pnpm exec nx run-many -t test</task>
+      <task id="5" acs="1-4">Document and fix any failures</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">All tests pass: pnpm exec nx run-many -t test</criterion>
+    <criterion id="2">All builds pass: pnpm exec nx run-many -t build</criterion>
+    <criterion id="3">All lint checks pass: pnpm exec nx run-many -t lint</criterion>
+    <criterion id="4">Typecheck passes: pnpm exec nx run-many -t typecheck</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/epic-5b-nx-upgrade-analysis.md</path>
+        <title>Epic 5b Nx Upgrade Analysis</title>
+        <section>Risk Assessment, Breaking Changes</section>
+        <snippet>Documents expected breaking changes in Jest configuration, ESLint configuration, TypeScript paths.</snippet>
+      </doc>
+      <doc>
+        <path>docs/memories/testing-reference.md</path>
+        <title>Testing Reference</title>
+        <section>Jest Configuration Patterns</section>
+        <snippet>Jest configuration patterns, workspace preset usage, TypeScript settings for tests.</snippet>
+      </doc>
+      <doc>
+        <path>docs/memories/troubleshooting.md</path>
+        <title>Troubleshooting Guide</title>
+        <section>Jest Issues, Windows Hanging</section>
+        <snippet>Jest hanging solutions: NX_DAEMON=false, --no-cloud flag usage.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>apps/web/jest.config.ts</path>
+        <kind>test-config</kind>
+        <symbol>Jest configuration for web app</symbol>
+        <reason>May need updates for Nx 22.x Jest migrations</reason>
+      </file>
+      <file>
+        <path>apps/server/jest.config.ts</path>
+        <kind>test-config</kind>
+        <symbol>Jest configuration for server</symbol>
+        <reason>May need updates for Nx 22.x Jest migrations</reason>
+      </file>
+      <file>
+        <path>packages/schemas/jest.config.ts</path>
+        <kind>test-config</kind>
+        <symbol>Jest configuration for schemas package</symbol>
+        <reason>Reference for package-level Jest configuration</reason>
+      </file>
+      <file>
+        <path>tsconfig.base.json</path>
+        <kind>typescript-config</kind>
+        <symbol>Base TypeScript configuration</symbol>
+        <reason>Path resolution may change with Nx 22.x</reason>
+      </file>
+      <file>
+        <path>eslint.config.mjs</path>
+        <kind>lint-config</kind>
+        <symbol>ESLint flat config</symbol>
+        <reason>May be affected by @nx/eslint updates</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <ecosystem name="testing">
+        <package name="jest" version="30.2.0" />
+        <package name="@swc/jest" version="~0.2.38" />
+        <package name="@nx/jest" version="22.2.0+" />
+        <package name="@testing-library/react" version="16.2.0" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="pattern">Tests are co-located in src/ next to source files (.spec.ts pattern)</constraint>
+    <constraint type="windows">If Jest hangs on Windows, use NX_DAEMON=false or --no-cloud</constraint>
+    <constraint type="command">Use pnpm exec nx commands, never npm or yarn</constraint>
+    <constraint type="documentation">Document all fixes in commit messages for future reference</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Nx Run Many Test</name>
+      <kind>CLI command</kind>
+      <signature>pnpm exec nx run-many -t test</signature>
+      <path>node_modules/nx/bin/nx.js</path>
+    </interface>
+    <interface>
+      <name>Nx Run Many Build</name>
+      <kind>CLI command</kind>
+      <signature>pnpm exec nx run-many -t build</signature>
+      <path>node_modules/nx/bin/nx.js</path>
+    </interface>
+    <interface>
+      <name>Nx Run Many Lint</name>
+      <kind>CLI command</kind>
+      <signature>pnpm exec nx run-many -t lint</signature>
+      <path>node_modules/nx/bin/nx.js</path>
+    </interface>
+    <interface>
+      <name>Nx Run Many Typecheck</name>
+      <kind>CLI command</kind>
+      <signature>pnpm exec nx run-many -t typecheck</signature>
+      <path>node_modules/nx/bin/nx.js</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Jest 30.2.0 with @swc/jest transformer. Co-locate test files next to source files using .spec.ts pattern.
+      Run tests via: pnpm exec nx run-many -t test
+      If Windows + hanging: use NX_DAEMON=false pnpm exec nx run-many -t test
+    </standards>
+    <locations>
+      <location>apps/web/src/**/*.spec.tsx</location>
+      <location>apps/server/src/**/*.spec.ts</location>
+      <location>packages/*/src/**/*.spec.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Run all tests with verbose output to identify failures</idea>
+      <idea ac="2">Verify build outputs are generated correctly</idea>
+      <idea ac="3">Check for new ESLint deprecation warnings</idea>
+      <idea ac="4">Verify TypeScript paths resolve correctly</idea>
+    </ideas>
+  </tests>
+</story-context>

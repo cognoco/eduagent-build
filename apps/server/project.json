@@ -25,7 +25,10 @@
         "{projectRoot}/scripts/write-openapi.ts"
       ],
       "outputs": ["{workspaceRoot}/packages/api-client/src/gen/openapi.json"],
-      "cache": true
+      "cache": true,
+      "metadata": {
+        "description": "Generates OpenAPI spec from compiled server routes. Cache invalidated via sharedGlobals bust (nx.json) after Nx 22 migration."
+      }
     },
     "spec-validate": {
       "executor": "nx:run-commands",

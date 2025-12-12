@@ -96,6 +96,7 @@ This document provides the complete epic and story breakdown for the AI-Native N
 | Epic 3: Observability Baseline | FR17 | MVP |
 | Epic 4: Authentication Infrastructure | FR10 (completion) | MVP |
 | Epic 5: CI/CD Staging & Production Deployment | FR16, FR18, FR19 | MVP |
+| Epic 5b: Nx 22.x Infrastructure Upgrade | Enables FR20, FR21, FR22 | MVP |
 | Epic 6: Mobile Walking Skeleton | FR20, FR21, FR22 | MVP |
 | Epic 7: MVP Documentation | FR5 | MVP |
 | Epic 8: Task Data Model & CRUD | FR23, FR25 | PoC |
@@ -812,6 +813,401 @@ So that I have confidence in deployment portability.
 
 ---
 
+## Epic 5b: Nx 22.x Infrastructure Upgrade
+
+**Status:** 🚧 **IN PROGRESS** | Branch: `e5b/expo-prep`
+
+**User Value Statement:** The monorepo foundation is upgraded to support modern Expo SDK 54 development, enabling Epic 6 mobile implementation with proper @nx/expo plugin integration.
+
+**PRD Coverage:** Enables FR20, FR21, FR22 (Mobile requirements)
+
+**Technical Context from Architecture Analysis (2025-12-11):**
+- **Current state:** Nx 21.6.5 with all @nx/* plugins at 21.6.5, React 19.0.1
+- **Target state:** Nx 22.2.0+ with @nx/expo plugin, React 19.1.0
+- **Critical finding:** Current @nx/expo plugin **requires** Expo SDK >= 54.0.0
+- **Expo SDK 54:** Uses React 19.1.0, React Native 0.81, stable release
+- **React alignment:** SDK 54's React 19.1.0 aligns perfectly with web app's React 19.0.1 (minor bump)
+
+**Architecture Decision Reference:** See `docs/sprint-artifacts/epic-5b-nx-upgrade-analysis.md` for full research findings including:
+- Nx + Expo SDK version compatibility matrix
+- React version alignment strategy
+- Community experiences and known issues
+- Risk assessment and mitigation strategies
+
+**Why This Epic Exists:**
+1. @nx/expo (current) requires Expo SDK >= 54.0.0
+2. Nx 22.2.0+ required for SDK 54 support (migration `update-22-2-0-add-expo-system-ui`)
+3. All @nx/* packages must upgrade together (version pinning policy)
+4. React 19.0.1 → 19.1.0 alignment enables maximum code sharing between web and mobile
+
+**Dependencies:** None (foundational infrastructure work)
+**Blocking:** Epic 6 (Mobile Walking Skeleton)
+
+**Risk Assessment:**
+- **Blast radius:** All build/test/lint operations (Nx core upgrade)
+- **Mitigation:** Separate branch, full regression testing before merge
+- **Rollback:** Abandon branch if critical issues discovered
+
+**Progress:**
+- [x] Analysis complete (2025-12-11)
+- [x] Branch created: `e5b/expo-prep`
+- [ ] Nx migrate executed
+- [ ] Plugins updated
+- [ ] Tests validated
+- [ ] React updated
+- [ ] CI validated
+- [ ] @nx/expo installed
+- [ ] Docs updated
+- [ ] Merged to main
+
+---
+
+### Story 5b.1: Create Upgrade Branch and Run Nx Migrate
+
+**Status:** 🚧 In Progress | Branch: `e5b/expo-prep` ✅
+
+As a DevOps engineer,
+I want to initiate the Nx upgrade in an isolated branch,
+So that we can safely test the upgrade without affecting main.
+
+**Acceptance Criteria:**
+
+**Given** the main branch is stable
+**When** I create the upgrade branch and run Nx migrate
+**Then** the branch `e5b/expo-prep` exists ✅ (created 2025-12-11)
+
+**And** `pnpm exec nx migrate 22.2.0` completes successfully ⏳
+**And** migrations.json file is generated (if any migrations needed)
+**And** No immediate breaking errors in migration output
+
+**Prerequisites:** None
+
+**Technical Notes:**
+- ~~Create branch: `git checkout -b epic/nx-22-upgrade`~~ → Branch `e5b/expo-prep` created
+- Run: `pnpm exec nx migrate 22.2.0`
+- Review generated migrations.json before proceeding
+- Document any warnings or notes from migrate output
+
+**Handover Context:**
+- **Assigned Persona:** 🏗️ Architect (Vimes)
+- **From:** Epic start - analysis complete (see `docs/sprint-artifacts/epic-5b-nx-upgrade-analysis.md`)
+- **Artifacts produced:** Branch created, migrations.json generated, migration output documented
+- **Handover to:** 💻 Dev (Mort) for Story 5b.2
+- **Context for next:** Review migrations.json contents; proceed with `nx migrate --run-migrations`
+
+---
+
+### Story 5b.2: Execute Migrations and Update All @nx/* Plugins
+
+As a DevOps engineer,
+I want all @nx/* plugins updated to match Nx 22.2.0,
+So that the workspace has consistent tooling versions.
+
+**Acceptance Criteria:**
+
+**Given** migrations.json exists from Story 5b.1
+**When** I run migrations and update plugins
+**Then** the following are updated in package.json:
+  - `nx`: 22.2.0 (or latest 22.x)
+  - All `@nx/*` packages: matching version
+
+**And** `pnpm install` completes without errors
+**And** `pnpm exec nx migrate --run-migrations` completes
+**And** Version pinning policy is maintained (all @nx/* match)
+
+**Prerequisites:** Story 5b.1 complete
+
+**Technical Notes:**
+- Affected packages: @nx/devkit, @nx/esbuild, @nx/eslint, @nx/eslint-plugin, @nx/jest, @nx/js, @nx/next, @nx/node, @nx/playwright, @nx/react, @nx/workspace
+- Run: `pnpm install` after package.json updates
+- Run: `pnpm exec nx migrate --run-migrations`
+- Verify all versions match in package.json
+
+**Handover Context:**
+- **Assigned Persona:** 💻 Dev (Mort) | 🏗️ Architect (Vimes) oversight
+- **From:** 🏗️ Architect (Vimes) - Story 5b.1 (migrations.json ready)
+- **Artifacts produced:** Updated package.json, lock file refreshed, migrations executed
+- **Handover to:** 🧪 TEA (Vetinari) for Story 5b.3
+- **Context for next:** All @nx/* versions now at 22.x; expect potential Jest config changes; run full test suite
+
+---
+
+### Story 5b.3: Run Full Test Suite and Fix Breaking Changes
+
+As a developer,
+I want all existing tests to pass after the Nx upgrade,
+So that we have confidence the upgrade didn't break functionality.
+
+**Acceptance Criteria:**
+
+**Given** all @nx/* plugins are updated
+**When** I run the full test suite
+**Then** all tests pass: `pnpm exec nx run-many -t test`
+
+**And** all builds pass: `pnpm exec nx run-many -t build`
+**And** all lint checks pass: `pnpm exec nx run-many -t lint`
+**And** typecheck passes: `pnpm exec nx run-many -t typecheck`
+
+**If failures occur:**
+**Then** breaking changes are identified and fixed
+**And** fixes are documented in commit messages
+
+**Prerequisites:** Story 5b.2 complete
+
+**Technical Notes:**
+- Run each target separately to isolate issues
+- Check Nx 22.x release notes for breaking changes
+- Jest configuration may need updates (Nx 22.2 has Jest-specific migrations)
+- Document any manual fixes required
+
+**Handover Context:**
+- **Assigned Persona:** 🧪 TEA (Vetinari) | 💻 Dev (Mort) for fixes
+- **From:** 💻 Dev (Mort) - Story 5b.2 (plugins updated)
+- **Artifacts produced:** All tests green, all builds passing, fixes documented in commits
+- **Handover to:** 💻 Dev (Mort) for Story 5b.4
+- **Context for next:** Test infrastructure stable; proceed with React version alignment
+- **Known concerns:** Windows Jest hanging issue may surface; use `NX_DAEMON=false` if needed
+
+---
+
+### Story 5b.4: Update React to 19.1.0
+
+As a developer,
+I want React aligned at 19.1.0 across the monorepo,
+So that web and mobile share the same React version.
+
+**Acceptance Criteria:**
+
+**Given** tests pass with Nx 22.x
+**When** I update React version
+**Then** package.json has:
+  - `react`: 19.1.0 (from 19.0.1)
+  - `react-dom`: 19.1.0 (from 19.0.1)
+
+**And** `@types/react` and `@types/react-dom` are compatible
+**And** `pnpm install` completes without peer dependency errors
+**And** Web app builds and runs correctly
+**And** All tests still pass
+
+**Prerequisites:** Story 5b.3 complete
+
+**Technical Notes:**
+- This is a patch version bump (19.0.1 → 19.1.0) - low risk
+- Check React 19.1 release notes for any changes
+- Verify no breaking changes in testing-library compatibility
+- Update docs/tech-stack.md with new React version
+
+**Handover Context:**
+- **Assigned Persona:** 💻 Dev (Mort)
+- **From:** 🧪 TEA (Vetinari) - Story 5b.3 (tests passing)
+- **Artifacts produced:** React 19.1.0 in package.json, docs/tech-stack.md updated
+- **Handover to:** 💻 Dev (Mort) for Story 5b.5
+- **Context for next:** Local tests pass; verify CI pipeline behaves the same
+
+---
+
+### Story 5b.5: Validate CI/CD Pipeline
+
+As a DevOps engineer,
+I want CI/CD to pass with the upgraded tooling,
+So that automated quality gates work correctly.
+
+**Acceptance Criteria:**
+
+**Given** all local tests pass
+**When** I push the upgrade branch to GitHub
+**Then** CI workflow completes successfully
+
+**And** All existing CI jobs pass (lint, test, build, typecheck, e2e)
+**And** Nx Cloud caching still works (if enabled)
+**And** No new warnings or deprecations in CI logs
+
+**Prerequisites:** Story 5b.4 complete
+
+**Technical Notes:**
+- Push branch and create draft PR to trigger CI
+- Monitor CI job output for warnings
+- Verify cache hit rates haven't degraded
+- Check Nx Cloud dashboard if available
+
+**Handover Context:**
+- **Assigned Persona:** 💻 Dev (Mort) | 🧪 TEA (Vetinari) for test validation
+- **From:** 💻 Dev (Mort) - Story 5b.4 (React updated)
+- **Artifacts produced:** CI green on branch, draft PR created, Nx Cloud verified
+- **Handover to:** 🏗️ Architect (Vimes) for Story 5b.6
+- **Context for next:** Infrastructure validated; ready to add @nx/expo plugin
+
+---
+
+### Story 5b.6: Install @nx/expo Plugin
+
+As a mobile developer,
+I want the @nx/expo plugin installed,
+So that we can generate and manage Expo applications.
+
+**Acceptance Criteria:**
+
+**Given** Nx 22.x is validated
+**When** I install the @nx/expo plugin
+**Then** `nx add @nx/expo` completes successfully
+
+**And** @nx/expo version matches other @nx/* packages (22.2.0+)
+**And** `pnpm exec nx list @nx/expo` shows available generators
+**And** No peer dependency conflicts
+
+**Prerequisites:** Story 5b.5 complete
+
+**Technical Notes:**
+- Run: `nx add @nx/expo`
+- Verify plugin installation: `pnpm exec nx list @nx/expo`
+- Check that generators are available: application, library, component
+- Do NOT generate mobile app yet (that's Epic 6)
+
+**Handover Context:**
+- **Assigned Persona:** 🏗️ Architect (Vimes) | 💻 Dev (Mort) support
+- **From:** 💻 Dev (Mort) - Story 5b.5 (CI validated)
+- **Artifacts produced:** @nx/expo plugin installed, generators verified available
+- **Handover to:** 💻 Dev (Mort) for Story 5b.7
+- **Context for next:** Plugin ready; install Expo CLI and EAS CLI tooling
+
+---
+
+### Story 5b.7: Install and Configure Expo CLIs
+
+As a mobile developer,
+I want the Expo and EAS CLIs properly installed and configured,
+So that I can run development commands and cloud builds.
+
+**Acceptance Criteria:**
+
+**Given** @nx/expo plugin is installed
+**When** I install and configure the CLIs
+**Then** the following are working:
+
+**Expo CLI (bundled with expo package):**
+- `npx expo --version` returns version info
+- `npx expo doctor` runs successfully
+
+**EAS CLI (separate global install):**
+- `npm install -g eas-cli` completes successfully
+- `eas --version` returns version info
+- `eas login` authenticates with Expo account
+- `eas whoami` confirms logged-in user
+
+**And** EAS project is initialized (if needed): `eas init`
+**And** CLI versions are documented in `docs/tech-stack.md`
+
+**Prerequisites:** Story 5b.6 complete
+
+**Technical Notes:**
+- Expo CLI: Bundled with `expo` package, accessed via `npx expo [command]`
+- EAS CLI: Requires separate global install: `npm install -g eas-cli`
+- EAS account required for cloud builds (free tier available)
+- Consider adding `eas-cli` to package.json devDependencies for CI consistency
+- Alternative: Use `npx eas-cli@latest` instead of global install
+- Document which team members need EAS account access
+
+**CLI Commands Reference:**
+```bash
+# Expo CLI (local development)
+npx expo start          # Start dev server
+npx expo install        # Install compatible packages
+npx expo doctor         # Diagnose project issues
+npx expo prebuild       # Generate native directories
+
+# EAS CLI (cloud services)
+eas login               # Authenticate with Expo account
+eas init                # Initialize EAS project
+eas build               # Create cloud builds
+eas update              # Push OTA updates
+eas submit              # Submit to app stores
+```
+
+**Handover Context:**
+- **Assigned Persona:** 💻 Dev (Mort)
+- **From:** 🏗️ Architect (Vimes) - Story 5b.6 (@nx/expo installed)
+- **Artifacts produced:** Expo CLI verified, EAS CLI installed and authenticated, docs/tech-stack.md updated
+- **Handover to:** 📚 Tech Writer (Twoflower) for Story 5b.8
+- **Context for next:** All tooling installed; document the upgrade for team awareness
+
+---
+
+### Story 5b.8: Update Documentation
+
+As a developer,
+I want documentation updated to reflect the new versions,
+So that the team has accurate reference information.
+
+**Acceptance Criteria:**
+
+**Given** all upgrades are validated
+**When** I update documentation
+**Then** the following are updated:
+  - `docs/tech-stack.md`: Nx version, React version, @nx/expo added
+  - `docs/architecture-decisions.md`: SDK 54 decision documented (if not exists)
+  - `.ruler/AGENTS.md`: Any Nx command changes
+
+**And** Version dates are updated
+**And** Compatibility matrix reflects new versions
+
+**Prerequisites:** Story 5b.6 complete
+
+**Technical Notes:**
+- Create `docs/sprint-artifacts/epic-5b-nx-upgrade-analysis.md` with full research
+- Update Nx version references throughout docs
+- Document the SDK 54 requirement rationale
+- Note: Do NOT edit CLAUDE.md directly (Ruler manages it)
+
+**Handover Context:**
+- **Assigned Persona:** 📚 Tech Writer (Twoflower) | 🏗️ Architect (Vimes) for technical review
+- **From:** 💻 Dev (Mort) - Story 5b.7 (CLIs installed)
+- **Artifacts produced:** Updated tech-stack.md, architecture-decisions.md, AGENTS.md
+- **Handover to:** 🏃 SM (Rincewind) for Story 5b.9
+- **Context for next:** Documentation complete; coordinate final validation and merge
+
+---
+
+### Story 5b.9: Final Validation and Merge to Main
+
+As a team lead,
+I want to validate the complete upgrade before merging,
+So that main branch remains stable with upgraded infrastructure.
+
+**Acceptance Criteria:**
+
+**Given** all upgrade stories are complete
+**When** I perform final validation
+**Then** the following are verified:
+  - Fresh clone + install works
+  - All apps start correctly (web, server)
+  - All test suites pass
+  - E2E tests pass
+  - No TypeScript errors
+  - CI pipeline green
+
+**And** PR is approved by reviewer
+**And** Branch is merged to main
+**And** Post-merge CI confirms stability
+
+**Prerequisites:** Stories 5b.1-5b.8 complete
+
+**Technical Notes:**
+- Create comprehensive PR description with upgrade summary
+- Include before/after version comparison
+- Tag PR with appropriate labels
+- Consider squash merge to keep history clean
+- Announce upgrade in team channel after merge
+
+**Handover Context:**
+- **Assigned Persona:** 🏃 SM (Rincewind) | All personas for sign-off
+- **From:** 📚 Tech Writer (Twoflower) - Story 5b.8 (docs complete)
+- **Artifacts produced:** Merged PR, main branch stable, team notified
+- **Handover to:** Epic 6 (Mobile Walking Skeleton) - unblocked
+- **Context for next:** Nx 22.x + @nx/expo + React 19.1.0 ready; proceed with `nx g @nx/expo:app`
+- **Sign-off required:** 🏗️ Architect (Vimes), 🧪 TEA (Vetinari), 💻 Dev (Mort)
+
+---
+
 ## Epic 6: Mobile Walking Skeleton
 
 **User Value Statement:** Mobile app validates that shared business logic works identically across platforms, proving cross-platform code sharing.
@@ -824,14 +1220,20 @@ So that I have confidence in deployment portability.
 - Same API endpoints as web
 - Expo managed workflow
 
-> **📋 Design Decisions Document:** See `docs/sprint-artifacts/epic-6-design-decisions.md` for architectural decisions made during technical contexting (2025-12-05). Key decisions:
-> - **Expo SDK 53** (stable) - React 19.0.0 matches web exactly
-> - **Expo Router** - File-based routing (officially recommended)
-> - **Walking skeleton approach** - Use out-of-box scaffolding, no custom navigation patterns
+> **📋 Design Decisions Document:** See `docs/sprint-artifacts/epic-6-design-decisions.md` for architectural decisions made during technical contexting (2025-12-05).
 >
-> **⚠️ Post-Implementation:** Formalize validated decisions into `docs/architecture.md`, `docs/tech-stack.md`, and memory files.
+> **⚠️ UPDATED 2025-12-11:** Architecture analysis determined SDK 54 is required:
+> - **Expo SDK 54** (stable) - Required by @nx/expo plugin (>= 54.0.0)
+> - **React 19.1.0** - Aligns with web app after Epic 5b upgrade
+> - **Nx 22.2.0+** - Required for SDK 54 support
+> - See `docs/sprint-artifacts/epic-5b-nx-upgrade-analysis.md` for full analysis
+>
+> **Previous decision (SDK 53) superseded by Epic 5b analysis.**
 
-**Dependencies:** Epic 1 complete, Epic 5 recommended (staging for mobile testing)
+**Dependencies:**
+- **Epic 5b REQUIRED** (Nx 22.x Infrastructure Upgrade) - provides @nx/expo plugin and SDK 54 support
+- Epic 1 complete
+- Epic 5 recommended (staging for mobile testing)
 
 ### Story 6.1: Generate Expo Mobile Application
 
@@ -841,7 +1243,7 @@ So that I can build cross-platform mobile experiences.
 
 **Acceptance Criteria:**
 
-**Given** the Nx workspace exists
+**Given** Epic 5b is complete (Nx 22.x + @nx/expo installed)
 **When** I generate the mobile app with `pnpm exec nx g @nx/expo:app mobile --directory=apps/mobile`
 **Then** the app is created with correct structure
 
@@ -849,15 +1251,15 @@ So that I can build cross-platform mobile experiences.
 **And** `pnpm exec nx run mobile:lint` passes
 **And** `pnpm exec nx run mobile:test` passes (default tests)
 
-**Prerequisites:** None
+**Prerequisites:** **Epic 5b complete** (Nx 22.x Infrastructure Upgrade)
 
 **Technical Notes:**
-- **SDK Version:** Use Expo SDK 53 (stable) with React 19.0.0 (see `epic-6-design-decisions.md`)
-- **Nx Generation:** Primary: `pnpm exec nx g @nx/expo:app mobile --directory=apps/mobile`
-- **Fallback:** If @nx/expo doesn't support SDK 53, use `create-expo-app` and integrate manually
+- **SDK Version:** Expo SDK 54 (required by @nx/expo >= 54.0.0) with React 19.1.0
+- **Nx Generation:** `pnpm exec nx g @nx/expo:app mobile --directory=apps/mobile`
+- **Architecture:** Use New Architecture (default in SDK 54, required in SDK 55)
 - Follow `docs/memories/post-generation-checklist.md` after generation
 - Verify path aliases work for shared packages
-- Configure Metro for monorepo support (see `epic-6-design-decisions.md` D4)
+- Metro bundler configured automatically by @nx/expo
 - Update `.github/workflows/ci.yml` if needed
 
 ---
@@ -1329,6 +1731,13 @@ So that I can make type-safe task API calls.
 - JWT tokens for API authentication
 - Server middleware from Epic 4
 - Client-side auth state from Epic 4
+
+**⚠️ Pre-Implementation Note (Added 2025-12-12):**
+- Next.js 16 deprecates `middleware.ts` in favor of `proxy.ts` convention
+- When enabling route protection (Story 9.4), migrate `apps/web/src/middleware.ts` → `proxy.ts`
+- Migration codemod: `npx @next/codemod@canary middleware-to-proxy`
+- Benefit: `proxy.ts` runs on Node.js runtime (not Edge), better for Supabase Auth server calls
+- See: https://nextjs.org/docs/messages/middleware-to-proxy
 
 **Dependencies:** Epic 4 complete (auth infrastructure), Epic 8 complete (task endpoints to protect)
 
@@ -2101,7 +2510,8 @@ So that we're ready for real user traffic.
 | 3 | Observability Baseline | MVP | 4 | ✅ Complete |
 | 4 | Authentication Infrastructure | MVP | 4 | ✅ Complete |
 | 5 | CI/CD Multi-Platform Deployment | MVP | 10 | In Progress |
-| 6 | Mobile Walking Skeleton | MVP | 7 | Pending |
+| **5b** | **Nx 22.x Infrastructure Upgrade** | **MVP** | **9** | **🚧 In Progress** |
+| 6 | Mobile Walking Skeleton | MVP | 7 | Blocked by 5b |
 | 7 | MVP Documentation | MVP | 4 | Pending |
 | 8 | Task Data Model & CRUD | PoC | 5 | Pending |
 | 9 | User Authentication Flows | PoC | 5 | Pending |
@@ -2113,16 +2523,17 @@ So that we're ready for real user traffic.
 
 ### Totals
 
-- **Phase 1 MVP:** 7 Epics, 33 Stories (Epics 1, 3, 4 complete; Epic 5 in progress)
+- **Phase 1 MVP:** 8 Epics, 42 Stories (Epics 1, 3, 4 complete; Epic 5 in progress; Epic 5b blocks Epic 6)
 - **Phase 2 PoC:** 7 Epics, 30 Stories
-- **Total:** 14 Epics, 63 Stories
+- **Total:** 15 Epics, 72 Stories
 
 ### Key Milestones
 
-1. **MVP Complete:** All Epics 1-7 done - template is production-ready
-2. **PoC Core Features:** Epics 8-11 done - Task app fully functional
-3. **Quality Certified:** Epic 12 done - 80% coverage enforced
-4. **Production Ready:** Epics 13-14 done - deployed and monitored
+1. **Infrastructure Ready:** Epic 5b done - Nx 22.x + @nx/expo enables mobile development
+2. **MVP Complete:** All Epics 1-7 done - template is production-ready (includes mobile walking skeleton)
+3. **PoC Core Features:** Epics 8-11 done - Task app fully functional
+4. **Quality Certified:** Epic 12 done - 80% coverage enforced
+5. **Production Ready:** Epics 13-14 done - deployed and monitored
 
 ---
 

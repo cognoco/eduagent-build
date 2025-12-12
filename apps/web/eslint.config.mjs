@@ -1,18 +1,12 @@
-import { FlatCompat } from '@eslint/eslintrc';
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
-import js from '@eslint/js';
-import { fixupConfigRules } from '@eslint/compat';
 import nx from '@nx/eslint-plugin';
+import nextPlugin from '@next/eslint-plugin-next';
 import baseConfig from '../../eslint.config.mjs';
-const compat = new FlatCompat({
-  baseDirectory: dirname(fileURLToPath(import.meta.url)),
-  recommendedConfig: js.configs.recommended,
-});
 
 const config = [
-  ...fixupConfigRules(compat.extends('next')),
-  ...fixupConfigRules(compat.extends('next/core-web-vitals')),
+  // Use Next.js 16 flat config (ESLint 9 compatible)
+  // API changed in 16.x: flatConfig.* → configs.*
+  nextPlugin.configs.recommended,
+  nextPlugin.configs['core-web-vitals'],
   ...baseConfig,
   ...nx.configs['flat/react-typescript'],
   {

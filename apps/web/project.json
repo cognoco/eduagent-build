@@ -31,7 +31,7 @@
       "dependsOn": ["^build"],
       "options": {
         "cwd": "apps/web",
-        "command": "tsc --noEmit"
+        "command": "pnpm exec next typegen && tsc --noEmit"
       },
       "cache": true,
       "inputs": [
@@ -41,9 +41,10 @@
           "externalDependencies": ["typescript"]
         }
       ],
+      "outputs": ["{projectRoot}/.next/types"],
       "metadata": {
         "technologies": ["typescript"],
-        "description": "Runs type-checking for the project."
+        "description": "Runs type-checking for the project. Outputs include generated route types from next typegen."
       }
     },
     "format:check": {}

@@ -101,3 +101,4 @@ After migration:
 **Applies To:** Next.js 15+, @sentry/nextjs 8.28.0+, Turbopack
 **Severity:** Breaking change (silent failure)
 
+

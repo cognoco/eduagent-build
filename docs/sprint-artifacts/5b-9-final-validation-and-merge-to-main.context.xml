@@ -1,0 +1,149 @@
+<story-context id="5b-9-final-validation-and-merge-to-main" v="1.0">
+  <metadata>
+    <epicId>5b</epicId>
+    <storyId>9</storyId>
+    <title>Final Validation and Merge to Main</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-12-11</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/5b-9-final-validation-and-merge-to-main.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>team lead</asA>
+    <iWant>to validate the complete upgrade before merging</iWant>
+    <soThat>main branch remains stable with upgraded infrastructure</soThat>
+    <tasks>
+      <task id="1" acs="1">Fresh clone validation - clone to new directory, pnpm install</task>
+      <task id="2" acs="2,3,4,5">Run full quality gates - lint, typecheck, test, build, e2e</task>
+      <task id="3" acs="2">Manual smoke testing - start web and server, verify health check</task>
+      <task id="4" acs="6">Create PR - comprehensive description, link to analysis</task>
+      <task id="5" acs="6">PR review - request review, address feedback</task>
+      <task id="6" acs="7">Merge to main - squash merge, delete feature branch</task>
+      <task id="7" acs="8">Post-merge validation - verify CI passes on main</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Fresh clone + install works without errors</criterion>
+    <criterion id="2">All apps start correctly (web, server)</criterion>
+    <criterion id="3">All test suites pass</criterion>
+    <criterion id="4">E2E tests pass</criterion>
+    <criterion id="5">No TypeScript errors</criterion>
+    <criterion id="6">PR approved by reviewer</criterion>
+    <criterion id="7">Branch merged to main</criterion>
+    <criterion id="8">Post-merge CI confirms stability</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/epic-5b-nx-upgrade-analysis.md</path>
+        <title>Epic 5b Nx Upgrade Analysis</title>
+        <section>Complete Document</section>
+        <snippet>Complete upgrade context for PR description. Link in PR.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epics</title>
+        <section>Epic 6 dependency</section>
+        <snippet>Epic 6 depends on 5b completion. This merge unblocks mobile development.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>.github/workflows/ci.yml</path>
+        <kind>ci-config</kind>
+        <symbol>CI workflow</symbol>
+        <reason>CI must pass on main after merge</reason>
+      </file>
+      <file>
+        <path>package.json</path>
+        <kind>manifest</kind>
+        <symbol>All dependencies</symbol>
+        <reason>Fresh install must succeed</reason>
+      </file>
+      <file>
+        <path>apps/web/src/app/page.tsx</path>
+        <kind>react-component</kind>
+        <symbol>Home page</symbol>
+        <reason>Manual smoke test target</reason>
+      </file>
+      <file>
+        <path>apps/server/src/main.ts</path>
+        <kind>server-entry</kind>
+        <symbol>Server entry point</symbol>
+        <reason>Manual smoke test target</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <ecosystem name="final-state">
+        <package name="nx" version="22.2.0+" />
+        <package name="@nx/expo" version="22.2.0+" />
+        <package name="react" version="19.1.0" />
+        <package name="react-dom" version="19.1.0" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="process">All previous Epic 5b stories (5b.1-5b.8) must be complete</constraint>
+    <constraint type="git">Use squash merge for clean history</constraint>
+    <constraint type="git">Delete feature branch after merge</constraint>
+    <constraint type="review">Require at least one reviewer approval</constraint>
+    <constraint type="ci">CI must be green before and after merge</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Fresh Clone Test</name>
+      <kind>CLI commands</kind>
+      <signature>git clone ... &amp;&amp; cd ... &amp;&amp; pnpm install</signature>
+      <path>N/A</path>
+    </interface>
+    <interface>
+      <name>Quality Gates</name>
+      <kind>CLI commands</kind>
+      <signature>pnpm exec nx run-many -t lint typecheck test build e2e</signature>
+      <path>node_modules/nx/bin/nx.js</path>
+    </interface>
+    <interface>
+      <name>Web Dev Server</name>
+      <kind>CLI command</kind>
+      <signature>pnpm exec nx run web:dev</signature>
+      <path>apps/web</path>
+    </interface>
+    <interface>
+      <name>Server</name>
+      <kind>CLI command</kind>
+      <signature>pnpm exec nx run server:serve</signature>
+      <path>apps/server</path>
+    </interface>
+    <interface>
+      <name>GitHub PR</name>
+      <kind>Web interface</kind>
+      <signature>gh pr create</signature>
+      <path>GitHub</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Final validation story - comprehensive verification before merge.
+      Run full test suite, E2E tests, and manual smoke tests.
+    </standards>
+    <locations>
+      <location>All test locations across workspace</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Verify pnpm install completes without errors on fresh clone</idea>
+      <idea ac="2">Verify web app loads at localhost:3000</idea>
+      <idea ac="2">Verify server responds at localhost:3001/health</idea>
+      <idea ac="3,4,5">Verify all nx run-many commands pass</idea>
+      <idea ac="6,7">Verify GitHub PR is approved and merged</idea>
+      <idea ac="8">Verify CI is green on main branch after merge</idea>
+    </ideas>
+  </tests>
+</story-context>

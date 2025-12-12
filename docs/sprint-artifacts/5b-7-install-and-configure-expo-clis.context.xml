@@ -1,0 +1,122 @@
+<story-context id="5b-7-install-and-configure-expo-clis" v="1.0">
+  <metadata>
+    <epicId>5b</epicId>
+    <storyId>7</storyId>
+    <title>Install and Configure Expo CLIs</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-12-11</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/5b-7-install-and-configure-expo-clis.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>mobile developer</asA>
+    <iWant>the Expo and EAS CLIs properly installed and configured</iWant>
+    <soThat>I can run development commands and cloud builds</soThat>
+    <tasks>
+      <task id="1" acs="1">Verify Expo CLI availability - npx expo --version, npx expo doctor</task>
+      <task id="2" acs="2">Install EAS CLI - npm install -g eas-cli or add to devDependencies</task>
+      <task id="3" acs="3">Configure EAS authentication - eas login, eas whoami</task>
+      <task id="4" acs="4">Initialize EAS project if needed - may defer to Epic 6</task>
+      <task id="5" acs="5">Document CLI setup - update docs/tech-stack.md</task>
+      <task id="6" acs="5">Consider CI configuration - document EAS CLI setup for CI</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">npx expo --version returns version info and npx expo doctor runs successfully</criterion>
+    <criterion id="2">eas --version returns version info after installation</criterion>
+    <criterion id="3">eas login authenticates and eas whoami confirms logged-in user</criterion>
+    <criterion id="4">EAS project initialized if mobile app exists (may defer to Epic 6)</criterion>
+    <criterion id="5">CLI versions documented in docs/tech-stack.md</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/epic-5b-nx-upgrade-analysis.md</path>
+        <title>Epic 5b Nx Upgrade Analysis</title>
+        <section>Expo SDK 54 Analysis</section>
+        <snippet>SDK 54 tooling requirements. Expo CLI bundled with expo package. EAS CLI for cloud services.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-stack.md</path>
+        <title>Technology Stack Reference</title>
+        <section>Tooling</section>
+        <snippet>Will be updated with Expo CLI and EAS CLI references.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>package.json</path>
+        <kind>manifest</kind>
+        <symbol>devDependencies</symbol>
+        <reason>May add eas-cli as devDependency for CI consistency</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <ecosystem name="expo-cli">
+        <package name="expo" version="~54.0.0" note="Expo CLI bundled with expo package" />
+        <package name="eas-cli" version="latest" note="Global or devDependency" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="cli">Expo CLI is bundled with expo package - use npx expo commands</constraint>
+    <constraint type="cli">EAS CLI is separate - install globally or as devDependency</constraint>
+    <constraint type="authentication">EAS login requires Expo account</constraint>
+    <constraint type="documentation">Document CLI versions in docs/tech-stack.md</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Expo CLI Version</name>
+      <kind>CLI command</kind>
+      <signature>npx expo --version</signature>
+      <path>Bundled with expo package</path>
+    </interface>
+    <interface>
+      <name>Expo Doctor</name>
+      <kind>CLI command</kind>
+      <signature>npx expo doctor</signature>
+      <path>Bundled with expo package</path>
+    </interface>
+    <interface>
+      <name>EAS CLI Install</name>
+      <kind>CLI command</kind>
+      <signature>npm install -g eas-cli</signature>
+      <path>Global installation</path>
+    </interface>
+    <interface>
+      <name>EAS Login</name>
+      <kind>CLI command</kind>
+      <signature>eas login</signature>
+      <path>eas-cli</path>
+    </interface>
+    <interface>
+      <name>EAS Whoami</name>
+      <kind>CLI command</kind>
+      <signature>eas whoami</signature>
+      <path>eas-cli</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Tooling installation story - verification via CLI commands.
+    </standards>
+    <locations>
+      <location>N/A - tooling installation</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Verify npx expo --version outputs version number</idea>
+      <idea ac="1">Verify npx expo doctor completes without errors</idea>
+      <idea ac="2">Verify eas --version outputs version number</idea>
+      <idea ac="3">Verify eas whoami shows authenticated user</idea>
+      <idea ac="5">Verify docs/tech-stack.md contains CLI version information</idea>
+    </ideas>
+  </tests>
+</story-context>

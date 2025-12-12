@@ -1,0 +1,112 @@
+<story-context id="5b-6-install-nx-expo-plugin" v="1.0">
+  <metadata>
+    <epicId>5b</epicId>
+    <storyId>6</storyId>
+    <title>Install @nx/expo Plugin</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-12-11</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/5b-6-install-nx-expo-plugin.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>mobile developer</asA>
+    <iWant>the @nx/expo plugin installed</iWant>
+    <soThat>we can generate and manage Expo applications</soThat>
+    <tasks>
+      <task id="1" acs="1">Install @nx/expo plugin - nx add @nx/expo</task>
+      <task id="2" acs="2">Verify version alignment - confirm @nx/expo matches other @nx/* packages</task>
+      <task id="3" acs="3">Verify generators available - nx list @nx/expo</task>
+      <task id="4" acs="4">Check peer dependencies</task>
+      <task id="5" acs="3">Test generator (dry run) - nx g @nx/expo:app --help</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">nx add @nx/expo completes successfully</criterion>
+    <criterion id="2">@nx/expo version matches other @nx/* packages (22.2.0+)</criterion>
+    <criterion id="3">pnpm exec nx list @nx/expo shows available generators</criterion>
+    <criterion id="4">No peer dependency conflicts</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/epic-5b-nx-upgrade-analysis.md</path>
+        <title>Epic 5b Nx Upgrade Analysis</title>
+        <section>Nx Plugin Compatibility, Critical Discovery</section>
+        <snippet>@nx/expo current version requires expo >= 54.0.0. This means SDK 53 is not supported by current @nx/expo plugin.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Mobile Architecture Plan</section>
+        <snippet>Mobile app will integrate into existing dependency graph: mobile → api-client → schemas.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>package.json</path>
+        <kind>manifest</kind>
+        <symbol>devDependencies</symbol>
+        <reason>Will add @nx/expo as devDependency</reason>
+      </file>
+      <file>
+        <path>nx.json</path>
+        <kind>workspace-config</kind>
+        <symbol>plugins</symbol>
+        <reason>Plugin may add configuration to nx.json</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <ecosystem name="nx-expo">
+        <package name="@nx/expo" version="22.2.0+" note="Must match other @nx/* versions" />
+        <package name="expo" version=">= 54.0.0" note="Required by @nx/expo" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="version-match">@nx/expo MUST match other @nx/* package versions (22.2.0+)</constraint>
+    <constraint type="process">DO NOT generate mobile app in this story - that's Epic 6</constraint>
+    <constraint type="command">Use pnpm exec nx commands, never npm or yarn</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Nx Add Plugin</name>
+      <kind>CLI command</kind>
+      <signature>nx add @nx/expo</signature>
+      <path>node_modules/nx/bin/nx.js</path>
+    </interface>
+    <interface>
+      <name>Nx List Plugin</name>
+      <kind>CLI command</kind>
+      <signature>pnpm exec nx list @nx/expo</signature>
+      <path>node_modules/nx/bin/nx.js</path>
+    </interface>
+    <interface>
+      <name>Nx Expo App Generator Help</name>
+      <kind>CLI command</kind>
+      <signature>pnpm exec nx g @nx/expo:app --help</signature>
+      <path>node_modules/@nx/expo</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Plugin installation story - verification via CLI commands.
+    </standards>
+    <locations>
+      <location>N/A - plugin installation</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Verify nx add @nx/expo exits with success code</idea>
+      <idea ac="2">Verify package.json shows @nx/expo at same version as other @nx/*</idea>
+      <idea ac="3">Verify generators listed: application, library, component</idea>
+      <idea ac="4">Verify pnpm install has no peer dependency warnings</idea>
+    </ideas>
+  </tests>
+</story-context>

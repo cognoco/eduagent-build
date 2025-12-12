@@ -9,8 +9,8 @@
     "@nx-monorepo/api-client": "workspace:*",
     "@nx-monorepo/supabase-client": "workspace:*",
     "@sentry/nextjs": "^10.28.0",
-    "next": "~15.2.6",
-    "react": "19.0.1",
-    "react-dom": "19.0.1"
+    "next": "16.0.8",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
   }
 }
