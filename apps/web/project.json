@@ -31,7 +31,7 @@
       "dependsOn": ["^build"],
       "options": {
         "cwd": "apps/web",
-        "command": "tsc --noEmit"
+        "command": "pnpm exec next typegen && tsc --noEmit"
       },
       "cache": true,
       "inputs": [

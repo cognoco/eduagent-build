@@ -38,9 +38,9 @@ This document provides the complete technology stack inventory for the nx-monore
 
 | Package | Version | Pinning | Purpose |
 |---------|---------|---------|---------|
-| **next** | ~15.2.6 | Tilde (~) | React framework for web app |
-| **react** | 19.0.0 | Exact | UI library |
-| **react-dom** | 19.0.0 | Exact | React DOM renderer |
+| **next** | 16.0.8 | Exact | React framework for web app |
+| **react** | 19.1.0 | Exact | UI library |
+| **react-dom** | 19.1.0 | Exact | React DOM renderer |
 | **@types/react** | 19.0.1 | Exact | TypeScript types for React |
 | **@types/react-dom** | 19.0.1 | Exact | TypeScript types for React DOM |
 | **tailwindcss** | 3.4.3 | Exact | Utility-first CSS framework |
@@ -48,9 +48,10 @@ This document provides the complete technology stack inventory for the nx-monore
 | **postcss** | 8.4.38 | Exact | CSS transformation tool |
 
 **Rationale**:
-- **Next.js 15.2**: Latest stable with App Router, RSC, and React 19 support
-- **React 19**: Latest major version with improved concurrent features
-- **Tilde (~) on Next.js**: Allows patch updates (15.2.x) for security fixes while preventing minor version bumps
+- **Next.js 16.0**: Latest stable with App Router, RSC, Turbopack production builds, and React 19 support
+- **React 19.1**: Aligned with Expo SDK 54 for mobile parity; minor update from 19.0 with bug fixes and performance improvements
+- **Tilde (~) on Next.js**: Allows patch updates (16.0.x) for security fixes while preventing minor version bumps
+- **pnpm overrides**: Force React 19.1.0 across all dependencies to prevent version mismatch in monorepo
 
 ### Server Stack
 
@@ -106,8 +107,8 @@ This document provides the complete technology stack inventory for the nx-monore
 
 | Package | Version | Pinning | Purpose |
 |---------|---------|---------|---------|
-| **nx** | 21.6.5 | Exact | Monorepo build system |
-| **@nx/*** | 21.6.5 | Exact | Nx plugins (must match core) |
+| **nx** | 22.2.0 | Exact | Monorepo build system |
+| **@nx/*** | 22.2.0 | Exact | Nx plugins (must match core) |
 | **typescript** | ~5.9.2 | Tilde (~) | TypeScript compiler |
 | **eslint** | 9.37.0 | Exact | JavaScript/TypeScript linter |
 | **prettier** | ^2.6.2 | Caret (^) | Code formatter |
@@ -115,7 +116,7 @@ This document provides the complete technology stack inventory for the nx-monore
 | **lint-staged** | ^16.2.5 | Caret (^) | Run linters on staged files |
 
 **Rationale**:
-- **Nx 21.6.5**: All Nx packages must use same exact version for compatibility
+- **Nx 22.2.0**: Latest Nx major version with @nx/expo support for mobile development
 - **TypeScript ~5.9**: Allows patch updates (5.9.x) but not minor bumps (5.10.x)
 - **ESLint 9**: Latest major version with flat config support
 - **Exact pins on Nx**: Critical for task graph and caching to work correctly
@@ -168,10 +169,10 @@ This document provides the complete technology stack inventory for the nx-monore
 **Critical Rule**: All `@nx/*` packages must match the core `nx` version:
 ```json
 {
-  "nx": "21.6.5",
-  "@nx/jest": "21.6.5",
-  "@nx/next": "21.6.5",
-  "@nx/react": "21.6.5"
+  "nx": "22.2.0",
+  "@nx/jest": "22.2.0",
+  "@nx/next": "22.2.0",
+  "@nx/react": "22.2.0"
 }
 ```
 
@@ -248,7 +249,7 @@ This document provides the complete technology stack inventory for the nx-monore
 
 | Next.js | React | TypeScript | Node.js | Status |
 |---------|-------|------------|---------|--------|
-| ~15.2.4 | 19.0.0 | ~5.9.2 | 22.16.0 | ✅ Tested & Working |
+| 16.0.8 | 19.1.0 | ~5.9.2 | 22.16.0 | ✅ Tested & Working |
 
 | Jest | @swc/jest | TypeScript | Node.js | Status |
 |------|-----------|------------|---------|--------|
@@ -256,7 +257,7 @@ This document provides the complete technology stack inventory for the nx-monore
 
 | Nx | @nx/jest | Jest | TypeScript | Status |
 |----|----------|------|------------|--------|
-| 21.6.5 | 21.6.5 | 30.2.0 | ~5.9.2 | ✅ Tested & Working |
+| 22.2.0 | 22.2.0 | 30.2.0 | ~5.9.2 | ✅ Tested & Working |
 
 | Playwright | Node.js | TypeScript | Status |
 |------------|---------|------------|--------|
@@ -403,6 +404,6 @@ Before approving version changes:
 - When platform-specific issues are identified
 - When upgrade guidelines need refinement
 
-**Last Updated**: 2025-12-04
-**Last Major Audit**: 2025-12-04 (Node.js 22 upgrade)
-**Next Review Due**: 2026-03-04 (quarterly review recommended)
+**Last Updated**: 2025-12-12
+**Last Major Audit**: 2025-12-12 (Nx 22.2 + React 19.1 upgrade for Expo SDK 54 alignment)
+**Next Review Due**: 2026-03-12 (quarterly review recommended)
