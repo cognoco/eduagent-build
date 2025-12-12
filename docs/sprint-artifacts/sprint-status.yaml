@@ -226,7 +226,7 @@ development_status:
   5b-5-validate-cicd-pipeline: done  # COMPLETED 2025-12-12 - CI green, Nx Cloud verified
   5b-6-install-nx-expo-plugin: done  # APPROVED 2025-12-12 - Senior Dev Review passed
   5b-7-install-and-configure-expo-clis: done  # APPROVED 2025-12-12 - Senior Dev Review passed, all ACs verified
-  5b-8-update-documentation: ready-for-dev  # Context generated 2025-12-11
+  5b-8-update-documentation: review  # COMPLETED 2025-12-12 - Ready for code review
   5b-9-final-validation-and-merge-to-main: ready-for-dev  # Context generated 2025-12-11
   epic-5b-retrospective: optional
 

@@ -436,11 +436,12 @@ This is a **gold standard Nx monorepo template** designed as a production-ready 
 **CRITICAL: Agents must use pinned versions or will go off the rails.**
 
 ### Core Stack
-- **Web**: Next.js 15.2, React 19, Tailwind CSS
+- **Web**: Next.js 16.0, React 19.1, Tailwind CSS
 - **Server**: Express with REST+OpenAPI
 - **Database**: Prisma 6.17.1 (CLI) / 6.18.0 (Client), Supabase PostgreSQL
 - **Testing**: Jest 30 (unit), Playwright (E2E)
-- **Tooling**: Nx 21.6, TypeScript 5.9, ESLint 9, Prettier
+- **Tooling**: Nx 22.2, TypeScript 5.9, ESLint 9, Prettier
+- **Mobile**: @nx/expo 22.2, Expo SDK 54, React Native 0.81.5
 
 **Detailed Versions & Compatibility**: See `docs/tech-stack.md`
 
