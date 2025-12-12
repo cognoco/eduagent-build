@@ -1732,6 +1732,13 @@ So that I can make type-safe task API calls.
 - Server middleware from Epic 4
 - Client-side auth state from Epic 4
 
+**⚠️ Pre-Implementation Note (Added 2025-12-12):**
+- Next.js 16 deprecates `middleware.ts` in favor of `proxy.ts` convention
+- When enabling route protection (Story 9.4), migrate `apps/web/src/middleware.ts` → `proxy.ts`
+- Migration codemod: `npx @next/codemod@canary middleware-to-proxy`
+- Benefit: `proxy.ts` runs on Node.js runtime (not Edge), better for Supabase Auth server calls
+- See: https://nextjs.org/docs/messages/middleware-to-proxy
+
 **Dependencies:** Epic 4 complete (auth infrastructure), Epic 8 complete (task endpoints to protect)
 
 ### Story 9.1: Create Web Signup Page

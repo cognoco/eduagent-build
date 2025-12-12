@@ -218,3 +218,4 @@ echo "=== Smoke Test Complete ==="
 |------|--------|--------|
 | 2025-12-09 | Dev Agent (Mort) | Initial checklist created during Story 5.6 |
 
+
