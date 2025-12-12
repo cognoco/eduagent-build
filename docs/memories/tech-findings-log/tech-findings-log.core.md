@@ -32,6 +32,9 @@
 - [Environment Validation: Optional Variables Allowlist (Issue #23, 2025-11-05)](module-18-environment-validation-optional-variables-allowlist-issue-23-2025-11-05.md)
 - [Nx Configuration: Custom Target Cache Inputs (2025-12-05)](module-20-nx-configuration-custom-target-cache-inputs-2025-12-05.md)
 - [Deployment Configuration: Vercel + Railway Nx Monorepo (2025-12-08)](module-21-deployment-vercel-railway-nx-monorepo-configuration-2025-12-08.md)
+- [Sentry: Next.js 15 Turbopack Client Configuration (2025-12-10)](module-22-sentry-nextjs-15-turbopack-client-configuration-2025-12-10.md)
+- [Deployment: Railway Web Frontend Configuration (2025-12-10)](module-23-deployment-railway-web-frontend-configuration-2025-12-10.md)
+- [Nx Configuration: Nx 22 Upgrade Breaking Changes (2025-12-12)](module-24-nx-22-upgrade-breaking-changes-2025-12-12.md)
 - [Future Entries Placeholder](module-19-future-entries.md)
 
 ## Usage Notes
