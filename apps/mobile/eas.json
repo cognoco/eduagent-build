@@ -3,11 +3,7 @@
     "appVersionSource": "remote"
   },
   "build": {
-    "base": {
-      "prebuildCommand": "cd ../.. && pnpm exec nx run-many -t build -p @nx-monorepo/api-client @nx-monorepo/schemas"
-    },
     "production": {
-      "extends": "base",
       "android": {
         "buildType": "app-bundle"
       },
@@ -16,12 +12,10 @@
       }
     },
     "development": {
-      "extends": "base",
       "developmentClient": true,
       "distribution": "internal"
     },
     "preview": {
-      "extends": "base",
       "distribution": "internal",
       "ios": {
         "simulator": true
