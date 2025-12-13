@@ -15,6 +15,32 @@ on:
       - 'packages/api-client/**'
       - 'packages/schemas/**'
       - '.github/workflows/mobile-ci.yml'
+  # Manual trigger for testing builds before merge
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'EAS build profile'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - development
+          - preview
+          - production
+      platform:
+        description: 'Target platform'
+        required: true
+        default: 'android'
+        type: choice
+        options:
+          - android
+          - ios
+          - all
+      skip_tests:
+        description: 'Skip lint and test (use for quick build verification)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -66,7 +92,9 @@ jobs:
   # Lint mobile code
   lint:
     needs: check-affected
-    if: needs.check-affected.outputs.mobile-affected == 'true'
+    if: |
+      (github.event_name != 'workflow_dispatch' && needs.check-affected.outputs.mobile-affected == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.skip_tests != true)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -86,7 +114,9 @@ jobs:
   # Test mobile code
   test:
     needs: check-affected
-    if: needs.check-affected.outputs.mobile-affected == 'true'
+    if: |
+      (github.event_name != 'workflow_dispatch' && needs.check-affected.outputs.mobile-affected == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.skip_tests != true)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -135,3 +165,36 @@ jobs:
       - name: Build Android preview APK
         working-directory: apps/mobile
         run: eas build --profile preview --platform android --non-interactive
+
+  # Manual build - triggered via workflow_dispatch
+  build-manual:
+    needs: [check-affected, lint, test]
+    # Run on manual trigger; always() ensures we evaluate even if lint/test were skipped
+    if: |
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.skip_tests == true || (needs.lint.result == 'success' && needs.test.result == 'success'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build with EAS
+        working-directory: apps/mobile
+        run: |
+          echo "Building with profile: ${{ inputs.profile }}, platform: ${{ inputs.platform }}"
+          eas build --profile ${{ inputs.profile }} --platform ${{ inputs.platform }} --non-interactive
