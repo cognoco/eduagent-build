@@ -1,0 +1,184 @@
+<story-context id="6-3-implement-mobile-health-check-screen" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>3</storyId>
+    <title>Implement Mobile Health Check Screen</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-12-13</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/6-3-implement-mobile-health-check-screen.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>mobile user</asA>
+    <iWant>view a list of health checks and trigger new pings from the mobile app</iWant>
+    <soThat>I can verify the mobile-to-server data flow works identically to the web app</soThat>
+    <tasks>
+      <task id="1" title="Create HealthCheckList Component" acs="1,4,6">
+        <subtask>Create apps/mobile/src/components/HealthCheckList.tsx</subtask>
+        <subtask>Implement FlatList to render health check items</subtask>
+        <subtask>Create HealthCheckItem sub-component</subtask>
+        <subtask>Add loading spinner/skeleton state</subtask>
+        <subtask>Add empty state message</subtask>
+        <subtask>Style with React Native StyleSheet</subtask>
+      </task>
+      <task id="2" title="Implement Data Fetching Hook" acs="1,4,5">
+        <subtask>Create apps/mobile/src/hooks/useHealthChecks.ts</subtask>
+        <subtask>Use apiClient.GET('/api/health')</subtask>
+        <subtask>Manage loading, data, and error states</subtask>
+        <subtask>Add refetch function for pull-to-refresh</subtask>
+        <subtask>Handle network errors with user-friendly messages</subtask>
+        <subtask>Write unit test: useHealthChecks.spec.ts</subtask>
+      </task>
+      <task id="3" title="Implement Ping Mutation" acs="2,3">
+        <subtask>Create apps/mobile/src/hooks/useCreateHealthCheck.ts</subtask>
+        <subtask>Use apiClient.POST('/api/health', { body: { message: 'Mobile ping' } })</subtask>
+        <subtask>Trigger refetch after successful creation</subtask>
+        <subtask>Handle mutation errors gracefully</subtask>
+        <subtask>Add loading state for ping button during mutation</subtask>
+      </task>
+      <task id="4" title="Build Home Screen UI" acs="1,2,7">
+        <subtask>Update apps/mobile/app/index.tsx to use HealthCheckList</subtask>
+        <subtask>Add Ping button (Pressable/TouchableOpacity)</subtask>
+        <subtask>Connect Ping button to createHealthCheck mutation</subtask>
+        <subtask>Implement pull-to-refresh via RefreshControl</subtask>
+        <subtask>Add screen title</subtask>
+      </task>
+      <task id="5" title="Implement Error Handling UI" acs="5">
+        <subtask>Create error display component</subtask>
+        <subtask>Add Retry button for failed fetches</subtask>
+        <subtask>Display specific error messages</subtask>
+        <subtask>Ensure errors don't crash the app</subtask>
+      </task>
+      <task id="6" title="Manual Testing" acs="1-7">
+        <subtask>Test on iOS Simulator</subtask>
+        <subtask>Test on Android Emulator</subtask>
+        <subtask>Document platform-specific issues</subtask>
+      </task>
+      <task id="7" title="Write Component Tests" acs="1,4,5,6">
+        <subtask>Create HealthCheckList.spec.tsx</subtask>
+        <subtask>Test loading, empty, error, and data states</subtask>
+        <subtask>Run: pnpm exec nx run mobile:test</subtask>
+      </task>
+      <task id="8" title="Update Sprint Status" acs="all">
+        <subtask>Update sprint-status.yaml</subtask>
+        <subtask>Document completion notes</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="6.3.1">Health checks list displayed on home screen (app/index.tsx) using FlatList or similar</criterion>
+    <criterion id="6.3.2">"Ping" button creates new health check via POST /api/health</criterion>
+    <criterion id="6.3.3">List updates immediately after new ping created (refetch or optimistic update)</criterion>
+    <criterion id="6.3.4">Loading state displayed while fetching data</criterion>
+    <criterion id="6.3.5">Error states handled gracefully (API unavailable, network error, timeout)</criterion>
+    <criterion id="6.3.6">Empty state displayed when no health checks exist</criterion>
+    <criterion id="6.3.7">Pull-to-refresh functionality to manually refetch list</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/sprint-artifacts/tech-spec-epic-6.md" title="Epic 6 Technical Specification" section="Story-6.3">
+        Story 6.3 ACs: Health checks list displayed, Ping button creates health check, List updates after ping, Error states handled.
+      </doc>
+      <doc path="docs/sprint-artifacts/epic-6-design-decisions.md" title="Epic 6 Design Decisions" section="D5-API-Client">
+        Use existing openapi-fetch from @nx-monorepo/api-client. Environment-aware URL configuration for iOS Simulator, Android Emulator, and production.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture" section="Implementation-Patterns">
+        Naming patterns, structure patterns (co-located tests), format patterns ({ data, error } responses), communication patterns (openapi-fetch with typed paths).
+      </doc>
+      <doc path="docs/epics.md" title="Epics" section="Epic-6-Mobile-Walking-Skeleton">
+        FR20-FR22 coverage. Mobile app shares API client, types, and auth patterns with web. Mobile walking skeleton mirrors web experience.
+      </doc>
+    </docs>
+
+    <code>
+      <artifact path="packages/schemas/src/lib/health.schema.ts" kind="schema" symbol="HealthCheckSchema" lines="15-32" reason="Zod schema defining HealthCheck type - mobile must use same type">
+        HealthCheckSchema with id (uuid), message (string), timestamp (datetime). Also HealthCheckListResponseSchema, HealthCheckPingRequestSchema, HealthCheckPingResponseSchema.
+      </artifact>
+      <artifact path="packages/api-client/src/index.ts" kind="barrel" symbol="paths" reason="Exports OpenAPI paths type for type-safe API calls">
+        Exports paths and components types from generated OpenAPI spec.
+      </artifact>
+      <artifact path="apps/server/src/routes/health.openapi.ts" kind="openapi" symbol="registerHealthOpenApi" lines="18-73" reason="Defines API contract for health endpoints">
+        GET /health returns HealthCheckListResponseSchema. POST /health/ping accepts HealthCheckPingRequestSchema, returns HealthCheckPingResponseSchema (201 Created).
+      </artifact>
+      <artifact path="apps/mobile/src/lib/api.ts" kind="config" symbol="API_CONFIG" lines="1-17" reason="Existing placeholder for API client - Story 6.2 expanded this">
+        Type-only import of paths verified. API_CONFIG with baseUrl placeholder. Full apiClient instance needed from Story 6.2.
+      </artifact>
+      <artifact path="apps/mobile/src/app/App.tsx" kind="component" symbol="App" lines="14-720" reason="Current mobile app component to be replaced/modified">
+        Default @nx/expo generated welcome screen. Story 6.3 will replace this with HealthCheckList and Ping functionality.
+      </artifact>
+      <artifact path="apps/web/src/app/health/page.tsx" kind="reference" symbol="HealthPage" reason="Web implementation to mirror - reference for mobile implementation">
+        Web health page implementation. Mobile should provide identical functionality but with React Native components.
+      </artifact>
+    </code>
+
+    <dependencies>
+      <ecosystem name="expo">
+        <package name="expo" version="~54.0.0" />
+        <package name="react-native" version="0.81.5" />
+        <package name="react" version="19.1.0" />
+        <package name="expo-status-bar" version="~3.0.8" />
+      </ecosystem>
+      <ecosystem name="api-client">
+        <package name="openapi-fetch" location="@nx-monorepo/api-client" />
+        <package name="openapi-typescript" version="^7.10.1" scope="dev" />
+      </ecosystem>
+      <ecosystem name="testing">
+        <package name="jest" version="30.2.0" scope="dev" />
+        <package name="jest-expo" version="~54.0.13" scope="dev" />
+        <package name="@testing-library/react-native" version="~13.2.0" scope="dev" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="architecture.md">Test files co-located in src/ next to source files (*.spec.ts, *.spec.tsx)</constraint>
+    <constraint source="architecture.md">API responses use { data, error } pattern - check if (error) before accessing data</constraint>
+    <constraint source="architecture.md">All imports from shared packages via @nx-monorepo/* aliases</constraint>
+    <constraint source="epic-6-design-decisions.md">Use Legacy Architecture (SDK 54 is last supporting it)</constraint>
+    <constraint source="epic-6-design-decisions.md">No external UI libraries for walking skeleton - use React Native StyleSheet</constraint>
+    <constraint source="tech-spec-epic-6.md">Use out-of-the-box Expo Router structure - no custom navigation patterns yet</constraint>
+    <constraint source="story-prereq">Story 6.1 complete (mobile app exists at apps/mobile/)</constraint>
+    <constraint source="story-prereq">Story 6.2 complete (apiClient configured in apps/mobile/src/lib/api.ts)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="GET /health" kind="REST endpoint" path="apps/server/src/routes/health.openapi.ts">
+      <signature>GET /health -> { healthChecks: HealthCheck[] }</signature>
+      <notes>Returns all health check records ordered by timestamp descending</notes>
+    </interface>
+    <interface name="POST /health/ping" kind="REST endpoint" path="apps/server/src/routes/health.openapi.ts">
+      <signature>POST /health/ping { message?: string } -> { healthCheck: HealthCheck }</signature>
+      <notes>Creates new health check with optional custom message. Returns 201 on success, 400 on validation error.</notes>
+    </interface>
+    <interface name="HealthCheck" kind="TypeScript type" path="packages/schemas/src/lib/health.schema.ts">
+      <signature>{ id: string (uuid), message: string, timestamp: string (ISO8601) }</signature>
+    </interface>
+    <interface name="apiClient" kind="function" path="apps/mobile/src/lib/api.ts">
+      <signature>createClient&lt;paths&gt;({ baseUrl })</signature>
+      <notes>Type-safe API client using openapi-fetch. Use .GET() and .POST() methods.</notes>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Tests use Jest with jest-expo preset. Component tests use @testing-library/react-native. Test files co-located with source: *.spec.ts for utilities/hooks, *.spec.tsx for components. Mock API calls using jest.mock or MSW patterns. Coverage measured but not enforced for walking skeleton (60% target).
+    </standards>
+    <locations>
+      <location>apps/mobile/src/hooks/*.spec.ts</location>
+      <location>apps/mobile/src/components/*.spec.tsx</location>
+    </locations>
+    <ideas>
+      <idea ac="6.3.1">Test HealthCheckList renders FlatList with provided data</idea>
+      <idea ac="6.3.4">Test loading state renders ActivityIndicator when loading=true and data is empty</idea>
+      <idea ac="6.3.5">Test error state renders error message and Retry button</idea>
+      <idea ac="6.3.6">Test empty state renders "No health checks" message when data=[]</idea>
+      <idea ac="6.3.1">Test HealthCheckItem renders id, message, and formatted timestamp</idea>
+      <idea ac="6.3.2">Test useHealthChecks hook calls apiClient.GET on mount</idea>
+      <idea ac="6.3.3">Test useCreateHealthCheck triggers refetch after successful POST</idea>
+      <idea ac="6.3.7">Test pull-to-refresh calls refetch function</idea>
+    </ideas>
+  </tests>
+</story-context>

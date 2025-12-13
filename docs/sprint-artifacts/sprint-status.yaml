@@ -65,7 +65,7 @@ planning_notes:
       depends_on: [4-1, 4-2, 4-3]
 
     - story: 6-1-generate-expo-mobile-application
-      notes: "RESET 2025-12-12 - Story files deleted. Needs re-drafting with SDK 54 context (Epic 5b upgraded from SDK 53). Run architect to update epic-6-design-decisions.md, then create-story workflow."
+      notes: "READY-FOR-DEV 2025-12-13 - Story context generated. Run dev-story workflow to implement."
       depends_on: epic-5b  # SATISFIED - Nx 22.x + @nx/expo installed
 
     - story: 7-1-document-walking-skeleton-architecture
@@ -234,12 +234,12 @@ development_status:
   # Epic 6: Mobile Walking Skeleton (Extended 2025-12-08)
   # RESET 2025-12-12: Story files deleted - need re-drafting with SDK 54 context (not SDK 53)
   # See epic-5b-nx-upgrade-analysis.md for SDK 54 requirements
-  epic-6: backlog  # RESET - needs re-contexting for SDK 54 (was SDK 53)
-  6-1-generate-expo-mobile-application: drafted  # Story created 2025-12-13 with SDK 54 context
-  6-2-configure-api-client-for-mobile: backlog  # RESET - story file deleted
-  6-3-implement-mobile-health-check-screen: backlog  # RESET - story file deleted
-  6-4-validate-cross-platform-sync: backlog  # RESET - story file deleted
-  6-5-document-mobile-development-setup: backlog  # RESET - story file deleted
+  epic-6: contexted  # Tech spec updated 2025-12-13 for SDK 54
+  6-1-generate-expo-mobile-application: review  # COMPLETED 2025-12-13 - All ACs verified, ready for SM review
+  6-2-configure-api-client-for-mobile: ready-for-dev  # Story context created 2025-12-13
+  6-3-implement-mobile-health-check-screen: ready-for-dev  # Story context generated 2025-12-13
+  6-4-validate-cross-platform-sync: ready-for-dev  # Story context generated 2025-12-13
+  6-5-document-mobile-development-setup: ready-for-dev  # Story context generated 2025-12-13
   6-6-mobile-cicd-pipeline-integration: backlog  # RESET - story file deleted
   6-7-validate-mobile-deployment-pipeline: backlog  # RESET - story file deleted
   epic-6-retrospective: optional

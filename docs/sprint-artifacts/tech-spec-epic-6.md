@@ -1,87 +1,102 @@
 # Epic Technical Specification: Mobile Walking Skeleton
 
-Date: 2025-12-05
-Author: Jørn
-Epic ID: 6
-Status: Draft (Contexted)
+**Date:** 2025-12-13 (Revised for SDK 54)
+**Author:** Jørn
+**Epic ID:** 6
+**Status:** Approved
 
 ---
 
-> **Related Document:** See `docs/sprint-artifacts/epic-6-design-decisions.md` for detailed architectural decisions and version rationale made during technical contexting.
+> **Revision Note:** This tech spec was updated on 2025-12-13 to reflect Expo SDK 54 requirements established by Epic 5b (Nx 22.x Infrastructure Upgrade). The original SDK 53 spec is obsolete.
+>
+> **Related Documents:**
+> - `docs/sprint-artifacts/epic-6-design-decisions.md` - Detailed architectural decisions (revised for SDK 54)
+> - `docs/sprint-artifacts/epic-5b-nx-upgrade-analysis.md` - Infrastructure upgrade analysis
 
 ## Overview
 
-Epic 6 delivers the mobile application foundation that proves cross-platform code sharing works as designed. By implementing a React Native/Expo mobile app that shares the API client, type definitions, and schemas with the web application, this epic validates the core architectural promise: business logic implemented once can execute identically across all platforms.
+Epic 6 delivers the mobile walking skeleton for the AI-Native Nx Monorepo Template, extending the validated web-server-database infrastructure to cross-platform mobile development using Expo and React Native. This epic validates that the shared infrastructure patterns (API client, schemas, authentication) work identically across web and mobile platforms, proving the building-block philosophy of the template.
 
-The mobile walking skeleton mirrors the web health check experience—fetching health check records from the database and creating new ones via the "Ping" button—demonstrating that the shared infrastructure packages (`@nx-monorepo/api-client`, `@nx-monorepo/schemas`) work seamlessly in a mobile context without modification.
+The walking skeleton approach continues from Epic 1's pattern: rather than building features, we validate that all mobile infrastructure layers connect and function correctly before any mobile feature development begins. The health check feature used in Epic 1 will be replicated on mobile to prove cross-platform data synchronization.
 
-This epic is critical for the template's value proposition: proving that a single human orchestrator directing AI coding agents can build true cross-platform applications with shared business logic, not just separate mobile and web codebases that happen to live in the same repository.
+**Context**: Epic 5b (completed 2025-12-12) upgraded the monorepo to Nx 22.2.0 with @nx/expo plugin and Expo SDK 54, establishing the infrastructure foundation for this epic.
+
+---
 
 ## Objectives and Scope
 
 ### In Scope
 
-- **Mobile Application Generation**: Create Expo mobile app using Nx generators (`@nx/expo:app`)
-- **API Client Integration**: Configure `@nx-monorepo/api-client` for React Native environment
-- **Health Check Screen**: Implement screen displaying health checks with "Ping" functionality
-- **Cross-Platform Validation**: Prove data sync between web and mobile (same database, same API)
-- **Mobile Development Documentation**: Setup guides for simulators, emulators, and local development
-- **Nx Integration**: Ensure `nx run mobile:lint`, `nx run mobile:test`, `nx run mobile:start` work correctly
+**Infrastructure Objectives:**
+- Generate Expo mobile application using `@nx/expo:application` generator
+- Configure API client for mobile environment (localhost for simulators, staging URL for devices)
+- Integrate shared packages (`@nx-monorepo/api-client`, `@nx-monorepo/schemas`) into mobile app
+- Implement health check screen mirroring web functionality
+- Validate cross-platform data synchronization (web creates → mobile sees, mobile creates → web sees)
+- Document mobile development setup and troubleshooting
+- Integrate mobile app into CI/CD pipeline (lint, test, build validation)
+
+**Walking Skeleton Features:**
+- Display list of health checks from API
+- "Ping" button to create new health check
+- Real-time sync validation between web and mobile
 
 ### Out of Scope
 
-- **Authentication UI**: No login/signup screens (deferred to Epic 9 - Phase 2)
-- **Push Notifications**: Infrastructure not required for walking skeleton
-- **Offline Support**: No offline-first or caching patterns (Phase 3+)
-- **App Store Deployment**: No production mobile builds (PoC scope only)
-- **Platform-Specific Features**: No iOS/Android native modules
-- **State Management Libraries**: No Redux/Zustand (useState sufficient for walking skeleton)
+**Explicitly NOT included in Epic 6:**
+- Custom navigation patterns (tabs, drawers, complex stacks) - use out-of-the-box Expo Router
+- State management libraries (Redux, Zustand, MobX) - use React state
+- Offline-first/caching patterns - online-only for walking skeleton
+- Platform-specific native modules - pure JavaScript/TypeScript
+- Custom theming system - use Expo defaults
+- New Architecture migration - use Legacy Architecture (SDK 54 is last supporting it)
+- Authentication flows - deferred to Epic 11 (Mobile Task Management)
+- Production app store deployment - EAS Build/Submit deferred to post-PoC
 
-### Success Criteria
-
-1. Mobile app launches on iOS simulator and Android emulator
-2. Health check list displays data from shared Supabase database
-3. "Ping" button creates new health check visible on both web and mobile
-4. TypeScript autocomplete works for API endpoints in mobile codebase
-5. All Nx targets pass: `lint`, `test`, `start`
-6. New developer can follow docs to run mobile app in <15 minutes
+---
 
 ## System Architecture Alignment
 
-### Dependency Flow Integration
+### Monorepo Integration
 
-The mobile app integrates into the existing dependency graph:
+Epic 6 extends the existing dependency flow with a new mobile application:
 
 ```
 apps/web ────────┐
                  ├──► packages/api-client ──► packages/schemas
 apps/mobile ─────┘                                   ↑
                                                      │
-apps/server ──► packages/database ───────────────────┘
+apps/server ──► packages/database ──────────────────┘
                       │
                       └──► packages/supabase-client
 ```
 
-### Architecture Principles Applied
+**Alignment Points:**
+- Mobile app depends on shared packages (api-client, schemas) - same as web
+- No app-to-app imports (mobile does not import from web)
+- API server remains the security boundary - mobile uses REST+OpenAPI like web
+- Nx task graph includes mobile targets (build, lint, test, start)
 
-| Principle | Application to Mobile |
-|-----------|----------------------|
-| **Type Safety End-to-End** | Mobile uses same `openapi-fetch` client with generated types |
-| **Unidirectional Dependencies** | Mobile imports from packages, never from `apps/web` |
-| **API Server as Security Boundary** | Mobile calls Express API, not direct database access |
-| **Shared Schema Source of Truth** | Zod schemas in `@nx-monorepo/schemas` validate mobile requests |
+### Technology Alignment
 
-### Mobile-Specific Architecture Decisions
+| Component | Web | Mobile | Alignment |
+|-----------|-----|--------|-----------|
+| React | 19.1.0 | 19.1.0 | ✅ Exact match via pnpm overrides |
+| React Native | N/A | 0.81.5 | ✅ SDK 54 bundled version |
+| API Client | openapi-fetch | openapi-fetch | ✅ Same library |
+| Schema Validation | Zod | Zod | ✅ Same library |
+| TypeScript | ~5.9.2 | ~5.9.2 | ✅ Same version |
+| Testing | Jest 30 | Jest (Expo preset) | ✅ Same framework |
 
-| Decision | Rationale |
-|----------|-----------|
-| **Expo SDK 53 (Stable)** | Production-ready; React 19.0.0 matches web exactly (see `epic-6-design-decisions.md`) |
-| **Expo Router (File-Based)** | Officially recommended by Expo; familiar Next.js-like mental model |
-| **Expo Managed Workflow** | Simpler setup, no native code required for walking skeleton |
-| **Same API Client** | Validates cross-platform type safety (PR FR20) |
-| **No Auth in Epic 6** | Walking skeleton validates infrastructure, not business logic |
-| **Staging API URL** | Mobile development requires public HTTPS endpoint (Railway) |
-| **Out-of-Box Scaffolding** | Walking skeleton uses default patterns; no custom navigation yet |
+### Architectural Constraints
+
+From `docs/architecture-decisions.md` and Epic 5b analysis:
+- **SDK 54 is required** - @nx/expo 22.2.0 plugin requires `expo >= 54.0.0`
+- **Legacy Architecture** - SDK 55 will require New Architecture; SDK 54 is transition period
+- **Metro auto-configuration** - Since SDK 52, no manual watchFolders configuration needed
+- **Single React version** - pnpm overrides enforce 19.1.0 monorepo-wide
+
+---
 
 ## Detailed Design
 
@@ -89,14 +104,15 @@ apps/server ──► packages/database ─────────────�
 
 | Module | Location | Responsibility |
 |--------|----------|----------------|
-| **Mobile App** | `apps/mobile/` | Expo application entry point, navigation, screens |
-| **Health Check Screen** | `apps/mobile/src/screens/HealthScreen.tsx` | Display health checks, handle ping button |
-| **API Configuration** | `apps/mobile/src/lib/api.ts` | Configure `openapi-fetch` client for mobile |
-| **Environment Config** | `apps/mobile/app.config.ts` | Expo config with environment variables |
+| **Mobile App** | `apps/mobile/` | Expo application shell with Expo Router navigation |
+| **Health Check Screen** | `apps/mobile/app/index.tsx` | Display health checks, trigger new pings |
+| **API Configuration** | `apps/mobile/src/lib/api.ts` | Environment-aware API client factory |
+| **Shared API Client** | `packages/api-client/` | Type-safe REST client (existing) |
+| **Shared Schemas** | `packages/schemas/` | Zod schemas for validation (existing) |
 
 ### Project Structure
 
-> **Decision:** Using Expo Router (file-based routing). See `epic-6-design-decisions.md`.
+> **Decision:** Using Expo Router v6 (file-based routing). See `epic-6-design-decisions.md`.
 
 ```
 apps/mobile/
@@ -104,15 +120,15 @@ apps/mobile/
 │   ├── _layout.tsx             # Root layout (providers, navigation config)
 │   ├── index.tsx               # Home/Health check screen (/)
 │   └── +not-found.tsx          # 404 handler
+├── assets/                     # Static assets (images, fonts)
 ├── src/
 │   ├── components/             # Reusable components
 │   │   └── HealthCheckList.tsx # Health check list component
 │   └── lib/
 │       └── api.ts              # API client configuration
 ├── app.json                    # Expo configuration
-├── app.config.ts               # Dynamic Expo config
 ├── babel.config.js             # Babel configuration
-├── metro.config.js             # Metro bundler config (monorepo support)
+├── metro.config.js             # Metro bundler config (auto-configured since SDK 52)
 ├── tsconfig.json               # TypeScript configuration
 ├── jest.config.ts              # Jest configuration
 └── project.json                # Nx project configuration
@@ -159,8 +175,8 @@ import createClient from 'openapi-fetch';
 import type { paths } from '@nx-monorepo/api-client';
 import Constants from 'expo-constants';
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl 
-  ?? 'https://your-api.railway.app/api';
+const API_URL = Constants.expoConfig?.extra?.apiUrl
+  ?? 'http://localhost:4000/api';
 
 export const apiClient = createClient<paths>({
   baseUrl: API_URL,
@@ -170,7 +186,40 @@ export const apiClient = createClient<paths>({
 });
 ```
 
+**Environment URL Configuration:**
+
+| Environment | API_URL | Notes |
+|-------------|---------|-------|
+| iOS Simulator | `http://localhost:4000/api` | Same as web dev |
+| Android Emulator | `http://10.0.2.2:4000/api` | Android's localhost alias |
+| Physical Device (Dev Build) | Railway staging URL | Must be public HTTPS |
+| Production | Production API URL | Future consideration |
+
 ### Workflows and Sequencing
+
+**Story Sequence (Epic 6):**
+
+```
+6.1 Generate Expo Application
+    │
+    ▼
+6.2 Configure API Client for Mobile
+    │
+    ▼
+6.3 Implement Mobile Health Check Screen
+    │
+    ▼
+6.4 Validate Cross-Platform Sync
+    │
+    ▼
+6.5 Document Mobile Development Setup
+    │
+    ▼
+6.6 Mobile CI/CD Pipeline Integration
+    │
+    ▼
+6.7 Validate Mobile Deployment Pipeline
+```
 
 **Health Check Flow (Mobile):**
 
@@ -196,29 +245,7 @@ export const apiClient = createClient<paths>({
 10. Refetch list, new record appears
 ```
 
-**Cross-Platform Sync Flow:**
-
-```
-Web App                    Mobile App
-   │                           │
-   │ POST /api/health          │
-   ├─────────────────────────► │
-   │                           │
-   │      ← 201 Created        │
-   │                           │ (User refreshes)
-   │                           │ GET /api/health
-   │                           ├──►
-   │                           │
-   │                           │ ← Returns all records
-   │                           │   (including web-created)
-   │                           │
-   │ (User refreshes)          │
-   │ GET /api/health           │
-   ├─────────────────────────► │
-   │                           │
-   │ ← Returns all records     │
-   │   (including mobile-created)
-```
+---
 
 ## Non-Functional Requirements
 
@@ -226,286 +253,270 @@ Web App                    Mobile App
 
 | Metric | Target | Rationale |
 |--------|--------|-----------|
-| **App startup** | <3 seconds (dev mode) | Acceptable for Expo Go development |
-| **API response display** | <500ms | Same target as web (same API) |
-| **List rendering** | 60 FPS scroll | FlatList with proper key extraction |
+| App startup | < 3 seconds | Standard mobile expectation |
+| API call latency | < 200ms | Same as web (shared API) |
+| Metro bundler start | < 30 seconds | Development productivity |
+| CI build time | < 5 minutes | Addition to existing ~10 min pipeline |
 
-**Note:** Production performance targets deferred to Phase 2 (EAS Build optimization).
+**Validation Method:** Manual testing during Story 6.1 and 6.3; CI timing in Story 6.6.
 
 ### Security
 
-| Aspect | Implementation |
-|--------|----------------|
-| **No Auth in Epic 6** | Walking skeleton doesn't require authentication |
-| **HTTPS Required** | Mobile requires valid SSL (Railway provides) |
-| **No Sensitive Storage** | No tokens to store yet (auth in Epic 9) |
-| **CORS Configuration** | Server allows Expo origins (already configured) |
+**Mobile-Specific Security Concerns:**
+
+| Concern | Mitigation |
+|---------|------------|
+| API URL exposure | Use `expo-constants` for environment configuration |
+| Transport security | HTTPS required for non-localhost (enforced by iOS ATS) |
+| Secret storage | Defer to Epic 11 (auth flows); walking skeleton has no secrets |
+| Code signing | EAS Build handles signing; deferred to post-PoC |
+
+**Alignment with Architecture:**
+- API server remains security boundary (no direct database access from mobile)
+- Input validation via Zod schemas (same as web)
+- No authentication in walking skeleton (public health check endpoint)
 
 ### Reliability/Availability
 
-| Aspect | Implementation |
-|--------|----------------|
-| **Error States** | Display user-friendly error messages on API failure |
-| **Loading States** | Show ActivityIndicator during API calls |
-| **Network Handling** | Graceful degradation message if no connectivity |
-| **Retry Pattern** | Manual refresh via pull-to-refresh |
+**Walking Skeleton Reliability Targets:**
+
+| Scenario | Expected Behavior |
+|----------|-------------------|
+| API unavailable | Display error message, allow retry |
+| Network timeout | 10-second timeout, error display |
+| Invalid response | Validation error via Zod, graceful handling |
+
+**Note:** Walking skeleton prioritizes "happy path" validation. Comprehensive error handling patterns will be established during Task App PoC (Epic 11).
 
 ### Observability
 
-| Aspect | Implementation |
-|--------|----------------|
-| **Console Logging** | `console.log` for development debugging |
-| **Sentry Integration** | Deferred to Epic 3 completion (mobile Sentry in Epic 6 stretch goal) |
-| **Error Boundaries** | React error boundary for crash capture |
+**Deferred to Epic 3 Extension:**
+- Sentry SDK is available for React Native but not wired in walking skeleton
+- Basic `console.log` debugging sufficient for infrastructure validation
+- Full mobile observability integration planned for Task App PoC
+
+**CI Observability:**
+- Nx Cloud will capture mobile task execution metrics
+- GitHub Actions will log lint/test/build results
+- Pipeline failures will block PR merges
+
+---
 
 ## Dependencies and Integrations
 
-### Package Dependencies
+### Package Dependencies (Installed via Epic 5b)
 
-> **Note:** See `docs/sprint-artifacts/epic-6-design-decisions.md` for detailed rationale on version choices.
+| Package | Version | Purpose |
+|---------|---------|---------|
+| expo | ~54.0.0 | Expo SDK and CLI |
+| react-native | 0.81.5 | Mobile framework |
+| react | 19.1.0 | UI library (aligned with web) |
+| expo-router | ~6.0.17 | File-based navigation |
+| expo-constants | (bundled) | Environment configuration |
+| @nx/expo | 22.2.0 | Nx plugin for Expo |
 
-**Core Expo/React Native:**
+### Development Dependencies (To Be Added in Story 6.1)
 
-```json
-{
-  "expo": "~53.0.0",
-  "react-native": "~0.79.0",
-  "react": "19.0.0",
-  "expo-router": "~4.0.0"
-}
-```
-
-**Shared Packages (Workspace):**
-
-```json
-{
-  "@nx-monorepo/api-client": "workspace:*",
-  "@nx-monorepo/schemas": "workspace:*"
-}
-```
-
-**Type-Safe HTTP Client:**
-
-```json
-{
-  "openapi-fetch": "^0.14.0"
-}
-```
-
-### External Service Dependencies
-
-| Service | Purpose | Endpoint |
+| Package | Purpose | Added By |
 |---------|---------|----------|
-| **Express API** | Data operations | `https://your-api.railway.app/api` (staging) or `http://localhost:4000/api` (dev) |
-| **Supabase** | Database (via API) | Indirect (through Express) |
+| @testing-library/react-native | Mobile component testing | Post-generation checklist |
+| jest-expo | Jest preset for Expo | @nx/expo generator |
 
-### Development Tool Dependencies
+### External Integrations
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| **Expo Go** | Latest | Development testing on physical devices |
-| **iOS Simulator** | Xcode 15+ | iOS development testing |
-| **Android Emulator** | API 34+ | Android development testing |
-| **Nx** | 21.6.x | Monorepo orchestration |
+| Service | Integration Point | Status |
+|---------|-------------------|--------|
+| Expo Dev Server | `nx run mobile:start` | Story 6.1 |
+| Expo Go (testing) | QR code scanning | Story 6.1 |
+| Nx Cloud | Remote caching | Already configured |
+| GitHub Actions | CI/CD pipeline | Story 6.6 |
+| Railway API | Staging backend | Already deployed |
 
-### Mobile-Specific Considerations
+### Metro Configuration
 
-**Metro Bundler Configuration:**
+Since SDK 52, Expo automatically configures Metro for monorepos when using `expo/metro-config`. **No manual configuration required.**
 
 ```javascript
-// apps/mobile/metro.config.js
-const { withNxMetro } = require('@nx/expo');
+// apps/mobile/metro.config.js (expected from generator)
 const { getDefaultConfig } = require('expo/metro-config');
-const path = require('path');
 
 const config = getDefaultConfig(__dirname);
-const workspaceRoot = path.resolve(__dirname, '../..');
 
-// Enable monorepo support
-config.watchFolders = [workspaceRoot];
-config.resolver.nodeModulesPaths = [
-  path.resolve(workspaceRoot, 'node_modules'),
-];
-
-module.exports = withNxMetro(config, {
-  debug: false,
-  extensions: [],
-  watchFolders: [],
-});
+module.exports = config;
 ```
 
-**API URL for Different Environments:**
+**Note:** If @nx/expo generator includes `withNxMetro` wrapper, it should be compatible with automatic monorepo support. Validate during Story 6.1.
 
-| Environment | API URL | How to Configure |
-|-------------|---------|------------------|
-| **Local (Simulator)** | `http://localhost:4000/api` | Default for iOS Simulator |
-| **Local (Android Emulator)** | `http://10.0.2.2:4000/api` | Android special localhost alias |
-| **Staging** | `https://your-api.railway.app/api` | Environment variable |
-| **Expo Go (Physical Device)** | Railway staging URL | Must be public HTTPS |
+---
 
 ## Acceptance Criteria (Authoritative)
 
-### AC-6.1: Generate Expo Mobile Application
+### Epic-Level Success Criteria
 
-1. **Given** the Nx workspace exists
-   **When** I run `pnpm exec nx g @nx/expo:app mobile --directory=apps/mobile`
-   **Then** the app is created with correct Nx project structure
+1. **AC-E6.1**: Mobile app generated with correct Nx project structure and Expo Router navigation
+2. **AC-E6.2**: API client configured and making successful calls to server
+3. **AC-E6.3**: Health check screen displays data from API and creates new pings
+4. **AC-E6.4**: Cross-platform sync validated (web ↔ mobile data consistency)
+5. **AC-E6.5**: Mobile development documentation complete and accurate
+6. **AC-E6.6**: CI/CD pipeline includes mobile targets (lint, test, build)
+7. **AC-E6.7**: Mobile deployment pipeline validated end-to-end
 
-2. **Given** the mobile app is generated
-   **When** I run `pnpm exec nx run mobile:start`
-   **Then** Expo dev server launches and QR code is displayed
+### Story-Level Acceptance Criteria
 
-3. **Given** the mobile app is generated
-   **When** I run `pnpm exec nx run mobile:lint`
-   **Then** linting passes with no errors
+**Story 6.1: Generate Expo Mobile Application**
+- [ ] `pnpm exec nx g @nx/expo:application mobile --directory=apps/mobile` succeeds
+- [ ] `pnpm exec nx run mobile:start` launches Expo dev server
+- [ ] `pnpm exec nx run mobile:lint` passes
+- [ ] `pnpm exec nx run mobile:test` passes (default tests)
+- [ ] TypeScript path aliases resolve (`@nx-monorepo/*`)
 
-4. **Given** the mobile app is generated
-   **When** I run `pnpm exec nx run mobile:test`
-   **Then** default tests pass
+**Story 6.2: Configure API Client for Mobile**
+- [ ] `apiClient` factory created in `apps/mobile/src/lib/api.ts`
+- [ ] Environment-aware URL configuration working
+- [ ] Test API call succeeds from mobile app
+- [ ] Type safety preserved (compile-time errors on wrong API usage)
 
-### AC-6.2: Configure API Client for Mobile
+**Story 6.3: Implement Mobile Health Check Screen**
+- [ ] Health checks list displayed on home screen
+- [ ] "Ping" button creates new health check
+- [ ] List updates after new ping created
+- [ ] Error states handled (API unavailable, network error)
 
-5. **Given** mobile app exists
-   **When** I import `@nx-monorepo/api-client`
-   **Then** TypeScript resolves the import without errors
+**Story 6.4: Validate Cross-Platform Sync**
+- [ ] Web creates ping → Mobile sees it immediately (after refresh)
+- [ ] Mobile creates ping → Web sees it immediately (after refresh)
+- [ ] Same data displayed on both platforms
+- [ ] Timestamps and IDs match exactly
 
-6. **Given** API client is imported
-   **When** I configure base URL for mobile environment
-   **Then** client correctly points to local dev server or staging
+**Story 6.5: Document Mobile Development Setup**
+- [ ] README section for mobile development added
+- [ ] Simulator/emulator setup documented
+- [ ] Network configuration for local development documented
+- [ ] Troubleshooting section with common issues
 
-7. **Given** API client is configured
-   **When** I use `apiClient.GET('/api/health')`
-   **Then** TypeScript provides autocomplete for path, params, and response types
+**Story 6.6: Mobile CI/CD Pipeline Integration**
+- [ ] `.github/workflows/ci.yml` updated with mobile targets
+- [ ] `pnpm exec nx run mobile:lint` runs in CI
+- [ ] `pnpm exec nx run mobile:test` runs in CI
+- [ ] `pnpm exec nx run mobile:build-deps` runs in CI (if applicable)
+- [ ] CI passes with new mobile project
 
-### AC-6.3: Implement Mobile Health Check Screen
+**Story 6.7: Validate Mobile Deployment Pipeline**
+- [ ] CI pipeline completes successfully with mobile targets
+- [ ] Nx Cloud shows mobile task caching working
+- [ ] No regression in existing web/server CI
+- [ ] Pipeline timing documented
 
-8. **Given** API client is working
-   **When** mobile app opens to health screen
-   **Then** health check list is fetched and displayed
-
-9. **Given** health check list is displayed
-   **When** I tap the "Ping" button
-   **Then** new health check is created and appears in list
-
-10. **Given** multiple health checks exist
-    **When** I scroll the list
-    **Then** scrolling is smooth (60 FPS) using FlatList
-
-11. **Given** API call is in progress
-    **When** user sees the screen
-    **Then** loading indicator is displayed
-
-12. **Given** API call fails (server down)
-    **When** user sees the screen
-    **Then** error message is displayed clearly
-
-### AC-6.4: Validate Cross-Platform Sync
-
-13. **Given** health check is created on web
-    **When** I refresh mobile app
-    **Then** the web-created record appears in mobile list
-
-14. **Given** health check is created on mobile
-    **When** I refresh web app
-    **Then** the mobile-created record appears in web list
-
-### AC-6.5: Document Mobile Development Setup
-
-15. **Given** documentation is created
-    **When** a new developer follows the guide
-    **Then** they can run mobile app on iOS Simulator in <15 minutes
-
-16. **Given** documentation is created
-    **When** a new developer follows the guide
-    **Then** they can run mobile app on Android Emulator
-
-17. **Given** documentation exists
-    **When** developer wants to test against staging API
-    **Then** instructions explain how to configure API URL
+---
 
 ## Traceability Mapping
 
-| AC | Spec Section | Component/API | Test Approach |
-|----|--------------|---------------|---------------|
-| AC-6.1 (1-4) | Services and Modules | `apps/mobile/*` | Nx target execution verification |
-| AC-6.2 (5-7) | APIs and Interfaces | `apps/mobile/src/lib/api.ts` | TypeScript compilation + API call test |
-| AC-6.3 (8-12) | Workflows and Sequencing | `HealthScreen.tsx` | Component test + manual E2E |
-| AC-6.4 (13-14) | Cross-Platform Sync Flow | Database sync | Manual validation with documentation |
-| AC-6.5 (15-17) | Dependencies | `docs/mobile-setup.md` | Documentation review + test run |
+| AC ID | PRD Requirement | Spec Section | Component/API | Test Idea |
+|-------|-----------------|--------------|---------------|-----------|
+| AC-E6.1 | FR20 (shared patterns) | Services/Modules | `apps/mobile/` | Generator output validation |
+| AC-E6.2 | FR20 (API client sharing) | APIs/Interfaces | `api.ts` | API call integration test |
+| AC-E6.3 | FR21 (mirror web flows) | Workflows | Health screen | E2E user journey |
+| AC-E6.4 | FR21 (identical behavior) | Workflows | Cross-platform | Manual + automated sync test |
+| AC-E6.5 | FR22 (documentation) | NFR/Observability | `README.md` | Documentation review |
+| AC-E6.6 | FR13 (CI pipeline) | NFR/Performance | `.github/workflows/` | CI execution verification |
+| AC-E6.7 | FR13 (CI validation) | NFR/Reliability | Nx Cloud | Pipeline health check |
 
-### PRD Functional Requirements Coverage
-
-| FR | Requirement | Story Coverage |
-|----|-------------|----------------|
-| **FR20** | Mobile shares API client, types, auth patterns | Stories 6.2, 6.3 |
-| **FR21** | Mobile walking skeleton mirrors web | Stories 6.3, 6.4 |
-| **FR22** | Mobile development documentation | Story 6.5 |
+---
 
 ## Risks, Assumptions, Open Questions
 
 ### Risks
 
-| Risk | Impact | Likelihood | Mitigation |
-|------|--------|------------|------------|
-| **R1**: Metro bundler issues with monorepo | High | Medium | Follow Nx/Expo docs; test early |
-| **R2**: TypeScript path alias issues in RN | Medium | Medium | Configure Metro resolver correctly |
-| **R3**: API client incompatibility with RN | High | Low | openapi-fetch uses native fetch (RN compatible) |
-| **R4**: Expo SDK version conflicts | Medium | Medium | Pin versions in tech-stack.md |
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| Metro bundler issues with monorepo | Medium | High | Use SDK 52+ auto-configuration; validate in Story 6.1 |
+| TypeScript path alias resolution | Medium | Medium | Verify `tsconfig.base.json` paths work with Metro |
+| openapi-fetch incompatibility with RN | Low | High | Test early in Story 6.2; fallback to native fetch if needed |
+| Android emulator networking issues | Medium | Low | Document `10.0.2.2` workaround; test both platforms |
+| Jest configuration drift | Low | Medium | Follow post-generation checklist; align with workspace patterns |
 
 ### Assumptions
 
-| Assumption | Validation Plan |
-|------------|-----------------|
-| **A1**: `openapi-fetch` works in React Native | Story 6.2 validates during API configuration |
-| **A2**: Expo SDK 53 supports workspace dependencies | Story 6.1 validates during app generation |
-| **A3**: Railway staging API is accessible from Expo Go | Story 6.3 validates during implementation |
-| **A4**: FlatList provides adequate performance | Story 6.3 validates during list implementation |
-| **A5**: React 19.0.0 (matching web) works with SDK 53 | Story 6.1 validates during generation |
+| Assumption | Validation Point |
+|------------|------------------|
+| A1: Expo SDK 54 stable for production use | Epic 5b research confirmed 2+ months stable |
+| A2: @nx/expo generator produces valid project | Validate in Story 6.1 |
+| A3: openapi-fetch works in React Native | Test in Story 6.2 |
+| A4: pnpm workspaces resolve correctly for Metro | Verify in Story 6.1 |
+| A5: Legacy Architecture sufficient for walking skeleton | Confirmed in Epic 5b design decisions |
 
 ### Open Questions
 
-| Question | Owner | Resolution Path |
-|----------|-------|-----------------|
-| **Q1**: ~~Should we use Expo Router or traditional navigation?~~ | Dev | ✅ **RESOLVED**: Use Expo Router (see `epic-6-design-decisions.md`) |
-| **Q2**: How to handle API URL in EAS builds? | Dev | Document in Story 6.5 (app.config.ts extras) |
-| **Q3**: Should Epic 6 include Sentry mobile integration? | PM | Deferred to Epic 3 extension (stretch goal) |
-| **Q4**: Does @nx/expo support SDK 53? | Dev | Validate in Story 6.1; fallback to manual integration if needed |
-
-## Test Strategy Summary
-
-### Unit Tests (Jest)
-
-| Component | Test Focus | Location |
-|-----------|------------|----------|
-| `HealthCheckList` | Rendering, item display | `apps/mobile/src/components/HealthCheckList.spec.tsx` |
-| `api.ts` | Client configuration | `apps/mobile/src/lib/api.spec.ts` |
-
-### Integration Tests
-
-| Test | Coverage |
-|------|----------|
-| API client → server | Call real API, verify response typing |
-| Screen data flow | Mock API, verify state updates |
-
-### E2E Tests (Manual for Epic 6)
-
-| Test Case | Validation Method |
-|-----------|-------------------|
-| App launches on iOS Simulator | Manual observation |
-| App launches on Android Emulator | Manual observation |
-| Health check list displays | Manual observation |
-| Ping creates new record | Manual observation + database verification |
-| Cross-platform sync | Create on web, verify on mobile (and vice versa) |
-
-### Test Environment
-
-| Environment | API Target | Database |
-|-------------|------------|----------|
-| **Local Dev** | `http://localhost:4000/api` | Supabase DEV |
-| **Staging** | Railway URL | Supabase TEST |
+| Question | Decision Point | Owner | Status |
+|----------|----------------|-------|--------|
+| Q1: Use Expo Go or Dev Build for development? | Story 6.1 | Dev Agent | Open |
+| Q2: Add mobile-specific ESLint rules? | Story 6.1 | Dev Agent | Open |
+| Q3: Include visual regression testing? | Story 6.6 | SM | Deferred |
+| Q4: EAS Build for CI artifacts? | Post-PoC | Architect | Deferred |
 
 ---
 
-**Document Status:** Draft
-**Ready for:** Story creation workflow
+## Test Strategy Summary
 
+### Testing Levels
+
+| Level | Framework | Scope | Coverage Target |
+|-------|-----------|-------|-----------------|
+| **Unit** | Jest + @testing-library/react-native | Components, utilities | 60% (walking skeleton) |
+| **Integration** | Jest | API client integration | API call success/failure |
+| **E2E** | Manual | Full user journey | Sync validation |
+
+### Test Plan by Story
+
+| Story | Test Focus | Validation Method |
+|-------|------------|-------------------|
+| 6.1 | Project generation | `nx run mobile:test` passes |
+| 6.2 | API integration | Mock API tests + real API smoke test |
+| 6.3 | UI rendering | Component tests + manual QA |
+| 6.4 | Cross-platform sync | Manual testing (web ↔ mobile) |
+| 6.5 | Documentation accuracy | Review checklist |
+| 6.6 | CI integration | Pipeline execution |
+| 6.7 | Pipeline reliability | Multiple CI runs |
+
+### Coverage Strategy
+
+**Walking Skeleton Baseline:**
+- Coverage measured but not enforced (consistent with MVP phase)
+- Focus on critical paths: API calls, data rendering
+- Component tests for reusable UI elements
+
+**Deferred to Task App PoC:**
+- 80% coverage enforcement
+- Comprehensive error handling tests
+- Authentication flow tests
+
+---
+
+## References
+
+### Source Documents
+
+- `docs/PRD.md` - FR20-FR22 (Mobile requirements)
+- `docs/architecture.md` - Dependency flow, project structure
+- `docs/architecture-decisions.md` - REST+OpenAPI, Expo choices
+- `docs/tech-stack.md` - Version matrix, Expo SDK 54
+- `docs/epics.md` - Epic 6 user stories
+- `docs/sprint-artifacts/epic-6-design-decisions.md` - SDK 54 decisions
+- `docs/sprint-artifacts/epic-5b-nx-upgrade-analysis.md` - Infrastructure upgrade
+
+### External Documentation
+
+- [Expo SDK 54 Changelog](https://expo.dev/changelog/sdk-54)
+- [Expo Router Documentation](https://docs.expo.dev/router/introduction)
+- [Expo Monorepo Guide](https://docs.expo.dev/guides/monorepos)
+- [Nx Expo Plugin](https://nx.dev/nx-api/expo)
+- [openapi-fetch Documentation](https://openapi-ts.pages.dev/openapi-fetch)
+
+---
+
+## Document History
+
+| Date | Author | Change |
+|------|--------|--------|
+| 2025-12-05 | SM Agent (Rincewind) | Initial draft with SDK 53 assumptions |
+| 2025-12-13 | SM Agent (Rincewind) | **Major revision**: Updated for SDK 54 per Epic 5b; revised React 19.1.0, expo-router v6, removed obsolete Metro config guidance, updated dependencies, aligned with epic-6-design-decisions.md |
