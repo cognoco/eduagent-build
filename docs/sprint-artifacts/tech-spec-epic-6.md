@@ -302,6 +302,151 @@ export const apiClient = createClient<paths>({
 
 ---
 
+## CI/CD Implementation (Stories 6.6-6.7)
+
+> **Primary Reference:** `docs/mobile-environment-strategy.md` - CI/CD Integration section
+>
+> **Platform Constraint:** Android-only for PoC/Phase 2. iOS builds deferred until hardware available.
+
+### Workflow Architecture
+
+Mobile CI uses a **separate workflow file** to keep mobile builds independent from web/server CI:
+
+```
+.github/workflows/
+├── ci.yml              # Existing: web + server (lint, test, build, e2e)
+└── mobile-ci.yml       # NEW: mobile-specific workflow
+```
+
+**Why separate?** Mobile builds (especially EAS) are slow (10-30 min) and shouldn't block web/server PRs.
+
+### Smart Triggers with Nx Affected
+
+Mobile CI only runs when mobile code is affected:
+
+```yaml
+# .github/workflows/mobile-ci.yml
+name: Mobile CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/api-client/**'
+      - 'packages/schemas/**'
+  push:
+    branches: [main]
+
+jobs:
+  check-affected:
+    runs-on: ubuntu-latest
+    outputs:
+      mobile-affected: ${{ steps.check.outputs.affected }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check if mobile affected
+        id: check
+        run: |
+          affected=$(pnpm exec nx show projects --affected --base=origin/main)
+          if echo "$affected" | grep -q "mobile"; then
+            echo "affected=true" >> $GITHUB_OUTPUT
+          else
+            echo "affected=false" >> $GITHUB_OUTPUT
+          fi
+```
+
+### CI Tasks
+
+| Task | Command | When to Run |
+|------|---------|-------------|
+| Lint | `pnpm exec nx run mobile:lint` | Every PR/push |
+| Test | `pnpm exec nx run mobile:test` | Every PR/push |
+| Type Check | `pnpm exec nx run-many -t typecheck` | Already in main CI |
+| Build (EAS) | `eas build --profile preview --platform android` | On merge to main |
+
+### EAS Build Integration
+
+**Build Profiles** (from `apps/mobile/eas.json`):
+
+| Profile | Purpose | Distribution | Trigger |
+|---------|---------|--------------|---------|
+| `development` | Dev builds with Metro connection | EAS Internal | Manual |
+| `preview` | QA testing, production-like | EAS Internal | PR merge to main |
+| `production` | Play Store release | Play Store | Manual/release tag |
+
+**CI Job for EAS Build:**
+
+```yaml
+build-preview:
+  needs: check-affected
+  if: needs.check-affected.outputs.mobile-affected == 'true'
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - uses: expo/expo-github-action@v8
+      with:
+        eas-version: latest
+        token: ${{ secrets.EXPO_TOKEN }}
+    - run: eas build --profile preview --platform android --non-interactive
+```
+
+### Secrets Management
+
+| Secret | Purpose | Where to Configure |
+|--------|---------|-------------------|
+| `EXPO_TOKEN` | EAS Build authentication | GitHub Settings → Secrets |
+
+**To generate EXPO_TOKEN:**
+1. Run `npx eas login` locally
+2. Run `npx eas credentials` to verify setup
+3. Create token at https://expo.dev/accounts/[username]/settings/access-tokens
+4. Add to GitHub repository secrets
+
+### CI Flow Diagram
+
+```
+PR Created (touches apps/mobile/)
+    │
+    ▼
+Check if mobile affected (Nx)
+    │
+    ├── No ──► Skip mobile CI (fast path)
+    │
+    └── Yes ─► Run lint + test
+                    │
+                    ▼
+              PR Merged to main
+                    │
+                    ▼
+              EAS Preview Build (Android)
+                    │
+                    ▼
+              Build available on Expo dashboard
+```
+
+### Expected CI Timing
+
+| Stage | Duration | Notes |
+|-------|----------|-------|
+| Check affected | ~30 seconds | Nx graph analysis |
+| Lint + Test | ~2-3 minutes | Jest with Nx caching |
+| EAS Preview Build | ~10-20 minutes | Cloud build, cached layers help |
+| **Total (with build)** | ~15-25 minutes | Runs in parallel with web CI |
+
+### Validation Checklist (Story 6.7)
+
+- [ ] PR touching only `apps/web/` does NOT trigger mobile CI
+- [ ] PR touching `apps/mobile/` triggers mobile lint + test
+- [ ] Intentional lint failure blocks PR merge
+- [ ] Intentional test failure blocks PR merge
+- [ ] Merge to main triggers EAS preview build
+- [ ] Build artifact accessible from Expo dashboard
+- [ ] Nx Cloud shows mobile task caching working
+
+---
+
 ## Dependencies and Integrations
 
 ### Package Dependencies (Installed via Epic 5b)
@@ -520,3 +665,4 @@ module.exports = config;
 |------|--------|--------|
 | 2025-12-05 | SM Agent (Rincewind) | Initial draft with SDK 53 assumptions |
 | 2025-12-13 | SM Agent (Rincewind) | **Major revision**: Updated for SDK 54 per Epic 5b; revised React 19.1.0, expo-router v6, removed obsolete Metro config guidance, updated dependencies, aligned with epic-6-design-decisions.md |
+| 2025-12-13 | Dev Agent (Claude Opus 4.5) | Added comprehensive CI/CD Implementation section for Stories 6.6-6.7; workflow architecture, EAS Build profiles, secrets management, validation checklist |

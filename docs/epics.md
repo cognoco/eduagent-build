@@ -1229,6 +1229,10 @@ So that main branch remains stable with upgraded infrastructure.
 > - See `docs/sprint-artifacts/epic-5b-nx-upgrade-analysis.md` for full analysis
 >
 > **Previous decision (SDK 53) superseded by Epic 5b analysis.**
+>
+> **📱 Mobile Environment Strategy:** See `docs/mobile-environment-strategy.md` for comprehensive development workflow, build profiles (EAS), CI/CD integration patterns, and deployment strategy.
+>
+> **⚠️ Platform Constraint:** Android-only for PoC/Phase 2. iOS testing deferred until hardware available.
 
 **Dependencies:**
 - **Epic 5b REQUIRED** (Nx 22.x Infrastructure Upgrade) - provides @nx/expo plugin and SDK 54 support
@@ -1392,13 +1396,15 @@ So that mobile builds and tests run automatically.
 **And** EAS Build is configured for preview builds (optional)
 **And** mobile-specific secrets are documented
 
-**Prerequisites:** Stories 6.1-6.4 complete, Epic 5 CI/CD infrastructure
+**Prerequisites:** Stories 6.1-6.5 complete, Epic 5 CI/CD infrastructure
 
 **Technical Notes:**
-- Update `.github/workflows/ci.yml` with mobile targets
-- Consider EAS Build for actual mobile builds (staging/production)
-- Document Expo credentials management
-- Mobile doesn't need separate deployment workflow (EAS handles it)
+- **Primary reference:** `docs/mobile-environment-strategy.md` (CI/CD Integration section)
+- Create separate `.github/workflows/mobile-ci.yml` for mobile builds (keeps mobile CI independent)
+- Use Nx `affected` to only run mobile CI when mobile code changes
+- Configure EAS Build profiles: `development`, `preview`, `production`
+- Document Expo/EAS credentials management (EXPO_TOKEN secret)
+- **Android-only:** iOS build configuration deferred per platform constraint
 
 ---
 
@@ -1421,9 +1427,12 @@ So that mobile app quality is maintained automatically.
 **Prerequisites:** Story 6.6 complete
 
 **Technical Notes:**
-- Manual validation of CI pipeline
-- Test with intentional lint/test failure
-- Document EAS Build workflow if configured
+- **Primary reference:** `docs/mobile-environment-strategy.md` (CI/CD Integration section)
+- Manual validation of CI pipeline on Android builds
+- Test with intentional lint/test failure to verify PR blocking
+- Validate EAS Build workflow for `preview` profile
+- Document mobile CI patterns in project documentation
+- **Android-only:** iOS pipeline validation deferred per platform constraint
 
 ---
 
