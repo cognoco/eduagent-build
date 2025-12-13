@@ -79,4 +79,5 @@ jobs:
       # Prepend any command with "nx-cloud record --" to record its logs to Nx Cloud
       # - run: pnpm exec nx-cloud record -- echo Hello World
       # When you enable task distribution, run the e2e-ci task instead of e2e
-      - run: pnpm exec nx run-many -t lint test build typecheck e2e
+      # Note: Mobile build excluded - mobile:build requires EAS CLI which is handled by mobile-ci.yml
+      - run: pnpm exec nx run-many -t lint test typecheck e2e && pnpm exec nx run-many -t build --exclude=@nx-monorepo/mobile
