@@ -44,8 +44,8 @@ The API client automatically selects the correct URL based on environment and pl
 
 #### URL Resolution Priority
 
-1. **Expo Config** (`app.json` → `extra.apiUrl`) - Highest priority
-2. **Environment Variable** (`EXPO_PUBLIC_API_URL`)
+1. **Environment Variable** (`EXPO_PUBLIC_API_URL`) - Recommended for local dev + Expo Go
+2. **Expo Config** (`app.json` → `extra.apiUrl`)
 3. **Platform Detection** (iOS vs Android development defaults)
 4. **Production Fallback** (when not in `__DEV__` mode)
 
@@ -63,6 +63,9 @@ To test the mobile app against staging (without building via EAS):
 # Set environment variable before starting
 EXPO_PUBLIC_API_URL=https://nx-monoreposerver-staging.up.railway.app/api pnpm exec nx run mobile:start
 ```
+
+> Tip: If you are using **Expo Go with a Tunnel URL** (like `exp://*.exp.direct`), your phone cannot reach `http://localhost:4000`.
+> Use a reachable API URL (staging, or a LAN IP) via `EXPO_PUBLIC_API_URL`.
 
 Or temporarily modify `app.json`:
 

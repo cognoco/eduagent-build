@@ -18,8 +18,8 @@ export type { paths, components, ApiClient } from '@nx-monorepo/api-client';
  * Gets the appropriate API URL based on the current environment and platform.
  *
  * Priority order:
- * 1. Expo config `extra.apiUrl` (from app.json or EAS build)
- * 2. `EXPO_PUBLIC_API_URL` environment variable
+ * 1. `EXPO_PUBLIC_API_URL` environment variable (recommended for local dev + Expo Go)
+ * 2. Expo config `extra.apiUrl` (from app.json or EAS build)
  * 3. Platform-specific development defaults:
  *    - iOS Simulator: http://localhost:4000/api
  *    - Android Emulator: http://10.0.2.2:4000/api (Android's localhost alias)
@@ -28,16 +28,16 @@ export type { paths, components, ApiClient } from '@nx-monorepo/api-client';
  * @returns The API base URL for the current environment
  */
 export function getApiUrl(): string {
-  // 1. Check Expo config (set via app.json extra or EAS environment)
-  const configUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
-  if (configUrl) {
-    return configUrl;
-  }
-
-  // 2. Check environment variable (set via EAS build or local .env)
+  // 1. Check environment variable (set via EAS build or local dev shell)
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
   if (envUrl) {
     return envUrl;
+  }
+
+  // 2. Check Expo config (set via app.json extra or EAS config)
+  const configUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
+  if (configUrl) {
+    return configUrl;
   }
 
   // 3. Development fallback based on platform
