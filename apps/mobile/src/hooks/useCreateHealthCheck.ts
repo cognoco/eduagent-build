@@ -105,7 +105,9 @@ export function useCreateHealthCheck(
         setMutating(false);
       }
     },
-    [options]
+    // Track callback directly, not wrapper object, to prevent recreation on every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [options?.onSuccess]
   );
 
   return { createHealthCheck, mutating, error };

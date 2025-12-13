@@ -5,21 +5,35 @@
 
 ## Checklist
 
-### 1. Set Legacy Architecture Mode
+### 1. Verify Architecture Mode Setting
 
-The generator defaults to `newArchEnabled: true`, but SDK 54 is the last version supporting Legacy Architecture.
+The generator defaults to `newArchEnabled: true`. **This is the recommended setting for most projects.**
 
 **File**: `apps/<name>/app.json`
 
+**Recommended (default):**
 ```json
 {
   "expo": {
-    "newArchEnabled": false
+    "newArchEnabled": true
   }
 }
 ```
 
-**Why**: SDK 54 constraint - New Architecture will be required in SDK 55+, but for now we use Legacy Architecture for stability.
+**When to keep `true` (RECOMMENDED for most projects):**
+- 75%+ of SDK 53/54 projects already use New Architecture successfully
+- Major libraries (Reanimated v4, FlashList v2) now ONLY support New Architecture
+- SDK 55 will REQUIRE New Architecture (no opt-out possible)
+- New React/RN features only available in New Architecture
+
+**When to set `false` (only for specific blockers):**
+- Using NativeWind (requires Reanimated v3, which doesn't support New Arch)
+- Using unmaintained third-party libraries with no New Arch support
+- Explicitly following a staged migration strategy (upgrade SDK first, then architecture)
+
+**Note**: SDK 54 is the LAST version supporting Legacy Architecture. Evaluate dependencies before setting to `false`—it only delays the inevitable migration.
+
+**Sources**: [Expo SDK 54 Changelog](https://expo.dev/changelog/sdk-54), [New Architecture Guide](https://docs.expo.dev/guides/new-architecture/)
 
 ### 2. Add Workspace Dependencies for Shared Packages
 

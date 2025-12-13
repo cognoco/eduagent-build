@@ -2,7 +2,7 @@
 
 > **Purpose:** Comprehensive guide for mobile app development, building, and deployment in the nx-monorepo template.
 > **Audience:** Developers working with the Expo mobile app
-> **Last Updated:** 2025-12-13
+> **Last Updated:** 2025-12-13 (v1.1 - Development profile API URL strategy revised)
 
 ---
 
@@ -124,9 +124,11 @@ Three profiles configured in `eas.json`:
 
 | Profile | Purpose | Distribution | API URL |
 |---------|---------|--------------|---------|
-| `development` | Daily dev, connects to Metro | EAS Internal | `10.0.2.2:4000` (localhost) |
+| `development` | Daily dev, connects to Metro | EAS Internal | Platform-auto (see note) |
 | `preview` | QA testing, production-like | EAS Internal | Staging (Railway) |
 | `production` | App Store release | Play Store | Production (Railway) |
+
+> **Note:** Development profile intentionally omits `EXPO_PUBLIC_API_URL` so that `api.ts` can use `Platform.select` at runtime: Android Emulator gets `10.0.2.2:4000`, iOS Simulator gets `localhost:4000`.
 
 ### Building
 
@@ -178,35 +180,30 @@ pnpm exec nx run mobile:start
 
 ```json
 {
-  "cli": {
-    "version": ">= 5.0.0"
-  },
   "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      },
-      "env": {
-        "EXPO_PUBLIC_API_URL": "http://10.0.2.2:4000/api"
-      }
-    },
-    "preview": {
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      },
-      "env": {
-        "EXPO_PUBLIC_API_URL": "https://nx-monoreposerver-staging.up.railway.app/api"
-      }
-    },
     "production": {
       "android": {
         "buildType": "app-bundle"
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://nx-monoreposerver-production.up.railway.app/api"
+      }
+    },
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+      // No env section - api.ts Platform.select handles platform differences
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://nx-monoreposerver-staging.up.railway.app/api"
       }
     }
   },
@@ -216,18 +213,22 @@ pnpm exec nx run mobile:start
 }
 ```
 
+> **Why no env in development?** EAS builds "bake in" environment variables at build time. If we set `EXPO_PUBLIC_API_URL` here, the smart platform-detection in `api.ts` would never run. By omitting it, the app uses `Platform.select` at runtime to choose the correct URL for each platform.
+
 ### API URL Resolution
 
-The mobile app resolves API URLs in this priority order:
+The mobile app (`api.ts`) resolves API URLs in this priority order:
 
 1. `EXPO_PUBLIC_API_URL` environment variable (set by EAS build)
 2. `Constants.expoConfig.extra.apiUrl` (from app.json)
-3. Platform-specific defaults:
+3. Platform-specific defaults (when `__DEV__` is true):
    - iOS: `http://localhost:4000/api`
    - Android: `http://10.0.2.2:4000/api`
 4. Production fallback: `https://api.example.com/api`
 
-**In practice:** EAS profiles set the env var, so option 1 always applies for builds.
+**In practice:**
+- **Development builds**: No env var set → Falls through to option 3 → Platform-appropriate URL
+- **Preview/Production builds**: Env var set → Uses option 1 → Explicit staging/production URL
 
 ---
 

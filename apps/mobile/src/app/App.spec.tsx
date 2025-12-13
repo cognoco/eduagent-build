@@ -138,6 +138,7 @@ describe('App (Health Check Screen)', () => {
     mockApiClient.POST.mockResolvedValueOnce({
       data: { healthCheck: mockHealthCheck },
       error: undefined,
+      response: new Response(null, { status: 200 }),
     });
 
     // After POST, GET will be called again (refetch)

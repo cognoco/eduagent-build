@@ -1,0 +1,134 @@
+name: Mobile CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/api-client/**'
+      - 'packages/schemas/**'
+      - '.github/workflows/mobile-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/api-client/**'
+      - 'packages/schemas/**'
+      - '.github/workflows/mobile-ci.yml'
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  # Check if mobile is actually affected by the changes
+  check-affected:
+    runs-on: ubuntu-latest
+    outputs:
+      mobile-affected: ${{ steps.check.outputs.affected }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch for comparison
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin ${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check if mobile affected
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            BASE="origin/${{ github.base_ref }}"
+          else
+            BASE="HEAD~1"
+          fi
+          affected=$(pnpm exec nx show projects --affected --base=$BASE 2>/dev/null || echo "")
+          echo "Affected projects: $affected"
+          if echo "$affected" | grep -q "mobile"; then
+            echo "affected=true" >> $GITHUB_OUTPUT
+            echo "Mobile is affected"
+          else
+            echo "affected=false" >> $GITHUB_OUTPUT
+            echo "Mobile is NOT affected"
+          fi
+
+  # Lint mobile code
+  lint:
+    needs: check-affected
+    if: needs.check-affected.outputs.mobile-affected == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run mobile lint
+        run: pnpm exec nx run mobile:lint
+
+  # Test mobile code
+  test:
+    needs: check-affected
+    if: needs.check-affected.outputs.mobile-affected == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run mobile tests
+        run: pnpm exec nx run mobile:test
+
+  # Build preview APK on merge to main (Android only for PoC)
+  build-preview:
+    needs: [check-affected, lint, test]
+    if: |
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.check-affected.outputs.mobile-affected == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build Android preview APK
+        working-directory: apps/mobile
+        run: eas build --profile preview --platform android --non-interactive

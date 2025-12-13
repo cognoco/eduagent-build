@@ -51,7 +51,7 @@ Epic 5b (completed December 12, 2025) established the mobile development infrast
 | D3: Nx Generation | **@nx/expo:application** | High | ✅ Plugin installed in Epic 5b |
 | D4: Metro Bundler Config | **Automatic** (SDK 52+) | High | ✅ Verified via Expo docs |
 | D5: API Client | **openapi-fetch** (existing) | Medium | Needs runtime verification |
-| D6: New Architecture | **Legacy** (SDK 54 last support) | High | Strategic decision |
+| D6: New Architecture | **New Architecture** (`true`) | High | ✅ Revised 2025-12-13 - recommended setting |
 
 ---
 
@@ -287,31 +287,51 @@ Test API calls during Story 6.2 to confirm `openapi-fetch` works in React Native
 
 ---
 
-## D6: New Architecture Strategy (NEW)
+## D6: New Architecture Strategy (REVISED 2025-12-13)
 
 ### Decision
-Use **Legacy Architecture** for Epic 6 walking skeleton.
+Use **New Architecture** (`newArchEnabled: true`) for Epic 6 walking skeleton.
 
-### Rationale
+### Rationale (Updated after research)
 
-1. **SDK 54 is the last version supporting Legacy Architecture** - SDK 55 will require New Architecture
-2. **Walking skeleton priority**: Validate infrastructure first, migrate architecture later
-3. **Library compatibility**: Not all libraries support New Architecture yet (e.g., NativeWind with Reanimated v4)
+**Original decision (2025-12-05):** Use Legacy Architecture for stability during walking skeleton development.
 
-### Future Migration Path
+**Revised decision (2025-12-13):** After thorough research from official Expo documentation, React Native blog, and ecosystem analysis:
 
-| Milestone | Architecture | Timeline |
-|-----------|--------------|----------|
-| Epic 6 (Walking Skeleton) | Legacy | Now |
-| Feature Development | Legacy | Q1 2026 |
-| SDK 55 Upgrade | New Architecture | When SDK 55 stable |
+1. **New Architecture is now the recommended default** - 75% of SDK 53/54 projects use it successfully
+2. **Our project has NO blocking dependencies** - No NativeWind, no Reanimated v3
+3. **SDK 55 will REQUIRE New Architecture** - Using Legacy only delays inevitable migration
+4. **Legacy Architecture has code freeze** - No more improvements or bug fixes
+5. **Major libraries ONLY support New Architecture** - Reanimated v4, FlashList v2
 
-### Key Consideration
+### When to Use Legacy Architecture (`newArchEnabled: false`)
 
-From Expo changelog:
-> "SDK 54 is the final release to include Legacy Architecture support. In React Native 0.82, it will no longer be possible to opt out of the new architecture."
+Only set to `false` if you have one of these specific blockers:
+- Using NativeWind (requires Reanimated v3)
+- Using unmaintained third-party libraries without New Arch support
+- Explicitly following staged migration (upgrade SDK first, then architecture)
 
-**Action:** Monitor New Architecture compatibility for key dependencies before SDK 55 upgrade.
+### Architecture Timeline
+
+| SDK Version | New Architecture Status | Source |
+|-------------|------------------------|--------|
+| SDK 52 | Default for NEW projects | [Expo SDK 52](https://expo.dev/changelog/2024-11-12-sdk-52) |
+| SDK 53 | Default for ALL projects | [Expo Blog](https://expo.dev/blog/out-with-the-old-in-with-the-new-architecture) |
+| SDK 54 | Last opt-out available | [Expo SDK 54](https://expo.dev/changelog/sdk-54) |
+| SDK 55 | **Required** (no opt-out) | [RN 0.82 Blog](https://reactnative.dev/blog/2025/10/08/react-native-0.82) |
+
+### Key Statistics
+
+- **75%** of SDK 53 projects on EAS Build use New Architecture
+- **Interop layer retained** - Legacy-compatible libraries still work
+- **Known issues resolved** - 3 minor issues with documented workarounds
+
+### Sources
+
+- [Expo SDK 54 Changelog](https://expo.dev/changelog/sdk-54)
+- [New Architecture Guide](https://docs.expo.dev/guides/new-architecture/)
+- [New Arch SDK 54 Status](https://github.com/expo/fyi/blob/main/new-arch-sdk-54-status.md)
+- [React Native 0.82 Blog](https://reactnative.dev/blog/2025/10/08/react-native-0.82)
 
 ---
 
@@ -334,7 +354,6 @@ From Expo changelog:
 - Offline-first/caching patterns
 - Platform-specific native modules
 - Custom theming system
-- New Architecture migration
 
 ---
 
@@ -391,3 +410,4 @@ Pre-existing detox warning for `expect@29.x.x` vs Jest 30's `expect@30.2.0`. Wil
 |------|--------|--------|
 | 2025-12-05 | AI Agent (SM persona) | Initial creation from architectural walkthrough |
 | 2025-12-12 | AI Agent (Architect persona) | **Major revision** after Epic 5b completion: Updated SDK from 53→54, React from 19.0→19.1, expo-router from v4→v6, Nx from 21.6→22.2, simplified Metro config, added New Architecture strategy, updated open questions status |
+| 2025-12-13 | Mort (Dev Agent) | **D6 Revised**: Changed from Legacy to New Architecture after research. 75% adoption rate, no blocking deps, SDK 55 will require it. Original constraint was outdated. |
