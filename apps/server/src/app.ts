@@ -27,12 +27,12 @@ export function createApp(): Express {
   // Goals:
   // - Keep strict allowlisting in production (credentials-enabled CORS cannot use '*')
   // - Make local dev resilient to port changes (e.g. Expo web can bump 8081 → 8082)
+  // - Fail fast in production if CORS is misconfigured (security by default)
   //
   // Priority:
-  // 1) If CORS_ORIGIN is set, treat it as an explicit comma-separated allowlist.
-  // 2) Otherwise:
-  //    - production: allow only a placeholder domain (must be overridden in real deployments)
-  //    - development: allow localhost / 127.0.0.1 on ANY port (http or https)
+  // 1) Production REQUIRES CORS_ORIGIN to be set (fails at startup otherwise).
+  // 2) If CORS_ORIGIN is set, treat it as an explicit comma-separated allowlist.
+  // 3) Development (without CORS_ORIGIN): allow localhost / 127.0.0.1 on ANY port.
   const explicitCorsOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',')
         .map((origin) => origin.trim())
@@ -40,6 +40,15 @@ export function createApp(): Express {
     : null;
 
   const isProduction = process.env.NODE_ENV === 'production';
+
+  // Fail fast in production if CORS is not explicitly configured
+  if (isProduction && !explicitCorsOrigins) {
+    throw new Error(
+      'CORS_ORIGIN environment variable must be set in production. ' +
+        'Example: CORS_ORIGIN=https://yourdomain.com,https://api.yourdomain.com'
+    );
+  }
+
   const devLocalOriginRegex = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
   const corsOrigin: cors.CorsOptions['origin'] = (origin, callback) => {
@@ -54,16 +63,12 @@ export function createApp(): Express {
     }
 
     // 2) Development: allow localhost + 127.0.0.1 on any port (handles Expo web port bumps).
+    //    Production without CORS_ORIGIN already threw at startup, so this only runs in dev.
     if (!isProduction && devLocalOriginRegex.test(origin)) {
       return callback(null, true);
     }
 
-    // 3) Production fallback (must be overridden via CORS_ORIGIN in real deployments).
-    if (isProduction) {
-      return callback(null, origin === 'https://your-domain.com');
-    }
-
-    // Default deny.
+    // Default deny (production always has CORS_ORIGIN set due to startup check).
     return callback(null, false);
   };
 
