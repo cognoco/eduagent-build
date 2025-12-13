@@ -26,6 +26,9 @@
     },
     {
       "path": "./packages/test-utils"
+    },
+    {
+      "path": "./apps/mobile"
     }
   ]
 }

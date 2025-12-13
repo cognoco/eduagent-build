@@ -1244,7 +1244,7 @@ So that I can build cross-platform mobile experiences.
 **Acceptance Criteria:**
 
 **Given** Epic 5b is complete (Nx 22.x + @nx/expo installed)
-**When** I generate the mobile app with `pnpm exec nx g @nx/expo:app mobile --directory=apps/mobile`
+**When** I generate the mobile app with `pnpm exec nx g @nx/expo:application mobile --directory=apps/mobile`
 **Then** the app is created with correct structure
 
 **And** `pnpm exec nx run mobile:start` launches Expo dev server

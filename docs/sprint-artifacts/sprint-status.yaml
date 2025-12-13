@@ -235,8 +235,8 @@ development_status:
   # RESET 2025-12-12: Story files deleted - need re-drafting with SDK 54 context (not SDK 53)
   # See epic-5b-nx-upgrade-analysis.md for SDK 54 requirements
   epic-6: contexted  # Tech spec updated 2025-12-13 for SDK 54
-  6-1-generate-expo-mobile-application: review  # COMPLETED 2025-12-13 - All ACs verified, ready for SM review
-  6-2-configure-api-client-for-mobile: ready-for-dev  # Story context created 2025-12-13
+  6-1-generate-expo-mobile-application: done  # APPROVED 2025-12-13 - Senior Developer Review passed, all ACs verified
+  6-2-configure-api-client-for-mobile: in-progress  # Started implementation 2025-12-13
   6-3-implement-mobile-health-check-screen: ready-for-dev  # Story context generated 2025-12-13
   6-4-validate-cross-platform-sync: ready-for-dev  # Story context generated 2025-12-13
   6-5-document-mobile-development-setup: ready-for-dev  # Story context generated 2025-12-13
