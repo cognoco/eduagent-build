@@ -1,0 +1,224 @@
+<story-context id="6-6-mobile-cicd-pipeline-integration" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>6</storyId>
+    <title>Mobile CI/CD Pipeline Integration</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-13</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/6-6-mobile-cicd-pipeline-integration.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>DevOps engineer maintaining the monorepo</asA>
+    <iWant>the mobile app integrated into the CI/CD pipeline</iWant>
+    <soThat>mobile code quality is automatically validated and preview builds are generated</soThat>
+    <tasks>
+      <task id="1" ac="1">Create Mobile CI Workflow File
+        <subtask id="1.1">Create `.github/workflows/mobile-ci.yml` with appropriate triggers</subtask>
+        <subtask id="1.2">Configure workflow to trigger on PR/push with mobile-related path filters</subtask>
+        <subtask id="1.3">Add job dependency on affected check to skip when mobile not affected</subtask>
+        <subtask id="1.4">Configure Node.js, pnpm, and Nx setup steps</subtask>
+      </task>
+      <task id="2" ac="5">Implement Nx Affected Detection
+        <subtask id="2.1">Add `check-affected` job using `nx show projects --affected`</subtask>
+        <subtask id="2.2">Set job output for conditional execution</subtask>
+        <subtask id="2.3">Configure fetch-depth for proper git history</subtask>
+      </task>
+      <task id="3" ac="2">Configure Mobile Lint Job
+        <subtask id="3.1">Add lint job depending on affected check</subtask>
+        <subtask id="3.2">Run `pnpm exec nx run mobile:lint`</subtask>
+        <subtask id="3.3">Ensure lint failure blocks PR merge</subtask>
+      </task>
+      <task id="4" ac="3">Configure Mobile Test Job
+        <subtask id="4.1">Add test job depending on affected check</subtask>
+        <subtask id="4.2">Run `pnpm exec nx run mobile:test`</subtask>
+        <subtask id="4.3">Ensure test failure blocks PR merge</subtask>
+      </task>
+      <task id="5" ac="4">Validate Type Check Integration
+        <subtask id="5.1">Verify mobile project is included in `nx run-many -t typecheck`</subtask>
+        <subtask id="5.2">Confirm typecheck target exists in mobile project</subtask>
+        <subtask id="5.3">No changes needed if already configured by @nx/expo generator</subtask>
+      </task>
+      <task id="6" ac="6">Configure EAS Build Integration
+        <subtask id="6.1">Verify `eas.json` exists with build profiles (development, preview, production)</subtask>
+        <subtask id="6.2">Add EAS build job triggered on merge to main</subtask>
+        <subtask id="6.3">Use `expo/expo-github-action@v8` for EAS CLI</subtask>
+        <subtask id="6.4">Configure Android-only build (`--platform android`)</subtask>
+        <subtask id="6.5">Add `--non-interactive` flag for CI environment</subtask>
+      </task>
+      <task id="7" ac="7">Document and Configure Secrets
+        <subtask id="7.1">Document EXPO_TOKEN generation process in README or docs</subtask>
+        <subtask id="7.2">Add instructions for configuring GitHub repository secret</subtask>
+        <subtask id="7.3">Reference `docs/mobile-environment-strategy.md` for complete secrets documentation</subtask>
+      </task>
+      <task id="8" ac="8">Test CI Pipeline
+        <subtask id="8.1">Push branch with mobile changes to trigger CI</subtask>
+        <subtask id="8.2">Verify affected detection works correctly</subtask>
+        <subtask id="8.3">Verify lint and test jobs execute</subtask>
+        <subtask id="8.4">Verify EAS build triggers on merge (or manual trigger for testing)</subtask>
+        <subtask id="8.5">Confirm no regression in existing web/server CI</subtask>
+      </task>
+      <task id="9" ac="all">Update Sprint Status
+        <subtask id="9.1">Update sprint-status.yaml: set 6-6 status to done</subtask>
+        <subtask id="9.2">Document completion notes in Dev Agent Record</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-6.6.1">Mobile-specific CI workflow file created (`.github/workflows/mobile-ci.yml`)</criterion>
+    <criterion id="AC-6.6.2">Mobile lint runs on PR/push when mobile code affected: `pnpm exec nx run mobile:lint`</criterion>
+    <criterion id="AC-6.6.3">Mobile test runs on PR/push when mobile code affected: `pnpm exec nx run mobile:test`</criterion>
+    <criterion id="AC-6.6.4">Mobile type check included in workspace typecheck target</criterion>
+    <criterion id="AC-6.6.5">Nx affected detection correctly identifies mobile as affected when relevant files change</criterion>
+    <criterion id="AC-6.6.6">EAS Build configured for preview builds (Android-only for PoC)</criterion>
+    <criterion id="AC-6.6.7">Mobile-specific secrets (EXPO_TOKEN) documented and configured</criterion>
+    <criterion id="AC-6.6.8">CI workflow passes with new mobile project</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-6.md</path>
+        <title>Epic 6 Technical Specification</title>
+        <section>CI/CD Implementation (Stories 6.6-6.7)</section>
+        <snippet>Comprehensive CI/CD section defining workflow architecture, smart triggers with Nx affected, EAS build profiles, secrets management, and validation checklist for mobile pipeline integration.</snippet>
+      </doc>
+      <doc>
+        <path>docs/mobile-environment-strategy.md</path>
+        <title>Mobile Environment Strategy</title>
+        <section>CI/CD Integration</section>
+        <snippet>Primary reference for mobile CI/CD patterns including smart triggers, workflow structure, EAS build integration, and flow diagrams showing PR → affected check → lint/test → build pipeline.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture</title>
+        <section>Deployment Architecture → CI/CD Pipeline</section>
+        <snippet>Defines quality gates (pre-commit, CI) and deployment targets. CI executes lint, test, build, typecheck, e2e. Mobile extends this pattern via separate workflow.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Epic 6: Mobile Walking Skeleton → Story 6.6</section>
+        <snippet>Original story definition covering CI/CD pipeline integration with lint, test, build targets for mobile app.</snippet>
+      </doc>
+      <doc>
+        <path>.github/workflows/ci.yml</path>
+        <title>Main CI Workflow</title>
+        <section>Entire file</section>
+        <snippet>Existing web+server CI workflow. Uses pnpm/action-setup@v4, Node 22, Playwright, Prisma, runs `nx run-many -t lint test build typecheck e2e`. Mobile CI should follow similar patterns.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>apps/mobile/eas.json</path>
+        <kind>config</kind>
+        <symbol>EAS Build Configuration</symbol>
+        <lines>all</lines>
+        <reason>Defines build profiles (development, preview, production) with API URLs. CI will use `preview` profile for Android builds.</reason>
+      </artifact>
+      <artifact>
+        <path>apps/mobile/package.json</path>
+        <kind>manifest</kind>
+        <symbol>Mobile package manifest</symbol>
+        <lines>all</lines>
+        <reason>Defines dependencies including @nx-monorepo/api-client workspace reference. Contains eas-build-post-install script for EAS builds.</reason>
+      </artifact>
+      <artifact>
+        <path>.github/workflows/ci.yml</path>
+        <kind>workflow</kind>
+        <symbol>Main CI workflow</symbol>
+        <lines>all</lines>
+        <reason>Reference implementation for CI patterns: pnpm setup, Node 22, Nx commands, Prisma generation. Mobile CI should follow similar setup steps.</reason>
+      </artifact>
+      <artifact>
+        <path>.github/workflows/deploy-staging.yml</path>
+        <kind>workflow</kind>
+        <symbol>Staging deployment workflow</symbol>
+        <lines>all</lines>
+        <reason>Shows deployment patterns and GitHub Actions best practices used in this project.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="Node/pnpm">
+        <package name="@nx/expo" version="22.2.0">Nx plugin for Expo apps - provides targets for build, lint, test</package>
+        <package name="expo" version="~54.0.0">Expo SDK for mobile development</package>
+        <package name="expo-github-action" version="v8">GitHub Action for EAS CLI in CI</package>
+        <package name="jest-expo" version="~54.0.13">Jest preset for Expo testing</package>
+        <package name="@testing-library/react-native" version="~13.2.0">Testing utilities for React Native</package>
+        <package name="nx" version="22.2.0">Monorepo build system with affected detection</package>
+        <package name="pnpm" version="10.19.0">Package manager</package>
+      </ecosystem>
+      <ecosystem name="GitHub Actions">
+        <package name="actions/checkout" version="v4">Repository checkout with fetch-depth for Nx affected</package>
+        <package name="pnpm/action-setup" version="v4">pnpm installation</package>
+        <package name="actions/setup-node" version="v4">Node.js environment setup</package>
+        <package name="expo/expo-github-action" version="v8">EAS CLI installation and authentication</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="platform">Android-only for PoC/Phase 2. iOS builds deferred until hardware available.</constraint>
+    <constraint type="workflow-separation">Mobile CI uses separate workflow file to avoid blocking web/server PRs (EAS builds take 10-30 min).</constraint>
+    <constraint type="smart-triggering">Use Nx affected detection to skip mobile CI when mobile code not changed.</constraint>
+    <constraint type="path-filters">CI should trigger on: apps/mobile/**, packages/api-client/**, packages/schemas/**</constraint>
+    <constraint type="secret-management">EXPO_TOKEN required for EAS builds - must be configured in GitHub repository secrets.</constraint>
+    <constraint type="existing-ci">Mobile CI must not regress or interfere with existing ci.yml workflow for web/server.</constraint>
+    <constraint type="nx-patterns">Follow existing Nx patterns: pnpm exec nx run, nx affected, remote caching via Nx Cloud.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Mobile Nx Targets</name>
+      <kind>Nx targets</kind>
+      <signature>pnpm exec nx run mobile:{lint|test|typecheck|build|start}</signature>
+      <path>apps/mobile (inferred by @nx/expo)</path>
+    </interface>
+    <interface>
+      <name>Nx Affected Detection</name>
+      <kind>CLI command</kind>
+      <signature>pnpm exec nx show projects --affected --base=origin/main</signature>
+      <path>nx workspace</path>
+    </interface>
+    <interface>
+      <name>EAS Build CLI</name>
+      <kind>CLI command</kind>
+      <signature>eas build --profile {development|preview|production} --platform android --non-interactive</signature>
+      <path>apps/mobile (uses eas.json)</path>
+    </interface>
+    <interface>
+      <name>expo-github-action</name>
+      <kind>GitHub Action</kind>
+      <signature>uses: expo/expo-github-action@v8 with: {eas-version: latest, token: ${{ secrets.EXPO_TOKEN }}}</signature>
+      <path>.github/workflows/mobile-ci.yml (to be created)</path>
+    </interface>
+    <interface>
+      <name>GitHub Actions Outputs</name>
+      <kind>Workflow pattern</kind>
+      <signature>jobs.{job}.outputs.{name} = ${{ steps.{step}.outputs.{var} }}</signature>
+      <path>.github/workflows/</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Mobile tests use Jest with jest-expo preset for React Native testing. Tests should be co-located in src/ directories following the monorepo convention (*.spec.ts, *.spec.tsx). @testing-library/react-native provides component testing utilities. Coverage is measured but not enforced for walking skeleton phase.
+    </standards>
+    <locations>
+      <location>apps/mobile/src/**/*.spec.{ts,tsx}</location>
+      <location>apps/mobile/src/**/*.test.{ts,tsx}</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-6.6.1">Verify mobile-ci.yml file exists and has valid YAML syntax</idea>
+      <idea ac="AC-6.6.2">Run `pnpm exec nx run mobile:lint` locally and verify it passes</idea>
+      <idea ac="AC-6.6.3">Run `pnpm exec nx run mobile:test` locally and verify it passes</idea>
+      <idea ac="AC-6.6.4">Run `pnpm exec nx run-many -t typecheck` and verify mobile is included</idea>
+      <idea ac="AC-6.6.5">Modify apps/mobile/src/index.tsx, run `nx show projects --affected`, verify mobile listed</idea>
+      <idea ac="AC-6.6.6">Verify eas.json has preview profile with Android config, attempt manual EAS build</idea>
+      <idea ac="AC-6.6.7">Check documentation for EXPO_TOKEN generation steps, verify GitHub secret placeholder</idea>
+      <idea ac="AC-6.6.8">Push PR with mobile changes, verify GitHub Actions workflow completes successfully</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -5,7 +5,7 @@ import { z, ZodError } from 'zod';
  * Validation middleware factory for Zod schemas
  * Imports schemas from @nx-monorepo/schemas package
  */
-export const validateBody = (schema: z.ZodType<any>) => {
+export const validateBody = (schema: z.ZodType<unknown>) => {
   return async (
     req: Request,
     res: Response,
@@ -28,7 +28,7 @@ export const validateBody = (schema: z.ZodType<any>) => {
   };
 };
 
-export const validateQuery = (schema: z.ZodType<any>) => {
+export const validateQuery = (schema: z.ZodType<unknown>) => {
   return async (
     req: Request,
     res: Response,
@@ -51,7 +51,7 @@ export const validateQuery = (schema: z.ZodType<any>) => {
   };
 };
 
-export const validateParams = (schema: z.ZodType<any>) => {
+export const validateParams = (schema: z.ZodType<unknown>) => {
   return async (
     req: Request,
     res: Response,

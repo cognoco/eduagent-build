@@ -24,17 +24,53 @@ export function createApp(): Express {
   app.use(express.json());
 
   // CORS configuration
-  // Support multiple origins (comma-separated) for development scenarios
-  // where multiple web apps run on different ports (3000, 3001, etc.)
-  const corsOrigin = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
-    : process.env.NODE_ENV === 'production'
-    ? ['https://your-domain.com'] // Configure for production
-    : [
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://localhost:3002',
-      ];
+  // Goals:
+  // - Keep strict allowlisting in production (credentials-enabled CORS cannot use '*')
+  // - Make local dev resilient to port changes (e.g. Expo web can bump 8081 → 8082)
+  // - Fail fast in production if CORS is misconfigured (security by default)
+  //
+  // Priority:
+  // 1) Production REQUIRES CORS_ORIGIN to be set (fails at startup otherwise).
+  // 2) If CORS_ORIGIN is set, treat it as an explicit comma-separated allowlist.
+  // 3) Development (without CORS_ORIGIN): allow localhost / 127.0.0.1 on ANY port.
+  const explicitCorsOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean)
+    : null;
+
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // Fail fast in production if CORS is not explicitly configured
+  if (isProduction && !explicitCorsOrigins) {
+    throw new Error(
+      'CORS_ORIGIN environment variable must be set in production. ' +
+        'Example: CORS_ORIGIN=https://yourdomain.com,https://api.yourdomain.com'
+    );
+  }
+
+  const devLocalOriginRegex = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+  const corsOrigin: cors.CorsOptions['origin'] = (origin, callback) => {
+    // Some clients (curl, server-to-server) send no Origin header; allow these.
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // 1) Explicit allowlist from env var.
+    if (explicitCorsOrigins) {
+      return callback(null, explicitCorsOrigins.includes(origin));
+    }
+
+    // 2) Development: allow localhost + 127.0.0.1 on any port (handles Expo web port bumps).
+    //    Production without CORS_ORIGIN already threw at startup, so this only runs in dev.
+    if (!isProduction && devLocalOriginRegex.test(origin)) {
+      return callback(null, true);
+    }
+
+    // Default deny (production always has CORS_ORIGIN set due to startup check).
+    return callback(null, false);
+  };
 
   app.use(
     cors({

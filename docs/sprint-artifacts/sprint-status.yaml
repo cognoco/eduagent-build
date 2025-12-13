@@ -65,8 +65,8 @@ planning_notes:
       depends_on: [4-1, 4-2, 4-3]
 
     - story: 6-1-generate-expo-mobile-application
-      notes: "DRAFTED - All Epic 6 stories drafted 2025-12-05. Run story-context or mark ready-for-dev to begin implementation."
-      depends_on: null
+      notes: "READY-FOR-DEV 2025-12-13 - Story context generated. Run dev-story workflow to implement."
+      depends_on: epic-5b  # SATISFIED - Nx 22.x + @nx/expo installed
 
     - story: 7-1-document-walking-skeleton-architecture
       notes: "Documentation from existing code"
@@ -137,7 +137,8 @@ planning_notes:
 
     mobile:
       sequence: [6-1, 6-2, 6-3, 6-4, 6-5, 6-6, 6-7]
-      notes: "Generate → Configure → Implement → Validate → Document → CI/CD Integration → Validate CI/CD"
+      notes: "NEEDS RE-DRAFTING with SDK 54 - Generate → Configure → Implement → Validate → Document → CI/CD → Validate"
+      prerequisites: epic-5b  # SATISFIED - Nx 22.x + @nx/expo + SDK 54 ready
 
 # STATUS DEFINITIONS:
 # ==================
@@ -226,19 +227,21 @@ development_status:
   5b-5-validate-cicd-pipeline: done  # COMPLETED 2025-12-12 - CI green, Nx Cloud verified
   5b-6-install-nx-expo-plugin: done  # APPROVED 2025-12-12 - Senior Dev Review passed
   5b-7-install-and-configure-expo-clis: done  # APPROVED 2025-12-12 - Senior Dev Review passed, all ACs verified
-  5b-8-update-documentation: review  # COMPLETED 2025-12-12 - Ready for code review
-  5b-9-final-validation-and-merge-to-main: ready-for-dev  # Context generated 2025-12-11
-  epic-5b-retrospective: optional
+  5b-8-update-documentation: done  # APPROVED 2025-12-12 - Documentation updated
+  5b-9-final-validation-and-merge-to-main: done  # COMPLETED 2025-12-12 - Fresh clone validated, PR #42 ready for merge
+  epic-5b-retrospective: completed  # Epic 5b complete - Nx 22.x + @nx/expo ready for Epic 6
 
   # Epic 6: Mobile Walking Skeleton (Extended 2025-12-08)
-  epic-6: contexted  # Tech context completed 2025-12-05 - see epic-6-design-decisions.md
-  6-1-generate-expo-mobile-application: ready-for-dev  # Context generated 2025-12-05
-  6-2-configure-api-client-for-mobile: ready-for-dev  # Context generated 2025-12-05
-  6-3-implement-mobile-health-check-screen: ready-for-dev  # Context generated 2025-12-05
-  6-4-validate-cross-platform-sync: ready-for-dev  # Context generated 2025-12-05
-  6-5-document-mobile-development-setup: ready-for-dev  # Context generated 2025-12-05
-  6-6-mobile-cicd-pipeline-integration: drafted  # NEW 2025-12-08 - Integrate mobile into CI/CD
-  6-7-validate-mobile-deployment-pipeline: drafted  # NEW 2025-12-08 - Validate mobile CI/CD
+  # RESET 2025-12-12: Story files deleted - need re-drafting with SDK 54 context (not SDK 53)
+  # See epic-5b-nx-upgrade-analysis.md for SDK 54 requirements
+  epic-6: contexted  # Tech spec updated 2025-12-13 for SDK 54
+  6-1-generate-expo-mobile-application: done  # APPROVED 2025-12-13 - Senior Developer Review passed, all ACs verified
+  6-2-configure-api-client-for-mobile: done  # APPROVED 2025-12-13 - Senior Developer Review passed
+  6-3-implement-mobile-health-check-screen: done  # APPROVED 2025-12-13 - Senior Developer Review passed, all ACs verified
+  6-4-validate-cross-platform-sync: done  # COMPLETED 2025-12-13 - Validated during Story 6.3 (Expo Go + staging API)
+  6-5-document-mobile-development-setup: done  # COMPLETED 2025-12-13 - Documentation validated through practical use
+  6-6-mobile-cicd-pipeline-integration: done  # APPROVED 2025-12-13 - Senior Developer Review passed, AC-6.6.8 (CI execution) deferred to Story 6.7 by design
+  6-7-validate-mobile-deployment-pipeline: in-progress  # Started 2025-12-13 - Validation in progress
   epic-6-retrospective: optional
 
   # Epic 7: MVP Documentation

@@ -1,141 +1,292 @@
-<story-context id="6-5-document-mobile-development-setup" v="1.0">
+<story-context id="bmad/bmm/workflows/4-implementation/story-context" v="1.0">
   <metadata>
     <epicId>6</epicId>
     <storyId>5</storyId>
     <title>Document Mobile Development Setup</title>
     <status>ready-for-dev</status>
-    <generatedAt>2025-12-05</generatedAt>
+    <generatedAt>2025-12-13</generatedAt>
     <generator>BMAD Story Context Workflow</generator>
     <sourceStoryPath>docs/sprint-artifacts/6-5-document-mobile-development-setup.md</sourceStoryPath>
   </metadata>
 
   <story>
-    <asA>new mobile developer</asA>
-    <iWant>documentation for mobile development</iWant>
-    <soThat>I can get started quickly</soThat>
+    <asA>a new mobile developer joining the project</asA>
+    <iWant>comprehensive documentation for mobile development setup and workflow</iWant>
+    <soThat>I can get started quickly and troubleshoot common issues independently</soThat>
     <tasks>
-      <task id="1" acs="7">Create Mobile README - apps/mobile/README.md</task>
-      <task id="2" acs="2,3">Document Prerequisites - Node, pnpm, Xcode, Android Studio</task>
-      <task id="3" acs="2">Document iOS Simulator Setup</task>
-      <task id="4" acs="3">Document Android Emulator Setup</task>
-      <task id="5" acs="4">Document Expo Commands - start, lint, test</task>
-      <task id="6" acs="5">Document Networking Configuration - localhost differences</task>
-      <task id="7" acs="6">Document Staging API Configuration - API_URL env var</task>
-      <task id="8">Add Troubleshooting Section</task>
-      <task id="9" acs="7">Update Project Documentation - main README, docs/index.md</task>
-      <task id="10" acs="2,3">Validate Documentation - test with unfamiliar developer</task>
+      <task id="1" ac="1">Create mobile development documentation structure in apps/mobile/README.md</task>
+      <task id="2" ac="2,3">Document prerequisites and system requirements for iOS and Android</task>
+      <task id="3" ac="2">Document iOS Simulator setup with launch commands</task>
+      <task id="4" ac="3">Document Android Emulator setup with launch commands</task>
+      <task id="5" ac="4">Document network configuration (localhost, 10.0.2.2)</task>
+      <task id="6" ac="1,2,3,4,5">Document development workflow and available Nx commands</task>
+      <task id="7" ac="5">Document staging API configuration</task>
+      <task id="8" ac="6">Create troubleshooting section with common issues</task>
+      <task id="9" ac="7">Validate documentation with fresh checkout test</task>
+      <task id="10" ac="1">Update root README.md with mobile section link</task>
+      <task id="11" ac="1-7">Final review and polish</task>
     </tasks>
   </story>
 
   <acceptanceCriteria>
-    <criterion id="1">Documentation covers simulator/emulator setup</criterion>
-    <criterion id="2">Developer can run mobile app on iOS Simulator in &lt;15 minutes</criterion>
-    <criterion id="3">Developer can run mobile app on Android Emulator</criterion>
-    <criterion id="4">Documentation covers all Expo/Nx commands needed</criterion>
-    <criterion id="5">Documentation explains localhost differences per platform</criterion>
-    <criterion id="6">Instructions explain how to configure staging API URL</criterion>
-    <criterion id="7">Documentation exists in docs/ or apps/mobile/README.md</criterion>
+    <criterion id="AC-6.5.1">README section for mobile development added (or dedicated apps/mobile/README.md)</criterion>
+    <criterion id="AC-6.5.2">iOS Simulator setup documented with prerequisites and launch commands</criterion>
+    <criterion id="AC-6.5.3">Android Emulator setup documented with prerequisites and launch commands</criterion>
+    <criterion id="AC-6.5.4">Network configuration for local development documented (localhost, 10.0.2.2)</criterion>
+    <criterion id="AC-6.5.5">Running against staging API documented</criterion>
+    <criterion id="AC-6.5.6">Troubleshooting section with common issues and solutions</criterion>
+    <criterion id="AC-6.5.7">New developer can follow docs to run mobile app within 15 minutes</criterion>
   </acceptanceCriteria>
 
   <artifacts>
     <docs>
-      <doc>
-        <path>docs/sprint-artifacts/epic-6-design-decisions.md</path>
-        <title>Epic 6 Design Decisions</title>
-        <section>D4, D5: Metro Config, API Client</section>
-        <snippet>Document Metro monorepo config, environment URL handling per platform</snippet>
+      <doc path="docs/sprint-artifacts/tech-spec-epic-6.md" relevance="high">
+        <summary>Technical specification for Epic 6 Mobile Walking Skeleton - Story 6.5 ACs defined at lines 391-396</summary>
+        <keyInfo>
+          - Documentation story requirements
+          - Target: README section, simulator/emulator setup, network config, troubleshooting
+        </keyInfo>
       </doc>
-      <doc>
-        <path>docs/index.md</path>
-        <title>Documentation Index</title>
-        <section>Project documentation structure</section>
-        <snippet>Add mobile documentation reference to project index</snippet>
+      <doc path="docs/sprint-artifacts/epic-6-design-decisions.md" relevance="high">
+        <summary>Architectural decisions for Epic 6 mobile development - SDK 54, Legacy Architecture, Metro auto-config</summary>
+        <keyInfo>
+          - SDK 54 (54.0.29) with React 19.1.0
+          - Expo Router v6 for navigation
+          - Legacy Architecture (SDK 54 is last to support it)
+          - Metro bundler auto-configures for monorepo since SDK 52
+          - API URL configuration: localhost:4000 (iOS), 10.0.2.2:4000 (Android)
+        </keyInfo>
       </doc>
-      <doc>
-        <path>README.md</path>
-        <title>Project README</title>
-        <section>Quick start, commands</section>
-        <snippet>May need mobile section added to main README</snippet>
+      <doc path="docs/tech-stack.md" relevance="high">
+        <summary>Authoritative version reference for all technologies</summary>
+        <keyInfo>
+          - Expo SDK 54.0.x (tilde pinning)
+          - React Native 0.81.5
+          - React 19.1.0
+          - EAS CLI 16.28.0 (global install)
+          - CLI commands reference included
+        </keyInfo>
+      </doc>
+      <doc path="docs/memories/expo-development.md" relevance="high">
+        <summary>Expo development patterns and troubleshooting for AI agents</summary>
+        <keyInfo>
+          - Context7 library IDs for documentation cross-verification
+          - EAS CLI command reference
+          - Monorepo integration patterns
+          - Common troubleshooting steps
+          - Package installation: always use npx expo install
+        </keyInfo>
+      </doc>
+      <doc path="docs/epics.md" relevance="medium">
+        <summary>Epic and story breakdown - Story 6.5 at lines 1349-1373</summary>
+        <keyInfo>
+          - Story 6.5 is final story in Epic 6
+          - Depends on Stories 6.1-6.4 completion
+          - Focus: simulator/emulator setup, Expo commands, networking, troubleshooting
+        </keyInfo>
       </doc>
     </docs>
-
     <code>
-      <file>
-        <path>apps/web/README.md</path>
-        <kind>documentation</kind>
-        <symbol>Web app README (if exists)</symbol>
-        <reason>Reference for app-level documentation pattern</reason>
+      <file path="apps/mobile/README.md" action="create" relevance="high">
+        <purpose>Primary deliverable - comprehensive mobile development documentation</purpose>
+        <notes>File may not exist yet; create with full documentation content</notes>
       </file>
-      <file>
-        <path>apps/mobile/app.config.ts</path>
-        <kind>config</kind>
-        <symbol>Expo configuration</symbol>
-        <reason>Document how to configure API_URL via extras</reason>
-      </file>
-      <file>
-        <path>apps/mobile/metro.config.js</path>
-        <kind>config</kind>
-        <symbol>Metro bundler config</symbol>
-        <reason>Document monorepo configuration for troubleshooting</reason>
+      <file path="README.md" action="modify" relevance="medium">
+        <purpose>Add mobile development section with link to apps/mobile/README.md</purpose>
+        <notes>Add brief section pointing to detailed mobile docs</notes>
       </file>
     </code>
-
     <dependencies>
-      <ecosystem name="documentation-references">
-        <package name="Expo Documentation" note="https://docs.expo.dev" />
-        <package name="Nx Expo Plugin" note="https://nx.dev/technologies/react/expo" />
-      </ecosystem>
+      <dependency name="Stories 6.1-6.4" status="prerequisite">
+        <note>Mobile app must exist and be working before documentation can reference actual commands and behavior</note>
+      </dependency>
+      <packages>
+        <package name="expo" version="~54.0.0" />
+        <package name="react-native" version="0.81.5" />
+        <package name="react" version="19.1.0" />
+        <package name="@nx/expo" version="22.2.0" />
+        <package name="eas-cli" version="16.28.0" />
+      </packages>
     </dependencies>
   </artifacts>
 
   <constraints>
-    <constraint type="dependency">Depends on Stories 6.1-6.4 completion - need working mobile app to document</constraint>
-    <constraint type="quality">&lt;15 minute setup target for new developer</constraint>
-    <constraint type="scope">Document practical setup, not comprehensive Expo tutorial</constraint>
-    <constraint type="format">Markdown documentation in docs/ or apps/mobile/README.md</constraint>
+    <constraint type="format">
+      <description>Documentation must be Markdown format</description>
+    </constraint>
+    <constraint type="accuracy">
+      <description>All commands must be verified to work in the actual project</description>
+      <notes>Use actual package.json scripts, Nx targets, and Expo CLI commands</notes>
+    </constraint>
+    <constraint type="completeness">
+      <description>Documentation must enable 15-minute setup for new developers</description>
+    </constraint>
+    <constraint type="versions">
+      <description>Reference correct versions from docs/tech-stack.md (see dependencies/packages for values)</description>
+    </constraint>
   </constraints>
 
   <interfaces>
-    <interface>
-      <name>Nx Expo Targets</name>
-      <kind>CLI commands</kind>
-      <signature>pnpm exec nx run mobile:{start|lint|test}</signature>
-      <path>apps/mobile/project.json</path>
+    <interface type="nx-commands">
+      <description>Nx targets for mobile app (from @nx/expo plugin)</description>
+      <commands>
+        <command>pnpm exec nx run mobile:start</command>
+        <command>pnpm exec nx run mobile:run-ios</command>
+        <command>pnpm exec nx run mobile:run-android</command>
+        <command>pnpm exec nx run mobile:build</command>
+        <command>pnpm exec nx run mobile:lint</command>
+        <command>pnpm exec nx run mobile:test</command>
+      </commands>
     </interface>
-    <interface>
-      <name>iOS Simulator</name>
-      <kind>development tool</kind>
-      <signature>open -a Simulator; press 'i' in Expo CLI</signature>
-      <path>Xcode (macOS)</path>
+    <interface type="expo-cli">
+      <description>Expo CLI commands (bundled with expo package)</description>
+      <commands>
+        <command>npx expo start</command>
+        <command>npx expo install [package]</command>
+        <command>npx expo-doctor</command>
+        <command>npx expo prebuild</command>
+      </commands>
     </interface>
-    <interface>
-      <name>Android Emulator</name>
-      <kind>development tool</kind>
-      <signature>Start AVD in Android Studio; press 'a' in Expo CLI</signature>
-      <path>Android Studio</path>
+    <interface type="eas-cli">
+      <description>EAS CLI commands (global install)</description>
+      <commands>
+        <command>eas login</command>
+        <command>eas whoami</command>
+        <command>eas build</command>
+        <command>eas update</command>
+      </commands>
     </interface>
-    <interface>
-      <name>Environment Config</name>
-      <kind>configuration</kind>
-      <signature>API_URL=https://staging.example.com pnpm exec nx run mobile:start</signature>
-      <path>apps/mobile/app.config.ts</path>
+    <interface type="network">
+      <description>API URL configuration per platform</description>
+      <endpoints>
+        <endpoint platform="iOS Simulator" url="http://localhost:4000/api" />
+        <endpoint platform="Android Emulator" url="http://10.0.2.2:4000/api" />
+        <endpoint platform="Physical Device" url="https://staging.your-domain.com/api" />
+      </endpoints>
     </interface>
   </interfaces>
 
   <tests>
     <standards>
-      Validation by having unfamiliar developer follow documentation.
-      Success: mobile app running in &lt;15 minutes from clean clone.
+      <standard>This is a documentation story - no code tests</standard>
+      <standard>Validation is manual: fresh checkout + setup timer</standard>
     </standards>
     <locations>
-      <location>Manual validation</location>
+      <location>N/A - documentation deliverable</location>
     </locations>
     <ideas>
-      <idea ac="2">Time a fresh setup following docs - target &lt;15 minutes</idea>
-      <idea ac="1,3,4,5,6">Review documentation for completeness and clarity</idea>
-      <idea ac="7">Verify documentation exists in expected location</idea>
+      <idea priority="required" ac="7">
+        Fresh checkout test: Clone repo in new directory, follow docs, verify mobile app starts within 15 minutes
+      </idea>
+      <idea priority="required" ac="2,3">
+        Verify all documented commands work: iOS Simulator launch, Android Emulator launch
+      </idea>
+      <idea priority="required" ac="4">
+        Test network configuration: API calls from simulator/emulator reach local server
+      </idea>
+      <idea priority="recommended" ac="6">
+        Have team member unfamiliar with mobile dev review docs for clarity
+      </idea>
     </ideas>
   </tests>
+
+  <devNotes>
+    <documentationStructure>
+      <heading level="1">Mobile Development (apps/mobile)</heading>
+      <heading level="2">Prerequisites</heading>
+      <heading level="2">Quick Start</heading>
+      <heading level="2">iOS Development</heading>
+      <heading level="3">Simulator Setup</heading>
+      <heading level="3">Running the App</heading>
+      <heading level="2">Android Development</heading>
+      <heading level="3">Emulator Setup</heading>
+      <heading level="3">Running the App</heading>
+      <heading level="2">Network Configuration</heading>
+      <heading level="2">Development Workflow</heading>
+      <heading level="2">Running Against Staging</heading>
+      <heading level="2">Troubleshooting</heading>
+    </documentationStructure>
+    <keyCommands>
+      <section name="Development">
+        <command desc="Start Expo dev server">pnpm exec nx run mobile:start</command>
+        <command desc="Run on iOS Simulator">pnpm exec nx run mobile:run-ios</command>
+        <command desc="Run on Android Emulator">pnpm exec nx run mobile:run-android</command>
+        <command desc="Check project health">npx expo-doctor</command>
+      </section>
+      <section name="Build">
+        <command desc="Build mobile app">pnpm exec nx run mobile:build</command>
+        <command desc="EAS cloud build">eas build --platform all</command>
+      </section>
+      <section name="Quality">
+        <command desc="Run mobile tests">pnpm exec nx run mobile:test</command>
+        <command desc="Lint mobile code">pnpm exec nx run mobile:lint</command>
+      </section>
+    </keyCommands>
+    <networkDiagram>
+      <![CDATA[
+┌─────────────────────────────────────────────────────────────┐
+│                     LOCAL DEVELOPMENT                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────────────┐       ┌──────────────────┐           │
+│  │  iOS Simulator   │       │ Android Emulator │           │
+│  │  (localhost)     │       │ (10.0.2.2)       │           │
+│  └────────┬─────────┘       └────────┬─────────┘           │
+│           │                          │                      │
+│           └──────────┬───────────────┘                      │
+│                      ▼                                      │
+│           ┌──────────────────────┐                          │
+│           │  Express Server      │                          │
+│           │  localhost:4000      │                          │
+│           └──────────┬───────────┘                          │
+│                      ▼                                      │
+│           ┌──────────────────────┐                          │
+│           │  Supabase DEV        │                          │
+│           │  (PostgreSQL)        │                          │
+│           └──────────────────────┘                          │
+└─────────────────────────────────────────────────────────────┘
+
+Note: Android Emulator uses 10.0.2.2 to reach host machine's localhost
+      ]]>
+    </networkDiagram>
+    <troubleshootingReference>
+      <issue symptom="Metro bundler not finding packages">
+        <cause>Monorepo workspace not properly resolved</cause>
+        <solution>Clear Metro cache: npx expo start --clear</solution>
+      </issue>
+      <issue symptom="Cannot connect to API from Android Emulator">
+        <cause>Using localhost instead of 10.0.2.2</cause>
+        <solution>Change API_URL to http://10.0.2.2:4000/api</solution>
+      </issue>
+      <issue symptom="Expo Doctor shows version warnings">
+        <cause>Project uses Jest 30 vs expected 29.7</cause>
+        <solution>Expected - intentional upgrade for Nx 22 compatibility</solution>
+      </issue>
+      <issue symptom="Build fails with native module error">
+        <cause>Native modules need prebuild</cause>
+        <solution>Run: npx expo prebuild</solution>
+      </issue>
+    </troubleshootingReference>
+    <prerequisites>
+      <ios>
+        <item>macOS (required for iOS development)</item>
+        <item>Xcode 15+ installed from App Store</item>
+        <item>Xcode Command Line Tools: xcode-select --install</item>
+        <item>iOS Simulator (installed with Xcode)</item>
+        <item>CocoaPods: sudo gem install cocoapods (if using native modules)</item>
+      </ios>
+      <android>
+        <item>Android Studio (any OS)</item>
+        <item>Android SDK with API level 34+</item>
+        <item>Android Emulator with system image</item>
+        <item>ANDROID_HOME environment variable set</item>
+        <item>Platform-tools in PATH</item>
+      </android>
+      <common>
+        <item>Node.js 22.x (project requirement)</item>
+        <item>pnpm 10.x (project requirement)</item>
+        <item>Git</item>
+      </common>
+    </prerequisites>
+  </devNotes>
 </story-context>
-
-
