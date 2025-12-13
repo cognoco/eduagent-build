@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "@nx-monorepo/mobile",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },

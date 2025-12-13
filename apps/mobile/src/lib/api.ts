@@ -69,7 +69,7 @@ export function getApiUrl(): string {
  * import { apiClient } from '../lib/api';
  *
  * // Type-safe GET request
- * const { data, error } = await apiClient.GET('/api/health');
+ * const { data, error } = await apiClient.GET('/health');
  *
  * if (error) {
  *   console.error('Health check failed:', error);

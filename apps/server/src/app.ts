@@ -24,17 +24,48 @@ export function createApp(): Express {
   app.use(express.json());
 
   // CORS configuration
-  // Support multiple origins (comma-separated) for development scenarios
-  // where multiple web apps run on different ports (3000, 3001, etc.)
-  const corsOrigin = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
-    : process.env.NODE_ENV === 'production'
-    ? ['https://your-domain.com'] // Configure for production
-    : [
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://localhost:3002',
-      ];
+  // Goals:
+  // - Keep strict allowlisting in production (credentials-enabled CORS cannot use '*')
+  // - Make local dev resilient to port changes (e.g. Expo web can bump 8081 → 8082)
+  //
+  // Priority:
+  // 1) If CORS_ORIGIN is set, treat it as an explicit comma-separated allowlist.
+  // 2) Otherwise:
+  //    - production: allow only a placeholder domain (must be overridden in real deployments)
+  //    - development: allow localhost / 127.0.0.1 on ANY port (http or https)
+  const explicitCorsOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean)
+    : null;
+
+  const isProduction = process.env.NODE_ENV === 'production';
+  const devLocalOriginRegex = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+  const corsOrigin: cors.CorsOptions['origin'] = (origin, callback) => {
+    // Some clients (curl, server-to-server) send no Origin header; allow these.
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // 1) Explicit allowlist from env var.
+    if (explicitCorsOrigins) {
+      return callback(null, explicitCorsOrigins.includes(origin));
+    }
+
+    // 2) Development: allow localhost + 127.0.0.1 on any port (handles Expo web port bumps).
+    if (!isProduction && devLocalOriginRegex.test(origin)) {
+      return callback(null, true);
+    }
+
+    // 3) Production fallback (must be overridden via CORS_ORIGIN in real deployments).
+    if (isProduction) {
+      return callback(null, origin === 'https://your-domain.com');
+    }
+
+    // Default deny.
+    return callback(null, false);
+  };
 
   app.use(
     cors({
