@@ -130,6 +130,36 @@ Three profiles configured in `eas.json`:
 
 > **Note:** Development profile intentionally omits `EXPO_PUBLIC_API_URL` so that `api.ts` can use `Platform.select` at runtime: Android Emulator gets `10.0.2.2:4000`, iOS Simulator gets `localhost:4000`.
 
+### Monorepo Build Hook
+
+EAS builds don't automatically compile Nx workspace packages. The mobile app's `package.json` includes a hook that builds dependencies before Metro bundling:
+
+```json
+// apps/mobile/package.json
+{
+  "scripts": {
+    "eas-build-post-install": "cd ../.. && pnpm exec nx run-many -t build -p @nx-monorepo/api-client @nx-monorepo/schemas && node tools/scripts/eas-build-post-install.mjs . apps/mobile"
+  }
+}
+```
+
+This ensures `@nx-monorepo/api-client` and `@nx-monorepo/schemas` are compiled before the EAS build runs Metro bundler.
+
+### Credentials Setup (One-Time)
+
+EAS manages signing credentials (keystores for Android, certificates for iOS). Credentials are stored **per-app**, not per-profile.
+
+```bash
+# Set up Android credentials (interactive, one-time)
+cd apps/mobile
+eas credentials --platform android
+
+# When prompted for profile, any choice works - the keystore
+# is stored at the app level and used by ALL profiles
+```
+
+**Key point:** You only need to run this once. The same keystore is automatically used by development, preview, and production builds.
+
 ### Building
 
 ```bash
@@ -180,6 +210,9 @@ pnpm exec nx run mobile:start
 
 ```json
 {
+  "cli": {
+    "appVersionSource": "remote"
+  },
   "build": {
     "production": {
       "android": {
