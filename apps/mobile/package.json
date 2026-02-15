@@ -1,9 +1,9 @@
 {
-  "name": "@nx-monorepo/mobile",
+  "name": "@eduagent/mobile",
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "eas-build-post-install": "cd ../.. && pnpm exec nx run-many -t build -p @nx-monorepo/schemas && node tools/scripts/eas-build-post-install.mjs . apps/mobile"
+    "eas-build-post-install": "cd ../.. && pnpm exec nx run-many -t build -p @eduagent/schemas && node tools/scripts/eas-build-post-install.mjs . apps/mobile"
   },
   "dependencies": {
     "@expo/metro-config": "*",

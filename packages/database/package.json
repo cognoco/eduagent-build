@@ -1,5 +1,5 @@
 {
-  "name": "@nx-monorepo/database",
+  "name": "@eduagent/database",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -15,14 +15,14 @@
   "exports": {
     ".": {
       "types": "./src/index.ts",
-      "@nx-monorepo/source": "./src/index.ts",
+      "@eduagent/source": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./package.json": "./package.json"
   },
   "devDependencies": {
-    "@nx-monorepo/test-utils": "workspace:*",
+    "@eduagent/test-utils": "workspace:*",
     "prisma": "^6.17.1"
   },
   "dependencies": {

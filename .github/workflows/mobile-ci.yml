@@ -129,7 +129,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: pnpm --filter @nx-monorepo/database db:generate
+        run: pnpm --filter @eduagent/database db:generate
 
       - name: Run mobile tests
         run: pnpm exec nx run mobile:test

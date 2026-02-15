@@ -11,7 +11,7 @@
  * @see docs/memories/testing-reference.md for testing guidelines
  */
 
-import { loadDatabaseEnv } from '@nx-monorepo/test-utils';
+import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 
 // Load database environment variables for tests

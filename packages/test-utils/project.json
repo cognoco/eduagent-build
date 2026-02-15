@@ -1,5 +1,5 @@
 {
-  "name": "@nx-monorepo/test-utils",
+  "name": "@eduagent/test-utils",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "packages/test-utils/src",
   "projectType": "library",

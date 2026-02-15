@@ -12,7 +12,7 @@ const { assetExts, sourceExts } = defaultConfig.resolver;
  * @type {import('metro-config').MetroConfig}
  */
 const customConfig = {
-  cacheVersion: '@nx-monorepo/mobile',
+  cacheVersion: '@eduagent/mobile',
   transformer: {
     babelTransformerPath: require.resolve('react-native-svg-transformer'),
   },

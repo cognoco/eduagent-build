@@ -61,11 +61,11 @@ jobs:
       - run: pnpm install
 
       # Generate Prisma Client (postinstall script is ignored by pnpm security)
-      - run: pnpm --filter @nx-monorepo/database db:generate
+      - run: pnpm --filter @eduagent/database db:generate
 
       # Apply database migrations
       - name: Apply database migrations
-        run: pnpm --filter @nx-monorepo/database db:migrate
+        run: pnpm --filter @eduagent/database db:migrate
 
       # Validate research documentation exists for material spec changes
       - name: Validate Research Documentation
@@ -79,4 +79,4 @@ jobs:
       # - run: pnpm exec nx-cloud record -- echo Hello World
       # When you enable task distribution, run the e2e-ci task instead of e2e
       # Note: Mobile build excluded - mobile:build requires EAS CLI which is handled by mobile-ci.yml
-      - run: pnpm exec nx run-many -t lint test typecheck && pnpm exec nx run-many -t build --exclude=@nx-monorepo/mobile
+      - run: pnpm exec nx run-many -t lint test typecheck && pnpm exec nx run-many -t build --exclude=@eduagent/mobile
