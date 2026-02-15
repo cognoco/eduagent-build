@@ -7,6 +7,9 @@ import { profileRoutes } from './routes/profiles';
 import { consentRoutes } from './routes/consent';
 import { accountRoutes } from './routes/account';
 import { inngestRoute } from './routes/inngest';
+import { subjectRoutes } from './routes/subjects';
+import { interviewRoutes } from './routes/interview';
+import { curriculumRoutes } from './routes/curriculum';
 
 type Bindings = {
   ENVIRONMENT: string;
@@ -33,6 +36,9 @@ app.route('/', profileRoutes);
 app.route('/', consentRoutes);
 app.route('/', accountRoutes);
 app.route('/', inngestRoute);
+app.route('/', subjectRoutes);
+app.route('/', interviewRoutes);
+app.route('/', curriculumRoutes);
 
 export type AppType = typeof app;
 
