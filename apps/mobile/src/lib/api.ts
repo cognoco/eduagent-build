@@ -1,9 +1,11 @@
 /**
- * API client configuration for the mobile app.
+ * Hono RPC client — provides end-to-end type safety from API to mobile.
  *
- * Placeholder — will be replaced with Hono RPC client (hc<AppType>)
- * during Epic 0 when the Hono API is scaffolded.
+ * The `hc<AppType>` pattern gives full autocomplete for all API routes
+ * and response types without code generation.
  */
+import { hc } from 'hono/client';
+import type { AppType } from '@eduagent/api';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
@@ -22,5 +24,7 @@ export function getApiUrl(): string {
     }) as string;
   }
 
-  return 'https://api.example.com';
+  return 'https://api.eduagent.app';
 }
+
+export const api = hc<AppType>(getApiUrl());

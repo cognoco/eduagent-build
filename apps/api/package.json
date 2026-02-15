@@ -2,15 +2,23 @@
   "name": "@eduagent/api",
   "version": "0.0.1",
   "private": true,
+  "exports": {
+    ".": {
+      "@eduagent/source": "./src/index.ts"
+    }
+  },
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"
   },
   "dependencies": {
-    "hono": "^4.11.0"
+    "@eduagent/schemas": "workspace:*",
+    "hono": "^4.11.0",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
-    "wrangler": "^4.0.0",
-    "@cloudflare/workers-types": "^4.0.0"
+    "@clerk/types": "^4.40.0",
+    "@cloudflare/workers-types": "^4.0.0",
+    "wrangler": "^4.0.0"
   }
 }

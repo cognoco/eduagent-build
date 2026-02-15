@@ -6,10 +6,12 @@
     "eas-build-post-install": "cd ../.. && pnpm exec nx run-many -t build -p @eduagent/schemas && node tools/scripts/eas-build-post-install.mjs . apps/mobile"
   },
   "dependencies": {
+    "@eduagent/api": "workspace:*",
     "@expo/metro-config": "*",
     "@testing-library/react-native": "*",
     "expo": "*",
     "expo-constants": "~18.0.12",
+    "hono": "^4.11.0",
     "expo-splash-screen": "*",
     "expo-status-bar": "*",
     "expo-system-ui": "*",

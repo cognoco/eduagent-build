@@ -1,0 +1,9 @@
+{
+  "name": "@eduagent/factory",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/factory/src",
+  "projectType": "library",
+  "targets": {
+    "format:check": {}
+  }
+}

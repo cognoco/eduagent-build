@@ -1,12 +1,8 @@
 import { Hono } from 'hono';
 
-const health = new Hono();
-
-health.get('/health', (c) => {
+export const health = new Hono().get('/health', (c) => {
   return c.json({
-    status: 'ok',
+    status: 'ok' as const,
     timestamp: new Date().toISOString(),
   });
 });
-
-export { health };

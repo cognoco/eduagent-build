@@ -6,7 +6,7 @@ describe('GET /v1/health', () => {
 
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = (await res.json()) as { status: string; timestamp: string };
     expect(body.status).toBe('ok');
     expect(body.timestamp).toBeDefined();
     expect(() => new Date(body.timestamp)).not.toThrow();
