@@ -18,15 +18,10 @@
     "validate:governance": "node tools/gates/run-internal-alignment.mjs",
     "validate:env": "node scripts/validate-env.js",
     "prepare": "husky",
-    "db:push:dev": "dotenv -e .env.development.local -- npx prisma db push --schema=packages/database/prisma/schema.prisma",
-    "db:push:test": "dotenv -e .env.test.local -- npx prisma db push --schema=packages/database/prisma/schema.prisma",
-    "db:migrate:dev": "dotenv -e .env.development.local -- npx prisma migrate dev --schema=packages/database/prisma/schema.prisma",
-    "db:migrate:test": "dotenv -e .env.test.local -- npx prisma migrate dev --schema=packages/database/prisma/schema.prisma",
-    "db:migrate:deploy:dev": "dotenv -e .env.development.local -- npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma",
-    "db:migrate:deploy:test": "dotenv -e .env.test.local -- npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma",
-    "db:studio:dev": "dotenv -e .env.development.local -- npx prisma studio --schema=packages/database/prisma/schema.prisma",
-    "db:studio:test": "dotenv -e .env.test.local -- npx prisma studio --schema=packages/database/prisma/schema.prisma",
-    "db:generate": "dotenv -e .env.development.local -- npx prisma generate --schema=packages/database/prisma/schema.prisma"
+    "db:push:dev": "dotenv -e .env.development.local -- npx drizzle-kit push --config=packages/database/drizzle.config.ts",
+    "db:generate": "dotenv -e .env.development.local -- npx drizzle-kit generate --config=packages/database/drizzle.config.ts",
+    "db:migrate:dev": "dotenv -e .env.development.local -- npx drizzle-kit migrate --config=packages/database/drizzle.config.ts",
+    "db:studio:dev": "dotenv -e .env.development.local -- npx drizzle-kit studio --config=packages/database/drizzle.config.ts"
   },
   "private": true,
   "dependencies": {
@@ -93,20 +88,20 @@
     "metro-resolver": "~0.83.0",
     "nx": "22.2.0",
     "prettier": "^2.6.2",
-    "prisma": "^6.17.1",
     "ts-jest": "^29.4.0",
     "ts-node": "10.9.1",
     "tslib": "^2.3.0",
     "tsx": "^4.20.6",
     "typescript": "~5.9.2",
-    "typescript-eslint": "^8.40.0"
+    "typescript-eslint": "^8.40.0",
+    "@cloudflare/workers-types": "^4.0.0",
+    "@naxodev/nx-cloudflare": "^5.0.0",
+    "hono": "^4.11.0",
+    "wrangler": "^4.0.0"
   },
   "packageManager": "pnpm@10.19.0",
   "pnpm": {
     "onlyBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
-      "prisma",
       "esbuild",
       "sharp"
     ],

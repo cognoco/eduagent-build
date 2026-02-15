@@ -33,8 +33,7 @@
           "buildDepsName": "build-deps",
           "watchDepsName": "watch-deps"
         }
-      },
-      "exclude": ["packages/database/*"]
+      }
     },
     {
       "plugin": "@nx/eslint/plugin",
@@ -46,15 +45,6 @@
       "plugin": "@nx/jest/plugin",
       "options": {
         "targetName": "test"
-      }
-    },
-    {
-      "plugin": "@nx/js/typescript",
-      "include": ["packages/database/*"],
-      "options": {
-        "typecheck": {
-          "targetName": "typecheck"
-        }
       }
     },
     {

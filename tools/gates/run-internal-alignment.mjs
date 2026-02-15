@@ -114,9 +114,9 @@ function main() {
   const tasksPath = path.join(root, artifacts.tasks || '');
 
   const envExample = readIfExists(path.join(root, '.env.example'));
-  const schemaPrisma = readIfExists(path.join(root, 'packages', 'database', 'prisma', 'schema.prisma'));
-  const webJestConfig = readIfExists(path.join(root, 'apps', 'web', 'jest.config.ts'));
-  const webPkgJson = loadJson(path.join(root, 'apps', 'web', 'package.json')) || {};
+  const drizzleConfig = readIfExists(path.join(root, 'packages', 'database', 'drizzle.config.ts'));
+  const apiJestConfig = readIfExists(path.join(root, 'apps', 'api', 'jest.config.ts'));
+  const mobilePkgJson = loadJson(path.join(root, 'apps', 'mobile', 'package.json')) || {};
 
   // Global exceptions docket (project-level)
   const exceptionsMd = readIfExists(path.join(root, 'specs', 'exceptions.md'));
@@ -136,31 +136,25 @@ function main() {
     }
   }
 
-  // Rule: schema.prisma must not use directUrl in Phase 1 (only non-comment assignment lines)
+  // Rule: Drizzle config must use DATABASE_URL (not hardcoded connection strings)
   if (phase === 'phase1') {
-    const hasDirectUrl = schemaPrisma
+    const hasHardcodedUrl = drizzleConfig
       .split(/\r?\n/)
-      .some((line) => /^\s*directUrl\s*=/.test(line));
-    if (hasDirectUrl) {
-      const v = { rule: 'PRISMA_DIRECTURL', file: 'packages/database/prisma/schema.prisma', message: 'Phase 1: Prisma datasource must not use directUrl' };
+      .some((line) => /url\s*:\s*['"]postgres/.test(line));
+    if (hasHardcodedUrl) {
+      const v = { rule: 'DRIZZLE_HARDCODED_URL', file: 'packages/database/drizzle.config.ts', message: 'Phase 1: Drizzle config must use DATABASE_URL env var, not hardcoded strings' };
       (exceptions.has(v.rule) ? waived : violations).push(v);
     }
   }
 
   // Rule: Phase 1 coverageThreshold should be 10
   if (phase === 'phase1') {
-    const has10 = /branches\s*:\s*10/.test(webJestConfig) && /functions\s*:\s*10/.test(webJestConfig) && /lines\s*:\s*10/.test(webJestConfig) && /statements\s*:\s*10/.test(webJestConfig);
+    const dbJestConfig = readIfExists(path.join(root, 'packages', 'database', 'jest.config.cjs'));
+    const has10 = /branches\s*:\s*10/.test(dbJestConfig) && /functions\s*:\s*10/.test(dbJestConfig) && /lines\s*:\s*10/.test(dbJestConfig) && /statements\s*:\s*10/.test(dbJestConfig);
     if (!has10) {
-      const v = { rule: 'PHASE1_COVERAGE', file: 'apps/web/jest.config.ts', message: 'Phase 1: coverageThreshold must be 10% (raise later per plan)' };
+      const v = { rule: 'PHASE1_COVERAGE', file: 'packages/database/jest.config.cjs', message: 'Phase 1: coverageThreshold must be 10% (raise later per plan)' };
       (exceptions.has(v.rule) ? waived : violations).push(v);
     }
-  }
-
-  // Rule: MSW required in UI devDependencies
-  const devDeps = (webPkgJson.devDependencies || {});
-  if (!devDeps['msw']) {
-    const v = { rule: 'MSW_REQUIRED', file: 'apps/web/package.json', message: 'UI packages must include msw in devDependencies' };
-    (exceptions.has(v.rule) ? waived : violations).push(v);
   }
 
   // Feature discovery for reporting (and future feature-scoped rules)

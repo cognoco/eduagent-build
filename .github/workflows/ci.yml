@@ -15,10 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:14-alpine
+        image: postgres:16-alpine
         env:
-          POSTGRES_USER: prisma
-          POSTGRES_PASSWORD: prisma
+          POSTGRES_USER: eduagent
+          POSTGRES_PASSWORD: eduagent
           POSTGRES_DB: tests
         options: >-
           --health-cmd pg_isready
@@ -28,8 +28,7 @@ jobs:
         ports:
           - 5432:5432
     env:
-      DATABASE_URL: postgresql://prisma:prisma@localhost:5432/tests?schema=public
-      DIRECT_URL: postgresql://prisma:prisma@localhost:5432/tests?schema=public
+      DATABASE_URL: postgresql://eduagent:eduagent@localhost:5432/tests
       CI: true
     steps:
       - uses: actions/checkout@v4
@@ -60,12 +59,9 @@ jobs:
 
       - run: pnpm install
 
-      # Generate Prisma Client (postinstall script is ignored by pnpm security)
-      - run: pnpm --filter @eduagent/database db:generate
-
-      # Apply database migrations
-      - name: Apply database migrations
-        run: pnpm --filter @eduagent/database db:migrate
+      # Push database schema to test postgres (Drizzle push for CI)
+      - name: Apply database schema
+        run: pnpm --filter @eduagent/database db:push
 
       # Validate research documentation exists for material spec changes
       - name: Validate Research Documentation

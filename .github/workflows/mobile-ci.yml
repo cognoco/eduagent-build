@@ -128,8 +128,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Generate Prisma client
-        run: pnpm --filter @eduagent/database db:generate
+      - name: Build database package
+        run: pnpm exec nx run @eduagent/database:build
 
       - name: Run mobile tests
         run: pnpm exec nx run mobile:test

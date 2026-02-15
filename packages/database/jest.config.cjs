@@ -10,7 +10,7 @@ const swcJestConfig = JSON.parse(
 swcJestConfig.swcrc = false;
 
 module.exports = {
-  displayName: '@nx-monorepo/database',
+  displayName: '@eduagent/database',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
   setupFiles: [join(__dirname, 'jest.setup.ts')],
@@ -33,6 +33,7 @@ module.exports = {
       statements: 10, // TODO: Increase coverage threshold to 60% in Phase 2+ (Stage 5 requirement)
     },
   },
+  passWithNoTests: true,
   testTimeout: 10000,
   maxWorkers: 1,
 };

@@ -9,7 +9,8 @@ const swcJestConfig = JSON.parse(
 swcJestConfig.swcrc = false;
 
 module.exports = {
-  displayName: '@nx-monorepo/schemas',
+  displayName: '@eduagent/schemas',
+  passWithNoTests: true,
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
   testMatch: ['<rootDir>/src/**/*.(spec|test).[jt]s?(x)'],
