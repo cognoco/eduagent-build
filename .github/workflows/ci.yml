@@ -59,7 +59,6 @@ jobs:
           cache: 'pnpm'
 
       - run: pnpm install
-      - run: pnpm exec playwright install --with-deps
 
       # Generate Prisma Client (postinstall script is ignored by pnpm security)
       - run: pnpm --filter @nx-monorepo/database db:generate
@@ -80,4 +79,4 @@ jobs:
       # - run: pnpm exec nx-cloud record -- echo Hello World
       # When you enable task distribution, run the e2e-ci task instead of e2e
       # Note: Mobile build excluded - mobile:build requires EAS CLI which is handled by mobile-ci.yml
-      - run: pnpm exec nx run-many -t lint test typecheck e2e && pnpm exec nx run-many -t build --exclude=@nx-monorepo/mobile
+      - run: pnpm exec nx run-many -t lint test typecheck && pnpm exec nx run-many -t build --exclude=@nx-monorepo/mobile

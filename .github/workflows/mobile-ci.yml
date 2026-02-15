@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - 'apps/mobile/**'
-      - 'packages/api-client/**'
       - 'packages/schemas/**'
       - '.github/workflows/mobile-ci.yml'
   push:
@@ -12,7 +11,6 @@ on:
       - main
     paths:
       - 'apps/mobile/**'
-      - 'packages/api-client/**'
       - 'packages/schemas/**'
       - '.github/workflows/mobile-ci.yml'
   # Manual trigger for testing builds before merge

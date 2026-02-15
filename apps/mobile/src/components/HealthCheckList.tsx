@@ -21,10 +21,10 @@ import {
   RefreshControl,
   Pressable,
 } from 'react-native';
-import type { components } from '@nx-monorepo/api-client';
 import { HealthCheckItem } from './HealthCheckItem';
 
-type HealthCheck = components['schemas']['HealthCheck'];
+// TODO: Replace with Hono RPC types in Epic 0
+type HealthCheck = { id: string; message: string; timestamp: string };
 
 export interface HealthCheckListProps {
   /** Array of health check records to display */

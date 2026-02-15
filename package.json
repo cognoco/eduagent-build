@@ -8,16 +8,10 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "dev": "nx run-many -t dev --projects=web,server --parallel=2",
-    "dev:web": "nx run web:dev",
-    "dev:server": "nx run server:serve",
     "build": "nx run-many -t build",
     "test": "nx run-many -t test",
     "test:coverage": "nx run-many -t test --coverage",
-    "test:coverage:web": "nx run web:test --coverage",
-    "test:coverage:server": "nx run server:test --coverage",
     "lint": "nx run-many -t lint",
-    "e2e": "nx run-many -t e2e",
     "format:check": "nx run-many -t format:check",
     "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,scss,html}\"",
     "validate:research": "node tools/scripts/validate-research.js",
@@ -43,14 +37,10 @@
     "expo-splash-screen": "~31.0.11",
     "expo-status-bar": "~3.0.8",
     "expo-system-ui": "~6.0.8",
-    "express": "^4.21.2",
-    "next": "16.0.8",
     "react": "19.1.0",
-    "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-svg": "15.12.1",
-    "react-native-svg-transformer": "~1.5.1",
-    "react-native-web": "~0.21.0"
+    "react-native-svg-transformer": "~1.5.1"
   },
   "devDependencies": {
     "@babel/runtime": "~7.27.6",
@@ -60,7 +50,6 @@
     "@eslint/eslintrc": "^2.1.1",
     "@eslint/js": "^9.8.0",
     "@expo/cli": "~54.0.16",
-    "@next/eslint-plugin-next": "16.0.8",
     "@nx/devkit": "22.2.0",
     "@nx/esbuild": "22.2.0",
     "@nx/eslint": "22.2.0",
@@ -68,12 +57,9 @@
     "@nx/expo": "22.2.0",
     "@nx/jest": "22.2.0",
     "@nx/js": "22.2.0",
-    "@nx/next": "22.2.0",
     "@nx/node": "22.2.0",
-    "@nx/playwright": "22.2.0",
     "@nx/react": "22.2.0",
     "@nx/workspace": "22.2.0",
-    "@playwright/test": "1.56.1",
     "@swc-node/register": "~1.9.1",
     "@swc/cli": "~0.6.0",
     "@swc/core": "^1.13.5",
@@ -82,22 +68,17 @@
     "@testing-library/dom": "10.4.0",
     "@testing-library/react": "16.1.0",
     "@testing-library/react-native": "~13.2.0",
-    "@types/express": "^4.17.21",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.0.0",
     "@types/react": "19.1.0",
-    "@types/react-dom": "19.1.0",
-    "autoprefixer": "10.4.13",
     "babel-jest": "30.2.0",
     "babel-preset-expo": "~54.0.7",
     "dotenv-cli": "^11.0.0",
     "esbuild": "^0.19.2",
     "eslint": "9.37.0",
-    "eslint-config-next": "16.0.8",
     "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-import": "2.31.0",
     "eslint-plugin-jsx-a11y": "6.10.1",
-    "eslint-plugin-playwright": "^1.6.2",
     "eslint-plugin-react": "7.35.0",
     "eslint-plugin-react-hooks": "5.0.0",
     "husky": "^9.1.7",
@@ -111,11 +92,8 @@
     "metro-config": "~0.83.0",
     "metro-resolver": "~0.83.0",
     "nx": "22.2.0",
-    "openapi-typescript": "^7.10.1",
-    "postcss": "8.4.38",
     "prettier": "^2.6.2",
     "prisma": "^6.17.1",
-    "tailwindcss": "3.4.3",
     "ts-jest": "^29.4.0",
     "ts-node": "10.9.1",
     "tslib": "^2.3.0",
@@ -133,8 +111,7 @@
       "sharp"
     ],
     "overrides": {
-      "react": "19.1.0",
-      "react-dom": "19.1.0"
+      "react": "19.1.0"
     }
   }
 }

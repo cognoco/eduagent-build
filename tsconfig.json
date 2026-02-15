@@ -4,25 +4,10 @@
   "files": [],
   "references": [
     {
-      "path": "./apps/web-e2e"
-    },
-    {
-      "path": "./apps/web"
-    },
-    {
-      "path": "./apps/server"
-    },
-    {
       "path": "./packages/database"
     },
     {
       "path": "./packages/schemas"
-    },
-    {
-      "path": "./packages/api-client"
-    },
-    {
-      "path": "./packages/supabase-client"
     },
     {
       "path": "./packages/test-utils"

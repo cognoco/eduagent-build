@@ -15,7 +15,7 @@ export default [
   ...nx.configs['flat/typescript'],
   ...nx.configs['flat/javascript'],
   {
-    ignores: ['**/dist', '**/out-tsc', '**/.next', '**/coverage', '**/.nx'],
+    ignores: ['**/dist', '**/out-tsc', '**/coverage', '**/.nx'],
   },
   // React/Expo config for mobile app (with deprecated rule filtered out)
   {

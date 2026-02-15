@@ -9,9 +9,8 @@
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import type { components } from '@nx-monorepo/api-client';
-
-type HealthCheck = components['schemas']['HealthCheck'];
+// TODO: Replace with Hono RPC types in Epic 0
+type HealthCheck = { id: string; message: string; timestamp: string };
 
 interface HealthCheckItemProps {
   item: HealthCheck;
