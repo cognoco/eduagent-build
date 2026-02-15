@@ -2,6 +2,11 @@ import { Hono } from 'hono';
 import { authMiddleware } from './middleware/auth';
 import type { AuthUser } from './middleware/auth';
 import { health } from './routes/health';
+import { auth } from './routes/auth';
+import { profileRoutes } from './routes/profiles';
+import { consentRoutes } from './routes/consent';
+import { accountRoutes } from './routes/account';
+import { inngestRoute } from './routes/inngest';
 
 type Bindings = {
   ENVIRONMENT: string;
@@ -23,6 +28,11 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>().basePath(
 app.use('*', authMiddleware);
 
 app.route('/', health);
+app.route('/', auth);
+app.route('/', profileRoutes);
+app.route('/', consentRoutes);
+app.route('/', accountRoutes);
+app.route('/', inngestRoute);
 
 export type AppType = typeof app;
 

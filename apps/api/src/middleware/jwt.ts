@@ -151,7 +151,7 @@ export async function verifyJWT(token: string, jwk: JWK): Promise<JWTPayload> {
   const valid = await crypto.subtle.verify(
     'RSASSA-PKCS1-v1_5',
     cryptoKey,
-    signature,
+    signature as Uint8Array<ArrayBuffer>,
     data
   );
 
