@@ -29,3 +29,109 @@ export const sessionStartSchema = z.object({
   topicId: z.string().uuid().optional(),
 });
 export type SessionStartInput = z.infer<typeof sessionStartSchema>;
+
+// Learning session schemas (Epic 2)
+
+export const sessionTypeSchema = z.enum(['learning', 'homework']);
+export type SessionType = z.infer<typeof sessionTypeSchema>;
+
+export const sessionStatusSchema = z.enum([
+  'active',
+  'paused',
+  'completed',
+  'auto_closed',
+]);
+export type SessionStatus = z.infer<typeof sessionStatusSchema>;
+
+export const summaryStatusSchema = z.enum([
+  'pending',
+  'submitted',
+  'accepted',
+  'skipped',
+  'auto_closed',
+]);
+export type SummaryStatus = z.infer<typeof summaryStatusSchema>;
+
+export const escalationRungSchema = z.number().int().min(1).max(5);
+export type EscalationRung = z.infer<typeof escalationRungSchema>;
+
+// Exchange schemas
+
+export const sessionMessageSchema = z.object({
+  message: z.string().min(1).max(10000),
+  sessionType: sessionTypeSchema.optional(),
+});
+export type SessionMessageInput = z.infer<typeof sessionMessageSchema>;
+
+// Session state response
+
+export const learningSessionSchema = z.object({
+  id: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  topicId: z.string().uuid().nullable(),
+  sessionType: sessionTypeSchema,
+  status: sessionStatusSchema,
+  escalationRung: escalationRungSchema,
+  exchangeCount: z.number().int(),
+  startedAt: z.string().datetime(),
+  lastActivityAt: z.string().datetime(),
+  endedAt: z.string().datetime().nullable(),
+  durationSeconds: z.number().int().nullable(),
+});
+export type LearningSession = z.infer<typeof learningSessionSchema>;
+
+// Session close request
+
+export const sessionCloseSchema = z.object({
+  reason: z.enum(['user_ended', 'hard_cap', 'silence_timeout']).optional(),
+});
+export type SessionCloseInput = z.infer<typeof sessionCloseSchema>;
+
+// Content flag
+
+export const contentFlagSchema = z.object({
+  eventId: z.string().uuid(),
+  reason: z.string().min(1).max(1000).optional(),
+});
+export type ContentFlagInput = z.infer<typeof contentFlagSchema>;
+
+// Summary submission
+
+export const summarySubmitSchema = z.object({
+  content: z.string().min(10).max(2000),
+});
+export type SummarySubmitInput = z.infer<typeof summarySubmitSchema>;
+
+// Summary response
+
+export const sessionSummarySchema = z.object({
+  id: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  content: z.string(),
+  aiFeedback: z.string().nullable(),
+  status: summaryStatusSchema,
+});
+export type SessionSummary = z.infer<typeof sessionSummarySchema>;
+
+// Parking lot schemas
+
+export const parkingLotAddSchema = z.object({
+  question: z.string().min(1).max(2000),
+});
+export type ParkingLotAddInput = z.infer<typeof parkingLotAddSchema>;
+
+export const parkingLotItemSchema = z.object({
+  id: z.string().uuid(),
+  question: z.string(),
+  explored: z.boolean(),
+  createdAt: z.string().datetime(),
+});
+export type ParkingLotItem = z.infer<typeof parkingLotItemSchema>;
+
+// Homework OCR schema
+
+export const ocrResultSchema = z.object({
+  text: z.string(),
+  confidence: z.number().min(0).max(1),
+});
+export type OcrResult = z.infer<typeof ocrResultSchema>;

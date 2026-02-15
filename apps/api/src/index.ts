@@ -10,6 +10,9 @@ import { inngestRoute } from './routes/inngest';
 import { subjectRoutes } from './routes/subjects';
 import { interviewRoutes } from './routes/interview';
 import { curriculumRoutes } from './routes/curriculum';
+import { sessionRoutes } from './routes/sessions';
+import { parkingLotRoutes } from './routes/parking-lot';
+import { homeworkRoutes } from './routes/homework';
 
 type Bindings = {
   ENVIRONMENT: string;
@@ -39,6 +42,9 @@ app.route('/', inngestRoute);
 app.route('/', subjectRoutes);
 app.route('/', interviewRoutes);
 app.route('/', curriculumRoutes);
+app.route('/', sessionRoutes);
+app.route('/', parkingLotRoutes);
+app.route('/', homeworkRoutes);
 
 export type AppType = typeof app;
 
