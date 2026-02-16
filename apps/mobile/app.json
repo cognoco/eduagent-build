@@ -1,22 +1,22 @@
 {
   "expo": {
-    "name": "Mobile",
-    "slug": "nx-monorepo-mobile",
+    "name": "EduAgent",
+    "slug": "eduagent",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "nx-monorepo-mobile",
+    "scheme": "eduagent",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "com.zwizzly.nxmonorepo",
+      "bundleIdentifier": "com.zwizzly.eduagent",
       "supportsTablet": true
     },
     "android": {
-      "package": "com.zwizzly.nxmonorepo",
+      "package": "com.zwizzly.eduagent",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0f0f0f"
       },
       "edgeToEdgeEnabled": true
     },
@@ -31,9 +31,10 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#0f0f0f"
         }
-      ]
+      ],
+      ["expo-router", { "root": "./src/app" }]
     ],
     "extra": {
       "eas": {

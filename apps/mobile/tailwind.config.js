@@ -1,0 +1,44 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: ['./src/**/*.{js,jsx,ts,tsx}'],
+  presets: [require('nativewind/preset')],
+  theme: {
+    extend: {
+      colors: {
+        background: 'var(--color-background)',
+        surface: 'var(--color-surface)',
+        'surface-elevated': 'var(--color-surface-elevated)',
+        'text-primary': 'var(--color-text-primary)',
+        'text-secondary': 'var(--color-text-secondary)',
+        'text-inverse': 'var(--color-text-inverse)',
+        primary: 'var(--color-primary)',
+        'primary-soft': 'var(--color-primary-soft)',
+        secondary: 'var(--color-secondary)',
+        accent: 'var(--color-accent)',
+        success: 'var(--color-success)',
+        warning: 'var(--color-warning)',
+        danger: 'var(--color-danger)',
+        info: 'var(--color-info)',
+        'retention-strong': 'var(--color-retention-strong)',
+        'retention-fading': 'var(--color-retention-fading)',
+        'retention-weak': 'var(--color-retention-weak)',
+        'coaching-card': 'var(--color-coaching-card)',
+      },
+      borderRadius: {
+        card: 'var(--radius-card)',
+        button: 'var(--radius-button)',
+        input: 'var(--radius-input)',
+      },
+      fontSize: {
+        display: ['32px', { lineHeight: '1.2' }],
+        h1: ['24px', { lineHeight: '1.2' }],
+        h2: ['20px', { lineHeight: '1.2' }],
+        h3: ['18px', { lineHeight: '1.2' }],
+        body: ['16px', { lineHeight: '1.5' }],
+        'body-sm': ['14px', { lineHeight: '1.5' }],
+        caption: ['12px', { lineHeight: '1.5' }],
+      },
+    },
+  },
+  plugins: [],
+};
