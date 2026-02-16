@@ -1,381 +1,1503 @@
-# AI-Native Nx Monorepo Template - Product Requirements Document
+---
+stepsCompleted: [1, 2]
+inputDocuments:
+  - 'docs/analysis/product-brief-EduAgent-2025-12-11.md'
+  - 'docs/analysis/research/market-ai-tutoring-research-2024-12-11.md'
+  - 'docs/analysis/research/evidence based learning science.md'
+  - 'docs/Legacy/AI Model pricing.md'
+  - 'docs/legacy/PRD.md'
+  - 'docs/legacy/MVP_DEFINITION.md'
+  - 'docs/legacy/USER_MOTIVATION.md'
+  - 'prd-workflow-execution-brief.md'
+documentCounts:
+  briefs: 1
+  research: 3
+  brainstorming: 0
+  projectDocs: 3
+workflowType: 'prd'
+lastStep: 1
+project_name: 'EduAgent'
+user_name: 'Zuzka'
+date: '2025-12-11'
+---
 
-**Author:** Jørn
-**Date:** 2025-11-18
-**Version:** 1.0
+# Product Requirements Document - EduAgent
+
+**Author:** Zuzka
+**Date:** 2025-12-11
+**Version:** 1.0 (BMAD Standard)
 
 ---
 
 ## Executive Summary
 
-The AI-Native Nx Monorepo Template is a production-ready foundation for building type-safe, full-stack applications with shared business logic across web, server, and mobile platforms. This template is specifically designed for AI-first development workflows, where AI coding agents serve as the primary development workforce, with human architects and product managers providing strategic direction.
+### Product Vision
 
-Unlike traditional monorepo templates that assume human developers will learn through experimentation and documentation, this template is architected to work seamlessly with AI agent frameworks. The template provides explicit pattern documentation, comprehensive architectural decision records, and structured configuration that AI agents can parse and apply consistently across the monorepo. The "walking skeleton" approach validates that all infrastructure layers work together before feature development begins, reducing the discovery of integration issues during critical development phases.
+*"A teacher who grows with you."*
 
-The template front-loads foundational architectural, tooling, and governance decisions, delivering not just basic scaffolding but a complete production infrastructure. This includes comprehensive QA automation (Jest for unit tests, Playwright for E2E), CI/CD pipelines with GitHub Actions, observability through Sentry integration, end-to-end type safety (database → API → UI), and deployment patterns for lightweight hosting platforms. The vision is to enable small teams (1-5 people) with high technical literacy but limited coding resources to build production-ready applications by orchestrating AI coding agents using gold-standard infrastructure patterns.
+EduAgent is a premium AI tutoring platform that teaches through conversation—using research-backed methodologies to guide motivated learners aged 11+ to understanding, remembering what they've learned across sessions, and verifying retention.
 
-The MVP's technical quality and completeness is validated through the template infrastructure itself and the working walking skeleton that exercises all layers end-to-end. Following MVP completion, a Task App proof-of-concept serves a different purpose: demonstrating that a single human orchestrator, supported by AI coding agents, can deliver production-ready features through an efficient assembly-line process while maintaining comprehensive quality gates and architectural consistency.
+### The Problem
 
-### What Makes This Special
+No affordable option exists that actually teaches—with memory, structure, verification, and personalization.
 
-**AI-Native Architecture:**
-- Explicit architectural decisions and patterns documented in structured formats that AI agents can parse and apply consistently
-- Clear separation of concerns: template provides infrastructure patterns, applications implement business logic
-- Type-safe contracts and boundaries that guide AI agents toward correct implementations
-- Consistent monorepo structure with predictable conventions across all projects
+Learners don't need more information—they need guided practice, systematic verification, and continuity across sessions. Current solutions (video courses, gamified drills, generic AI chat, human tutors) optimize for engagement or scale, not learning outcomes. None provide structured teaching with retention verification at an accessible price point.
 
-**Production-Ready from Day One:**
-- Complete CI/CD infrastructure with automated quality gates, linting, testing, and deployment pipelines
-- End-to-end type safety from database schema through API contracts to UI components
-- Comprehensive testing strategy with unit tests, integration tests, and E2E browser tests
-- Walking skeleton validates all layers before feature development and remains as permanent validation harness
-- Integrated observability and deployment patterns for lightweight hosting platforms
+*See Product Brief for detailed competitive analysis.*
 
-**Building-Block Philosophy:**
-- Reusable infrastructure patterns and shared libraries, not opinionated business logic
-- Scales seamlessly as the monorepo grows without requiring architectural refactoring
-- Clear separation: template provides building blocks, applications implement features
-- Flexible deployment options with validated patterns for one or two lightweight hosting platforms
-- No vendor lock-in: provider-agnostic architecture supports multiple deployment targets
+### The Solution
 
----
+EduAgent delivers personalized AI tutoring through tiered subscriptions—combining the teaching quality of human tutors with the accessibility and consistency of AI.
 
-## Scope of this PRD (WHAT vs HOW)
+**Four Pillars:**
 
-**WHAT:** Establishes the canonical architectural boundaries and mandatory technology surfaces that constitute the product. This template is fundamentally an architectural artifact that defines infrastructure patterns and technology constraints, not a feature-complete application.
+1. **Memory:** Remembers what you learned, your struggles, and how you learn best—eliminating redundant explanations and building on prior knowledge
 
-**WHY:** Documents the strategic rationale for these boundaries, including agent-first development support, end-to-end type safety, deployment portability, and repeatable quality gates.
+2. **Structure:** Builds personalized curricula and sequences topics in optimal order—not random Q&A but a guided learning journey
 
-**HOW:** Implementation design and technical trade-offs are elaborated in the architecture phase. Epic and story decomposition occurs during the planning phase following architectural specification.
+3. **Verification:** Tests understanding through learner-generated demonstrations of mastery and systematic assessment—you can't just consume, you must prove comprehension
 
----
+4. **Relationship:** Knows your goals, learning style, and progress history—a persistent teacher, not a disposable tool
 
-## Project Classification
+### Target Users
 
-**Technical Type:** Infrastructure Template & Development Foundation  
-**Domain:** Software Development Tooling / Monorepo Architecture  
-**Complexity:** High – multi-application, multi-package, cross-platform infrastructure requiring concurrent validation across all layers  
-**Primary Users:** Human architects and product managers orchestrating AI coding agents
+Motivated learners aged 11+ who really want to learn—not casual browsers:
 
-This is a meta-product: the deliverable is the reusable template itself that provides infrastructure patterns optimized for AI-first development workflows. The work spans infrastructure (Nx + pnpm), backend (Express + Prisma + Supabase), frontend (Next.js), mobile (Expo-ready), QA automation, observability, and DevOps workflows. Complexity is high because every layer must be validated concurrently, yet the end-user experience must stay lightweight enough for rapid AI-driven iteration.
+- **Parents of struggling students** (primary): Kid needs to pass, catch up, get into good school. Affordable subscription tiers cheaper than tutor, available anytime
+- **Career changers**: Need new skills for hiring/promotion. Investment in earning potential
+- **Certification seekers**: Preparing for exams (AWS, CPA, language tests). Structured prep that sticks
+- **Serious students**: University courses they're struggling with. On-demand help that remembers gaps
+- **Committed lifelong learners**: Learning language for move abroad, skill for passion project. Real progress, not dabbling
 
-### Domain Context
+### Pricing Structure
 
-Traditional development templates assume human developers who learn through experimentation and adapt patterns intuitively. This template is designed to work seamlessly with AI agent frameworks through explicit architectural decisions, structured pattern documentation, and clear governance boundaries. The template is framework-agnostic but framework-ready—providing the structured foundation that allows AI agent frameworks to be applied plug-and-play without requiring template modifications. This architectural approach enables human orchestrators to direct AI coding agents effectively without firefighting setup debt or pattern inconsistencies.
+> **Note:** All pricing is preliminary and subject to beta validation. See Pricing Specification (`docs/Legacy/eduagent-pricing-specification.md`) for full details.
 
----
-
-## Architectural Building Blocks (WHAT)
-
-This section defines the foundational technology architecture for the template. These represent initial technology choices selected for their maturity, AI-agent compatibility, and type-safety characteristics. The architecture is designed to be modular—specific technologies can be replaced provided the underlying capabilities and architectural principles are maintained.
-
-```mermaid
-graph TB
-    subgraph TEMPLATE["**AI-Native Nx Monorepo Template**"]
-        subgraph APPS["**Applications**<br/>What You Build"]
-            WEB[**Web Application**<br/>Next.js]
-            MOBILE[**Mobile App**<br/>React Native/Expo]
-            SERVER[**API Server**<br/>Express REST]
-        end
-        
-        subgraph INFRA["**Shared Infrastructure**<br/>Provided by Template"]
-            DB[**Database Layer**<br/>Prisma + PostgreSQL]
-            SCHEMAS[**Type-Safe Contracts**<br/>Zod Schemas]
-            API[**API Client**<br/>Auto-generated Types]
-            AUTH[**Auth Infrastructure**<br/>Supabase Auth]
-        end
-        
-        subgraph QA["**Quality & Automation**<br/>Built-In"]
-            TEST[**Testing Framework**<br/>Jest + Playwright]
-            CICD[**CI/CD Pipeline**<br/>GitHub Actions]
-            OBS[**Observability**<br/>Error Tracking]
-            DEPLOY[**Deployment Patterns**<br/>Docker + Cloud]
-        end
-        
-        subgraph FOUNDATION["**Foundation**<br/>Template Core"]
-            NX[**Monorepo Structure**<br/>Nx Workspace]
-            DOCS[**Documentation & Patterns**<br/>AI-Agent Ready]
-        end
-    end
-    
-    NX --> DB
-    NX --> SCHEMAS
-    NX --> AUTH
-    NX --> TEST
-    NX --> CICD
-    
-    DOCS -.-> WEB
-    DOCS -.-> MOBILE
-    DOCS -.-> SERVER
-    
-    SCHEMAS --> API
-    DB --> SERVER
-    AUTH --> WEB
-    AUTH --> MOBILE
-    API --> WEB
-    API --> MOBILE
-    
-    SERVER --> DB
-    
-    TEST --> WEB
-    TEST --> MOBILE
-    TEST --> SERVER
-    
-    CICD --> DEPLOY
-    OBS --> WEB
-    OBS --> MOBILE
-    OBS --> SERVER
-    
-    style WEB fill:#e1f5ff
-    style MOBILE fill:#e1f5ff
-    style SERVER fill:#e1f5ff
-    style NX fill:#fff4e1
-    style DOCS fill:#fff4e1
-    style TEMPLATE fill:#f0f0f0
-```
-
-**What This Diagram Shows:**
-- **Foundation Layer (Yellow):** The template core that provides structure and AI-ready documentation
-- **Shared Infrastructure (White):** Reusable components all applications use (database, type-safe contracts, authentication)
-- **Quality & Automation (White):** Built-in testing, CI/CD, monitoring, and deployment patterns
-- **Applications (Blue):** The actual products you build on top of the template (web, mobile, API)
-
-The template eliminates 80% of setup work by providing battle-tested infrastructure that "just works" - letting teams focus on building features, not wiring up databases and deployment pipelines.
-
-### Architectural Capabilities & Principles
-
-**Monorepo Structure & Modularity**
-- Build system supporting multi-application, multi-package workspaces with intelligent caching
-- Buildable shared libraries with unidirectional dependency flow
-- Strict boundaries: applications depend on packages; no app-to-app imports; no dependency cycles
-
-**Type Safety Flow (Single Source of Truth)**
-- Schema definitions generate API specifications, which generate type-safe client code
-- Database schema generates strongly-typed data access layer
-- Compile-time validation of API contracts across all consumers
-
-**Security Architecture**
-- API server establishes the security boundary for all data operations
-- Client applications use authentication services for identity; all data access routed through API
-- Environment configuration validated at startup; database row-level security with API bypass
-
-**Quality Assurance Infrastructure**
-- Unit testing framework with support for component and function-level tests
-- Integration testing for cross-layer validation
-- End-to-end browser testing for user journey validation
-- Automated quality gates in CI/CD pipeline
-
-**Deployment & Operations**
-- Containerization support for consistent deployment across environments
-- CI/CD automation with secrets management
-- Observability platform integration for error tracking and performance monitoring
-- Provider-agnostic deployment patterns supporting multiple hosting platforms
-
-**Scalability Design**
-- Template supports 6–8 applications and 8–10 packages without architectural refactoring
-- Clean dependency graph maintained as workspace grows
-
-**Separation of Concerns**
-- **Template provides:** Shared libraries, authentication infrastructure, testing patterns, CI/CD patterns, API contract generation, database access layer, observability baseline
-- **Applications implement:** Authentication UI/flows, domain models, business logic, deployment platform selections
-
-### Technology Mappings
-- **Monorepo & Build System:** Nx with pnpm package management
-- **Web Applications:** Next.js with React
-- **API Server:** Express with REST+OpenAPI contract generation (Zod → zod-to-openapi → openapi-typescript → openapi-fetch type-safe client)
-- **Database Layer:** Prisma ORM with PostgreSQL via Supabase
-- **Testing Infrastructure:** Jest for unit/integration testing; Playwright for E2E browser testing
-- **Type System:** TypeScript in strict mode
-- **Code Quality:** ESLint (flat config) and Prettier
-- **CI/CD:** GitHub Actions with Nx Cloud caching; Docker for containerization
-- **Observability:** Sentry for server, web, and mobile error tracking and performance monitoring
-- **Deployment Patterns:** Docker-based staging environment; production validation on multiple lightweight hosting platforms
+- **Tiers:** Free → Plus → Family → Pro (account required for all tiers)
+- **Pricing:** €18.99/mo (Plus) | €28.99/mo (Family, up to 4 users) | €48.99/mo (Pro, up to 6 users)
+- **Family/Pro:** Shared question pools across all users
+- **Trial:** 14 days Plus access + 14 days soft landing (reverse trial)
+- **Free Tier:** 50 questions/month with first-week boost (10/day for days 1-7)
+- **Top-ups:** Plus €10/500, Family/Pro €5/500 (12-month expiry)
 
 ---
 
 ## Success Criteria
 
-### MVP Success Criteria
+### North Star Metric
 
-The MVP is validated when 
-- A new engineer or orchestrator can clone the repository, install dependencies, configure environment variables, and
-    - The walking skeleton runs end-to-end (web → API → database) without additional tooling work
-    - All shared packages build, lint, and test successfully across the monorepo
-    - Mobile project scaffolding exists and can consume the same API client and types as web, proving cross-platform parity
-    - The Nx dependency graph remains clean with no circular dependencies
-    - CI/CD pipeline deploys automatically to staging environment with secrets management
-    - Pre-commit hooks enforce quality gates and block regressions
-- Observability instrumentation is wired for server, web, and mobile applications
-- Baseline authentication infrastructure is in place and ready for application-level implementation
-- Documentation is comprehensive and accessible for AI agent frameworks
+**Weekly Active Learners who completed verification** (not just app opens)
 
-**Validation Method:** A new developer can complete the full setup and observe the working walking skeleton in under 30 minutes.
+### Primary Success Metrics
 
-### Post-MVP Task App PoC Success Criteria
+| Metric | Target | Why It Matters |
+|--------|--------|----------------|
+| **Onboarding Completion** | >60% | Product clarity and value communication |
+| **First Week Retention** | >30% | Early product-market fit signal |
+| **Trial → Paid Conversion** | >15% | Business viability |
+| **30-Day Retention** | >40% | Product stickiness and sustainable growth |
+| **Session Completion** | >70% | Engagement quality (not abandoning mid-topic) |
+| **Learning Efficacy** | >50% | Pass rate on re-tests (2 weeks later) validates retention |
+| **App Store Rating** | >4.0 | User satisfaction |
 
-The Task App proof-of-concept validates the template when:
+### Secondary Metrics
 
-- A functional task/todo application (web + mobile) demonstrates CRUD operations, authentication-protected flows, and data persistence built entirely on the template
-- CI/CD promotes automatically to one or two lightweight production platforms, proving deployment portability
-- Test coverage reaches ≥80% across application and shared packages
-- Observability captures errors and performance events across all application surfaces
-- Architecture patterns observed in implementation align with documented standards
-- No major infrastructure gaps are discovered during PoC development
-- TDD workflows complete without tooling friction
+| Metric | Definition | Target |
+|--------|------------|--------|
+| Weekly Active Learners (WAL) | Users completing ≥1 session/week | Growing 20%/month |
+| Session Completion Rate | Sessions not abandoned mid-topic | >70% |
+| NPS | User satisfaction | >40 |
+| LLM cost per question | System must optimize AI costs (multi-model routing) | <€0.005 avg |
 
-**Primary Success Indicator:** The ultimate measure of PoC success is a subjective assessment by the human orchestrator that AI coding agents achieve approximately 70% first-pass code quality with minimal human rework. This qualitative evaluation considers code correctness, pattern adherence, and architectural consistency. Since this assessment is inherently subjective and context-dependent, it serves as a guiding principle rather than a measurable gate—success is determined by the team's confidence that the template, documentation, and architectural patterns effectively support AI-first development workflows.
+### Validation Approach
+
+**Beta Users (Target Weeks 10-13 post-launch):**
+- Key assumption to validate: Parents will pay premium pricing (Plus tier) for verified learning outcomes
+- Method: User interviews + conversion data across pricing tiers
+
+#<<< MISSING: Detailed validation plan, beta program structure, hypothesis testing framework, instrumentation/analytics setup, cohort analysis approach, funnel optimization strategy >>>
+
+*Future: Create Analytics & Validation Plan auxiliary document.*
 
 ---
 
 ## Product Scope
 
-### MVP - Minimum Viable Product
+### MVP Scope (v1.0)
 
-The MVP delivers a complete, production-ready infrastructure template that validates all architectural building blocks working together. This includes:
+**Core Value Proposition:**
+A user can learn ANY subject through AI-powered tutoring with personalized curriculum and retention verification.
 
-- **Monorepo workspace** with multi-application and multi-package structure, dependency management, and build orchestration
-- **Core applications**: Next.js web application, Express API server, and mobile application scaffolding (React Native/Expo)
-- **Shared infrastructure packages**: Database layer, type-safe schemas, API client with generated types, and authentication client factories
-- **Walking skeleton feature** that exercises all layers end-to-end (web → API → server → database) and remains as permanent validation harness
-- **Comprehensive QA infrastructure**: Unit testing framework, integration testing patterns, E2E browser testing, and automated quality gates
-- **CI/CD automation**: Build pipelines, automated testing, deployment to staging environment, and secrets management
-- **Observability baseline**: Error tracking and performance monitoring instrumentation across all application surfaces
-- **Authentication infrastructure wiring**: Client factories, middleware patterns, and integration points ready for application-level implementation
-- **Documentation and patterns**: Architectural decision records, deployment guides, and structured documentation accessible to AI agent frameworks
+**In Scope:**
 
-The MVP proves that the template infrastructure is technically sound, complete, and ready to support feature development.
+| Feature Category | Included Features |
+|------------------|-------------------|
+| **Authentication** | Email + password, Google OAuth, Apple Sign-in, OpenAI OAuth (exploring), multi-profile (family), GDPR parental consent (11-15, EU) |
+| **Onboarding** | Subject selection (any topic), conversational interview, dynamic curriculum generation, homework help quick entry |
+| **Learning Experience** | Real-time AI chat, prior knowledge context, adaptive explanations, mandatory user summaries, homework integrity mode |
+| **Assessments** | In-lesson quizzes, topic completion tests, re-testing from summaries |
+| **Progress** | Learning Book (review past topics), mastery tracking, knowledge decay visualization |
+| **Gamification** | Honest streak (recall-based), retention XP (verified after delayed recall), decay bars |
+| **Language Learning** | Four Strands methodology (explicit instruction + input + output + fluency), vocabulary tracking, CEFR progress |
+| **Subscription** | Free tier + 14-day Plus trial + reverse trial, tiered pricing (Free/Plus/Family/Pro), shared question pools, top-up credits, payment gateway integration, BYOK waitlist |
+| **Platforms** | iOS, Android, Web (cross-platform) |
 
-### Growth Features (Post-MVP)
+**Subject Coverage:** ANY subject via dynamic curriculum generation (no pre-curated content bottleneck)
 
-**Phase 2: Task App Proof-of-Concept**
+**Teaching Modes:**
+- **Socratic Method** (default): Conceptual subjects—guide learners to discover answers
+- **Four Strands** (language learning): Explicit grammar instruction + comprehensible input + output practice + fluency drills
 
-Following MVP completion, a Task App proof-of-concept validates the end-to-end development workflow:
+### Explicitly Out of Scope (v1.0)
 
-- **Task App implementation**: A basic task application (web + mobile) designed to validate all key functions in the template, built entirely using the template's infrastructure
-- **Full authentication experience**: User signup, login, and session management on both web and mobile platforms
-- **Production deployment validation**: CI/CD pipelines extended to deploy automatically to one or two lightweight production platforms with environment-specific secrets
-- **Comprehensive test coverage**: Raise test coverage to ≥80% across application and shared packages
-- **Production-ready observability**: Enhanced monitoring dashboards and alerting for production environments
+| Feature | Rationale | Target Version |
+|---------|-----------|----------------|
+| Cohorts, buddy matching, study groups | Needs user volume | v1.5 |
+| Human coaching add-on | New business model | v2.0 |
+| Portfolio projects | Complexity, needs curriculum stability | v2.0 |
+| Multi-language UI (beyond EN/DE) | English + German MVP | v2.0 |
+| Offline mode | Significant caching complexity | v2.0 |
+| Age 6-10 mode | Different UX, stricter COPPA requirements | v2.0 |
+| B2B/Team licensing | Focus on B2C first | v2.0 |
 
-**Phase 3: Template Extensions (Future)**
-
-Optional extensions demonstrating additional building blocks and patterns:
-
-- **Advanced Infrastructure**: Real-time collaboration features, file upload and storage patterns, background job processing, webhook integrations
-- **Multi-Tenancy**: Organization/workspace management, subscription and billing integration, admin dashboard infrastructure
-- **Production Optimization**: Advanced caching strategies, application-specific database indexing, performance tuning patterns
-- **Additional Platforms**: Support for additional deployment targets and hosting environments
+*See Product Brief for post-MVP roadmap (v1.5, v2.0).*
 
 ---
 
-## Architectural Philosophy & Design Principles
+## User Journeys
 
-### Building-Block Architecture
+### Journey 1: New User Onboarding
 
-The template embodies a building-block philosophy: it provides reusable infrastructure patterns and shared libraries rather than opinionated business logic. This architectural approach is specifically optimized for AI-first development workflows where explicit patterns, clear boundaries, and type-safe contracts enable AI coding agents to work effectively within well-defined constraints.
+**Actor:** New learner (or parent creating child profile)
 
-**Core Principles:**
+**Goal:** Get from discovery to first lesson completion with clear value demonstration
 
-- **Composable**: Applications and packages can be added or removed without breaking others
-- **Flexible**: Multiple deployment options and technology choices without vendor lock-in
-- **Type-Safe**: Shared schemas and generated types provide compile-time validation across all layers
-- **Explicit over Implicit**: Architectural decisions are documented and discoverable rather than hidden in code
-- **Separation of Concerns**: Clear boundaries between template-provided infrastructure and application-implemented features
-- **AI-Optimized**: Architecture, patterns, and documentation are structured to enable AI agent frameworks to parse and apply standards consistently. The template is framework-agnostic but framework-ready, providing the explicit boundaries and type-safe contracts that allow human orchestrators to direct AI coding agents effectively without pattern drift or setup debt
+**Journey Flow:**
 
-### Template Responsibilities vs. Application Responsibilities
+1. **Discovery & Registration**
+   - Downloads app or visits web app
+   - Creates account (email/Google/Apple)
+   - Completes profile (name, birthdate, country)
+   - If 11-15 in EU: Parent receives consent email
+   - Parent approves consent (if applicable)
 
-**The template provides the foundation:**
-- Shared infrastructure packages and buildable libraries
-- Authentication infrastructure and security patterns
-- Testing frameworks and CI/CD pipelines
-- API contract generation and type-safe client tooling
-- Database access layer and migration patterns
-- Observability baseline and deployment patterns
+2. **Intent Selection**
+   - Sees fork: "Learn something new" vs "Get help with homework"
+   - Selects learning intent
 
-**Applications implement the features:**
-- Authentication UI and user flows
-- Domain models and business logic
-- Application-specific validation rules
-- Deployment platform selections and configurations
-- Performance optimization for specific use cases
+3. **Curriculum Creation (if "Learn something new")**
+   - Types any subject they want to learn
+   - Conversational interview with AI (goal, background, spot check) ~3 minutes
+   - AI generates personalized learning path
+   - Reviews curriculum, can skip known topics or challenge order
+   - Sees "why this order?" explanations on demand
 
-**AI agent frameworks are separate from both:**
-The template does not include or prescribe specific AI agent frameworks, memory systems, or development orchestration tooling. Instead, the template is designed to work seamlessly with any AI agent framework through its structured documentation, explicit patterns, and clear governance boundaries. Teams apply their chosen AI frameworks (for agent orchestration, memory management, prompt engineering, etc.) on top of the template infrastructure.
+4. **First Lesson**
+   - AI introduces first topic
+   - Learns through conversation, asks questions
+   - AI adapts explanations based on responses
+   - Quick understanding checks during lesson
+   - Writes 3-5 sentence summary in own words (mandatory production)
+   - Receives AI feedback on summary, guided to self-correct
+   - Lesson completes, progress saved
 
-This separation ensures the template remains a flexible foundation that adapts to diverse application requirements and AI development workflows without imposing unnecessary constraints.
+5. **Post-First-Lesson**
+   - Sees progress in Learning Book
+   - Views personalized curriculum path
+   - Receives notification reminder for next lesson
+
+**Success Indicators:**
+- Completes onboarding in <10 minutes
+- Starts first lesson within 24 hours
+- Completes first lesson (doesn't abandon mid-topic)
+- Returns for second session within 7 days
+
+### Journey 2: Daily Learning Loop
+
+**Actor:** Returning learner
+
+**Goal:** Continue learning journey with continuity from previous sessions
+
+**Journey Flow:**
+
+1. **Session Entry**
+   - Opens app, sees "Continue where you left off"
+   - OR receives push notification: "Ready for your next lesson?"
+   - OR clicks "New Topic" to advance curriculum
+
+2. **Learning Session**
+   - AI references prior learning: "Remember when we covered..."
+   - Teaches new concept through conversation
+   - Adapts based on demonstrated understanding
+   - Asks questions, AI clarifies with different examples if confused
+   - Provides worked examples (for novices) or problem-first (for advanced)
+
+3. **Verification**
+   - In-lesson quick checks (2-3 questions)
+   - Explains reasoning, not just answers
+   - Receives feedback on WHERE thinking went wrong
+   - Writes summary in own words
+   - AI guides self-correction if summary shows misunderstanding
+
+4. **Progress Update**
+   - Topic marked complete (pending verification)
+   - Mastery level updated
+   - XP remains pending until recall test passes
+   - Curriculum adapts based on performance
+
+5. **Retention Loop**
+   - After 2 weeks: Receives review reminder
+   - Takes quick recall test on old topic
+   - Pass → XP becomes verified, mastery maintained
+   - Fail → XP decays, topic marked for re-learning
+
+**Success Indicators:**
+- Completes sessions without abandoning
+- Returns within 7 days consistently
+- Passes >50% of delayed recall tests
+- Progresses through curriculum steadily
+
+### Journey 3: Parent Oversight
+
+**Actor:** Parent monitoring child's learning
+
+**Goal:** Verify child is learning (not cheating) and track progress
+
+**Journey Flow:**
+
+1. **Profile Access**
+   - Opens app, switches into child's profile
+   - Full access to child's learning history (no separate dashboard)
+
+2. **Progress Review**
+   - Views Learning Book with all topics
+   - Sees retention scores and decay indicators
+   - Reviews "Problems worked through" section
+   - Verifies homework sessions show guidance, not answers given
+   - Sees: "✓ AI guided through factoring steps / ✓ You found the solution / ✓ No answers were given"
+
+3. **Curriculum Insight**
+   - Reviews personalized learning path
+   - Sees topics completed vs pending
+   - Checks mastery levels and knowledge decay
+
+4. **Trust Validation**
+   - Sees child's own written summaries in their voice
+   - Reviews AI's teaching notes and feedback
+   - Confirms Socratic guidance for homework (not answer-giving)
+
+**Success Indicators:**
+- Parent reviews progress at least weekly
+- Parent trusts app isn't enabling cheating
+- Parent renews subscription based on visible learning outcomes
+
+### Journey 4: Homework Help
+
+**Actor:** Student with specific homework problem
+
+**Goal:** Get help solving problem through guided thinking (not getting answers)
+
+**Journey Flow:**
+
+1. **Quick Entry**
+   - Selects "Get help with homework" from intent screen
+   - OR clicks "Homework Help" quick action button
+   - Selects subject from dropdown
+
+2. **Problem Input**
+   - Types homework problem description
+   - OR photographs problem (v1.1)
+
+3. **Socratic Guidance**
+   - AI detects "help with problem" vs "teach concept"
+   - AI switches to homework integrity mode
+   - Asks: "What do you think the first step is?"
+   - Student explains thinking
+   - AI guides: "Good! Now what happens next?"
+   - Student works through problem with prompting
+   - AI NEVER gives final answer
+
+4. **Solution Discovery**
+   - Student arrives at solution through own reasoning
+   - AI confirms correctness
+   - Session marked as "🎯 Guided problem-solving" in Learning Book
+
+5. **Parent Visibility**
+   - Parent can review session
+   - Sees student did thinking, AI only guided
+   - Trust reinforced: "App helps, doesn't cheat"
+
+**Success Indicators:**
+- Student solves problem independently
+- Parent sees guided process, not answer-giving
+- Student returns for future homework help
+- Retention maintained for underlying concepts
+
+### Journey 5: Language Learning
+
+**Actor:** Learner studying a new language
+
+**Goal:** Achieve conversational proficiency through structured progression
+
+**Journey Flow:**
+
+1. **Mode Detection**
+   - Types "Learn Spanish" (or German, Chinese, etc.)
+   - System detects language subject, switches to Four Strands methodology
+   - AI explains realistic time expectations (FSI categories: 600-2200 hours)
+
+2. **Foundation Building**
+   - Receives explicit grammar instruction (not Socratic discovery)
+   - Practices vocabulary with spaced repetition
+   - Reads comprehensible passages at 95-98% known words
+   - Writes/speaks to produce language (output practice)
+
+3. **Daily Practice**
+   - Vocabulary review queue (SM-2 spaced repetition)
+   - Time-pressured fluency drills for automatic retrieval
+   - Grammar pattern practice
+   - Comprehensible input (reading/listening)
+
+4. **Progress Tracking**
+   - Sees vocabulary count growing
+   - Tracks hours studied vs FSI estimate
+   - CEFR milestone progress (A1 → A2 → B1...)
+   - Production count (not just recognition)
+
+5. **Error Correction**
+   - Direct correction + explanation (not Socratic hints)
+   - Collocation learning (phrases, not just isolated words)
+   - Natural speech patterns
+
+**Success Indicators:**
+- Vocabulary count increases steadily
+- Passes CEFR milestone assessments
+- Can produce (speak/write) learned material
+- Retains vocabulary long-term (12+ exposures)
+
+*Note: Detailed journey maps for certification seekers, career changers, and serious students to be created during Epics phase. See `docs/analysis/epics-inputs.md`.*
+
+---
+
+## Domain Requirements
+
+### Age & Compliance Requirements
+
+**Minimum Age:** 11 years old
+- Conversational AI works better with older learners
+- Can sustain 20-30 minute sessions
+- Can learn independently (parents don't need to hover)
+
+**GDPR Compliance (Ages 11-15 in EU):**
+- Parental consent required for users aged 11-15 in EU countries
+- Parent email collection during registration
+- Consent email with approve/decline links
+- Pending consent state (child cannot start until parent approves)
+- Consent confirmation stored in database
+- Account deletion flow (GDPR right to erasure)
+- Data export capability
+
+**COPPA Compliance (Ages 11-12 in US):**
+- Verifiable parental consent required for users aged 11-12 in US
+- Same consent workflow as GDPR (email verification)
+- Cannot collect personal data before consent obtained
+- Parent must be able to review and delete child's data
+- Clear privacy policy in child-accessible language
+
+**Consent Decline Flow:**
+- If parent declines consent → Account deleted immediately
+- No data retained (child's registration data purged)
+- Child notified: "Your parent declined. You can register again when you're [16 in EU / 13 in US]."
+- Email not blocked (can re-register at appropriate age)
+
+**Consent Timeout & Non-Response:**
+- Consent email links expire after **7 days**
+- Child can request "Resend consent email" from pending state (maximum 3 resends)
+- If parent never responds:
+  - Reminder emails sent at Day 7, Day 14, Day 25
+  - After **30 days** in pending state → account auto-deleted
+  - Child notified before deletion: "Your parent didn't respond. Your account will be deleted on [date]."
+- Requesting new consent email resets the 30-day clock (up to 3 times total)
+
+#<<< MISSING: Detailed GDPR/COPPA implementation requirements, consent management workflows, data retention policies, cross-border data transfer compliance >>>
+
+*Future: Create Privacy Compliance Guide auxiliary document (covers both GDPR and COPPA).*
+
+**Ages 6-10 (Out of Scope):**
+- v2.0 target
+- Would require different UX (simpler interface)
+- Stricter COPPA requirements for younger children
+
+### Family Account Requirements
+
+**Multi-Profile Support (Family/Pro Tiers):**
+- **Family tier (€28.99/mo):** Up to 4 learner profiles, 1,500 questions/month shared
+- **Pro tier (€48.99/mo):** Up to 6 learner profiles, 3,000 questions/month shared
+- Each profile has own curriculum, progress, preferences
+- Eligibility: Anyone can be invited (no household verification, like Duolingo)
+- Owner sends invite via email or link; can add/remove members anytime
+
+**Parent Access Model:**
+- Parent can switch INTO child's profile for full access
+- No separate "parent dashboard" (uses same learner UI)
+- Full visibility into:
+  - Learning history and conversations
+  - Progress and mastery scores
+  - Homework sessions (integrity verification)
+  - Knowledge retention patterns
+
+**Data Isolation:**
+- Each profile has separate learning history
+- No cross-contamination of curricula
+- Individual mastery tracking
+- Separate XP and streak counters
+
+**Family Owner Cancellation:**
+- Family owner cancellation → **all profiles downgrade** to Free tier
+- Owner warned before cancellation: "This will affect X family members"
+- Each family member notified: "Your family subscription ended. You're now on Free tier."
+- **Transfer option:** Before cancellation, owner can transfer ownership to another adult family member
+- Family members can upgrade to individual subscription to retain premium access
+- All progress preserved (downgrade, not delete)
+
+**Family Member Removal:**
+- **Parent removes child:**
+  - Child's profile becomes standalone Free account (if child is 16+ EU / 13+ US)
+  - Child's profile deleted if under consent age (data can't exist without consent)
+  - All progress preserved for eligible standalone accounts
+  - Child notified: "You've been removed from family. Your account is now Free tier."
+- **Child leaves voluntarily:**
+  - Same rules apply (standalone if eligible, deleted if under consent age)
+  - Child must confirm: "Leaving will convert you to Free tier. Continue?"
+
+**Parent Account Deletion with Children:**
+- Parent cannot delete account while children are attached
+- Must first: Remove all children OR transfer ownership to another adult
+- Prompt: "You have X family members. Remove them or transfer ownership before deleting."
+- If children are under consent age: Parent must explicitly confirm deletion of children's data too
+
+#<<< MISSING: Family account management workflows, profile switching UX specifications >>>
+
+*Future: Covered in UX Design phase and Architecture phase. Billing logic in `docs/analysis/architecture-inputs.md`.*
+
+### Regulatory Compliance
+
+**Data Protection:**
+- GDPR compliance for EU users
+- Data encryption in transit and at rest using industry-standard protocols
+- Token-based authentication with secure session management
+- Session management and timeout policies
+- Account deletion within 30 days of request
+
+**Content Safety:**
+- Age-appropriate content filtering
+- No inappropriate subject matter
+- Homework integrity enforcement (no cheating enablement)
+- Parent visibility into all child interactions
+
+**Inappropriate Subject Handling:**
+- AI-level filtering for prohibited topics (weapons, drugs, self-harm, illegal activities, adult content)
+- LLM refuses to create curriculum for harmful subjects
+- No explicit blocklist maintained; trust AI judgment for edge cases
+- If AI refuses subject, user can rephrase or choose different topic
+
+**Accessibility:**
+- WCAG 2.1 Level AA compliance (target)
+
+#<<< MISSING: Detailed accessibility requirements, WCAG compliance checklist, screen reader support specifications, keyboard navigation requirements >>>
+
+*Future: Create Accessibility Testing Plan auxiliary document.*
+
+### Internationalization
+
+**MVP:** English + German UI
+**Post-MVP:** Spanish, French, Polish UI translations
+
+**Learning Languages:** ANY language can be taught (via LLM capability)
+**UI Languages:** English + German in v1.0
+
+#<<< MISSING: Translation workflows, locale-specific compliance requirements >>>
+
+*Note: i18n architecture design captured in `docs/analysis/architecture-inputs.md` for Architecture phase.*
+
+---
+
+## Teaching & Learning Specifications
+
+### Teaching Methodology
+
+**Dual-Mode Teaching:** System automatically detects subject type and applies appropriate methodology:
+
+| Subject Type | Method | Application |
+|--------------|--------|-------------|
+| **Conceptual** (math, programming, science) | Socratic Method | Guide learner to discover answers through questioning |
+| **Language Learning** | Four Strands (Nation) | Explicit instruction + comprehensible input + output practice + fluency |
+
+**Four Strands Implementation (25% time allocation each):**
+1. **Meaning-Focused Input:** Comprehensible passages at 95-98% known words
+2. **Meaning-Focused Output:** Speaking/writing practice (production)
+3. **Language-Focused Learning:** Explicit grammar and vocabulary instruction
+4. **Fluency Development:** Time-pressured drills for automatic retrieval
+
+**Research Basis:**
+- Socratic method effective for conceptual subjects (guided discovery)
+- Four Strands framework (Nation) required for language acquisition
+- Adults need explicit grammar instruction, not discovery-based learning for languages
+
+### Gamification Mechanics
+
+**Philosophy:** Reward knowledge retention, not app engagement
+
+**XP and Streak System:**
+
+| Mechanic | Specification |
+|----------|---------------|
+| Topic completion | 0 XP immediately; XP awarded only after verification |
+| Honest Streak | Streak counts only when recall test passed (not app opens) |
+| XP Decay | XP decays over time without review (reflects knowledge fading) |
+| Retention XP | Verified after 2-week and 6-week delayed recall tests |
+| Badges | Awarded for demonstrated retention (e.g., "90%+ recall at 6 weeks") |
+
+**Research Basis:**
+- Interleaved retrieval practice (d=1.21 effect size)
+- Spaced repetition (SM-2 algorithm)
+- Knowledge decay visualization (metacognitive awareness)
+
+### Step-Level Feedback (Critical)
+
+**Research basis:** Step-level tutoring achieves d=0.76 vs answer-level tutoring at d=0.31 (VanLehn meta-analysis). The difference accounts for 2x effectiveness.
+
+**Requirement:**
+- AI must provide real-time feedback during problem-solving, not just evaluate final answers
+- When learner makes error mid-reasoning, AI intervenes immediately: "Let's pause here - what made you choose that step?"
+- Feedback targets the specific step where thinking went wrong, not just "incorrect"
+- AI guides through each step: "Good, what's the next step?" rather than waiting for complete answer
+
+**Implementation:**
+- For multi-step problems: AI checks understanding at each step
+- For explanations: AI asks clarifying questions during learner's explanation
+- For homework help: Socratic guidance operates at step level, not problem level
+
+### Adaptive Difficulty (80% Success Target)
+
+**Research basis:** Rosenshine's Principles - optimal learning occurs at ~80% success rate during practice. Too easy = no learning; too hard = frustration and cognitive overload.
+
+**Requirement:**
+- AI calibrates question difficulty to maintain approximately 80% success rate per session
+- If learner succeeds >90% consistently → increase difficulty (harder questions, less scaffolding)
+- If learner succeeds <70% consistently → decrease difficulty (more hints, simpler questions)
+- Tracks success rate per topic and adjusts dynamically
+
+**Implementation:**
+- Rolling window of last 10 questions determines adjustment
+- Difficulty dimensions: question complexity, scaffolding level, time pressure
+- User can see their success rate in session summary (transparency)
+
+### Interleaved Practice
+
+**Research basis:** Interleaving produces d=1.21 effect size - one of highest in learning science. Mixing related topics forces discrimination and improves long-term retention.
+
+**Default behavior (Interleaved Recall Tests):**
+- Recall tests mix **3-5 topics from the same subject**
+- Topics selected based on: due for review + related/confusable content
+- Forces discrimination: "Which concept applies here?"
+- Example: Math recall mixes multiplication, division, fractions (not all multiplication)
+
+**User choice (Focused Practice):**
+- User can select "Practice only [current topic]" after completing a lesson
+- Or from Learning Book: "Practice this topic only"
+- Useful for struggling learners who need reinforcement before mixing
+
+**UI flow:**
+- After completing a topic: "Ready for review?" → [Mixed Practice (Recommended)] or [Just This Topic]
+- Learning Book: Each topic has "Practice" button with dropdown for Mixed/Focused
+
+**Not interleaved:**
+- Cross-subject mixing (Spanish + Calculus) is NOT interleaving - topics must be related/confusable
+
+### Learning Science Explanations
+
+**Research basis:** 93% of students incorrectly believe massed study is more effective than spaced study. Learners prefer ineffective strategies because they feel easier.
+
+**Requirement:**
+- AI explains WHY the system uses certain techniques when learners might resist
+- When learner complains about difficulty: "This feels harder because we're mixing topics - research shows this doubles your retention"
+- Brief explanations, not lectures: 1-2 sentences max
+
+**When to explain:**
+- First interleaved recall test: "We're mixing topics to help your brain discriminate - this is proven to work better"
+- First delayed recall test: "Testing yourself is the #1 way to remember - better than re-reading"
+- When difficulty increases: "I'm making this harder because you're doing well - challenge helps you grow"
+- When user skips summary: "Writing in your own words cements learning - skipping means weaker memory"
+
+**Opt-out:**
+- User can disable explanations in Settings: "Don't show learning tips"
+- Default: ON for first 30 days, then reduced frequency
+
+### Chunk-Based Language Learning
+
+**Research basis:** 32-59% of natural language consists of formulaic sequences (chunks). High-proficiency learners store and retrieve chunks holistically; low-proficiency learners analyze word-by-word, losing fluency.
+
+**Requirement:**
+- Language learning mode teaches phrases/chunks, not just isolated words
+- Vocabulary tracking includes chunk count alongside word count
+- Examples: "por favor", "it turns out", "on the other hand", "je voudrais"
+
+**Implementation:**
+- Vocabulary list shows: Words (2,450) | Chunks (380)
+- Spaced repetition applies to chunks as single units
+- AI introduces chunks in context, not as word lists
+- Common chunks prioritized (greetings, transitions, discourse markers)
+
+### Pattern Noticing Prompts
+
+**Research basis:** Schmidt's Noticing Hypothesis - "input does not become intake unless consciously registered." Explicit attention to patterns accelerates acquisition.
+
+**Requirement:**
+- AI explicitly highlights patterns learners might miss
+- After examples, AI draws attention: "Notice how all these verbs end in -tion? That's a pattern..."
+- For language learning: "See how 'ser' is used for permanent things, 'estar' for temporary?"
+
+**Implementation:**
+- AI summarizes patterns after 3+ related examples shown
+- Patterns saved to topic notes in Learning Book
+- User can ask "What patterns should I notice?" for any topic
+- Visual highlighting in text where applicable (bold key patterns)
+
+**Streak Outage Protection:**
+- If system detects **server outage >1 hour** during user's active streak day:
+  - Automatic "streak freeze" applied for affected users
+  - User notified: "We had an outage. Your streak is protected."
+- Manual streak restoration available via support request (with evidence of app issue)
+- Streak already has 3-day pause buffer, so minor issues covered
+
+**Learning Mode Switching:**
+- Two modes: "Serious Learner" (mastery gates, verified XP) and "Casual Explorer" (no gates, completion XP)
+- Mode can be changed from Settings **OR** by asking AI conversationally ("Switch me to Serious mode")
+- AI confirms before switching: "Switching to [mode] means [consequences]. Are you sure?"
+- **Casual → Serious transition:**
+  - All existing "completion XP" converts to "pending XP"
+  - Topics marked as "Unverified" until recall tests passed
+- **Serious → Casual transition:**
+  - All "pending XP" immediately converts to "verified XP"
+  - Mastery gates removed
+- Mode applies per-profile (not per-subject)
+
+### Homework Integrity Mode
+
+**Trigger:** System detects "help with this problem" vs "teach me concept"
+
+**Workflow:**
+1. AI switches to homework integrity mode automatically
+2. Guides through solution: "What do you think the first step is?"
+3. Student explains thinking, AI prompts next step
+4. AI never provides final answers directly
+5. Session marked as "Guided problem-solving" in Learning Book
+
+**Parent Visibility:**
+- All homework sessions flagged in Learning Book
+- Parent can see: AI guidance provided / Student found solution / No answers given
+- Full conversation history available for review
+
+### Summary Quality & Skip Consequences
+
+**Summary Quality Validation:**
+- AI evaluates summary quality before accepting
+- **Gibberish detection:** If summary is <20 characters or nonsensical → prompt "Please write a real summary in your own words"
+- **Copy detection:** If >80% similarity to AI's explanation → prompt "This looks copied. Try explaining in YOUR words."
+- User gets **3 attempts** to write acceptable summary
+- After 3 failed attempts → summary marked as "skipped"
+
+**Skip Consequences:**
+- Skipped summary → Topic marked as "Unverified" (not "Completed")
+- Unverified topics:
+  - Don't count toward curriculum progress percentage
+  - Get recall tests sooner (1 week instead of 2 weeks)
+  - No XP awarded until verified via recall OR user writes summary later
+- User can return to topic anytime from Learning Book to "Add summary" and convert to Verified status
+
+**Repeated Skipping Escalation:**
+- After **5 consecutive skips**: Warning "Summaries help you remember. Your recent topics are unverified."
+- After **10 consecutive skips**: Prompt "Would you like to switch to Casual Explorer mode?" (no summary requirement)
+- No hard block; user can keep skipping but sees impact (unverified topics, no XP)
+- Skip counter resets when user writes an accepted summary
+
+**Parked Question Limits:**
+- **Soft limit:** 20 parked questions per subject
+- At 21st: "You have 20 parked questions. Review some before adding more?"
+- User can override and add anyway
+- **Hard limit:** 50 parked questions per subject
+- At hard limit: Must review/delete before adding new
+- "Clear all parked questions" bulk action available
+
+**Notifications Disabled Handling:**
+- User can disable all notifications (their choice respected)
+- In-app banner shown on home screen: "You have X topics ready for review" (passive reminder)
+- If notifications disabled AND user hasn't reviewed in 14+ days:
+  - One-time in-app prompt: "Your knowledge is fading. Enable reminders?"
+- No forced notifications; respect user preference
+- Parent (if applicable) still sees decay status when viewing child's profile
+
+### Adaptive Teaching (In-Lesson)
+
+**Three-Strike Rule:** When user fails to answer correctly 3 times on same concept:
+
+1. **Strikes 1-2:** AI rephrases question, provides hints, guides with Socratic method
+2. **Strike 3:** AI automatically switches to direct instruction:
+   - Explains concept with concrete examples
+   - Shows worked solution
+   - Rephrases original question
+3. **After AI explanation:**
+   - If user answers correctly → Topic saved to Learning Book (normal)
+   - If user still struggles → Topic saved to Learning Book "Needs Deepening" section
+
+**"Needs Deepening" Topics:**
+- Automatically scheduled for more frequent review
+- Flagged in Learning Book with ⚠️ indicator
+- When eventually mastered (3+ successful recalls) → moves to normal section
+
+### Adaptive Teaching (Subject-Level)
+
+**Trigger:** User fails recall test 3+ times and chooses "Different method" during re-learning
+
+**Method Preferences Storage:**
+- Stored per-subject in learner profile (not global)
+- Options: "More examples", "Step-by-step", "Different analogies", "Simpler language", "Direct instruction"
+- System remembers preference for future sessions
+
+**Auto-Apply Logic:**
+- When user starts new session in subject with stored preference → AI applies that method
+- If user struggles again (3 wrong answers) → AI can suggest trying another approach
+- Preferences can be reset from Settings
+
+**Tunable Teaching Dimensions:**
+| Dimension | Default | Alternatives |
+|-----------|---------|--------------|
+| Method | Socratic (questions) | Direct instruction, Worked examples first |
+| Chunking | 1 concept/exchange | Micro-chunks, Larger context |
+| Examples | Examples before theory | Theory first, Analogy-heavy |
+| Language | Age-appropriate | Simpler, Step-by-step procedural |
+
+### Recall Test Handling
+
+**Optional but Encouraged:**
+- Recall tests are optional; users are not forced to take them
+- If user dismisses recall notification **3 times**:
+  - Topic stays in "Pending Verification" status
+  - XP remains unverified (shown as "pending XP")
+  - Decay visualization shows "?" instead of decay bar
+- User can take test anytime from Learning Book
+- Gamification naturally incentivizes testing (verified XP, honest streak)
+
+### Perpetual Failure Escalation
+
+**When All Methods Exhausted:**
+- After **3 different teaching methods** all fail for same topic:
+  - Topic marked as "Blocked" in Learning Book
+  - AI suggests: "This topic might need prerequisite knowledge. Would you like to review [suggested prerequisite]?"
+  - User can choose:
+    - Review prerequisite topic
+    - Skip topic entirely
+    - Try again later
+- If user skips: Topic removed from active curriculum, preserved in Learning Book as "Skipped - Blocked"
+- User can always revisit skipped topics later from Learning Book
+
+### Needs Deepening Limits
+
+**Overflow Prevention:**
+- Maximum **10 active** "Needs Deepening" topics per subject
+- When 11th topic would be added:
+  - Oldest "Needs Deepening" topic auto-converts to "Weak" status (regular decay)
+  - User notified: "You have many struggling topics. Consider focusing on review."
+- Needs Deepening section shows priority order (most recent failures first)
+- Bulk action available: "Clear all to Weak" if user wants to reset
+
+**Delete Struggling Topic:**
+- User can delete any topic from Learning Book (including Needs Deepening)
+- Confirmation required: "Delete [topic]? This removes all progress and summaries."
+- Deleted topics:
+  - Removed from curriculum entirely
+  - Can be re-added by requesting curriculum regeneration or asking AI
+- Deletion is permanent (no undo)
+- Rationale: User autonomy; if topic isn't relevant, let them remove it
+
+**Method Preference Conflict Resolution:**
+- User can change method preference anytime:
+  - From Settings → Subject preferences
+  - By telling AI: "Try teaching me differently"
+- If user fails 3 times AFTER preference was applied:
+  - AI suggests: "Your preferred method doesn't seem to be working. Try a different approach?"
+  - User can accept (AI tries new method) or decline (keep current)
+- "Reset all preferences" option in Settings clears all stored methods
+
+---
+
+## Project-Type Requirements
+
+### Application Type
+
+**Primary Classification:** Web Application + Mobile Application (cross-platform)
+
+**Platform Requirements:**
+- iOS (native application)
+- Android (native application)
+- Web (browser-based application)
+
+**Rationale:**
+- Mobile-first learning (users prefer apps over desktop)
+- Cross-platform reduces development overhead
+- Web access for desktop users and SEO
+
+### Technical Category Requirements
+
+**Real-Time Conversational AI:**
+- System must support real-time bidirectional communication for conversational chat
+- System must stream AI responses progressively for natural conversation flow
+- System must persist session state across temporary disconnections
+- System must retrieve conversation history for continuity
+
+**Session Recovery:**
+- Session state auto-saved after each AI exchange (not just at session end)
+- On reconnection: Show "Welcome back! Continue where you left off?" with last message displayed
+- If disconnected >30 minutes: Session marked as "paused", can resume from Learning Book
+- If disconnected >24 hours: Session auto-closes, partial progress saved as "incomplete topic"
+
+**AI/LLM Integration:**
+- System must integrate with AI language model APIs for conversational teaching
+- System must implement provider fallback to maintain availability during outages
+- System must optimize AI model selection based on task complexity to control costs
+- System must track token usage and costs per session
+- System must implement rate limiting to prevent abuse and control costs
+
+**Personalization Engine:**
+- System must store user profiles including learning style, goals, and background
+- System must generate and adapt personalized curricula based on user progress
+- System must inject prior knowledge context into teaching sessions
+- System must update learner models after each session
+
+**Spaced Repetition System:**
+- System must schedule review sessions using spaced repetition algorithms
+- System must track and visualize knowledge decay over time
+- System must generate daily review queues based on retention scores
+- System must calculate and update retention scores per topic
+
+**Authentication & Authorization:**
+- System must support multiple authentication methods including social login and email/password
+- System must manage multiple learner profiles under single subscription (family accounts)
+- System must implement parental consent workflow for users aged 11-15 in EU
+- System must maintain user sessions with automatic expiration for security
+
+**Payment Processing:**
+- System must process recurring monthly subscription billing
+- System must manage 14-day trial periods with full access
+- System must integrate with payment processor for secure checkout
+- System must track and display subscription status to users
+
+**Code Execution (Programming Subjects):**
+- System must execute user-written code safely in isolated environment
+- System must provide in-browser code execution without server-side compilation
+- System must display code execution results in real-time within learning interface
+- System must validate code output against test cases
+
+### Infrastructure Requirements
+
+**Hosting & Deployment:**
+- System must deploy backend services to managed cloud hosting with auto-scaling capability
+- System must build and distribute native mobile applications through automated CI/CD pipeline
+- System must serve web application via content delivery network for global performance
+- System must persist data in relational database with ACID compliance and 99.99% durability
+- System must cache frequently accessed data to meet response time targets
+
+**Scalability Targets:**
+- MVP: 1-1,000 users
+- Growth: 1,000-50,000 users
+- Scale: 50,000+ users
+
+**Performance Requirements:**
+- API response time: <200ms (p95, excluding LLM)
+- LLM first token: <2s (streaming start)
+- App cold start: <3s (modern devices)
+- Real-time chat latency: <100ms
+
+**Reliability Requirements:**
+- System uptime: 99.5% (excluding planned maintenance)
+- Data durability: 99.99%
+- AI provider availability: Multi-provider fallback capability
+
+*Note: Infrastructure architecture, disaster recovery, backup strategies, and CI/CD pipeline specifications captured in `docs/analysis/architecture-inputs.md` for Architecture phase.*
+
+### Security Requirements
+
+**Data Protection:**
+- System must encrypt all data in transit using industry-standard protocols
+- System must encrypt sensitive data at rest using strong encryption algorithms
+- System must use token-based authentication with automatic expiration
+- System must implement rate limiting to prevent abuse
+- System must validate and sanitize all user inputs
+
+**Privacy:**
+- System must comply with GDPR (account deletion, data export, parental consent)
+- System must verify user age (11+ minimum)
+- System must require parental consent for users aged 11-15 in EU
+- System must not collect PII from minors without parental consent
+
+**API Security:**
+- System must implement rate limiting per user and IP address
+- System must validate all API inputs
+- System must prevent SQL injection attacks
+- System must prevent cross-site scripting (XSS) attacks
+
+#<<< MISSING: Detailed security architecture, threat model analysis, penetration testing requirements, security audit checklist >>>
+
+*Future: Create Security Audit Checklist auxiliary document.*
 
 ---
 
 ## Functional Requirements
 
-### Foundation & Architecture
+### User Management
 
-**FR1:** The repository must include Nx workspace configuration, pnpm workspace definitions, and project graphs that support multi-application, multi-package builds without manual configuration tweaks.
+- FR1: Users can register using email/password, Google OAuth, Apple Sign-in, or OpenAI OAuth
+- FR2: Users can verify email addresses to activate accounts
+- FR3: Users can reset passwords via email link
+- FR4: Users can create multiple learner profiles under single subscription (family accounts)
+- FR5: Users can switch between learner profiles
+- FR6: Parents can switch into child's profile for full access to learning history
+- FR7: Users aged 11-15 in EU can request parental consent during registration
+- FR8: Users aged 11-12 in US can request parental consent during registration (COPPA)
+- FR9: Parents can approve or decline consent via email link
+- FR10: If parent declines consent, child account is deleted immediately with no data retained
+- FR11: Users can delete their accounts and all associated data (GDPR)
+- FR12: Users can export their learning data (GDPR)
 
-**FR2:** The walking skeleton (health check feature) must remain in the template and execute successfully after every clone and installation, validating end-to-end connectivity before feature work begins.
+**OpenAI OAuth (Exploring):**
+- Enables authentication via OpenAI account
+- Future potential: Users with ChatGPT Plus could use their own API quota, reducing EduAgent LLM costs
+- MVP scope: Authentication only; token usage integration deferred to BYOK feature (v1.1+)
+- Implementation details TBD during Architecture phase
 
-**FR3:** Shared package boundaries must follow the unidirectional dependency flow defined in architectural decisions: applications depend on packages, packages may depend on other packages, but no circular dependencies are permitted.
+### Learning Path Personalization
 
-**FR4:** All TypeScript configurations must enforce strict mode, appropriate module resolution patterns, and path aliases for cross-package imports, ensuring compile-time validation across the monorepo.
+- FR13: Users can specify any subject they want to learn
+- FR14: Users can complete conversational interview to assess goals, background, and current level
+- FR15: Users can receive AI-generated personalized curriculum based on interview
+- FR16: Users can view complete learning path with topics and learning outcomes
+- FR17: Users can request explanation for curriculum topic sequencing ("why this order?")
+- FR18: Users can skip topics they already know
+- FR19: Users can challenge curriculum and request regeneration
+- FR20: Users can see confidence levels on curriculum topics (Core/Recommended/Contemporary/Emerging)
+- FR21: Users can have curriculum adapt after module completion based on performance
+- FR22: Users can see realistic time estimates per topic
 
-**FR5:** Project documentation (architecture decisions, technical stack, patterns, and operational guides) must remain synchronized with template behavior so that documentation serves as reliable ground truth for AI agent frameworks.
+**Interview Abandonment:**
+- Interview progress auto-saved after each exchange
+- On return: "Continue your interview?" with summary of what was discussed
+- Interview expires after **7 days** of inactivity → must restart
+- User can manually "Restart interview" anytime from draft curriculum screen
 
-**FR6:** The template must provide workspace-level scripts for common development operations (build, test, lint, dev server, deployment) that work consistently across all projects in the monorepo.
+**Skip All Topics Prevention:**
+- If user skips >80% of curriculum topics:
+  - AI asks: "You know most of this! Want a placement assessment instead?"
+  - **Option A:** Take assessment → AI places user at appropriate level
+  - **Option B:** Continue anyway → curriculum generated with advanced/edge topics only
+  - **Option C:** Choose different subject
+- Cannot skip 100% (at least 1 topic required to proceed)
 
-### Type Safety & Data Layer
+**Goal Change Mid-Curriculum:**
+- User can request "Change my learning goal" from Settings or by asking AI
+- AI conducts mini-interview: "What's your new goal?"
+- Curriculum regenerated, preserving completed topics
+- Progress on incomplete topics converted to "Paused" status
+- User warned: "Changing goals will reorganize your curriculum. Completed topics stay completed."
 
-**FR7:** Zod schemas must be the single source of truth for API contracts, generating OpenAPI specifications and typed clients automatically without manual intervention.
+**Curriculum Regeneration Limit:**
+- **3 free regenerations** per curriculum
+- After 3rd: "You've regenerated 3 times. Would you like to talk through what's not working?"
+- AI offers guided refinement instead of blind regeneration
+- No hard block, but friction encourages conversation over repeated regeneration
+- Regeneration count resets if user completes interview again
 
-**FR8:** Prisma schema and migrations must manage Supabase PostgreSQL resources with appropriate defaults (UUID primary keys, timestamptz columns) and Supabase-compatible naming conventions.
+### Interactive Teaching
 
-**FR9:** API client factory must expose type-safe helpers for both web and mobile consumers using generated types, ensuring compile-time validation of all API calls.
+- FR23: Users can chat with AI tutor in real-time with streaming responses
+- FR24: Users can ask follow-up questions for clarification
+- FR25: Users can request simpler or more complex explanations
+- FR26: Users can receive adaptive explanations based on demonstrated understanding
+- FR27: Users can see worked examples appropriate to their skill level:
+  - **Full examples**: mastery < 0.3 (novice) - complete step-by-step walkthrough
+  - **Fading examples**: mastery 0.3-0.6 (developing) - first steps shown, user completes rest
+  - **Problem-first**: mastery > 0.6 (competent) - attempt problem, example only if stuck
+- FR28: Users can receive cognitive load management (1-2 concepts per message maximum)
+- FR29: Users can flag content that seems incorrect
+- FR30: Users can choose between "Learn something new" and "Get help with homework" modes
+- FR31: Users can receive Socratic guidance for homework (guided problem-solving, never answer-giving)
+- FR32: Users can photograph homework problems for AI analysis (v1.1)
+- FR33: Users can see sessions marked as "guided problem-solving" in Learning Book
 
-**FR10:** Supabase client factories must support both browser contexts (Next.js client components) and server contexts (SSR, Route Handlers, API routes) with appropriate key usage and security boundaries.
+**Session Timeout Handling:**
+- After **5 minutes** inactivity: First soft prompt "Still there?"
+- After **10 minutes** inactivity: Second prompt "Your session will pause soon"
+- After **15 minutes** inactivity: Session auto-pauses, state saved
+- On return: "Welcome back! Continue where you left off?"
+- No penalty for timeout; session simply pauses
 
-**FR11:** Environment configuration (database URLs, API keys, service credentials) must be validated at application startup using type-safe schemas. Applications must fail immediately on missing or invalid configuration with clear, actionable error messages indicating which variables are missing or malformed, rather than allowing runtime failures with obscure errors.
+**Content Flag Resolution:**
+- Flag submitted → User sees "Thanks! We'll review this."
+- Flags queued for human review (not auto-actioned)
+- If confirmed incorrect: Content corrected in AI prompts/knowledge base
+- User NOT notified of resolution (low priority for MVP)
+- Flag data used for AI improvement and prompt refinement
 
-### Quality & Governance
+**User Abuse Handling:**
+- AI-level filtering: AI declines to engage with abusive content
+- AI responds: "I'm here to help you learn. Let's focus on your studies."
+- No account penalties for occasional outbursts (teens may vent)
+- Persistent abuse (10+ abusive messages in session): Session ends, user warned
+- Extreme content (threats, illegal): Logged for review, parent notified (if child account)
 
-**FR12:** Husky and lint-staged must run linting, formatting, and targeted test suites on every commit, blocking commits on failure to enforce quality gates before code enters version control.
+**Jailbreak Attempt Handling:**
+- AI trained to resist jailbreak attempts for answer-giving
+- If user persists after 3 attempts: AI says "I can only guide you to the answer, not give it. Want to work through it together?"
+- No penalties; just persistent refusal
+- Homework integrity mode cannot be disabled by user
+- Parent visibility shows all attempts (transparency)
 
-**FR13:** CI pipeline must execute lint, test, build, typecheck, and e2e tasks with deterministic Nx caching, publishing results and blocking merges on failures.
+**Learn/Homework Mode Mid-Session Switch:**
+- User can switch modes anytime by saying "Help me with homework" or "Teach me this concept"
+- AI acknowledges: "Switching to homework help mode" or "Switching to teaching mode"
+- Session history preserved; mode change logged
+- Learning Book shows session with mixed modes: "Teaching + Homework help"
 
-**FR14:** TDD must be enforced for all feature development with co-located tests and coverage reporting scripts, ensuring tests exist before implementation and coverage thresholds are measurable.
+**Tiered Tangent Handling:**
 
-**FR15:** Nx Cloud integration must provide remote caching and distributed task execution capabilities, enabling consistent build performance across team members and CI environments.
+AI maintains lesson focus while respecting learner curiosity through tiered responses:
 
-### DevOps, Observability & Secrets
+| Tangent Type | AI Response | Example |
+|--------------|-------------|---------|
+| **Legitimate tangent** (directly related, deepens understanding) | Explore briefly (2-3 exchanges), then return | "Great question about recursion! [brief explanation] Now back to functions..." |
+| **Adjacent topic** (related but off-curriculum) | Acknowledge + park for later | "That's a good question about databases. I've saved it to your parking lot. For now, let's finish loops..." |
+| **True drift** (unrelated, off-topic) | Gentle redirect | "Interesting! But let's stay focused on Python. You can explore that separately." |
+| **Repeated drift** (3+ true drifts in session) | Firmer redirect | "I notice we keep going off-topic. Let's focus on finishing this lesson first." |
 
-**FR16:** GitHub Actions must manage environment-specific secrets (staging and production environments) and deploy automatically to staging environment following successful CI validation.
+**Implementation:**
+- AI tracks invisible session objective (user doesn't see)
+- Tangent classification happens automatically based on topic relevance
+- Parked questions appear in Learning Book for later exploration
+- No penalty for tangents; natural curiosity is welcome
+- After lesson completes: "You had 3 parked questions. Want to explore any now?"
 
-**FR17:** Observability platform must capture server and web errors and performance metrics with credentials managed through secrets, and monitoring dashboards must be documented for operational use.
+### Knowledge Retention
 
-**FR18:** Docker containerization must be provided for consistent deployment packaging, and health check endpoints must be available for deployment validation and load balancer integration.
+- FR34: Users can write 3-5 sentence summaries in their own words at topic completion (mandatory production)
+- FR35: Users can receive AI feedback on summary quality and understanding
+- FR36: Users can be guided to self-correct misunderstandings before AI provides corrections
+- FR37: Users can skip summary production (with consequences: pending verification status)
+- FR38: Users can have questions parked for later exploration (parking lot)
+- FR39: Users can access parked questions in Topic Review
+- FR40: Users can have AI reference prior learning in new lessons
+- FR41: Users can receive understanding checks during lessons
+- FR42: Users can choose in-app or push notifications for review reminders
 
-**FR19:** Post-MVP CI/CD pipelines must deploy automatically to one or two lightweight production platforms, demonstrating deployment portability and proving that the template supports multiple hosting targets.
+### Learning Verification
 
-### Multi-Channel & Mobile
+- FR43: Users can take in-lesson quick checks (2-3 questions)
+- FR44: Users can explain reasoning for answers (not just final answer)
+- FR45: Users can receive feedback on WHERE thinking went wrong (not just "wrong")
+- FR46: Users can take topic completion assessments
+- FR47: Users can request re-tests on old topics from saved summaries
+- FR48: Users can see mastery level per topic (0-1 score)
+- FR49: Users can take delayed recall tests (2-week, 6-week intervals)
+- FR50: Users can have XP verified only after passing delayed recall
+- FR51: Users can see XP decay if recall tests fail
 
-**FR20:** The mobile application must share the API client, type definitions, and authentication patterns with the web application, following the same linting, testing, and build patterns to ensure consistency.
+**Verification Types:**
 
-**FR21:** Mobile walking skeleton flows (retrieving health checks, triggering health pings) must mirror the web experience, validating that shared business logic works identically across platforms.
+AI uses different assessment types based on subject and skill being verified:
 
-**FR22:** Documentation must cover mobile development setup including simulator/emulator configuration, Expo commands, and networking configuration for local development versus deployed API targets.
+| Type | Description | Subjects | Example |
+|------|-------------|----------|---------|
+| **RECALL** | Remember facts, definitions, terminology | All | "What is the Pythagorean theorem?" |
+| **APPLY** | Use a procedure correctly | Math, Programming, Science | "Solve for x: 2x + 5 = 15" |
+| **EXPLAIN** | Demonstrate understanding in own words | All | "Explain why water expands when it freezes" |
+| **ANALYZE** | Interpret, reason, compare/contrast | Humanities, Science, Business | "Why did the Roman Empire decline?" |
+| **CREATE** | Produce original work | Essays, Code, Languages | "Write a function that sorts a list" |
+| **LISTEN** | Comprehend spoken language | Languages | "What did the speaker say about the weather?" |
+| **SPEAK** | Produce spoken language | Languages | "Describe your morning routine in Spanish" |
 
-### Task App PoC
+**Implementation:**
+- AI selects verification type based on learning objective and topic
+- Mix of types within a session (not all RECALL)
+- EXPLAIN required for every topic (confirms understanding, not just memorization)
+- Language learning emphasizes LISTEN + SPEAK (production, not just recognition)
 
-**FR23:** The PoC must implement task/todo CRUD operations with validation, optimistic updates, and data synchronization patterns built entirely on the template's shared infrastructure.
+> Note: Visual/point-based verification (diagrams, visual matching) deferred to v1.5.
 
-**FR24:** Authenticated sessions must gate PoC routes and API endpoints, enforcing Supabase Auth policies and demonstrating secure token handling across web and mobile platforms.
+**Cheating Mitigation (Trust-Based):**
+- **No active cheating detection** for MVP (invasive, complex)
+- Trust-based system; recall tests are for user's benefit
+- Mitigation: Questions require explanation of reasoning, not just answers
+- If user copy-pastes obvious web text: AI detects and prompts "Explain this in your own words"
+- Future consideration: Time-based anomaly detection (answering complex question in <5 seconds)
 
-**FR25:** The PoC must use shared packages without violating dependency rules (no app-to-app imports, clean dependency graph maintained).
+**Remediation Refusal Handling:**
+- Relearning is optional; user can dismiss remediation prompts
+- If user dismisses remediation **3 times** for same topic:
+  - Topic stays in "Failed" status in Learning Book
+  - XP for that topic set to 0 (fully decayed)
+  - Topic no longer scheduled for recall tests
+  - User can manually "Restart topic" anytime from Learning Book
+- No forced relearning; natural consequences instead
 
-**FR26:** CI/CD must include production deployments with documented rollback procedures for both hosting targets, proving end-to-end deployment reliability.
+**XP Floor and Forgotten Topics:**
+- XP can decay to **0** (no artificial floor)
+- Topic at 0 XP shows "Forgotten" status in Learning Book
+- "Forgotten" topics:
+  - Removed from active recall schedule
+  - Shown in separate "Forgotten" section in Learning Book
+  - User can "Relearn" to restart from beginning
+- Total profile XP has floor of 0 (can't go negative)
+- Rationale: Honest system; forgotten knowledge is forgotten
 
-**FR27:** Test coverage across PoC application and shared packages must reach ≥80%, with failing coverage thresholds configured to block merges.
+### Failed Recall Remediation
 
-**FR28:** Observability dashboards must track PoC-specific flows (authentication failures, CRUD errors, performance bottlenecks) with actionable alerts configured for production monitoring.
+- FR52: Users who fail recall tests (3+ times) are guided to Learning Book for that topic
+- FR53: Users can see their previous scores, "Your Words" summary, and decay status
+- FR54: Users can choose "Review & Re-test" (re-test available after 24+ hours)
+- FR55: Users can choose "Relearn Topic" to restart learning
+- FR56: Users who choose Relearn can select "Same method" or "Different method"
+- FR57: Users who select "Different method" are asked by AI what would help (conversational prompt)
+- FR58: AI adapts teaching approach based on user's feedback (more examples, simpler, analogies, step-by-step, etc.)
+
+### Adaptive Teaching
+
+- FR59: AI applies three-strike rule during lessons (3 wrong answers → switch to direct instruction)
+- FR60: AI explains with examples after 3 failed attempts, then rephrases question
+- FR61: Topics where AI had to explain are saved to "Needs Deepening" section if user still struggles
+- FR62: "Needs Deepening" topics are automatically scheduled for more frequent review
+- FR63: "Needs Deepening" topics move to normal section after 3+ successful recalls
+- FR64: Users can store teaching method preference per subject (not global)
+- FR65: System auto-applies stored method preference when user starts session in that subject
+- FR66: Users can reset teaching method preferences from Settings
+
+### Progress Tracking
+
+- FR67: Users can view Learning Book with all past topics
+- FR68: Users can browse topic summaries with "Your Words" (user's own writing)
+- FR69: Users can see retention scores and knowledge decay bars
+- FR70: Users can see topic retention status (Strong/Fading/Weak/Forgotten) and struggle status (Normal/Needs Deepening/Blocked) as separate indicators
+- FR71: Users can view progress through learning path (topics completed vs remaining)
+- FR72: Users can see "completed vs verified" topic status
+- FR73: Users can access topic review with key concepts, examples, user summary, and teacher notes
+- FR74: Users can initiate re-learning for weak topics
+- FR75: Users can continue from last topic ("Continue where I left off")
+- FR76: Users can view "Needs Deepening" section with topics requiring extra review
+
+### Multi-Subject Learning
+
+- FR77: Users can create multiple curricula (subjects) under one profile
+- FR78: Users can view all active subjects on Home Screen with progress summary
+- FR79: Users can switch between subjects from Home Screen or Learning Book
+- FR80: Users can pause a subject (hidden from Home, accessible in Learning Book)
+- FR81: Users can resume a paused subject
+- FR82: Users can archive a subject (removes from active view, Learning Book entries preserved)
+- FR83: Users can restore archived subjects from Settings
+- FR84: Users can see subjects auto-archived after 30 days of inactivity
+- FR85: Learning Book organizes topics by subject with subject switcher
+
+**Learning Book Structure:**
+- Home Screen = subject switcher (all active/paused paths visible)
+- Learning Book = per-subject topic list with status indicators
+- Each subject shows: progress %, last studied, topics completed/total
+- Topics within subject show: title, retention status, struggle indicator (if applicable), actions
+
+**Topic Status Model (Two Orthogonal Dimensions):**
+
+Topics have TWO independent status types that can combine:
+
+| Dimension | Statuses | Based On |
+|-----------|----------|----------|
+| **Retention** (time-based) | Strong → Fading → Weak → Forgotten | Time since last successful recall |
+| **Struggle** (difficulty-based) | Normal / Needs Deepening / Blocked | Learning difficulty during sessions |
+
+**Retention Status (time-based decay):**
+- **Strong**: Recently reviewed, high retention (decay_level >80%)
+- **Fading**: Review soon recommended (decay_level 50-80%)
+- **Weak**: Needs review urgently (decay_level 25-50%)
+- **Forgotten**: No recall activity, XP = 0 (decay_level <25%)
+- **Stable**: 5+ consecutive successful recalls - exits active decay tracking
+
+**Struggle Status (learning difficulty):**
+- **Normal**: No struggle flags (default)
+- **Needs Deepening**: AI had to explain after 3 wrong attempts; user still struggled
+- **Blocked**: 3 different teaching methods all failed; requires user decision
+
+**Combined Examples:**
+- Topic can be "Strong + Needs Deepening" (recently reviewed but historically struggled)
+- Topic can be "Weak + Normal" (hasn't reviewed lately but learned it easily)
+- Topic can be "Forgotten + Blocked" (abandoned difficult topic)
+
+**Visual Representation:**
+```
+┌─────────────────────────────────────────────────┐
+│ Variables & Data Types                          │
+│ ████████░░ Strong            [Review] [Details] │
+└─────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────┐
+│ Recursion                        ⚠️ Needs Deepening │
+│ ██████░░░░ Fading               [Review] [Details] │
+└─────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────┐
+│ Pointers                         🚫 Blocked     │
+│ ███░░░░░░░ Weak                 [Restart] [Skip] │
+└─────────────────────────────────────────────────┘
+```
+
+**Subject Limits:**
+- **Soft limit:** 10 active subjects per profile
+- When creating 11th subject: Prompt "You have 10 active subjects. Would you like to pause or archive one first?"
+- User can override soft limit and create anyway (no hard block)
+- **Hard limit:** 25 total subjects (active + paused + archived)
+- At hard limit: Must archive or delete before creating new
+
+**Archive Behavior with Pending Tests:**
+- When archiving subject with pending recall tests:
+  - Warning shown: "This subject has X pending recall tests. Archive anyway?"
+  - If archived: Pending tests are **suspended** (not deleted)
+  - When subject restored: Suspended tests resume from where they were
+- Archived subjects don't send recall notifications
+- Learning Book entries preserved; just not actively scheduled
+
+**Archive Behavior with Needs Deepening Topics:**
+- When archiving subject with Needs Deepening topics:
+  - Warning: "This subject has X topics that need extra review. Archive anyway?"
+  - If archived: Needs Deepening status preserved but notifications suspended
+  - When restored: Needs Deepening schedule resumes
+- Archived subjects don't clutter active review queue
+
+**All Subjects Inactive Handling:**
+- If all subjects auto-archived due to inactivity (30+ days):
+  - User sees "Welcome back!" screen on next login
+  - Prompt: "Your subjects are archived. Which would you like to resume?"
+  - Shows list of archived subjects with last activity date
+- Account remains active; just no active learning paths
+- Push notification after 30 days all-inactive: "We miss you! Ready to continue learning?"
+- After 90 days: One final "win-back" email, then silence (respect user's choice)
+
+### Engagement & Motivation
+
+- FR86: Users can maintain Honest Streak (consecutive days passing recall, not just opening app)
+- FR87: Users can see Streak pause for 3 days (not instant break)
+- FR88: Users can earn Retention XP (pending → verified after delayed recall)
+- FR89: Users can see "topics completed" vs "topics verified" distinction
+- FR90: Users can view knowledge decay visualization (progress bars fading over time)
+- FR91: Users can receive review reminders for fading topics
+- FR92: Users can take interleaved retrieval sessions (multiple topics mixed, questions randomized)
+- FR93: Users can see topics become "Stable" after 5+ consecutive successful retrievals
+- FR94: Users can choose learning mode: "Serious Learner" (mastery gates, verified XP) or "Casual Explorer" (no gates, completion XP)
+- FR95: Users can receive daily push notifications for learning reminders
+
+### Language Learning
+
+- FR96: Users can have system detect language learning intent and switch to Four Strands methodology automatically
+- FR97: Users can specify native language for grammar explanations
+- FR98: Users can see realistic time estimates (FSI category: 600-2200 hours)
+- FR99: Users can receive explicit grammar instruction (not Socratic discovery)
+- FR100: Users can practice output (speaking/writing) every session
+- FR101: Users can read comprehensible passages at 95-98% known words
+- FR102: Users can practice vocabulary with spaced repetition (SM-2 algorithm)
+- FR103: Users can see vocabulary count and CEFR progress (A1 → A2 → B1...)
+- FR104: Users can practice fluency with time-pressured drills
+- FR105: Users can learn collocations and phrases (not just isolated words)
+- FR106: Users can see hours studied vs FSI estimate
+- FR107: Users can receive direct error correction (not Socratic hints)
+
+**Multi-Language Vocabulary Isolation:**
+- Vocabulary is **isolated per subject** (per language)
+- Each language subject has its own vocabulary list and spaced repetition queue
+- No cross-contamination (Spanish vocab doesn't appear in French reviews)
+- Vocabulary stats shown per-language: "Spanish: 450 words | 85 chunks / French: 230 words | 42 chunks"
+- CEFR progress tracked independently per language
+- Rationale: Languages are distinct domains; mixing would confuse learners
+
+**FSI Time Estimates:**
+
+Realistic time expectations based on Foreign Service Institute research (for English speakers achieving professional working proficiency):
+
+| Category | Languages | Hours to Proficiency | Daily Practice (1hr) |
+|----------|-----------|---------------------|----------------------|
+| **I** | Spanish, French, Italian, Portuguese, Dutch, Norwegian, Swedish, Danish, Romanian | 600-750 hours | ~2 years |
+| **II** | German, Indonesian, Malay, Swahili | 900 hours | ~2.5 years |
+| **III** | Russian, Polish, Greek, Hindi, Hebrew, Czech, Finnish, Hungarian, Vietnamese | 1,100 hours | ~3 years |
+| **IV** | Chinese (Mandarin/Cantonese), Japanese, Korean, Arabic | 2,200+ hours | ~6 years |
+
+**Implementation:**
+- AI explains FSI category during language onboarding: "German is a Category II language. At 1 hour/day, expect ~2.5 years to professional proficiency."
+- Progress dashboard shows: "Hours studied: 124 / ~900 FSI estimate (14%)"
+- Manages expectations early to prevent dropout from unrealistic goals
+- CEFR milestones provide interim progress markers (A1 achievable in ~60-100 hours for Category I)
+
+### Subscription Management
+
+> **Canonical Source:** Full pricing specification in `docs/Legacy/eduagent-pricing-specification.md`
+
+**Subscription Tiers:**
+
+| Tier | Monthly | Annual | Users | Questions/Month | Top-Up Price |
+|------|---------|--------|-------|-----------------|--------------|
+| **Free** | €0 | - | 1 | 50* | N/A |
+| **Plus** | €18.99 | €169 (26% off) | 1 | 500 | €10/500 |
+| **Family** | €28.99 | €259 (26% off) | Up to 4 | 1,500 shared | €5/500 |
+| **Pro** | €48.99 | €439 (25% off) | Up to 6 | 3,000 shared | €5/500 |
+
+*\*Free tier includes first-week boost: 10 questions/day for days 1-7*
+
+**Free Tier:**
+- Unlimited onboarding (interview + curriculum generation)
+- 50 questions/month with first-week boost (10/day for days 1-7)
+- Full feature access (no feature gating, only usage limits)
+- Progress tracking and Learning Book (progress saved forever)
+- Top-ups not available (must upgrade)
+- Purpose: Ensure "aha moment" before friction, create upgrade pressure
+- Est. LLM cost: ~€0.25/month per free user
+
+**Plus Tier:**
+- 500 questions/month for individual learner
+- Full feature access
+- Top-up credits: €10/500 questions
+- Target: Individual serious learners
+
+**Family Tier:**
+- 1,500 questions/month SHARED across all users
+- Up to 4 learner profiles
+- Top-up credits: €5/500 questions (50% cheaper than Plus)
+- Anyone can be invited (no household verification)
+- Target: Parents with children, households learning together
+
+**Pro Tier:**
+- 3,000 questions/month SHARED across all users
+- Up to 6 learner profiles
+- Top-up credits: €5/500 questions
+- Fair use soft limit: ~500/user/month before review
+- Target: Power users, large families, heavy exam prep
+
+**Shared Pool Mechanics (Family/Pro):**
+- All users draw from same monthly allocation
+- Creates natural household coordination
+- When pool exhausted: purchase top-ups or upgrade tier
+- Example: Family (1,500/mo) with 4 users averaging 375 each
+
+**Top-Up Credits:**
+- Purchase anytime to extend monthly allocation
+- Expiration: 12 months from purchase date
+- Usage order: Monthly quota first, then top-ups (FIFO)
+- Rollover: Monthly quota does NOT roll over; top-ups DO (until expiry)
+- Notifications: Month 6, 8, 10, 12 (early), 12 (late) expiry reminders
+
+**Downgrade Policy:**
+- All progress preserved when downgrading tiers (Pro → Family → Plus → Free)
+- Learning Book, curricula, XP, summaries remain fully accessible
+- Only usage limits change (questions/month)
+- No data archived or deleted on downgrade
+- Unused top-ups remain valid until expiration (can be used after re-upgrade)
+- Rationale: Progress is switching cost moat; preserved data incentivizes re-upgrade
+
+**Cancellation Policy:**
+- Users can cancel subscription at any time
+- Access continues until end of billing period
+- Progress preserved indefinitely (reverts to Free tier limits)
+- Account deletion available separately (GDPR right to erasure)
+
+**Payment Failure Handling:**
+- **3-day grace period** after failed payment
+- Automatic payment retry on Day 1, Day 2, Day 3
+- Email notification sent on each failed attempt
+- After Day 3 without successful payment → Downgrade to Free tier (progress preserved)
+- User can upgrade again anytime with valid payment method
+
+**Trial Strategy (Reverse Trial with Soft Landing):**
+
+| Period | Access Level | Daily Limit | Purpose |
+|--------|--------------|-------------|---------|
+| Days 1-14 | Full Plus access | Up to 500/month | Experience full value |
+| Days 15-28 | Extended trial | 15 questions/day | Soft landing (friction without cliff) |
+| Day 29+ | Free tier | ~5/day (50/month) | Standard free limits |
+
+**Soft Landing Messaging:**
+- Day 15: "Your trial ended, but we're giving you 15 questions/day for 2 more weeks"
+- Day 21: "1 week left of extended access — upgrade to keep learning without limits"
+- Day 28: "Tomorrow you'll move to Free (50 questions/month). Upgrade now?"
+
+**Trial Mechanics:**
+- Credit card required for trial (2.7x higher conversion)
+- Trial messaging: Use "Try for €0" (outperforms "Free trial")
+- Trial expires at **end of day** (midnight user's timezone), not mid-session
+- If user is mid-session when period ends → session completes, then next period limits apply
+- Countdown notifications: "3 days left", "1 day left", "Last day of trial"
+
+**Question Counting Rules:**
+- **What counts:** Each user message that triggers an AI response
+- **What doesn't count:** System messages, curriculum generation (unlimited), onboarding interview (unlimited)
+- **Counter reset:** Monthly questions reset on billing cycle date
+- **Display:** Show remaining questions in app header/dashboard
+
+**Usage Limit Enforcement:**
+- **Soft warning** at 80% of monthly ceiling: "You're approaching your monthly limit"
+- **Hard warning** at 95%: "X questions remaining this month"
+- At ceiling: Current AI exchange completes fully, then upgrade/top-up prompt shown
+- Never interrupts mid-AI-response
+- Ceiling resets on billing cycle date
+
+**Upgrade Triggers:**
+
+| From | To | Trigger & Message |
+|------|-----|-------------------|
+| Free | Plus | User hits 50/month cap: "Upgrade for 10x more questions" |
+| Plus | Family | User wants to add family member: "Add up to 3 more people, 3x the questions" |
+| Plus | Family | User buys 3+ top-ups: "You've spent €30 on top-ups. Family tier saves you money" |
+| Family | Pro | Need 5-6 users: "Need more seats? Pro includes up to 6 users" |
+| Family | Pro | Running out of questions: "Double your questions with Pro" |
+
+- FR108: Users can start 14-day free trial with full access
+- FR109: Users can have progress saved during and after trial
+- FR110: Users can receive trial expiry warnings (3 days before)
+- FR111: Users can upgrade to premium subscription (tiered: Standard/Plus/Pro)
+- FR112: Users can cancel subscription at any time
+- FR113: Users can view subscription status and renewal date
+- FR114: Users can access BYOK waitlist (email capture for future feature)
+- FR115: Users can choose monthly or yearly billing (with annual discount)
+- FR116: Users can add additional profiles to family account (per-profile pricing)
+- FR117: Users can view token usage against tier ceiling
+
+**BYOK (Bring Your Own Key) - Future Feature:**
+
+BYOK allows power users who already have AI subscriptions (Claude Pro, ChatGPT Plus) to use their own API keys, reducing their EduAgent cost.
+
+**MVP:**
+- BYOK waitlist capture (email + preferred provider)
+- Track waitlist signups as demand signal
+- If <100 signups by v1.0 launch → defer BYOK indefinitely
+
+**v1.1 (if demand validated):**
+- Claude API key support only (simplest implementation)
+- Reduced pricing tier for BYOK users (methodology + infrastructure only)
+- Token usage dashboard with cost estimates
+- User responsible for their own API costs
+
+**v1.2+ (if v1.1 successful):**
+- OpenAI API key support
+- Gemini API key support
+- Per-model prompt optimization (different providers need tuned prompts)
+
+**Implementation Notes:**
+- LLM abstraction layer required (Architecture phase decision)
+- Token logging from MVP validates cost estimates before BYOK commitment
+- User bill shock prevention: usage alerts at 50%, 80%, 100% of estimated monthly cost
+
+#<<< MISSING: Functional requirements for admin/support tools, moderation workflows, analytics dashboards, A/B testing framework, customer support tooling >>>
+
+*Future: Create Admin & Support Tools auxiliary document.*
 
 ---
 
@@ -383,170 +1505,125 @@ This separation ensures the template remains a flexible foundation that adapts t
 
 ### Performance
 
-**Build Performance:**
-- Nx caching must provide >50% cache hit rate after initial run, enabling efficient iterative development
-- Incremental builds must rebuild only affected dependents when a single package changes
-- Full CI build pipeline must complete in <10 minutes to support iterative AI-driven development
-- Remote caching via Nx Cloud must be enabled across team members and CI environments
+| Requirement | Target | Measurement Context |
+|-------------|--------|---------------------|
+| API Response Time | <200ms (p95) | Excluding LLM calls |
+| LLM First Token | <2s | Streaming response start |
+| App Cold Start | <3s | On modern devices (iPhone 12+, Android 2021+) |
+| WebSocket Latency | <100ms | Real-time chat feel |
+| Database Query Time | <100ms (p95) | Simple queries (profile, progress) |
+| Page Load Time | <2s | Initial app load |
 
-**Runtime Performance:**
-- Template patterns must demonstrate production-aligned performance characteristics without enforcing specific hard targets
-- API endpoints should target <200ms response times for simple operations
-- Database queries should follow best practices (selective field loading, appropriate indexing)
-- Frontend applications should leverage automatic code splitting for optimal bundle sizes
+### Reliability
+
+| Requirement | Target | Notes |
+|-------------|--------|-------|
+| System Uptime | 99.5% | Excluding planned maintenance |
+| Data Durability | 99.99% | Managed database service |
+| AI Provider Availability | Multi-provider fallback | Automatic failover between providers |
+| Session Recovery | Automatic reconnection | Restore state after temporary disconnection |
+| Backup Frequency | Daily automated | Automated backup retention |
 
 ### Security
 
-**Template-Provided Security:**
-- Environment variable validation with fail-fast behavior and clear error messages
-- CORS configuration must be implemented
-- HTTP security headers must be implemented
-- Input validation must be enforced for all API endpoints
-- SQL injection prevention must be implemented
-- XSS prevention must be implemented
-- Authentication middleware patterns must be provided for protected routes
+| Requirement | Implementation |
+|-------------|---------------|
+| Authentication | Token-based authentication with secure session management |
+| Data Encryption (Transit) | Industry-standard encryption for all API calls |
+| Data Encryption (Rest) | Strong encryption at rest for sensitive data |
+| API Rate Limiting | 100 requests/minute per user |
+| Input Validation | All user inputs validated and sanitized |
+| SQL Injection Prevention | Parameterized queries and input validation |
+| XSS Prevention | Content security policies and output encoding |
+| Session Management | Automatic session expiration with secure refresh mechanism |
 
-**Application-Level Security:**
-- Rate limiting and throttling patterns demonstrated in PoC
-- Role-based access control patterns demonstrated in PoC
-- Audit logging patterns available for business-critical operations
+### Privacy & Compliance
 
-**Secrets Management:**
-- Environment files (`.env`, `.env.local`) must be gitignored
-- Example templates (`.env.example`) must be provided
-- GitHub Actions secrets must manage all credentials (database URLs, API keys, service tokens)
-- CI/CD workflows must use minimal-privilege service accounts for deployments
+| Requirement | Implementation |
+|-------------|---------------|
+| GDPR Compliance | Account deletion, data export, parental consent |
+| Age Verification | 11+ minimum, birthdate validation |
+| Parental Consent | Required for ages 11-15 in EU |
+| Data Retention | User data deleted within 30 days of account deletion request |
+| Cookie Consent | EU cookie banner (web only) |
+| Privacy Policy | Available during registration |
+| Terms of Service | Acceptance required during registration |
 
 ### Scalability
 
-**Monorepo Scale:**
-- Template must support 6-8 applications without architectural refactoring
-- Template must support 8-10 packages without architectural refactoring
-- Nx dependency graph must remain clean and performant at maximum scale
-- No circular dependencies permitted at any scale
+| Phase | User Count | Infrastructure Scaling | LLM Cost/User/Month |
+|-------|------------|------------------------|---------------------|
+| MVP | 1-1,000 | Managed services with auto-scaling | €0.50-2.00 (model routing) |
+| Growth | 1,000-50,000 | Scaled managed services | €0.50-1.50 (optimized routing) |
+| Scale | 50,000+ | Enterprise cloud infrastructure | €0.30-1.00 (volume + caching) |
 
-**Application Scale:**
-- Template patterns must support typical production workloads (1000+ concurrent users for SaaS applications)
-- Architecture must accommodate horizontal scaling patterns for API and database layers
+**AI Cost Model (per question, 3,600 input + 1,500 output tokens):**
 
-**Note:** Specific performance targets are application-dependent. The template provides patterns proven to work at production scale.
+| Model Tier | Cost/Question | Use Case |
+|------------|---------------|----------|
+| Gemini 1.5 Flash | €0.0007 | Simple Q&A, drills |
+| GPT-4o-mini | €0.0013 | Standard teaching |
+| GPT-4o | €0.022 | Complex reasoning |
+| Claude 3.5 Sonnet | €0.030 | Nuanced explanations |
 
-### Type Safety
-
-**End-to-End Type Safety (Non-Negotiable):**
-- TypeScript strict mode enforced in all projects
-- Zod schemas serve as single source of truth for API contracts
-- OpenAPI specifications generated from schemas (no manual editing)
-- TypeScript types generated automatically from OpenAPI specifications
-- Prisma generates types from database schema
-- No type assertions (`as` casting) permitted; proper typing required
-- Compile-time validation of all API calls using type-safe clients
-
-**Validation:**
-- Type checking must pass across all projects
-- Pre-commit hooks must block commits with TypeScript errors
-- CI must fail builds on any type checking failures
-
-### Testing
-
-**Coverage Strategy:**
-- **MVP Phase**: Tests must exist and pass; coverage is measured but not enforced
-- **PoC Phase**: 80% coverage required for feature completion; pre-commit hooks report coverage warnings when below threshold to provide early feedback, but coverage gates enforce thresholds at PR merge (blocking)
-- **Production Phase**: 80% coverage enforced for all code changes
-
-**Testing Infrastructure:**
-- Unit tests for isolated component and function testing
-- Integration tests for cross-layer validation (API → database)
-- End-to-end browser tests for complete user journeys
-
-**Quality Gates:**
-- Pre-commit hooks run tests for affected code (must pass) and report coverage status with warnings for sub-threshold coverage
-- PR merge gates enforce coverage thresholds for changed files (blocking)
-- Coverage decreases are never permitted once baseline is established
+**Cost Optimization Strategy:**
+- Multi-model routing based on query complexity
+- Aggressive prompt caching (50-90% input cost reduction)
+- Target: €0.001-0.005/question average with intelligent routing
 
 ### Accessibility
 
-**Web Application Standards:**
-- Semantic HTML structure must be used
-- Keyboard navigation must be supported
-- Color contrast standards must meet accessibility guidelines
-- Screen reader compatibility must be ensured
+| Requirement | Target | Standard |
+|-------------|--------|----------|
+| WCAG Compliance | Level AA | WCAG 2.1 |
+| Keyboard Navigation | Full support | All interactive elements |
+| Screen Reader Support | Tested on iOS VoiceOver, Android TalkBack | ARIA labels |
+| Color Contrast | 4.5:1 minimum | Text and UI elements |
+| Font Sizing | Supports system font scaling | Up to 200% |
 
-**Note:** Accessibility is primarily application-specific. The template demonstrates foundational patterns; applications implement comprehensive accessibility based on their requirements.
+#<<< MISSING: Detailed screen reader testing checklist, keyboard navigation map, ARIA attribute specifications, accessibility audit results >>>
 
-### Integration & Deployment
+*Future: Covered in Accessibility Testing Plan auxiliary document.*
 
-**External Services:**
-- Database and authentication services configured and integrated
-- Remote caching and distributed task execution enabled
-- Observability platform (error tracking and performance monitoring) integrated
-- CI/CD platform configured with deployment automation
+### Localization
 
-**API Integration:**
-- REST+OpenAPI provides standard HTTP interface
-- OpenAPI specification enables SDK generation for any language
-- Type-safe TypeScript client provided
-- Interactive API documentation available
+| Requirement | MVP | Post-MVP |
+|-------------|-----|----------|
+| UI Languages | English + German | Spanish, French, Polish |
+| Learning Languages | ANY (via LLM) | ANY (via LLM) |
+| Time Zones | UTC + user local | UTC + user local |
+| Currency | EUR | EUR, USD, GBP (based on region) |
 
-**Deployment:**
-- MVP deployments target staging environment automatically following successful CI
-- PoC deployments promote to one or two production platforms demonstrating portability
-- Template remains agnostic to specific AI agent frameworks
+### Monitoring & Observability
 
-### Observability
+| Requirement | Capability | Metrics |
+|-------------|------------|---------|
+| Error Tracking | Application error monitoring | Error rates, stack traces, user impact |
+| Analytics | User behavior analytics | User events, funnels, retention cohorts |
+| Performance Monitoring | System performance tracking | CPU, memory, response times, throughput |
+| AI Usage Tracking | AI model usage logging | Token usage, cost per session, provider distribution |
+| Uptime Monitoring | Service availability monitoring | Uptime percentage, response time, incident detection |
 
-**Monitoring Infrastructure:**
-- Error tracking and performance monitoring instrumentation across all application surfaces (web, server, mobile)
-- Monitoring credentials managed securely through secrets management
-- Basic dashboards and alerting configured
-- Correlation IDs included in logs for request tracing across services
+#<<< MISSING: Detailed monitoring dashboard specifications, alerting thresholds, incident response procedures, SLA definitions >>>
 
-### Documentation
-
-**Documentation Standards:**
-- Architecture decisions, technical stack, and patterns documented and synchronized with template behavior
-- Deployment guides and operational procedures provided
-- Documentation structured for accessibility by AI agent frameworks
-- Code comments provide both technical and business context where appropriate
+*Future: Create Monitoring & Operations Runbook auxiliary document.*
 
 ---
 
-## Out of Scope
+## Appendix
 
-The following are explicitly NOT part of the template product scope:
-
-**Opinionated Business Logic:**
-- Pre-built domain models for specific industries
-- Pre-configured business workflows or rules
-- Industry-specific UI component libraries
-
-**Note:** The template provides infrastructure building blocks; applications implement business-specific features using those building blocks.
+*Epic-level planning content (7 epics with representative stories and success indicators) has been moved to `docs/analysis/epics-inputs.md` for use during Epics & Stories phase.*
 
 ---
 
-## Implementation Planning
-
-**Roadmap (High-Level):**
-
-**Phase 1: MVP (Stages 0-8)**
-- Walking skeleton across web, server, and mobile applications
-- Shared infrastructure packages with complete type safety chain
-- Baseline authentication infrastructure wiring
-- Observability baseline instrumentation
-- CI/CD to staging environment
-- Tests exist and pass (coverage measured but not enforced)
-
-**Phase 2: Task App PoC**
-- CRUD functionality with authentication on web and mobile
-- Test coverage raised to ≥80% with enforcement at PR merge
-- Deployment to one or two production platforms
-- Enhanced observability dashboards and alerting
-
-**Phase 3: Template Extensions (Optional)**
-- Advanced infrastructure patterns (real-time, file storage, background jobs, webhooks)
-- Multi-tenancy building blocks (organizations, subscriptions, admin dashboards)
-- Production optimization patterns (advanced caching, performance tuning)
-- Additional deployment target support
-
-**Note:** Epic and story decomposition occurs during the planning phase following this PRD. Architecture design occurs in the architecture phase. Both phases follow BMAD workflow processes.
-
+**Document Status:** BMAD v1.0 - PRD Complete
+**Completed:**
+- Phase 1 cleanup (23 markers processed)
+- Phase 2 gap analysis (38 gaps addressed, research-based features added, legacy PRD cross-referenced)
+- Added: Verification Types taxonomy, Tiered Tangent Handling, FSI Time Estimates, Step-Level Feedback, Adaptive Difficulty, Interleaved Practice, Learning Science Explanations, Chunk-Based Language Learning, Pattern Noticing Prompts
+- Technical docs cross-reference: BYOK feature roadmap, Topic Status Model (orthogonal retention + struggle dimensions), worked example mastery thresholds
+- Pricing finalized: 4-tier model (Free/Plus/Family/Pro), reverse trial, top-up credits, shared pools
+**Next Steps:**
+1. Stakeholder review
+2. Proceed to Architecture phase
+3. Create auxiliary docs as needed (listed in MISSING notes)

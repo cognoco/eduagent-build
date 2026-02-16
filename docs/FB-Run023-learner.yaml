@@ -1,0 +1,1029 @@
+# Factory Brief - Run023 Eager Learner Segment (Mentomate)
+# Schema Version: 2.22
+# Generated: 2026-01-17
+# Segment: Eager Learner (Self-Directed Adult)
+
+metadata:
+  run_id: "Run023"
+  run_date: "2026-01-17"
+  work_order_id: "WO-Run023"
+  phase: "factory_handoff"
+  briefs_generated: 3
+  generated_at: "2026-01-17T12:00:00Z"
+  segment_id: "SEG-002-eager-learner"
+  segment_name: "Eager Learner (Self-Directed Adult)"
+
+scout_reference:
+  run_id: "Run023"
+  run_folder: "docs/Run023_2026-01-17/"
+  phase_files:
+    - "phase-2-research.yaml"
+    - "phase-3-validation.yaml"
+
+source_brief:
+  type: "product_brief"
+  brief_path: "inline_product_brief"
+  ingestion_date: "2026-01-17T00:00:00Z"
+  ingestion_version: "1.0"
+
+  preserved_elements:
+    killer_features:
+      - feature_name: "Memory (Persistent Learning)"
+        description: "Remembers your learning journey across sessions"
+        how_it_works: "Learning Book tracks progress, eliminates redundant explanations"
+        why_it_matters: "Creates personalized learning path that compounds over time"
+        competitor_gap: "Video courses don't remember you; start fresh every time"
+        source_section: "Four Pillars"
+        source_quote: "Remembers what you learned, your struggles, how you learn best"
+
+      - feature_name: "Structure (Personalized Curricula)"
+        description: "Builds personalized curricula for ANY subject"
+        how_it_works: "AI generates optimal topic sequence based on your goals"
+        why_it_matters: "Guided journey vs random Q&A sessions"
+        competitor_gap: "ChatGPT has no structure; video courses are one-size-fits-all"
+        source_section: "Four Pillars"
+        source_quote: "Builds personalized curricula and sequences topics in optimal order"
+
+      - feature_name: "Verification (Mastery Demonstration)"
+        description: "Tests understanding through learner-generated demonstrations"
+        how_it_works: "You explain back in your own words before AI confirms understanding"
+        why_it_matters: "Active learning beats passive consumption"
+        competitor_gap: "Video courses have no verification; quizzes aren't mastery proof"
+        source_section: "Four Pillars"
+        source_quote: "Tests understanding through learner-generated demonstrations"
+
+    methodology_details:
+      - approach_name: "Socratic Method"
+        default_behavior: "Guide learner to discover answers through questioning"
+        fallback_behavior: "Direct explanation if learner is stuck"
+        switching_conditions: "Struggle detection"
+        domain_variants: []
+        architecture_notes: "Pluggable teaching strategies"
+        source_quote: "Default: Socratic method"
+
+    user_journey_specifics:
+      - stage_name: "Intent Screen"
+        duration: "5 minutes"
+        key_actions: ["Create account", "Select 'Learn something new'", "Subject input"]
+        decision_points: ["What do you want to learn?"]
+        ux_specifics: ["Interview to understand goals"]
+        source_quote: "Intent fork: Learn something new"
+
+    pricing_rationale:
+      - aspect: "4-Tier Model"
+        detail: "Free -> Plus (€18.99) -> Family (€28.99) -> Pro (€48.99)"
+        rationale: "Plus tier ideal for individual adult learners"
+        source_quote: "4-Tier Model"
+
+    compliance_requirements: []
+
+    mvp_scope_decisions:
+      - feature: "Personalized Curricula"
+        in_mvp: true
+        target_version: "v1.0"
+        rationale: "Core value for eager learner segment"
+
+  unmapped_elements: []
+  extraction_stats:
+    total_elements_extracted: 20
+    elements_by_category:
+      killer_features: 3
+      methodology_details: 1
+      user_journey_specifics: 1
+      pricing_rationale: 1
+      compliance_requirements: 0
+      mvp_scope_decisions: 1
+    unmapped_count: 0
+    confidence_distribution:
+      high: 18
+      medium: 2
+      low: 0
+
+briefs:
+  - id: "BRIEF-Run023-001-learner"
+    working_name: "Mentomate"
+    tagline: "A teacher who grows with you"
+    final_score: 7.5
+    technique: "product_brief"
+    verdict: "PASS"
+    conditional_pass: null
+
+angles_evaluated:
+  discovery_source: "Stage 3.0.5.5"
+  angles_received: 3
+  angles_scored: 3
+
+  angles:
+    - angle_id: "curiosity_driven"
+      source: "brainstormed"
+      source_detail: "Stage 3.0.5.5: Capability-based discovery"
+      frame: "Explore anything with a patient guide"
+      buyer: "Self (adult learner)"
+      problem: "Want to learn but video courses are passive and boring"
+      emotional_hook: "Curiosity, discovery, growth"
+      scores:
+        pain_intensity: 6.5
+        evidence_density: 8.0
+        differentiation: 7.0
+        emotional_resonance: 7.5
+        composite: 7.2
+      p2_evidence:
+        keywords: ["learn new skill", "self-paced learning"]
+        reddit_threads: ["r/learnprogramming", "r/selfimprovement"]
+        competitor_gaps: ["No interactive tutor with persistence"]
+      designation: "PRIMARY"
+
+    - angle_id: "career_advancer"
+      source: "brainstormed"
+      source_detail: "Multi-LLM research: professionals upskilling"
+      frame: "Master skills that get you promoted"
+      buyer: "Self (professional)"
+      problem: "Need new skills for career but courses don't stick"
+      emotional_hook: "Ambition, career growth, competence"
+      scores:
+        pain_intensity: 7.0
+        evidence_density: 7.5
+        differentiation: 6.5
+        emotional_resonance: 7.0
+        composite: 7.0
+      p2_evidence:
+        keywords: ["upskilling", "career development"]
+        reddit_threads: ["career advancement discussions"]
+        competitor_gaps: ["Coursera/Udemy are passive"]
+      designation: "SECONDARY"
+
+  primary_angle:
+    angle_id: "curiosity_driven"
+    composite_score: 7.2
+    rationale: "Broader appeal, stronger differentiation from video courses"
+
+  secondary_angle:
+    angle_id: "career_advancer"
+    composite_score: 7.0
+    abbreviated_check:
+      fatal_flaw_scan: "PASS"
+      messaging_coherence: "low_risk"
+      ab_validity: "PASS_OUTREACH"
+    verdict: "OUTREACH_VARIANT"
+
+  outreach_recommendation:
+    create_variants: true
+    primary_profile: "curiosity_driven"
+    secondary_profile: "career_advancer"
+    outreach_difference: "Curiosity: exploration and discovery. Career: skills and advancement."
+
+problem:
+  statement: |
+    Adults want to learn new skills but video courses are passive and boring.
+    Knowledge doesn't stick because there's no interaction, no verification, no personalization.
+
+  four_u_scores:
+    unworkable:
+      score: 6
+      evidence: "Completion rates for online courses are notoriously low (3-10%)"
+    unavoidable:
+      score: 7
+      evidence: "Skills gaps and curiosity are persistent human needs"
+    urgent:
+      score: 6
+      evidence: "Self-paced, no external deadline; but career pressure creates urgency"
+    underserved:
+      score: 8
+      evidence: "Interactive AI tutoring for adults is new category"
+    composite: 6.8
+
+  hair_on_fire:
+    classification: "annoying"
+    key_evidence: "Not crisis-level, but persistent frustration with passive learning"
+
+customer:
+  beachhead_segment: "Self-directed adult learners in US/EU"
+  economic_buyer: "Self"
+  current_spend: "$20-50/month on Coursera, Udemy, Skillshare"
+
+  beachhead_validation:
+    budget_exists: true
+    accessible_buyer: true
+    compelling_reason: true
+    whole_product_feasible: true
+    no_entrenched_competitor: true
+
+  persona:
+    name: "Alex (The Curious Explorer)"
+    role: "Professional / Lifelong learner"
+    company_size: "N/A - Individual"
+    industry: "Any"
+    goals:
+      - "Learn new topics for curiosity or career"
+      - "Actually retain knowledge (not just watch videos)"
+      - "Flexible learning on own schedule"
+    frustrations:
+      - "Video courses are boring and passive"
+      - "Knowledge doesn't stick"
+      - "Start courses but never finish"
+      - "No one to ask questions to"
+    where_they_gather:
+      - "r/learnprogramming"
+      - "r/selfimprovement"
+      - "r/getdisciplined"
+      - "Hacker News"
+      - "LinkedIn Learning communities"
+
+  acquisition_channels:
+    primary:
+      channel: "Reddit (r/learnprogramming, r/selfimprovement)"
+      channel_type: "community"
+      estimated_cac: "€20-30"
+      cac_rationale: "Organic community posts + value content"
+      why_primary: "High concentration of target audience"
+      ltv_cac_ratio: "10:1"
+    secondary:
+      channel: "Content marketing (SEO)"
+      channel_type: "organic"
+      estimated_cac: "€15-25"
+      cac_rationale: "Long-term content investment"
+      why_secondary: "Scales well, builds authority"
+    tertiary:
+      channel: "YouTube (educational content)"
+      channel_type: "organic"
+      estimated_cac: "€25-40"
+      notes: "Demonstrate learning methodology"
+    channel_validation:
+      competitors_using: ["Coursera uses paid search", "Brilliant uses YouTube"]
+      evidence_of_demand: "$450B+ adult learning market"
+      test_approach: "Start with Reddit, measure engagement"
+
+strategy:
+  type: "gap_wedge"
+
+  red_ocean:
+    top_competitors:
+      - "Coursera (passive video)"
+      - "Udemy (pre-recorded)"
+      - "Skillshare (creative focus)"
+    wedge: "Interactive AI tutor with memory vs passive video consumption"
+    switching_trigger: "Frustration with video courses that don't help retention"
+
+bet_ability:
+  moat_type: "switching_costs"
+  moat_strength: 7
+  moat_rationale: "Learning Book creates personalized knowledge graph - high switching cost"
+
+  retention_pattern: "data_lock_in"
+  retention_evidence: "Curriculum and progress tied to account"
+
+  ten_x_multiple: 6
+  ten_x_dimension: "Retention - interactive learning beats passive video"
+
+  boring_advantage: false
+  boring_rationale: "Education is competitive space"
+
+  expansion_path: "Individual -> Teams -> Enterprise training"
+  expansion_ltv_multiplier: 2.0
+
+  sustainability:
+    classification: "durable"
+    time_horizon: "years"
+    accumulation: "data"
+    wrapper_risk:
+      is_wrapper: false
+      core_value_source: "domain_expertise"
+      llm_dependency: "medium"
+      commoditization_threat: "Coursera/Udemy add AI tutors"
+      weekend_replicable: false
+    sustainability_rationale: |
+      Memory and curriculum structure create differentiation from generic LLM.
+      Data accumulates making product better over time.
+
+  composite_score: 7.0
+  diamond_flag: false
+  prioritization_tier: 2
+
+value_proposition:
+  user_story: "As a curious adult, I want a patient tutor who remembers my journey, so I actually retain what I learn."
+  positioning_statement: "Mentomate is the AI tutor that grows with you - interactive, personalized, persistent."
+  working_name: "Mentomate"
+  tagline: "A teacher who grows with you"
+
+  name_options:
+    primary:
+      name: "Mentomate"
+      domain_available: true
+      domain_checked: "mentomate.com"
+      domain_alternatives: ["mentomate.io"]
+      trademark_clear: true
+      rationale: "Mentor + mate - conveys guidance and companionship"
+    alternatives:
+      - name: "LearnPath"
+        domain_available: false
+        domain_checked: "learnpath.com"
+        positioning_fit: "strong"
+        notes: "Emphasizes structured learning journey"
+    naming_style: "compound"
+
+  scope:
+    scoped_mvp:
+      description: "AI tutor with memory for adult learners"
+      geography: "US and EU"
+      integrations: []
+      customer_segment: "Self-directed adult learners"
+      feature_set:
+        - "Personalized curriculum generation"
+        - "Memory/Learning Book"
+        - "Socratic tutoring"
+        - "Progress tracking"
+      build_estimate: "6-8 weeks"
+      in:
+        - "Core tutoring chat"
+        - "Learning Book"
+        - "Curriculum generation"
+        - "Any-subject support"
+      out:
+        - "Code execution"
+        - "Team features"
+        - "Enterprise features"
+
+    full_vision:
+      description: "Universal AI tutor for all learning needs"
+      geography: "Global"
+      integrations: ["Learning platforms"]
+      customer_segment: "All learners"
+      feature_set: ["Full platform"]
+      build_estimate: "12-18 months"
+
+    reduction_rationale: "Focus on core tutoring experience first"
+    expansion_path: "Individual -> Small teams -> Enterprise"
+
+positioning_canvas:
+  category:
+    claimed: "AI-Powered Personal Tutoring"
+    alternatives_considered: ["Online Learning", "EdTech", "Coaching"]
+    why_this_category: "Differentiates from passive video courses"
+    category_maturity: "emerging"
+
+  target:
+    primary_audience: "Self-directed adult learners in US/EU"
+    secondary_audience: "Professionals seeking to upskill"
+    anti_audience: "People who prefer video courses"
+    derived_from: "Stage 3.0.5.5 segment discovery"
+
+  frame_of_reference:
+    direct_competitors: ["Coursera", "Udemy", "Skillshare"]
+    indirect_competitors: ["YouTube tutorials", "ChatGPT"]
+    positioned_against: "Passive video courses"
+    why_this_frame: "Interactive vs passive is clear differentiation"
+
+  differentiator:
+    primary: "Interactive AI tutor with persistent memory"
+    supporting:
+      - "Learns how YOU learn best"
+      - "Personalized curriculum"
+      - "Verification of understanding"
+    proof_points:
+      - "Learning Book tracks your journey"
+      - "AI adapts to your pace"
+    derived_from: "Brief Four Pillars"
+
+  reason_to_believe:
+    primary: "Memory creates personalized experience impossible with video"
+    evidence_type: "demo"
+    specific_proof: "Learning Book shows accumulated knowledge"
+    source: "Product design"
+
+  positioning_statement: |
+    For self-directed adult learners who are frustrated with passive video courses,
+    Mentomate is an AI tutor
+    that remembers your learning journey and adapts to how you learn.
+    Unlike Coursera and Udemy,
+    we provide interactive tutoring that actually helps you retain knowledge.
+
+  positioning_map:
+    axis_x:
+      dimension: "Interactivity"
+      our_position: "high"
+    axis_y:
+      dimension: "Personalization"
+      our_position: "high"
+    strategic_quadrant: "Interactive-Personalized"
+    competitors_in_quadrant: []
+
+  derived_from:
+    - field: "competitor_weaknesses"
+      influence: "Video courses are passive"
+
+technical:
+  architecture_sketch: |
+    User -> Next.js Frontend -> API Gateway
+    -> LLM Service with curriculum prompting
+    -> Learning Book (PostgreSQL)
+    -> Subject knowledge base
+
+  stack:
+    frontend: "Next.js PWA"
+    backend: "Node.js + Express"
+    database: "PostgreSQL (Supabase)"
+    ai_models: ["GPT-4 for tutoring", "Embeddings for curriculum"]
+    third_party: ["Stripe", "Auth0"]
+    hosting: "Vercel + Supabase"
+
+  complexity:
+    level: "medium"
+    rationale: "Curriculum generation and memory require careful engineering"
+    hardest_part: "Dynamic curriculum generation for any subject"
+    unknowns:
+      - "Subject coverage quality across all topics"
+
+  dependencies:
+    - "OpenAI API"
+
+  risks:
+    - "Quality varies by subject"
+    - "Memory retrieval latency"
+
+  build_estimate:
+    mvp_weeks: 8
+    mvp_scope: "Core tutoring + memory + curriculum"
+    post_mvp_roadmap:
+      - "Code execution - v1.5"
+      - "Team features - v2.0"
+    team_required: "1 full-stack dev, 1 LLM engineer"
+
+  data:
+    user_data_collected: ["Learning history", "Curriculum progress", "Chat logs"]
+    data_moat_potential: "High - personalized learning data"
+    privacy_considerations: "Standard privacy, no special compliance needed for adults"
+
+monetisation:
+  model: "subscription"
+
+  pricing:
+    starter:
+      price: "€0/month"
+      includes: ["50 questions/month"]
+      target: "Trialers"
+    pro:
+      price: "€18.99/month"
+      includes: ["500 questions/month"]
+      target: "Individual learners"
+    enterprise:
+      price: "€48.99/month"
+      includes: ["3000 questions/month", "Priority support"]
+      target: "Power learners"
+
+  pricing_validation:
+    method: "competitor_benchmark"
+    evidence:
+      - "Coursera Plus: $59/month"
+      - "Skillshare: $14/month"
+      - "Brilliant: $25/month"
+    confidence: "high"
+    confidence_rationale: "Adult learners proven to pay for learning tools"
+    anchor_high: "Coursera Plus at $59/month"
+    anchor_low: "Free YouTube tutorials"
+    our_position: "Mid-range with more interactivity"
+    price_sensitivity:
+      segments_tested: ["Adult learners"]
+      elasticity: "medium"
+
+  competitor_benchmarks:
+    - competitor: "Coursera Plus"
+      price: "$59/month"
+    - competitor: "Brilliant"
+      price: "$25/month"
+
+  unit_economics:
+    estimated_cac: "€30"
+    estimated_ltv: "€240"
+    ltv_cac_ratio: "8:1"
+    payback_months: "3"
+    gross_margin: "70%"
+    ltv_rationale: "10-month average retention"
+    cac_rationale: "Content marketing + community"
+
+market:
+  tam: "$450B+ Online Adult Education"
+  sam: "$50B (US + EU self-directed learners)"
+  som: "$5M (0.01% capture)"
+  growth_rate: "10-15% CAGR"
+  timing_catalyst: "AI tutoring becoming mainstream, video course fatigue"
+
+validation:
+  adversarial_attacks_survived: 6
+  fatal_flaws: []
+  unresolved_risks:
+    - "Coursera/Udemy may add AI tutoring"
+    - "Quality varies by subject"
+  confidence: "medium-high"
+
+  reality_check:
+    geographic_reach:
+      score: 9
+      rationale: "Learning is universal, no geographic restrictions"
+      region_locks: []
+      international_path: "Global from day one"
+    mechanism_reliability:
+      score: 7
+      rationale: "Curriculum generation quality varies by subject"
+      dependencies: ["OpenAI API", "Subject knowledge base"]
+      mitigation: "Focus on popular subjects first"
+    flags: []
+
+magnitude:
+  scale_potential:
+    ceiling: "High - massive adult learning market"
+    bottleneck: "Quality assurance across subjects"
+  leverage:
+    type: "Software"
+    multiplier: "High"
+  structure:
+    recurring: true
+    expansion: "More subjects, team features"
+  topology:
+    network_effects: "Low"
+    data_effects: "Medium"
+  capture:
+    switching_costs: "High"
+    lock_in: "Medium"
+
+  magnitude_composite:
+    overall_rating: "B+"
+    scores:
+      scale: 9
+      leverage: 9
+      structure: 7
+      topology: 5
+      capture: 7
+    investor_fit:
+      bootstrappable: true
+      vc_scale: true
+      rationale: "Large market, software economics"
+    magnitude_risks:
+      - "Competitive from video platforms adding AI"
+    diamond_signals:
+      present: false
+      reason: "Solid execution play"
+
+factory_notes:
+  visual_recommendations:
+    style: "Modern, clean, intellectual"
+    colors: "Blues and purples - knowledge and creativity"
+    imagery: "Person learning, lightbulb moments"
+  pricing_recommendations:
+    display: "Compare to Coursera Plus ($59/mo)"
+  differentiation_opportunities:
+    - "Emphasize 'remembers you' vs starting fresh"
+    - "Show Learning Book as unique feature"
+  landing_page_focus: "Learning that actually sticks"
+
+site_components:
+  target_markets: ["US", "EU", "Global"]
+  primary_language: "English"
+  legal_entity:
+    company_name: "{{PENDING}}"
+    contact_email: "{{PENDING}}"
+
+landing_page_inputs:
+  messaging_hierarchy:
+    l1_category: "AI Personal Tutoring"
+    l2_value_proposition: "A teacher who grows with you"
+    l3_benefits:
+      - "Actually retain what you learn"
+      - "Personalized to how you learn"
+      - "Available 24/7"
+    pain_claim_gain:
+      pain: "Video courses don't help you retain knowledge"
+      claim: "Mentomate remembers your journey and adapts"
+      gain: "Learning that actually sticks"
+
+  pain_points_ranked:
+    - "Knowledge doesn't stick from video courses"
+    - "No one to ask questions to"
+    - "Start courses but never finish"
+    - "Learning feels lonely and boring"
+
+  key_messages:
+    headline: "Learning That Actually Sticks"
+    subheadline: "An AI tutor who remembers your journey"
+    cta: "Start Learning Free"
+
+  competitor_weaknesses:
+    - competitor: "Coursera"
+      weakness: "Passive video consumption"
+      our_counter: "Interactive tutoring"
+    - competitor: "YouTube"
+      weakness: "No structure or verification"
+      our_counter: "Personalized curriculum"
+
+  differentiation_for_copy:
+    primary: "AI tutor with persistent memory"
+    supporting:
+      - "Personalized curriculum for any subject"
+      - "Verification of understanding"
+
+  social_proof_strategy:
+    recommended_types:
+      - "skill_gained"
+      - "testimonial"
+    specific_proof_points:
+      - "Topics mastered"
+      - "Retention improvement"
+    source: "P3 analysis"
+
+  objections_to_address:
+    - objection: "Why not just use ChatGPT?"
+      response: "ChatGPT doesn't remember you or build curricula"
+    - objection: "How is this different from Coursera?"
+      response: "We're interactive, not passive video"
+
+  competitor_references:
+    steal_this:
+      - pattern: "Progress visualization"
+        from: "Duolingo"
+    avoid_this:
+      - pattern: "Long video lectures"
+        from: "Coursera"
+
+  tone_of_voice:
+    attributes:
+      - "Encouraging"
+      - "Intellectual"
+      - "Patient"
+      - "Curious"
+    examples:
+      do: ["'Explore anything you're curious about'", "'Your learning journey, remembered'"]
+      dont: ["'Revolutionary AI'", "'Disruptive platform'"]
+    guidelines:
+      sentence_length: "Medium, conversational"
+      technical_jargon: "Minimal"
+    audience_adjustments:
+      curious: "Emphasize exploration"
+      career: "Emphasize skills and growth"
+
+marketing_intelligence:
+  keywords:
+    primary: ["learn new skill", "AI tutor", "self-paced learning"]
+    secondary: ["online learning", "personal tutor"]
+    search_volume_total: 5000
+  voice_of_customer:
+    pain_quotes:
+      - "'I start courses but never finish'"
+      - "'Video courses are boring'"
+    desire_quotes:
+      - "'I wish I had someone to explain things to me'"
+  competitors_full:
+    analyzed: ["Coursera", "Udemy", "Brilliant", "Skillshare"]
+  adversarial_insights:
+    top_attack: "Video platforms may add AI tutoring"
+    mitigation: "Build memory moat and brand"
+  external_failures:
+    patterns: ["Low completion rates for MOOCs"]
+    learnings: ["Interactivity improves completion"]
+  content_seeds:
+    blog_topics:
+      - "Why video courses don't help you retain knowledge"
+      - "The science of active vs passive learning"
+    social_hooks:
+      - "Started 10 courses, finished 0?"
+  ad_copy_bank:
+    headlines:
+      - "Learning That Actually Sticks"
+      - "Your AI Tutor Who Remembers"
+    descriptions:
+      - "Interactive tutoring that adapts to you"
+  sources:
+    p2_research: true
+    p3_adversarial: true
+
+brand_archetype:
+  primary_archetype: "Sage"
+  archetype_rationale: |
+    Adult learners seeking knowledge align with Sage archetype - wisdom,
+    understanding, truth-seeking. Messaging should emphasize knowledge,
+    mastery, and intellectual growth.
+  selection_signals:
+    buyer_motivation: "Gain knowledge and understanding"
+    emotional_drivers: ["Curiosity", "Growth", "Mastery"]
+    competitor_positioning: "Others offer passive consumption"
+  visual_specs:
+    color_approach: "Blues and purples - knowledge and wisdom"
+    typography_guidance:
+      headings: "Clean, modern sans-serif"
+      body: "Readable, professional"
+    whitespace_density: "Medium-high - intellectual, not cluttered"
+    energy_level: "Calm, focused"
+  copy_specs:
+    tone_keywords: ["Wise", "Patient", "Encouraging", "Curious"]
+    cta_style: "Invitational"
+    pricing_display_pattern: "Value-focused"
+    reading_level: "Educated adult"
+    power_vocabulary: ["Master", "Understand", "Discover", "Grow"]
+    avoid_vocabulary: ["Revolutionary", "Disruptive", "Game-changing"]
+  trust_signal_priority:
+    - "Learning outcomes/skills gained"
+    - "User testimonials"
+    - "Subject coverage"
+  buyer_profile_key: "curious_explorer"
+
+page_structure:
+  variant_a:
+    name: "curiosity_first"
+    derived_from:
+      - field: "primary_angle"
+        value: "curiosity_driven"
+        influence: "Lead with exploration"
+    hypothesis: "Curiosity-driven messaging resonates"
+    section_order:
+      - "hero"
+      - "how_it_works"
+      - "features"
+      - "subjects"
+      - "social_proof"
+      - "pricing"
+      - "cta"
+    section_config:
+      hero:
+        headline: "Explore Anything With a Patient Guide"
+        subheadline: "An AI tutor who remembers your journey"
+    copy:
+      hero_headline: "Explore Anything With a Patient Guide"
+      problem_tone: "curious"
+    visual_style:
+      typography: "clean_modern"
+      imagery: "exploration_discovery"
+
+  variant_b:
+    name: "retention_focus"
+    derived_from:
+      - field: "pain_points_ranked[0]"
+        value: "Knowledge doesn't stick"
+        influence: "Lead with retention problem"
+    hypothesis: "Retention pain drives conversions"
+    section_order:
+      - "hero"
+      - "problem"
+      - "solution"
+      - "features"
+      - "social_proof"
+      - "pricing"
+      - "cta"
+    section_config:
+      hero:
+        headline: "Learning That Actually Sticks"
+        subheadline: "Stop forgetting what you learn"
+    copy:
+      hero_headline: "Learning That Actually Sticks"
+      problem_tone: "empathetic"
+    visual_style:
+      typography: "professional"
+      imagery: "before_after_knowledge"
+
+  deployment:
+    primary_variant: "variant_a"
+    primary_rationale: "Curiosity aligns with Sage archetype and target audience motivation"
+    site_naming:
+      primary_domain: "mentomate.com"
+      path: "/learn"
+
+  strategy_context:
+    angle_source: "Stage 3.0.6"
+    variant_rationale: "Curiosity-driven is primary angle"
+
+channel_ops:
+  subreddit_targeting:
+    primary_subreddits:
+      - "r/learnprogramming"
+      - "r/selfimprovement"
+      - "r/getdisciplined"
+    engagement_strategy: "Share learning insights, answer questions"
+
+  newsletter_discovery:
+    relevant_newsletters:
+      - "Lifelong learning newsletters"
+      - "Productivity newsletters"
+
+  influencer_discovery:
+    relevant_influencers:
+      - "Learning YouTubers"
+      - "Productivity creators"
+
+  ad_platform_sizing:
+    google:
+      keyword_volume: "5K/month"
+      estimated_cpc: "$2"
+    linkedin:
+      audience_size: "10M professionals"
+      estimated_cpm: "$30"
+
+  competitor_ad_analysis:
+    competitors_running_ads: ["Coursera", "Brilliant", "Skillshare"]
+
+  competitor_backlinks:
+    top_referrers: ["Learning blogs", "Productivity sites"]
+
+  channel_prioritization:
+    tier_1: ["Reddit organic", "Content marketing"]
+    tier_2: ["YouTube content", "LinkedIn"]
+    tier_3: ["Paid search"]
+
+outreach_assets:
+  cold_dm_templates: []
+
+  cold_email_templates: []
+
+  reddit_posts:
+    - post_id: "curiosity_post"
+      profile: "curiosity_driven"
+      subreddit: "r/learnprogramming"
+      title: "Found an AI tutor that actually remembers what I learned"
+      body: |
+        Been trying to learn Python for months. Video courses weren't working -
+        I'd watch, forget, repeat. Found this AI tutor that remembers where I left off
+        and builds a personalized curriculum. Way more interactive than videos.
+
+  linkedin_posts: []
+
+  influencer_pitches: []
+
+tracking_setup:
+  metrics:
+    primary:
+      - "Signups"
+      - "Weekly active learners"
+      - "Questions asked"
+    secondary:
+      - "Topics explored"
+      - "Retention rate"
+
+  channel_benchmarks:
+    - channel: "Reddit"
+      expected_ctr: "2%"
+      expected_conversion: "4%"
+
+  validation_benchmarks:
+    conversion_rate:
+      floor: 1
+      target: 2
+      excellent: 4
+    cac:
+      acceptable_max: 60
+      target: 30
+    signups:
+      minimum: 100
+      target: 300
+    payment_intent:
+      threshold: 15
+      signal_types: ["trial_start", "engagement"]
+    traffic:
+      minimum_visitors: 1000
+      target_visitors: 3000
+    validation_period:
+      weeks: 4
+
+  tracking_stack:
+    analytics: "Plausible"
+    attribution: "UTM"
+    funnel: "PostHog"
+
+  utm_conventions:
+    source: "reddit, google, linkedin"
+    medium: "organic, paid"
+    campaign: "learner_launch"
+
+  pre_launch_checklist:
+    - "Privacy policy"
+    - "Analytics installed"
+    - "Payment configured"
+
+outcome_tracking:
+  prediction:
+    verdict: "PASS"
+    confidence: 75
+    composite_score: 7.5
+    key_risks_identified:
+      - "Competition from video platforms"
+      - "Quality varies by subject"
+    predicted_success_factors:
+      - "Memory creates differentiation"
+      - "Large adult learning market"
+    bet_ability:
+      moat_type: "switching_costs"
+      moat_strength: 7
+      sustainability: "durable"
+    adversarial_attacks_survived:
+      - "Video platform competition"
+      - "Subject coverage"
+    predicted_at: "2026-01-17T12:00:00Z"
+
+  validation: null
+  outcome: null
+
+# ============================================
+# PHASE 4: GTM PREP (Added 2026-01-17)
+# ============================================
+
+channel_ops:
+  subreddit_targeting:
+    primary:
+      - subreddit: "r/selfimprovement"
+        subscribers: "3M+"
+        relevance: "High - skill-building discussions"
+        posting_rules: "Genuine advice, no spam"
+      - subreddit: "r/IWantToLearn"
+        subscribers: "1.5M+"
+        relevance: "Very high - learning seekers"
+        posting_rules: "Helpful content"
+      - subreddit: "r/learnprogramming"
+        subscribers: "4M+"
+        relevance: "High for tech topics"
+    secondary:
+      - "r/getdisciplined"
+      - "r/DecidingToBeBetter"
+      - "r/productivity"
+      - "r/Adulting"
+
+  newsletter_discovery:
+    primary:
+      - name: "Ness Labs"
+        audience: "Mindful productivity learners"
+        sponsorship_potential: "Yes"
+      - name: "Farnam Street (Brain Food)"
+        audience: "Mental model enthusiasts"
+        sponsorship_potential: "Selective"
+
+  channel_prioritization:
+    primary:
+      channel: "Reddit (r/selfimprovement, r/IWantToLearn)"
+      channel_type: "organic_community"
+      estimated_cac: "€20-35"
+      cac_rationale: "Learning-focused community, advice-seeking mindset"
+      why_primary: "Direct match to eager learner persona"
+      ltv_cac_ratio: "5-8x"
+    secondary:
+      channel: "Hacker News / Product Hunt"
+      channel_type: "launch_platform"
+      estimated_cac: "€15-25"
+      why_secondary: "Early adopter tech audience"
+    tertiary:
+      channel: "LinkedIn Learning communities"
+      channel_type: "professional_network"
+      estimated_cac: "€40-60"
+      why_tertiary: "Professional learners with budget"
+
+outreach_assets:
+  reddit_posts:
+    - title: "Tired of video courses where you watch but don't learn? Found an AI tutor that actually makes you do the work"
+      subreddit: "r/selfimprovement"
+      hook: "Udemy completions: 12. Skills actually learned: 2. Sound familiar?"
+      key_points:
+        - "Interactive, not passive"
+        - "Personalized curriculum"
+        - "Remembers what you've learned"
+        - "Tests understanding before moving on"
+      cta: "Happy to share what's working for me"
+      tone: "Fellow self-improver sharing discovery"
+
+  cold_dm_templates:
+    - type: "influencer_pitch"
+      target: "Productivity YouTubers/bloggers"
+      subject: "Re: Your video on learning - tool your audience might love"
+      key_angle: "Active learning with persistence - actually understand, don't just watch"
+
+tracking_setup:
+  validation_benchmarks:
+    conversion_rate:
+      floor: 0.5
+      target: 2.0
+      excellent: 3.5
+    cac:
+      acceptable_max: 60
+      target: 30
+    signups:
+      minimum: 20
+      target: 75
+    payment_intent:
+      threshold: 5
+      signal_types:
+        - "credit card entered"
+        - "pricing page visit > 30s"
+    traffic:
+      minimum_visitors: 400
+      target_visitors: 1500
+    validation_period:
+      weeks: 6
+
+  tracking_stack:
+    analytics: "Plausible (GDPR-compliant)"
+    forms: "Tally"
+    email: "ConvertKit"
+
+  utm_conventions:
+    format: "utm_source={platform}&utm_medium={type}&utm_campaign=learner&utm_content={variant}"
+    examples:
+      - "utm_source=reddit&utm_medium=organic&utm_campaign=learner&utm_content=video_courses"
+
+  pre_launch_checklist:
+    - "Landing page live at mentomate.com/learn"
+    - "Email capture functional"
+    - "UTM links created"
+    - "Reddit accounts aged (>30 days)"
+    - "First post drafted and reviewed"

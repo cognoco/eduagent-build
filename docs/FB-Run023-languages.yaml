@@ -1,0 +1,1042 @@
+# Factory Brief - Run023 Language Learner Segment (Mentomate)
+# Schema Version: 2.22
+# Generated: 2026-01-17
+# Segment: Language Learner (SUB_SEGMENT)
+
+metadata:
+  run_id: "Run023"
+  run_date: "2026-01-17"
+  work_order_id: "WO-Run023"
+  phase: "factory_handoff"
+  briefs_generated: 3
+  generated_at: "2026-01-17T12:00:00Z"
+  segment_id: "SEG-003-language-learner"
+  segment_name: "Language Learner"
+
+scout_reference:
+  run_id: "Run023"
+  run_folder: "docs/Run023_2026-01-17/"
+  phase_files:
+    - "phase-2-research.yaml"
+    - "phase-3-validation.yaml"
+
+source_brief:
+  type: "product_brief"
+  brief_path: "inline_product_brief"
+  ingestion_date: "2026-01-17T00:00:00Z"
+  ingestion_version: "1.0"
+
+  preserved_elements:
+    killer_features:
+      - feature_name: "Four Strands Methodology"
+        description: "Research-backed language learning approach"
+        how_it_works: |
+          - Explicit instruction (grammar rules, vocabulary)
+          - Input (comprehensible input, reading/listening)
+          - Output (production, speaking/writing)
+          - Fluency (speed and automaticity)
+        why_it_matters: "Balanced approach vs gamified drills"
+        competitor_gap: "Duolingo focuses on gamification, not pedagogy"
+        source_section: "Methodology Details"
+        source_quote: "Language subjects: Four Strands methodology"
+
+      - feature_name: "Memory (Persistent Learning)"
+        description: "Remembers your language journey across sessions"
+        how_it_works: "Learning Book tracks vocabulary, grammar mastery, conversation skills"
+        why_it_matters: "Builds on prior knowledge, no starting over"
+        competitor_gap: "Duolingo resets; no personalized conversation history"
+        source_section: "Four Pillars"
+        source_quote: "Remembers what you learned"
+
+      - feature_name: "Conversation Practice"
+        description: "AI conversation partner for real practice"
+        how_it_works: "Socratic dialogue in target language with correction and guidance"
+        why_it_matters: "Speaking practice is what learners lack most"
+        competitor_gap: "Duolingo has limited speaking; no real conversation"
+        source_section: "User Journey"
+        source_quote: "Conversational teaching"
+
+    methodology_details:
+      - approach_name: "Four Strands"
+        default_behavior: "Balance all four strands across sessions"
+        fallback_behavior: "Adjust based on learner weakness"
+        switching_conditions: "Learner struggling in one strand"
+        domain_variants:
+          - "Explicit instruction"
+          - "Input (comprehensible)"
+          - "Output (production)"
+          - "Fluency (speed/automaticity)"
+        architecture_notes: "Domain-specific variant within pluggable teaching system"
+        source_quote: "Language subjects: Four Strands methodology"
+
+    user_journey_specifics:
+      - stage_name: "Language Learning Path"
+        duration: "Daily 10-30 min sessions"
+        key_actions:
+          - "Vocabulary introduction"
+          - "Grammar explanation"
+          - "Reading/listening comprehension"
+          - "Conversation practice"
+          - "Review and retention"
+        decision_points: ["Which language?", "What's your goal?"]
+        ux_specifics: ["Daily practice reminders", "Progress visualization"]
+        source_quote: "Four Strands methodology"
+
+    pricing_rationale:
+      - aspect: "Competitive with Duolingo Max"
+        detail: "€18.99-28.99/month vs Duolingo Max $30/month"
+        rationale: "Price validated by Duolingo; we offer better pedagogy"
+        source_quote: "Duolingo Max: $30/month, 545K users"
+
+    compliance_requirements: []
+
+    mvp_scope_decisions:
+      - feature: "Four Strands for Languages"
+        in_mvp: false
+        target_version: "v1.5"
+        rationale: "Domain-specific variant - add after core is stable"
+
+  unmapped_elements: []
+  extraction_stats:
+    total_elements_extracted: 15
+    elements_by_category:
+      killer_features: 3
+      methodology_details: 1
+      user_journey_specifics: 1
+      pricing_rationale: 1
+      compliance_requirements: 0
+      mvp_scope_decisions: 1
+    unmapped_count: 0
+    confidence_distribution:
+      high: 12
+      medium: 3
+      low: 0
+
+briefs:
+  - id: "BRIEF-Run023-001-languages"
+    working_name: "Mentomate Languages"
+    tagline: "Real language learning, not gamified streaks"
+    final_score: 7.0
+    technique: "product_brief"
+    verdict: "PASS"
+    conditional_pass: null
+
+angles_evaluated:
+  discovery_source: "Stage 3.0.5.5"
+  angles_received: 3
+  angles_scored: 1
+
+  angles:
+    - angle_id: "serious_learner"
+      source: "brainstormed"
+      source_detail: "Stage 3.0.5.5: Capability-based discovery + Market size override"
+      frame: "Real language learning, not gamified streaks"
+      buyer: "Self (language learner)"
+      problem: "Duolingo is gamified but doesn't help you speak"
+      emotional_hook: "Frustration with apps that don't work, desire for real fluency"
+      scores:
+        pain_intensity: 7.0
+        evidence_density: 9.0
+        differentiation: 6.0
+        emotional_resonance: 7.5
+        composite: 7.3
+      p2_evidence:
+        keywords: ["language learning app (14,800 vol)"]
+        reddit_threads: ["r/languagelearning complaints about Duolingo"]
+        competitor_gaps: ["Four Strands methodology unique", "Real conversation practice"]
+      designation: "PRIMARY"
+
+  primary_angle:
+    angle_id: "serious_learner"
+    composite_score: 7.3
+    rationale: "Only angle for this segment; differentiates from gamified apps"
+
+  secondary_angle: null
+
+  outreach_recommendation:
+    create_variants: true
+    primary_profile: "travel_prepper"
+    secondary_profile: "heritage_learner"
+    outreach_difference: "Travel: urgency and practical phrases. Heritage: emotional connection and family."
+
+problem:
+  statement: |
+    People use language apps but can't actually speak the language.
+    Gamified drills don't teach real conversation skills or proper pedagogy.
+
+  four_u_scores:
+    unworkable:
+      score: 7
+      evidence: "Reddit complaints: 'I can do the app but can't use the language'"
+    unavoidable:
+      score: 7
+      evidence: "Language learning is persistent need (travel, heritage, career)"
+    urgent:
+      score: 6
+      evidence: "Varies - trip deadlines create urgency, casual learning less urgent"
+    underserved:
+      score: 7
+      evidence: "No app uses Four Strands; Duolingo dominates with gamification"
+    composite: 6.8
+
+  hair_on_fire:
+    classification: "annoying"
+    key_evidence: "Persistent frustration but not crisis-level"
+
+customer:
+  beachhead_segment: "Serious language learners in US/EU"
+  economic_buyer: "Self"
+  current_spend: "$30/month for Duolingo Max, $15-80/hour for tutors"
+
+  beachhead_validation:
+    budget_exists: true
+    accessible_buyer: true
+    compelling_reason: true
+    whole_product_feasible: true
+    no_entrenched_competitor: false  # Duolingo is dominant
+
+  persona:
+    name: "Maria (The Frustrated Learner)"
+    role: "Professional / Traveler / Heritage seeker"
+    company_size: "N/A - Individual"
+    industry: "Any"
+    goals:
+      - "Actually speak the language"
+      - "Have real conversations"
+      - "Understand grammar properly"
+    frustrations:
+      - "Duolingo feels like a game, not learning"
+      - "Can complete lessons but can't speak"
+      - "No one to practice conversation with"
+      - "Apps focus on streaks, not fluency"
+    where_they_gather:
+      - "r/languagelearning"
+      - "r/LearnSpanish, r/LearnJapanese, etc."
+      - "Polyglot YouTube"
+      - "iTalki forums"
+      - "Discord language servers"
+
+  acquisition_channels:
+    primary:
+      channel: "Reddit (r/languagelearning, specific language subs)"
+      channel_type: "community"
+      estimated_cac: "€20-30"
+      cac_rationale: "Active community frustrated with Duolingo"
+      why_primary: "High concentration of target audience expressing pain"
+      ltv_cac_ratio: "8:1"
+    secondary:
+      channel: "YouTube (language learning content)"
+      channel_type: "organic"
+      estimated_cac: "€30-50"
+      cac_rationale: "Demonstrate Four Strands methodology"
+      why_secondary: "Language learners research heavily on YouTube"
+    tertiary:
+      channel: "Google Ads (language learning terms)"
+      channel_type: "paid"
+      estimated_cac: "€40-60"
+      notes: "Expensive but scalable; 'language learning app' has 14,800 vol"
+    channel_validation:
+      competitors_using: ["Duolingo uses paid social", "Babbel uses TV ads"]
+      evidence_of_demand: "14,800 monthly searches for 'language learning app'"
+      test_approach: "Start with Reddit, validate before paid"
+
+strategy:
+  type: "gap_wedge"
+
+  red_ocean:
+    top_competitors:
+      - "Duolingo Max ($30/mo, 545K users)"
+      - "Babbel"
+      - "Rosetta Stone"
+    wedge: "Four Strands methodology + real conversation practice vs gamified drills"
+    switching_trigger: "Frustration with completing app but can't speak"
+
+bet_ability:
+  moat_type: "switching_costs"
+  moat_strength: 6
+  moat_rationale: "Learning history and vocabulary mastery create switching costs, but language learning is competitive"
+
+  retention_pattern: "habit_formation"
+  retention_evidence: "Daily practice habit; streak mechanics can help retention"
+
+  ten_x_multiple: 5
+  ten_x_dimension: "Speaking ability - actually help you converse vs gamified drills"
+
+  boring_advantage: false
+  boring_rationale: "Language learning is crowded; Duolingo is dominant"
+
+  expansion_path: "Consumer -> B2B language training"
+  expansion_ltv_multiplier: 1.5
+
+  sustainability:
+    classification: "window"
+    time_horizon: "months"
+    accumulation: "data"
+    wrapper_risk:
+      is_wrapper: false
+      core_value_source: "domain_expertise"
+      llm_dependency: "high"
+      commoditization_threat: "Duolingo adds AI conversation; LLMs improve at languages"
+      weekend_replicable: false
+    sustainability_rationale: |
+      Four Strands methodology provides differentiation, but Duolingo could add
+      similar features. Window opportunity while AI language tutoring is new.
+      Build fast and establish brand before incumbents catch up.
+
+  composite_score: 6.5
+  diamond_flag: false
+  prioritization_tier: 3
+
+value_proposition:
+  user_story: "As a language learner, I want an AI tutor that teaches real conversation skills, so I can actually speak the language."
+  positioning_statement: "Mentomate Languages uses the Four Strands methodology for real language learning, not gamified streaks."
+  working_name: "Mentomate Languages"
+  tagline: "Real language learning, not gamified streaks"
+
+  name_options:
+    primary:
+      name: "Mentomate Languages"
+      domain_available: true
+      domain_checked: "mentomate.com/languages"
+      domain_alternatives: ["mentomatelanguages.com"]
+      trademark_clear: true
+      rationale: "Clear sub-brand under Mentomate umbrella"
+    alternatives:
+      - name: "SpeakReal"
+        domain_available: true
+        domain_checked: "speakreal.io"
+        positioning_fit: "strong"
+        notes: "Emphasizes speaking ability"
+      - name: "FourStrands"
+        domain_available: true
+        domain_checked: "fourstrands.app"
+        positioning_fit: "moderate"
+        notes: "Named after methodology"
+    naming_style: "descriptive"
+
+  scope:
+    scoped_mvp:
+      description: "AI language tutor with Four Strands methodology"
+      geography: "US and EU"
+      integrations: []
+      customer_segment: "Serious language learners"
+      feature_set:
+        - "Four Strands methodology"
+        - "AI conversation practice"
+        - "Vocabulary tracking"
+        - "Grammar instruction"
+      build_estimate: "8-10 weeks (after core platform)"
+      in:
+        - "Four Strands teaching"
+        - "Conversation practice"
+        - "Vocabulary/grammar tracking"
+        - "Progress visualization"
+      out:
+        - "Speech recognition"
+        - "Native speaker matching"
+        - "Certification prep"
+
+    full_vision:
+      description: "Complete language learning platform"
+      geography: "Global"
+      integrations: ["Human tutor marketplace"]
+      customer_segment: "All language learners"
+      feature_set: ["Full platform with all languages"]
+      build_estimate: "12-18 months"
+
+    reduction_rationale: "Focus on AI tutoring; speech recognition is hard"
+    expansion_path: "AI only -> AI + human tutors"
+
+positioning_canvas:
+  category:
+    claimed: "AI Language Tutoring"
+    alternatives_considered: ["Language Learning App", "Language Education"]
+    why_this_category: "Positions against gamified apps"
+    category_maturity: "mature"
+
+  target:
+    primary_audience: "Serious language learners in US/EU"
+    secondary_audience: "Heritage language learners"
+    anti_audience: "Casual learners who just want streaks"
+    derived_from: "Stage 3.0.5.5 segment discovery"
+
+  frame_of_reference:
+    direct_competitors: ["Duolingo Max", "Babbel", "Rosetta Stone"]
+    indirect_competitors: ["Human tutors (iTalki)", "YouTube"]
+    positioned_against: "Gamified language apps (Duolingo)"
+    why_this_frame: "Gamification vs real learning is clear differentiation"
+
+  differentiator:
+    primary: "Four Strands methodology with AI conversation practice"
+    supporting:
+      - "Real conversation, not just drills"
+      - "Remembers your learning journey"
+      - "Balanced pedagogy"
+    proof_points:
+      - "Four Strands is research-backed methodology"
+      - "AI adapts to your level in real-time"
+    derived_from: "Brief methodology details"
+
+  reason_to_believe:
+    primary: "Four Strands is established language learning research"
+    evidence_type: "data"
+    specific_proof: "Four Strands methodology from language acquisition research"
+    source: "Paul Nation research"
+
+  positioning_statement: |
+    For serious language learners who are frustrated with gamified apps,
+    Mentomate Languages is an AI tutor
+    that uses the Four Strands methodology for real conversation skills.
+    Unlike Duolingo which focuses on streaks and games,
+    we help you actually speak the language.
+
+  positioning_map:
+    axis_x:
+      dimension: "Pedagogy depth"
+      our_position: "high"
+    axis_y:
+      dimension: "Conversation practice"
+      our_position: "high"
+    strategic_quadrant: "Deep-Conversational"
+    competitors_in_quadrant: ["iTalki (human tutors only)"]
+
+  derived_from:
+    - field: "brief.methodology_details"
+      influence: "Four Strands is key differentiator"
+
+technical:
+  architecture_sketch: |
+    User -> Next.js Frontend -> API Gateway
+    -> LLM Service with Four Strands prompting
+    -> Language-specific knowledge base
+    -> Learning Book (PostgreSQL)
+
+  stack:
+    frontend: "Next.js PWA"
+    backend: "Node.js + Express"
+    database: "PostgreSQL (Supabase)"
+    ai_models: ["GPT-4 for conversation", "Embeddings for vocabulary"]
+    third_party: ["Stripe", "Auth0"]
+    hosting: "Vercel + Supabase"
+
+  complexity:
+    level: "medium-high"
+    rationale: "Four Strands requires careful prompt engineering; conversation quality is critical"
+    hardest_part: "Natural conversation that teaches without being pedantic"
+    unknowns:
+      - "Speech recognition integration"
+      - "Accent handling"
+
+  dependencies:
+    - "OpenAI API (GPT-4 for conversation)"
+
+  risks:
+    - "Conversation quality varies"
+    - "Limited languages at launch"
+    - "Speech recognition not in MVP"
+
+  build_estimate:
+    mvp_weeks: 10
+    mvp_scope: "Four Strands + conversation for 3-5 languages"
+    post_mvp_roadmap:
+      - "Speech recognition - v1.5"
+      - "More languages - v1.5"
+      - "Human tutor integration - v2.0"
+    team_required: "1 full-stack dev, 1 LLM engineer, 1 language learning expert"
+
+  data:
+    user_data_collected: ["Vocabulary mastery", "Grammar progress", "Conversation history"]
+    data_moat_potential: "Medium - personalized but language learning is competitive"
+    privacy_considerations: "Standard privacy"
+
+monetisation:
+  model: "subscription"
+
+  pricing:
+    starter:
+      price: "€0/month"
+      includes: ["50 questions/month"]
+      target: "Trialers"
+    pro:
+      price: "€18.99/month"
+      includes: ["500 questions/month"]
+      target: "Individual learners"
+    enterprise:
+      price: "€28.99/month"
+      includes: ["1500 questions/month", "Multiple languages"]
+      target: "Polyglots"
+
+  pricing_validation:
+    method: "competitor_benchmark"
+    evidence:
+      - "Duolingo Max: $30/month with 545K users"
+      - "Babbel: $15/month"
+      - "iTalki tutors: $15-80/hour"
+    confidence: "high"
+    confidence_rationale: "Duolingo Max at $30/month validates willingness to pay"
+    anchor_high: "Human tutors at €40+/hour"
+    anchor_low: "Free Duolingo"
+    our_position: "Premium AI between free and human"
+    price_sensitivity:
+      segments_tested: ["Language learners"]
+      elasticity: "medium"
+
+  competitor_benchmarks:
+    - competitor: "Duolingo Max"
+      price: "$30/month"
+      users: "545K"
+    - competitor: "Babbel"
+      price: "$15/month"
+    - competitor: "iTalki"
+      price: "$15-80/hour"
+
+  unit_economics:
+    estimated_cac: "€35"
+    estimated_ltv: "€180"
+    ltv_cac_ratio: "5:1"
+    payback_months: "4"
+    gross_margin: "65%"
+    ltv_rationale: "8-month average retention; language learning is habitual"
+    cac_rationale: "Higher CAC due to competition"
+
+market:
+  tam: "$60.63B Language Learning (2024)"
+  sam: "$12B (US + EU serious learners)"
+  som: "$600K (0.005% capture)"
+  growth_rate: "9.4% CAGR"
+  timing_catalyst: "AI conversation practice becoming viable"
+
+validation:
+  adversarial_attacks_survived: 5
+  fatal_flaws: []
+  unresolved_risks:
+    - "Duolingo may add AI conversation"
+    - "Market is competitive"
+    - "Speech recognition not in MVP"
+  confidence: "medium"
+
+  reality_check:
+    geographic_reach:
+      score: 9
+      rationale: "Language learning is global need"
+      region_locks: []
+      international_path: "Global from start"
+    mechanism_reliability:
+      score: 7
+      rationale: "AI conversation quality is good but not perfect"
+      dependencies: ["OpenAI API quality for languages"]
+      mitigation: "Focus on popular languages first"
+    flags:
+      - "Window opportunity - move fast"
+
+magnitude:
+  scale_potential:
+    ceiling: "High - massive market"
+    bottleneck: "Competing with Duolingo"
+  leverage:
+    type: "Software"
+    multiplier: "High"
+  structure:
+    recurring: true
+    expansion: "More languages, B2B"
+  topology:
+    network_effects: "Low"
+    data_effects: "Medium"
+  capture:
+    switching_costs: "Medium"
+    lock_in: "Medium"
+
+  magnitude_composite:
+    overall_rating: "B"
+    scores:
+      scale: 9
+      leverage: 8
+      structure: 7
+      topology: 5
+      capture: 6
+    investor_fit:
+      bootstrappable: true
+      vc_scale: false
+      rationale: "Competitive market; bootstrap and find niche"
+    magnitude_risks:
+      - "Duolingo dominance"
+      - "LLM improvements commoditize"
+    diamond_signals:
+      present: false
+      reason: "Competitive market, window opportunity"
+
+factory_notes:
+  visual_recommendations:
+    style: "Global, cultural, sophisticated"
+    colors: "Warm earth tones - connection and culture"
+    imagery: "Conversation, cultural connection, travel"
+  pricing_recommendations:
+    display: "Compare to Duolingo Max and human tutors"
+  differentiation_opportunities:
+    - "Emphasize 'actually speak' vs 'complete lessons'"
+    - "Show Four Strands methodology"
+  landing_page_focus: "Finally speak the language"
+
+site_components:
+  target_markets: ["US", "EU", "Global"]
+  primary_language: "English"
+  legal_entity:
+    company_name: "{{PENDING}}"
+    contact_email: "{{PENDING}}"
+
+landing_page_inputs:
+  messaging_hierarchy:
+    l1_category: "AI Language Tutoring"
+    l2_value_proposition: "Real language learning, not gamified streaks"
+    l3_benefits:
+      - "Actually speak the language"
+      - "Real conversation practice"
+      - "Research-backed methodology"
+    pain_claim_gain:
+      pain: "You can complete Duolingo but can't speak"
+      claim: "Mentomate uses Four Strands for real conversation"
+      gain: "Finally speak with confidence"
+
+  pain_points_ranked:
+    - "Can complete app lessons but can't speak"
+    - "No one to practice conversation with"
+    - "Apps focus on streaks, not fluency"
+    - "Grammar explanations are shallow"
+
+  key_messages:
+    headline: "Finally Speak The Language"
+    subheadline: "AI conversation practice with real methodology"
+    cta: "Start Speaking Free"
+
+  competitor_weaknesses:
+    - competitor: "Duolingo"
+      weakness: "Gamified drills, weak on speaking"
+      our_counter: "Four Strands + conversation practice"
+    - competitor: "Babbel"
+      weakness: "Pre-recorded, no AI adaptation"
+      our_counter: "AI adapts in real-time"
+
+  differentiation_for_copy:
+    primary: "Four Strands methodology with AI conversation"
+    supporting:
+      - "Remembers your vocabulary journey"
+      - "Real-time conversation practice"
+
+  social_proof_strategy:
+    recommended_types:
+      - "fluency_gained"
+      - "testimonial"
+    specific_proof_points:
+      - "First conversation in target language"
+      - "Grammar concepts finally understood"
+    source: "P3 analysis"
+
+  objections_to_address:
+    - objection: "Why not just use Duolingo?"
+      response: "Duolingo is games; we're real learning with Four Strands"
+    - objection: "Can AI really teach conversation?"
+      response: "GPT-4 enables natural conversation practice"
+
+  competitor_references:
+    steal_this:
+      - pattern: "Progress visualization"
+        from: "Duolingo"
+    avoid_this:
+      - pattern: "Gamified streaks as primary"
+        from: "Duolingo"
+
+  tone_of_voice:
+    attributes:
+      - "Culturally curious"
+      - "Encouraging"
+      - "Authentic"
+      - "Warm"
+    examples:
+      do: ["'Actually speak with confidence'", "'Your conversation partner'"]
+      dont: ["'Gamify your learning'", "'Beat your streak'"]
+    guidelines:
+      sentence_length: "Medium"
+      technical_jargon: "Avoid (except Four Strands)"
+    audience_adjustments:
+      travel: "Practical, urgency"
+      heritage: "Emotional, connection"
+
+marketing_intelligence:
+  keywords:
+    primary: ["language learning app (14,800 vol)", "learn Spanish", "AI language tutor"]
+    secondary: ["speak Spanish", "conversation practice"]
+    search_volume_total: 20000
+  voice_of_customer:
+    pain_quotes:
+      - "'I can do Duolingo but can't speak'"
+      - "'Apps don't help with real conversation'"
+    desire_quotes:
+      - "'I want to actually have a conversation'"
+  competitors_full:
+    analyzed: ["Duolingo", "Babbel", "Rosetta Stone", "iTalki"]
+  adversarial_insights:
+    top_attack: "Duolingo may add AI conversation"
+    mitigation: "Build Four Strands brand differentiation"
+  external_failures:
+    patterns: ["App completion doesn't equal fluency"]
+    learnings: ["Speaking practice is key gap"]
+  content_seeds:
+    blog_topics:
+      - "Why you can complete Duolingo but can't speak"
+      - "What is the Four Strands methodology?"
+    social_hooks:
+      - "1000 day Duolingo streak. Still can't order coffee in Spanish."
+  ad_copy_bank:
+    headlines:
+      - "Finally Speak The Language"
+      - "Beyond Duolingo Streaks"
+    descriptions:
+      - "AI conversation practice that actually works"
+  sources:
+    p2_research: true
+    p3_adversarial: true
+
+brand_archetype:
+  primary_archetype: "Explorer"
+  archetype_rationale: |
+    Language learners are seeking new experiences, cultures, and connections.
+    Explorer archetype emphasizes discovery, authenticity, and expanding horizons.
+    Messaging should emphasize cultural connection and real-world use.
+  selection_signals:
+    buyer_motivation: "Connect with cultures, travel, heritage"
+    emotional_drivers: ["Curiosity", "Connection", "Adventure"]
+    competitor_positioning: "Others gamify; we enable real exploration"
+  visual_specs:
+    color_approach: "Warm earth tones - global, cultural"
+    typography_guidance:
+      headings: "Friendly, slightly adventurous"
+      body: "Warm, readable"
+    whitespace_density: "Medium - inviting"
+    energy_level: "Warm and engaging"
+  copy_specs:
+    tone_keywords: ["Authentic", "Connected", "Adventurous", "Real"]
+    cta_style: "Invitational, exploratory"
+    pricing_display_pattern: "Value vs human tutors"
+    reading_level: "Accessible"
+    power_vocabulary: ["Speak", "Connect", "Discover", "Real"]
+    avoid_vocabulary: ["Streak", "Gamify", "Points", "Level up"]
+  trust_signal_priority:
+    - "Conversation examples"
+    - "Four Strands methodology explanation"
+    - "User success stories"
+    - "Language count"
+  buyer_profile_key: "cultural_explorer"
+
+page_structure:
+  variant_a:
+    name: "speak_first"
+    derived_from:
+      - field: "pain_points_ranked[0]"
+        value: "Can't speak after app"
+        influence: "Lead with speaking promise"
+    hypothesis: "Speaking ability is #1 desire"
+    section_order:
+      - "hero"
+      - "problem_agitate"
+      - "solution"
+      - "methodology"
+      - "demo"
+      - "social_proof"
+      - "pricing"
+      - "cta"
+    section_config:
+      hero:
+        headline: "Finally Speak The Language"
+        subheadline: "AI conversation practice with real methodology"
+      methodology:
+        title: "The Four Strands Approach"
+        strands: ["Explicit instruction", "Input", "Output", "Fluency"]
+    copy:
+      hero_headline: "Finally Speak The Language"
+      problem_tone: "empathetic"
+    visual_style:
+      typography: "warm_global"
+      imagery: "conversation_cultural"
+
+  variant_b:
+    name: "methodology_first"
+    derived_from:
+      - field: "differentiator.primary"
+        value: "Four Strands methodology"
+        influence: "Lead with credibility"
+    hypothesis: "Methodology credibility drives conversions"
+    section_order:
+      - "hero"
+      - "methodology"
+      - "features"
+      - "comparison"
+      - "social_proof"
+      - "pricing"
+      - "cta"
+    section_config:
+      hero:
+        headline: "Language Learning That Actually Works"
+        subheadline: "Powered by the Four Strands methodology"
+    copy:
+      hero_headline: "Language Learning That Actually Works"
+      problem_tone: "educational"
+    visual_style:
+      typography: "professional_warm"
+      imagery: "methodology_visual"
+
+  deployment:
+    primary_variant: "variant_a"
+    primary_rationale: "Speaking is the ultimate desire; methodology is supporting"
+    site_naming:
+      primary_domain: "mentomate.com"
+      path: "/languages"
+
+  strategy_context:
+    angle_source: "Stage 3.0.6"
+    variant_rationale: "Speaking promise is primary draw"
+
+channel_ops:
+  subreddit_targeting:
+    primary_subreddits:
+      - "r/languagelearning"
+      - "r/LearnSpanish"
+      - "r/LearnJapanese"
+      - "r/French"
+    engagement_strategy: "Share Four Strands insights, answer methodology questions"
+
+  newsletter_discovery:
+    relevant_newsletters:
+      - "Language learning newsletters"
+      - "Polyglot blogs"
+
+  influencer_discovery:
+    relevant_influencers:
+      - "Polyglot YouTubers"
+      - "Language learning creators"
+
+  ad_platform_sizing:
+    google:
+      keyword_volume: "20K/month"
+      estimated_cpc: "$6.27"
+    facebook:
+      audience_size: "10M language learners"
+      estimated_cpm: "$12"
+
+  competitor_ad_analysis:
+    competitors_running_ads: ["Duolingo", "Babbel", "Rosetta Stone"]
+
+  competitor_backlinks:
+    top_referrers: ["Language learning blogs", "Polyglot communities"]
+
+  channel_prioritization:
+    tier_1: ["Reddit r/languagelearning", "YouTube content"]
+    tier_2: ["Google Ads", "Facebook Ads"]
+    tier_3: ["Polyglot influencers"]
+
+outreach_assets:
+  cold_dm_templates: []
+
+  cold_email_templates: []
+
+  reddit_posts:
+    - post_id: "duolingo_frustration"
+      profile: "travel_prepper"
+      subreddit: "r/languagelearning"
+      title: "Found an app that actually helped me speak Spanish (not Duolingo)"
+      body: |
+        After 500 days on Duolingo, I still couldn't order coffee in Barcelona.
+        Started using this AI tutor that uses the Four Strands methodology -
+        it actually makes you practice conversation, not just match pictures.
+        Finally had my first real conversation last week.
+
+  linkedin_posts: []
+
+  influencer_pitches: []
+
+tracking_setup:
+  metrics:
+    primary:
+      - "Signups"
+      - "Conversation minutes"
+      - "Weekly active users"
+    secondary:
+      - "Languages started"
+      - "Vocabulary mastered"
+
+  channel_benchmarks:
+    - channel: "Reddit r/languagelearning"
+      expected_ctr: "2.5%"
+      expected_conversion: "3%"
+
+  validation_benchmarks:
+    conversion_rate:
+      floor: 1
+      target: 2
+      excellent: 3
+    cac:
+      acceptable_max: 60
+      target: 35
+    signups:
+      minimum: 100
+      target: 250
+    payment_intent:
+      threshold: 10
+      signal_types: ["trial_start", "conversation_minutes"]
+    traffic:
+      minimum_visitors: 1000
+      target_visitors: 2500
+    validation_period:
+      weeks: 4
+
+  tracking_stack:
+    analytics: "Plausible"
+    attribution: "UTM"
+    funnel: "PostHog"
+
+  utm_conventions:
+    source: "reddit, google, youtube"
+    medium: "organic, paid"
+    campaign: "languages_launch"
+
+  pre_launch_checklist:
+    - "Privacy policy"
+    - "Analytics"
+    - "Payment"
+    - "Core languages ready"
+
+outcome_tracking:
+  prediction:
+    verdict: "PASS"
+    confidence: 65
+    composite_score: 7.0
+    key_risks_identified:
+      - "Duolingo may add AI conversation"
+      - "Competitive market"
+      - "Speech recognition not in MVP"
+    predicted_success_factors:
+      - "Four Strands is unique methodology"
+      - "Speaking gap is real pain point"
+      - "Pricing validated by Duolingo Max"
+    bet_ability:
+      moat_type: "switching_costs"
+      moat_strength: 6
+      sustainability: "window"
+    adversarial_attacks_survived:
+      - "Duolingo competition"
+      - "LLM commoditization"
+    predicted_at: "2026-01-17T12:00:00Z"
+
+  validation: null
+  outcome: null
+
+# ============================================
+# PHASE 4: GTM PREP (Added 2026-01-17)
+# ============================================
+
+channel_ops:
+  subreddit_targeting:
+    primary:
+      - subreddit: "r/languagelearning"
+        subscribers: "3M+"
+        relevance: "Very high - core target audience"
+        posting_rules: "Share resources with context"
+      - subreddit: "r/duolingo"
+        subscribers: "900K+"
+        relevance: "High - frustrated Duolingo users"
+        posting_rules: "Don't bash Duolingo directly"
+      - subreddit: "r/language_exchange"
+        subscribers: "300K+"
+        relevance: "High - conversation seekers"
+    secondary:
+      - "r/LearnJapanese"
+      - "r/LearnSpanish"
+      - "r/LearnGerman"
+      - "r/polyglot"
+
+  newsletter_discovery:
+    primary:
+      - name: "FluentU Blog Newsletter"
+        audience: "Active language learners"
+        sponsorship_potential: "Yes"
+      - name: "Fluent in 3 Months (Benny Lewis)"
+        audience: "Motivation-focused learners"
+        sponsorship_potential: "Affiliate/guest possible"
+
+  channel_prioritization:
+    primary:
+      channel: "Reddit (r/languagelearning, r/duolingo)"
+      channel_type: "organic_community"
+      estimated_cac: "€20-30"
+      cac_rationale: "Frustrated Duolingo users are ideal converts"
+      why_primary: "High engagement, strong Duolingo frustration signal"
+      ltv_cac_ratio: "6-10x"
+    secondary:
+      channel: "Language learning YouTube creators"
+      channel_type: "influencer"
+      estimated_cac: "€40-60"
+      why_secondary: "Trusted recommendations"
+    tertiary:
+      channel: "Polyglot communities (Discord, forums)"
+      channel_type: "niche_community"
+      estimated_cac: "€10-20"
+      why_tertiary: "Highly engaged, word-of-mouth"
+
+outreach_assets:
+  reddit_posts:
+    - title: "If Duolingo 'conversation practice' is driving you nuts, try an AI tutor that actually talks back (and remembers)"
+      subreddit: "r/languagelearning"
+      hook: "I'm not trying to win XP. I'm trying to speak."
+      key_points:
+        - "Real conversation, not multiple-choice scripts"
+        - "Correction style you control"
+        - "Remembers your weak points (persistence)"
+        - "Roleplays real situations"
+      cta: "If people are interested, I can share what I'm using"
+      tone: "Frustrated learner who found solution"
+
+  cold_dm_templates:
+    - type: "influencer_pitch"
+      target: "Language learning YouTubers"
+      subject: "Re: Your video on conversation practice - tool your audience might love"
+      key_angle: "Four Strands methodology - real fluency, not gamified streaks"
+
+tracking_setup:
+  validation_benchmarks:
+    conversion_rate:
+      floor: 1.0
+      target: 2.5
+      excellent: 4.0
+    cac:
+      acceptable_max: 40
+      target: 20
+    signups:
+      minimum: 50
+      target: 200
+    payment_intent:
+      threshold: 15
+      signal_types:
+        - "credit card entered"
+        - "pricing page visit > 30s"
+        - "trial started"
+    traffic:
+      minimum_visitors: 1000
+      target_visitors: 4000
+    validation_period:
+      weeks: 6
+
+  tracking_stack:
+    analytics: "Plausible (GDPR-compliant)"
+    forms: "Tally"
+    email: "ConvertKit"
+
+  utm_conventions:
+    format: "utm_source={platform}&utm_medium={type}&utm_campaign=languages&utm_content={variant}"
+    examples:
+      - "utm_source=reddit&utm_medium=organic&utm_campaign=languages&utm_content=duolingo_frustration"
+
+  pre_launch_checklist:
+    - "Landing page live at mentomate.com/languages"
+    - "Email capture functional"
+    - "UTM links created"
+    - "Reddit accounts aged (>30 days)"
+    - "First post drafted and reviewed"

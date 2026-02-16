@@ -1,0 +1,1087 @@
+# Factory Brief - Run023 Parents Segment (Mentomate)
+# Schema Version: 2.22
+# Generated: 2026-01-17
+# Segment: Parents (Homework Help)
+
+metadata:
+  run_id: "Run023"
+  run_date: "2026-01-17"
+  work_order_id: "WO-Run023"
+  phase: "factory_handoff"
+  briefs_generated: 3
+  generated_at: "2026-01-17T12:00:00Z"
+  segment_id: "SEG-001-parents"
+  segment_name: "Parents (Homework Help)"
+
+scout_reference:
+  run_id: "Run023"
+  run_folder: "docs/Run023_2026-01-17/"
+  phase_files:
+    - "phase-2-research.yaml"
+    - "phase-3-validation.yaml"
+
+source_brief:
+  type: "product_brief"
+  brief_path: "inline_product_brief"
+  ingestion_date: "2026-01-17T00:00:00Z"
+  ingestion_version: "1.0"
+
+  preserved_elements:
+    killer_features:
+      - feature_name: "Homework Integrity Mode"
+        description: "AI guides through problems without giving answers"
+        how_it_works: "Socratic questioning, sessions marked as guided, parent visibility"
+        why_it_matters: "Parents get proof child did the thinking, not copied"
+        competitor_gap: "ChatGPT, Gauth, Answer AI give answers directly"
+        source_section: "MVP Scope"
+        source_quote: "AI guides through problems, NEVER gives final answers"
+
+      - feature_name: "Memory (Persistent Learning)"
+        description: "Remembers what you learned across sessions"
+        how_it_works: "Eliminates redundant explanations, builds on prior knowledge"
+        why_it_matters: "Creates learning continuity, high switching costs"
+        competitor_gap: "Free AI lacks organized memory"
+        source_section: "Four Pillars"
+        source_quote: "Remembers what you learned, your struggles, how you learn best"
+
+    methodology_details:
+      - approach_name: "Socratic Method"
+        default_behavior: "Guide learner to discover answers through questioning"
+        fallback_behavior: "Direct explanation if learner is stuck"
+        switching_conditions: "Struggle detection"
+        domain_variants: []
+        architecture_notes: "Pluggable teaching strategies"
+        source_quote: "Default: Socratic method"
+
+    user_journey_specifics:
+      - stage_name: "Intent Screen"
+        duration: "5 minutes"
+        key_actions: ["Create account", "Select intent", "Subject input"]
+        decision_points: ["Learn vs Homework Help"]
+        ux_specifics: ["Two-mode UX fork"]
+        source_quote: "Intent fork: Learn something new OR Get homework help"
+
+    pricing_rationale:
+      - aspect: "4-Tier Model"
+        detail: "Free -> Plus (€18.99) -> Family (€28.99) -> Pro (€48.99)"
+        rationale: "Serves different willingness-to-pay segments"
+        source_quote: "4-Tier Model"
+
+      - aspect: "Charm Pricing"
+        detail: "All prices end in .99"
+        rationale: "24% conversion lift"
+        source_quote: "Charm pricing: 24% conversion lift"
+
+    compliance_requirements:
+      - regulation: "GDPR"
+        applies_to: "Ages 11-15 in EU"
+        implementation: "Parental consent flow"
+
+      - regulation: "COPPA"
+        applies_to: "Ages 11-12 in US"
+        implementation: "Parental consent flow"
+
+    mvp_scope_decisions:
+      - feature: "Homework Integrity Mode"
+        in_mvp: true
+        target_version: "v1.0"
+        rationale: "Killer feature for parent segment"
+
+  unmapped_elements: []
+  extraction_stats:
+    total_elements_extracted: 47
+    elements_by_category:
+      killer_features: 5
+      methodology_details: 4
+      user_journey_specifics: 5
+      pricing_rationale: 8
+      compliance_requirements: 3
+      mvp_scope_decisions: 10
+    unmapped_count: 2
+    confidence_distribution:
+      high: 40
+      medium: 5
+      low: 2
+
+briefs:
+  - id: "BRIEF-Run023-001-parents"
+    working_name: "Mentomate"
+    tagline: "The AI that helps your child learn, not cheat"
+    final_score: 8.2
+    technique: "product_brief"
+    verdict: "PASS"
+    conditional_pass: null
+
+angles_evaluated:
+  discovery_source: "Stage 3.0.5.5"
+  angles_received: 3
+  angles_scored: 3
+
+  angles:
+    - angle_id: "parent_relief"
+      source: "explicit"
+      source_detail: "P2 angle discovery: homework battles"
+      frame: "End homework battles, get your evenings back"
+      buyer: "Parent (for themselves)"
+      problem: "Homework battles drain 6.2 hours/week"
+      emotional_hook: "Exhaustion, desire for peaceful evenings"
+      scores:
+        pain_intensity: 8.5
+        evidence_density: 7.5
+        differentiation: 8.0
+        emotional_resonance: 9.0
+        composite: 8.3
+      p2_evidence:
+        keywords: ["homework help", "homework battles"]
+        reddit_threads: ["'killing us' r/Parenting", "'homework hell'"]
+        competitor_gaps: ["No competitor positions as parent relief"]
+      designation: "PRIMARY"
+
+    - angle_id: "learning_outcomes"
+      source: "explicit"
+      source_detail: "Original Brief: 'help child succeed'"
+      frame: "Help your child truly learn"
+      buyer: "Parent (for child)"
+      problem: "Child needs better learning support"
+      emotional_hook: "Parental aspiration for child's success"
+      scores:
+        pain_intensity: 7.0
+        evidence_density: 8.0
+        differentiation: 6.0
+        emotional_resonance: 7.5
+        composite: 7.1
+      p2_evidence:
+        keywords: ["AI tutor", "personalized learning"]
+        reddit_threads: ["tutoring recommendations"]
+        competitor_gaps: ["Learning Book persistence is unique"]
+      designation: "SECONDARY"
+
+  primary_angle:
+    angle_id: "parent_relief"
+    composite_score: 8.3
+    rationale: "Higher pain intensity, stronger emotional resonance, clearer differentiation"
+
+  secondary_angle:
+    angle_id: "learning_outcomes"
+    composite_score: 7.1
+    abbreviated_check:
+      fatal_flaw_scan: "PASS"
+      messaging_coherence: "low_risk"
+      ab_validity: "PASS_OUTREACH"
+    verdict: "OUTREACH_VARIANT"
+
+  outreach_recommendation:
+    create_variants: true
+    primary_profile: "parent_relief"
+    secondary_profile: "learning_outcomes"
+    outreach_difference: "Relief: lead with time-saving, stress reduction. Outcomes: lead with child's academic success."
+
+problem:
+  statement: |
+    Parents spend 6.2 hours per week on homework battles, creating stress and exhaustion.
+    Existing AI tools either enable cheating (answer-bots) or lack the structure for real learning.
+
+  four_u_scores:
+    unworkable:
+      score: 8
+      evidence: "Reddit: 'homework is killing us', 'homework hell'"
+    unavoidable:
+      score: 8
+      evidence: "Homework is mandatory; parents feel obligated to help"
+    urgent:
+      score: 7
+      evidence: "Daily trigger after school; deadline-driven"
+    underserved:
+      score: 9
+      evidence: "Answer-bots enable cheating; no integrity-focused solution exists"
+    composite: 8.0
+
+  hair_on_fire:
+    classification: "burning_platform"
+    key_evidence: "Daily pain, 6.2 hours/week time cost, emotional exhaustion"
+
+customer:
+  beachhead_segment: "Parents of children ages 11-17 in US/EU struggling with homework"
+  economic_buyer: "Parent"
+  current_spend: "€40-80/hour for human tutors; €30/month for Duolingo Max"
+
+  beachhead_validation:
+    budget_exists: true
+    accessible_buyer: true
+    compelling_reason: true
+    whole_product_feasible: true
+    no_entrenched_competitor: true
+
+  persona:
+    name: "Emma (The Overwhelmed Parent)"
+    role: "Parent of middle/high school student"
+    company_size: "N/A - Consumer"
+    industry: "Any"
+    goals:
+      - "Child succeeds academically"
+      - "Peaceful evenings without homework battles"
+      - "Proof child is learning, not cheating"
+    frustrations:
+      - "Homework takes hours every night"
+      - "Child just wants answers, not understanding"
+      - "Can't trust AI chat tools (enable cheating)"
+      - "Human tutors too expensive (€40-80/hour)"
+    where_they_gather:
+      - "r/Parenting"
+      - "r/daddit"
+      - "Facebook parenting groups"
+      - "School parent WhatsApp groups"
+      - "Mumsnet"
+
+  acquisition_channels:
+    primary:
+      channel: "Reddit (r/Parenting, r/daddit)"
+      channel_type: "community"
+      estimated_cac: "€15-25"
+      cac_rationale: "Organic community posts + targeted value content"
+      why_primary: "High pain expression, validated in P2 research"
+      ltv_cac_ratio: "12:1 (€300 LTV / €25 CAC)"
+    secondary:
+      channel: "Facebook Parenting Groups"
+      channel_type: "community"
+      estimated_cac: "€20-30"
+      cac_rationale: "Sponsored posts + organic engagement"
+      why_secondary: "Large audience, good targeting options"
+    tertiary:
+      channel: "Google Ads (homework help + parent terms)"
+      channel_type: "paid"
+      estimated_cac: "€40-60"
+      notes: "Higher CAC but scalable"
+    channel_validation:
+      competitors_using: ["Khanmigo uses school partnerships", "Duolingo uses paid social"]
+      evidence_of_demand: "14,800 monthly searches for 'language learning app'"
+      test_approach: "Start with organic Reddit, validate conversion before paid"
+
+strategy:
+  type: "gap_wedge"
+
+  red_ocean:
+    top_competitors:
+      - "ChatGPT (free, no structure)"
+      - "Khanmigo (K-12 only, $4/mo)"
+      - "Gauth (answer-giving)"
+    wedge: "Homework Integrity Mode - teaches without giving answers"
+    switching_trigger: "Parents discover child is using answer-bots to cheat"
+
+bet_ability:
+  moat_type: "switching_costs"
+  moat_strength: 7
+  moat_rationale: "Learning Book persistence creates high switching costs - lose learning history"
+
+  retention_pattern: "data_lock_in"
+  retention_evidence: "Curriculum and progress tied to account; can't export to competitors"
+
+  ten_x_multiple: 8
+  ten_x_dimension: "Trust - only solution parents can trust not to enable cheating"
+
+  boring_advantage: true
+  boring_rationale: "Education tech is unglamorous but necessary; parents have budget"
+
+  expansion_path: "Parents -> Students direct -> Adult learners"
+  expansion_ltv_multiplier: 2.5
+
+  sustainability:
+    classification: "durable"
+    time_horizon: "years"
+    accumulation: "data"
+    wrapper_risk:
+      is_wrapper: false
+      core_value_source: "domain_expertise"
+      llm_dependency: "medium"
+      commoditization_threat: "ChatGPT adds Homework Integrity feature"
+      weekend_replicable: false
+    sustainability_rationale: |
+      Learning Book persistence + Homework Integrity Mode + GDPR compliance create
+      defensible moat. Data accumulates making product better over time.
+      Not a wrapper - core value is in curriculum design and verification loops.
+
+  composite_score: 7.5
+  diamond_flag: false
+  prioritization_tier: 1
+
+value_proposition:
+  user_story: "As a parent, I want my child to get homework help without cheating, so I can have peaceful evenings knowing they actually learned."
+  positioning_statement: "Mentomate is the only AI tutor that parents can trust - it guides through problems without giving answers."
+  working_name: "Mentomate"
+  tagline: "The AI that helps your child learn, not cheat"
+
+  name_options:
+    primary:
+      name: "Mentomate"
+      domain_available: true
+      domain_checked: "mentomate.com"
+      domain_alternatives: ["getmentomate.com", "mentomate.io"]
+      trademark_clear: true
+      rationale: "Mentor + mate - friendly, approachable, conveys guidance"
+    alternatives:
+      - name: "LearnGuide"
+        domain_available: false
+        domain_checked: "learnguide.com"
+        positioning_fit: "moderate"
+        notes: "Descriptive but generic"
+      - name: "TrueLearn"
+        domain_available: true
+        domain_checked: "truelearn.io"
+        positioning_fit: "strong"
+        notes: "Emphasizes authentic learning"
+    naming_style: "compound"
+
+  scope:
+    scoped_mvp:
+      description: "AI tutor with Homework Integrity Mode for parents"
+      geography: "US and EU"
+      integrations: []
+      customer_segment: "Parents of children 11-17"
+      feature_set:
+        - "Homework Integrity Mode"
+        - "Memory/Learning Book"
+        - "Basic curriculum generation"
+        - "Parent dashboard"
+      build_estimate: "6-8 weeks"
+      in:
+        - "Core chat with Socratic method"
+        - "Homework Integrity Mode"
+        - "Learning Book (memory)"
+        - "Basic progress tracking"
+        - "GDPR/COPPA consent flows"
+      out:
+        - "Languages (Four Strands)"
+        - "Cohorts/buddy matching"
+        - "Human coaching add-on"
+        - "Offline mode"
+
+    full_vision:
+      description: "Universal AI tutor for all ages and subjects"
+      geography: "Global"
+      integrations: ["School LMS", "Google Classroom"]
+      customer_segment: "All learners 11+"
+      feature_set: ["Full platform with all features"]
+      build_estimate: "12-18 months"
+
+    reduction_rationale: "Focus on parent pain point first; validate before expanding"
+    expansion_path: "Parents -> Adult learners -> School partnerships"
+
+positioning_canvas:
+  category:
+    claimed: "AI Tutoring for Parents"
+    alternatives_considered: ["EdTech", "Homework Help", "Learning Platform"]
+    why_this_category: "Positions for parent buyer, not generic EdTech"
+    category_maturity: "emerging"
+
+  target:
+    primary_audience: "Parents of children 11-17 in US/EU"
+    secondary_audience: "Teachers looking for homework support tools"
+    anti_audience: "Students looking for quick answers (cheaters)"
+    derived_from: "P2 beachhead validation"
+
+  frame_of_reference:
+    direct_competitors: ["ChatGPT", "Khanmigo", "Gauth"]
+    indirect_competitors: ["Human tutors", "YouTube tutorials"]
+    positioned_against: "Answer-giving AI tools (Gauth, Answer AI, ChatGPT)"
+    why_this_frame: "Creates clear differentiation on integrity dimension"
+
+  differentiator:
+    primary: "Homework Integrity Mode - teaches without giving answers"
+    supporting:
+      - "Persistent memory across sessions"
+      - "Parent visibility dashboard"
+      - "GDPR/COPPA compliant"
+    proof_points:
+      - "Sessions marked as 'guided problem-solving' not 'answered'"
+      - "Learning Book shows progress over time"
+      - "EU-built with privacy by design"
+    derived_from: "P2 competitor analysis, Brief killer features"
+
+  reason_to_believe:
+    primary: "Duolingo Max proves €30/month willingness to pay for AI learning"
+    evidence_type: "comparison"
+    specific_proof: "545K Duolingo Max users at $30/month"
+    source: "P2 pricing validation"
+
+  positioning_statement: |
+    For parents of children 11-17 who struggle with homework battles,
+    Mentomate is an AI tutor
+    that teaches without giving answers.
+    Unlike ChatGPT and Gauth which enable cheating,
+    we use Homework Integrity Mode so parents can trust their child actually learned.
+
+  positioning_map:
+    axis_x:
+      dimension: "Learning Integrity (Cheating Prevention)"
+      our_position: "high"
+    axis_y:
+      dimension: "Personalization/Memory"
+      our_position: "high"
+    strategic_quadrant: "Premium-Trusted"
+    competitors_in_quadrant: ["Khanmigo (partial)"]
+
+  derived_from:
+    - field: "phase_2.competitor_analysis"
+      influence: "Identified answer-bot weakness"
+
+technical:
+  architecture_sketch: |
+    User (Mobile/Web) -> Next.js Frontend -> API Gateway
+    -> LLM Service (GPT-4) with Socratic Prompting
+    -> Learning Book (PostgreSQL) for memory/curriculum
+    -> Parent Dashboard API
+
+  stack:
+    frontend: "Next.js PWA"
+    backend: "Node.js + Express"
+    database: "PostgreSQL (Supabase)"
+    ai_models: ["GPT-4 for tutoring", "Embeddings for memory search"]
+    third_party: ["Stripe", "Auth0", "SendGrid"]
+    hosting: "Vercel + Supabase"
+
+  complexity:
+    level: "medium"
+    rationale: "Socratic prompting and memory require careful engineering"
+    hardest_part: "Homework Integrity Mode - preventing answer leakage while still being helpful"
+    unknowns:
+      - "Optimal Socratic prompting strategies"
+      - "Memory retrieval performance at scale"
+
+  dependencies:
+    - "OpenAI API availability"
+    - "Supabase uptime"
+
+  risks:
+    - "LLM may leak answers despite prompting"
+    - "Memory retrieval latency at scale"
+
+  build_estimate:
+    mvp_weeks: 8
+    mvp_scope: "Core chat + Homework Integrity + Learning Book"
+    post_mvp_roadmap:
+      - "Languages (Four Strands) - v1.5"
+      - "Cohorts - v1.5"
+      - "Human coaching - v2.0"
+    team_required: "1 full-stack dev, 1 LLM engineer"
+
+  data:
+    user_data_collected: ["Learning history", "Progress", "Curriculum", "Chat logs"]
+    data_moat_potential: "High - personalized learning data creates switching costs"
+    privacy_considerations: "GDPR/COPPA compliant, parental consent required"
+
+monetisation:
+  model: "subscription"
+
+  pricing:
+    starter:
+      price: "€0/month"
+      includes: ["50 questions/month", "All features"]
+      target: "Trialers"
+    pro:
+      price: "€18.99/month"
+      includes: ["500 questions/month", "Priority support"]
+      target: "Single-child families"
+    enterprise:
+      price: "€28.99/month"
+      includes: ["1500 questions/month", "5 profiles", "Shared pool"]
+      target: "Multi-child families"
+
+  pricing_validation:
+    method: "competitor_benchmark"
+    evidence:
+      - "Duolingo Max: $30/month with 545K users"
+      - "Khanmigo: $4/month (K-12 only)"
+      - "Human tutors: €40-80/hour"
+    confidence: "high"
+    confidence_rationale: "Duolingo Max proves willingness to pay €30/month for AI learning"
+    anchor_high: "Human tutors at €40-80/hour"
+    anchor_low: "Free ChatGPT"
+    our_position: "Premium AI (€18.99-48.99) between free and human"
+    price_sensitivity:
+      segments_tested: ["Parents US", "Parents EU"]
+      elasticity: "low - education spending is priority"
+
+  competitor_benchmarks:
+    - competitor: "Duolingo Max"
+      price: "$30/month"
+      users: "545K"
+    - competitor: "Khanmigo"
+      price: "$4/month"
+      users: "700K"
+
+  unit_economics:
+    estimated_cac: "€25"
+    estimated_ltv: "€300"
+    ltv_cac_ratio: "12:1"
+    payback_months: "2"
+    gross_margin: "75%"
+    ltv_rationale: "12-month average retention, €25/month average revenue"
+    cac_rationale: "Organic community acquisition + content marketing"
+
+market:
+  tam: "$7.99B AI Tutoring (2030)"
+  sam: "$1.63B (US + EU parents)"
+  som: "$16M (1% of SAM)"
+  growth_rate: "30.5% CAGR"
+  timing_catalyst: "ChatGPT Study Mode launched July 2025 - validates category"
+
+validation:
+  adversarial_attacks_survived: 7
+  fatal_flaws: []
+  unresolved_risks:
+    - "ChatGPT may add Homework Integrity feature"
+    - "LLM costs if usage spikes"
+  confidence: "high"
+
+  reality_check:
+    geographic_reach:
+      score: 8
+      rationale: "Problem is universal - homework battles exist globally"
+      region_locks: []
+      international_path: "Start US/EU, expand to English-speaking markets"
+    mechanism_reliability:
+      score: 8
+      rationale: "Core mechanism (Socratic prompting) is proven; parent dashboard provides visibility"
+      dependencies: ["OpenAI API"]
+      mitigation: "Prompt engineering, fallback to direct explanation"
+    flags: []
+
+magnitude:
+  scale_potential:
+    ceiling: "High - global education market"
+    bottleneck: "Trust building, word of mouth"
+  leverage:
+    type: "Software"
+    multiplier: "High - zero marginal cost per user"
+  structure:
+    recurring: true
+    expansion: "Family plans, additional subjects"
+  topology:
+    network_effects: "Low (individual learning)"
+    data_effects: "Medium (learning data improves product)"
+  capture:
+    switching_costs: "High (lose learning history)"
+    lock_in: "Medium (curriculum tied to platform)"
+
+  magnitude_composite:
+    overall_rating: "A-"
+    scores:
+      scale: 8
+      leverage: 9
+      structure: 8
+      topology: 6
+      capture: 7
+    investor_fit:
+      bootstrappable: true
+      vc_scale: true
+      rationale: "Can bootstrap to profitability; VC upside exists"
+    magnitude_risks:
+      - "Dependent on LLM provider pricing"
+      - "Education tech is competitive"
+    diamond_signals:
+      present: false
+      reason: "Solid execution play, not revolutionary"
+
+factory_notes:
+  visual_recommendations:
+    style: "Warm, trustworthy, educational"
+    colors: "Blues and greens - trust and growth"
+    imagery: "Parent and child, peaceful homework sessions"
+  pricing_recommendations:
+    display: "Emphasize €18.99 vs €40-80/hour human tutors"
+    anchoring: "Show human tutor comparison"
+  differentiation_opportunities:
+    - "Emphasize 'no cheating' strongly in hero"
+    - "Show parent dashboard prominently"
+  landing_page_focus: "End homework battles without enabling cheating"
+
+site_components:
+  target_markets: ["US", "EU"]
+  primary_language: "English"
+  legal_entity:
+    company_name: "{{PENDING}}"
+    contact_email: "{{PENDING}}"
+
+landing_page_inputs:
+  messaging_hierarchy:
+    l1_category: "AI Tutoring"
+    l2_value_proposition: "The AI that helps your child learn, not cheat"
+    l3_benefits:
+      - "End homework battles"
+      - "Know your child actually learned"
+      - "24/7 availability, €18.99/month"
+    pain_claim_gain:
+      pain: "Homework battles drain 6.2 hours/week"
+      claim: "Mentomate teaches without giving answers"
+      gain: "Peaceful evenings with confident learners"
+
+  pain_points_ranked:
+    - "Homework battles drain family time"
+    - "Can't trust AI tools (enable cheating)"
+    - "Human tutors too expensive"
+    - "Child copies answers instead of learning"
+
+  key_messages:
+    headline: "End Homework Battles Without Enabling Cheating"
+    subheadline: "The AI tutor that teaches, never tells"
+    cta: "Start Free Trial"
+
+  competitor_weaknesses:
+    - competitor: "ChatGPT"
+      weakness: "No structure, enables answer-copying"
+      our_counter: "Homework Integrity Mode"
+    - competitor: "Gauth"
+      weakness: "Gives answers directly"
+      our_counter: "Socratic questioning only"
+
+  differentiation_for_copy:
+    primary: "Homework Integrity Mode - teaches without giving answers"
+    supporting:
+      - "Persistent memory across sessions"
+      - "Parent visibility dashboard"
+
+  social_proof_strategy:
+    recommended_types:
+      - "before_after"
+      - "testimonial"
+    specific_proof_points:
+      - "Hours saved per week"
+      - "Parent trust scores"
+    source: "P2 social proof analysis"
+
+  objections_to_address:
+    - objection: "How do I know it's not just giving answers?"
+      response: "Parent dashboard shows guided sessions, not answer-giving"
+    - objection: "Why not just use ChatGPT?"
+      response: "ChatGPT has no Homework Integrity Mode - can't trust it not to cheat"
+
+  competitor_references:
+    steal_this:
+      - pattern: "Duolingo streak mechanics"
+        from: "Duolingo"
+    avoid_this:
+      - pattern: "Answer-giving"
+        from: "Gauth"
+
+  tone_of_voice:
+    attributes:
+      - "Warm"
+      - "Trustworthy"
+      - "Parent-focused"
+      - "Reassuring"
+    examples:
+      do: ["'Finally, homework without the battles'", "'Know they actually learned'"]
+      dont: ["'Revolutionary AI'", "'Disrupting education'"]
+    guidelines:
+      sentence_length: "Short and clear"
+      technical_jargon: "Avoid - speak to parents, not tech people"
+    audience_adjustments:
+      parents: "Emphasize trust and time-saving"
+
+marketing_intelligence:
+  keywords:
+    primary: ["homework help for parents", "AI tutor", "homework battles"]
+    secondary: ["homework assistant", "math help for kids"]
+    search_volume_total: 15000
+  voice_of_customer:
+    pain_quotes:
+      - "'Homework is killing us'"
+      - "'Homework hell'"
+      - "'I spend 6 hours a week on homework'"
+    desire_quotes:
+      - "'I just want peaceful evenings'"
+      - "'I want to know my kid actually learned'"
+  competitors_full:
+    analyzed: ["ChatGPT", "Khanmigo", "Gauth", "Duolingo"]
+  adversarial_insights:
+    top_attack: "ChatGPT may add Homework Integrity feature"
+    mitigation: "Build brand trust and data moat before that happens"
+  external_failures:
+    patterns: ["Chegg collapse from answer-giving model"]
+    learnings: ["Teaching model beats answer-giving model"]
+  content_seeds:
+    blog_topics:
+      - "How to know if your child is using AI to cheat"
+      - "5 signs homework battles are hurting your family"
+    social_hooks:
+      - "Spent 6 hours on homework this week?"
+  ad_copy_bank:
+    headlines:
+      - "End Homework Battles"
+      - "The AI Parents Can Trust"
+    descriptions:
+      - "Finally, homework help that teaches - not cheats"
+  sources:
+    p2_research: true
+    p3_adversarial: true
+
+brand_archetype:
+  primary_archetype: "Caregiver"
+  archetype_rationale: |
+    Parents buying for children align with Caregiver archetype - nurturing, protective,
+    focused on others' wellbeing. Messaging should emphasize caring for child's education
+    while protecting from cheating. Trust and safety are paramount.
+  selection_signals:
+    buyer_motivation: "Protect and nurture child's education"
+    emotional_drivers: ["Trust", "Safety", "Peace"]
+    competitor_positioning: "Others enable harm (cheating)"
+  visual_specs:
+    color_approach: "Warm blues and greens - trust and growth"
+    typography_guidance:
+      headings: "Rounded, friendly sans-serif"
+      body: "Clean, readable"
+    whitespace_density: "Medium - not cramped, not sparse"
+    energy_level: "Calm and reassuring"
+  copy_specs:
+    tone_keywords: ["Warm", "Trustworthy", "Reassuring", "Protective"]
+    cta_style: "Gentle invitation (not aggressive)"
+    pricing_display_pattern: "Emphasize value vs human tutors"
+    reading_level: "Simple, parent-friendly"
+    power_vocabulary: ["Trust", "Learn", "Peace", "Together"]
+    avoid_vocabulary: ["Revolutionary", "Disruptive", "AI-powered"]
+  trust_signal_priority:
+    - "Parent testimonials"
+    - "Before/after homework time"
+    - "Homework Integrity Mode explanation"
+    - "GDPR/COPPA compliance"
+  buyer_profile_key: "parent_protector"
+
+page_structure:
+  variant_a:
+    name: "trust_first"
+    derived_from:
+      - field: "social_proof_strategy.recommended_types[0]"
+        value: "before_after"
+        influence: "Lead with transformation story"
+    hypothesis: "Parents need trust before features"
+    section_order:
+      - "hero"
+      - "trust_badges"
+      - "before_after"
+      - "features"
+      - "social_proof"
+      - "pricing"
+      - "faq"
+      - "cta"
+    section_config:
+      hero:
+        headline: "End Homework Battles Without Enabling Cheating"
+        subheadline: "The AI tutor that teaches, never tells"
+      before_after:
+        before: "6 hours of homework battles per week"
+        after: "Peaceful evenings with confident learners"
+    copy:
+      hero_headline: "End Homework Battles Without Enabling Cheating"
+      problem_tone: "emotional"
+    visual_style:
+      typography: "warm_friendly"
+      imagery: "parent_child_peaceful"
+
+  variant_b:
+    name: "problem_agitate"
+    derived_from:
+      - field: "pain_points_ranked[0]"
+        value: "Homework battles drain family time"
+        influence: "Lead with pain"
+    hypothesis: "Strong pain resonance drives conversions"
+    section_order:
+      - "hero"
+      - "problem"
+      - "agitate"
+      - "solution"
+      - "features"
+      - "social_proof"
+      - "pricing"
+      - "cta"
+    section_config:
+      hero:
+        headline: "Homework Is Destroying Your Evenings"
+        subheadline: "What if it didn't have to?"
+    copy:
+      hero_headline: "Homework Is Destroying Your Evenings"
+      problem_tone: "urgent"
+    visual_style:
+      typography: "direct_clear"
+      imagery: "contrast_before_after"
+
+  deployment:
+    primary_variant: "variant_a"
+    primary_rationale: "Trust-first aligns with Caregiver archetype and parent psychology"
+    site_naming:
+      primary_domain: "mentomate.com"
+      path: "/parents"
+
+  strategy_context:
+    angle_source: "Stage 3.0.6"
+    variant_rationale: "Trust is primary driver for parent segment"
+
+channel_ops:
+  subreddit_targeting:
+    primary_subreddits:
+      - "r/Parenting"
+      - "r/daddit"
+      - "r/Mommit"
+    engagement_strategy: "Value-first posts about homework struggles"
+
+  newsletter_discovery:
+    relevant_newsletters:
+      - "Parenting newsletters"
+      - "Education newsletters"
+
+  influencer_discovery:
+    relevant_influencers:
+      - "Parenting bloggers"
+      - "Teacher influencers"
+
+  ad_platform_sizing:
+    facebook:
+      audience_size: "15M parents in US/EU"
+      estimated_cpm: "$15"
+    google:
+      keyword_volume: "15K/month"
+      estimated_cpc: "$3"
+
+  competitor_ad_analysis:
+    competitors_running_ads: ["Duolingo", "Brilliant"]
+
+  competitor_backlinks:
+    top_referrers: ["Education blogs", "Parenting sites"]
+
+  channel_prioritization:
+    tier_1: ["Reddit organic", "Facebook groups"]
+    tier_2: ["Google Ads", "Facebook Ads"]
+    tier_3: ["Influencer partnerships"]
+
+outreach_assets:
+  cold_dm_templates:
+    - template_id: "parent_relief_dm"
+      profile: "parent_relief"
+      message: |
+        Hi! Saw your post about homework struggles. We built something that might help -
+        an AI tutor that teaches without giving answers. Parents can finally trust their
+        kid is learning, not cheating. Would love your feedback if you have 5 mins.
+
+  cold_email_templates: []
+
+  reddit_posts:
+    - post_id: "parent_relief_post"
+      profile: "parent_relief"
+      subreddit: "r/Parenting"
+      title: "Finally found a homework helper that doesn't enable cheating"
+      body: |
+        Been struggling with homework battles for years. Kid kept using ChatGPT to
+        just get answers. Found this new app that uses Socratic questioning - it guides
+        without giving answers. I can actually see he's learning now. Thought other
+        parents might find it useful.
+
+  linkedin_posts: []
+
+  influencer_pitches: []
+
+tracking_setup:
+  metrics:
+    primary:
+      - "Signups"
+      - "Trial to paid conversion"
+      - "Weekly active users"
+    secondary:
+      - "Questions asked per user"
+      - "Learning Book entries created"
+
+  channel_benchmarks:
+    - channel: "Reddit organic"
+      expected_ctr: "3%"
+      expected_conversion: "5%"
+    - channel: "Facebook Ads"
+      expected_ctr: "1.5%"
+      expected_conversion: "2%"
+
+  validation_benchmarks:
+    conversion_rate:
+      floor: 1
+      target: 3
+      excellent: 5
+    cac:
+      acceptable_max: 50
+      target: 25
+    signups:
+      minimum: 100
+      target: 500
+    payment_intent:
+      threshold: 10
+      signal_types: ["trial_start", "pricing_page_view"]
+    traffic:
+      minimum_visitors: 1000
+      target_visitors: 5000
+    validation_period:
+      weeks: 4
+
+  tracking_stack:
+    analytics: "Plausible"
+    attribution: "UTM parameters"
+    funnel: "PostHog"
+
+  utm_conventions:
+    source: "reddit, facebook, google"
+    medium: "organic, paid, referral"
+    campaign: "parents_launch"
+
+  pre_launch_checklist:
+    - "Privacy policy published"
+    - "GDPR consent flows tested"
+    - "Payment processing configured"
+    - "Analytics installed"
+
+outcome_tracking:
+  prediction:
+    verdict: "PASS"
+    confidence: 85
+    composite_score: 8.2
+    key_risks_identified:
+      - "ChatGPT may add similar feature"
+      - "LLM costs at scale"
+    predicted_success_factors:
+      - "Homework Integrity Mode is unique"
+      - "Pricing validated by Duolingo Max"
+      - "Strong Reddit pain evidence"
+    bet_ability:
+      moat_type: "switching_costs"
+      moat_strength: 7
+      sustainability: "durable"
+    adversarial_attacks_survived:
+      - "Competition from free AI"
+      - "Cheating concerns"
+      - "Engagement collapse"
+    predicted_at: "2026-01-17T12:00:00Z"
+
+  validation: null
+  outcome: null
+
+# ============================================
+# PHASE 4: GTM PREP (Added 2026-01-17)
+# ============================================
+
+channel_ops:
+  subreddit_targeting:
+    primary:
+      - subreddit: "r/Parenting"
+        subscribers: "5.5M+"
+        relevance: "High - homework discussions common"
+        posting_rules: "No self-promotion, share as personal experience"
+      - subreddit: "r/daddit"
+        subscribers: "1M+"
+        relevance: "High - engaged dads seeking solutions"
+        posting_rules: "Supportive community"
+      - subreddit: "r/Teachers"
+        subscribers: "800K+"
+        relevance: "Medium - can influence parent recommendations"
+    secondary:
+      - "r/homeschool"
+      - "r/ParentingADHD"
+      - "r/raisingkids"
+
+  newsletter_discovery:
+    primary:
+      - name: "Common Sense Education"
+        audience: "Parents choosing learning apps"
+        sponsorship_potential: "Yes - accepts sponsors"
+      - name: "Understood.org"
+        audience: "Parents of kids with learning differences"
+        sponsorship_potential: "Guest content possible"
+      - name: "The Homeschool Mom"
+        audience: "Homeschool parents"
+        sponsorship_potential: "Yes - affiliate programs"
+
+  channel_prioritization:
+    primary:
+      channel: "Reddit (r/Parenting, r/daddit)"
+      channel_type: "organic_community"
+      estimated_cac: "€15-25"
+      cac_rationale: "High engagement, proven homework pain discussions"
+      why_primary: "Most engaged parent community with validated pain"
+      ltv_cac_ratio: "8-12x"
+    secondary:
+      channel: "Parent education newsletters"
+      channel_type: "sponsored_content"
+      estimated_cac: "€30-50"
+      why_secondary: "Targeted audience, builds credibility"
+    tertiary:
+      channel: "School parent WhatsApp/Facebook groups"
+      channel_type: "word_of_mouth"
+      estimated_cac: "€5-10"
+      why_tertiary: "Viral potential, trusted recommendations"
+
+outreach_assets:
+  reddit_posts:
+    - title: "Homework battles every night? We stopped fighting (without 'just giving the answers')—here's what helped"
+      subreddit: "r/Parenting"
+      hook: "If your house turns into a courtroom every time homework comes out, I see you."
+      key_points:
+        - "AI tutor that doesn't give answers - uses Socratic method"
+        - "Walks kids through thinking step-by-step"
+        - "Removes parent/child power struggle"
+        - "Kid still does the work, builds confidence"
+      cta: "If you want, I can share the name of the app we're using"
+      tone: "Personal experience, helpful parent"
+
+  cold_dm_templates:
+    - type: "influencer_pitch"
+      target: "Parenting YouTubers/bloggers"
+      subject: "Re: Your video on homework struggles - tool your audience might love"
+      key_angle: "Homework Integrity Mode - teaches without cheating"
+
+  cold_email_templates:
+    - type: "newsletter_sponsor"
+      target: "Parent education newsletters"
+      subject: "Sponsorship inquiry - [Newsletter Name]"
+      key_angle: "AI tutoring that parents trust"
+
+tracking_setup:
+  validation_benchmarks:
+    conversion_rate:
+      floor: 1.5
+      target: 3.0
+      excellent: 5.0
+    cac:
+      acceptable_max: 50
+      target: 25
+    signups:
+      minimum: 30
+      target: 100
+    payment_intent:
+      threshold: 10
+      signal_types:
+        - "credit card entered"
+        - "pricing page visit > 30s"
+        - "clicked subscribe button"
+    traffic:
+      minimum_visitors: 500
+      target_visitors: 2000
+    validation_period:
+      weeks: 6
+
+  channel_benchmarks:
+    - channel: "reddit"
+      expected_ctr: "2-5%"
+      expected_upvote_ratio: "70%+"
+    - channel: "newsletter"
+      expected_ctr: "1-3%"
+      expected_conversion: "5-10%"
+
+  tracking_stack:
+    analytics: "Plausible (GDPR-compliant)"
+    forms: "Tally"
+    email: "ConvertKit"
+
+  utm_conventions:
+    format: "utm_source={platform}&utm_medium={type}&utm_campaign=parents&utm_content={variant}"
+    examples:
+      - "utm_source=reddit&utm_medium=organic&utm_campaign=parents&utm_content=homework_battles"
+      - "utm_source=newsletter&utm_medium=sponsored&utm_campaign=parents&utm_content=commonsense"
+
+  pre_launch_checklist:
+    - "Landing page live at mentomate.com/parents"
+    - "Email capture functional"
+    - "UTM links created"
+    - "Reddit accounts aged (>30 days)"
+    - "First post drafted and reviewed"

@@ -1,699 +1,1460 @@
-# Architecture
-
-This document defines **HOW** the AI-Native Nx Monorepo Template is built and **HOW** features should be implemented. It is derived from PRD.md and constitution.md, with detailed rationale in architecture-decisions.md.
-
-**Audience**: AI coding agents (primary), architects, developers
-**Last Updated**: 2025-12-04
-**Stack Verification**: See `docs/tech-stack.md` (verified 2025-12-03)
-
+---
+stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]
+inputDocuments:
+  - 'docs/prd.md'
+  - 'docs/analysis/product-brief-EduAgent-2025-12-11.md'
+  - 'docs/analysis/epics-inputs.md'
+  - 'docs/analysis/architecture-inputs.md'
+  - 'docs/analysis/research/market-ai-tutoring-research-2024-12-11.md'
+  - 'docs/analysis/research/evidence based learning science.md'
+  - 'docs/FB-Run023-parents.yaml'
+  - 'docs/FB-Run023-learner.yaml'
+  - 'docs/FB-Run023-languages.yaml'
+  - 'docs/ux-design-specification.md'
+workflowType: 'architecture'
+lastStep: 8
+status: 'complete'
+completedAt: '2026-02-15'
+project_name: 'EduAgent'
+user_name: 'Zuzka'
+date: '2026-02-15'
 ---
 
-## Before You Start (Quick Reference)
+# Architecture Decision Document
 
-This document covers **HOW** the system is built. For related guidance, consult:
+_This document builds collaboratively through step-by-step discovery. Sections are appended as we work through each architectural decision together._
 
-| Topic | Document | Key Sections |
-|-------|----------|--------------|
-| **TDD Methodology** | `constitution.md` Section I | AI-adapted TDD with batch test writing, scope-appropriate cycles |
-| **All Core Principles** | `constitution.md` | 11 non-negotiable principles governing all work |
-| **Product Philosophy** | `PRD.md` "What Makes This Special" | AI-Native Architecture, Building-Block Philosophy |
-| **WHY Decisions Were Made** | `architecture-decisions.md` | Full rationale for API, database, tooling choices |
-| **Version Pinning** | `tech-stack.md` | Exact versions, compatibility matrix, upgrade policy |
-| **Agent Execution Rules** | `.ruler/AGENTS.md` | MCP server usage, sub-agent policy, git workflow |
-| **Operational Patterns** | `docs/memories/` | Adopted patterns, post-generation checklist, troubleshooting |
-| **Step-by-Step Playbooks** | `docs/guides/implementation-guide/` | Retry patterns, adding libraries, API endpoints *(embryo)* |
+## Project Context Analysis
 
-**Navigation tip**: Use `docs/index.md` for the complete documentation hierarchy and cross-reference guidelines.
+### Requirements Overview
 
----
+**Functional Requirements:**
 
-## Executive Summary
+117 FRs across 7 epics. Language Learning (FR96-FR107) **deferred to v1.1** — architecture designs for extensibility but doesn't build. Effective MVP scope: ~105 FRs.
 
-The AI-Native Nx Monorepo Template provides production-ready infrastructure for type-safe, full-stack applications with shared business logic across web, server, and mobile platforms. The architecture follows a building-block philosophy—providing reusable infrastructure patterns rather than opinionated business logic—enabling AI coding agents to work effectively within explicit boundaries and type-safe contracts. A walking skeleton validates all layers end-to-end before feature development begins.
+| PRD Category | FRs | Epic Mapping | Architectural Weight |
+|-------------|-----|-------------|---------------------|
+| User Management | FR1-FR12 | Epic 0 | Medium — Clerk handles auth, but GDPR consent workflow and multi-profile switching are custom |
+| Learning Path Personalization | FR13-FR22 | Epic 1 | High — conversational AI, dynamic curriculum generation, intent detection |
+| Interactive Teaching | FR23-FR33 | Epic 2 | Very High — real-time LLM orchestration, Socratic escalation ladder, homework integrity mode |
+| Knowledge Retention | FR34-FR42 | Epic 2 | High — mandatory production, parking lot, prior knowledge context injection |
+| Learning Verification | FR43-FR51 | Epic 3 | High — SM-2 spaced repetition, mastery scoring, delayed recall scheduling |
+| Failed Recall Remediation | FR52-FR58 | Epic 3 | Medium — guided relearning, adaptive method selection |
+| Adaptive Teaching | FR59-FR66 | Epic 3 | Medium — three-strike rule, teaching method preferences, "Needs Deepening" scheduling |
+| Progress Tracking | FR67-FR76 | Epic 4 | Medium — Learning Book, knowledge decay visualization, topic review |
+| Multi-Subject Learning | FR77-FR85 | Epic 4 | Medium — subject management, archive/pause, auto-archive |
+| Engagement & Motivation | FR86-FR95 | Epic 4 | Medium — honest streak, retention XP, interleaved retrieval |
+| Language Learning (v1.1) | FR96-FR107 | Epic 6 | Deferred — Four Strands, CEFR tracking, vocabulary spaced repetition |
+| Subscription Management | FR108-FR117 | Epic 5 | Medium — tiered billing, family pools, top-up credits, reverse trial |
 
-> **Document Status**: This architecture document describes the **existing** brownfield codebase. It is maintained as the authoritative reference for implementation patterns, not a proposal for future design.
+**Non-Functional Requirements driving architecture:**
 
----
+| NFR | Target | Architectural Implication |
+|-----|--------|--------------------------|
+| API response (p95) | <200ms excl. LLM | Rules out cold-start-heavy serverless for hot paths |
+| LLM first token | <2s | SSE streaming from backend to client, model routing optimization |
+| Camera → OCR → first AI response | <3s | Critical path for homework help flow. OCR provider choice directly impacts this budget. |
+| App cold start | <3s | Expo bundle optimization, coaching card precomputation |
+| Uptime | 99.5% | Multi-provider LLM fallback, circuit breaker with defined thresholds |
+| Data durability | 99.99% | Neon managed backups, point-in-time recovery |
+| GDPR compliance | Full | Consent state machine, deletion orchestrator, data residency |
+| COPPA-adjacent | Ages 11-15 | Parental consent workflow, profile isolation, audit trail |
 
-## Decision Summary
+**UX Specification Implications:**
 
-| Category | Decision | Rationale |
-|----------|----------|-----------|
-| **Build System** | Nx + pnpm | Intelligent caching, task graph, distributed execution |
-| **API Framework** | REST+OpenAPI (code-first) | Zero vendor lock-in, AI-agent optimized, mobile-ready |
-| **API Toolchain** | zod-to-openapi → openapi-typescript → openapi-fetch | Single source of truth, type-safe client |
-| **Web Framework** | Next.js (App Router) | RSC, streaming, modern React patterns |
-| **Server Framework** | Express | Mature, extensive ecosystem, well-documented |
-| **Database** | Prisma + Supabase PostgreSQL | Type safety, migrations, connection pooling |
-| **Auth Strategy** | Supabase Auth | Platform-handled, secure, minimal code |
-| **Unit Testing** | Jest | Industry standard, comprehensive ecosystem |
-| **E2E Testing** | Playwright | Fast, reliable, cross-browser |
-| **Type System** | TypeScript (strict) | Compile-time safety, no `as` casting |
+- **Coaching model** (Recall → Build → Apply → Close): Requires session state machine with rung tracking and LLM context injection
+- **Socratic Escalation Ladder**: 5 rungs driving model routing — fastest model at rung 1-2, reasoning models at rung 3+
+- **Coaching card two-path loading**: Cached path (<1s, context-hash freshness) vs fresh path (1-2s skeleton) — requires background precomputation pipeline
+- **Three-persona theming**: Teen dark, learner calm, parent light — CSS variable layer, components stay persona-unaware
+- **Confidence scoring**: Per-problem behavioral metrics feeding parent dashboard — time-to-answer, hints needed, escalation rung, difficulty
+- **Cold start framing**: Sessions 1-5 use coaching-voiced three-button menu, invisible transition to adaptive entry at session 6+
+- **Phase 1 MVP components**: BaseCoachingCard, Camera Capture, MessageThread + HomeworkChatWrapper, SessionCloseSummary, Retention Signal, ErrorRecovery
 
-**Version inventory**: See `docs/tech-stack.md` for exact versions and compatibility matrix
-**Detailed rationale**: See `docs/architecture-decisions.md`
+### Scale & Complexity Assessment
 
----
+**Complexity level: High**
+**Primary domain: Mobile-first full-stack AI application**
 
-## Project Structure
+**Scalability Inflection Points:**
+
+| Users | Inflection | Architectural Response |
+|-------|-----------|----------------------|
+| ~2K | Neon cold start latency on infrequent queries | Connection pooling, keep-alive strategy |
+| ~5K | Background jobs saturate simple queue | Inngest already handles this from MVP |
+| ~10K | Concurrent LLM API calls (~500-1000 simultaneous sessions) saturate connection pooling and provider rate limits — not orchestration CPU | Extract orchestration to dedicated service with its own connection pool and provider-level rate limit management |
+| ~25K | Parent dashboard queries compete with learning writes | Read replicas for reporting/analytics |
+| ~50K | pgvector scan times grow with per-user embeddings | Evaluate dedicated vector store migration |
+
+**Complexity Indicators:**
+
+- **Real-time features**: LLM streaming via SSE, coaching card live updates
+- **Multi-tenancy**: Family accounts with profile isolation, shared billing, independent learning state
+- **Regulatory**: GDPR (EU users 11-15), data deletion rights, parental consent workflows
+- **AI orchestration**: Multi-provider routing by conversation state, cost management, fallback chains
+- **Data complexity**: Relational (users, sessions, curricula) + vector (memory embeddings) + temporal (spaced repetition schedules, knowledge decay)
+- **Integration complexity**: 4+ external services (Clerk, Stripe, LLM providers, OCR provider)
+
+### Technical Constraints & Dependencies
+
+**Decided Stack:**
+
+| Component | Decision | Rationale |
+|-----------|----------|-----------|
+| Mobile Framework | Expo (React Native) | Cross-platform iOS/Android/Web, App Store presence |
+| Database | Neon (PostgreSQL) + pgvector | Serverless scale-to-zero, branching for dev/staging |
+| Authentication | Clerk | Expo SDK, social login, multi-tenant, cost-effective |
+| Payments | Stripe | Checkout, subscriptions, family billing, top-up credits |
+| AI/LLM | Multi-provider (Claude, GPT-4, Gemini Flash) | Routing by conversation state, cost optimization |
+| Vector Search | pgvector (in Neon) | Per-user embeddings, JOINs with relational data |
+| Backend Framework | Hono (Cloudflare Workers preferred, Railway/Fly fallback) | Edge deployment, scale-to-zero matching Neon, lightweight. Not Express. Same framework either runtime — easy migration if Workers constraints bite. |
+| Real-time Transport | SSE | Unidirectional streaming sufficient for tutoring chat. Student sends POST, AI streams back via SSE. Simpler than WebSockets — no sticky sessions, works through CDNs, native ReadableStream in Expo. |
+| Background Jobs | Inngest | Durable execution, automatic retries, step functions for multi-step jobs (SM-2 → coaching card → dashboard), observability. Pairs well with Workers/serverless. |
+
+**Remaining Architecture Decisions:**
+
+| Decision | Options to Evaluate | Blocking |
+|----------|-------------------|----------|
+| OCR provider | Cloud Vision API, ML Kit, Tesseract, Mathpix | Homework photo pipeline — critical path, different latency/accuracy/cost profiles |
+| Embedding generation | Pipeline architecture for per-user memory vectors | Memory retrieval system |
+| Push notification infrastructure | Expo Push, Firebase Cloud Messaging, OneSignal | Retention reminders, review nudges |
+| Code execution sandbox (v2.0) | Browser-based (WASM) vs server-side | Deferred — programming subjects |
+| Offline capability (v2.0) | Local cache strategy, sync protocol | Deferred |
+
+### Cross-Cutting Concerns
+
+| Concern | Architectural Pattern | Scope |
+|---------|----------------------|-------|
+| **Persona-aware theming** | CSS variable layer via NativeWind. 6 JSON token files (3 personas × 2 color modes). **Swap at app root layout**, not Clerk hook — persona is an application concept, not Clerk's. Flow: Clerk authenticates → app fetches active profile → profile includes persona type → root layout sets CSS variables before any child renders. Profile switching within family account swaps variable set without re-authentication. Components stay completely persona-unaware. | All UI |
+| **AI cost management** | Split into two layers: (1) **Metering middleware** calling a **PostgreSQL function** `decrement_quota(profile_id, family_id)` — atomic FIFO logic (monthly pool first, then top-up credits), returns remaining balance or rejection. Middleware interprets result: forward to LLM or return quota-exceeded with soft paywall data. Concurrent family usage handled by PostgreSQL row-level locking (`UPDATE ... SET remaining = remaining - 1 WHERE remaining > 0`) — no application-level locking. (2) **LLM orchestration module** (inline, not service) — `routeAndCall(conversationState, prompt, options) → stream`. Handles model selection by escalation rung, provider failover, streaming normalization. Clean interface enables future service extraction. Soft ceiling €0.05/session: **monitoring threshold, not a cutoff.** Never interrupt a learning session for cost reasons. Log when sessions exceed €0.05. If >20% of sessions consistently exceed ceiling, tune routing rules (e.g., lower the escalation rung threshold for reasoning models). Surface as a dashboard metric for cost monitoring. The metering middleware tracks per-session cost accumulation but does not enforce a hard stop — the quota system (monthly pool + top-ups) is the actual spending control. | Backend |
+| **Prompt caching** | Provider-level first (Anthropic prompt caching for system prompts — stable per subject/persona combination). **Parallel Example templates** cached in database: keyed by `subject + type + difficulty + system_prompt_hash`. System prompt change → hash change → old cache entries naturally bypassed. No explicit invalidation or TTL needed — stale entries are orphaned and can be garbage-collected periodically. No general-purpose prompt cache layer at MVP. | Backend |
+| **Multi-profile data isolation** | **Repository pattern** with automatic scope injection: `createScopedRepository(profileId)` — every query gets `WHERE profile_id = $1` automatically. **Neon RLS** as defense-in-depth, not primary enforcement. Profile ID set via session context, not passed per-request. | Data layer |
+| **Session state management** | **Every exchange, hybrid model.** After each AI response completes, in one transaction: (1) **Append session event** (immutable log): `{ exchange_id, timestamp, user_message, ai_response, model_used, escalation_rung, hints_given, time_to_answer, confidence_signals }`. (2) **Upsert session summary row** (mutable current state): `{ session_id, current_rung, total_exchanges, topics_touched, last_exchange_at }`. Event log gives replay/audit/analytics. Summary row gives fast reads for "where are we." Both in same database transaction — not a separate save step. Cost negligible vs. LLM call; no data loss window. | Backend |
+| **Client recovery** | **Show partial, auto-retry with backoff.** Stream drops mid-token: freeze partial response in chat UI (student may have read it), show inline "reconnecting..." indicator, auto-retry same request at 1s/2s/4s backoff, max 3 attempts. If all fail: persona-appropriate error + manual retry button. Partial response handling: <20% received → replace on retry; >20% → append with visual separator. Never discard what the student already read. | Frontend |
+| **Event-driven lifecycle** | **Direct queue dispatch via Inngest.** `session.completed` → 4-5 known consumers (SM-2 recalculation → coaching card precomputation → parent dashboard update). Inngest step functions for multi-step chains. Fire-and-forget with retry — no full event sourcing at MVP. Lifecycle events (`session.started`, `session.completed`, `session.timed_out`) stored as special event types in the same append-only session event log — replay capability without a full event store. Ordering: per-session/per-profile natural ordering. Overlapping sessions (unlikely): last-write-wins on SM-2 row, recalculation is idempotent. | Backend |
+| **Retention & spaced repetition** | SM-2 as **library/module** (~50 lines pure math). Takes `{ previous_interval, previous_ease_factor, quality_score }` → returns `{ next_interval, next_ease_factor, next_review_date }`. Writes to `topic_schedules` table. Consumers are all readers: coaching card ("which topics due/overdue"), notification scheduler ("when is next review"), parent dashboard ("how many topics fading"). Library is the writer, everything else is a reader. Clean interface enables future service extraction. Called through event-driven lifecycle. | Backend |
+| **Data privacy & compliance** | **Consent state machine**: `PENDING → PARENTAL_CONSENT_REQUESTED → CONSENTED → WITHDRAWN`, enforced at repository layer (no data access without CONSENTED). **Deletion orchestrator**: knows every table and external system, anonymizes immediately, full deletion within 30 days, idempotent/retryable steps. | Full stack |
+| **Error boundaries & graceful degradation** | Per-dependency circuit breakers with specific thresholds: **LLM providers** — trip after 3 consecutive 5xx/timeouts within 30-second window, half-open after 60s (one probe request). Tight window intentional — 30s wait is already bad UX in tutoring. **OCR** — no circuit breaker; single-request 5s timeout, immediate text input fallback (failures are per-image, not systemic). **Stripe** — no circuit breaker; webhook delays are normal. Check subscription from local DB (webhook-synced), never call Stripe during learning session. 3-day grace period per PRD. **Neon** — if DB is down, almost nothing works. Cache coaching card + Learning Book on client after each successful load, show with "limited mode" banner. Don't build elaborate fallbacks — invest in Neon reliability instead. | Full stack |
+| **Observability** | Structured logging with **correlation IDs** (request → LLM call → background job chain). Every LLM call logged: model, tokens in/out, latency, context hash, routing decision, cost. SM-2 decisions logged: card, interval, ease factor, grade. OpenTelemetry recommended. | Backend |
+| **i18n** | MVP: English + German UI. Backend: English only. Learning languages: any (via LLM). Framework: react-i18next. RTL deferred. | Frontend |
+
+## Starter Template Evaluation
+
+### Primary Technology Domain
+
+Monorepo with two apps: Expo mobile client + Hono API backend. **Starting from fork of existing Nx monorepo** ([cognoco/nx-monorepo](https://github.com/cognoco/nx-monorepo)), not from scratch.
+
+### Current Versions (verified Feb 2026)
+
+| Technology | Version | Notes |
+|-----------|---------|-------|
+| Expo SDK | 54 (v54.0.33) | SDK 55 in beta |
+| Hono | 4.11.x (v4.11.9) | Released Feb 8, 2026 |
+| NativeWind | **v4.2.1** (pin) | v5 is preview/pre-release only. Pin to v4.2.1 + Tailwind CSS 3.4.17. |
+| Drizzle ORM | Current stable | Type-safe SQL, replaces Prisma |
+| Nx | 22.5.0 | Released Feb 9, 2026 |
+| @naxodev/nx-cloudflare | 6.0.0 | Nx 22 compatible, actively maintained (Jan 2026) |
+
+### Starter Decision: Fork `cognoco/nx-monorepo`
+
+**Rationale:** The existing monorepo provides ~40% of value by infrastructure — Nx workspace config (with `@nx/expo/plugin` already configured), GitHub Actions CI/CD (lint, test, build, typecheck, deploy with Nx Cloud caching), Husky + lint-staged + commitlint, ESLint 9 flat config, Jest preset, Docker config, CodeRabbit/Dependabot/Sentry patterns, and Claude Code integration. Building this from scratch would be significant effort for zero product differentiation.
+
+**What we keep (high-leverage infrastructure):**
+
+| Asset | Value |
+|-------|-------|
+| Nx workspace config (`nx.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`) | Already has `@nx/expo/plugin`, `@nx/jest/plugin`, `@nx/eslint/plugin`, Nx Cloud |
+| GitHub Actions CI/CD (`ci.yml`, `mobile-ci.yml`, `deploy-staging.yml`, `deploy-production.yml`) | Lint, test, build, typecheck, deploy matrix with Nx Cloud caching |
+| `apps/mobile/` Expo shell | `app.json`, `eas.json`, `metro.config.js`, Jest config — keep and strip app code |
+| `packages/schemas/` | Zod schema pattern — becomes single source of shared types + validation |
+| `packages/test-utils/`, `packages/factory/` | Testing infrastructure — evaluate and keep what applies |
+| Husky + lint-staged + commitlint | Commit quality enforcement |
+| ESLint 9 flat config + Prettier | Code quality |
+| Jest preset + testing strategy | Testing infrastructure |
+| Docker config | Useful for Railway/Fly deployment path |
+| `.editorconfig`, `.nvmrc`, TypeScript strict mode | Dev environment consistency |
+| CodeRabbit, Dependabot, Sentry patterns | Quality and monitoring |
+| Claude Code integration (`claude.yml`, `claude-code-review.yml`, `CLAUDE.md`, `.claude/`) | AI-assisted development |
+
+**What we replace:**
+
+| Current | Replace With | Scope |
+|---------|-------------|-------|
+| `apps/web/` (Next.js 15) | Remove entirely | Different framework |
+| `apps/server/` (Express) | `apps/api/` (Hono on Workers/Railway) | Replace — different framework, same `packages/` consumption |
+| `packages/database/` (Prisma + Supabase) | `packages/database/` (Drizzle + Neon) | Replace — different ORM, different connection model |
+| `packages/supabase-client/` | Remove, add Clerk SDK config | Different auth provider |
+| `packages/api-client/` (REST + OpenAPI) | Hono RPC types in `packages/schemas/` | Single mobile client doesn't need OpenAPI |
+| `@nx/next/plugin` in nx.json | Remove | No Next.js |
+| `@nx/playwright/plugin` in nx.json | Remove (Detox or Maestro for mobile E2E later) | Different testing target |
+| Vercel deployment workflows | EAS (Expo) + Railway/Workers | Different deployment targets |
+
+**What we remove:**
+
+- `apps/web-e2e/` (Playwright) — mobile E2E needs Detox/Maestro
+- `packages/supabase-client/` — entirely Supabase-specific
+- Vercel-specific deployment workflow
+- Supabase environment variable wiring
+
+### Hono App Scaffolding (Manual)
+
+The `@johnlindquist/nx-hono` plugin is dead (0 downloads, missing GitHub repo, no updates since May 2025). Scaffold Hono manually — straightforward:
 
 ```
-nx-monorepo/
-├── apps/                          # Applications (what you build)
-│   ├── web/                       # Next.js web application
-│   │   ├── src/
-│   │   │   ├── app/               # App Router pages
-│   │   │   └── components/        # React components (tests co-located)
-│   │   ├── project.json
-│   │   ├── jest.config.ts
-│   │   └── tsconfig.*.json
-│   ├── web-e2e/                   # Playwright E2E tests
-│   │   ├── src/*.spec.ts
-│   │   └── playwright.config.ts
-│   └── server/                    # Express API server
+apps/api/
+├── src/
+│   ├── routes/          # Route handlers
+│   ├── middleware/       # Auth, metering, CORS, circuit breaker
+│   ├── lib/             # LLM orchestration module, Inngest functions
+│   └── index.ts         # Hono app entry
+├── drizzle/             # Migration files only (deployment artifacts)
+├── wrangler.toml        # Cloudflare Workers config
+├── project.json         # Nx targets: serve, build, deploy
+├── tsconfig.json
+├── tsconfig.app.json
+└── package.json
+```
+
+`project.json` targets use `@naxodev/nx-cloudflare` executors for build/deploy, or `nx:run-commands` wrapping `wrangler dev` / `wrangler deploy`.
+
+### Package Boundaries
+
+**`packages/schemas/`** — single source of truth for shared types AND validation:
+- Zod schemas (request/response validation)
+- Inferred TypeScript types via `z.infer<>`
+- Hono RPC type exports (`AppType` re-export)
+- Domain types that have no schema (pure UI state types, enums) also live here until the package outgrows a single concern
+- Split into `packages/types/` only when justified by size or divergent concerns
+
+**`packages/database/`** — Drizzle schema definitions, Neon connection factory, scoped repository pattern (`createScopedRepository`), RLS policy definitions. This is library code imported by `apps/api/`.
+
+**`apps/api/drizzle/`** — migration files only. Deployment artifacts generated by `drizzle-kit` reading schema from `packages/database/`. Not library code.
+
+**`packages/retention/`** — SM-2 library (~50 lines pure math, no dependencies). Testable in isolation, importable by both API and potentially mobile app (v2.0 offline schedule display).
+
+### Final Workspace Structure (post-fork)
+
+```
+eduagent/
+├── apps/
+│   ├── mobile/              # Expo (kept from fork, app code replaced)
+│   │   ├── app/             # Expo Router file-based routes
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   ├── lib/
+│   │   └── assets/
+│   └── api/                 # Hono (new, manually scaffolded)
 │       ├── src/
-│       │   ├── main.ts            # Entry point
-│       │   ├── routes/            # REST+OpenAPI endpoints
-│       │   └── openapi/           # OpenAPI infrastructure
-│       └── project.json
-├── packages/                      # Shared libraries (buildable)
-│   ├── database/                  # Prisma client + utilities
-│   │   ├── src/
-│   │   │   ├── index.ts           # Public API
-│   │   │   └── client.ts          # Prisma singleton
-│   │   └── prisma/
-│   │       ├── schema.prisma
-│   │       └── migrations/
-│   ├── schemas/                   # Zod schemas + TypeScript types
-│   │   └── src/lib/*.schema.ts
-│   ├── api-client/                # REST API client
-│   │   ├── src/
-│   │   │   ├── index.ts           # Client factory
-│   │   │   └── generated/         # OpenAPI-generated types
-│   │   └── project.json
-│   └── supabase-client/           # Supabase client factories
-│       └── src/index.ts           # Browser/server factories
-├── docs/                          # Project documentation
-│   ├── index.md                   # Documentation index
-│   ├── PRD.md                     # Product requirements
-│   ├── architecture.md            # This file
-│   ├── architecture-decisions.md  # ADR details
-│   ├── tech-stack.md              # Version inventory
-│   └── memories/                  # Cogno operational memory
-└── .ruler/
-    └── AGENTS.md                  # Agent rules → CLAUDE.md
+│       │   ├── routes/
+│       │   ├── middleware/
+│       │   ├── lib/
+│       │   └── index.ts
+│       ├── drizzle/         # Migration files only
+│       └── wrangler.toml
+├── packages/
+│   ├── schemas/             # Zod schemas + inferred types + Hono RPC exports (kept, extended)
+│   ├── retention/           # SM-2 library — pure math, no deps (new)
+│   ├── database/            # Drizzle schema + Neon connection + scoped repository (rebuilt)
+│   ├── test-utils/          # Testing utilities (kept, adapted)
+│   └── factory/             # Test factories (kept, adapted)
+├── .github/workflows/       # CI/CD (kept, deployment targets updated)
+├── nx.json
+├── tsconfig.base.json
+├── pnpm-workspace.yaml
+└── package.json
 ```
 
-### Dependency Flow (Enforced)
+### Type Safety Strategy — Hono RPC
 
-```
-apps/web ────┐
-             ├──► packages/api-client ──► packages/schemas
-apps/mobile ─┘                                   ↑
-                                                 │
-apps/server ──► packages/database ──────────────┘
-                      │
-                      └──► packages/supabase-client
-```
+Hono RPC exports the API type from the server; the client consumes it with full type inference. Lighter than tRPC, works as standard REST, no code generation.
 
-**Rules**:
-1. Applications depend on packages, never reverse
-2. No app-to-app imports
-3. No circular dependencies
-4. All packages buildable with proper TypeScript exports
+```typescript
+// API: apps/api/src/index.ts
+const app = new Hono().route('/sessions', sessionsRoute);
+export type AppType = typeof app;
 
-**Verify**: `pnpm exec nx graph`
-
----
-
-## Technology Stack Details
-
-### Core Technologies
-
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| **Web** | Next.js 15.2 + React 19 | Server components, streaming, App Router |
-| **Server** | Express 4.x | REST API with OpenAPI specification |
-| **Database** | Prisma 6.x + Supabase | Type-safe ORM with managed PostgreSQL |
-| **Testing** | Jest 30 + Playwright 1.56 | Unit/integration + E2E |
-| **Build** | Nx 21.6 + pnpm 10.19 | Monorepo orchestration with caching |
-
-> **⚠️ Known Incompatibilities**: Before mixing tools or versions, see `tech-stack.md` "Known Incompatibilities" section for combinations that cause failures (e.g., Jest 30 + mixed transformers, Nx version mismatches).
-
-### Integration Architecture
-
-```
-┌─────────────────────────────────────────┐
-│ Supabase Cloud                          │
-│  ├─ PostgreSQL Database                 │
-│  └─ Auth Service                        │
-└─────────────────────────────────────────┘
-           ↑                    ↑
-    DATABASE_URL         SUPABASE_URL + Keys
-           ↑                    ↑
-    ┌──────┴─────┐      ┌──────┴───────┐
-    │   Prisma   │      │ Supabase SDK │
-    │   (ORM)    │      │   (Auth)     │
-    └──────┬─────┘      └──────┬───────┘
-           ↑                    ↑
-    apps/server            apps/web
+// Re-export from packages/schemas/ for mobile consumption
+// Mobile: apps/mobile/lib/api.ts
+import type { AppType } from '@eduagent/schemas';
+import { hc } from 'hono/client';
+const client = hc<AppType>(API_URL);
 ```
 
-**Connection strategy**:
-- Server uses Prisma via `DATABASE_URL` for all data operations
-- Web/Mobile use Supabase SDK for authentication ONLY
-- All data flows through Express API (never direct client → database)
+**Note:** Project initialization = fork repo, strip Supabase/Next.js/Express specifics, scaffold Hono API, rebuild database package. This should be the first implementation epic.
 
----
+### pnpm + Expo Compatibility
 
-## Implementation Patterns
+Research noted pnpm symlink issues with Expo in some Nx setups. If encountered during project init, fix with `node-linker=hoisted` in `.npmrc`. Don't switch package managers preemptively.
 
-These patterns ensure consistent implementation across all AI agents. Each pattern MUST be followed exactly.
+## Core Architectural Decisions
+
+### Decision Priority Analysis
+
+**Critical Decisions (Block Implementation) — All Resolved:**
+
+| # | Decision | Resolution | Source |
+|---|----------|-----------|--------|
+| 1 | Database + ORM | Neon + Drizzle + pgvector | Step 2 |
+| 2 | Auth provider | Clerk | Step 2 |
+| 3 | Backend framework + runtime | Hono on Cloudflare Workers (Railway/Fly fallback) | Step 2 |
+| 4 | Real-time transport | SSE | Step 2 |
+| 5 | Background jobs | Inngest | Step 2 |
+| 6 | LLM orchestration pattern | Inline module, conversation-state routing | Step 2 |
+| 7 | Session state persistence | Every exchange, hybrid event log + summary row | Step 2 |
+| 8 | Data isolation | Scoped repository + Neon RLS defense-in-depth | Step 2 |
+| 9 | Monorepo + starter | Nx, forked from cognoco/nx-monorepo | Step 3 |
+| 10 | OCR strategy | ML Kit on-device primary, server-side fallback behind interface | Step 4 |
+
+**Deferred Decisions (Post-MVP):**
+
+| Decision | Deferred To | Rationale |
+|----------|-----------|-----------|
+| Code execution sandbox | v2.0 | Programming subjects not in MVP |
+| Offline capability | v2.0 | Requires local cache + sync protocol |
+| Language Learning mode | v1.1 | FR96-FR107, design for but don't build |
+| OCR server-side fallback provider | Homework Help epic | Mathpix vs CF Workers AI — design the interface now, choose provider when evaluating real content |
+| Zustand (shared client state) | When justified | Start with TanStack Query + Context + local state |
+
+### Data Architecture
+
+**Database:** Neon (PostgreSQL) + pgvector. Serverless scale-to-zero, branching for dev/staging.
+
+**ORM:** Drizzle. Type-safe schema definitions in `packages/database/`. Drizzle relational queries for 90% of operations (standard CRUD, JOINs). Raw SQL via Drizzle's `sql` template tag for parent dashboard aggregations — `GROUP BY`, window functions, time-series grouping across multiple children's topics with retention scoring. Complex queries wrapped in named query functions in `packages/database/` for type safety and reusability.
+
+**Caching — Workers KV (native, zero network hop):**
+- **Coaching cards**: Precomputed, written infrequently (on `session.completed` via Inngest), read on every app open. Perfect KV workload.
+- **Subscription status**: Updated on Stripe webhook, read on every LLM call by metering middleware. Same write-rare/read-often pattern.
+- **Session summary**: No cache needed — read once per session resumption, single DB query is fine.
+- No Redis/Upstash. Already on Workers — KV is native.
+
+**Migration Workflow:**
+- **Development**: `drizzle-kit push` (fast schema iteration, no migration files)
+- **Production/Staging**: `drizzle-kit generate` → committed migration SQL in `apps/api/drizzle/` → `drizzle-kit migrate` applied in CI/CD pipeline
+- **Rule**: Never `push` against production or staging
+- Schema definitions in `packages/database/`, migration artifacts in `apps/api/drizzle/`
+
+**Pagination:**
+- **Learning Book**: Full fetch per subject, filter/sort client-side with TanStack Query. Ceiling is a few hundred topics per power user — single query, under 10ms. Cursor pagination adds unnecessary client complexity for a dataset that fits in one response.
+- **Session history**: Cursor-based (`WHERE (created_at, id) < ($cursor_time, $cursor_id) ORDER BY created_at DESC, id DESC LIMIT $n`). Grows unbounded, pagination justified.
+
+### Authentication & Security
+
+**Auth provider:** Clerk. JWT-based. `@clerk/clerk-expo` on mobile, Clerk middleware on Hono API.
+
+**Mobile → API auth flow:** Clerk JWT verification. Mobile obtains JWT from Clerk SDK, sends as `Authorization: Bearer` header. Hono middleware verifies via Clerk's JWKS endpoint (cacheable in Workers KV). Profile ID extracted from Clerk session metadata, injected into request context for scoped repository.
+
+**Authorization model:** Custom RBAC on profile metadata, not Clerk Organizations. Clerk orgs are designed for B2B multi-tenancy (team invites, role management UI) — wrong abstraction for family accounts. Store profile type (parent, teen, learner), family linkage, and consent state in Neon. Clerk provides authenticated user identity; application middleware maps to profile and enforces access rules.
+
+**Rate limiting:** Cloudflare Workers built-in rate limiting (100 req/min per user per PRD). Configuration in `wrangler.toml`, not code. For the quota system (questions/month), `decrement_quota` PostgreSQL function is the enforcement point.
+
+**API security:** Input validation via Zod on every route. Parameterized queries via Drizzle. Content Security Policy headers. CORS restricted to mobile app origins.
+
+### API & Communication Patterns
+
+**Transport:** Hono REST API + SSE for LLM streaming. Hono RPC for end-to-end type safety.
+
+**API versioning:** `/v1/` prefix from day one. The moment a binary ships to the App Store, users on old binaries hitting breaking API changes is a real problem. A URL prefix costs nothing today but is painful to retrofit.
+
+**Error response format:** Simple typed envelope with Zod schema in `packages/schemas/`:
+
+```typescript
+const ApiErrorSchema = z.object({
+  code: z.string(),        // e.g. "QUOTA_EXCEEDED", "SESSION_NOT_FOUND"
+  message: z.string(),     // Human-readable
+  details: z.unknown().optional()  // Contextual data
+});
+```
+
+One mobile client, one error handling path. RFC 7807 overengineered for this. Both API and mobile import the same type.
+
+**Pagination:**
+- **Learning Book**: Full fetch per subject (few hundred topics max, single response)
+- **Session history**: Cursor-based (`WHERE (created_at, id) < ($cursor_time, $cursor_id)`)
+
+**Route structure:**
+
+```
+/v1/sessions/*          # Learning sessions, exchanges, session events
+/v1/profiles/*          # Profile management, persona, preferences
+/v1/curricula/*         # Curriculum generation, topics, learning paths
+/v1/assessments/*       # Quizzes, recall tests, mastery scores
+/v1/subscriptions/*     # Billing, quota, top-ups
+/v1/coaching/*          # Coaching card, coaching state
+/v1/book/*              # Learning Book, topic review, summaries
+/v1/ocr                 # Homework photo processing
+/v1/inngest             # Inngest webhook — NOT behind Clerk auth.
+                        # Verify Inngest signing key, skip JWT middleware.
+```
+
+### Frontend Architecture
+
+**State management:**
+- **TanStack Query** for all server state (sessions, topics, coaching cards, dashboard data). Handles caching, background refetch, optimistic updates.
+- **React Context** for auth state (Clerk session) and active profile (persona type, profile ID)
+- **Local component state** for UI interactions (form inputs, modal visibility, scroll position)
+- No Zustand at MVP. Add when shared client state crosses navigation boundaries and doesn't come from the server.
+
+**Navigation:** Expo Router with route groups:
+
+```
+app/
+├── (auth)/              # Login, registration, consent flows
+├── (learner)/           # Learner persona routes
+│   ├── _layout.tsx      # Learner tab bar + coaching voice
+│   ├── home.tsx
+│   ├── session/[id].tsx
+│   └── book/
+├── (parent)/            # Parent persona routes
+│   ├── _layout.tsx      # Parent nav + dashboard
+│   ├── dashboard.tsx
+│   └── profiles/
+└── _layout.tsx          # Root layout — sets CSS variables from active profile
+```
+
+**Styling:** NativeWind v4.2.1 + Tailwind CSS 3.4.17. CSS variable theming — root layout sets variables, all components are persona-unaware.
+
+**Image handling:** Expo Image (built into SDK 54, optimized for React Native, handles caching and progressive loading). No additional library needed.
+
+### Infrastructure & Deployment
+
+**Primary deployment:**
+- **API**: Cloudflare Workers via `@naxodev/nx-cloudflare` (fallback: Hono on Railway via Docker)
+- **Mobile**: EAS Build + EAS Submit (App Store / Google Play)
+- **Database**: Neon (managed, auto-scaling)
+
+**CI/CD:** GitHub Actions from forked repo. Nx Cloud for remote caching and affected-only builds. Matrix: lint → typecheck → test → build → deploy (staging on PR merge, production on release tag).
+
+**Environment configuration:** `.env` files per environment (dev/staging/prod). Cloudflare Workers uses `wrangler.toml` + Workers secrets for sensitive values. Neon branching for dev/staging databases.
+
+**OCR:**
+- **Primary**: ML Kit on-device (fast, no network dependency for common case)
+- **Fallback**: Server-side OCR behind a service interface for math-heavy content. Provider (Mathpix vs CF Workers AI) evaluated during homework help epic — interface designed now, implementation deferred.
+
+**Push notifications:** Expo Push Notifications (native to Expo, simplest integration, handles iOS APNs + Android FCM). No additional service needed at MVP.
+
+**Embedding pipeline:** On-write via Inngest. When a session completes, `session.completed` event triggers embedding generation for the session's key concepts. Stored in pgvector alongside profile ID. Lazy backfill for existing sessions if needed.
+
+**Observability:**
+- **Mobile**: Sentry (`@sentry/react-native`) for crash reporting + performance monitoring
+- **API**: `@sentry/cloudflare` (verify during project init it captures what's needed on Workers). If too limited, Sentry for mobile only.
+- **Backend debugging**: Axiom as primary. Structured logging with correlation IDs, LLM call logging, SM-2 decision logging routed to Axiom.
+- **OpenTelemetry**: Recommended for trace propagation (request → LLM → Inngest job chain)
+
+### Decision Impact Analysis
+
+**Implementation Sequence** (decisions that must be in place before dependent work):
+
+1. Nx monorepo fork + strip (unblocks everything)
+2. Neon database + Drizzle schema + scoped repository (unblocks all data-dependent work)
+3. Clerk integration (unblocks auth, profile switching, consent)
+4. Hono API shell + SSE streaming (unblocks session/LLM work)
+5. TanStack Query + Expo Router navigation (unblocks all mobile screens)
+6. Inngest setup (unblocks background jobs: SM-2, coaching card precompute)
+7. Stripe integration (can be parallel with 4-6)
+8. ML Kit OCR (can be parallel, needed for homework flow)
+
+## Implementation Patterns & Consistency Rules
 
 ### Naming Patterns
 
+**Database (Drizzle schema in `packages/database/`):**
+
 | Element | Convention | Example |
-|---------|------------|---------|
-| **Packages** | `@nx-monorepo/<name>` | `@nx-monorepo/api-client` |
-| **Database tables** | snake_case with `@@map()` | `health_checks` |
-| **Prisma models** | PascalCase | `HealthCheck` |
-| **API routes** | kebab-case | `/api/health-check` |
-| **Test files** | `*.spec.ts` / `*.spec.tsx` | `Button.spec.tsx` |
-| **Integration tests** | `*.integration.spec.ts` | `health.integration.spec.ts` |
+|---------|-----------|---------|
+| Tables | snake_case, plural | `learning_sessions`, `topic_schedules`, `session_events` |
+| Columns | snake_case | `profile_id`, `created_at`, `escalation_rung` |
+| Foreign keys | `{referenced_table_singular}_id` | `profile_id`, `session_id`, `curriculum_id` |
+| Indexes | `idx_{table}_{columns}` | `idx_session_events_session_id`, `idx_topic_schedules_next_review` |
+| Enums | snake_case type, SCREAMING_SNAKE values | `consent_state` type: `PENDING`, `PARENTAL_CONSENT_REQUESTED`, `CONSENTED`, `WITHDRAWN` |
+| Timestamps | Always `created_at` + `updated_at` | UTC, `timestamp with time zone` |
+
+**Drizzle schema file organization:** One schema file per domain, not one giant file and not one file per table.
+
+```
+packages/database/src/schema/
+├── profiles.ts        # profiles, family_links, consent_states
+├── sessions.ts        # learning_sessions, session_events, session_summaries
+├── curricula.ts       # curricula, topics, learning_paths
+├── assessments.ts     # assessments, recall_tests, mastery_scores
+├── subscriptions.ts   # subscriptions, quota_pools, top_up_credits
+├── coaching.ts        # coaching_cards, coaching_states
+└── index.ts           # re-exports all schemas
+```
+
+**API (Hono routes in `apps/api/`):**
+
+| Element | Convention | Example |
+|---------|-----------|---------|
+| Endpoints | plural nouns, kebab-case for multi-word | `/v1/sessions`, `/v1/coaching-cards`, `/v1/learning-book` |
+| Route params | camelCase | `/v1/sessions/:sessionId/exchanges/:exchangeId` |
+| Query params | camelCase | `?subjectId=...&cursor=...&limit=20` |
+| JSON fields | camelCase | `{ profileId, escalationRung, createdAt }` |
+| HTTP methods | Standard REST | GET (read), POST (create), PATCH (partial update), DELETE |
+
+**Code (TypeScript across all packages):**
+
+| Element | Convention | Example |
+|---------|-----------|---------|
+| Files — components | PascalCase | `CoachingCard.tsx`, `SessionThread.tsx` |
+| Files — utilities/hooks | camelCase | `useProfile.ts`, `createScopedRepository.ts` |
+| Files — schemas/types | camelCase | `sessionSchemas.ts`, `profileTypes.ts` |
+| Files — route handlers | camelCase | `sessions.ts`, `coaching.ts` |
+| Components | PascalCase | `BaseCoachingCard`, `MessageThread` |
+| Functions | camelCase | `routeAndCall()`, `decrementQuota()` |
+| Constants | SCREAMING_SNAKE | `MAX_RETRY_ATTEMPTS`, `SESSION_TIMEOUT_MS` |
+| Types/Interfaces | PascalCase | `SessionEvent`, `CoachingCardState` |
+| Zod schemas | camelCase + `Schema` suffix | `sessionEventSchema`, `apiErrorSchema` |
+| Inngest functions | `app/{domain}.{action}` | `app/session.completed`, `app/coaching.precompute` |
+
+**Import ordering** (enforced via ESLint `import/order` plugin):
+
+```typescript
+// 1. External packages
+import { Hono } from 'hono';
+import { streamSSE } from 'hono/streaming';
+import { z } from 'zod';
+
+// 2. @eduagent/* workspace packages
+import { sessionEventSchema } from '@eduagent/schemas';
+import { createScopedRepository } from '@eduagent/database';
+
+// 3. Relative imports
+import { processExchange } from '../lib/exchanges';
+import { config } from '../config';
+```
+
+Groups separated by blank lines. Automated enforcement, not manual discipline.
+
+**Exports:** Named exports everywhere. No default exports except where the framework requires them (Expo Router page components). Default exports make refactoring harder — renaming on import means grep can't find usages. Named exports keep the name consistent across the codebase.
 
 ### Structure Patterns
 
-| Pattern | Rule | Reference |
-|---------|------|-----------|
-| **Test location** | Co-located in `src/` next to source | `adopted-patterns/module-01` |
-| **Router organization** | Path-agnostic routers, mount in main.ts | `adopted-patterns/module-05` |
-| **Prisma singleton** | Single instance via globalThis | `adopted-patterns/module-10` |
+**Test location:** Co-located. Tests live next to the code they test.
+
+```
+routes/
+├── sessions.ts
+├── sessions.test.ts
+├── coaching.ts
+└── coaching.test.ts
+```
+
+Not a separate `__tests__/` directory. Exception: integration/E2E tests in a top-level `tests/` directory.
+
+**Component organization (mobile):** Feature-based, not type-based.
+
+```
+components/
+├── coaching/
+│   ├── BaseCoachingCard.tsx
+│   ├── CoachingCard.test.tsx
+│   └── RecallPrompt.tsx
+├── session/
+│   ├── MessageThread.tsx
+│   ├── HomeworkChatWrapper.tsx
+│   └── SessionCloseSummary.tsx
+└── common/
+    ├── RetentionSignal.tsx
+    └── ErrorRecovery.tsx
+```
+
+**Hono handler pattern:** Handler stays inline for route definition and Hono RPC type inference. Business logic extracted into service functions in `apps/api/src/lib/` — testable, readable, handler is thin glue.
+
+```typescript
+// routes/sessions.ts — handler inline, logic extracted
+const sessions = new Hono()
+  .post('/:sessionId/exchanges', async (c) => {
+    const input = exchangeInputSchema.parse(await c.req.json());
+    const result = await processExchange(c.get('repo'), input); // lib/
+    return streamSSE(c, result.stream);
+  });
+```
+
+**Package exports:** Every package has an `index.ts` barrel file. Import from package name, never from internal paths.
+
+```typescript
+// CORRECT
+import { sessionEventSchema, type SessionEvent } from '@eduagent/schemas';
+
+// INCORRECT
+import { sessionEventSchema } from '@eduagent/schemas/src/session/events';
+```
+
+**Dependency direction:** One-way flow, strictly enforced.
+
+```
+apps/mobile  →  @eduagent/schemas
+apps/mobile  →  @eduagent/retention
+apps/api     →  @eduagent/schemas
+apps/api     →  @eduagent/database
+apps/api     →  @eduagent/retention
+
+@eduagent/database  →  @eduagent/schemas    (DB schema references Zod types)
+@eduagent/retention →  (no workspace deps)   (pure math, zero deps)
+@eduagent/schemas   →  (no workspace deps)   (leaf package)
+```
+
+`packages/` never imports from `apps/`. `packages/schemas` never imports from `packages/database`. An agent importing a Drizzle type into a shared schema creates a circular dependency — the schema package must remain a leaf.
 
 ### Format Patterns
 
-| Format | Standard |
-|--------|----------|
-| **API responses** | `{ data, error }` or RFC 7807 Problem Details |
-| **Timestamps** | ISO 8601 with timezone (`@db.Timestamptz`) |
-| **Primary keys** | UUID (`@id @default(uuid()) @db.Uuid`) |
+**API responses:**
+
+```typescript
+// Success — direct data, no wrapper
+GET /v1/sessions/:id → { sessionId, currentRung, ... }
+GET /v1/book/:subjectId/topics → [{ topicId, title, retentionStatus, ... }]
+
+// Error — typed envelope (from packages/schemas/)
+{ code: "QUOTA_EXCEEDED", message: "Monthly question limit reached", details: { remaining: 0, resetDate: "2026-03-01" } }
+
+// Paginated (cursor-based, session history only)
+{ data: [...], cursor: { nextCursor: "2026-02-15T10:30:00Z_abc123" | null } }
+```
+
+**Dates:** ISO 8601 strings in JSON (`"2026-02-15T10:30:00Z"`). Always UTC. Frontend formats for display using user's locale.
+
+**Nulls and optionality:**
+- **Response schemas**: `.nullable()` — explicit `null` over missing keys so mobile app distinguishes "exists but empty" from "wasn't sent"
+- **Request schemas** (POST/PATCH): `.optional()` — client shouldn't send `"fieldName": null` for fields it's not updating
+- **Never**: `.nullable().optional()` — pick one
+
+**IDs:** UUID v7 for all primary keys on user-facing entities (sessions, topics, exchanges, profiles). Timestamp-ordered B-tree indexes are naturally chronological — benefits cursor pagination and time-range queries without a separate `created_at` index. v4 only for IDs that must not leak creation order (security tokens).
 
 ### Communication Patterns
 
-| Pattern | Implementation |
-|---------|----------------|
-| **API contracts** | Zod schemas → OpenAPI spec → TypeScript types |
-| **HTTP client** | `openapi-fetch` with typed paths |
-| **Error handling** | Check `if (error)` before accessing `data` |
+**Inngest events:**
 
-### Lifecycle Patterns
+```typescript
+// Naming: app/{domain}.{action}
+"app/session.completed"
+"app/session.timed_out"
+"app/coaching.precompute"
+"app/retention.recalculate"
 
-| State | Approach |
-|-------|----------|
-| **Loading** | React Server Components + Suspense |
-| **Mutations** | `useTransition` or `useOptimistic` |
-| **Error boundaries** | Fatal errors; inline messages for validation |
-| **Retries** | Manual exponential backoff (no built-in) |
+// Payload: always includes profileId + timestamp
+{
+  name: "app/session.completed",
+  data: {
+    profileId: "...",
+    sessionId: "...",
+    subjectId: "...",
+    totalExchanges: 8,
+    finalRung: 3,
+    timestamp: "2026-02-15T10:30:00Z"
+  }
+}
+```
 
-> **State Diagrams**: Visual diagrams showing UI state transitions (loading → success/error → retry) are planned for a future UX patterns guide. See `docs/guides/implementation-guide/` for retry logic examples.
+**TanStack Query keys:** Array format, hierarchical, consistent ordering.
 
-### Location Patterns
+```typescript
+// Pattern: [domain, resource, ...params]
+['sessions', sessionId]
+['sessions', sessionId, 'exchanges']
+['book', subjectId, 'topics']
+['coaching', profileId, 'card']
+['subscriptions', profileId, 'quota']
+```
 
-| Element | Location |
+**Logging:** Structured JSON to Axiom. Always include correlation ID.
+
+```typescript
+logger.info({ correlationId, event: "llm.call.complete", model, tokensIn, tokensOut, latencyMs, cost });
+logger.error({ correlationId, event: "llm.call.failed", model, error: err.message, attempt });
+```
+
+Log levels: `error` (failures requiring attention), `warn` (degraded but functional), `info` (significant events — LLM calls, session lifecycle, SM-2 decisions), `debug` (development only, never in production).
+
+### Process Patterns
+
+**Async/await:** Always `async`/`await`, never `.then()` chains. Exception: `Promise.all()` for parallel operations is fine.
+
+**Return types:** Explicit return types on all exported functions and service functions. TypeScript can infer them, but explicit types serve as documentation, catch accidental return type changes, and speed up incremental compilation. Internal/private helper functions can rely on inference.
+
+```typescript
+// CORRECT — exported, explicit return type
+export async function processExchange(repo: ScopedRepository, input: ExchangeInput): Promise<ExchangeResult> { ... }
+
+// OK — private helper, inference fine
+function buildPromptContext(session: Session) { ... }
+```
+
+**Error handling (API):**
+
+```typescript
+app.onError((err, c) => {
+  if (err instanceof AppError) {
+    return c.json({ code: err.code, message: err.message, details: err.details }, err.status);
+  }
+  logger.error({ correlationId: c.get('correlationId'), error: err.message, stack: err.stack });
+  return c.json({ code: "INTERNAL_ERROR", message: "Something went wrong" }, 500);
+});
+```
+
+Custom `AppError` class with typed codes. Never leak stack traces or internal details to client.
+
+**Error handling (mobile):** TanStack Query `onError` callbacks per query/mutation. Global error boundary at root layout for unhandled crashes. Persona-appropriate error messages (coaching voice for learners, direct for parents).
+
+**Loading states (mobile):** TanStack Query's built-in `isLoading`, `isFetching`, `isError`. No custom loading state management. Skeleton screens for initial loads (coaching card, Learning Book). Inline spinners for mutations (submit answer, save summary).
+
+**Validation timing:**
+- **Client**: Zod validation before sending (shared schema from `packages/schemas/`)
+- **Server**: Zod validation on every route handler input (never trust client)
+- **Database**: Drizzle schema constraints as final safety net
+
+Both client and server import the same Zod schemas — single source of truth prevents drift.
+
+**Environment-specific behavior:** Never `if (process.env.NODE_ENV === 'development')` in application code. If behavior differs by environment, drive it through configuration values (the typed config object from `apps/api/src/config.ts`). This prevents invisible behavior differences between environments.
+
+### Enforcement Rules
+
+**All AI agents MUST:**
+
+1. Import types/schemas from `@eduagent/schemas`, never define API types locally
+2. Use the scoped repository (`createScopedRepository(profileId)`), never write raw `WHERE profile_id =` clauses
+3. Include `correlationId` in every log statement
+4. Use Inngest for any async work that should survive a request lifecycle
+5. Keep components persona-unaware — no conditional rendering based on persona type
+6. Write co-located tests for every new route handler and component
+7. Use Drizzle relational queries for CRUD, `sql` template tag for complex aggregations
+8. Return typed `ApiError` envelope for all error responses, never ad-hoc JSON
+9. **No direct LLM API calls.** Every LLM call goes through the orchestration module (`routeAndCall`). Ensures metering, logging, provider fallback, and cost tracking. A direct `fetch` to Anthropic/OpenAI bypasses metering and blinds the cost dashboard.
+10. **Typed config object, never raw env reads.** All env vars accessed via typed config validated with Zod at startup (`apps/api/src/config.ts`). Missing var → fail immediately with clear error. Critical on Workers where env comes from `wrangler.toml` bindings.
+11. **Respect dependency direction.** `packages/` never imports from `apps/`. `schemas` never imports from `database`. Circular dependencies are build-breaking errors.
+12. **Named exports only.** No default exports except framework-required (Expo Router pages).
+13. **Cross-service calls through exported interfaces.** `services/exchanges.ts` calling `services/retention.ts` uses the exported function (e.g., `getTopicSchedules(profileId)`), never imports internal helpers. Circular import graphs between services are a refactoring signal — extract shared logic into a new service or push it down to `packages/database`.
+
+## Project Structure & Boundaries
+
+### Complete Project Directory Structure
+
+```
+eduagent/
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yml                    # Lint → typecheck → test → build (Nx Cloud caching)
+│   │   ├── mobile-ci.yml            # EAS Build for PR previews
+│   │   ├── deploy-staging.yml       # Deploy on PR merge to main
+│   │   ├── deploy-production.yml    # Deploy on release tag
+│   │   └── claude-code-review.yml   # AI-assisted PR review
+│   └── CODEOWNERS
+├── .claude/                          # Claude Code config (from fork)
+│   └── CLAUDE.md
+├── .husky/                           # Git hooks (from fork)
+│   ├── pre-commit
+│   └── commit-msg
+├── apps/
+│   ├── mobile/                       # Expo (React Native)
+│   │   ├── app/                      # Expo Router file-based routes
+│   │   │   ├── _layout.tsx           # Root layout — persona CSS vars, Clerk provider, error boundary
+│   │   │   ├── (auth)/
+│   │   │   │   ├── _layout.tsx
+│   │   │   │   ├── login.tsx
+│   │   │   │   ├── register.tsx
+│   │   │   │   └── consent.tsx       # GDPR parental consent flow
+│   │   │   ├── (learner)/
+│   │   │   │   ├── _layout.tsx       # Learner tab bar + coaching voice
+│   │   │   │   ├── home.tsx          # Coaching card entry point (daily use)
+│   │   │   │   ├── onboarding/
+│   │   │   │   │   ├── interview.tsx     # Conversational goal/background assessment
+│   │   │   │   │   └── curriculum-review.tsx  # AI-generated path review + customization
+│   │   │   │   ├── session/
+│   │   │   │   │   └── [id].tsx      # Active learning session
+│   │   │   │   ├── book/
+│   │   │   │   │   ├── index.tsx     # Learning Book — all subjects
+│   │   │   │   │   └── [subjectId].tsx
+│   │   │   │   ├── homework/
+│   │   │   │   │   └── camera.tsx    # Camera capture + ML Kit OCR
+│   │   │   │   └── subjects/
+│   │   │   │       └── index.tsx     # Subject management
+│   │   │   └── (parent)/
+│   │   │       ├── _layout.tsx       # Parent nav + dashboard
+│   │   │       ├── dashboard.tsx     # Aggregated child progress
+│   │   │       └── profiles/
+│   │   │           └── [profileId].tsx
+│   │   ├── components/
+│   │   │   ├── coaching/
+│   │   │   │   ├── BaseCoachingCard.tsx
+│   │   │   │   ├── BaseCoachingCard.test.tsx
+│   │   │   │   ├── RecallPrompt.tsx
+│   │   │   │   └── ColdStartMenu.tsx
+│   │   │   ├── session/
+│   │   │   │   ├── MessageThread.tsx
+│   │   │   │   ├── MessageThread.test.tsx
+│   │   │   │   ├── HomeworkChatWrapper.tsx
+│   │   │   │   └── SessionCloseSummary.tsx
+│   │   │   ├── assessment/
+│   │   │   │   ├── QuickCheck.tsx
+│   │   │   │   └── RecallTest.tsx
+│   │   │   ├── progress/
+│   │   │   │   ├── RetentionSignal.tsx
+│   │   │   │   ├── StreakDisplay.tsx
+│   │   │   │   └── DecayVisualization.tsx
+│   │   │   └── common/
+│   │   │       ├── ErrorRecovery.tsx
+│   │   │       ├── SkeletonCard.tsx
+│   │   │       └── PersonaText.tsx
+│   │   ├── hooks/
+│   │   │   ├── useProfile.ts
+│   │   │   ├── useCoachingCard.ts
+│   │   │   ├── useSession.ts
+│   │   │   ├── useSSEStream.ts
+│   │   │   └── useRetentionSchedule.ts
+│   │   ├── lib/
+│   │   │   ├── api.ts               # Hono RPC client (hc<AppType>)
+│   │   │   ├── queryKeys.ts         # TanStack Query key constants
+│   │   │   └── storage.ts           # Client-side cache for offline resilience
+│   │   ├── theme/
+│   │   │   ├── tokens/
+│   │   │   │   ├── teen-dark.json
+│   │   │   │   ├── teen-light.json
+│   │   │   │   ├── learner-dark.json
+│   │   │   │   ├── learner-light.json
+│   │   │   │   ├── parent-dark.json
+│   │   │   │   └── parent-light.json
+│   │   │   └── provider.tsx         # Reads profile persona, sets CSS vars
+│   │   ├── assets/
+│   │   │   └── locales/             # UI translation files (react-i18next)
+│   │   │       ├── en/
+│   │   │       │   ├── common.json
+│   │   │       │   ├── coaching.json
+│   │   │       │   ├── assessment.json
+│   │   │       │   └── settings.json
+│   │   │       └── de/
+│   │   │           ├── common.json
+│   │   │           ├── coaching.json
+│   │   │           ├── assessment.json
+│   │   │           └── settings.json
+│   │   ├── app.json
+│   │   ├── eas.json
+│   │   ├── metro.config.js
+│   │   ├── tailwind.config.js       # NativeWind v4.2.1 config
+│   │   ├── tsconfig.json
+│   │   ├── jest.config.ts
+│   │   ├── project.json             # Nx targets
+│   │   └── package.json
+│   └── api/                          # Hono (Cloudflare Workers)
+│       ├── src/
+│       │   ├── index.ts             # Hono app entry, route mounting, global error handler
+│       │   ├── routes/
+│       │   │   ├── sessions.ts      # /v1/sessions/* — learning sessions, exchanges
+│       │   │   ├── profiles.ts      # /v1/profiles/* — profile management, persona
+│       │   │   ├── curricula.ts     # /v1/curricula/* — curriculum gen, topics, paths
+│       │   │   ├── assessments.ts   # /v1/assessments/* — quizzes, recall, mastery
+│       │   │   ├── subscriptions.ts # /v1/subscriptions/* — billing, quota, top-ups
+│       │   │   ├── coaching.ts      # /v1/coaching/* — coaching card, state
+│       │   │   ├── book.ts          # /v1/book/* — Learning Book, summaries
+│       │   │   ├── ocr.ts           # /v1/ocr — server-side OCR fallback
+│       │   │   └── inngest.ts       # /v1/inngest — Inngest webhook (signing key auth)
+│       │   ├── middleware/
+│       │   │   ├── auth.ts          # Clerk JWT verification via JWKS (cached in KV)
+│       │   │   ├── metering.ts      # Quota enforcement (calls decrement_quota)
+│       │   │   ├── profileScope.ts  # Extracts profile, creates scoped repository
+│       │   │   ├── cors.ts          # CORS restricted to mobile origins
+│       │   │   └── requestId.ts     # Correlation ID injection
+│       │   ├── services/
+│       │   │   ├── exchanges.ts     # Exchange processing, prompt assembly, response handling
+│       │   │   ├── coaching.ts      # Coaching card precompute + KV write
+│       │   │   ├── curricula.ts     # Curriculum generation, topic management
+│       │   │   ├── assessments.ts   # Quiz generation, recall test scoring, mastery calc
+│       │   │   ├── retention.ts     # SM-2 orchestration — calls @eduagent/retention, writes DB
+│       │   │   ├── embeddings.ts    # Embedding generation — provider call + pgvector write
+│       │   │   ├── notifications.ts # Expo Push — batch sends, token cleanup, receipt checking
+│       │   │   └── ocr.ts           # Server-side OCR provider interface
+│       │   ├── llm/
+│       │   │   ├── orchestrator.ts  # routeAndCall() — model routing, provider failover, streaming
+│       │   │   ├── providers.ts     # Provider configs, API key management
+│       │   │   └── circuitBreaker.ts # Per-provider circuit breaker state
+│       │   ├── events/
+│       │   │   ├── client.ts        # Inngest client init
+│       │   │   ├── sessionCompleted.ts  # session.completed → SM-2 → coaching → dashboard → embeddings
+│       │   │   ├── coachingPrecompute.ts
+│       │   │   ├── retentionRecalculate.ts
+│       │   │   └── retentionReminder.ts  # Scheduled — calls services/notifications.ts
+│       │   ├── logger.ts            # Axiom structured logging factory, correlation ID injection
+│       │   ├── sentry.ts            # Sentry init for @sentry/cloudflare
+│       │   ├── config.ts            # Typed env config (Zod validated at startup)
+│       │   └── errors.ts            # AppError class, typed error codes
+│       ├── drizzle/                  # Migration files only (generated artifacts)
+│       ├── wrangler.toml            # Workers config + KV namespace bindings + rate limiting rules
+│       ├── tsconfig.json
+│       ├── tsconfig.app.json
+│       ├── jest.config.ts
+│       ├── project.json             # Nx targets: serve, build, deploy
+│       └── package.json
+├── packages/
+│   ├── schemas/                     # Zod schemas + inferred types + Hono RPC exports
+│   │   ├── src/
+│   │   │   ├── sessions.ts
+│   │   │   ├── profiles.ts
+│   │   │   ├── curricula.ts
+│   │   │   ├── assessments.ts
+│   │   │   ├── subscriptions.ts
+│   │   │   ├── coaching.ts
+│   │   │   ├── errors.ts           # ApiErrorSchema, typed error codes
+│   │   │   ├── events.ts           # Inngest event payload schemas
+│   │   │   └── index.ts            # Barrel export
+│   │   ├── tsconfig.json
+│   │   ├── project.json
+│   │   └── package.json
+│   ├── database/                    # Drizzle schema + Neon connection + scoped repository
+│   │   ├── src/
+│   │   │   ├── schema/
+│   │   │   │   ├── profiles.ts     # profiles, family_links, consent_states
+│   │   │   │   ├── sessions.ts     # learning_sessions, session_events, session_summaries
+│   │   │   │   ├── curricula.ts    # curricula, topics, learning_paths
+│   │   │   │   ├── assessments.ts  # assessments, recall_tests, mastery_scores
+│   │   │   │   ├── subscriptions.ts # subscriptions, quota_pools, top_up_credits
+│   │   │   │   ├── coaching.ts     # coaching_cards, coaching_states
+│   │   │   │   └── index.ts        # Re-exports all schemas
+│   │   │   ├── repository.ts       # createScopedRepository(profileId)
+│   │   │   ├── connection.ts       # Neon serverless connection factory
+│   │   │   ├── queries/            # Named query functions for complex/non-standard queries
+│   │   │   │   ├── dashboard.ts    # Parent dashboard: GROUP BY, window functions
+│   │   │   │   ├── retention.ts    # Retention analytics, decay calculations
+│   │   │   │   └── embeddings.ts   # pgvector similarity search (cosine distance, LIMIT N)
+│   │   │   └── index.ts
+│   │   ├── tsconfig.json
+│   │   ├── project.json
+│   │   └── package.json
+│   ├── retention/                   # SM-2 library — pure math, zero deps
+│   │   ├── src/
+│   │   │   ├── sm2.ts              # ~50 lines: interval, ease factor, next review date
+│   │   │   ├── sm2.test.ts
+│   │   │   └── index.ts
+│   │   ├── tsconfig.json
+│   │   ├── project.json
+│   │   └── package.json
+│   ├── test-utils/                  # Shared testing utilities
+│   │   ├── src/
+│   │   │   ├── setup.ts            # Jest environment setup
+│   │   │   ├── mocks.ts            # Common mocks (Clerk, Neon, Inngest)
+│   │   │   └── index.ts
+│   │   ├── tsconfig.json
+│   │   ├── project.json
+│   │   └── package.json
+│   └── factory/                     # Test data factories (types from @eduagent/schemas)
+│       ├── src/
+│       │   ├── profiles.ts
+│       │   ├── sessions.ts
+│       │   ├── curricula.ts
+│       │   └── index.ts
+│       ├── tsconfig.json
+│       ├── project.json
+│       └── package.json
+├── nx.json                          # Nx workspace config, plugins, Nx Cloud
+├── tsconfig.base.json               # Shared TS config, path aliases
+├── pnpm-workspace.yaml
+├── package.json
+├── .eslintrc.js                     # ESLint 9 flat config (import ordering enforced)
+├── .prettierrc
+├── .editorconfig
+├── .nvmrc
+├── .npmrc                           # node-linker=hoisted if needed for Expo+pnpm
+├── .env.example
+├── .gitignore
+└── commitlint.config.js
+```
+
+### Key Structural Decisions
+
+**`apps/api/src/` split — `services/`, `llm/`, `events/` instead of flat `lib/`:**
+
+The original `lib/` was accumulating too many unrelated concerns. Replaced with three purpose-specific directories:
+
+- **`services/`** — Business logic extracted from route handlers. Each service file corresponds to a route file at the start. Cross-service calls go through exported function interfaces (e.g., `exchanges.ts` calls `getTopicSchedules()` from `retention.ts`), never internal imports. When the dependency graph between services gets tangled, that's a refactoring signal.
+- **`llm/`** — LLM orchestration module. `routeAndCall()` lives here alongside provider configs and circuit breaker state. Isolated because it's the most complex subsystem with its own concerns (model routing, streaming, failover, cost tracking). Does NOT include embedding generation — embedding is a different call pattern (single vector output, not streaming conversation).
+- **`events/`** — Inngest client + all event handler functions. Each event handler is a step function (e.g., `session.completed` → SM-2 → coaching card → dashboard → embeddings). Isolated because Inngest functions have different execution context (durable, retryable, not request-scoped). Event handlers call into `services/` for actual logic.
+
+**Embedding pipeline — separate from LLM orchestration:**
+
+Embeddings are structurally different from conversational LLM calls: single input → single vector output, no streaming, no routing decisions, no escalation rung. The pipeline:
+- **`services/embeddings.ts`** — Owns the embedding provider call (model TBD at implementation, likely OpenAI `text-embedding-3-small` or equivalent; behind an interface so provider is swappable). Extracts key concepts from session, generates embedding vectors, writes to pgvector.
+- **`packages/database/src/queries/embeddings.ts`** — Vector similarity search queries. Uses raw SQL (`ORDER BY embedding <=> $1 LIMIT $n` with cosine distance), not Drizzle relational queries. Different query pattern than standard CRUD.
+- **`events/sessionCompleted.ts`** — Inngest step calls `services/embeddings.ts` as the final step after SM-2 and coaching card precompute.
+
+**Onboarding as route-level split, not conditional rendering:**
+
+`(learner)/onboarding/` is a separate route group with `interview.tsx` and `curriculum-review.tsx`. The alternative — conditional rendering inside `home.tsx` based on onboarding state — overloads one component with two responsibilities and makes testing harder. Onboarding is a distinct flow with different UI needs (conversational interview, curriculum display with skip/accept). After onboarding completes, `router.replace('/(learner)/home')` navigates to daily coaching. The `(learner)/_layout.tsx` wraps both, so coaching voice and tab bar are shared.
+
+**`routes/ocr.ts` — server-side OCR fallback route:**
+
+ML Kit handles OCR on-device (primary path). The server-side `/v1/ocr` route exists for the fallback case: when ML Kit fails or returns low-confidence results on math-heavy content. Mobile sends the image to the server, server runs it through the OCR provider interface (`services/ocr.ts` — Mathpix vs CF Workers AI, provider TBD, interface defined now). The route accepts a base64-encoded image, returns structured text.
+
+**Coaching card KV invalidation:**
+
+Write-through on recompute: when `app/coaching.precompute` Inngest function completes, it writes the new card directly to Workers KV (key: `coaching:{profileId}`). No explicit invalidation — overwrite replaces stale data. KV TTL set to 24h as safety net (if Inngest fails to recompute, stale card expires rather than persisting indefinitely). On KV miss, API queries Neon and backfills KV.
+
+**SSE streaming and Workers CPU limits:**
+
+Workers have a 30-second CPU time limit (wall-clock can exceed this since I/O waits don't count). For LLM streaming, CPU usage is minimal — mostly awaiting the provider's SSE stream and forwarding chunks. Typical tutoring exchanges complete well within limits. If long reasoning-heavy model responses push CPU time, Durable Objects is the escape hatch — maintains a persistent connection with no CPU time limit. Design the SSE handler so streaming logic is behind an interface, enabling migration to Durable Objects without changing route contracts.
+
+**Rate limiting — two layers, different purposes:**
+
+1. **Cloudflare rate limiting** (configured in `wrangler.toml`): 100 req/min per user per PRD. Stops abuse before it hits application code. Applies to all routes.
+2. **Quota metering middleware** (`middleware/metering.ts`): Per-profile question limits based on subscription tier. Applies to LLM-consuming routes only. Calls `decrement_quota` PostgreSQL function.
+
+Different concerns: rate limiting protects infrastructure, quota metering enforces billing.
+
+**Notifications service — centralized push delivery:**
+
+`services/notifications.ts` encapsulates `expo-server-sdk`: batch sends, expired token handling (410 → remove token from DB), receipt checking, per-platform rate limit awareness. Any Inngest handler that needs to send a push calls this service rather than making direct Expo Push API calls. Failure modes are isolated and retry logic is written once.
+
+**Observability files — established from day one:**
+
+- **`logger.ts`** — Axiom structured logging factory. Creates loggers with automatic correlation ID injection. Every service file imports from here. Convention established at project init, not retrofitted after 20 service files exist.
+- **`sentry.ts`** — `@sentry/cloudflare` initialization. Captures unhandled errors, sets user context from Clerk session, tags with profile ID and persona type.
+
+**i18n — two distinct concerns:**
+
+1. **UI translations**: `apps/mobile/assets/locales/{en,de}/*.json` via react-i18next. Namespace files per feature area (common, coaching, assessment, settings). Standard string lookup, nothing novel.
+2. **LLM language preference**: NOT i18n infrastructure. The learner's preferred language is a field on their profile (`preferredLanguage`), injected into the system prompt during prompt assembly in `services/exchanges.ts`. The LLM responds in the learner's language naturally. This is a prompt construction concern, not a translation file concern. UI language and LLM language can differ (e.g., German UI, learning Spanish content).
+
+**Test factory schema sync:**
+
+`packages/factory/` imports types from `packages/schemas/` (same Zod-inferred types the API uses). If a schema changes and a factory doesn't update, TypeScript compilation fails — the type mismatch is caught at build time, not at test runtime. No runtime sync mechanism needed; the type system enforces it. CI runs `nx affected --target=typecheck` on every PR.
+
+### Architectural Boundaries
+
+**API Boundaries:**
+
+| Boundary | Internal | External | Auth |
+|----------|----------|----------|------|
+| `/v1/sessions/*` | Exchange processing, session state | LLM providers (via orchestrator) | Clerk JWT |
+| `/v1/profiles/*` | Profile CRUD, persona, family links | Clerk (user metadata sync) | Clerk JWT |
+| `/v1/curricula/*` | Curriculum generation, topic management | LLM providers (via orchestrator) | Clerk JWT |
+| `/v1/assessments/*` | Quiz generation, recall scoring, mastery | LLM providers (via orchestrator) | Clerk JWT |
+| `/v1/subscriptions/*` | Subscription state, quota reads | Stripe (webhook-synced) | Clerk JWT |
+| `/v1/coaching/*` | Coaching card reads, state updates | Workers KV (cache reads) | Clerk JWT |
+| `/v1/book/*` | Learning Book, topic review, summaries | — | Clerk JWT |
+| `/v1/ocr` | Image processing, text extraction | OCR provider (server-side fallback) | Clerk JWT |
+| `/v1/inngest` | Event handler dispatch | Inngest platform | Inngest signing key |
+
+**Component Boundaries (Mobile):**
+
+```
+Root Layout (_layout.tsx)
+├── Sets: Clerk Provider, TanStack QueryClient, persona CSS variables, Sentry
+├── Owns: Global error boundary, font loading, splash screen
+│
+├── (auth)/ — Auth-gated, no persona context yet
+│   └── Communicates: Clerk SDK directly, no API calls except registration
+│
+├── (learner)/ — Requires authenticated profile with learner/teen persona
+│   ├── home.tsx → reads: coaching card (TanStack Query → /v1/coaching)
+│   ├── onboarding/ → interview + curriculum review (first-run only, then router.replace to home)
+│   ├── session/[id].tsx → reads/writes: session state (SSE stream + POST exchanges)
+│   ├── homework/camera.tsx → uses: ML Kit OCR (on-device), falls back to /v1/ocr
+│   └── book/ → reads: Learning Book (full fetch, TanStack Query → /v1/book)
+│
+└── (parent)/ — Requires authenticated profile with parent persona
+    ├── dashboard.tsx → reads: aggregated child data (/v1/profiles/*/progress)
+    └── profiles/[profileId].tsx → reads: child's session history, coaching state
+```
+
+**Service Boundaries (API):**
+
+```
+Route Handler (thin glue)
+  │ validates input (Zod), calls service, formats response
+  ▼
+Service Function (business logic)
+  │ orchestrates: DB queries, LLM calls, KV reads/writes
+  │ never touches Hono context (c) — receives typed args, returns typed results
+  │ cross-service calls: through exported function interfaces only
+  ▼
+┌──────────────────┬────────────────┬──────────────┬──────────────────┐
+│ @eduagent/database │ llm/orchestrator │ Workers KV     │ services/embeddings │
+│ (scoped repo +     │ (routeAndCall)    │ (coaching, sub) │ (embedding provider) │
+│  queries/*)        │                   │                │                      │
+└──────────────────┴────────────────┴──────────────┴──────────────────┘
+```
+
+**Data Boundaries:**
+
+| Data Store | Reads | Writes | Boundary |
+|-----------|-------|--------|----------|
+| Neon (PostgreSQL) | All services via scoped repository | All services via scoped repository | `packages/database` — single access point |
+| pgvector (in Neon) | `queries/embeddings.ts` — vector similarity search for memory retrieval | `services/embeddings.ts` via Inngest (on session.completed) | Same Neon connection, separate query module |
+| Workers KV | `middleware/auth.ts` (JWKS), `services/coaching.ts` (card), `middleware/metering.ts` (subscription) | Inngest events (coaching precompute), Stripe webhook handler (subscription sync) | KV namespace bindings in wrangler.toml |
+| Client storage | TanStack Query cache (automatic) | TanStack Query cache (automatic), `lib/storage.ts` (offline resilience) | AsyncStorage for persistence across app restarts |
+
+### Requirements to Structure Mapping
+
+**Epic-to-Structure Mapping:**
+
+| Epic | Routes | Services | Components | Schemas | Database |
+|------|--------|----------|------------|---------|----------|
+| **Epic 0: Registration** | `profiles.ts` | — (Clerk-driven) | `(auth)/*` | `profiles.ts` | `schema/profiles.ts` |
+| **Epic 1: Onboarding** | `curricula.ts` | `curricula.ts` | `(learner)/onboarding/*` | `curricula.ts` | `schema/curricula.ts` |
+| **Epic 2: Learning** | `sessions.ts`, `ocr.ts` | `exchanges.ts`, `embeddings.ts`, `ocr.ts` | `session/*`, `homework/*`, `coaching/*` | `sessions.ts` | `schema/sessions.ts` |
+| **Epic 3: Assessment** | `assessments.ts` | `assessments.ts`, `retention.ts` | `assessment/*` | `assessments.ts` | `schema/assessments.ts` |
+| **Epic 4: Progress** | `book.ts`, `coaching.ts` | `coaching.ts`, `notifications.ts` | `progress/*`, `book/*` | `coaching.ts` | `schema/coaching.ts` |
+| **Epic 5: Subscription** | `subscriptions.ts` | — (Stripe webhook-driven) | `(auth)/upgrade.tsx` (inline) | `subscriptions.ts` | `schema/subscriptions.ts` |
+| **Epic 6: Language (v1.1)** | New route file | New service file | New component directory | New schema file | New schema file |
+
+**Cross-Cutting Concerns Mapping:**
+
+| Concern | Location |
 |---------|----------|
-| **Zod schemas** | `packages/schemas/src/lib/*.schema.ts` |
-| **OpenAPI registration** | `apps/server/src/routes/*.openapi.ts` |
-| **Route handlers** | `apps/server/src/routes/*.ts` |
-| **Generated types** | `packages/api-client/src/generated/` |
+| Authentication | `middleware/auth.ts`, `@clerk/clerk-expo` in root layout |
+| Profile scoping | `middleware/profileScope.ts` → `packages/database/repository.ts` |
+| Quota/metering | `middleware/metering.ts` → `packages/database/` (`decrement_quota` function) |
+| LLM orchestration | `llm/orchestrator.ts`, `llm/providers.ts`, `llm/circuitBreaker.ts` |
+| Embedding pipeline | `services/embeddings.ts` (provider call) → `queries/embeddings.ts` (vector search) |
+| Background jobs | `events/*.ts` (Inngest functions) → call `services/` for logic |
+| Push notifications | `services/notifications.ts` (centralized) ← called by Inngest event handlers |
+| Persona theming | `theme/tokens/*.json`, `theme/provider.tsx`, root `_layout.tsx` |
+| Error handling | `errors.ts` (API), `common/ErrorRecovery.tsx` (mobile) |
+| Observability | `logger.ts` (Axiom), `sentry.ts`, `middleware/requestId.ts` (correlation ID) |
+| i18n (UI) | `assets/locales/{en,de}/*.json` via react-i18next |
+| i18n (LLM) | Profile `preferredLanguage` field → system prompt in `services/exchanges.ts` |
+| Spaced repetition | `packages/retention/` (math), `services/retention.ts` (orchestration) |
 
-### Consistency Patterns
+### Integration Points
 
-| Area | Standard |
-|------|----------|
-| **TypeScript** | `bundler` resolution (prod), `nodenext` (tests) |
-| **Module system** | ESM everywhere, CommonJS for Jest |
-| **Line endings** | LF (`.gitattributes` enforced) |
+**Internal Communication:**
 
-**Detailed patterns**: See `docs/memories/adopted-patterns/`
+```
+Mobile App                          API (Hono on Workers)
+    │                                    │
+    ├── Hono RPC (typed HTTP)  ──────────┤
+    │   POST /v1/sessions/:id/exchanges  │──→ services/exchanges.ts
+    │   GET  /v1/coaching/:profileId     │──→ services/coaching.ts (→ KV → Neon fallback)
+    │   GET  /v1/book/:subjectId         │──→ packages/database (full fetch)
+    │                                    │
+    ├── SSE stream  ◀────────────────────┤
+    │   (LLM response chunks)            │──→ llm/orchestrator.ts → LLM provider
+    │                                    │
+    └── Expo Push  ◀──────────── events/ → services/notifications.ts
+        (retention reminders)            │──→ Expo Push API
+```
+
+**External Integrations:**
+
+| Service | Integration Point | Protocol | Auth |
+|---------|------------------|----------|------|
+| Clerk | `middleware/auth.ts` + `@clerk/clerk-expo` | JWKS verification, REST API | JWT + API key |
+| Stripe | `routes/subscriptions.ts` (webhooks) | Webhook events | Webhook signing secret |
+| LLM providers (Claude, GPT-4, Gemini) | `llm/orchestrator.ts` | REST + SSE | API keys per provider |
+| Embedding provider (TBD) | `services/embeddings.ts` | REST | API key |
+| Inngest | `routes/inngest.ts` + `events/*.ts` | Webhook | Inngest signing key |
+| Neon | `packages/database/connection.ts` | PostgreSQL wire protocol (serverless driver) | Connection string |
+| Expo Push | `services/notifications.ts` | REST API | Expo push token |
+| ML Kit | Mobile on-device (no server integration) | Native SDK | — |
+| OCR fallback provider | `services/ocr.ts` | REST API | API key |
+| Axiom | `logger.ts` | HTTPS ingest | API token |
+| Sentry | `sentry.ts` + `@sentry/react-native` | SDK | DSN |
+
+**Data Flow — Learning Session:**
+
+```
+1. Student opens app
+   └─ Mobile reads coaching card: TanStack Query → GET /v1/coaching → KV (hit) or Neon (miss)
+
+2. Student starts session
+   └─ POST /v1/sessions → creates session row + first event
+
+3. Student sends message / submits photo
+   ├─ Text: POST /v1/sessions/:id/exchanges { message }
+   └─ Photo: ML Kit OCR on-device → extracted text → POST /v1/sessions/:id/exchanges { message, source: "ocr" }
+       └─ ML Kit fails? → POST /v1/ocr { image } → extracted text → same exchange endpoint
+
+4. API processes exchange
+   ├─ middleware/auth.ts → Clerk JWT verification
+   ├─ middleware/metering.ts → decrement_quota() → quota check
+   ├─ middleware/profileScope.ts → scoped repository
+   └─ services/exchanges.ts:
+       ├─ Loads session context (summary row + recent events + pgvector memory via queries/embeddings.ts)
+       ├─ Assembles prompt (system + context + student message + preferredLanguage)
+       ├─ llm/orchestrator.ts → routes to model by escalation rung → streams response
+       └─ SSE stream back to mobile (client renders incrementally)
+
+5. Exchange complete (stream ends)
+   └─ Same transaction: append session_event + upsert session_summary
+
+6. Session completes
+   └─ POST /v1/sessions/:id/complete → fires "app/session.completed" to Inngest
+
+7. Inngest step function executes (async, durable)
+   ├─ Step 1: SM-2 recalculation (services/retention.ts → @eduagent/retention → topic_schedules)
+   ├─ Step 2: Coaching card precompute (services/coaching.ts → Workers KV write, 24h TTL)
+   ├─ Step 3: Parent dashboard data update
+   └─ Step 4: Embedding generation (services/embeddings.ts → embedding provider → pgvector INSERT)
+```
+
+### Development Workflow Integration
+
+**Development Server Structure:**
+
+```
+# Terminal 1: Expo dev server (mobile)
+nx serve mobile          # Metro bundler, hot reload
+
+# Terminal 2: Hono dev server (API)
+nx serve api             # wrangler dev (local Workers runtime) or node
+
+# Terminal 3: Database
+#   Neon branch for dev — no local PostgreSQL needed
+#   drizzle-kit push for fast schema iteration
+```
+
+**Build Process:**
+
+```
+nx build mobile          # EAS Build (cloud) — iOS + Android bundles
+nx build api             # Workers bundle (wrangler) or Docker (Railway)
+nx run-many --target=typecheck   # All packages + apps — catches cross-boundary breaks
+nx run-many --target=test        # Co-located tests, affected-only in CI
+nx run-many --target=lint        # ESLint (import ordering, naming conventions)
+```
+
+**Deployment:**
+
+| Target | Staging | Production |
+|--------|---------|------------|
+| API | `wrangler deploy --env staging` (on PR merge) | `wrangler deploy --env production` (on release tag) |
+| Mobile | EAS Build → internal distribution | EAS Submit → App Store / Google Play |
+| Database | Neon branch (auto-created per PR) | Neon main branch, migrations via CI |
+| KV | Staging KV namespace | Production KV namespace |
+
+## Architecture Validation Results
+
+### Coherence Validation
+
+**Decision Compatibility:**
+
+All technology choices verified compatible (Feb 2026):
+- Expo SDK 54 + NativeWind v4.2.1 (Tailwind 3.4.17) — confirmed working combination
+- Hono 4.11.x on Cloudflare Workers — native SSE streaming via `streamSSE()`, Workers KV bindings
+- Drizzle ORM + Neon serverless driver (`@neondatabase/serverless`) — both target PostgreSQL, connection factory pattern handles serverless pooling
+- Clerk `@clerk/clerk-expo` + Hono middleware — JWT/JWKS verification compatible with Workers runtime, KV-cacheable JWKS
+- Inngest + Cloudflare Workers — Inngest v3 supports Workers as serve target via `inngest/cloudflare`
+- Nx 22.5.0 + `@naxodev/nx-cloudflare` 6.0.0 — version-compatible, plugin actively maintained
+- pgvector in Neon — supported natively, no extensions to install
+
+No contradictory decisions found. The Workers → Railway/Fly fallback path is clean because Hono runs on both without framework changes.
+
+**Pattern Consistency:**
+
+- Naming conventions are comprehensive (DB snake_case, API camelCase, code PascalCase/camelCase, Inngest `app/domain.action`)
+- Import ordering, export rules, and dependency direction are consistent and enforceable via ESLint
+- Co-located test pattern is uniform across routes, services, and components
+- Error handling follows single pattern: `AppError` → typed envelope → Zod schema in `packages/schemas`
+- All 13 enforcement rules are non-contradictory and cover the most common agent mistakes
+
+**Structure Alignment:**
+
+- Project tree directly maps to all architectural decisions (services/, llm/, events/ correspond to documented patterns)
+- Package boundaries (`schemas` → leaf, `database` → imports schemas, `retention` → zero deps) support the dependency direction rule
+- Route structure mirrors API boundary table 1:1
+- Mobile route groups align with persona boundaries (auth, learner, parent)
+- Onboarding route split (`(learner)/onboarding/`) consistent between project tree and Epic 1 mapping
+
+### Requirements Coverage Validation
+
+**Epic Coverage:**
+
+| Epic | Architectural Support | Coverage |
+|------|----------------------|----------|
+| Epic 0: Registration & Account Setup | Clerk auth, consent state machine, profile scoping, deletion orchestrator | Full |
+| Epic 1: Onboarding & Interview | LLM orchestration for curriculum gen, `(learner)/onboarding/` route split (interview + curriculum review), curricula schema | Full |
+| Epic 2: Learning Experience | SSE streaming, session state hybrid model, exchange processing, LLM routing by escalation rung, OCR pipeline (ML Kit + server fallback), homework integrity via prompt design | Full |
+| Epic 3: Assessment & Retention | SM-2 library, Inngest lifecycle chain, mastery scoring in schema, delayed recall scheduling, "Needs Deepening" topic flagging | Full |
+| Epic 4: Progress & Motivation | Learning Book (full fetch), coaching card (KV cache), decay visualization, honest streak, notifications service | Full |
+| Epic 5: Subscription | Stripe webhook-synced, `decrement_quota` PostgreSQL function, KV-cached subscription status, family pool with row-level locking | Full |
+| Epic 6: Language Learning (v1.1) | Deferred. Route/service/schema/component extension points documented. No blocking architectural debt. | Deferred by design |
+
+**Functional Requirements Coverage (105 MVP FRs):**
+
+All 105 MVP functional requirements have architectural support. The architecture provides the structural slots, patterns, and infrastructure for every FR category. Specific algorithmic details (mastery formula, decay model, escalation thresholds, interleaved topic selection) are implementation concerns for individual stories — the architecture provides the right service files, database schemas, and integration patterns for those algorithms to live in.
+
+**Non-Functional Requirements Coverage:**
+
+| NFR | Target | Architectural Support | Status |
+|-----|--------|----------------------|--------|
+| API response (p95) | <200ms excl. LLM | Workers edge deployment, KV caching, scoped repository | Covered |
+| LLM first token | <2s | SSE streaming, model routing (Gemini Flash for simple, Claude/GPT-4 for complex) | Covered |
+| Camera → OCR → first AI | <3s | ML Kit on-device (no network), server fallback behind interface | Covered |
+| App cold start | <3s | Coaching card precompute (KV), Expo bundle optimization | Covered |
+| Uptime | 99.5% | Multi-provider LLM fallback, circuit breakers, Inngest durable jobs | Covered |
+| Data durability | 99.99% | Neon managed backups, point-in-time recovery | Covered |
+| Rate limiting | 100 req/min | Cloudflare Workers rate limiting (wrangler.toml) + quota metering middleware | Covered |
+| GDPR | Full | Consent state machine, deletion orchestrator, data export, profile isolation | Covered |
+| COPPA-adjacent | Ages 11-15 | Parental consent workflow, profile-scoped data access | Covered |
+| i18n | EN+DE MVP | react-i18next + locale files + LLM `preferredLanguage` in system prompt | Covered |
+| Accessibility | WCAG 2.1 AA | Phased per UX spec (MVP free, v1.1 moderate, v2.0 operational). NativeWind supports accessibility props. | Phased |
+| Offline behavior | Read-only cached data | See "Offline Boundary" below | Defined |
+
+**Offline Boundary:**
+
+MVP offline behavior is **read-only cached data, no offline writes**:
+- **Available offline**: Last-fetched coaching card, Learning Book topics, and profile data — cached by TanStack Query in `lib/storage.ts` (AsyncStorage persistence). Stale but useful.
+- **Not available offline**: Active learning sessions, assessments, new exchanges, subscription changes — all require server roundtrip.
+- **Behavior**: When offline, show cached data with a subtle "offline" indicator. Disable actions that require the server (start session, submit answer, take assessment). No offline queue or sync protocol.
+- **Why this boundary**: Offline sessions would require local LLM inference or request queuing with conflict resolution — fundamentally different architecture. Defining this now prevents scope creep. Full offline is deferred to v2.0.
+
+### Implementation Readiness Validation
+
+**Decision Completeness:**
+
+- All 10 critical decisions documented with specific versions
+- 5 deferred decisions documented with clear deferral rationale
+- Implementation patterns cover naming, structure, format, communication, and process
+- 13 enforcement rules provide clear guardrails for AI agents
+- Code examples provided for every major pattern (Hono handlers, scoped repository, error handling, Inngest events, TanStack Query keys, logging)
+
+**Structure Completeness:**
+
+- Complete project tree with every file and directory specified
+- All 7 epics mapped to specific routes, services, components, schemas, and database files
+- 13 cross-cutting concerns mapped to specific file locations
+- Integration points documented with protocol, auth, and data flow
+
+**Pattern Completeness:**
+
+- Naming, structure, format, communication, and process patterns fully specified
+- Import ordering, export rules, dependency direction — all enforceable via tooling
+- Error handling, validation, loading states — patterns complete for both API and mobile
+
+### Gap Analysis Results
+
+**No critical gaps found.** All 105 MVP functional requirements have architectural homes. The following are important items to address during the Epics & Stories phase — they are implementation details, not architectural decisions:
+
+**Implementation details to specify in stories (not architecture):**
+
+| Area | Detail Needed | Where to Specify |
+|------|---------------|-----------------|
+| Summary quality validation (FR34-37) | Heuristic for copy-paste detection vs. legitimate summaries | Story acceptance criteria for mandatory production feature |
+| Escalation rung thresholds (FR59-60) | When to advance from Socratic to direct instruction | Tech spec for LLM prompt engineering |
+| Mastery scoring formula (FR48) | How to calculate 0-1 mastery from assessment performance | Story for mastery tracking feature |
+| Knowledge decay model (FR90) | Mathematical model for retention decay visualization | Story for decay visualization component |
+| Interleaved topic selection (FR92) | Algorithm for picking related/confusable topics for mixed recall | Story for interleaved retrieval feature |
+| Parent dashboard precomputation | Whether to use live queries or snapshot tables | Tech spec for parent dashboard epic |
+
+**Items to finalize during implementation (structural slots exist, decisions pending):**
+
+| Item | Description | When |
+|------|-------------|------|
+| Embedding model/provider selection | Architecture has `services/embeddings.ts` and `queries/embeddings.ts` in place, but provider (OpenAI `text-embedding-3-small`, Cohere, etc.) and model dimension TBD | Epic 2 stories — needed when building memory retrieval |
+| Parental consent timeout Inngest job | Scheduled reminder emails (Day 7, 14, 25) + auto-delete (Day 30) | Epic 0 stories |
+| Notification preferences schema | `notification_preferences` JSONB on profiles table | Epic 4 stories |
+| Content flagging storage | How user-flagged content is persisted and reviewed | Epic 2 stories |
+| Data export endpoint | GDPR data export format and endpoint | Epic 0 stories |
+
+### Risk Areas
+
+**Inngest lifecycle chain — highest integration risk:**
+
+The `session.completed` → SM-2 recalculation → coaching card precompute → parent dashboard update → embedding generation chain is the most complex async flow in the system. Individual step unit tests will not catch the bugs that hide here: step ordering assumptions, data shape mismatches between steps, idempotency failures on retry, and partial chain completion. **Recommendation**: When writing Epic 3 stories, include an integration test that exercises the full chain using Inngest's test mode (`inngest/test`). Test the chain end-to-end: fire `session.completed`, assert all downstream side effects (topic_schedules updated, KV coaching card written, embedding generated). This is where most production bugs will surface.
+
+**E2E testing — spike during Epic 2, not after:**
+
+Detox/Maestro setup on CI with Expo is notoriously finicky — device farms, build configurations, Metro bundler integration, and CI runner compatibility all need to work. Leaving this to the end creates a release blocker with no slack. **Recommendation**: Spike E2E testing infrastructure during Epic 2 (when there's actual UI to test — session flow, coaching card). Solve the CI plumbing early. Even if initial coverage is just "app launches and navigates to home," the infrastructure being proven matters more than the test count.
+
+### Architecture Completeness Checklist
+
+**Requirements Analysis**
+
+- [x] Project context thoroughly analyzed (117 FRs mapped, NFRs with targets, UX spec implications)
+- [x] Scale and complexity assessed (5 inflection points, high complexity confirmed)
+- [x] Technical constraints identified (decided stack with versions, remaining decisions with deferral rationale)
+- [x] Cross-cutting concerns mapped (14 concerns with architectural patterns and scope)
+
+**Architectural Decisions**
+
+- [x] Critical decisions documented with versions (10 critical, all resolved)
+- [x] Technology stack fully specified (Expo 54, Hono 4.11, Drizzle, Neon, Clerk, Stripe, Inngest, NativeWind 4.2.1)
+- [x] Integration patterns defined (Hono RPC, SSE, Inngest events, Workers KV, Expo Push)
+- [x] Performance considerations addressed (KV caching, ML Kit on-device, streaming, circuit breakers)
+
+**Implementation Patterns**
+
+- [x] Naming conventions established (DB, API, code, imports, exports — with examples)
+- [x] Structure patterns defined (co-located tests, feature-based components, service extraction)
+- [x] Communication patterns specified (Inngest events, TanStack Query keys, structured logging)
+- [x] Process patterns documented (async/await, return types, error handling, validation, env config)
+
+**Project Structure**
+
+- [x] Complete directory structure defined (every file and directory)
+- [x] Component boundaries established (API, mobile, service, data)
+- [x] Integration points mapped (11 external services with protocol and auth)
+- [x] Requirements to structure mapping complete (7 epics + 13 cross-cutting concerns)
+
+### Architecture Readiness Assessment
+
+**Overall Status:** READY FOR IMPLEMENTATION
+
+**Confidence Level:** High for architecture. Moderate for the Inngest lifecycle chain (integration risk) and E2E testing infrastructure (tooling risk). Both are mitigatable with the recommendations above.
+
+**Key Strengths:**
+
+1. **Strong type safety chain**: Zod schemas → Hono RPC → TanStack Query — type errors caught at compile time, not runtime
+2. **Clean separation of concerns**: Routes (thin) → Services (logic) → Database (scoped) — testable at every layer
+3. **Pragmatic caching strategy**: Workers KV for write-rare/read-often data, no over-engineered cache layer
+4. **Durable background processing**: Inngest step functions handle multi-step lifecycle chains with built-in retry and observability
+5. **Extensibility without overengineering**: Language Learning v1.1, Zustand, Durable Objects, dedicated vector store — all have clear migration paths without restructuring
+6. **Cost-conscious AI design**: Metering middleware + routing by conversation state + soft ceiling monitoring — cost control without compromising learning experience
+7. **Starting from existing infrastructure**: Fork of working Nx monorepo with CI/CD, commit quality, and testing already in place
+8. **Clear offline boundary**: Read-only cached data at MVP, no ambiguity about what works without connectivity
+
+**Areas for Future Enhancement:**
+
+- Durable Objects migration for SSE if Workers CPU limits become an issue
+- Parent dashboard snapshot precomputation if live queries exceed <200ms target
+- Zustand for shared client state when TanStack Query + Context proves insufficient
+- Dedicated vector store if pgvector scan times grow beyond acceptable at ~50K users
+- Full offline capability with local cache + sync protocol (v2.0)
+
+### Implementation Handoff
+
+**AI Agent Guidelines:**
+
+- Follow all architectural decisions exactly as documented in this file
+- Use implementation patterns consistently across all components (13 enforcement rules)
+- Respect project structure and package boundaries (dependency direction is a build-breaking error)
+- Refer to this document for all architectural questions before making independent decisions
+- When a decision isn't covered here, it belongs in a story's tech spec — don't invent architectural precedent
+
+**Implementation Sequence:**
+
+1. Fork `cognoco/nx-monorepo`, strip Supabase/Next.js/Express specifics
+2. Scaffold Hono API (`apps/api/`), rebuild database package (Drizzle + Neon)
+3. Clerk integration (auth middleware, Expo SDK, consent flow)
+4. Hono API shell + SSE streaming (unblocks session/LLM work)
+5. TanStack Query + Expo Router navigation (unblocks all mobile screens)
+6. Inngest setup (unblocks background jobs)
+7. Stripe integration (can parallel with 4-6)
+8. ML Kit OCR (can parallel, needed for homework flow)
+
+**Early spikes:**
+
+- E2E testing infrastructure (Detox or Maestro + CI) — spike during Epic 2
+- Inngest lifecycle chain integration test — include in Epic 3 stories
 
 ---
 
-## Consistency Rules
+## Architecture Completion Summary
 
-### Code Organization
+**Architecture Decision Workflow:** COMPLETED
+**Total Steps Completed:** 8
+**Date Completed:** 2026-02-15
+**Document Location:** `docs/architecture.md`
 
-- **Applications**: Feature-based folders under `src/` (e.g., `src/features/tasks/`, `src/features/auth/`)
-- **Packages**: Barrel exports via `index.ts`
-- **Never export implementation details**, only public interfaces
+**Deliverables:**
 
-```
-# Feature-based folder example (apps/web)
-src/
-├── app/                    # Next.js App Router (pages)
-├── features/               # Feature modules
-│   ├── tasks/
-│   │   ├── components/     # Task-specific components
-│   │   ├── hooks/          # Task-specific hooks
-│   │   └── utils/          # Task-specific utilities
-│   └── auth/
-│       ├── components/
-│       └── hooks/
-└── components/             # Shared/generic components
-```
+- 10 critical architectural decisions resolved (all with specific versions)
+- 5 deferred decisions documented with deferral rationale
+- 13 enforcement rules for AI agent consistency
+- Complete project directory structure (~100 files/directories)
+- 105 MVP functional requirements mapped to architectural components
+- 7 epics + 13 cross-cutting concerns mapped to specific file locations
+- 11 external service integrations documented with protocol and auth
+- 2 risk areas identified with mitigation strategies
 
-### Error Handling
+**Architecture Status:** READY FOR IMPLEMENTATION
 
-```typescript
-// API Layer - structured errors
-return res.status(400).json({
-  error: "Validation failed",
-  code: "VALIDATION_ERROR",
-  details: result.error.errors
-});
+**Next Phase:** Epics & Stories (`/bmad:bmm:workflows:create-epics-stories`)
 
-// Client Layer - check before access
-const { data, error } = await client.GET('/resource');
-if (error) {
-  // Handle typed error
-}
-```
-
-### Logging Strategy
-
-- Correlation IDs for request tracing
-- Business + technical context in comments
-- No sensitive data in logs
-
-```typescript
-// Correlation ID middleware example (apps/server)
-import { randomUUID } from 'crypto';
-
-export function correlationIdMiddleware(req, res, next) {
-  req.correlationId = req.headers['x-correlation-id'] || randomUUID();
-  res.setHeader('x-correlation-id', req.correlationId);
-  next();
-}
-
-// Usage in logging
-console.log(`[${req.correlationId}] Processing request: ${req.method} ${req.path}`);
-```
-
----
-
-## Data Architecture
-
-### Prisma Schema Conventions
-
-```prisma
-model HealthCheck {
-  id        String   @id @default(uuid()) @db.Uuid
-  message   String   @db.Text
-  timestamp DateTime @default(now()) @db.Timestamptz
-
-  @@map("health_checks")  // Explicit table mapping
-}
-```
-
-### Type Generation Pipeline
-
-```
-Zod Schema (source)
-     ↓
-OpenAPI Specification (runtime generated)
-     ↓
-TypeScript Types (build-time generated)
-     ↓
-Type-Safe Client (compile-time validated)
-```
-
-### Nx Task Dependencies
-
-```
-packages/schemas:build
-     ↓
-apps/server:build → apps/server:spec-write
-                          ↓
-              packages/api-client:generate-types
-                          ↓
-              packages/api-client:build
-                          ↓
-                   apps/web:build
-```
-
----
-
-## API Contracts
-
-### OpenAPI Code-First Pattern
-
-**1. Define Zod schema** (`packages/schemas`):
-```typescript
-export const CreateTaskSchema = z.object({
-  title: z.string().min(1).max(200),
-  completed: z.boolean().default(false),
-}).openapi('CreateTaskRequest');
-```
-
-**2. Register with OpenAPI** (`apps/server/src/routes/tasks.openapi.ts`):
-```typescript
-registry.registerPath({
-  method: 'post',
-  path: '/tasks',
-  request: { body: { content: { 'application/json': { schema: CreateTaskSchema } } } },
-  responses: { 201: { /* ... */ } },
-});
-```
-
-**3. Implement handler** (`apps/server/src/routes/tasks.ts`):
-```typescript
-export const tasksRouter = Router();
-tasksRouter.post('/', async (req, res) => {
-  const result = CreateTaskSchema.safeParse(req.body);
-  if (!result.success) {
-    return res.status(400).json({ errors: result.error.errors });
-  }
-  // Implementation...
-});
-```
-
-**4. Use type-safe client**:
-```typescript
-const { data, error } = await apiClient.POST('/api/tasks', {
-  body: { title: 'Buy groceries', completed: false }
-});  // Fully typed!
-```
-
-> **CRUD Examples**: The above demonstrates the POST pattern. Full CRUD examples (GET, PUT, DELETE) will be documented during PoC implementation when real business entities are built on this infrastructure.
-
----
-
-## Security Architecture
-
-### Security Boundary
-
-```
-┌─────────────┐
-│   Browser   │ ───── Supabase SDK (auth only)
-│ (Untrusted) │ ───── openapi-fetch client
-└──────┬──────┘
-       │ HTTP requests (authenticated)
-       ↓
-┌─────────────────┐
-│  Express API    │ ◄─── Security boundary
-│   (Trusted)     │      - Authentication checks
-│                 │      - Authorization logic
-│                 │      - Input validation (Zod)
-└───────┬─────────┘
-        │ Prisma queries
-        ↓
-┌─────────────────┐
-│  PostgreSQL DB  │ ◄─── RLS enabled (defense-in-depth)
-│   (Protected)   │
-└─────────────────┘
-```
-
-### Row Level Security (RLS)
-
-- **Enabled** on all tables (defense-in-depth)
-- **Service role key** bypasses RLS for API server
-- **No policy logic** needed—API server controls access
-- **Protects against** accidental Data API exposure
-
-### Input Validation
-
-All API inputs validated with Zod schemas before processing:
-```typescript
-const result = Schema.safeParse(req.body);
-if (!result.success) {
-  return res.status(400).json({ errors: result.error.errors });
-}
-```
-
-### Authentication Infrastructure (Phase 1 Foundation)
-
-Authentication infrastructure is ready for Phase 2 implementation. The patterns are in place but not yet applied to business routes.
-
-#### Server Auth Middleware (`apps/server/src/middleware/auth.ts`)
-
-```typescript
-// Protect routes with requireAuth middleware
-import { requireAuth } from './middleware';
-
-router.get('/protected', requireAuth, (req: AuthenticatedRequest, res) => {
-  // req.user contains validated user info
-  res.json({ userId: req.user.id });
-});
-```
-
-**Pattern**: Express middleware validates JWT tokens via Supabase Admin client. Uses service role key for secure server-side verification.
-
-#### Web Auth Utilities (`apps/web/src/lib/auth.ts`)
-
-```typescript
-// Server Components - retrieve session/user
-import { getSession, getUser } from '@/lib/auth';
-
-export default async function ProtectedPage() {
-  const session = await getSession();
-  if (!session) redirect('/login');
-  // ...
-}
-```
-
-```typescript
-// Client Components - auth state changes (forward-looking example)
-// NOTE: Current useAuthStateChange() returns AuthState object; API may evolve in Phase 2
-import { useAuthStateChange } from '@/lib/auth-hooks';
-
-function AuthProvider({ children }) {
-  const { session, user, loading } = useAuthStateChange();
-  // ...
-}
-```
-
-#### Next.js Middleware Pattern (`apps/web/src/middleware.ts`)
-
-```typescript
-// Currently disabled (matcher: []) - enable in Phase 2
-export async function middleware(request: NextRequest) {
-  const session = await getSession();
-  if (!session && isProtectedRoute(request.pathname)) {
-    return NextResponse.redirect(new URL('/login', request.url));
-  }
-}
-```
-
-**Phase 2 Enablement**: Update `matcher` array to include protected routes (e.g., `/tasks/*`).
-
-### Rate Limiting
-
-Rate limiting middleware is available to protect against brute force and DDoS attacks:
-
-| Limiter | Window | Max Requests | Use Case |
-|---------|--------|--------------|----------|
-| `defaultRateLimiter` | 15 min | 100 | General API endpoints |
-| `authRateLimiter` | 15 min | 10 | Login, signup, password reset |
-| `sensitiveRateLimiter` | 1 hour | 5 | Password change, account deletion |
-
-**Usage:**
-```typescript
-import { authRateLimiter } from './middleware';
-app.use('/api/auth', authRateLimiter);
-```
-
----
-
-## Performance Considerations
-
-From PRD Non-Functional Requirements:
-
-| Metric | Target |
-|--------|--------|
-| **Nx cache hit rate** | >50% after initial run |
-| **Full CI pipeline** | <10 minutes |
-| **API response (simple)** | <200ms |
-| **Build** | Incremental, affected-only |
-
-### Optimization Patterns
-
-- **Nx caching**: Remote via Nx Cloud
-- **Database**: Selective field loading, appropriate indexing
-- **Frontend**: Automatic code splitting
-- **API**: Connection pooling via Supavisor
-
-### Caching Strategy
-
-**Current state**: No application-level caching implemented. The template relies on:
-- Nx remote caching (build artifacts)
-- Supavisor connection pooling (database connections)
-- Standard HTTP caching (browser-controlled)
-
-**Future consideration**: Add Redis or HTTP cache headers based on production performance profiling.
-
----
-
-## Deployment Architecture
-
-### CI/CD Pipeline
-
-```yaml
-# .github/workflows/ci.yml
-- Install dependencies (pnpm)
-- Install Playwright browsers
-- Run: pnpm exec nx run-many -t lint test build typecheck e2e
-```
-
-### Quality Gates
-
-| Stage | Checks |
-|-------|--------|
-| **Pre-commit** | lint-staged, affected tests |
-| **CI** | Full lint, all tests, build, typecheck, E2E |
-| **PR merge** | All CI passes, code review, no conflicts |
-
-### Pre-commit Hooks
-
-```bash
-# .husky/pre-commit
-pnpm exec lint-staged
-NX_DAEMON=false pnpm exec nx affected -t test --base=HEAD~1
-```
-
-**NX_DAEMON=false**: Prevents Jest hanging on Windows.
-
-### Deployment Targets
-
-This template is **deployment-agnostic** by design. The architecture avoids vendor-specific APIs to support multiple deployment strategies:
-
-| Target | Web (Next.js) | Server (Express) | Notes |
-|--------|---------------|------------------|-------|
-| **Vercel + Functions** | Vercel | Vercel Serverless | Simplest setup, cold starts possible |
-| **Vercel + Container** | Vercel | Railway/Render/Fly.io | Best for long-running processes |
-| **Self-hosted** | Docker | Docker | Full control, requires infrastructure |
-
-**Validation scope**: One or two deployment targets will be tested and documented during PoC implementation.
-
----
-
-## Development Environment
-
-### Prerequisites
-
-- Node.js 22+
-- pnpm 10.19+
-- Git with LF line endings
-
-### Setup Commands
-
-```bash
-# Clone and install
-git clone <repo>
-cd nx-monorepo
-pnpm install
-
-# Configure environment
-cp .env.example .env.local
-# Edit with Supabase credentials
-
-# Validate infrastructure
-pnpm exec nx run-many -t lint test build
-
-# Start development
-pnpm run dev
-```
-
-### Common Operations
-
-| Task | Command |
-|------|---------|
-| **Build all** | `pnpm exec nx run-many -t build` |
-| **Test affected** | `pnpm exec nx affected -t test` |
-| **Lint** | `pnpm exec nx run-many -t lint` |
-| **Dev server** | `pnpm run dev` |
-| **View graph** | `pnpm exec nx graph` |
-
----
-
-## Architecture Decision Records (ADRs)
-
-| ADR | Category | Decision | Status |
-|-----|----------|----------|--------|
-| ADR-001 | API Framework | REST+OpenAPI over RPC frameworks | Accepted |
-| ADR-002 | API Toolchain | zod-to-openapi → openapi-typescript → openapi-fetch | Accepted |
-| ADR-003 | Database | Prisma + Supabase with dual-connection | Accepted |
-| ADR-004 | RLS Strategy | Enabled with service_role bypass | Accepted |
-| ADR-005 | Testing | Jest 30 + Playwright | Accepted |
-| ADR-006 | Module Resolution | `bundler` (prod) / `nodenext` (tests) | Accepted |
-
-**Full rationale**: See `docs/architecture-decisions.md`
-
----
-
-## Core Principles Reference
-
-These principles from PRD/constitution govern all architectural decisions. For authoritative definitions and rationale, see `constitution.md`.
-
-1. **AI-Native Architecture** - Explicit patterns, structured formats, discoverable conventions (see PRD.md "What Makes This Special")
-2. **Building-Block Philosophy** - Infrastructure patterns, not business logic
-3. **Type Safety End-to-End** - Zod → OpenAPI → TypeScript, no `as` casting
-4. **Production-Ready from Day One** - Quality gates, CI/CD, observability
-5. **No Vendor Lock-in** - Provider-agnostic, multiple deployment targets
-6. **Monorepo Standards Over Framework Defaults** - Post-generation checklist mandatory
-7. **External Validation Mandatory** - MCP research before material changes
-8. **Governance Alignment Mandatory** - Check docs before proposing solutions
-
----
-
-## PRD Traceability
-
-This table maps key PRD requirements to their architectural implementation. For complete requirements, see `docs/PRD.md`.
-
-### Functional Requirements
-
-| PRD ID | Requirement | Architecture Section | Notes |
-|--------|-------------|---------------------|-------|
-| **FR1** | Nx workspace configuration | Project Structure | Multi-app, multi-package structure |
-| **FR2** | Walking skeleton validation | Executive Summary | Health check exercises all layers |
-| **FR3** | Unidirectional dependency flow | Project Structure → Dependency Flow | Enforced via `nx graph` |
-| **FR4** | TypeScript strict mode | Consistency Patterns | `bundler`/`nodenext` resolution |
-| **FR5** | Documentation sync | Document References | Tier hierarchy in `docs/index.md` |
-| **FR6** | Workspace scripts | Development Environment → Common Operations | `pnpm run` shortcuts |
-| **FR7** | Zod schemas as source of truth | API Contracts, Data Architecture | Zod → OpenAPI → TypeScript |
-| **FR8** | Prisma + PostgreSQL | Data Architecture | UUID, timestamptz, snake_case |
-| **FR9** | Type-safe API client | API Contracts | `openapi-fetch` client |
-| **FR10** | Supabase client factories | Integration Architecture | Browser/server context support |
-| **FR11** | Environment validation | Development Environment | Fail-fast on missing config |
-| **FR12-14** | Quality gates | Deployment Architecture → Quality Gates | Pre-commit, CI, coverage |
-| **FR15** | Nx Cloud caching | Optimization Patterns | Remote caching enabled |
-| **FR16-18** | CI/CD + observability | Deployment Architecture | GitHub Actions, health endpoints |
-| **FR20-22** | Mobile parity | — | *Deferred to PoC implementation* |
-| **FR23-28** | Task App PoC | — | *Out of MVP scope* |
-
-### Non-Functional Requirements
-
-| NFR Category | Architecture Section | Coverage |
-|--------------|---------------------|----------|
-| **Performance** | Performance Considerations | Metrics, optimization patterns, caching strategy |
-| **Security** | Security Architecture | Trust boundary, RLS, input validation |
-| **Type Safety** | Implementation Patterns, Data Architecture | End-to-end type flow |
-| **Scalability** | Project Structure → Dependency Flow | 6-8 apps, 8-10 packages supported |
-| **Deployment** | Deployment Architecture → Deployment Targets | Multi-platform flexibility |
-
----
-
-## Document References
-
-| Document | Purpose |
-|----------|---------|
-| `docs/PRD.md` | WHAT and WHY (source of truth) |
-| `docs/architecture-decisions.md` | WHY decisions were made |
-| `docs/tech-stack.md` | WHICH versions to use |
-| `docs/memories/adopted-patterns/` | Implementation patterns (operational) |
-| `docs/memories/post-generation-checklist/` | After `nx g` commands |
-| `docs/memories/troubleshooting/` | Common issues and solutions |
-| `.ruler/AGENTS.md` | Agent execution rules |
-
----
-
-**Maintainer**: Architecture Team
-**Status**: Canonical
-**Version**: 2.0.0
+**Document Maintenance:** Update this architecture when major technical decisions are made during implementation.

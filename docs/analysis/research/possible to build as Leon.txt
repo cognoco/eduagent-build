@@ -1,0 +1,80 @@
+
+
+I can present the plan as a detailed **Technical Specification Document** outlining the required components, integrations, and logic flow for an SaaS app. 
+
+## 🛠️ AI SaaS Technical Specification: "Room Prompt"
+
+This document provides a detailed, structured specification for building the "Room Prompt" AI SaaS application, designed to be executed by a capable LLM coding agent.
+
+### 1. Project Goal and Overview
+
+* **Application Name:** Room Prompt
+* **Goal:** Build a production-ready, full-stack SaaS application that allows users to upload an image of a room and use AI to reimagine the space based on a text prompt.
+* **Core Feature:** AI-powered room redesign/reimagining.
+* **Monetization:** Credit-based system via a tiered pricing structure.
+
+### 2. Technology Stack (The Blueprint)
+
+The entire application should be generated and integrated using an AI coding agent (like Claude Code).
+
+| Component | Technology | Role |
+| :--- | :--- | :--- |
+| **Development** | Claude Code (Agent) | Code generation, initial planning, component integration. |
+| **Workflow Engine** | **Ingest** (Open Source) | Manage and monitor long-running, multi-step AI tasks. Must provide automatic retry functionality. |
+| **Payment Gateway** | **Polar** (Stripe Alternative) | Subscription/credit purchase processing, product management, and customer billing portal. |
+| **Analytics** | **PostHog** (Open Source) | Web and product analytics, session replay, and error tracking. |
+| **Authentication**| Google Sign-in (OAuth) | User sign-up and sign-in. |
+| **Storage** | Blob Storage (e.g., S3/Cloud Provider) | For storing original and AI-generated images. |
+| **Database** | (TBD, recommend PostgreSQL or similar) | User profiles, credit balances, order history, image metadata. |
+
+### 3. Application Workflow and Logic
+
+#### 3.1. User Authentication and Credit System
+
+| Step | Requirement | Implementation Detail |
+| :--- | :--- | :--- |
+| **Sign-in** | Implement Google Sign-in. | On successful sign-in, create a new user record in the database. |
+| **Credit Allocation**| Allocate **3 free credits** to new users upon account creation. | Display the current credit count clearly in the UI header. |
+| **Credit Check** | Before starting an AI generation, check the user's credit balance. | If `credits > 0`, proceed to generation. If `credits == 0`, block the request and display the "Insufficient funds" message with a link to the pricing page. |
+
+#### 3.2. Core AI Generation Process (Ingest Workflow)
+
+This multi-step process must be managed by the **Ingest** workflow engine to ensure observability and reliability .
+
+| Step | Action | Service/Database Interaction |
+| :--- | :--- | :--- |
+| 1. **User Request** | User clicks "Generate" with an image and prompt. | A job is submitted to Ingest. |
+| 2. **Credit Deduction**| Immediately decrement the user's credit count by 1. | Update the database record. |
+| 3. **AI Generation**| Call the underlying AI model (e.g., a diffusion model) with the image and prompt. | This is the long-running step. |
+| 4. **Image Upload** | Upload the newly generated image file. | Store the image in **Blob Storage**. |
+| 5. **Database Update**| Update the user's history with the new image's metadata (URL, prompt, status). | Update the database. |
+| 6. **Completion** | Notify the client (via websocket/polling) that the new image is ready. | Display the image in the application. |
+
+**Critical Requirement:** The Ingest workflow must be configured to automatically retry steps if a temporary failure occurs.
+
+#### 3.3. Payment Integration (Polar)
+
+| Feature | Requirement | Implementation Detail |
+| :--- | :--- | :--- |
+| **Pricing Page** | Display three credit packages (e.g., Starter, Pro, Business). | Must link to the Polar checkout page for the selected product. |
+| **Webhook Handler**| Implement a webhook listener for Polar `payment_successful` events. | On successful payment, verify the product ID and atomically update the user's credit balance in the database (e.g., add 30, 100, or 200 credits). |
+| **Customer Portal** | Provide a link to the Polar Customer Portal. | Allows users to view their order history and download invoices. |
+
+### 4. User Interface and Experience (UX)
+
+* **Design:** Modern, beautiful design with full support for **Light and Dark mode**.
+* **Admin Page:** A dedicated, hidden route (`/admin`) only accessible to users with the `platform_admin` role. This page must include the ability to view and dynamically edit product pricing.
+* **Documentation:** Implement a page with a Quick Start Guide/documentation on how to use the app.
+
+### 5. Analytics Implementation (PostHog)
+
+Integrate PostHog for platform monitoring. The following events must be tracked:
+
+* `page_view`: Track all general web traffic and page views.
+* `user_signed_in`: Track successful user logins.
+* `generation_started`: Track when a user initiates an AI job (before credit deduction).
+* `generation_successful`: Track when the Ingest workflow successfully completes.
+* `generation_failed`: Track when the Ingest workflow fails (after all retries).
+* `credit_purchase_successful`: Track after the Polar webhook successfully adds credits.
+
+Would you like me to look for the next video in the series, which covers the "Project Setup" (as mentioned by Leon) to continue building the spec?
