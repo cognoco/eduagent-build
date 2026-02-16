@@ -1,0 +1,219 @@
+// ---------------------------------------------------------------------------
+// Mock JWT module so auth middleware passes with a valid token
+// ---------------------------------------------------------------------------
+
+jest.mock('../middleware/jwt', () => ({
+  decodeJWTHeader: jest.fn().mockReturnValue({ alg: 'RS256', kid: 'test-kid' }),
+  fetchJWKS: jest.fn().mockResolvedValue({
+    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
+  }),
+  verifyJWT: jest.fn().mockResolvedValue({
+    sub: 'user_test',
+    email: 'test@example.com',
+    exp: Math.floor(Date.now() / 1000) + 3600,
+  }),
+}));
+
+import app from '../index';
+
+const TEST_ENV = {
+  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+};
+
+const AUTH_HEADERS = {
+  Authorization: 'Bearer valid.jwt.token',
+  'Content-Type': 'application/json',
+};
+
+describe('settings routes', () => {
+  // -------------------------------------------------------------------------
+  // GET /v1/settings/notifications
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/settings/notifications', () => {
+    it('returns 200 with notification preferences', async () => {
+      const res = await app.request(
+        '/v1/settings/notifications',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.preferences).toBeDefined();
+      expect(body.preferences.reviewReminders).toBe(false);
+      expect(body.preferences.dailyReminders).toBe(false);
+      expect(body.preferences.pushEnabled).toBe(false);
+      expect(body.preferences.maxDailyPush).toBe(3);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request('/v1/settings/notifications', {}, TEST_ENV);
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // PUT /v1/settings/notifications
+  // -------------------------------------------------------------------------
+
+  describe('PUT /v1/settings/notifications', () => {
+    it('returns 200 with valid body', async () => {
+      const res = await app.request(
+        '/v1/settings/notifications',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            reviewReminders: true,
+            dailyReminders: true,
+            pushEnabled: true,
+            maxDailyPush: 5,
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.preferences.reviewReminders).toBe(true);
+      expect(body.preferences.dailyReminders).toBe(true);
+      expect(body.preferences.pushEnabled).toBe(true);
+      expect(body.preferences.maxDailyPush).toBe(5);
+    });
+
+    it('defaults maxDailyPush to 3 when not provided', async () => {
+      const res = await app.request(
+        '/v1/settings/notifications',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            reviewReminders: false,
+            dailyReminders: false,
+            pushEnabled: false,
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.preferences.maxDailyPush).toBe(3);
+    });
+
+    it('returns 400 with invalid body', async () => {
+      const res = await app.request(
+        '/v1/settings/notifications',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            reviewReminders: 'not-a-boolean',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        '/v1/settings/notifications',
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            reviewReminders: true,
+            dailyReminders: true,
+            pushEnabled: true,
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /v1/settings/learning-mode
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/settings/learning-mode', () => {
+    it('returns 200 with learning mode', async () => {
+      const res = await app.request(
+        '/v1/settings/learning-mode',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.mode).toBe('serious');
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request('/v1/settings/learning-mode', {}, TEST_ENV);
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // PUT /v1/settings/learning-mode
+  // -------------------------------------------------------------------------
+
+  describe('PUT /v1/settings/learning-mode', () => {
+    it('returns 200 with valid mode', async () => {
+      const res = await app.request(
+        '/v1/settings/learning-mode',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ mode: 'casual' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.mode).toBe('casual');
+    });
+
+    it('returns 400 with invalid mode', async () => {
+      const res = await app.request(
+        '/v1/settings/learning-mode',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ mode: 'invalid_mode' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        '/v1/settings/learning-mode',
+        {
+          method: 'PUT',
+          body: JSON.stringify({ mode: 'casual' }),
+          headers: { 'Content-Type': 'application/json' },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+});

@@ -24,7 +24,7 @@ export type AuthEnv = {
 // Public routes that skip auth
 // ---------------------------------------------------------------------------
 
-const PUBLIC_PATHS = ['/v1/health', '/v1/inngest', '/v1/auth/'];
+const PUBLIC_PATHS = ['/v1/health', '/v1/inngest', '/v1/auth/', '/v1/stripe/'];
 
 function isPublicPath(path: string): boolean {
   return PUBLIC_PATHS.some((p) => path.startsWith(p));

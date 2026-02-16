@@ -13,3 +13,9 @@ export * from './sessions.js';
 
 // Assessment & Retention (Epic 3)
 export * from './assessments.js';
+
+// Progress, Motivation & Dashboard (Epic 4)
+export * from './progress.js';
+
+// Subscription & Billing (Epic 5)
+export * from './billing.js';
