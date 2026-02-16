@@ -129,11 +129,11 @@ Packages never import from apps. Circular dependencies are build-breaking errors
 1. `docs/architecture.md` — Full architecture decisions and technical design
 2. `docs/epics.md` — Epic breakdown with stories (understand what's built vs planned)
 3. `docs/project_context.md` — Detailed AI agent implementation rules (47 rules)
+4. `docs/ux-design-specification.md` — UX patterns, theming, component specs, accessibility
 
 **Read as needed:**
 
 - `docs/prd.md` — Product requirements (117 FRs)
-- `docs/ux-design-specification.md` — UX patterns and component specs
 
 ## Git Rules
 
