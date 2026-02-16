@@ -1,9 +1,10 @@
+import type { EscalationRung } from '@eduagent/schemas';
+
 // ---------------------------------------------------------------------------
 // LLM orchestrator types (ARCH-8, ARCH-9)
 // ---------------------------------------------------------------------------
 
-/** Escalation rung determines which model to use */
-export type EscalationRung = 1 | 2 | 3 | 4 | 5;
+export type { EscalationRung };
 
 /** Model selection based on rung */
 export interface ModelConfig {

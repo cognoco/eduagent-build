@@ -1,13 +1,11 @@
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
+import type { VerificationDepth } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Assessment Engine — Stories 3.1, 3.2
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
-
-/** Verification depth levels (UX-19) */
-export type VerificationDepth = 'recall' | 'explain' | 'transfer';
 
 export interface QuickCheckContext {
   topicTitle: string;

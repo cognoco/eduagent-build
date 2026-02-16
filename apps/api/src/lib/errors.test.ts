@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
 import {
   apiError,
@@ -8,7 +9,7 @@ import {
   validationError,
 } from './errors';
 
-function createTestApp(handler: (c: any) => any) {
+function createTestApp(handler: (c: Context) => Response | Promise<Response>) {
   const app = new Hono();
   app.get('/test', handler);
   return app;

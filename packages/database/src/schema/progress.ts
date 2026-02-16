@@ -37,10 +37,10 @@ export const xpLedger = pgTable('xp_ledger', {
     .references(() => profiles.id, { onDelete: 'cascade' }),
   topicId: uuid('topic_id')
     .notNull()
-    .references(() => curriculumTopics.id),
+    .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
   subjectId: uuid('subject_id')
     .notNull()
-    .references(() => subjects.id),
+    .references(() => subjects.id, { onDelete: 'cascade' }),
   amount: integer('amount').notNull(),
   status: text('status').notNull().default('pending'),
   earnedAt: timestamp('earned_at', { withTimezone: true })

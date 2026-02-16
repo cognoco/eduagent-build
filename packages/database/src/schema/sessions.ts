@@ -70,14 +70,18 @@ export const onboardingDrafts = pgTable('onboarding_drafts', {
 
 export const sessionEvents = pgTable('session_events', {
   id: uuid('id').primaryKey().defaultRandom(),
-  sessionId: uuid('session_id').notNull(),
+  sessionId: uuid('session_id')
+    .notNull()
+    .references(() => learningSessions.id, { onDelete: 'cascade' }),
   profileId: uuid('profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' }),
   subjectId: uuid('subject_id')
     .notNull()
-    .references(() => subjects.id),
-  topicId: uuid('topic_id').references(() => curriculumTopics.id),
+    .references(() => subjects.id, { onDelete: 'cascade' }),
+  topicId: uuid('topic_id').references(() => curriculumTopics.id, {
+    onDelete: 'cascade',
+  }),
   eventType: sessionEventTypeEnum('event_type').notNull(),
   content: text('content').notNull(),
   metadata: jsonb('metadata').default({}),
@@ -93,8 +97,10 @@ export const learningSessions = pgTable('learning_sessions', {
     .references(() => profiles.id, { onDelete: 'cascade' }),
   subjectId: uuid('subject_id')
     .notNull()
-    .references(() => subjects.id),
-  topicId: uuid('topic_id').references(() => curriculumTopics.id),
+    .references(() => subjects.id, { onDelete: 'cascade' }),
+  topicId: uuid('topic_id').references(() => curriculumTopics.id, {
+    onDelete: 'cascade',
+  }),
   sessionType: sessionTypeEnum('session_type').notNull().default('learning'),
   status: sessionStatusEnum('status').notNull().default('active'),
   escalationRung: integer('escalation_rung').notNull().default(1),
@@ -124,7 +130,9 @@ export const sessionSummaries = pgTable('session_summaries', {
   profileId: uuid('profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' }),
-  topicId: uuid('topic_id').references(() => curriculumTopics.id),
+  topicId: uuid('topic_id').references(() => curriculumTopics.id, {
+    onDelete: 'cascade',
+  }),
   content: text('content'),
   aiFeedback: text('ai_feedback'),
   status: summaryStatusEnum('status').notNull().default('pending'),
@@ -144,7 +152,9 @@ export const parkingLotItems = pgTable('parking_lot_items', {
   profileId: uuid('profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' }),
-  topicId: uuid('topic_id').references(() => curriculumTopics.id),
+  topicId: uuid('topic_id').references(() => curriculumTopics.id, {
+    onDelete: 'cascade',
+  }),
   question: text('question').notNull(),
   explored: boolean('explored').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true })

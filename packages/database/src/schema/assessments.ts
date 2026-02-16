@@ -36,11 +36,13 @@ export const assessments = pgTable('assessments', {
     .references(() => profiles.id, { onDelete: 'cascade' }),
   subjectId: uuid('subject_id')
     .notNull()
-    .references(() => subjects.id),
+    .references(() => subjects.id, { onDelete: 'cascade' }),
   topicId: uuid('topic_id')
     .notNull()
-    .references(() => curriculumTopics.id),
-  sessionId: uuid('session_id').references(() => learningSessions.id),
+    .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
+  sessionId: uuid('session_id').references(() => learningSessions.id, {
+    onDelete: 'cascade',
+  }),
   verificationDepth: verificationDepthEnum('verification_depth')
     .notNull()
     .default('recall'),
@@ -63,7 +65,7 @@ export const retentionCards = pgTable('retention_cards', {
     .references(() => profiles.id, { onDelete: 'cascade' }),
   topicId: uuid('topic_id')
     .notNull()
-    .references(() => curriculumTopics.id),
+    .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
   easeFactor: numeric('ease_factor', { precision: 4, scale: 2 })
     .notNull()
     .default('2.50'),
@@ -89,10 +91,10 @@ export const needsDeepeningTopics = pgTable('needs_deepening_topics', {
     .references(() => profiles.id, { onDelete: 'cascade' }),
   subjectId: uuid('subject_id')
     .notNull()
-    .references(() => subjects.id),
+    .references(() => subjects.id, { onDelete: 'cascade' }),
   topicId: uuid('topic_id')
     .notNull()
-    .references(() => curriculumTopics.id),
+    .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
   status: needsDeepeningStatusEnum('status').notNull().default('active'),
   consecutiveSuccessCount: integer('consecutive_success_count')
     .notNull()
@@ -112,7 +114,7 @@ export const teachingPreferences = pgTable('teaching_preferences', {
     .references(() => profiles.id, { onDelete: 'cascade' }),
   subjectId: uuid('subject_id')
     .notNull()
-    .references(() => subjects.id),
+    .references(() => subjects.id, { onDelete: 'cascade' }),
   method: text('method').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
