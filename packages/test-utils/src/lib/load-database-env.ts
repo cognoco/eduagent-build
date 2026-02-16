@@ -2,18 +2,11 @@
  * Load Database Environment Variables
  *
  * Loads environment-specific .env files to ensure tests have access to:
- * - DATABASE_URL (Supabase connection string)
- * - DIRECT_URL (Direct Prisma connection)
- * - NEXT_PUBLIC_SUPABASE_URL
- * - NEXT_PUBLIC_SUPABASE_ANON_KEY
+ * - DATABASE_URL (Neon PostgreSQL connection string)
  *
  * Environment file loaded depends on NODE_ENV:
- * - NODE_ENV=test → .env.test.local (connects to STAGING Supabase)
- * - NODE_ENV=development → .env.development.local (connects to DEV Supabase)
- *
- * Note: File names follow NODE_ENV convention, not database naming.
- * The "test" in .env.test.local refers to the execution context (running tests),
- * not the database environment (which is STAGING).
+ * - NODE_ENV=test → .env.test.local
+ * - NODE_ENV=development → .env.development.local
  *
  * @param workspaceRoot - Absolute path to workspace root. Callers MUST use
  *                        resolve(__dirname, '../..') to compute this from their
@@ -21,8 +14,6 @@
  *                        project runs tests.
  *
  * @throws {Error} If environment file doesn't exist
- * @see docs/project-config/supabase.md for environment configuration
- * @see docs/memories/testing-reference.md for testing guidelines
  */
 
 import { config } from 'dotenv';
@@ -48,7 +39,7 @@ export function loadDatabaseEnv(workspaceRoot: string): void {
       throw new Error(
         `Environment file not found: ${envFile}\n` +
           `Expected location: ${envPath}\n` +
-          `See: docs/project-config/supabase.md`
+          `See .env.example for required variables`
       );
     }
 
@@ -60,7 +51,7 @@ export function loadDatabaseEnv(workspaceRoot: string): void {
       console.error(error.message);
     }
     console.error('\nTests cannot run without environment configuration.');
-    console.error('See: docs/project-config/supabase.md\n');
+    console.error('See .env.example for required variables\n');
     process.exit(1);
   }
 }

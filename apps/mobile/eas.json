@@ -8,7 +8,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://nx-monoreposerver-production.up.railway.app/api"
+        "EXPO_PUBLIC_API_URL": "https://api.eduagent.app"
       }
     },
     "development": {
@@ -24,7 +24,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://nx-monoreposerver-staging.up.railway.app/api"
+        "EXPO_PUBLIC_API_URL": "https://api-staging.eduagent.app"
       }
     }
   },

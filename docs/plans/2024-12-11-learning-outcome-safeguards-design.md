@@ -354,7 +354,7 @@ This shows user their curiosity is valued, not dismissed.
 3. [x] **Architecture review** — ADR-027 approved: extend `session_trails`
 4. [x] Update each document listed above (8 documents)
 5. [x] Update AGENT_PROMPTS.md with specific prompt changes
-6. [ ] Create Supabase migration file for 6 new columns
+6. [ ] Create Drizzle migration for 6 new columns
 7. [ ] Create LLM behavior test suite for conversation guardrails (see below)
 
 ---

@@ -1,7 +1,7 @@
 /// <reference types="jest" />
 /// <reference types="node" />
 module.exports = {
-  displayName: '@nx-monorepo/mobile',
+  displayName: '@eduagent/mobile',
   preset: 'jest-expo',
   moduleFileExtensions: ['ts', 'js', 'html', 'tsx', 'jsx'],
   setupFilesAfterEnv: ['<rootDir>/src/test-setup.ts'],

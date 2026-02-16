@@ -431,13 +431,13 @@ technical:
     -> Learning Book (PostgreSQL) for memory/curriculum
     -> Parent Dashboard API
 
-  stack:
-    frontend: "Next.js PWA"
-    backend: "Node.js + Express"
-    database: "PostgreSQL (Supabase)"
-    ai_models: ["GPT-4 for tutoring", "Embeddings for memory search"]
-    third_party: ["Stripe", "Auth0", "SendGrid"]
-    hosting: "Vercel + Supabase"
+  stack:  # NOTE: Updated to reflect current architecture
+    frontend: "Expo (React Native)"
+    backend: "Hono (Cloudflare Workers)"
+    database: "PostgreSQL (Neon) + pgvector"
+    ai_models: ["Multi-provider LLM (Claude, GPT-4, Gemini Flash)", "Embeddings for memory search"]
+    third_party: ["Stripe", "Clerk"]
+    hosting: "Cloudflare Workers + Neon"
 
   complexity:
     level: "medium"
@@ -449,7 +449,7 @@ technical:
 
   dependencies:
     - "OpenAI API availability"
-    - "Supabase uptime"
+    - "Neon database availability"
 
   risks:
     - "LLM may leak answers despite prompting"

@@ -411,13 +411,13 @@ technical:
     -> Language-specific knowledge base
     -> Learning Book (PostgreSQL)
 
-  stack:
-    frontend: "Next.js PWA"
-    backend: "Node.js + Express"
-    database: "PostgreSQL (Supabase)"
-    ai_models: ["GPT-4 for conversation", "Embeddings for vocabulary"]
-    third_party: ["Stripe", "Auth0"]
-    hosting: "Vercel + Supabase"
+  stack:  # NOTE: Updated to reflect current architecture
+    frontend: "Expo (React Native)"
+    backend: "Hono (Cloudflare Workers)"
+    database: "PostgreSQL (Neon) + pgvector"
+    ai_models: ["Multi-provider LLM (Claude, GPT-4, Gemini Flash)", "Embeddings for vocabulary"]
+    third_party: ["Stripe", "Clerk"]
+    hosting: "Cloudflare Workers + Neon"
 
   complexity:
     level: "medium-high"
