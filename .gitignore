@@ -85,14 +85,6 @@ temp/*
 # TestSprite AI Testing (generated tests, ephemeral results)
 testsprite_tests/
 
-# START Ruler Generated Files
-/.codex/config.toml
-/.codex/config.toml.bak
-/AGENTS.md
-/AGENTS.md.bak
-/CLAUDE.md
-/CLAUDE.md.bak
-# END Ruler Generated Files
 .env.tokens
 
 # Expo
