@@ -122,13 +122,18 @@ Packages never import from apps. Circular dependencies are build-breaking errors
 
 **Not yet implemented:** Clerk auth, real API wiring (mobile uses mock data), SSE streaming, Neon database connection, E2E tests.
 
-## Documentation
+## Required Reading (before any implementation work)
 
-- `docs/architecture.md` — Full architecture decisions
+**You MUST read these before writing code:**
+
+1. `docs/architecture.md` — Full architecture decisions and technical design
+2. `docs/epics.md` — Epic breakdown with stories (understand what's built vs planned)
+3. `docs/project_context.md` — Detailed AI agent implementation rules (47 rules)
+
+**Read as needed:**
+
 - `docs/prd.md` — Product requirements (117 FRs)
-- `docs/epics.md` — Epic breakdown with stories
 - `docs/ux-design-specification.md` — UX patterns and component specs
-- `docs/project_context.md` — Detailed AI agent implementation rules (47 rules)
 
 ## Git Rules
 
