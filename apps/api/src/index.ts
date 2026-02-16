@@ -13,6 +13,8 @@ import { curriculumRoutes } from './routes/curriculum';
 import { sessionRoutes } from './routes/sessions';
 import { parkingLotRoutes } from './routes/parking-lot';
 import { homeworkRoutes } from './routes/homework';
+import { assessmentRoutes } from './routes/assessments';
+import { retentionRoutes } from './routes/retention';
 
 type Bindings = {
   ENVIRONMENT: string;
@@ -45,6 +47,8 @@ app.route('/', curriculumRoutes);
 app.route('/', sessionRoutes);
 app.route('/', parkingLotRoutes);
 app.route('/', homeworkRoutes);
+app.route('/', assessmentRoutes);
+app.route('/', retentionRoutes);
 
 export type AppType = typeof app;
 

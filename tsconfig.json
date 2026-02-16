@@ -13,6 +13,9 @@
       "path": "./packages/schemas"
     },
     {
+      "path": "./packages/retention"
+    },
+    {
       "path": "./packages/test-utils"
     },
     {

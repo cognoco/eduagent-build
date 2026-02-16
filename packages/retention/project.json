@@ -1,0 +1,6 @@
+{
+  "name": "@eduagent/retention",
+  "projectType": "library",
+  "sourceRoot": "packages/retention/src",
+  "targets": {}
+}

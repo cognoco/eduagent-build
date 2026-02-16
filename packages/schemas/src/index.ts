@@ -10,3 +10,6 @@ export * from './consent.js';
 // Onboarding & Curriculum (Epic 1)
 export * from './subjects.js';
 export * from './sessions.js';
+
+// Assessment & Retention (Epic 3)
+export * from './assessments.js';
