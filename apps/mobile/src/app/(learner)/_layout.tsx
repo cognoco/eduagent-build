@@ -68,6 +68,12 @@ export default function LearnerLayout() {
             ),
           }}
         />
+        <Tabs.Screen
+          name="curriculum"
+          options={{
+            href: null,
+          }}
+        />
       </Tabs>
     </View>
   );

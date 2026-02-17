@@ -25,6 +25,13 @@
         "command": "pnpm exec wrangler deploy",
         "cwd": "apps/api"
       }
+    },
+    "test:integration": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec jest --config tests/integration/jest.config.cjs --maxWorkers=2",
+        "cwd": "."
+      }
     }
   }
 }

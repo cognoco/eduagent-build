@@ -1,3 +1,9 @@
+import { and, eq } from 'drizzle-orm';
+import {
+  assessments,
+  createScopedRepository,
+  type Database,
+} from '@eduagent/database';
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
 import type { VerificationDepth } from '@eduagent/schemas';
@@ -263,4 +269,114 @@ function parseAssessmentEvaluation(
     masteryScore: 0,
     qualityRating: 0,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Persistence — Database-backed CRUD for assessments
+// ---------------------------------------------------------------------------
+
+export interface Assessment {
+  id: string;
+  profileId: string;
+  subjectId: string;
+  topicId: string;
+  sessionId: string | null;
+  verificationDepth: VerificationDepth;
+  status: 'in_progress' | 'passed' | 'failed';
+  masteryScore: number | null;
+  qualityRating: number | null;
+  exchangeHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function mapAssessmentRow(row: typeof assessments.$inferSelect): Assessment {
+  return {
+    id: row.id,
+    profileId: row.profileId,
+    subjectId: row.subjectId,
+    topicId: row.topicId,
+    sessionId: row.sessionId ?? null,
+    verificationDepth: row.verificationDepth,
+    status: row.status,
+    masteryScore: row.masteryScore !== null ? Number(row.masteryScore) : null,
+    qualityRating: row.qualityRating ?? null,
+    exchangeHistory: (row.exchangeHistory ??
+      []) as Assessment['exchangeHistory'],
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+export async function createAssessment(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  topicId: string,
+  sessionId?: string
+): Promise<Assessment> {
+  const [row] = await db
+    .insert(assessments)
+    .values({
+      profileId,
+      subjectId,
+      topicId,
+      sessionId: sessionId ?? null,
+      verificationDepth: 'recall',
+      status: 'in_progress',
+      exchangeHistory: [],
+    })
+    .returning();
+  return mapAssessmentRow(row);
+}
+
+export async function getAssessment(
+  db: Database,
+  profileId: string,
+  assessmentId: string
+): Promise<Assessment | null> {
+  const repo = createScopedRepository(db, profileId);
+  const row = await repo.assessments.findFirst(
+    eq(assessments.id, assessmentId)
+  );
+  return row ? mapAssessmentRow(row) : null;
+}
+
+export async function updateAssessment(
+  db: Database,
+  profileId: string,
+  assessmentId: string,
+  updates: {
+    verificationDepth?: VerificationDepth;
+    status?: 'in_progress' | 'passed' | 'failed';
+    masteryScore?: number;
+    qualityRating?: number;
+    exchangeHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  }
+): Promise<void> {
+  const setValues: Record<string, unknown> = { updatedAt: new Date() };
+  if (updates.verificationDepth !== undefined) {
+    setValues.verificationDepth = updates.verificationDepth;
+  }
+  if (updates.status !== undefined) {
+    setValues.status = updates.status;
+  }
+  if (updates.masteryScore !== undefined) {
+    setValues.masteryScore = String(updates.masteryScore);
+  }
+  if (updates.qualityRating !== undefined) {
+    setValues.qualityRating = updates.qualityRating;
+  }
+  if (updates.exchangeHistory !== undefined) {
+    setValues.exchangeHistory = updates.exchangeHistory;
+  }
+  await db
+    .update(assessments)
+    .set(setValues)
+    .where(
+      and(
+        eq(assessments.id, assessmentId),
+        eq(assessments.profileId, profileId)
+      )
+    );
 }

@@ -1,21 +1,54 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { topicSkipSchema, curriculumChallengeSchema } from '@eduagent/schemas';
-import type { AuthEnv } from '../middleware/auth';
+import type { Database } from '@eduagent/database';
+import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
+import {
+  getCurriculum,
+  skipTopic,
+  challengeCurriculum,
+  explainTopicOrdering,
+} from '../services/curriculum';
+import { notFound, apiError } from '../lib/errors';
 
-export const curriculumRoutes = new Hono<AuthEnv>()
+type CurriculumRouteEnv = {
+  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Variables: {
+    user: AuthUser;
+    db: Database;
+    account: Account;
+    profileId: string;
+  };
+};
+
+export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
   // Get curriculum for a subject
   .get('/subjects/:subjectId/curriculum', async (c) => {
-    // TODO: Fetch current curriculum with topics via c.req.param('subjectId')
-    return c.json({ curriculum: null });
+    const db = c.get('db');
+    const profileId = c.get('profileId');
+    const subjectId = c.req.param('subjectId');
+    const curriculum = await getCurriculum(db, profileId, subjectId);
+    return c.json({ curriculum });
   })
   // Skip a topic
   .post(
     '/subjects/:subjectId/curriculum/skip',
     zValidator('json', topicSkipSchema),
     async (c) => {
+      const db = c.get('db');
+      const profileId = c.get('profileId');
+      const subjectId = c.req.param('subjectId');
       const { topicId } = c.req.valid('json');
-      return c.json({ message: 'Topic skipped', topicId });
+      try {
+        await skipTopic(db, profileId, subjectId, topicId);
+        return c.json({ message: 'Topic skipped', topicId });
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Subject not found') {
+          return notFound(c, 'Subject not found');
+        }
+        throw error;
+      }
     }
   )
   // Challenge/regenerate curriculum
@@ -23,12 +56,47 @@ export const curriculumRoutes = new Hono<AuthEnv>()
     '/subjects/:subjectId/curriculum/challenge',
     zValidator('json', curriculumChallengeSchema),
     async (c) => {
-      // TODO: Use c.req.valid('json') feedback to regenerate curriculum
-      return c.json({ message: 'Curriculum regeneration started' });
+      const db = c.get('db');
+      const profileId = c.get('profileId');
+      const subjectId = c.req.param('subjectId');
+      const { feedback } = c.req.valid('json');
+      try {
+        const curriculum = await challengeCurriculum(
+          db,
+          profileId,
+          subjectId,
+          feedback
+        );
+        return c.json({ curriculum });
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Subject not found') {
+          return notFound(c, 'Subject not found');
+        }
+        throw error;
+      }
     }
   )
   // Explain topic ordering
   .get('/subjects/:subjectId/curriculum/topics/:topicId/explain', async (c) => {
-    // TODO: Call LLM to explain pedagogical reasoning via c.req.param('topicId')
-    return c.json({ explanation: 'Mock explanation for topic ordering' });
+    const db = c.get('db');
+    const profileId = c.get('profileId');
+    const subjectId = c.req.param('subjectId');
+    const topicId = c.req.param('topicId');
+    try {
+      const explanation = await explainTopicOrdering(
+        db,
+        profileId,
+        subjectId,
+        topicId
+      );
+      return c.json({ explanation });
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === 'Subject not found')
+          return notFound(c, 'Subject not found');
+        if (error.message === 'Topic not found')
+          return notFound(c, 'Topic not found');
+      }
+      throw error;
+    }
   });

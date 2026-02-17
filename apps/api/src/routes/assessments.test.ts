@@ -14,6 +14,100 @@ jest.mock('../middleware/jwt', () => ({
   }),
 }));
 
+jest.mock('@eduagent/database', () => ({
+  createDatabase: jest.fn().mockReturnValue({}),
+}));
+
+jest.mock('../services/account', () => ({
+  findOrCreateAccount: jest.fn().mockResolvedValue({
+    id: 'test-account-id',
+    clerkUserId: 'user_test',
+    email: 'test@example.com',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+}));
+
+jest.mock('../services/profile', () => ({
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    accountId: 'test-account-id',
+    displayName: 'Test User',
+    personaType: 'LEARNER',
+    isOwner: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+}));
+
+jest.mock('../services/assessments', () => ({
+  generateQuickCheck: jest.fn().mockResolvedValue({
+    questions: ['Q1?', 'Q2?'],
+    checkType: 'concept_boundary',
+  }),
+  evaluateAssessmentAnswer: jest.fn().mockResolvedValue({
+    feedback: 'Good reasoning!',
+    passed: true,
+    shouldEscalateDepth: false,
+    masteryScore: 0.45,
+    qualityRating: 4,
+  }),
+  getNextVerificationDepth: jest.fn().mockReturnValue(null),
+  calculateMasteryScore: jest.fn().mockReturnValue(0.45),
+  createAssessment: jest.fn().mockResolvedValue({
+    id: 'assessment-1',
+    profileId: 'test-profile-id',
+    subjectId: '550e8400-e29b-41d4-a716-446655440000',
+    topicId: '660e8400-e29b-41d4-a716-446655440000',
+    sessionId: null,
+    verificationDepth: 'recall',
+    status: 'in_progress',
+    masteryScore: null,
+    qualityRating: null,
+    exchangeHistory: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+  getAssessment: jest.fn().mockResolvedValue({
+    id: '770e8400-e29b-41d4-a716-446655440000',
+    profileId: 'test-profile-id',
+    subjectId: '550e8400-e29b-41d4-a716-446655440000',
+    topicId: '660e8400-e29b-41d4-a716-446655440000',
+    sessionId: null,
+    verificationDepth: 'recall',
+    status: 'in_progress',
+    masteryScore: null,
+    qualityRating: null,
+    exchangeHistory: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+  updateAssessment: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../services/session', () => ({
+  getSession: jest.fn().mockResolvedValue({
+    id: '880e8400-e29b-41d4-a716-446655440000',
+    subjectId: '550e8400-e29b-41d4-a716-446655440000',
+    topicId: '660e8400-e29b-41d4-a716-446655440000',
+    sessionType: 'learning',
+    status: 'active',
+    escalationRung: 1,
+    exchangeCount: 5,
+    startedAt: new Date().toISOString(),
+    lastActivityAt: new Date().toISOString(),
+    endedAt: null,
+    durationSeconds: null,
+  }),
+  startSession: jest.fn(),
+  processMessage: jest.fn(),
+  streamMessage: jest.fn(),
+  closeSession: jest.fn(),
+  flagContent: jest.fn(),
+  getSessionSummary: jest.fn(),
+  submitSummary: jest.fn(),
+}));
+
 import app from '../index';
 
 const TEST_ENV = {
@@ -23,6 +117,7 @@ const TEST_ENV = {
 const AUTH_HEADERS = {
   Authorization: 'Bearer valid.jwt.token',
   'Content-Type': 'application/json',
+  'X-Profile-Id': 'test-profile-id',
 };
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -51,6 +146,7 @@ describe('assessment routes', () => {
 
       const body = await res.json();
       expect(body.assessment).toBeDefined();
+      expect(body.assessment.id).toBe('assessment-1');
       expect(body.assessment.topicId).toBe(TOPIC_ID);
       expect(body.assessment.verificationDepth).toBe('recall');
       expect(body.assessment.status).toBe('in_progress');
@@ -78,7 +174,7 @@ describe('assessment routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/assessments/:assessmentId/answer', () => {
-    it('returns 200 with valid answer', async () => {
+    it('returns 200 with evaluation', async () => {
       const res = await app.request(
         `/v1/assessments/${ASSESSMENT_ID}/answer`,
         {
@@ -96,7 +192,7 @@ describe('assessment routes', () => {
 
       const body = await res.json();
       expect(body.evaluation).toBeDefined();
-      expect(body.evaluation.feedback).toBe('Mock feedback');
+      expect(body.evaluation.feedback).toBe('Good reasoning!');
       expect(body.evaluation.passed).toBe(true);
       expect(body.evaluation.shouldEscalateDepth).toBe(false);
       expect(body.evaluation.masteryScore).toBe(0.45);
@@ -115,6 +211,23 @@ describe('assessment routes', () => {
       );
 
       expect(res.status).toBe(400);
+    });
+
+    it('returns 404 when assessment not found', async () => {
+      const { getAssessment } = jest.requireMock('../services/assessments');
+      getAssessment.mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        `/v1/assessments/${ASSESSMENT_ID}/answer`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ answer: 'Some answer' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
     });
 
     it('returns 401 without auth header', async () => {
@@ -148,6 +261,26 @@ describe('assessment routes', () => {
 
       const body = await res.json();
       expect(body).toHaveProperty('assessment');
+      expect(body.assessment).not.toBeNull();
+      expect(body.assessment.id).toBe(ASSESSMENT_ID);
+      expect(body.assessment.verificationDepth).toBe('recall');
+      expect(body.assessment.status).toBe('in_progress');
+    });
+
+    it('returns 404 when assessment not found', async () => {
+      const { getAssessment } = jest.requireMock('../services/assessments');
+      getAssessment.mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        `/v1/assessments/${ASSESSMENT_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+
+      const body = await res.json();
+      expect(body.message).toBe('Assessment not found');
     });
 
     it('returns 401 without auth header', async () => {
@@ -166,7 +299,7 @@ describe('assessment routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/sessions/:sessionId/quick-check', () => {
-    it('returns 200 with valid answer', async () => {
+    it('returns 200 with feedback and isCorrect', async () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/quick-check`,
         {
@@ -182,10 +315,25 @@ describe('assessment routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.feedback).toBe(
-        'Good reasoning! You identified the key concept.'
-      );
+      expect(body.feedback).toBe('Good reasoning!');
       expect(body.isCorrect).toBe(true);
+    });
+
+    it('returns 404 when session not found', async () => {
+      const { getSession } = jest.requireMock('../services/session');
+      getSession.mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/quick-check`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ answer: 'Some answer' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
     });
 
     it('returns 400 with empty answer', async () => {

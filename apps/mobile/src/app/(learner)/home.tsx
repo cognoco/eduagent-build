@@ -80,24 +80,50 @@ export default function HomeScreen() {
               <ActivityIndicator />
             </View>
           ) : subjects && subjects.length > 0 ? (
-            subjects.map(
-              (subject: { id: string; name: string; status: string }) => (
-                <View
-                  key={subject.id}
-                  className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
-                >
-                  <Text className="text-body font-medium text-text-primary">
-                    {subject.name}
-                  </Text>
-                  <RetentionSignal status="strong" />
-                </View>
-              )
-            )
+            <>
+              {subjects.map(
+                (subject: { id: string; name: string; status: string }) => (
+                  <Pressable
+                    key={subject.id}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(learner)/curriculum',
+                        params: { subjectId: subject.id },
+                      })
+                    }
+                    className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
+                  >
+                    <Text className="text-body font-medium text-text-primary">
+                      {subject.name}
+                    </Text>
+                    <RetentionSignal status="strong" />
+                  </Pressable>
+                )
+              )}
+              <Pressable
+                onPress={() => router.push('/create-subject')}
+                className="bg-primary rounded-button py-3 mt-4 items-center"
+                testID="add-subject-button"
+              >
+                <Text className="text-text-inverse text-body font-semibold">
+                  Add subject
+                </Text>
+              </Pressable>
+            </>
           ) : (
             <View className="bg-surface rounded-card px-4 py-6 items-center">
               <Text className="text-body text-text-secondary">
                 Start learning — add your first subject
               </Text>
+              <Pressable
+                onPress={() => router.push('/create-subject')}
+                className="bg-primary rounded-button py-3 mt-4 items-center w-full"
+                testID="add-subject-button"
+              >
+                <Text className="text-text-inverse text-body font-semibold">
+                  Add subject
+                </Text>
+              </Pressable>
             </View>
           )}
         </View>

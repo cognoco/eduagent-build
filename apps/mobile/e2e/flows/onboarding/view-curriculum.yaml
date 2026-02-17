@@ -1,0 +1,15 @@
+# Smoke test: View generated curriculum after onboarding
+# Tags: smoke, onboarding
+# Prerequisites: User has completed onboarding for at least one subject
+appId: com.eduagent.mobile
+tags:
+  - smoke
+  - onboarding
+---
+- launchApp
+- assertVisible: "Your subjects"
+- tapOn: "Mathematics"
+- assertVisible:
+    text: "Your Curriculum"
+    timeout: 5000
+- assertVisible: "Start learning"

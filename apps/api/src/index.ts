@@ -1,9 +1,13 @@
 import { Hono } from 'hono';
 import { authMiddleware } from './middleware/auth';
 import { databaseMiddleware } from './middleware/database';
+import { accountMiddleware } from './middleware/account';
+import { profileScopeMiddleware } from './middleware/profile-scope';
+import { llmMiddleware } from './middleware/llm';
 import { requestLogger } from './middleware/request-logger';
 import type { AuthUser } from './middleware/auth';
 import type { Database } from '@eduagent/database';
+import type { Account } from './services/account';
 import { health } from './routes/health';
 import { auth } from './routes/auth';
 import { profileRoutes } from './routes/profiles';
@@ -31,12 +35,15 @@ type Bindings = {
   CLERK_SECRET_KEY?: string;
   CLERK_PUBLISHABLE_KEY?: string;
   CLERK_JWKS_URL?: string;
+  GEMINI_API_KEY?: string;
   LOG_LEVEL?: string;
 };
 
 type Variables = {
   user: AuthUser;
   db: Database;
+  account: Account;
+  profileId: string;
 };
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>().basePath(
@@ -51,6 +58,15 @@ app.use('*', authMiddleware);
 
 // Database middleware — creates per-request Database instance from env binding
 app.use('*', databaseMiddleware);
+
+// Account middleware — resolves Clerk user → local Account; skips public routes
+app.use('*', accountMiddleware);
+
+// Profile scope middleware — reads X-Profile-Id header, verifies ownership; skips when absent
+app.use('*', profileScopeMiddleware);
+
+// LLM middleware — lazy-registers the Gemini provider from env bindings on first request
+app.use('*', llmMiddleware);
 
 app.route('/', health);
 app.route('/', auth);

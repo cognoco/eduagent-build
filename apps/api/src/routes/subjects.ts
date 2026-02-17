@@ -1,38 +1,64 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { subjectCreateSchema, subjectUpdateSchema } from '@eduagent/schemas';
-import type { AuthEnv } from '../middleware/auth';
+import type { Database } from '@eduagent/database';
+import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
+import {
+  listSubjects,
+  createSubject,
+  getSubject,
+  updateSubject,
+} from '../services/subject';
 
-export const subjectRoutes = new Hono<AuthEnv>()
+type SubjectRouteEnv = {
+  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Variables: {
+    user: AuthUser;
+    db: Database;
+    account: Account;
+    profileId: string;
+  };
+};
+
+export const subjectRoutes = new Hono<SubjectRouteEnv>()
   .get('/subjects', async (c) => {
-    // TODO: Query subjects for current user's profile
-    return c.json({ subjects: [] });
+    const db = c.get('db');
+    const account = c.get('account');
+    // Use profileId from profile-scope middleware, fallback to account.id
+    const profileId = c.get('profileId') ?? account.id;
+    const subjects = await listSubjects(db, profileId);
+    return c.json({ subjects });
   })
   .post('/subjects', zValidator('json', subjectCreateSchema), async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
     const input = c.req.valid('json');
-    return c.json(
-      {
-        subject: {
-          id: 'placeholder',
-          profileId: 'placeholder',
-          ...input,
-          status: 'active',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      },
-      201
-    );
+    const profileId = c.get('profileId') ?? account.id;
+    const subject = await createSubject(db, profileId, input);
+    return c.json({ subject }, 201);
   })
   .get('/subjects/:id', async (c) => {
-    // TODO: Fetch subject by ID
-    return c.json({ subject: null });
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const subject = await getSubject(db, profileId, c.req.param('id'));
+    return c.json({ subject });
   })
   .patch(
     '/subjects/:id',
     zValidator('json', subjectUpdateSchema),
     async (c) => {
-      // TODO: Update subject
-      return c.json({ subject: null });
+      const db = c.get('db');
+      const account = c.get('account');
+      const input = c.req.valid('json');
+      const profileId = c.get('profileId') ?? account.id;
+      const subject = await updateSubject(
+        db,
+        profileId,
+        c.req.param('id'),
+        input
+      );
+      return c.json({ subject });
     }
   );

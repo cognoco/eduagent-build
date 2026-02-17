@@ -1,28 +1,17 @@
 import { useMutation } from '@tanstack/react-query';
+import type { AccountDeletionResponse, DataExport } from '@eduagent/schemas';
 import { useApi } from '../lib/auth-api';
-
-interface DeletionResponse {
-  message: string;
-  gracePeriodEnds: string;
-}
 
 interface CancelDeletionResponse {
   message: string;
-}
-
-interface DataExport {
-  account: { email: string; createdAt: string };
-  profiles: unknown[];
-  consentStates: unknown[];
-  exportedAt: string;
 }
 
 export function useDeleteAccount() {
   const { post } = useApi();
 
   return useMutation({
-    mutationFn: async (): Promise<DeletionResponse> => {
-      return post<DeletionResponse>('/account/delete', {});
+    mutationFn: async (): Promise<AccountDeletionResponse> => {
+      return post<AccountDeletionResponse>('/account/delete', {});
     },
   });
 }

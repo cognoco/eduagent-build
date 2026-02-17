@@ -3,6 +3,8 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
+import { eq, desc } from 'drizzle-orm';
+import { consentStates, profiles, type Database } from '@eduagent/database';
 import type {
   ConsentType,
   ConsentStatus,
@@ -22,6 +24,22 @@ export interface ConsentState {
   parentEmail: string | null;
   requestedAt: string;
   respondedAt: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Mapper — Drizzle Date → API ISO string
+// ---------------------------------------------------------------------------
+
+function mapConsentRow(row: typeof consentStates.$inferSelect): ConsentState {
+  return {
+    id: row.id,
+    profileId: row.profileId,
+    consentType: row.consentType,
+    status: row.status,
+    parentEmail: row.parentEmail ?? null,
+    requestedAt: row.requestedAt.toISOString(),
+    respondedAt: row.respondedAt?.toISOString() ?? null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -65,16 +83,23 @@ export function checkConsentRequired(
 
 /**
  * Creates a consent request and sends a notification email to the parent.
- *
- * TODO: Insert into consentStates table
- * TODO: Generate signed token (crypto.randomUUID + HMAC)
  */
 export async function requestConsent(
+  db: Database,
   input: ConsentRequest
 ): Promise<ConsentState> {
-  const consentId = crypto.randomUUID();
   const token = crypto.randomUUID();
-  const now = new Date().toISOString();
+
+  const [row] = await db
+    .insert(consentStates)
+    .values({
+      profileId: input.childProfileId,
+      consentType: input.consentType,
+      status: 'PARENTAL_CONSENT_REQUESTED',
+      parentEmail: input.parentEmail,
+      consentToken: token,
+    })
+    .returning();
 
   // TODO: Build consent URL from token using app config
   const tokenUrl = `https://app.eduagent.com/consent?token=${token}`;
@@ -88,50 +113,65 @@ export async function requestConsent(
     )
   );
 
-  return {
-    id: consentId,
-    profileId: input.childProfileId,
-    consentType: input.consentType,
-    status: 'PARENTAL_CONSENT_REQUESTED',
-    parentEmail: input.parentEmail,
-    requestedAt: now,
-    respondedAt: null,
-  };
+  return mapConsentRow(row);
 }
 
 /**
  * Processes a parent's consent response (approve or deny).
  *
- * TODO: Look up consent record by token from DB
- * TODO: If denied, cascade-delete profile (FR10)
+ * Looks up the consent record by its unique token, updates the status,
+ * and — if denied — cascade-deletes the child's profile (FR10).
  */
 export async function processConsentResponse(
+  db: Database,
   token: string,
   approved: boolean
 ): Promise<ConsentState> {
-  void token;
-  const now = new Date().toISOString();
+  // 1. Look up consent record by token
+  const row = await db.query.consentStates.findFirst({
+    where: eq(consentStates.consentToken, token),
+  });
 
-  // Stub response — in production, this would query the DB
-  return {
-    id: 'mock-consent-id',
-    profileId: 'mock-profile-id',
-    consentType: 'GDPR',
-    status: approved ? 'CONSENTED' : 'WITHDRAWN',
-    parentEmail: 'parent@example.com',
-    requestedAt: now,
+  if (!row) {
+    throw new Error('Invalid consent token');
+  }
+
+  // 2. Update status
+  const newStatus = approved ? 'CONSENTED' : 'WITHDRAWN';
+  const now = new Date();
+
+  await db
+    .update(consentStates)
+    .set({
+      status: newStatus,
+      respondedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(consentStates.id, row.id));
+
+  // 3. If denied (FR10): cascade-delete the child's profile.
+  //    CASCADE FKs handle all child data (subjects, sessions, etc.)
+  if (!approved) {
+    await db.delete(profiles).where(eq(profiles.id, row.profileId));
+  }
+
+  return mapConsentRow({
+    ...row,
+    status: newStatus,
     respondedAt: now,
-  };
+  });
 }
 
 /**
- * Returns the current consent status for a profile.
- *
- * TODO: Query consentStates table for profileId
+ * Returns the current consent status for a profile (latest consent record).
  */
 export async function getConsentStatus(
+  db: Database,
   profileId: string
 ): Promise<ConsentStatus | null> {
-  void profileId;
-  return null;
+  const row = await db.query.consentStates.findFirst({
+    where: eq(consentStates.profileId, profileId),
+    orderBy: desc(consentStates.requestedAt),
+  });
+  return row?.status ?? null;
 }

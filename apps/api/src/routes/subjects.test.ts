@@ -14,6 +14,56 @@ jest.mock('../middleware/jwt', () => ({
   }),
 }));
 
+// ---------------------------------------------------------------------------
+// Mock database module — middleware creates a stub db per request
+// ---------------------------------------------------------------------------
+
+jest.mock('@eduagent/database', () => ({
+  createDatabase: jest.fn().mockReturnValue({}),
+}));
+
+// ---------------------------------------------------------------------------
+// Mock account + subject services — no DB interaction
+// ---------------------------------------------------------------------------
+
+jest.mock('../services/account', () => ({
+  findOrCreateAccount: jest.fn().mockResolvedValue({
+    id: 'test-account-id',
+    clerkUserId: 'user_test',
+    email: 'test@example.com',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+}));
+
+jest.mock('../services/subject', () => ({
+  listSubjects: jest.fn().mockResolvedValue([]),
+  createSubject: jest.fn().mockImplementation((_db, profileId, input) => ({
+    id: 'test-subject-id',
+    profileId,
+    name: input.name,
+    status: 'active',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  })),
+  getSubject: jest.fn().mockResolvedValue({
+    id: 'test-subject-id',
+    profileId: 'test-account-id',
+    name: 'Mathematics',
+    status: 'active',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+  updateSubject: jest.fn().mockResolvedValue({
+    id: 'test-subject-id',
+    profileId: 'test-account-id',
+    name: 'Updated Subject',
+    status: 'active',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+}));
+
 import app from '../index';
 
 const TEST_ENV = {

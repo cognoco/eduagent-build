@@ -1,0 +1,19 @@
+# Smoke test: Create a subject and start onboarding interview
+# Tags: smoke, onboarding
+# Prerequisites: User is logged in, no subjects yet
+appId: com.eduagent.mobile
+tags:
+  - smoke
+  - onboarding
+---
+- launchApp
+- assertVisible: "Ready to learn"
+- tapOn: "Add subject"
+- assertVisible: "New subject"
+- tapOn:
+    id: "create-subject-name"
+- inputText: "Mathematics"
+- tapOn: "Start Learning"
+- assertVisible:
+    text: "Interview"
+    timeout: 5000

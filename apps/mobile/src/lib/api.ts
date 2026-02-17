@@ -1,11 +1,16 @@
 /**
- * Hono RPC client — provides end-to-end type safety from API to mobile.
+ * API base URL resolution.
  *
- * The `hc<AppType>` pattern gives full autocomplete for all API routes
- * and response types without code generation.
+ * Determines the correct API endpoint based on environment:
+ * 1. EXPO_PUBLIC_API_URL env var (explicit override)
+ * 2. Expo config extra.apiUrl (app.json / app.config.ts)
+ * 3. Platform-specific localhost for __DEV__
+ * 4. Production URL fallback
+ *
+ * Note: The Hono RPC client (`hc<AppType>`) is intentionally NOT exported
+ * here. AppType lives in @eduagent/api, which mobile cannot import per
+ * dependency direction rules. Use `useApi()` from ./auth-api instead.
  */
-import { hc } from 'hono/client';
-import type { AppType } from '@eduagent/api';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
@@ -26,5 +31,3 @@ export function getApiUrl(): string {
 
   return 'https://api.eduagent.app';
 }
-
-export const api = hc<AppType>(getApiUrl());

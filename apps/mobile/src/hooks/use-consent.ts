@@ -1,11 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
+import type { ConsentRequest } from '@eduagent/schemas';
 import { useApi } from '../lib/auth-api';
-
-interface ConsentRequestInput {
-  childProfileId: string;
-  parentEmail: string;
-  consentType: 'GDPR' | 'COPPA';
-}
 
 interface ConsentRequestResult {
   message: string;
@@ -17,7 +12,7 @@ export function useRequestConsent() {
 
   return useMutation({
     mutationFn: async (
-      input: ConsentRequestInput
+      input: ConsentRequest
     ): Promise<ConsentRequestResult> => {
       return post<ConsentRequestResult>('/consent/request', input);
     },

@@ -14,6 +14,106 @@ jest.mock('../middleware/jwt', () => ({
   }),
 }));
 
+// ---------------------------------------------------------------------------
+// Mock database module — middleware creates a stub db per request
+// ---------------------------------------------------------------------------
+
+jest.mock('@eduagent/database', () => ({
+  createDatabase: jest.fn().mockReturnValue({}),
+}));
+
+// ---------------------------------------------------------------------------
+// Mock account + session services — no DB interaction
+// ---------------------------------------------------------------------------
+
+jest.mock('../services/account', () => ({
+  findOrCreateAccount: jest.fn().mockResolvedValue({
+    id: 'test-account-id',
+    clerkUserId: 'user_test',
+    email: 'test@example.com',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+}));
+
+const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
+const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
+const EVENT_ID = '770e8400-e29b-41d4-a716-446655440000';
+
+jest.mock('../services/session', () => ({
+  startSession: jest
+    .fn()
+    .mockImplementation((_db, _profileId, subjectId, input) => ({
+      id: SESSION_ID,
+      subjectId,
+      topicId: input.topicId ?? null,
+      sessionType: 'learning',
+      status: 'active',
+      escalationRung: 1,
+      exchangeCount: 0,
+      startedAt: new Date().toISOString(),
+      lastActivityAt: new Date().toISOString(),
+      endedAt: null,
+      durationSeconds: null,
+    })),
+  getSession: jest.fn().mockResolvedValue({
+    id: SESSION_ID,
+    subjectId: SUBJECT_ID,
+    topicId: null,
+    sessionType: 'learning',
+    status: 'active',
+    escalationRung: 1,
+    exchangeCount: 0,
+    startedAt: new Date().toISOString(),
+    lastActivityAt: new Date().toISOString(),
+    endedAt: null,
+    durationSeconds: null,
+  }),
+  processMessage: jest.fn().mockResolvedValue({
+    response: 'Mock AI tutor response',
+    escalationRung: 1,
+    isUnderstandingCheck: false,
+    exchangeCount: 1,
+  }),
+  closeSession: jest.fn().mockImplementation((_db, _profileId, sessionId) => ({
+    message: 'Session closed',
+    sessionId,
+  })),
+  flagContent: jest.fn().mockResolvedValue({
+    message: 'Content flagged for review. Thank you!',
+  }),
+  getSessionSummary: jest.fn().mockResolvedValue({
+    id: 'summary-1',
+    sessionId: SESSION_ID,
+    content: 'Test summary',
+    aiFeedback: null,
+    status: 'submitted',
+  }),
+  submitSummary: jest
+    .fn()
+    .mockImplementation((_db, _profileId, sessionId, input) => ({
+      summary: {
+        id: 'summary-1',
+        sessionId,
+        content: input.content,
+        aiFeedback: 'Great summary! You captured the key concepts.',
+        status: 'accepted',
+      },
+    })),
+  streamMessage: jest.fn().mockImplementation(() =>
+    Promise.resolve({
+      stream: (async function* () {
+        yield 'Hello ';
+        yield 'world!';
+      })(),
+      onComplete: jest.fn().mockResolvedValue({
+        exchangeCount: 1,
+        escalationRung: 1,
+      }),
+    })
+  ),
+}));
+
 import app from '../index';
 
 const TEST_ENV = {
@@ -24,10 +124,6 @@ const AUTH_HEADERS = {
   Authorization: 'Bearer valid.jwt.token',
   'Content-Type': 'application/json',
 };
-
-const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
-const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
-const EVENT_ID = '770e8400-e29b-41d4-a716-446655440000';
 
 describe('session routes', () => {
   // -------------------------------------------------------------------------
@@ -322,6 +418,74 @@ describe('session routes', () => {
           body: JSON.stringify({
             content: 'A valid summary that is long enough.',
           }),
+          headers: { 'Content-Type': 'application/json' },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /v1/sessions/:sessionId/stream
+  // -------------------------------------------------------------------------
+
+  describe('POST /v1/sessions/:sessionId/stream', () => {
+    it('returns SSE response with text/event-stream content type', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Explain gravity' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toContain('text/event-stream');
+    });
+
+    it('streams chunks followed by done event', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Explain gravity' }),
+        },
+        TEST_ENV
+      );
+
+      const body = await res.text();
+      // SSE format: data: {...}\n\n
+      expect(body).toContain('"type":"chunk"');
+      expect(body).toContain('"type":"done"');
+      expect(body).toContain('"content":"Hello "');
+      expect(body).toContain('"content":"world!"');
+    });
+
+    it('returns 400 with empty message', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: '' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ message: 'Hello' }),
           headers: { 'Content-Type': 'application/json' },
         },
         TEST_ENV

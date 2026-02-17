@@ -73,6 +73,9 @@ testsprite_tests/
 # Keep .env.example tracked
 !.env.example
 
+# Cloudflare Workers local secrets
+.dev.vars
+
 nul
 temp/*
 

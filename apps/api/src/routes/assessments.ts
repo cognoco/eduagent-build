@@ -4,27 +4,53 @@ import {
   assessmentAnswerSchema,
   quickCheckResponseSchema,
 } from '@eduagent/schemas';
-import type { AuthEnv } from '../middleware/auth';
+import type { Database } from '@eduagent/database';
+import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
+import {
+  evaluateAssessmentAnswer,
+  createAssessment,
+  getAssessment,
+  updateAssessment,
+} from '../services/assessments';
+import { getSession } from '../services/session';
+import { notFound } from '../lib/errors';
 
-export const assessmentRoutes = new Hono<AuthEnv>()
+type AssessmentRouteEnv = {
+  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Variables: {
+    user: AuthUser;
+    db: Database;
+    account: Account;
+    profileId: string;
+  };
+};
+
+export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
   // Start a topic completion assessment
   .post('/subjects/:subjectId/topics/:topicId/assessments', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
-    const now = new Date().toISOString();
 
-    // TODO: Verify subject/topic belongs to user via c.get('user').userId
-    // TODO: Create assessment record in assessments table
-    // TODO: Generate first recall question via services/assessments.ts
+    const assessment = await createAssessment(
+      db,
+      profileId,
+      subjectId,
+      topicId
+    );
 
     return c.json(
       {
         assessment: {
-          id: 'placeholder',
-          topicId,
-          verificationDepth: 'recall' as const,
-          status: 'in_progress' as const,
-          masteryScore: null,
-          createdAt: now,
+          id: assessment.id,
+          topicId: assessment.topicId,
+          verificationDepth: assessment.verificationDepth,
+          status: assessment.status,
+          masteryScore: assessment.masteryScore,
+          createdAt: assessment.createdAt,
         },
       },
       201
@@ -36,27 +62,59 @@ export const assessmentRoutes = new Hono<AuthEnv>()
     '/assessments/:assessmentId/answer',
     zValidator('json', assessmentAnswerSchema),
     async (c) => {
-      // TODO: Look up assessment by c.req.param('assessmentId'), verify ownership
-      // TODO: Evaluate answer via services/assessments.ts using c.req.valid('json')
-      // TODO: Potentially escalate verification depth (recall -> explain -> transfer)
-      // TODO: Update assessment record with new mastery score
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
+      const assessmentId = c.req.param('assessmentId');
+      const { answer } = c.req.valid('json');
 
-      return c.json({
-        evaluation: {
-          feedback: 'Mock feedback',
-          passed: true,
-          shouldEscalateDepth: false,
-          masteryScore: 0.45,
-          qualityRating: 4,
+      const assessment = await getAssessment(db, profileId, assessmentId);
+      if (!assessment) return notFound(c, 'Assessment not found');
+
+      const evaluation = await evaluateAssessmentAnswer(
+        {
+          topicTitle: assessment.topicId, // In real use would load topic title
+          topicDescription: '',
+          currentDepth: assessment.verificationDepth,
+          exchangeHistory: assessment.exchangeHistory,
         },
+        answer
+      );
+
+      const updatedHistory = [
+        ...assessment.exchangeHistory,
+        { role: 'user' as const, content: answer },
+        { role: 'assistant' as const, content: evaluation.feedback },
+      ];
+
+      const newStatus = evaluation.passed
+        ? evaluation.shouldEscalateDepth
+          ? 'in_progress'
+          : 'passed'
+        : 'in_progress';
+
+      await updateAssessment(db, profileId, assessmentId, {
+        verificationDepth: evaluation.nextDepth ?? assessment.verificationDepth,
+        status: newStatus as 'in_progress' | 'passed' | 'failed',
+        masteryScore: evaluation.masteryScore,
+        qualityRating: evaluation.qualityRating,
+        exchangeHistory: updatedHistory,
       });
+
+      return c.json({ evaluation });
     }
   )
 
   // Get assessment state
   .get('/assessments/:assessmentId', async (c) => {
-    // TODO: Look up assessment by c.req.param('assessmentId'), verify ownership via c.get('user').userId
-    return c.json({ assessment: null });
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const assessmentId = c.req.param('assessmentId');
+
+    const assessment = await getAssessment(db, profileId, assessmentId);
+    if (!assessment) return notFound(c, 'Assessment not found');
+    return c.json({ assessment });
   })
 
   // Submit quick check response during session
@@ -64,13 +122,29 @@ export const assessmentRoutes = new Hono<AuthEnv>()
     '/sessions/:sessionId/quick-check',
     zValidator('json', quickCheckResponseSchema),
     async (c) => {
-      // TODO: Look up session by c.req.param('sessionId'), verify ownership
-      // TODO: Evaluate quick check answer via services/assessments.ts using c.req.valid('json')
-      // TODO: Store result in session_events table
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
+      const sessionId = c.req.param('sessionId');
+      const { answer } = c.req.valid('json');
+
+      const session = await getSession(db, profileId, sessionId);
+      if (!session) return notFound(c, 'Session not found');
+
+      // Evaluate the quick check answer
+      const evaluation = await evaluateAssessmentAnswer(
+        {
+          topicTitle: session.topicId ?? 'General',
+          topicDescription: '',
+          currentDepth: 'recall',
+          exchangeHistory: [],
+        },
+        answer
+      );
 
       return c.json({
-        feedback: 'Good reasoning! You identified the key concept.',
-        isCorrect: true,
+        feedback: evaluation.feedback,
+        isCorrect: evaluation.passed,
       });
     }
   );

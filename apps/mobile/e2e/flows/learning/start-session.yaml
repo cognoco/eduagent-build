@@ -1,0 +1,24 @@
+# Smoke test: Start a learning session
+# Tags: smoke, learning
+# Prerequisites: User is logged in with at least one subject
+appId: com.eduagent.mobile
+tags:
+  - smoke
+  - learning
+---
+- launchApp
+- assertVisible: "Home"
+# Navigate to a subject
+- tapOn: "Math"
+- assertVisible: "Start Session"
+- tapOn: "Start Session"
+# Wait for session to initialize
+- assertVisible: "Type your message"
+# Send a message
+- tapOn: "Type your message"
+- inputText: "What is 2+2?"
+- tapOn: "Send"
+# Wait for AI response
+- assertVisible:
+    text: ".*"
+    timeout: 10000

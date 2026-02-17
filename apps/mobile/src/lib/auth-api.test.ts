@@ -1,19 +1,18 @@
 import { renderHook } from '@testing-library/react-native';
 import { useAuth } from '@clerk/clerk-expo';
-import { useAuthenticatedApi } from './auth-api';
+import { useApi } from './auth-api';
 
 jest.mock('./api', () => ({
   getApiUrl: () => 'http://localhost:8787',
 }));
 
-jest.mock('hono/client', () => ({
-  hc: (_url: string, opts: { fetch: typeof globalThis.fetch }) => {
-    // Expose the custom fetch so tests can call it directly
-    return { _customFetch: opts.fetch };
-  },
+jest.mock('./profile', () => ({
+  useProfile: () => ({
+    activeProfile: { id: 'test-profile-id' },
+  }),
 }));
 
-describe('useAuthenticatedApi', () => {
+describe('useApi', () => {
   const mockGetToken = jest.fn();
 
   beforeEach(() => {
@@ -21,47 +20,91 @@ describe('useAuthenticatedApi', () => {
     (useAuth as jest.Mock).mockReturnValue({
       getToken: mockGetToken,
     });
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), { status: 200 })
+      );
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it('injects Authorization header with Bearer token', async () => {
+  it('get() injects Authorization and X-Profile-Id headers', async () => {
     mockGetToken.mockResolvedValue('test-jwt-token');
 
-    const { result } = renderHook(() => useAuthenticatedApi());
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const customFetch = (result.current as any)
-      ._customFetch as typeof globalThis.fetch;
-
-    await customFetch('http://localhost:8787/v1/health', {});
+    const { result } = renderHook(() => useApi());
+    await result.current.get('/health');
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
       'http://localhost:8787/v1/health',
       expect.objectContaining({
-        headers: expect.any(Headers),
+        headers: expect.objectContaining({
+          Authorization: 'Bearer test-jwt-token',
+          'X-Profile-Id': 'test-profile-id',
+          'Content-Type': 'application/json',
+        }),
+      })
+    );
+  });
+
+  it('get() omits Authorization when token is null', async () => {
+    mockGetToken.mockResolvedValue(null);
+
+    const { result } = renderHook(() => useApi());
+    await result.current.get('/health');
+
+    const callArgs = (globalThis.fetch as jest.Mock).mock.calls[0];
+    const headers = callArgs[1].headers as Record<string, string>;
+    expect(headers).not.toHaveProperty('Authorization');
+  });
+
+  it('get() throws with response body on error', async () => {
+    mockGetToken.mockResolvedValue('test-jwt-token');
+    jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response('Not Found', { status: 404, statusText: 'Not Found' })
+      );
+
+    const { result } = renderHook(() => useApi());
+    await expect(result.current.get('/missing')).rejects.toThrow(
+      'API error 404: Not Found'
+    );
+  });
+
+  it('post() sends JSON body with auth headers', async () => {
+    mockGetToken.mockResolvedValue('test-jwt-token');
+
+    const { result } = renderHook(() => useApi());
+    await result.current.post('/profiles', { displayName: 'Test' });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://localhost:8787/v1/profiles',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ displayName: 'Test' }),
+        headers: expect.objectContaining({
+          Authorization: 'Bearer test-jwt-token',
+          'Content-Type': 'application/json',
+        }),
+      })
+    );
+  });
+
+  it('post() throws with response body on error', async () => {
+    mockGetToken.mockResolvedValue('test-jwt-token');
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('{"code":"VALIDATION","message":"Invalid input"}', {
+        status: 400,
+        statusText: 'Bad Request',
       })
     );
 
-    const callArgs = (globalThis.fetch as jest.Mock).mock.calls[0];
-    const headers = callArgs[1].headers as Headers;
-    expect(headers.get('Authorization')).toBe('Bearer test-jwt-token');
-  });
-
-  it('omits Authorization header when token is null', async () => {
-    mockGetToken.mockResolvedValue(null);
-
-    const { result } = renderHook(() => useAuthenticatedApi());
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const customFetch = (result.current as any)
-      ._customFetch as typeof globalThis.fetch;
-
-    await customFetch('http://localhost:8787/v1/health', {});
-
-    const callArgs = (globalThis.fetch as jest.Mock).mock.calls[0];
-    const headers = callArgs[1].headers as Headers;
-    expect(headers.has('Authorization')).toBe(false);
+    const { result } = renderHook(() => useApi());
+    await expect(
+      result.current.post('/profiles', { displayName: '' })
+    ).rejects.toThrow('API error 400:');
   });
 });

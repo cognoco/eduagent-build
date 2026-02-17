@@ -84,6 +84,13 @@ function ThemedApp() {
             animation: 'slide_from_bottom',
           }}
         />
+        <Stack.Screen
+          name="create-subject"
+          options={{
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
+        />
       </Stack>
     </ThemeContext.Provider>
   );

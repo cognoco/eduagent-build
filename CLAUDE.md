@@ -61,6 +61,7 @@ Read `docs/project_context.md` for the full 47 rules. The critical ones:
 ### API (Hono)
 
 - Handlers inline for RPC type inference. Business logic in `services/`.
+- **Route files must never import ORM primitives** (`eq`, `and`, table refs). Even one DB query belongs in a service.
 - Services never import from `hono` — testable without mocking context.
 - All routes prefixed `/v1/`. Zod validation on every input.
 - Error responses use `ApiErrorSchema` from `@eduagent/schemas`.
@@ -75,7 +76,7 @@ Read `docs/project_context.md` for the full 47 rules. The critical ones:
 
 ### Database (Drizzle + Neon)
 
-- Always use `createScopedRepository(profileId)` — never raw `WHERE profile_id =`.
+- `createScopedRepository(profileId)` for reads. For writes, add defence-in-depth `profileId` filter with `and()`.
 - One schema file per domain, not one giant file.
 - Import from `@eduagent/database` barrel only, never internal paths.
 - `drizzle-kit push` for dev. `drizzle-kit generate` + committed SQL for prod.
@@ -91,6 +92,7 @@ Read `docs/project_context.md` for the full 47 rules. The critical ones:
 - Use for any async work surviving request lifecycle. Never fire-and-forget.
 - Event naming: `app/{domain}.{action}` (e.g., `app/session.completed`).
 - Event handlers call services. Inngest functions orchestrate steps.
+- Never put secrets/connection strings in event payloads. Use `getStepDatabase()` for DB access in steps.
 
 ## Dependency Direction (strictly enforced)
 
@@ -102,21 +104,26 @@ apps/api     →  @eduagent/schemas, @eduagent/database, @eduagent/retention
 @eduagent/schemas   →  (no workspace deps — leaf package)
 ```
 
-Packages never import from apps. Circular dependencies are build-breaking errors.
+This applies to imports, `tsconfig.json` references, AND `package.json` deps. Packages never import from apps. Circular dependencies are build-breaking errors.
 
 ## Anti-Patterns
 
 | Do NOT | Instead |
 |--------|---------|
-| Write raw `WHERE profile_id = $1` | `createScopedRepository(profileId)` |
+| Write raw `WHERE profile_id = $1` (reads) | `createScopedRepository(profileId)` |
+| Write/update without `profileId` filter | `and(eq(table.id, id), eq(table.profileId, profileId))` |
+| Import `eq`/tables in route files | Move DB query to a service function |
+| Put secrets in Inngest event payloads | `getStepDatabase()` helper reading runtime env |
 | Call LLM providers directly | `routeAndCall()` from `llm/orchestrator.ts` |
-| Define types locally in routes | Import from `@eduagent/schemas` |
+| Define client-facing types locally | Import from `@eduagent/schemas` |
 | Use default exports | Named exports (except Expo Router pages) |
 | Read `process.env` directly | Typed config from `apps/api/src/config.ts` |
 | Import internal package paths | Import from barrel (`@eduagent/schemas`) |
 | Create `__tests__/` directories | Co-locate tests next to source |
 | Add Zustand/global state | TanStack Query or React Context |
 | Render per-persona in components | CSS variables — components persona-unaware |
+| Hardcode hex colors in components | NativeWind semantic classes (`bg-surface`, `text-primary`) |
+| Check `persona` inside components | Only root `_layout.tsx` reads persona |
 
 ## Current Status
 

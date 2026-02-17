@@ -1,12 +1,13 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { renderHook, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useSubjects } from './use-subjects';
+import { useSubjects, useCreateSubject } from './use-subjects';
 
 const mockGet = jest.fn();
+const mockPost = jest.fn();
 
 jest.mock('../lib/auth-api', () => ({
-  useApi: () => ({ get: mockGet }),
+  useApi: () => ({ get: mockGet, post: mockPost }),
   useApiGet: () => ({ get: mockGet }),
 }));
 
@@ -82,6 +83,57 @@ describe('useSubjects', () => {
 
     const { result } = renderHook(() => useSubjects(), {
       wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    expect(result.current.error).toBeInstanceOf(Error);
+  });
+});
+
+describe('useCreateSubject', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('calls POST /subjects with subject name', async () => {
+    mockPost.mockResolvedValue({
+      subject: { id: 's1', name: 'Calculus', status: 'active' },
+    });
+
+    const { result } = renderHook(() => useCreateSubject(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate({ name: 'Calculus' });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(mockPost).toHaveBeenCalledWith('/subjects', { name: 'Calculus' });
+    expect(result.current.data).toEqual({
+      subject: { id: 's1', name: 'Calculus', status: 'active' },
+    });
+  });
+
+  it('handles creation errors', async () => {
+    mockPost.mockRejectedValue(new Error('Subject already exists'));
+
+    const { result } = renderHook(() => useCreateSubject(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate({ name: 'Calculus' });
     });
 
     await waitFor(() => {

@@ -3,7 +3,8 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import type { Database } from '@eduagent/database';
+import { eq, and } from 'drizzle-orm';
+import { profiles, type Database } from '@eduagent/database';
 import type {
   ProfileCreateInput,
   ProfileUpdateInput,
@@ -11,21 +12,38 @@ import type {
 } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
+// Mapper — Drizzle Date → API ISO string
+// ---------------------------------------------------------------------------
+
+function mapProfileRow(row: typeof profiles.$inferSelect): Profile {
+  return {
+    id: row.id,
+    accountId: row.accountId,
+    displayName: row.displayName,
+    avatarUrl: row.avatarUrl ?? null,
+    birthDate: row.birthDate ? row.birthDate.toISOString().split('T')[0] : null,
+    personaType: row.personaType,
+    isOwner: row.isOwner,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Core functions
 // ---------------------------------------------------------------------------
 
 /**
  * Lists all profiles belonging to an account.
- *
- * TODO: db.query.profiles.findMany({ where: eq(profiles.accountId, accountId) })
  */
 export async function listProfiles(
   db: Database,
   accountId: string
 ): Promise<Profile[]> {
-  void db;
-  void accountId;
-  return [];
+  const rows = await db.query.profiles.findMany({
+    where: eq(profiles.accountId, accountId),
+  });
+  return rows.map(mapProfileRow);
 }
 
 /**
@@ -33,8 +51,6 @@ export async function listProfiles(
  *
  * The first profile created for an account is automatically marked as the
  * owner profile (isOwner = true). Subsequent profiles are non-owner.
- *
- * TODO: db.insert(profiles).values({ accountId, ...input, isOwner }).returning()
  */
 export async function createProfile(
   db: Database,
@@ -42,19 +58,18 @@ export async function createProfile(
   input: ProfileCreateInput,
   isOwner?: boolean
 ): Promise<Profile> {
-  void db;
-  const now = new Date().toISOString();
-  return {
-    id: crypto.randomUUID(),
-    accountId,
-    displayName: input.displayName,
-    avatarUrl: input.avatarUrl ?? null,
-    birthDate: input.birthDate ?? null,
-    personaType: input.personaType ?? 'LEARNER',
-    isOwner: isOwner ?? false,
-    createdAt: now,
-    updatedAt: now,
-  };
+  const [row] = await db
+    .insert(profiles)
+    .values({
+      accountId,
+      displayName: input.displayName,
+      avatarUrl: input.avatarUrl ?? null,
+      birthDate: input.birthDate ? new Date(input.birthDate) : null,
+      personaType: input.personaType ?? 'LEARNER',
+      isOwner: isOwner ?? false,
+    })
+    .returning();
+  return mapProfileRow(row);
 }
 
 /**
@@ -62,26 +77,22 @@ export async function createProfile(
  *
  * Returns null if the profile doesn't exist or doesn't belong to the
  * caller's account — callers should treat null as 404.
- *
- * TODO: db.query.profiles.findFirst({ where: and(eq(id, profileId), eq(accountId, accountId)) })
  */
 export async function getProfile(
   db: Database,
   profileId: string,
   accountId: string
 ): Promise<Profile | null> {
-  void db;
-  void profileId;
-  void accountId;
-  return null;
+  const row = await db.query.profiles.findFirst({
+    where: and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)),
+  });
+  return row ? mapProfileRow(row) : null;
 }
 
 /**
  * Updates a profile after verifying ownership.
  *
  * Returns null if the profile doesn't exist or isn't owned by the account.
- *
- * TODO: Verify ownership, then db.update(profiles).set({ ...input, updatedAt }).where(...)
  */
 export async function updateProfile(
   db: Database,
@@ -89,27 +100,30 @@ export async function updateProfile(
   accountId: string,
   input: ProfileUpdateInput
 ): Promise<Profile | null> {
-  void db;
-  void profileId;
-  void accountId;
-  void input;
-  return null;
+  const rows = await db
+    .update(profiles)
+    .set({
+      ...input,
+      birthDate: input.birthDate ? new Date(input.birthDate) : undefined,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)))
+    .returning();
+  return rows[0] ? mapProfileRow(rows[0]) : null;
 }
 
 /**
  * Verifies a profile belongs to the account for profile switching.
  *
  * Returns null if the profile isn't owned — caller returns 403.
- *
- * TODO: Verify profile belongs to account
  */
 export async function switchProfile(
   db: Database,
   profileId: string,
   accountId: string
 ): Promise<{ profileId: string } | null> {
-  void db;
-  void profileId;
-  void accountId;
-  return null;
+  const row = await db.query.profiles.findFirst({
+    where: and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)),
+  });
+  return row ? { profileId: row.id } : null;
 }

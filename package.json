@@ -15,10 +15,10 @@
     "format:check": "nx run-many -t format:check",
     "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,scss,html}\"",
     "prepare": "husky",
-    "db:push:dev": "dotenv -e .env.development.local -- npx drizzle-kit push --config=packages/database/drizzle.config.ts",
-    "db:generate": "dotenv -e .env.development.local -- npx drizzle-kit generate --config=packages/database/drizzle.config.ts",
-    "db:migrate:dev": "dotenv -e .env.development.local -- npx drizzle-kit migrate --config=packages/database/drizzle.config.ts",
-    "db:studio:dev": "dotenv -e .env.development.local -- npx drizzle-kit studio --config=packages/database/drizzle.config.ts"
+    "db:push:dev": "dotenv -e .env.development.local -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs push",
+    "db:generate": "dotenv -e .env.development.local -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs generate",
+    "db:migrate:dev": "dotenv -e .env.development.local -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs migrate",
+    "db:studio:dev": "dotenv -e .env.development.local -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs studio"
   },
   "private": true,
   "dependencies": {

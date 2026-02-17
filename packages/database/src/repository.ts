@@ -11,6 +11,7 @@ import {
   sessionEvents,
   sessionSummaries,
   needsDeepeningTopics,
+  onboardingDrafts,
 } from './schema/index.js';
 
 export function createScopedRepository(db: Database, profileId: string) {
@@ -130,6 +131,19 @@ export function createScopedRepository(db: Database, profileId: string) {
       async findMany(extraWhere?: SQL) {
         return db.query.needsDeepeningTopics.findMany({
           where: scopedWhere(needsDeepeningTopics, extraWhere),
+        });
+      },
+    },
+
+    onboardingDrafts: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.onboardingDrafts.findMany({
+          where: scopedWhere(onboardingDrafts, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.onboardingDrafts.findFirst({
+          where: scopedWhere(onboardingDrafts, extraWhere),
         });
       },
     },

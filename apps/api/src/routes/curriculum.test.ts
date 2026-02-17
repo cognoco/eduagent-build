@@ -14,6 +14,64 @@ jest.mock('../middleware/jwt', () => ({
   }),
 }));
 
+// ---------------------------------------------------------------------------
+// Mock database module — middleware creates a stub db per request
+// ---------------------------------------------------------------------------
+
+jest.mock('@eduagent/database', () => ({
+  createDatabase: jest.fn().mockReturnValue({}),
+}));
+
+// ---------------------------------------------------------------------------
+// Mock account service — no DB interaction
+// ---------------------------------------------------------------------------
+
+jest.mock('../services/account', () => ({
+  findOrCreateAccount: jest.fn().mockResolvedValue({
+    id: 'test-account-id',
+    clerkUserId: 'user_test',
+    email: 'test@example.com',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+}));
+
+// ---------------------------------------------------------------------------
+// Mock profile service — profile-scope middleware resolves X-Profile-Id
+// ---------------------------------------------------------------------------
+
+jest.mock('../services/profile', () => ({
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    accountId: 'test-account-id',
+    displayName: 'Test User',
+    personaType: 'LEARNER',
+    isOwner: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+}));
+
+// ---------------------------------------------------------------------------
+// Mock curriculum service — no DB interaction
+// ---------------------------------------------------------------------------
+
+jest.mock('../services/curriculum', () => ({
+  generateCurriculum: jest.fn().mockResolvedValue([]),
+  getCurriculum: jest.fn().mockResolvedValue(null),
+  skipTopic: jest.fn().mockResolvedValue(undefined),
+  challengeCurriculum: jest.fn().mockResolvedValue({
+    id: 'curr-1',
+    subjectId: '550e8400-e29b-41d4-a716-446655440000',
+    version: 2,
+    topics: [],
+    generatedAt: new Date().toISOString(),
+  }),
+  explainTopicOrdering: jest
+    .fn()
+    .mockResolvedValue('This topic builds on fundamentals.'),
+}));
+
 import app from '../index';
 
 const TEST_ENV = {
@@ -23,6 +81,7 @@ const TEST_ENV = {
 const AUTH_HEADERS = {
   Authorization: 'Bearer valid.jwt.token',
   'Content-Type': 'application/json',
+  'X-Profile-Id': 'test-profile-id',
 };
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -45,6 +104,7 @@ describe('curriculum routes', () => {
 
       const body = await res.json();
       expect(body).toHaveProperty('curriculum');
+      expect(body.curriculum).toBeNull();
     });
 
     it('returns 401 without auth header', async () => {
@@ -115,7 +175,7 @@ describe('curriculum routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/subjects/:subjectId/curriculum/challenge', () => {
-    it('returns 200 with feedback', async () => {
+    it('returns 200 with curriculum', async () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/curriculum/challenge`,
         {
@@ -131,7 +191,10 @@ describe('curriculum routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.message).toBe('Curriculum regeneration started');
+      expect(body).toHaveProperty('curriculum');
+      expect(body.curriculum.id).toBe('curr-1');
+      expect(body.curriculum.version).toBe(2);
+      expect(body.curriculum.generatedAt).toBeDefined();
     });
 
     it('returns 400 with empty feedback', async () => {
@@ -178,7 +241,7 @@ describe('curriculum routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.explanation).toBe('Mock explanation for topic ordering');
+      expect(body.explanation).toBe('This topic builds on fundamentals.');
     });
 
     it('returns 401 without auth header', async () => {

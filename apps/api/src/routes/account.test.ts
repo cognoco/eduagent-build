@@ -25,10 +25,62 @@ jest.mock('../inngest/client', () => ({
   },
 }));
 
+// ---------------------------------------------------------------------------
+// Mock database module — middleware creates a stub db per request
+// ---------------------------------------------------------------------------
+
+jest.mock('@eduagent/database', () => ({
+  createDatabase: jest.fn().mockReturnValue({
+    query: {
+      profiles: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    },
+  }),
+  profiles: { accountId: 'accountId' },
+}));
+
+// ---------------------------------------------------------------------------
+// Mock account, deletion, and export services — no DB interaction
+// ---------------------------------------------------------------------------
+
+jest.mock('../services/account', () => ({
+  findOrCreateAccount: jest.fn().mockResolvedValue({
+    id: 'test-account-id',
+    clerkUserId: 'user_test',
+    email: 'test@example.com',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+}));
+
+jest.mock('../services/deletion', () => ({
+  scheduleDeletion: jest.fn().mockResolvedValue({
+    gracePeriodEnds: new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000
+    ).toISOString(),
+  }),
+  cancelDeletion: jest.fn().mockResolvedValue(undefined),
+  getProfileIdsForAccount: jest.fn().mockResolvedValue(['profile-1']),
+}));
+
+jest.mock('../services/export', () => ({
+  generateExport: jest.fn().mockResolvedValue({
+    account: {
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+    },
+    profiles: [],
+    consentStates: [],
+    exportedAt: new Date().toISOString(),
+  }),
+}));
+
 import app from '../index';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  DATABASE_URL: 'postgresql://test:test@localhost/test',
 };
 
 const AUTH_HEADERS = {

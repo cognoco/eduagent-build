@@ -12,12 +12,67 @@ jest.mock('./notifications', () => ({
   }),
 }));
 
+import type { Database } from '@eduagent/database';
 import {
   checkConsentRequired,
   requestConsent,
   processConsentResponse,
   getConsentStatus,
 } from './consent';
+
+const NOW = new Date('2025-01-15T10:00:00.000Z');
+
+function mockConsentRow(
+  overrides?: Partial<{
+    id: string;
+    profileId: string;
+    consentType: 'GDPR' | 'COPPA';
+    status:
+      | 'PENDING'
+      | 'PARENTAL_CONSENT_REQUESTED'
+      | 'CONSENTED'
+      | 'WITHDRAWN';
+    parentEmail: string | null;
+  }>
+) {
+  return {
+    id: overrides?.id ?? 'consent-1',
+    profileId: overrides?.profileId ?? '550e8400-e29b-41d4-a716-446655440000',
+    consentType: overrides?.consentType ?? 'GDPR',
+    status: overrides?.status ?? 'PARENTAL_CONSENT_REQUESTED',
+    parentEmail: overrides?.parentEmail ?? 'parent@example.com',
+    requestedAt: NOW,
+    respondedAt: null,
+    expiresAt: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+}
+
+function createMockDb({
+  findFirstResult = undefined as ReturnType<typeof mockConsentRow> | undefined,
+  insertReturning = [] as ReturnType<typeof mockConsentRow>[],
+} = {}): Database {
+  const updateWhere = jest.fn().mockResolvedValue(undefined);
+  const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+  const deleteWhere = jest.fn().mockResolvedValue(undefined);
+  const deleteFn = jest.fn().mockReturnValue({ where: deleteWhere });
+
+  return {
+    query: {
+      consentStates: {
+        findFirst: jest.fn().mockResolvedValue(findFirstResult),
+      },
+    },
+    insert: jest.fn().mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue(insertReturning),
+      }),
+    }),
+    update: jest.fn().mockReturnValue({ set: updateSet }),
+    delete: deleteFn,
+  } as unknown as Database;
+}
 
 // ---------------------------------------------------------------------------
 // checkConsentRequired
@@ -81,7 +136,9 @@ describe('checkConsentRequired', () => {
 
 describe('requestConsent', () => {
   it('returns consent state with PARENTAL_CONSENT_REQUESTED status', async () => {
-    const result = await requestConsent({
+    const row = mockConsentRow();
+    const db = createMockDb({ insertReturning: [row] });
+    const result = await requestConsent(db, {
       childProfileId: '550e8400-e29b-41d4-a716-446655440000',
       parentEmail: 'parent@example.com',
       consentType: 'GDPR',
@@ -96,8 +153,27 @@ describe('requestConsent', () => {
     expect(result.requestedAt).toBeDefined();
   });
 
+  it('persists the consent token in the insert values', async () => {
+    const row = mockConsentRow();
+    const db = createMockDb({ insertReturning: [row] });
+    await requestConsent(db, {
+      childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+      parentEmail: 'parent@example.com',
+      consentType: 'GDPR',
+    });
+
+    const insertCall = (db.insert as jest.Mock).mock.results[0].value;
+    const valuesCall = insertCall.values as jest.Mock;
+    const insertedValues = valuesCall.mock.calls[0][0];
+    expect(insertedValues).toHaveProperty('consentToken');
+    expect(typeof insertedValues.consentToken).toBe('string');
+    expect(insertedValues.consentToken.length).toBeGreaterThan(0);
+  });
+
   it('returns consent state with correct consent type for COPPA', async () => {
-    const result = await requestConsent({
+    const row = mockConsentRow({ consentType: 'COPPA' });
+    const db = createMockDb({ insertReturning: [row] });
+    const result = await requestConsent(db, {
       childProfileId: '550e8400-e29b-41d4-a716-446655440000',
       parentEmail: 'parent@example.com',
       consentType: 'COPPA',
@@ -112,18 +188,56 @@ describe('requestConsent', () => {
 // ---------------------------------------------------------------------------
 
 describe('processConsentResponse', () => {
-  it('returns CONSENTED status when approved', async () => {
-    const result = await processConsentResponse('test-token', true);
+  it('returns CONSENTED status when token found and approved', async () => {
+    const row = mockConsentRow();
+    const db = createMockDb({ findFirstResult: row });
+    const result = await processConsentResponse(db, 'valid-token', true);
 
     expect(result.status).toBe('CONSENTED');
     expect(result.respondedAt).toBeDefined();
+    expect(result.profileId).toBe(row.profileId);
+    expect(result.consentType).toBe('GDPR');
   });
 
-  it('returns WITHDRAWN status when denied', async () => {
-    const result = await processConsentResponse('test-token', false);
+  it('returns WITHDRAWN status when token found and denied', async () => {
+    const row = mockConsentRow();
+    const db = createMockDb({ findFirstResult: row });
+    const result = await processConsentResponse(db, 'valid-token', false);
 
     expect(result.status).toBe('WITHDRAWN');
     expect(result.respondedAt).toBeDefined();
+  });
+
+  it('throws error when token is not found', async () => {
+    const db = createMockDb({ findFirstResult: undefined });
+
+    await expect(
+      processConsentResponse(db, 'invalid-token', true)
+    ).rejects.toThrow('Invalid consent token');
+  });
+
+  it('updates consent state in the database', async () => {
+    const row = mockConsentRow();
+    const db = createMockDb({ findFirstResult: row });
+    await processConsentResponse(db, 'valid-token', true);
+
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it('deletes profile when consent is denied', async () => {
+    const row = mockConsentRow();
+    const db = createMockDb({ findFirstResult: row });
+    await processConsentResponse(db, 'valid-token', false);
+
+    expect(db.delete).toHaveBeenCalled();
+  });
+
+  it('does not delete profile when consent is approved', async () => {
+    const row = mockConsentRow();
+    const db = createMockDb({ findFirstResult: row });
+    await processConsentResponse(db, 'valid-token', true);
+
+    expect(db.delete).not.toHaveBeenCalled();
   });
 });
 
@@ -132,9 +246,21 @@ describe('processConsentResponse', () => {
 // ---------------------------------------------------------------------------
 
 describe('getConsentStatus', () => {
-  it('returns null (stub — no DB integration yet)', async () => {
-    const result = await getConsentStatus('any-profile-id');
+  it('returns null when no consent record exists', async () => {
+    const db = createMockDb({ findFirstResult: undefined });
+    const result = await getConsentStatus(db, 'any-profile-id');
 
     expect(result).toBeNull();
+  });
+
+  it('returns status from latest consent record', async () => {
+    const row = mockConsentRow({ status: 'CONSENTED' });
+    const db = createMockDb({ findFirstResult: row });
+    const result = await getConsentStatus(
+      db,
+      '550e8400-e29b-41d4-a716-446655440000'
+    );
+
+    expect(result).toBe('CONSENTED');
   });
 });

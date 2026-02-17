@@ -14,6 +14,20 @@ jest.mock('../middleware/jwt', () => ({
   }),
 }));
 
+jest.mock('@eduagent/database', () => ({
+  createDatabase: jest.fn().mockReturnValue({}),
+}));
+
+jest.mock('../services/account', () => ({
+  findOrCreateAccount: jest.fn().mockResolvedValue({
+    id: 'test-account-id',
+    clerkUserId: 'user_test',
+    email: 'test@example.com',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+}));
+
 import app from '../index';
 
 const TEST_ENV = {

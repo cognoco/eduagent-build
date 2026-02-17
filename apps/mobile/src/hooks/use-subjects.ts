@@ -1,12 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { Subject } from '@eduagent/schemas';
 import { useApi } from '../lib/auth-api';
 import { useProfile } from '../lib/profile';
-
-interface Subject {
-  id: string;
-  name: string;
-  status: string;
-}
 
 export function useSubjects() {
   const { get } = useApi();
@@ -19,5 +14,18 @@ export function useSubjects() {
       return data.subjects;
     },
     enabled: !!activeProfile,
+  });
+}
+
+export function useCreateSubject() {
+  const { post } = useApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: { name: string }) =>
+      post<{ subject: Subject }>('/subjects', input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['subjects'] });
+    },
   });
 }

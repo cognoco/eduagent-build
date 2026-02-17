@@ -68,3 +68,7 @@ jobs:
       # When you enable task distribution, run the e2e-ci task instead of e2e
       # Note: Mobile build excluded - mobile:build requires EAS CLI which is handled by mobile-ci.yml
       - run: pnpm exec nx run-many -t lint test typecheck && pnpm exec nx run-many -t build --exclude=@eduagent/mobile
+
+      # Run API integration tests against real PostgreSQL
+      - name: API integration tests
+        run: pnpm exec nx run api:test:integration

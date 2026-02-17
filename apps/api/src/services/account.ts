@@ -3,7 +3,8 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import type { Database } from '@eduagent/database';
+import { eq } from 'drizzle-orm';
+import { accounts, type Database } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -18,21 +19,34 @@ export interface Account {
 }
 
 // ---------------------------------------------------------------------------
+// Mapper — Drizzle Date → API ISO string
+// ---------------------------------------------------------------------------
+
+function mapAccountRow(row: typeof accounts.$inferSelect): Account {
+  return {
+    id: row.id,
+    clerkUserId: row.clerkUserId,
+    email: row.email,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Core functions
 // ---------------------------------------------------------------------------
 
 /**
  * Finds an existing account by its Clerk user ID.
- *
- * TODO: db.query.accounts.findFirst({ where: eq(accounts.clerkUserId, clerkUserId) })
  */
 export async function findAccountByClerkId(
   db: Database,
   clerkUserId: string
 ): Promise<Account | null> {
-  void db;
-  void clerkUserId;
-  return null;
+  const row = await db.query.accounts.findFirst({
+    where: eq(accounts.clerkUserId, clerkUserId),
+  });
+  return row ? mapAccountRow(row) : null;
 }
 
 /**
@@ -42,22 +56,30 @@ export async function findAccountByClerkId(
  * auth externally — the first time a JWT-verified user hits our API, we
  * lazily create their local account row. This avoids a separate "create
  * account" step and handles the webhook-vs-lazy-provision race gracefully.
- *
- * TODO: Upsert — find by clerkUserId, create if missing
- * TODO: db.insert(accounts).values({ clerkUserId, email }).onConflictDoNothing()
  */
 export async function findOrCreateAccount(
   db: Database,
   clerkUserId: string,
   email: string
 ): Promise<Account> {
-  void db;
-  const now = new Date().toISOString();
-  return {
-    id: 'placeholder-account-id',
-    clerkUserId,
-    email,
-    createdAt: now,
-    updatedAt: now,
-  };
+  const existing = await findAccountByClerkId(db, clerkUserId);
+  if (existing) return existing;
+
+  // onConflictDoNothing guards against the TOCTOU race where two concurrent
+  // requests both pass the findFirst check and attempt to insert. The unique
+  // constraint on accounts.clerkUserId ensures only one row is created.
+  const [row] = await db
+    .insert(accounts)
+    .values({ clerkUserId, email })
+    .onConflictDoNothing({ target: accounts.clerkUserId })
+    .returning();
+
+  // If conflict occurred (row is undefined), the other request won — re-query.
+  if (!row) {
+    const found = await findAccountByClerkId(db, clerkUserId);
+    if (!found) throw new Error('Account creation failed after conflict');
+    return found;
+  }
+
+  return mapAccountRow(row);
 }

@@ -9,21 +9,11 @@ import {
 import { createElement, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
+import type { Profile } from '@eduagent/schemas';
 import { useProfiles } from '../hooks/use-profiles';
 import { useApi } from './auth-api';
 
-/** Matches `profileSchema` from `@eduagent/schemas`. */
-export interface Profile {
-  id: string;
-  accountId: string;
-  displayName: string;
-  avatarUrl: string | null;
-  birthDate: string | null;
-  personaType: 'TEEN' | 'LEARNER' | 'PARENT';
-  isOwner: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+export type { Profile };
 
 export interface ProfileContextValue {
   profiles: Profile[];
@@ -46,7 +36,11 @@ export function useProfile(): ProfileContextValue {
   return useContext(ProfileContext);
 }
 
-export function ProfileProvider({ children }: { children: ReactNode }) {
+export function ProfileProvider({
+  children,
+}: {
+  children: ReactNode;
+}): ReactNode {
   const { data: profiles = [], isLoading: isProfilesLoading } = useProfiles();
   const { post } = useApi();
   const queryClient = useQueryClient();

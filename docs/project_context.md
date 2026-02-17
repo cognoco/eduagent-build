@@ -64,6 +64,7 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 ### Hono (API) Rules
 
 - **Handlers inline for Hono RPC type inference.** Business logic extracted to `services/`.
+- **Route files must never import ORM primitives** (`eq`, `and`, table references, `createScopedRepository`). If a route needs data, call a service function. One DB query is still "business logic."
 - **Services never import from `hono`.** They receive typed args, return typed results. Testable without mocking Hono context.
 - **All routes prefixed `/v1/`.** App Store binaries can't be force-updated.
 - **Error responses use typed envelope:**
@@ -77,6 +78,9 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 ### Expo (Mobile) Rules
 
 - **Components are persona-unaware.** No conditional rendering based on persona type. Theming via CSS variables set at root layout.
+  - WRONG: `if (persona === 'teen') { color = '#1a1a1a'; }` or `isDark = persona === 'teen'`
+  - WRONG: Hardcoded hex colors in component props (`color="#7c3aed"`, `backgroundColor: '#262626'`)
+  - RIGHT: Use NativeWind semantic classes (`bg-surface`, `text-primary`, `border-accent`) that resolve via CSS variables. The root `_layout.tsx` sets variables per persona — components never need to know which persona is active.
 - **TanStack Query for all server state.** React Context for auth + active profile only. Local state for UI interactions.
 - **No Zustand at MVP.** Add only when shared client state crosses navigation boundaries and doesn't come from the server.
 - **Expo Router route groups:** `(auth)/`, `(learner)/`, `(parent)/`. Root `_layout.tsx` sets persona CSS variables.
@@ -84,7 +88,17 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 
 ### Database & Data Rules
 
-- **Always use `createScopedRepository(profileId)`.** Never write raw `WHERE profile_id =` clauses.
+- **Always use `createScopedRepository(profileId)` for reads.** Never write raw `WHERE profile_id =` clauses for reads.
+- **For writes (`db.insert`, `db.update`, `db.delete`), add defence-in-depth `profileId` filter.** The scoped repo only provides read methods. For writes, always include `eq(table.profileId, profileId)` in the WHERE clause using `and()`:
+  ```typescript
+  // Read — use scoped repo
+  const repo = createScopedRepository(db, profileId);
+  const row = await repo.assessments.findFirst(eq(assessments.id, id));
+
+  // Write — defence-in-depth profileId filter
+  await db.update(assessments).set(values)
+    .where(and(eq(assessments.id, id), eq(assessments.profileId, profileId)));
+  ```
 - **Drizzle relational queries for CRUD.** `sql` template tag for complex aggregations (dashboard, retention analytics).
 - **Schema files: one per domain,** not one giant file and not one per table.
 - **`packages/database/` is the single access point.** Import from `@eduagent/database`, never from internal paths.
@@ -102,7 +116,8 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 
 - **Use Inngest for any async work that should survive a request lifecycle.** Never fire-and-forget in a route handler.
 - **Event naming: `app/{domain}.{action}`** — e.g., `app/session.completed`, `app/coaching.precompute`.
-- **Payloads always include `profileId` + `timestamp`.**
+- **Payloads always include `profileId` + `timestamp`.** Never include secrets or connection strings (e.g., `databaseUrl`) — event payloads are serialized to queues.
+- **Database access inside Inngest steps:** Use a `getStepDatabase()` helper that reads `process.env['DATABASE_URL']` at runtime. Cloudflare Worker env bindings are request-scoped and unavailable in step functions.
 - **Event handlers call `services/` for logic.** Inngest functions orchestrate steps, services do the work.
 - **`session.completed` chain:** SM-2 → coaching card KV write → dashboard update → embedding generation. Test full chain with `inngest/test`, not just individual steps.
 
@@ -130,7 +145,7 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
   // WRONG
   import { sessionEventSchema } from '@eduagent/schemas/src/session/events';
   ```
-- **Dependency direction (strictly enforced):**
+- **Dependency direction (strictly enforced — applies to ALL dependency graphs):**
   ```
   apps/mobile  →  @eduagent/schemas, @eduagent/retention
   apps/api     →  @eduagent/schemas, @eduagent/database, @eduagent/retention
@@ -138,6 +153,7 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
   @eduagent/retention →  (no workspace deps)
   @eduagent/schemas   →  (no workspace deps — leaf package)
   ```
+  This applies to: runtime `import` statements, `tsconfig.json` project `references`, AND `package.json` `dependencies`. For example, `apps/mobile/tsconfig.json` must NOT reference `../api` — that would create a build-time dependency from mobile→api.
   `packages/` never imports from `apps/`. Circular dependencies are build-breaking errors.
 - **Cross-service calls through exported function interfaces.** Never import internals from another service file.
 
@@ -152,15 +168,20 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 
 | Do NOT | Instead |
 |--------|---------|
-| Write `WHERE profile_id = $1` manually | Use `createScopedRepository(profileId)` |
+| Write `WHERE profile_id = $1` manually (reads) | Use `createScopedRepository(profileId)` |
+| Write/update without `profileId` filter | Add `and(eq(table.id, id), eq(table.profileId, profileId))` on all writes |
+| Import ORM primitives (`eq`, tables) in route files | Move the query to a service function |
+| Put `databaseUrl` or secrets in Inngest event payloads | Use `getStepDatabase()` helper reading runtime env |
 | Call LLM providers directly | Use `routeAndCall()` from `llm/orchestrator.ts` |
-| Define API types locally in a route file | Import from `@eduagent/schemas` |
+| Define API/client-facing types locally | Import from `@eduagent/schemas` (service-internal context types are OK locally) |
 | Use default exports | Use named exports (except Expo Router pages) |
 | Read `process.env` directly | Use typed config from `apps/api/src/config.ts` |
 | Import from internal package paths | Import from package barrel (`@eduagent/schemas`) |
 | Create `__tests__/` directories | Co-locate tests next to source files |
 | Add Zustand/global state store | Use TanStack Query (server state) or React Context (auth/profile) |
 | Render differently per persona in components | Use CSS variables — components are persona-unaware |
+| Hardcode hex colors in component props/styles | Use NativeWind semantic classes (`bg-surface`, `text-primary`) |
+| Check `persona` inside any component | Only root `_layout.tsx` reads persona; components use semantic tokens |
 | Call Stripe during learning sessions | Read from local DB (webhook-synced subscription state) |
 | Use `.then()` chains | Use `async`/`await` |
 | Put all schemas in one file | One schema file per domain |
@@ -183,4 +204,4 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 - Update when technology stack or patterns change
 - Remove rules that become obvious over time
 
-Last Updated: 2026-02-15
+Last Updated: 2026-02-17

@@ -13,7 +13,7 @@ export const ThemeContext = createContext<ThemeContextValue>({
   setPersona: () => {},
 });
 
-export function useTheme() {
+export function useTheme(): ThemeContextValue {
   return useContext(ThemeContext);
 }
 

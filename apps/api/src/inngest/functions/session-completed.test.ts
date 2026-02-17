@@ -25,8 +25,8 @@ jest.mock('@eduagent/database', () => ({
     retentionCards: { findFirst: mockFindFirstRetentionCard },
     streaks: { findFirst: mockFindFirstStreak },
   })),
-  retentionCards: { topicId: 'topicId', id: 'id' },
-  streaks: { id: 'id' },
+  retentionCards: { topicId: 'topicId', id: 'id', profileId: 'profileId' },
+  streaks: { id: 'id', profileId: 'profileId' },
   sessionSummaries: {},
   storeEmbedding: jest.fn().mockResolvedValue(undefined),
 }));
@@ -94,7 +94,6 @@ function createEventData(
     summaryStatus: 'pending',
     escalationRungs: [1, 2],
     timestamp: '2026-02-17T10:00:00.000Z',
-    databaseUrl: 'postgresql://test:test@localhost/test',
     ...overrides,
   };
 }
@@ -108,6 +107,11 @@ describe('sessionCompleted', () => {
     jest.clearAllMocks();
     mockFindFirstRetentionCard.mockResolvedValue(null);
     mockFindFirstStreak.mockResolvedValue(null);
+    process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
+  });
+
+  afterEach(() => {
+    delete process.env['DATABASE_URL'];
   });
 
   it('should be defined as an Inngest function', () => {

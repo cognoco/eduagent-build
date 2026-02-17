@@ -86,6 +86,7 @@ export const consentStates = pgTable('consent_states', {
   consentType: consentTypeEnum('consent_type').notNull(),
   status: consentStatusEnum('status').notNull().default('PENDING'),
   parentEmail: text('parent_email'),
+  consentToken: text('consent_token'),
   requestedAt: timestamp('requested_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

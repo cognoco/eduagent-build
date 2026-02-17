@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { inngest } from '../client';
 import { sm2 } from '@eduagent/retention';
 import {
@@ -10,6 +10,18 @@ import {
   storeEmbedding,
 } from '@eduagent/database';
 import { recordDailyActivity } from '../../services/streaks';
+
+/**
+ * Returns a Database instance for use within Inngest step functions.
+ *
+ * TODO: Inject DATABASE_URL via Inngest middleware when wiring Neon (Layer 2).
+ * See account-deletion.ts for rationale.
+ */
+function getStepDatabase() {
+  const url = process.env['DATABASE_URL'];
+  if (!url) throw new Error('DATABASE_URL is not configured');
+  return createDatabase(url);
+}
 
 export const sessionCompleted = inngest.createFunction(
   { id: 'session-completed', name: 'Process session completion' },
@@ -23,10 +35,9 @@ export const sessionCompleted = inngest.createFunction(
       summaryStatus,
       escalationRungs: _escalationRungs,
       timestamp,
-      databaseUrl,
     } = event.data;
 
-    const db = createDatabase(databaseUrl);
+    const db = getStepDatabase();
     const repo = createScopedRepository(db, profileId);
 
     // Step 1: Update retention data via SM-2
@@ -51,6 +62,7 @@ export const sessionCompleted = inngest.createFunction(
         },
       });
 
+      // Scoped repo only provides reads — use raw db with defence-in-depth profileId filter
       await db
         .update(retentionCards)
         .set({
@@ -61,7 +73,12 @@ export const sessionCompleted = inngest.createFunction(
           nextReviewAt: new Date(result.card.nextReviewAt),
           updatedAt: new Date(),
         })
-        .where(eq(retentionCards.id, card.id));
+        .where(
+          and(
+            eq(retentionCards.id, card.id),
+            eq(retentionCards.profileId, profileId)
+          )
+        );
     });
 
     // Step 2: Write coaching card / session summary
@@ -97,6 +114,7 @@ export const sessionCompleted = inngest.createFunction(
 
         const update = recordDailyActivity(streakState, today);
 
+        // Defence-in-depth: scope update by both ID and profileId
         await db
           .update(streaks)
           .set({
@@ -106,7 +124,9 @@ export const sessionCompleted = inngest.createFunction(
             gracePeriodStartDate: update.newState.gracePeriodStartDate,
             updatedAt: new Date(),
           })
-          .where(eq(streaks.id, streakRow.id));
+          .where(
+            and(eq(streaks.id, streakRow.id), eq(streaks.profileId, profileId))
+          );
       }
 
       // TODO: Insert XP ledger entry when mastery score is computed (Epic 3)
