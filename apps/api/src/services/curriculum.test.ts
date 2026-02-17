@@ -303,9 +303,32 @@ describe('skipTopic', () => {
     ).rejects.toThrow('Subject not found');
   });
 
+  it('throws when no curriculum exists for subject', async () => {
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: undefined,
+    });
+    await expect(
+      skipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
+    ).rejects.toThrow('Curriculum not found');
+  });
+
+  it('throws when topic does not belong to curriculum', async () => {
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
+      topicFindFirst: undefined,
+    });
+    await expect(
+      skipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
+    ).rejects.toThrow('Topic not found in curriculum');
+  });
+
   it('calls update and insert on the database', async () => {
     const db = createMockDb({
       subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
+      topicFindFirst: mockTopicRow(),
     });
 
     await skipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID);

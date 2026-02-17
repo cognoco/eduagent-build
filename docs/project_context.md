@@ -95,9 +95,20 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
   const repo = createScopedRepository(db, profileId);
   const row = await repo.assessments.findFirst(eq(assessments.id, id));
 
-  // Write — defence-in-depth profileId filter
+  // Update/Delete — defence-in-depth profileId filter in WHERE
   await db.update(assessments).set(values)
     .where(and(eq(assessments.id, id), eq(assessments.profileId, profileId)));
+
+  // Insert — always include profileId in values
+  await db.insert(assessments).values({ ...values, profileId });
+  ```
+  For tables **without a direct `profileId` column** (e.g., `curriculumTopics` via `curricula → subjects`), verify ownership through the parent chain **before** writing:
+  ```typescript
+  const subject = await getSubject(db, profileId, subjectId);
+  if (!subject) throw new Error('Subject not found');
+  // Ownership verified — now safe to write
+  await db.update(curriculumTopics).set({ skipped: true })
+    .where(eq(curriculumTopics.id, topicId));
   ```
 - **Drizzle relational queries for CRUD.** `sql` template tag for complex aggregations (dashboard, retention analytics).
 - **Schema files: one per domain,** not one giant file and not one per table.
@@ -173,7 +184,7 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 | Import ORM primitives (`eq`, tables) in route files | Move the query to a service function |
 | Put `databaseUrl` or secrets in Inngest event payloads | Use `getStepDatabase()` helper reading runtime env |
 | Call LLM providers directly | Use `routeAndCall()` from `llm/orchestrator.ts` |
-| Define API/client-facing types locally | Import from `@eduagent/schemas` (service-internal context types are OK locally) |
+| Define API/client-facing types locally | Import from `@eduagent/schemas`. A type is "client-facing" if it's returned by an exported service function, appears in a route response, or is used by more than one file. Local types are OK only for: single-function parameter bundles, intermediate computation shapes within one function body, and mapper helpers. |
 | Use default exports | Use named exports (except Expo Router pages) |
 | Read `process.env` directly | Use typed config from `apps/api/src/config.ts` |
 | Import from internal package paths | Import from package barrel (`@eduagent/schemas`) |

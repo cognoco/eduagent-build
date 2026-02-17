@@ -138,11 +138,15 @@ describe('requestConsent', () => {
   it('returns consent state with PARENTAL_CONSENT_REQUESTED status', async () => {
     const row = mockConsentRow();
     const db = createMockDb({ insertReturning: [row] });
-    const result = await requestConsent(db, {
-      childProfileId: '550e8400-e29b-41d4-a716-446655440000',
-      parentEmail: 'parent@example.com',
-      consentType: 'GDPR',
-    });
+    const result = await requestConsent(
+      db,
+      {
+        childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+      },
+      'https://test.example.com'
+    );
 
     expect(result.status).toBe('PARENTAL_CONSENT_REQUESTED');
     expect(result.profileId).toBe('550e8400-e29b-41d4-a716-446655440000');
@@ -156,11 +160,15 @@ describe('requestConsent', () => {
   it('persists the consent token in the insert values', async () => {
     const row = mockConsentRow();
     const db = createMockDb({ insertReturning: [row] });
-    await requestConsent(db, {
-      childProfileId: '550e8400-e29b-41d4-a716-446655440000',
-      parentEmail: 'parent@example.com',
-      consentType: 'GDPR',
-    });
+    await requestConsent(
+      db,
+      {
+        childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+      },
+      'https://test.example.com'
+    );
 
     const insertCall = (db.insert as jest.Mock).mock.results[0].value;
     const valuesCall = insertCall.values as jest.Mock;
@@ -173,11 +181,15 @@ describe('requestConsent', () => {
   it('returns consent state with correct consent type for COPPA', async () => {
     const row = mockConsentRow({ consentType: 'COPPA' });
     const db = createMockDb({ insertReturning: [row] });
-    const result = await requestConsent(db, {
-      childProfileId: '550e8400-e29b-41d4-a716-446655440000',
-      parentEmail: 'parent@example.com',
-      consentType: 'COPPA',
-    });
+    const result = await requestConsent(
+      db,
+      {
+        childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+        parentEmail: 'parent@example.com',
+        consentType: 'COPPA',
+      },
+      'https://test.example.com'
+    );
 
     expect(result.consentType).toBe('COPPA');
   });

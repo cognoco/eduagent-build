@@ -10,7 +10,7 @@ import {
   challengeCurriculum,
   explainTopicOrdering,
 } from '../services/curriculum';
-import { notFound, apiError } from '../lib/errors';
+import { notFound } from '../lib/errors';
 
 type CurriculumRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };

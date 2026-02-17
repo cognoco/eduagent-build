@@ -4,10 +4,11 @@ import { consentRequestSchema, consentResponseSchema } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requestConsent, processConsentResponse } from '../services/consent';
+import { notFound } from '../lib/errors';
 import { inngest } from '../inngest/client';
 
 type ConsentRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string; APP_URL?: string };
   Variables: { user: AuthUser; db: Database };
 };
 
@@ -18,7 +19,8 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const input = c.req.valid('json');
-      const consentState = await requestConsent(db, input);
+      const appUrl = c.env.APP_URL ?? 'https://app.eduagent.com';
+      const consentState = await requestConsent(db, input, appUrl);
 
       // Dispatch Inngest event for reminder workflow
       await inngest.send({
@@ -56,10 +58,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           error instanceof Error &&
           error.message === 'Invalid consent token'
         ) {
-          return c.json(
-            { code: 'NOT_FOUND', message: 'Invalid consent token' },
-            404
-          );
+          return notFound(c, 'Invalid consent token');
         }
         throw error;
       }

@@ -86,7 +86,8 @@ export function checkConsentRequired(
  */
 export async function requestConsent(
   db: Database,
-  input: ConsentRequest
+  input: ConsentRequest,
+  appUrl: string
 ): Promise<ConsentState> {
   const token = crypto.randomUUID();
 
@@ -101,8 +102,7 @@ export async function requestConsent(
     })
     .returning();
 
-  // TODO: Build consent URL from token using app config
-  const tokenUrl = `https://app.eduagent.com/consent?token=${token}`;
+  const tokenUrl = `${appUrl}/consent?token=${token}`;
 
   await sendEmail(
     formatConsentRequestEmail(

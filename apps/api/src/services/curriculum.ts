@@ -4,6 +4,7 @@ import {
   curriculumTopics,
   curriculumAdaptations,
   subjects,
+  createScopedRepository,
   type Database,
 } from '@eduagent/database';
 import { routeAndCall, type ChatMessage } from './llm';
@@ -85,10 +86,9 @@ export async function getCurriculum(
   profileId: string,
   subjectId: string
 ): Promise<CurriculumWithTopics | null> {
-  // Verify subject belongs to profile
-  const subject = await db.query.subjects.findFirst({
-    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
-  });
+  // Verify subject belongs to profile via scoped repository
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subject) return null;
 
   const curriculum = await db.query.curricula.findFirst({
@@ -129,11 +129,25 @@ export async function skipTopic(
   subjectId: string,
   topicId: string
 ): Promise<void> {
-  // Verify ownership through subject
-  const subject = await db.query.subjects.findFirst({
-    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
-  });
+  // Verify ownership through scoped repository
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subject) throw new Error('Subject not found');
+
+  // Verify topic belongs to this subject's curriculum
+  const curriculum = await db.query.curricula.findFirst({
+    where: eq(curricula.subjectId, subjectId),
+    orderBy: desc(curricula.version),
+  });
+  if (!curriculum) throw new Error('Curriculum not found');
+
+  const topic = await db.query.curriculumTopics.findFirst({
+    where: and(
+      eq(curriculumTopics.id, topicId),
+      eq(curriculumTopics.curriculumId, curriculum.id)
+    ),
+  });
+  if (!topic) throw new Error('Topic not found in curriculum');
 
   await db
     .update(curriculumTopics)
@@ -163,9 +177,8 @@ export async function challengeCurriculum(
   subjectId: string,
   feedback: string
 ): Promise<CurriculumWithTopics> {
-  const subject = await db.query.subjects.findFirst({
-    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
-  });
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subject) throw new Error('Subject not found');
 
   // Load current curriculum to determine new version
@@ -206,11 +219,11 @@ export async function challengeCurriculum(
   }
 
   // Return the newly generated curriculum
-  return getCurriculum(
-    db,
-    profileId,
-    subjectId
-  ) as Promise<CurriculumWithTopics>;
+  const result = await getCurriculum(db, profileId, subjectId);
+  if (!result) {
+    throw new Error('Failed to retrieve generated curriculum');
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -223,9 +236,8 @@ export async function explainTopicOrdering(
   subjectId: string,
   topicId: string
 ): Promise<string> {
-  const subject = await db.query.subjects.findFirst({
-    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
-  });
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subject) throw new Error('Subject not found');
 
   const topic = await db.query.curriculumTopics.findFirst({

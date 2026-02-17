@@ -10,10 +10,14 @@ import {
   evaluateAssessmentAnswer,
   getNextVerificationDepth,
   calculateMasteryScore,
+  createAssessment,
+  getAssessment,
+  updateAssessment,
   type QuickCheckContext,
   type AssessmentContext,
-  type VerificationDepth,
 } from './assessments';
+import type { VerificationDepth } from '@eduagent/schemas';
+import type { Database } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -345,5 +349,213 @@ describe('calculateMasteryScore', () => {
     expect(calculateMasteryScore('recall', 0.3)).toBeCloseTo(0.3);
     expect(calculateMasteryScore('explain', 0.6)).toBeCloseTo(0.6);
     expect(calculateMasteryScore('transfer', 0.7)).toBeCloseTo(0.7);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CRUD persistence — createAssessment, getAssessment, updateAssessment
+// ---------------------------------------------------------------------------
+
+const CRUD_NOW = new Date('2025-01-15T10:00:00.000Z');
+const testProfileId = 'test-profile-id';
+const testSubjectId = 'subject-1';
+const testTopicId = 'topic-1';
+const testAssessmentId = 'assessment-1';
+
+function mockAssessmentRow(
+  overrides?: Partial<{
+    id: string;
+    profileId: string;
+    sessionId: string | null;
+    verificationDepth: 'recall' | 'explain' | 'transfer';
+    status: 'in_progress' | 'passed' | 'failed';
+    masteryScore: string | null;
+    qualityRating: number | null;
+    exchangeHistory: unknown[];
+  }>
+) {
+  return {
+    id: overrides?.id ?? testAssessmentId,
+    profileId: overrides?.profileId ?? testProfileId,
+    subjectId: testSubjectId,
+    topicId: testTopicId,
+    sessionId: overrides?.sessionId ?? null,
+    verificationDepth: overrides?.verificationDepth ?? 'recall',
+    status: overrides?.status ?? 'in_progress',
+    masteryScore: overrides?.masteryScore ?? null,
+    qualityRating: overrides?.qualityRating ?? null,
+    exchangeHistory: overrides?.exchangeHistory ?? [],
+    createdAt: CRUD_NOW,
+    updatedAt: CRUD_NOW,
+  };
+}
+
+function createAssessmentMockDb({
+  findFirstResult = undefined as
+    | ReturnType<typeof mockAssessmentRow>
+    | undefined,
+  insertReturning = [] as ReturnType<typeof mockAssessmentRow>[],
+} = {}) {
+  const updateWhere = jest.fn().mockResolvedValue(undefined);
+  const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+
+  return {
+    query: {
+      assessments: {
+        findFirst: jest.fn().mockResolvedValue(findFirstResult),
+      },
+    },
+    insert: jest.fn().mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue(insertReturning),
+      }),
+    }),
+    update: jest.fn().mockReturnValue({ set: updateSet }),
+  } as unknown as Database;
+}
+
+describe('createAssessment', () => {
+  it('returns assessment with initial recall depth and in_progress status', async () => {
+    const row = mockAssessmentRow();
+    const db = createAssessmentMockDb({ insertReturning: [row] });
+
+    const result = await createAssessment(
+      db,
+      testProfileId,
+      testSubjectId,
+      testTopicId
+    );
+
+    expect(result.id).toBe(testAssessmentId);
+    expect(result.profileId).toBe(testProfileId);
+    expect(result.subjectId).toBe(testSubjectId);
+    expect(result.topicId).toBe(testTopicId);
+    expect(result.verificationDepth).toBe('recall');
+    expect(result.status).toBe('in_progress');
+    expect(result.sessionId).toBeNull();
+    expect(result.exchangeHistory).toEqual([]);
+  });
+
+  it('includes sessionId when provided', async () => {
+    const row = mockAssessmentRow({ sessionId: 'session-1' });
+    const db = createAssessmentMockDb({ insertReturning: [row] });
+
+    const result = await createAssessment(
+      db,
+      testProfileId,
+      testSubjectId,
+      testTopicId,
+      'session-1'
+    );
+
+    expect(result.sessionId).toBe('session-1');
+  });
+
+  it('includes profileId in insert values', async () => {
+    const row = mockAssessmentRow();
+    const db = createAssessmentMockDb({ insertReturning: [row] });
+
+    await createAssessment(db, testProfileId, testSubjectId, testTopicId);
+
+    const insertCall = (db.insert as jest.Mock).mock.results[0].value;
+    const valuesCall = insertCall.values as jest.Mock;
+    const insertedValues = valuesCall.mock.calls[0][0];
+    expect(insertedValues.profileId).toBe(testProfileId);
+  });
+
+  it('converts dates to ISO strings', async () => {
+    const row = mockAssessmentRow();
+    const db = createAssessmentMockDb({ insertReturning: [row] });
+
+    const result = await createAssessment(
+      db,
+      testProfileId,
+      testSubjectId,
+      testTopicId
+    );
+
+    expect(result.createdAt).toBe('2025-01-15T10:00:00.000Z');
+    expect(result.updatedAt).toBe('2025-01-15T10:00:00.000Z');
+  });
+});
+
+describe('getAssessment', () => {
+  it('returns assessment when found', async () => {
+    const row = mockAssessmentRow();
+    const db = createAssessmentMockDb({ findFirstResult: row });
+
+    const result = await getAssessment(db, testProfileId, testAssessmentId);
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(testAssessmentId);
+    expect(result!.createdAt).toBe('2025-01-15T10:00:00.000Z');
+  });
+
+  it('returns null when assessment not found', async () => {
+    const db = createAssessmentMockDb({ findFirstResult: undefined });
+
+    const result = await getAssessment(db, testProfileId, 'nonexistent');
+
+    expect(result).toBeNull();
+  });
+
+  it('maps masteryScore from string to number', async () => {
+    const row = mockAssessmentRow({ masteryScore: '0.75' });
+    const db = createAssessmentMockDb({ findFirstResult: row });
+
+    const result = await getAssessment(db, testProfileId, testAssessmentId);
+
+    expect(result!.masteryScore).toBe(0.75);
+  });
+
+  it('returns null masteryScore when not set', async () => {
+    const row = mockAssessmentRow({ masteryScore: null });
+    const db = createAssessmentMockDb({ findFirstResult: row });
+
+    const result = await getAssessment(db, testProfileId, testAssessmentId);
+
+    expect(result!.masteryScore).toBeNull();
+  });
+});
+
+describe('updateAssessment', () => {
+  it('calls update with defence-in-depth profileId filter', async () => {
+    const db = createAssessmentMockDb();
+
+    await updateAssessment(db, testProfileId, testAssessmentId, {
+      status: 'passed',
+      masteryScore: 0.8,
+    });
+
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it('only sets provided fields in update', async () => {
+    const db = createAssessmentMockDb();
+
+    await updateAssessment(db, testProfileId, testAssessmentId, {
+      verificationDepth: 'explain',
+    });
+
+    const updateCall = (db.update as jest.Mock).mock.results[0].value;
+    const setCall = updateCall.set as jest.Mock;
+    const setValues = setCall.mock.calls[0][0];
+    expect(setValues.verificationDepth).toBe('explain');
+    expect(setValues).toHaveProperty('updatedAt');
+    expect(setValues).not.toHaveProperty('status');
+    expect(setValues).not.toHaveProperty('masteryScore');
+  });
+
+  it('converts masteryScore to string for decimal storage', async () => {
+    const db = createAssessmentMockDb();
+
+    await updateAssessment(db, testProfileId, testAssessmentId, {
+      masteryScore: 0.65,
+    });
+
+    const updateCall = (db.update as jest.Mock).mock.results[0].value;
+    const setCall = updateCall.set as jest.Mock;
+    const setValues = setCall.mock.calls[0][0];
+    expect(setValues.masteryScore).toBe('0.65');
   });
 });

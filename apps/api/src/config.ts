@@ -9,6 +9,7 @@ const envSchema = z.object({
   CLERK_PUBLISHABLE_KEY: z.string().min(1).optional(),
   CLERK_JWKS_URL: z.string().url().optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
+  APP_URL: z.string().url().default('https://app.eduagent.com'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 });
 

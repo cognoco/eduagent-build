@@ -76,7 +76,7 @@ Read `docs/project_context.md` for the full 47 rules. The critical ones:
 
 ### Database (Drizzle + Neon)
 
-- `createScopedRepository(profileId)` for reads. For writes, add defence-in-depth `profileId` filter with `and()`.
+- `createScopedRepository(profileId)` for reads. For writes: updates/deletes add `profileId` filter with `and()`; inserts include `profileId` in `.values()`. For tables without direct `profileId` (e.g., `curriculumTopics`), verify ownership via parent chain before writing.
 - One schema file per domain, not one giant file.
 - Import from `@eduagent/database` barrel only, never internal paths.
 - `drizzle-kit push` for dev. `drizzle-kit generate` + committed SQL for prod.
@@ -111,11 +111,11 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 | Do NOT | Instead |
 |--------|---------|
 | Write raw `WHERE profile_id = $1` (reads) | `createScopedRepository(profileId)` |
-| Write/update without `profileId` filter | `and(eq(table.id, id), eq(table.profileId, profileId))` |
+| Write without `profileId` scoping | Updates/deletes: `and(eq(table.id, id), eq(table.profileId, profileId))`. Inserts: include `profileId` in `.values()`. No direct FK: verify parent chain first. |
 | Import `eq`/tables in route files | Move DB query to a service function |
 | Put secrets in Inngest event payloads | `getStepDatabase()` helper reading runtime env |
 | Call LLM providers directly | `routeAndCall()` from `llm/orchestrator.ts` |
-| Define client-facing types locally | Import from `@eduagent/schemas` |
+| Define client-facing types locally | Import from `@eduagent/schemas`. Client-facing = returned by exported service, in route response, or used by >1 file. |
 | Use default exports | Named exports (except Expo Router pages) |
 | Read `process.env` directly | Typed config from `apps/api/src/config.ts` |
 | Import internal package paths | Import from barrel (`@eduagent/schemas`) |
@@ -127,9 +127,18 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 
 ## Current Status
 
-**Complete:** Epics 0-5 (API layer, 521 tests), Phase 1 mobile screens (NativeWind + Expo Router + three-persona theming).
+**Complete:**
+- Epics 0-5 API layer (692 unit tests + 7 integration tests, all passing)
+- All API route stubs wired to real services with DB persistence (interview, curriculum, assessment, consent)
+- Signal extraction from interviews + curriculum generation pipeline
+- Mobile screens: auth (Clerk), onboarding (subject creation → interview → curriculum), learner home, parent dashboard
+- Mobile-API integration: Clerk auth wired, TanStack Query hooks for all major flows
+- SSE streaming: mobile SSE client + `useStreamMessage` hook for learning/homework sessions
+- Maestro E2E flow scaffolds (create-subject, view-curriculum, start-session)
 
-**Not yet implemented:** Clerk auth, real API wiring (mobile uses mock data), SSE streaming, Neon database connection, E2E tests.
+**Remaining stub routes (mock data):** progress, retention, streaks, settings, dashboard (real data), parking-lot, homework, billing, stripe-webhook.
+
+**Not yet integrated:** Stripe payments, email provider (Resend/SendGrid), Expo Push notifications, real embedding vectors (pgvector), OCR provider.
 
 ## Required Reading (before any implementation work)
 
