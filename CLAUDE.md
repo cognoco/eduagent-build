@@ -68,6 +68,8 @@ Read `docs/project_context.md` for the full 47 rules. The critical ones:
 ### Mobile (Expo)
 
 - Components are **persona-unaware**. Theming via CSS variables at root layout.
+- Route groups: `(auth)/`, `(learner)/`, `(parent)/` — persona is a first-class routing concern.
+- Auth screens redirect to `/(learner)/home`; each group's layout guards persona and cross-redirects.
 - TanStack Query for server state. React Context for auth/profile only.
 - No Zustand at MVP. Expo Image (built into SDK 54) for all images.
 

@@ -14,6 +14,70 @@ jest.mock('../middleware/jwt', () => ({
   }),
 }));
 
+// ---------------------------------------------------------------------------
+// Mock database module — middleware creates a stub db per request
+// ---------------------------------------------------------------------------
+
+jest.mock('@eduagent/database', () => ({
+  createDatabase: jest.fn().mockReturnValue({}),
+}));
+
+// ---------------------------------------------------------------------------
+// Mock account & profile services — pure stubs, no DB interaction
+// ---------------------------------------------------------------------------
+
+jest.mock('../services/account', () => ({
+  findOrCreateAccount: jest.fn().mockResolvedValue({
+    id: 'test-account-id',
+    clerkUserId: 'user_test',
+    email: 'test@example.com',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+}));
+
+jest.mock('../services/profile', () => ({
+  listProfiles: jest.fn().mockResolvedValue([]),
+  createProfile: jest
+    .fn()
+    .mockImplementation((_db, accountId, input, isOwner) => ({
+      id: 'test-profile-id',
+      accountId,
+      displayName: input.displayName,
+      avatarUrl: input.avatarUrl ?? null,
+      birthDate: input.birthDate ?? null,
+      personaType: input.personaType ?? 'LEARNER',
+      isOwner: isOwner ?? false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })),
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    accountId: 'test-account-id',
+    displayName: 'Test User',
+    avatarUrl: null,
+    birthDate: null,
+    personaType: 'LEARNER',
+    isOwner: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+  updateProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    accountId: 'test-account-id',
+    displayName: 'Updated Name',
+    avatarUrl: null,
+    birthDate: null,
+    personaType: 'LEARNER',
+    isOwner: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+  switchProfile: jest.fn().mockResolvedValue({
+    profileId: '550e8400-e29b-41d4-a716-446655440000',
+  }),
+}));
+
 import app from '../index';
 
 const TEST_ENV = {

@@ -1,4 +1,5 @@
 import { inngest } from '../client';
+import { isDeletionCancelled, executeDeletion } from '../../services/deletion';
 
 export const scheduledDeletion = inngest.createFunction(
   {
@@ -14,8 +15,7 @@ export const scheduledDeletion = inngest.createFunction(
 
     // Check if deletion was cancelled
     const cancelled = await step.run('check-cancellation', async () => {
-      // TODO: Check if account deletion was cancelled during grace period
-      return false;
+      return isDeletionCancelled(accountId);
     });
 
     if (cancelled) {
@@ -24,8 +24,7 @@ export const scheduledDeletion = inngest.createFunction(
 
     // Permanently delete all data
     await step.run('delete-account-data', async () => {
-      // TODO: Delete all profiles, learning data, consent records
-      console.log(`Permanently deleting account ${accountId}`);
+      await executeDeletion(accountId);
     });
 
     return { status: 'deleted', accountId };

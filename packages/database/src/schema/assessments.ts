@@ -11,6 +11,7 @@ import {
 import { profiles } from './profiles.js';
 import { subjects, curriculumTopics } from './subjects.js';
 import { learningSessions } from './sessions.js';
+import { generateUUIDv7 } from '../utils/uuid.js';
 
 export const verificationDepthEnum = pgEnum('verification_depth', [
   'recall',
@@ -30,7 +31,9 @@ export const needsDeepeningStatusEnum = pgEnum('needs_deepening_status', [
 ]);
 
 export const assessments = pgTable('assessments', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   profileId: uuid('profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' }),
@@ -59,7 +62,9 @@ export const assessments = pgTable('assessments', {
 });
 
 export const retentionCards = pgTable('retention_cards', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   profileId: uuid('profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' }),
@@ -85,7 +90,9 @@ export const retentionCards = pgTable('retention_cards', {
 });
 
 export const needsDeepeningTopics = pgTable('needs_deepening_topics', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   profileId: uuid('profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' }),
@@ -108,7 +115,9 @@ export const needsDeepeningTopics = pgTable('needs_deepening_topics', {
 });
 
 export const teachingPreferences = pgTable('teaching_preferences', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   profileId: uuid('profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' }),

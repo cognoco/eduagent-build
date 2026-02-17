@@ -1,21 +1,34 @@
 import { Hono } from 'hono';
 import type { AuthEnv } from '../middleware/auth';
+import { scheduleDeletion, cancelDeletion } from '../services/deletion';
+import { generateExport } from '../services/export';
+import { inngest } from '../inngest/client';
 
 export const accountRoutes = new Hono<AuthEnv>()
   .post('/account/delete', async (c) => {
-    // TODO: Schedule deletion for c.get('user').userId via Inngest
+    const userId = c.get('user').userId;
+    const { gracePeriodEnds } = await scheduleDeletion(userId);
+
+    await inngest.send({
+      name: 'app/account.deletion-scheduled',
+      data: {
+        accountId: userId,
+        profileIds: [], // TODO: look up profile IDs
+      },
+    });
+
     return c.json({
       message: 'Deletion scheduled',
-      gracePeriodEnds: new Date(
-        Date.now() + 7 * 24 * 60 * 60 * 1000
-      ).toISOString(),
+      gracePeriodEnds,
     });
   })
   .post('/account/cancel-deletion', async (c) => {
-    // TODO: Cancel scheduled deletion for c.get('user').userId
+    const userId = c.get('user').userId;
+    await cancelDeletion(userId);
     return c.json({ message: 'Deletion cancelled' });
   })
   .get('/account/export', async (c) => {
-    // TODO: Trigger data export for c.get('user').userId
-    return c.json({ message: 'Export started', status: 'processing' });
+    const userId = c.get('user').userId;
+    const data = await generateExport(userId);
+    return c.json(data);
   });

@@ -6,6 +6,7 @@ import {
   boolean,
   pgEnum,
 } from 'drizzle-orm/pg-core';
+import { generateUUIDv7 } from '../utils/uuid.js';
 
 export const personaTypeEnum = pgEnum('persona_type', [
   'TEEN',
@@ -21,7 +22,9 @@ export const consentStatusEnum = pgEnum('consent_status', [
 ]);
 
 export const accounts = pgTable('accounts', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   clerkUserId: text('clerk_user_id').notNull().unique(),
   email: text('email').notNull().unique(),
   createdAt: timestamp('created_at', { withTimezone: true })
@@ -30,10 +33,18 @@ export const accounts = pgTable('accounts', {
   updatedAt: timestamp('updated_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
+  deletionScheduledAt: timestamp('deletion_scheduled_at', {
+    withTimezone: true,
+  }),
+  deletionCancelledAt: timestamp('deletion_cancelled_at', {
+    withTimezone: true,
+  }),
 });
 
 export const profiles = pgTable('profiles', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   accountId: uuid('account_id')
     .notNull()
     .references(() => accounts.id, { onDelete: 'cascade' }),
@@ -51,7 +62,9 @@ export const profiles = pgTable('profiles', {
 });
 
 export const familyLinks = pgTable('family_links', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   parentProfileId: uuid('parent_profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' }),
@@ -64,7 +77,9 @@ export const familyLinks = pgTable('family_links', {
 });
 
 export const consentStates = pgTable('consent_states', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   profileId: uuid('profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' }),

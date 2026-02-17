@@ -7,6 +7,7 @@ import {
   pgEnum,
 } from 'drizzle-orm/pg-core';
 import { accounts } from './profiles.js';
+import { generateUUIDv7 } from '../utils/uuid.js';
 
 export const subscriptionStatusEnum = pgEnum('subscription_status', [
   'trial',
@@ -24,7 +25,9 @@ export const subscriptionTierEnum = pgEnum('subscription_tier', [
 ]);
 
 export const subscriptions = pgTable('subscriptions', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   accountId: uuid('account_id')
     .notNull()
     .unique()
@@ -51,7 +54,9 @@ export const subscriptions = pgTable('subscriptions', {
 });
 
 export const quotaPools = pgTable('quota_pools', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   subscriptionId: uuid('subscription_id')
     .notNull()
     .unique()
@@ -68,7 +73,9 @@ export const quotaPools = pgTable('quota_pools', {
 });
 
 export const topUpCredits = pgTable('top_up_credits', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   subscriptionId: uuid('subscription_id')
     .notNull()
     .references(() => subscriptions.id, { onDelete: 'cascade' }),
@@ -84,7 +91,9 @@ export const topUpCredits = pgTable('top_up_credits', {
 });
 
 export const byokWaitlist = pgTable('byok_waitlist', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   email: text('email').notNull().unique(),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()

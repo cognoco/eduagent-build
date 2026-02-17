@@ -1,4 +1,34 @@
 // ---------------------------------------------------------------------------
+// Mock dependencies used by consent service and routes
+// ---------------------------------------------------------------------------
+
+jest.mock('inngest/hono', () => ({
+  serve: jest.fn().mockReturnValue(jest.fn()),
+}));
+
+jest.mock('../inngest/client', () => ({
+  inngest: {
+    send: jest.fn().mockResolvedValue(undefined),
+    createFunction: jest.fn().mockReturnValue(jest.fn()),
+  },
+}));
+
+jest.mock('../services/notifications', () => ({
+  sendEmail: jest.fn().mockResolvedValue({ sent: true }),
+  formatConsentRequestEmail: jest.fn().mockReturnValue({
+    to: 'parent@example.com',
+    subject: 'Test',
+    body: 'Test',
+    type: 'consent_request',
+  }),
+  sendPushNotification: jest.fn().mockResolvedValue({ sent: true }),
+  formatReviewReminderBody: jest.fn(),
+  formatDailyReminderBody: jest.fn(),
+  formatConsentReminderEmail: jest.fn(),
+  MAX_DAILY_PUSH: 3,
+}));
+
+// ---------------------------------------------------------------------------
 // Mock JWT module so auth middleware passes with a valid token
 // ---------------------------------------------------------------------------
 

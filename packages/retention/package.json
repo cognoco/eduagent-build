@@ -5,9 +5,10 @@
   "type": "module",
   "exports": {
     ".": {
+      "types": "./src/index.ts",
       "@eduagent/source": "./src/index.ts",
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
     }
   },
   "scripts": {

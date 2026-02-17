@@ -14,6 +14,17 @@ jest.mock('../middleware/jwt', () => ({
   }),
 }));
 
+jest.mock('inngest/hono', () => ({
+  serve: jest.fn().mockReturnValue(jest.fn()),
+}));
+
+jest.mock('../inngest/client', () => ({
+  inngest: {
+    send: jest.fn().mockResolvedValue(undefined),
+    createFunction: jest.fn().mockReturnValue(jest.fn()),
+  },
+}));
+
 import app from '../index';
 
 const TEST_ENV = {
@@ -75,13 +86,19 @@ describe('homework routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/ocr', () => {
-    it('returns 200 with OCR result', async () => {
+    it('returns 200 with structured OCR result for valid image', async () => {
+      const formData = new FormData();
+      formData.append(
+        'image',
+        new File([new ArrayBuffer(100)], 'test.jpg', { type: 'image/jpeg' })
+      );
+
       const res = await app.request(
         '/v1/ocr',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
-          body: JSON.stringify({}),
+          headers: { Authorization: 'Bearer valid.jwt.token' },
+          body: formData,
         },
         TEST_ENV
       );
@@ -89,17 +106,180 @@ describe('homework routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.text).toBe('Mock OCR extracted text');
-      expect(body.confidence).toBe(0.95);
+      expect(body).toEqual({
+        text: '',
+        confidence: 0,
+        regions: [],
+      });
     });
 
-    it('returns 401 without auth header', async () => {
+    it('accepts image/png files', async () => {
+      const formData = new FormData();
+      formData.append(
+        'image',
+        new File([new ArrayBuffer(50)], 'test.png', { type: 'image/png' })
+      );
+
       const res = await app.request(
         '/v1/ocr',
         {
           method: 'POST',
-          body: JSON.stringify({}),
-          headers: { 'Content-Type': 'application/json' },
+          headers: { Authorization: 'Bearer valid.jwt.token' },
+          body: formData,
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+    });
+
+    it('accepts image/webp files', async () => {
+      const formData = new FormData();
+      formData.append(
+        'image',
+        new File([new ArrayBuffer(50)], 'test.webp', { type: 'image/webp' })
+      );
+
+      const res = await app.request(
+        '/v1/ocr',
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid.jwt.token' },
+          body: formData,
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+    });
+
+    it('returns 400 when image field is missing', async () => {
+      const formData = new FormData();
+
+      const res = await app.request(
+        '/v1/ocr',
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid.jwt.token' },
+          body: formData,
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+
+      const body = await res.json();
+      expect(body.error.code).toBe('VALIDATION_ERROR');
+      expect(body.error.message).toContain('Missing required field: image');
+    });
+
+    it('returns 400 when image field is not a file', async () => {
+      const formData = new FormData();
+      formData.append('image', 'not-a-file');
+
+      const res = await app.request(
+        '/v1/ocr',
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid.jwt.token' },
+          body: formData,
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+
+      const body = await res.json();
+      expect(body.error.code).toBe('VALIDATION_ERROR');
+      expect(body.error.message).toContain('Missing required field: image');
+    });
+
+    it('returns 400 for unsupported MIME type', async () => {
+      const formData = new FormData();
+      formData.append(
+        'image',
+        new File([new ArrayBuffer(100)], 'test.gif', { type: 'image/gif' })
+      );
+
+      const res = await app.request(
+        '/v1/ocr',
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid.jwt.token' },
+          body: formData,
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+
+      const body = await res.json();
+      expect(body.error.code).toBe('VALIDATION_ERROR');
+      expect(body.error.message).toContain('Unsupported file type: image/gif');
+      expect(body.error.message).toContain('image/jpeg');
+      expect(body.error.message).toContain('image/png');
+      expect(body.error.message).toContain('image/webp');
+    });
+
+    it('returns 400 when file exceeds 5MB', async () => {
+      const largeBuffer = new ArrayBuffer(5 * 1024 * 1024 + 1);
+      const formData = new FormData();
+      formData.append(
+        'image',
+        new File([largeBuffer], 'large.jpg', { type: 'image/jpeg' })
+      );
+
+      const res = await app.request(
+        '/v1/ocr',
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid.jwt.token' },
+          body: formData,
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+
+      const body = await res.json();
+      expect(body.error.code).toBe('VALIDATION_ERROR');
+      expect(body.error.message).toContain('File too large');
+      expect(body.error.message).toContain('5MB');
+    });
+
+    it('accepts a file exactly at 5MB', async () => {
+      const exactBuffer = new ArrayBuffer(5 * 1024 * 1024);
+      const formData = new FormData();
+      formData.append(
+        'image',
+        new File([exactBuffer], 'exact.jpg', { type: 'image/jpeg' })
+      );
+
+      const res = await app.request(
+        '/v1/ocr',
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid.jwt.token' },
+          body: formData,
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const formData = new FormData();
+      formData.append(
+        'image',
+        new File([new ArrayBuffer(100)], 'test.jpg', { type: 'image/jpeg' })
+      );
+
+      const res = await app.request(
+        '/v1/ocr',
+        {
+          method: 'POST',
+          body: formData,
         },
         TEST_ENV
       );

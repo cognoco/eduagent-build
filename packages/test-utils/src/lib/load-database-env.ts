@@ -8,12 +8,14 @@
  * - NODE_ENV=test → .env.test.local
  * - NODE_ENV=development → .env.development.local
  *
+ * When the env file is missing, a warning is logged but execution continues.
+ * Tests using mocks will run normally; tests requiring a real database will
+ * fail at connection time with a clear error.
+ *
  * @param workspaceRoot - Absolute path to workspace root. Callers MUST use
  *                        resolve(__dirname, '../..') to compute this from their
  *                        location, NOT process.cwd() which varies based on which
  *                        project runs tests.
- *
- * @throws {Error} If environment file doesn't exist
  */
 
 import { config } from 'dotenv';
@@ -30,28 +32,19 @@ export function loadDatabaseEnv(workspaceRoot: string): void {
   }
 
   // Otherwise, load from .env file (local development)
-  try {
-    const env = process.env.NODE_ENV || 'development';
-    const envFile = `.env.${env}.local`;
-    const envPath = resolve(workspaceRoot, envFile);
+  const env = process.env.NODE_ENV || 'development';
+  const envFile = `.env.${env}.local`;
+  const envPath = resolve(workspaceRoot, envFile);
 
-    if (!existsSync(envPath)) {
-      throw new Error(
-        `Environment file not found: ${envFile}\n` +
-          `Expected location: ${envPath}\n` +
-          `See .env.example for required variables`
-      );
-    }
-
-    config({ path: envPath });
-    console.log(`✅ Loaded environment variables from: ${envFile}`);
-  } catch (error) {
-    console.error('❌ Failed to load environment variables for tests:');
-    if (error instanceof Error) {
-      console.error(error.message);
-    }
-    console.error('\nTests cannot run without environment configuration.');
-    console.error('See .env.example for required variables\n');
-    process.exit(1);
+  if (!existsSync(envPath)) {
+    console.warn(
+      `⚠️  ${envFile} not found — DATABASE_URL is unset.\n` +
+        `   Tests requiring a real database connection will fail.\n` +
+        `   See .env.example for required variables.`
+    );
+    return;
   }
+
+  config({ path: envPath });
+  console.log(`✅ Loaded environment variables from: ${envFile}`);
 }

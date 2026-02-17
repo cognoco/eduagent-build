@@ -6,6 +6,7 @@ export * from './errors.js';
 export * from './auth.js';
 export * from './profiles.js';
 export * from './consent.js';
+export * from './account.js';
 
 // Onboarding & Curriculum (Epic 1)
 export * from './subjects.js';

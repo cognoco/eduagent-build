@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { AuthEnv } from '../middleware/auth';
+import { OCR_CONSTRAINTS } from '@eduagent/schemas';
 
 export const homeworkRoutes = new Hono<AuthEnv>()
   // Start a homework help session
@@ -33,8 +34,51 @@ export const homeworkRoutes = new Hono<AuthEnv>()
 
   // Server-side OCR endpoint (fallback for ML Kit)
   .post('/ocr', async (c) => {
-    // TODO: Accept image from request body (multipart or base64)
-    // TODO: Run server-side OCR via Workers AI or external service
-    // TODO: Return extracted text and confidence score
-    return c.json({ text: 'Mock OCR extracted text', confidence: 0.95 });
+    const body = await c.req.parseBody();
+    const file = body['image'];
+
+    if (!(file instanceof File)) {
+      return c.json(
+        {
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Missing required field: image',
+          },
+        },
+        400
+      );
+    }
+
+    if (
+      !OCR_CONSTRAINTS.acceptedMimeTypes.includes(
+        file.type as (typeof OCR_CONSTRAINTS.acceptedMimeTypes)[number]
+      )
+    ) {
+      return c.json(
+        {
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `Unsupported file type: ${
+              file.type
+            }. Accepted: ${OCR_CONSTRAINTS.acceptedMimeTypes.join(', ')}`,
+          },
+        },
+        400
+      );
+    }
+
+    if (file.size > OCR_CONSTRAINTS.maxFileSizeBytes) {
+      return c.json(
+        {
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `File too large: ${file.size} bytes. Maximum: ${OCR_CONSTRAINTS.maxFileSizeBytes} bytes (5MB)`,
+          },
+        },
+        400
+      );
+    }
+
+    // TODO: Integrate actual OCR provider (Google Vision / Tesseract / Workers AI)
+    return c.json({ text: '', confidence: 0, regions: [] });
   });

@@ -9,11 +9,14 @@ import {
 } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles.js';
 import { curriculumTopics, subjects } from './subjects.js';
+import { generateUUIDv7 } from '../utils/uuid.js';
 
 export const learningModeEnum = pgEnum('learning_mode', ['serious', 'casual']);
 
 export const streaks = pgTable('streaks', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   profileId: uuid('profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' })
@@ -31,7 +34,9 @@ export const streaks = pgTable('streaks', {
 });
 
 export const xpLedger = pgTable('xp_ledger', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   profileId: uuid('profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' }),
@@ -53,7 +58,9 @@ export const xpLedger = pgTable('xp_ledger', {
 });
 
 export const notificationPreferences = pgTable('notification_preferences', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   profileId: uuid('profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' })
@@ -71,7 +78,9 @@ export const notificationPreferences = pgTable('notification_preferences', {
 });
 
 export const learningModes = pgTable('learning_modes', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   profileId: uuid('profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' })

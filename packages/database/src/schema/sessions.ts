@@ -10,6 +10,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles.js';
 import { subjects, curriculumTopics } from './subjects.js';
+import { generateUUIDv7 } from '../utils/uuid.js';
 
 export const draftStatusEnum = pgEnum('draft_status', [
   'in_progress',
@@ -49,7 +50,9 @@ export const summaryStatusEnum = pgEnum('summary_status', [
 ]);
 
 export const onboardingDrafts = pgTable('onboarding_drafts', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   profileId: uuid('profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' }),
@@ -69,7 +72,9 @@ export const onboardingDrafts = pgTable('onboarding_drafts', {
 });
 
 export const sessionEvents = pgTable('session_events', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   sessionId: uuid('session_id')
     .notNull()
     .references(() => learningSessions.id, { onDelete: 'cascade' }),
@@ -91,7 +96,9 @@ export const sessionEvents = pgTable('session_events', {
 });
 
 export const learningSessions = pgTable('learning_sessions', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   profileId: uuid('profile_id')
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' }),
@@ -123,7 +130,9 @@ export const learningSessions = pgTable('learning_sessions', {
 });
 
 export const sessionSummaries = pgTable('session_summaries', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   sessionId: uuid('session_id')
     .notNull()
     .references(() => learningSessions.id, { onDelete: 'cascade' }),
@@ -145,7 +154,9 @@ export const sessionSummaries = pgTable('session_summaries', {
 });
 
 export const parkingLotItems = pgTable('parking_lot_items', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
   sessionId: uuid('session_id')
     .notNull()
     .references(() => learningSessions.id, { onDelete: 'cascade' }),

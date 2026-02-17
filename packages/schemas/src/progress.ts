@@ -85,3 +85,68 @@ export const dashboardChildSchema = z.object({
   guidedVsImmediateRatio: z.number().min(0).max(1),
 });
 export type DashboardChild = z.infer<typeof dashboardChildSchema>;
+
+// ---------------------------------------------------------------------------
+// Coaching Cards (Epic 4 — Story 4.4)
+// ---------------------------------------------------------------------------
+
+export const coachingCardTypeSchema = z.enum([
+  'streak',
+  'insight',
+  'review_due',
+  'challenge',
+]);
+export type CoachingCardType = z.infer<typeof coachingCardTypeSchema>;
+
+const baseCoachingCardFields = {
+  id: z.string().uuid(),
+  profileId: z.string().uuid(),
+  type: coachingCardTypeSchema,
+  title: z.string(),
+  body: z.string(),
+  priority: z.number().int().min(1).max(10),
+  expiresAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+};
+
+export const streakCardSchema = z.object({
+  ...baseCoachingCardFields,
+  type: z.literal('streak'),
+  currentStreak: z.number().int().min(0),
+  graceRemaining: z.number().int().min(0).max(3),
+});
+export type StreakCard = z.infer<typeof streakCardSchema>;
+
+export const insightCardSchema = z.object({
+  ...baseCoachingCardFields,
+  type: z.literal('insight'),
+  topicId: z.string().uuid(),
+  insightType: z.enum(['strength', 'growth_area', 'pattern', 'milestone']),
+});
+export type InsightCard = z.infer<typeof insightCardSchema>;
+
+export const reviewDueCardSchema = z.object({
+  ...baseCoachingCardFields,
+  type: z.literal('review_due'),
+  topicId: z.string().uuid(),
+  dueAt: z.string().datetime(),
+  easeFactor: z.number().min(1.3),
+});
+export type ReviewDueCard = z.infer<typeof reviewDueCardSchema>;
+
+export const challengeCardSchema = z.object({
+  ...baseCoachingCardFields,
+  type: z.literal('challenge'),
+  topicId: z.string().uuid(),
+  difficulty: z.enum(['easy', 'medium', 'hard']),
+  xpReward: z.number().int().min(0),
+});
+export type ChallengeCard = z.infer<typeof challengeCardSchema>;
+
+export const coachingCardSchema = z.discriminatedUnion('type', [
+  streakCardSchema,
+  insightCardSchema,
+  reviewDueCardSchema,
+  challengeCardSchema,
+]);
+export type CoachingCard = z.infer<typeof coachingCardSchema>;

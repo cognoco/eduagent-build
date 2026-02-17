@@ -1,0 +1,39 @@
+import { pgTable, uuid, text, timestamp } from 'drizzle-orm/pg-core';
+import { customType } from 'drizzle-orm/pg-core';
+import { profiles } from './profiles.js';
+import { learningSessions } from './sessions.js';
+import { curriculumTopics } from './subjects.js';
+import { generateUUIDv7 } from '../utils/uuid.js';
+
+/** Custom pgvector type for Drizzle ORM — 1536 dimensions (OpenAI text-embedding-3-small) */
+const vector = customType<{ data: number[]; driverData: string }>({
+  dataType() {
+    return 'vector(1536)';
+  },
+  toDriver(value: number[]): string {
+    return `[${value.join(',')}]`;
+  },
+  fromDriver(value: string): number[] {
+    return JSON.parse(value);
+  },
+});
+
+export const sessionEmbeddings = pgTable('session_embeddings', {
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
+  sessionId: uuid('session_id')
+    .notNull()
+    .references(() => learningSessions.id, { onDelete: 'cascade' }),
+  profileId: uuid('profile_id')
+    .notNull()
+    .references(() => profiles.id, { onDelete: 'cascade' }),
+  topicId: uuid('topic_id').references(() => curriculumTopics.id, {
+    onDelete: 'cascade',
+  }),
+  embedding: vector('embedding').notNull(),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});

@@ -2,10 +2,8 @@
 // Retention Management — Stories 3.3, 3.4, 3.5
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
-// SM-2 algorithm will be available at @eduagent/retention.
-// Until the package is importable, we use an inline SM-2 calculation
-// matching the standard SM-2 formula.
-// ---------------------------------------------------------------------------
+
+import { sm2 } from '@eduagent/retention';
 
 export interface RetentionState {
   topicId: string;
@@ -30,83 +28,8 @@ export interface RecallTestResult {
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Minimum ease factor per SM-2 spec */
-const MIN_EASE_FACTOR = 1.3;
-
 /** Anti-cramming cooldown in milliseconds (24 hours — FR54) */
 const RETEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-
-// ---------------------------------------------------------------------------
-// SM-2 inline implementation (to be replaced by @eduagent/retention import)
-// ---------------------------------------------------------------------------
-
-interface SM2Input {
-  quality: number;
-  easeFactor: number;
-  intervalDays: number;
-  repetitions: number;
-}
-
-interface SM2Output {
-  easeFactor: number;
-  intervalDays: number;
-  repetitions: number;
-  wasSuccessful: boolean;
-}
-
-/**
- * Standard SM-2 algorithm.
- *
- * quality 0-5 where:
- * - 0: complete blackout
- * - 1: incorrect, but upon seeing the correct answer it seemed easy to remember
- * - 2: incorrect, but the correct answer seemed easy to recall
- * - 3: correct response recalled with serious difficulty
- * - 4: correct response after a hesitation
- * - 5: perfect response
- *
- * quality >= 3 is considered a successful recall.
- */
-function sm2(input: SM2Input): SM2Output {
-  const { quality, easeFactor, intervalDays, repetitions } = input;
-
-  if (quality >= 3) {
-    // Successful recall
-    let newInterval: number;
-    if (repetitions === 0) {
-      newInterval = 1;
-    } else if (repetitions === 1) {
-      newInterval = 6;
-    } else {
-      newInterval = Math.round(intervalDays * easeFactor);
-    }
-
-    const newEF = Math.max(
-      MIN_EASE_FACTOR,
-      easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
-    );
-
-    return {
-      easeFactor: newEF,
-      intervalDays: newInterval,
-      repetitions: repetitions + 1,
-      wasSuccessful: true,
-    };
-  }
-
-  // Failed recall — reset repetitions, keep minimum interval
-  const newEF = Math.max(
-    MIN_EASE_FACTOR,
-    easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
-  );
-
-  return {
-    easeFactor: newEF,
-    intervalDays: 1,
-    repetitions: 0,
-    wasSuccessful: false,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -154,13 +77,14 @@ export function processRecallResult(
 
   const sm2Result = sm2({
     quality: clampedQuality,
-    easeFactor: state.easeFactor,
-    intervalDays: state.intervalDays,
-    repetitions: state.repetitions,
+    card: {
+      easeFactor: state.easeFactor,
+      interval: state.intervalDays,
+      repetitions: state.repetitions,
+      lastReviewedAt: state.lastReviewedAt ?? now,
+      nextReviewAt: state.nextReviewAt ?? now,
+    },
   });
-
-  const nextReviewDate = new Date();
-  nextReviewDate.setDate(nextReviewDate.getDate() + sm2Result.intervalDays);
 
   if (sm2Result.wasSuccessful) {
     // Success path
@@ -171,12 +95,12 @@ export function processRecallResult(
 
     const newState: RetentionState = {
       ...state,
-      easeFactor: sm2Result.easeFactor,
-      intervalDays: sm2Result.intervalDays,
-      repetitions: sm2Result.repetitions,
+      easeFactor: sm2Result.card.easeFactor,
+      intervalDays: sm2Result.card.interval,
+      repetitions: sm2Result.card.repetitions,
       consecutiveSuccesses: state.consecutiveSuccesses + 1,
       xpStatus: newXpStatus,
-      nextReviewAt: nextReviewDate.toISOString(),
+      nextReviewAt: sm2Result.card.nextReviewAt,
       lastReviewedAt: now,
     };
 
@@ -196,13 +120,13 @@ export function processRecallResult(
 
   const newState: RetentionState = {
     ...state,
-    easeFactor: sm2Result.easeFactor,
-    intervalDays: sm2Result.intervalDays,
-    repetitions: sm2Result.repetitions,
+    easeFactor: sm2Result.card.easeFactor,
+    intervalDays: sm2Result.card.interval,
+    repetitions: sm2Result.card.repetitions,
     failureCount: newFailureCount,
     consecutiveSuccesses: 0,
     xpStatus: newXpStatus,
-    nextReviewAt: nextReviewDate.toISOString(),
+    nextReviewAt: sm2Result.card.nextReviewAt,
     lastReviewedAt: now,
   };
 

@@ -14,6 +14,17 @@ jest.mock('../middleware/jwt', () => ({
   }),
 }));
 
+jest.mock('inngest/hono', () => ({
+  serve: jest.fn().mockReturnValue(jest.fn()),
+}));
+
+jest.mock('../inngest/client', () => ({
+  inngest: {
+    send: jest.fn().mockResolvedValue(undefined),
+    createFunction: jest.fn().mockReturnValue(jest.fn()),
+  },
+}));
+
 import app from '../index';
 
 const TEST_ENV = {
@@ -97,7 +108,7 @@ describe('account routes', () => {
   // -------------------------------------------------------------------------
 
   describe('GET /v1/account/export', () => {
-    it('returns 200 with export status', async () => {
+    it('returns 200 with data export', async () => {
       const res = await app.request(
         '/v1/account/export',
         { headers: AUTH_HEADERS },
@@ -107,8 +118,8 @@ describe('account routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.message).toBe('Export started');
-      expect(body.status).toBe('processing');
+      expect(body.account).toBeDefined();
+      expect(body.exportedAt).toBeDefined();
     });
 
     it('returns 401 without auth header', async () => {

@@ -1,6 +1,9 @@
 import { Hono } from 'hono';
 import { authMiddleware } from './middleware/auth';
+import { databaseMiddleware } from './middleware/database';
+import { requestLogger } from './middleware/request-logger';
 import type { AuthUser } from './middleware/auth';
+import type { Database } from '@eduagent/database';
 import { health } from './routes/health';
 import { auth } from './routes/auth';
 import { profileRoutes } from './routes/profiles';
@@ -28,18 +31,26 @@ type Bindings = {
   CLERK_SECRET_KEY?: string;
   CLERK_PUBLISHABLE_KEY?: string;
   CLERK_JWKS_URL?: string;
+  LOG_LEVEL?: string;
 };
 
 type Variables = {
   user: AuthUser;
+  db: Database;
 };
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>().basePath(
   '/v1'
 );
 
+// Request logging — runs before auth so every request (including public) is logged
+app.use('*', requestLogger);
+
 // Auth middleware — runs before all routes; public paths are skipped internally
 app.use('*', authMiddleware);
+
+// Database middleware — creates per-request Database instance from env binding
+app.use('*', databaseMiddleware);
 
 app.route('/', health);
 app.route('/', auth);

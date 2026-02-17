@@ -128,10 +128,28 @@ export const parkingLotItemSchema = z.object({
 });
 export type ParkingLotItem = z.infer<typeof parkingLotItemSchema>;
 
-// Homework OCR schema
+// Homework OCR schemas
+
+export const ocrRegionSchema = z.object({
+  text: z.string(),
+  confidence: z.number().min(0).max(1),
+  boundingBox: z.object({
+    x: z.number(),
+    y: z.number(),
+    width: z.number(),
+    height: z.number(),
+  }),
+});
+export type OcrRegion = z.infer<typeof ocrRegionSchema>;
 
 export const ocrResultSchema = z.object({
   text: z.string(),
   confidence: z.number().min(0).max(1),
+  regions: z.array(ocrRegionSchema),
 });
 export type OcrResult = z.infer<typeof ocrResultSchema>;
+
+export const OCR_CONSTRAINTS = {
+  maxFileSizeBytes: 5 * 1024 * 1024,
+  acceptedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+} as const;

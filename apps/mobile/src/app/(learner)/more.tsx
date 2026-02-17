@@ -1,7 +1,11 @@
-import { View, Text, Pressable, ScrollView, Switch } from 'react-native';
-import { useState } from 'react';
+import { View, Text, Pressable, ScrollView, Switch, Alert } from 'react-native';
+import { useState, useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { useAuth, useUser } from '@clerk/clerk-expo';
 import { useTheme, type Persona } from '../../lib/theme';
+import { useProfile } from '../../lib/profile';
+import { useExportData } from '../../hooks/use-account';
 
 function SettingsRow({
   label,
@@ -44,9 +48,30 @@ function ToggleRow({
 
 export default function MoreScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { signOut } = useAuth();
+  const { user } = useUser();
+  const { activeProfile } = useProfile();
   const { persona, setPersona } = useTheme();
   const [pushEnabled, setPushEnabled] = useState(true);
   const [weeklyDigest, setWeeklyDigest] = useState(false);
+  const exportData = useExportData();
+
+  const handleExport = useCallback(async () => {
+    try {
+      await exportData.mutateAsync();
+      Alert.alert('Export complete', 'Your data export is ready.');
+    } catch {
+      Alert.alert('Export failed', 'Please try again later.');
+    }
+  }, [exportData]);
+
+  const displayName =
+    activeProfile?.displayName ??
+    user?.fullName ??
+    user?.firstName ??
+    user?.primaryEmailAddress?.emailAddress ??
+    'User';
 
   const personaLabels: Record<Persona, string> = {
     teen: 'Teen (Dark)',
@@ -102,9 +127,28 @@ export default function MoreScreen() {
         <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
           Account
         </Text>
-        <SettingsRow label="Profile" value="Alex" />
+        <SettingsRow
+          label="Profile"
+          value={displayName}
+          onPress={() => router.push('/profiles')}
+        />
         <SettingsRow label="Subscription" value="Plus" />
         <SettingsRow label="Help & Support" />
+        <SettingsRow label="Export my data" onPress={handleExport} />
+        <SettingsRow
+          label="Delete account"
+          onPress={() => router.push('/delete-account')}
+        />
+
+        <Pressable
+          onPress={async () => {
+            await signOut();
+          }}
+          className="bg-surface rounded-card px-4 py-3.5 mt-6 items-center"
+          testID="sign-out-button"
+        >
+          <Text className="text-body font-semibold text-danger">Sign out</Text>
+        </Pressable>
 
         <View className="mt-8 items-center">
           <Text className="text-caption text-text-secondary">
