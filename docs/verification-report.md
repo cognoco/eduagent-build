@@ -1100,7 +1100,7 @@ Additional: `useStreamMessage` has no test coverage despite being the most compl
 
 ## Overall Project Health Summary
 
-**Last updated:** 2026-02-17
+**Last updated:** 2026-02-17 (all 10 shadow reviewer reports consolidated)
 
 ### Review History
 
@@ -1110,37 +1110,80 @@ Additional: `useStreamMessage` has no test coverage despite being the most compl
 | Route Restructure | 2026-02-17 | `(tabs)/` → `(learner)/` + `(parent)/` | 3 parallel agents | PASS — all 8 new files compliant |
 | Codebase Review #1 | 2026-02-17 | 83 files (commit bdab454) | 5 parallel agents | 4C/10S fixed; 3 deferred |
 | New Feature Review | 2026-02-17 | 72 files post-remediation | 4 parallel agents | 4 NC critical fixed; 8 NH + 3 patterns open |
-| Shadow Review | 2026-02-17 | Full codebase | 10 agents (5 A/B pairs) | 8 cross-domain patterns identified; 3-phase remediation plan |
+| **Shadow Review** | **2026-02-17** | **Full codebase** | **10 agents (5 A/B pairs)** | **33 CRITICAL, 94+ HIGH, 89+ MEDIUM, 78+ LOW — 30-item remediation plan** |
 
-### What IS Solid
+### What IS Solid (confirmed by 10 independent reviewers)
 
-- **API service architecture**: Clean separation (routes → services → DB), no Hono imports in services
-- **SM-2 algorithm**: Correct implementation, pure math, zero deps
-- **Socratic escalation**: 5-rung ladder with correct behaviors
+- **API service architecture**: Clean separation (routes → services → DB), zero Hono imports in services
+- **SM-2 algorithm**: Correct pure math implementation, zero workspace deps
+- **Socratic escalation**: 5-rung ladder with correct behaviors and "I don't know" handling
 - **Database schemas**: Complete across all 6 epics, FK cascades, UUID v7
 - **Scoped repository**: 10 domain namespaces with automatic `WHERE profile_id =`
 - **LLM orchestration**: All calls through `routeAndCall()`, no direct provider access
-- **Inngest patterns**: Correct event naming, `getStepDatabase()` pattern
+- **Inngest event naming**: Consistent `app/{domain}.{action}` pattern
 - **TanStack Query**: All server state managed correctly, no Zustand
-- **Dependency direction**: Clean package graph (after NC1/NC2 fix)
-- **Test coverage**: 877+ tests across 6 projects
+- **Dependency direction**: Clean package graph (imports, tsconfig refs, package.json deps)
+- **Zod validation**: Present on all implemented mutating route inputs
+- **Named exports**: Consistent throughout (except required Expo Router/Workers defaults)
+- **Import ordering**: Consistent external → @eduagent/* → relative
+- **No `.then()` chains**: async/await used exclusively
+- **Test coverage**: 877+ tests across 6 projects, 0 failures
 
-### What Needs Work
+### What Needs Work (prioritized)
 
-| Area | Severity | Estimated Scope | Blocking? |
-|------|----------|----------------|-----------|
-| Stripe webhook signature | CRITICAL | 1 file | Yes — security |
-| ProfileId scoping gaps | HIGH | 4–5 services | Yes — data isolation |
-| Auth redirect persona | HIGH | 2 files | Yes — UX correctness |
-| GDPR export completeness | HIGH | 1 service | Yes — compliance |
-| Hardcoded colors (60+) | CRITICAL | ~15 files | No — theming sprint |
-| Persona-aware components (18) | CRITICAL | ~8 files | No — theming sprint |
-| Local type definitions (15+) | HIGH | ~12 files | No — tech debt |
-| Missing tests (~10) | HIGH | ~10 files | No — quality sprint |
-| Ad-hoc error responses (~8) | MEDIUM | ~8 routes | No — consistency |
+#### Blocking — Must Fix Before Any Feature Work
+
+| Area | Severity | Scope | Category |
+|------|----------|-------|----------|
+| **Documentation accuracy** (LLM path, Zod 4, versions, signatures) | CRITICAL | 4+ doc files | Docs |
+| Stripe webhook signature verification | CRITICAL | 1 file | Security |
+| GDPR day-30 auto-delete is no-op + wrong status check | CRITICAL | 1 file | Compliance |
+| Inngest step boundary violation (DB outside `step.run`) | CRITICAL | 1 file | Correctness |
+| `curriculum.ts` profileId undefined (×4 handlers) | CRITICAL | 1 file | Data isolation |
+| Inngest serve target `inngest/hono` → `inngest/cloudflare` | HIGH | 1 file | Architecture |
+| ProfileId scoping gaps in 5+ services | HIGH | 5 files | Data isolation |
+| Auth redirect ignores persona | HIGH | 2 files | UX correctness |
+| GDPR export missing retention cards/embeddings | HIGH | 1 file | Compliance |
+| Vector embedding SQL injection risk | CRITICAL | 1 file | Security |
+
+#### Important — Before Next Sprint
+
+| Area | Severity | Scope | Category |
+|------|----------|-------|----------|
+| Hardcoded hex colors (60+) | CRITICAL | ~15 files | Theming |
+| Persona-aware components (18) | CRITICAL | ~8 files | Theming |
+| Missing explicit return types (20 hooks) | HIGH | ~10 files | TypeScript |
+| Local type definitions (15+) | HIGH | ~12 files | Architecture |
+| 3 tables missing from scoped repository | HIGH | 1 file | Data isolation |
+| Ad-hoc error responses (homework.ts nested envelope) | HIGH | ~8 routes | Consistency |
+| Touch targets below 44×44 | HIGH | ~5 files | Accessibility |
+| Mobile package.json `*` wildcards for "pinned" versions | HIGH | 1 file | Dependency mgmt |
+
+#### Ongoing — Quality Improvements
+
+| Area | Severity | Scope | Category |
+|------|----------|-------|----------|
+| Missing co-located tests (~10 files) | HIGH | ~10 files | Testing |
+| Shared `getStepDatabase()` helper | MEDIUM | 3 files | DRY |
+| DB schema constraints (unique indexes) | MEDIUM | 3 tables | Schema |
+| DB performance indexes | MEDIUM | 3 tables | Performance |
+| Inngest timestamps in payloads | MEDIUM | ~4 events | Spec compliance |
+| Factory builder coverage | MEDIUM | 1 package | Testing |
+| SM-2 input validation | MEDIUM | 1 file | Correctness |
+| Dead imports cleanup | LOW | ~5 files | Maintenance |
 
 ### Test Status
 
 ```
 877 tests | 6 projects | 84 suites | 0 failures
 ```
+
+### Review Confidence
+
+| Domain | A Reviewer | B Reviewer | Agreement | Confidence |
+|--------|-----------|-----------|-----------|------------|
+| API Services | 0C/10H/40M/12L | 0C/11H/19M/7L | HIGH — confirmed same critical paths | Strong |
+| API Routes | 5C/7H/17M/28L | 1C/11H/10M/12L | HIGH — both found stripe/curriculum gaps | Strong |
+| Infrastructure | 0C/0H/13M/16L | 4C/8H/10M/8L | MEDIUM — B found critical step boundary + GDPR issues A missed | B more thorough |
+| Mobile | 18C/52H/3M/1L | Detailed adversarial | HIGH — confirmed same persona/color patterns | Strong |
+| Documentation | 6H/13M/9L | 5C/3H/4M/3L | HIGH — both found LLM path + version issues | B found Zod 4 gap |
