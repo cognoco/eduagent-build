@@ -66,3 +66,12 @@ export async function executeDeletion(
   // FK cascades handle all child records. Idempotent — no-op if already deleted.
   await db.delete(accounts).where(eq(accounts.id, accountId));
 }
+
+export async function deleteProfile(
+  db: Database,
+  profileId: string
+): Promise<void> {
+  // FK cascades handle all child records (subjects, sessions, consent_states, etc.).
+  // Idempotent — no-op if already deleted.
+  await db.delete(profiles).where(eq(profiles.id, profileId));
+}

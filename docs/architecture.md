@@ -125,7 +125,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | Concern | Architectural Pattern | Scope |
 |---------|----------------------|-------|
 | **Persona-aware theming** | CSS variable layer via NativeWind. 6 JSON token files (3 personas × 2 color modes). **Swap at app root layout**, not Clerk hook — persona is an application concept, not Clerk's. Flow: Clerk authenticates → app fetches active profile → profile includes persona type → root layout sets CSS variables before any child renders. Profile switching within family account swaps variable set without re-authentication. Components stay completely persona-unaware. | All UI |
-| **AI cost management** | Split into two layers: (1) **Metering middleware** calling a **PostgreSQL function** `decrement_quota(profile_id, family_id)` — atomic FIFO logic (monthly pool first, then top-up credits), returns remaining balance or rejection. Middleware interprets result: forward to LLM or return quota-exceeded with soft paywall data. Concurrent family usage handled by PostgreSQL row-level locking (`UPDATE ... SET remaining = remaining - 1 WHERE remaining > 0`) — no application-level locking. (2) **LLM orchestration module** (inline, not service) — `routeAndCall(conversationState, prompt, options) → stream`. Handles model selection by escalation rung, provider failover, streaming normalization. Clean interface enables future service extraction. Soft ceiling €0.05/session: **monitoring threshold, not a cutoff.** Never interrupt a learning session for cost reasons. Log when sessions exceed €0.05. If >20% of sessions consistently exceed ceiling, tune routing rules (e.g., lower the escalation rung threshold for reasoning models). Surface as a dashboard metric for cost monitoring. The metering middleware tracks per-session cost accumulation but does not enforce a hard stop — the quota system (monthly pool + top-ups) is the actual spending control. | Backend |
+| **AI cost management** | Split into two layers: (1) **Metering middleware** calling a **PostgreSQL function** `decrement_quota(profile_id, family_id)` — atomic FIFO logic (monthly pool first, then top-up credits), returns remaining balance or rejection. Middleware interprets result: forward to LLM or return quota-exceeded with soft paywall data. Concurrent family usage handled by PostgreSQL row-level locking (`UPDATE ... SET remaining = remaining - 1 WHERE remaining > 0`) — no application-level locking. (2) **LLM orchestration module** in `services/llm/router.ts` — `routeAndCall(messages: ChatMessage[], rung: EscalationRung, options?) → Promise<RouteResult>`. Handles model selection by escalation rung, provider failover, streaming normalization (`routeAndStream` for SSE). Soft ceiling €0.05/session: **monitoring threshold, not a cutoff.** Never interrupt a learning session for cost reasons. Log when sessions exceed €0.05. If >20% of sessions consistently exceed ceiling, tune routing rules (e.g., lower the escalation rung threshold for reasoning models). Surface as a dashboard metric for cost monitoring. The metering middleware tracks per-session cost accumulation but does not enforce a hard stop — the quota system (monthly pool + top-ups) is the actual spending control. | Backend |
 | **Prompt caching** | Provider-level first (Anthropic prompt caching for system prompts — stable per subject/persona combination). **Parallel Example templates** cached in database: keyed by `subject + type + difficulty + system_prompt_hash`. System prompt change → hash change → old cache entries naturally bypassed. No explicit invalidation or TTL needed — stale entries are orphaned and can be garbage-collected periodically. No general-purpose prompt cache layer at MVP. | Backend |
 | **Multi-profile data isolation** | **Repository pattern** with automatic scope injection: `createScopedRepository(profileId)` — every query gets `WHERE profile_id = $1` automatically. **Neon RLS** as defense-in-depth, not primary enforcement. Profile ID set via session context, not passed per-request. | Data layer |
 | **Session state management** | **Every exchange, hybrid model.** After each AI response completes, in one transaction: (1) **Append session event** (immutable log): `{ exchange_id, timestamp, user_message, ai_response, model_used, escalation_rung, hints_given, time_to_answer, confidence_signals }`. (2) **Upsert session summary row** (mutable current state): `{ session_id, current_rung, total_exchanges, topics_touched, last_exchange_at }`. Event log gives replay/audit/analytics. Summary row gives fast reads for "where are we." Both in same database transaction — not a separate save step. Cost negligible vs. LLM call; no data loss window. | Backend |
@@ -272,9 +272,10 @@ Hono RPC exports the API type from the server; the client consumes it with full 
 const app = new Hono().route('/sessions', sessionsRoute);
 export type AppType = typeof app;
 
-// Re-export from packages/schemas/ for mobile consumption
+// NOTE: AppType cannot live in @eduagent/schemas (circular dep: api→schemas→api).
+// Mobile imports directly from the API package using TypeScript project references.
 // Mobile: apps/mobile/lib/api.ts
-import type { AppType } from '@eduagent/schemas';
+import type { AppType } from '@eduagent/api';
 import { hc } from 'hono/client';
 const client = hc<AppType>(API_URL);
 ```
@@ -861,16 +862,24 @@ eduagent/
 │       │   │   ├── embeddings.ts    # Embedding generation — provider call + pgvector write
 │       │   │   ├── notifications.ts # Expo Push — batch sends, token cleanup, receipt checking
 │       │   │   └── ocr.ts           # Server-side OCR provider interface
-│       │   ├── llm/
-│       │   │   ├── orchestrator.ts  # routeAndCall() — model routing, provider failover, streaming
-│       │   │   ├── providers.ts     # Provider configs, API key management
-│       │   │   └── circuitBreaker.ts # Per-provider circuit breaker state
-│       │   ├── events/
-│       │   │   ├── client.ts        # Inngest client init
-│       │   │   ├── sessionCompleted.ts  # session.completed → SM-2 → coaching → dashboard → embeddings
-│       │   │   ├── coachingPrecompute.ts
-│       │   │   ├── retentionRecalculate.ts
-│       │   │   └── retentionReminder.ts  # Scheduled — calls services/notifications.ts
+│       │   ├── llm/                    # LLM orchestration — lives inside services/, imported via barrel
+│       │   │   ├── router.ts          # routeAndCall(messages, rung, options?) — model routing, streaming
+│       │   │   ├── router.test.ts     # Co-located tests
+│       │   │   ├── types.ts           # ChatMessage, EscalationRung, RouteResult, StreamResult
+│       │   │   ├── index.ts           # Barrel: export { routeAndCall, routeAndStream, registerProvider }
+│       │   │   └── providers/
+│       │   │       ├── gemini.ts      # Gemini Flash (rung 1-2) + Gemini Pro (rung 3+)
+│       │   │       └── mock.ts        # Test provider
+│       │   ├── inngest/
+│       │   │   ├── client.ts             # Inngest client init
+│       │   │   ├── index.ts              # Barrel for all Inngest functions
+│       │   │   └── functions/
+│       │   │       ├── session-completed.ts   # session.completed → SM-2 → coaching → dashboard → embeddings
+│       │   │       ├── consent-reminders.ts   # Consent reminder schedule (7/14/25/30 days)
+│       │   │       ├── account-deletion.ts    # Deletion orchestrator (7-day grace period)
+│       │   │       ├── review-reminder.ts     # Scheduled retention review notifications
+│       │   │       ├── payment-retry.ts       # Payment failure retry logic
+│       │   │       └── trial-expiry.ts        # Trial expiration handling
 │       │   ├── logger.ts            # Axiom structured logging factory, correlation ID injection
 │       │   ├── sentry.ts            # Sentry init for @sentry/cloudflare
 │       │   ├── config.ts            # Typed env config (Zod validated at startup)
@@ -958,20 +967,20 @@ eduagent/
 
 ### Key Structural Decisions
 
-**`apps/api/src/` split — `services/`, `llm/`, `events/` instead of flat `lib/`:**
+**`apps/api/src/` split — `services/` (including `services/llm/`), `inngest/`, `middleware/` instead of flat `lib/`:**
 
-The original `lib/` was accumulating too many unrelated concerns. Replaced with three purpose-specific directories:
+The original `lib/` was accumulating too many unrelated concerns. Replaced with purpose-specific directories:
 
-- **`services/`** — Business logic extracted from route handlers. Each service file corresponds to a route file at the start. Cross-service calls go through exported function interfaces (e.g., `exchanges.ts` calls `getTopicSchedules()` from `retention.ts`), never internal imports. When the dependency graph between services gets tangled, that's a refactoring signal.
-- **`llm/`** — LLM orchestration module. `routeAndCall()` lives here alongside provider configs and circuit breaker state. Isolated because it's the most complex subsystem with its own concerns (model routing, streaming, failover, cost tracking). Does NOT include embedding generation — embedding is a different call pattern (single vector output, not streaming conversation).
-- **`events/`** — Inngest client + all event handler functions. Each event handler is a step function (e.g., `session.completed` → SM-2 → coaching card → dashboard → embeddings). Isolated because Inngest functions have different execution context (durable, retryable, not request-scoped). Event handlers call into `services/` for actual logic.
+- **`services/`** — Business logic extracted from route handlers, including the `services/llm/` orchestration sub-module. Each service file corresponds to a route file at the start. Cross-service calls go through exported function interfaces (e.g., `exchanges.ts` calls `getTopicSchedules()` from `retention.ts`), never internal imports. When the dependency graph between services gets tangled, that's a refactoring signal.
+- **`services/llm/`** — LLM orchestration module, nested inside `services/`. `routeAndCall()` in `router.ts`, exported via `index.ts` barrel. Services import as `from './llm'`. Currently only Gemini provider (Flash for rung 1-2, Pro for rung 3+) and mock provider. Does NOT include embedding generation — embedding is a different call pattern (single vector output, not streaming conversation).
+- **`inngest/`** — Inngest client + all event handler functions in `inngest/functions/`. Each event handler is a step function (e.g., `session.completed` → SM-2 → coaching card → dashboard → embeddings). Isolated because Inngest functions have different execution context (durable, retryable, not request-scoped). Event handlers call into `services/` for actual logic.
 
 **Embedding pipeline — separate from LLM orchestration:**
 
 Embeddings are structurally different from conversational LLM calls: single input → single vector output, no streaming, no routing decisions, no escalation rung. The pipeline:
 - **`services/embeddings.ts`** — Owns the embedding provider call (model TBD at implementation, likely OpenAI `text-embedding-3-small` or equivalent; behind an interface so provider is swappable). Extracts key concepts from session, generates embedding vectors, writes to pgvector.
 - **`packages/database/src/queries/embeddings.ts`** — Vector similarity search queries. Uses raw SQL (`ORDER BY embedding <=> $1 LIMIT $n` with cosine distance), not Drizzle relational queries. Different query pattern than standard CRUD.
-- **`events/sessionCompleted.ts`** — Inngest step calls `services/embeddings.ts` as the final step after SM-2 and coaching card precompute.
+- **`inngest/functions/session-completed.ts`** — Inngest step calls `services/embeddings.ts` as the final step after SM-2 and coaching card precompute.
 
 **Onboarding as route-level split, not conditional rendering:**
 
@@ -1064,7 +1073,7 @@ Service Function (business logic)
   │ cross-service calls: through exported function interfaces only
   ▼
 ┌──────────────────┬────────────────┬──────────────┬──────────────────┐
-│ @eduagent/database │ llm/orchestrator │ Workers KV     │ services/embeddings │
+│ @eduagent/database │ services/llm/    │ Workers KV     │ services/embeddings │
 │ (scoped repo +     │ (routeAndCall)    │ (coaching, sub) │ (embedding provider) │
 │  queries/*)        │                   │                │                      │
 └──────────────────┴────────────────┴──────────────┴──────────────────┘
@@ -1100,9 +1109,9 @@ Service Function (business logic)
 | Authentication | `middleware/auth.ts`, `@clerk/clerk-expo` in root layout |
 | Profile scoping | `middleware/profileScope.ts` → `packages/database/repository.ts` |
 | Quota/metering | `middleware/metering.ts` → `packages/database/` (`decrement_quota` function) |
-| LLM orchestration | `llm/orchestrator.ts`, `llm/providers.ts`, `llm/circuitBreaker.ts` |
+| LLM orchestration | `services/llm/router.ts`, `services/llm/providers/gemini.ts`, `services/llm/types.ts` |
 | Embedding pipeline | `services/embeddings.ts` (provider call) → `queries/embeddings.ts` (vector search) |
-| Background jobs | `events/*.ts` (Inngest functions) → call `services/` for logic |
+| Background jobs | `inngest/functions/*.ts` (Inngest functions) → call `services/` for logic |
 | Push notifications | `services/notifications.ts` (centralized) ← called by Inngest event handlers |
 | Persona theming | `theme/tokens/*.json`, `theme/provider.tsx`, root `_layout.tsx` |
 | Error handling | `errors.ts` (API), `common/ErrorRecovery.tsx` (mobile) |
@@ -1124,9 +1133,9 @@ Mobile App                          API (Hono on Workers)
     │   GET  /v1/book/:subjectId         │──→ packages/database (full fetch)
     │                                    │
     ├── SSE stream  ◀────────────────────┤
-    │   (LLM response chunks)            │──→ llm/orchestrator.ts → LLM provider
+    │   (LLM response chunks)            │──→ services/llm/router.ts → LLM provider
     │                                    │
-    └── Expo Push  ◀──────────── events/ → services/notifications.ts
+    └── Expo Push  ◀──────────── inngest/functions/ → services/notifications.ts
         (retention reminders)            │──→ Expo Push API
 ```
 
@@ -1136,9 +1145,9 @@ Mobile App                          API (Hono on Workers)
 |---------|------------------|----------|------|
 | Clerk | `middleware/auth.ts` + `@clerk/clerk-expo` | JWKS verification, REST API | JWT + API key |
 | Stripe | `routes/subscriptions.ts` (webhooks) | Webhook events | Webhook signing secret |
-| LLM providers (Claude, GPT-4, Gemini) | `llm/orchestrator.ts` | REST + SSE | API keys per provider |
+| LLM providers (currently Gemini only; Claude, GPT-4 planned) | `services/llm/router.ts` | REST + SSE | API keys per provider |
 | Embedding provider (TBD) | `services/embeddings.ts` | REST | API key |
-| Inngest | `routes/inngest.ts` + `events/*.ts` | Webhook | Inngest signing key |
+| Inngest | `routes/inngest.ts` + `inngest/functions/*.ts` | Webhook | Inngest signing key |
 | Neon | `packages/database/connection.ts` | PostgreSQL wire protocol (serverless driver) | Connection string |
 | Expo Push | `services/notifications.ts` | REST API | Expo push token |
 | ML Kit | Mobile on-device (no server integration) | Native SDK | — |
@@ -1167,7 +1176,7 @@ Mobile App                          API (Hono on Workers)
    └─ services/exchanges.ts:
        ├─ Loads session context (summary row + recent events + pgvector memory via queries/embeddings.ts)
        ├─ Assembles prompt (system + context + student message + preferredLanguage)
-       ├─ llm/orchestrator.ts → routes to model by escalation rung → streams response
+       ├─ services/llm/router.ts → routes to model by escalation rung → streams response
        └─ SSE stream back to mobile (client renders incrementally)
 
 5. Exchange complete (stream ends)
@@ -1229,7 +1238,7 @@ All technology choices verified compatible (Feb 2026):
 - Hono 4.11.x on Cloudflare Workers — native SSE streaming via `streamSSE()`, Workers KV bindings
 - Drizzle ORM + Neon serverless driver (`@neondatabase/serverless`) — both target PostgreSQL, connection factory pattern handles serverless pooling
 - Clerk `@clerk/clerk-expo` + Hono middleware — JWT/JWKS verification compatible with Workers runtime, KV-cacheable JWKS
-- Inngest + Cloudflare Workers — Inngest v3 supports Workers as serve target via `inngest/cloudflare`
+- Inngest + Cloudflare Workers — Inngest v3 supports Workers via `inngest/hono` serve adapter (for Hono apps) or `inngest/cloudflare` (bare Workers)
 - Nx 22.5.0 + `@naxodev/nx-cloudflare` 6.0.0 — version-compatible, plugin actively maintained
 - pgvector in Neon — supported natively, no extensions to install
 
@@ -1245,7 +1254,7 @@ No contradictory decisions found. The Workers → Railway/Fly fallback path is c
 
 **Structure Alignment:**
 
-- Project tree directly maps to all architectural decisions (services/, llm/, events/ correspond to documented patterns)
+- Project tree directly maps to all architectural decisions (services/, services/llm/, inngest/ correspond to documented patterns)
 - Package boundaries (`schemas` → leaf, `database` → imports schemas, `retention` → zero deps) support the dependency direction rule
 - Route structure mirrors API boundary table 1:1
 - Mobile route groups align with persona boundaries (auth, learner, parent)

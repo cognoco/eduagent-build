@@ -4,7 +4,21 @@ import { Hono } from 'hono';
 export const stripeWebhookRoute = new Hono().post(
   '/stripe/webhook',
   async (c) => {
-    // TODO: Verify Stripe signature from c.req.header('stripe-signature')
+    const signature = c.req.header('stripe-signature');
+    if (!signature) {
+      return c.json(
+        {
+          code: 'MISSING_SIGNATURE',
+          message: 'Missing Stripe-Signature header',
+        },
+        400
+      );
+    }
+
+    // TODO: Verify signature using Stripe signing secret from typed config
+    // const stripe = new Stripe(config.STRIPE_WEBHOOK_SECRET);
+    // const event = stripe.webhooks.constructEvent(rawBody, signature, config.STRIPE_WEBHOOK_SECRET);
+
     // TODO: Parse event, handle subscription lifecycle events:
     //   - customer.subscription.created
     //   - customer.subscription.updated

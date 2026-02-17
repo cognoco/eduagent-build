@@ -18,12 +18,26 @@ export interface EmbeddingInsert {
   embedding: number[];
 }
 
+function validateEmbedding(embedding: number[]): void {
+  if (embedding.length === 0) {
+    throw new Error('Embedding vector must not be empty');
+  }
+  for (let i = 0; i < embedding.length; i++) {
+    if (typeof embedding[i] !== 'number' || !Number.isFinite(embedding[i])) {
+      throw new Error(
+        `Embedding contains invalid value at index ${i}: ${embedding[i]}`
+      );
+    }
+  }
+}
+
 export async function findSimilarTopics(
   db: Database,
   embedding: number[],
   limit = 5,
   profileId?: string
 ): Promise<SimilarTopic[]> {
+  validateEmbedding(embedding);
   const vectorStr = `[${embedding.join(',')}]`;
 
   const baseQuery = profileId
@@ -51,6 +65,7 @@ export async function storeEmbedding(
   db: Database,
   data: EmbeddingInsert
 ): Promise<void> {
+  validateEmbedding(data.embedding);
   await db.insert(sessionEmbeddings).values({
     id: generateUUIDv7(),
     sessionId: data.sessionId,

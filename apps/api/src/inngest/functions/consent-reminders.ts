@@ -1,6 +1,7 @@
 import { inngest } from '../client';
 import { createDatabase } from '@eduagent/database';
 import { getConsentStatus } from '../../services/consent';
+import { deleteProfile } from '../../services/deletion';
 import {
   sendEmail,
   formatConsentReminderEmail,
@@ -60,14 +61,15 @@ export const consentReminder = inngest.createFunction(
       });
     });
 
-    // Day 30 auto-delete
+    // Day 30 auto-delete — GDPR/COPPA requires deletion if consent not granted
     await step.sleep('wait-5-more-days', '5d');
     await step.run('auto-delete-account', async () => {
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
       if (status === 'CONSENTED') return;
-      // TODO: Delete account and all data via deletion orchestrator
-      console.log(`Auto-deleting account for profile ${profileId}`);
+      // Consent not granted (PENDING or WITHDRAWN) — delete the profile.
+      // FK cascades remove all child records (subjects, sessions, consent_states, etc.).
+      await deleteProfile(db, profileId);
     });
   }
 );

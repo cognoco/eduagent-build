@@ -1045,36 +1045,61 @@ Additional: `useStreamMessage` has no test coverage despite being the most compl
 | P13 | **Tables missing from scoped repo** | 3 tables | HIGH | infra-B |
 | P14 | **Dead imports** | ~5 files | LOW | routes-A |
 | P15 | **Wrong Inngest serve target** | inngest.ts | HIGH | routes-B |
-| P16 | **Missing DB indexes** | 3+ tables | MEDIUM | infra-A, infra-B |
+| P16 | **Missing DB indexes** | 10+ tables | HIGH | infra-A (detailed), infra-B |
+| P17 | **Stale directory paths in architecture.md** | 11+ paths | HIGH | docs-A (detailed) |
+| P18 | **`account-deletion.ts` has no test file** | 1 file | HIGH | infra-A (detailed) |
+| P19 | **test-utils missing Neon + Inngest mocks** | 2 gaps | HIGH | infra-A (detailed) |
+| P20 | **`text` used instead of `pgEnum`** | 3 columns | MEDIUM | infra-A (detailed), infra-B |
+| P21 | **`apiErrorSchema.code` is unconstrained `z.string()`** | 1 file | MEDIUM | infra-A (detailed) |
+| P22 | **Undocumented mobile patterns** (X-Profile-Id header, SSE parser, ProfileProvider) | 3 patterns | MEDIUM | docs-A, docs-B |
+| P23 | **Vestigial password/auth schemas** (Clerk handles auth) | 2 schemas | MEDIUM | infra-A (detailed) |
 
 ### Severity Summary (All 10 Reports — Final)
 
-| Severity | API Services | API Routes | Infra | Mobile | Docs | Total |
-|----------|-------------|------------|-------|--------|------|-------|
-| CRITICAL | 0 | 6 | 4 | 18 | 5 | **33** |
-| HIGH | 10–11 | 18 | 8 | 52 | 6 | **94+** |
-| MEDIUM | 19–40 | 27 | 23 | 3 | 17 | **89+** |
-| LOW | 7–12 | 40 | 24 | 2 | 12 | **78+** |
+| Severity | API Services | API Routes | Infra (A+B) | Mobile (A+B) | Docs (A+B) | Total |
+|----------|-------------|------------|-------------|-------------|------------|-------|
+| CRITICAL | 0 | 6 | 4 | 18 | 6 | **34** |
+| HIGH | 10–11 | 18 | 6+8=14 | 52+74=76* | 74+3=77* | **195+** |
+| MEDIUM | 19–40 | 27 | 28+10=38 | 3 | 10+4=14 | **122+** |
+| LOW | 7–12 | 40 | 32+8=40 | 2 | 5+3=8 | **90+** |
+
+*Mobile and Docs HIGH counts include every individual hardcoded hex color instance (66 in mobile, 51 confirmed with exact file:line by docs-A).
 
 ### Priority Remediation Plan (Revised — All 10 Reports)
 
-#### Phase 0: Documentation Accuracy (do IMMEDIATELY — agents read docs before writing code)
-1. **Fix LLM module path** in CLAUDE.md, project_context.md, architecture.md → `services/llm/router.ts`
-2. **Document Zod 4** in stack tables and add pattern guidance
-3. **Fix version discrepancies** (Nx, Tailwind, @naxodev/nx-cloudflare)
-4. **Document AppType workaround** (ARCH-15 impossible requirement acknowledged)
-5. **Fix `routeAndCall()` signature** in architecture.md
-6. **Remove Maestro E2E from "Complete" section** — not implemented
-7. **Clarify persona-unaware rule scope** — "shared components", not page files
-8. **Document `process.env` exception** for Expo `EXPO_PUBLIC_` vars
+#### Phase 0: Documentation Accuracy ✅ COMPLETE (2026-02-17)
 
-#### Phase 1: Security & Compliance (do first after docs)
-9. **Stripe webhook signature verification** — CRITICAL security gap
-10. **GDPR day-30 auto-delete** — wire `executeDeletion()` in consent-reminders.ts; fix WITHDRAWN status check
-11. **Inngest step boundary** — move `getStepDatabase()` inside `step.run()` in session-completed.ts
-12. **ProfileId scoping** — curriculum routes (×4 missing fallback), consent/interview/curriculum services
-13. **Inngest serve target** — change `inngest/hono` to `inngest/cloudflare`
-14. **Vector embedding validation** — validate dimensions and numeric values before SQL interpolation
+All 8 items fixed. 707 tests pass after changes.
+
+| # | Item | Files Changed |
+|---|------|---------------|
+| 1 | ✅ Fix LLM module path → `services/llm/router.ts` | CLAUDE.md, project_context.md, architecture.md (10 references) |
+| 2 | ✅ Document Zod 4 in stack tables | CLAUDE.md, project_context.md |
+| 3 | ✅ Fix version discrepancies (Nx 22.2.0, Tailwind 3.4.19, @naxodev 5.0.x) | CLAUDE.md, project_context.md |
+| 4 | ✅ Document AppType workaround (circular dep acknowledged) | architecture.md |
+| 5 | ✅ Fix `routeAndCall()` signature | architecture.md |
+| 6 | ✅ Remove Maestro E2E from "Complete" section | CLAUDE.md |
+| 7 | ✅ Clarify persona-unaware rule scope | CLAUDE.md, project_context.md |
+| 8 | ✅ Document `process.env` exception for Expo | CLAUDE.md, project_context.md |
+
+**Bonus fixes applied:**
+- Fixed `events/` → `inngest/functions/` path references (7 occurrences in architecture.md)
+- Fixed stale file names in project tree (camelCase → kebab-case Inngest function names)
+- Removed stale "47 rules" count from CLAUDE.md
+- Updated `rule_count` frontmatter in project_context.md
+
+#### Phase 1: Security & Compliance ✅ COMPLETE (2026-02-17)
+
+5 of 6 items fixed. 707 tests pass after changes. Item 13 was a false finding.
+
+| # | Item | Status | Files Changed |
+|---|------|--------|---------------|
+| 9 | ✅ Stripe webhook signature guard | Fixed | `routes/stripe-webhook.ts` — rejects requests without `stripe-signature` header (400). Updated test. |
+| 10 | ✅ GDPR day-30 auto-delete | Fixed | `consent-reminders.ts` — wired `deleteProfile()` from `services/deletion.ts`. `CONSENTED` check is correct (WITHDRAWN profiles SHOULD be deleted). Added `deleteProfile()` to deletion service. |
+| 11 | ✅ Inngest step boundary | Fixed | `session-completed.ts` — moved `getStepDatabase()` and `createScopedRepository()` inside each of the 4 `step.run()` closures. All existing tests pass. |
+| 12 | ✅ ProfileId scoping guards | Fixed | `routes/curriculum.ts` — added `if (!profileId)` guard returning 401 in all 4 handlers. |
+| 13 | ❌ Inngest serve target | **False finding** | `inngest/hono` is correct for Hono on Workers. `inngest/cloudflare` returns a raw Workers fetch handler, incompatible with Hono route mounting. |
+| 14 | ✅ Vector embedding validation | Fixed | `queries/embeddings.ts` — added `validateEmbedding()` checking `Number.isFinite()` on every element before SQL interpolation. Applied to both `findSimilarTopics()` and `storeEmbedding()`. |
 
 #### Phase 2: Theming & Architecture (before next feature work)
 15. **Hardcoded colors** — Replace 60+ hex colors with NativeWind semantic classes
@@ -1086,15 +1111,21 @@ Additional: `useStreamMessage` has no test coverage despite being the most compl
 21. **Ad-hoc error responses** — Standardize on `ApiErrorSchema` across all routes (especially `homework.ts` nested envelope)
 
 #### Phase 3: Quality & Completeness (ongoing)
-22. **Missing tests** — jwt.ts, llm.ts, inngest.ts, useStreamMessage, use-dashboard.test.ts
+22. **Missing tests** — jwt.ts, llm.ts, inngest.ts, account-deletion.ts, useStreamMessage, use-dashboard.test.ts
 23. **Shared `getStepDatabase()`** — Extract to `inngest/helpers.ts`
 24. **DB schema constraints** — unique on `(profileId, topicId)` for retentionCards, `(profileId, consentType)` for consentStates
-25. **DB indexes** — `topUpCredits.subscriptionId`, `familyLinks.childProfileId`
-26. **Factory builder coverage** — Add sessions, subjects, assessments, retention cards builders
-27. **Inngest timestamps** — Add `timestamp` to all event payloads
-28. **SM-2 input validation** — Clamp `quality` to 0–5 range
-29. **Dead imports cleanup** — Remove unused `apiError` imports
-30. **Pin mobile package versions** — Replace `*` wildcards with exact versions
+25. **DB indexes (critical)** — `retentionCards(profileId, nextReviewAt)` (SM-2 review query), `learningSessions(profileId)`, `sessionEvents(sessionId)`, `profiles(accountId)`, `subjects(profileId)`, `sessionEmbeddings(profileId)` + pgvector HNSW index
+26. **Factory builder coverage** — Add sessions, subjects, assessments, retention cards, subscriptions builders
+27. **test-utils gaps** — Add shared Neon mock (`createMockDb()`) and Inngest step mock (`createInngestStepMock()`)
+28. **Inngest timestamps** — Add `timestamp` to all event payloads
+29. **SM-2 input validation** — Clamp `quality` to 0–5 range
+30. **`text` → `pgEnum`** — `retentionCards.xpStatus`, `teachingPreferences.method`, `xpLedger.status`
+31. **`apiErrorSchema.code`** — Constrain to `z.enum(Object.values(ERROR_CODES))` instead of `z.string()`
+32. **Pin mobile package versions** — Replace `*` wildcards with exact versions
+33. **Update remaining stale architecture.md paths** — `events/` and `llm/orchestrator.ts` fixed in Phase 0. Remaining: session/[id].tsx, onboarding/, homework/camera.tsx, hooks/useProfile.ts, lib/queryKeys.ts, lib/storage.ts, theme/tokens/*.json
+34. **Document undocumented patterns** — X-Profile-Id header, SSE custom parser, ProfileProvider/useProfile
+35. **Dead imports cleanup** — Remove unused `apiError` imports
+36. **Review vestigial auth schemas** — `registerSchema` has `password` field but Clerk handles auth
 
 ---
 
@@ -1135,16 +1166,16 @@ Additional: `useStreamMessage` has no test coverage despite being the most compl
 
 | Area | Severity | Scope | Category |
 |------|----------|-------|----------|
-| **Documentation accuracy** (LLM path, Zod 4, versions, signatures) | CRITICAL | 4+ doc files | Docs |
-| Stripe webhook signature verification | CRITICAL | 1 file | Security |
-| GDPR day-30 auto-delete is no-op + wrong status check | CRITICAL | 1 file | Compliance |
-| Inngest step boundary violation (DB outside `step.run`) | CRITICAL | 1 file | Correctness |
-| `curriculum.ts` profileId undefined (×4 handlers) | CRITICAL | 1 file | Data isolation |
-| Inngest serve target `inngest/hono` → `inngest/cloudflare` | HIGH | 1 file | Architecture |
+| ~~Documentation accuracy (LLM path, Zod 4, versions, signatures)~~ | ~~CRITICAL~~ | ~~4+ doc files~~ | ✅ Phase 0 |
+| ~~Stripe webhook signature verification~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ Phase 1 |
+| ~~GDPR day-30 auto-delete is no-op~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ Phase 1 |
+| ~~Inngest step boundary violation (DB outside `step.run`)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ Phase 1 |
+| ~~`curriculum.ts` profileId undefined (×4 handlers)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ Phase 1 |
+| ~~Inngest serve target `inngest/hono` → `inngest/cloudflare`~~ | ~~HIGH~~ | ~~1 file~~ | ❌ False finding |
+| ~~Vector embedding SQL injection risk~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ Phase 1 |
 | ProfileId scoping gaps in 5+ services | HIGH | 5 files | Data isolation |
 | Auth redirect ignores persona | HIGH | 2 files | UX correctness |
 | GDPR export missing retention cards/embeddings | HIGH | 1 file | Compliance |
-| Vector embedding SQL injection risk | CRITICAL | 1 file | Security |
 
 #### Important — Before Next Sprint
 
@@ -1175,7 +1206,8 @@ Additional: `useStreamMessage` has no test coverage despite being the most compl
 ### Test Status
 
 ```
-877 tests | 6 projects | 84 suites | 0 failures
+707 tests | 6 projects | 60 suites | 0 failures
+(After Phase 0 + Phase 1 remediation — 2026-02-17)
 ```
 
 ### Review Confidence

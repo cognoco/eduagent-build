@@ -26,7 +26,7 @@ describe('stripe webhook route', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/stripe/webhook', () => {
-    it('returns 200', async () => {
+    it('rejects requests without stripe-signature header', async () => {
       const res = await app.request(
         '/v1/stripe/webhook',
         {
@@ -36,7 +36,12 @@ describe('stripe webhook route', () => {
         TEST_ENV
       );
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body).toEqual({
+        code: 'MISSING_SIGNATURE',
+        message: 'Missing Stripe-Signature header',
+      });
     });
 
     it('works without auth header (public route)', async () => {
@@ -52,16 +57,20 @@ describe('stripe webhook route', () => {
       expect(res.status).not.toBe(401);
     });
 
-    it('returns { received: true }', async () => {
+    it('returns { received: true } with valid stripe-signature', async () => {
       const res = await app.request(
         '/v1/stripe/webhook',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'stripe-signature': 't=1234,v1=abc',
+          },
         },
         TEST_ENV
       );
 
+      expect(res.status).toBe(200);
       const body = await res.json();
       expect(body).toEqual({ received: true });
     });

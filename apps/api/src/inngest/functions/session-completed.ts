@@ -37,11 +37,10 @@ export const sessionCompleted = inngest.createFunction(
       timestamp,
     } = event.data;
 
-    const db = getStepDatabase();
-    const repo = createScopedRepository(db, profileId);
-
     // Step 1: Update retention data via SM-2
     await step.run('update-retention', async () => {
+      const db = getStepDatabase();
+      const repo = createScopedRepository(db, profileId);
       const card = await repo.retentionCards.findFirst(
         eq(retentionCards.topicId, topicId)
       );
@@ -83,6 +82,7 @@ export const sessionCompleted = inngest.createFunction(
 
     // Step 2: Write coaching card / session summary
     await step.run('write-coaching-card', async () => {
+      const db = getStepDatabase();
       // Insert a pending session summary. The LLM-generated feedback
       // will be filled in when routeAndCall() is wired (Layer 2).
       await db.insert(sessionSummaries).values({
@@ -98,6 +98,8 @@ export const sessionCompleted = inngest.createFunction(
 
     // Step 3: Update dashboard — streaks + XP
     await step.run('update-dashboard', async () => {
+      const db = getStepDatabase();
+      const repo = createScopedRepository(db, profileId);
       const today = timestamp
         ? new Date(timestamp).toISOString().slice(0, 10)
         : new Date().toISOString().slice(0, 10);
@@ -135,6 +137,7 @@ export const sessionCompleted = inngest.createFunction(
 
     // Step 4: Generate and store session embedding
     await step.run('generate-embeddings', async () => {
+      const db = getStepDatabase();
       // TODO: Replace placeholder with real embedding from LLM provider
       // when embedding generation is wired (Layer 2).
       // For now, store the session metadata as content with a zero vector.

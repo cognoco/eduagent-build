@@ -22,13 +22,14 @@ packages/
 | Technology | Version | Notes |
 |-----------|---------|-------|
 | Expo SDK | 54 | SDK 55 is beta — do not use |
-| NativeWind | **4.2.1** | v5 is preview. Pin with Tailwind CSS 3.4.17. |
+| NativeWind | **4.2.1** | v5 is preview. Pin with Tailwind CSS 3.4.19. |
 | Hono | 4.11.x | Cloudflare Workers runtime |
 | Drizzle ORM | Current stable | Type-safe SQL. NOT Prisma. |
 | Neon | Managed | PostgreSQL + pgvector. `@neondatabase/serverless` driver. |
 | Clerk | Current | `@clerk/clerk-expo` on mobile, JWKS on API |
-| Inngest | v3 | `inngest/cloudflare` for Workers |
-| Nx | 22 | pnpm workspace, `@naxodev/nx-cloudflare` for Workers |
+| Inngest | v3 | `inngest/hono` serve adapter (Hono on Cloudflare Workers) |
+| Zod | **4.x** | `^4.1.12` in schemas. Breaking changes from Zod 3 — see [Zod 4 migration](https://zod.dev/v4/changelog). |
+| Nx | 22.2.0 | pnpm workspace, `@naxodev/nx-cloudflare` 5.0.x for Workers |
 | TypeScript | 5.9 | Strict mode everywhere |
 | Jest | 30 | Co-located tests (no `__tests__/` dirs) |
 
@@ -48,7 +49,7 @@ pnpm run db:generate                     # Generate migration
 
 ## Key Architecture Rules
 
-Read `docs/project_context.md` for the full 47 rules. The critical ones:
+Read `docs/project_context.md` for the full rules. The critical ones:
 
 ### Code Patterns
 
@@ -68,7 +69,7 @@ Read `docs/project_context.md` for the full 47 rules. The critical ones:
 
 ### Mobile (Expo)
 
-- Components are **persona-unaware**. Theming via CSS variables at root layout.
+- Shared components are **persona-unaware**. Theming via CSS variables at root layout. Page-level route files (`_layout.tsx`) may read persona for routing guards and CSS variable injection.
 - Route groups: `(auth)/`, `(learner)/`, `(parent)/` — persona is a first-class routing concern.
 - Auth screens redirect to `/(learner)/home`; each group's layout guards persona and cross-redirects.
 - TanStack Query for server state. React Context for auth/profile only.
@@ -83,7 +84,7 @@ Read `docs/project_context.md` for the full 47 rules. The critical ones:
 
 ### LLM / AI
 
-- Every LLM call through `llm/orchestrator.ts` → `routeAndCall()`. Never direct API calls.
+- Every LLM call through `services/llm/router.ts` → `routeAndCall()`. Never direct API calls. Import via barrel: `import { routeAndCall } from './llm'`.
 - Model routing by escalation rung, not initial classification.
 - Soft ceiling €0.05/session is monitoring, not a cutoff. Never interrupt learning.
 
@@ -114,10 +115,10 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 | Write without `profileId` scoping | Updates/deletes: `and(eq(table.id, id), eq(table.profileId, profileId))`. Inserts: include `profileId` in `.values()`. No direct FK: verify parent chain first. |
 | Import `eq`/tables in route files | Move DB query to a service function |
 | Put secrets in Inngest event payloads | `getStepDatabase()` helper reading runtime env |
-| Call LLM providers directly | `routeAndCall()` from `llm/orchestrator.ts` |
+| Call LLM providers directly | `routeAndCall()` from `services/llm/` (import via barrel: `from './llm'`) |
 | Define client-facing types locally | Import from `@eduagent/schemas`. Client-facing = returned by exported service, in route response, or used by >1 file. |
 | Use default exports | Named exports (except Expo Router pages) |
-| Read `process.env` directly | Typed config from `apps/api/src/config.ts` |
+| Read `process.env` directly (API) | Typed config from `apps/api/src/config.ts`. Exception: Expo mobile uses `process.env.EXPO_PUBLIC_*` per Expo convention. |
 | Import internal package paths | Import from barrel (`@eduagent/schemas`) |
 | Create `__tests__/` directories | Co-locate tests next to source |
 | Add Zustand/global state | TanStack Query or React Context |
@@ -134,8 +135,6 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 - Mobile screens: auth (Clerk), onboarding (subject creation → interview → curriculum), learner home, parent dashboard
 - Mobile-API integration: Clerk auth wired, TanStack Query hooks for all major flows
 - SSE streaming: mobile SSE client + `useStreamMessage` hook for learning/homework sessions
-- Maestro E2E flow scaffolds (create-subject, view-curriculum, start-session)
-
 **Remaining stub routes (mock data):** progress, retention, streaks, settings, dashboard (real data), parking-lot, homework, billing, stripe-webhook.
 
 **Not yet integrated:** Stripe payments, email provider (Resend/SendGrid), Expo Push notifications, real embedding vectors (pgvector), OCR provider.

@@ -4,7 +4,7 @@ user_name: 'Zuzka'
 date: '2026-02-15'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 47
+rule_count: 49
 optimized_for_llm: true
 source: 'docs/architecture.md'
 ---
@@ -22,13 +22,14 @@ _Critical rules and patterns for implementing code in EduAgent. Focus on unobvio
 | Technology | Version | Critical Notes |
 |-----------|---------|---------------|
 | Expo SDK | 54 | SDK 55 is beta — do not upgrade |
-| NativeWind | **4.2.1** | v5 is preview only. Pin with Tailwind CSS 3.4.17. |
+| NativeWind | **4.2.1** | v5 is preview only. Pin with Tailwind CSS 3.4.19. |
+| Zod | **4.x** | `^4.1.12` in `@eduagent/schemas`. Breaking changes from Zod 3 — use Zod 4 APIs. |
 | Hono | 4.11.x | On Cloudflare Workers. Same framework if migrating to Railway. |
 | Drizzle ORM | Current stable | Type-safe SQL. Not Prisma. |
 | Neon | Managed | PostgreSQL + pgvector. Serverless driver `@neondatabase/serverless`. |
 | Clerk | Current | `@clerk/clerk-expo` on mobile. JWKS verification on API. |
-| Inngest | v3 | `inngest/cloudflare` for Workers serve target. |
-| Nx | 22.5.0 | `@naxodev/nx-cloudflare` 6.0.0 for Workers deployment. |
+| Inngest | v3 | `inngest/hono` serve adapter (Hono on Cloudflare Workers). Use `inngest/cloudflare` only for bare Workers without Hono. |
+| Nx | 22.2.0 | `@naxodev/nx-cloudflare` 5.0.x for Workers deployment. |
 
 **Monorepo:** Nx with pnpm. If Expo + pnpm symlink issues arise, add `node-linker=hoisted` to `.npmrc`.
 
@@ -77,7 +78,7 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 
 ### Expo (Mobile) Rules
 
-- **Components are persona-unaware.** No conditional rendering based on persona type. Theming via CSS variables set at root layout.
+- **Shared components are persona-unaware.** No conditional rendering based on persona type in reusable components. Theming via CSS variables set at root layout. Page-level route files (e.g., `_layout.tsx`) may read persona for routing guards and CSS variable injection — that's the intended boundary.
   - WRONG: `if (persona === 'teen') { color = '#1a1a1a'; }` or `isDark = persona === 'teen'`
   - WRONG: Hardcoded hex colors in component props (`color="#7c3aed"`, `backgroundColor: '#262626'`)
   - RIGHT: Use NativeWind semantic classes (`bg-surface`, `text-primary`, `border-accent`) that resolve via CSS variables. The root `_layout.tsx` sets variables per persona — components never need to know which persona is active.
@@ -118,7 +119,7 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 
 ### LLM & AI Rules
 
-- **No direct LLM API calls.** Every call goes through `llm/orchestrator.ts` → `routeAndCall()`. Ensures metering, logging, provider fallback, cost tracking. A direct `fetch` to Anthropic/OpenAI bypasses metering.
+- **No direct LLM API calls.** Every call goes through `services/llm/router.ts` → `routeAndCall()` (import via barrel: `from './llm'`). Ensures metering, logging, provider fallback, cost tracking. A direct `fetch` to Anthropic/OpenAI bypasses metering.
 - **Embedding generation is separate from LLM orchestration.** Different call pattern (single vector, no streaming). Lives in `services/embeddings.ts`.
 - **Soft ceiling €0.05/session is a monitoring threshold, not a cutoff.** Never interrupt a learning session for cost reasons.
 - **Model routing by conversation state (escalation rung),** not initial classification. Gemini Flash for rung 1-2, reasoning models for rung 3+.
@@ -173,7 +174,7 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 - **Commit quality:** Husky + lint-staged + commitlint enforced from forked repo.
 - **CI matrix:** lint → typecheck → test → build → deploy. Nx Cloud for remote caching and affected-only builds.
 - **Neon branching** for dev/staging databases. No local PostgreSQL.
-- **Environment config:** Typed config object (`apps/api/src/config.ts`) validated with Zod at startup. Never `process.env.NODE_ENV` checks in application code. Never raw `process.env` reads.
+- **Environment config:** Typed config object (`apps/api/src/config.ts`) validated with Zod at startup. Never `process.env.NODE_ENV` checks in application code. Never raw `process.env` reads in API code. Exception: Expo mobile uses `process.env.EXPO_PUBLIC_*` per Expo convention.
 
 ## Critical Anti-Patterns
 
@@ -183,10 +184,10 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 | Write/update without `profileId` filter | Add `and(eq(table.id, id), eq(table.profileId, profileId))` on all writes |
 | Import ORM primitives (`eq`, tables) in route files | Move the query to a service function |
 | Put `databaseUrl` or secrets in Inngest event payloads | Use `getStepDatabase()` helper reading runtime env |
-| Call LLM providers directly | Use `routeAndCall()` from `llm/orchestrator.ts` |
+| Call LLM providers directly | Use `routeAndCall()` from `services/llm/` (import via barrel: `from './llm'`) |
 | Define API/client-facing types locally | Import from `@eduagent/schemas`. A type is "client-facing" if it's returned by an exported service function, appears in a route response, or is used by more than one file. Local types are OK only for: single-function parameter bundles, intermediate computation shapes within one function body, and mapper helpers. |
 | Use default exports | Use named exports (except Expo Router pages) |
-| Read `process.env` directly | Use typed config from `apps/api/src/config.ts` |
+| Read `process.env` directly (API) | Use typed config from `apps/api/src/config.ts`. Exception: Expo mobile uses `process.env.EXPO_PUBLIC_*` per Expo convention. |
 | Import from internal package paths | Import from package barrel (`@eduagent/schemas`) |
 | Create `__tests__/` directories | Co-locate tests next to source files |
 | Add Zustand/global state store | Use TanStack Query (server state) or React Context (auth/profile) |

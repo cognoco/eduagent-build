@@ -10,7 +10,7 @@ import {
   challengeCurriculum,
   explainTopicOrdering,
 } from '../services/curriculum';
-import { notFound } from '../lib/errors';
+import { notFound, unauthorized } from '../lib/errors';
 
 type CurriculumRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -27,6 +27,11 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
   .get('/subjects/:subjectId/curriculum', async (c) => {
     const db = c.get('db');
     const profileId = c.get('profileId');
+    if (!profileId)
+      return unauthorized(
+        c,
+        'Profile selection required (X-Profile-Id header)'
+      );
     const subjectId = c.req.param('subjectId');
     const curriculum = await getCurriculum(db, profileId, subjectId);
     return c.json({ curriculum });
@@ -38,6 +43,11 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = c.get('profileId');
+      if (!profileId)
+        return unauthorized(
+          c,
+          'Profile selection required (X-Profile-Id header)'
+        );
       const subjectId = c.req.param('subjectId');
       const { topicId } = c.req.valid('json');
       try {
@@ -58,6 +68,11 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = c.get('profileId');
+      if (!profileId)
+        return unauthorized(
+          c,
+          'Profile selection required (X-Profile-Id header)'
+        );
       const subjectId = c.req.param('subjectId');
       const { feedback } = c.req.valid('json');
       try {
@@ -80,6 +95,11 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
   .get('/subjects/:subjectId/curriculum/topics/:topicId/explain', async (c) => {
     const db = c.get('db');
     const profileId = c.get('profileId');
+    if (!profileId)
+      return unauthorized(
+        c,
+        'Profile selection required (X-Profile-Id header)'
+      );
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
     try {
