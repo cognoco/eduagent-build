@@ -904,58 +904,197 @@ Findings confirmed by both A and B are marked **[CONFIRMED]**. Findings from onl
 | HIGH | `hooks/use-account.ts` | `useExportData` uses GET request as mutation pattern — should be `useMutation` with POST or `useQuery` with GET | React Query patterns |
 | HIGH | Auth screens | Redirect after login goes to `/(learner)/home` regardless of persona — parent users land in wrong group | Route guards |
 
+### Domain 2 Update: API Routes (Shadow Reviewer B)
+
+**Reviewer B** (api-routes-reviewer-b): 1 Critical / 11 High / 10 Medium / 12 Low
+
+#### Confirmed by Both A and B
+
+| Severity | File | Finding |
+|----------|------|---------|
+| CRITICAL | `routes/stripe-webhook.ts` | No Stripe signature verification — any POST succeeds |
+| HIGH | `routes/curriculum.ts` | No `profileId` fallback (×4 handlers) — `undefined` propagates to services |
+| HIGH | `routes/homework.ts` | Non-standard error envelope `{ error: { code, message } }` instead of flat `{ code, message }` |
+| HIGH | `middleware/auth.ts` | Ad-hoc `c.json({ code: 'UNAUTHORIZED' })` bypasses `unauthorized()` helper (×2) |
+| HIGH | `routes/consent.ts:59` | Ad-hoc 404 bypasses `notFound()` helper |
+| MEDIUM | `config.ts` | `validateEnv()` exported but never called anywhere |
+| MEDIUM | `routes/consent.ts` | Inngest payload missing `timestamp` |
+| LOW | `routes/inngest.ts` | No co-located test file |
+
+#### Unique to Reviewer B
+
+| Severity | File | Finding |
+|----------|------|---------|
+| HIGH | `routes/inngest.ts:2` | **`serve` imported from `inngest/hono` — spec requires `inngest/cloudflare` for Workers** |
+| HIGH | `routes/retention.ts`, `progress.ts`, `streaks.ts`, `settings.ts`, `dashboard.ts`, `parking-lot.ts` | All stub routes have TODO comments referencing `c.get('user').userId` — **wrong ownership pattern** (should be `profileId` via `profileScopeMiddleware`) |
+| HIGH | `routes/homework.ts:11` | `POST /subjects/:subjectId/homework` — no subject ownership verification, hardcoded placeholder ID |
+| MEDIUM | `middleware/database.ts:14` | Missing `DATABASE_URL` silently skips DB creation — downstream routes crash with undefined `db` |
+| MEDIUM | `middleware/jwt.ts:93` | JWKS cache not keyed by URL — calling with two different URLs returns stale keys |
+| MEDIUM | `index.ts:44` | `Variables` type marks `user`, `db`, `account`, `profileId` as non-optional but all are conditionally set |
+
+#### Unique to Reviewer A (revised report)
+
+| Severity | File | Finding |
+|----------|------|---------|
+| CRITICAL | `routes/curriculum.ts:29,40,60,82` | 4 handlers with `c.get('profileId')` and NO `?? account.id` fallback — `undefined` as profileId |
+| CRITICAL | `routes/curriculum.test.ts:84` | All tests send `X-Profile-Id` header — missing fallback bug has zero test coverage |
+| HIGH | `middleware/jwt.ts` | No co-located test file — crypto/JWKS logic has zero direct test coverage |
+| MEDIUM | `routes/profiles.ts:36` | `isFirstProfile` check orchestrated in route handler — belongs in `createProfile` service |
+| MEDIUM | `routes/subjects.test.ts` | Never sends `X-Profile-Id` header — only tests `account.id` fallback path |
+
+### Domain 3 Update: Infrastructure (Shadow Reviewer B)
+
+**Reviewer B** (infra-reviewer-b): 4 Critical / 8 High / 10 Medium / 8 Low + 4 coverage gaps
+
+#### Confirmed by Both A and B
+
+| Severity | File | Finding |
+|----------|------|---------|
+| HIGH | 3 Inngest files | `getStepDatabase()` duplicated in all 3 function files — should be shared helper |
+| MEDIUM | Inngest functions | Missing `timestamp` in event payloads |
+| MEDIUM | `packages/factory/` | Missing builders for sessions, subjects, assessments, retention cards |
+
+#### Critical Findings from Reviewer B (NEW)
+
+| # | Severity | File | Finding |
+|---|----------|------|---------|
+| IC-1 | **CRITICAL** | `session-completed.ts:40-41` | DB connection created OUTSIDE `step.run()` boundary — on Inngest v3 replay, entire handler re-executes; DB created on every replay. If `createDatabase()` throws, function crashes without step-level retry. `account-deletion.ts` does this correctly inside each step. |
+| IC-2 | **CRITICAL** | `consent-reminders.ts:65-71` | Day-30 auto-delete step is a no-op `console.log`. GDPR/COPPA compliance failure — unconsented accounts won't be deleted. Also: only checks `CONSENTED` status, NOT `WITHDRAWN` — a withdrawn profile would be erroneously deleted at day 30. |
+| IC-3 | **CRITICAL** | `queries/embeddings.ts:27` | Vector string constructed via `[${embedding.join(',')}]` then interpolated into SQL. If non-numeric values appear in array (NaN, Infinity, malicious injection via deserialized JSON), potential SQL injection vector. No validation of vector dimensions or value range. |
+| IC-4 | **CRITICAL** | `schema/assessments.ts:83` | `retentionCards.xpStatus` uses unconstrained `text` instead of `pgEnum`. Zod schema constrains to `['pending', 'verified', 'decayed']` but DB accepts any string — schema/DB mismatch. |
+
+#### High Findings from Reviewer B
+
+| # | Severity | File | Finding |
+|---|----------|------|---------|
+| IH-1 | HIGH | `session-completed.ts:1` | ORM primitives (`eq`, `and`, table refs) imported directly — business logic should be in services per "Event handlers call services" rule |
+| IH-2 | HIGH | `repository.ts` | `parkingLotItems`, `teachingPreferences`, `curriculumAdaptations` NOT in scoped repository — any reads bypass data isolation |
+| IH-3 | HIGH | `payment-retry.ts:7` | No `profileId` or `timestamp` in `payment.failed` event payload |
+| IH-4 | HIGH | `review-reminder.ts` | Returns `{ status: 'sent' }` when nothing was sent — false success in dashboards |
+| IH-5 | HIGH | `session-completed.test.ts:77` | Accesses Inngest internals via `(sessionCompleted as any).fn` — fragile test pattern |
+| IH-6 | HIGH | `repository.ts:18` | `scopedWhere` type constraint checks `ReturnType<typeof profiles.id.mapFromDriverValue>` — incorrect type for column reference |
+
+#### Medium Findings from Reviewer B
+
+| Severity | File | Finding |
+|----------|------|---------|
+| MEDIUM | `sm2.ts:30` | `quality` input not validated — out-of-range values (6, -1) silently produce wrong results |
+| MEDIUM | `session-completed.ts:51` | `qualityRating` trusted from event payload instead of read from DB `assessments` table |
+| MEDIUM | `schema/profiles.ts:79` | `consentStates` missing unique constraint on `(profileId, consentType)` |
+| MEDIUM | `schema/billing.ts:79` | `topUpCredits.subscriptionId` has no index — sequential scan |
+| MEDIUM | `schema/profiles.ts:64` | `familyLinks` missing index on `childProfileId` |
+| MEDIUM | `schema/assessments.ts:64` | `retentionCards` missing unique constraint on `(profileId, topicId)` — duplicate cards possible |
+| MEDIUM | `consent-reminders.ts:25` | `consentType` (GDPR vs COPPA) discarded — different legal timelines not handled |
+
+### Domain 4 Update: Mobile (Supplemental Report from Reviewer A)
+
+#### Additional Findings (20 missing return types)
+
+**ALL 20 exported hook functions** lack explicit return type annotations. Rule: "Explicit return types on exported functions." Files affected: `use-consent.ts`, `use-account.ts` (×3), `use-dashboard.ts`, `use-profiles.ts`, `use-interview.ts` (×2), `use-settings.ts` (×2), `use-subjects.ts` (×2), `use-streaks.ts`, `use-curriculum.ts` (×4), `use-sessions.ts` (×3).
+
+10 functions confirmed WITH correct return types (lib utilities and `useConsentCheck`, `useStreamMessage`).
+
+Additional: `useStreamMessage` has no test coverage despite being the most complex hook (manages AsyncGenerator, streaming state, text concatenation).
+
 ### Domain 5: Documentation
 
-**Reviewer A** (docs-reviewer): *Report pending — agent contacted*
-**Reviewer B** (docs-reviewer-b): *Report pending — agent contacted*
+**Reviewer A** (docs-reviewer): 6 High / 13 Medium / 9 Low / 2 Info = **30 findings**
+**Reviewer B** (docs-reviewer-b): 5 Critical / 3 High / 4 Medium / 3 Low = **15 findings**
 
-*Documentation review findings will be added when reports are received.*
+#### Confirmed by Both A and B
 
-### Cross-Domain Confirmed Patterns
+| # | Severity | Finding |
+|---|----------|---------|
+| D1 | **CRITICAL** | **LLM module path wrong everywhere.** CLAUDE.md, project_context.md, architecture.md all reference `llm/orchestrator.ts`. Actual location: `apps/api/src/services/llm/router.ts`. An AI agent would create a duplicate `orchestrator.ts` file. |
+| D2 | **CRITICAL** | **Version discrepancies.** Nx: docs say "22" / "22.5.0", actual is "22.2.0". Tailwind: docs say "3.4.17", lock file resolves "3.4.19". `@naxodev/nx-cloudflare`: docs say "6.0.0", actual is "^5.0.0". |
+| D3 | **HIGH** | **`routeAndCall()` signature wrong in architecture.md.** Documented as `routeAndCall(conversationState, prompt, options)`. Actual: `routeAndCall(messages: ChatMessage[], rung: EscalationRung, _options?)`. |
+| D4 | **HIGH** | **Missing documentation for `ProfileProvider`/`useProfile()` hook** — foundational mobile pattern not documented anywhere. |
+| D5 | **HIGH** | **Architecture.md scaffold diagram shows LLM in `lib/`** — actual location is `services/llm/`. |
+| D6 | **MEDIUM** | **UX spec `--color-homework-lane` token** not present in `tailwind.config.js`. |
+| D7 | **MEDIUM** | **"React Native Reusables" referenced in UX spec** but not installed. Components are hand-written. |
+| D8 | **MEDIUM** | **Persona-unaware rule scope ambiguous.** Rule says "components" but page-level route files do check persona for routing guards. The `components/` directory is clean. Rule needs "shared components" qualifier. |
 
-These issues appear across multiple domains and were flagged by multiple reviewers:
+#### Unique to Reviewer B (agent-safety critical)
 
-| # | Pattern | Instances | Severity | Impact |
-|---|---------|-----------|----------|--------|
-| P1 | **Hardcoded hex colors in mobile** | 60+ | CRITICAL | Theming breaks when persona changes; violates persona-unaware rule |
-| P2 | **Persona-conditional rendering** | 18+ | CRITICAL | Components directly check persona instead of using CSS variables |
-| P3 | **Local type definitions** | 15+ | HIGH | Types drift from `@eduagent/schemas`; changes must be duplicated |
-| P4 | **Missing `profileId` scoping** | 5+ services | HIGH | Data isolation bypassed — cross-profile data leaks possible |
-| P5 | **Missing co-located tests** | ~10 files | HIGH | Business logic untested; regression risk |
-| P6 | **Ad-hoc error responses** | ~8 routes | MEDIUM | Inconsistent error shape for clients; breaks typed error handling |
-| P7 | **Missing Inngest timestamps** | ~4 events | MEDIUM | Event ordering and debugging compromised |
-| P8 | **Dead imports** | ~5 files | LOW | Lint noise; confusing for maintainers |
+| # | Severity | Finding |
+|---|----------|---------|
+| D9 | **CRITICAL** | **Zod 4 undocumented.** `packages/schemas/package.json` uses `zod: ^4.1.12`. Zod 4 has breaking API changes from Zod 3. No stack table mentions the version. An agent writing Zod 3 syntax would produce broken code. |
+| D10 | **CRITICAL** | **AppType placement is an impossible requirement.** ARCH-15 says export `AppType` via `@eduagent/schemas`, but `AppType` is generated from the Hono app instance in `apps/api/src/index.ts`. Cannot be in schemas (would create circular dep api→schemas→api). Mobile has comments acknowledging the workaround but it's undocumented. |
+| D11 | **CRITICAL** | **"Multi-provider LLM" claimed but only Gemini exists.** architecture.md: "Multi-provider (Claude, GPT-4, Gemini Flash)". Reality: only `gemini.ts` and `mock.ts` providers. |
+| D12 | **HIGH** | **Maestro E2E claimed complete but no files found.** CLAUDE.md says "Maestro E2E flow scaffolds" in Complete section. No `.maestro/` directory or YAML flows exist anywhere. |
+| D13 | **HIGH** | **Mobile `package.json` uses `*` wildcards** for all "pinned" packages (`expo: *`, `nativewind: *`, `react-native: *`). Contradicts CLAUDE.md "Pin these versions. Do not upgrade without approval." |
+| D14 | **MEDIUM** | **`process.env` exception for Expo undocumented.** `_layout.tsx` reads `process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` — correct Expo convention but rule says "never read process.env directly" with no exception noted. |
+| D15 | **MEDIUM** | **Stale `rule_count: 47` in project_context.md frontmatter** — document has grown beyond 47 rules. |
 
-### Severity Summary (across all received reports)
+### Cross-Domain Confirmed Patterns (Final — All 10 Reports)
 
-| Severity | API Services | API Routes | Infra | Mobile | Total |
-|----------|-------------|------------|-------|--------|-------|
-| CRITICAL | 0 | 1 | 0 | 18+ | **19+** |
-| HIGH | 10–11 | 4 | 0 | 32+ | **46+** |
-| MEDIUM | 19–40 | 9 | 13 | 3 | **44+** |
-| LOW | 7–12 | 9 | 16 | 1 | **33+** |
+| # | Pattern | Instances | Severity | Confirmed By |
+|---|---------|-----------|----------|-------------|
+| P1 | **Hardcoded hex colors in mobile** | 60+ | CRITICAL | mobile-A, mobile-B, docs-A |
+| P2 | **Persona-conditional rendering** | 18+ | CRITICAL | mobile-A, mobile-B |
+| P3 | **LLM module path wrong in docs** | 4+ docs | CRITICAL | docs-A, docs-B |
+| P4 | **Zod 4 undocumented** | All schemas | CRITICAL | docs-B |
+| P5 | **GDPR auto-delete is no-op** | consent-reminders.ts | CRITICAL | infra-B |
+| P6 | **Inngest step boundary violation** | session-completed.ts | CRITICAL | infra-B |
+| P7 | **Missing `profileId` scoping** | 5+ services + curriculum routes | HIGH | services-A, services-B, routes-A, routes-B |
+| P8 | **Local type definitions** | 15+ | HIGH | services-A, services-B |
+| P9 | **Missing explicit return types** | 20 hooks | HIGH | mobile-A (supplemental) |
+| P10 | **Missing co-located tests** | ~10 files | HIGH | routes-A, routes-B, mobile-A |
+| P11 | **Ad-hoc error responses** | ~8 routes | MEDIUM | routes-A, routes-B |
+| P12 | **Missing Inngest timestamps** | ~4 events | MEDIUM | infra-A, infra-B |
+| P13 | **Tables missing from scoped repo** | 3 tables | HIGH | infra-B |
+| P14 | **Dead imports** | ~5 files | LOW | routes-A |
+| P15 | **Wrong Inngest serve target** | inngest.ts | HIGH | routes-B |
+| P16 | **Missing DB indexes** | 3+ tables | MEDIUM | infra-A, infra-B |
 
-### Priority Remediation Plan
+### Severity Summary (All 10 Reports — Final)
 
-#### Phase 1: Security & Data Isolation (do first)
-1. **Stripe webhook signature verification** — CRITICAL security gap
-2. **ProfileId scoping** in consent, interview, curriculum, assessments services
-3. **Auth redirect persona check** — parent users redirected to wrong route group
-4. **GDPR export completeness** — missing retention cards, session events, embeddings
+| Severity | API Services | API Routes | Infra | Mobile | Docs | Total |
+|----------|-------------|------------|-------|--------|------|-------|
+| CRITICAL | 0 | 6 | 4 | 18 | 5 | **33** |
+| HIGH | 10–11 | 18 | 8 | 52 | 6 | **94+** |
+| MEDIUM | 19–40 | 27 | 23 | 3 | 17 | **89+** |
+| LOW | 7–12 | 40 | 24 | 2 | 12 | **78+** |
+
+### Priority Remediation Plan (Revised — All 10 Reports)
+
+#### Phase 0: Documentation Accuracy (do IMMEDIATELY — agents read docs before writing code)
+1. **Fix LLM module path** in CLAUDE.md, project_context.md, architecture.md → `services/llm/router.ts`
+2. **Document Zod 4** in stack tables and add pattern guidance
+3. **Fix version discrepancies** (Nx, Tailwind, @naxodev/nx-cloudflare)
+4. **Document AppType workaround** (ARCH-15 impossible requirement acknowledged)
+5. **Fix `routeAndCall()` signature** in architecture.md
+6. **Remove Maestro E2E from "Complete" section** — not implemented
+7. **Clarify persona-unaware rule scope** — "shared components", not page files
+8. **Document `process.env` exception** for Expo `EXPO_PUBLIC_` vars
+
+#### Phase 1: Security & Compliance (do first after docs)
+9. **Stripe webhook signature verification** — CRITICAL security gap
+10. **GDPR day-30 auto-delete** — wire `executeDeletion()` in consent-reminders.ts; fix WITHDRAWN status check
+11. **Inngest step boundary** — move `getStepDatabase()` inside `step.run()` in session-completed.ts
+12. **ProfileId scoping** — curriculum routes (×4 missing fallback), consent/interview/curriculum services
+13. **Inngest serve target** — change `inngest/hono` to `inngest/cloudflare`
+14. **Vector embedding validation** — validate dimensions and numeric values before SQL interpolation
 
 #### Phase 2: Theming & Architecture (before next feature work)
-5. **Hardcoded colors** — Replace 60+ hex colors with NativeWind semantic classes
-6. **Persona-aware components** — Extract 18 persona checks to CSS variable resolution at root layout
-7. **Local type consolidation** — Move 15+ types to `@eduagent/schemas`
-8. **Touch targets** — Ensure all interactive elements meet 44x44 minimum
+15. **Hardcoded colors** — Replace 60+ hex colors with NativeWind semantic classes
+16. **Persona-aware components** — Extract 18 persona checks to CSS variable resolution
+17. **Local type consolidation** — Move 15+ types to `@eduagent/schemas`
+18. **Missing return types** — Add to 20 exported hook functions
+19. **Touch targets** — Ensure all interactive elements meet 44x44 minimum
+20. **Add missing tables to scoped repo** — `parkingLotItems`, `teachingPreferences`, `curriculumAdaptations`
+21. **Ad-hoc error responses** — Standardize on `ApiErrorSchema` across all routes (especially `homework.ts` nested envelope)
 
 #### Phase 3: Quality & Completeness (ongoing)
-9. **Missing tests** — Add co-located tests for ~10 untested files
-10. **Ad-hoc error responses** — Standardize on `ApiErrorSchema` across all routes
-11. **Inngest timestamps** — Add `timestamp` to all event payloads
-12. **Shared `getStepDatabase()`** — Extract to single utility
-13. **Factory builder coverage** — Add missing entity builders
-14. **Dead imports cleanup** — Remove unused imports
+22. **Missing tests** — jwt.ts, llm.ts, inngest.ts, useStreamMessage, use-dashboard.test.ts
+23. **Shared `getStepDatabase()`** — Extract to `inngest/helpers.ts`
+24. **DB schema constraints** — unique on `(profileId, topicId)` for retentionCards, `(profileId, consentType)` for consentStates
+25. **DB indexes** — `topUpCredits.subscriptionId`, `familyLinks.childProfileId`
+26. **Factory builder coverage** — Add sessions, subjects, assessments, retention cards builders
+27. **Inngest timestamps** — Add `timestamp` to all event payloads
+28. **SM-2 input validation** — Clamp `quality` to 0–5 range
+29. **Dead imports cleanup** — Remove unused `apiError` imports
+30. **Pin mobile package versions** — Replace `*` wildcards with exact versions
 
 ---
 
