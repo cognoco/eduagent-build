@@ -1124,7 +1124,7 @@ All 8 items fixed. 707 tests pass after changes.
 | 26 | Factory builder coverage | Open | Add sessions, subjects, assessments, retention cards, subscriptions builders |
 | 27 | test-utils gaps | Open | Add shared Neon mock (`createMockDb()`) and Inngest step mock (`createInngestStepMock()`) |
 | 28 | Inngest timestamps | Open | Add `timestamp` to all event payloads |
-| 29 | ✅ SM-2 input validation | Fixed | Added quality clamping to `Math.max(0, Math.min(5, Math.round(input.quality)))` in `sm2()`. |
+| 29 | ⚠️ SM-2 input validation | Partial | Quality clamping added but NaN propagation not handled — `Math.round(NaN)` returns NaN, bypassing the clamp chain. See Post-Remediation Review CR4. |
 | 30 | `text` → `pgEnum` | Open | `retentionCards.xpStatus`, `teachingPreferences.method`, `xpLedger.status` |
 | 31 | ✅ `apiErrorSchema.code` | Fixed | Constrained from `z.string()` to `z.enum(errorCodeValues)`. Added `ErrorCode` type, `errorCodeSchema` export, `MISSING_SIGNATURE` to `ERROR_CODES`. `apiError()` helper now type-safe. Tests updated. |
 | 32 | Pin mobile package versions | Open | Replace `*` wildcards with exact versions in `apps/mobile/package.json` |
