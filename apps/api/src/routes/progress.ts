@@ -8,7 +8,7 @@ import {
   getOverallProgress,
   getContinueSuggestion,
 } from '../services/progress';
-import { notFound } from '../lib/errors';
+import { notFound } from '../errors';
 
 type ProgressRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };

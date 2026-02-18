@@ -5,7 +5,7 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import { useApi } from '../lib/auth-api';
+import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 
 // ---------------------------------------------------------------------------
@@ -77,15 +77,14 @@ interface ByokWaitlistResult {
 // ---------------------------------------------------------------------------
 
 export function useSubscription(): UseQueryResult<SubscriptionData> {
-  const { get } = useApi();
+  const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery({
     queryKey: ['subscription', activeProfile?.id],
     queryFn: async () => {
-      const data = await get<{ subscription: SubscriptionData }>(
-        '/subscription'
-      );
+      const res = await client.subscription.$get();
+      const data = await res.json();
       return data.subscription;
     },
     enabled: !!activeProfile,
@@ -93,13 +92,14 @@ export function useSubscription(): UseQueryResult<SubscriptionData> {
 }
 
 export function useUsage(): UseQueryResult<UsageData> {
-  const { get } = useApi();
+  const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery({
     queryKey: ['usage', activeProfile?.id],
     queryFn: async () => {
-      const data = await get<{ usage: UsageData }>('/usage');
+      const res = await client.usage.$get();
+      const data = await res.json();
       return data.usage;
     },
     enabled: !!activeProfile,
@@ -115,11 +115,13 @@ export function useCreateCheckout(): UseMutationResult<
   Error,
   CheckoutInput
 > {
-  const { post } = useApi();
+  const client = useApiClient();
 
   return useMutation({
-    mutationFn: (input: CheckoutInput) =>
-      post<CheckoutResult>('/subscription/checkout', input),
+    mutationFn: async (input: CheckoutInput) => {
+      const res = await client.subscription.checkout.$post({ json: input });
+      return await res.json();
+    },
   });
 }
 
@@ -128,12 +130,15 @@ export function useCancelSubscription(): UseMutationResult<
   Error,
   void
 > {
-  const { post } = useApi();
+  const client = useApiClient();
   const queryClient = useQueryClient();
   const { activeProfile } = useProfile();
 
   return useMutation({
-    mutationFn: () => post<CancelResult>('/subscription/cancel', {}),
+    mutationFn: async () => {
+      const res = await client.subscription.cancel.$post({ json: {} });
+      return await res.json();
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['subscription', activeProfile?.id],
@@ -147,10 +152,13 @@ export function useCreatePortalSession(): UseMutationResult<
   Error,
   void
 > {
-  const { post } = useApi();
+  const client = useApiClient();
 
   return useMutation({
-    mutationFn: () => post<PortalResult>('/subscription/portal', {}),
+    mutationFn: async () => {
+      const res = await client.subscription.portal.$post({ json: {} });
+      return await res.json();
+    },
   });
 }
 
@@ -159,13 +167,17 @@ export function usePurchaseTopUp(): UseMutationResult<
   Error,
   void
 > {
-  const { post } = useApi();
+  const client = useApiClient();
   const queryClient = useQueryClient();
   const { activeProfile } = useProfile();
 
   return useMutation({
-    mutationFn: () =>
-      post<TopUpResult>('/subscription/top-up', { amount: 500 }),
+    mutationFn: async () => {
+      const res = await client.subscription['top-up'].$post({
+        json: { amount: 500 },
+      });
+      return await res.json();
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['usage', activeProfile?.id],
@@ -179,10 +191,12 @@ export function useJoinByokWaitlist(): UseMutationResult<
   Error,
   { email: string }
 > {
-  const { post } = useApi();
+  const client = useApiClient();
 
   return useMutation({
-    mutationFn: (input: { email: string }) =>
-      post<ByokWaitlistResult>('/byok-waitlist', input),
+    mutationFn: async (input: { email: string }) => {
+      const res = await client['byok-waitlist'].$post({ json: input });
+      return await res.json();
+    },
   });
 }

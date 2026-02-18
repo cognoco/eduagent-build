@@ -21,6 +21,7 @@ function createMockKV({ getResult = null as string | null } = {}): KVNamespace {
 }
 
 const sampleStatus: CachedSubscriptionStatus = {
+  subscriptionId: 'sub-123',
   tier: 'plus',
   status: 'active',
   monthlyLimit: 500,

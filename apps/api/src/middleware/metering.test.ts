@@ -54,16 +54,17 @@ jest.mock('../services/profile', () => ({
 // Mock billing service
 // ---------------------------------------------------------------------------
 
-const mockGetSubscriptionByAccountId = jest.fn();
+const mockEnsureFreeSubscription = jest.fn();
 const mockGetQuotaPool = jest.fn();
 const mockDecrementQuota = jest.fn();
 
 jest.mock('../services/billing', () => ({
-  getSubscriptionByAccountId: (...args: unknown[]) =>
-    mockGetSubscriptionByAccountId(...args),
+  ensureFreeSubscription: (...args: unknown[]) =>
+    mockEnsureFreeSubscription(...args),
   getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
   decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
   createSubscription: jest.fn(),
+  getSubscriptionByAccountId: jest.fn(),
   linkStripeCustomer: jest.fn(),
 }));
 
@@ -74,7 +75,7 @@ jest.mock('../services/billing', () => ({
 const mockReadSubscriptionStatus = jest.fn();
 const mockWriteSubscriptionStatus = jest.fn();
 
-jest.mock('../lib/kv', () => ({
+jest.mock('../services/kv', () => ({
   readSubscriptionStatus: (...args: unknown[]) =>
     mockReadSubscriptionStatus(...args),
   writeSubscriptionStatus: (...args: unknown[]) =>
@@ -127,7 +128,8 @@ function mockQuota(overrides?: Record<string, unknown>) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockGetSubscriptionByAccountId.mockResolvedValue(null);
+  // Default: ensureFreeSubscription returns a plus subscription
+  mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
   mockGetQuotaPool.mockResolvedValue(null);
   mockDecrementQuota.mockResolvedValue({
     success: true,
@@ -152,7 +154,6 @@ describe('metering middleware', () => {
         TEST_ENV
       );
 
-      // Should pass through to the billing route handler, not be blocked by metering
       expect(res.status).toBe(200);
       expect(mockDecrementQuota).not.toHaveBeenCalled();
     });
@@ -164,7 +165,6 @@ describe('metering middleware', () => {
         TEST_ENV
       );
 
-      // Whatever status the route returns, metering should not block it
       expect(mockDecrementQuota).not.toHaveBeenCalled();
     });
   });
@@ -175,7 +175,7 @@ describe('metering middleware', () => {
 
   describe('LLM routes with quota available', () => {
     it('allows session messages when quota is under limit (DB path)', async () => {
-      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));
       mockDecrementQuota.mockResolvedValue({
         success: true,
@@ -202,7 +202,7 @@ describe('metering middleware', () => {
     });
 
     it('sets X-Quota-Remaining header', async () => {
-      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));
       mockDecrementQuota.mockResolvedValue({
         success: true,
@@ -225,7 +225,7 @@ describe('metering middleware', () => {
     });
 
     it('sets X-Quota-Warning-Level header', async () => {
-      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({ usedThisMonth: 450, monthlyLimit: 500 })
       );
@@ -257,7 +257,7 @@ describe('metering middleware', () => {
 
   describe('LLM routes with quota exceeded', () => {
     it('returns 402 when monthly quota is exhausted and decrement fails', async () => {
-      mockGetSubscriptionByAccountId.mockResolvedValue(
+      mockEnsureFreeSubscription.mockResolvedValue(
         mockSubscription({ tier: 'free' })
       );
       mockGetQuotaPool.mockResolvedValue(
@@ -290,7 +290,7 @@ describe('metering middleware', () => {
     });
 
     it('includes upgrade options in 402 response', async () => {
-      mockGetSubscriptionByAccountId.mockResolvedValue(
+      mockEnsureFreeSubscription.mockResolvedValue(
         mockSubscription({ tier: 'free' })
       );
       mockGetQuotaPool.mockResolvedValue(
@@ -322,9 +322,24 @@ describe('metering middleware', () => {
       expect(tiers).toContain('pro');
     });
 
-    it('returns 402 when no subscription exists and free tier is exhausted', async () => {
-      // No subscription at all
-      mockGetSubscriptionByAccountId.mockResolvedValue(null);
+    it('auto-provisions free tier and meters new users (CR1 fix)', async () => {
+      // ensureFreeSubscription auto-creates a free sub
+      mockEnsureFreeSubscription.mockResolvedValue(
+        mockSubscription({ id: 'sub-free', tier: 'free', status: 'active' })
+      );
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({
+          subscriptionId: 'sub-free',
+          usedThisMonth: 0,
+          monthlyLimit: 50,
+        })
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 49,
+        remainingTopUp: 0,
+      });
 
       const res = await app.request(
         '/v1/sessions/session-1/messages',
@@ -336,12 +351,17 @@ describe('metering middleware', () => {
         TEST_ENV
       );
 
-      // With no subscription, free tier defaults (50 limit, 0 used) should allow through
-      // But since there's no subscriptionId for decrement, it's allowed through
-      // Actually the middleware checks checkQuota first — 0/50 is allowed, but no subscriptionId
-      // means we skip the decrement and proceed. This is correct because a brand-new
-      // user with no subscription row hasn't hit any limit yet.
       expect(res.status).toBe(200);
+      // ensureFreeSubscription called (auto-provisions if needed)
+      expect(mockEnsureFreeSubscription).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-account-id'
+      );
+      // Decrement called with the auto-provisioned subscription
+      expect(mockDecrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-free'
+      );
     });
   });
 
@@ -350,15 +370,14 @@ describe('metering middleware', () => {
   // -----------------------------------------------------------------------
 
   describe('KV cache integration', () => {
-    it('uses KV-cached subscription status when available', async () => {
+    it('uses KV-cached subscription status when available (CR3 fix: includes subscriptionId)', async () => {
       mockReadSubscriptionStatus.mockResolvedValue({
+        subscriptionId: 'sub-1',
         tier: 'plus',
         status: 'active',
         monthlyLimit: 500,
         usedThisMonth: 100,
       });
-      // Still need subscription for decrement
-      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
       mockDecrementQuota.mockResolvedValue({
         success: true,
         source: 'monthly',
@@ -378,11 +397,13 @@ describe('metering middleware', () => {
 
       expect(res.status).toBe(200);
       expect(mockReadSubscriptionStatus).toHaveBeenCalled();
+      // CR3: ensureFreeSubscription NOT called when KV has the data
+      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
     });
 
-    it('backfills KV on cache miss', async () => {
+    it('backfills KV on cache miss (includes subscriptionId)', async () => {
       mockReadSubscriptionStatus.mockResolvedValue(null);
-      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota());
       mockDecrementQuota.mockResolvedValue({
         success: true,
@@ -401,15 +422,70 @@ describe('metering middleware', () => {
         { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
       );
 
+      // I7: writeSubscriptionStatus called twice — backfill + post-decrement update
       expect(mockWriteSubscriptionStatus).toHaveBeenCalledWith(
         expect.anything(),
         'test-account-id',
         expect.objectContaining({
+          subscriptionId: 'sub-1',
           tier: 'plus',
           status: 'active',
           monthlyLimit: 500,
         })
       );
+    });
+
+    it('tolerates KV read failure (I4 fix)', async () => {
+      mockReadSubscriptionStatus.mockRejectedValue(new Error('KV unavailable'));
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(mockQuota());
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 399,
+        remainingTopUp: 0,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
+      );
+
+      // Should fall through to DB, not crash
+      expect(res.status).toBe(200);
+    });
+
+    it('tolerates KV write failure (I4 fix)', async () => {
+      mockReadSubscriptionStatus.mockResolvedValue(null);
+      mockWriteSubscriptionStatus.mockRejectedValue(
+        new Error('KV unavailable')
+      );
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(mockQuota());
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 399,
+        remainingTopUp: 0,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
+      );
+
+      // Should still succeed — KV is best-effort
+      expect(res.status).toBe(200);
     });
   });
 
@@ -419,7 +495,7 @@ describe('metering middleware', () => {
 
   describe('top-up credit fallback', () => {
     it('allows through when monthly exhausted but top-up succeeds', async () => {
-      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({ usedThisMonth: 500, monthlyLimit: 500 })
       );
@@ -451,7 +527,7 @@ describe('metering middleware', () => {
 
   describe('streaming endpoint', () => {
     it('applies metering to /sessions/:id/stream', async () => {
-      mockGetSubscriptionByAccountId.mockResolvedValue(
+      mockEnsureFreeSubscription.mockResolvedValue(
         mockSubscription({ tier: 'free' })
       );
       mockGetQuotaPool.mockResolvedValue(
@@ -475,6 +551,31 @@ describe('metering middleware', () => {
       );
 
       expect(res.status).toBe(402);
+      expect(mockDecrementQuota).toHaveBeenCalled();
+    });
+
+    it('matches stream endpoint with trailing slash (I6 fix)', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(
+        mockSubscription({ tier: 'free' })
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: false,
+        source: 'none',
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/messages/',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV
+      );
+
+      // Should be caught by metering (402) not pass through unmetered
       expect(mockDecrementQuota).toHaveBeenCalled();
     });
   });

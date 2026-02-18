@@ -25,6 +25,8 @@ function SettingsRow({
     <Pressable
       onPress={onPress}
       className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3.5 mb-2"
+      accessibilityLabel={label}
+      accessibilityRole="button"
     >
       <Text className="text-body text-text-primary">{label}</Text>
       {value && (
@@ -48,7 +50,12 @@ function ToggleRow({
   return (
     <View className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2">
       <Text className="text-body text-text-primary">{label}</Text>
-      <Switch value={value} onValueChange={onToggle} disabled={disabled} />
+      <Switch
+        value={value}
+        onValueChange={onToggle}
+        disabled={disabled}
+        accessibilityLabel={label}
+      />
     </View>
   );
 }
@@ -133,6 +140,8 @@ export default function MoreScreen() {
             key={p}
             onPress={() => setPersona(p)}
             className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3.5 mb-2"
+            accessibilityLabel={`Select ${personaLabels[p]} theme`}
+            accessibilityRole="button"
           >
             <Text className="text-body text-text-primary">
               {personaLabels[p]}
@@ -193,6 +202,8 @@ export default function MoreScreen() {
           }}
           className="bg-surface rounded-card px-4 py-3.5 mt-6 items-center"
           testID="sign-out-button"
+          accessibilityLabel="Sign out"
+          accessibilityRole="button"
         >
           <Text className="text-body font-semibold text-danger">Sign out</Text>
         </Pressable>

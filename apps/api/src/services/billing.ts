@@ -4,7 +4,7 @@
 // Pure data layer — no Hono imports.
 // ---------------------------------------------------------------------------
 
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   subscriptions,
   quotaPools,
@@ -288,6 +288,67 @@ export async function resetMonthlyQuota(
 }
 
 // ---------------------------------------------------------------------------
+// Free-tier auto-provisioning (CR1 fix: ensures free users get metered)
+// ---------------------------------------------------------------------------
+
+const FREE_TIER_LIMIT = 50;
+
+/**
+ * Ensures an account has a subscription row for metering.
+ * If no subscription exists, auto-provisions a free-tier subscription + quota pool.
+ * This prevents free-tier users from bypassing metering entirely.
+ */
+export async function ensureFreeSubscription(
+  db: Database,
+  accountId: string
+): Promise<SubscriptionRow> {
+  const existing = await getSubscriptionByAccountId(db, accountId);
+  if (existing) return existing;
+  return createSubscription(db, accountId, 'free', FREE_TIER_LIMIT, {
+    status: 'active',
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Trial expiry helpers (used by Inngest trial-expiry function)
+// ---------------------------------------------------------------------------
+
+/**
+ * Expires a trial subscription by setting status to expired and tier to free.
+ */
+export async function expireTrialSubscription(
+  db: Database,
+  subscriptionId: string
+): Promise<void> {
+  await db
+    .update(subscriptions)
+    .set({
+      status: 'expired',
+      tier: 'free',
+      updatedAt: new Date(),
+    })
+    .where(eq(subscriptions.id, subscriptionId));
+}
+
+/**
+ * Downgrades a quota pool to the given tier's monthly limit and resets usage.
+ */
+export async function downgradeQuotaPool(
+  db: Database,
+  subscriptionId: string,
+  monthlyLimit: number
+): Promise<void> {
+  await db
+    .update(quotaPools)
+    .set({
+      monthlyLimit,
+      usedThisMonth: 0,
+      updatedAt: new Date(),
+    })
+    .where(eq(quotaPools.subscriptionId, subscriptionId));
+}
+
+// ---------------------------------------------------------------------------
 // Quota decrement / increment (Phase 4)
 // ---------------------------------------------------------------------------
 
@@ -302,45 +363,38 @@ export interface DecrementResult {
  * Decrements the quota pool by 1 exchange.
  *
  * Strategy:
- * 1. Try monthly quota first (usedThisMonth < monthlyLimit)
+ * 1. Try monthly quota first (atomic WHERE guard prevents TOCTOU race)
  * 2. If monthly exhausted, consume from oldest unexpired top-up credit (FIFO)
  * 3. If both exhausted, return { success: false }
  *
- * Uses atomic SQL increment to prevent races in family shared pools.
+ * All UPDATEs use SQL WHERE guards so concurrent requests cannot over-decrement.
  */
 export async function decrementQuota(
   db: Database,
   subscriptionId: string
 ): Promise<DecrementResult> {
-  const pool = await db.query.quotaPools.findFirst({
-    where: eq(quotaPools.subscriptionId, subscriptionId),
-  });
+  // 1. Try monthly quota — atomic: only succeeds if usedThisMonth < monthlyLimit
+  const [monthlyUpdated] = await db
+    .update(quotaPools)
+    .set({
+      usedThisMonth: sql`${quotaPools.usedThisMonth} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(quotaPools.subscriptionId, subscriptionId),
+        sql`${quotaPools.usedThisMonth} < ${quotaPools.monthlyLimit}`
+      )
+    )
+    .returning();
 
-  if (!pool) {
-    return {
-      success: false,
-      source: 'none',
-      remainingMonthly: 0,
-      remainingTopUp: 0,
-    };
-  }
-
-  // 1. Try monthly quota
-  if (pool.usedThisMonth < pool.monthlyLimit) {
-    const [updated] = await db
-      .update(quotaPools)
-      .set({
-        usedThisMonth: sql`${quotaPools.usedThisMonth} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(eq(quotaPools.id, pool.id))
-      .returning();
-
+  if (monthlyUpdated) {
     return {
       success: true,
       source: 'monthly',
-      remainingMonthly: updated.monthlyLimit - updated.usedThisMonth,
-      remainingTopUp: 0, // caller can aggregate separately if needed
+      remainingMonthly:
+        monthlyUpdated.monthlyLimit - monthlyUpdated.usedThisMonth,
+      remainingTopUp: 0,
     };
   }
 
@@ -354,23 +408,28 @@ export async function decrementQuota(
   });
 
   if (topUp) {
+    // Atomic: only succeeds if remaining > 0 (concurrent request may have consumed it)
     const [updatedTopUp] = await db
       .update(topUpCredits)
       .set({
         remaining: sql`${topUpCredits.remaining} - 1`,
       })
-      .where(eq(topUpCredits.id, topUp.id))
+      .where(
+        and(eq(topUpCredits.id, topUp.id), sql`${topUpCredits.remaining} > 0`)
+      )
       .returning();
 
-    return {
-      success: true,
-      source: 'top_up',
-      remainingMonthly: 0,
-      remainingTopUp: updatedTopUp.remaining,
-    };
+    if (updatedTopUp) {
+      return {
+        success: true,
+        source: 'top_up',
+        remainingMonthly: 0,
+        remainingTopUp: updatedTopUp.remaining,
+      };
+    }
   }
 
-  // 3. Both exhausted
+  // 3. Both exhausted or no quota pool exists
   return {
     success: false,
     source: 'none',

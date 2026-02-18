@@ -59,6 +59,10 @@ function PlanOption({
       className={`bg-surface rounded-card px-4 py-3.5 mb-2 ${
         isCurrentPlan ? 'border border-primary' : ''
       }`}
+      accessibilityLabel={`${isCurrentPlan ? 'Current plan' : 'Upgrade to'} ${
+        TIER_LABELS[tier]
+      }`}
+      accessibilityRole="button"
     >
       <View className="flex-row items-center justify-between">
         <View>
@@ -171,7 +175,12 @@ export default function SubscriptionScreen() {
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
-        <Pressable onPress={() => router.back()} className="mr-3 py-1">
+        <Pressable
+          onPress={() => router.back()}
+          className="mr-3 py-1"
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
           <Text className="text-primary text-body font-semibold">Back</Text>
         </Pressable>
         <Text className="text-h2 font-bold text-text-primary">
@@ -279,6 +288,8 @@ export default function SubscriptionScreen() {
                 onPress={handleTopUp}
                 disabled={topUp.isPending}
                 className="bg-surface rounded-card px-4 py-3.5"
+                accessibilityLabel="Buy 500 credits"
+                accessibilityRole="button"
               >
                 <Text className="text-body font-semibold text-primary">
                   Buy 500 credits
@@ -300,6 +311,8 @@ export default function SubscriptionScreen() {
                 onPress={handleManageBilling}
                 disabled={portal.isPending}
                 className="bg-surface rounded-card px-4 py-3.5 mb-2"
+                accessibilityLabel="Manage billing"
+                accessibilityRole="button"
               >
                 <Text className="text-body text-text-primary">
                   Manage billing
@@ -309,6 +322,8 @@ export default function SubscriptionScreen() {
                 onPress={handleCancel}
                 disabled={cancel.isPending}
                 className="bg-surface rounded-card px-4 py-3.5"
+                accessibilityLabel="Cancel subscription"
+                accessibilityRole="button"
               >
                 <Text className="text-body text-danger">
                   Cancel subscription
@@ -336,11 +351,14 @@ export default function SubscriptionScreen() {
                   autoCapitalize="none"
                   className="flex-1 bg-background rounded-button px-3 py-2.5 text-body text-text-primary mr-2"
                   placeholderTextColor="#999"
+                  accessibilityLabel="Email for BYOK waitlist"
                 />
                 <Pressable
                   onPress={handleByokSubmit}
                   disabled={byokWaitlist.isPending || !byokEmail.trim()}
                   className="bg-primary rounded-button px-4 py-2.5 justify-center"
+                  accessibilityLabel="Join BYOK waitlist"
+                  accessibilityRole="button"
                 >
                   <Text className="text-text-inverse text-body font-semibold">
                     Join

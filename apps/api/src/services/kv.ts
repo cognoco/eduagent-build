@@ -6,6 +6,7 @@
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 
 export interface CachedSubscriptionStatus {
+  subscriptionId: string;
   tier: SubscriptionTier;
   status: SubscriptionStatus;
   monthlyLimit: number;

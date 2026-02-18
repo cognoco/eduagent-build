@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { AuthEnv } from '../middleware/auth';
-import { ERROR_CODES, OCR_CONSTRAINTS } from '@eduagent/schemas';
+import { OCR_CONSTRAINTS } from '@eduagent/schemas';
+import { validationError } from '../errors';
 
 export const homeworkRoutes = new Hono<AuthEnv>()
   // Start a homework help session
@@ -38,15 +39,7 @@ export const homeworkRoutes = new Hono<AuthEnv>()
     const file = body['image'];
 
     if (!(file instanceof File)) {
-      return c.json(
-        {
-          error: {
-            code: ERROR_CODES.VALIDATION_ERROR,
-            message: 'Missing required field: image',
-          },
-        },
-        400
-      );
+      return validationError(c, 'Missing required field: image');
     }
 
     if (
@@ -54,28 +47,18 @@ export const homeworkRoutes = new Hono<AuthEnv>()
         file.type as (typeof OCR_CONSTRAINTS.acceptedMimeTypes)[number]
       )
     ) {
-      return c.json(
-        {
-          error: {
-            code: ERROR_CODES.VALIDATION_ERROR,
-            message: `Unsupported file type: ${
-              file.type
-            }. Accepted: ${OCR_CONSTRAINTS.acceptedMimeTypes.join(', ')}`,
-          },
-        },
-        400
+      return validationError(
+        c,
+        `Unsupported file type: ${
+          file.type
+        }. Accepted: ${OCR_CONSTRAINTS.acceptedMimeTypes.join(', ')}`
       );
     }
 
     if (file.size > OCR_CONSTRAINTS.maxFileSizeBytes) {
-      return c.json(
-        {
-          error: {
-            code: ERROR_CODES.VALIDATION_ERROR,
-            message: `File too large: ${file.size} bytes. Maximum: ${OCR_CONSTRAINTS.maxFileSizeBytes} bytes (5MB)`,
-          },
-        },
-        400
+      return validationError(
+        c,
+        `File too large: ${file.size} bytes. Maximum: ${OCR_CONSTRAINTS.maxFileSizeBytes} bytes (5MB)`
       );
     }
 

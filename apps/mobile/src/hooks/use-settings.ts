@@ -5,7 +5,7 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import { useApi } from '../lib/auth-api';
+import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 
 // ---------------------------------------------------------------------------
@@ -33,15 +33,14 @@ type LearningMode = 'serious' | 'casual';
 // ---------------------------------------------------------------------------
 
 export function useNotificationSettings(): UseQueryResult<NotificationPrefs> {
-  const { get } = useApi();
+  const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery({
     queryKey: ['settings', 'notifications', activeProfile?.id],
     queryFn: async () => {
-      const data = await get<{ preferences: NotificationPrefs }>(
-        '/settings/notifications'
-      );
+      const res = await client.settings.notifications.$get();
+      const data = await res.json();
       return data.preferences;
     },
     enabled: !!activeProfile,
@@ -49,13 +48,14 @@ export function useNotificationSettings(): UseQueryResult<NotificationPrefs> {
 }
 
 export function useLearningMode(): UseQueryResult<LearningMode> {
-  const { get } = useApi();
+  const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery({
     queryKey: ['settings', 'learning-mode', activeProfile?.id],
     queryFn: async () => {
-      const data = await get<{ mode: LearningMode }>('/settings/learning-mode');
+      const res = await client.settings['learning-mode'].$get();
+      const data = await res.json();
       return data.mode;
     },
     enabled: !!activeProfile,
@@ -71,16 +71,14 @@ export function useUpdateNotificationSettings(): UseMutationResult<
   Error,
   NotificationPrefsInput
 > {
-  const { put } = useApi();
+  const client = useApiClient();
   const queryClient = useQueryClient();
   const { activeProfile } = useProfile();
 
   return useMutation({
     mutationFn: async (input: NotificationPrefsInput) => {
-      const data = await put<{ preferences: NotificationPrefs }>(
-        '/settings/notifications',
-        input
-      );
+      const res = await client.settings.notifications.$put({ json: input });
+      const data = await res.json();
       return data.preferences;
     },
     onSuccess: () => {
@@ -96,16 +94,16 @@ export function useUpdateLearningMode(): UseMutationResult<
   Error,
   LearningMode
 > {
-  const { put } = useApi();
+  const client = useApiClient();
   const queryClient = useQueryClient();
   const { activeProfile } = useProfile();
 
   return useMutation({
     mutationFn: async (mode: LearningMode) => {
-      const data = await put<{ mode: LearningMode }>(
-        '/settings/learning-mode',
-        { mode }
-      );
+      const res = await client.settings['learning-mode'].$put({
+        json: { mode },
+      });
+      const data = await res.json();
       return data.mode;
     },
     onSuccess: () => {

@@ -14,7 +14,7 @@ import {
   updateAssessment,
 } from '../services/assessments';
 import { getSession } from '../services/session';
-import { notFound } from '../lib/errors';
+import { notFound } from '../errors';
 
 type AssessmentRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };

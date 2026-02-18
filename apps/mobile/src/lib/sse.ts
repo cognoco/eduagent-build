@@ -21,31 +21,13 @@ export interface StreamDoneEvent {
 export type StreamEvent = StreamChunkEvent | StreamDoneEvent;
 
 /**
- * Streams SSE events from the API using raw fetch.
- * React Native doesn't have built-in EventSource, so we parse the stream manually.
+ * Parses SSE events from a Response already fetched via the RPC client.
+ * The RPC client handles auth headers and error status codes;
+ * this function only reads the stream body.
  */
-export async function* streamSSE(
-  url: string,
-  body: object,
-  headers: Record<string, string>
+export async function* parseSSEStream(
+  response: Response
 ): AsyncGenerator<StreamEvent> {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      ...headers,
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new Error(
-      `SSE error ${response.status}: ${text || response.statusText}`
-    );
-  }
-
   if (!response.body) {
     throw new Error('Response body is null — streaming not supported');
   }

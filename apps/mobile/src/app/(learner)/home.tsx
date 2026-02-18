@@ -102,6 +102,8 @@ export default function HomeScreen() {
                       })
                     }
                     className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
+                    accessibilityLabel={`Open ${subject.name}`}
+                    accessibilityRole="button"
                   >
                     <Text className="text-body font-medium text-text-primary">
                       {subject.name}
@@ -116,6 +118,8 @@ export default function HomeScreen() {
                 onPress={() => router.push('/create-subject')}
                 className="bg-primary rounded-button py-3 mt-4 items-center"
                 testID="add-subject-button"
+                accessibilityLabel="Add subject"
+                accessibilityRole="button"
               >
                 <Text className="text-text-inverse text-body font-semibold">
                   Add subject
@@ -131,6 +135,8 @@ export default function HomeScreen() {
                 onPress={() => router.push('/create-subject')}
                 className="bg-primary rounded-button py-3 mt-4 items-center w-full"
                 testID="add-subject-button"
+                accessibilityLabel="Add subject"
+                accessibilityRole="button"
               >
                 <Text className="text-text-inverse text-body font-semibold">
                   Add subject

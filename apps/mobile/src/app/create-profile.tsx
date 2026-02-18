@@ -12,9 +12,9 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
-import { useApi } from '../lib/auth-api';
+import { useApiClient } from '../lib/api-client';
 import { useProfile, type Profile } from '../lib/profile';
-import { useConsentCheck } from '../hooks/use-consent';
+import { checkConsentRequirement } from '../hooks/use-consent';
 import { useThemeColors } from '../lib/theme';
 
 type PersonaType = 'TEEN' | 'LEARNER' | 'PARENT';
@@ -38,7 +38,7 @@ export default function CreateProfileScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const queryClient = useQueryClient();
-  const { post } = useApi();
+  const client = useApiClient();
   const { switchProfile } = useProfile();
 
   const [displayName, setDisplayName] = useState('');
@@ -48,7 +48,7 @@ export default function CreateProfileScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { required: consentRequired, consentType } = useConsentCheck(
+  const { required: consentRequired, consentType } = checkConsentRequirement(
     birthDate.trim() || null,
     location || null
   );
@@ -79,7 +79,8 @@ export default function CreateProfileScreen() {
         body.location = location;
       }
 
-      const result = await post<{ profile: Profile }>('/profiles', body);
+      const res = await client.profiles.$post({ json: body });
+      const result = (await res.json()) as { profile: Profile };
       await queryClient.invalidateQueries({ queryKey: ['profiles'] });
       await switchProfile(result.profile.id);
 

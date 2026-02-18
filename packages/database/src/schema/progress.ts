@@ -6,9 +6,11 @@ import {
   boolean,
   timestamp,
   pgEnum,
+  index,
 } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles.js';
 import { curriculumTopics, subjects } from './subjects.js';
+import { xpStatusEnum } from './assessments.js';
 import { generateUUIDv7 } from '../utils/uuid.js';
 
 export const learningModeEnum = pgEnum('learning_mode', ['serious', 'casual']);
@@ -33,29 +35,36 @@ export const streaks = pgTable('streaks', {
     .defaultNow(),
 });
 
-export const xpLedger = pgTable('xp_ledger', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  profileId: uuid('profile_id')
-    .notNull()
-    .references(() => profiles.id, { onDelete: 'cascade' }),
-  topicId: uuid('topic_id')
-    .notNull()
-    .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
-  subjectId: uuid('subject_id')
-    .notNull()
-    .references(() => subjects.id, { onDelete: 'cascade' }),
-  amount: integer('amount').notNull(),
-  status: text('status').notNull().default('pending'),
-  earnedAt: timestamp('earned_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  verifiedAt: timestamp('verified_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const xpLedger = pgTable(
+  'xp_ledger',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    topicId: uuid('topic_id')
+      .notNull()
+      .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
+    subjectId: uuid('subject_id')
+      .notNull()
+      .references(() => subjects.id, { onDelete: 'cascade' }),
+    amount: integer('amount').notNull(),
+    status: xpStatusEnum('status').notNull().default('pending'),
+    earnedAt: timestamp('earned_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('xp_ledger_profile_id_idx').on(table.profileId),
+    index('xp_ledger_topic_id_idx').on(table.topicId),
+  ]
+);
 
 export const notificationPreferences = pgTable('notification_preferences', {
   id: uuid('id')

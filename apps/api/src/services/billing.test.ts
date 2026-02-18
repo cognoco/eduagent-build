@@ -15,6 +15,7 @@ import {
   getSubscriptionForProfile,
   getProfileCountForSubscription,
   canAddProfile,
+  ensureFreeSubscription,
 } from './billing';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -455,22 +456,20 @@ describe('resetMonthlyQuota', () => {
 // ---------------------------------------------------------------------------
 
 describe('decrementQuota', () => {
-  it('returns failure when no quota pool exists', async () => {
-    const db = createMockDb({ quotaPoolFindFirst: undefined });
+  it('returns failure when no quota pool exists (atomic UPDATE returns no rows)', async () => {
+    const db = createMockDb({ updateReturning: [] });
     const result = await decrementQuota(db, subscriptionId);
 
     expect(result.success).toBe(false);
     expect(result.source).toBe('none');
   });
 
-  it('decrements monthly quota when under limit', async () => {
-    const pool = mockQuotaPoolRow({ usedThisMonth: 100, monthlyLimit: 500 });
+  it('decrements monthly quota atomically when under limit', async () => {
     const updatedPool = mockQuotaPoolRow({
       usedThisMonth: 101,
       monthlyLimit: 500,
     });
     const db = createMockDb({
-      quotaPoolFindFirst: pool,
       updateReturning: [updatedPool],
     });
 
@@ -482,15 +481,39 @@ describe('decrementQuota', () => {
     expect(db.update).toHaveBeenCalled();
   });
 
-  it('falls back to top-up credits when monthly exhausted', async () => {
-    const pool = mockQuotaPoolRow({ usedThisMonth: 500, monthlyLimit: 500 });
+  it('falls back to top-up credits when monthly atomic UPDATE returns no rows', async () => {
     const topUp = mockTopUpRow({ remaining: 100 });
     const updatedTopUp = mockTopUpRow({ remaining: 99 });
-    const db = createMockDb({
-      quotaPoolFindFirst: pool,
-      topUpFindFirst: topUp,
-      updateReturning: [updatedTopUp],
-    });
+
+    // First update (monthly) returns empty, second update (top-up) returns result
+    const updateReturningFn = jest
+      .fn()
+      .mockResolvedValueOnce([]) // monthly: WHERE used < limit fails
+      .mockResolvedValueOnce([updatedTopUp]); // top-up: succeeds
+    const updateWhere = jest
+      .fn()
+      .mockReturnValue({ returning: updateReturningFn });
+    const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+
+    const db = {
+      query: {
+        subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        quotaPools: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        topUpCredits: { findFirst: jest.fn().mockResolvedValue(topUp) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
+      },
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+      update: jest.fn().mockReturnValue({ set: updateSet }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    } as unknown as Database;
 
     const result = await decrementQuota(db, subscriptionId);
 
@@ -500,10 +523,9 @@ describe('decrementQuota', () => {
   });
 
   it('returns failure when both monthly and top-up are exhausted', async () => {
-    const pool = mockQuotaPoolRow({ usedThisMonth: 500, monthlyLimit: 500 });
     const db = createMockDb({
-      quotaPoolFindFirst: pool,
-      topUpFindFirst: undefined,
+      updateReturning: [], // monthly atomic fails
+      topUpFindFirst: undefined, // no top-up credits
     });
 
     const result = await decrementQuota(db, subscriptionId);
@@ -524,6 +546,37 @@ describe('incrementQuota', () => {
     await incrementQuota(db, subscriptionId);
 
     expect(db.update).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ensureFreeSubscription
+// ---------------------------------------------------------------------------
+
+describe('ensureFreeSubscription', () => {
+  it('returns existing subscription when one exists', async () => {
+    const existing = mockSubscriptionRow({ tier: 'plus', status: 'active' });
+    const db = createMockDb({ subscriptionFindFirst: existing });
+    const result = await ensureFreeSubscription(db, accountId);
+
+    expect(result.tier).toBe('plus');
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('creates free-tier subscription when none exists', async () => {
+    const created = mockSubscriptionRow({
+      tier: 'free',
+      status: 'active',
+    });
+    const db = createMockDb({
+      subscriptionFindFirst: undefined,
+      insertReturning: [created],
+    });
+    const result = await ensureFreeSubscription(db, accountId);
+
+    expect(result.tier).toBe('free');
+    expect(result.status).toBe('active');
+    expect(db.insert).toHaveBeenCalled();
   });
 });
 

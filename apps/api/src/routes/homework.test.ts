@@ -183,8 +183,9 @@ describe('homework routes', () => {
       expect(res.status).toBe(400);
 
       const body = await res.json();
-      expect(body.error.code).toBe('VALIDATION_ERROR');
-      expect(body.error.message).toContain('Missing required field: image');
+      expect(body.code).toBe('VALIDATION_ERROR');
+      expect(body.message).toBe('Validation failed');
+      expect(body.details).toContain('Missing required field: image');
     });
 
     it('returns 400 when image field is not a file', async () => {
@@ -204,8 +205,9 @@ describe('homework routes', () => {
       expect(res.status).toBe(400);
 
       const body = await res.json();
-      expect(body.error.code).toBe('VALIDATION_ERROR');
-      expect(body.error.message).toContain('Missing required field: image');
+      expect(body.code).toBe('VALIDATION_ERROR');
+      expect(body.message).toBe('Validation failed');
+      expect(body.details).toContain('Missing required field: image');
     });
 
     it('returns 400 for unsupported MIME type', async () => {
@@ -228,11 +230,11 @@ describe('homework routes', () => {
       expect(res.status).toBe(400);
 
       const body = await res.json();
-      expect(body.error.code).toBe('VALIDATION_ERROR');
-      expect(body.error.message).toContain('Unsupported file type: image/gif');
-      expect(body.error.message).toContain('image/jpeg');
-      expect(body.error.message).toContain('image/png');
-      expect(body.error.message).toContain('image/webp');
+      expect(body.code).toBe('VALIDATION_ERROR');
+      expect(body.details).toContain('Unsupported file type: image/gif');
+      expect(body.details).toContain('image/jpeg');
+      expect(body.details).toContain('image/png');
+      expect(body.details).toContain('image/webp');
     });
 
     it('returns 400 when file exceeds 5MB', async () => {
@@ -256,9 +258,9 @@ describe('homework routes', () => {
       expect(res.status).toBe(400);
 
       const body = await res.json();
-      expect(body.error.code).toBe('VALIDATION_ERROR');
-      expect(body.error.message).toContain('File too large');
-      expect(body.error.message).toContain('5MB');
+      expect(body.code).toBe('VALIDATION_ERROR');
+      expect(body.details).toContain('File too large');
+      expect(body.details).toContain('5MB');
     });
 
     it('accepts a file exactly at 5MB', async () => {

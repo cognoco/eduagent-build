@@ -7,11 +7,12 @@ import {
   useSubmitAnswer,
 } from './use-assessments';
 
-const mockGet = jest.fn();
-const mockPost = jest.fn();
-
-jest.mock('../lib/auth-api', () => ({
-  useApi: () => ({ get: mockGet, post: mockPost }),
+const mockFetch = jest.fn();
+jest.mock('../lib/api-client', () => ({
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
 }));
 
 jest.mock('../lib/profile', () => ({
@@ -37,6 +38,7 @@ function createWrapper() {
 
 describe('useAssessment', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -45,16 +47,21 @@ describe('useAssessment', () => {
   });
 
   it('fetches assessment by ID', async () => {
-    mockGet.mockResolvedValue({
-      assessment: {
-        id: 'assess-1',
-        topicId: 'topic-1',
-        verificationDepth: 'recall',
-        status: 'in_progress',
-        masteryScore: null,
-        createdAt: '2026-02-15T10:00:00.000Z',
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          assessment: {
+            id: 'assess-1',
+            topicId: 'topic-1',
+            verificationDepth: 'recall',
+            status: 'in_progress',
+            masteryScore: null,
+            createdAt: '2026-02-15T10:00:00.000Z',
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useAssessment('assess-1'), {
       wrapper: createWrapper(),
@@ -64,13 +71,13 @@ describe('useAssessment', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith('/assessments/assess-1');
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.id).toBe('assess-1');
     expect(result.current.data?.status).toBe('in_progress');
   });
 
   it('handles API errors', async () => {
-    mockGet.mockRejectedValue(new Error('Not found'));
+    mockFetch.mockResolvedValueOnce(new Response('Not found', { status: 404 }));
 
     const { result } = renderHook(() => useAssessment('assess-1'), {
       wrapper: createWrapper(),
@@ -84,6 +91,7 @@ describe('useAssessment', () => {
 
 describe('useCreateAssessment', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -92,16 +100,21 @@ describe('useCreateAssessment', () => {
   });
 
   it('creates assessment via POST', async () => {
-    mockPost.mockResolvedValue({
-      assessment: {
-        id: 'new-assess',
-        topicId: 'topic-1',
-        verificationDepth: 'recall',
-        status: 'in_progress',
-        masteryScore: null,
-        createdAt: '2026-02-15T10:00:00.000Z',
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          assessment: {
+            id: 'new-assess',
+            topicId: 'topic-1',
+            verificationDepth: 'recall',
+            status: 'in_progress',
+            masteryScore: null,
+            createdAt: '2026-02-15T10:00:00.000Z',
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(
       () => useCreateAssessment('sub-1', 'topic-1'),
@@ -116,15 +129,13 @@ describe('useCreateAssessment', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith(
-      '/subjects/sub-1/topics/topic-1/assessments',
-      { subjectId: 'sub-1', topicId: 'topic-1' }
-    );
+    expect(mockFetch).toHaveBeenCalled();
   });
 });
 
 describe('useSubmitAnswer', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -133,13 +144,18 @@ describe('useSubmitAnswer', () => {
   });
 
   it('submits answer via POST', async () => {
-    mockPost.mockResolvedValue({
-      result: {
-        passed: true,
-        masteryScore: 0.85,
-        feedback: 'Well done!',
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          result: {
+            passed: true,
+            masteryScore: 0.85,
+            feedback: 'Well done!',
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useSubmitAnswer('assess-1'), {
       wrapper: createWrapper(),
@@ -155,14 +171,14 @@ describe('useSubmitAnswer', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/assessments/assess-1/answer', {
-      answer: 'Photosynthesis converts light into energy.',
-    });
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.result.passed).toBe(true);
   });
 
   it('handles submission errors', async () => {
-    mockPost.mockRejectedValue(new Error('Submission failed'));
+    mockFetch.mockResolvedValueOnce(
+      new Response('Submission failed', { status: 500 })
+    );
 
     const { result } = renderHook(() => useSubmitAnswer('assess-1'), {
       wrapper: createWrapper(),

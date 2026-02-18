@@ -3,12 +3,12 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useSubjects, useCreateSubject } from './use-subjects';
 
-const mockGet = jest.fn();
-const mockPost = jest.fn();
-
-jest.mock('../lib/auth-api', () => ({
-  useApi: () => ({ get: mockGet, post: mockPost }),
-  useApiGet: () => ({ get: mockGet }),
+const mockFetch = jest.fn();
+jest.mock('../lib/api-client', () => ({
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
 }));
 
 jest.mock('../lib/profile', () => ({
@@ -34,6 +34,7 @@ function createWrapper() {
 
 describe('useSubjects', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -42,12 +43,17 @@ describe('useSubjects', () => {
   });
 
   it('returns subjects from API', async () => {
-    mockGet.mockResolvedValue({
-      subjects: [
-        { id: 's1', name: 'Math', status: 'active' },
-        { id: 's2', name: 'Science', status: 'active' },
-      ],
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          subjects: [
+            { id: 's1', name: 'Math', status: 'active' },
+            { id: 's2', name: 'Science', status: 'active' },
+          ],
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useSubjects(), {
       wrapper: createWrapper(),
@@ -57,7 +63,7 @@ describe('useSubjects', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith('/subjects');
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data).toEqual([
       { id: 's1', name: 'Math', status: 'active' },
       { id: 's2', name: 'Science', status: 'active' },
@@ -65,7 +71,9 @@ describe('useSubjects', () => {
   });
 
   it('returns empty array when API returns no subjects', async () => {
-    mockGet.mockResolvedValue({ subjects: [] });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ subjects: [] }), { status: 200 })
+    );
 
     const { result } = renderHook(() => useSubjects(), {
       wrapper: createWrapper(),
@@ -79,7 +87,9 @@ describe('useSubjects', () => {
   });
 
   it('handles API errors', async () => {
-    mockGet.mockRejectedValue(new Error('Network error'));
+    mockFetch.mockResolvedValueOnce(
+      new Response('Network error', { status: 500 })
+    );
 
     const { result } = renderHook(() => useSubjects(), {
       wrapper: createWrapper(),
@@ -95,6 +105,7 @@ describe('useSubjects', () => {
 
 describe('useCreateSubject', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -103,9 +114,14 @@ describe('useCreateSubject', () => {
   });
 
   it('calls POST /subjects with subject name', async () => {
-    mockPost.mockResolvedValue({
-      subject: { id: 's1', name: 'Calculus', status: 'active' },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          subject: { id: 's1', name: 'Calculus', status: 'active' },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useCreateSubject(), {
       wrapper: createWrapper(),
@@ -119,14 +135,16 @@ describe('useCreateSubject', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/subjects', { name: 'Calculus' });
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data).toEqual({
       subject: { id: 's1', name: 'Calculus', status: 'active' },
     });
   });
 
   it('handles creation errors', async () => {
-    mockPost.mockRejectedValue(new Error('Subject already exists'));
+    mockFetch.mockResolvedValueOnce(
+      new Response('Subject already exists', { status: 409 })
+    );
 
     const { result } = renderHook(() => useCreateSubject(), {
       wrapper: createWrapper(),

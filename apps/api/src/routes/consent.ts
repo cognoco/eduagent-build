@@ -4,7 +4,7 @@ import { consentRequestSchema, consentResponseSchema } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requestConsent, processConsentResponse } from '../services/consent';
-import { notFound } from '../lib/errors';
+import { notFound } from '../errors';
 import { inngest } from '../inngest/client';
 
 type ConsentRouteEnv = {

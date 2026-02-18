@@ -102,7 +102,7 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
     return next();
   } catch {
     return c.json(
-      { code: 'UNAUTHORIZED', message: 'Invalid or expired token' },
+      { code: ERROR_CODES.UNAUTHORIZED, message: 'Invalid or expired token' },
       401
     );
   }

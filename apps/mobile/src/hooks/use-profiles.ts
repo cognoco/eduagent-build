@@ -1,14 +1,15 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { useApi } from '../lib/auth-api';
+import { useApiClient } from '../lib/api-client';
 import type { Profile } from '../lib/profile';
 
 export function useProfiles(): UseQueryResult<Profile[]> {
-  const { get } = useApi();
+  const client = useApiClient();
 
   return useQuery({
     queryKey: ['profiles'],
     queryFn: async () => {
-      const data = await get<{ profiles: Profile[] }>('/profiles');
+      const res = await client.profiles.$get();
+      const data = await res.json();
       return data.profiles;
     },
   });

@@ -6,11 +6,9 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-expo';
-import { useApi } from '../lib/auth-api';
-import { getApiUrl } from '../lib/api';
+import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
-import { streamSSE } from '../lib/sse';
+import { parseSSEStream } from '../lib/sse';
 
 interface SessionStartResult {
   session: {
@@ -64,12 +62,17 @@ export function useStartSession(
   Error,
   { subjectId: string; topicId?: string }
 > {
-  const { post } = useApi();
+  const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: { subjectId: string; topicId?: string }) =>
-      post<SessionStartResult>(`/subjects/${subjectId}/sessions`, input),
+    mutationFn: async (input: { subjectId: string; topicId?: string }) => {
+      const res = await client.subjects[':subjectId'].sessions.$post({
+        param: { subjectId },
+        json: input,
+      });
+      return await res.json();
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['sessions'] });
     },
@@ -79,22 +82,33 @@ export function useStartSession(
 export function useSendMessage(
   sessionId: string
 ): UseMutationResult<MessageResult, Error, { message: string }> {
-  const { post } = useApi();
+  const client = useApiClient();
 
   return useMutation({
-    mutationFn: (input: { message: string }) =>
-      post<MessageResult>(`/sessions/${sessionId}/messages`, input),
+    mutationFn: async (input: { message: string }) => {
+      const res = await client.sessions[':sessionId'].messages.$post({
+        param: { sessionId },
+        json: input,
+      });
+      return await res.json();
+    },
   });
 }
 
 export function useCloseSession(
   sessionId: string
 ): UseMutationResult<CloseResult, Error, void> {
-  const { post } = useApi();
+  const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => post<CloseResult>(`/sessions/${sessionId}/close`, {}),
+    mutationFn: async () => {
+      const res = await client.sessions[':sessionId'].close.$post({
+        param: { sessionId },
+        json: {},
+      });
+      return await res.json();
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['sessions'] });
     },
@@ -109,8 +123,7 @@ export function useStreamMessage(sessionId: string): {
   ) => Promise<void>;
   isStreaming: boolean;
 } {
-  const { getToken } = useAuth();
-  const { activeProfile } = useProfile();
+  const client = useApiClient();
   const [isStreaming, setIsStreaming] = useState(false);
 
   const stream = useCallback(
@@ -126,16 +139,13 @@ export function useStreamMessage(sessionId: string): {
       setIsStreaming(true);
 
       try {
-        const token = await getToken();
-        const headers: Record<string, string> = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        if (activeProfile?.id) headers['X-Profile-Id'] = activeProfile.id;
-
-        const baseUrl = getApiUrl();
-        const url = `${baseUrl}/v1/sessions/${sessionId}/stream`;
+        const res = await client.sessions[':sessionId'].stream.$post({
+          param: { sessionId },
+          json: { message },
+        });
 
         let accumulated = '';
-        for await (const event of streamSSE(url, { message }, headers)) {
+        for await (const event of parseSSEStream(res as unknown as Response)) {
           if (event.type === 'chunk') {
             accumulated += event.content;
             onChunk(accumulated);
@@ -150,7 +160,7 @@ export function useStreamMessage(sessionId: string): {
         setIsStreaming(false);
       }
     },
-    [sessionId, isStreaming, getToken, activeProfile?.id]
+    [sessionId, isStreaming, client]
   );
 
   return { stream, isStreaming };
@@ -159,15 +169,16 @@ export function useStreamMessage(sessionId: string): {
 export function useSessionSummary(
   sessionId: string
 ): UseQueryResult<SessionSummaryResult | null> {
-  const { get } = useApi();
+  const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery({
     queryKey: ['session-summary', sessionId, activeProfile?.id],
     queryFn: async () => {
-      const data = await get<{ summary: SessionSummaryResult | null }>(
-        `/sessions/${sessionId}/summary`
-      );
+      const res = await client.sessions[':sessionId'].summary.$get({
+        param: { sessionId },
+      });
+      const data = await res.json();
       return data.summary;
     },
     enabled: !!activeProfile && !!sessionId,
@@ -177,12 +188,17 @@ export function useSessionSummary(
 export function useSubmitSummary(
   sessionId: string
 ): UseMutationResult<SubmitSummaryResult, Error, { content: string }> {
-  const { post } = useApi();
+  const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: { content: string }) =>
-      post<SubmitSummaryResult>(`/sessions/${sessionId}/summary`, input),
+    mutationFn: async (input: { content: string }) => {
+      const res = await client.sessions[':sessionId'].summary.$post({
+        param: { sessionId },
+        json: input,
+      });
+      return await res.json();
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['session-summary', sessionId],

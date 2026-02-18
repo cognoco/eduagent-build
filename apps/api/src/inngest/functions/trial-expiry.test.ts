@@ -3,26 +3,16 @@
 // ---------------------------------------------------------------------------
 
 const mockFindManySubscriptions = jest.fn().mockResolvedValue([]);
-const mockDbUpdate = jest.fn().mockReturnValue({
-  set: jest
-    .fn()
-    .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
-});
 
 jest.mock('@eduagent/database', () => ({
   createDatabase: jest.fn(() => ({
     query: {
       subscriptions: { findMany: mockFindManySubscriptions },
     },
-    update: mockDbUpdate,
   })),
   subscriptions: {
     status: 'status',
     trialEndsAt: 'trial_ends_at',
-    id: 'id',
-  },
-  quotaPools: {
-    subscriptionId: 'subscription_id',
     id: 'id',
   },
 }));
@@ -32,6 +22,15 @@ jest.mock('../../services/subscription', () => ({
     monthlyQuota: 50,
     maxProfiles: 1,
   }),
+}));
+
+const mockExpireTrialSubscription = jest.fn().mockResolvedValue(undefined);
+const mockDowngradeQuotaPool = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../../services/billing', () => ({
+  expireTrialSubscription: (...args: unknown[]) =>
+    mockExpireTrialSubscription(...args),
+  downgradeQuotaPool: (...args: unknown[]) => mockDowngradeQuotaPool(...args),
 }));
 
 jest.mock('../../services/trial', () => ({
@@ -132,8 +131,16 @@ describe('trialExpiry', () => {
     const { result } = await executeSteps();
 
     expect(result.expiredCount).toBe(1);
-    // db.update should be called for both subscription and quota_pool
-    expect(mockDbUpdate).toHaveBeenCalled();
+    // Service functions should be called for subscription expiry and quota downgrade
+    expect(mockExpireTrialSubscription).toHaveBeenCalledWith(
+      expect.anything(),
+      'sub-1'
+    );
+    expect(mockDowngradeQuotaPool).toHaveBeenCalledWith(
+      expect.anything(),
+      'sub-1',
+      50
+    );
   });
 
   it('counts warnings for trials ending in 3 or 1 days', async () => {

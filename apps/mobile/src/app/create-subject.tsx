@@ -31,9 +31,8 @@ export default function CreateSubjectScreen() {
       const result = await createSubject.mutateAsync({ name: name.trim() });
       // Navigate to interview for the new subject
       router.replace({
-        pathname: '/chat',
+        pathname: '/interview',
         params: {
-          mode: 'interview',
           subjectId: result.subject.id,
           subjectName: result.subject.name,
         },

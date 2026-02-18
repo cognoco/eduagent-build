@@ -6,17 +6,18 @@ import {
   type UseMutationResult,
 } from '@tanstack/react-query';
 import type { Subject } from '@eduagent/schemas';
-import { useApi } from '../lib/auth-api';
+import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 
 export function useSubjects(): UseQueryResult<Subject[]> {
-  const { get } = useApi();
+  const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery({
     queryKey: ['subjects', activeProfile?.id],
     queryFn: async () => {
-      const data = await get<{ subjects: Subject[] }>('/subjects');
+      const res = await client.subjects.$get();
+      const data = await res.json();
       return data.subjects;
     },
     enabled: !!activeProfile,
@@ -28,12 +29,14 @@ export function useCreateSubject(): UseMutationResult<
   Error,
   { name: string }
 > {
-  const { post } = useApi();
+  const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: { name: string }) =>
-      post<{ subject: Subject }>('/subjects', input),
+    mutationFn: async (input: { name: string }) => {
+      const res = await client.subjects.$post({ json: input });
+      return await res.json();
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['subjects'] });
     },

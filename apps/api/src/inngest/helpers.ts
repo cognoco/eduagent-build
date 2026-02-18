@@ -12,6 +12,10 @@ import { createDatabase } from '@eduagent/database';
  */
 export function getStepDatabase() {
   const url = process.env['DATABASE_URL'];
-  if (!url) throw new Error('DATABASE_URL is not configured');
+  if (!url) {
+    throw new Error(
+      'DATABASE_URL not available — ensure Inngest middleware provides env bindings'
+    );
+  }
   return createDatabase(url);
 }

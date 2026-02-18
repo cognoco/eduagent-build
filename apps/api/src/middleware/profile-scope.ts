@@ -7,7 +7,7 @@ import { createMiddleware } from 'hono/factory';
 import type { Account } from '../services/account';
 import { getProfile } from '../services/profile';
 import type { Database } from '@eduagent/database';
-import { forbidden } from '../lib/errors';
+import { forbidden } from '../errors';
 
 export type ProfileScopeEnv = {
   Variables: { db: Database; account: Account; profileId: string };

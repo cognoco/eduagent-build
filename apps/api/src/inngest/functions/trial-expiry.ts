@@ -6,8 +6,12 @@
 import { lte, eq, and, gte } from 'drizzle-orm';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { subscriptions, quotaPools } from '@eduagent/database';
+import { subscriptions } from '@eduagent/database';
 import { getTierConfig } from '../../services/subscription';
+import {
+  expireTrialSubscription,
+  downgradeQuotaPool,
+} from '../../services/billing';
 import {
   getTrialWarningMessage,
   getSoftLandingMessage,
@@ -37,24 +41,10 @@ export const trialExpiry = inngest.createFunction(
 
       for (const trial of expiredTrials) {
         // Transition to expired
-        await db
-          .update(subscriptions)
-          .set({
-            status: 'expired',
-            tier: 'free',
-            updatedAt: now,
-          })
-          .where(eq(subscriptions.id, trial.id));
+        await expireTrialSubscription(db, trial.id);
 
         // Reset quota to free tier limits
-        await db
-          .update(quotaPools)
-          .set({
-            monthlyLimit: freeTier.monthlyQuota,
-            usedThisMonth: 0,
-            updatedAt: now,
-          })
-          .where(eq(quotaPools.subscriptionId, trial.id));
+        await downgradeQuotaPool(db, trial.id, freeTier.monthlyQuota);
 
         count++;
       }

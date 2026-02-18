@@ -35,6 +35,24 @@ export const dataExportSchema = z.object({
   }),
   profiles: z.array(profileSchema),
   consentStates: z.array(dataExportConsentSchema),
+  // GDPR Article 15 — all personal data
+  subjects: z.array(z.record(z.string(), z.unknown())).optional(),
+  curricula: z.array(z.record(z.string(), z.unknown())).optional(),
+  curriculumTopics: z.array(z.record(z.string(), z.unknown())).optional(),
+  learningSessions: z.array(z.record(z.string(), z.unknown())).optional(),
+  sessionEvents: z.array(z.record(z.string(), z.unknown())).optional(),
+  sessionSummaries: z.array(z.record(z.string(), z.unknown())).optional(),
+  retentionCards: z.array(z.record(z.string(), z.unknown())).optional(),
+  assessments: z.array(z.record(z.string(), z.unknown())).optional(),
+  xpLedger: z.array(z.record(z.string(), z.unknown())).optional(),
+  streaks: z.array(z.record(z.string(), z.unknown())).optional(),
+  notificationPreferences: z
+    .array(z.record(z.string(), z.unknown()))
+    .optional(),
+  learningModes: z.array(z.record(z.string(), z.unknown())).optional(),
+  teachingPreferences: z.array(z.record(z.string(), z.unknown())).optional(),
+  onboardingDrafts: z.array(z.record(z.string(), z.unknown())).optional(),
+  parkingLotItems: z.array(z.record(z.string(), z.unknown())).optional(),
   exportedAt: z.string().datetime(),
 });
 

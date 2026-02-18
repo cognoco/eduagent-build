@@ -64,7 +64,7 @@ const mockCustomersCreate = jest.fn();
 const mockPaymentIntentsCreate = jest.fn();
 const mockPortalCreate = jest.fn();
 
-jest.mock('../lib/stripe', () => ({
+jest.mock('../services/stripe', () => ({
   createStripeClient: jest.fn().mockReturnValue({
     checkout: {
       sessions: { create: (...args: unknown[]) => mockCheckoutCreate(...args) },

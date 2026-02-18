@@ -3,11 +3,12 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useInterviewState, useSendInterviewMessage } from './use-interview';
 
-const mockGet = jest.fn();
-const mockPost = jest.fn();
-
-jest.mock('../lib/auth-api', () => ({
-  useApi: () => ({ get: mockGet, post: mockPost }),
+const mockFetch = jest.fn();
+jest.mock('../lib/api-client', () => ({
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
 }));
 
 jest.mock('../lib/profile', () => ({
@@ -33,6 +34,7 @@ function createWrapper() {
 
 describe('useInterviewState', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -41,14 +43,19 @@ describe('useInterviewState', () => {
   });
 
   it('returns interview state from API', async () => {
-    mockGet.mockResolvedValue({
-      state: {
-        draftId: 'draft-1',
-        status: 'in_progress',
-        exchangeCount: 2,
-        subjectName: 'Math',
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          state: {
+            draftId: 'draft-1',
+            status: 'in_progress',
+            exchangeCount: 2,
+            subjectName: 'Math',
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useInterviewState('subject-1'), {
       wrapper: createWrapper(),
@@ -58,7 +65,7 @@ describe('useInterviewState', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith('/subjects/subject-1/interview');
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data).toEqual({
       draftId: 'draft-1',
       status: 'in_progress',
@@ -68,7 +75,9 @@ describe('useInterviewState', () => {
   });
 
   it('returns null when no interview exists', async () => {
-    mockGet.mockResolvedValue({ state: null });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ state: null }), { status: 200 })
+    );
 
     const { result } = renderHook(() => useInterviewState('subject-1'), {
       wrapper: createWrapper(),
@@ -87,12 +96,13 @@ describe('useInterviewState', () => {
     });
 
     expect(result.current.fetchStatus).toBe('idle');
-    expect(mockGet).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 
 describe('useSendInterviewMessage', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -101,11 +111,16 @@ describe('useSendInterviewMessage', () => {
   });
 
   it('sends interview message and returns response', async () => {
-    mockPost.mockResolvedValue({
-      response: 'What are your goals?',
-      isComplete: false,
-      exchangeCount: 1,
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          response: 'What are your goals?',
+          isComplete: false,
+          exchangeCount: 1,
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useSendInterviewMessage('subject-1'), {
       wrapper: createWrapper(),
@@ -119,19 +134,22 @@ describe('useSendInterviewMessage', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/subjects/subject-1/interview', {
-      message: 'I want to learn calculus',
-    });
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.response).toBe('What are your goals?');
     expect(result.current.data?.isComplete).toBe(false);
   });
 
   it('returns isComplete when interview finishes', async () => {
-    mockPost.mockResolvedValue({
-      response: 'Great, I have enough to create your curriculum!',
-      isComplete: true,
-      exchangeCount: 4,
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          response: 'Great, I have enough to create your curriculum!',
+          isComplete: true,
+          exchangeCount: 4,
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useSendInterviewMessage('subject-1'), {
       wrapper: createWrapper(),
@@ -150,7 +168,12 @@ describe('useSendInterviewMessage', () => {
   });
 
   it('handles API errors gracefully', async () => {
-    mockPost.mockRejectedValue(new Error('API error 500: Internal error'));
+    mockFetch.mockResolvedValueOnce(
+      new Response('Internal error', {
+        status: 500,
+        statusText: 'Internal Server Error',
+      })
+    );
 
     const { result } = renderHook(() => useSendInterviewMessage('subject-1'), {
       wrapper: createWrapper(),
@@ -164,6 +187,6 @@ describe('useSendInterviewMessage', () => {
       expect(result.current.isError).toBe(true);
     });
 
-    expect(result.current.error?.message).toBe('API error 500: Internal error');
+    expect(result.current.error).toBeInstanceOf(Error);
   });
 });

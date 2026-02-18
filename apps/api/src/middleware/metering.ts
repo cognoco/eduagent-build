@@ -1,7 +1,14 @@
 // ---------------------------------------------------------------------------
-// Metering Middleware — Sprint 9 Phase 4
+// Metering Middleware — Sprint 9 Phase 4 + Pre-Feature Hardening
 // Enforces quota on LLM-consuming routes (session messages + streaming).
 // Reads from KV cache first, falls back to DB, backfills KV on miss.
+//
+// Fixes applied:
+//   CR1 — Free-tier users auto-provisioned (ensureFreeSubscription)
+//   CR3 — KV cache stores subscriptionId (no DB hit on cache hit)
+//   I4  — KV operations wrapped in try/catch
+//   I6  — Trailing slash tolerated in route matching
+//   I7  — KV cache updated after decrement
 // ---------------------------------------------------------------------------
 
 import { createMiddleware } from 'hono/factory';
@@ -10,7 +17,7 @@ import { ERROR_CODES } from '@eduagent/schemas';
 import type { SubscriptionTier } from '@eduagent/schemas';
 import type { Account } from '../services/account';
 import {
-  getSubscriptionByAccountId,
+  ensureFreeSubscription,
   getQuotaPool,
   decrementQuota,
 } from '../services/billing';
@@ -20,7 +27,7 @@ import {
   readSubscriptionStatus,
   writeSubscriptionStatus,
   type CachedSubscriptionStatus,
-} from '../lib/kv';
+} from '../services/kv';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,11 +45,12 @@ export type MeteringEnv = {
 // ---------------------------------------------------------------------------
 // LLM-consuming route patterns
 // The middleware only applies to routes that consume LLM exchanges.
+// I6 fix: optional trailing slash (/?)
 // ---------------------------------------------------------------------------
 
 const LLM_ROUTE_PATTERNS = [
-  /\/sessions\/[^/]+\/messages$/,
-  /\/sessions\/[^/]+\/stream$/,
+  /\/sessions\/[^/]+\/messages\/?$/,
+  /\/sessions\/[^/]+\/stream\/?$/,
 ];
 
 function isLlmRoute(path: string): boolean {
@@ -53,9 +61,7 @@ function isLlmRoute(path: string): boolean {
 // Upgrade options builder
 // ---------------------------------------------------------------------------
 
-function buildUpgradeOptions(
-  currentTier: SubscriptionTier
-): Array<{
+function buildUpgradeOptions(currentTier: SubscriptionTier): Array<{
   tier: 'plus' | 'family' | 'pro';
   monthlyQuota: number;
   priceMonthly: number;
@@ -71,6 +77,33 @@ function buildUpgradeOptions(
         priceMonthly: config.priceMonthly,
       };
     });
+}
+
+// ---------------------------------------------------------------------------
+// KV helpers with error resilience (I4 fix)
+// ---------------------------------------------------------------------------
+
+async function safeReadKV(
+  kv: KVNamespace,
+  accountId: string
+): Promise<CachedSubscriptionStatus | null> {
+  try {
+    return await readSubscriptionStatus(kv, accountId);
+  } catch {
+    return null; // KV unavailable — fall through to DB
+  }
+}
+
+async function safeWriteKV(
+  kv: KVNamespace,
+  accountId: string,
+  status: CachedSubscriptionStatus
+): Promise<void> {
+  try {
+    await writeSubscriptionStatus(kv, accountId, status);
+  } catch {
+    // KV unavailable — ignore, DB is source of truth
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -95,54 +128,47 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     const db = c.get('db');
     const kv = c.env?.SUBSCRIPTION_KV;
 
-    // 1. Try KV cache for fast quota check
+    // 1. Try KV cache for fast quota check (I4: wrapped in try/catch)
     let cached: CachedSubscriptionStatus | null = null;
     if (kv) {
-      cached = await readSubscriptionStatus(kv, account.id);
+      cached = await safeReadKV(kv, account.id);
     }
 
     let tier: SubscriptionTier;
     let monthlyLimit: number;
     let usedThisMonth: number;
-    let subscriptionId: string | null = null;
+    let subscriptionId: string;
+    let subscriptionStatus: string;
 
     if (cached) {
-      // KV hit — use cached values for the initial check
+      // KV hit — use cached values (CR3: subscriptionId now in cache)
+      subscriptionId = cached.subscriptionId;
       tier = cached.tier;
       monthlyLimit = cached.monthlyLimit;
       usedThisMonth = cached.usedThisMonth;
+      subscriptionStatus = cached.status;
     } else {
       // KV miss — fall back to DB
-      const subscription = await getSubscriptionByAccountId(db, account.id);
+      // CR1: Auto-provision free-tier subscription if none exists
+      const subscription = await ensureFreeSubscription(db, account.id);
+      subscriptionId = subscription.id;
+      tier = subscription.tier;
+      subscriptionStatus = subscription.status;
 
-      if (!subscription) {
-        // No subscription — use free-tier defaults
-        tier = 'free';
-        monthlyLimit = 50;
-        usedThisMonth = 0;
-      } else {
-        subscriptionId = subscription.id;
-        tier = subscription.tier;
-        const quota = await getQuotaPool(db, subscription.id);
-        monthlyLimit = quota?.monthlyLimit ?? 50;
-        usedThisMonth = quota?.usedThisMonth ?? 0;
+      const quota = await getQuotaPool(db, subscriptionId);
+      monthlyLimit = quota?.monthlyLimit ?? 50;
+      usedThisMonth = quota?.usedThisMonth ?? 0;
 
-        // Backfill KV cache on miss
-        if (kv) {
-          await writeSubscriptionStatus(kv, account.id, {
-            tier,
-            status: subscription.status,
-            monthlyLimit,
-            usedThisMonth,
-          });
-        }
+      // Backfill KV cache on miss (I4: wrapped in try/catch)
+      if (kv) {
+        await safeWriteKV(kv, account.id, {
+          subscriptionId,
+          tier,
+          status: subscriptionStatus,
+          monthlyLimit,
+          usedThisMonth,
+        });
       }
-    }
-
-    // Resolve subscriptionId if we only had cache
-    if (!subscriptionId) {
-      const subscription = await getSubscriptionByAccountId(db, account.id);
-      subscriptionId = subscription?.id ?? null;
     }
 
     // 2. Check quota using pure business logic
@@ -152,8 +178,10 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       topUpCreditsRemaining: 0, // will be checked by decrementQuota FIFO fallback
     });
 
-    // If quota exceeded and no subscription to decrement from, block
-    if (!result.allowed && !subscriptionId) {
+    // 3. Attempt to decrement quota (atomic, handles top-up FIFO fallback)
+    const decrement = await decrementQuota(db, subscriptionId);
+
+    if (!decrement.success) {
       return c.json(
         {
           code: ERROR_CODES.QUOTA_EXCEEDED,
@@ -171,36 +199,24 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       );
     }
 
-    // 3. Attempt to decrement quota (atomic, handles top-up FIFO fallback)
-    if (subscriptionId) {
-      const decrement = await decrementQuota(db, subscriptionId);
+    // Store subscriptionId for potential refund on LLM failure
+    c.set('subscriptionId', subscriptionId);
 
-      if (!decrement.success) {
-        return c.json(
-          {
-            code: ERROR_CODES.QUOTA_EXCEEDED,
-            message:
-              'Monthly quota exceeded. Upgrade your plan or purchase top-up credits.',
-            details: {
-              tier,
-              monthlyLimit,
-              usedThisMonth,
-              topUpCreditsRemaining: 0,
-              upgradeOptions: buildUpgradeOptions(tier),
-            },
-          },
-          402
-        );
-      }
-
-      // Store subscriptionId for potential refund on LLM failure
-      c.set('subscriptionId', subscriptionId);
-
-      // Set quota headers for client-side UI
-      const remaining = decrement.remainingMonthly + decrement.remainingTopUp;
-      c.header('X-Quota-Remaining', String(remaining));
-      c.header('X-Quota-Warning-Level', result.warningLevel);
+    // I7 fix: Update KV cache after decrement so next request sees fresh count
+    if (kv) {
+      await safeWriteKV(kv, account.id, {
+        subscriptionId,
+        tier,
+        status: subscriptionStatus,
+        monthlyLimit,
+        usedThisMonth: usedThisMonth + 1,
+      });
     }
+
+    // Set quota headers for client-side UI
+    const remaining = decrement.remainingMonthly + decrement.remainingTopUp;
+    c.header('X-Quota-Remaining', String(remaining));
+    c.header('X-Quota-Warning-Level', result.warningLevel);
 
     await next();
   }

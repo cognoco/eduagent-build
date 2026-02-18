@@ -4,18 +4,19 @@ import type {
   CancelDeletionResponse,
   DataExport,
 } from '@eduagent/schemas';
-import { useApi } from '../lib/auth-api';
+import { useApiClient } from '../lib/api-client';
 
 export function useDeleteAccount(): UseMutationResult<
   AccountDeletionResponse,
   Error,
   void
 > {
-  const { post } = useApi();
+  const client = useApiClient();
 
   return useMutation({
     mutationFn: async (): Promise<AccountDeletionResponse> => {
-      return post<AccountDeletionResponse>('/account/delete', {});
+      const res = await client.account.delete.$post({ json: {} });
+      return await res.json();
     },
   });
 }
@@ -25,21 +26,23 @@ export function useCancelDeletion(): UseMutationResult<
   Error,
   void
 > {
-  const { post } = useApi();
+  const client = useApiClient();
 
   return useMutation({
     mutationFn: async (): Promise<CancelDeletionResponse> => {
-      return post<CancelDeletionResponse>('/account/cancel-deletion', {});
+      const res = await client.account['cancel-deletion'].$post({ json: {} });
+      return await res.json();
     },
   });
 }
 
 export function useExportData(): UseMutationResult<DataExport, Error, void> {
-  const { get } = useApi();
+  const client = useApiClient();
 
   return useMutation({
     mutationFn: async (): Promise<DataExport> => {
-      return get<DataExport>('/account/export');
+      const res = await client.account.export.$get();
+      return await res.json();
     },
   });
 }

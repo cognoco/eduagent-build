@@ -106,4 +106,40 @@ describe('sm2', () => {
     expect(result.wasSuccessful).toBe(true);
     expect(result.card.repetitions).toBe(1);
   });
+
+  it('NaN quality treats as 0, produces valid card', () => {
+    const result = sm2({ quality: NaN });
+    expect(result.wasSuccessful).toBe(false);
+    expect(result.card.repetitions).toBe(0);
+    expect(result.card.interval).toBe(1);
+    expect(Number.isFinite(result.card.easeFactor)).toBe(true);
+    expect(result.card.easeFactor).toBeGreaterThanOrEqual(1.3);
+  });
+
+  it('Infinity quality treats as 0, produces valid card', () => {
+    const result = sm2({ quality: Infinity });
+    expect(result.wasSuccessful).toBe(false);
+    expect(result.card.repetitions).toBe(0);
+    expect(result.card.interval).toBe(1);
+    expect(Number.isFinite(result.card.easeFactor)).toBe(true);
+    expect(result.card.easeFactor).toBeGreaterThanOrEqual(1.3);
+  });
+
+  it('-Infinity quality treats as 0, produces valid card', () => {
+    const result = sm2({ quality: -Infinity });
+    expect(result.wasSuccessful).toBe(false);
+    expect(result.card.repetitions).toBe(0);
+    expect(result.card.interval).toBe(1);
+    expect(Number.isFinite(result.card.easeFactor)).toBe(true);
+    expect(result.card.easeFactor).toBeGreaterThanOrEqual(1.3);
+  });
+
+  it('undefined quality coerced treats as 0, produces valid card', () => {
+    const result = sm2({ quality: undefined as unknown as number });
+    expect(result.wasSuccessful).toBe(false);
+    expect(result.card.repetitions).toBe(0);
+    expect(result.card.interval).toBe(1);
+    expect(Number.isFinite(result.card.easeFactor)).toBe(true);
+    expect(result.card.easeFactor).toBeGreaterThanOrEqual(1.3);
+  });
 });

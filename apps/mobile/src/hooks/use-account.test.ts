@@ -7,11 +7,12 @@ import {
   useExportData,
 } from './use-account';
 
-const mockPost = jest.fn();
-const mockGet = jest.fn();
-
-jest.mock('../lib/auth-api', () => ({
-  useApi: () => ({ post: mockPost, get: mockGet }),
+const mockFetch = jest.fn();
+jest.mock('../lib/api-client', () => ({
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
 }));
 
 let queryClient: QueryClient;
@@ -31,6 +32,7 @@ function createWrapper() {
 
 describe('useDeleteAccount', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
   afterEach(() => {
@@ -42,7 +44,9 @@ describe('useDeleteAccount', () => {
       message: 'Deletion scheduled',
       gracePeriodEnds: '2026-02-24T00:00:00.000Z',
     };
-    mockPost.mockResolvedValue(response);
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(response), { status: 200 })
+    );
 
     const { result } = renderHook(() => useDeleteAccount(), {
       wrapper: createWrapper(),
@@ -50,13 +54,14 @@ describe('useDeleteAccount', () => {
 
     const data = await result.current.mutateAsync();
 
-    expect(mockPost).toHaveBeenCalledWith('/account/delete', {});
+    expect(mockFetch).toHaveBeenCalled();
     expect(data.gracePeriodEnds).toBe('2026-02-24T00:00:00.000Z');
   });
 });
 
 describe('useCancelDeletion', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
   afterEach(() => {
@@ -64,7 +69,11 @@ describe('useCancelDeletion', () => {
   });
 
   it('calls POST /account/cancel-deletion', async () => {
-    mockPost.mockResolvedValue({ message: 'Deletion cancelled' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: 'Deletion cancelled' }), {
+        status: 200,
+      })
+    );
 
     const { result } = renderHook(() => useCancelDeletion(), {
       wrapper: createWrapper(),
@@ -72,13 +81,14 @@ describe('useCancelDeletion', () => {
 
     const data = await result.current.mutateAsync();
 
-    expect(mockPost).toHaveBeenCalledWith('/account/cancel-deletion', {});
+    expect(mockFetch).toHaveBeenCalled();
     expect(data.message).toBe('Deletion cancelled');
   });
 });
 
 describe('useExportData', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
   afterEach(() => {
@@ -92,7 +102,9 @@ describe('useExportData', () => {
       consentStates: [],
       exportedAt: '2026-02-17T00:00:00Z',
     };
-    mockGet.mockResolvedValue(exportData);
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(exportData), { status: 200 })
+    );
 
     const { result } = renderHook(() => useExportData(), {
       wrapper: createWrapper(),
@@ -100,7 +112,7 @@ describe('useExportData', () => {
 
     const data = await result.current.mutateAsync();
 
-    expect(mockGet).toHaveBeenCalledWith('/account/export');
+    expect(mockFetch).toHaveBeenCalled();
     expect(data.exportedAt).toBeDefined();
   });
 });

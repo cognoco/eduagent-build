@@ -7,9 +7,9 @@
  * 3. Platform-specific localhost for __DEV__
  * 4. Production URL fallback
  *
- * Note: The Hono RPC client (`hc<AppType>`) is intentionally NOT exported
- * here. AppType lives in @eduagent/api, which mobile cannot import per
- * dependency direction rules. Use `useApi()` from ./auth-api instead.
+ * Used by `useApiClient()` in ./api-client.ts as the base URL for the
+ * Hono RPC client (`hc<AppType>`). AppType is imported as a type-only
+ * devDependency from @eduagent/api (erased at compile time).
  */
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';

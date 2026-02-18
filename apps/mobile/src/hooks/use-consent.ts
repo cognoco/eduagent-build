@@ -1,19 +1,20 @@
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import type { ConsentRequest, ConsentRequestResult } from '@eduagent/schemas';
-import { useApi } from '../lib/auth-api';
+import { useApiClient } from '../lib/api-client';
 
 export function useRequestConsent(): UseMutationResult<
   ConsentRequestResult,
   Error,
   ConsentRequest
 > {
-  const { post } = useApi();
+  const client = useApiClient();
 
   return useMutation({
     mutationFn: async (
       input: ConsentRequest
     ): Promise<ConsentRequestResult> => {
-      return post<ConsentRequestResult>('/consent/request', input);
+      const res = await client.consent.request.$post({ json: input });
+      return await res.json();
     },
   });
 }
@@ -23,7 +24,7 @@ export function useRequestConsent(): UseMutationResult<
  * EU: age < 16 requires GDPR consent
  * US: age < 13 requires COPPA consent
  */
-export function useConsentCheck(
+export function checkConsentRequirement(
   birthDate: string | null,
   location: string | null
 ): { required: boolean; consentType: 'GDPR' | 'COPPA' | null } {

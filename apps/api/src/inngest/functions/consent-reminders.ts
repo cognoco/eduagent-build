@@ -18,7 +18,7 @@ export const consentReminder = inngest.createFunction(
     await step.run('send-day-7-reminder', async () => {
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
-      if (status === 'CONSENTED' || status === 'WITHDRAWN') return;
+      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
       await sendEmail(
         formatConsentReminderEmail(parentEmail, 'your child', 23)
       );
@@ -29,7 +29,7 @@ export const consentReminder = inngest.createFunction(
     await step.run('send-day-14-reminder', async () => {
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
-      if (status === 'CONSENTED' || status === 'WITHDRAWN') return;
+      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
       await sendEmail(
         formatConsentReminderEmail(parentEmail, 'your child', 16)
       );
@@ -40,7 +40,7 @@ export const consentReminder = inngest.createFunction(
     await step.run('send-day-25-warning', async () => {
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
-      if (status === 'CONSENTED' || status === 'WITHDRAWN') return;
+      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
       await sendEmail({
         to: parentEmail,
         subject: "Final warning: your child's EduAgent account will be removed",
@@ -54,8 +54,8 @@ export const consentReminder = inngest.createFunction(
     await step.run('auto-delete-account', async () => {
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
-      if (status === 'CONSENTED') return;
-      // Consent not granted (PENDING or WITHDRAWN) — delete the profile.
+      if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
+      // Consent not granted (PENDING) — delete the profile.
       // FK cascades remove all child records (subjects, sessions, consent_states, etc.).
       await deleteProfile(db, profileId);
     });

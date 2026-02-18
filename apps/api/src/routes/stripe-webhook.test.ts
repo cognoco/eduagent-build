@@ -2,11 +2,11 @@
 // Stripe Webhook Route — Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('../lib/stripe', () => ({
+jest.mock('../services/stripe', () => ({
   verifyWebhookSignature: jest.fn(),
 }));
 
-jest.mock('../lib/kv', () => ({
+jest.mock('../services/kv', () => ({
   writeSubscriptionStatus: jest.fn().mockResolvedValue(undefined),
 }));
 
@@ -24,8 +24,8 @@ jest.mock('../inngest/client', () => ({
 
 import { Hono } from 'hono';
 import { stripeWebhookRoute } from './stripe-webhook';
-import { verifyWebhookSignature } from '../lib/stripe';
-import { writeSubscriptionStatus } from '../lib/kv';
+import { verifyWebhookSignature } from '../services/stripe';
+import { writeSubscriptionStatus } from '../services/kv';
 import {
   updateSubscriptionFromWebhook,
   getSubscriptionByAccountId,

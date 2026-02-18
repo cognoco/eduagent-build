@@ -5,7 +5,7 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import { useApi } from '../lib/auth-api';
+import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 
 interface CurriculumTopic {
@@ -29,15 +29,16 @@ interface Curriculum {
 export function useCurriculum(
   subjectId: string
 ): UseQueryResult<Curriculum | null> {
-  const { get } = useApi();
+  const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery({
     queryKey: ['curriculum', subjectId, activeProfile?.id],
     queryFn: async () => {
-      const data = await get<{ curriculum: Curriculum | null }>(
-        `/subjects/${subjectId}/curriculum`
-      );
+      const res = await client.subjects[':subjectId'].curriculum.$get({
+        param: { subjectId },
+      });
+      const data = await res.json();
       return data.curriculum;
     },
     enabled: !!activeProfile && !!subjectId,
@@ -47,14 +48,17 @@ export function useCurriculum(
 export function useSkipTopic(
   subjectId: string
 ): UseMutationResult<{ message: string }, Error, string> {
-  const { post } = useApi();
+  const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (topicId: string) =>
-      post<{ message: string }>(`/subjects/${subjectId}/curriculum/skip`, {
-        topicId,
-      }),
+    mutationFn: async (topicId: string) => {
+      const res = await client.subjects[':subjectId'].curriculum.skip.$post({
+        param: { subjectId },
+        json: { topicId },
+      });
+      return await res.json();
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['curriculum', subjectId],
@@ -66,15 +70,19 @@ export function useSkipTopic(
 export function useChallengeCurriculum(
   subjectId: string
 ): UseMutationResult<{ curriculum: Curriculum }, Error, string> {
-  const { post } = useApi();
+  const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (feedback: string) =>
-      post<{ curriculum: Curriculum }>(
-        `/subjects/${subjectId}/curriculum/challenge`,
-        { feedback }
-      ),
+    mutationFn: async (feedback: string) => {
+      const res = await client.subjects[
+        ':subjectId'
+      ].curriculum.challenge.$post({
+        param: { subjectId },
+        json: { feedback },
+      });
+      return await res.json();
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['curriculum', subjectId],
@@ -86,13 +94,16 @@ export function useChallengeCurriculum(
 export function useExplainTopic(
   subjectId: string
 ): UseMutationResult<string, Error, string> {
-  const { get } = useApi();
+  const client = useApiClient();
 
   return useMutation({
     mutationFn: async (topicId: string) => {
-      const data = await get<{ explanation: string }>(
-        `/subjects/${subjectId}/curriculum/topics/${topicId}/explain`
-      );
+      const res = await client.subjects[':subjectId'].curriculum.topics[
+        ':topicId'
+      ].explain.$get({
+        param: { subjectId, topicId },
+      });
+      const data = await res.json();
       return data.explanation;
     },
   });

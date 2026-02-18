@@ -3,10 +3,12 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useProfiles } from './use-profiles';
 
-const mockGet = jest.fn();
-
-jest.mock('../lib/auth-api', () => ({
-  useApi: () => ({ get: mockGet }),
+const mockFetch = jest.fn();
+jest.mock('../lib/api-client', () => ({
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
 }));
 
 jest.mock('../lib/profile', () => ({}));
@@ -28,6 +30,7 @@ function createWrapper() {
 
 describe('useProfiles', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -61,7 +64,9 @@ describe('useProfiles', () => {
       },
     ];
 
-    mockGet.mockResolvedValue({ profiles });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profiles }), { status: 200 })
+    );
 
     const { result } = renderHook(() => useProfiles(), {
       wrapper: createWrapper(),
@@ -71,12 +76,14 @@ describe('useProfiles', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith('/profiles');
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data).toEqual(profiles);
   });
 
   it('returns empty array when no profiles exist', async () => {
-    mockGet.mockResolvedValue({ profiles: [] });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profiles: [] }), { status: 200 })
+    );
 
     const { result } = renderHook(() => useProfiles(), {
       wrapper: createWrapper(),
@@ -90,7 +97,9 @@ describe('useProfiles', () => {
   });
 
   it('handles API errors', async () => {
-    mockGet.mockRejectedValue(new Error('Network error'));
+    mockFetch.mockResolvedValueOnce(
+      new Response('Network error', { status: 500 })
+    );
 
     const { result } = renderHook(() => useProfiles(), {
       wrapper: createWrapper(),

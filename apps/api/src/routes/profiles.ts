@@ -8,7 +8,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
-import { notFound, forbidden } from '../lib/errors';
+import { notFound, forbidden } from '../errors';
 import {
   listProfiles,
   createProfile,

@@ -29,8 +29,10 @@ const MIN_EASE = 1.3;
 
 export function sm2(input: SM2Input): SM2Result {
   const { card } = input;
+  // Guard against NaN/Infinity — treat non-finite quality as total blackout (0)
+  const raw = Number.isFinite(input.quality) ? input.quality : 0;
   // Clamp quality to valid 0-5 range (out-of-range values would produce wrong ease factors)
-  const quality = Math.max(0, Math.min(5, Math.round(input.quality)));
+  const quality = Math.max(0, Math.min(5, Math.round(raw)));
   const now = new Date().toISOString();
   const wasSuccessful = quality >= 3;
 

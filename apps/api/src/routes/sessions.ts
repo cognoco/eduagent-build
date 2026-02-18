@@ -21,7 +21,7 @@ import {
   getSessionSummary,
   submitSummary,
 } from '../services/session';
-import { notFound } from '../lib/errors';
+import { notFound } from '../errors';
 
 type SessionRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };

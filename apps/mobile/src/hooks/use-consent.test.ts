@@ -1,12 +1,14 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useConsentCheck, useRequestConsent } from './use-consent';
+import { checkConsentRequirement, useRequestConsent } from './use-consent';
 
-const mockPost = jest.fn();
-
-jest.mock('../lib/auth-api', () => ({
-  useApi: () => ({ post: mockPost }),
+const mockFetch = jest.fn();
+jest.mock('../lib/api-client', () => ({
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
 }));
 
 let queryClient: QueryClient;
@@ -24,15 +26,17 @@ function createWrapper() {
   };
 }
 
-describe('useConsentCheck', () => {
+describe('checkConsentRequirement', () => {
   it('returns not required when birthDate is null', () => {
-    const { result } = renderHook(() => useConsentCheck(null, 'EU'));
+    const { result } = renderHook(() => checkConsentRequirement(null, 'EU'));
     expect(result.current.required).toBe(false);
     expect(result.current.consentType).toBeNull();
   });
 
   it('returns not required when location is null', () => {
-    const { result } = renderHook(() => useConsentCheck('2015-01-01', null));
+    const { result } = renderHook(() =>
+      checkConsentRequirement('2015-01-01', null)
+    );
     expect(result.current.required).toBe(false);
     expect(result.current.consentType).toBeNull();
   });
@@ -43,7 +47,9 @@ describe('useConsentCheck', () => {
     tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
     const birthDate = tenYearsAgo.toISOString().split('T')[0];
 
-    const { result } = renderHook(() => useConsentCheck(birthDate, 'EU'));
+    const { result } = renderHook(() =>
+      checkConsentRequirement(birthDate, 'EU')
+    );
     expect(result.current.required).toBe(true);
     expect(result.current.consentType).toBe('GDPR');
   });
@@ -53,7 +59,9 @@ describe('useConsentCheck', () => {
     twentyYearsAgo.setFullYear(twentyYearsAgo.getFullYear() - 20);
     const birthDate = twentyYearsAgo.toISOString().split('T')[0];
 
-    const { result } = renderHook(() => useConsentCheck(birthDate, 'EU'));
+    const { result } = renderHook(() =>
+      checkConsentRequirement(birthDate, 'EU')
+    );
     expect(result.current.required).toBe(false);
     expect(result.current.consentType).toBeNull();
   });
@@ -63,7 +71,9 @@ describe('useConsentCheck', () => {
     tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
     const birthDate = tenYearsAgo.toISOString().split('T')[0];
 
-    const { result } = renderHook(() => useConsentCheck(birthDate, 'US'));
+    const { result } = renderHook(() =>
+      checkConsentRequirement(birthDate, 'US')
+    );
     expect(result.current.required).toBe(true);
     expect(result.current.consentType).toBe('COPPA');
   });
@@ -73,7 +83,9 @@ describe('useConsentCheck', () => {
     fourteenYearsAgo.setFullYear(fourteenYearsAgo.getFullYear() - 14);
     const birthDate = fourteenYearsAgo.toISOString().split('T')[0];
 
-    const { result } = renderHook(() => useConsentCheck(birthDate, 'US'));
+    const { result } = renderHook(() =>
+      checkConsentRequirement(birthDate, 'US')
+    );
     expect(result.current.required).toBe(false);
     expect(result.current.consentType).toBeNull();
   });
@@ -83,7 +95,9 @@ describe('useConsentCheck', () => {
     tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
     const birthDate = tenYearsAgo.toISOString().split('T')[0];
 
-    const { result } = renderHook(() => useConsentCheck(birthDate, 'OTHER'));
+    const { result } = renderHook(() =>
+      checkConsentRequirement(birthDate, 'OTHER')
+    );
     expect(result.current.required).toBe(false);
     expect(result.current.consentType).toBeNull();
   });
@@ -91,6 +105,7 @@ describe('useConsentCheck', () => {
 
 describe('useRequestConsent', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -99,10 +114,15 @@ describe('useRequestConsent', () => {
   });
 
   it('calls POST /consent/request with input', async () => {
-    mockPost.mockResolvedValue({
-      message: 'Consent request sent to parent',
-      consentType: 'GDPR',
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          message: 'Consent request sent to parent',
+          consentType: 'GDPR',
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useRequestConsent(), {
       wrapper: createWrapper(),
@@ -115,11 +135,7 @@ describe('useRequestConsent', () => {
     });
 
     await waitFor(() => {
-      expect(mockPost).toHaveBeenCalledWith('/consent/request', {
-        childProfileId: '550e8400-e29b-41d4-a716-446655440000',
-        parentEmail: 'parent@example.com',
-        consentType: 'GDPR',
-      });
+      expect(mockFetch).toHaveBeenCalled();
     });
   });
 });

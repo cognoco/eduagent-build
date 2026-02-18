@@ -1,18 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import type { SubjectProgress, TopicProgress } from '@eduagent/schemas';
-import { useApi } from '../lib/auth-api';
+import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 
 export function useSubjectProgress(subjectId: string) {
-  const { get } = useApi();
+  const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery({
     queryKey: ['progress', 'subject', subjectId, activeProfile?.id],
     queryFn: async () => {
-      const data = await get<{ progress: SubjectProgress }>(
-        `/subjects/${subjectId}/progress`
-      );
+      const res = await client.subjects[':subjectId'].progress.$get({
+        param: { subjectId },
+      });
+      const data = await res.json();
       return data.progress;
     },
     enabled: !!activeProfile && !!subjectId,
@@ -20,38 +21,28 @@ export function useSubjectProgress(subjectId: string) {
 }
 
 export function useOverallProgress() {
-  const { get } = useApi();
+  const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery({
     queryKey: ['progress', 'overview', activeProfile?.id],
     queryFn: async () => {
-      const data = await get<{
-        subjects: SubjectProgress[];
-        totalTopicsCompleted: number;
-        totalTopicsVerified: number;
-      }>('/progress/overview');
-      return data;
+      const res = await client.progress.overview.$get();
+      return await res.json();
     },
     enabled: !!activeProfile,
   });
 }
 
 export function useContinueSuggestion() {
-  const { get } = useApi();
+  const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery({
     queryKey: ['progress', 'continue', activeProfile?.id],
     queryFn: async () => {
-      const data = await get<{
-        suggestion: {
-          subjectId: string;
-          subjectName: string;
-          topicId: string;
-          topicTitle: string;
-        } | null;
-      }>('/progress/continue');
+      const res = await client.progress.continue.$get();
+      const data = await res.json();
       return data.suggestion;
     },
     enabled: !!activeProfile,
@@ -59,15 +50,18 @@ export function useContinueSuggestion() {
 }
 
 export function useTopicProgress(subjectId: string, topicId: string) {
-  const { get } = useApi();
+  const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery({
     queryKey: ['progress', 'topic', subjectId, topicId, activeProfile?.id],
     queryFn: async () => {
-      const data = await get<{ topic: TopicProgress }>(
-        `/subjects/${subjectId}/topics/${topicId}/progress`
-      );
+      const res = await client.subjects[':subjectId'].topics[
+        ':topicId'
+      ].progress.$get({
+        param: { subjectId, topicId },
+      });
+      const data = await res.json();
       return data.topic;
     },
     enabled: !!activeProfile && !!subjectId && !!topicId,

@@ -9,6 +9,7 @@ import { tokenCache } from '@clerk/clerk-expo/token-cache';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeContext, type Persona } from '../lib/theme';
 import { ProfileProvider, useProfile } from '../lib/profile';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -50,7 +51,28 @@ function ThemedApp() {
         <Stack.Screen name="(parent)" />
         <Stack.Screen name="sso-callback" />
         <Stack.Screen
-          name="chat"
+          name="interview"
+          options={{
+            presentation: 'fullScreenModal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="session"
+          options={{
+            presentation: 'fullScreenModal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="assessment"
+          options={{
+            presentation: 'fullScreenModal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="session-summary"
           options={{
             presentation: 'fullScreenModal',
             animation: 'slide_from_bottom',
@@ -107,7 +129,9 @@ export default function RootLayout() {
           <ClerkLoaded>
             <QueryClientProvider client={queryClient}>
               <ProfileProvider>
-                <ThemedApp />
+                <ErrorBoundary>
+                  <ThemedApp />
+                </ErrorBoundary>
               </ProfileProvider>
             </QueryClientProvider>
           </ClerkLoaded>

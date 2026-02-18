@@ -135,6 +135,7 @@ export default function SessionSummaryScreen() {
                 textAlignVertical="top"
                 editable={!submitSummary.isPending}
                 testID="summary-input"
+                accessibilityLabel="Write your learning summary"
               />
               <Text className="text-caption text-text-secondary mt-1 text-right">
                 {summaryText.length}/2000
@@ -160,6 +161,8 @@ export default function SessionSummaryScreen() {
                     : 'bg-surface-elevated'
                 }`}
                 testID="submit-summary-button"
+                accessibilityLabel="Submit summary"
+                accessibilityRole="button"
               >
                 {submitSummary.isPending ? (
                   <ActivityIndicator color={colors.textInverse} />
@@ -204,6 +207,8 @@ export default function SessionSummaryScreen() {
             onPress={handleContinue}
             className="py-3 items-center"
             testID="skip-summary-button"
+            accessibilityLabel="Skip summary"
+            accessibilityRole="button"
           >
             <Text className="text-body-sm text-text-secondary">
               Skip for now
@@ -214,6 +219,8 @@ export default function SessionSummaryScreen() {
             onPress={handleContinue}
             className="bg-primary rounded-button py-3 items-center mt-2"
             testID="continue-button"
+            accessibilityLabel="Continue to home"
+            accessibilityRole="button"
           >
             <Text className="text-text-inverse text-body font-semibold">
               Continue

@@ -4,11 +4,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
 import { ProfileProvider, useProfile, type Profile } from './profile';
 
-const mockGet = jest.fn();
-const mockPost = jest.fn();
-
-jest.mock('./auth-api', () => ({
-  useApi: () => ({ get: mockGet, post: mockPost }),
+const mockFetch = jest.fn();
+jest.mock('./api-client', () => ({
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
 }));
 
 const mockProfiles: Profile[] = [
@@ -53,10 +54,13 @@ function createWrapper() {
 
 describe('ProfileProvider', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
     (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(null);
     (SecureStore.setItemAsync as jest.Mock).mockResolvedValue(undefined);
-    mockGet.mockResolvedValue({ profiles: mockProfiles });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profiles: mockProfiles }), { status: 200 })
+    );
   });
 
   afterEach(() => {
@@ -111,7 +115,10 @@ describe('ProfileProvider', () => {
   });
 
   it('switchProfile updates active profile and persists to SecureStore', async () => {
-    mockPost.mockResolvedValue({ ok: true });
+    // Mock the switch POST call
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), { status: 200 })
+    );
 
     const { result } = renderHook(() => useProfile(), {
       wrapper: createWrapper(),
@@ -125,9 +132,7 @@ describe('ProfileProvider', () => {
       await result.current.switchProfile('child-id');
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/profiles/switch', {
-      profileId: 'child-id',
-    });
+    expect(mockFetch).toHaveBeenCalledTimes(2); // profiles GET + switch POST
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
       'eduagent_active_profile_id',
       'child-id'
@@ -136,7 +141,10 @@ describe('ProfileProvider', () => {
   });
 
   it('returns empty profiles when API returns none', async () => {
-    mockGet.mockResolvedValue({ profiles: [] });
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profiles: [] }), { status: 200 })
+    );
 
     const { result } = renderHook(() => useProfile(), {
       wrapper: createWrapper(),

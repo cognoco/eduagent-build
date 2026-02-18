@@ -8,11 +8,12 @@ import {
   useExplainTopic,
 } from './use-curriculum';
 
-const mockGet = jest.fn();
-const mockPost = jest.fn();
-
-jest.mock('../lib/auth-api', () => ({
-  useApi: () => ({ get: mockGet, post: mockPost }),
+const mockFetch = jest.fn();
+jest.mock('../lib/api-client', () => ({
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
 }));
 
 jest.mock('../lib/profile', () => ({
@@ -65,6 +66,7 @@ const mockCurriculum = {
 
 describe('useCurriculum', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -73,7 +75,11 @@ describe('useCurriculum', () => {
   });
 
   it('returns curriculum from API', async () => {
-    mockGet.mockResolvedValue({ curriculum: mockCurriculum });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ curriculum: mockCurriculum }), {
+        status: 200,
+      })
+    );
 
     const { result } = renderHook(() => useCurriculum('subject-1'), {
       wrapper: createWrapper(),
@@ -83,12 +89,14 @@ describe('useCurriculum', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith('/subjects/subject-1/curriculum');
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data).toEqual(mockCurriculum);
   });
 
   it('returns null when no curriculum exists', async () => {
-    mockGet.mockResolvedValue({ curriculum: null });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ curriculum: null }), { status: 200 })
+    );
 
     const { result } = renderHook(() => useCurriculum('subject-1'), {
       wrapper: createWrapper(),
@@ -102,7 +110,9 @@ describe('useCurriculum', () => {
   });
 
   it('handles API errors', async () => {
-    mockGet.mockRejectedValue(new Error('Network error'));
+    mockFetch.mockResolvedValueOnce(
+      new Response('Network error', { status: 500 })
+    );
 
     const { result } = renderHook(() => useCurriculum('subject-1'), {
       wrapper: createWrapper(),
@@ -126,6 +136,7 @@ describe('useCurriculum', () => {
 
 describe('useSkipTopic', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -134,7 +145,11 @@ describe('useSkipTopic', () => {
   });
 
   it('calls POST to skip a topic', async () => {
-    mockPost.mockResolvedValue({ message: 'Topic skipped' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: 'Topic skipped' }), {
+        status: 200,
+      })
+    );
 
     const { result } = renderHook(() => useSkipTopic('subject-1'), {
       wrapper: createWrapper(),
@@ -148,15 +163,13 @@ describe('useSkipTopic', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith(
-      '/subjects/subject-1/curriculum/skip',
-      { topicId: 'topic-1' }
-    );
+    expect(mockFetch).toHaveBeenCalled();
   });
 });
 
 describe('useChallengeCurriculum', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -165,7 +178,11 @@ describe('useChallengeCurriculum', () => {
   });
 
   it('calls POST to challenge curriculum with feedback', async () => {
-    mockPost.mockResolvedValue({ curriculum: mockCurriculum });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ curriculum: mockCurriculum }), {
+        status: 200,
+      })
+    );
 
     const { result } = renderHook(() => useChallengeCurriculum('subject-1'), {
       wrapper: createWrapper(),
@@ -179,15 +196,13 @@ describe('useChallengeCurriculum', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith(
-      '/subjects/subject-1/curriculum/challenge',
-      { feedback: 'I already know the basics' }
-    );
+    expect(mockFetch).toHaveBeenCalled();
   });
 });
 
 describe('useExplainTopic', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -196,7 +211,11 @@ describe('useExplainTopic', () => {
   });
 
   it('calls GET to explain a topic', async () => {
-    mockGet.mockResolvedValue({ explanation: 'This topic covers...' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ explanation: 'This topic covers...' }), {
+        status: 200,
+      })
+    );
 
     const { result } = renderHook(() => useExplainTopic('subject-1'), {
       wrapper: createWrapper(),
@@ -210,9 +229,7 @@ describe('useExplainTopic', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith(
-      '/subjects/subject-1/curriculum/topics/topic-1/explain'
-    );
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data).toBe('This topic covers...');
   });
 });

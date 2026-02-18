@@ -3,11 +3,12 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useStreaks } from './use-streaks';
 
-const mockGet = jest.fn();
-
-jest.mock('../lib/auth-api', () => ({
-  useApi: () => ({ get: mockGet }),
-  useApiGet: () => ({ get: mockGet }),
+const mockFetch = jest.fn();
+jest.mock('../lib/api-client', () => ({
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
 }));
 
 jest.mock('../lib/profile', () => ({
@@ -33,6 +34,7 @@ function createWrapper() {
 
 describe('useStreaks', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -50,7 +52,9 @@ describe('useStreaks', () => {
       graceDaysRemaining: 0,
     };
 
-    mockGet.mockResolvedValue({ streak: streakData });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ streak: streakData }), { status: 200 })
+    );
 
     const { result } = renderHook(() => useStreaks(), {
       wrapper: createWrapper(),
@@ -60,12 +64,14 @@ describe('useStreaks', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith('/streaks');
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data).toEqual(streakData);
   });
 
   it('handles API errors', async () => {
-    mockGet.mockRejectedValue(new Error('Network error'));
+    mockFetch.mockResolvedValueOnce(
+      new Response('Network error', { status: 500 })
+    );
 
     const { result } = renderHook(() => useStreaks(), {
       wrapper: createWrapper(),

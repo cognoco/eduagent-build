@@ -107,6 +107,8 @@ apps/api     →  @eduagent/schemas, @eduagent/database, @eduagent/retention
 
 This applies to imports, `tsconfig.json` references, AND `package.json` deps. Packages never import from apps. Circular dependencies are build-breaking errors.
 
+**Exception — type-only API import:** `apps/mobile` has `@eduagent/api` as a **devDependency** for Hono RPC type inference (`import type { AppType } from '@eduagent/api'`). This is erased at compile time — zero API code enters the mobile bundle. The `hono` runtime (`hc` client) is a regular dependency. See `apps/mobile/src/lib/api-client.ts`.
+
 ## Anti-Patterns
 
 | Do NOT | Instead |
@@ -129,7 +131,7 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 ## Current Status
 
 **Complete:**
-- Epics 0-5 API layer (692 unit tests + 7 integration tests, all passing)
+- Epics 0-5 API layer (868 unit tests + 7 integration tests, all passing)
 - All API route stubs wired to real services with DB persistence (interview, curriculum, assessment, consent)
 - Signal extraction from interviews + curriculum generation pipeline
 - Mobile screens: auth (Clerk), onboarding (subject creation → interview → curriculum), learner home, parent dashboard

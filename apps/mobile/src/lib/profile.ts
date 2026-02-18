@@ -11,7 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
 import type { Profile } from '@eduagent/schemas';
 import { useProfiles } from '../hooks/use-profiles';
-import { useApi } from './auth-api';
+import { useApiClient } from './api-client';
 
 export type { Profile };
 
@@ -42,7 +42,7 @@ export function ProfileProvider({
   children: ReactNode;
 }): ReactNode {
   const { data: profiles = [], isLoading: isProfilesLoading } = useProfiles();
-  const { post } = useApi();
+  const client = useApiClient();
   const queryClient = useQueryClient();
 
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
@@ -80,12 +80,12 @@ export function ProfileProvider({
 
   const switchProfile = useCallback(
     async (profileId: string) => {
-      await post('/profiles/switch', { profileId });
+      await client.profiles.switch.$post({ json: { profileId } });
       setActiveProfileId(profileId);
       await SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, profileId);
       await queryClient.invalidateQueries();
     },
-    [post, queryClient]
+    [client, queryClient]
   );
 
   const isLoading = isProfilesLoading || isRestoringId;

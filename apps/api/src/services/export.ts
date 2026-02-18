@@ -8,6 +8,21 @@ import {
   accounts,
   profiles,
   consentStates,
+  subjects,
+  curricula,
+  curriculumTopics,
+  learningSessions,
+  sessionEvents,
+  sessionSummaries,
+  retentionCards,
+  assessments,
+  xpLedger,
+  streaks,
+  notificationPreferences,
+  learningModes,
+  teachingPreferences,
+  onboardingDrafts,
+  parkingLotItems,
   type Database,
 } from '@eduagent/database';
 import type { DataExport } from '@eduagent/schemas';
@@ -34,6 +49,116 @@ export async function generateExport(
     profileIds.length > 0
       ? await db.query.consentStates.findMany({
           where: inArray(consentStates.profileId, profileIds),
+        })
+      : [];
+
+  // --- GDPR Article 15: query all profile-scoped personal data ---
+  const subjectRows =
+    profileIds.length > 0
+      ? await db.query.subjects.findMany({
+          where: inArray(subjects.profileId, profileIds),
+        })
+      : [];
+
+  const subjectIds = subjectRows.map((s) => s.id);
+
+  const curriculaRows =
+    subjectIds.length > 0
+      ? await db.query.curricula.findMany({
+          where: inArray(curricula.subjectId, subjectIds),
+        })
+      : [];
+
+  const curriculumIds = curriculaRows.map((c) => c.id);
+
+  const curriculumTopicRows =
+    curriculumIds.length > 0
+      ? await db.query.curriculumTopics.findMany({
+          where: inArray(curriculumTopics.curriculumId, curriculumIds),
+        })
+      : [];
+
+  const learningSessionRows =
+    profileIds.length > 0
+      ? await db.query.learningSessions.findMany({
+          where: inArray(learningSessions.profileId, profileIds),
+        })
+      : [];
+
+  const sessionEventRows =
+    profileIds.length > 0
+      ? await db.query.sessionEvents.findMany({
+          where: inArray(sessionEvents.profileId, profileIds),
+        })
+      : [];
+
+  const sessionSummaryRows =
+    profileIds.length > 0
+      ? await db.query.sessionSummaries.findMany({
+          where: inArray(sessionSummaries.profileId, profileIds),
+        })
+      : [];
+
+  const retentionCardRows =
+    profileIds.length > 0
+      ? await db.query.retentionCards.findMany({
+          where: inArray(retentionCards.profileId, profileIds),
+        })
+      : [];
+
+  const assessmentRows =
+    profileIds.length > 0
+      ? await db.query.assessments.findMany({
+          where: inArray(assessments.profileId, profileIds),
+        })
+      : [];
+
+  const xpLedgerRows =
+    profileIds.length > 0
+      ? await db.query.xpLedger.findMany({
+          where: inArray(xpLedger.profileId, profileIds),
+        })
+      : [];
+
+  const streakRows =
+    profileIds.length > 0
+      ? await db.query.streaks.findMany({
+          where: inArray(streaks.profileId, profileIds),
+        })
+      : [];
+
+  const notificationPrefRows =
+    profileIds.length > 0
+      ? await db.query.notificationPreferences.findMany({
+          where: inArray(notificationPreferences.profileId, profileIds),
+        })
+      : [];
+
+  const learningModeRows =
+    profileIds.length > 0
+      ? await db.query.learningModes.findMany({
+          where: inArray(learningModes.profileId, profileIds),
+        })
+      : [];
+
+  const teachingPrefRows =
+    profileIds.length > 0
+      ? await db.query.teachingPreferences.findMany({
+          where: inArray(teachingPreferences.profileId, profileIds),
+        })
+      : [];
+
+  const onboardingDraftRows =
+    profileIds.length > 0
+      ? await db.query.onboardingDrafts.findMany({
+          where: inArray(onboardingDrafts.profileId, profileIds),
+        })
+      : [];
+
+  const parkingLotRows =
+    profileIds.length > 0
+      ? await db.query.parkingLotItems.findMany({
+          where: inArray(parkingLotItems.profileId, profileIds),
         })
       : [];
 
@@ -64,6 +189,21 @@ export async function generateExport(
       requestedAt: row.requestedAt.toISOString(),
       respondedAt: row.respondedAt?.toISOString() ?? null,
     })),
+    subjects: subjectRows as Record<string, unknown>[],
+    curricula: curriculaRows as Record<string, unknown>[],
+    curriculumTopics: curriculumTopicRows as Record<string, unknown>[],
+    learningSessions: learningSessionRows as Record<string, unknown>[],
+    sessionEvents: sessionEventRows as Record<string, unknown>[],
+    sessionSummaries: sessionSummaryRows as Record<string, unknown>[],
+    retentionCards: retentionCardRows as Record<string, unknown>[],
+    assessments: assessmentRows as Record<string, unknown>[],
+    xpLedger: xpLedgerRows as Record<string, unknown>[],
+    streaks: streakRows as Record<string, unknown>[],
+    notificationPreferences: notificationPrefRows as Record<string, unknown>[],
+    learningModes: learningModeRows as Record<string, unknown>[],
+    teachingPreferences: teachingPrefRows as Record<string, unknown>[],
+    onboardingDrafts: onboardingDraftRows as Record<string, unknown>[],
+    parkingLotItems: parkingLotRows as Record<string, unknown>[],
     exportedAt: new Date().toISOString(),
   };
 }

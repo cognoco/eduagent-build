@@ -3,10 +3,12 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useCoachingCard } from './use-coaching-card';
 
-const mockGet = jest.fn();
-
-jest.mock('../lib/auth-api', () => ({
-  useApi: () => ({ get: mockGet }),
+const mockFetch = jest.fn();
+jest.mock('../lib/api-client', () => ({
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
 }));
 
 jest.mock('../lib/profile', () => ({
@@ -32,6 +34,7 @@ function createWrapper() {
 
 describe('useCoachingCard', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -40,30 +43,41 @@ describe('useCoachingCard', () => {
   });
 
   it('returns suggestion-based card when topic available', async () => {
-    mockGet.mockImplementation((path: string) => {
-      if (path === '/progress/continue') {
-        return Promise.resolve({
-          suggestion: {
-            subjectId: 'sub-1',
-            subjectName: 'Mathematics',
-            topicId: 'topic-1',
-            topicTitle: 'Algebra Basics',
-          },
-        });
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/progress/continue')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              suggestion: {
+                subjectId: 'sub-1',
+                subjectName: 'Mathematics',
+                topicId: 'topic-1',
+                topicTitle: 'Algebra Basics',
+              },
+            }),
+            { status: 200 }
+          )
+        );
       }
-      if (path === '/streaks') {
-        return Promise.resolve({
-          streak: {
-            currentStreak: 5,
-            longestStreak: 12,
-            lastActivityDate: '2026-02-15',
-            gracePeriodStartDate: null,
-            isOnGracePeriod: false,
-            graceDaysRemaining: 0,
-          },
-        });
+      if (url.includes('/streaks')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              streak: {
+                currentStreak: 5,
+                longestStreak: 12,
+                lastActivityDate: '2026-02-15',
+                gracePeriodStartDate: null,
+                isOnGracePeriod: false,
+                graceDaysRemaining: 0,
+              },
+            }),
+            { status: 200 }
+          )
+        );
       }
-      return Promise.resolve({});
+      return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
     });
 
     const { result } = renderHook(() => useCoachingCard(), {
@@ -81,23 +95,31 @@ describe('useCoachingCard', () => {
   });
 
   it('returns grace period card when on grace period', async () => {
-    mockGet.mockImplementation((path: string) => {
-      if (path === '/progress/continue') {
-        return Promise.resolve({ suggestion: null });
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/progress/continue')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ suggestion: null }), { status: 200 })
+        );
       }
-      if (path === '/streaks') {
-        return Promise.resolve({
-          streak: {
-            currentStreak: 7,
-            longestStreak: 12,
-            lastActivityDate: '2026-02-14',
-            gracePeriodStartDate: '2026-02-15',
-            isOnGracePeriod: true,
-            graceDaysRemaining: 2,
-          },
-        });
+      if (url.includes('/streaks')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              streak: {
+                currentStreak: 7,
+                longestStreak: 12,
+                lastActivityDate: '2026-02-14',
+                gracePeriodStartDate: '2026-02-15',
+                isOnGracePeriod: true,
+                graceDaysRemaining: 2,
+              },
+            }),
+            { status: 200 }
+          )
+        );
       }
-      return Promise.resolve({});
+      return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
     });
 
     const { result } = renderHook(() => useCoachingCard(), {
@@ -114,23 +136,31 @@ describe('useCoachingCard', () => {
   });
 
   it('returns default card when no suggestion and no grace period', async () => {
-    mockGet.mockImplementation((path: string) => {
-      if (path === '/progress/continue') {
-        return Promise.resolve({ suggestion: null });
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/progress/continue')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ suggestion: null }), { status: 200 })
+        );
       }
-      if (path === '/streaks') {
-        return Promise.resolve({
-          streak: {
-            currentStreak: 0,
-            longestStreak: 0,
-            lastActivityDate: null,
-            gracePeriodStartDate: null,
-            isOnGracePeriod: false,
-            graceDaysRemaining: 0,
-          },
-        });
+      if (url.includes('/streaks')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              streak: {
+                currentStreak: 0,
+                longestStreak: 0,
+                lastActivityDate: null,
+                gracePeriodStartDate: null,
+                isOnGracePeriod: false,
+                graceDaysRemaining: 0,
+              },
+            }),
+            { status: 200 }
+          )
+        );
       }
-      return Promise.resolve({});
+      return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
     });
 
     const { result } = renderHook(() => useCoachingCard(), {
@@ -147,8 +177,14 @@ describe('useCoachingCard', () => {
 
   it('shows loading state initially', async () => {
     // Delay the responses so loading state is visible
-    mockGet.mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve({}), 100))
+    mockFetch.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () => resolve(new Response(JSON.stringify({}), { status: 200 })),
+            100
+          )
+        )
     );
 
     const { result } = renderHook(() => useCoachingCard(), {

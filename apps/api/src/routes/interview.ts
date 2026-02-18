@@ -12,7 +12,7 @@ import {
   updateDraft,
   persistCurriculum,
 } from '../services/interview';
-import { notFound } from '../lib/errors';
+import { notFound } from '../errors';
 
 type InterviewRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };

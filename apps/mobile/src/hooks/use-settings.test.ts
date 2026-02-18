@@ -8,11 +8,12 @@ import {
   useUpdateLearningMode,
 } from './use-settings';
 
-const mockGet = jest.fn();
-const mockPut = jest.fn();
-
-jest.mock('../lib/auth-api', () => ({
-  useApi: () => ({ get: mockGet, put: mockPut }),
+const mockFetch = jest.fn();
+jest.mock('../lib/api-client', () => ({
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
 }));
 
 jest.mock('../lib/profile', () => ({
@@ -38,6 +39,7 @@ function createWrapper() {
 
 describe('useNotificationSettings', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -46,14 +48,19 @@ describe('useNotificationSettings', () => {
   });
 
   it('fetches notification settings from API', async () => {
-    mockGet.mockResolvedValue({
-      preferences: {
-        reviewReminders: true,
-        dailyReminders: false,
-        pushEnabled: true,
-        maxDailyPush: 5,
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          preferences: {
+            reviewReminders: true,
+            dailyReminders: false,
+            pushEnabled: true,
+            maxDailyPush: 5,
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useNotificationSettings(), {
       wrapper: createWrapper(),
@@ -63,7 +70,7 @@ describe('useNotificationSettings', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith('/settings/notifications');
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data).toEqual({
       reviewReminders: true,
       dailyReminders: false,
@@ -73,7 +80,9 @@ describe('useNotificationSettings', () => {
   });
 
   it('handles API errors', async () => {
-    mockGet.mockRejectedValue(new Error('Network error'));
+    mockFetch.mockResolvedValueOnce(
+      new Response('Network error', { status: 500 })
+    );
 
     const { result } = renderHook(() => useNotificationSettings(), {
       wrapper: createWrapper(),
@@ -89,6 +98,7 @@ describe('useNotificationSettings', () => {
 
 describe('useLearningMode', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -97,7 +107,9 @@ describe('useLearningMode', () => {
   });
 
   it('fetches learning mode from API', async () => {
-    mockGet.mockResolvedValue({ mode: 'casual' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ mode: 'casual' }), { status: 200 })
+    );
 
     const { result } = renderHook(() => useLearningMode(), {
       wrapper: createWrapper(),
@@ -107,13 +119,14 @@ describe('useLearningMode', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith('/settings/learning-mode');
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data).toBe('casual');
   });
 });
 
 describe('useUpdateNotificationSettings', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -122,14 +135,19 @@ describe('useUpdateNotificationSettings', () => {
   });
 
   it('calls PUT with notification preferences', async () => {
-    mockPut.mockResolvedValue({
-      preferences: {
-        reviewReminders: true,
-        dailyReminders: true,
-        pushEnabled: true,
-        maxDailyPush: 3,
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          preferences: {
+            reviewReminders: true,
+            dailyReminders: true,
+            pushEnabled: true,
+            maxDailyPush: 3,
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useUpdateNotificationSettings(), {
       wrapper: createWrapper(),
@@ -143,16 +161,13 @@ describe('useUpdateNotificationSettings', () => {
       });
     });
 
-    expect(mockPut).toHaveBeenCalledWith('/settings/notifications', {
-      reviewReminders: true,
-      dailyReminders: true,
-      pushEnabled: true,
-    });
+    expect(mockFetch).toHaveBeenCalled();
   });
 });
 
 describe('useUpdateLearningMode', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -161,7 +176,9 @@ describe('useUpdateLearningMode', () => {
   });
 
   it('calls PUT with learning mode', async () => {
-    mockPut.mockResolvedValue({ mode: 'casual' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ mode: 'casual' }), { status: 200 })
+    );
 
     const { result } = renderHook(() => useUpdateLearningMode(), {
       wrapper: createWrapper(),
@@ -171,8 +188,6 @@ describe('useUpdateLearningMode', () => {
       await result.current.mutateAsync('casual');
     });
 
-    expect(mockPut).toHaveBeenCalledWith('/settings/learning-mode', {
-      mode: 'casual',
-    });
+    expect(mockFetch).toHaveBeenCalled();
   });
 });

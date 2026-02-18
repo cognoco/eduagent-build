@@ -1,18 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Assessment } from '@eduagent/schemas';
-import { useApi } from '../lib/auth-api';
+import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 
 export function useAssessment(assessmentId: string) {
-  const { get } = useApi();
+  const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery({
     queryKey: ['assessment', assessmentId, activeProfile?.id],
     queryFn: async () => {
-      const data = await get<{ assessment: Assessment }>(
-        `/assessments/${assessmentId}`
-      );
+      const res = await client.assessments[':assessmentId'].$get({
+        param: { assessmentId },
+      });
+      const data = await res.json();
       return data.assessment;
     },
     enabled: !!activeProfile && !!assessmentId,
@@ -20,15 +21,19 @@ export function useAssessment(assessmentId: string) {
 }
 
 export function useCreateAssessment(subjectId: string, topicId: string) {
-  const { post } = useApi();
+  const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () =>
-      post<{ assessment: Assessment }>(
-        `/subjects/${subjectId}/topics/${topicId}/assessments`,
-        { subjectId, topicId }
-      ),
+    mutationFn: async () => {
+      const res = await client.subjects[':subjectId'].topics[
+        ':topicId'
+      ].assessments.$post({
+        param: { subjectId, topicId },
+        json: { subjectId, topicId },
+      });
+      return await res.json();
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['assessment'] });
       void queryClient.invalidateQueries({
@@ -39,18 +44,17 @@ export function useCreateAssessment(subjectId: string, topicId: string) {
 }
 
 export function useSubmitAnswer(assessmentId: string) {
-  const { post } = useApi();
+  const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: { answer: string }) =>
-      post<{
-        result: {
-          passed: boolean;
-          masteryScore: number;
-          feedback: string;
-        };
-      }>(`/assessments/${assessmentId}/answer`, input),
+    mutationFn: async (input: { answer: string }) => {
+      const res = await client.assessments[':assessmentId'].answer.$post({
+        param: { assessmentId },
+        json: input,
+      });
+      return await res.json();
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['assessment', assessmentId],

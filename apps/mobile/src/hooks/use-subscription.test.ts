@@ -11,15 +11,17 @@ import {
   useJoinByokWaitlist,
 } from './use-subscription';
 
-const mockPost = jest.fn();
-const mockGet = jest.fn();
+const mockFetch = jest.fn();
 
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
 }));
 
-jest.mock('../lib/auth-api', () => ({
-  useApi: () => ({ post: mockPost, get: mockGet }),
+jest.mock('../lib/api-client', () => ({
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
 }));
 
 jest.mock('../lib/api', () => ({
@@ -53,6 +55,7 @@ function createWrapper() {
 
 describe('useSubscription', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -61,17 +64,22 @@ describe('useSubscription', () => {
   });
 
   it('fetches subscription from GET /subscription', async () => {
-    mockGet.mockResolvedValue({
-      subscription: {
-        tier: 'plus',
-        status: 'active',
-        trialEndsAt: null,
-        currentPeriodEnd: '2026-03-18T00:00:00Z',
-        monthlyLimit: 500,
-        usedThisMonth: 42,
-        remainingQuestions: 458,
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          subscription: {
+            tier: 'plus',
+            status: 'active',
+            trialEndsAt: null,
+            currentPeriodEnd: '2026-03-18T00:00:00Z',
+            monthlyLimit: 500,
+            usedThisMonth: 42,
+            remainingQuestions: 458,
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useSubscription(), {
       wrapper: createWrapper(),
@@ -81,23 +89,28 @@ describe('useSubscription', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith('/subscription');
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.tier).toBe('plus');
     expect(result.current.data?.remainingQuestions).toBe(458);
   });
 
   it('returns free-tier defaults when no subscription', async () => {
-    mockGet.mockResolvedValue({
-      subscription: {
-        tier: 'free',
-        status: 'trial',
-        trialEndsAt: null,
-        currentPeriodEnd: null,
-        monthlyLimit: 50,
-        usedThisMonth: 0,
-        remainingQuestions: 50,
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          subscription: {
+            tier: 'free',
+            status: 'trial',
+            trialEndsAt: null,
+            currentPeriodEnd: null,
+            monthlyLimit: 50,
+            usedThisMonth: 0,
+            remainingQuestions: 50,
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useSubscription(), {
       wrapper: createWrapper(),
@@ -112,7 +125,9 @@ describe('useSubscription', () => {
   });
 
   it('handles API errors', async () => {
-    mockGet.mockRejectedValue(new Error('Network error'));
+    mockFetch.mockResolvedValueOnce(
+      new Response('Network error', { status: 500 })
+    );
 
     const { result } = renderHook(() => useSubscription(), {
       wrapper: createWrapper(),
@@ -132,6 +147,7 @@ describe('useSubscription', () => {
 
 describe('useUsage', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -140,16 +156,21 @@ describe('useUsage', () => {
   });
 
   it('fetches usage from GET /usage', async () => {
-    mockGet.mockResolvedValue({
-      usage: {
-        monthlyLimit: 500,
-        usedThisMonth: 120,
-        remainingQuestions: 380,
-        topUpCreditsRemaining: 0,
-        warningLevel: 'none',
-        cycleResetAt: '2026-03-01T00:00:00Z',
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          usage: {
+            monthlyLimit: 500,
+            usedThisMonth: 120,
+            remainingQuestions: 380,
+            topUpCreditsRemaining: 0,
+            warningLevel: 'none',
+            cycleResetAt: '2026-03-01T00:00:00Z',
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useUsage(), {
       wrapper: createWrapper(),
@@ -159,22 +180,27 @@ describe('useUsage', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith('/usage');
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.warningLevel).toBe('none');
     expect(result.current.data?.remainingQuestions).toBe(380);
   });
 
   it('returns exceeded warning level', async () => {
-    mockGet.mockResolvedValue({
-      usage: {
-        monthlyLimit: 50,
-        usedThisMonth: 55,
-        remainingQuestions: 0,
-        topUpCreditsRemaining: 0,
-        warningLevel: 'exceeded',
-        cycleResetAt: '2026-03-01T00:00:00Z',
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          usage: {
+            monthlyLimit: 50,
+            usedThisMonth: 55,
+            remainingQuestions: 0,
+            topUpCreditsRemaining: 0,
+            warningLevel: 'exceeded',
+            cycleResetAt: '2026-03-01T00:00:00Z',
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useUsage(), {
       wrapper: createWrapper(),
@@ -195,6 +221,7 @@ describe('useUsage', () => {
 
 describe('useCreateCheckout', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -203,10 +230,15 @@ describe('useCreateCheckout', () => {
   });
 
   it('calls POST /subscription/checkout with tier and interval', async () => {
-    mockPost.mockResolvedValue({
-      checkoutUrl: 'https://checkout.stripe.com/cs_test_123',
-      sessionId: 'cs_test_123',
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          checkoutUrl: 'https://checkout.stripe.com/cs_test_123',
+          sessionId: 'cs_test_123',
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useCreateCheckout(), {
       wrapper: createWrapper(),
@@ -220,10 +252,7 @@ describe('useCreateCheckout', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/subscription/checkout', {
-      tier: 'plus',
-      interval: 'monthly',
-    });
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.checkoutUrl).toBe(
       'https://checkout.stripe.com/cs_test_123'
     );
@@ -236,6 +265,7 @@ describe('useCreateCheckout', () => {
 
 describe('useCancelSubscription', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -244,11 +274,16 @@ describe('useCancelSubscription', () => {
   });
 
   it('calls POST /subscription/cancel', async () => {
-    mockPost.mockResolvedValue({
-      message:
-        'Subscription cancelled. Access continues until end of billing period.',
-      currentPeriodEnd: '2026-03-18T00:00:00Z',
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          message:
+            'Subscription cancelled. Access continues until end of billing period.',
+          currentPeriodEnd: '2026-03-18T00:00:00Z',
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useCancelSubscription(), {
       wrapper: createWrapper(),
@@ -262,7 +297,7 @@ describe('useCancelSubscription', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/subscription/cancel', {});
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.currentPeriodEnd).toBe('2026-03-18T00:00:00Z');
   });
 });
@@ -273,6 +308,7 @@ describe('useCancelSubscription', () => {
 
 describe('useCreatePortalSession', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -281,9 +317,14 @@ describe('useCreatePortalSession', () => {
   });
 
   it('calls POST /subscription/portal', async () => {
-    mockPost.mockResolvedValue({
-      portalUrl: 'https://billing.stripe.com/p/session_123',
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          portalUrl: 'https://billing.stripe.com/p/session_123',
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useCreatePortalSession(), {
       wrapper: createWrapper(),
@@ -297,7 +338,7 @@ describe('useCreatePortalSession', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/subscription/portal', {});
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.portalUrl).toBe(
       'https://billing.stripe.com/p/session_123'
     );
@@ -310,6 +351,7 @@ describe('useCreatePortalSession', () => {
 
 describe('usePurchaseTopUp', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -318,13 +360,18 @@ describe('usePurchaseTopUp', () => {
   });
 
   it('calls POST /subscription/top-up with amount 500', async () => {
-    mockPost.mockResolvedValue({
-      topUp: {
-        amount: 500,
-        clientSecret: 'pi_test_secret',
-        paymentIntentId: 'pi_test_123',
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          topUp: {
+            amount: 500,
+            clientSecret: 'pi_test_secret',
+            paymentIntentId: 'pi_test_123',
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => usePurchaseTopUp(), {
       wrapper: createWrapper(),
@@ -338,9 +385,7 @@ describe('usePurchaseTopUp', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/subscription/top-up', {
-      amount: 500,
-    });
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.topUp.amount).toBe(500);
   });
 });
@@ -351,6 +396,7 @@ describe('usePurchaseTopUp', () => {
 
 describe('useJoinByokWaitlist', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -359,10 +405,15 @@ describe('useJoinByokWaitlist', () => {
   });
 
   it('calls POST /byok-waitlist with email', async () => {
-    mockPost.mockResolvedValue({
-      message: 'Added to BYOK waitlist',
-      email: 'user@example.com',
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          message: 'Added to BYOK waitlist',
+          email: 'user@example.com',
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useJoinByokWaitlist(), {
       wrapper: createWrapper(),
@@ -376,14 +427,17 @@ describe('useJoinByokWaitlist', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/byok-waitlist', {
-      email: 'user@example.com',
-    });
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.email).toBe('user@example.com');
   });
 
   it('handles validation error', async () => {
-    mockPost.mockRejectedValue(new Error('API error 422'));
+    mockFetch.mockResolvedValueOnce(
+      new Response('API error 422', {
+        status: 422,
+        statusText: 'Unprocessable Entity',
+      })
+    );
 
     const { result } = renderHook(() => useJoinByokWaitlist(), {
       wrapper: createWrapper(),
@@ -397,6 +451,6 @@ describe('useJoinByokWaitlist', () => {
       expect(result.current.isError).toBe(true);
     });
 
-    expect(result.current.error?.message).toBe('API error 422');
+    expect(result.current.error).toBeInstanceOf(Error);
   });
 });

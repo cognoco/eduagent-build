@@ -5,7 +5,7 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import { useApi } from '../lib/auth-api';
+import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 
 interface InterviewState {
@@ -24,15 +24,16 @@ interface InterviewResponse {
 export function useInterviewState(
   subjectId: string
 ): UseQueryResult<InterviewState | null> {
-  const { get } = useApi();
+  const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery({
     queryKey: ['interview', subjectId, activeProfile?.id],
     queryFn: async () => {
-      const data = await get<{ state: InterviewState | null }>(
-        `/subjects/${subjectId}/interview`
-      );
+      const res = await client.subjects[':subjectId'].interview.$get({
+        param: { subjectId },
+      });
+      const data = await res.json();
       return data.state;
     },
     enabled: !!activeProfile && !!subjectId,
@@ -42,14 +43,17 @@ export function useInterviewState(
 export function useSendInterviewMessage(
   subjectId: string
 ): UseMutationResult<InterviewResponse, Error, string> {
-  const { post } = useApi();
+  const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (message: string) =>
-      post<InterviewResponse>(`/subjects/${subjectId}/interview`, {
-        message,
-      }),
+    mutationFn: async (message: string) => {
+      const res = await client.subjects[':subjectId'].interview.$post({
+        param: { subjectId },
+        json: { message },
+      });
+      return await res.json();
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['interview', subjectId],

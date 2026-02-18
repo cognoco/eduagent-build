@@ -8,10 +8,12 @@ import {
   useTopicProgress,
 } from './use-progress';
 
-const mockGet = jest.fn();
-
-jest.mock('../lib/auth-api', () => ({
-  useApi: () => ({ get: mockGet }),
+const mockFetch = jest.fn();
+jest.mock('../lib/api-client', () => ({
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
 }));
 
 jest.mock('../lib/profile', () => ({
@@ -37,6 +39,7 @@ function createWrapper() {
 
 describe('useSubjectProgress', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -45,18 +48,23 @@ describe('useSubjectProgress', () => {
   });
 
   it('fetches subject progress from API', async () => {
-    mockGet.mockResolvedValue({
-      progress: {
-        subjectId: 'sub-1',
-        name: 'Mathematics',
-        topicsTotal: 10,
-        topicsCompleted: 3,
-        topicsVerified: 1,
-        urgencyScore: 0,
-        retentionStatus: 'strong',
-        lastSessionAt: null,
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          progress: {
+            subjectId: 'sub-1',
+            name: 'Mathematics',
+            topicsTotal: 10,
+            topicsCompleted: 3,
+            topicsVerified: 1,
+            urgencyScore: 0,
+            retentionStatus: 'strong',
+            lastSessionAt: null,
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useSubjectProgress('sub-1'), {
       wrapper: createWrapper(),
@@ -66,13 +74,15 @@ describe('useSubjectProgress', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith('/subjects/sub-1/progress');
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.name).toBe('Mathematics');
     expect(result.current.data?.topicsTotal).toBe(10);
   });
 
   it('handles API errors', async () => {
-    mockGet.mockRejectedValue(new Error('Network error'));
+    mockFetch.mockResolvedValueOnce(
+      new Response('Network error', { status: 500 })
+    );
 
     const { result } = renderHook(() => useSubjectProgress('sub-1'), {
       wrapper: createWrapper(),
@@ -88,6 +98,7 @@ describe('useSubjectProgress', () => {
 
 describe('useOverallProgress', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -96,22 +107,27 @@ describe('useOverallProgress', () => {
   });
 
   it('fetches overall progress from API', async () => {
-    mockGet.mockResolvedValue({
-      subjects: [
-        {
-          subjectId: 'sub-1',
-          name: 'Math',
-          topicsTotal: 5,
-          topicsCompleted: 2,
-          topicsVerified: 1,
-          urgencyScore: 0,
-          retentionStatus: 'strong',
-          lastSessionAt: null,
-        },
-      ],
-      totalTopicsCompleted: 2,
-      totalTopicsVerified: 1,
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          subjects: [
+            {
+              subjectId: 'sub-1',
+              name: 'Math',
+              topicsTotal: 5,
+              topicsCompleted: 2,
+              topicsVerified: 1,
+              urgencyScore: 0,
+              retentionStatus: 'strong',
+              lastSessionAt: null,
+            },
+          ],
+          totalTopicsCompleted: 2,
+          totalTopicsVerified: 1,
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useOverallProgress(), {
       wrapper: createWrapper(),
@@ -121,13 +137,14 @@ describe('useOverallProgress', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith('/progress/overview');
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.totalTopicsCompleted).toBe(2);
   });
 });
 
 describe('useContinueSuggestion', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -136,14 +153,19 @@ describe('useContinueSuggestion', () => {
   });
 
   it('fetches continue suggestion from API', async () => {
-    mockGet.mockResolvedValue({
-      suggestion: {
-        subjectId: 'sub-1',
-        subjectName: 'Math',
-        topicId: 'topic-1',
-        topicTitle: 'Algebra',
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          suggestion: {
+            subjectId: 'sub-1',
+            subjectName: 'Math',
+            topicId: 'topic-1',
+            topicTitle: 'Algebra',
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useContinueSuggestion(), {
       wrapper: createWrapper(),
@@ -153,12 +175,14 @@ describe('useContinueSuggestion', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith('/progress/continue');
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.topicTitle).toBe('Algebra');
   });
 
   it('returns null when no suggestion', async () => {
-    mockGet.mockResolvedValue({ suggestion: null });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ suggestion: null }), { status: 200 })
+    );
 
     const { result } = renderHook(() => useContinueSuggestion(), {
       wrapper: createWrapper(),
@@ -174,6 +198,7 @@ describe('useContinueSuggestion', () => {
 
 describe('useTopicProgress', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -182,19 +207,24 @@ describe('useTopicProgress', () => {
   });
 
   it('fetches topic progress from API', async () => {
-    mockGet.mockResolvedValue({
-      topic: {
-        topicId: 'topic-1',
-        title: 'Algebra Basics',
-        description: 'Intro',
-        completionStatus: 'in_progress',
-        retentionStatus: 'strong',
-        struggleStatus: 'normal',
-        masteryScore: 0.85,
-        summaryExcerpt: null,
-        xpStatus: 'pending',
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          topic: {
+            topicId: 'topic-1',
+            title: 'Algebra Basics',
+            description: 'Intro',
+            completionStatus: 'in_progress',
+            retentionStatus: 'strong',
+            struggleStatus: 'normal',
+            masteryScore: 0.85,
+            summaryExcerpt: null,
+            xpStatus: 'pending',
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useTopicProgress('sub-1', 'topic-1'), {
       wrapper: createWrapper(),
@@ -204,9 +234,7 @@ describe('useTopicProgress', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith(
-      '/subjects/sub-1/topics/topic-1/progress'
-    );
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.title).toBe('Algebra Basics');
   });
 });

@@ -6,8 +6,8 @@
 
 import { Hono } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
-import { verifyWebhookSignature } from '../lib/stripe';
-import { writeSubscriptionStatus } from '../lib/kv';
+import { verifyWebhookSignature } from '../services/stripe';
+import { writeSubscriptionStatus } from '../services/kv';
 import {
   updateSubscriptionFromWebhook,
   getSubscriptionByAccountId,
@@ -16,7 +16,7 @@ import {
 import { inngest } from '../inngest/client';
 import type { Database } from '@eduagent/database';
 import type Stripe from 'stripe';
-import type { CachedSubscriptionStatus } from '../lib/kv';
+import type { CachedSubscriptionStatus } from '../services/kv';
 import type { WebhookSubscriptionUpdate } from '../services/billing';
 
 // ---------------------------------------------------------------------------

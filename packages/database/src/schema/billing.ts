@@ -5,6 +5,7 @@ import {
   integer,
   timestamp,
   pgEnum,
+  index,
 } from 'drizzle-orm/pg-core';
 import { accounts } from './profiles.js';
 import { generateUUIDv7 } from '../utils/uuid.js';
@@ -72,23 +73,29 @@ export const quotaPools = pgTable('quota_pools', {
     .defaultNow(),
 });
 
-export const topUpCredits = pgTable('top_up_credits', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  subscriptionId: uuid('subscription_id')
-    .notNull()
-    .references(() => subscriptions.id, { onDelete: 'cascade' }),
-  amount: integer('amount').notNull(),
-  remaining: integer('remaining').notNull(),
-  purchasedAt: timestamp('purchased_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const topUpCredits = pgTable(
+  'top_up_credits',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    subscriptionId: uuid('subscription_id')
+      .notNull()
+      .references(() => subscriptions.id, { onDelete: 'cascade' }),
+    amount: integer('amount').notNull(),
+    remaining: integer('remaining').notNull(),
+    purchasedAt: timestamp('purchased_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('top_up_credits_subscription_id_idx').on(table.subscriptionId),
+  ]
+);
 
 export const byokWaitlist = pgTable('byok_waitlist', {
   id: uuid('id')

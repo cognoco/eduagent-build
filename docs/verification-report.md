@@ -1101,15 +1101,17 @@ All 8 items fixed. 707 tests pass after changes.
 | 13 | ❌ Inngest serve target | **False finding** | `inngest/hono` is correct for Hono on Workers. `inngest/cloudflare` returns a raw Workers fetch handler, incompatible with Hono route mounting. |
 | 14 | ✅ Vector embedding validation | Fixed | `queries/embeddings.ts` — added `validateEmbedding()` checking `Number.isFinite()` on every element before SQL interpolation. Applied to both `findSimilarTopics()` and `storeEmbedding()`. |
 
-#### Phase 2: Theming & Architecture ✅ COMPLETE (2026-02-17)
+#### Phase 2: Theming & Architecture ✅ COMPLETE (2026-02-18)
+
+All 6 fixable items resolved. 1 deferred (touch targets). 1,094 tests pass.
 
 | # | Item | Status | Details |
 |---|------|--------|---------|
-| 15 | Hardcoded colors | In progress | Background agent dispatched for 60+ hex color replacements with NativeWind classes |
-| 16 | Persona-aware components | In progress | Background agent working on 18 persona check extractions |
-| 17 | Local type consolidation | In progress | Background agent consolidating 15+ types to `@eduagent/schemas` |
+| 15 | ✅ Hardcoded colors | Fixed | 60+ hex color replacements across ~15 mobile files. All `placeholderTextColor`, `ActivityIndicator color`, and inline hex values replaced with NativeWind semantic classes. |
+| 16 | ✅ Persona-aware components | Fixed | 18 persona-conditional checks extracted from shared components. Persona logic now confined to root layout CSS variable assignment. |
+| 17 | ✅ Local type consolidation | Fixed | 15+ local type definitions across hooks and services replaced with imports from `@eduagent/schemas`. |
 | 18 | ✅ Missing return types | Fixed | 18 exported hooks across 10 files annotated with `UseQueryResult<T>` / `UseMutationResult<T, E, V>`. All 115 mobile tests pass. |
-| 19 | Touch targets | Deferred | Requires visual audit — bundled with mobile hardcoded colors agent |
+| 19 | Touch targets | Deferred | Requires visual audit — deferred to accessibility sprint. |
 | 20 | ✅ Scoped repo missing tables | Fixed | Added `parkingLotItems`, `teachingPreferences`, `curriculumAdaptations` to `createScopedRepository()` with `findMany` and `findFirst` methods. |
 | 21 | ✅ Ad-hoc error responses | Fixed | All inline error code strings replaced with `ERROR_CODES.*` constants. `auth.ts`, `homework.ts`, `stripe-webhook.ts` now use centralized codes. |
 
@@ -1117,15 +1119,15 @@ All 8 items fixed. 707 tests pass after changes.
 
 | # | Item | Status | Details |
 |---|------|--------|---------|
-| 22 | Missing tests | Open | jwt.ts, llm.ts, inngest.ts, account-deletion.ts, useStreamMessage, use-dashboard.test.ts |
+| 22 | Missing tests | Partial | ~~account-deletion.ts~~ (FIXED 2026-02-18, 7 tests), ~~consent-reminders behavioral~~ (FIXED, 5 tests). Remaining: jwt.ts, llm.ts, inngest.ts, useStreamMessage, use-dashboard.test.ts |
 | 23 | ✅ Shared `getStepDatabase()` | Fixed | Extracted to `inngest/helpers.ts`, all 3 Inngest function files updated to use shared helper. |
-| 24 | DB schema constraints | Open | unique on `(profileId, topicId)` for retentionCards, `(profileId, consentType)` for consentStates |
-| 25 | DB indexes (critical) | Open | `retentionCards(profileId, nextReviewAt)` (SM-2 review query), `learningSessions(profileId)`, `sessionEvents(sessionId)`, `profiles(accountId)`, `subjects(profileId)`, `sessionEmbeddings(profileId)` + pgvector HNSW index |
+| 24 | ✅ DB schema constraints | Fixed | unique on `(profileId, topicId)` for retentionCards, `(profileId, consentType)` for consentStates — **FIXED 2026-02-18** |
+| 25 | ✅ DB indexes (critical) | Fixed | Added indexes on `sessionEvents(sessionId)`, `learningSessions(profileId)`, `topUpCredits(subscriptionId)`, `xpLedger(profileId)`, `xpLedger(topicId)`, `familyLinks(childProfileId)` — **FIXED 2026-02-18**. Remaining: `profiles(accountId)`, `subjects(profileId)`, pgvector HNSW index |
 | 26 | Factory builder coverage | Open | Add sessions, subjects, assessments, retention cards, subscriptions builders |
 | 27 | test-utils gaps | Open | Add shared Neon mock (`createMockDb()`) and Inngest step mock (`createInngestStepMock()`) |
 | 28 | Inngest timestamps | Open | Add `timestamp` to all event payloads |
-| 29 | ⚠️ SM-2 input validation | Partial | Quality clamping added but NaN propagation not handled — `Math.round(NaN)` returns NaN, bypassing the clamp chain. See Post-Remediation Review CR4. |
-| 30 | `text` → `pgEnum` | Open | `retentionCards.xpStatus`, `teachingPreferences.method`, `xpLedger.status` |
+| 29 | ✅ SM-2 input validation | Fixed | Quality clamping + NaN propagation fully handled — `Number.isFinite()` guard added before clamping. 4 new tests. See CR4. **FIXED 2026-02-18** |
+| 30 | ✅ `text` → `pgEnum` | Fixed | `retentionCards.xpStatus` → `xpStatusEnum`, `teachingPreferences.method` → `teachingMethodEnum`, `xpLedger.status` → `xpStatusEnum` — **FIXED 2026-02-18** |
 | 31 | ✅ `apiErrorSchema.code` | Fixed | Constrained from `z.string()` to `z.enum(errorCodeValues)`. Added `ErrorCode` type, `errorCodeSchema` export, `MISSING_SIGNATURE` to `ERROR_CODES`. `apiError()` helper now type-safe. Tests updated. |
 | 32 | Pin mobile package versions | Open | Replace `*` wildcards with exact versions in `apps/mobile/package.json` |
 | 33 | ✅ Stale architecture.md paths | Fixed | Full audit: 30+ path corrections across routes, middleware, services, schema, schemas trees. Epic mapping, cross-cutting concerns, external integrations tables all updated. |
@@ -1136,9 +1138,172 @@ All 8 items fixed. 707 tests pass after changes.
 
 ---
 
+## Post-Remediation A/B Review (2026-02-18)
+
+**Date:** 2026-02-18
+**Scope:** Full codebase after all Phase 0–3 remediation applied
+**Method:** 10 parallel review agents — 5 domain pairs (A + B cross-validation)
+**Finding totals:** 8 Critical, 24 Important, 25 Suggestions = **57 total**
+
+### Methodology
+
+Same A/B cross-validation as the Shadow Review: each domain independently reviewed by a systematic (A) reviewer and an adversarial (B) reviewer. Items flagged by both teams are highest confidence.
+
+### Agent Coverage Map
+
+| Domain | A-Team | B-Team |
+|--------|--------|--------|
+| API Routes & Middleware | A-API | B-API |
+| Schemas & Database | A-Schema | B-Schema |
+| Services & Inngest | A-Svc | B-Svc |
+| Mobile App | A-Mobile | B-Mobile |
+| Docs & Cross-cutting | A-Docs | B-Docs |
+
+### Critical Issues (8) — Must Fix
+
+| # | Issue | File(s) | Found By | Confidence |
+|---|-------|---------|----------|------------|
+| ~~**CR1**~~ | ~~**Free-tier users bypass metering entirely** — no subscription row means `usedThisMonth=0` every request, `subscriptionId=null` skips decrement. Unlimited free LLM usage.~~ **FIXED 2026-02-18** — Added `ensureFreeSubscription()` in billing service; metering middleware auto-provisions free-tier subscription + quota pool on KV miss. | `middleware/metering.ts:111-168` | B-API | High (architectural) |
+| ~~**CR2**~~ | ~~**TOCTOU race in `decrementQuota()`** — reads quota in JS, checks limit, then increments via SQL. Concurrent requests both pass the guard.~~ **FIXED 2026-02-18** — Rewrote `decrementQuota()` with atomic SQL `WHERE usedThisMonth < monthlyLimit` guard; top-up fallback also atomic with `WHERE remaining > 0`. | `services/billing.ts:315-379` | A-Svc, B-API, B-Svc | **Very High** (3 agents) |
+| ~~**CR3**~~ | ~~**KV cache hit still queries DB** — `subscriptionId` not stored in KV, so lines 138-142 always call `getSubscriptionByAccountId()` even on cache hit, defeating the cache.~~ **FIXED 2026-02-18** — Added `subscriptionId` to `CachedSubscriptionStatus` interface in `kv.ts`; metering middleware uses cached value on KV hit. | `middleware/metering.ts:105-142` | A-API | High |
+| ~~**CR4**~~ | ~~**SM-2 NaN propagation** — `Math.max(0, Math.min(5, Math.round(NaN)))` → `NaN`. Permanently corrupts retention card's `easeFactor`. No test coverage for NaN input.~~ **FIXED 2026-02-18:** Added `Number.isFinite()` guard before clamping + 4 new tests (NaN, Infinity, -Infinity, undefined). | `packages/retention/src/sm2.ts:33` | A-Schema, B-Schema | **Very High** (2 agents) |
+| ⚠️ **CR5** | **`getStepDatabase()` uses `process.env`** — Cloudflare Workers don't expose env via `process.env`. Every Inngest function will crash at runtime on CF Workers. **IMPROVED 2026-02-18:** Added runtime guard with clear error message. Full fix deferred to Neon wiring (Layer 2). | `inngest/helpers.ts:13-17` | A-Svc, B-Svc | **Very High** (2 agents) |
+| **CR6** | **Unsafe `as unknown as Database` cast** — stripe webhook route lacks `Variables: { db: Database }` in Hono generic, forcing double cast that bypasses type safety. | `routes/stripe-webhook.ts:256` | A-API, B-API | **Very High** (2 agents) |
+| **CR7** | **architecture.md mobile tree is fiction** — 30+ documented paths don't exist, 15+ actual files undocumented. AI agents following this tree would create duplicates at wrong paths. | `docs/architecture.md:756-843` | A-Docs, B-Docs | **Very High** (2 agents) |
+| **CR8** | **Circular import cycle** — `profile.ts` → `use-profiles.ts` → `auth-api.ts` → `profile.ts`. Works via lazy resolution but violates "circular deps are build-breaking errors." | `mobile/src/lib/profile.ts:13` + chain | B-Mobile only | Medium |
+
+### Important Issues (24) — Should Fix
+
+#### API Layer (7)
+
+| # | Issue | File | Found By |
+|---|-------|------|----------|
+| ~~**I1**~~ | ~~Auth middleware catch block still uses inline `'UNAUTHORIZED'` string (line 105), missed during ERROR_CODES refactor~~ **FIXED 2026-02-18** | `middleware/auth.ts:105` | A-API, B-API |
+| ~~**I2**~~ | ~~Homework routes use nested `{ error: { code, message } }` format instead of flat `ApiErrorSchema`~~ **FIXED 2026-02-18** — replaced with `validationError()` helper | `routes/homework.ts:41-79` | A-API, B-API |
+| ~~**I3**~~ | ~~`session.url!` non-null assertion — Stripe can return `null`~~ **FIXED 2026-02-18** — replaced with null guard returning `apiError()` | `routes/billing.ts:146` | A-API, B-API |
+| ~~**I4**~~ | ~~KV write has no try/catch — if KV unavailable, entire middleware throws 500~~ **FIXED 2026-02-18** — Added `safeReadKV()` and `safeWriteKV()` helpers with try/catch; KV failure falls through to DB gracefully. | `middleware/metering.ts:128-133` | B-API |
+| **I5** | No webhook replay/event-age check | `routes/stripe-webhook.ts` | B-API |
+| ~~**I6**~~ | ~~Metering regex bypassable with trailing slash (`/messages/`)~~ **FIXED 2026-02-18** — Added `\/?` optional trailing slash to LLM route patterns. | `middleware/metering.ts:43-49` | B-API |
+| ~~**I7**~~ | ~~KV cache stores `usedThisMonth` but never updates after decrement — stale for up to 24h~~ **FIXED 2026-02-18** — After successful decrement, KV cache updated with incremented `usedThisMonth`. | `middleware/metering.ts:127-134` | B-API |
+
+#### Services & Inngest (7)
+
+| # | Issue | File | Found By |
+|---|-------|------|----------|
+| **I8** | N+1 queries in `getOverallProgress` and `getContinueSuggestion` — per-subject DB queries in a loop. **Partially mitigated 2026-02-18** — inner queries now use `inArray()` (see I9), reducing data transferred per iteration. Full batch refactor deferred. | `services/progress.ts:249-333` | A-Svc, B-Svc |
+| ~~**I9**~~ | ~~Fetches ALL retention cards then filters in JS instead of SQL `WHERE IN`~~ **FIXED 2026-02-18** — Replaced `repo.retentionCards.findMany()` + JS `.filter()` with `inArray(retentionCards.topicId, topicIds)` DB-level filter. Same fix applied to assessments. | `services/progress.ts:106-115` | A-Svc, B-Svc |
+| ~~**I10**~~ | ~~`trial-expiry.ts` directly updates DB tables bypassing billing service; also unbounded batch (no pagination)~~ **FIXED 2026-02-18** — extracted `expireTrialSubscription()` and `downgradeQuotaPool()` into billing service | `inngest/functions/trial-expiry.ts:24-66` | A-Svc, B-Svc |
+| **I11** | `payment-retry` doesn't actually retry — returns `attempt + 1` but never re-emits the event | `inngest/functions/payment-retry.ts:40-53` | B-Svc |
+| ~~**I12**~~ | ~~Consent reminder auto-delete needs null guard for already-deleted profiles~~ **FIXED 2026-02-18** — added `!status` null guards in all 4 step callbacks | `inngest/functions/consent-reminders.ts:57` | B-Svc |
+| ~~**I13**~~ | ~~No test file for `account-deletion.ts` (7-day sleep + cancellation logic)~~ **FIXED 2026-02-18** — added `account-deletion.test.ts` with 7 tests (function config, 7-day sleep, cancellation, deletion, step DB access) | `inngest/functions/account-deletion.ts` | B-Svc |
+| ~~**I14**~~ | ~~`consent-reminders.test.ts` only tests metadata, not behavior (GDPR/COPPA compliance)~~ **FIXED 2026-02-18** — added 5 behavioral tests covering GDPR/COPPA flows, early exit on CONSENTED, day-30 auto-delete, null profile guard | `inngest/functions/consent-reminders.test.ts` | A-Svc, B-Svc |
+
+#### Mobile (6)
+
+| # | Issue | File | Found By |
+|---|-------|------|----------|
+| ~~**I15**~~ | ~~Zero `accessibilityLabel`/`accessibilityRole` props in entire mobile codebase~~ **FIXED 2026-02-18** — added labels+roles to ~26 interactive elements across 6 screen files | all mobile files | A-Mobile, B-Mobile |
+| ~~**I16**~~ | ~~No error boundaries anywhere — component throw crashes entire app~~ **FIXED 2026-02-18** — added `ErrorBoundary.tsx` class component wrapping root `<ThemedApp />` | all mobile files | B-Mobile |
+| ~~**I17**~~ | ~~`useConsentCheck` named as hook but contains zero React hooks; causes unnecessary re-renders~~ **FIXED 2026-02-18** — renamed to `checkConsentRequirement()`, updated all callers | `hooks/use-consent.ts:22-40` | A-Mobile, B-Mobile |
+| ~~**I18**~~ | ~~Default exports on `HealthCheckList`/`HealthCheckItem` (non-page components)~~ **FIXED 2026-02-18** — deleted all 3 orphaned HealthCheck files (components + spec) | `components/HealthCheck*.tsx` | A-Mobile, B-Mobile |
+| **I19** | Memory leak: `setInterval` in chat.tsx streaming has no cleanup on unmount | `app/chat.tsx:117-137` | B-Mobile |
+| ~~**I20**~~ | ~~Persona logic leaking into `(learner)/_layout.tsx` — should only be at root layout~~ **FIXED 2026-02-18** — removed conditional `theme-learner` class, now always `flex-1` | `app/(learner)/_layout.tsx:30` | B-Mobile |
+
+#### Schemas & Database (1)
+
+| # | Issue | File | Found By |
+|---|-------|------|----------|
+| **I21** | Missing test coverage for 4 repository namespaces: `parkingLotItems`, `teachingPreferences`, `curriculumAdaptations`, `onboardingDrafts` | `packages/database/src/repository.test.ts` | A-Schema |
+
+#### Documentation (3)
+
+| # | Issue | File | Found By |
+|---|-------|------|----------|
+| ~~**I22**~~ | ~~CLAUDE.md test count stale: says "692" but actual is **1,094**~~ **FIXED 2026-02-18** — updated to 856 unit tests (API count; total across all projects: 1,036+) | `CLAUDE.md` | A-Docs, B-Docs |
+| ~~**I23**~~ | ~~`.env.example` missing `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `CLERK_JWKS_URL`~~ **FIXED 2026-02-18** — added `CLERK_JWKS_URL` with comment (other Clerk vars already present via `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`) | `.env.example` | B-Docs |
+| ~~**I24**~~ | ~~Orphaned `HealthCheckList`/`HealthCheckItem` components — no screen references them~~ **FIXED 2026-02-18** — deleted all 3 files (see I18) | `components/HealthCheck*.tsx` | B-Docs |
+
+### Suggestions (25) — Nice to Have
+
+| # | Issue | File | Found By |
+|---|-------|------|----------|
+| S1 | `as never` cast in error helper — type `status` as union instead | `lib/errors.ts:15` | A-API |
+| S2 | Free-tier default `50` duplicated in 3 places | `metering.ts`, `billing.ts` | A-API |
+| S3 | KV `JSON.parse` returns unvalidated data | `lib/kv.ts` | A-API, B-API |
+| S4 | Test files use `as any` casts | `stripe-webhook.test.ts` | A-API |
+| S5 | Stripe API version cast may hide staleness | `lib/stripe.ts:8` | A-API |
+| S6 | Throwaway Stripe client for webhook verification | `lib/stripe.ts:31` | A-API, B-API |
+| S7 | Extract repeated `retentionStatus` enum | `schemas/progress.ts:46,62,82` | A-Schema, B-Schema |
+| S8 | `timestampSchema` accepts non-UTC offsets | `schemas/common.ts:5` | B-Schema |
+| S9 | Dead code + incorrect formula in SM-2 test | `retention/sm2.test.ts:28-47` | B-Schema |
+| S10 | `teachingPreferences.method` is `text` not `pgEnum` | `schema/assessments.ts:127` | B-Schema |
+| S11 | Account creation not wrapped in transaction | `services/account.ts:86-92` | A-Svc |
+| ~~S12~~ | ~~Duplicate `eq` import in `quota-reset.ts`~~ **FIXED 2026-02-18** — merged into single `import { eq, lte } from 'drizzle-orm'` | `inngest/functions/quota-reset.ts:6,10` | A-Svc, B-Svc |
+| S13 | Answer-length quality proxy needs TODO tracking | `services/retention-data.ts:139` | A-Svc |
+| S14 | `streaks.test.ts` missing coverage for DB-aware functions | `services/streaks.test.ts` | A-Svc |
+| S15 | `getStepDatabase()` should cache Drizzle instance | `inngest/helpers.ts:13-17` | B-Svc |
+| S16 | Missing `testID` on several interactive elements | various mobile files | B-Mobile |
+| S17 | Touch target violation on subscription "Back" button | `subscription.tsx:169` | B-Mobile |
+| S18 | `ClerkError` interface duplicated in 3 auth files | `sign-in.tsx`, `sign-up.tsx`, `forgot-password.tsx` | B-Mobile |
+| S19 | Stale `(tabs)` directory files — verify no stale imports | `app/(tabs)/` | B-Mobile |
+| S20 | `HealthCheckList.spec.tsx` uses `.spec` instead of `.test` convention | `components/HealthCheckList.spec.tsx` | B-Docs |
+| S21 | architecture.md root config lists `.eslintrc.js` (actual: `eslint.config.mjs`) | `docs/architecture.md` | A-Docs |
+| S22 | architecture.md missing `lib/` directory in API tree | `docs/architecture.md` | A-Docs, B-Docs |
+| S23 | architecture.md missing `metering.ts` in middleware list | `docs/architecture.md` | A-Docs, B-Docs |
+| S24 | `.env.example` missing `ENVIRONMENT` and `LOG_LEVEL` | `.env.example` | B-Docs |
+| S25 | Top-up endpoint hardcodes 499 cents regardless of `amount` param | `routes/billing.ts:213-219` | B-API |
+
+### A/B Cross-Reference Analysis
+
+**Issues flagged by BOTH teams (strongest signal):**
+- CR2 (TOCTOU race) — 3 agents caught independently
+- CR4 (SM-2 NaN) — 2 agents
+- CR5 (process.env on CF Workers) — 2 agents
+- CR6 (unsafe double cast) — 2 agents
+- CR7 (architecture.md fiction) — 2 agents
+- I1, I2, I3 (auth/homework/billing API issues) — 2 agents each
+- I8, I9, I10, I14 (service layer issues) — 2 agents each
+- I15, I17, I18 (mobile issues) — 2 agents each
+
+**Unique B-team catches (contrarian reviewer added value):**
+- CR1 (free-tier metering bypass) — most significant unique find
+- CR8 (circular import cycle)
+- I4, I5, I6, I7 (metering edge cases)
+- I11 (payment-retry doesn't retry)
+- I12, I13 (consent/deletion test gaps)
+- I16 (no error boundaries)
+- I19 (memory leak in streaming)
+- I20 (persona logic leaking)
+- I23 (.env.example missing Clerk vars)
+
+### Cross-References with Shadow Review Open Items
+
+Several post-remediation findings overlap with existing Phase 3 open items:
+
+| Post-Rem # | Shadow Review # | Overlap |
+|------------|----------------|---------|
+| CR4 | #29 (SM-2 input validation) | NaN propagation discovered — status upgraded to "Partial" |
+| CR5 | #23 (`getStepDatabase()`) | Shared helper fixed but still uses `process.env` |
+| CR7 | #33 (Stale architecture.md paths) | Mobile tree section specifically — much worse than initially assessed |
+| I13 | #22 (Missing tests) | `account-deletion.ts` test gap confirmed |
+| I14 | #22 (Missing tests) | `consent-reminders.test.ts` tests only metadata |
+| I22 | — | New finding: CLAUDE.md test count stale |
+| S10 | #30 (`text` → `pgEnum`) | `teachingPreferences.method` confirmed as `text` |
+
+### Severity Summary
+
+| Severity | Count | Resolved | Remaining | Merge Blocker? |
+|----------|-------|----------|-----------|----------------|
+| Critical | 8 | 1 fixed (CR4) + 1 improved (CR5) | 6 | Yes |
+| Important | 24 | 15 fixed (I1-3, I10, I12-18, I20, I22-24) | 9 | Pre-deploy |
+| Suggestion | 25 | 0 | 25 | No |
+| **Total** | **57** | **17** | **40** | |
+
+---
+
 ## Overall Project Health Summary
 
-**Last updated:** 2026-02-17 (all 10 shadow reviewer reports consolidated)
+**Last updated:** 2026-02-18 (pre-feature hardening — 21 items fixed across 5 phases)
 
 ### Review History
 
@@ -1148,7 +1313,9 @@ All 8 items fixed. 707 tests pass after changes.
 | Route Restructure | 2026-02-17 | `(tabs)/` → `(learner)/` + `(parent)/` | 3 parallel agents | PASS — all 8 new files compliant |
 | Codebase Review #1 | 2026-02-17 | 83 files (commit bdab454) | 5 parallel agents | 4C/10S fixed; 3 deferred |
 | New Feature Review | 2026-02-17 | 72 files post-remediation | 4 parallel agents | 4 NC critical fixed; 8 NH + 3 patterns open |
-| **Shadow Review** | **2026-02-17** | **Full codebase** | **10 agents (5 A/B pairs)** | **33 CRITICAL, 94+ HIGH, 89+ MEDIUM, 78+ LOW — 30-item remediation plan** |
+| **Shadow Review** | **2026-02-17** | **Full codebase** | **10 agents (5 A/B pairs)** | **33 CRITICAL, 94+ HIGH, 89+ MEDIUM, 78+ LOW — 36-item remediation plan** |
+| **Post-Remediation A/B Review** | **2026-02-18** | **Full codebase post-remediation** | **10 agents (5 A/B pairs)** | **8 Critical, 24 Important, 25 Suggestions = 57 new findings** |
+| **Pre-Feature Hardening** | **2026-02-18** | **21 items from A/B review** | **4 parallel agents (5 phases)** | **CR4 fixed, CR5 improved, 17 Important fixed, 3 schema items fixed, 1,036+ tests** |
 
 ### What IS Solid (confirmed by 10 independent reviewers)
 
@@ -1165,7 +1332,7 @@ All 8 items fixed. 707 tests pass after changes.
 - **Named exports**: Consistent throughout (except required Expo Router/Workers defaults)
 - **Import ordering**: Consistent external → @eduagent/* → relative
 - **No `.then()` chains**: async/await used exclusively
-- **Test coverage**: 1,070 tests across 6 projects, 103 suites, 0 failures
+- **Test coverage**: 1,043+ tests across 6 projects (863 API + 14 retention + 166 mobile), 0 failures
 
 ### What Needs Work (prioritized)
 
@@ -1182,20 +1349,32 @@ All 8 items fixed. 707 tests pass after changes.
 | ~~Vector embedding SQL injection risk~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ Phase 1 |
 | ProfileId scoping gaps in 5+ services | HIGH | 5 files | Data isolation |
 | Auth redirect ignores persona | HIGH | 2 files | UX correctness |
-| GDPR export missing retention cards/embeddings | HIGH | 1 file | Compliance |
+| ~~GDPR export missing retention cards/embeddings~~ | ~~HIGH~~ | ~~1 file~~ | ✅ Fixed 2026-02-18 — 15 tables added |
+| ~~Free-tier metering bypass (CR1)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ Fixed 2026-02-18 — `ensureFreeSubscription()` |
+| ~~TOCTOU race in `decrementQuota()` (CR2)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ Fixed 2026-02-18 — atomic SQL WHERE guard |
+| ~~KV cache hit still queries DB (CR3)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ Fixed 2026-02-18 — `subscriptionId` in KV cache |
+| ~~**SM-2 NaN propagation (CR4)**~~ | ~~**CRITICAL**~~ | ~~1 file~~ | ✅ Fixed 2026-02-18 |
+| ⚠️ **`process.env` in Inngest helper (CR5)** | **CRITICAL** | 1 file | Improved 2026-02-18 (runtime guard). Full fix deferred. |
+| **Unsafe double cast in stripe webhook (CR6)** | **CRITICAL** | 1 file | Post-Rem Review |
+| **architecture.md mobile tree fiction (CR7)** | **CRITICAL** | 1 file | Post-Rem Review |
+| **Circular import cycle in mobile (CR8)** | **CRITICAL** | 3 files | Post-Rem Review |
 
 #### Important — Before Next Sprint
 
 | Area | Severity | Scope | Category |
 |------|----------|-------|----------|
-| Hardcoded hex colors (60+) | CRITICAL | ~15 files | Theming — in progress |
-| Persona-aware components (18) | CRITICAL | ~8 files | Theming — in progress |
-| ~~Missing explicit return types (20 hooks)~~ | ~~HIGH~~ | ~~~10 files~~ | ✅ Phase 2 |
-| ~~Local type definitions (15+)~~ | ~~HIGH~~ | ~~~12 files~~ | In progress (Phase 2) |
+| ~~Hardcoded hex colors (60+)~~ | ~~CRITICAL~~ | ~~15 files~~ | ✅ Phase 2 |
+| ~~Persona-aware components (18)~~ | ~~CRITICAL~~ | ~~8 files~~ | ✅ Phase 2 |
+| ~~Missing explicit return types (20 hooks)~~ | ~~HIGH~~ | ~~10 files~~ | ✅ Phase 2 |
+| ~~Local type definitions (15+)~~ | ~~HIGH~~ | ~~12 files~~ | ✅ Phase 2 |
 | ~~3 tables missing from scoped repository~~ | ~~HIGH~~ | ~~1 file~~ | ✅ Phase 2 |
-| ~~Ad-hoc error responses~~ | ~~HIGH~~ | ~~~8 routes~~ | ✅ Phase 2 |
+| ~~Ad-hoc error responses~~ | ~~HIGH~~ | ~~8 routes~~ | ✅ Phase 2 |
 | Touch targets below 44×44 | HIGH | ~5 files | Accessibility — deferred |
 | Mobile package.json `*` wildcards for "pinned" versions | HIGH | 1 file | Dependency mgmt |
+| N+1 queries in progress service (I8) | HIGH | 1 file | Partially mitigated 2026-02-18 (I9 fixed; loop remains) |
+| ~~Zero accessibility labels in mobile (I15)~~ | ~~HIGH~~ | ~~~15 files~~ | ✅ Fixed 2026-02-18 |
+| ~~No error boundaries in mobile (I16)~~ | ~~HIGH~~ | ~~~3 files~~ | ✅ Fixed 2026-02-18 |
+| Memory leak in chat streaming (I19) | HIGH | 1 file | Post-Rem Review |
 
 #### Ongoing — Quality Improvements
 
@@ -1203,21 +1382,28 @@ All 8 items fixed. 707 tests pass after changes.
 |------|----------|-------|----------|
 | Missing co-located tests (~10 files) | HIGH | ~10 files | Testing |
 | ~~Shared `getStepDatabase()` helper~~ | ~~MEDIUM~~ | ~~3 files~~ | ✅ Phase 3 |
-| DB schema constraints (unique indexes) | MEDIUM | 3 tables | Schema |
-| DB performance indexes | MEDIUM | 3 tables | Performance |
+| ~~DB schema constraints (unique indexes)~~ | ~~MEDIUM~~ | ~~3 tables~~ | ✅ Fixed 2026-02-18 |
+| ~~DB performance indexes~~ | ~~MEDIUM~~ | ~~3 tables~~ | ✅ Fixed 2026-02-18 (6 indexes added) |
 | Inngest timestamps in payloads | MEDIUM | ~4 events | Spec compliance |
 | Factory builder coverage | MEDIUM | 1 package | Testing |
-| ~~SM-2 input validation~~ | ~~MEDIUM~~ | ~~1 file~~ | ✅ Phase 3 |
-| ~~Dead imports cleanup~~ | ~~LOW~~ | ~~~5 files~~ | ✅ Phase 3 |
+| ~~SM-2 input validation~~ | ~~MEDIUM~~ | ~~1 file~~ | ✅ Fixed 2026-02-18 (NaN guard + tests) |
+| ~~Dead imports cleanup~~ | ~~LOW~~ | ~~5 files~~ | ✅ Phase 3 |
 | ~~`apiErrorSchema.code` unconstrained~~ | ~~MEDIUM~~ | ~~1 file~~ | ✅ Phase 3 |
 | ~~Stale architecture.md paths (30+)~~ | ~~HIGH~~ | ~~1 file~~ | ✅ Phase 3 |
+| KV cache staleness after decrement (I7) | MEDIUM | 1 file | Post-Rem Review |
+| Payment-retry doesn't actually retry (I11) | MEDIUM | 1 file | Post-Rem Review |
+| ~~`.env.example` missing Clerk vars (I23)~~ | ~~MEDIUM~~ | ~~1 file~~ | ✅ Fixed 2026-02-18 |
+| ~~Orphaned HealthCheck components (I24)~~ | ~~LOW~~ | ~~2 files~~ | ✅ Fixed 2026-02-18 (deleted) |
 
 ### Test Status
 
 ```
-1,070 tests | 6 projects | 103 suites | 0 failures
-(After Phase 0–3 remediation + Sprint 9 user work — 2026-02-18)
-Previous: 707 tests | 60 suites (Phase 0+1)
+1,043+ tests | 6 projects | 0 failures
+  - API:       863 tests (69 suites)
+  - Retention:  14 tests (1 suite)
+  - Mobile:    166 tests (28 suites)
+(After Pre-Feature Hardening remediation — 2026-02-18)
+Previous: 1,094 tests (Phase 0–3 + Sprint 9) → 1,070 tests (Phase 0–3) → 707 tests (Phase 0+1)
 ```
 
 ### Review Confidence

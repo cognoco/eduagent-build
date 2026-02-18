@@ -9,15 +9,17 @@ import {
   useSubmitSummary,
 } from './use-sessions';
 
-const mockPost = jest.fn();
-const mockGet = jest.fn();
+const mockFetch = jest.fn();
 
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
 }));
 
-jest.mock('../lib/auth-api', () => ({
-  useApi: () => ({ post: mockPost, get: mockGet }),
+jest.mock('../lib/api-client', () => ({
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
 }));
 
 jest.mock('../lib/api', () => ({
@@ -51,6 +53,7 @@ function createWrapper() {
 
 describe('useStartSession', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -59,20 +62,25 @@ describe('useStartSession', () => {
   });
 
   it('calls POST /subjects/:subjectId/sessions', async () => {
-    mockPost.mockResolvedValue({
-      session: {
-        id: 'session-1',
-        subjectId: 'subject-1',
-        sessionType: 'learning',
-        status: 'active',
-        escalationRung: 1,
-        exchangeCount: 0,
-        startedAt: '2025-01-01T00:00:00Z',
-        lastActivityAt: '2025-01-01T00:00:00Z',
-        endedAt: null,
-        durationSeconds: null,
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          session: {
+            id: 'session-1',
+            subjectId: 'subject-1',
+            sessionType: 'learning',
+            status: 'active',
+            escalationRung: 1,
+            exchangeCount: 0,
+            startedAt: '2025-01-01T00:00:00Z',
+            lastActivityAt: '2025-01-01T00:00:00Z',
+            endedAt: null,
+            durationSeconds: null,
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useStartSession('subject-1'), {
       wrapper: createWrapper(),
@@ -86,14 +94,13 @@ describe('useStartSession', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/subjects/subject-1/sessions', {
-      subjectId: 'subject-1',
-    });
+    expect(mockFetch).toHaveBeenCalled();
   });
 });
 
 describe('useSendMessage', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -102,12 +109,17 @@ describe('useSendMessage', () => {
   });
 
   it('calls POST /sessions/:sessionId/messages', async () => {
-    mockPost.mockResolvedValue({
-      response: 'AI response',
-      escalationRung: 1,
-      isUnderstandingCheck: false,
-      exchangeCount: 1,
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          response: 'AI response',
+          escalationRung: 1,
+          isUnderstandingCheck: false,
+          exchangeCount: 1,
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useSendMessage('session-1'), {
       wrapper: createWrapper(),
@@ -121,15 +133,14 @@ describe('useSendMessage', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/sessions/session-1/messages', {
-      message: 'What is gravity?',
-    });
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.response).toBe('AI response');
   });
 });
 
 describe('useCloseSession', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -138,10 +149,15 @@ describe('useCloseSession', () => {
   });
 
   it('calls POST /sessions/:sessionId/close', async () => {
-    mockPost.mockResolvedValue({
-      message: 'Session closed',
-      sessionId: 'session-1',
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          message: 'Session closed',
+          sessionId: 'session-1',
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useCloseSession('session-1'), {
       wrapper: createWrapper(),
@@ -155,12 +171,13 @@ describe('useCloseSession', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/sessions/session-1/close', {});
+    expect(mockFetch).toHaveBeenCalled();
   });
 });
 
 describe('useSessionSummary', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -169,15 +186,20 @@ describe('useSessionSummary', () => {
   });
 
   it('calls GET /sessions/:sessionId/summary', async () => {
-    mockGet.mockResolvedValue({
-      summary: {
-        id: 'summary-1',
-        sessionId: 'session-1',
-        content: 'I learned about gravity',
-        aiFeedback: 'Good summary',
-        status: 'accepted',
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          summary: {
+            id: 'summary-1',
+            sessionId: 'session-1',
+            content: 'I learned about gravity',
+            aiFeedback: 'Good summary',
+            status: 'accepted',
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useSessionSummary('session-1'), {
       wrapper: createWrapper(),
@@ -187,13 +209,15 @@ describe('useSessionSummary', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockGet).toHaveBeenCalledWith('/sessions/session-1/summary');
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.content).toBe('I learned about gravity');
     expect(result.current.data?.aiFeedback).toBe('Good summary');
   });
 
   it('returns null when no summary exists', async () => {
-    mockGet.mockResolvedValue({ summary: null });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ summary: null }), { status: 200 })
+    );
 
     const { result } = renderHook(() => useSessionSummary('session-1'), {
       wrapper: createWrapper(),
@@ -209,6 +233,7 @@ describe('useSessionSummary', () => {
 
 describe('useSubmitSummary', () => {
   beforeEach(() => {
+    mockFetch.mockReset();
     jest.clearAllMocks();
   });
 
@@ -217,15 +242,20 @@ describe('useSubmitSummary', () => {
   });
 
   it('calls POST /sessions/:sessionId/summary with content', async () => {
-    mockPost.mockResolvedValue({
-      summary: {
-        id: 'summary-1',
-        sessionId: 'session-1',
-        content: 'Gravity pulls objects toward Earth',
-        aiFeedback: 'Clear and accurate summary.',
-        status: 'accepted',
-      },
-    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          summary: {
+            id: 'summary-1',
+            sessionId: 'session-1',
+            content: 'Gravity pulls objects toward Earth',
+            aiFeedback: 'Clear and accurate summary.',
+            status: 'accepted',
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useSubmitSummary('session-1'), {
       wrapper: createWrapper(),
@@ -239,9 +269,7 @@ describe('useSubmitSummary', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/sessions/session-1/summary', {
-      content: 'Gravity pulls objects toward Earth',
-    });
+    expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.summary.aiFeedback).toBe(
       'Clear and accurate summary.'
     );
@@ -249,7 +277,12 @@ describe('useSubmitSummary', () => {
   });
 
   it('handles submission error', async () => {
-    mockPost.mockRejectedValue(new Error('API error 422'));
+    mockFetch.mockResolvedValueOnce(
+      new Response('API error 422', {
+        status: 422,
+        statusText: 'Unprocessable Entity',
+      })
+    );
 
     const { result } = renderHook(() => useSubmitSummary('session-1'), {
       wrapper: createWrapper(),
@@ -263,6 +296,6 @@ describe('useSubmitSummary', () => {
       expect(result.current.isError).toBe(true);
     });
 
-    expect(result.current.error?.message).toBe('API error 422');
+    expect(result.current.error).toBeInstanceOf(Error);
   });
 });

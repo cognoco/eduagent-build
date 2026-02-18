@@ -19,8 +19,8 @@ import {
   getWarningLevel,
   calculateRemainingQuestions,
 } from '../services/metering';
-import { createStripeClient } from '../lib/stripe';
-import { apiError, notFound } from '../lib/errors';
+import { createStripeClient } from '../services/stripe';
+import { apiError, notFound } from '../errors';
 
 type BillingRouteEnv = {
   Bindings: {
@@ -151,8 +151,17 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         metadata: { accountId: account.id, tier, interval },
       });
 
+      if (!session.url) {
+        return apiError(
+          c,
+          500,
+          ERROR_CODES.INTERNAL_ERROR,
+          'Stripe returned no checkout URL'
+        );
+      }
+
       return c.json({
-        checkoutUrl: session.url!,
+        checkoutUrl: session.url,
         sessionId: session.id,
       });
     }

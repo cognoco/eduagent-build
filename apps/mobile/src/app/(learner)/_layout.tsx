@@ -29,7 +29,7 @@ export default function LearnerLayout() {
   if (persona === 'parent') return <Redirect href="/(parent)/dashboard" />;
 
   return (
-    <View className={persona === 'learner' ? 'theme-learner flex-1' : 'flex-1'}>
+    <View className="flex-1">
       <Tabs
         screenOptions={{
           headerShown: false,

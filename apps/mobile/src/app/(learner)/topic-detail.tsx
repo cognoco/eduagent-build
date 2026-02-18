@@ -84,6 +84,8 @@ export default function TopicDetailScreen() {
           onPress={() => router.back()}
           className="mr-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="topic-detail-back"
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
         >
           <Text className="text-primary text-h3">&larr;</Text>
         </Pressable>
@@ -239,7 +241,7 @@ export default function TopicDetailScreen() {
           <Pressable
             onPress={() =>
               router.push({
-                pathname: '/chat',
+                pathname: '/session',
                 params: {
                   mode: 'practice',
                   subjectId,
@@ -249,6 +251,8 @@ export default function TopicDetailScreen() {
             }
             className="bg-primary rounded-button py-3.5 items-center mb-2"
             testID="start-review-button"
+            accessibilityLabel="Start review session"
+            accessibilityRole="button"
           >
             <Text className="text-text-inverse text-body font-semibold">
               Start Review Session
@@ -258,9 +262,8 @@ export default function TopicDetailScreen() {
             <Pressable
               onPress={() =>
                 router.push({
-                  pathname: '/chat',
+                  pathname: '/assessment',
                   params: {
-                    mode: 'assessment',
                     subjectId,
                     topicId,
                   },
@@ -268,6 +271,8 @@ export default function TopicDetailScreen() {
               }
               className="flex-1 bg-surface-elevated rounded-button py-3 items-center mr-2"
               testID="request-retest-button"
+              accessibilityLabel="Request re-test"
+              accessibilityRole="button"
             >
               <Text className="text-body-sm font-medium text-text-primary">
                 Request Re-test
@@ -276,7 +281,7 @@ export default function TopicDetailScreen() {
             <Pressable
               onPress={() =>
                 router.push({
-                  pathname: '/chat',
+                  pathname: '/session',
                   params: {
                     mode: 'learning',
                     subjectId,
@@ -286,6 +291,8 @@ export default function TopicDetailScreen() {
               }
               className="flex-1 bg-surface-elevated rounded-button py-3 items-center"
               testID="relearn-button"
+              accessibilityLabel="Relearn topic"
+              accessibilityRole="button"
             >
               <Text className="text-body-sm font-medium text-text-primary">
                 Relearn Topic
