@@ -29,7 +29,7 @@ export default function ParentLayout() {
   if (persona !== 'parent') return <Redirect href="/(learner)/home" />;
 
   return (
-    <View className="theme-parent flex-1">
+    <View className="flex-1">
       <Tabs
         screenOptions={{
           headerShown: false,

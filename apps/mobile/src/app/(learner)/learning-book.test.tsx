@@ -151,8 +151,8 @@ describe('LearningBookScreen', () => {
     fireEvent.press(screen.getByTestId('topic-row-topic-1'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(learner)/topic-detail',
-      params: { subjectId: 'sub-1', topicId: 'topic-1' },
+      pathname: '/(learner)/topic/topic-1',
+      params: { subjectId: 'sub-1' },
     });
   });
 

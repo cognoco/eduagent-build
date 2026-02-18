@@ -2,7 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Teen Theme — dark, high-contrast, minimal */
+/*
+ * Fallback values for Tailwind build-time processing.
+ * Runtime values are injected from design-tokens.ts via NativeWind vars().
+ * The :root block defines the teen (default) theme as a baseline.
+ */
 :root {
   --color-background: #0f0f0f;
   --color-surface: #1a1a1a;
@@ -28,60 +32,4 @@
   --radius-card: 16px;
   --radius-button: 12px;
   --radius-input: 10px;
-}
-
-/* Learner Theme — calm, spacious, warm */
-.theme-learner {
-  --color-background: #fafaf9;
-  --color-surface: #ffffff;
-  --color-surface-elevated: #f5f5f4;
-  --color-text-primary: #1c1917;
-  --color-text-secondary: #78716c;
-  --color-text-inverse: #fafaf9;
-  --color-primary: #6366f1;
-  --color-primary-soft: rgba(99, 102, 241, 0.1);
-  --color-secondary: #818cf8;
-  --color-accent: #818cf8;
-  --color-success: #16a34a;
-  --color-warning: #ca8a04;
-  --color-danger: #dc2626;
-  --color-info: #0ea5e9;
-  --color-border: #e7e5e4;
-  --color-muted: #a8a29e;
-  --color-retention-strong: #16a34a;
-  --color-retention-fading: #ca8a04;
-  --color-retention-weak: #dc2626;
-  --color-retention-forgotten: #737373;
-  --color-coaching-card: #f5f5f4;
-  --radius-card: 12px;
-  --radius-button: 10px;
-  --radius-input: 8px;
-}
-
-/* Parent Theme — light, clean, high-trust */
-.theme-parent {
-  --color-background: #ffffff;
-  --color-surface: #f8fafc;
-  --color-surface-elevated: #f1f5f9;
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #64748b;
-  --color-text-inverse: #ffffff;
-  --color-primary: #4f46e5;
-  --color-primary-soft: rgba(79, 70, 229, 0.08);
-  --color-secondary: #6366f1;
-  --color-accent: #6366f1;
-  --color-success: #15803d;
-  --color-warning: #a16207;
-  --color-danger: #b91c1c;
-  --color-info: #0284c7;
-  --color-border: #e2e8f0;
-  --color-muted: #94a3b8;
-  --color-retention-strong: #15803d;
-  --color-retention-fading: #a16207;
-  --color-retention-weak: #b91c1c;
-  --color-retention-forgotten: #737373;
-  --color-coaching-card: #f1f5f9;
-  --radius-card: 10px;
-  --radius-button: 8px;
-  --radius-input: 6px;
 }

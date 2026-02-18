@@ -17,11 +17,11 @@ jest.mock('react-native-safe-area-context', () => ({
 const mockUseTopicProgress = jest.fn();
 const mockUseTopicRetention = jest.fn();
 
-jest.mock('../../hooks/use-progress', () => ({
+jest.mock('../../../hooks/use-progress', () => ({
   useTopicProgress: (...args: unknown[]) => mockUseTopicProgress(...args),
 }));
 
-jest.mock('../../hooks/use-retention', () => ({
+jest.mock('../../../hooks/use-retention', () => ({
   useTopicRetention: (...args: unknown[]) => mockUseTopicRetention(...args),
 }));
 
@@ -42,7 +42,7 @@ function createWrapper() {
   };
 }
 
-const TopicDetailScreen = require('./topic-detail').default;
+const TopicDetailScreen = require('./[topicId]').default;
 
 describe('TopicDetailScreen', () => {
   beforeEach(() => {

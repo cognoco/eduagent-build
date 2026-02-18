@@ -1,5 +1,6 @@
 import '../../global.css';
 import { useState, useEffect, useMemo } from 'react';
+import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -7,9 +8,9 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ThemeContext, type Persona } from '../lib/theme';
+import { ThemeContext, useTokenVars, type Persona } from '../lib/theme';
 import { ProfileProvider, useProfile } from '../lib/profile';
-import { ErrorBoundary } from '../components/ErrorBoundary';
+import { ErrorBoundary } from '../components/common';
 
 const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -44,6 +45,17 @@ function ThemedApp() {
 
   return (
     <ThemeContext.Provider value={themeValue}>
+      <ThemedContent persona={persona} />
+    </ThemeContext.Provider>
+  );
+}
+
+/** Inner component that reads ThemeContext to inject CSS variables via vars() */
+function ThemedContent({ persona }: { persona: Persona }) {
+  const tokenVars = useTokenVars();
+
+  return (
+    <View style={[{ flex: 1 }, tokenVars]}>
       <StatusBar style={persona === 'teen' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
@@ -114,7 +126,7 @@ function ThemedApp() {
           }}
         />
       </Stack>
-    </ThemeContext.Provider>
+    </View>
   );
 }
 

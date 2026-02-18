@@ -11,7 +11,7 @@ import {
 import { useState, useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { UsageMeter } from '../../components/UsageMeter';
+import { UsageMeter } from '../../components/common';
 import {
   useSubscription,
   useUsage,

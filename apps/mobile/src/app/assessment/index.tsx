@@ -4,8 +4,11 @@ import {
   ChatShell,
   animateResponse,
   type ChatMessage,
-} from '../components/ChatShell';
-import { useCreateAssessment, useSubmitAnswer } from '../hooks/use-assessments';
+} from '../../components/session';
+import {
+  useCreateAssessment,
+  useSubmitAnswer,
+} from '../../hooks/use-assessments';
 
 const OPENING_MESSAGE =
   "Time for a knowledge check. I'll ask you a few questions to see how well you've understood the material. Ready?";

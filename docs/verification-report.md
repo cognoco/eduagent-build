@@ -1206,7 +1206,7 @@ Same A/B cross-validation as the Shadow Review: each domain independently review
 | ~~**I16**~~ | ~~No error boundaries anywhere — component throw crashes entire app~~ **FIXED 2026-02-18** — added `ErrorBoundary.tsx` class component wrapping root `<ThemedApp />` | all mobile files | B-Mobile |
 | ~~**I17**~~ | ~~`useConsentCheck` named as hook but contains zero React hooks; causes unnecessary re-renders~~ **FIXED 2026-02-18** — renamed to `checkConsentRequirement()`, updated all callers | `hooks/use-consent.ts:22-40` | A-Mobile, B-Mobile |
 | ~~**I18**~~ | ~~Default exports on `HealthCheckList`/`HealthCheckItem` (non-page components)~~ **FIXED 2026-02-18** — deleted all 3 orphaned HealthCheck files (components + spec) | `components/HealthCheck*.tsx` | A-Mobile, B-Mobile |
-| **I19** | Memory leak: `setInterval` in chat.tsx streaming has no cleanup on unmount | `app/chat.tsx:117-137` | B-Mobile |
+| ~~**I19**~~ | ~~Memory leak: `setInterval` in chat.tsx streaming has no cleanup on unmount~~ **FIXED 2026-02-18** — stored `animateResponse()` cleanup in ref, added `useEffect` unmount cleanup in `session/index.tsx` | `app/session/index.tsx:63-69` | B-Mobile |
 | ~~**I20**~~ | ~~Persona logic leaking into `(learner)/_layout.tsx` — should only be at root layout~~ **FIXED 2026-02-18** — removed conditional `theme-learner` class, now always `flex-1` | `app/(learner)/_layout.tsx:30` | B-Mobile |
 
 #### Schemas & Database (1)
@@ -1272,7 +1272,7 @@ Same A/B cross-validation as the Shadow Review: each domain independently review
 - I11 (payment-retry doesn't retry)
 - I12, I13 (consent/deletion test gaps)
 - I16 (no error boundaries)
-- I19 (memory leak in streaming)
+- ~~I19 (memory leak in streaming)~~ — fixed 2026-02-18
 - I20 (persona logic leaking)
 - I23 (.env.example missing Clerk vars)
 
@@ -1374,7 +1374,7 @@ Several post-remediation findings overlap with existing Phase 3 open items:
 | N+1 queries in progress service (I8) | HIGH | 1 file | Partially mitigated 2026-02-18 (I9 fixed; loop remains) |
 | ~~Zero accessibility labels in mobile (I15)~~ | ~~HIGH~~ | ~~~15 files~~ | ✅ Fixed 2026-02-18 |
 | ~~No error boundaries in mobile (I16)~~ | ~~HIGH~~ | ~~~3 files~~ | ✅ Fixed 2026-02-18 |
-| Memory leak in chat streaming (I19) | HIGH | 1 file | Post-Rem Review |
+| ~~Memory leak in chat streaming (I19)~~ | ~~HIGH~~ | ~~1 file~~ | ✅ Fixed 2026-02-18 |
 
 #### Ongoing — Quality Improvements
 

@@ -25,7 +25,7 @@ jest.mock('react-native-safe-area-context', () => ({
 
 const mockSubmitMutateAsync = jest.fn();
 
-jest.mock('../hooks/use-sessions', () => ({
+jest.mock('../../hooks/use-sessions', () => ({
   useSubmitSummary: () => ({
     mutateAsync: mockSubmitMutateAsync,
     isPending: false,
@@ -34,7 +34,7 @@ jest.mock('../hooks/use-sessions', () => ({
   }),
 }));
 
-jest.mock('../lib/theme', () => ({
+jest.mock('../../lib/theme', () => ({
   useThemeColors: () => ({
     muted: '#a3a3a3',
     textInverse: '#0f0f0f',
@@ -51,7 +51,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-const SessionSummaryScreen = require('./session-summary').default;
+const SessionSummaryScreen = require('./[sessionId]').default;
 
 describe('SessionSummaryScreen', () => {
   beforeEach(() => {

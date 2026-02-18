@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { RetentionSignal } from '../../components/RetentionSignal';
+import { RetentionSignal } from '../../components/progress';
 import { useSubjects } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
 import { useRetentionTopics } from '../../hooks/use-retention';
@@ -186,12 +186,11 @@ export default function LearningBookScreen() {
               key={topic.topicId}
               onPress={() =>
                 router.push({
-                  pathname: '/(learner)/topic-detail',
+                  pathname: `/(learner)/topic/${topic.topicId}`,
                   params: {
                     subjectId: topic.subjectId,
-                    topicId: topic.topicId,
                   },
-                })
+                } as never)
               }
               className="bg-surface rounded-card px-4 py-3 mb-2"
               testID={`topic-row-${topic.topicId}`}

@@ -1,16 +1,16 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Text, Pressable, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ChatShell,
   animateResponse,
   type ChatMessage,
-} from '../components/ChatShell';
+} from '../../components/session';
 import {
   useStreamMessage,
   useStartSession,
   useCloseSession,
-} from '../hooks/use-sessions';
+} from '../../hooks/use-sessions';
 
 const OPENING_MESSAGES: Record<string, string> = {
   homework:
@@ -60,6 +60,14 @@ export default function SessionScreen() {
     routeSessionId ?? null
   );
 
+  const animationCleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      animationCleanupRef.current?.();
+    };
+  }, []);
+
   const startSession = useStartSession(subjectId ?? '');
   const closeSession = useCloseSession(activeSessionId ?? '');
   const { stream: streamMessage } = useStreamMessage(activeSessionId ?? '');
@@ -90,7 +98,7 @@ export default function SessionScreen() {
       try {
         const sid = await ensureSession();
         if (!sid) {
-          animateResponse(
+          animationCleanupRef.current = animateResponse(
             "I'm having trouble starting a session. Please try again.",
             setMessages,
             setIsStreaming
@@ -126,7 +134,7 @@ export default function SessionScreen() {
           }
         );
       } catch {
-        animateResponse(
+        animationCleanupRef.current = animateResponse(
           "I'm having trouble connecting right now. Please try again.",
           setMessages,
           setIsStreaming
@@ -151,14 +159,13 @@ export default function SessionScreen() {
             try {
               await closeSession.mutateAsync();
               router.replace({
-                pathname: '/session-summary',
+                pathname: `/session-summary/${activeSessionId}`,
                 params: {
-                  sessionId: activeSessionId,
                   subjectName: subjectName ?? '',
                   exchangeCount: String(exchangeCount),
                   escalationRung: String(escalationRung),
                 },
-              });
+              } as never);
             } catch {
               setIsClosing(false);
               Alert.alert(

@@ -1,5 +1,5 @@
 import { View, Text } from 'react-native';
-import { RetentionSignal } from './RetentionSignal';
+import { RetentionSignal } from '../progress/RetentionSignal';
 
 type RetentionStatus = 'strong' | 'fading' | 'weak' | 'forgotten';
 

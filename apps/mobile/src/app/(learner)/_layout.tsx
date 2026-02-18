@@ -78,7 +78,7 @@ export default function LearnerLayout() {
           }}
         />
         <Tabs.Screen
-          name="topic-detail"
+          name="topic"
           options={{
             href: null,
           }}

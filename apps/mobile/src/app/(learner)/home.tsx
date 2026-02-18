@@ -7,8 +7,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CoachingCard } from '../../components/CoachingCard';
-import { RetentionSignal } from '../../components/RetentionSignal';
+import { CoachingCard } from '../../components/coaching';
+import { RetentionSignal } from '../../components/progress';
 import { useSubjects } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
 import { useStreaks } from '../../hooks/use-streaks';
@@ -96,10 +96,9 @@ export default function HomeScreen() {
                   <Pressable
                     key={subject.id}
                     onPress={() =>
-                      router.push({
-                        pathname: '/(learner)/curriculum',
-                        params: { subjectId: subject.id },
-                      })
+                      router.push(
+                        `/(learner)/curriculum/${subject.id}` as never
+                      )
                     }
                     className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
                     accessibilityLabel={`Open ${subject.name}`}

@@ -5,8 +5,8 @@ import {
   ChatShell,
   animateResponse,
   type ChatMessage,
-} from '../components/ChatShell';
-import { useSendInterviewMessage } from '../hooks/use-interview';
+} from '../../components/session';
+import { useSendInterviewMessage } from '../../hooks/use-interview';
 
 const OPENING_MESSAGE =
   "Hi! I'm your learning coach. I'd like to get to know you a bit before we start. What made you interested in learning this subject?";
@@ -70,10 +70,7 @@ export default function InterviewScreen() {
             </Text>
             <Pressable
               onPress={() =>
-                router.replace({
-                  pathname: '/(learner)/curriculum',
-                  params: { subjectId },
-                })
+                router.replace(`/(learner)/curriculum/${subjectId}` as never)
               }
               className="bg-primary rounded-button py-3 items-center"
               testID="view-curriculum-button"

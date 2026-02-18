@@ -10,12 +10,12 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useThemeColors } from '../../lib/theme';
+import { useThemeColors } from '../../../lib/theme';
 import {
   useCurriculum,
   useSkipTopic,
   useChallengeCurriculum,
-} from '../../hooks/use-curriculum';
+} from '../../../hooks/use-curriculum';
 
 const RELEVANCE_COLORS: Record<string, string> = {
   core: 'bg-primary/20 text-primary',

@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../lib/theme';
-import { DashboardCard } from '../../components/DashboardCard';
+import { DashboardCard } from '../../components/common';
 import { useDashboard } from '../../hooks/use-dashboard';
 
 type RetentionStatus = 'strong' | 'fading' | 'weak';

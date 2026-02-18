@@ -1,0 +1,236 @@
+import type { Persona } from './theme';
+
+export type ColorScheme = 'light' | 'dark';
+
+export interface ThemeTokens {
+  colors: {
+    background: string;
+    surface: string;
+    surfaceElevated: string;
+    textPrimary: string;
+    textSecondary: string;
+    textInverse: string;
+    primary: string;
+    primarySoft: string;
+    secondary: string;
+    accent: string;
+    success: string;
+    warning: string;
+    danger: string;
+    info: string;
+    border: string;
+    muted: string;
+    retentionStrong: string;
+    retentionFading: string;
+    retentionWeak: string;
+    retentionForgotten: string;
+    coachingCard: string;
+  };
+  radii: {
+    card: string;
+    button: string;
+    input: string;
+  };
+}
+
+/**
+ * Canonical source of truth for all theme values.
+ * These drive both NativeWind CSS variables (via `vars()`) and native color props.
+ *
+ * Values match the CSS variables previously defined in global.css.
+ * To change a color: update it here — everything else follows automatically.
+ */
+export const tokens: Record<Persona, Record<ColorScheme, ThemeTokens>> = {
+  teen: {
+    light: {
+      colors: {
+        background: '#0f0f0f',
+        surface: '#1a1a1a',
+        surfaceElevated: '#262626',
+        textPrimary: '#f5f5f5',
+        textSecondary: '#a3a3a3',
+        textInverse: '#0f0f0f',
+        primary: '#7c3aed',
+        primarySoft: 'rgba(124, 58, 237, 0.15)',
+        secondary: '#a78bfa',
+        accent: '#a855f7',
+        success: '#22c55e',
+        warning: '#eab308',
+        danger: '#ef4444',
+        info: '#38bdf8',
+        border: '#262626',
+        muted: '#525252',
+        retentionStrong: '#22c55e',
+        retentionFading: '#eab308',
+        retentionWeak: '#ef4444',
+        retentionForgotten: '#737373',
+        coachingCard: '#262626',
+      },
+      radii: { card: '16px', button: '12px', input: '10px' },
+    },
+    dark: {
+      colors: {
+        background: '#0f0f0f',
+        surface: '#1a1a1a',
+        surfaceElevated: '#262626',
+        textPrimary: '#f5f5f5',
+        textSecondary: '#a3a3a3',
+        textInverse: '#0f0f0f',
+        primary: '#7c3aed',
+        primarySoft: 'rgba(124, 58, 237, 0.15)',
+        secondary: '#a78bfa',
+        accent: '#a855f7',
+        success: '#22c55e',
+        warning: '#eab308',
+        danger: '#ef4444',
+        info: '#38bdf8',
+        border: '#262626',
+        muted: '#525252',
+        retentionStrong: '#22c55e',
+        retentionFading: '#eab308',
+        retentionWeak: '#ef4444',
+        retentionForgotten: '#737373',
+        coachingCard: '#262626',
+      },
+      radii: { card: '16px', button: '12px', input: '10px' },
+    },
+  },
+  learner: {
+    light: {
+      colors: {
+        background: '#fafaf9',
+        surface: '#ffffff',
+        surfaceElevated: '#f5f5f4',
+        textPrimary: '#1c1917',
+        textSecondary: '#78716c',
+        textInverse: '#fafaf9',
+        primary: '#6366f1',
+        primarySoft: 'rgba(99, 102, 241, 0.1)',
+        secondary: '#818cf8',
+        accent: '#818cf8',
+        success: '#16a34a',
+        warning: '#ca8a04',
+        danger: '#dc2626',
+        info: '#0ea5e9',
+        border: '#e7e5e4',
+        muted: '#a8a29e',
+        retentionStrong: '#16a34a',
+        retentionFading: '#ca8a04',
+        retentionWeak: '#dc2626',
+        retentionForgotten: '#737373',
+        coachingCard: '#f5f5f4',
+      },
+      radii: { card: '12px', button: '10px', input: '8px' },
+    },
+    dark: {
+      colors: {
+        background: '#fafaf9',
+        surface: '#ffffff',
+        surfaceElevated: '#f5f5f4',
+        textPrimary: '#1c1917',
+        textSecondary: '#78716c',
+        textInverse: '#fafaf9',
+        primary: '#6366f1',
+        primarySoft: 'rgba(99, 102, 241, 0.1)',
+        secondary: '#818cf8',
+        accent: '#818cf8',
+        success: '#16a34a',
+        warning: '#ca8a04',
+        danger: '#dc2626',
+        info: '#0ea5e9',
+        border: '#e7e5e4',
+        muted: '#a8a29e',
+        retentionStrong: '#16a34a',
+        retentionFading: '#ca8a04',
+        retentionWeak: '#dc2626',
+        retentionForgotten: '#737373',
+        coachingCard: '#f5f5f4',
+      },
+      radii: { card: '12px', button: '10px', input: '8px' },
+    },
+  },
+  parent: {
+    light: {
+      colors: {
+        background: '#ffffff',
+        surface: '#f8fafc',
+        surfaceElevated: '#f1f5f9',
+        textPrimary: '#0f172a',
+        textSecondary: '#64748b',
+        textInverse: '#ffffff',
+        primary: '#4f46e5',
+        primarySoft: 'rgba(79, 70, 229, 0.08)',
+        secondary: '#6366f1',
+        accent: '#6366f1',
+        success: '#15803d',
+        warning: '#a16207',
+        danger: '#b91c1c',
+        info: '#0284c7',
+        border: '#e2e8f0',
+        muted: '#94a3b8',
+        retentionStrong: '#15803d',
+        retentionFading: '#a16207',
+        retentionWeak: '#b91c1c',
+        retentionForgotten: '#737373',
+        coachingCard: '#f1f5f9',
+      },
+      radii: { card: '10px', button: '8px', input: '6px' },
+    },
+    dark: {
+      colors: {
+        background: '#ffffff',
+        surface: '#f8fafc',
+        surfaceElevated: '#f1f5f9',
+        textPrimary: '#0f172a',
+        textSecondary: '#64748b',
+        textInverse: '#ffffff',
+        primary: '#4f46e5',
+        primarySoft: 'rgba(79, 70, 229, 0.08)',
+        secondary: '#6366f1',
+        accent: '#6366f1',
+        success: '#15803d',
+        warning: '#a16207',
+        danger: '#b91c1c',
+        info: '#0284c7',
+        border: '#e2e8f0',
+        muted: '#94a3b8',
+        retentionStrong: '#15803d',
+        retentionFading: '#a16207',
+        retentionWeak: '#b91c1c',
+        retentionForgotten: '#737373',
+        coachingCard: '#f1f5f9',
+      },
+      radii: { card: '10px', button: '8px', input: '6px' },
+    },
+  },
+};
+
+/** Convert tokens to CSS variable dictionary for NativeWind vars() */
+export function tokensToCssVars(t: ThemeTokens): Record<`--${string}`, string> {
+  return {
+    '--color-background': t.colors.background,
+    '--color-surface': t.colors.surface,
+    '--color-surface-elevated': t.colors.surfaceElevated,
+    '--color-text-primary': t.colors.textPrimary,
+    '--color-text-secondary': t.colors.textSecondary,
+    '--color-text-inverse': t.colors.textInverse,
+    '--color-primary': t.colors.primary,
+    '--color-primary-soft': t.colors.primarySoft,
+    '--color-secondary': t.colors.secondary,
+    '--color-accent': t.colors.accent,
+    '--color-success': t.colors.success,
+    '--color-warning': t.colors.warning,
+    '--color-danger': t.colors.danger,
+    '--color-info': t.colors.info,
+    '--color-border': t.colors.border,
+    '--color-muted': t.colors.muted,
+    '--color-retention-strong': t.colors.retentionStrong,
+    '--color-retention-fading': t.colors.retentionFading,
+    '--color-retention-weak': t.colors.retentionWeak,
+    '--color-retention-forgotten': t.colors.retentionForgotten,
+    '--color-coaching-card': t.colors.coachingCard,
+    '--radius-card': t.radii.card,
+    '--radius-button': t.radii.button,
+    '--radius-input': t.radii.input,
+  };
+}

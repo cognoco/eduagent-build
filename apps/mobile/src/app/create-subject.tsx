@@ -31,12 +31,11 @@ export default function CreateSubjectScreen() {
       const result = await createSubject.mutateAsync({ name: name.trim() });
       // Navigate to interview for the new subject
       router.replace({
-        pathname: '/interview',
+        pathname: `/interview/${result.subject.id}`,
         params: {
-          subjectId: result.subject.id,
           subjectName: result.subject.name,
         },
-      });
+      } as never);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
     }

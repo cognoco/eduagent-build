@@ -11,8 +11,8 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useThemeColors } from '../lib/theme';
-import { useSubmitSummary } from '../hooks/use-sessions';
+import { useThemeColors } from '../../lib/theme';
+import { useSubmitSummary } from '../../hooks/use-sessions';
 
 export default function SessionSummaryScreen() {
   const { sessionId, subjectName, exchangeCount, escalationRung } =
