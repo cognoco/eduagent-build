@@ -7,7 +7,19 @@ const mockFetch = jest.fn();
 jest.mock('../lib/api-client', () => ({
   useApiClient: () => {
     const { hc } = require('hono/client');
-    return hc('http://localhost', { fetch: mockFetch });
+    return hc('http://localhost', {
+      fetch: async (...args: unknown[]) => {
+        const res = await mockFetch(...(args as Parameters<typeof fetch>));
+        if (!res.ok) {
+          const text = await res
+            .clone()
+            .text()
+            .catch(() => res.statusText);
+          throw new Error(`API error ${res.status}: ${text}`);
+        }
+        return res;
+      },
+    });
   },
 }));
 

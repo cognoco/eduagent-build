@@ -40,22 +40,25 @@ jest.mock('../services/account', () => ({
 // Mock billing service — metering middleware calls these on LLM routes
 // ---------------------------------------------------------------------------
 
+const mockSubscription = {
+  id: 'sub-1',
+  accountId: 'test-account-id',
+  tier: 'plus',
+  status: 'active',
+  stripeCustomerId: null,
+  stripeSubscriptionId: null,
+  trialEndsAt: null,
+  currentPeriodEnd: null,
+  currentPeriodStart: null,
+  cancelledAt: null,
+  lastStripeEventTimestamp: null,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
 jest.mock('../services/billing', () => ({
-  getSubscriptionByAccountId: jest.fn().mockResolvedValue({
-    id: 'sub-1',
-    accountId: 'test-account-id',
-    tier: 'plus',
-    status: 'active',
-    stripeCustomerId: null,
-    stripeSubscriptionId: null,
-    trialEndsAt: null,
-    currentPeriodEnd: null,
-    currentPeriodStart: null,
-    cancelledAt: null,
-    lastStripeEventTimestamp: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
+  getSubscriptionByAccountId: jest.fn().mockResolvedValue(mockSubscription),
+  ensureFreeSubscription: jest.fn().mockResolvedValue(mockSubscription),
   getQuotaPool: jest.fn().mockResolvedValue({
     id: 'qp-1',
     subscriptionId: 'sub-1',

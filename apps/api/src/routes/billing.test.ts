@@ -44,12 +44,15 @@ jest.mock('../services/account', () => ({
 // ---------------------------------------------------------------------------
 
 const mockGetSubscriptionByAccountId = jest.fn();
+const mockEnsureFreeSubscription = jest.fn();
 const mockGetQuotaPool = jest.fn();
 const mockLinkStripeCustomer = jest.fn();
 
 jest.mock('../services/billing', () => ({
   getSubscriptionByAccountId: (...args: unknown[]) =>
     mockGetSubscriptionByAccountId(...args),
+  ensureFreeSubscription: (...args: unknown[]) =>
+    mockEnsureFreeSubscription(...args),
   getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
   linkStripeCustomer: (...args: unknown[]) => mockLinkStripeCustomer(...args),
 }));

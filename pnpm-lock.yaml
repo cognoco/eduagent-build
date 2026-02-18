@@ -273,6 +273,9 @@ importers:
       inngest:
         specifier: ^3.0.0
         version: 3.52.0(@opentelemetry/core@2.5.1(@opentelemetry/api@1.9.0))(encoding@0.1.13)(express@4.21.2)(hono@4.11.9)(koa@3.0.3)(next@14.2.35(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.56.1)(babel-plugin-macros@3.1.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(sass@1.93.3))(typescript@5.9.3)(zod@4.1.12)
+      stripe:
+        specifier: ^20.3.0
+        version: 20.3.1(@types/node@22.19.1)
       zod:
         specifier: ^4.1.12
         version: 4.1.12
@@ -11450,6 +11453,15 @@ packages:
 
   strip-literal@3.1.0:
     resolution: {integrity: sha512-8r3mkIM/2+PpjHoOtiAW8Rg3jJLHaV7xPwG+YRGrv6FP0wwk/toTpATxWYOW0BKdWwl82VT2tFYi5DlROa0Mxg==}
+
+  stripe@20.3.1:
+    resolution: {integrity: sha512-k990yOT5G5rhX3XluRPw5Y8RLdJDW4dzQ29wWT66piHrbnM2KyamJ1dKgPsw4HzGHRWjDiSSdcI2WdxQUPV3aQ==}
+    engines: {node: '>=16'}
+    peerDependencies:
+      '@types/node': '>=16'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
 
   strtok3@10.3.4:
     resolution: {integrity: sha512-KIy5nylvC5le1OdaaoCJ07L+8iQzJHGH6pWDuzS+d07Cu7n1MZ2x26P8ZKIWfbK02+XIL8Mp4RkWeqdUCrDMfg==}
@@ -26225,6 +26237,10 @@ snapshots:
     dependencies:
       js-tokens: 9.0.1
     optional: true
+
+  stripe@20.3.1(@types/node@22.19.1):
+    optionalDependencies:
+      '@types/node': 22.19.1
 
   strtok3@10.3.4:
     dependencies:

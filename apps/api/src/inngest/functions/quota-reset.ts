@@ -3,11 +3,10 @@
 // Daily cron: reset monthly quota for subscriptions whose billing cycle reset.
 // ---------------------------------------------------------------------------
 
-import { lte } from 'drizzle-orm';
+import { eq, lte } from 'drizzle-orm';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { quotaPools, subscriptions } from '@eduagent/database';
-import { eq } from 'drizzle-orm';
 import { getTierConfig } from '../../services/subscription';
 
 export const quotaReset = inngest.createFunction(

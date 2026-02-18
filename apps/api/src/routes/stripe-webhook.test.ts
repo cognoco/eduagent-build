@@ -13,6 +13,7 @@ jest.mock('../services/kv', () => ({
 jest.mock('../services/billing', () => ({
   updateSubscriptionFromWebhook: jest.fn(),
   getSubscriptionByAccountId: jest.fn(),
+  ensureFreeSubscription: jest.fn(),
   getQuotaPool: jest.fn(),
 }));
 

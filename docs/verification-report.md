@@ -1332,7 +1332,7 @@ Several post-remediation findings overlap with existing Phase 3 open items:
 - **Named exports**: Consistent throughout (except required Expo Router/Workers defaults)
 - **Import ordering**: Consistent external → @eduagent/* → relative
 - **No `.then()` chains**: async/await used exclusively
-- **Test coverage**: 1,043+ tests across 6 projects (863 API + 14 retention + 166 mobile), 0 failures
+- **Test coverage**: 1,048+ tests across 6 projects (868 API + 14 retention + 166 mobile), 0 failures
 
 ### What Needs Work (prioritized)
 
@@ -1398,12 +1398,12 @@ Several post-remediation findings overlap with existing Phase 3 open items:
 ### Test Status
 
 ```
-1,043+ tests | 6 projects | 0 failures
-  - API:       863 tests (69 suites)
+1,048+ tests | 6 projects | 0 failures
+  - API:       868 tests (69 suites)
   - Retention:  14 tests (1 suite)
   - Mobile:    166 tests (28 suites)
-(After Pre-Feature Hardening remediation — 2026-02-18)
-Previous: 1,094 tests (Phase 0–3 + Sprint 9) → 1,070 tests (Phase 0–3) → 707 tests (Phase 0+1)
+(After Pre-Feature Hardening remediation + metering overhaul — 2026-02-18)
+Previous: 1,043 → 1,094 (Phase 0–3 + Sprint 9) → 1,070 (Phase 0–3) → 707 (Phase 0+1)
 ```
 
 ### Review Confidence

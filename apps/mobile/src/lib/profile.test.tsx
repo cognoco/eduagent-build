@@ -132,7 +132,7 @@ describe('ProfileProvider', () => {
       await result.current.switchProfile('child-id');
     });
 
-    expect(mockFetch).toHaveBeenCalledTimes(2); // profiles GET + switch POST
+    expect(mockFetch).toHaveBeenCalledTimes(3); // profiles GET + switch POST + invalidation refetch
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
       'eduagent_active_profile_id',
       'child-id'

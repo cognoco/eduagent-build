@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, and, asc, inArray } from 'drizzle-orm';
 import {
   subjects,
   curricula,
@@ -100,16 +100,19 @@ export async function getSubjectProgress(
 
   const topicIds = topics.map((t) => t.id);
 
-  // Get retention cards for these topics
-  const cards = topicIds.length > 0 ? await repo.retentionCards.findMany() : [];
-  const topicCards = cards.filter((c) => topicIds.includes(c.topicId));
+  // Get retention cards for these topics (filtered at DB level, not in JS)
+  const topicCards =
+    topicIds.length > 0
+      ? await repo.retentionCards.findMany(
+          inArray(retentionCards.topicId, topicIds)
+        )
+      : [];
 
-  // Get assessments for these topics
-  const allAssessments =
-    topicIds.length > 0 ? await repo.assessments.findMany() : [];
-  const topicAssessments = allAssessments.filter((a) =>
-    topicIds.includes(a.topicId)
-  );
+  // Get assessments for these topics (filtered at DB level, not in JS)
+  const topicAssessments =
+    topicIds.length > 0
+      ? await repo.assessments.findMany(inArray(assessments.topicId, topicIds))
+      : [];
 
   // Count completed/verified
   const completedTopics = new Set<string>();

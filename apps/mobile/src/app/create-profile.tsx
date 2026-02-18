@@ -107,7 +107,7 @@ export default function CreateProfileScreen() {
     location,
     consentRequired,
     consentType,
-    post,
+    client,
     queryClient,
     switchProfile,
     router,
