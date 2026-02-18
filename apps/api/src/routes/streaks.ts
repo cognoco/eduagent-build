@@ -1,33 +1,36 @@
 import { Hono } from 'hono';
-import type { AuthEnv } from '../middleware/auth';
+import type { Database } from '@eduagent/database';
+import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
+import { getStreakData, getXpSummary } from '../services/streaks';
 
-export const streakRoutes = new Hono<AuthEnv>()
+type StreakRouteEnv = {
+  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Variables: {
+    user: AuthUser;
+    db: Database;
+    account: Account;
+    profileId: string;
+  };
+};
+
+export const streakRoutes = new Hono<StreakRouteEnv>()
   // Get current streak state
   .get('/streaks', async (c) => {
-    // TODO: Fetch streak for current profile via c.get('user').userId
-    return c.json({
-      streak: {
-        currentStreak: 0,
-        longestStreak: 0,
-        lastActivityDate: null,
-        gracePeriodStartDate: null,
-        isOnGracePeriod: false,
-        graceDaysRemaining: 0,
-      },
-    });
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+
+    const streak = await getStreakData(db, profileId);
+    return c.json({ streak });
   })
 
   // Get XP summary
   .get('/xp', async (c) => {
-    // TODO: Aggregate XP ledger for user via c.get('user').userId
-    return c.json({
-      xp: {
-        totalXp: 0,
-        verifiedXp: 0,
-        pendingXp: 0,
-        decayedXp: 0,
-        topicsCompleted: 0,
-        topicsVerified: 0,
-      },
-    });
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+
+    const xp = await getXpSummary(db, profileId);
+    return c.json({ xp });
   });

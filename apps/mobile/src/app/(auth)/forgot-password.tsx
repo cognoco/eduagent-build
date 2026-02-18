@@ -12,6 +12,7 @@ import {
 import { useSignIn } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useThemeColors } from '../../lib/theme';
 
 interface ClerkError {
   message?: string;
@@ -31,6 +32,7 @@ export default function ForgotPasswordScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
 
   const [emailAddress, setEmailAddress] = useState('');
   const [code, setCode] = useState('');
@@ -123,7 +125,7 @@ export default function ForgotPasswordScreen() {
           <TextInput
             className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
             placeholder="Enter 6-digit code"
-            placeholderTextColor="#525252"
+            placeholderTextColor={colors.muted}
             keyboardType="number-pad"
             value={code}
             onChangeText={setCode}
@@ -138,7 +140,7 @@ export default function ForgotPasswordScreen() {
             className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
             secureTextEntry
             placeholder="Enter new password"
-            placeholderTextColor="#525252"
+            placeholderTextColor={colors.muted}
             value={newPassword}
             onChangeText={setNewPassword}
             editable={!loading}
@@ -154,7 +156,7 @@ export default function ForgotPasswordScreen() {
             testID="reset-password-button"
           >
             {loading ? (
-              <ActivityIndicator color="#ffffff" />
+              <ActivityIndicator color={colors.textInverse} />
             ) : (
               <Text
                 className={`text-body font-semibold ${
@@ -208,7 +210,7 @@ export default function ForgotPasswordScreen() {
           autoComplete="email"
           keyboardType="email-address"
           placeholder="you@example.com"
-          placeholderTextColor="#525252"
+          placeholderTextColor={colors.muted}
           value={emailAddress}
           onChangeText={setEmailAddress}
           editable={!loading}
@@ -224,7 +226,7 @@ export default function ForgotPasswordScreen() {
           testID="send-reset-code-button"
         >
           {loading ? (
-            <ActivityIndicator color="#ffffff" />
+            <ActivityIndicator color={colors.textInverse} />
           ) : (
             <Text
               className={`text-body font-semibold ${
@@ -237,7 +239,11 @@ export default function ForgotPasswordScreen() {
         </Pressable>
 
         <View className="flex-row justify-center mt-6">
-          <Pressable onPress={() => router.back()} testID="back-to-sign-in">
+          <Pressable
+            onPress={() => router.back()}
+            className="min-h-[44px] justify-center"
+            testID="back-to-sign-in"
+          >
             <Text className="text-body-sm text-primary font-semibold">
               Back to sign in
             </Text>

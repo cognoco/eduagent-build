@@ -1,5 +1,11 @@
 import { useState, useCallback } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  type UseQueryResult,
+  type UseMutationResult,
+} from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import { useApi } from '../lib/auth-api';
 import { getApiUrl } from '../lib/api';
@@ -33,7 +39,31 @@ interface CloseResult {
   sessionId: string;
 }
 
-export function useStartSession(subjectId: string) {
+interface SessionSummaryResult {
+  id: string;
+  sessionId: string;
+  content: string;
+  aiFeedback: string | null;
+  status: string;
+}
+
+interface SubmitSummaryResult {
+  summary: {
+    id: string;
+    sessionId: string;
+    content: string;
+    aiFeedback: string;
+    status: 'accepted' | 'submitted';
+  };
+}
+
+export function useStartSession(
+  subjectId: string
+): UseMutationResult<
+  SessionStartResult,
+  Error,
+  { subjectId: string; topicId?: string }
+> {
   const { post } = useApi();
   const queryClient = useQueryClient();
 
@@ -46,7 +76,9 @@ export function useStartSession(subjectId: string) {
   });
 }
 
-export function useSendMessage(sessionId: string) {
+export function useSendMessage(
+  sessionId: string
+): UseMutationResult<MessageResult, Error, { message: string }> {
   const { post } = useApi();
 
   return useMutation({
@@ -55,7 +87,9 @@ export function useSendMessage(sessionId: string) {
   });
 }
 
-export function useCloseSession(sessionId: string) {
+export function useCloseSession(
+  sessionId: string
+): UseMutationResult<CloseResult, Error, void> {
   const { post } = useApi();
   const queryClient = useQueryClient();
 
@@ -120,4 +154,39 @@ export function useStreamMessage(sessionId: string): {
   );
 
   return { stream, isStreaming };
+}
+
+export function useSessionSummary(
+  sessionId: string
+): UseQueryResult<SessionSummaryResult | null> {
+  const { get } = useApi();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['session-summary', sessionId, activeProfile?.id],
+    queryFn: async () => {
+      const data = await get<{ summary: SessionSummaryResult | null }>(
+        `/sessions/${sessionId}/summary`
+      );
+      return data.summary;
+    },
+    enabled: !!activeProfile && !!sessionId,
+  });
+}
+
+export function useSubmitSummary(
+  sessionId: string
+): UseMutationResult<SubmitSummaryResult, Error, { content: string }> {
+  const { post } = useApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: { content: string }) =>
+      post<SubmitSummaryResult>(`/sessions/${sessionId}/summary`, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['session-summary', sessionId],
+      });
+    },
+  });
 }

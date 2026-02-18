@@ -7,13 +7,19 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageBubble } from '../components/MessageBubble';
-import { useTheme } from '../lib/theme';
+import { useThemeColors } from '../lib/theme';
 import { useSendInterviewMessage } from '../hooks/use-interview';
-import { useStreamMessage } from '../hooks/use-sessions';
+import {
+  useStreamMessage,
+  useStartSession,
+  useCloseSession,
+} from '../hooks/use-sessions';
+import { useCreateAssessment, useSubmitAnswer } from '../hooks/use-assessments';
 
 interface Message {
   id: string;
@@ -31,44 +37,59 @@ const OPENING_MESSAGES: Record<string, string> = {
     "Great, let's pick up where we left off. What do you remember from our last session?",
   practice:
     "Let's see what you remember.\n\nQuick: what's the key concept we covered?",
+  assessment:
+    "Time for a knowledge check. I'll ask you a few questions to see how well you've understood the material. Ready?",
   freeform: "What's on your mind? I'm ready when you are.",
 };
 
-const MOCK_RESPONSES = [
-  'Good start. Now, what happens when you move to the next step?',
-  'Not quite — let me show you on a similar one.\n\nImagine you have 2x + 5 = 15. What would you do first?',
-  'You got it. The key pattern here is isolating the variable.\n\nNow try applying that to your original problem.',
-  "Still strong. You remembered that from last week.\n\nLet's connect it to something new.",
-  "Solid on this. I'll check in 4 days.\n\nTomorrow: we connect this to quadratic formula.",
-];
-
 export default function ChatScreen() {
-  const { mode, subjectId, subjectName, sessionId } = useLocalSearchParams<{
+  const {
+    mode,
+    subjectId,
+    subjectName,
+    sessionId: routeSessionId,
+    topicId,
+  } = useLocalSearchParams<{
     mode?: string;
     subjectId?: string;
     subjectName?: string;
     sessionId?: string;
+    topicId?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { persona } = useTheme();
-  const isDark = persona === 'teen';
+  const colors = useThemeColors();
   const scrollRef = useRef<ScrollView>(null);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [interviewComplete, setInterviewComplete] = useState(false);
-  const [mockIndex, setMockIndex] = useState(0);
+  const [exchangeCount, setExchangeCount] = useState(0);
+  const [escalationRung, setEscalationRung] = useState(1);
+  const [isClosing, setIsClosing] = useState(false);
+
+  // For freeform/practice: we create a session on-demand
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(
+    routeSessionId ?? null
+  );
+
+  const [assessmentId, setAssessmentId] = useState<string | null>(null);
 
   const effectiveMode = mode ?? 'freeform';
   const isInterview = effectiveMode === 'interview';
+  const isAssessment = effectiveMode === 'assessment';
   const isSessionMode =
-    effectiveMode === 'learning' || effectiveMode === 'homework';
+    effectiveMode === 'learning' ||
+    effectiveMode === 'homework' ||
+    effectiveMode === 'freeform' ||
+    effectiveMode === 'practice';
 
   // Hooks (always called, conditionally used)
   const sendInterview = useSendInterviewMessage(subjectId ?? '');
-  const { stream: streamMessage, isStreaming: sseStreaming } = useStreamMessage(
-    sessionId ?? ''
-  );
+  const startSession = useStartSession(subjectId ?? '');
+  const closeSession = useCloseSession(activeSessionId ?? '');
+  const { stream: streamMessage } = useStreamMessage(activeSessionId ?? '');
+  const createAssessment = useCreateAssessment(subjectId ?? '', topicId ?? '');
+  const submitAnswer = useSubmitAnswer(assessmentId ?? '');
 
   const openingContent =
     OPENING_MESSAGES[effectiveMode] ?? OPENING_MESSAGES.freeform;
@@ -80,7 +101,7 @@ export default function ChatScreen() {
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
-  // Simulate streaming animation for a response
+  // Simulate streaming animation for interview responses
   const animateResponse = useCallback(
     (response: string, onDone?: () => void) => {
       const streamId = `ai-${Date.now()}`;
@@ -117,6 +138,21 @@ export default function ChatScreen() {
     []
   );
 
+  // Create a session on-demand for freeform/practice modes
+  const ensureSession = useCallback(async (): Promise<string | null> => {
+    if (activeSessionId) return activeSessionId;
+    if (!subjectId) return null;
+
+    try {
+      const result = await startSession.mutateAsync({ subjectId });
+      const newId = result.session.id;
+      setActiveSessionId(newId);
+      return newId;
+    } catch {
+      return null;
+    }
+  }, [activeSessionId, subjectId, startSession]);
+
   const handleSend = useCallback(async () => {
     if (!input.trim() || isStreaming) return;
     const userMessage = input.trim();
@@ -136,8 +172,44 @@ export default function ChatScreen() {
             setInterviewComplete(true);
           }
         });
-      } else if (isSessionMode && sessionId) {
-        // Real SSE streaming for learning/homework sessions
+      } else if (isAssessment && subjectId && topicId) {
+        // Create assessment on first user message if we don't have one
+        let currentAssessmentId = assessmentId;
+        if (!currentAssessmentId) {
+          const created = await createAssessment.mutateAsync();
+          currentAssessmentId = created.assessment.id;
+          setAssessmentId(currentAssessmentId);
+        }
+
+        const result = await submitAnswer.mutateAsync({ answer: userMessage });
+        const feedback = result.result.feedback;
+        const passed = result.result.passed;
+
+        animateResponse(feedback, () => {
+          if (passed) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `assessment-done-${Date.now()}`,
+                role: 'ai',
+                content: `Assessment complete! Your mastery score: ${Math.round(
+                  result.result.masteryScore * 100
+                )}%`,
+              },
+            ]);
+          }
+        });
+      } else if (isSessionMode) {
+        // Ensure we have a session (creates one for freeform/practice if needed)
+        const sid = await ensureSession();
+        if (!sid) {
+          animateResponse(
+            "I'm having trouble starting a session. Please try again."
+          );
+          return;
+        }
+
+        // Real SSE streaming for all session modes
         const streamId = `ai-${Date.now()}`;
         setMessages((prev) => [
           ...prev,
@@ -154,20 +226,21 @@ export default function ChatScreen() {
               )
             );
           },
-          () => {
+          (result) => {
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === streamId ? { ...m, streaming: false } : m
               )
             );
             setIsStreaming(false);
+            setExchangeCount(result.exchangeCount);
+            setEscalationRung(result.escalationRung);
           }
         );
       } else {
-        // Mock for freeform/practice (Sprint 7 will wire these)
-        const response = MOCK_RESPONSES[mockIndex % MOCK_RESPONSES.length];
-        setMockIndex((i) => i + 1);
-        animateResponse(response);
+        animateResponse(
+          "I'm having trouble connecting right now. Please try again."
+        );
       }
     } catch {
       animateResponse(
@@ -178,17 +251,67 @@ export default function ChatScreen() {
     input,
     isStreaming,
     isInterview,
+    isAssessment,
     isSessionMode,
     subjectId,
-    sessionId,
+    topicId,
+    assessmentId,
     sendInterview,
     streamMessage,
     animateResponse,
-    mockIndex,
+    ensureSession,
+    createAssessment,
+    submitAnswer,
+  ]);
+
+  const handleEndSession = useCallback(async () => {
+    if (!activeSessionId || isClosing) return;
+
+    Alert.alert(
+      'End Session',
+      'Ready to wrap up? You can write a summary of what you learned.',
+      [
+        { text: 'Keep Going', style: 'cancel' },
+        {
+          text: 'End Session',
+          onPress: async () => {
+            setIsClosing(true);
+            try {
+              await closeSession.mutateAsync();
+              router.replace({
+                pathname: '/session-summary',
+                params: {
+                  sessionId: activeSessionId,
+                  subjectName: subjectName ?? '',
+                  exchangeCount: String(exchangeCount),
+                  escalationRung: String(escalationRung),
+                },
+              });
+            } catch {
+              setIsClosing(false);
+              Alert.alert(
+                'Error',
+                'Failed to close session. Please try again.'
+              );
+            }
+          },
+        },
+      ]
+    );
+  }, [
+    activeSessionId,
+    isClosing,
+    closeSession,
+    router,
+    subjectName,
+    exchangeCount,
+    escalationRung,
   ]);
 
   const headerTitle = isInterview
     ? `Interview: ${subjectName ?? 'New Subject'}`
+    : effectiveMode === 'assessment'
+    ? 'Knowledge Check'
     : effectiveMode === 'homework'
     ? 'Homework Help'
     : effectiveMode === 'learning'
@@ -196,6 +319,9 @@ export default function ChatScreen() {
     : effectiveMode === 'practice'
     ? 'Practice Session'
     : 'Chat';
+
+  const showEndSession =
+    !isInterview && !interviewComplete && isSessionMode && exchangeCount > 0;
 
   return (
     <KeyboardAvoidingView
@@ -208,7 +334,10 @@ export default function ChatScreen() {
         className="flex-row items-center px-4 py-3 bg-surface border-b border-surface-elevated"
         style={{ paddingTop: insets.top + 8 }}
       >
-        <Pressable onPress={() => router.back()} className="mr-3 p-1">
+        <Pressable
+          onPress={() => router.back()}
+          className="mr-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
+        >
           <Text className="text-primary text-h3">←</Text>
         </Pressable>
         <View className="flex-1">
@@ -219,6 +348,18 @@ export default function ChatScreen() {
             Your coach is here
           </Text>
         </View>
+        {showEndSession && (
+          <Pressable
+            onPress={handleEndSession}
+            disabled={isClosing || isStreaming}
+            className="ml-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
+            testID="end-session-button"
+          >
+            <Text className="text-body-sm font-semibold text-text-secondary">
+              {isClosing ? 'Closing...' : 'Done'}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       {/* Messages */}
@@ -236,7 +377,6 @@ export default function ChatScreen() {
             role={msg.role}
             content={msg.content}
             streaming={msg.streaming}
-            isDark={isDark}
           />
         ))}
 
@@ -276,7 +416,7 @@ export default function ChatScreen() {
           <TextInput
             className="flex-1 bg-background rounded-input px-4 py-3 text-body text-text-primary mr-2"
             placeholder="Type a message..."
-            placeholderTextColor={isDark ? '#525252' : '#94a3b8'}
+            placeholderTextColor={colors.muted}
             value={input}
             onChangeText={setInput}
             onSubmitEditing={handleSend}
@@ -284,15 +424,17 @@ export default function ChatScreen() {
             maxLength={5000}
             returnKeyType="send"
             editable={!isStreaming}
+            testID="chat-input"
           />
           <Pressable
             onPress={handleSend}
             disabled={!input.trim() || isStreaming}
-            className={`rounded-button px-5 py-3 ${
+            className={`rounded-button px-5 py-3 min-h-[44px] min-w-[44px] items-center justify-center ${
               input.trim() && !isStreaming
                 ? 'bg-primary'
                 : 'bg-surface-elevated'
             }`}
+            testID="send-button"
           >
             <Text
               className={`text-body font-semibold ${

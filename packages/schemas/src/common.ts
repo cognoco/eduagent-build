@@ -10,3 +10,11 @@ export const paginationSchema = z.object({
 });
 
 export type Pagination = z.infer<typeof paginationSchema>;
+
+// Chat exchange — reusable across interview, assessment, and session histories
+
+export const chatExchangeSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string(),
+});
+export type ChatExchange = z.infer<typeof chatExchangeSchema>;

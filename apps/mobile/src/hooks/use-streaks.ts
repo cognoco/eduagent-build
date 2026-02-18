@@ -1,9 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { Streak } from '@eduagent/schemas';
 import { useApi } from '../lib/auth-api';
 import { useProfile } from '../lib/profile';
 
-export function useStreaks() {
+export function useStreaks(): UseQueryResult<Streak> {
   const { get } = useApi();
   const { activeProfile } = useProfile();
 

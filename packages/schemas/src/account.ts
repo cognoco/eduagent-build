@@ -11,6 +11,13 @@ export type AccountDeletionResponse = z.infer<
   typeof accountDeletionResponseSchema
 >;
 
+export const cancelDeletionResponseSchema = z.object({
+  message: z.string(),
+});
+export type CancelDeletionResponse = z.infer<
+  typeof cancelDeletionResponseSchema
+>;
+
 export const dataExportConsentSchema = z.object({
   id: z.string().uuid(),
   profileId: z.string().uuid(),

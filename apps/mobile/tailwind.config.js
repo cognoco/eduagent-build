@@ -19,9 +19,12 @@ module.exports = {
         warning: 'var(--color-warning)',
         danger: 'var(--color-danger)',
         info: 'var(--color-info)',
+        border: 'var(--color-border)',
+        muted: 'var(--color-muted)',
         'retention-strong': 'var(--color-retention-strong)',
         'retention-fading': 'var(--color-retention-fading)',
         'retention-weak': 'var(--color-retention-weak)',
+        'retention-forgotten': 'var(--color-retention-forgotten)',
         'coaching-card': 'var(--color-coaching-card)',
       },
       borderRadius: {

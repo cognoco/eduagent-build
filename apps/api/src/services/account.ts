@@ -5,6 +5,7 @@
 
 import { eq } from 'drizzle-orm';
 import { accounts, type Database } from '@eduagent/database';
+import { createSubscription } from './billing';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -80,6 +81,13 @@ export async function findOrCreateAccount(
     if (!found) throw new Error('Account creation failed after conflict');
     return found;
   }
+
+  // FR108: Auto-create a 14-day trial subscription with Plus-tier limits
+  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  await createSubscription(db, row.id, 'free', 500, {
+    status: 'trial',
+    trialEndsAt: trialEndsAt.toISOString(),
+  });
 
   return mapAccountRow(row);
 }

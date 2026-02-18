@@ -1,8 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { useApi } from '../lib/auth-api';
 import type { Profile } from '../lib/profile';
 
-export function useProfiles() {
+export function useProfiles(): UseQueryResult<Profile[]> {
   const { get } = useApi();
 
   return useQuery({

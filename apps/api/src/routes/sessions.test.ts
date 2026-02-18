@@ -36,6 +36,44 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
+// ---------------------------------------------------------------------------
+// Mock billing service — metering middleware calls these on LLM routes
+// ---------------------------------------------------------------------------
+
+jest.mock('../services/billing', () => ({
+  getSubscriptionByAccountId: jest.fn().mockResolvedValue({
+    id: 'sub-1',
+    accountId: 'test-account-id',
+    tier: 'plus',
+    status: 'active',
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    trialEndsAt: null,
+    currentPeriodEnd: null,
+    currentPeriodStart: null,
+    cancelledAt: null,
+    lastStripeEventTimestamp: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+  getQuotaPool: jest.fn().mockResolvedValue({
+    id: 'qp-1',
+    subscriptionId: 'sub-1',
+    monthlyLimit: 500,
+    usedThisMonth: 10,
+    cycleResetAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+  decrementQuota: jest.fn().mockResolvedValue({
+    success: true,
+    source: 'monthly',
+    remainingMonthly: 489,
+    remainingTopUp: 0,
+  }),
+  createSubscription: jest.fn(),
+}));
+
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
 const EVENT_ID = '770e8400-e29b-41d4-a716-446655440000';
@@ -117,6 +155,7 @@ jest.mock('../services/session', () => ({
 import app from '../index';
 
 const TEST_ENV = {
+  DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
 };
 

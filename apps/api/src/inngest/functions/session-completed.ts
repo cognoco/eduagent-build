@@ -1,8 +1,8 @@
 import { eq, and } from 'drizzle-orm';
 import { inngest } from '../client';
+import { getStepDatabase } from '../helpers';
 import { sm2 } from '@eduagent/retention';
 import {
-  createDatabase,
   createScopedRepository,
   retentionCards,
   streaks,
@@ -10,18 +10,6 @@ import {
   storeEmbedding,
 } from '@eduagent/database';
 import { recordDailyActivity } from '../../services/streaks';
-
-/**
- * Returns a Database instance for use within Inngest step functions.
- *
- * TODO: Inject DATABASE_URL via Inngest middleware when wiring Neon (Layer 2).
- * See account-deletion.ts for rationale.
- */
-function getStepDatabase() {
-  const url = process.env['DATABASE_URL'];
-  if (!url) throw new Error('DATABASE_URL is not configured');
-  return createDatabase(url);
-}
 
 export const sessionCompleted = inngest.createFunction(
   { id: 'session-completed', name: 'Process session completion' },

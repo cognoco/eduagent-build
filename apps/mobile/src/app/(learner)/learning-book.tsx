@@ -1,57 +1,98 @@
-import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
 import { RetentionSignal } from '../../components/RetentionSignal';
 import { useSubjects } from '../../hooks/use-subjects';
-import { useApiGet } from '../../lib/auth-api';
+import { useOverallProgress } from '../../hooks/use-progress';
+import { useRetentionTopics } from '../../hooks/use-retention';
 
-type RetentionStatus = 'strong' | 'fading' | 'weak';
+type RetentionStatus = 'strong' | 'fading' | 'weak' | 'forgotten';
 
-interface Topic {
+interface EnrichedTopic {
+  topicId: string;
+  subjectId: string;
   name: string;
-  subject: string;
+  subjectName: string;
   retention: RetentionStatus;
 }
 
-interface RetentionTopic {
-  name: string;
-  retentionStatus?: string;
-}
-
 export default function LearningBookScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { get } = useApiGet();
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(
+    null
+  );
+
   const { data: subjects, isLoading: subjectsLoading } = useSubjects();
+  const { data: overallProgress, isLoading: progressLoading } =
+    useOverallProgress();
 
-  const { data: topics, isLoading: topicsLoading } = useQuery({
-    queryKey: ['topics', subjects?.map((s) => s.id)],
-    queryFn: async (): Promise<Topic[]> => {
-      if (!subjects || subjects.length === 0) return [];
+  // Fetch retention data for each subject
+  const firstSubjectId = subjects?.[0]?.id ?? '';
+  const secondSubjectId = subjects?.[1]?.id ?? '';
+  const thirdSubjectId = subjects?.[2]?.id ?? '';
 
-      const results = await Promise.all(
-        subjects.map(async (subject) => {
-          const data = await get<{
-            topics: RetentionTopic[];
-            reviewDueCount: number;
-          }>(`/subjects/${subject.id}/retention`);
-          return (
-            data.topics?.map((t) => ({
-              name: t.name,
-              subject: subject.name,
-              retention: (t.retentionStatus ?? 'strong') as RetentionStatus,
-            })) ?? []
-          );
-        })
-      );
+  const first = useRetentionTopics(firstSubjectId);
+  const second = useRetentionTopics(secondSubjectId);
+  const third = useRetentionTopics(thirdSubjectId);
 
-      return results.flat();
-    },
-    enabled: !!subjects && subjects.length > 0,
-  });
+  const retentionBySubject = [first, second, third];
 
-  const isLoading = subjectsLoading || topicsLoading;
-  const allTopics = topics ?? [];
-  const subjectCount = new Set(allTopics.map((t) => t.subject)).size;
+  // Build retention status map from progress data
+  const retentionMap = new Map<string, RetentionStatus>();
+  if (overallProgress?.subjects) {
+    for (const sp of overallProgress.subjects) {
+      retentionMap.set(sp.subjectId, sp.retentionStatus);
+    }
+  }
+
+  // Build enriched topic list from retention queries
+  const allTopics: EnrichedTopic[] = [];
+  const topicsLoading =
+    (firstSubjectId && first.isLoading) ||
+    (secondSubjectId && second.isLoading) ||
+    (thirdSubjectId && third.isLoading);
+
+  if (subjects) {
+    for (let i = 0; i < Math.min(subjects.length, 3); i++) {
+      const subject = subjects[i];
+      const retentionData = retentionBySubject[i]?.data;
+      if (retentionData?.topics) {
+        for (const topic of retentionData.topics) {
+          const retention: RetentionStatus =
+            topic.xpStatus === 'decayed'
+              ? 'forgotten'
+              : topic.repetitions === 0
+              ? 'weak'
+              : topic.easeFactor >= 2.5
+              ? 'strong'
+              : 'fading';
+          allTopics.push({
+            topicId: topic.topicId,
+            subjectId: subject.id,
+            name: `Topic ${topic.topicId.slice(0, 8)}`,
+            subjectName: subject.name,
+            retention,
+          });
+        }
+      }
+    }
+  }
+
+  // Apply subject filter
+  const filteredTopics = selectedSubjectId
+    ? allTopics.filter((t) => t.subjectId === selectedSubjectId)
+    : allTopics;
+
+  const isLoading = subjectsLoading || progressLoading || topicsLoading;
+  const subjectCount = new Set(allTopics.map((t) => t.subjectId)).size;
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -62,22 +103,98 @@ export default function LearningBookScreen() {
         <Text className="text-body-sm text-text-secondary mt-1">
           {isLoading
             ? 'Loading...'
-            : `${allTopics.length} topics across ${subjectCount} subjects`}
+            : `${allTopics.length} topics across ${subjectCount} subject${
+                subjectCount === 1 ? '' : 's'
+              }`}
         </Text>
       </View>
+
+      {/* Subject filter tabs */}
+      {subjects && subjects.length > 1 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          className="px-5 py-2"
+          contentContainerStyle={{ gap: 8 }}
+          testID="subject-filter-tabs"
+        >
+          <Pressable
+            onPress={() => setSelectedSubjectId(null)}
+            className={`rounded-full px-4 py-2 ${
+              selectedSubjectId === null ? 'bg-primary' : 'bg-surface-elevated'
+            }`}
+            testID="filter-all"
+          >
+            <Text
+              className={`text-body-sm font-medium ${
+                selectedSubjectId === null
+                  ? 'text-text-inverse'
+                  : 'text-text-secondary'
+              }`}
+            >
+              All
+            </Text>
+          </Pressable>
+          {subjects.map((subject) => (
+            <Pressable
+              key={subject.id}
+              onPress={() =>
+                setSelectedSubjectId(
+                  selectedSubjectId === subject.id ? null : subject.id
+                )
+              }
+              className={`rounded-full px-4 py-2 flex-row items-center ${
+                selectedSubjectId === subject.id
+                  ? 'bg-primary'
+                  : 'bg-surface-elevated'
+              }`}
+              testID={`filter-${subject.id}`}
+            >
+              <Text
+                className={`text-body-sm font-medium ${
+                  selectedSubjectId === subject.id
+                    ? 'text-text-inverse'
+                    : 'text-text-secondary'
+                }`}
+              >
+                {subject.name}
+              </Text>
+              {retentionMap.has(subject.id) && (
+                <View className="ml-2">
+                  <RetentionSignal
+                    status={retentionMap.get(subject.id)!}
+                    compact
+                  />
+                </View>
+              )}
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
       <ScrollView
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 24 }}
       >
         {isLoading ? (
-          <View className="py-8 items-center">
+          <View className="py-8 items-center" testID="learning-book-loading">
             <ActivityIndicator />
           </View>
-        ) : allTopics.length > 0 ? (
-          allTopics.map((topic) => (
-            <View
-              key={`${topic.subject}-${topic.name}`}
+        ) : filteredTopics.length > 0 ? (
+          filteredTopics.map((topic) => (
+            <Pressable
+              key={topic.topicId}
+              onPress={() =>
+                router.push({
+                  pathname: '/(learner)/topic-detail',
+                  params: {
+                    subjectId: topic.subjectId,
+                    topicId: topic.topicId,
+                  },
+                })
+              }
               className="bg-surface rounded-card px-4 py-3 mb-2"
+              testID={`topic-row-${topic.topicId}`}
             >
               <View className="flex-row items-center justify-between">
                 <View className="flex-1 mr-3">
@@ -85,15 +202,18 @@ export default function LearningBookScreen() {
                     {topic.name}
                   </Text>
                   <Text className="text-caption text-text-secondary mt-1">
-                    {topic.subject}
+                    {topic.subjectName}
                   </Text>
                 </View>
                 <RetentionSignal status={topic.retention} />
               </View>
-            </View>
+            </Pressable>
           ))
         ) : (
-          <View className="bg-surface rounded-card px-4 py-6 items-center">
+          <View
+            className="bg-surface rounded-card px-4 py-6 items-center"
+            testID="learning-book-empty"
+          >
             <Text className="text-body text-text-secondary">
               No topics yet — add a subject to get started
             </Text>

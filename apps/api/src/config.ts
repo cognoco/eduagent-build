@@ -11,6 +11,17 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().min(1).optional(),
   APP_URL: z.string().url().default('https://app.eduagent.com'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+
+  // Stripe — required in production, optional for dev/test
+  STRIPE_SECRET_KEY: z.string().min(1).optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+  STRIPE_PRICE_PLUS_MONTHLY: z.string().min(1).optional(),
+  STRIPE_PRICE_PLUS_YEARLY: z.string().min(1).optional(),
+  STRIPE_PRICE_FAMILY_MONTHLY: z.string().min(1).optional(),
+  STRIPE_PRICE_FAMILY_YEARLY: z.string().min(1).optional(),
+  STRIPE_PRICE_PRO_MONTHLY: z.string().min(1).optional(),
+  STRIPE_PRICE_PRO_YEARLY: z.string().min(1).optional(),
+  STRIPE_CUSTOMER_PORTAL_URL: z.string().url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

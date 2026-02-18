@@ -86,6 +86,14 @@ export const dashboardChildSchema = z.object({
 });
 export type DashboardChild = z.infer<typeof dashboardChildSchema>;
 
+// Dashboard data — parent view wrapper
+
+export const dashboardDataSchema = z.object({
+  children: z.array(dashboardChildSchema),
+  demoMode: z.boolean(),
+});
+export type DashboardData = z.infer<typeof dashboardDataSchema>;
+
 // ---------------------------------------------------------------------------
 // Coaching Cards (Epic 4 — Story 4.4)
 // ---------------------------------------------------------------------------

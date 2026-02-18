@@ -1,4 +1,10 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  type UseQueryResult,
+  type UseMutationResult,
+} from '@tanstack/react-query';
 import { useApi } from '../lib/auth-api';
 import { useProfile } from '../lib/profile';
 
@@ -20,7 +26,9 @@ interface Curriculum {
   generatedAt: string;
 }
 
-export function useCurriculum(subjectId: string) {
+export function useCurriculum(
+  subjectId: string
+): UseQueryResult<Curriculum | null> {
   const { get } = useApi();
   const { activeProfile } = useProfile();
 
@@ -36,7 +44,9 @@ export function useCurriculum(subjectId: string) {
   });
 }
 
-export function useSkipTopic(subjectId: string) {
+export function useSkipTopic(
+  subjectId: string
+): UseMutationResult<{ message: string }, Error, string> {
   const { post } = useApi();
   const queryClient = useQueryClient();
 
@@ -53,7 +63,9 @@ export function useSkipTopic(subjectId: string) {
   });
 }
 
-export function useChallengeCurriculum(subjectId: string) {
+export function useChallengeCurriculum(
+  subjectId: string
+): UseMutationResult<{ curriculum: Curriculum }, Error, string> {
   const { post } = useApi();
   const queryClient = useQueryClient();
 
@@ -71,7 +83,9 @@ export function useChallengeCurriculum(subjectId: string) {
   });
 }
 
-export function useExplainTopic(subjectId: string) {
+export function useExplainTopic(
+  subjectId: string
+): UseMutationResult<string, Error, string> {
   const { get } = useApi();
 
   return useMutation({

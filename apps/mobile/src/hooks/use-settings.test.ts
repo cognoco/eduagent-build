@@ -1,12 +1,18 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { renderHook, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useNotificationSettings, useLearningMode } from './use-settings';
+import {
+  useNotificationSettings,
+  useLearningMode,
+  useUpdateNotificationSettings,
+  useUpdateLearningMode,
+} from './use-settings';
 
 const mockGet = jest.fn();
+const mockPut = jest.fn();
 
 jest.mock('../lib/auth-api', () => ({
-  useApi: () => ({ get: mockGet }),
+  useApi: () => ({ get: mockGet, put: mockPut }),
 }));
 
 jest.mock('../lib/profile', () => ({
@@ -41,9 +47,12 @@ describe('useNotificationSettings', () => {
 
   it('fetches notification settings from API', async () => {
     mockGet.mockResolvedValue({
-      emailEnabled: true,
-      pushEnabled: false,
-      weeklyDigest: true,
+      preferences: {
+        reviewReminders: true,
+        dailyReminders: false,
+        pushEnabled: true,
+        maxDailyPush: 5,
+      },
     });
 
     const { result } = renderHook(() => useNotificationSettings(), {
@@ -56,9 +65,10 @@ describe('useNotificationSettings', () => {
 
     expect(mockGet).toHaveBeenCalledWith('/settings/notifications');
     expect(result.current.data).toEqual({
-      emailEnabled: true,
-      pushEnabled: false,
-      weeklyDigest: true,
+      reviewReminders: true,
+      dailyReminders: false,
+      pushEnabled: true,
+      maxDailyPush: 5,
     });
   });
 
@@ -86,11 +96,8 @@ describe('useLearningMode', () => {
     queryClient.clear();
   });
 
-  it('fetches learning mode settings from API', async () => {
-    mockGet.mockResolvedValue({
-      mode: 'focused',
-      sessionDurationMinutes: 30,
-    });
+  it('fetches learning mode from API', async () => {
+    mockGet.mockResolvedValue({ mode: 'casual' });
 
     const { result } = renderHook(() => useLearningMode(), {
       wrapper: createWrapper(),
@@ -101,9 +108,71 @@ describe('useLearningMode', () => {
     });
 
     expect(mockGet).toHaveBeenCalledWith('/settings/learning-mode');
-    expect(result.current.data).toEqual({
-      mode: 'focused',
-      sessionDurationMinutes: 30,
+    expect(result.current.data).toBe('casual');
+  });
+});
+
+describe('useUpdateNotificationSettings', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('calls PUT with notification preferences', async () => {
+    mockPut.mockResolvedValue({
+      preferences: {
+        reviewReminders: true,
+        dailyReminders: true,
+        pushEnabled: true,
+        maxDailyPush: 3,
+      },
+    });
+
+    const { result } = renderHook(() => useUpdateNotificationSettings(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        reviewReminders: true,
+        dailyReminders: true,
+        pushEnabled: true,
+      });
+    });
+
+    expect(mockPut).toHaveBeenCalledWith('/settings/notifications', {
+      reviewReminders: true,
+      dailyReminders: true,
+      pushEnabled: true,
+    });
+  });
+});
+
+describe('useUpdateLearningMode', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('calls PUT with learning mode', async () => {
+    mockPut.mockResolvedValue({ mode: 'casual' });
+
+    const { result } = renderHook(() => useUpdateLearningMode(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync('casual');
+    });
+
+    expect(mockPut).toHaveBeenCalledWith('/settings/learning-mode', {
+      mode: 'casual',
     });
   });
 });

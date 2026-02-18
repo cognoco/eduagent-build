@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useThemeColors } from '../../lib/theme';
 import {
   useCurriculum,
   useSkipTopic,
@@ -27,6 +28,7 @@ export default function CurriculumScreen() {
   const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const { data: curriculum, isLoading } = useCurriculum(subjectId ?? '');
   const skipTopic = useSkipTopic(subjectId ?? '');
   const challengeCurriculum = useChallengeCurriculum(subjectId ?? '');
@@ -56,7 +58,7 @@ export default function CurriculumScreen() {
       <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
         <Pressable
           onPress={() => router.back()}
-          className="mr-3 p-1"
+          className="mr-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="curriculum-back"
         >
           <Text className="text-primary text-h3">&larr;</Text>
@@ -66,7 +68,7 @@ export default function CurriculumScreen() {
         </Text>
         <Pressable
           onPress={() => setShowChallengeModal(true)}
-          className="bg-surface-elevated rounded-button px-3 py-1.5"
+          className="bg-surface-elevated rounded-button px-3 py-1.5 min-h-[44px] items-center justify-center"
           testID="challenge-button"
         >
           <Text className="text-body-sm text-primary font-semibold">
@@ -136,7 +138,7 @@ export default function CurriculumScreen() {
                 {!topic.skipped && (
                   <Pressable
                     onPress={() => skipTopic.mutate(topic.id)}
-                    className="bg-surface-elevated rounded-button px-2 py-1"
+                    className="bg-surface-elevated rounded-button px-3 py-1 min-h-[44px] min-w-[44px] items-center justify-center"
                     testID={`skip-${topic.id}`}
                   >
                     <Text className="text-caption text-text-secondary">
@@ -193,7 +195,7 @@ export default function CurriculumScreen() {
             <TextInput
               className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
               placeholder="e.g. I already know the basics, skip intro topics..."
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={colors.muted}
               value={challengeFeedback}
               onChangeText={setChallengeFeedback}
               multiline
@@ -221,7 +223,7 @@ export default function CurriculumScreen() {
                 testID="challenge-submit"
               >
                 {challengeCurriculum.isPending ? (
-                  <ActivityIndicator color="#ffffff" />
+                  <ActivityIndicator color={colors.textInverse} />
                 ) : (
                   <Text
                     className={`text-body font-semibold ${

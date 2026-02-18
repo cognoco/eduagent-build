@@ -1,0 +1,474 @@
+// ---------------------------------------------------------------------------
+// Billing DB Service — Sprint 9 Phase 1
+// Account-scoped database operations for subscriptions and quota pools.
+// Pure data layer — no Hono imports.
+// ---------------------------------------------------------------------------
+
+import { eq, sql } from 'drizzle-orm';
+import {
+  subscriptions,
+  quotaPools,
+  topUpCredits,
+  profiles,
+  type Database,
+} from '@eduagent/database';
+import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface SubscriptionRow {
+  id: string;
+  accountId: string;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  tier: SubscriptionTier;
+  status: SubscriptionStatus;
+  trialEndsAt: string | null;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  cancelledAt: string | null;
+  lastStripeEventTimestamp: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuotaPoolRow {
+  id: string;
+  subscriptionId: string;
+  monthlyLimit: number;
+  usedThisMonth: number;
+  cycleResetAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WebhookSubscriptionUpdate {
+  tier?: SubscriptionTier;
+  status?: SubscriptionStatus;
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  cancelledAt?: string | null;
+  lastStripeEventTimestamp: string;
+}
+
+// ---------------------------------------------------------------------------
+// Mappers — Drizzle Date -> API ISO string
+// ---------------------------------------------------------------------------
+
+function mapSubscriptionRow(
+  row: typeof subscriptions.$inferSelect
+): SubscriptionRow {
+  return {
+    id: row.id,
+    accountId: row.accountId,
+    stripeCustomerId: row.stripeCustomerId,
+    stripeSubscriptionId: row.stripeSubscriptionId,
+    tier: row.tier,
+    status: row.status,
+    trialEndsAt: row.trialEndsAt?.toISOString() ?? null,
+    currentPeriodStart: row.currentPeriodStart?.toISOString() ?? null,
+    currentPeriodEnd: row.currentPeriodEnd?.toISOString() ?? null,
+    cancelledAt: row.cancelledAt?.toISOString() ?? null,
+    lastStripeEventTimestamp:
+      row.lastStripeEventTimestamp?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function mapQuotaPoolRow(row: typeof quotaPools.$inferSelect): QuotaPoolRow {
+  return {
+    id: row.id,
+    subscriptionId: row.subscriptionId,
+    monthlyLimit: row.monthlyLimit,
+    usedThisMonth: row.usedThisMonth,
+    cycleResetAt: row.cycleResetAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Core functions
+// ---------------------------------------------------------------------------
+
+/**
+ * Reads the subscription for a given account.
+ * Returns null if no subscription exists.
+ */
+export async function getSubscriptionByAccountId(
+  db: Database,
+  accountId: string
+): Promise<SubscriptionRow | null> {
+  const row = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.accountId, accountId),
+  });
+  return row ? mapSubscriptionRow(row) : null;
+}
+
+/**
+ * Creates a new subscription for an account.
+ * Also creates the associated quota pool with the given monthly limit.
+ */
+export async function createSubscription(
+  db: Database,
+  accountId: string,
+  tier: SubscriptionTier,
+  monthlyLimit: number,
+  options?: {
+    stripeCustomerId?: string;
+    stripeSubscriptionId?: string;
+    trialEndsAt?: string;
+    status?: SubscriptionStatus;
+  }
+): Promise<SubscriptionRow> {
+  const [subRow] = await db
+    .insert(subscriptions)
+    .values({
+      accountId,
+      tier,
+      status: options?.status ?? 'trial',
+      stripeCustomerId: options?.stripeCustomerId ?? null,
+      stripeSubscriptionId: options?.stripeSubscriptionId ?? null,
+      trialEndsAt: options?.trialEndsAt ? new Date(options.trialEndsAt) : null,
+    })
+    .returning();
+
+  // Create the quota pool linked to this subscription
+  const now = new Date();
+  const cycleResetAt = new Date(now);
+  cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
+
+  await db.insert(quotaPools).values({
+    subscriptionId: subRow.id,
+    monthlyLimit,
+    usedThisMonth: 0,
+    cycleResetAt,
+  });
+
+  return mapSubscriptionRow(subRow);
+}
+
+/**
+ * Idempotent update from a Stripe webhook event.
+ * Skips the update if `lastStripeEventTimestamp` is newer than the incoming event,
+ * preventing out-of-order event processing.
+ */
+export async function updateSubscriptionFromWebhook(
+  db: Database,
+  stripeSubscriptionId: string,
+  updates: WebhookSubscriptionUpdate
+): Promise<SubscriptionRow | null> {
+  // Load current row
+  const existing = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId),
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  // Idempotency check: skip if incoming event is older
+  if (existing.lastStripeEventTimestamp) {
+    const existingTs = existing.lastStripeEventTimestamp.getTime();
+    const incomingTs = new Date(updates.lastStripeEventTimestamp).getTime();
+    if (incomingTs <= existingTs) {
+      return mapSubscriptionRow(existing);
+    }
+  }
+
+  const setValues: Record<string, unknown> = {
+    lastStripeEventTimestamp: new Date(updates.lastStripeEventTimestamp),
+    updatedAt: new Date(),
+  };
+
+  if (updates.tier !== undefined) {
+    setValues.tier = updates.tier;
+  }
+  if (updates.status !== undefined) {
+    setValues.status = updates.status;
+  }
+  if (updates.currentPeriodStart !== undefined) {
+    setValues.currentPeriodStart = new Date(updates.currentPeriodStart);
+  }
+  if (updates.currentPeriodEnd !== undefined) {
+    setValues.currentPeriodEnd = new Date(updates.currentPeriodEnd);
+  }
+  if (updates.cancelledAt !== undefined) {
+    setValues.cancelledAt = updates.cancelledAt
+      ? new Date(updates.cancelledAt)
+      : null;
+  }
+
+  const [updated] = await db
+    .update(subscriptions)
+    .set(setValues)
+    .where(eq(subscriptions.id, existing.id))
+    .returning();
+
+  return mapSubscriptionRow(updated);
+}
+
+/**
+ * Links a Stripe customer ID to an existing subscription.
+ */
+export async function linkStripeCustomer(
+  db: Database,
+  accountId: string,
+  stripeCustomerId: string
+): Promise<SubscriptionRow | null> {
+  const existing = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.accountId, accountId),
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  const [updated] = await db
+    .update(subscriptions)
+    .set({
+      stripeCustomerId,
+      updatedAt: new Date(),
+    })
+    .where(eq(subscriptions.id, existing.id))
+    .returning();
+
+  return mapSubscriptionRow(updated);
+}
+
+/**
+ * Reads the quota pool for a subscription.
+ */
+export async function getQuotaPool(
+  db: Database,
+  subscriptionId: string
+): Promise<QuotaPoolRow | null> {
+  const row = await db.query.quotaPools.findFirst({
+    where: eq(quotaPools.subscriptionId, subscriptionId),
+  });
+  return row ? mapQuotaPoolRow(row) : null;
+}
+
+/**
+ * Resets the monthly quota counter and updates the limit.
+ * Called at the start of each billing cycle.
+ */
+export async function resetMonthlyQuota(
+  db: Database,
+  subscriptionId: string,
+  newLimit: number
+): Promise<QuotaPoolRow | null> {
+  const existing = await db.query.quotaPools.findFirst({
+    where: eq(quotaPools.subscriptionId, subscriptionId),
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  const now = new Date();
+  const nextReset = new Date(now);
+  nextReset.setMonth(nextReset.getMonth() + 1);
+
+  const [updated] = await db
+    .update(quotaPools)
+    .set({
+      monthlyLimit: newLimit,
+      usedThisMonth: 0,
+      cycleResetAt: nextReset,
+      updatedAt: now,
+    })
+    .where(eq(quotaPools.id, existing.id))
+    .returning();
+
+  return mapQuotaPoolRow(updated);
+}
+
+// ---------------------------------------------------------------------------
+// Quota decrement / increment (Phase 4)
+// ---------------------------------------------------------------------------
+
+export interface DecrementResult {
+  success: boolean;
+  source: 'monthly' | 'top_up' | 'none';
+  remainingMonthly: number;
+  remainingTopUp: number;
+}
+
+/**
+ * Decrements the quota pool by 1 exchange.
+ *
+ * Strategy:
+ * 1. Try monthly quota first (usedThisMonth < monthlyLimit)
+ * 2. If monthly exhausted, consume from oldest unexpired top-up credit (FIFO)
+ * 3. If both exhausted, return { success: false }
+ *
+ * Uses atomic SQL increment to prevent races in family shared pools.
+ */
+export async function decrementQuota(
+  db: Database,
+  subscriptionId: string
+): Promise<DecrementResult> {
+  const pool = await db.query.quotaPools.findFirst({
+    where: eq(quotaPools.subscriptionId, subscriptionId),
+  });
+
+  if (!pool) {
+    return {
+      success: false,
+      source: 'none',
+      remainingMonthly: 0,
+      remainingTopUp: 0,
+    };
+  }
+
+  // 1. Try monthly quota
+  if (pool.usedThisMonth < pool.monthlyLimit) {
+    const [updated] = await db
+      .update(quotaPools)
+      .set({
+        usedThisMonth: sql`${quotaPools.usedThisMonth} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(quotaPools.id, pool.id))
+      .returning();
+
+    return {
+      success: true,
+      source: 'monthly',
+      remainingMonthly: updated.monthlyLimit - updated.usedThisMonth,
+      remainingTopUp: 0, // caller can aggregate separately if needed
+    };
+  }
+
+  // 2. Fall back to top-up credits (FIFO by purchasedAt, unexpired)
+  const now = new Date();
+  const topUp = await db.query.topUpCredits.findFirst({
+    where: sql`${topUpCredits.subscriptionId} = ${subscriptionId}
+      AND ${topUpCredits.remaining} > 0
+      AND ${topUpCredits.expiresAt} > ${now}`,
+    orderBy: sql`${topUpCredits.purchasedAt} ASC`,
+  });
+
+  if (topUp) {
+    const [updatedTopUp] = await db
+      .update(topUpCredits)
+      .set({
+        remaining: sql`${topUpCredits.remaining} - 1`,
+      })
+      .where(eq(topUpCredits.id, topUp.id))
+      .returning();
+
+    return {
+      success: true,
+      source: 'top_up',
+      remainingMonthly: 0,
+      remainingTopUp: updatedTopUp.remaining,
+    };
+  }
+
+  // 3. Both exhausted
+  return {
+    success: false,
+    source: 'none',
+    remainingMonthly: 0,
+    remainingTopUp: 0,
+  };
+}
+
+/**
+ * Refunds 1 exchange back to the quota pool.
+ * Used when an LLM call fails after decrement — avoids charging for failed work.
+ *
+ * Refunds always go to the monthly pool (simpler, avoids FIFO complications).
+ */
+export async function incrementQuota(
+  db: Database,
+  subscriptionId: string
+): Promise<void> {
+  await db
+    .update(quotaPools)
+    .set({
+      usedThisMonth: sql`GREATEST(${quotaPools.usedThisMonth} - 1, 0)`,
+      updatedAt: new Date(),
+    })
+    .where(eq(quotaPools.subscriptionId, subscriptionId));
+}
+
+// ---------------------------------------------------------------------------
+// Family billing (Phase 4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolves a profile ID to its account's subscription.
+ * Profile → Account → Subscription chain.
+ */
+export async function getSubscriptionForProfile(
+  db: Database,
+  profileId: string
+): Promise<SubscriptionRow | null> {
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, profileId),
+  });
+
+  if (!profile) {
+    return null;
+  }
+
+  return getSubscriptionByAccountId(db, profile.accountId);
+}
+
+/**
+ * Counts profiles under the account that owns a subscription.
+ */
+export async function getProfileCountForSubscription(
+  db: Database,
+  subscriptionId: string
+): Promise<number> {
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, subscriptionId),
+  });
+
+  if (!sub) {
+    return 0;
+  }
+
+  const result = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(profiles)
+    .where(eq(profiles.accountId, sub.accountId));
+
+  return result[0]?.count ?? 0;
+}
+
+/**
+ * Checks whether a subscription can accept another profile.
+ * Family tier allows 4 profiles, Pro allows 6, others allow 1.
+ */
+export async function canAddProfile(
+  db: Database,
+  subscriptionId: string
+): Promise<boolean> {
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, subscriptionId),
+  });
+
+  if (!sub) {
+    return false;
+  }
+
+  const maxProfiles: Record<string, number> = {
+    free: 1,
+    plus: 1,
+    family: 4,
+    pro: 6,
+  };
+
+  const max = maxProfiles[sub.tier] ?? 1;
+  const current = await getProfileCountForSubscription(db, subscriptionId);
+
+  return current < max;
+}

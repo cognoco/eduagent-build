@@ -4,6 +4,7 @@ import { databaseMiddleware } from './middleware/database';
 import { accountMiddleware } from './middleware/account';
 import { profileScopeMiddleware } from './middleware/profile-scope';
 import { llmMiddleware } from './middleware/llm';
+import { meteringMiddleware } from './middleware/metering';
 import { requestLogger } from './middleware/request-logger';
 import type { AuthUser } from './middleware/auth';
 import type { Database } from '@eduagent/database';
@@ -37,6 +38,16 @@ type Bindings = {
   CLERK_JWKS_URL?: string;
   GEMINI_API_KEY?: string;
   LOG_LEVEL?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PRICE_PLUS_MONTHLY?: string;
+  STRIPE_PRICE_PLUS_YEARLY?: string;
+  STRIPE_PRICE_FAMILY_MONTHLY?: string;
+  STRIPE_PRICE_FAMILY_YEARLY?: string;
+  STRIPE_PRICE_PRO_MONTHLY?: string;
+  STRIPE_PRICE_PRO_YEARLY?: string;
+  STRIPE_CUSTOMER_PORTAL_URL?: string;
+  SUBSCRIPTION_KV?: KVNamespace;
 };
 
 type Variables = {
@@ -44,6 +55,7 @@ type Variables = {
   db: Database;
   account: Account;
   profileId: string;
+  subscriptionId: string;
 };
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>().basePath(
@@ -64,6 +76,9 @@ app.use('*', accountMiddleware);
 
 // Profile scope middleware — reads X-Profile-Id header, verifies ownership; skips when absent
 app.use('*', profileScopeMiddleware);
+
+// Metering middleware — enforces quota on LLM-consuming routes (session messages/stream)
+app.use('*', meteringMiddleware);
 
 // LLM middleware — lazy-registers the Gemini provider from env bindings on first request
 app.use('*', llmMiddleware);

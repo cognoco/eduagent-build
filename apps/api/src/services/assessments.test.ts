@@ -13,10 +13,12 @@ import {
   createAssessment,
   getAssessment,
   updateAssessment,
-  type QuickCheckContext,
-  type AssessmentContext,
 } from './assessments';
-import type { VerificationDepth } from '@eduagent/schemas';
+import type {
+  VerificationDepth,
+  QuickCheckContext,
+  AssessmentContext,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------

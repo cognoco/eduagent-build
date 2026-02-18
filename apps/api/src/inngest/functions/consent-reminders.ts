@@ -1,23 +1,11 @@
 import { inngest } from '../client';
-import { createDatabase } from '@eduagent/database';
+import { getStepDatabase } from '../helpers';
 import { getConsentStatus } from '../../services/consent';
 import { deleteProfile } from '../../services/deletion';
 import {
   sendEmail,
   formatConsentReminderEmail,
 } from '../../services/notifications';
-
-/**
- * Returns a Database instance for use within Inngest step functions.
- *
- * TODO: Inject DATABASE_URL via Inngest middleware when wiring Neon (Layer 2).
- * See account-deletion.ts for rationale.
- */
-function getStepDatabase() {
-  const url = process.env['DATABASE_URL'];
-  if (!url) throw new Error('DATABASE_URL is not configured');
-  return createDatabase(url);
-}
 
 export const consentReminder = inngest.createFunction(
   { id: 'consent-reminder', name: 'Send consent reminder' },

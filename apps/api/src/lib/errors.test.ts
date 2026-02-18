@@ -19,28 +19,30 @@ describe('error helpers', () => {
   describe('apiError', () => {
     it('returns JSON with code and message', async () => {
       const app = createTestApp((c) =>
-        apiError(c, 400, 'SOME_CODE', 'Something went wrong')
+        apiError(c, 400, ERROR_CODES.VALIDATION_ERROR, 'Something went wrong')
       );
       const res = await app.request('/test');
 
       expect(res.status).toBe(400);
       const body = await res.json();
       expect(body).toEqual({
-        code: 'SOME_CODE',
+        code: ERROR_CODES.VALIDATION_ERROR,
         message: 'Something went wrong',
       });
     });
 
     it('includes details when provided', async () => {
       const app = createTestApp((c) =>
-        apiError(c, 422, 'DETAIL_CODE', 'With details', { field: 'name' })
+        apiError(c, 422, ERROR_CODES.NOT_FOUND, 'With details', {
+          field: 'name',
+        })
       );
       const res = await app.request('/test');
 
       expect(res.status).toBe(422);
       const body = await res.json();
       expect(body).toEqual({
-        code: 'DETAIL_CODE',
+        code: ERROR_CODES.NOT_FOUND,
         message: 'With details',
         details: { field: 'name' },
       });
@@ -48,7 +50,7 @@ describe('error helpers', () => {
 
     it('omits details when undefined', async () => {
       const app = createTestApp((c) =>
-        apiError(c, 500, 'NO_DETAIL', 'No details here')
+        apiError(c, 500, ERROR_CODES.INTERNAL_ERROR, 'No details here')
       );
       const res = await app.request('/test');
 

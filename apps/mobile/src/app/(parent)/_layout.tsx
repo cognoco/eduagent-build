@@ -1,16 +1,19 @@
 import { Tabs, Redirect } from 'expo-router';
 import { View, Text } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
-import { useTheme } from '../../lib/theme';
+import { useTheme, useThemeColors } from '../../lib/theme';
 
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
+  const colors = useThemeColors();
   const icons: Record<string, string> = {
     Dashboard: focused ? '●' : '○',
     Book: focused ? '◆' : '◇',
     More: focused ? '≡' : '☰',
   };
   return (
-    <Text style={{ fontSize: 20, color: focused ? '#7c3aed' : '#a3a3a3' }}>
+    <Text
+      style={{ fontSize: 20, color: focused ? colors.accent : colors.muted }}
+    >
       {icons[name] ?? '○'}
     </Text>
   );
@@ -19,6 +22,7 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
 export default function ParentLayout() {
   const { isLoaded, isSignedIn } = useAuth();
   const { persona } = useTheme();
+  const colors = useThemeColors();
 
   if (!isLoaded) return null;
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
@@ -30,13 +34,13 @@ export default function ParentLayout() {
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: '#ffffff',
-            borderTopColor: '#e5e7eb',
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
             height: 64,
             paddingBottom: 8,
           },
-          tabBarActiveTintColor: '#4f46e5',
-          tabBarInactiveTintColor: '#94a3b8',
+          tabBarActiveTintColor: colors.accent,
+          tabBarInactiveTintColor: colors.muted,
           tabBarLabelStyle: { fontSize: 12 },
         }}
       >

@@ -28,7 +28,36 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
+jest.mock('../services/settings', () => ({
+  getNotificationPrefs: jest.fn().mockResolvedValue({
+    reviewReminders: false,
+    dailyReminders: false,
+    pushEnabled: false,
+    maxDailyPush: 3,
+  }),
+  upsertNotificationPrefs: jest
+    .fn()
+    .mockImplementation((_db, _profileId, input) =>
+      Promise.resolve({
+        reviewReminders: input.reviewReminders,
+        dailyReminders: input.dailyReminders,
+        pushEnabled: input.pushEnabled,
+        maxDailyPush: input.maxDailyPush ?? 3,
+      })
+    ),
+  getLearningMode: jest.fn().mockResolvedValue({ mode: 'serious' }),
+  upsertLearningMode: jest
+    .fn()
+    .mockImplementation((_db, _profileId, mode) => Promise.resolve({ mode })),
+}));
+
 import app from '../index';
+import {
+  getNotificationPrefs,
+  upsertNotificationPrefs,
+  getLearningMode,
+  upsertLearningMode,
+} from '../services/settings';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
@@ -40,6 +69,10 @@ const AUTH_HEADERS = {
 };
 
 describe('settings routes', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   // -------------------------------------------------------------------------
   // GET /v1/settings/notifications
   // -------------------------------------------------------------------------
@@ -60,6 +93,16 @@ describe('settings routes', () => {
       expect(body.preferences.dailyReminders).toBe(false);
       expect(body.preferences.pushEnabled).toBe(false);
       expect(body.preferences.maxDailyPush).toBe(3);
+    });
+
+    it('calls getNotificationPrefs service', async () => {
+      await app.request(
+        '/v1/settings/notifications',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(getNotificationPrefs).toHaveBeenCalled();
     });
 
     it('returns 401 without auth header', async () => {
@@ -97,6 +140,24 @@ describe('settings routes', () => {
       expect(body.preferences.dailyReminders).toBe(true);
       expect(body.preferences.pushEnabled).toBe(true);
       expect(body.preferences.maxDailyPush).toBe(5);
+    });
+
+    it('calls upsertNotificationPrefs service', async () => {
+      await app.request(
+        '/v1/settings/notifications',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            reviewReminders: true,
+            dailyReminders: true,
+            pushEnabled: true,
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(upsertNotificationPrefs).toHaveBeenCalled();
     });
 
     it('defaults maxDailyPush to 3 when not provided', async () => {
@@ -173,6 +234,16 @@ describe('settings routes', () => {
       expect(body.mode).toBe('serious');
     });
 
+    it('calls getLearningMode service', async () => {
+      await app.request(
+        '/v1/settings/learning-mode',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(getLearningMode).toHaveBeenCalled();
+    });
+
     it('returns 401 without auth header', async () => {
       const res = await app.request('/v1/settings/learning-mode', {}, TEST_ENV);
 
@@ -200,6 +271,20 @@ describe('settings routes', () => {
 
       const body = await res.json();
       expect(body.mode).toBe('casual');
+    });
+
+    it('calls upsertLearningMode service', async () => {
+      await app.request(
+        '/v1/settings/learning-mode',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ mode: 'casual' }),
+        },
+        TEST_ENV
+      );
+
+      expect(upsertLearningMode).toHaveBeenCalled();
     });
 
     it('returns 400 with invalid mode', async () => {

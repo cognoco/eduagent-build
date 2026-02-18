@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { chatExchangeSchema } from './common.js';
 
 // Verification depth
 
@@ -18,7 +19,7 @@ export const assessmentStatusSchema = z.enum([
 ]);
 export type AssessmentStatus = z.infer<typeof assessmentStatusSchema>;
 
-// Assessment response
+// Assessment response (API-facing, lightweight)
 
 export const assessmentSchema = z.object({
   id: z.string().uuid(),
@@ -29,6 +30,63 @@ export const assessmentSchema = z.object({
   createdAt: z.string().datetime(),
 });
 export type Assessment = z.infer<typeof assessmentSchema>;
+
+// Assessment record — full DB-mapped type with all fields
+
+export const assessmentRecordSchema = z.object({
+  id: z.string().uuid(),
+  profileId: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  topicId: z.string().uuid(),
+  sessionId: z.string().uuid().nullable(),
+  verificationDepth: verificationDepthSchema,
+  status: assessmentStatusSchema,
+  masteryScore: z.number().min(0).max(1).nullable(),
+  qualityRating: z.number().int().min(0).max(5).nullable(),
+  exchangeHistory: z.array(chatExchangeSchema),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type AssessmentRecord = z.infer<typeof assessmentRecordSchema>;
+
+// Quick check context — input for generating comprehension questions
+
+export const quickCheckContextSchema = z.object({
+  topicTitle: z.string(),
+  topicDescription: z.string(),
+  recentExchanges: z.array(chatExchangeSchema),
+});
+export type QuickCheckContext = z.infer<typeof quickCheckContextSchema>;
+
+// Quick check result — generated comprehension questions
+
+export const quickCheckResultSchema = z.object({
+  questions: z.array(z.string()),
+  checkType: z.literal('concept_boundary'),
+});
+export type QuickCheckResult = z.infer<typeof quickCheckResultSchema>;
+
+// Assessment context — input for evaluating an assessment answer
+
+export const assessmentContextSchema = z.object({
+  topicTitle: z.string(),
+  topicDescription: z.string(),
+  currentDepth: verificationDepthSchema,
+  exchangeHistory: z.array(chatExchangeSchema),
+});
+export type AssessmentContext = z.infer<typeof assessmentContextSchema>;
+
+// Assessment evaluation — result of evaluating a learner's answer
+
+export const assessmentEvaluationSchema = z.object({
+  feedback: z.string(),
+  passed: z.boolean(),
+  shouldEscalateDepth: z.boolean(),
+  nextDepth: verificationDepthSchema.optional(),
+  masteryScore: z.number().min(0).max(1),
+  qualityRating: z.number().int().min(0).max(5),
+});
+export type AssessmentEvaluation = z.infer<typeof assessmentEvaluationSchema>;
 
 // Assessment answer submission
 

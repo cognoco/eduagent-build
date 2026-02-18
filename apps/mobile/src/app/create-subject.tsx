@@ -12,10 +12,12 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCreateSubject } from '../hooks/use-subjects';
+import { useThemeColors } from '../lib/theme';
 
 export default function CreateSubjectScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const colors = useThemeColors();
   const createSubject = useCreateSubject();
   const [name, setName] = useState('');
   const [error, setError] = useState('');
@@ -62,6 +64,7 @@ export default function CreateSubjectScreen() {
           </Text>
           <Pressable
             onPress={() => router.back()}
+            className="min-h-[44px] min-w-[44px] items-center justify-center"
             testID="create-subject-cancel"
           >
             <Text className="text-body text-primary font-semibold">Cancel</Text>
@@ -90,7 +93,7 @@ export default function CreateSubjectScreen() {
         <TextInput
           className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
           placeholder="e.g. Calculus, World History, Python..."
-          placeholderTextColor="#94a3b8"
+          placeholderTextColor={colors.muted}
           value={name}
           onChangeText={setName}
           maxLength={200}
@@ -109,7 +112,7 @@ export default function CreateSubjectScreen() {
         >
           {createSubject.isPending ? (
             <ActivityIndicator
-              color="#ffffff"
+              color={colors.textInverse}
               testID="create-subject-loading"
             />
           ) : (

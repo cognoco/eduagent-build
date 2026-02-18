@@ -58,6 +58,26 @@ export const curriculumSchema = z.object({
 });
 export type Curriculum = z.infer<typeof curriculumSchema>;
 
+// Curriculum generation input — used by the LLM curriculum generator
+
+export const curriculumInputSchema = z.object({
+  subjectName: z.string(),
+  interviewSummary: z.string(),
+  goals: z.array(z.string()),
+  experienceLevel: z.string(),
+});
+export type CurriculumInput = z.infer<typeof curriculumInputSchema>;
+
+// Generated topic — LLM-generated topic before persistence
+
+export const generatedTopicSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  relevance: topicRelevanceSchema,
+  estimatedMinutes: z.number().int(),
+});
+export type GeneratedTopic = z.infer<typeof generatedTopicSchema>;
+
 // Curriculum interaction schemas
 
 export const topicSkipSchema = z.object({

@@ -48,3 +48,39 @@ export const usageSchema = z.object({
   cycleResetAt: z.string().datetime(),
 });
 export type Usage = z.infer<typeof usageSchema>;
+
+export const checkoutResponseSchema = z.object({
+  checkoutUrl: z.string().url(),
+  sessionId: z.string().min(1),
+});
+export type CheckoutResponse = z.infer<typeof checkoutResponseSchema>;
+
+export const portalResponseSchema = z.object({
+  portalUrl: z.string().url(),
+});
+export type PortalResponse = z.infer<typeof portalResponseSchema>;
+
+export const cancelResponseSchema = z.object({
+  message: z.string(),
+  currentPeriodEnd: z.string().datetime(),
+});
+export type CancelResponse = z.infer<typeof cancelResponseSchema>;
+
+export const quotaExceededSchema = z.object({
+  code: z.literal('QUOTA_EXCEEDED'),
+  message: z.string(),
+  details: z.object({
+    tier: subscriptionTierSchema,
+    monthlyLimit: z.number().int(),
+    usedThisMonth: z.number().int(),
+    topUpCreditsRemaining: z.number().int(),
+    upgradeOptions: z.array(
+      z.object({
+        tier: z.enum(['plus', 'family', 'pro']),
+        monthlyQuota: z.number().int(),
+        priceMonthly: z.number(),
+      })
+    ),
+  }),
+});
+export type QuotaExceeded = z.infer<typeof quotaExceededSchema>;

@@ -17,11 +17,11 @@ import {
   View,
   Text,
   ActivityIndicator,
-  StyleSheet,
   RefreshControl,
   Pressable,
 } from 'react-native';
 import { HealthCheckItem } from './HealthCheckItem';
+import { useThemeColors } from '../lib/theme';
 
 // TODO: Replace with Hono RPC types in Epic 0
 type HealthCheck = { id: string; message: string; timestamp: string };
@@ -52,12 +52,19 @@ export function HealthCheckList({
   refreshing,
   onRetry,
 }: HealthCheckListProps) {
+  const colors = useThemeColors();
+
   // Loading state - show spinner when loading and no existing data
   if (loading && data.length === 0) {
     return (
-      <View style={styles.centered} testID="loading-state">
-        <ActivityIndicator size="large" color="#2563eb" />
-        <Text style={styles.loadingText}>Loading health checks...</Text>
+      <View
+        className="flex-1 justify-center items-center p-6"
+        testID="loading-state"
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text className="mt-3 text-body text-text-secondary">
+          Loading health checks...
+        </Text>
       </View>
     );
   }
@@ -65,18 +72,28 @@ export function HealthCheckList({
   // Error state - show error message with retry option
   if (error && data.length === 0) {
     return (
-      <View style={styles.centered} testID="error-state">
-        <Text style={styles.errorTitle}>Error Loading Health Checks</Text>
-        <Text style={styles.errorMessage} testID="error-message">
+      <View
+        className="flex-1 justify-center items-center p-6"
+        testID="error-state"
+      >
+        <Text className="text-h3 font-semibold text-danger mb-2">
+          Error Loading Health Checks
+        </Text>
+        <Text
+          className="text-body-sm text-danger text-center mb-4"
+          testID="error-message"
+        >
           {error}
         </Text>
         {onRetry && (
           <Pressable
-            style={styles.retryButton}
+            className="bg-primary px-6 py-3 rounded-button min-h-[44px] min-w-[44px] items-center justify-center"
             onPress={onRetry}
             testID="retry-button"
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text className="text-text-inverse text-body font-semibold">
+              Retry
+            </Text>
           </Pressable>
         )}
       </View>
@@ -86,9 +103,16 @@ export function HealthCheckList({
   // Empty state - show message when no records exist
   if (!loading && !error && data.length === 0) {
     return (
-      <View style={styles.centered} testID="empty-state">
-        <Text style={styles.emptyTitle}>No health checks yet</Text>
-        <Text style={styles.emptyMessage}>Tap Ping to create one!</Text>
+      <View
+        className="flex-1 justify-center items-center p-6"
+        testID="empty-state"
+      >
+        <Text className="text-h3 font-semibold text-text-primary mb-2">
+          No health checks yet
+        </Text>
+        <Text className="text-body-sm text-text-secondary text-center">
+          Tap Ping to create one!
+        </Text>
       </View>
     );
   }
@@ -103,15 +127,15 @@ export function HealthCheckList({
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor="#2563eb"
-          colors={['#2563eb']}
+          tintColor={colors.primary}
+          colors={[colors.primary]}
         />
       }
-      contentContainerStyle={styles.listContent}
+      contentContainerStyle={{ flexGrow: 1 }}
       testID="health-list"
       ListFooterComponent={
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
+        <View className="p-4 border-t-2 border-dashed border-border bg-surface-elevated items-center">
+          <Text className="text-body-sm text-text-secondary">
             Showing {data.length} health check{data.length === 1 ? '' : 's'}
           </Text>
         </View>
@@ -119,68 +143,5 @@ export function HealthCheckList({
     />
   );
 }
-
-const styles = StyleSheet.create({
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6b7280',
-  },
-  errorTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#dc2626',
-    marginBottom: 8,
-  },
-  errorMessage: {
-    fontSize: 14,
-    color: '#7f1d1d',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  emptyMessage: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  listContent: {
-    flexGrow: 1,
-  },
-  footer: {
-    padding: 16,
-    borderTopWidth: 2,
-    borderTopColor: '#e5e7eb',
-    borderStyle: 'dashed',
-    backgroundColor: '#f9fafb',
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-});
 
 export default HealthCheckList;

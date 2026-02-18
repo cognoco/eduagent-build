@@ -1,12 +1,16 @@
-import { useMutation } from '@tanstack/react-query';
-import type { AccountDeletionResponse, DataExport } from '@eduagent/schemas';
+import { useMutation, type UseMutationResult } from '@tanstack/react-query';
+import type {
+  AccountDeletionResponse,
+  CancelDeletionResponse,
+  DataExport,
+} from '@eduagent/schemas';
 import { useApi } from '../lib/auth-api';
 
-interface CancelDeletionResponse {
-  message: string;
-}
-
-export function useDeleteAccount() {
+export function useDeleteAccount(): UseMutationResult<
+  AccountDeletionResponse,
+  Error,
+  void
+> {
   const { post } = useApi();
 
   return useMutation({
@@ -16,7 +20,11 @@ export function useDeleteAccount() {
   });
 }
 
-export function useCancelDeletion() {
+export function useCancelDeletion(): UseMutationResult<
+  CancelDeletionResponse,
+  Error,
+  void
+> {
   const { post } = useApi();
 
   return useMutation({
@@ -26,7 +34,7 @@ export function useCancelDeletion() {
   });
 }
 
-export function useExportData() {
+export function useExportData(): UseMutationResult<DataExport, Error, void> {
   const { get } = useApi();
 
   return useMutation({

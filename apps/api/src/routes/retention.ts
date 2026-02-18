@@ -5,20 +5,51 @@ import {
   relearnTopicSchema,
   teachingPreferenceSchema,
 } from '@eduagent/schemas';
-import type { AuthEnv } from '../middleware/auth';
+import type { Database } from '@eduagent/database';
+import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
+import {
+  getSubjectRetention,
+  getTopicRetention,
+  processRecallTest,
+  startRelearn,
+  getSubjectNeedsDeepening,
+  getTeachingPreference,
+  setTeachingPreference,
+  deleteTeachingPreference,
+} from '../services/retention-data';
 
-export const retentionRoutes = new Hono<AuthEnv>()
+type RetentionRouteEnv = {
+  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Variables: {
+    user: AuthUser;
+    db: Database;
+    account: Account;
+    profileId: string;
+  };
+};
+
+export const retentionRoutes = new Hono<RetentionRouteEnv>()
   // Get retention status for all topics in subject
   .get('/subjects/:subjectId/retention', async (c) => {
-    // TODO: Fetch retention cards for all topics in subject via c.req.param('subjectId')
-    // TODO: Verify subject belongs to user via c.get('user').userId
-    return c.json({ topics: [], reviewDueCount: 0 });
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const subjectId = c.req.param('subjectId');
+
+    const result = await getSubjectRetention(db, profileId, subjectId);
+    return c.json(result);
   })
 
   // Get retention card for single topic
   .get('/topics/:topicId/retention', async (c) => {
-    // TODO: Fetch retention card by c.req.param('topicId'), verify ownership via c.get('user').userId
-    return c.json({ card: null });
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const topicId = c.req.param('topicId');
+
+    const card = await getTopicRetention(db, profileId, topicId);
+    return c.json({ card });
   })
 
   // Submit a delayed recall test
@@ -26,18 +57,13 @@ export const retentionRoutes = new Hono<AuthEnv>()
     '/retention/recall-test',
     zValidator('json', recallTestSubmitSchema),
     async (c) => {
-      // TODO: Evaluate recall answer via services/retention.ts using c.req.valid('json')
-      // TODO: Update SM-2 parameters (easeFactor, interval, repetitions)
-      // TODO: Update XP status based on result
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
+      const input = c.req.valid('json');
 
-      return c.json({
-        result: {
-          passed: true,
-          masteryScore: 0.75,
-          xpChange: 'verified',
-          nextReviewAt: new Date().toISOString(),
-        },
-      });
+      const result = await processRecallTest(db, profileId, input);
+      return c.json({ result });
     }
   )
 
@@ -46,28 +72,36 @@ export const retentionRoutes = new Hono<AuthEnv>()
     '/retention/relearn',
     zValidator('json', relearnTopicSchema),
     async (c) => {
-      const { topicId, method } = c.req.valid('json');
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
+      const input = c.req.valid('json');
 
-      // TODO: Reset mastery score for topic via services/retention.ts
-      // TODO: Create new learning session with appropriate teaching method
-      // TODO: Mark topic as needs_deepening if not already
-
-      return c.json({ message: 'Relearn started', topicId, method });
+      const result = await startRelearn(db, profileId, input);
+      return c.json(result);
     }
   )
 
   // Get topics needing extra review
   .get('/subjects/:subjectId/needs-deepening', async (c) => {
-    // TODO: Query needs_deepening_topics for subject via c.req.param('subjectId')
-    // TODO: Verify subject belongs to user via c.get('user').userId
-    return c.json({ topics: [], count: 0 });
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const subjectId = c.req.param('subjectId');
+
+    const result = await getSubjectNeedsDeepening(db, profileId, subjectId);
+    return c.json(result);
   })
 
   // Get teaching method preference
   .get('/subjects/:subjectId/teaching-preference', async (c) => {
-    // TODO: Query teaching_preferences for subject via c.req.param('subjectId')
-    // TODO: Verify subject belongs to user via c.get('user').userId
-    return c.json({ preference: null });
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const subjectId = c.req.param('subjectId');
+
+    const preference = await getTeachingPreference(db, profileId, subjectId);
+    return c.json({ preference });
   })
 
   // Set teaching method preference
@@ -75,19 +109,29 @@ export const retentionRoutes = new Hono<AuthEnv>()
     '/subjects/:subjectId/teaching-preference',
     zValidator('json', teachingPreferenceSchema),
     async (c) => {
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
       const subjectId = c.req.param('subjectId');
       const { method } = c.req.valid('json');
 
-      // TODO: Upsert teaching preference via services/adaptive-teaching.ts
-      // TODO: Verify subject belongs to user via c.get('user').userId
-
-      return c.json({ preference: { subjectId, method } });
+      const preference = await setTeachingPreference(
+        db,
+        profileId,
+        subjectId,
+        method
+      );
+      return c.json({ preference });
     }
   )
 
   // Reset teaching preference (FR66)
   .delete('/subjects/:subjectId/teaching-preference', async (c) => {
-    // TODO: Delete teaching preference for subject via c.req.param('subjectId')
-    // TODO: Verify subject belongs to user via c.get('user').userId
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const subjectId = c.req.param('subjectId');
+
+    await deleteTeachingPreference(db, profileId, subjectId);
     return c.json({ message: 'Teaching preference reset' });
   });

@@ -1,22 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import type { DashboardData } from '@eduagent/schemas';
 import { useApi } from '../lib/auth-api';
 import { useProfile } from '../lib/profile';
 
-interface DashboardChild {
-  profileId: string;
-  displayName: string;
-  summary: string;
-  sessionsThisWeek: number;
-  sessionsLastWeek: number;
-  subjects: { name: string; retentionStatus: string }[];
-}
-
-interface DashboardData {
-  children: DashboardChild[];
-  demoMode: boolean;
-}
-
-export function useDashboard() {
+export function useDashboard(): UseQueryResult<DashboardData> {
   const { get } = useApi();
   const { activeProfile } = useProfile();
 

@@ -1,11 +1,16 @@
 import { View, Text, Pressable, ScrollView, Switch, Alert } from 'react-native';
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { useTheme, type Persona } from '../../lib/theme';
 import { useProfile } from '../../lib/profile';
 import { useExportData } from '../../hooks/use-account';
+import {
+  useNotificationSettings,
+  useUpdateNotificationSettings,
+} from '../../hooks/use-settings';
+import { useSubscription } from '../../hooks/use-subscription';
 
 function SettingsRow({
   label,
@@ -33,15 +38,17 @@ function ToggleRow({
   label,
   value,
   onToggle,
+  disabled,
 }: {
   label: string;
   value: boolean;
   onToggle: (v: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <View className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2">
       <Text className="text-body text-text-primary">{label}</Text>
-      <Switch value={value} onValueChange={onToggle} />
+      <Switch value={value} onValueChange={onToggle} disabled={disabled} />
     </View>
   );
 }
@@ -53,9 +60,37 @@ export default function MoreScreen() {
   const { user } = useUser();
   const { activeProfile } = useProfile();
   const { persona, setPersona } = useTheme();
-  const [pushEnabled, setPushEnabled] = useState(true);
-  const [weeklyDigest, setWeeklyDigest] = useState(false);
   const exportData = useExportData();
+
+  const { data: subscription } = useSubscription();
+  const { data: notifPrefs, isLoading: notifLoading } =
+    useNotificationSettings();
+  const updateNotifications = useUpdateNotificationSettings();
+
+  const pushEnabled = notifPrefs?.pushEnabled ?? false;
+  const weeklyDigest = notifPrefs?.dailyReminders ?? false;
+
+  const handleTogglePush = useCallback(
+    (value: boolean) => {
+      updateNotifications.mutate({
+        reviewReminders: notifPrefs?.reviewReminders ?? false,
+        dailyReminders: notifPrefs?.dailyReminders ?? false,
+        pushEnabled: value,
+      });
+    },
+    [updateNotifications, notifPrefs]
+  );
+
+  const handleToggleDigest = useCallback(
+    (value: boolean) => {
+      updateNotifications.mutate({
+        reviewReminders: notifPrefs?.reviewReminders ?? false,
+        dailyReminders: value,
+        pushEnabled: notifPrefs?.pushEnabled ?? false,
+      });
+    },
+    [updateNotifications, notifPrefs]
+  );
 
   const handleExport = useCallback(async () => {
     try {
@@ -116,12 +151,14 @@ export default function MoreScreen() {
         <ToggleRow
           label="Push notifications"
           value={pushEnabled}
-          onToggle={setPushEnabled}
+          onToggle={handleTogglePush}
+          disabled={notifLoading || updateNotifications.isPending}
         />
         <ToggleRow
           label="Weekly progress digest"
           value={weeklyDigest}
-          onToggle={setWeeklyDigest}
+          onToggle={handleToggleDigest}
+          disabled={notifLoading || updateNotifications.isPending}
         />
 
         <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
@@ -132,7 +169,17 @@ export default function MoreScreen() {
           value={displayName}
           onPress={() => router.push('/profiles')}
         />
-        <SettingsRow label="Subscription" value="Plus" />
+        <SettingsRow
+          label="Subscription"
+          value={
+            subscription
+              ? `${subscription.tier
+                  .charAt(0)
+                  .toUpperCase()}${subscription.tier.slice(1)}`
+              : undefined
+          }
+          onPress={() => router.push('/(learner)/subscription')}
+        />
         <SettingsRow label="Help & Support" />
         <SettingsRow label="Export my data" onPress={handleExport} />
         <SettingsRow

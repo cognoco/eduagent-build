@@ -9,10 +9,12 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDeleteAccount, useCancelDeletion } from '../hooks/use-account';
+import { useThemeColors } from '../lib/theme';
 
 export default function DeleteAccountScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const colors = useThemeColors();
   const deleteAccount = useDeleteAccount();
   const cancelDeletion = useCancelDeletion();
 
@@ -70,6 +72,7 @@ export default function DeleteAccountScreen() {
           </Text>
           <Pressable
             onPress={() => router.back()}
+            className="min-h-[44px] min-w-[44px] items-center justify-center"
             testID="delete-account-close"
           >
             <Text className="text-body text-primary font-semibold">Close</Text>
@@ -104,7 +107,7 @@ export default function DeleteAccountScreen() {
               testID="delete-account-keep"
             >
               {cancelDeletion.isPending ? (
-                <ActivityIndicator color="#ffffff" />
+                <ActivityIndicator color={colors.textInverse} />
               ) : (
                 <Text className="text-body font-semibold text-text-inverse">
                   I changed my mind — keep my account
@@ -131,7 +134,7 @@ export default function DeleteAccountScreen() {
             >
               {deleteAccount.isPending ? (
                 <ActivityIndicator
-                  color="#ffffff"
+                  color={colors.textInverse}
                   testID="delete-account-loading"
                 />
               ) : (

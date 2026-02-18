@@ -14,6 +14,7 @@ import { Link, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useThemeColors } from '../../lib/theme';
 
 interface ClerkError {
   message?: string;
@@ -33,6 +34,7 @@ export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
 
   const [emailAddress, setEmailAddress] = useState('');
   const [password, setPassword] = useState('');
@@ -180,7 +182,7 @@ export default function SignInScreen() {
           autoComplete="email"
           keyboardType="email-address"
           placeholder="you@example.com"
-          placeholderTextColor="#525252"
+          placeholderTextColor={colors.muted}
           value={emailAddress}
           onChangeText={setEmailAddress}
           editable={!loading}
@@ -194,7 +196,7 @@ export default function SignInScreen() {
           className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-2"
           secureTextEntry
           placeholder="Enter your password"
-          placeholderTextColor="#525252"
+          placeholderTextColor={colors.muted}
           value={password}
           onChangeText={setPassword}
           editable={!loading}
@@ -203,7 +205,10 @@ export default function SignInScreen() {
 
         <View className="items-end mb-4">
           <Link href="/(auth)/forgot-password" asChild>
-            <Pressable testID="forgot-password-link">
+            <Pressable
+              className="min-h-[44px] justify-center"
+              testID="forgot-password-link"
+            >
               <Text className="text-body-sm text-primary font-semibold">
                 Forgot password?
               </Text>
@@ -220,7 +225,7 @@ export default function SignInScreen() {
           testID="sign-in-button"
         >
           {loading ? (
-            <ActivityIndicator color="#ffffff" />
+            <ActivityIndicator color={colors.textInverse} />
           ) : (
             <Text
               className={`text-body font-semibold ${
@@ -237,7 +242,7 @@ export default function SignInScreen() {
             Don&apos;t have an account?{' '}
           </Text>
           <Link href="/(auth)/sign-up" asChild>
-            <Pressable>
+            <Pressable className="min-h-[44px] justify-center">
               <Text className="text-body-sm text-primary font-semibold">
                 Sign up
               </Text>

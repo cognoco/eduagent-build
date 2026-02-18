@@ -7,6 +7,13 @@ import {
 } from '@eduagent/database';
 import { routeAndCall, type ChatMessage } from './llm';
 import { generateCurriculum } from './curriculum';
+import type {
+  InterviewContext,
+  InterviewResult,
+  OnboardingDraft,
+  ChatExchange,
+  DraftStatus,
+} from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Interview service — pure business logic, no Hono imports
@@ -16,37 +23,6 @@ const INTERVIEW_SYSTEM_PROMPT = `You are EduAgent, an AI tutor conducting a brie
 Ask about the learner's goals, prior experience, and current knowledge level for the given subject.
 Keep questions conversational and brief. After 3-5 exchanges when you have enough signal,
 respond with the special marker [INTERVIEW_COMPLETE] at the end of your response.`;
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export interface InterviewContext {
-  subjectName: string;
-  exchangeHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
-}
-
-export interface InterviewResult {
-  response: string;
-  isComplete: boolean;
-  extractedSignals?: {
-    goals: string[];
-    experienceLevel: string;
-    currentKnowledge: string;
-  };
-}
-
-export interface OnboardingDraft {
-  id: string;
-  profileId: string;
-  subjectId: string;
-  exchangeHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
-  extractedSignals: Record<string, unknown>;
-  status: 'in_progress' | 'completed' | 'expired';
-  expiresAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
 
 // ---------------------------------------------------------------------------
 // Row mapper — Drizzle Date → API ISO string
@@ -88,9 +64,7 @@ Be concise. Extract only what's clearly stated or strongly implied.`;
 // Signal extraction — extracts structured learner data from interview
 // ---------------------------------------------------------------------------
 
-export async function extractSignals(
-  exchangeHistory: Array<{ role: 'user' | 'assistant'; content: string }>
-): Promise<{
+export async function extractSignals(exchangeHistory: ChatExchange[]): Promise<{
   goals: string[];
   experienceLevel: string;
   currentKnowledge: string;
@@ -217,9 +191,9 @@ export async function updateDraft(
   db: Database,
   draftId: string,
   updates: {
-    exchangeHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+    exchangeHistory?: ChatExchange[];
     extractedSignals?: Record<string, unknown>;
-    status?: 'in_progress' | 'completed' | 'expired';
+    status?: DraftStatus;
   }
 ): Promise<void> {
   await db

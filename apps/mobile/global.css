@@ -18,9 +18,12 @@
   --color-warning: #eab308;
   --color-danger: #ef4444;
   --color-info: #38bdf8;
+  --color-border: #262626;
+  --color-muted: #525252;
   --color-retention-strong: #22c55e;
   --color-retention-fading: #eab308;
   --color-retention-weak: #ef4444;
+  --color-retention-forgotten: #737373;
   --color-coaching-card: #262626;
   --radius-card: 16px;
   --radius-button: 12px;
@@ -43,9 +46,12 @@
   --color-warning: #ca8a04;
   --color-danger: #dc2626;
   --color-info: #0ea5e9;
+  --color-border: #e7e5e4;
+  --color-muted: #a8a29e;
   --color-retention-strong: #16a34a;
   --color-retention-fading: #ca8a04;
   --color-retention-weak: #dc2626;
+  --color-retention-forgotten: #737373;
   --color-coaching-card: #f5f5f4;
   --radius-card: 12px;
   --radius-button: 10px;
@@ -68,9 +74,12 @@
   --color-warning: #a16207;
   --color-danger: #b91c1c;
   --color-info: #0284c7;
+  --color-border: #e2e8f0;
+  --color-muted: #94a3b8;
   --color-retention-strong: #15803d;
   --color-retention-fading: #a16207;
   --color-retention-weak: #b91c1c;
+  --color-retention-forgotten: #737373;
   --color-coaching-card: #f1f5f9;
   --radius-card: 10px;
   --radius-button: 8px;

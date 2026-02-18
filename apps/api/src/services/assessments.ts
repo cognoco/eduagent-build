@@ -6,39 +6,21 @@ import {
 } from '@eduagent/database';
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
-import type { VerificationDepth } from '@eduagent/schemas';
+import type {
+  VerificationDepth,
+  QuickCheckContext,
+  QuickCheckResult,
+  AssessmentContext,
+  AssessmentEvaluation,
+  AssessmentRecord,
+  AssessmentStatus,
+  ChatExchange,
+} from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Assessment Engine — Stories 3.1, 3.2
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
-
-export interface QuickCheckContext {
-  topicTitle: string;
-  topicDescription: string;
-  recentExchanges: Array<{ role: 'user' | 'assistant'; content: string }>;
-}
-
-export interface QuickCheckResult {
-  questions: string[];
-  checkType: 'concept_boundary';
-}
-
-export interface AssessmentContext {
-  topicTitle: string;
-  topicDescription: string;
-  currentDepth: VerificationDepth;
-  exchangeHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
-}
-
-export interface AssessmentEvaluation {
-  feedback: string;
-  passed: boolean;
-  shouldEscalateDepth: boolean;
-  nextDepth?: VerificationDepth;
-  masteryScore: number; // 0-1, capped by depth: recall max 0.5, explain max 0.8, transfer max 1.0
-  qualityRating: number; // 0-5 for SM-2 input
-}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -275,22 +257,12 @@ function parseAssessmentEvaluation(
 // Persistence — Database-backed CRUD for assessments
 // ---------------------------------------------------------------------------
 
-export interface Assessment {
-  id: string;
-  profileId: string;
-  subjectId: string;
-  topicId: string;
-  sessionId: string | null;
-  verificationDepth: VerificationDepth;
-  status: 'in_progress' | 'passed' | 'failed';
-  masteryScore: number | null;
-  qualityRating: number | null;
-  exchangeHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
-  createdAt: string;
-  updatedAt: string;
-}
+// Re-export AssessmentRecord for consumers that import from this module
+export type { AssessmentRecord } from '@eduagent/schemas';
 
-function mapAssessmentRow(row: typeof assessments.$inferSelect): Assessment {
+function mapAssessmentRow(
+  row: typeof assessments.$inferSelect
+): AssessmentRecord {
   return {
     id: row.id,
     profileId: row.profileId,
@@ -302,7 +274,7 @@ function mapAssessmentRow(row: typeof assessments.$inferSelect): Assessment {
     masteryScore: row.masteryScore !== null ? Number(row.masteryScore) : null,
     qualityRating: row.qualityRating ?? null,
     exchangeHistory: (row.exchangeHistory ??
-      []) as Assessment['exchangeHistory'],
+      []) as AssessmentRecord['exchangeHistory'],
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -314,7 +286,7 @@ export async function createAssessment(
   subjectId: string,
   topicId: string,
   sessionId?: string
-): Promise<Assessment> {
+): Promise<AssessmentRecord> {
   const [row] = await db
     .insert(assessments)
     .values({
@@ -334,7 +306,7 @@ export async function getAssessment(
   db: Database,
   profileId: string,
   assessmentId: string
-): Promise<Assessment | null> {
+): Promise<AssessmentRecord | null> {
   const repo = createScopedRepository(db, profileId);
   const row = await repo.assessments.findFirst(
     eq(assessments.id, assessmentId)
@@ -348,10 +320,10 @@ export async function updateAssessment(
   assessmentId: string,
   updates: {
     verificationDepth?: VerificationDepth;
-    status?: 'in_progress' | 'passed' | 'failed';
+    status?: AssessmentStatus;
     masteryScore?: number;
     qualityRating?: number;
-    exchangeHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+    exchangeHistory?: ChatExchange[];
   }
 ): Promise<void> {
   const setValues: Record<string, unknown> = { updatedAt: new Date() };

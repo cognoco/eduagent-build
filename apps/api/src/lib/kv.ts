@@ -1,0 +1,50 @@
+// ---------------------------------------------------------------------------
+// Workers KV Helpers — Sprint 9 Phase 1
+// Subscription status cache with 24h TTL
+// ---------------------------------------------------------------------------
+
+import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
+
+export interface CachedSubscriptionStatus {
+  tier: SubscriptionTier;
+  status: SubscriptionStatus;
+  monthlyLimit: number;
+  usedThisMonth: number;
+}
+
+/** 24 hours in seconds */
+const TTL_SECONDS = 86400;
+
+/** Key pattern: sub:{accountId} */
+function subscriptionKey(accountId: string): string {
+  return `sub:${accountId}`;
+}
+
+/**
+ * Writes subscription status to KV with a 24h TTL.
+ * Called after webhook updates and DB changes to keep the cache fresh.
+ */
+export async function writeSubscriptionStatus(
+  kv: KVNamespace,
+  accountId: string,
+  status: CachedSubscriptionStatus
+): Promise<void> {
+  await kv.put(subscriptionKey(accountId), JSON.stringify(status), {
+    expirationTtl: TTL_SECONDS,
+  });
+}
+
+/**
+ * Reads subscription status from KV.
+ * Returns null on cache miss — caller should fall back to DB.
+ */
+export async function readSubscriptionStatus(
+  kv: KVNamespace,
+  accountId: string
+): Promise<CachedSubscriptionStatus | null> {
+  const raw = await kv.get(subscriptionKey(accountId));
+  if (!raw) {
+    return null;
+  }
+  return JSON.parse(raw) as CachedSubscriptionStatus;
+}

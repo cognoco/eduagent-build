@@ -1,4 +1,10 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  type UseQueryResult,
+  type UseMutationResult,
+} from '@tanstack/react-query';
 import { useApi } from '../lib/auth-api';
 import { useProfile } from '../lib/profile';
 
@@ -15,7 +21,9 @@ interface InterviewResponse {
   exchangeCount: number;
 }
 
-export function useInterviewState(subjectId: string) {
+export function useInterviewState(
+  subjectId: string
+): UseQueryResult<InterviewState | null> {
   const { get } = useApi();
   const { activeProfile } = useProfile();
 
@@ -31,7 +39,9 @@ export function useInterviewState(subjectId: string) {
   });
 }
 
-export function useSendInterviewMessage(subjectId: string) {
+export function useSendInterviewMessage(
+  subjectId: string
+): UseMutationResult<InterviewResponse, Error, string> {
   const { post } = useApi();
   const queryClient = useQueryClient();
 

@@ -1,16 +1,19 @@
 import { Tabs, Redirect } from 'expo-router';
 import { View, Text } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
-import { useTheme } from '../../lib/theme';
+import { useTheme, useThemeColors } from '../../lib/theme';
 
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
+  const colors = useThemeColors();
   const icons: Record<string, string> = {
     Home: focused ? '●' : '○',
     Book: focused ? '◆' : '◇',
     More: focused ? '≡' : '☰',
   };
   return (
-    <Text style={{ fontSize: 20, color: focused ? '#7c3aed' : '#a3a3a3' }}>
+    <Text
+      style={{ fontSize: 20, color: focused ? colors.accent : colors.muted }}
+    >
       {icons[name] ?? '○'}
     </Text>
   );
@@ -19,7 +22,7 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
 export default function LearnerLayout() {
   const { isLoaded, isSignedIn } = useAuth();
   const { persona } = useTheme();
-  const isDark = persona === 'teen';
+  const colors = useThemeColors();
 
   if (!isLoaded) return null;
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
@@ -31,13 +34,13 @@ export default function LearnerLayout() {
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
-            borderTopColor: isDark ? '#262626' : '#e5e7eb',
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
             height: 64,
             paddingBottom: 8,
           },
-          tabBarActiveTintColor: isDark ? '#a855f7' : '#4f46e5',
-          tabBarInactiveTintColor: isDark ? '#525252' : '#94a3b8',
+          tabBarActiveTintColor: colors.accent,
+          tabBarInactiveTintColor: colors.muted,
           tabBarLabelStyle: { fontSize: 12 },
         }}
       >
@@ -70,6 +73,18 @@ export default function LearnerLayout() {
         />
         <Tabs.Screen
           name="curriculum"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="topic-detail"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="subscription"
           options={{
             href: null,
           }}

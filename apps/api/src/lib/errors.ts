@@ -1,11 +1,12 @@
 import type { Context } from 'hono';
 import type { TypedResponse } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
+import type { ErrorCode } from '@eduagent/schemas';
 
 export function apiError(
   c: Context,
   status: number,
-  code: string,
+  code: ErrorCode,
   message: string,
   details?: unknown
 ): Response & TypedResponse {

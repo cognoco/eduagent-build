@@ -8,6 +8,11 @@ import {
   type Database,
 } from '@eduagent/database';
 import { routeAndCall, type ChatMessage } from './llm';
+import type {
+  CurriculumInput,
+  GeneratedTopic,
+  Curriculum,
+} from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Curriculum generation service — pure business logic, no Hono imports
@@ -17,20 +22,6 @@ const CURRICULUM_SYSTEM_PROMPT = `You are EduAgent's curriculum designer. Based 
 generate a personalized learning curriculum. Return a JSON array of topics with this structure:
 [{"title": "Topic Name", "description": "What the learner will learn", "relevance": "core|recommended|contemporary|emerging", "estimatedMinutes": 30}]
 Order topics pedagogically. Include 8-15 topics.`;
-
-export interface CurriculumInput {
-  subjectName: string;
-  interviewSummary: string;
-  goals: string[];
-  experienceLevel: string;
-}
-
-export interface GeneratedTopic {
-  title: string;
-  description: string;
-  relevance: 'core' | 'recommended' | 'contemporary' | 'emerging';
-  estimatedMinutes: number;
-}
 
 export async function generateCurriculum(
   input: CurriculumInput
@@ -61,21 +52,7 @@ Interview Summary: ${input.interviewSummary}`,
 // Persistence types
 // ---------------------------------------------------------------------------
 
-export interface CurriculumWithTopics {
-  id: string;
-  subjectId: string;
-  version: number;
-  topics: Array<{
-    id: string;
-    title: string;
-    description: string;
-    sortOrder: number;
-    relevance: string;
-    estimatedMinutes: number;
-    skipped: boolean;
-  }>;
-  generatedAt: string;
-}
+// CurriculumWithTopics is now Curriculum from @eduagent/schemas
 
 // ---------------------------------------------------------------------------
 // Get the latest curriculum for a subject, with ownership verification
@@ -85,7 +62,7 @@ export async function getCurriculum(
   db: Database,
   profileId: string,
   subjectId: string
-): Promise<CurriculumWithTopics | null> {
+): Promise<Curriculum | null> {
   // Verify subject belongs to profile via scoped repository
   const repo = createScopedRepository(db, profileId);
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
@@ -176,7 +153,7 @@ export async function challengeCurriculum(
   profileId: string,
   subjectId: string,
   feedback: string
-): Promise<CurriculumWithTopics> {
+): Promise<Curriculum> {
   const repo = createScopedRepository(db, profileId);
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subject) throw new Error('Subject not found');

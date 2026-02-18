@@ -1,22 +1,6 @@
 import { inngest } from '../client';
-import { createDatabase } from '@eduagent/database';
+import { getStepDatabase } from '../helpers';
 import { isDeletionCancelled, executeDeletion } from '../../services/deletion';
-
-/**
- * Returns a Database instance for use within Inngest step functions.
- *
- * In Cloudflare Workers, env bindings are request-scoped and not directly
- * accessible inside Inngest step closures. When Inngest invokes a step it
- * calls the Worker's /inngest endpoint, so bindings are available — but the
- * current serve() handler doesn't forward them to individual functions.
- *
- * TODO: Inject DATABASE_URL via Inngest middleware when wiring Neon (Layer 2).
- */
-function getStepDatabase() {
-  const url = process.env['DATABASE_URL'];
-  if (!url) throw new Error('DATABASE_URL is not configured');
-  return createDatabase(url);
-}
 
 export const scheduledDeletion = inngest.createFunction(
   {

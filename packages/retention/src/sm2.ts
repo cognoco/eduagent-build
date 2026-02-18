@@ -28,7 +28,9 @@ const DEFAULT_EASE = 2.5;
 const MIN_EASE = 1.3;
 
 export function sm2(input: SM2Input): SM2Result {
-  const { quality, card } = input;
+  const { card } = input;
+  // Clamp quality to valid 0-5 range (out-of-range values would produce wrong ease factors)
+  const quality = Math.max(0, Math.min(5, Math.round(input.quality)));
   const now = new Date().toISOString();
   const wasSuccessful = quality >= 3;
 

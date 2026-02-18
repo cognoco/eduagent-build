@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { chatExchangeSchema } from './common.js';
 
 // Interview schemas
 
@@ -21,6 +22,44 @@ export const interviewStateSchema = z.object({
   subjectName: z.string(),
 });
 export type InterviewState = z.infer<typeof interviewStateSchema>;
+
+// Interview context — input for processing interview exchanges
+
+export const interviewContextSchema = z.object({
+  subjectName: z.string(),
+  exchangeHistory: z.array(chatExchangeSchema),
+});
+export type InterviewContext = z.infer<typeof interviewContextSchema>;
+
+// Interview result — response from a single interview exchange
+
+export const interviewResultSchema = z.object({
+  response: z.string(),
+  isComplete: z.boolean(),
+  extractedSignals: z
+    .object({
+      goals: z.array(z.string()),
+      experienceLevel: z.string(),
+      currentKnowledge: z.string(),
+    })
+    .optional(),
+});
+export type InterviewResult = z.infer<typeof interviewResultSchema>;
+
+// Onboarding draft — persisted interview state
+
+export const onboardingDraftSchema = z.object({
+  id: z.string().uuid(),
+  profileId: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  exchangeHistory: z.array(chatExchangeSchema),
+  extractedSignals: z.record(z.string(), z.unknown()),
+  status: draftStatusSchema,
+  expiresAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type OnboardingDraft = z.infer<typeof onboardingDraftSchema>;
 
 // Session schemas
 

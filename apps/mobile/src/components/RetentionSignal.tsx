@@ -28,8 +28,8 @@ const CONFIG: Record<
   },
   forgotten: {
     label: 'Forgotten',
-    dotColor: 'bg-[#737373]',
-    textColor: 'text-[#737373]',
+    dotColor: 'bg-retention-forgotten',
+    textColor: 'text-retention-forgotten',
   },
 };
 

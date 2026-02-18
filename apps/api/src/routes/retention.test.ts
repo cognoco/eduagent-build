@@ -28,7 +28,28 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
+jest.mock('../services/retention-data', () => ({
+  getSubjectRetention: jest.fn(),
+  getTopicRetention: jest.fn(),
+  processRecallTest: jest.fn(),
+  startRelearn: jest.fn(),
+  getSubjectNeedsDeepening: jest.fn(),
+  getTeachingPreference: jest.fn(),
+  setTeachingPreference: jest.fn(),
+  deleteTeachingPreference: jest.fn(),
+}));
+
 import app from '../index';
+import {
+  getSubjectRetention,
+  getTopicRetention,
+  processRecallTest,
+  startRelearn,
+  getSubjectNeedsDeepening,
+  getTeachingPreference,
+  setTeachingPreference,
+  deleteTeachingPreference,
+} from '../services/retention-data';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
@@ -42,6 +63,10 @@ const AUTH_HEADERS = {
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const TOPIC_ID = '660e8400-e29b-41d4-a716-446655440000';
 
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
 describe('retention routes', () => {
   // -------------------------------------------------------------------------
   // GET /v1/subjects/:subjectId/retention
@@ -49,6 +74,21 @@ describe('retention routes', () => {
 
   describe('GET /v1/subjects/:subjectId/retention', () => {
     it('returns 200 with retention status', async () => {
+      (getSubjectRetention as jest.Mock).mockResolvedValue({
+        topics: [
+          {
+            topicId: TOPIC_ID,
+            easeFactor: 2.5,
+            intervalDays: 7,
+            repetitions: 3,
+            nextReviewAt: '2026-02-22T10:00:00.000Z',
+            xpStatus: 'pending',
+            failureCount: 0,
+          },
+        ],
+        reviewDueCount: 0,
+      });
+
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/retention`,
         { headers: AUTH_HEADERS },
@@ -58,7 +98,7 @@ describe('retention routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.topics).toEqual([]);
+      expect(body.topics).toHaveLength(1);
       expect(body.reviewDueCount).toBe(0);
     });
 
@@ -79,6 +119,16 @@ describe('retention routes', () => {
 
   describe('GET /v1/topics/:topicId/retention', () => {
     it('returns 200 with retention card', async () => {
+      (getTopicRetention as jest.Mock).mockResolvedValue({
+        topicId: TOPIC_ID,
+        easeFactor: 2.5,
+        intervalDays: 7,
+        repetitions: 3,
+        nextReviewAt: '2026-02-22T10:00:00.000Z',
+        xpStatus: 'pending',
+        failureCount: 0,
+      });
+
       const res = await app.request(
         `/v1/topics/${TOPIC_ID}/retention`,
         { headers: AUTH_HEADERS },
@@ -88,7 +138,23 @@ describe('retention routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body).toHaveProperty('card');
+      expect(body.card).not.toBeNull();
+      expect(body.card.topicId).toBe(TOPIC_ID);
+    });
+
+    it('returns 200 with null card when not found', async () => {
+      (getTopicRetention as jest.Mock).mockResolvedValue(null);
+
+      const res = await app.request(
+        `/v1/topics/${TOPIC_ID}/retention`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.card).toBeNull();
     });
 
     it('returns 401 without auth header', async () => {
@@ -108,6 +174,13 @@ describe('retention routes', () => {
 
   describe('POST /v1/retention/recall-test', () => {
     it('returns 200 with valid body', async () => {
+      (processRecallTest as jest.Mock).mockResolvedValue({
+        passed: true,
+        masteryScore: 0.75,
+        xpChange: 'verified',
+        nextReviewAt: '2026-02-22T10:00:00.000Z',
+      });
+
       const res = await app.request(
         '/v1/retention/recall-test',
         {
@@ -172,6 +245,12 @@ describe('retention routes', () => {
 
   describe('POST /v1/retention/relearn', () => {
     it('returns 200 with valid body', async () => {
+      (startRelearn as jest.Mock).mockResolvedValue({
+        message: 'Relearn started',
+        topicId: TOPIC_ID,
+        method: 'different',
+      });
+
       const res = await app.request(
         '/v1/retention/relearn',
         {
@@ -234,6 +313,11 @@ describe('retention routes', () => {
 
   describe('GET /v1/subjects/:subjectId/needs-deepening', () => {
     it('returns 200 with needs-deepening list', async () => {
+      (getSubjectNeedsDeepening as jest.Mock).mockResolvedValue({
+        topics: [],
+        count: 0,
+      });
+
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/needs-deepening`,
         { headers: AUTH_HEADERS },
@@ -264,6 +348,11 @@ describe('retention routes', () => {
 
   describe('GET /v1/subjects/:subjectId/teaching-preference', () => {
     it('returns 200 with preference', async () => {
+      (getTeachingPreference as jest.Mock).mockResolvedValue({
+        subjectId: SUBJECT_ID,
+        method: 'visual_diagrams',
+      });
+
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/teaching-preference`,
         { headers: AUTH_HEADERS },
@@ -273,7 +362,8 @@ describe('retention routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body).toHaveProperty('preference');
+      expect(body.preference).toBeDefined();
+      expect(body.preference.method).toBe('visual_diagrams');
     });
 
     it('returns 401 without auth header', async () => {
@@ -293,6 +383,11 @@ describe('retention routes', () => {
 
   describe('PUT /v1/subjects/:subjectId/teaching-preference', () => {
     it('returns 200 with valid method', async () => {
+      (setTeachingPreference as jest.Mock).mockResolvedValue({
+        subjectId: SUBJECT_ID,
+        method: 'visual_diagrams',
+      });
+
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/teaching-preference`,
         {
@@ -355,6 +450,8 @@ describe('retention routes', () => {
 
   describe('DELETE /v1/subjects/:subjectId/teaching-preference', () => {
     it('returns 200 with reset confirmation', async () => {
+      (deleteTeachingPreference as jest.Mock).mockResolvedValue(undefined);
+
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/teaching-preference`,
         {

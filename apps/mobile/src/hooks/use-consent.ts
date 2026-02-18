@@ -1,13 +1,12 @@
-import { useMutation } from '@tanstack/react-query';
-import type { ConsentRequest } from '@eduagent/schemas';
+import { useMutation, type UseMutationResult } from '@tanstack/react-query';
+import type { ConsentRequest, ConsentRequestResult } from '@eduagent/schemas';
 import { useApi } from '../lib/auth-api';
 
-interface ConsentRequestResult {
-  message: string;
-  consentType: string;
-}
-
-export function useRequestConsent() {
+export function useRequestConsent(): UseMutationResult<
+  ConsentRequestResult,
+  Error,
+  ConsentRequest
+> {
   const { post } = useApi();
 
   return useMutation({

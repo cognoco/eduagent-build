@@ -12,6 +12,9 @@ import {
   sessionSummaries,
   needsDeepeningTopics,
   onboardingDrafts,
+  parkingLotItems,
+  teachingPreferences,
+  curriculumAdaptations,
 } from './schema/index.js';
 
 export function createScopedRepository(db: Database, profileId: string) {
@@ -144,6 +147,45 @@ export function createScopedRepository(db: Database, profileId: string) {
       async findFirst(extraWhere?: SQL) {
         return db.query.onboardingDrafts.findFirst({
           where: scopedWhere(onboardingDrafts, extraWhere),
+        });
+      },
+    },
+
+    parkingLotItems: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.parkingLotItems.findMany({
+          where: scopedWhere(parkingLotItems, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.parkingLotItems.findFirst({
+          where: scopedWhere(parkingLotItems, extraWhere),
+        });
+      },
+    },
+
+    teachingPreferences: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.teachingPreferences.findMany({
+          where: scopedWhere(teachingPreferences, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.teachingPreferences.findFirst({
+          where: scopedWhere(teachingPreferences, extraWhere),
+        });
+      },
+    },
+
+    curriculumAdaptations: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.curriculumAdaptations.findMany({
+          where: scopedWhere(curriculumAdaptations, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.curriculumAdaptations.findFirst({
+          where: scopedWhere(curriculumAdaptations, extraWhere),
         });
       },
     },

@@ -1,4 +1,5 @@
 import { createMiddleware } from 'hono/factory';
+import { ERROR_CODES } from '@eduagent/schemas';
 import { decodeJWTHeader, fetchJWKS, verifyJWT } from './jwt';
 import type { JWK } from './jwt';
 
@@ -83,7 +84,7 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
   if (!authHeader?.startsWith('Bearer ')) {
     return c.json(
       {
-        code: 'UNAUTHORIZED',
+        code: ERROR_CODES.UNAUTHORIZED,
         message: 'Missing or invalid authorization header',
       },
       401

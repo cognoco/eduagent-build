@@ -8,7 +8,7 @@
  * @see Story 6.3: Implement Mobile Health Check Screen
  */
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 // TODO: Replace with Hono RPC types in Epic 0
 type HealthCheck = { id: string; message: string; timestamp: string };
 
@@ -29,63 +29,26 @@ function formatTimestamp(timestamp: string): string {
 
 export function HealthCheckItem({ item }: HealthCheckItemProps) {
   return (
-    <View style={styles.container} testID="health-check-item">
-      <View style={styles.content}>
-        <Text style={styles.message}>{item.message}</Text>
-        <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
+    <View
+      className="bg-surface p-4 border-b border-border"
+      testID="health-check-item"
+    >
+      <View className="flex-row justify-between items-start mb-2">
+        <Text className="text-body font-medium text-text-primary flex-1">
+          {item.message}
+        </Text>
+        <Text className="text-body-sm text-text-secondary mt-1">
+          {formatTimestamp(item.timestamp)}
+        </Text>
       </View>
-      <View style={styles.statusBadge}>
-        <Text style={styles.statusText}>OK</Text>
+      <View className="absolute top-4 right-4 bg-success/20 px-3 py-1 rounded-xl">
+        <Text className="text-caption font-semibold text-success">OK</Text>
       </View>
-      <Text style={styles.id}>ID: {item.id}</Text>
+      <Text className="text-caption font-mono text-muted mt-2">
+        ID: {item.id}
+      </Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#ffffff',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  content: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  message: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#111827',
-    flex: 1,
-  },
-  timestamp: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 4,
-  },
-  statusBadge: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    backgroundColor: '#d1fae5',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#065f46',
-  },
-  id: {
-    fontSize: 12,
-    fontFamily: 'monospace',
-    color: '#9ca3af',
-    marginTop: 8,
-  },
-});
 
 export default HealthCheckItem;

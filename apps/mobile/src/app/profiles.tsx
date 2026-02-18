@@ -27,7 +27,11 @@ export default function ProfilesScreen() {
     >
       <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
         <Text className="text-h1 font-bold text-text-primary">Profiles</Text>
-        <Pressable onPress={() => router.back()} testID="profiles-close">
+        <Pressable
+          onPress={() => router.back()}
+          className="min-h-[44px] min-w-[44px] items-center justify-center"
+          testID="profiles-close"
+        >
           <Text className="text-body text-primary font-semibold">Done</Text>
         </Pressable>
       </View>

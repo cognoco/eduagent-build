@@ -12,7 +12,7 @@ import {
   challengeCurriculum,
   explainTopicOrdering,
 } from './curriculum';
-import type { CurriculumInput } from './curriculum';
+import type { CurriculumInput } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');

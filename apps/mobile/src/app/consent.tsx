@@ -12,10 +12,12 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRequestConsent } from '../hooks/use-consent';
+import { useThemeColors } from '../lib/theme';
 
 export default function ConsentScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const colors = useThemeColors();
   const { profileId, consentType } = useLocalSearchParams<{
     profileId: string;
     consentType: 'GDPR' | 'COPPA';
@@ -117,7 +119,7 @@ export default function ConsentScreen() {
             <TextInput
               className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
               placeholder="parent@example.com"
-              placeholderTextColor="#525252"
+              placeholderTextColor={colors.muted}
               value={parentEmail}
               onChangeText={setParentEmail}
               keyboardType="email-address"
@@ -136,7 +138,10 @@ export default function ConsentScreen() {
               testID="consent-submit"
             >
               {isPending ? (
-                <ActivityIndicator color="#ffffff" testID="consent-loading" />
+                <ActivityIndicator
+                  color={colors.textInverse}
+                  testID="consent-loading"
+                />
               ) : (
                 <Text
                   className={`text-body font-semibold ${

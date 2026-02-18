@@ -1,7 +1,10 @@
 // ---------------------------------------------------------------------------
 // Honest Streak — Story 4.5
-// Pure business logic, no Hono imports
+// Pure business logic (core functions) + DB query helpers for route wiring
 // ---------------------------------------------------------------------------
+
+import { createScopedRepository, type Database } from '@eduagent/database';
+import type { Streak, XpSummary } from '@eduagent/schemas';
 
 export interface StreakState {
   currentStreak: number;
@@ -180,5 +183,87 @@ export function getStreakDisplayInfo(
     isOnGracePeriod: false,
     graceDaysRemaining: 0,
     displayText: 'Start a new streak today!',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// DB-aware query functions (Sprint 8 Phase 1 — route wiring)
+// ---------------------------------------------------------------------------
+
+/** Get streak state from DB for a profile, with display info */
+export async function getStreakData(
+  db: Database,
+  profileId: string
+): Promise<Streak> {
+  const repo = createScopedRepository(db, profileId);
+  const row = await repo.streaks.findFirst();
+
+  if (!row) {
+    return {
+      currentStreak: 0,
+      longestStreak: 0,
+      lastActivityDate: null,
+      gracePeriodStartDate: null,
+      isOnGracePeriod: false,
+      graceDaysRemaining: 0,
+    };
+  }
+
+  const state: StreakState = {
+    currentStreak: row.currentStreak,
+    longestStreak: row.longestStreak,
+    lastActivityDate: row.lastActivityDate,
+    gracePeriodStartDate: row.gracePeriodStartDate,
+  };
+
+  const today = new Date().toISOString().slice(0, 10);
+  const display = getStreakDisplayInfo(state, today);
+
+  return {
+    currentStreak: state.currentStreak,
+    longestStreak: state.longestStreak,
+    lastActivityDate: state.lastActivityDate,
+    gracePeriodStartDate: state.gracePeriodStartDate,
+    isOnGracePeriod: display.isOnGracePeriod,
+    graceDaysRemaining: display.graceDaysRemaining,
+  };
+}
+
+/** Get XP summary from DB for a profile */
+export async function getXpSummary(
+  db: Database,
+  profileId: string
+): Promise<XpSummary> {
+  const repo = createScopedRepository(db, profileId);
+  const entries = await repo.xpLedger.findMany();
+
+  let totalXp = 0;
+  let verifiedXp = 0;
+  let pendingXp = 0;
+  let decayedXp = 0;
+  const completedTopics = new Set<string>();
+  const verifiedTopics = new Set<string>();
+
+  for (const entry of entries) {
+    totalXp += entry.amount;
+    completedTopics.add(entry.topicId);
+
+    if (entry.status === 'verified') {
+      verifiedXp += entry.amount;
+      verifiedTopics.add(entry.topicId);
+    } else if (entry.status === 'pending') {
+      pendingXp += entry.amount;
+    } else if (entry.status === 'decayed') {
+      decayedXp += entry.amount;
+    }
+  }
+
+  return {
+    totalXp,
+    verifiedXp,
+    pendingXp,
+    decayedXp,
+    topicsCompleted: completedTopics.size,
+    topicsVerified: verifiedTopics.size,
   };
 }

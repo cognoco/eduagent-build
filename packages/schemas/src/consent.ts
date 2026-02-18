@@ -25,3 +25,11 @@ export const consentResponseSchema = z.object({
 });
 
 export type ConsentResponse = z.infer<typeof consentResponseSchema>;
+
+// Consent request result — response after submitting a consent request
+
+export const consentRequestResultSchema = z.object({
+  message: z.string(),
+  consentType: consentTypeSchema,
+});
+export type ConsentRequestResult = z.infer<typeof consentRequestResultSchema>;

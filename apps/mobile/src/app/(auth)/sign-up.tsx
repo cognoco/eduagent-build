@@ -12,6 +12,7 @@ import {
 import { useSignUp } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useThemeColors } from '../../lib/theme';
 
 interface ClerkError {
   message?: string;
@@ -22,6 +23,7 @@ export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
 
   const [emailAddress, setEmailAddress] = useState('');
   const [password, setPassword] = useState('');
@@ -121,7 +123,7 @@ export default function SignUpScreen() {
           <TextInput
             className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
             placeholder="Enter 6-digit code"
-            placeholderTextColor="#525252"
+            placeholderTextColor={colors.muted}
             keyboardType="number-pad"
             value={code}
             onChangeText={setCode}
@@ -138,7 +140,7 @@ export default function SignUpScreen() {
             testID="sign-up-verify-button"
           >
             {loading ? (
-              <ActivityIndicator color="#ffffff" />
+              <ActivityIndicator color={colors.textInverse} />
             ) : (
               <Text
                 className={`text-body font-semibold ${
@@ -192,7 +194,7 @@ export default function SignUpScreen() {
           autoComplete="email"
           keyboardType="email-address"
           placeholder="you@example.com"
-          placeholderTextColor="#525252"
+          placeholderTextColor={colors.muted}
           value={emailAddress}
           onChangeText={setEmailAddress}
           editable={!loading}
@@ -206,7 +208,7 @@ export default function SignUpScreen() {
           className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
           secureTextEntry
           placeholder="Create a password"
-          placeholderTextColor="#525252"
+          placeholderTextColor={colors.muted}
           value={password}
           onChangeText={setPassword}
           editable={!loading}
@@ -222,7 +224,7 @@ export default function SignUpScreen() {
           testID="sign-up-button"
         >
           {loading ? (
-            <ActivityIndicator color="#ffffff" />
+            <ActivityIndicator color={colors.textInverse} />
           ) : (
             <Text
               className={`text-body font-semibold ${
@@ -239,7 +241,7 @@ export default function SignUpScreen() {
             Already have an account?{' '}
           </Text>
           <Link href="/(auth)/sign-in" asChild>
-            <Pressable>
+            <Pressable className="min-h-[44px] justify-center">
               <Text className="text-body-sm text-primary font-semibold">
                 Sign in
               </Text>

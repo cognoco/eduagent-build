@@ -15,6 +15,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../lib/auth-api';
 import { useProfile, type Profile } from '../lib/profile';
 import { useConsentCheck } from '../hooks/use-consent';
+import { useThemeColors } from '../lib/theme';
 
 type PersonaType = 'TEEN' | 'LEARNER' | 'PARENT';
 
@@ -35,6 +36,7 @@ const LOCATION_OPTIONS: { value: LocationValue; label: string }[] = [
 export default function CreateProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const colors = useThemeColors();
   const queryClient = useQueryClient();
   const { post } = useApi();
   const { switchProfile } = useProfile();
@@ -131,6 +133,7 @@ export default function CreateProfileScreen() {
           </Text>
           <Pressable
             onPress={() => router.back()}
+            className="min-h-[44px] min-w-[44px] items-center justify-center"
             testID="create-profile-cancel"
           >
             <Text className="text-body text-primary font-semibold">Cancel</Text>
@@ -154,7 +157,7 @@ export default function CreateProfileScreen() {
         <TextInput
           className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
           placeholder="Enter name"
-          placeholderTextColor="#525252"
+          placeholderTextColor={colors.muted}
           value={displayName}
           onChangeText={setDisplayName}
           maxLength={50}
@@ -168,7 +171,7 @@ export default function CreateProfileScreen() {
         <TextInput
           className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
           placeholder="YYYY-MM-DD"
-          placeholderTextColor="#525252"
+          placeholderTextColor={colors.muted}
           value={birthDate}
           onChangeText={setBirthDate}
           editable={!loading}
@@ -245,7 +248,7 @@ export default function CreateProfileScreen() {
         >
           {loading ? (
             <ActivityIndicator
-              color="#ffffff"
+              color={colors.textInverse}
               testID="create-profile-loading"
             />
           ) : (

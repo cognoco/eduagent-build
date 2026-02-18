@@ -1,58 +1,67 @@
 import { Hono } from 'hono';
-import type { AuthEnv } from '../middleware/auth';
+import type { Database } from '@eduagent/database';
+import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
+import {
+  getSubjectProgress,
+  getTopicProgress,
+  getOverallProgress,
+  getContinueSuggestion,
+} from '../services/progress';
+import { notFound } from '../lib/errors';
 
-export const progressRoutes = new Hono<AuthEnv>()
+type ProgressRouteEnv = {
+  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Variables: {
+    user: AuthUser;
+    db: Database;
+    account: Account;
+    profileId: string;
+  };
+};
+
+export const progressRoutes = new Hono<ProgressRouteEnv>()
   // Get subject progress with topic breakdown
   .get('/subjects/:subjectId/progress', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
     const subjectId = c.req.param('subjectId');
-    // TODO: Aggregate topic progress, completion vs verification counts
-    // TODO: Verify subject belongs to user via c.get('user').userId
-    return c.json({
-      progress: {
-        subjectId,
-        name: 'Mock Subject',
-        topicsTotal: 10,
-        topicsCompleted: 3,
-        topicsVerified: 1,
-        urgencyScore: 0,
-        retentionStatus: 'strong',
-        lastSessionAt: null,
-      },
-    });
+
+    const progress = await getSubjectProgress(db, profileId, subjectId);
+    if (!progress) return notFound(c, 'Subject not found');
+    return c.json({ progress });
   })
 
   // Get detailed topic progress
   .get('/subjects/:subjectId/topics/:topicId/progress', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
-    // TODO: Fetch retention, mastery, summary, XP for topic
-    // TODO: Verify topic belongs to user via c.get('user').userId
-    return c.json({
-      topic: {
-        topicId,
-        title: 'Mock Topic',
-        description: 'Mock description',
-        completionStatus: 'not_started',
-        retentionStatus: null,
-        struggleStatus: 'normal',
-        masteryScore: null,
-        summaryExcerpt: null,
-        xpStatus: null,
-      },
-    });
+
+    const topic = await getTopicProgress(db, profileId, subjectId, topicId);
+    if (!topic) return notFound(c, 'Topic not found');
+    return c.json({ topic });
   })
 
   // Get overall progress across all subjects
   .get('/progress/overview', async (c) => {
-    // TODO: Aggregate all subject progress for user via c.get('user').userId
-    return c.json({
-      subjects: [],
-      totalTopicsCompleted: 0,
-      totalTopicsVerified: 0,
-    });
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+
+    const overview = await getOverallProgress(db, profileId);
+    return c.json(overview);
   })
 
   // Get "continue where I left off" suggestion
   .get('/progress/continue', async (c) => {
-    // TODO: Find last topic in progress for user via c.get('user').userId
-    return c.json({ suggestion: null });
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+
+    const suggestion = await getContinueSuggestion(db, profileId);
+    return c.json({ suggestion });
   });

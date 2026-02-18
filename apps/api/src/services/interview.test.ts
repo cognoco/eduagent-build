@@ -52,7 +52,7 @@ import {
   updateDraft,
   persistCurriculum,
 } from './interview';
-import type { InterviewContext, OnboardingDraft } from './interview';
+import type { InterviewContext, OnboardingDraft } from '@eduagent/schemas';
 import { routeAndCall } from './llm';
 import { generateCurriculum } from './curriculum';
 
