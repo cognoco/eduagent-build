@@ -216,7 +216,7 @@ describe('TopicDetailScreen', () => {
     fireEvent.press(screen.getByTestId('start-review-button'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/session',
+      pathname: '/(learner)/session',
       params: { mode: 'practice', subjectId: 'sub-1', topicId: 'topic-1' },
     });
   });
@@ -270,7 +270,7 @@ describe('TopicDetailScreen', () => {
     fireEvent.press(screen.getByTestId('relearn-button'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/session',
+      pathname: '/(learner)/session',
       params: { mode: 'learning', subjectId: 'sub-1', topicId: 'topic-1' },
     });
   });

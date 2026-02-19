@@ -57,6 +57,7 @@ export default function HomeScreen() {
       <ScrollView
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 24 }}
+        testID="home-scroll-view"
       >
         {coachingCard.isLoading ? (
           <View className="bg-coaching-card rounded-card p-5 mt-4 items-center py-8">
@@ -96,13 +97,15 @@ export default function HomeScreen() {
                   <Pressable
                     key={subject.id}
                     onPress={() =>
-                      router.push(
-                        `/(learner)/curriculum/${subject.id}` as never
-                      )
+                      router.push({
+                        pathname: '/(learner)/onboarding/curriculum-review',
+                        params: { subjectId: subject.id },
+                      } as never)
                     }
                     className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
                     accessibilityLabel={`Open ${subject.name}`}
                     accessibilityRole="button"
+                    testID={`home-subject-${subject.id}`}
                   >
                     <Text className="text-body font-medium text-text-primary">
                       {subject.name}

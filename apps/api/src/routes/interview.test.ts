@@ -208,6 +208,7 @@ describe('interview routes', () => {
 
       expect(updateDraft).toHaveBeenCalledWith(
         undefined,
+        expect.any(String),
         'draft-1',
         expect.objectContaining({
           exchangeHistory: expect.arrayContaining([
@@ -245,6 +246,7 @@ describe('interview routes', () => {
 
       expect(updateDraft).toHaveBeenCalledWith(
         undefined,
+        expect.any(String),
         'draft-1',
         expect.objectContaining({
           status: 'completed',

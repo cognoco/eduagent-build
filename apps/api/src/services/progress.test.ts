@@ -129,12 +129,14 @@ function createMockDb({
   curriculumFindFirst = undefined as
     | { id: string; subjectId: string }
     | undefined,
+  curriculaFindMany = [] as Array<{ id: string; subjectId: string }>,
   topicsFindMany = [] as ReturnType<typeof mockTopicRow>[],
 } = {}): Database {
   return {
     query: {
       curricula: {
         findFirst: jest.fn().mockResolvedValue(curriculumFindFirst),
+        findMany: jest.fn().mockResolvedValue(curriculaFindMany),
       },
       curriculumTopics: {
         findMany: jest.fn().mockResolvedValue(topicsFindMany),
@@ -389,29 +391,85 @@ describe('getOverallProgress', () => {
     expect(result.totalTopicsVerified).toBe(0);
   });
 
-  it('aggregates across multiple subjects', async () => {
+  it('aggregates across multiple subjects with batch queries', async () => {
     const subject1 = mockSubjectRow({ id: 'sub-1', name: 'Math' });
     const subject2 = mockSubjectRow({ id: 'sub-2', name: 'Science' });
+    const curriculum1Id = 'curr-1';
+    const curriculum2Id = 'curr-2';
 
-    // This test relies on getSubjectProgress being called for each subject.
-    // We mock at the repo level, so each call to getSubjectProgress
-    // will use the same repo setup. In a real integration test we'd use
-    // different data per subject. Here we verify the aggregation logic.
+    const topic1 = mockTopicRow({
+      id: 'topic-1',
+      title: 'Algebra',
+      sortOrder: 1,
+    });
+    const topic2 = mockTopicRow({
+      id: 'topic-2',
+      title: 'Biology',
+      sortOrder: 1,
+    });
+
+    // Override curriculumId on topic2 to belong to curriculum2
+    const topic2WithCurriculum = { ...topic2, curriculumId: curriculum2Id };
+    const topic1WithCurriculum = { ...topic1, curriculumId: curriculum1Id };
+
     setupScopedRepo({
       subjectsFindMany: [subject1, subject2],
-      subjectFindFirst: subject1,
-      retentionCardsFindMany: [],
-      assessmentsFindMany: [],
-      sessionsFindMany: [],
+      retentionCardsFindMany: [
+        mockRetentionCard({ topicId: 'topic-1', xpStatus: 'verified' }),
+      ],
+      assessmentsFindMany: [
+        mockAssessmentRow({ topicId: 'topic-2', status: 'passed' }),
+      ],
+      sessionsFindMany: [mockSessionRow({ subjectId: 'sub-1' })],
     });
+
     const db = createMockDb({
-      curriculumFindFirst: { id: curriculumId, subjectId: subject1.id },
-      topicsFindMany: [mockTopicRow()],
+      curriculaFindMany: [
+        { id: curriculum1Id, subjectId: 'sub-1' },
+        { id: curriculum2Id, subjectId: 'sub-2' },
+      ],
+      topicsFindMany: [topic1WithCurriculum, topic2WithCurriculum],
     });
 
     const result = await getOverallProgress(db, profileId);
 
-    expect(result.subjects.length).toBeGreaterThanOrEqual(1);
+    expect(result.subjects).toHaveLength(2);
+    expect(result.totalTopicsCompleted).toBe(2); // 1 verified + 1 passed
+    expect(result.totalTopicsVerified).toBe(1);
+
+    const math = result.subjects.find((s) => s.name === 'Math');
+    const science = result.subjects.find((s) => s.name === 'Science');
+    expect(math).toBeDefined();
+    expect(math!.topicsTotal).toBe(1);
+    expect(math!.topicsCompleted).toBe(1);
+    expect(math!.topicsVerified).toBe(1);
+    expect(science).toBeDefined();
+    expect(science!.topicsTotal).toBe(1);
+    expect(science!.topicsCompleted).toBe(1);
+    expect(science!.topicsVerified).toBe(0);
+  });
+
+  it('handles subjects without curricula', async () => {
+    const subject = mockSubjectRow({ id: 'sub-1', name: 'Math' });
+
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      retentionCardsFindMany: [],
+      assessmentsFindMany: [],
+      sessionsFindMany: [],
+    });
+
+    const db = createMockDb({
+      curriculaFindMany: [],
+      topicsFindMany: [],
+    });
+
+    const result = await getOverallProgress(db, profileId);
+
+    expect(result.subjects).toHaveLength(1);
+    expect(result.subjects[0].topicsTotal).toBe(0);
+    expect(result.subjects[0].retentionStatus).toBe('strong');
+    expect(result.totalTopicsCompleted).toBe(0);
   });
 });
 

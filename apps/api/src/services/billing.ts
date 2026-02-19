@@ -13,6 +13,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
+import { getTierConfig } from './subscription';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -291,7 +292,7 @@ export async function resetMonthlyQuota(
 // Free-tier auto-provisioning (CR1 fix: ensures free users get metered)
 // ---------------------------------------------------------------------------
 
-const FREE_TIER_LIMIT = 50;
+const FREE_TIER_LIMIT = getTierConfig('free').monthlyQuota;
 
 /**
  * Ensures an account has a subscription row for metering.

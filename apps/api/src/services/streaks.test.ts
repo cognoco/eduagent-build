@@ -230,3 +230,17 @@ describe('getStreakDisplayInfo', () => {
     expect(info.displayText).toContain('new streak');
   });
 });
+
+// ---------------------------------------------------------------------------
+// DB-aware functions (require mock database)
+// ---------------------------------------------------------------------------
+
+describe('getStreakData', () => {
+  it.todo('returns streak state with display info for profile');
+  it.todo('returns initial state when no streak record exists');
+});
+
+describe('getXpSummary', () => {
+  it.todo('aggregates XP totals from ledger entries');
+  it.todo('returns zero summary when no XP entries exist');
+});

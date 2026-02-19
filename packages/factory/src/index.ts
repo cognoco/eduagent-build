@@ -24,3 +24,40 @@ export {
   buildConsentResponse,
   resetConsentCounter,
 } from './consent.js';
+
+// Session factories
+export {
+  buildSession,
+  buildSessionSummary,
+  resetSessionCounter,
+} from './sessions.js';
+
+// Subject & curriculum factories
+export {
+  buildSubject,
+  buildCurriculum,
+  buildCurriculumTopic,
+  resetSubjectCounter,
+} from './subjects.js';
+
+// Assessment & retention factories
+export {
+  buildAssessment,
+  buildRetentionCard,
+  resetAssessmentCounter,
+} from './assessments.js';
+
+// Billing factories
+export {
+  buildSubscription,
+  buildQuotaPool,
+  buildTopUpCredits,
+  resetBillingCounter,
+} from './billing.js';
+
+// Progress factories
+export {
+  buildStreak,
+  buildXpLedgerEntry,
+  resetProgressCounter,
+} from './progress.js';

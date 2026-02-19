@@ -13,11 +13,7 @@ import { useSignUp } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
-
-interface ClerkError {
-  message?: string;
-  longMessage?: string;
-}
+import { extractClerkError } from '../../lib/clerk-error';
 
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -47,12 +43,7 @@ export default function SignUpScreen() {
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
       setPendingVerification(true);
     } catch (err: unknown) {
-      const clerkErrors = (err as { errors?: ClerkError[] }).errors;
-      const message =
-        clerkErrors?.[0]?.longMessage ??
-        clerkErrors?.[0]?.message ??
-        'Something went wrong. Please try again.';
-      setError(message);
+      setError(extractClerkError(err));
     } finally {
       setLoading(false);
     }
@@ -71,17 +62,16 @@ export default function SignUpScreen() {
 
       if (signUpAttempt.status === 'complete') {
         await setActive({ session: signUpAttempt.createdSessionId });
+        // Two-step redirect: always land in (learner), then layout guard
+        // checks persona and bounces parent users to /(parent)/dashboard.
         router.replace('/(learner)/home');
       } else {
         setError('Verification could not be completed. Please try again.');
       }
     } catch (err: unknown) {
-      const clerkErrors = (err as { errors?: ClerkError[] }).errors;
-      const message =
-        clerkErrors?.[0]?.longMessage ??
-        clerkErrors?.[0]?.message ??
-        'Invalid verification code. Please try again.';
-      setError(message);
+      setError(
+        extractClerkError(err, 'Invalid verification code. Please try again.')
+      );
     } finally {
       setLoading(false);
     }

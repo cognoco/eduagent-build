@@ -29,6 +29,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           profileId: consentState.profileId,
           parentEmail: consentState.parentEmail,
           consentType: consentState.consentType,
+          timestamp: new Date().toISOString(),
         },
       });
 

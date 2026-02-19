@@ -161,7 +161,7 @@ export default function CurriculumScreen() {
           <Pressable
             onPress={() =>
               router.push({
-                pathname: '/session',
+                pathname: '/(learner)/session',
                 params: {
                   mode: 'learning',
                   subjectId,

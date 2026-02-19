@@ -135,7 +135,9 @@ export async function processRecallTest(
     };
   }
 
-  // Use answer length as rough quality proxy (in production, LLM evaluates)
+  // TODO(quality-eval): Replace length-based proxy with LLM evaluation.
+  // Track: Epic 3 Story 3.2 — mastery verification requires semantic assessment.
+  // Current heuristic: answer > 50 chars = quality 4 (pass), else quality 2 (fail).
   const quality = input.answer.length > 50 ? 4 : 2;
   const state = rowToRetentionState(card);
   const result = processRecallResult(state, quality);

@@ -1,6 +1,5 @@
 // ---------------------------------------------------------------------------
 // Payment Retry — Sprint 9 Phase 2
-// Handles failed payments: retry up to 3 times, then downgrade to free tier.
 // ---------------------------------------------------------------------------
 
 import { inngest } from '../client';
@@ -12,6 +11,21 @@ import {
 } from '../../services/billing';
 import { getTierConfig } from '../../services/subscription';
 
+/**
+ * Payment Retry Tracker — triggered by `app/payment.failed`.
+ *
+ * DESIGN NOTE: This function does NOT retry Stripe payments directly.
+ * Stripe handles payment retries via its Smart Retries feature
+ * (https://stripe.com/docs/billing/revenue-recovery/smart-retries).
+ *
+ * This function serves two purposes:
+ * 1. Track failed payment attempts across Stripe's retry cycles
+ * 2. After 3 failed attempts, downgrade the subscription to free tier
+ *
+ * The `attempt` counter increments each time Stripe's retry fails and
+ * our webhook receives a new `invoice.payment_failed` event, which
+ * dispatches a new `app/payment.failed` Inngest event.
+ */
 export const paymentRetry = inngest.createFunction(
   { id: 'payment-retry', name: 'Retry failed payment' },
   { event: 'app/payment.failed' },

@@ -53,7 +53,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       ];
 
       if (result.isComplete) {
-        await updateDraft(db, draft.id, {
+        await updateDraft(db, profileId, draft.id, {
           exchangeHistory: updatedHistory,
           extractedSignals: result.extractedSignals ?? draft.extractedSignals,
           status: 'completed',
@@ -64,7 +64,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
           extractedSignals: result.extractedSignals ?? draft.extractedSignals,
         });
       } else {
-        await updateDraft(db, draft.id, {
+        await updateDraft(db, profileId, draft.id, {
           exchangeHistory: updatedHistory,
         });
       }

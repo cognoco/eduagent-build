@@ -5,14 +5,14 @@ import type { ErrorCode } from '@eduagent/schemas';
 
 export function apiError(
   c: Context,
-  status: number,
+  status: 400 | 401 | 403 | 404 | 409 | 422 | 500,
   code: ErrorCode,
   message: string,
   details?: unknown
 ): Response & TypedResponse {
   return c.json(
     { code, message, ...(details !== undefined && { details }) },
-    status as never
+    status
   );
 }
 

@@ -56,6 +56,7 @@ function createMockDb({
   learningSessions = [] as Record<string, unknown>[],
   sessionEvents = [] as Record<string, unknown>[],
   sessionSummaries = [] as Record<string, unknown>[],
+  sessionEmbeddings = [] as Record<string, unknown>[],
   retentionCards = [] as Record<string, unknown>[],
   assessments = [] as Record<string, unknown>[],
   xpLedger = [] as Record<string, unknown>[],
@@ -65,6 +66,11 @@ function createMockDb({
   teachingPreferences = [] as Record<string, unknown>[],
   onboardingDrafts = [] as Record<string, unknown>[],
   parkingLotItems = [] as Record<string, unknown>[],
+  needsDeepeningTopics = [] as Record<string, unknown>[],
+  familyLinks = [] as Record<string, unknown>[],
+  subscriptions = [] as Record<string, unknown>[],
+  quotaPools = [] as Record<string, unknown>[],
+  topUpCredits = [] as Record<string, unknown>[],
 } = {}): Database {
   return {
     query: {
@@ -95,6 +101,9 @@ function createMockDb({
       sessionSummaries: {
         findMany: jest.fn().mockResolvedValue(sessionSummaries),
       },
+      sessionEmbeddings: {
+        findMany: jest.fn().mockResolvedValue(sessionEmbeddings),
+      },
       retentionCards: {
         findMany: jest.fn().mockResolvedValue(retentionCards),
       },
@@ -121,6 +130,21 @@ function createMockDb({
       },
       parkingLotItems: {
         findMany: jest.fn().mockResolvedValue(parkingLotItems),
+      },
+      needsDeepeningTopics: {
+        findMany: jest.fn().mockResolvedValue(needsDeepeningTopics),
+      },
+      familyLinks: {
+        findMany: jest.fn().mockResolvedValue(familyLinks),
+      },
+      subscriptions: {
+        findMany: jest.fn().mockResolvedValue(subscriptions),
+      },
+      quotaPools: {
+        findMany: jest.fn().mockResolvedValue(quotaPools),
+      },
+      topUpCredits: {
+        findMany: jest.fn().mockResolvedValue(topUpCredits),
       },
     },
   } as unknown as Database;
@@ -269,6 +293,7 @@ describe('generateExport', () => {
     expect(result.learningSessions).toEqual([]);
     expect(result.sessionEvents).toEqual([]);
     expect(result.sessionSummaries).toEqual([]);
+    expect(result.sessionEmbeddings).toEqual([]);
     expect(result.retentionCards).toEqual([]);
     expect(result.assessments).toEqual([]);
     expect(result.xpLedger).toEqual([]);
@@ -278,5 +303,11 @@ describe('generateExport', () => {
     expect(result.teachingPreferences).toEqual([]);
     expect(result.onboardingDrafts).toEqual([]);
     expect(result.parkingLotItems).toEqual([]);
+    expect(result.needsDeepeningTopics).toEqual([]);
+    expect(result.familyLinks).toEqual([]);
+    // subscriptions are account-scoped (not profile-scoped), so they still get queried
+    expect(result.subscriptions).toEqual([]);
+    expect(result.quotaPools).toEqual([]);
+    expect(result.topUpCredits).toEqual([]);
   });
 });

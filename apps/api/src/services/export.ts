@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, or } from 'drizzle-orm';
 import {
   accounts,
   profiles,
@@ -14,6 +14,7 @@ import {
   learningSessions,
   sessionEvents,
   sessionSummaries,
+  sessionEmbeddings,
   retentionCards,
   assessments,
   xpLedger,
@@ -23,6 +24,11 @@ import {
   teachingPreferences,
   onboardingDrafts,
   parkingLotItems,
+  needsDeepeningTopics,
+  familyLinks,
+  subscriptions,
+  quotaPools,
+  topUpCredits,
   type Database,
 } from '@eduagent/database';
 import type { DataExport } from '@eduagent/schemas';
@@ -162,6 +168,50 @@ export async function generateExport(
         })
       : [];
 
+  const sessionEmbeddingRows =
+    profileIds.length > 0
+      ? await db.query.sessionEmbeddings.findMany({
+          where: inArray(sessionEmbeddings.profileId, profileIds),
+        })
+      : [];
+
+  const needsDeepeningTopicRows =
+    profileIds.length > 0
+      ? await db.query.needsDeepeningTopics.findMany({
+          where: inArray(needsDeepeningTopics.profileId, profileIds),
+        })
+      : [];
+
+  const familyLinkRows =
+    profileIds.length > 0
+      ? await db.query.familyLinks.findMany({
+          where: or(
+            inArray(familyLinks.parentProfileId, profileIds),
+            inArray(familyLinks.childProfileId, profileIds)
+          ),
+        })
+      : [];
+
+  const subscriptionRows = await db.query.subscriptions.findMany({
+    where: eq(subscriptions.accountId, accountId),
+  });
+
+  const subscriptionIds = subscriptionRows.map((s) => s.id);
+
+  const quotaPoolRows =
+    subscriptionIds.length > 0
+      ? await db.query.quotaPools.findMany({
+          where: inArray(quotaPools.subscriptionId, subscriptionIds),
+        })
+      : [];
+
+  const topUpCreditRows =
+    subscriptionIds.length > 0
+      ? await db.query.topUpCredits.findMany({
+          where: inArray(topUpCredits.subscriptionId, subscriptionIds),
+        })
+      : [];
+
   return {
     account: {
       email: account.email,
@@ -204,6 +254,12 @@ export async function generateExport(
     teachingPreferences: teachingPrefRows as Record<string, unknown>[],
     onboardingDrafts: onboardingDraftRows as Record<string, unknown>[],
     parkingLotItems: parkingLotRows as Record<string, unknown>[],
+    sessionEmbeddings: sessionEmbeddingRows as Record<string, unknown>[],
+    subscriptions: subscriptionRows as Record<string, unknown>[],
+    quotaPools: quotaPoolRows as Record<string, unknown>[],
+    topUpCredits: topUpCreditRows as Record<string, unknown>[],
+    needsDeepeningTopics: needsDeepeningTopicRows as Record<string, unknown>[],
+    familyLinks: familyLinkRows as Record<string, unknown>[],
     exportedAt: new Date().toISOString(),
   };
 }

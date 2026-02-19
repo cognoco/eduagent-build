@@ -28,6 +28,7 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
       data: {
         accountId: account.id,
         profileIds,
+        timestamp: new Date().toISOString(),
       },
     });
 

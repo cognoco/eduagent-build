@@ -177,7 +177,7 @@ export default function SubscriptionScreen() {
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={() => router.back()}
-          className="mr-3 py-1"
+          className="mr-3 min-w-[44px] min-h-[44px] justify-center items-center"
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >

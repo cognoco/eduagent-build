@@ -238,9 +238,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         await linkStripeCustomer(db, account.id, customerId);
       }
 
-      // Amount in cents — 500 credits = €4.99
+      // Price per top-up pack in EUR cents (€4.99)
+      const TOP_UP_PRICE_CENTS = 499;
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: 499,
+        amount: TOP_UP_PRICE_CENTS,
         currency: 'eur',
         customer: customerId,
         metadata: { accountId: account.id, credits: String(amount) },

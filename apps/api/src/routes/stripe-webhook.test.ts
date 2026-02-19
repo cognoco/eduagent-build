@@ -60,7 +60,7 @@ const TEST_ENV = {
 function makeStripeEvent(
   type: string,
   dataObject: Record<string, unknown>,
-  created = 1700000000
+  created = Math.floor(Date.now() / 1000)
 ) {
   return {
     id: `evt_${Date.now()}`,
@@ -191,6 +191,56 @@ describe('signature verification', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.received).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stale event rejection
+// ---------------------------------------------------------------------------
+
+describe('stale event rejection', () => {
+  it('returns 400 for events older than 5 minutes', async () => {
+    const staleCreated = Math.floor(Date.now() / 1000) - 6 * 60; // 6 minutes ago
+    const stripeSub = makeSubscription({ status: 'active' });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', stripeSub, staleCreated)
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe('STALE_EVENT');
+    expect(updateSubscriptionFromWebhook).not.toHaveBeenCalled();
+  });
+
+  it('accepts events within the 5-minute window', async () => {
+    const recentCreated = Math.floor(Date.now() / 1000) - 2 * 60; // 2 minutes ago
+    const stripeSub = makeSubscription({ status: 'active' });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', stripeSub, recentCreated)
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalled();
   });
 });
 

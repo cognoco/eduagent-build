@@ -7,6 +7,7 @@ import {
   numeric,
   pgEnum,
   unique,
+  index,
 } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles.js';
 import { subjects, curriculumTopics } from './subjects.js';
@@ -108,6 +109,7 @@ export const retentionCards = pgTable(
       table.profileId,
       table.topicId
     ),
+    index('retention_cards_review_idx').on(table.profileId, table.nextReviewAt),
   ]
 );
 

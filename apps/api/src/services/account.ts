@@ -82,12 +82,21 @@ export async function findOrCreateAccount(
     return found;
   }
 
-  // FR108: Auto-create a 14-day trial subscription with Plus-tier limits
-  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-  await createSubscription(db, row.id, 'free', 500, {
-    status: 'trial',
-    trialEndsAt: trialEndsAt.toISOString(),
-  });
+  // FR108: Auto-create a 14-day trial subscription with Plus-tier limits.
+  // Quota is 500 (Plus-tier monthly quota) during the 14-day trial period.
+  try {
+    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    await createSubscription(db, row.id, 'free', 500, {
+      status: 'trial',
+      trialEndsAt: trialEndsAt.toISOString(),
+    });
+  } catch (error) {
+    // Log but don't fail account creation — subscription can be retried
+    console.error(
+      'Failed to create trial subscription for new account:',
+      error
+    );
+  }
 
   return mapAccountRow(row);
 }

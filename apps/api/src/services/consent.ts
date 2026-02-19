@@ -164,6 +164,10 @@ export async function processConsentResponse(
 
 /**
  * Returns the current consent status for a profile (latest consent record).
+ *
+ * Note: Uses raw db query because consentStates is not included in the scoped
+ * repository — consent records are managed by the parental consent flow which
+ * operates cross-profile (parent approves for child).
  */
 export async function getConsentStatus(
   db: Database,

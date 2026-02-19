@@ -43,25 +43,29 @@ export const accounts = pgTable('accounts', {
   }),
 });
 
-export const profiles = pgTable('profiles', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  accountId: uuid('account_id')
-    .notNull()
-    .references(() => accounts.id, { onDelete: 'cascade' }),
-  displayName: text('display_name').notNull(),
-  avatarUrl: text('avatar_url'),
-  birthDate: timestamp('birth_date', { mode: 'date' }),
-  personaType: personaTypeEnum('persona_type').notNull().default('LEARNER'),
-  isOwner: boolean('is_owner').notNull().default(false),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const profiles = pgTable(
+  'profiles',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    displayName: text('display_name').notNull(),
+    avatarUrl: text('avatar_url'),
+    birthDate: timestamp('birth_date', { mode: 'date' }),
+    personaType: personaTypeEnum('persona_type').notNull().default('LEARNER'),
+    isOwner: boolean('is_owner').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index('profiles_account_id_idx').on(table.accountId)]
+);
 
 export const familyLinks = pgTable(
   'family_links',

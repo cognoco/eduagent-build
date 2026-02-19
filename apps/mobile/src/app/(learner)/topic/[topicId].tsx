@@ -241,7 +241,7 @@ export default function TopicDetailScreen() {
           <Pressable
             onPress={() =>
               router.push({
-                pathname: '/session',
+                pathname: '/(learner)/session',
                 params: {
                   mode: 'practice',
                   subjectId,
@@ -281,7 +281,7 @@ export default function TopicDetailScreen() {
             <Pressable
               onPress={() =>
                 router.push({
-                  pathname: '/session',
+                  pathname: '/(learner)/session',
                   params: {
                     mode: 'learning',
                     subjectId,

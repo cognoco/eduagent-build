@@ -5,12 +5,12 @@ import {
   ChatShell,
   animateResponse,
   type ChatMessage,
-} from '../../components/session';
+} from '../../../components/session';
 import {
   useStreamMessage,
   useStartSession,
   useCloseSession,
-} from '../../hooks/use-sessions';
+} from '../../../hooks/use-sessions';
 
 const OPENING_MESSAGES: Record<string, string> = {
   homework:

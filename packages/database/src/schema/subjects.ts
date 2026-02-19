@@ -6,6 +6,7 @@ import {
   boolean,
   timestamp,
   pgEnum,
+  index,
 } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles.js';
 import { generateUUIDv7 } from '../utils/uuid.js';
@@ -23,22 +24,26 @@ export const topicRelevanceEnum = pgEnum('topic_relevance', [
   'emerging',
 ]);
 
-export const subjects = pgTable('subjects', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  profileId: uuid('profile_id')
-    .notNull()
-    .references(() => profiles.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  status: subjectStatusEnum('status').notNull().default('active'),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const subjects = pgTable(
+  'subjects',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    status: subjectStatusEnum('status').notNull().default('active'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index('subjects_profile_id_idx').on(table.profileId)]
+);
 
 export const curricula = pgTable('curricula', {
   id: uuid('id')

@@ -43,8 +43,8 @@ export function useCoachingCard(): CoachingCardState {
         secondaryLabel: 'I have something else in mind',
         primaryRoute: suggestion
           ? `/session?mode=practice&subjectId=${suggestion.subjectId}&topicId=${suggestion.topicId}`
-          : '/session?mode=freeform',
-        secondaryRoute: '/session?mode=freeform',
+          : '/(learner)/session?mode=freeform',
+        secondaryRoute: '/(learner)/session?mode=freeform',
         isLoading: false,
       };
     }
@@ -57,7 +57,7 @@ export function useCoachingCard(): CoachingCardState {
         primaryLabel: "Let's go",
         secondaryLabel: 'I have something else in mind',
         primaryRoute: `/session?mode=practice&subjectId=${suggestion.subjectId}&topicId=${suggestion.topicId}`,
-        secondaryRoute: '/session?mode=freeform',
+        secondaryRoute: '/(learner)/session?mode=freeform',
         isLoading: false,
       };
     }
@@ -68,8 +68,8 @@ export function useCoachingCard(): CoachingCardState {
       subtext: 'Start a new topic or explore something on your mind.',
       primaryLabel: "Let's go",
       secondaryLabel: 'I have something else in mind',
-      primaryRoute: '/session?mode=freeform',
-      secondaryRoute: '/session?mode=freeform',
+      primaryRoute: '/(learner)/session?mode=freeform',
+      secondaryRoute: '/(learner)/session?mode=freeform',
       isLoading: false,
     };
   }, [isLoading, suggestion, streak]);

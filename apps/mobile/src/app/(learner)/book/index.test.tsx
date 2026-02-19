@@ -13,17 +13,17 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 const mockUseSubjects = jest.fn();
-jest.mock('../../hooks/use-subjects', () => ({
+jest.mock('../../../hooks/use-subjects', () => ({
   useSubjects: () => mockUseSubjects(),
 }));
 
 const mockUseOverallProgress = jest.fn();
-jest.mock('../../hooks/use-progress', () => ({
+jest.mock('../../../hooks/use-progress', () => ({
   useOverallProgress: () => mockUseOverallProgress(),
 }));
 
 const mockUseRetentionTopics = jest.fn();
-jest.mock('../../hooks/use-retention', () => ({
+jest.mock('../../../hooks/use-retention', () => ({
   useRetentionTopics: () => mockUseRetentionTopics(),
 }));
 
@@ -40,7 +40,7 @@ function createWrapper() {
   };
 }
 
-const LearningBookScreen = require('./learning-book').default;
+const LearningBookScreen = require('./index').default;
 
 describe('LearningBookScreen', () => {
   beforeEach(() => {

@@ -276,19 +276,163 @@ export async function getOverallProgress(
   totalTopicsVerified: number;
 }> {
   const repo = createScopedRepository(db, profileId);
-  const allSubjects = await repo.subjects.findMany();
 
+  // 1. Batch all queries upfront (6 total regardless of N subjects)
+  const allSubjects = await repo.subjects.findMany();
+  if (allSubjects.length === 0) {
+    return { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 };
+  }
+
+  const subjectIds = allSubjects.map((s) => s.id);
+
+  // Fetch all curricula for these subjects in one query
+  const allCurricula = await db.query.curricula.findMany({
+    where: inArray(curricula.subjectId, subjectIds),
+  });
+
+  const curriculumIds = allCurricula.map((c) => c.id);
+  const curriculumBySubject = new Map(
+    allCurricula.map((c) => [c.subjectId, c])
+  );
+
+  // Fetch all topics for all curricula in one query
+  const allTopics =
+    curriculumIds.length > 0
+      ? await db.query.curriculumTopics.findMany({
+          where: and(
+            inArray(curriculumTopics.curriculumId, curriculumIds),
+            eq(curriculumTopics.skipped, false)
+          ),
+        })
+      : [];
+
+  const topicIds = allTopics.map((t) => t.id);
+  const topicsByCurriculum = new Map<string, typeof allTopics>();
+  for (const topic of allTopics) {
+    const list = topicsByCurriculum.get(topic.curriculumId) ?? [];
+    list.push(topic);
+    topicsByCurriculum.set(topic.curriculumId, list);
+  }
+
+  // Fetch all retention cards in one query
+  const allCards =
+    topicIds.length > 0
+      ? await repo.retentionCards.findMany(
+          inArray(retentionCards.topicId, topicIds)
+        )
+      : [];
+
+  const cardsByTopic = new Map<string, typeof allCards>();
+  for (const card of allCards) {
+    const list = cardsByTopic.get(card.topicId) ?? [];
+    list.push(card);
+    cardsByTopic.set(card.topicId, list);
+  }
+
+  // Fetch all assessments in one query
+  const allAssessments =
+    topicIds.length > 0
+      ? await repo.assessments.findMany(inArray(assessments.topicId, topicIds))
+      : [];
+
+  const assessmentsByTopic = new Map<string, typeof allAssessments>();
+  for (const assessment of allAssessments) {
+    const list = assessmentsByTopic.get(assessment.topicId) ?? [];
+    list.push(assessment);
+    assessmentsByTopic.set(assessment.topicId, list);
+  }
+
+  // Fetch all sessions in one query
+  const allSessions =
+    subjectIds.length > 0
+      ? await repo.sessions.findMany(
+          inArray(learningSessions.subjectId, subjectIds)
+        )
+      : [];
+
+  const sessionsBySubject = new Map<string, typeof allSessions>();
+  for (const session of allSessions) {
+    const list = sessionsBySubject.get(session.subjectId) ?? [];
+    list.push(session);
+    sessionsBySubject.set(session.subjectId, list);
+  }
+
+  // 2. Compute per-subject progress in-memory
   const subjectProgressList: SubjectProgress[] = [];
   let totalCompleted = 0;
   let totalVerified = 0;
 
   for (const subject of allSubjects) {
-    const progress = await getSubjectProgress(db, profileId, subject.id);
-    if (progress) {
-      subjectProgressList.push(progress);
-      totalCompleted += progress.topicsCompleted;
-      totalVerified += progress.topicsVerified;
+    const curriculum = curriculumBySubject.get(subject.id);
+
+    if (!curriculum) {
+      subjectProgressList.push({
+        subjectId: subject.id,
+        name: subject.name,
+        topicsTotal: 0,
+        topicsCompleted: 0,
+        topicsVerified: 0,
+        urgencyScore: 0,
+        retentionStatus: 'strong',
+        lastSessionAt: null,
+      });
+      continue;
     }
+
+    const topics = topicsByCurriculum.get(curriculum.id) ?? [];
+
+    const completedTopics = new Set<string>();
+    const verifiedTopics = new Set<string>();
+
+    for (const topic of topics) {
+      const topicAssessments = assessmentsByTopic.get(topic.id) ?? [];
+      const topicCards = cardsByTopic.get(topic.id) ?? [];
+
+      for (const a of topicAssessments) {
+        if (a.status === 'passed') completedTopics.add(a.topicId);
+      }
+      for (const c of topicCards) {
+        if (c.xpStatus === 'verified') {
+          verifiedTopics.add(c.topicId);
+          completedTopics.add(c.topicId);
+        }
+      }
+    }
+
+    // Last session
+    const subjectSessions = sessionsBySubject.get(subject.id) ?? [];
+    const lastSession = subjectSessions.sort(
+      (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
+    )[0];
+
+    // Retention status from all cards for this subject's topics
+    const subjectTopicIds = new Set(topics.map((t) => t.id));
+    const subjectCards = allCards.filter((c) => subjectTopicIds.has(c.topicId));
+    const retentionStatuses = subjectCards.map((c) =>
+      computeRetentionStatus(c.nextReviewAt)
+    );
+    const retentionStatus = computeAggregateRetentionStatus(retentionStatuses);
+
+    // Urgency: count of overdue reviews
+    const now = new Date();
+    const overdueCount = subjectCards.filter(
+      (c) => c.nextReviewAt && c.nextReviewAt.getTime() < now.getTime()
+    ).length;
+
+    const progress: SubjectProgress = {
+      subjectId: subject.id,
+      name: subject.name,
+      topicsTotal: topics.length,
+      topicsCompleted: completedTopics.size,
+      topicsVerified: verifiedTopics.size,
+      urgencyScore: overdueCount,
+      retentionStatus,
+      lastSessionAt: lastSession?.lastActivityAt.toISOString() ?? null,
+    };
+
+    subjectProgressList.push(progress);
+    totalCompleted += completedTopics.size;
+    totalVerified += verifiedTopics.size;
   }
 
   return {

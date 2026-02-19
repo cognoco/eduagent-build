@@ -54,7 +54,7 @@ export default function LearnerLayout() {
           }}
         />
         <Tabs.Screen
-          name="learning-book"
+          name="book"
           options={{
             title: 'Learning Book',
             tabBarIcon: ({ focused }) => (
@@ -72,9 +72,17 @@ export default function LearnerLayout() {
           }}
         />
         <Tabs.Screen
-          name="curriculum"
+          name="onboarding"
           options={{
             href: null,
+            tabBarStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="session"
+          options={{
+            href: null,
+            tabBarStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen

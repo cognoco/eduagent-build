@@ -3,6 +3,7 @@
 // Subscription status cache with 24h TTL
 // ---------------------------------------------------------------------------
 
+import { z } from 'zod';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 
 export interface CachedSubscriptionStatus {
@@ -12,6 +13,14 @@ export interface CachedSubscriptionStatus {
   monthlyLimit: number;
   usedThisMonth: number;
 }
+
+const cachedSubscriptionStatusSchema = z.object({
+  subscriptionId: z.string(),
+  tier: z.string(),
+  status: z.string(),
+  monthlyLimit: z.number(),
+  usedThisMonth: z.number(),
+});
 
 /** 24 hours in seconds */
 const TTL_SECONDS = 86400;
@@ -47,5 +56,12 @@ export async function readSubscriptionStatus(
   if (!raw) {
     return null;
   }
-  return JSON.parse(raw) as CachedSubscriptionStatus;
+
+  try {
+    const parsed = cachedSubscriptionStatusSchema.parse(JSON.parse(raw));
+    return parsed as CachedSubscriptionStatus;
+  } catch {
+    // Cache corruption — treat as miss
+    return null;
+  }
 }

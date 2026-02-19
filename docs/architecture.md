@@ -68,7 +68,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 - **Three-persona theming**: Teen dark, learner calm, parent light — CSS variable layer, components stay persona-unaware
 - **Confidence scoring**: Per-problem behavioral metrics feeding parent dashboard — time-to-answer, hints needed, escalation rung, difficulty
 - **Cold start framing**: Sessions 1-5 use coaching-voiced three-button menu, invisible transition to adaptive entry at session 6+
-- **Phase 1 MVP components**: BaseCoachingCard, Camera Capture, MessageThread + HomeworkChatWrapper, SessionCloseSummary, Retention Signal, ErrorRecovery
+- **Phase 1 MVP components**: CoachingCard (planned: BaseCoachingCard + 4 variants per UX-7), Camera Capture, ChatShell + MessageBubble (planned: MessageThread + HomeworkChatWrapper per UX-7), SessionCloseSummary, RetentionSignal, ErrorBoundary (planned: ErrorRecovery per UX-7)
 
 ### Scale & Complexity Assessment
 
@@ -124,7 +124,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 
 | Concern | Architectural Pattern | Scope |
 |---------|----------------------|-------|
-| **Persona-aware theming** | CSS variable layer via NativeWind. 6 JSON token files (3 personas × 2 color modes). **Swap at app root layout**, not Clerk hook — persona is an application concept, not Clerk's. Flow: Clerk authenticates → app fetches active profile → profile includes persona type → root layout sets CSS variables before any child renders. Profile switching within family account swaps variable set without re-authentication. Components stay completely persona-unaware. | All UI |
+| **Persona-aware theming** | CSS variable layer via NativeWind. 6 JSON token files (3 personas × 2 color modes). **Swap at app root layout**, not Clerk hook — persona is an application concept, not Clerk's. Flow: Clerk authenticates → app fetches active profile → profile includes persona type → root layout sets CSS variables before any child renders. Profile switching within family account swaps variable set without re-authentication. Components stay completely persona-unaware. **Current implementation vs target:** The token system is implemented in `lib/design-tokens.ts` (single TypeScript file) + `lib/theme.ts` (context + hooks). This deviates from the target `theme/tokens/*.json` + `theme/provider.tsx` structure. Migration is planned for v1.1 (dark mode support), when JSON files are needed for: design tool integration (Figma token plugins), automated contrast ratio validation (a11y linting), and 6 distinct value sets (3 personas × 2 color schemes). Current `design-tokens.ts` has identical light/dark values per persona (MVP ships fixed themes: teen=dark, learner=light, parent=light). | All UI |
 | **AI cost management** | Split into two layers: (1) **Metering middleware** calling a **PostgreSQL function** `decrement_quota(profile_id, family_id)` — atomic FIFO logic (monthly pool first, then top-up credits), returns remaining balance or rejection. Middleware interprets result: forward to LLM or return quota-exceeded with soft paywall data. Concurrent family usage handled by PostgreSQL row-level locking (`UPDATE ... SET remaining = remaining - 1 WHERE remaining > 0`) — no application-level locking. (2) **LLM orchestration module** in `services/llm/router.ts` — `routeAndCall(messages: ChatMessage[], rung: EscalationRung, options?) → Promise<RouteResult>`. Handles model selection by escalation rung, provider failover, streaming normalization (`routeAndStream` for SSE). Soft ceiling €0.05/session: **monitoring threshold, not a cutoff.** Never interrupt a learning session for cost reasons. Log when sessions exceed €0.05. If >20% of sessions consistently exceed ceiling, tune routing rules (e.g., lower the escalation rung threshold for reasoning models). Surface as a dashboard metric for cost monitoring. The metering middleware tracks per-session cost accumulation but does not enforce a hard stop — the quota system (monthly pool + top-ups) is the actual spending control. | Backend |
 | **Prompt caching** | Provider-level first (Anthropic prompt caching for system prompts — stable per subject/persona combination). **Parallel Example templates** cached in database: keyed by `subject + type + difficulty + system_prompt_hash`. System prompt change → hash change → old cache entries naturally bypassed. No explicit invalidation or TTL needed — stale entries are orphaned and can be garbage-collected periodically. No general-purpose prompt cache layer at MVP. | Backend |
 | **Multi-profile data isolation** | **Repository pattern** with automatic scope injection: `createScopedRepository(profileId)` — every query gets `WHERE profile_id = $1` automatically. **Neon RLS** as defense-in-depth, not primary enforcement. Profile ID set via session context, not passed per-request. | Data layer |
@@ -203,8 +203,11 @@ The `@johnlindquist/nx-hono` plugin is dead (0 downloads, missing GitHub repo, n
 apps/api/
 ├── src/
 │   ├── routes/          # Route handlers
-│   ├── middleware/       # Auth, JWT, profile-scope, request-logger, database, LLM, account
-│   ├── lib/             # LLM orchestration module, Inngest functions
+│   ├── services/        # Business logic (includes services/llm/ orchestration)
+│   ├── middleware/       # Auth, JWT, profile-scope, request-logger, database, LLM, metering, account
+│   ├── inngest/         # Background job functions
+│   ├── config.ts        # Typed env config (Zod validated at startup)
+│   ├── errors.ts        # AppError class, typed error codes
 │   └── index.ts         # Hono app entry
 ├── wrangler.toml        # Cloudflare Workers config
 ├── project.json         # Nx targets: serve, build, deploy
@@ -422,6 +425,14 @@ app/
 
 **Image handling:** Expo Image (built into SDK 54, optimized for React Native, handles caching and progressive loading). No additional library needed.
 
+### Mobile-API Integration Patterns
+
+**X-Profile-Id Header Convention:** All authenticated API requests include an `X-Profile-Id` header. The `useApi()` hook in `apps/mobile/src/lib/auth-api.ts` automatically injects this from `ProfileProvider`. On the API side, routes extract it via `c.get('profileId')` set by `profileScopeMiddleware`. Falls back to `account.id` when the header is absent.
+
+**SSE Streaming Parser:** Learning sessions use Server-Sent Events for real-time LLM responses. The `useStreamMessage` hook in `apps/mobile/src/hooks/use-sessions.ts` manages an `AsyncGenerator` for text streaming, concatenating chunks and handling cleanup on unmount.
+
+**ProfileProvider/useProfile Lifecycle:** `ProfileProvider` in `apps/mobile/src/lib/profile.ts` loads the active profile on mount via TanStack Query, provides it via React Context, and exposes `switchProfile()`. Root `_layout.tsx` wraps the app with this provider. `useProfile()` is the access point for all profile-dependent UI.
+
 ### Infrastructure & Deployment
 
 **Primary deployment:**
@@ -507,7 +518,7 @@ packages/database/src/schema/
 | Files — utilities/hooks | camelCase | `useProfile.ts`, `createScopedRepository.ts` |
 | Files — schemas/types | camelCase | `sessionSchemas.ts`, `profileTypes.ts` |
 | Files — route handlers | camelCase | `sessions.ts`, `progress.ts` |
-| Components | PascalCase | `BaseCoachingCard`, `MessageThread` |
+| Components | PascalCase | `CoachingCard` (planned: `BaseCoachingCard` per UX-7), `ChatShell` |
 | Functions | camelCase | `routeAndCall()`, `decrementQuota()` |
 | Constants | SCREAMING_SNAKE | `MAX_RETRY_ATTEMPTS`, `SESSION_TIMEOUT_MS` |
 | Types/Interfaces | PascalCase | `SessionEvent`, `CoachingCardState` |
@@ -554,17 +565,19 @@ Not a separate `__tests__/` directory. Exception: integration/E2E tests in a top
 ```
 components/
 ├── coaching/
-│   ├── BaseCoachingCard.tsx
-│   ├── CoachingCard.test.tsx
-│   └── RecallPrompt.tsx
+│   └── CoachingCard.tsx         # (BaseCoachingCard hierarchy planned — UX-7)
 ├── session/
-│   ├── MessageThread.tsx
-│   ├── HomeworkChatWrapper.tsx
-│   └── SessionCloseSummary.tsx
+│   ├── ChatShell.tsx            # Reusable chat UI shell (replaces planned MessageThread)
+│   └── MessageBubble.tsx        # Individual message rendering
+├── progress/
+│   └── RetentionSignal.tsx
 └── common/
-    ├── RetentionSignal.tsx
-    └── ErrorRecovery.tsx
+    ├── ErrorBoundary.tsx        # React error boundary (replaces planned ErrorRecovery)
+    ├── DashboardCard.tsx
+    └── UsageMeter.tsx
 ```
+
+> **Note:** Current implementations (`CoachingCard`, `ChatShell`) are simplified versions of the planned UX-7 component hierarchy (`BaseCoachingCard` with 4 variants, `MessageThread` + wrappers). The UX specification component names represent the target architecture.
 
 **Hono handler pattern:** Handler stays inline for route definition and Hono RPC type inference. Business logic extracted into service functions in `apps/api/src/services/` — testable, readable, handler is thin glue.
 
@@ -783,15 +796,10 @@ eduagent/
 │   │   │           └── [profileId].tsx
 │   │   ├── components/
 │   │   │   ├── coaching/
-│   │   │   │   ├── BaseCoachingCard.tsx
-│   │   │   │   ├── BaseCoachingCard.test.tsx
-│   │   │   │   ├── RecallPrompt.tsx
-│   │   │   │   └── ColdStartMenu.tsx
+│   │   │   │   └── CoachingCard.tsx      # (BaseCoachingCard hierarchy planned — UX-7)
 │   │   │   ├── session/
-│   │   │   │   ├── MessageThread.tsx
-│   │   │   │   ├── MessageThread.test.tsx
-│   │   │   │   ├── HomeworkChatWrapper.tsx
-│   │   │   │   └── SessionCloseSummary.tsx
+│   │   │   │   ├── ChatShell.tsx         # Reusable chat UI shell (planned: MessageThread)
+│   │   │   │   └── MessageBubble.tsx     # Individual message rendering
 │   │   │   ├── assessment/
 │   │   │   │   ├── QuickCheck.tsx
 │   │   │   │   └── RecallTest.tsx
@@ -800,9 +808,9 @@ eduagent/
 │   │   │   │   ├── StreakDisplay.tsx
 │   │   │   │   └── DecayVisualization.tsx
 │   │   │   └── common/
-│   │   │       ├── ErrorRecovery.tsx
-│   │   │       ├── SkeletonCard.tsx
-│   │   │       └── PersonaText.tsx
+│   │   │       ├── ErrorBoundary.tsx     # React error boundary (planned: ErrorRecovery)
+│   │   │       ├── DashboardCard.tsx
+│   │   │       └── UsageMeter.tsx
 │   │   ├── hooks/
 │   │   │   ├── useProfile.ts
 │   │   │   ├── useCoachingCard.ts
@@ -872,6 +880,7 @@ eduagent/
 │       │   │   ├── profile-scope.ts # Extracts profile, creates scoped repository
 │       │   │   ├── request-logger.ts # Request logging + correlation ID injection
 │       │   │   ├── database.ts      # Database connection middleware
+│       │   │   ├── metering.ts      # Quota metering + rate limiting
 │       │   │   ├── llm.ts           # LLM-related middleware
 │       │   │   └── account.ts       # Account-related middleware
 │       │   ├── services/
@@ -1001,7 +1010,7 @@ eduagent/
 ├── tsconfig.base.json               # Shared TS config, path aliases
 ├── pnpm-workspace.yaml
 ├── package.json
-├── .eslintrc.js                     # ESLint 9 flat config (import ordering enforced)
+├── eslint.config.mjs                # ESLint 9 flat config (import ordering enforced)
 ├── .prettierrc
 ├── .editorconfig
 ├── .nvmrc
@@ -1169,7 +1178,7 @@ Service Function (business logic)
 | Background jobs | `inngest/functions/*.ts` (Inngest functions) → call `services/` for logic |
 | Push notifications | `services/notifications.ts` (centralized) ← called by Inngest event handlers |
 | Persona theming | `theme/tokens/*.json`, `theme/provider.tsx`, root `_layout.tsx` |
-| Error handling | `errors.ts` (API), `common/ErrorRecovery.tsx` (mobile) |
+| Error handling | `errors.ts` (API), `common/ErrorBoundary.tsx` (mobile) |
 | Observability | `logger.ts` (Axiom), `sentry.ts`, `middleware/request-logger.ts` (correlation ID) |
 | i18n (UI) | `assets/locales/{en,de}/*.json` via react-i18next |
 | i18n (LLM) | Profile `preferredLanguage` field → system prompt in `services/exchanges.ts` |

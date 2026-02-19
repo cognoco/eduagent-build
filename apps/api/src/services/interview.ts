@@ -1,8 +1,9 @@
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import {
   onboardingDrafts,
   curricula,
   curriculumTopics,
+  createScopedRepository,
   type Database,
 } from '@eduagent/database';
 import { routeAndCall, type ChatMessage } from './llm';
@@ -149,13 +150,13 @@ export async function getOrCreateDraft(
   profileId: string,
   subjectId: string
 ): Promise<OnboardingDraft> {
-  const existing = await db.query.onboardingDrafts.findFirst({
-    where: and(
-      eq(onboardingDrafts.profileId, profileId),
+  const repo = createScopedRepository(db, profileId);
+  const existing = await repo.onboardingDrafts.findFirst(
+    and(
       eq(onboardingDrafts.subjectId, subjectId),
       eq(onboardingDrafts.status, 'in_progress')
-    ),
-  });
+    )
+  );
   if (existing) return mapDraftRow(existing);
 
   const [row] = await db
@@ -177,18 +178,16 @@ export async function getDraftState(
   profileId: string,
   subjectId: string
 ): Promise<OnboardingDraft | null> {
-  const row = await db.query.onboardingDrafts.findFirst({
-    where: and(
-      eq(onboardingDrafts.profileId, profileId),
-      eq(onboardingDrafts.subjectId, subjectId)
-    ),
-    orderBy: desc(onboardingDrafts.createdAt),
-  });
+  const repo = createScopedRepository(db, profileId);
+  const row = await repo.onboardingDrafts.findFirst(
+    eq(onboardingDrafts.subjectId, subjectId)
+  );
   return row ? mapDraftRow(row) : null;
 }
 
 export async function updateDraft(
   db: Database,
+  profileId: string,
   draftId: string,
   updates: {
     exchangeHistory?: ChatExchange[];
@@ -202,7 +201,12 @@ export async function updateDraft(
       ...updates,
       updatedAt: new Date(),
     })
-    .where(eq(onboardingDrafts.id, draftId));
+    .where(
+      and(
+        eq(onboardingDrafts.id, draftId),
+        eq(onboardingDrafts.profileId, profileId)
+      )
+    );
 }
 
 // ---------------------------------------------------------------------------

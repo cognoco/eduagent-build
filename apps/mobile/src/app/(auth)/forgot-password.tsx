@@ -13,20 +13,7 @@ import { useSignIn } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
-
-interface ClerkError {
-  message?: string;
-  longMessage?: string;
-}
-
-function extractClerkError(err: unknown): string {
-  const clerkErrors = (err as { errors?: ClerkError[] }).errors;
-  return (
-    clerkErrors?.[0]?.longMessage ??
-    clerkErrors?.[0]?.message ??
-    'Something went wrong. Please try again.'
-  );
-}
+import { extractClerkError } from '../../lib/clerk-error';
 
 export default function ForgotPasswordScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();

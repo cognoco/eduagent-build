@@ -5,6 +5,8 @@
 
 import Stripe from 'stripe';
 
+// Stripe SDK types require LatestApiVersion; we pin to a specific version
+// to prevent breaking changes. Update this when upgrading the Stripe SDK.
 const API_VERSION = '2025-04-30.basil' as Stripe.LatestApiVersion;
 
 /**
@@ -18,6 +20,15 @@ export function createStripeClient(secretKey: string): Stripe {
   });
 }
 
+let webhookStripeClient: Stripe | null = null;
+
+function getWebhookStripeClient(): Stripe {
+  if (!webhookStripeClient) {
+    webhookStripeClient = createStripeClient('unused');
+  }
+  return webhookStripeClient;
+}
+
 /**
  * Verifies a Stripe webhook signature and returns the parsed event.
  * Wraps `stripe.webhooks.constructEventAsync` for the Workers runtime
@@ -28,7 +39,7 @@ export async function verifyWebhookSignature(
   signature: string,
   secret: string
 ): Promise<Stripe.Event> {
-  const stripe = createStripeClient('unused');
+  const stripe = getWebhookStripeClient();
   return await stripe.webhooks.constructEventAsync(
     payload,
     signature,

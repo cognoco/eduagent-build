@@ -402,7 +402,7 @@ describe('getDraftState', () => {
 describe('updateDraft', () => {
   it('calls db.update with correct draft id', async () => {
     const db = createMockDb();
-    await updateDraft(db, 'draft-1', {
+    await updateDraft(db, profileId, 'draft-1', {
       exchangeHistory: [{ role: 'user', content: 'Hello' }],
     });
 
@@ -411,7 +411,7 @@ describe('updateDraft', () => {
 
   it('can update status to completed', async () => {
     const db = createMockDb();
-    await updateDraft(db, 'draft-1', {
+    await updateDraft(db, profileId, 'draft-1', {
       status: 'completed',
     });
 

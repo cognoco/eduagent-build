@@ -173,6 +173,7 @@ async function handlePaymentFailed(
         stripeSubscriptionId,
         accountId: updated.accountId,
         attempt: invoice.attempt_count ?? 1,
+        timestamp: new Date().toISOString(),
       },
     });
   }
@@ -214,6 +215,9 @@ export const stripeWebhookRoute = new Hono<{
     STRIPE_WEBHOOK_SECRET?: string;
     SUBSCRIPTION_KV?: KVNamespace;
   };
+  Variables: {
+    db: Database;
+  };
 }>().post('/stripe/webhook', async (c) => {
   const signature = c.req.header('stripe-signature');
   if (!signature) {
@@ -253,9 +257,21 @@ export const stripeWebhookRoute = new Hono<{
     );
   }
 
-  const db = c.get('db') as unknown as Database;
+  const db = c.get('db');
   const kv = c.env.SUBSCRIPTION_KV;
   const eventTimestamp = new Date(event.created * 1000).toISOString();
+
+  // Reject stale events (>5 minutes old) to prevent replay attacks
+  const eventAge = Date.now() - event.created * 1000;
+  if (eventAge > 5 * 60 * 1000) {
+    return c.json(
+      {
+        code: ERROR_CODES.STALE_EVENT,
+        message: 'Event too old — rejected to prevent replay',
+      },
+      400
+    );
+  }
 
   switch (event.type) {
     case 'customer.subscription.created':

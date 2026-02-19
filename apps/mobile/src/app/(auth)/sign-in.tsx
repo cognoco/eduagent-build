@@ -15,20 +15,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
-
-interface ClerkError {
-  message?: string;
-  longMessage?: string;
-}
-
-function extractClerkError(err: unknown): string {
-  const clerkErrors = (err as { errors?: ClerkError[] }).errors;
-  return (
-    clerkErrors?.[0]?.longMessage ??
-    clerkErrors?.[0]?.message ??
-    'Something went wrong. Please try again.'
-  );
-}
+import { extractClerkError } from '../../lib/clerk-error';
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -72,6 +59,8 @@ export default function SignInScreen() {
 
         if (createdSessionId && setActive) {
           await setActive({ session: createdSessionId });
+          // Two-step redirect: always land in (learner), then layout guard
+          // checks persona and bounces parent users to /(parent)/dashboard.
           router.replace('/(learner)/home');
         }
       } catch (err: unknown) {
@@ -97,6 +86,8 @@ export default function SignInScreen() {
 
       if (signInAttempt.status === 'complete') {
         await setActive({ session: signInAttempt.createdSessionId });
+        // Two-step redirect: always land in (learner), then layout guard
+        // checks persona and bounces parent users to /(parent)/dashboard.
         router.replace('/(learner)/home');
       } else {
         setError('Sign-in could not be completed. Please try again.');

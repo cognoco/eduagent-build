@@ -10,6 +10,10 @@ import {
   sessionEvents,
   sessionSummaries,
   needsDeepeningTopics,
+  parkingLotItems,
+  teachingPreferences,
+  curriculumAdaptations,
+  onboardingDrafts,
 } from './schema/index.js';
 import { createScopedRepository } from './repository.js';
 import type { Database } from './client.js';
@@ -77,6 +81,10 @@ describe('createScopedRepository', () => {
     ['assessments', assessments],
     ['retentionCards', retentionCards],
     ['xpLedger', xpLedger],
+    ['parkingLotItems', parkingLotItems],
+    ['teachingPreferences', teachingPreferences],
+    ['curriculumAdaptations', curriculumAdaptations],
+    ['onboardingDrafts', onboardingDrafts],
   ] as const)('%s.findMany', (namespace, table) => {
     it('auto-injects profileId filter', async () => {
       const { db, findMany } = createMockDb();
@@ -105,6 +113,10 @@ describe('createScopedRepository', () => {
     ['assessments', assessments],
     ['retentionCards', retentionCards],
     ['xpLedger', xpLedger],
+    ['parkingLotItems', parkingLotItems],
+    ['teachingPreferences', teachingPreferences],
+    ['curriculumAdaptations', curriculumAdaptations],
+    ['onboardingDrafts', onboardingDrafts],
   ] as const)('%s.findMany with extraWhere', (namespace, table) => {
     it('composes profileId with extra condition', async () => {
       const { db, findMany } = createMockDb();
@@ -135,6 +147,10 @@ describe('createScopedRepository', () => {
     ['retentionCards', retentionCards],
     ['xpLedger', xpLedger],
     ['sessionSummaries', sessionSummaries],
+    ['parkingLotItems', parkingLotItems],
+    ['teachingPreferences', teachingPreferences],
+    ['curriculumAdaptations', curriculumAdaptations],
+    ['onboardingDrafts', onboardingDrafts],
   ] as const)('%s.findFirst', (namespace, table) => {
     it('auto-injects profileId filter', async () => {
       const { db, findFirst } = createMockDb();
@@ -245,6 +261,10 @@ describe('createScopedRepository', () => {
       expect(repo.sessionEvents).toBeDefined();
       expect(repo.sessionSummaries).toBeDefined();
       expect(repo.needsDeepeningTopics).toBeDefined();
+      expect(repo.parkingLotItems).toBeDefined();
+      expect(repo.teachingPreferences).toBeDefined();
+      expect(repo.curriculumAdaptations).toBeDefined();
+      expect(repo.onboardingDrafts).toBeDefined();
     });
   });
 });

@@ -1294,16 +1294,16 @@ Several post-remediation findings overlap with existing Phase 3 open items:
 
 | Severity | Count | Resolved | Remaining | Merge Blocker? |
 |----------|-------|----------|-----------|----------------|
-| Critical | 8 | 1 fixed (CR4) + 1 improved (CR5) | 6 | Yes |
-| Important | 24 | 15 fixed (I1-3, I10, I12-18, I20, I22-24) | 9 | Pre-deploy |
-| Suggestion | 25 | 0 | 25 | No |
-| **Total** | **57** | **17** | **40** | |
+| Critical | 8 | 4 fixed (CR1-CR4) + 1 improved (CR5) | 3 (CR6-CR8) | Yes |
+| Important | 24 | 20 fixed (I1-I4, I6-I7, I9-I10, I12-I20, I22-I24) | 4 (I5, I8, I11, I21) | Pre-deploy |
+| Suggestion | 25 | 1 fixed (S12) | 24 | No |
+| **Total** | **57** | **26** | **31** | |
 
 ---
 
 ## Overall Project Health Summary
 
-**Last updated:** 2026-02-18 (pre-feature hardening — 21 items fixed across 5 phases)
+**Last updated:** 2026-02-18 (post-hardening — 26 of 57 post-remediation items resolved across 5 phases)
 
 ### Review History
 
@@ -1315,7 +1315,7 @@ Several post-remediation findings overlap with existing Phase 3 open items:
 | New Feature Review | 2026-02-17 | 72 files post-remediation | 4 parallel agents | 4 NC critical fixed; 8 NH + 3 patterns open |
 | **Shadow Review** | **2026-02-17** | **Full codebase** | **10 agents (5 A/B pairs)** | **33 CRITICAL, 94+ HIGH, 89+ MEDIUM, 78+ LOW — 36-item remediation plan** |
 | **Post-Remediation A/B Review** | **2026-02-18** | **Full codebase post-remediation** | **10 agents (5 A/B pairs)** | **8 Critical, 24 Important, 25 Suggestions = 57 new findings** |
-| **Pre-Feature Hardening** | **2026-02-18** | **21 items from A/B review** | **4 parallel agents (5 phases)** | **CR4 fixed, CR5 improved, 17 Important fixed, 3 schema items fixed, 1,036+ tests** |
+| **Pre-Feature Hardening** | **2026-02-18** | **26 items from A/B review** | **4 parallel agents (5 phases)** | **CR1-CR4 fixed, CR5 improved, 20 Important fixed, 1 Suggestion fixed, 1,048+ tests** |
 
 ### What IS Solid (confirmed by 10 independent reviewers)
 
@@ -1350,10 +1350,10 @@ Several post-remediation findings overlap with existing Phase 3 open items:
 | ProfileId scoping gaps in 5+ services | HIGH | 5 files | Data isolation |
 | Auth redirect ignores persona | HIGH | 2 files | UX correctness |
 | ~~GDPR export missing retention cards/embeddings~~ | ~~HIGH~~ | ~~1 file~~ | ✅ Fixed 2026-02-18 — 15 tables added |
-| ~~Free-tier metering bypass (CR1)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ Fixed 2026-02-18 — `ensureFreeSubscription()` |
-| ~~TOCTOU race in `decrementQuota()` (CR2)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ Fixed 2026-02-18 — atomic SQL WHERE guard |
-| ~~KV cache hit still queries DB (CR3)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ Fixed 2026-02-18 — `subscriptionId` in KV cache |
-| ~~**SM-2 NaN propagation (CR4)**~~ | ~~**CRITICAL**~~ | ~~1 file~~ | ✅ Fixed 2026-02-18 |
+| ~~Free-tier metering bypass (CR1)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ FIXED 2026-02-18 — `ensureFreeSubscription()` auto-provisions free users |
+| ~~TOCTOU race in `decrementQuota()` (CR2)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ FIXED 2026-02-18 — atomic SQL `WHERE usedThisMonth < monthlyLimit` guard |
+| ~~KV cache hit still queries DB (CR3)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ FIXED 2026-02-18 — KV cache stores `subscriptionId` |
+| ~~SM-2 NaN propagation (CR4)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ FIXED 2026-02-18 — `Number.isFinite()` guard + 4 new tests |
 | ⚠️ **`process.env` in Inngest helper (CR5)** | **CRITICAL** | 1 file | Improved 2026-02-18 (runtime guard). Full fix deferred. |
 | **Unsafe double cast in stripe webhook (CR6)** | **CRITICAL** | 1 file | Post-Rem Review |
 | **architecture.md mobile tree fiction (CR7)** | **CRITICAL** | 1 file | Post-Rem Review |
@@ -1390,7 +1390,7 @@ Several post-remediation findings overlap with existing Phase 3 open items:
 | ~~Dead imports cleanup~~ | ~~LOW~~ | ~~5 files~~ | ✅ Phase 3 |
 | ~~`apiErrorSchema.code` unconstrained~~ | ~~MEDIUM~~ | ~~1 file~~ | ✅ Phase 3 |
 | ~~Stale architecture.md paths (30+)~~ | ~~HIGH~~ | ~~1 file~~ | ✅ Phase 3 |
-| KV cache staleness after decrement (I7) | MEDIUM | 1 file | Post-Rem Review |
+| ~~KV cache staleness after decrement (I7)~~ | ~~MEDIUM~~ | ~~1 file~~ | ✅ FIXED 2026-02-18 — KV updated after decrement |
 | Payment-retry doesn't actually retry (I11) | MEDIUM | 1 file | Post-Rem Review |
 | ~~`.env.example` missing Clerk vars (I23)~~ | ~~MEDIUM~~ | ~~1 file~~ | ✅ Fixed 2026-02-18 |
 | ~~Orphaned HealthCheck components (I24)~~ | ~~LOW~~ | ~~2 files~~ | ✅ Fixed 2026-02-18 (deleted) |

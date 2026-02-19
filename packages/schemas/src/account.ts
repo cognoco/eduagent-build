@@ -53,6 +53,12 @@ export const dataExportSchema = z.object({
   teachingPreferences: z.array(z.record(z.string(), z.unknown())).optional(),
   onboardingDrafts: z.array(z.record(z.string(), z.unknown())).optional(),
   parkingLotItems: z.array(z.record(z.string(), z.unknown())).optional(),
+  sessionEmbeddings: z.array(z.record(z.string(), z.unknown())).optional(),
+  subscriptions: z.array(z.record(z.string(), z.unknown())).optional(),
+  quotaPools: z.array(z.record(z.string(), z.unknown())).optional(),
+  topUpCredits: z.array(z.record(z.string(), z.unknown())).optional(),
+  needsDeepeningTopics: z.array(z.record(z.string(), z.unknown())).optional(),
+  familyLinks: z.array(z.record(z.string(), z.unknown())).optional(),
   exportedAt: z.string().datetime(),
 });
 

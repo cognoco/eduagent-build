@@ -63,20 +63,6 @@ function ThemedContent({ persona }: { persona: Persona }) {
         <Stack.Screen name="(parent)" />
         <Stack.Screen name="sso-callback" />
         <Stack.Screen
-          name="interview"
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="session"
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
           name="assessment"
           options={{
             presentation: 'fullScreenModal',
