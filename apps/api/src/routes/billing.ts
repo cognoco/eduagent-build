@@ -218,7 +218,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     );
 
     const currentPeriodEnd = new Date(
-      updated.current_period_end * 1000
+      (updated as any).current_period_end * 1000
     ).toISOString();
 
     // Mark local DB row so cancelAtPeriodEnd is reflected immediately

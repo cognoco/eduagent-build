@@ -33,5 +33,6 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
     }
     c.set('profileId', profile.id);
     await next();
+    return;
   }
 );

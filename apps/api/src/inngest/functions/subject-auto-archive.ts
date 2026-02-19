@@ -3,7 +3,7 @@
 // Daily cron: archive subjects with no activity in the last 30 days.
 // ---------------------------------------------------------------------------
 
-import { eq, and, ne, notInArray, sql } from 'drizzle-orm';
+import { eq, and, notInArray, sql } from 'drizzle-orm';
 import { subjects, learningSessions } from '@eduagent/database';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';

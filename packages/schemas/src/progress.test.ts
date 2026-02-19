@@ -1,11 +1,10 @@
-import { describe, it, expect } from '@jest/globals';
 import {
   streakCardSchema,
   insightCardSchema,
   reviewDueCardSchema,
   challengeCardSchema,
   coachingCardSchema,
-} from './progress';
+} from './progress.js';
 
 // Test data factory — UUIDs must be RFC 9562 compliant (version 4, variant 1)
 const TEST_UUID = '550e8400-e29b-41d4-a716-446655440000';

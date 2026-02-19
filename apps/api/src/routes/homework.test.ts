@@ -165,7 +165,10 @@ describe('homework routes', () => {
       expect(mockStartSession).toHaveBeenCalledTimes(1);
       const [, , subjectArg, inputArg] = mockStartSession.mock.calls[0];
       expect(subjectArg).toBe(SUBJECT_ID);
-      expect(inputArg).toEqual({ sessionType: 'homework' });
+      expect(inputArg).toEqual({
+        subjectId: SUBJECT_ID,
+        sessionType: 'homework',
+      });
     });
 
     it('returns 403 when subject is paused', async () => {

@@ -13,13 +13,13 @@ export function useDashboard(): UseQueryResult<DashboardData> {
 
   return useQuery({
     queryKey: ['dashboard', activeProfile?.id],
-    queryFn: async () => {
+    queryFn: async (): Promise<DashboardData> => {
       const res = await client.dashboard.$get();
-      const data = await res.json();
+      const data = (await res.json()) as DashboardData;
 
       if (data.children.length === 0) {
         const demoRes = await client.dashboard.demo.$get();
-        return await demoRes.json();
+        return (await demoRes.json()) as DashboardData;
       }
 
       return data;

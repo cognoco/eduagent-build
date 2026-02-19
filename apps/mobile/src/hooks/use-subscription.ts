@@ -112,9 +112,9 @@ export function useCreateCheckout(): UseMutationResult<
   const client = useApiClient();
 
   return useMutation({
-    mutationFn: async (input: CheckoutRequest) => {
+    mutationFn: async (input: CheckoutRequest): Promise<CheckoutResponse> => {
       const res = await client.subscription.checkout.$post({ json: input });
-      return await res.json();
+      return (await res.json()) as CheckoutResponse;
     },
   });
 }
@@ -129,9 +129,9 @@ export function useCancelSubscription(): UseMutationResult<
   const { activeProfile } = useProfile();
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<CancelResponse> => {
       const res = await client.subscription.cancel.$post({ json: {} });
-      return await res.json();
+      return (await res.json()) as CancelResponse;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -149,9 +149,9 @@ export function useCreatePortalSession(): UseMutationResult<
   const client = useApiClient();
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<PortalResponse> => {
       const res = await client.subscription.portal.$post({ json: {} });
-      return await res.json();
+      return (await res.json()) as PortalResponse;
     },
   });
 }
@@ -166,11 +166,11 @@ export function usePurchaseTopUp(): UseMutationResult<
   const { activeProfile } = useProfile();
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<TopUpResult> => {
       const res = await client.subscription['top-up'].$post({
         json: { amount: 500 },
       });
-      return await res.json();
+      return (await res.json()) as TopUpResult;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({

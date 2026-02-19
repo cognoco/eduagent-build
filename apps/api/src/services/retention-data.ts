@@ -409,6 +409,8 @@ export async function getTeachingPreference(
   return rows ? { subjectId: rows.subjectId, method: rows.method } : null;
 }
 
+type TeachingMethod = (typeof teachingPreferences.$inferInsert)['method'];
+
 export async function setTeachingPreference(
   db: Database,
   profileId: string,
@@ -426,7 +428,7 @@ export async function setTeachingPreference(
   if (existing) {
     await db
       .update(teachingPreferences)
-      .set({ method, updatedAt: new Date() })
+      .set({ method: method as TeachingMethod, updatedAt: new Date() })
       .where(
         and(
           eq(teachingPreferences.id, existing.id),
@@ -437,7 +439,7 @@ export async function setTeachingPreference(
     await db.insert(teachingPreferences).values({
       profileId,
       subjectId,
-      method,
+      method: method as TeachingMethod,
     });
   }
 

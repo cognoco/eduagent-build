@@ -1,4 +1,4 @@
-import { eq, and, type SQL } from 'drizzle-orm';
+import { eq, and, type SQL, type Column } from 'drizzle-orm';
 import type { Database } from './client.js';
 import {
   profiles,
@@ -23,7 +23,7 @@ import {
 
 export function createScopedRepository(db: Database, profileId: string) {
   function scopedWhere(
-    table: { profileId: ReturnType<typeof profiles.id.mapFromDriverValue> },
+    table: { profileId: Column },
     extraWhere?: SQL
   ): SQL | undefined {
     const profileFilter = eq(table.profileId, profileId);

@@ -53,12 +53,12 @@ export function useStartSession(
       subjectId: string;
       topicId?: string;
       sessionType?: 'learning' | 'homework';
-    }) => {
+    }): Promise<SessionStartResult> => {
       const res = await client.subjects[':subjectId'].sessions.$post({
         param: { subjectId },
         json: input,
       });
-      return await res.json();
+      return (await res.json()) as SessionStartResult;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['sessions'] });

@@ -99,7 +99,7 @@ describe('createScopedRepository', () => {
       const repo = createScopedRepository(db, TEST_PROFILE_ID);
 
       await (
-        repo as Record<
+        repo as unknown as Record<
           string,
           { findMany: (w?: unknown) => Promise<unknown[]> }
         >
@@ -136,7 +136,7 @@ describe('createScopedRepository', () => {
       const extraCondition = sql`1 = 1`;
 
       await (
-        repo as Record<
+        repo as unknown as Record<
           string,
           { findMany: (w?: unknown) => Promise<unknown[]> }
         >
@@ -173,7 +173,10 @@ describe('createScopedRepository', () => {
       const repo = createScopedRepository(db, TEST_PROFILE_ID);
 
       await (
-        repo as Record<string, { findFirst: (w?: unknown) => Promise<unknown> }>
+        repo as unknown as Record<
+          string,
+          { findFirst: (w?: unknown) => Promise<unknown> }
+        >
       )[namespace].findFirst();
 
       expect(findFirst).toHaveBeenCalledWith({
@@ -187,7 +190,10 @@ describe('createScopedRepository', () => {
       const extraCondition = sql`1 = 1`;
 
       await (
-        repo as Record<string, { findFirst: (w?: unknown) => Promise<unknown> }>
+        repo as unknown as Record<
+          string,
+          { findFirst: (w?: unknown) => Promise<unknown> }
+        >
       )[namespace].findFirst(extraCondition);
 
       expect(findFirst).toHaveBeenCalledWith({

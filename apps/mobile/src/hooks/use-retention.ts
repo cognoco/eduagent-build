@@ -21,7 +21,7 @@ export function useRetentionTopics(subjectId: string) {
 
 export function useTopicRetention(
   topicId: string
-): UseQueryResult<RetentionCardResponse> {
+): UseQueryResult<RetentionCardResponse | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
@@ -31,7 +31,7 @@ export function useTopicRetention(
       const res = await client.topics[':topicId'].retention.$get({
         param: { topicId },
       });
-      const data = await res.json();
+      const data = (await res.json()) as { card: RetentionCardResponse | null };
       return data.card;
     },
     enabled: !!activeProfile && !!topicId,

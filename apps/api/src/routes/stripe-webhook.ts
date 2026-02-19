@@ -112,14 +112,14 @@ async function handleSubscriptionEvent(
     updates.tier = tier;
   }
 
-  if (stripeSubscription.current_period_start) {
+  if ((stripeSubscription as any).current_period_start) {
     updates.currentPeriodStart = new Date(
-      stripeSubscription.current_period_start * 1000
+      (stripeSubscription as any).current_period_start * 1000
     ).toISOString();
   }
-  if (stripeSubscription.current_period_end) {
+  if ((stripeSubscription as any).current_period_end) {
     updates.currentPeriodEnd = new Date(
-      stripeSubscription.current_period_end * 1000
+      (stripeSubscription as any).current_period_end * 1000
     ).toISOString();
   }
   if (stripeSubscription.canceled_at) {
@@ -206,9 +206,9 @@ async function handlePaymentFailed(
   eventTimestamp: string
 ): Promise<void> {
   const stripeSubscriptionId =
-    typeof invoice.subscription === 'string'
-      ? invoice.subscription
-      : invoice.subscription?.id;
+    typeof (invoice as any).subscription === 'string'
+      ? (invoice as any).subscription
+      : (invoice as any).subscription?.id;
 
   if (!stripeSubscriptionId) return;
 
@@ -246,9 +246,9 @@ async function handlePaymentSucceeded(
   eventTimestamp: string
 ): Promise<void> {
   const stripeSubscriptionId =
-    typeof invoice.subscription === 'string'
-      ? invoice.subscription
-      : invoice.subscription?.id;
+    typeof (invoice as any).subscription === 'string'
+      ? (invoice as any).subscription
+      : (invoice as any).subscription?.id;
 
   if (!stripeSubscriptionId) return;
 

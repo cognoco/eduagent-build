@@ -4,7 +4,7 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { Assessment } from '@eduagent/schemas';
+import type { Assessment, AssessmentEvaluation } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 
@@ -20,7 +20,7 @@ export function useAssessment(
       const res = await client.assessments[':assessmentId'].$get({
         param: { assessmentId },
       });
-      const data = await res.json();
+      const data = (await res.json()) as { assessment: Assessment };
       return data.assessment;
     },
     enabled: !!activeProfile && !!assessmentId,
@@ -37,7 +37,6 @@ export function useCreateAssessment(subjectId: string, topicId: string) {
         ':topicId'
       ].assessments.$post({
         param: { subjectId, topicId },
-        json: { subjectId, topicId },
       });
       return await res.json();
     },
@@ -55,12 +54,14 @@ export function useSubmitAnswer(assessmentId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { answer: string }) => {
+    mutationFn: async (input: {
+      answer: string;
+    }): Promise<{ evaluation: AssessmentEvaluation }> => {
       const res = await client.assessments[':assessmentId'].answer.$post({
         param: { assessmentId },
         json: input,
       });
-      return await res.json();
+      return (await res.json()) as { evaluation: AssessmentEvaluation };
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({

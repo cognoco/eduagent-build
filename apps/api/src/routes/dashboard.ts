@@ -1,12 +1,24 @@
 import { Hono } from 'hono';
-import type { AuthEnv } from '../middleware/auth';
+import type { Database } from '@eduagent/database';
+import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
 import {
   getChildrenForParent,
   getChildDetail,
   getChildSubjectTopics,
 } from '../services/dashboard';
 
-export const dashboardRoutes = new Hono<AuthEnv>()
+type DashboardRouteEnv = {
+  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Variables: {
+    user: AuthUser;
+    db: Database;
+    account: Account;
+    profileId: string;
+  };
+};
+
+export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   // Get parent dashboard data
   .get('/dashboard', async (c) => {
     const db = c.get('db');

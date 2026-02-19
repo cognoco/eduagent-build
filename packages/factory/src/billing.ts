@@ -10,6 +10,7 @@ export function buildSubscription(
     status: 'trial',
     trialEndsAt: null,
     currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
     monthlyLimit: 50,
     usedThisMonth: 0,
     remainingQuestions: 50,

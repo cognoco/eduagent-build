@@ -3,9 +3,8 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, lte, asc } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
-  retentionCards,
   curriculumTopics,
   curricula,
   learningSessions,
@@ -13,7 +12,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import type { InterleavedSessionStartInput } from '@eduagent/schemas';
-import { isTopicStable, STABILITY_THRESHOLD } from './retention';
+import { isTopicStable } from './retention';
 
 // ---------------------------------------------------------------------------
 // Types

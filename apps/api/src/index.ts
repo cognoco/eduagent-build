@@ -65,52 +65,69 @@ type Variables = {
   subscriptionId: string;
 };
 
-const app = new Hono<{ Bindings: Bindings; Variables: Variables }>().basePath(
-  '/v1'
-);
+type Env = { Bindings: Bindings; Variables: Variables };
+
+// ---------------------------------------------------------------------------
+// Route definition — a plain Hono instance (no basePath) so that `AppType`
+// gives the RPC client a flat namespace (`client.profiles`, not `client.v1.profiles`).
+// ---------------------------------------------------------------------------
+const api = new Hono<Env>();
 
 // Request logging — runs before auth so every request (including public) is logged
-app.use('*', requestLogger);
+api.use('*', requestLogger);
 
 // Auth middleware — runs before all routes; public paths are skipped internally
-app.use('*', authMiddleware);
+api.use('*', authMiddleware);
 
 // Database middleware — creates per-request Database instance from env binding
-app.use('*', databaseMiddleware);
+api.use('*', databaseMiddleware);
 
 // Account middleware — resolves Clerk user → local Account; skips public routes
-app.use('*', accountMiddleware);
+api.use('*', accountMiddleware);
 
 // Profile scope middleware — reads X-Profile-Id header, verifies ownership; skips when absent
-app.use('*', profileScopeMiddleware);
+api.use('*', profileScopeMiddleware);
 
 // Metering middleware — enforces quota on LLM-consuming routes (session messages/stream)
-app.use('*', meteringMiddleware);
+api.use('*', meteringMiddleware);
 
 // LLM middleware — lazy-registers the Gemini provider from env bindings on first request
-app.use('*', llmMiddleware);
+api.use('*', llmMiddleware);
 
-app.route('/', health);
-app.route('/', auth);
-app.route('/', profileRoutes);
-app.route('/', consentRoutes);
-app.route('/', accountRoutes);
-app.route('/', inngestRoute);
-app.route('/', subjectRoutes);
-app.route('/', interviewRoutes);
-app.route('/', curriculumRoutes);
-app.route('/', sessionRoutes);
-app.route('/', parkingLotRoutes);
-app.route('/', homeworkRoutes);
-app.route('/', assessmentRoutes);
-app.route('/', retentionRoutes);
-app.route('/', progressRoutes);
-app.route('/', streakRoutes);
-app.route('/', settingsRoutes);
-app.route('/', coachingCardRoutes);
-app.route('/', dashboardRoutes);
-app.route('/', billingRoutes);
-app.route('/', stripeWebhookRoute);
+// Route registration — chained so TypeScript preserves the full route schema
+// in the inferred type. This is required for Hono RPC (`hc<AppType>`) to work
+// across project-reference boundaries where declaration emit is used.
+const routes = api
+  .route('/', health)
+  .route('/', auth)
+  .route('/', profileRoutes)
+  .route('/', consentRoutes)
+  .route('/', accountRoutes)
+  .route('/', inngestRoute)
+  .route('/', subjectRoutes)
+  .route('/', interviewRoutes)
+  .route('/', curriculumRoutes)
+  .route('/', sessionRoutes)
+  .route('/', parkingLotRoutes)
+  .route('/', homeworkRoutes)
+  .route('/', assessmentRoutes)
+  .route('/', retentionRoutes)
+  .route('/', progressRoutes)
+  .route('/', streakRoutes)
+  .route('/', settingsRoutes)
+  .route('/', coachingCardRoutes)
+  .route('/', dashboardRoutes)
+  .route('/', billingRoutes)
+  .route('/', stripeWebhookRoute);
+
+// ---------------------------------------------------------------------------
+// App — mounts routes under /v1 for the actual Cloudflare Worker runtime.
+// AppType is derived from `routes` (no basePath) so the RPC client accesses
+// `client.health`, `client.profiles`, etc. without a `v1` segment.
+// The mobile client sets the base URL to include `/v1`.
+// ---------------------------------------------------------------------------
+const app = new Hono<Env>().basePath('/v1');
+app.route('/', routes);
 
 // Global error handler — catches unhandled exceptions and returns ApiErrorSchema envelope
 app.onError((err, c) => {
@@ -127,7 +144,7 @@ app.onError((err, c) => {
   );
 });
 
-export type AppType = typeof app;
+export type AppType = typeof routes;
 
 // Default export required by Cloudflare Workers
 export default app;

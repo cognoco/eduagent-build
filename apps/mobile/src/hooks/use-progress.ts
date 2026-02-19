@@ -15,7 +15,7 @@ export function useSubjectProgress(
       const res = await client.subjects[':subjectId'].progress.$get({
         param: { subjectId },
       });
-      const data = await res.json();
+      const data = (await res.json()) as { progress: SubjectProgress };
       return data.progress;
     },
     enabled: !!activeProfile && !!subjectId,
@@ -66,7 +66,7 @@ export function useTopicProgress(
       ].progress.$get({
         param: { subjectId, topicId },
       });
-      const data = await res.json();
+      const data = (await res.json()) as { topic: TopicProgress };
       return data.topic;
     },
     enabled: !!activeProfile && !!subjectId && !!topicId,

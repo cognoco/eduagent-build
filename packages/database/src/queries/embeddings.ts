@@ -58,7 +58,7 @@ export async function findSimilarTopics(
       `;
 
   const result = await db.execute(baseQuery);
-  return result.rows as SimilarTopic[];
+  return result.rows as unknown as SimilarTopic[];
 }
 
 export async function storeEmbedding(

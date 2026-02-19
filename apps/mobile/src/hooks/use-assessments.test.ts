@@ -147,7 +147,7 @@ describe('useSubmitAnswer', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          result: {
+          evaluation: {
             passed: true,
             masteryScore: 0.85,
             feedback: 'Well done!',
@@ -172,7 +172,7 @@ describe('useSubmitAnswer', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
-    expect(result.current.data?.result.passed).toBe(true);
+    expect(result.current.data?.evaluation.passed).toBe(true);
   });
 
   it('handles submission errors', async () => {

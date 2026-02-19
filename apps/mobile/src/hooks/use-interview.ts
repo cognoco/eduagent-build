@@ -42,12 +42,12 @@ export function useSendInterviewMessage(
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (message: string) => {
+    mutationFn: async (message: string): Promise<InterviewResponse> => {
       const res = await client.subjects[':subjectId'].interview.$post({
         param: { subjectId },
         json: { message },
       });
-      return await res.json();
+      return (await res.json()) as InterviewResponse;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({

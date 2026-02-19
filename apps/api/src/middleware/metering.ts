@@ -14,7 +14,7 @@
 import { createMiddleware } from 'hono/factory';
 import type { Database } from '@eduagent/database';
 import { ERROR_CODES } from '@eduagent/schemas';
-import type { SubscriptionTier } from '@eduagent/schemas';
+import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 import type { Account } from '../services/account';
 import {
   ensureFreeSubscription,
@@ -138,7 +138,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     let monthlyLimit: number;
     let usedThisMonth: number;
     let subscriptionId: string;
-    let subscriptionStatus: string;
+    let subscriptionStatus: SubscriptionStatus;
 
     if (cached) {
       // KV hit — use cached values (CR3: subscriptionId now in cache)
@@ -219,5 +219,6 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     c.header('X-Quota-Warning-Level', result.warningLevel);
 
     await next();
+    return;
   }
 );

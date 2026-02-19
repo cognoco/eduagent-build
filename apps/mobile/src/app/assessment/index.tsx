@@ -46,8 +46,9 @@ export default function AssessmentScreen() {
         }
 
         const result = await submitAnswer.mutateAsync({ answer: text });
-        const feedback = result.result.feedback;
-        const passed = result.result.passed;
+        const evaluation = result.evaluation;
+        const feedback = evaluation.feedback;
+        const passed = evaluation.passed;
 
         animateResponse(feedback, setMessages, setIsStreaming, () => {
           if (passed) {
@@ -57,7 +58,7 @@ export default function AssessmentScreen() {
                 id: `assessment-done-${Date.now()}`,
                 role: 'ai',
                 content: `Assessment complete! Your mastery score: ${Math.round(
-                  result.result.masteryScore * 100
+                  evaluation.masteryScore * 100
                 )}%`,
               },
             ]);

@@ -83,6 +83,6 @@ export function useApiClient(): ApiClient {
       return res;
     };
 
-    return hc<AppType>(getApiUrl(), { fetch: customFetch });
+    return hc<AppType>(`${getApiUrl()}/v1`, { fetch: customFetch });
   }, []);
 }

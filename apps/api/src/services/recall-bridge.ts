@@ -3,7 +3,7 @@
 // Brief recall warmup after homework success. Pure business logic, no Hono.
 // ---------------------------------------------------------------------------
 
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
   learningSessions,
   curriculumTopics,

@@ -68,7 +68,12 @@ export default function CreateProfileScreen() {
     setLoading(true);
 
     try {
-      const body: Record<string, unknown> = {
+      const body: {
+        displayName: string;
+        personaType?: PersonaType;
+        birthDate?: string;
+        location?: string;
+      } = {
         displayName: trimmedName,
         personaType,
       };

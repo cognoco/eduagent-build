@@ -21,7 +21,7 @@ export function useCurriculum(
       const res = await client.subjects[':subjectId'].curriculum.$get({
         param: { subjectId },
       });
-      const data = await res.json();
+      const data = (await res.json()) as { curriculum: Curriculum | null };
       return data.curriculum;
     },
     enabled: !!activeProfile && !!subjectId,
@@ -35,12 +35,12 @@ export function useSkipTopic(
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (topicId: string) => {
+    mutationFn: async (topicId: string): Promise<{ message: string }> => {
       const res = await client.subjects[':subjectId'].curriculum.skip.$post({
         param: { subjectId },
         json: { topicId },
       });
-      return await res.json();
+      return (await res.json()) as { message: string };
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -57,14 +57,16 @@ export function useChallengeCurriculum(
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (feedback: string) => {
+    mutationFn: async (
+      feedback: string
+    ): Promise<{ curriculum: Curriculum }> => {
       const res = await client.subjects[
         ':subjectId'
       ].curriculum.challenge.$post({
         param: { subjectId },
         json: { feedback },
       });
-      return await res.json();
+      return (await res.json()) as { curriculum: Curriculum };
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -80,13 +82,13 @@ export function useExplainTopic(
   const client = useApiClient();
 
   return useMutation({
-    mutationFn: async (topicId: string) => {
+    mutationFn: async (topicId: string): Promise<string> => {
       const res = await client.subjects[':subjectId'].curriculum.topics[
         ':topicId'
       ].explain.$get({
         param: { subjectId, topicId },
       });
-      const data = await res.json();
+      const data = (await res.json()) as { explanation: string };
       return data.explanation;
     },
   });

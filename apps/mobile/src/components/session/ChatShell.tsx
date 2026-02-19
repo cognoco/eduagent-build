@@ -11,7 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageBubble } from './MessageBubble';
-import { useThemeColors } from '../lib/theme';
+import { useThemeColors } from '../../lib/theme';
 
 export interface ChatMessage {
   id: string;
