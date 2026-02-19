@@ -31,6 +31,7 @@ import {
   type RetentionState,
 } from './retention';
 import { canExitNeedsDeepening } from './adaptive-teaching';
+import { routeAndCall, type ChatMessage } from './llm';
 
 // ---------------------------------------------------------------------------
 // Mappers
@@ -64,6 +65,58 @@ function rowToRetentionState(
     nextReviewAt: row.nextReviewAt?.toISOString() ?? null,
     lastReviewedAt: row.lastReviewedAt?.toISOString() ?? null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Recall quality evaluation (LLM-based, Epic 3 Story 3.2)
+// ---------------------------------------------------------------------------
+
+const RECALL_QUALITY_PROMPT = `You are an educational assessment evaluator. Given a topic title and a learner's recall answer, rate the quality of their recall on the SM-2 scale:
+
+5 = Perfect response with no hesitation
+4 = Correct response after some thought
+3 = Correct but with significant difficulty
+2 = Incorrect, but the answer shows some relevant knowledge
+1 = Incorrect, barely related to the topic
+0 = Complete blackout, no meaningful content
+
+Consider:
+- Does the answer demonstrate understanding of the topic?
+- Is the answer factually accurate for the topic?
+- How complete is the coverage of key concepts?
+
+Respond with ONLY a single digit (0-5).`;
+
+/**
+ * Evaluates recall answer quality using LLM (rung 1 — Gemini Flash).
+ * Falls back to the length-based heuristic if the LLM returns an unparseable result.
+ */
+export async function evaluateRecallQuality(
+  answer: string,
+  topicTitle: string
+): Promise<number> {
+  try {
+    const messages: ChatMessage[] = [
+      { role: 'system', content: RECALL_QUALITY_PROMPT },
+      {
+        role: 'user',
+        content: `Topic: ${topicTitle}\n\nLearner's answer: ${answer}`,
+      },
+    ];
+
+    const result = await routeAndCall(messages, 1);
+    const parsed = parseInt(result.response.trim(), 10);
+
+    if (Number.isNaN(parsed) || parsed < 0 || parsed > 5) {
+      // Fallback: length heuristic
+      return answer.length > 50 ? 4 : 2;
+    }
+
+    return parsed;
+  } catch {
+    // LLM failure fallback
+    return answer.length > 50 ? 4 : 2;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -160,10 +213,13 @@ export async function processRecallTest(
     };
   }
 
-  // TODO(quality-eval): Replace length-based proxy with LLM evaluation.
-  // Track: Epic 3 Story 3.2 — mastery verification requires semantic assessment.
-  // Current heuristic: answer > 50 chars = quality 4 (pass), else quality 2 (fail).
-  const quality = input.answer.length > 50 ? 4 : 2;
+  // Look up topic title for LLM evaluation context
+  const topic = await db.query.curriculumTopics.findFirst({
+    where: eq(curriculumTopics.id, input.topicId),
+  });
+  const topicTitle = topic?.title ?? input.topicId;
+
+  const quality = await evaluateRecallQuality(input.answer, topicTitle);
   const state = rowToRetentionState(card);
   const result = processRecallResult(state, quality);
 

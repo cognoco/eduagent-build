@@ -20,6 +20,13 @@ import { createScopedRepository } from '@eduagent/database';
 import { processRecallResult, getRetentionStatus } from './retention';
 import { canExitNeedsDeepening } from './adaptive-teaching';
 import {
+  registerProvider,
+  createMockProvider,
+  type LLMProvider,
+  type ChatMessage,
+  type ModelConfig,
+} from './llm';
+import {
   getSubjectRetention,
   getTopicRetention,
   processRecallTest,
@@ -29,6 +36,7 @@ import {
   setTeachingPreference,
   deleteTeachingPreference,
   updateNeedsDeepeningProgress,
+  evaluateRecallQuality,
 } from './retention-data';
 
 const NOW = new Date('2026-02-15T10:00:00.000Z');
@@ -75,6 +83,7 @@ function createMockDb(): Database {
         findFirst: jest.fn().mockResolvedValue({
           id: topicId,
           curriculumId,
+          title: 'Topic 1',
         }),
       },
       teachingPreferences: {
@@ -133,6 +142,8 @@ function setupScopedRepo({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Register a default gemini mock that returns quality '4' for recall tests
+  registerProvider(createMockProvider('gemini'));
 });
 
 // ---------------------------------------------------------------------------
@@ -711,5 +722,187 @@ describe('updateNeedsDeepeningProgress', () => {
 
     expect(createScopedRepository).not.toHaveBeenCalled();
     expect(db.update).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// evaluateRecallQuality
+// ---------------------------------------------------------------------------
+
+describe('evaluateRecallQuality', () => {
+  afterEach(() => {
+    registerProvider(createMockProvider('gemini'));
+  });
+
+  it('returns parsed SM-2 quality from LLM response', async () => {
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(
+        _messages: ChatMessage[],
+        _config: ModelConfig
+      ): Promise<string> {
+        return '4';
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield '4';
+      },
+    };
+    registerProvider(provider);
+
+    const result = await evaluateRecallQuality(
+      'A thorough explanation of photosynthesis involving chlorophyll and light reactions',
+      'Photosynthesis'
+    );
+    expect(result).toBe(4);
+  });
+
+  it('handles quality 0 (blackout)', async () => {
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        return '0';
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield '0';
+      },
+    };
+    registerProvider(provider);
+
+    const result = await evaluateRecallQuality('', 'Photosynthesis');
+    expect(result).toBe(0);
+  });
+
+  it('handles quality 5 (perfect)', async () => {
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        return '5';
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield '5';
+      },
+    };
+    registerProvider(provider);
+
+    const result = await evaluateRecallQuality(
+      'Complete and perfect explanation of the topic',
+      'Topic'
+    );
+    expect(result).toBe(5);
+  });
+
+  it('falls back to length heuristic on unparseable LLM response', async () => {
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        return 'I think the answer is good';
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield 'good';
+      },
+    };
+    registerProvider(provider);
+
+    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    expect(result).toBe(4); // Long answer -> fallback quality 4
+  });
+
+  it('falls back to short-answer heuristic on unparseable LLM response', async () => {
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        return 'not a number';
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield 'not a number';
+      },
+    };
+    registerProvider(provider);
+
+    const result = await evaluateRecallQuality('idk', 'Topic');
+    expect(result).toBe(2); // Short answer -> fallback quality 2
+  });
+
+  it('falls back to length heuristic on LLM error', async () => {
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        throw new Error('LLM unavailable');
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield '';
+      },
+    };
+    registerProvider(provider);
+
+    const result = await evaluateRecallQuality('idk', 'Topic');
+    expect(result).toBe(2); // Short answer -> fallback quality 2
+  });
+
+  it('falls back for long answer on LLM error', async () => {
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        throw new Error('LLM unavailable');
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield '';
+      },
+    };
+    registerProvider(provider);
+
+    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    expect(result).toBe(4); // Long answer -> fallback quality 4
+  });
+
+  it('clamps out-of-range values to fallback', async () => {
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        return '7';
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield '7';
+      },
+    };
+    registerProvider(provider);
+
+    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    expect(result).toBe(4); // Fallback for long answer
+  });
+
+  it('clamps negative values to fallback', async () => {
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        return '-1';
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield '-1';
+      },
+    };
+    registerProvider(provider);
+
+    const result = await evaluateRecallQuality('short', 'Topic');
+    expect(result).toBe(2); // Fallback for short answer
+  });
+
+  it('handles LLM response with whitespace', async () => {
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        return '  3  \n';
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield '3';
+      },
+    };
+    registerProvider(provider);
+
+    const result = await evaluateRecallQuality(
+      'Some answer about the topic',
+      'Topic'
+    );
+    expect(result).toBe(3);
   });
 });
