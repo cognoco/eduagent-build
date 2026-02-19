@@ -1,4 +1,9 @@
-import { getEmbeddingConfig, generateEmbedding } from './embeddings';
+import {
+  getEmbeddingConfig,
+  generateEmbedding,
+  extractSessionContent,
+} from './embeddings';
+import type { Database } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
 // getEmbeddingConfig
@@ -56,5 +61,89 @@ describe('generateEmbedding', () => {
 
     expect(result1.dimensions).toBe(result2.dimensions);
     expect(result1.vector.length).toBe(result2.vector.length);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractSessionContent
+// ---------------------------------------------------------------------------
+
+function createMockDb(
+  events: Array<{ eventType: string; content: string }>
+): Database {
+  return {
+    query: {
+      sessionEvents: {
+        findMany: jest.fn().mockResolvedValue(events),
+      },
+    },
+  } as unknown as Database;
+}
+
+const SESSION_ID = '00000000-0000-7000-8000-000000000001';
+const PROFILE_ID = '00000000-0000-7000-8000-000000000002';
+
+describe('extractSessionContent', () => {
+  it('concatenates user_message and ai_response content', async () => {
+    const db = createMockDb([
+      { eventType: 'user_message', content: 'What is photosynthesis?' },
+      {
+        eventType: 'ai_response',
+        content: 'Photosynthesis is how plants convert light to energy.',
+      },
+      { eventType: 'user_message', content: 'How does chlorophyll work?' },
+      {
+        eventType: 'ai_response',
+        content: 'Chlorophyll absorbs light energy from the sun.',
+      },
+    ]);
+
+    const result = await extractSessionContent(db, SESSION_ID, PROFILE_ID);
+
+    expect(result).toBe(
+      'What is photosynthesis?\n\n' +
+        'Photosynthesis is how plants convert light to energy.\n\n' +
+        'How does chlorophyll work?\n\n' +
+        'Chlorophyll absorbs light energy from the sun.'
+    );
+  });
+
+  it('returns fallback when no events found', async () => {
+    const db = createMockDb([]);
+
+    const result = await extractSessionContent(db, SESSION_ID, PROFILE_ID);
+
+    expect(result).toBe(
+      `Session ${SESSION_ID} — no conversation events recorded`
+    );
+  });
+
+  it('filters out non-conversation events', async () => {
+    const db = createMockDb([
+      { eventType: 'session_start', content: 'Session started' },
+      { eventType: 'user_message', content: 'Hello' },
+      { eventType: 'escalation', content: 'Escalated to level 2' },
+      { eventType: 'ai_response', content: 'Hi there!' },
+      { eventType: 'hint', content: 'Think about it differently' },
+      { eventType: 'session_end', content: 'Session ended' },
+    ]);
+
+    const result = await extractSessionContent(db, SESSION_ID, PROFILE_ID);
+
+    expect(result).toBe('Hello\n\nHi there!');
+  });
+
+  it('truncates to 8000 characters max', async () => {
+    const longMessage = 'A'.repeat(5000);
+    const db = createMockDb([
+      { eventType: 'user_message', content: longMessage },
+      { eventType: 'ai_response', content: longMessage },
+    ]);
+
+    const result = await extractSessionContent(db, SESSION_ID, PROFILE_ID);
+
+    // 5000 + '\n\n' (2) + 5000 = 10002, should be truncated to 8000
+    expect(result.length).toBe(8000);
+    expect(result).toBe((longMessage + '\n\n' + longMessage).slice(0, 8000));
   });
 });

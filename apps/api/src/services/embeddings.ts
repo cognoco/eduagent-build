@@ -5,7 +5,12 @@
 // TODO: Replace with actual provider call after embedding spike decision.
 // ---------------------------------------------------------------------------
 
-import { storeEmbedding, type Database } from '@eduagent/database';
+import { eq, and } from 'drizzle-orm';
+import {
+  storeEmbedding,
+  sessionEvents,
+  type Database,
+} from '@eduagent/database';
 
 export interface EmbeddingResult {
   vector: number[];
@@ -68,6 +73,52 @@ export async function generateEmbedding(
     model: config.model,
     provider: config.provider,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Session content extraction (for embedding input)
+// ---------------------------------------------------------------------------
+
+/** Max characters for embedding input text */
+const MAX_EMBEDDING_CHARS = 8000;
+
+/** Event types that represent actual conversation content */
+const CONVERSATION_EVENT_TYPES = ['user_message', 'ai_response'] as const;
+
+/**
+ * Extracts conversation content from session events for embedding generation.
+ *
+ * Queries the `session_events` table and concatenates user_message + ai_response
+ * content. Non-conversation events (session_start, escalation, hint, etc.) are
+ * filtered out. Output is truncated to 8 000 chars to stay within typical
+ * embedding model input limits.
+ */
+export async function extractSessionContent(
+  db: Database,
+  sessionId: string,
+  profileId: string
+): Promise<string> {
+  const events = await db.query.sessionEvents.findMany({
+    where: and(
+      eq(sessionEvents.sessionId, sessionId),
+      eq(sessionEvents.profileId, profileId)
+    ),
+    orderBy: (table, { asc }) => [asc(table.createdAt)],
+  });
+
+  const conversationEvents = events.filter((e) =>
+    (CONVERSATION_EVENT_TYPES as readonly string[]).includes(e.eventType)
+  );
+
+  if (conversationEvents.length === 0) {
+    return `Session ${sessionId} \u2014 no conversation events recorded`;
+  }
+
+  const joined = conversationEvents.map((e) => e.content).join('\n\n');
+
+  return joined.length > MAX_EMBEDDING_CHARS
+    ? joined.slice(0, MAX_EMBEDDING_CHARS)
+    : joined;
 }
 
 // ---------------------------------------------------------------------------
