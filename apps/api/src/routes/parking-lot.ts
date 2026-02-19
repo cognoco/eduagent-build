@@ -1,13 +1,35 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { parkingLotAddSchema } from '@eduagent/schemas';
-import type { AuthEnv } from '../middleware/auth';
+import { parkingLotAddSchema, ERROR_CODES } from '@eduagent/schemas';
+import type { Database } from '@eduagent/database';
+import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
+import {
+  getParkingLotItems,
+  addParkingLotItem,
+} from '../services/parking-lot-data';
+import { apiError } from '../errors';
 
-export const parkingLotRoutes = new Hono<AuthEnv>()
+type ParkingLotRouteEnv = {
+  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Variables: {
+    user: AuthUser;
+    db: Database;
+    account: Account;
+    profileId: string;
+  };
+};
+
+export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
   // Get parked questions for a session
   .get('/sessions/:sessionId/parking-lot', async (c) => {
-    // TODO: Query parking_lot_items for c.req.param('sessionId'), verify ownership via c.get('user').userId
-    return c.json({ items: [], count: 0 });
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const sessionId = c.req.param('sessionId');
+
+    const result = await getParkingLotItems(db, profileId, sessionId);
+    return c.json(result);
   })
 
   // Park a question for later
@@ -16,21 +38,22 @@ export const parkingLotRoutes = new Hono<AuthEnv>()
     zValidator('json', parkingLotAddSchema),
     async (c) => {
       const { question } = c.req.valid('json');
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
+      const sessionId = c.req.param('sessionId');
 
-      // TODO: Store in parking_lot_items table for c.req.param('sessionId')
-      // TODO: Check max 10 items per topic, return 409 if limit reached
-      // TODO: Verify session ownership via c.get('user').userId
+      const item = await addParkingLotItem(db, profileId, sessionId, question);
 
-      return c.json(
-        {
-          item: {
-            id: 'placeholder',
-            question,
-            explored: false,
-            createdAt: new Date().toISOString(),
-          },
-        },
-        201
-      );
+      if (!item) {
+        return apiError(
+          c,
+          409,
+          ERROR_CODES.QUOTA_EXCEEDED,
+          'Parking lot limit reached (max 10 items per session)'
+        );
+      }
+
+      return c.json({ item }, 201);
     }
   );
