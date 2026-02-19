@@ -26,6 +26,9 @@ export type { SubscriptionTier, SubscriptionStatus };
 export type SubscriptionData = Subscription;
 export type UsageData = Usage;
 
+/** Matches the warningLevel enum from @eduagent/schemas usageSchema */
+export type WarningLevel = 'none' | 'soft' | 'hard' | 'exceeded';
+
 interface TopUpResult {
   topUp: {
     amount: number;

@@ -23,6 +23,7 @@ import {
 } from '../services/session';
 import { notFound } from '../errors';
 import { inngest } from '../inngest/client';
+import { incrementQuota } from '../services/billing';
 
 type SessionRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -31,6 +32,7 @@ type SessionRouteEnv = {
     db: Database;
     account: Account;
     profileId: string;
+    subscriptionId: string;
   };
 };
 
@@ -68,13 +70,23 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const db = c.get('db');
       const account = c.get('account');
       const profileId = c.get('profileId') ?? account.id;
-      const result = await processMessage(
-        db,
-        profileId,
-        c.req.param('sessionId'),
-        c.req.valid('json')
-      );
-      return c.json(result);
+      const subscriptionId = c.get('subscriptionId');
+
+      try {
+        const result = await processMessage(
+          db,
+          profileId,
+          c.req.param('sessionId'),
+          c.req.valid('json')
+        );
+        return c.json(result);
+      } catch (err) {
+        // Refund quota on LLM failure — user should not be charged for a failed exchange
+        if (subscriptionId) {
+          await incrementQuota(db, subscriptionId);
+        }
+        throw err;
+      }
     }
   )
 
@@ -86,38 +98,47 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const db = c.get('db');
       const account = c.get('account');
       const profileId = c.get('profileId') ?? account.id;
+      const subscriptionId = c.get('subscriptionId');
       const sessionId = c.req.param('sessionId');
       const input = c.req.valid('json');
 
       const session = await getSession(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');
 
-      const { stream, onComplete } = await streamMessage(
-        db,
-        profileId,
-        sessionId,
-        input
-      );
+      try {
+        const { stream, onComplete } = await streamMessage(
+          db,
+          profileId,
+          sessionId,
+          input
+        );
 
-      return streamSSE(c, async (sseStream) => {
-        let fullResponse = '';
+        return streamSSE(c, async (sseStream) => {
+          let fullResponse = '';
 
-        for await (const chunk of stream) {
-          fullResponse += chunk;
+          for await (const chunk of stream) {
+            fullResponse += chunk;
+            await sseStream.writeSSE({
+              data: JSON.stringify({ type: 'chunk', content: chunk }),
+            });
+          }
+
+          const result = await onComplete(fullResponse);
           await sseStream.writeSSE({
-            data: JSON.stringify({ type: 'chunk', content: chunk }),
+            data: JSON.stringify({
+              type: 'done',
+              exchangeCount: result.exchangeCount,
+              escalationRung: result.escalationRung,
+            }),
           });
-        }
-
-        const result = await onComplete(fullResponse);
-        await sseStream.writeSSE({
-          data: JSON.stringify({
-            type: 'done',
-            exchangeCount: result.exchangeCount,
-            escalationRung: result.escalationRung,
-          }),
         });
-      });
+      } catch (err) {
+        // Refund quota on LLM failure — user should not be charged for a failed exchange
+        if (subscriptionId) {
+          await incrementQuota(db, subscriptionId);
+        }
+        throw err;
+      }
     }
   )
 

@@ -1,25 +1,48 @@
 import { Hono } from 'hono';
 import type { AuthEnv } from '../middleware/auth';
+import {
+  getChildrenForParent,
+  getChildDetail,
+  getChildSubjectTopics,
+} from '../services/dashboard';
 
 export const dashboardRoutes = new Hono<AuthEnv>()
   // Get parent dashboard data
   .get('/dashboard', async (c) => {
-    // TODO: Aggregate children's learning data for parent via c.get('user').userId
-    return c.json({ children: [], demoMode: false });
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+
+    const children = await getChildrenForParent(db, profileId);
+    return c.json({ children, demoMode: false });
   })
 
   // Get detailed child data
   .get('/dashboard/children/:profileId', async (c) => {
-    // TODO: Fetch child's subjects, sessions, retention via c.req.param('profileId')
-    // TODO: Verify parent has access to this child via c.get('user').userId
-    return c.json({ child: null });
+    const db = c.get('db');
+    const account = c.get('account');
+    const parentProfileId = c.get('profileId') ?? account.id;
+    const childProfileId = c.req.param('profileId');
+
+    const child = await getChildDetail(db, parentProfileId, childProfileId);
+    return c.json({ child });
   })
 
   // Get child's subject detail
   .get('/dashboard/children/:profileId/subjects/:subjectId', async (c) => {
-    // TODO: Fetch topic-level data via c.req.param('profileId') and c.req.param('subjectId')
-    // TODO: Verify parent has access to this child via c.get('user').userId
-    return c.json({ topics: [] });
+    const db = c.get('db');
+    const account = c.get('account');
+    const parentProfileId = c.get('profileId') ?? account.id;
+    const childProfileId = c.req.param('profileId');
+    const subjectId = c.req.param('subjectId');
+
+    const topics = await getChildSubjectTopics(
+      db,
+      parentProfileId,
+      childProfileId,
+      subjectId
+    );
+    return c.json({ topics });
   })
 
   // Get demo mode fixture data
@@ -31,7 +54,7 @@ export const dashboardRoutes = new Hono<AuthEnv>()
           profileId: 'demo-child-1',
           displayName: 'Alex',
           summary:
-            'Alex: Math — 5 problems, 3 guided. Science fading. 4 sessions this week (↑ from 2 last week).',
+            'Alex: Math \u2014 5 problems, 3 guided. Science fading. 4 sessions this week (\u2191 from 2 last week).',
           sessionsThisWeek: 4,
           sessionsLastWeek: 2,
           totalTimeThisWeek: 180,
@@ -47,7 +70,7 @@ export const dashboardRoutes = new Hono<AuthEnv>()
           profileId: 'demo-child-2',
           displayName: 'Sam',
           summary:
-            'Sam: English — steady progress. 3 sessions this week (→ same as last week).',
+            'Sam: English \u2014 steady progress. 3 sessions this week (\u2192 same as last week).',
           sessionsThisWeek: 3,
           sessionsLastWeek: 3,
           totalTimeThisWeek: 120,

@@ -28,6 +28,11 @@ import {
   handleTierChange,
   getUpgradePrompt,
   getTopUpPriceCents,
+  listFamilyMembers,
+  addProfileToSubscription,
+  removeProfileFromSubscription,
+  downgradeAllFamilyProfiles,
+  getFamilyPoolStatus,
 } from './billing';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -112,14 +117,19 @@ function mockTopUpRow(
 }
 
 function mockProfileRow(
-  overrides?: Partial<{ id: string; accountId: string }>
+  overrides?: Partial<{
+    id: string;
+    accountId: string;
+    displayName: string;
+    isOwner: boolean;
+  }>
 ) {
   return {
     id: overrides?.id ?? 'profile-1',
     accountId: overrides?.accountId ?? accountId,
-    displayName: 'Test',
+    displayName: overrides?.displayName ?? 'Test',
     personaType: 'LEARNER',
-    isOwner: true,
+    isOwner: overrides?.isOwner ?? true,
     createdAt: NOW,
     updatedAt: NOW,
   };
@@ -1359,5 +1369,465 @@ describe('getTopUpPriceCents', () => {
 
   it('returns 500 (EUR 5) for pro tier', () => {
     expect(getTopUpPriceCents('pro')).toBe(500);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Family billing helpers — extended mock DB factory
+// ---------------------------------------------------------------------------
+
+function createFamilyMockDb({
+  subscriptionFindFirst = undefined as
+    | ReturnType<typeof mockSubscriptionRow>
+    | undefined,
+  quotaPoolFindFirst = undefined as
+    | ReturnType<typeof mockQuotaPoolRow>
+    | undefined,
+  profileFindFirst = undefined as ReturnType<typeof mockProfileRow> | undefined,
+  profileFindMany = [] as ReturnType<typeof mockProfileRow>[],
+  selectResult = [] as unknown[],
+  insertReturning = [] as unknown[],
+}: {
+  subscriptionFindFirst?: ReturnType<typeof mockSubscriptionRow>;
+  quotaPoolFindFirst?: ReturnType<typeof mockQuotaPoolRow>;
+  profileFindFirst?: ReturnType<typeof mockProfileRow>;
+  profileFindMany?: ReturnType<typeof mockProfileRow>[];
+  selectResult?: unknown[];
+  insertReturning?: unknown[];
+} = {}): Database {
+  const updateWhere = jest.fn().mockReturnValue({
+    returning: jest.fn().mockResolvedValue([]),
+  });
+  const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+
+  return {
+    query: {
+      subscriptions: {
+        findFirst: jest.fn().mockResolvedValue(subscriptionFindFirst),
+      },
+      quotaPools: {
+        findFirst: jest.fn().mockResolvedValue(quotaPoolFindFirst),
+      },
+      topUpCredits: {
+        findFirst: jest.fn().mockResolvedValue(undefined),
+      },
+      profiles: {
+        findFirst: jest.fn().mockResolvedValue(profileFindFirst),
+        findMany: jest.fn().mockResolvedValue(profileFindMany),
+      },
+    },
+    insert: jest.fn().mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue(insertReturning),
+      }),
+    }),
+    update: jest.fn().mockReturnValue({ set: updateSet }),
+    select: jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(selectResult),
+      }),
+    }),
+  } as unknown as Database;
+}
+
+// ---------------------------------------------------------------------------
+// listFamilyMembers (Story 5.5)
+// ---------------------------------------------------------------------------
+
+describe('listFamilyMembers', () => {
+  it('returns empty array when subscription not found', async () => {
+    const db = createFamilyMockDb({ subscriptionFindFirst: undefined });
+    const result = await listFamilyMembers(db, subscriptionId);
+
+    expect(result).toEqual([]);
+  });
+
+  it('returns profiles mapped to FamilyMember shape', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family' });
+    const profiles = [
+      mockProfileRow({ id: 'p-owner', displayName: 'Parent', isOwner: true }),
+      mockProfileRow({ id: 'p-child', displayName: 'Child', isOwner: false }),
+    ];
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      profileFindMany: profiles,
+    });
+
+    const result = await listFamilyMembers(db, subscriptionId);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({
+      profileId: 'p-owner',
+      displayName: 'Parent',
+      isOwner: true,
+    });
+    expect(result[1]).toEqual({
+      profileId: 'p-child',
+      displayName: 'Child',
+      isOwner: false,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// addProfileToSubscription (Story 5.5)
+// ---------------------------------------------------------------------------
+
+describe('addProfileToSubscription', () => {
+  it('returns null when subscription not found', async () => {
+    const db = createFamilyMockDb({ subscriptionFindFirst: undefined });
+    const result = await addProfileToSubscription(db, subscriptionId, 'p-1');
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null for plus tier (single-profile tier)', async () => {
+    const sub = mockSubscriptionRow({ tier: 'plus' });
+    const db = createFamilyMockDb({ subscriptionFindFirst: sub });
+    const result = await addProfileToSubscription(db, subscriptionId, 'p-1');
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null for free tier', async () => {
+    const sub = mockSubscriptionRow({ tier: 'free' });
+    const db = createFamilyMockDb({ subscriptionFindFirst: sub });
+    const result = await addProfileToSubscription(db, subscriptionId, 'p-1');
+
+    expect(result).toBeNull();
+  });
+
+  it('adds profile to family tier when room exists', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family' });
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      selectResult: [{ count: 2 }], // canAddProfile check + final count
+    });
+
+    const result = await addProfileToSubscription(db, subscriptionId, 'p-new');
+
+    expect(result).not.toBeNull();
+    expect(result!.profileCount).toBe(2);
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it('adds profile to pro tier when room exists', async () => {
+    const sub = mockSubscriptionRow({ tier: 'pro' });
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      selectResult: [{ count: 3 }],
+    });
+
+    const result = await addProfileToSubscription(db, subscriptionId, 'p-new');
+
+    expect(result).not.toBeNull();
+    expect(result!.profileCount).toBe(3);
+  });
+
+  it('returns null when family tier is full (4 profiles)', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family' });
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      selectResult: [{ count: 4 }],
+    });
+
+    const result = await addProfileToSubscription(db, subscriptionId, 'p-new');
+
+    expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// removeProfileFromSubscription (Story 5.5)
+// ---------------------------------------------------------------------------
+
+describe('removeProfileFromSubscription', () => {
+  const newAccountId = 'acc-new-for-removed-profile';
+
+  it('returns null when subscription not found', async () => {
+    const db = createFamilyMockDb({ subscriptionFindFirst: undefined });
+    const result = await removeProfileFromSubscription(
+      db,
+      subscriptionId,
+      'p-1',
+      newAccountId
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when profile not found in family', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family' });
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      profileFindFirst: undefined,
+    });
+
+    const result = await removeProfileFromSubscription(
+      db,
+      subscriptionId,
+      'p-unknown',
+      newAccountId
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when trying to remove the owner', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family' });
+    const ownerProfile = mockProfileRow({ id: 'p-owner', isOwner: true });
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      profileFindFirst: ownerProfile,
+    });
+
+    const result = await removeProfileFromSubscription(
+      db,
+      subscriptionId,
+      'p-owner',
+      newAccountId
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it('removes non-owner profile and provisions free subscription', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family' });
+    const childProfile = mockProfileRow({ id: 'p-child', isOwner: false });
+    // ensureFreeSubscription needs: getSubscriptionByAccountId returns null, then insert
+    const freeSub = mockSubscriptionRow({
+      id: 'sub-free',
+      accountId: newAccountId,
+      tier: 'free',
+      status: 'active',
+    });
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      profileFindFirst: childProfile,
+      insertReturning: [freeSub],
+    });
+
+    // Override subscriptions.findFirst to return sub first (for removeProfile),
+    // then null for ensureFreeSubscription check, so it creates a new one
+    const findFirstMock = jest
+      .fn()
+      .mockResolvedValueOnce(sub) // removeProfileFromSubscription lookup
+      .mockResolvedValueOnce(undefined); // ensureFreeSubscription → getSubscriptionByAccountId
+
+    (db.query.subscriptions.findFirst as jest.Mock) = findFirstMock;
+
+    const result = await removeProfileFromSubscription(
+      db,
+      subscriptionId,
+      'p-child',
+      newAccountId
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.removedProfileId).toBe('p-child');
+    expect(db.update).toHaveBeenCalled(); // profile moved
+    expect(db.insert).toHaveBeenCalled(); // free subscription created
+  });
+});
+
+// ---------------------------------------------------------------------------
+// downgradeAllFamilyProfiles (Story 5.5)
+// ---------------------------------------------------------------------------
+
+describe('downgradeAllFamilyProfiles', () => {
+  it('returns empty array when subscription not found', async () => {
+    const db = createFamilyMockDb({ subscriptionFindFirst: undefined });
+    const result = await downgradeAllFamilyProfiles(
+      db,
+      subscriptionId,
+      new Map()
+    );
+
+    expect(result).toEqual([]);
+  });
+
+  it('downgrades non-owner profiles and returns their IDs', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family' });
+    const owner = mockProfileRow({
+      id: 'p-owner',
+      displayName: 'Owner',
+      isOwner: true,
+    });
+    const child1 = mockProfileRow({
+      id: 'p-child1',
+      displayName: 'Child 1',
+      isOwner: false,
+    });
+    const child2 = mockProfileRow({
+      id: 'p-child2',
+      displayName: 'Child 2',
+      isOwner: false,
+    });
+
+    const freeSub = mockSubscriptionRow({
+      id: 'sub-free',
+      tier: 'free',
+      status: 'active',
+    });
+
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      profileFindMany: [owner, child1, child2],
+      insertReturning: [freeSub],
+    });
+
+    // Need subscriptions.findFirst to return sub first, then null for each ensureFreeSubscription
+    const findFirstMock = jest
+      .fn()
+      .mockResolvedValueOnce(sub) // initial downgradeAllFamilyProfiles
+      .mockResolvedValueOnce(undefined) // ensureFreeSubscription for child1
+      .mockResolvedValueOnce(undefined); // ensureFreeSubscription for child2
+
+    (db.query.subscriptions.findFirst as jest.Mock) = findFirstMock;
+
+    const profileToAccountMap = new Map([
+      ['p-child1', 'acc-child1'],
+      ['p-child2', 'acc-child2'],
+    ]);
+
+    const result = await downgradeAllFamilyProfiles(
+      db,
+      subscriptionId,
+      profileToAccountMap
+    );
+
+    expect(result).toEqual(['p-child1', 'p-child2']);
+    // update: 2x profile moves + 1x subscription tier + 1x quota pool limit = 4
+    expect(db.update).toHaveBeenCalledTimes(4);
+  });
+
+  it('skips owner profile', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family' });
+    const owner = mockProfileRow({
+      id: 'p-owner',
+      displayName: 'Owner',
+      isOwner: true,
+    });
+
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      profileFindMany: [owner],
+    });
+
+    const result = await downgradeAllFamilyProfiles(
+      db,
+      subscriptionId,
+      new Map([['p-owner', 'acc-owner']])
+    );
+
+    // Owner is not in the result — only the subscription tier change happens
+    expect(result).toEqual([]);
+    // update: 1x subscription tier + 1x quota pool limit = 2
+    expect(db.update).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips profiles without mapping entry', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family' });
+    const child = mockProfileRow({
+      id: 'p-child',
+      displayName: 'Child',
+      isOwner: false,
+    });
+
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      profileFindMany: [child],
+    });
+
+    // Empty map — no new account for the child
+    const result = await downgradeAllFamilyProfiles(
+      db,
+      subscriptionId,
+      new Map()
+    );
+
+    expect(result).toEqual([]);
+    // Only the subscription tier downgrade + quota pool limit
+    expect(db.update).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getFamilyPoolStatus (Story 5.5)
+// ---------------------------------------------------------------------------
+
+describe('getFamilyPoolStatus', () => {
+  it('returns null when subscription not found', async () => {
+    const db = createFamilyMockDb({ subscriptionFindFirst: undefined });
+    const result = await getFamilyPoolStatus(db, subscriptionId);
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when quota pool not found', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family' });
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      quotaPoolFindFirst: undefined,
+    });
+
+    const result = await getFamilyPoolStatus(db, subscriptionId);
+
+    expect(result).toBeNull();
+  });
+
+  it('returns pool status for family tier', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family' });
+    const pool = mockQuotaPoolRow({ monthlyLimit: 1500, usedThisMonth: 300 });
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      quotaPoolFindFirst: pool,
+      selectResult: [{ count: 3 }],
+    });
+
+    const result = await getFamilyPoolStatus(db, subscriptionId);
+
+    expect(result).not.toBeNull();
+    expect(result!.tier).toBe('family');
+    expect(result!.monthlyLimit).toBe(1500);
+    expect(result!.usedThisMonth).toBe(300);
+    expect(result!.remainingQuestions).toBe(1200);
+    expect(result!.profileCount).toBe(3);
+    expect(result!.maxProfiles).toBe(4);
+  });
+
+  it('returns pool status for pro tier', async () => {
+    const sub = mockSubscriptionRow({ tier: 'pro' });
+    const pool = mockQuotaPoolRow({ monthlyLimit: 3000, usedThisMonth: 2800 });
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      quotaPoolFindFirst: pool,
+      selectResult: [{ count: 5 }],
+    });
+
+    const result = await getFamilyPoolStatus(db, subscriptionId);
+
+    expect(result).not.toBeNull();
+    expect(result!.tier).toBe('pro');
+    expect(result!.monthlyLimit).toBe(3000);
+    expect(result!.usedThisMonth).toBe(2800);
+    expect(result!.remainingQuestions).toBe(200);
+    expect(result!.profileCount).toBe(5);
+    expect(result!.maxProfiles).toBe(6);
+  });
+
+  it('clamps remaining to 0 when over limit', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family' });
+    const pool = mockQuotaPoolRow({ monthlyLimit: 1500, usedThisMonth: 1600 });
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      quotaPoolFindFirst: pool,
+      selectResult: [{ count: 2 }],
+    });
+
+    const result = await getFamilyPoolStatus(db, subscriptionId);
+
+    expect(result).not.toBeNull();
+    expect(result!.remainingQuestions).toBe(0);
   });
 });

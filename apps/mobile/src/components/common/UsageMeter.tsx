@@ -1,5 +1,5 @@
 import { View, Text } from 'react-native';
-import type { WarningLevel } from '../hooks/use-subscription';
+import type { WarningLevel } from '../../hooks/use-subscription';
 
 interface UsageMeterProps {
   used: number;

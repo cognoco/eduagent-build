@@ -1,6 +1,9 @@
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { updateRetentionFromSession } from '../../services/retention-data';
+import {
+  updateRetentionFromSession,
+  updateNeedsDeepeningProgress,
+} from '../../services/retention-data';
 import { createPendingSessionSummary } from '../../services/summaries';
 import { recordSessionActivity } from '../../services/streaks';
 import {
@@ -32,6 +35,14 @@ export const sessionCompleted = inngest.createFunction(
       const db = getStepDatabase();
       const quality = event.data.qualityRating ?? 3;
       await updateRetentionFromSession(db, profileId, topicId, quality);
+    });
+
+    // Step 1b: Update needs-deepening progress (FR63)
+    await step.run('update-needs-deepening', async () => {
+      if (!topicId) return;
+      const db = getStepDatabase();
+      const quality = event.data.qualityRating ?? 3;
+      await updateNeedsDeepeningProgress(db, profileId, topicId, quality);
     });
 
     // Step 2: Write coaching card / session summary

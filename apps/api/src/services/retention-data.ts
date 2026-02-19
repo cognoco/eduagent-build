@@ -23,6 +23,7 @@ import type {
 } from '@eduagent/schemas';
 import { sm2 } from '@eduagent/retention';
 import { processRecallResult, type RetentionState } from './retention';
+import { canExitNeedsDeepening } from './adaptive-teaching';
 
 // ---------------------------------------------------------------------------
 // Mappers
@@ -306,6 +307,54 @@ export async function deleteTeachingPreference(
 // ---------------------------------------------------------------------------
 // Session-triggered retention update (used by inngest/functions/session-completed.ts)
 // ---------------------------------------------------------------------------
+
+/**
+ * Updates needs-deepening progress after a session completes.
+ *
+ * - quality >= 3: increment consecutiveSuccessCount
+ * - quality < 3: reset consecutiveSuccessCount to 0
+ * - If count reaches 3: mark as 'resolved' (FR63)
+ */
+export async function updateNeedsDeepeningProgress(
+  db: Database,
+  profileId: string,
+  topicId: string | null,
+  quality: number
+): Promise<void> {
+  if (!topicId) return;
+
+  const repo = createScopedRepository(db, profileId);
+  const records = await repo.needsDeepeningTopics.findMany(
+    eq(needsDeepeningTopics.topicId, topicId)
+  );
+  const active = records.find((d) => d.status === 'active');
+  if (!active) return;
+
+  const passed = quality >= 3;
+  const newCount = passed ? active.consecutiveSuccessCount + 1 : 0;
+
+  const state = {
+    topicId: active.topicId,
+    subjectId: active.subjectId,
+    consecutiveSuccessCount: newCount,
+    status: 'active' as const,
+  };
+  const shouldResolve = canExitNeedsDeepening(state);
+
+  await db
+    .update(needsDeepeningTopics)
+    .set({
+      consecutiveSuccessCount: newCount,
+      status: shouldResolve ? 'resolved' : 'active',
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(needsDeepeningTopics.id, active.id),
+        eq(needsDeepeningTopics.profileId, profileId)
+      )
+    );
+}
 
 /**
  * Updates a retention card via SM-2 after a session completes.

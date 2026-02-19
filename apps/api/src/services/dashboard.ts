@@ -1,7 +1,19 @@
 // ---------------------------------------------------------------------------
 // Parent Dashboard Data — Story 4.11
-// Pure business logic, no Hono imports
+// Pure business logic + DB-aware query functions, no Hono imports
 // ---------------------------------------------------------------------------
+
+import { eq, and, gte } from 'drizzle-orm';
+import {
+  familyLinks,
+  profiles,
+  learningSessions,
+  curricula,
+  curriculumTopics,
+  type Database,
+} from '@eduagent/database';
+import type { DashboardChild, TopicProgress } from '@eduagent/schemas';
+import { getOverallProgress, getTopicProgress } from './progress';
 
 export interface DashboardInput {
   childProfileId: string;
@@ -89,4 +101,178 @@ export function calculateTrend(
 export function calculateGuidedRatio(guided: number, total: number): number {
   if (total === 0) return 0;
   return Math.min(1, Math.max(0, guided / total));
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Returns Monday 00:00:00 UTC of the week containing the given date. */
+function getStartOfWeek(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getUTCDay();
+  const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
+  d.setUTCDate(diff);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
+// ---------------------------------------------------------------------------
+// DB-aware query functions (Sprint 8 — route wiring)
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetches aggregated dashboard data for all children linked to a parent.
+ */
+export async function getChildrenForParent(
+  db: Database,
+  parentProfileId: string
+): Promise<DashboardChild[]> {
+  // 1. Query familyLinks for this parent
+  const links = await db.query.familyLinks.findMany({
+    where: eq(familyLinks.parentProfileId, parentProfileId),
+  });
+  if (links.length === 0) return [];
+
+  const children: DashboardChild[] = [];
+
+  for (const link of links) {
+    const childProfileId = link.childProfileId;
+
+    // 2. Get child's display name
+    const profile = await db.query.profiles.findFirst({
+      where: eq(profiles.id, childProfileId),
+    });
+    if (!profile) continue;
+
+    // 3. Get subject progress (includes retention status per subject)
+    const progress = await getOverallProgress(db, childProfileId);
+
+    // 4. Count sessions this week and last week
+    const now = new Date();
+    const startOfThisWeek = getStartOfWeek(now);
+    const startOfLastWeek = new Date(startOfThisWeek);
+    startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+
+    const recentSessions = await db.query.learningSessions.findMany({
+      where: and(
+        eq(learningSessions.profileId, childProfileId),
+        gte(learningSessions.startedAt, startOfLastWeek)
+      ),
+    });
+
+    const sessionsThisWeek = recentSessions.filter(
+      (s) => s.startedAt >= startOfThisWeek
+    ).length;
+    const sessionsLastWeek = recentSessions.filter(
+      (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
+    ).length;
+
+    // 5. Sum duration for time tracking (seconds -> minutes)
+    const totalTimeThisWeek = recentSessions
+      .filter((s) => s.startedAt >= startOfThisWeek)
+      .reduce((sum, s) => sum + (s.durationSeconds ?? 0), 0);
+    const totalTimeLastWeek = recentSessions
+      .filter(
+        (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
+      )
+      .reduce((sum, s) => sum + (s.durationSeconds ?? 0), 0);
+
+    // 6. Build DashboardInput for summary generation
+    const subjectRetentionData = progress.subjects.map((s) => ({
+      name: s.name,
+      status: s.retentionStatus,
+    }));
+
+    const dashboardInput: DashboardInput = {
+      childProfileId,
+      displayName: profile.displayName,
+      sessionsThisWeek,
+      sessionsLastWeek,
+      totalTimeThisWeekMinutes: Math.round(totalTimeThisWeek / 60),
+      totalTimeLastWeekMinutes: Math.round(totalTimeLastWeek / 60),
+      subjectRetentionData,
+      guidedCount: 0,
+      totalProblemCount: 0,
+    };
+
+    const summary = generateChildSummary(dashboardInput);
+    const trend = calculateTrend(sessionsThisWeek, sessionsLastWeek);
+
+    children.push({
+      profileId: childProfileId,
+      displayName: profile.displayName,
+      summary,
+      sessionsThisWeek,
+      sessionsLastWeek,
+      totalTimeThisWeek: dashboardInput.totalTimeThisWeekMinutes,
+      totalTimeLastWeek: dashboardInput.totalTimeLastWeekMinutes,
+      trend,
+      subjects: subjectRetentionData.map((s) => ({
+        name: s.name,
+        retentionStatus: s.status,
+      })),
+      guidedVsImmediateRatio: 0,
+    });
+  }
+
+  return children;
+}
+
+/**
+ * Fetches detailed dashboard data for a single child, with parent access check.
+ */
+export async function getChildDetail(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string
+): Promise<DashboardChild | null> {
+  // Verify parent-child relationship
+  const link = await db.query.familyLinks.findFirst({
+    where: and(
+      eq(familyLinks.parentProfileId, parentProfileId),
+      eq(familyLinks.childProfileId, childProfileId)
+    ),
+  });
+  if (!link) return null;
+
+  const children = await getChildrenForParent(db, parentProfileId);
+  return children.find((c) => c.profileId === childProfileId) ?? null;
+}
+
+/**
+ * Fetches topic-level progress for a child's subject, with parent access check.
+ */
+export async function getChildSubjectTopics(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string,
+  subjectId: string
+): Promise<TopicProgress[]> {
+  // Verify parent-child relationship
+  const link = await db.query.familyLinks.findFirst({
+    where: and(
+      eq(familyLinks.parentProfileId, parentProfileId),
+      eq(familyLinks.childProfileId, childProfileId)
+    ),
+  });
+  if (!link) return [];
+
+  // Get curriculum for subject
+  const curriculum = await db.query.curricula.findFirst({
+    where: eq(curricula.subjectId, subjectId),
+  });
+  if (!curriculum) return [];
+
+  // Get all topics in the curriculum
+  const topics = await db.query.curriculumTopics.findMany({
+    where: eq(curriculumTopics.curriculumId, curriculum.id),
+  });
+
+  // Get progress for each topic
+  const results = await Promise.all(
+    topics.map((t) => getTopicProgress(db, childProfileId, subjectId, t.id))
+  );
+
+  return results.filter((r): r is TopicProgress => r !== null);
 }

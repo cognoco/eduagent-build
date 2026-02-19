@@ -19,10 +19,13 @@ jest.mock('../../services/embeddings', () => ({
 }));
 
 const mockUpdateRetentionFromSession = jest.fn().mockResolvedValue(undefined);
+const mockUpdateNeedsDeepeningProgress = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('../../services/retention-data', () => ({
   updateRetentionFromSession: (...args: unknown[]) =>
     mockUpdateRetentionFromSession(...args),
+  updateNeedsDeepeningProgress: (...args: unknown[]) =>
+    mockUpdateNeedsDeepeningProgress(...args),
 }));
 
 const mockCreatePendingSessionSummary = jest.fn().mockResolvedValue(undefined);
@@ -171,6 +174,36 @@ describe('sessionCompleted', () => {
       await executeSteps(createEventData());
 
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-001',
+        3
+      );
+    });
+  });
+
+  describe('update-needs-deepening step', () => {
+    it('calls updateNeedsDeepeningProgress with correct args', async () => {
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
+        expect.anything(), // db
+        'profile-001',
+        'topic-001',
+        4
+      );
+    });
+
+    it('skips needs-deepening update when no topicId', async () => {
+      await executeSteps(createEventData({ topicId: null }));
+
+      expect(mockUpdateNeedsDeepeningProgress).not.toHaveBeenCalled();
+    });
+
+    it('defaults qualityRating to 3 when not provided', async () => {
+      await executeSteps(createEventData());
+
+      expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
         expect.anything(),
         'profile-001',
         'topic-001',

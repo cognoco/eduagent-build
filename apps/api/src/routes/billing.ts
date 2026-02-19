@@ -4,6 +4,8 @@ import {
   checkoutRequestSchema,
   topUpRequestSchema,
   byokWaitlistSchema,
+  familyAddProfileSchema,
+  familyRemoveProfileSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -18,6 +20,10 @@ import {
   markSubscriptionCancelled,
   getTopUpCreditsRemaining,
   getTopUpPriceCents,
+  listFamilyMembers,
+  addProfileToSubscription,
+  removeProfileFromSubscription,
+  getFamilyPoolStatus,
 } from '../services/billing';
 import {
   getWarningLevel,
@@ -417,6 +423,105 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       },
     });
   })
+
+  // Get family members and pool status
+  .get('/subscription/family', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+
+    const subscription = await getSubscriptionByAccountId(db, account.id);
+    if (!subscription) {
+      return notFound(c, 'No subscription found');
+    }
+
+    const poolStatus = await getFamilyPoolStatus(db, subscription.id);
+    if (!poolStatus) {
+      return notFound(c, 'No quota pool found');
+    }
+
+    const members = await listFamilyMembers(db, subscription.id);
+
+    return c.json({
+      family: {
+        ...poolStatus,
+        members,
+      },
+    });
+  })
+
+  // Add a profile to the family subscription
+  .post(
+    '/subscription/family/add',
+    zValidator('json', familyAddProfileSchema),
+    async (c) => {
+      const { profileId } = c.req.valid('json');
+      const db = c.get('db');
+      const account = c.get('account');
+
+      const subscription = await getSubscriptionByAccountId(db, account.id);
+      if (!subscription) {
+        return notFound(c, 'No subscription found');
+      }
+
+      const result = await addProfileToSubscription(
+        db,
+        subscription.id,
+        profileId
+      );
+
+      if (!result) {
+        return apiError(
+          c,
+          403,
+          ERROR_CODES.FORBIDDEN,
+          'Cannot add profile. Subscription tier does not support additional profiles or profile limit reached.'
+        );
+      }
+
+      return c.json({
+        message: 'Profile added to family subscription',
+        profileCount: result.profileCount,
+      });
+    }
+  )
+
+  // Remove a profile from the family subscription
+  .post(
+    '/subscription/family/remove',
+    zValidator('json', familyRemoveProfileSchema),
+    async (c) => {
+      const { profileId, newAccountId } = c.req.valid('json');
+      const db = c.get('db');
+      const account = c.get('account');
+
+      const subscription = await getSubscriptionByAccountId(db, account.id);
+      if (!subscription) {
+        return notFound(c, 'No subscription found');
+      }
+
+      const result = await removeProfileFromSubscription(
+        db,
+        subscription.id,
+        profileId,
+        newAccountId
+      );
+
+      if (!result) {
+        return apiError(
+          c,
+          403,
+          ERROR_CODES.FORBIDDEN,
+          'Cannot remove profile. Profile not found, not in this family, or is the subscription owner.'
+        );
+      }
+
+      return c.json({
+        message:
+          'Profile removed from family subscription and downgraded to Free tier',
+        removedProfileId: result.removedProfileId,
+      });
+    }
+  )
 
   // Join BYOK waitlist
   .post('/byok-waitlist', zValidator('json', byokWaitlistSchema), async (c) => {

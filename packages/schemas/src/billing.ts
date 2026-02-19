@@ -67,6 +67,19 @@ export const cancelResponseSchema = z.object({
 });
 export type CancelResponse = z.infer<typeof cancelResponseSchema>;
 
+export const familyAddProfileSchema = z.object({
+  profileId: z.string().uuid(),
+});
+export type FamilyAddProfileInput = z.infer<typeof familyAddProfileSchema>;
+
+export const familyRemoveProfileSchema = z.object({
+  profileId: z.string().uuid(),
+  newAccountId: z.string().uuid(),
+});
+export type FamilyRemoveProfileInput = z.infer<
+  typeof familyRemoveProfileSchema
+>;
+
 export const quotaExceededSchema = z.object({
   code: z.literal('QUOTA_EXCEEDED'),
   message: z.string(),

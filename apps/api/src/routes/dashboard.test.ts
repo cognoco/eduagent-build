@@ -28,6 +28,19 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
+const mockGetChildrenForParent = jest.fn().mockResolvedValue([]);
+const mockGetChildDetail = jest.fn().mockResolvedValue(null);
+const mockGetChildSubjectTopics = jest.fn().mockResolvedValue([]);
+
+jest.mock('../services/dashboard', () => ({
+  ...jest.requireActual('../services/dashboard'),
+  getChildrenForParent: (...args: unknown[]) =>
+    mockGetChildrenForParent(...args),
+  getChildDetail: (...args: unknown[]) => mockGetChildDetail(...args),
+  getChildSubjectTopics: (...args: unknown[]) =>
+    mockGetChildSubjectTopics(...args),
+}));
+
 import app from '../index';
 
 const TEST_ENV = {

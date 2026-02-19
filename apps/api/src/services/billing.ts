@@ -1080,3 +1080,254 @@ export function getTopUpPriceCents(tier: SubscriptionTier): number | null {
   }
   return config.topUpPrice * 100;
 }
+
+// ---------------------------------------------------------------------------
+// Family billing — Story 5.5
+// ---------------------------------------------------------------------------
+
+export interface FamilyMember {
+  profileId: string;
+  displayName: string;
+  isOwner: boolean;
+}
+
+/**
+ * Lists all profiles under the same account (family) as the given subscription.
+ */
+export async function listFamilyMembers(
+  db: Database,
+  subscriptionId: string
+): Promise<FamilyMember[]> {
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, subscriptionId),
+  });
+
+  if (!sub) {
+    return [];
+  }
+
+  const rows = await db.query.profiles.findMany({
+    where: eq(profiles.accountId, sub.accountId),
+  });
+
+  return rows.map((r) => ({
+    profileId: r.id,
+    displayName: r.displayName,
+    isOwner: r.isOwner,
+  }));
+}
+
+/**
+ * Adds a profile to a family subscription.
+ *
+ * Checks:
+ * - Subscription exists and has room (canAddProfile)
+ * - Subscription tier supports multi-profile (family or pro)
+ *
+ * Returns the new profile count or null if rejected.
+ */
+export async function addProfileToSubscription(
+  db: Database,
+  subscriptionId: string,
+  profileId: string
+): Promise<{ profileCount: number } | null> {
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, subscriptionId),
+  });
+
+  if (!sub) {
+    return null;
+  }
+
+  // Only family and pro tiers support multiple profiles
+  if (sub.tier !== 'family' && sub.tier !== 'pro') {
+    return null;
+  }
+
+  const allowed = await canAddProfile(db, subscriptionId);
+  if (!allowed) {
+    return null;
+  }
+
+  // Re-parent the profile to the subscription's account
+  await db
+    .update(profiles)
+    .set({
+      accountId: sub.accountId,
+      updatedAt: new Date(),
+    })
+    .where(eq(profiles.id, profileId));
+
+  const count = await getProfileCountForSubscription(db, subscriptionId);
+  return { profileCount: count };
+}
+
+/**
+ * Removes a profile from a family subscription.
+ *
+ * The removed profile needs its own free-tier subscription provisioned.
+ * No clawback — questions already consumed remain spent.
+ *
+ * Returns the removed profile's new account ID (for notification purposes),
+ * or null if the profile/subscription doesn't exist or the profile is the owner.
+ */
+export async function removeProfileFromSubscription(
+  db: Database,
+  subscriptionId: string,
+  profileId: string,
+  newAccountId: string
+): Promise<{ removedProfileId: string } | null> {
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, subscriptionId),
+  });
+
+  if (!sub) {
+    return null;
+  }
+
+  const profile = await db.query.profiles.findFirst({
+    where: and(
+      eq(profiles.id, profileId),
+      eq(profiles.accountId, sub.accountId)
+    ),
+  });
+
+  if (!profile) {
+    return null;
+  }
+
+  // Owner cannot be removed — they must cancel the entire subscription
+  if (profile.isOwner) {
+    return null;
+  }
+
+  // Move profile to the new account
+  await db
+    .update(profiles)
+    .set({
+      accountId: newAccountId,
+      updatedAt: new Date(),
+    })
+    .where(eq(profiles.id, profileId));
+
+  // Provision a free-tier subscription for the removed profile's new account
+  await ensureFreeSubscription(db, newAccountId);
+
+  return { removedProfileId: profileId };
+}
+
+/**
+ * Family owner cancellation — downgrades all non-owner profiles to free tier.
+ *
+ * When the family owner cancels:
+ * 1. Each non-owner profile gets moved to its own new account with free-tier sub
+ * 2. The owner's subscription is downgraded to free tier
+ *
+ * This function handles only the DB-side: moving profiles and provisioning
+ * free subscriptions. Stripe cancellation is handled separately.
+ *
+ * Returns the list of profile IDs that were downgraded (for notification).
+ */
+export async function downgradeAllFamilyProfiles(
+  db: Database,
+  subscriptionId: string,
+  profileToAccountMap: Map<string, string>
+): Promise<string[]> {
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, subscriptionId),
+  });
+
+  if (!sub) {
+    return [];
+  }
+
+  const allProfiles = await db.query.profiles.findMany({
+    where: eq(profiles.accountId, sub.accountId),
+  });
+
+  const downgraded: string[] = [];
+
+  for (const profile of allProfiles) {
+    if (profile.isOwner) {
+      continue;
+    }
+
+    const newAccountId = profileToAccountMap.get(profile.id);
+    if (!newAccountId) {
+      continue;
+    }
+
+    // Move to new account
+    await db
+      .update(profiles)
+      .set({
+        accountId: newAccountId,
+        updatedAt: new Date(),
+      })
+      .where(eq(profiles.id, profile.id));
+
+    // Provision free-tier subscription for new account
+    await ensureFreeSubscription(db, newAccountId);
+
+    downgraded.push(profile.id);
+  }
+
+  // Downgrade the owner's subscription to free tier
+  const freeTier = getTierConfig('free');
+  await db
+    .update(subscriptions)
+    .set({
+      tier: 'free',
+      updatedAt: new Date(),
+    })
+    .where(eq(subscriptions.id, subscriptionId));
+
+  await updateQuotaPoolLimit(db, subscriptionId, freeTier.monthlyQuota);
+
+  return downgraded;
+}
+
+/**
+ * Returns subscription-level quota pool status for the family.
+ * Shows pool-level consumption (not per-profile).
+ */
+export async function getFamilyPoolStatus(
+  db: Database,
+  subscriptionId: string
+): Promise<{
+  tier: SubscriptionTier;
+  monthlyLimit: number;
+  usedThisMonth: number;
+  remainingQuestions: number;
+  profileCount: number;
+  maxProfiles: number;
+} | null> {
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, subscriptionId),
+  });
+
+  if (!sub) {
+    return null;
+  }
+
+  const pool = await db.query.quotaPools.findFirst({
+    where: eq(quotaPools.subscriptionId, subscriptionId),
+  });
+
+  if (!pool) {
+    return null;
+  }
+
+  const tierConfig = getTierConfig(sub.tier);
+  const profileCount = await getProfileCountForSubscription(db, subscriptionId);
+  const remaining = Math.max(0, pool.monthlyLimit - pool.usedThisMonth);
+
+  return {
+    tier: sub.tier,
+    monthlyLimit: pool.monthlyLimit,
+    usedThisMonth: pool.usedThisMonth,
+    remainingQuestions: remaining,
+    profileCount,
+    maxProfiles: tierConfig.maxProfiles,
+  };
+}

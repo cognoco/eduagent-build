@@ -51,6 +51,10 @@ const mockAddToByokWaitlist = jest.fn().mockResolvedValue(undefined);
 const mockMarkSubscriptionCancelled = jest.fn().mockResolvedValue(undefined);
 const mockGetTopUpCreditsRemaining = jest.fn().mockResolvedValue(0);
 const mockGetTopUpPriceCents = jest.fn().mockReturnValue(499);
+const mockListFamilyMembers = jest.fn();
+const mockAddProfileToSubscription = jest.fn();
+const mockRemoveProfileFromSubscription = jest.fn();
+const mockGetFamilyPoolStatus = jest.fn();
 
 jest.mock('../services/billing', () => ({
   getSubscriptionByAccountId: (...args: unknown[]) =>
@@ -65,6 +69,12 @@ jest.mock('../services/billing', () => ({
   getTopUpCreditsRemaining: (...args: unknown[]) =>
     mockGetTopUpCreditsRemaining(...args),
   getTopUpPriceCents: (...args: unknown[]) => mockGetTopUpPriceCents(...args),
+  listFamilyMembers: (...args: unknown[]) => mockListFamilyMembers(...args),
+  addProfileToSubscription: (...args: unknown[]) =>
+    mockAddProfileToSubscription(...args),
+  removeProfileFromSubscription: (...args: unknown[]) =>
+    mockRemoveProfileFromSubscription(...args),
+  getFamilyPoolStatus: (...args: unknown[]) => mockGetFamilyPoolStatus(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -166,6 +176,10 @@ beforeEach(() => {
   mockGetQuotaPool.mockResolvedValue(null);
   mockLinkStripeCustomer.mockResolvedValue(null);
   mockReadSubscriptionStatus.mockResolvedValue(null);
+  mockListFamilyMembers.mockResolvedValue([]);
+  mockAddProfileToSubscription.mockResolvedValue(null);
+  mockRemoveProfileFromSubscription.mockResolvedValue(null);
+  mockGetFamilyPoolStatus.mockResolvedValue(null);
 });
 
 describe('billing routes', () => {
@@ -684,6 +698,282 @@ describe('billing routes', () => {
         {
           method: 'POST',
           body: JSON.stringify({ email: 'test@example.com' }),
+          headers: { 'Content-Type': 'application/json' },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /v1/subscription/family
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/subscription/family', () => {
+    it('returns family pool status and members', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(
+        mockSubscription({ tier: 'family' })
+      );
+      mockGetFamilyPoolStatus.mockResolvedValue({
+        tier: 'family',
+        monthlyLimit: 1500,
+        usedThisMonth: 300,
+        remainingQuestions: 1200,
+        profileCount: 3,
+        maxProfiles: 4,
+      });
+      mockListFamilyMembers.mockResolvedValue([
+        { profileId: 'p-1', displayName: 'Parent', isOwner: true },
+        { profileId: 'p-2', displayName: 'Child 1', isOwner: false },
+        { profileId: 'p-3', displayName: 'Child 2', isOwner: false },
+      ]);
+
+      const res = await app.request(
+        '/v1/subscription/family',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.family.tier).toBe('family');
+      expect(body.family.monthlyLimit).toBe(1500);
+      expect(body.family.remainingQuestions).toBe(1200);
+      expect(body.family.profileCount).toBe(3);
+      expect(body.family.maxProfiles).toBe(4);
+      expect(body.family.members).toHaveLength(3);
+    });
+
+    it('returns 404 when no subscription exists', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(null);
+
+      const res = await app.request(
+        '/v1/subscription/family',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 404 when no quota pool found', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockGetFamilyPoolStatus.mockResolvedValue(null);
+
+      const res = await app.request(
+        '/v1/subscription/family',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request('/v1/subscription/family', {}, TEST_ENV);
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /v1/subscription/family/add
+  // -------------------------------------------------------------------------
+
+  describe('POST /v1/subscription/family/add', () => {
+    it('adds a profile to the family subscription', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(
+        mockSubscription({ tier: 'family' })
+      );
+      mockAddProfileToSubscription.mockResolvedValue({ profileCount: 3 });
+
+      const res = await app.request(
+        '/v1/subscription/family/add',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            profileId: '550e8400-e29b-41d4-a716-446655440000',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.message).toContain('Profile added');
+      expect(body.profileCount).toBe(3);
+    });
+
+    it('returns 403 when profile cannot be added', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockAddProfileToSubscription.mockResolvedValue(null);
+
+      const res = await app.request(
+        '/v1/subscription/family/add',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            profileId: '550e8400-e29b-41d4-a716-446655440000',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 404 when no subscription exists', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(null);
+
+      const res = await app.request(
+        '/v1/subscription/family/add',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            profileId: '550e8400-e29b-41d4-a716-446655440000',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 400 with invalid profileId', async () => {
+      const res = await app.request(
+        '/v1/subscription/family/add',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ profileId: 'not-a-uuid' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        '/v1/subscription/family/add',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            profileId: '550e8400-e29b-41d4-a716-446655440000',
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /v1/subscription/family/remove
+  // -------------------------------------------------------------------------
+
+  describe('POST /v1/subscription/family/remove', () => {
+    it('removes a profile from the family subscription', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(
+        mockSubscription({ tier: 'family' })
+      );
+      mockRemoveProfileFromSubscription.mockResolvedValue({
+        removedProfileId: '550e8400-e29b-41d4-a716-446655440000',
+      });
+
+      const res = await app.request(
+        '/v1/subscription/family/remove',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            profileId: '550e8400-e29b-41d4-a716-446655440000',
+            newAccountId: '660e8400-e29b-41d4-a716-446655440000',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.message).toContain('removed from family');
+      expect(body.removedProfileId).toBe(
+        '550e8400-e29b-41d4-a716-446655440000'
+      );
+    });
+
+    it('returns 403 when profile cannot be removed', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockRemoveProfileFromSubscription.mockResolvedValue(null);
+
+      const res = await app.request(
+        '/v1/subscription/family/remove',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            profileId: '550e8400-e29b-41d4-a716-446655440000',
+            newAccountId: '660e8400-e29b-41d4-a716-446655440000',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 404 when no subscription exists', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(null);
+
+      const res = await app.request(
+        '/v1/subscription/family/remove',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            profileId: '550e8400-e29b-41d4-a716-446655440000',
+            newAccountId: '660e8400-e29b-41d4-a716-446655440000',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 400 with invalid body', async () => {
+      const res = await app.request(
+        '/v1/subscription/family/remove',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ profileId: 'not-uuid' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        '/v1/subscription/family/remove',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            profileId: '550e8400-e29b-41d4-a716-446655440000',
+            newAccountId: '660e8400-e29b-41d4-a716-446655440000',
+          }),
           headers: { 'Content-Type': 'application/json' },
         },
         TEST_ENV

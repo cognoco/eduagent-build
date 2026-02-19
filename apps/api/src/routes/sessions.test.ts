@@ -56,6 +56,8 @@ const mockSubscription = {
   updatedAt: new Date().toISOString(),
 };
 
+const mockIncrementQuota = jest.fn().mockResolvedValue(undefined);
+
 jest.mock('../services/billing', () => ({
   getSubscriptionByAccountId: jest.fn().mockResolvedValue(mockSubscription),
   ensureFreeSubscription: jest.fn().mockResolvedValue(mockSubscription),
@@ -74,6 +76,7 @@ jest.mock('../services/billing', () => ({
     remainingMonthly: 489,
     remainingTopUp: 0,
   }),
+  incrementQuota: (...args: unknown[]) => mockIncrementQuota(...args),
   createSubscription: jest.fn(),
 }));
 
@@ -171,6 +174,7 @@ jest.mock('../inngest/client', () => ({
 }));
 
 import { inngest } from '../inngest/client';
+import { processMessage, streamMessage } from '../services/session';
 import app from '../index';
 
 const TEST_ENV = {
@@ -583,6 +587,98 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Quota refund on LLM failure (Story 5.6)
+  // -------------------------------------------------------------------------
+
+  describe('quota refund on LLM failure', () => {
+    afterEach(() => {
+      // Restore processMessage and streamMessage to their default mocks
+      (processMessage as jest.Mock).mockResolvedValue({
+        response: 'Mock AI tutor response',
+        escalationRung: 1,
+        isUnderstandingCheck: false,
+        exchangeCount: 1,
+      });
+      (streamMessage as jest.Mock).mockImplementation(() =>
+        Promise.resolve({
+          stream: (async function* () {
+            yield 'Hello ';
+            yield 'world!';
+          })(),
+          onComplete: jest.fn().mockResolvedValue({
+            exchangeCount: 1,
+            escalationRung: 1,
+          }),
+        })
+      );
+      mockIncrementQuota.mockClear();
+    });
+
+    it('refunds quota when processMessage throws (messages endpoint)', async () => {
+      (processMessage as jest.Mock).mockRejectedValueOnce(
+        new Error('LLM provider unavailable')
+      );
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/messages`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Explain photosynthesis' }),
+        },
+        TEST_ENV
+      );
+
+      // The error handler should return 500
+      expect(res.status).toBe(500);
+      // incrementQuota should have been called with the subscriptionId
+      expect(mockIncrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1'
+      );
+    });
+
+    it('refunds quota when streamMessage throws (stream endpoint)', async () => {
+      (streamMessage as jest.Mock).mockRejectedValueOnce(
+        new Error('LLM provider unavailable')
+      );
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Explain gravity' }),
+        },
+        TEST_ENV
+      );
+
+      // The error handler should return 500
+      expect(res.status).toBe(500);
+      // incrementQuota should have been called with the subscriptionId
+      expect(mockIncrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1'
+      );
+    });
+
+    it('does not refund quota when processMessage succeeds', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/messages`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Explain photosynthesis' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockIncrementQuota).not.toHaveBeenCalled();
     });
   });
 });
