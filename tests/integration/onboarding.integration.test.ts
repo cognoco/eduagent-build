@@ -110,6 +110,59 @@ jest.mock('@eduagent/database', () => ({
   createDatabase: jest.fn().mockReturnValue({}),
 }));
 
+// Mock Inngest client — session close dispatches background events via inngest.send(),
+// and Inngest function modules call inngest.createFunction() at import time.
+// The serve() handler calls fn.getConfig() on each function during setup.
+jest.mock('../../apps/api/src/inngest/client', () => {
+  let fnCounter = 0;
+  return {
+    inngest: {
+      send: jest.fn().mockResolvedValue({ ids: [] }),
+      createFunction: jest.fn().mockImplementation((config) => {
+        const id = config?.id ?? `mock-fn-${fnCounter++}`;
+        const fn = jest.fn();
+        (fn as any).getConfig = () => [
+          {
+            id,
+            name: id,
+            triggers: [],
+            steps: {},
+          },
+        ];
+        return fn;
+      }),
+    },
+  };
+});
+
+// Mock settings service — session close checks for casual switch prompt
+jest.mock('../../apps/api/src/services/settings', () => ({
+  shouldPromptCasualSwitch: jest.fn().mockResolvedValue(false),
+}));
+
+// Mock billing service — used by metering middleware on LLM-consuming routes
+const SUBSCRIPTION_ID = '00000000-0000-4000-8000-000000000005';
+jest.mock('../../apps/api/src/services/billing', () => ({
+  ensureFreeSubscription: jest.fn().mockResolvedValue({
+    id: SUBSCRIPTION_ID,
+    accountId: ACCOUNT_ID,
+    tier: 'free',
+    status: 'trial',
+    stripeSubscriptionId: null,
+  }),
+  getQuotaPool: jest.fn().mockResolvedValue({
+    id: '00000000-0000-4000-8000-000000000006',
+    subscriptionId: SUBSCRIPTION_ID,
+    monthlyLimit: 50,
+    usedThisMonth: 0,
+  }),
+  decrementQuota: jest.fn().mockResolvedValue({
+    success: true,
+    remainingMonthly: 49,
+    remainingTopUp: 0,
+  }),
+}));
+
 // Mock session service for smoke test
 jest.mock('../../apps/api/src/services/session', () => ({
   startSession: jest.fn().mockResolvedValue({
