@@ -1573,6 +1573,9 @@ packages/test-utils    -         -          -         -        -          -
 | **FIX-38** | ✅ `buildCurriculum` dead counter increment | Removed useless `counter++` in `buildCurriculum()` — incremented the shared counter but never used the value. Caused `buildCurriculumTopic()` called after `buildCurriculum()` to skip counter values, producing non-sequential `sortOrder` and `title` numbers. | `packages/factory/src/subjects.ts` |
 | **FIX-39** | ✅ NativeWind `text-*` color applied to `View` instead of `Text` | Split `RELEVANCE_COLORS` map into `RELEVANCE_BG` (View classes) and `RELEVANCE_TEXT` (Text classes). In React Native, `color` does not cascade from `View` to child `Text` — the `text-primary`/`text-accent`/etc. classes were no-ops on the `<View>` wrapper. Badge labels now render with correct relevance colors. | `apps/mobile/src/app/(learner)/onboarding/curriculum-review.tsx` |
 | **FIX-40** | ✅ `animateResponse` cleanup leak in interview screen | Added `animationCleanupRef` + `useEffect` cleanup pattern (matching `session/index.tsx`). Both success and error calls to `animateResponse()` now store the returned cleanup function. On unmount, the `useEffect` destructor clears any running `setInterval`. Previously, navigating away during animation left a dangling interval firing `setMessages` on unmounted state. | `apps/mobile/src/app/(learner)/onboarding/interview.tsx` |
+| **FIX-41** | ✅ architecture.md Nx version 22.5.0 → 22.2.0, @naxodev 6.0.0 → 5.0.x | Updated 3 occurrences: tech table (lines 154-155) and compatibility section (line 1328). Actual installed: Nx `22.2.0` in root `package.json:95`, `@naxodev/nx-cloudflare` `^5.0.0` resolving to `5.0.2`. Previous values `22.5.0`/`6.0.0` were never installed. | `docs/architecture.md` |
+| **FIX-42** | ✅ architecture.md services tree missing `settings.ts` and `stripe.ts` | Added both files to the detailed monorepo services tree. Both exist on disk but were omitted from the 240-line doc update in commit `9614cd9`. | `docs/architecture.md` |
+| **FIX-43** | ✅ `handleChallenge` missing error handling in curriculum-review.tsx | Added `try/catch` with `Alert.alert()` for the `challengeCurriculum.mutateAsync()` call. Previously, network failures or 500 errors would result in an unhandled rejection with no user feedback — modal stayed open, no error message. Matches the error handling pattern used in `subscription.tsx`'s `handleUpgrade`. | `apps/mobile/src/app/(learner)/onboarding/curriculum-review.tsx` |
 
 ### Shadow Agent False Findings (2026-02-19)
 
@@ -1649,6 +1652,16 @@ These are findings from the shadow review that were NOT already tracked in previ
 | **N43** | LOW | `export.test.ts` 103-line inline DB mock instead of `createMockDb` from test-utils | OPEN — Duplicate scaffolding that will drift from schema. Same category as N16. |
 | **N44** | LOW | `streaks.test.ts` `getStreakData`/`getXpSummary` entirely stubbed with `it.todo()` | OPEN — Two exported functions have zero test coverage. |
 | **N45** | LOW | `book/index.tsx` fabricates topic name from UUID prefix (`Topic ${topicId.slice(0,8)}`) | OPEN — Retention endpoint does not include topic titles. Placeholder visible to users. Requires enriching retention response or client-side curriculum join. |
+| **N46** | MEDIUM | architecture.md Nx 22.5.0 and @naxodev 6.0.0 never installed | ✅ FIXED (FIX-41) — Corrected to actual installed versions (22.2.0 / 5.0.x). |
+| **N47** | MEDIUM | architecture.md missing `services/stripe.ts` and `services/settings.ts` from tree | ✅ FIXED (FIX-42) — Added both to detailed monorepo tree. |
+| **N48** | MEDIUM | `handleChallenge` in curriculum-review.tsx had no error handling | ✅ FIXED (FIX-43) — Added try/catch with Alert.alert(). |
+| **N49** | MEDIUM | `billing.ts` service uses raw `sql` template in `topUpCredits` query instead of Drizzle operators | OPEN — `sql` template with column references is safe (parameterized), but bypasses Drizzle's type-safe query builder. Should use `and(eq(...), gt(...))` pattern. |
+| **N50** | LOW | `closeSession`/`flagContent` use `void input` — placeholder for unconsumed schema fields | OPEN — Not a bug; `SessionCloseInput` and `ContentFlagInput` fields are not yet consumed. Track for future implementation. |
+| **N51** | LOW | `streamMessage` has zero test coverage | OPEN — Contains same pipeline as `processMessage` but with `onComplete` callback pattern. The callback persistence path is untested. |
+| **N52** | LOW | `billing.ts` `decrementQuota`/`incrementQuota` have no unit tests | OPEN — Critical quota logic with TOCTOU protection and FIFO top-up fallback. High priority for test coverage. |
+| **N53** | LOW | `book/index.tsx` hard-limits retention queries to 3 subjects via static hook calls | OPEN — React hooks rule prevents dynamic hook count. 4th+ subjects silently dropped. Needs child-component pattern or combined API endpoint. |
+| **N54** | LOW | `dashboard.tsx` calls `setPersona` outside `_layout.tsx` | OPEN — Demo "Switch to Teen view" button in page route violates persona architecture rule. Should be in `_layout.tsx` or debug-only component. |
+| **N55** | LOW | architecture.md still references `react-i18next` and `assets/locales/` but neither exists | OPEN — Pre-existing issue not addressed in the 240-line doc update. i18n approach is still undecided. |
 
 ### Previously Tracked Items — Status Update (2026-02-19)
 
@@ -1673,7 +1686,7 @@ These are findings from the shadow review that were NOT already tracked in previ
   - Factory:    10 tests (1 suite) [Nx reports as 8]
   - Test-utils:  8 tests (1 suite)
   - Mobile:    160 tests (28 suites)
-(Updated 2026-02-19: 40 fixes verified, FIX-37→40 factory UUID v7, dead counter, NativeWind color, animation cleanup)
+(Updated 2026-02-19: 43 fixes verified, FIX-41→43 architecture.md versions, handleChallenge error handling)
 ```
 
 ### Database Schema Review (2026-02-19, Shadow Agent)
@@ -1692,14 +1705,14 @@ A deep adversarial review of the database layer found 79 findings. Key items req
 
 **Note on enum casing:** The 15 enum findings have been **reclassified as FALSE** — lowercase enum values (`learning`, `homework`, `active`, `completed`, etc.) are correct PostgreSQL convention. The SCREAMING_SNAKE rule applies to TypeScript constants, not database enum values. The 3 enums in `profiles.ts` that use uppercase (TEEN/LEARNER/PARENT, etc.) are the exception, not the rule.
 
-### Severity Summary (2026-02-19, cont. 7 updated)
+### Severity Summary (2026-02-19, cont. 8 — post-commit `9614cd9` review)
 
 | Severity | Total Found | Fixed | Deferred | Open |
 |----------|-------------|-------|----------|------|
 | CRITICAL | 6 (DB enums reclassified as FALSE) | 3 (N1, N2, CR6) | 2 (N3, N4) | 1 (CR5) |
 | HIGH | 14 + ~24 DB | 14 (N5, N6, N7, N8, N10, N18, N23, N24, N32, N35, N38, CR7, I11, FIX-24) + 1 DB (FIX-16) | 1 (N9) | 0 + ~23 DB (indexes, constraints, timestamps) |
-| MEDIUM | 18 + ~29 DB | 10 (I8, I21, N25, N26, N27, N28, N31-partial, N34/FIX-36, N37/FIX-39) | 2 (N11, N13) + ~12 DB | 7 (N12, N14, N20, N33, N39, N42, CR8) + ~17 DB |
-| LOW | 14 | 7 (N15/FIX-23, N21/FIX-33, N22/FIX-34, N29/FIX-27, N36/FIX-38, FIX-30) | 1 (N19 — accepted) | 7 (N16, N17, N30, N40, N41, N43, N44, N45) |
+| MEDIUM | 23 + ~29 DB | 13 (I8, I21, N25, N26, N27, N28, N31-partial, N34/FIX-36, N37/FIX-39, N46/FIX-41, N47/FIX-42, N48/FIX-43) | 2 (N11, N13) + ~12 DB | 8 (N12, N14, N20, N33, N39, N42, N49, CR8) + ~17 DB |
+| LOW | 20 | 7 (N15/FIX-23, N21/FIX-33, N22/FIX-34, N29/FIX-27, N36/FIX-38, FIX-30) | 1 (N19 — accepted) | 13 (N16, N17, N30, N40, N41, N43, N44, N45, N50, N51, N52, N53, N54, N55) |
 
 ### Review History
 
@@ -1714,3 +1727,4 @@ A deep adversarial review of the database layer found 79 findings. Key items req
 | 2026-02-19 (cont. 5) | Continuation review | FIX-29 → FIX-34 | 1,173 | No new code changes detected — codebase stable at commit `c5641bd`. Addressed 6 open items: **FIX-29** streak upsert for first-session users (HIGH N23 → 4 new tests), **FIX-30** dead `escalationRungs` field in session-completed (N31 partial), **FIX-31** subject ownership guard in startSession (N27 → 1 new test + security fix), **FIX-32** parallelized 5 sequential queries on hot path (N28 → `Promise.all`), **FIX-33** index.ts import group separators (N21), **FIX-34** CLAUDE.md schema name fix (N22). All HIGH-severity application items resolved. 1,173 tests passing (105 suites). |
 | 2026-02-19 (cont. 6) | Deep scan review | FIX-35, FIX-36 | 1,175 | 4 parallel deep-scan agents dispatched (API error handling, mobile hooks, Inngest event drift, schema/service drift). **FIX-35** completed RetentionStatus barrel consolidation (4 files, removed 2 local type defs + 2 internal-path imports). **FIX-36** subjects route null→404 mapping (GET+PATCH returned 200 with `{subject:null}` instead of 404, 2 new tests). New findings: **N33** PII in consent event payload (MEDIUM, deferred), **N34** fixed. Agent triaged: global error handler covers route-level try-catch (not a gap); TanStack Query invalidation is by-design; `qualityRating` already tracked as N31. 1,175 tests passing (105 suites). |
 | 2026-02-19 (cont. 7) | Factory + mobile scan | FIX-37→40 | 1,175 | 3 parallel deep-scan agents dispatched (factory builders, mobile screens, API test quality). **FIX-37** (HIGH) all 6 factory files UUID v4→v7 + added `uuidv7` dependency. **FIX-38** dead counter increment in `buildCurriculum`. **FIX-39** (BUG) NativeWind text color on View instead of Text in curriculum-review — split `RELEVANCE_COLORS` into `RELEVANCE_BG` + `RELEVANCE_TEXT`. **FIX-40** (BUG) animation cleanup leak in interview.tsx — added ref+useEffect pattern matching session/index.tsx. New items: N35-N45 (factory/mobile/test observations). All HIGH-severity application items remain resolved. |
+| 2026-02-19 (cont. 8) | Commit `9614cd9` review | FIX-41→43 | 1,175 | New commit: "session/billing/streaks services, Inngest simplification, mobile hook improvements" (60 files, 1,958 ins, 758 del). 3 parallel code-review agents dispatched (Inngest+services, mobile+routes, schema+docs). **FIX-41** (CRITICAL) architecture.md Nx version 22.5.0→22.2.0, @naxodev 6.0.0→5.0.x (never installed). **FIX-42** architecture.md missing services/stripe.ts and settings.ts from tree. **FIX-43** (BUG) curriculum-review.tsx `handleChallenge` unhandled promise rejection — added try/catch with Alert. **Positive findings**: Inngest functions correctly zero-ORM (delegating to services), session service comprehensive with parallelized queries, streaks upsert correct, decrementQuota atomic TOCTOU protection, factory builders all uuidv7, schema reorder backward-compatible. New items: N46-N55. |

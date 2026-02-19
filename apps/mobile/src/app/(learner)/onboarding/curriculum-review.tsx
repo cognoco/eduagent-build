@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   TextInput,
   Modal,
+  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -52,9 +53,16 @@ export default function CurriculumScreen() {
 
   const handleChallenge = async () => {
     if (!challengeFeedback.trim()) return;
-    await challengeCurriculum.mutateAsync(challengeFeedback.trim());
-    setChallengeFeedback('');
-    setShowChallengeModal(false);
+    try {
+      await challengeCurriculum.mutateAsync(challengeFeedback.trim());
+      setChallengeFeedback('');
+      setShowChallengeModal(false);
+    } catch {
+      Alert.alert(
+        'Something went wrong',
+        'We couldn\u2019t regenerate your curriculum. Please try again.'
+      );
+    }
   };
 
   const firstAvailableTopic = curriculum?.topics.find((t) => !t.skipped);

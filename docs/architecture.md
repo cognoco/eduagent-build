@@ -151,8 +151,8 @@ Monorepo with two apps: Expo mobile client + Hono API backend. **Starting from f
 | Hono | 4.11.x (v4.11.9) | Released Feb 8, 2026 |
 | NativeWind | **v4.2.1** (pin) | v5 is preview/pre-release only. Pin to v4.2.1 + Tailwind CSS 3.4.19. |
 | Drizzle ORM | Current stable | Type-safe SQL, replaces Prisma |
-| Nx | 22.5.0 | Released Feb 9, 2026 |
-| @naxodev/nx-cloudflare | 6.0.0 | Nx 22 compatible, actively maintained (Jan 2026) |
+| Nx | 22.2.0 | Pinned in root package.json |
+| @naxodev/nx-cloudflare | 5.0.x | `^5.0.0` in root devDependencies, resolves to 5.0.2 |
 
 ### Starter Decision: Fork `cognoco/nx-monorepo`
 
@@ -937,6 +937,8 @@ eduagent/
 │       │   │   ├── subject-urgency.ts # Subject urgency calculations
 │       │   │   ├── logger.ts        # Structured logging factory
 │       │   │   ├── kv.ts            # Workers KV caching helpers
+│       │   │   ├── settings.ts     # User settings management
+│       │   │   ├── stripe.ts       # Stripe SDK helpers (customer, checkout, portal)
 │       │   │   └── llm/             # LLM orchestration — imported via barrel
 │       │   │       ├── router.ts    # routeAndCall(messages, rung, options?) — model routing, streaming
 │       │   │       ├── types.ts     # ChatMessage, EscalationRung, RouteResult, StreamResult
@@ -1325,7 +1327,7 @@ All technology choices verified compatible (Feb 2026):
 - Drizzle ORM + Neon serverless driver (`@neondatabase/serverless`) — both target PostgreSQL, connection factory pattern handles serverless pooling
 - Clerk `@clerk/clerk-expo` + Hono middleware — JWT/JWKS verification compatible with Workers runtime, KV-cacheable JWKS
 - Inngest + Cloudflare Workers — Inngest v3 supports Workers via `inngest/hono` serve adapter (for Hono apps) or `inngest/cloudflare` (bare Workers)
-- Nx 22.5.0 + `@naxodev/nx-cloudflare` 6.0.0 — version-compatible, plugin actively maintained
+- Nx 22.2.0 + `@naxodev/nx-cloudflare` 5.0.x — version-compatible, plugin actively maintained
 - pgvector in Neon — supported natively, no extensions to install
 
 No contradictory decisions found. The Workers → Railway/Fly fallback path is clean because Hono runs on both without framework changes.
