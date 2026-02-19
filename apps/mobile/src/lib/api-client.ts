@@ -16,22 +16,13 @@ import { getApiUrl } from './api';
 import { useProfile } from './profile';
 
 // ---------------------------------------------------------------------------
-// Quota-exceeded error (preserved from auth-api.ts)
+// Quota-exceeded error — type derived from @eduagent/schemas QuotaExceeded
 // ---------------------------------------------------------------------------
 
-export interface UpgradeOption {
-  tier: 'plus' | 'family' | 'pro';
-  monthlyQuota: number;
-  priceMonthly: number;
-}
+import type { QuotaExceeded } from '@eduagent/schemas';
 
-export interface QuotaExceededDetails {
-  tier: string;
-  monthlyLimit: number;
-  usedThisMonth: number;
-  topUpCreditsRemaining: number;
-  upgradeOptions: UpgradeOption[];
-}
+export type QuotaExceededDetails = QuotaExceeded['details'];
+export type UpgradeOption = QuotaExceededDetails['upgradeOptions'][number];
 
 export class QuotaExceededError extends Error {
   readonly code = 'QUOTA_EXCEEDED' as const;

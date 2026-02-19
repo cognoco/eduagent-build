@@ -2,19 +2,8 @@
 // Trial Expiry — Tests
 // ---------------------------------------------------------------------------
 
-const mockFindManySubscriptions = jest.fn().mockResolvedValue([]);
-
 jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn(() => ({
-    query: {
-      subscriptions: { findMany: mockFindManySubscriptions },
-    },
-  })),
-  subscriptions: {
-    status: 'status',
-    trialEndsAt: 'trial_ends_at',
-    id: 'id',
-  },
+  createDatabase: jest.fn(() => ({})),
 }));
 
 jest.mock('../../services/subscription', () => ({
@@ -24,10 +13,15 @@ jest.mock('../../services/subscription', () => ({
   }),
 }));
 
+const mockFindExpiredTrials = jest.fn().mockResolvedValue([]);
+const mockFindSubscriptionsByTrialDateRange = jest.fn().mockResolvedValue([]);
 const mockExpireTrialSubscription = jest.fn().mockResolvedValue(undefined);
 const mockDowngradeQuotaPool = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('../../services/billing', () => ({
+  findExpiredTrials: (...args: unknown[]) => mockFindExpiredTrials(...args),
+  findSubscriptionsByTrialDateRange: (...args: unknown[]) =>
+    mockFindSubscriptionsByTrialDateRange(...args),
   expireTrialSubscription: (...args: unknown[]) =>
     mockExpireTrialSubscription(...args),
   downgradeQuotaPool: (...args: unknown[]) => mockDowngradeQuotaPool(...args),
@@ -120,18 +114,14 @@ describe('trialExpiry', () => {
       id: 'sub-1',
       accountId: 'acc-1',
       status: 'trial',
-      trialEndsAt: new Date('2025-01-14T23:00:00.000Z'),
+      trialEndsAt: '2025-01-14T23:00:00.000Z',
     };
 
-    // First findMany returns expired trials, subsequent calls return empty
-    mockFindManySubscriptions
-      .mockResolvedValueOnce([expiredTrial])
-      .mockResolvedValue([]);
+    mockFindExpiredTrials.mockResolvedValueOnce([expiredTrial]);
 
     const { result } = await executeSteps();
 
     expect(result.expiredCount).toBe(1);
-    // Service functions should be called for subscription expiry and quota downgrade
     expect(mockExpireTrialSubscription).toHaveBeenCalledWith(
       expect.anything(),
       'sub-1'
@@ -148,19 +138,24 @@ describe('trialExpiry', () => {
       id: 'sub-2',
       accountId: 'acc-2',
       status: 'trial',
-      trialEndsAt: new Date('2025-01-18T12:00:00.000Z'), // 3 days from now
+      trialEndsAt: '2025-01-18T12:00:00.000Z',
     };
 
-    // First call (expired): empty. Second (3-day warning): 1 trial.
-    // Remaining calls: empty.
-    mockFindManySubscriptions
-      .mockResolvedValueOnce([]) // expired
+    // findExpiredTrials returns empty; first warning query returns 1 trial
+    mockFindExpiredTrials.mockResolvedValueOnce([]);
+    mockFindSubscriptionsByTrialDateRange
       .mockResolvedValueOnce([trialEndingSoon]) // 3-day warnings
       .mockResolvedValue([]);
 
     const { result } = await executeSteps();
 
     expect(result.warningsSent).toBeGreaterThanOrEqual(1);
+    expect(mockFindSubscriptionsByTrialDateRange).toHaveBeenCalledWith(
+      expect.anything(),
+      'trial',
+      expect.any(Date),
+      expect.any(Date)
+    );
   });
 
   it('counts soft-landing messages for recently expired trials', async () => {
@@ -168,13 +163,12 @@ describe('trialExpiry', () => {
       id: 'sub-3',
       accountId: 'acc-3',
       status: 'expired',
-      trialEndsAt: new Date('2025-01-14T00:00:00.000Z'), // 1 day ago
+      trialEndsAt: '2025-01-14T00:00:00.000Z',
     };
 
-    // First call (expired): empty. Warning calls: empty.
-    // Soft-landing day-1: 1 trial. Rest: empty.
-    mockFindManySubscriptions
-      .mockResolvedValueOnce([]) // expired
+    mockFindExpiredTrials.mockResolvedValueOnce([]);
+    // Warning queries return empty (3 calls: days 3, 1, 0)
+    mockFindSubscriptionsByTrialDateRange
       .mockResolvedValueOnce([]) // 3-day warning
       .mockResolvedValueOnce([]) // 1-day warning
       .mockResolvedValueOnce([]) // 0-day warning
@@ -184,10 +178,17 @@ describe('trialExpiry', () => {
     const { result } = await executeSteps();
 
     expect(result.softLandingSent).toBeGreaterThanOrEqual(1);
+    expect(mockFindSubscriptionsByTrialDateRange).toHaveBeenCalledWith(
+      expect.anything(),
+      'expired',
+      expect.any(Date),
+      expect.any(Date)
+    );
   });
 
   it('handles zero expired trials gracefully', async () => {
-    mockFindManySubscriptions.mockResolvedValue([]);
+    mockFindExpiredTrials.mockResolvedValueOnce([]);
+    mockFindSubscriptionsByTrialDateRange.mockResolvedValue([]);
 
     const { result } = await executeSteps();
 

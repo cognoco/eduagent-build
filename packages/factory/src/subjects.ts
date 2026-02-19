@@ -1,5 +1,5 @@
 import type { Subject, Curriculum, CurriculumTopic } from '@eduagent/schemas';
-import { randomUUID } from 'crypto';
+import { uuidv7 } from 'uuidv7';
 
 let counter = 0;
 
@@ -7,8 +7,8 @@ export function buildSubject(overrides?: Partial<Subject>): Subject {
   counter++;
   const now = new Date().toISOString();
   return {
-    id: randomUUID(),
-    profileId: randomUUID(),
+    id: uuidv7(),
+    profileId: uuidv7(),
     name: `Test Subject ${counter}`,
     status: 'active',
     createdAt: now,
@@ -18,10 +18,9 @@ export function buildSubject(overrides?: Partial<Subject>): Subject {
 }
 
 export function buildCurriculum(overrides?: Partial<Curriculum>): Curriculum {
-  counter++;
   return {
-    id: randomUUID(),
-    subjectId: randomUUID(),
+    id: uuidv7(),
+    subjectId: uuidv7(),
     version: 1,
     topics: [],
     generatedAt: new Date().toISOString(),
@@ -34,7 +33,7 @@ export function buildCurriculumTopic(
 ): CurriculumTopic {
   counter++;
   return {
-    id: randomUUID(),
+    id: uuidv7(),
     title: `Topic ${counter}`,
     description: `Description for topic ${counter}`,
     sortOrder: counter,

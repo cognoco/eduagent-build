@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@eduagent/schemas": "workspace:*",
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "uuidv7": "^1.1.0"
   }
 }

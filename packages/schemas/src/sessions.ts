@@ -63,16 +63,15 @@ export type OnboardingDraft = z.infer<typeof onboardingDraftSchema>;
 
 // Session schemas
 
+export const sessionTypeSchema = z.enum(['learning', 'homework']);
+export type SessionType = z.infer<typeof sessionTypeSchema>;
+
 export const sessionStartSchema = z.object({
   subjectId: z.string().uuid(),
   topicId: z.string().uuid().optional(),
+  sessionType: sessionTypeSchema.default('learning'),
 });
 export type SessionStartInput = z.infer<typeof sessionStartSchema>;
-
-// Learning session schemas (Epic 2)
-
-export const sessionTypeSchema = z.enum(['learning', 'homework']);
-export type SessionType = z.infer<typeof sessionTypeSchema>;
 
 export const sessionStatusSchema = z.enum([
   'active',

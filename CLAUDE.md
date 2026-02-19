@@ -65,7 +65,7 @@ Read `docs/project_context.md` for the full rules. The critical ones:
 - **Route files must never import ORM primitives** (`eq`, `and`, table refs). Even one DB query belongs in a service.
 - Services never import from `hono` — testable without mocking context.
 - All routes prefixed `/v1/`. Zod validation on every input.
-- Error responses use `ApiErrorSchema` from `@eduagent/schemas`.
+- Error responses use `apiErrorSchema` (schema) / `ApiError` (type) from `@eduagent/schemas`.
 
 ### Mobile (Expo)
 

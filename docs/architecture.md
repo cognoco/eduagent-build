@@ -149,7 +149,7 @@ Monorepo with two apps: Expo mobile client + Hono API backend. **Starting from f
 |-----------|---------|-------|
 | Expo SDK | 54 (v54.0.33) | SDK 55 in beta |
 | Hono | 4.11.x (v4.11.9) | Released Feb 8, 2026 |
-| NativeWind | **v4.2.1** (pin) | v5 is preview/pre-release only. Pin to v4.2.1 + Tailwind CSS 3.4.17. |
+| NativeWind | **v4.2.1** (pin) | v5 is preview/pre-release only. Pin to v4.2.1 + Tailwind CSS 3.4.19. |
 | Drizzle ORM | Current stable | Type-safe SQL, replaces Prisma |
 | Nx | 22.5.0 | Released Feb 9, 2026 |
 | @naxodev/nx-cloudflare | 6.0.0 | Nx 22 compatible, actively maintained (Jan 2026) |
@@ -239,16 +239,18 @@ apps/api/
 eduagent/
 ├── apps/
 │   ├── mobile/              # Expo (kept from fork, app code replaced)
-│   │   ├── app/             # Expo Router file-based routes
-│   │   ├── components/
-│   │   ├── hooks/
-│   │   ├── lib/
+│   │   ├── src/
+│   │   │   ├── app/         # Expo Router file-based routes
+│   │   │   ├── components/
+│   │   │   ├── hooks/
+│   │   │   └── lib/
 │   │   └── assets/
 │   └── api/                 # Hono (new, manually scaffolded)
 │       ├── src/
 │       │   ├── routes/
+│       │   ├── services/
 │       │   ├── middleware/
-│       │   ├── lib/
+│       │   ├── inngest/
 │       │   └── index.ts
 │       └── wrangler.toml
 ├── packages/
@@ -407,27 +409,44 @@ One mobile client, one error handling path. RFC 7807 overengineered for this. Bo
 **Navigation:** Expo Router with route groups:
 
 ```
-app/
-├── (auth)/              # Login, registration, consent flows
-├── (learner)/           # Learner persona routes
-│   ├── _layout.tsx      # Learner tab bar + coaching voice
+src/app/
+├── (auth)/                    # Login, registration flows
+│   ├── _layout.tsx
+│   ├── sign-in.tsx
+│   ├── sign-up.tsx
+│   └── forgot-password.tsx
+├── (learner)/                 # Learner persona routes
+│   ├── _layout.tsx            # Learner tab bar + coaching voice
 │   ├── home.tsx
-│   ├── session/[id].tsx
-│   └── book/
-├── (parent)/            # Parent persona routes
-│   ├── _layout.tsx      # Parent nav + dashboard
+│   ├── more.tsx
+│   ├── subscription.tsx
+│   ├── book/                  # Learning Book (coaching cards)
+│   ├── onboarding/            # Subject creation → interview → curriculum
+│   ├── session/               # Active learning/homework session
+│   └── topic/[topicId].tsx
+├── (parent)/                  # Parent persona routes
+│   ├── _layout.tsx            # Parent nav + dashboard
 │   ├── dashboard.tsx
-│   └── profiles/
-└── _layout.tsx          # Root layout — sets CSS variables from active profile
+│   ├── book.tsx
+│   └── more.tsx
+├── assessment/                # Standalone assessment flow
+├── session-summary/[sessionId].tsx
+├── consent.tsx                # Consent collection (outside auth group)
+├── create-profile.tsx
+├── create-subject.tsx
+├── delete-account.tsx
+├── profiles.tsx               # Profile switcher
+├── sso-callback.tsx
+└── _layout.tsx                # Root layout — sets CSS variables from active profile
 ```
 
-**Styling:** NativeWind v4.2.1 + Tailwind CSS 3.4.17. CSS variable theming — root layout sets variables, all components are persona-unaware.
+**Styling:** NativeWind v4.2.1 + Tailwind CSS 3.4.19. CSS variable theming — root layout sets variables, all components are persona-unaware.
 
 **Image handling:** Expo Image (built into SDK 54, optimized for React Native, handles caching and progressive loading). No additional library needed.
 
 ### Mobile-API Integration Patterns
 
-**X-Profile-Id Header Convention:** All authenticated API requests include an `X-Profile-Id` header. The `useApi()` hook in `apps/mobile/src/lib/auth-api.ts` automatically injects this from `ProfileProvider`. On the API side, routes extract it via `c.get('profileId')` set by `profileScopeMiddleware`. Falls back to `account.id` when the header is absent.
+**X-Profile-Id Header Convention:** All authenticated API requests include an `X-Profile-Id` header. The `useApiClient()` hook in `apps/mobile/src/lib/api-client.ts` automatically injects this from `ProfileProvider`. On the API side, routes extract it via `c.get('profileId')` set by `profileScopeMiddleware`. Falls back to `account.id` when the header is absent.
 
 **SSE Streaming Parser:** Learning sessions use Server-Sent Events for real-time LLM responses. The `useStreamMessage` hook in `apps/mobile/src/hooks/use-sessions.ts` manages an `AsyncGenerator` for text streaming, concatenating chunks and handling cleanup on unmount.
 
@@ -767,81 +786,83 @@ eduagent/
 │   └── commit-msg
 ├── apps/
 │   ├── mobile/                       # Expo (React Native)
-│   │   ├── app/                      # Expo Router file-based routes
-│   │   │   ├── _layout.tsx           # Root layout — persona CSS vars, Clerk provider, error boundary
-│   │   │   ├── (auth)/
-│   │   │   │   ├── _layout.tsx
-│   │   │   │   ├── login.tsx
-│   │   │   │   ├── register.tsx
-│   │   │   │   └── consent.tsx       # GDPR parental consent flow
-│   │   │   ├── (learner)/
-│   │   │   │   ├── _layout.tsx       # Learner tab bar + coaching voice
-│   │   │   │   ├── home.tsx          # Coaching card entry point (daily use)
-│   │   │   │   ├── onboarding/
-│   │   │   │   │   ├── interview.tsx     # Conversational goal/background assessment
-│   │   │   │   │   └── curriculum-review.tsx  # AI-generated path review + customization
+│   │   ├── src/
+│   │   │   ├── app/                  # Expo Router file-based routes
+│   │   │   │   ├── _layout.tsx       # Root layout — persona CSS vars, Clerk provider, error boundary
+│   │   │   │   ├── (auth)/
+│   │   │   │   │   ├── _layout.tsx
+│   │   │   │   │   ├── sign-in.tsx
+│   │   │   │   │   ├── sign-up.tsx
+│   │   │   │   │   └── forgot-password.tsx
+│   │   │   │   ├── (learner)/
+│   │   │   │   │   ├── _layout.tsx       # Learner tab bar + coaching voice
+│   │   │   │   │   ├── home.tsx          # Coaching card entry point (daily use)
+│   │   │   │   │   ├── more.tsx          # Settings/account nav
+│   │   │   │   │   ├── subscription.tsx  # Subscription management
+│   │   │   │   │   ├── onboarding/
+│   │   │   │   │   │   ├── _layout.tsx
+│   │   │   │   │   │   ├── interview.tsx     # Conversational goal/background assessment
+│   │   │   │   │   │   └── curriculum-review.tsx  # AI-generated path review + customization
+│   │   │   │   │   ├── session/
+│   │   │   │   │   │   └── index.tsx     # Active learning session
+│   │   │   │   │   ├── book/
+│   │   │   │   │   │   └── index.tsx     # Learning Book — all subjects
+│   │   │   │   │   └── topic/
+│   │   │   │   │       └── [topicId].tsx # Topic detail + practice
+│   │   │   │   ├── (parent)/
+│   │   │   │   │   ├── _layout.tsx       # Parent nav + dashboard
+│   │   │   │   │   ├── dashboard.tsx     # Aggregated child progress
+│   │   │   │   │   ├── book.tsx          # Parent view of Learning Book
+│   │   │   │   │   └── more.tsx          # Parent settings/account
+│   │   │   │   ├── assessment/
+│   │   │   │   │   └── index.tsx
+│   │   │   │   ├── session-summary/
+│   │   │   │   │   └── [sessionId].tsx   # Post-session summary view
+│   │   │   │   ├── consent.tsx           # GDPR parental consent flow
+│   │   │   │   ├── create-profile.tsx
+│   │   │   │   ├── create-subject.tsx
+│   │   │   │   ├── delete-account.tsx
+│   │   │   │   ├── profiles.tsx          # Profile switcher
+│   │   │   │   └── sso-callback.tsx
+│   │   │   ├── components/
+│   │   │   │   ├── coaching/
+│   │   │   │   │   └── CoachingCard.tsx      # (BaseCoachingCard hierarchy planned — UX-7)
 │   │   │   │   ├── session/
-│   │   │   │   │   └── [id].tsx      # Active learning session
-│   │   │   │   ├── book/
-│   │   │   │   │   ├── index.tsx     # Learning Book — all subjects
-│   │   │   │   │   └── [subjectId].tsx
-│   │   │   │   ├── homework/
-│   │   │   │   │   └── camera.tsx    # Camera capture + ML Kit OCR
-│   │   │   │   └── subjects/
-│   │   │   │       └── index.tsx     # Subject management
-│   │   │   └── (parent)/
-│   │   │       ├── _layout.tsx       # Parent nav + dashboard
-│   │   │       ├── dashboard.tsx     # Aggregated child progress
-│   │   │       └── profiles/
-│   │   │           └── [profileId].tsx
-│   │   ├── components/
-│   │   │   ├── coaching/
-│   │   │   │   └── CoachingCard.tsx      # (BaseCoachingCard hierarchy planned — UX-7)
-│   │   │   ├── session/
-│   │   │   │   ├── ChatShell.tsx         # Reusable chat UI shell (planned: MessageThread)
-│   │   │   │   └── MessageBubble.tsx     # Individual message rendering
-│   │   │   ├── assessment/
-│   │   │   │   ├── QuickCheck.tsx
-│   │   │   │   └── RecallTest.tsx
-│   │   │   ├── progress/
-│   │   │   │   ├── RetentionSignal.tsx
-│   │   │   │   ├── StreakDisplay.tsx
-│   │   │   │   └── DecayVisualization.tsx
-│   │   │   └── common/
-│   │   │       ├── ErrorBoundary.tsx     # React error boundary (planned: ErrorRecovery)
-│   │   │       ├── DashboardCard.tsx
-│   │   │       └── UsageMeter.tsx
-│   │   ├── hooks/
-│   │   │   ├── useProfile.ts
-│   │   │   ├── useCoachingCard.ts
-│   │   │   ├── useSession.ts
-│   │   │   ├── useSSEStream.ts
-│   │   │   └── useRetentionSchedule.ts
-│   │   ├── lib/
-│   │   │   ├── api.ts               # Hono RPC client (hc<AppType>)
-│   │   │   ├── queryKeys.ts         # TanStack Query key constants
-│   │   │   └── storage.ts           # Client-side cache for offline resilience
-│   │   ├── theme/
-│   │   │   ├── tokens/
-│   │   │   │   ├── teen-dark.json
-│   │   │   │   ├── teen-light.json
-│   │   │   │   ├── learner-dark.json
-│   │   │   │   ├── learner-light.json
-│   │   │   │   ├── parent-dark.json
-│   │   │   │   └── parent-light.json
-│   │   │   └── provider.tsx         # Reads profile persona, sets CSS vars
+│   │   │   │   │   ├── ChatShell.tsx         # Reusable chat UI shell
+│   │   │   │   │   └── MessageBubble.tsx     # Individual message rendering
+│   │   │   │   ├── progress/
+│   │   │   │   │   └── RetentionSignal.tsx
+│   │   │   │   └── common/
+│   │   │   │       ├── ErrorBoundary.tsx
+│   │   │   │       ├── DashboardCard.tsx
+│   │   │   │       └── UsageMeter.tsx
+│   │   │   ├── hooks/                    # TanStack Query hooks (kebab-case convention)
+│   │   │   │   ├── use-sessions.ts       # Session CRUD + useStreamMessage (SSE)
+│   │   │   │   ├── use-coaching-card.ts
+│   │   │   │   ├── use-curriculum.ts
+│   │   │   │   ├── use-interview.ts
+│   │   │   │   ├── use-subjects.ts
+│   │   │   │   ├── use-progress.ts
+│   │   │   │   ├── use-retention.ts
+│   │   │   │   ├── use-streaks.ts
+│   │   │   │   ├── use-subscription.ts
+│   │   │   │   ├── use-settings.ts
+│   │   │   │   ├── use-profiles.ts
+│   │   │   │   ├── use-dashboard.ts
+│   │   │   │   ├── use-assessments.ts
+│   │   │   │   ├── use-account.ts
+│   │   │   │   └── use-consent.ts
+│   │   │   └── lib/
+│   │   │       ├── api.ts               # Hono RPC type export (AppType)
+│   │   │       ├── api-client.ts        # useApiClient() hook — Hono RPC client (hc<AppType>)
+│   │   │       ├── profile.ts           # ProfileProvider + useProfile() context
+│   │   │       ├── sse.ts               # parseSSEStream() for learning session streaming
+│   │   │       ├── theme.ts             # Theme utilities
+│   │   │       ├── design-tokens.ts     # NativeWind design token definitions
+│   │   │       └── clerk-error.ts       # Clerk error handling utilities
 │   │   ├── assets/
-│   │   │   └── locales/             # UI translation files (react-i18next)
-│   │   │       ├── en/
-│   │   │       │   ├── common.json
-│   │   │       │   ├── coaching.json
-│   │   │       │   ├── assessment.json
-│   │   │       │   └── settings.json
-│   │   │       └── de/
-│   │   │           ├── common.json
-│   │   │           ├── coaching.json
-│   │   │           ├── assessment.json
-│   │   │           └── settings.json
+│   │   │   ├── fonts/
+│   │   │   └── images/
 │   │   ├── app.json
 │   │   ├── eas.json
 │   │   ├── metro.config.js
@@ -888,13 +909,15 @@ eduagent/
 │       │   │   ├── curriculum.ts    # Curriculum generation, topic management
 │       │   │   ├── assessments.ts   # Quiz generation, recall test scoring, mastery calc
 │       │   │   ├── retention.ts     # SM-2 orchestration — calls @eduagent/retention, writes DB
+│       │   │   ├── retention-data.ts # Retention data queries + updateRetentionFromSession
 │       │   │   ├── embeddings.ts    # Embedding generation — provider call + pgvector write
 │       │   │   ├── notifications.ts # Expo Push — batch sends, token cleanup, receipt checking
 │       │   │   ├── metering.ts      # Quota enforcement (calls decrement_quota)
+│       │   │   ├── session.ts       # Session management
 │       │   │   ├── session-lifecycle.ts # Session lifecycle management
 │       │   │   ├── adaptive-teaching.ts # Adaptive teaching logic
 │       │   │   ├── subscription.ts  # Subscription management
-│       │   │   ├── billing.ts       # Billing logic
+│       │   │   ├── billing.ts       # Billing logic + quota pool/trial queries for Inngest
 │       │   │   ├── trial.ts         # Trial management
 │       │   │   ├── xp.ts            # XP/engagement tracking
 │       │   │   ├── progress.ts      # Progress tracking, coaching card, Learning Book
@@ -906,24 +929,24 @@ eduagent/
 │       │   │   ├── export.ts        # GDPR data export
 │       │   │   ├── interview.ts     # Onboarding interview logic
 │       │   │   ├── prior-learning.ts # Prior learning context
-│       │   │   ├── summaries.ts     # Session summaries
+│       │   │   ├── summaries.ts     # Session summaries + createPendingSessionSummary
 │       │   │   ├── parking-lot.ts   # Parking lot topic management
 │       │   │   ├── escalation.ts    # Escalation logic
-│       │   │   ├── streaks.ts       # Streak tracking
+│       │   │   ├── streaks.ts       # Streak tracking + recordSessionActivity
 │       │   │   ├── subject.ts       # Subject management
 │       │   │   ├── subject-urgency.ts # Subject urgency calculations
-│       │   │   ├── retention-data.ts # Retention data queries
-│       │   │   └── session.ts       # Session management
-│       │   ├── llm/                    # LLM orchestration — lives inside services/, imported via barrel
-│       │   │   ├── router.ts          # routeAndCall(messages, rung, options?) — model routing, streaming
-│       │   │   ├── router.test.ts     # Co-located tests
-│       │   │   ├── types.ts           # ChatMessage, EscalationRung, RouteResult, StreamResult
-│       │   │   ├── index.ts           # Barrel: export { routeAndCall, routeAndStream, registerProvider }
-│       │   │   └── providers/
-│       │   │       ├── gemini.ts      # Gemini Flash (rung 1-2) + Gemini Pro (rung 3+)
-│       │   │       └── mock.ts        # Test provider
+│       │   │   ├── logger.ts        # Structured logging factory
+│       │   │   ├── kv.ts            # Workers KV caching helpers
+│       │   │   └── llm/             # LLM orchestration — imported via barrel
+│       │   │       ├── router.ts    # routeAndCall(messages, rung, options?) — model routing, streaming
+│       │   │       ├── types.ts     # ChatMessage, EscalationRung, RouteResult, StreamResult
+│       │   │       ├── index.ts     # Barrel: export { routeAndCall, routeAndStream, registerProvider }
+│       │   │       └── providers/
+│       │   │           ├── gemini.ts # Gemini Flash (rung 1-2) + Gemini Pro (rung 3+)
+│       │   │           └── mock.ts  # Test provider
 │       │   ├── inngest/
 │       │   │   ├── client.ts             # Inngest client init
+│       │   │   ├── helpers.ts            # getStepDatabase() helper for step DB access
 │       │   │   ├── index.ts              # Barrel for all Inngest functions
 │       │   │   └── functions/
 │       │   │       ├── session-completed.ts   # session.completed → SM-2 → coaching → dashboard → embeddings
@@ -931,9 +954,8 @@ eduagent/
 │       │   │       ├── account-deletion.ts    # Deletion orchestrator (7-day grace period)
 │       │   │       ├── review-reminder.ts     # Scheduled retention review notifications
 │       │   │       ├── payment-retry.ts       # Payment failure retry logic
+│       │   │       ├── quota-reset.ts         # Monthly quota cycle reset
 │       │   │       └── trial-expiry.ts        # Trial expiration handling
-│       │   ├── logger.ts            # Axiom structured logging factory, correlation ID injection
-│       │   ├── sentry.ts            # Sentry init for @sentry/cloudflare
 │       │   ├── config.ts            # Typed env config (Zod validated at startup)
 │       │   └── errors.ts            # AppError class, typed error codes
 │       ├── wrangler.toml            # Workers config + KV namespace bindings + rate limiting rules
@@ -972,7 +994,7 @@ eduagent/
 │   │   │   │   ├── embeddings.ts   # pgvector embeddings
 │   │   │   │   └── index.ts        # Re-exports all schemas
 │   │   │   ├── repository.ts       # createScopedRepository(profileId)
-│   │   │   ├── connection.ts       # Neon serverless connection factory
+│   │   │   ├── client.ts       # Neon serverless connection factory
 │   │   │   ├── queries/            # Named query functions for complex/non-standard queries
 │   │   │   │   ├── dashboard.ts    # Parent dashboard: GROUP BY, window functions
 │   │   │   │   ├── retention.ts    # Retention analytics, decay calculations
@@ -1212,7 +1234,7 @@ Mobile App                          API (Hono on Workers)
 | LLM providers (currently Gemini only; Claude, GPT-4 planned) | `services/llm/router.ts` | REST + SSE | API keys per provider |
 | Embedding provider (TBD) | `services/embeddings.ts` | REST | API key |
 | Inngest | `routes/inngest.ts` + `inngest/functions/*.ts` | Webhook | Inngest signing key |
-| Neon | `packages/database/connection.ts` | PostgreSQL wire protocol (serverless driver) | Connection string |
+| Neon | `packages/database/client.ts` | PostgreSQL wire protocol (serverless driver) | Connection string |
 | Expo Push | `services/notifications.ts` | REST API | Expo push token |
 | ML Kit | Mobile on-device (no server integration) | Native SDK | — |
 | OCR fallback provider | `routes/homework.ts` (OCR sub-route) | REST API | API key |
@@ -1298,7 +1320,7 @@ nx run-many --target=lint        # ESLint (import ordering, naming conventions)
 **Decision Compatibility:**
 
 All technology choices verified compatible (Feb 2026):
-- Expo SDK 54 + NativeWind v4.2.1 (Tailwind 3.4.17) — confirmed working combination
+- Expo SDK 54 + NativeWind v4.2.1 (Tailwind 3.4.19) — confirmed working combination
 - Hono 4.11.x on Cloudflare Workers — native SSE streaming via `streamSSE()`, Workers KV bindings
 - Drizzle ORM + Neon serverless driver (`@neondatabase/serverless`) — both target PostgreSQL, connection factory pattern handles serverless pooling
 - Clerk `@clerk/clerk-expo` + Hono middleware — JWT/JWKS verification compatible with Workers runtime, KV-cacheable JWKS

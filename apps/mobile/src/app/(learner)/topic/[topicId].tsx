@@ -7,11 +7,12 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { RetentionSignal } from '../../../components/progress';
+import {
+  RetentionSignal,
+  type RetentionStatus,
+} from '../../../components/progress';
 import { useTopicProgress } from '../../../hooks/use-progress';
 import { useTopicRetention } from '../../../hooks/use-retention';
-
-type RetentionStatus = 'strong' | 'fading' | 'weak' | 'forgotten';
 
 function deriveRetentionStatus(
   card:

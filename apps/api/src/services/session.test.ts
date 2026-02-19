@@ -97,6 +97,19 @@ function mockSummaryRow(
   };
 }
 
+/** Creates a mock select chain: db.select().from().where().limit() */
+function mockSelectChain(result: unknown[] = []): {
+  from: jest.Mock;
+} {
+  return {
+    from: jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        limit: jest.fn().mockResolvedValue(result),
+      }),
+    }),
+  };
+}
+
 function createMockDb({
   insertReturning = [] as (
     | ReturnType<typeof mockSessionRow>
@@ -106,8 +119,17 @@ function createMockDb({
     eventType: string;
     content: string;
     createdAt: Date;
+    metadata?: Record<string, unknown>;
   }>,
+  selectResults = [] as unknown[][],
 } = {}): Database {
+  const selectMock = jest.fn();
+  for (const result of selectResults) {
+    selectMock.mockReturnValueOnce(mockSelectChain(result));
+  }
+  // Fallback for any additional select calls
+  selectMock.mockReturnValue(mockSelectChain([]));
+
   return {
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
@@ -119,6 +141,7 @@ function createMockDb({
         where: jest.fn().mockResolvedValue(undefined),
       }),
     }),
+    select: selectMock,
     query: {
       sessionEvents: {
         findMany: jest.fn().mockResolvedValue(findManyEvents),
@@ -176,6 +199,17 @@ beforeEach(() => {
 });
 
 describe('startSession', () => {
+  it('throws when subject not found for profile (ownership guard)', async () => {
+    (getSubject as jest.Mock).mockResolvedValue(null);
+    const row = mockSessionRow();
+    const db = createMockDb({ insertReturning: [row] });
+
+    await expect(
+      startSession(db, profileId, subjectId, { subjectId })
+    ).rejects.toThrow('Subject not found');
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
   it('returns session with correct subjectId and defaults', async () => {
     const row = mockSessionRow();
     const db = createMockDb({ insertReturning: [row] });
@@ -214,6 +248,31 @@ describe('startSession', () => {
     expect(result.topicId).toBeNull();
   });
 
+  it('stores sessionType from input when provided', async () => {
+    const row = mockSessionRow({ sessionType: 'homework' });
+    const db = createMockDb({ insertReturning: [row] });
+    await startSession(db, profileId, subjectId, {
+      subjectId,
+      sessionType: 'homework',
+    });
+
+    const valuesFn = (db.insert as jest.Mock).mock.results[0].value.values;
+    expect(valuesFn).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionType: 'homework' })
+    );
+  });
+
+  it('defaults sessionType to learning when not provided', async () => {
+    const row = mockSessionRow();
+    const db = createMockDb({ insertReturning: [row] });
+    await startSession(db, profileId, subjectId, { subjectId });
+
+    const valuesFn = (db.insert as jest.Mock).mock.results[0].value.values;
+    expect(valuesFn).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionType: 'learning' })
+    );
+  });
+
   it('includes valid timestamps', async () => {
     const row = mockSessionRow();
     const db = createMockDb({ insertReturning: [row] });
@@ -224,6 +283,23 @@ describe('startSession', () => {
     expect(result.startedAt).toBeDefined();
     expect(result.lastActivityAt).toBeDefined();
     expect(() => new Date(result.startedAt)).not.toThrow();
+  });
+
+  it('records a session_start event after creating the session', async () => {
+    const row = mockSessionRow();
+    const db = createMockDb({ insertReturning: [row] });
+    await startSession(db, profileId, subjectId, { subjectId });
+
+    // insert called twice: once for session row, once for session_start event
+    expect(db.insert).toHaveBeenCalledTimes(2);
+    const valuesFn = (db.insert as jest.Mock).mock.results[0].value.values;
+    expect(valuesFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'session_start',
+        sessionId,
+        profileId,
+      })
+    );
   });
 });
 
@@ -398,6 +474,232 @@ describe('processMessage', () => {
       'Hello'
     );
   });
+
+  it('loads topic title and description into exchange context', async () => {
+    const topicId = '770e8400-e29b-41d4-a716-446655440000';
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ topicId }),
+    });
+    const db = createMockDb({
+      selectResults: [
+        [{ title: 'Quadratic Equations', description: 'Solving ax²+bx+c=0' }],
+      ],
+    });
+    await processMessage(db, profileId, sessionId, {
+      message: 'How do I solve quadratics?',
+    });
+
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        topicTitle: 'Quadratic Equations',
+        topicDescription: 'Solving ax²+bx+c=0',
+      }),
+      'How do I solve quadratics?'
+    );
+  });
+
+  it('leaves topicTitle undefined when session has no topicId', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ topicId: null }),
+    });
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'General question',
+    });
+
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        topicTitle: undefined,
+      }),
+      'General question'
+    );
+  });
+
+  it('loads personaType from profile', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ topicId: null }),
+    });
+    // No topicId → no topic select → first select is profile query
+    const db = createMockDb({
+      selectResults: [[{ personaType: 'TEEN' }]],
+    });
+    await processMessage(db, profileId, sessionId, {
+      message: 'Hey there',
+    });
+
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        personaType: 'TEEN',
+      }),
+      'Hey there'
+    );
+  });
+
+  it('defaults personaType to LEARNER when profile not found', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ topicId: null }),
+    });
+    const db = createMockDb({
+      selectResults: [[]],
+    });
+    await processMessage(db, profileId, sessionId, {
+      message: 'Hello',
+    });
+
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        personaType: 'LEARNER',
+      }),
+      'Hello'
+    );
+  });
+
+  it.each([
+    [0, 'full'],
+    [1, 'full'],
+    [2, 'fading'],
+    [4, 'fading'],
+    [5, 'problem_first'],
+    [10, 'problem_first'],
+  ] as const)(
+    'when repetitions=%d → workedExampleLevel=%s',
+    async (reps, expected) => {
+      const topicId = '770e8400-e29b-41d4-a716-446655440000';
+      setupScopedRepo({
+        sessionFindFirst: mockSessionRow({ topicId }),
+      });
+      // selectResults order: [topic, profile, retentionCard]
+      const db = createMockDb({
+        selectResults: [
+          [{ title: 'Algebra', description: 'Basic algebra' }],
+          [{ personaType: 'LEARNER' }],
+          [{ repetitions: reps }],
+        ],
+      });
+      await processMessage(db, profileId, sessionId, {
+        message: 'Teach me',
+      });
+
+      expect(processExchange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workedExampleLevel: expected,
+        }),
+        'Teach me'
+      );
+    }
+  );
+
+  it('defaults workedExampleLevel to full when no retention card', async () => {
+    const topicId = '770e8400-e29b-41d4-a716-446655440000';
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ topicId }),
+    });
+    const db = createMockDb({
+      selectResults: [
+        [{ title: 'Algebra', description: 'Desc' }],
+        [{ personaType: 'LEARNER' }],
+        [], // no retention card
+      ],
+    });
+    await processMessage(db, profileId, sessionId, {
+      message: 'New topic',
+    });
+
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workedExampleLevel: 'full',
+      }),
+      'New topic'
+    );
+  });
+});
+
+describe('escalation tracking', () => {
+  it('computes questionsAtCurrentRung from ai_response events with matching rung', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ escalationRung: 2, exchangeCount: 5 }),
+    });
+    const db = createMockDb({
+      findManyEvents: [
+        {
+          eventType: 'ai_response',
+          content: 'r1',
+          createdAt: NOW,
+          metadata: { escalationRung: 1 },
+        },
+        {
+          eventType: 'ai_response',
+          content: 'r2',
+          createdAt: NOW,
+          metadata: { escalationRung: 1 },
+        },
+        {
+          eventType: 'ai_response',
+          content: 'r3',
+          createdAt: NOW,
+          metadata: { escalationRung: 2 },
+        },
+        { eventType: 'user_message', content: 'q', createdAt: NOW },
+      ],
+    });
+    await processMessage(db, profileId, sessionId, {
+      message: 'Still confused',
+    });
+
+    expect(evaluateEscalation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionsAtCurrentRung: 1, // only the one rung-2 ai_response
+      }),
+      'Still confused'
+    );
+  });
+
+  it('records escalation event when rung changes', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ escalationRung: 1 }),
+    });
+    (evaluateEscalation as jest.Mock).mockReturnValue({
+      shouldEscalate: true,
+      newRung: 2,
+      reason: 'Learner is stuck',
+    });
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: "I don't get it",
+    });
+
+    // Should have 3 insert calls: session_start is not here (separate startSession),
+    // but persistExchangeResult does: [user_message + ai_response events], [escalation event]
+    // Actually: insert #1 = session events batch (user_message + ai_response),
+    // insert #2 = escalation event
+    const valuesFn = (db.insert as jest.Mock).mock.results[0].value.values;
+    expect(valuesFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'escalation',
+        metadata: expect.objectContaining({ fromRung: 1, toRung: 2 }),
+      })
+    );
+  });
+
+  it('stores escalationRung in ai_response event metadata', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ escalationRung: 1 }),
+    });
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'Tell me more',
+    });
+
+    const valuesFn = (db.insert as jest.Mock).mock.results[0].value.values;
+    expect(valuesFn).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: 'ai_response',
+          metadata: expect.objectContaining({ escalationRung: 1 }),
+        }),
+      ])
+    );
+  });
 });
 
 describe('closeSession', () => {
@@ -512,5 +814,30 @@ describe('submitSummary', () => {
 
     // Should call db.update to persist the AI feedback
     expect(db.update).toHaveBeenCalled();
+  });
+
+  it('scopes submitSummary update to profileId (defense-in-depth)', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    const summaryRow = mockSummaryRow({ id: 'new-summary' });
+    const db = createMockDb({ insertReturning: [summaryRow] });
+
+    await submitSummary(db, profileId, sessionId, {
+      content: 'Summary content for profile scoping test.',
+    });
+
+    // The WHERE clause should use and() with both id and profileId
+    const whereFn = (db.update as jest.Mock).mock.results[0].value.set.mock
+      .results[0].value.where;
+    const whereArg = whereFn.mock.calls[0][0];
+    // Drizzle's and() wraps conditions — use circular-safe serialization
+    const seen = new WeakSet();
+    const whereStr = JSON.stringify(whereArg, (_key, value) => {
+      if (typeof value === 'object' && value !== null) {
+        if (seen.has(value)) return '[Circular]';
+        seen.add(value);
+      }
+      return value;
+    });
+    expect(whereStr).toContain('profile_id');
   });
 });

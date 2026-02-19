@@ -14,6 +14,10 @@ import {
   teachingPreferences,
   curriculumAdaptations,
   onboardingDrafts,
+  consentStates,
+  notificationPreferences,
+  learningModes,
+  sessionEmbeddings,
 } from './schema/index.js';
 import { createScopedRepository } from './repository.js';
 import type { Database } from './client.js';
@@ -85,6 +89,10 @@ describe('createScopedRepository', () => {
     ['teachingPreferences', teachingPreferences],
     ['curriculumAdaptations', curriculumAdaptations],
     ['onboardingDrafts', onboardingDrafts],
+    ['consentStates', consentStates],
+    ['notificationPreferences', notificationPreferences],
+    ['learningModes', learningModes],
+    ['sessionEmbeddings', sessionEmbeddings],
   ] as const)('%s.findMany', (namespace, table) => {
     it('auto-injects profileId filter', async () => {
       const { db, findMany } = createMockDb();
@@ -117,6 +125,10 @@ describe('createScopedRepository', () => {
     ['teachingPreferences', teachingPreferences],
     ['curriculumAdaptations', curriculumAdaptations],
     ['onboardingDrafts', onboardingDrafts],
+    ['consentStates', consentStates],
+    ['notificationPreferences', notificationPreferences],
+    ['learningModes', learningModes],
+    ['sessionEmbeddings', sessionEmbeddings],
   ] as const)('%s.findMany with extraWhere', (namespace, table) => {
     it('composes profileId with extra condition', async () => {
       const { db, findMany } = createMockDb();
@@ -151,6 +163,10 @@ describe('createScopedRepository', () => {
     ['teachingPreferences', teachingPreferences],
     ['curriculumAdaptations', curriculumAdaptations],
     ['onboardingDrafts', onboardingDrafts],
+    ['consentStates', consentStates],
+    ['notificationPreferences', notificationPreferences],
+    ['learningModes', learningModes],
+    ['sessionEmbeddings', sessionEmbeddings],
   ] as const)('%s.findFirst', (namespace, table) => {
     it('auto-injects profileId filter', async () => {
       const { db, findFirst } = createMockDb();
@@ -265,6 +281,10 @@ describe('createScopedRepository', () => {
       expect(repo.teachingPreferences).toBeDefined();
       expect(repo.curriculumAdaptations).toBeDefined();
       expect(repo.onboardingDrafts).toBeDefined();
+      expect(repo.consentStates).toBeDefined();
+      expect(repo.notificationPreferences).toBeDefined();
+      expect(repo.learningModes).toBeDefined();
+      expect(repo.sessionEmbeddings).toBeDefined();
     });
   });
 });

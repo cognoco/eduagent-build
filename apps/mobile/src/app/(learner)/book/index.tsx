@@ -8,12 +8,13 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { RetentionSignal } from '../../../components/progress';
+import {
+  RetentionSignal,
+  type RetentionStatus,
+} from '../../../components/progress';
 import { useSubjects } from '../../../hooks/use-subjects';
 import { useOverallProgress } from '../../../hooks/use-progress';
 import { useRetentionTopics } from '../../../hooks/use-retention';
-
-type RetentionStatus = 'strong' | 'fading' | 'weak' | 'forgotten';
 
 interface EnrichedTopic {
   topicId: string;

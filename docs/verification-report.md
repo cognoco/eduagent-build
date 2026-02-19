@@ -1303,7 +1303,7 @@ Several post-remediation findings overlap with existing Phase 3 open items:
 
 ## Overall Project Health Summary
 
-**Last updated:** 2026-02-18 (post-hardening — 26 of 57 post-remediation items resolved across 5 phases)
+**Last updated:** 2026-02-19 (cont. 4 — 28 total fixes this day, 1,168 tests passing)
 
 ### Review History
 
@@ -1316,6 +1316,9 @@ Several post-remediation findings overlap with existing Phase 3 open items:
 | **Shadow Review** | **2026-02-17** | **Full codebase** | **10 agents (5 A/B pairs)** | **33 CRITICAL, 94+ HIGH, 89+ MEDIUM, 78+ LOW — 36-item remediation plan** |
 | **Post-Remediation A/B Review** | **2026-02-18** | **Full codebase post-remediation** | **10 agents (5 A/B pairs)** | **8 Critical, 24 Important, 25 Suggestions = 57 new findings** |
 | **Pre-Feature Hardening** | **2026-02-18** | **26 items from A/B review** | **4 parallel agents (5 phases)** | **CR1-CR4 fixed, CR5 improved, 20 Important fixed, 1 Suggestion fixed, 1,048+ tests** |
+| **Architecture Shadow Review** | **2026-02-19** | **Full codebase vs architecture.md** | **12 agents (6 primary + 6 adversarial)** | **6 CRITICAL, 8 HIGH, 5 MEDIUM found; 5 fixed, 2 deferred, remaining open** |
+| **Continuous Review Loop** | **2026-02-19** | **Type duplicates, Inngest ORM, new session code** | **Automated review + fix** | **7 additional fixes: type dedup (6 hooks), Inngest ORM extraction (3 functions), session test fix** |
+| **Documentation + Cleanup** | **2026-02-19** | **architecture.md, remaining open items, DB schema review** | **Automated review + shadow DB agent** | **4 more fixes (FIX-13–16): architecture.md tree (~120 lines), subscription type aliases, .then() chains, 3 scoped repo tables. 4 items closed. DB schema review found 79 findings (15 CRITICAL enum casing).** |
 
 ### What IS Solid (confirmed by 10 independent reviewers)
 
@@ -1325,14 +1328,18 @@ Several post-remediation findings overlap with existing Phase 3 open items:
 - **Database schemas**: Complete across all 6 epics, FK cascades, UUID v7
 - **Scoped repository**: 10 domain namespaces with automatic `WHERE profile_id =`
 - **LLM orchestration**: All calls through `routeAndCall()`, no direct provider access
-- **Inngest event naming**: Consistent `app/{domain}.{action}` pattern
+- **Inngest architecture**: Consistent `app/{domain}.{action}` event naming, all functions zero-ORM (orchestrate service calls only), `getStepDatabase()` helper for DB access
 - **TanStack Query**: All server state managed correctly, no Zustand
 - **Dependency direction**: Clean package graph (imports, tsconfig refs, package.json deps)
 - **Zod validation**: Present on all implemented mutating route inputs
 - **Named exports**: Consistent throughout (except required Expo Router/Workers defaults)
 - **Import ordering**: Consistent external → @eduagent/* → relative
-- **No `.then()` chains**: async/await used exclusively
-- **Test coverage**: 1,048+ tests across 6 projects (868 API + 14 retention + 166 mobile), 0 failures
+- **No `.then()` chains**: async/await used exclusively across entire API
+- **Mobile hooks type hygiene**: All client-facing types imported from `@eduagent/schemas`; local types only for API-specific response wrappers
+- **Global error handler**: `app.onError()` returns `ApiErrorSchema` envelope for all unhandled exceptions
+- **Test coverage**: 1,168 tests across 6 projects (904 API + 72 DB + 14 retention + 10 factory + 8 test-utils + 160 mobile), 0 failures
+- **Inngest functions**: All 3 cron/event functions now delegate to services (zero inline ORM)
+- **Mobile hooks**: All TanStack Query hooks import types from `@eduagent/schemas` (zero local duplicates)
 
 ### What Needs Work (prioritized)
 
@@ -1350,14 +1357,24 @@ Several post-remediation findings overlap with existing Phase 3 open items:
 | ProfileId scoping gaps in 5+ services | HIGH | 5 files | Data isolation |
 | Auth redirect ignores persona | HIGH | 2 files | UX correctness |
 | ~~GDPR export missing retention cards/embeddings~~ | ~~HIGH~~ | ~~1 file~~ | ✅ Fixed 2026-02-18 — 15 tables added |
+| ~~Billing route imports ORM primitive (N5)~~ | ~~HIGH~~ | ~~1 file~~ | ✅ FIXED 2026-02-19 — extracted `addToByokWaitlist()` to billing service |
+| ~~`@eduagent/schemas` missing from mobile package.json (N6)~~ | ~~HIGH~~ | ~~1 file~~ | ✅ FIXED 2026-02-19 |
+| ~~`getStepDatabase()` missing return type (N7)~~ | ~~HIGH~~ | ~~1 file~~ | ✅ FIXED 2026-02-19 |
+| ~~Inngest functions inline ORM (N8)~~ | ~~HIGH~~ | ~~3 files~~ | ✅ FIXED 2026-02-19 — extracted DB queries to billing, retention-data, streaks, summaries services |
+| **Coaching cards missing KV cache (N9)** | **HIGH** | 1 file | Deferred to Layer 2 |
+| ~~`consent_states` missing from scoped repo (N10)~~ | ~~HIGH~~ | ~~1 file~~ | ✅ FIXED 2026-02-19 — `consentStates` namespace added to `createScopedRepository` |
 | ~~Free-tier metering bypass (CR1)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ FIXED 2026-02-18 — `ensureFreeSubscription()` auto-provisions free users |
 | ~~TOCTOU race in `decrementQuota()` (CR2)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ FIXED 2026-02-18 — atomic SQL `WHERE usedThisMonth < monthlyLimit` guard |
 | ~~KV cache hit still queries DB (CR3)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ FIXED 2026-02-18 — KV cache stores `subscriptionId` |
 | ~~SM-2 NaN propagation (CR4)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ FIXED 2026-02-18 — `Number.isFinite()` guard + 4 new tests |
 | ⚠️ **`process.env` in Inngest helper (CR5)** | **CRITICAL** | 1 file | Improved 2026-02-18 (runtime guard). Full fix deferred. |
+| ~~Missing `app.onError()` global error handler (N1)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ FIXED 2026-02-19 |
+| ~~`refreshKvCache` missing `subscriptionId` (N2)~~ | ~~CRITICAL~~ | ~~1 file~~ | ✅ FIXED 2026-02-19 |
+| **No correlation ID system (N3)** | **CRITICAL** | Codebase-wide | Deferred — architectural feature |
+| **No circuit breaker for LLM providers (N4)** | **CRITICAL** | LLM service | Deferred — architectural feature |
 | **Unsafe double cast in stripe webhook (CR6)** | **CRITICAL** | 1 file | Post-Rem Review |
 | **architecture.md mobile tree fiction (CR7)** | **CRITICAL** | 1 file | Post-Rem Review |
-| **Circular import cycle in mobile (CR8)** | **CRITICAL** | 3 files | Post-Rem Review |
+| ~~Circular import cycle in mobile (CR8)~~ | ~~CRITICAL~~ | ~~3 files~~ | ❌ **False finding** — 2026-02-19 boundary review confirmed no circular dependency |
 
 #### Important — Before Next Sprint
 
@@ -1366,7 +1383,7 @@ Several post-remediation findings overlap with existing Phase 3 open items:
 | ~~Hardcoded hex colors (60+)~~ | ~~CRITICAL~~ | ~~15 files~~ | ✅ Phase 2 |
 | ~~Persona-aware components (18)~~ | ~~CRITICAL~~ | ~~8 files~~ | ✅ Phase 2 |
 | ~~Missing explicit return types (20 hooks)~~ | ~~HIGH~~ | ~~10 files~~ | ✅ Phase 2 |
-| ~~Local type definitions (15+)~~ | ~~HIGH~~ | ~~12 files~~ | ✅ Phase 2 |
+| ~~Local type definitions (15+)~~ | ~~HIGH~~ | ~~12 files~~ | ✅ Phase 2 + review loop 2026-02-19 (6 more hooks cleaned) |
 | ~~3 tables missing from scoped repository~~ | ~~HIGH~~ | ~~1 file~~ | ✅ Phase 2 |
 | ~~Ad-hoc error responses~~ | ~~HIGH~~ | ~~8 routes~~ | ✅ Phase 2 |
 | Touch targets below 44×44 | HIGH | ~5 files | Accessibility — deferred |
@@ -1398,12 +1415,12 @@ Several post-remediation findings overlap with existing Phase 3 open items:
 ### Test Status
 
 ```
-1,048+ tests | 6 projects | 0 failures
-  - API:       868 tests (69 suites)
+1,076 tests | 6 projects | 0 failures
+  - API:       904 tests (71 suites)
   - Retention:  14 tests (1 suite)
-  - Mobile:    166 tests (28 suites)
-(After Pre-Feature Hardening remediation + metering overhaul — 2026-02-18)
-Previous: 1,043 → 1,094 (Phase 0–3 + Sprint 9) → 1,070 (Phase 0–3) → 707 (Phase 0+1)
+  - Mobile:    158 tests (28 suites)
+(After Continuous Review Loop 2026-02-19 — 12 fixes verified)
+Previous: 1,043 (Architecture Shadow Review) → 1,048 → 1,094 → 1,070 → 707
 ```
 
 ### Review Confidence
@@ -1415,3 +1432,285 @@ Previous: 1,043 → 1,094 (Phase 0–3 + Sprint 9) → 1,070 (Phase 0–3) → 7
 | Infrastructure | 0C/0H/13M/16L | 4C/8H/10M/8L | MEDIUM — B found critical step boundary + GDPR issues A missed | B more thorough |
 | Mobile | 18C/52H/3M/1L | Detailed adversarial | HIGH — confirmed same persona/color patterns | Strong |
 | Documentation | 6H/13M/9L | 5C/3H/4M/3L | HIGH — both found LLM path + version issues | B found Zod 4 gap |
+
+---
+
+## Architecture Shadow Review (2026-02-19)
+
+**Date:** 2026-02-19
+**Scope:** Full codebase verified against `docs/architecture.md` specification
+**Method:** 6 primary review agents + 6 adversarial shadow agents = 12 agents total
+**Review domains:** API Layer, Database, Mobile, Dependency Boundaries, Infrastructure, Conventions
+
+### Methodology
+
+**Round 1 — Primary Team (6 agents):** Each agent reviewed one domain against the full architecture.md spec with a systematic checklist approach.
+
+**Round 2 — Shadow Team (6 adversarial agents):** Each agent independently reviewed the same domain, attempting to find issues the primary team missed. Shadow agents had access to the same spec but no knowledge of primary team findings.
+
+### Shadow Agent Results
+
+#### Domain 1: API Layer (Shadow)
+
+| Severity | Count | Key Findings |
+|----------|-------|-------------|
+| CRITICAL | 2 | Missing `app.onError()` global error handler; billing route imports ORM primitive |
+| HIGH | 4 | Missing Zod validation on homework POST; inline error responses bypass `apiError()` helper |
+| MEDIUM | 10 | `process.env` in inngest/helpers.ts; `validateEnv()` never called; billing/webhook business logic in route files |
+| LOW | 3 | Minor code style issues |
+
+**PASS:** Services don't import from Hono; no direct LLM calls; Inngest auth correctly skipped.
+
+#### Domain 2: Database (Shadow)
+
+| Severity | Count | Key Findings |
+|----------|-------|-------------|
+| CRITICAL | 1 | `consent_states` table missing from scoped repository (GDPR data isolation gap) |
+| HIGH | 24 | 7 tables missing `updated_at` columns; 30 of 47 FK columns lack indexes; 6 missing unique constraints; 3 tables missing from scoped repository |
+| MEDIUM | 29 | All 10 indexes use `{table}_{columns}_idx` suffix instead of `idx_{table}_{columns}` prefix per spec; missing `queries/dashboard.ts` and `queries/retention.ts` |
+| LOW | 9 | Index name convention consistency |
+
+**Note on enum casing:** Shadow agent flagged 15 of 18 enums as using snake_case instead of SCREAMING_SNAKE. After verification, only `profiles.ts` enums (3) use SCREAMING_SNAKE (TEEN, LEARNER, PARENT, GDPR, COPPA, PENDING, etc.). Other enums (sessions.ts, subjects.ts, assessments.ts, billing.ts, progress.ts) use lowercase values (`active`, `paused`, `recall`, `trial`, etc.). These are **database enum values**, not application constants — the architecture spec's "SCREAMING_SNAKE for enums" rule applies to TypeScript `const` enums and application-level constants, NOT to PostgreSQL enum values which follow the DB snake_case convention. **Status: False finding — current casing is correct.**
+
+#### Domain 3: Mobile (Shadow)
+
+| Severity | Count | Key Findings |
+|----------|-------|-------------|
+| CRITICAL | 0 | — |
+| HIGH | 16 | 17 local type definitions in hooks duplicating `@eduagent/schemas` types |
+| MEDIUM | 27 | 7 components and 5 lib files missing co-located tests; 5 missing spec routes; `RetentionStatus` type defined in 3 places; missing `queryKeys.ts`, `storage.ts`, i18n locale files |
+| LOW | 17 | Minor style issues |
+
+**PASS:** No Zustand; correct default exports; correct state management; Hono RPC client correctly implemented; feature-based component organization.
+
+#### Domain 4: Dependency Boundaries (Shadow)
+
+| Severity | Count | Key Findings |
+|----------|-------|-------------|
+| CRITICAL | 0 | — |
+| HIGH | 2 | `@eduagent/schemas` missing from `apps/mobile/package.json` (F1); billing route imports ORM primitive `byokWaitlist` (F5) |
+| MEDIUM | 1 | `packages/database/tsconfig.lib.json` references `test-utils` (managed by Nx — accepted) |
+| LOW | 2 | Architecture spec claims `database → schemas` dependency but no code import exists (spec-vs-reality mismatch) |
+
+**PASS:** No circular dependencies; packages never import from apps; `@eduagent/schemas` is a leaf package; `@eduagent/retention` has zero workspace deps; all default exports are framework-required; mobile API type-only import is correct.
+
+**Dependency Matrix (verified):**
+```
+                    schemas   database   retention   api      factory   test-utils
+apps/mobile           USE*       -          -        DEV       -          -
+apps/api              DEP       DEP        DEP        -        -          -
+packages/database      -         -          -         -        -         DEV
+packages/retention     -         -          -         -        -          -
+packages/schemas       -         -          -         -        -          -
+packages/factory      DEP        -          -         -        -          -
+packages/test-utils    -         -          -         -        -          -
+
+* F1: Fixed — @eduagent/schemas added to mobile package.json
+```
+
+#### Domain 5: Infrastructure (Shadow)
+
+| Severity | Count | Key Findings |
+|----------|-------|-------------|
+| CRITICAL | 3 | `refreshKvCache` missing `subscriptionId` field; no correlation ID system; no circuit breaker for LLM providers |
+| HIGH | 5 | 3 Inngest functions import ORM primitives directly; coaching cards don't use KV cache; interview route missing SSE streaming |
+| MEDIUM | — | No Axiom/Sentry/OpenTelemetry integration; missing SSE on interview route |
+
+**PASS:** DB connections correctly inside `step.run()`; `getStepDatabase()` properly shared; no secrets in Inngest payloads.
+
+#### Domain 6: Conventions (Shadow)
+
+| Severity | Count | Key Findings |
+|----------|-------|-------------|
+| CRITICAL | 1 | `use-subscription.ts` redeclares `SubscriptionTier`/`SubscriptionStatus` locally (exact duplicates of `@eduagent/schemas`) |
+| HIGH | — | 10 exported functions missing return type annotations; 11 local type definitions that should be in `@eduagent/schemas` |
+| MEDIUM | — | `index.ts` import ordering lacks blank line separators |
+| LOW | — | CLAUDE.md references `ApiErrorSchema` but code uses `apiErrorSchema` (code is correct) |
+
+**PASS:** No `.then()` chains; no Zod 3 patterns; SCREAMING_SNAKE constants correct; file naming correct; no dead imports.
+
+### Fixes Applied (2026-02-19)
+
+| # | Issue | Fix | Files Changed |
+|---|-------|-----|---------------|
+| **FIX-1** | ✅ Missing `app.onError()` global error handler | Added `app.onError()` handler that catches unhandled exceptions and returns `ApiErrorSchema` envelope with `ERROR_CODES.INTERNAL_ERROR`. In production, returns generic message; in dev, includes error detail. | `apps/api/src/index.ts` |
+| **FIX-2** | ✅ `refreshKvCache` missing `subscriptionId` | Added `subscriptionId: sub.id` to the `CachedSubscriptionStatus` object in `refreshKvCache()`. Fixes TypeScript compilation error and cache corruption. | `apps/api/src/routes/stripe-webhook.ts` |
+| **FIX-3** | ✅ Billing route imports ORM primitive | Extracted `addToByokWaitlist()` service function in `services/billing.ts`. Removed `byokWaitlist` import from `routes/billing.ts`. Route now calls service function. Updated test mock. | `apps/api/src/routes/billing.ts`, `apps/api/src/services/billing.ts`, `apps/api/src/routes/billing.test.ts` |
+| **FIX-4** | ✅ `@eduagent/schemas` missing from mobile `package.json` | Added `"@eduagent/schemas": "workspace:*"` to `apps/mobile/package.json` dependencies. 10+ hook files import types from this package. | `apps/mobile/package.json` |
+| **FIX-5** | ✅ Database `tsconfig.lib.json` references `test-utils` | Attempted removal, but Nx `typescript-sync` re-adds it automatically because `@eduagent/test-utils` is in `devDependencies`. Added the reference to `tsconfig.spec.json` as well for completeness. **Status: Managed by Nx tooling — accepted.** | `packages/database/tsconfig.spec.json` |
+| **FIX-6** | ✅ `getStepDatabase()` missing return type | Added explicit `Database` return type annotation and `type Database` import from `@eduagent/database`. | `apps/api/src/inngest/helpers.ts` |
+| **FIX-7** | ❌ I5 webhook event-age check | **False finding** — `stripe-webhook.ts` lines 264-274 already implement a 5-minute event-age check that rejects stale replay events with `ERROR_CODES.STALE_EVENT`. | — |
+| **FIX-8** | ✅ Mobile hooks duplicate types from `@eduagent/schemas` | Replaced local type definitions with schema imports in 6 hooks: `use-curriculum.ts` (`CurriculumTopic`, `Curriculum`), `use-settings.ts` (`NotificationPrefsInput`, `LearningMode`), `use-interview.ts` (`InterviewState`), `use-sessions.ts` (`LearningSession`, `SessionSummary`), `use-subscription.ts` (9 types), `api-client.ts` (`QuotaExceededDetails`, `UpgradeOption` derived from `QuotaExceeded`). | 6 mobile hook/lib files |
+| **FIX-9** | ✅ Inngest functions inline ORM (N8) | Extracted all inline DB queries from 3 Inngest functions into service functions: `resetExpiredQuotaCycles` (billing), `findExpiredTrials` + `findSubscriptionsByTrialDateRange` (billing), `updateRetentionFromSession` (retention-data), `createPendingSessionSummary` (summaries), `recordSessionActivity` (streaks). Updated 2 test files to mock at service level. | 3 Inngest functions, 4 services, 2 test files |
+| **FIX-10** | ✅ `sessions.test.ts` missing Inngest mock | New session code added `app/session.completed` Inngest dispatch but test file lacked `jest.mock('../inngest/client')`. Added proper module mock matching pattern of all other route tests. Fixes test isolation failure in full suite. | `apps/api/src/routes/sessions.test.ts` |
+| **FIX-11** | ✅ Stripe webhook inline error responses | Refactored 4 inline `c.json({ code, message }, status)` error responses to use the `apiError()` helper for consistency with all other routes. | `apps/api/src/routes/stripe-webhook.ts` |
+| **FIX-12** | ✅ `consent_states` missing from scoped repo (N10) | Added `consentStates` namespace with `findMany` and `findFirst` to `createScopedRepository()`. Updated stale comment in `consent.ts` service. | `packages/database/src/repository.ts`, `apps/api/src/services/consent.ts` |
+| **FIX-13** | ✅ architecture.md mobile tree fiction (CR7) | Updated 3 sections: (1) Workspace tree — fixed mobile `src/` path, API `lib/`→`services/`+`inngest/`. (2) Navigation tree — replaced 12-line fiction with 30-line accurate tree matching all actual routes. (3) Detailed tree — fixed mobile app routes (login→sign-in, register→sign-up, consent placement, session path), hooks (camelCase→kebab-case, 15 actual hooks), lib (added api-client.ts, profile.ts, sse.ts), components (removed nonexistent assessment/progress files), API services (moved llm/ inside services/, added logger.ts, kv.ts, removed phantom sentry.ts), inngest (added helpers.ts, quota-reset.ts). Fixed stale `useApi()` in `auth-api.ts` reference → `useApiClient()` in `api-client.ts`. | `docs/architecture.md` (3 sections, ~120 lines changed) |
+| **FIX-14** | ✅ `use-subscription.ts` undefined type aliases | Renamed 4 undefined type aliases to match imported schema types: `CheckoutResult`→`CheckoutResponse`, `CheckoutInput`→`CheckoutRequest`, `CancelResult`→`CancelResponse`, `PortalResult`→`PortalResponse`. Types were imported correctly at lines 13-16 but wrong names used in function signatures. | `apps/mobile/src/hooks/use-subscription.ts` |
+| **FIX-15** | ✅ `.then()` chains in session service | Replaced 3 `.then((rows) => rows[0])` chains with array destructuring/indexing in `prepareExchangeContext()`. Architecture rule: "async/await always, never .then() chains." | `apps/api/src/services/session.ts` |
+| **FIX-16** | ✅ Scoped repository: 3 missing profile-scoped tables | Added `notificationPreferences`, `learningModes`, `sessionEmbeddings` namespaces with `findMany` and `findFirst`. Updated parametric tests + shape assertions. From shadow DB review. | `packages/database/src/repository.ts`, `packages/database/src/repository.test.ts` |
+| **FIX-17** | ✅ `RetentionStatus` type duplicated in 3 files | Exported `RetentionStatus` from `RetentionSignal.tsx` as single source of truth. `DashboardCard.tsx` now imports it. `dashboard.tsx` was missing `'forgotten'` value — now imports correct 4-value type. Re-exported via `components/progress/index.ts` barrel. | `RetentionSignal.tsx`, `DashboardCard.tsx`, `dashboard.tsx`, `components/progress/index.ts` |
+| **FIX-18** | ✅ Hardcoded `#999` in subscription.tsx | Replaced `placeholderTextColor="#999"` with `placeholderTextColor={colors.muted}` using `useThemeColors()` hook. Matches pattern used by `ChatShell.tsx` and other screens. | `apps/mobile/src/app/(learner)/subscription.tsx` |
+| **FIX-19** | ⚠️ Database `tsconfig.lib.json` test-utils reference | Attempted removal; Nx `typescript-sync` re-adds it because `@eduagent/test-utils` is in devDependencies. **Managed by Nx tooling — accepted.** Same finding as FIX-5. | — |
+| **FIX-20** | ✅ Missing return types on exported hooks | Added `UseQueryResult<T>` return type annotations to 4 hooks: `useSubjectProgress` (→ `SubjectProgress`), `useTopicProgress` (→ `TopicProgress`), `useTopicRetention` (→ `RetentionCardResponse`), `useAssessment` (→ `Assessment`). Added `UseQueryResult` imports. | `use-progress.ts`, `use-retention.ts`, `use-assessments.ts` |
+| **FIX-21** | ✅ `flagContent` null-session fallback bug | `session.ts:441` used `sessionId` as fallback for `subjectId` when session not found — semantically wrong (session UUID ≠ subject UUID). Would either violate FK constraint or corrupt audit log. Fixed: throw Error if session is null (early return). | `apps/api/src/services/session.ts` |
+| **FIX-22** | ✅ `closeSession` null-session handling | `session.ts:423` returned empty string `''` for `subjectId` when session not found. This propagated to Inngest `app/session.completed` event, causing background jobs to run with invalid subjectId. Fixed: throw Error if session is null. | `apps/api/src/services/session.ts` |
+| **FIX-23** | ✅ `session-completed.ts` imports `storeEmbedding` from `@eduagent/database` | Inngest function bypassed service layer by importing `storeEmbedding` directly from database package. Created `storeSessionEmbedding()` wrapper in `services/embeddings.ts` that generates embedding + stores it. Inngest function now imports only from service layer. Test updated. | `services/embeddings.ts`, `inngest/functions/session-completed.ts`, `session-completed.test.ts` |
+| **FIX-24** | ✅ Billing cycle drift in `resetExpiredQuotaCycles` | `nextReset` was computed once from `now` and applied to ALL pools. Each pool should advance from its own `cycleResetAt` to maintain billing cadence (e.g., always the 15th). Fixed: `nextReset = new Date(pool.cycleResetAt); nextReset.setMonth(+1)`. | `apps/api/src/services/billing.ts` |
+| **FIX-25** | ✅ `consentStates` missing from repository parametric tests | Added `consentStates` to all 3 `describe.each` arrays + shape assertion. 4 new tests added. | `packages/database/src/repository.test.ts` |
+| **FIX-26** | ✅ architecture.md Tailwind version (3.4.17 → 3.4.19) + `connection.ts` → `client.ts` | 3 Tailwind version references + 2 connection.ts references corrected. | `docs/architecture.md` |
+| **FIX-27** | ✅ `canAddProfile` hardcoded profile limits | Replaced hardcoded `{free:1, plus:1, family:4, pro:6}` map with `getTierConfig(sub.tier).maxProfiles`. Eliminates DRY violation — limits were duplicated from `TierConfig` in subscription.ts. | `apps/api/src/services/billing.ts` |
+| **FIX-28** | ✅ Stripe webhook stale event window 5min → 48h | Increased from `5 * 60 * 1000` (5 minutes) to `48 * 60 * 60 * 1000` (48 hours). Stripe retries failed webhook deliveries for up to 72 hours. Previous 5-minute window = exactly one chance per event. Idempotency guard (`lastStripeEventTimestamp`) already handles duplicates. Updated test: stale event = 49 hours ago, recent event = 2 hours ago. | `apps/api/src/routes/stripe-webhook.ts`, `apps/api/src/routes/stripe-webhook.test.ts` |
+| **FIX-29** | ✅ `recordSessionActivity` upsert for missing streak row | When no streak row exists (first-ever session), now creates a new streak row via `db.insert(streaks).values(...)` using `createInitialStreakState()` + `recordDailyActivity()`. Previously silently returned, so first-session users never started a streak. Added 4 new tests covering insert path, update path, and mutual exclusion. | `apps/api/src/services/streaks.ts`, `apps/api/src/services/streaks.test.ts` |
+| **FIX-30** | ✅ Dead `escalationRungs` field in session-completed consumer | Removed unused `escalationRungs: _escalationRungs` destructuring from `session-completed.ts` event data. Field was never sent by the route emitter and was immediately discarded. Clarifies the event contract. | `apps/api/src/inngest/functions/session-completed.ts` |
+| **FIX-31** | ✅ `startSession` missing subject ownership check | Added `getSubject(db, profileId, subjectId)` guard before session creation. Throws `'Subject not found'` if subject doesn't belong to the caller's profile. Prevents horizontal privilege escalation where a user could start a session for another user's subject. Added test verifying db.insert is never called when subject is null. | `apps/api/src/services/session.ts`, `apps/api/src/services/session.test.ts` |
+| **FIX-32** | ✅ `prepareExchangeContext` sequential queries parallelized | Replaced 5 sequential `await` calls (subject, topic, profile, retention card, events) with `Promise.all()`. All 5 queries are independent after session load. Reduces hot-path latency from sum-of-5-queries to max-of-5-queries. Used array-returning queries + post-destructuring to avoid `.then()` chains per architecture rules. All 58 session tests pass without modification. | `apps/api/src/services/session.ts` |
+| **FIX-33** | ✅ `index.ts` import group separators | Added blank line separators between import groups: external → @eduagent/* packages → middleware → type-only → routes. Matches project convention for grouped imports. | `apps/api/src/index.ts` |
+| **FIX-34** | ✅ CLAUDE.md `ApiErrorSchema` → `apiErrorSchema` | Corrected PascalCase schema name to match actual camelCase export. Updated to show both schema and type names: `apiErrorSchema` (schema) / `ApiError` (type). | `CLAUDE.md` |
+| **FIX-35** | ✅ Complete `RetentionStatus` barrel consolidation (FIX-17 follow-up) | Removed 2 local `type RetentionStatus` definitions in `book/index.tsx` and `topic/[topicId].tsx` — replaced with `import type { RetentionStatus } from '../../../components/progress'`. Fixed `DashboardCard.tsx` internal-path import (`../progress/RetentionSignal` → `../progress`). Fixed `dashboard.tsx` internal-path import (`../../components/progress/RetentionSignal` → `../../components/progress`). All `RetentionStatus` references now go through the barrel. | `apps/mobile/src/app/(learner)/book/index.tsx`, `apps/mobile/src/app/(learner)/topic/[topicId].tsx`, `apps/mobile/src/components/common/DashboardCard.tsx`, `apps/mobile/src/app/(parent)/dashboard.tsx` |
+| **FIX-36** | ✅ `subjects.ts` GET/PATCH routes missing null → 404 mapping | Added `notFound(c, 'Subject not found')` guard in both `GET /subjects/:id` and `PATCH /subjects/:id` when `getSubject()`/`updateSubject()` returns null. Previously returned `{ subject: null }` with 200 OK — incorrect HTTP semantics. Added 2 new tests verifying 404 status and `NOT_FOUND` error code. | `apps/api/src/routes/subjects.ts`, `apps/api/src/routes/subjects.test.ts` |
+| **FIX-37** | ✅ Factory builders use UUID v4 instead of v7 | Replaced `import { randomUUID } from 'crypto'` with `import { uuidv7 } from 'uuidv7'` and all `randomUUID()` calls with `uuidv7()` across 6 factory files. Added `uuidv7` as direct dependency of `@eduagent/factory` (cannot import from `@eduagent/database` — dependency direction rules). Architecture rule: "UUID v7 for entity PKs." | `packages/factory/src/assessments.ts`, `billing.ts`, `consent.ts`, `progress.ts`, `sessions.ts`, `subjects.ts`, `packages/factory/package.json` |
+| **FIX-38** | ✅ `buildCurriculum` dead counter increment | Removed useless `counter++` in `buildCurriculum()` — incremented the shared counter but never used the value. Caused `buildCurriculumTopic()` called after `buildCurriculum()` to skip counter values, producing non-sequential `sortOrder` and `title` numbers. | `packages/factory/src/subjects.ts` |
+| **FIX-39** | ✅ NativeWind `text-*` color applied to `View` instead of `Text` | Split `RELEVANCE_COLORS` map into `RELEVANCE_BG` (View classes) and `RELEVANCE_TEXT` (Text classes). In React Native, `color` does not cascade from `View` to child `Text` — the `text-primary`/`text-accent`/etc. classes were no-ops on the `<View>` wrapper. Badge labels now render with correct relevance colors. | `apps/mobile/src/app/(learner)/onboarding/curriculum-review.tsx` |
+| **FIX-40** | ✅ `animateResponse` cleanup leak in interview screen | Added `animationCleanupRef` + `useEffect` cleanup pattern (matching `session/index.tsx`). Both success and error calls to `animateResponse()` now store the returned cleanup function. On unmount, the `useEffect` destructor clears any running `setInterval`. Previously, navigating away during animation left a dangling interval firing `setMessages` on unmounted state. | `apps/mobile/src/app/(learner)/onboarding/interview.tsx` |
+
+### Shadow Agent False Findings (2026-02-19)
+
+Several shadow agent findings were stale (code already fixed by external developer):
+
+| Shadow Finding | Agent | Actual Status |
+|---------------|-------|---------------|
+| `refreshKvCache` missing `subscriptionId` (Infra 4.2) | Infra Shadow | **FALSE** — `subscriptionId: sub.id` already present at line 64 |
+| Billing route imports `byokWaitlist` table (API 1.1) | API Shadow | **FALSE** — route calls `addToByokWaitlist()` service function (line 339) |
+| Missing `app.onError()` global error handler (API 5.5) | API Shadow | **FALSE** — handler exists at `index.ts:109-121` |
+| `@eduagent/schemas` missing from mobile package.json (Boundary F1) | Boundary Shadow | **FALSE** — already declared at line 37 |
+| `use-subscription.ts` type duplications (16 HIGH, Conventions 6.x) | Conventions Shadow | **FALSE** — already fixed in FIX-8 + FIX-14 |
+| `use-interview.ts` local types (Mobile 6.10-6.11) | Mobile Shadow | **FALSE** — `InterviewState` imported from schemas; `InterviewResponse` correctly local (API-specific) |
+| `use-curriculum.ts` local types (Mobile 6.12-6.13) | Mobile Shadow | **FALSE** — `Curriculum` imported from schemas |
+| `use-sessions.ts` local types (Mobile 6.16-6.17) | Mobile Shadow | **FALSE** — `LearningSession`, `SessionSummary` imported from schemas; wrappers correctly local |
+| `use-settings.ts` local types (Mobile 6.14-6.15) | Mobile Shadow | **FALSE** — `NotificationPrefsInput`, `LearningMode` imported from schemas; `NotificationPrefs` correctly local (response shape) |
+| DB enum casing (15 CRITICAL) | DB Shadow | **FALSE** — lowercase enum values are correct PostgreSQL convention; SCREAMING_SNAKE applies to TypeScript constants |
+| `use-subscription.ts` duplicates SubscriptionTier/SubscriptionStatus (CRITICAL) | Conventions Shadow | **FALSE** — types are imported from `@eduagent/schemas` and re-exported; fixed in FIX-8/FIX-14 before agent completed |
+| 5 hooks missing return types (items 1-5 of 10) | Conventions Shadow | **STALE** — `getStepDatabase` fixed in FIX-6; `useSubjectProgress`, `useTopicProgress`, `useTopicRetention`, `useAssessment` fixed in FIX-20 |
+| Local types in hooks: WarningLevel, CurriculumTopic, InterviewState etc. | Conventions Shadow | **FALSE** — all domain types now imported from `@eduagent/schemas`; local interfaces are API-specific response wrappers (correctly local) |
+| Billing cycle drift — same `nextReset` for all pools (CRITICAL) | API Services Review | **STALE** — already fixed in FIX-24 (nextReset derived from pool's own `cycleResetAt`) |
+| `recordSessionActivity` silently no-ops on missing streak (HIGH) | API Services Review | **STALE** — already fixed in FIX-29 (streak upsert on first activity) |
+| Topic query missing ownership via parent chain (CRITICAL) | API Services Review | **LOW RISK** — `topicId` comes from profile-scoped session (FIX-31 guards subject ownership at session start). Transitive trust is safe. |
+| `as const` on eventType not validated against DB enum (HIGH) | API Services Review | **FALSE** — `sessionEventTypeEnum` in DB schema includes `session_start` and `escalation`. Drizzle validates at insert. |
+
+### New Items Not Previously Tracked
+
+These are findings from the shadow review that were NOT already tracked in previous review rounds:
+
+| # | Severity | Issue | Status |
+|---|----------|-------|--------|
+| **N1** | CRITICAL | Missing `app.onError()` global error handler | ✅ FIXED (FIX-1) |
+| **N2** | CRITICAL | `refreshKvCache` missing `subscriptionId` in stripe-webhook.ts | ✅ FIXED (FIX-2) |
+| **N3** | CRITICAL | No correlation ID system (enforcement rule #3) | DEFERRED — major architectural feature, requires planning |
+| **N4** | CRITICAL | No circuit breaker for LLM providers | DEFERRED — requires external library or custom implementation |
+| **N5** | HIGH | Billing route imports ORM primitive (`byokWaitlist`) | ✅ FIXED (FIX-3) |
+| **N6** | HIGH | `@eduagent/schemas` missing from mobile `package.json` | ✅ FIXED (FIX-4) |
+| **N7** | HIGH | `getStepDatabase()` missing return type | ✅ FIXED (FIX-6) |
+| **N8** | HIGH | 3 Inngest functions import ORM primitives directly (session-completed, trial-expiry, quota-reset) | ✅ FIXED 2026-02-19 — extracted `resetExpiredQuotaCycles()`, `findExpiredTrials()`, `findSubscriptionsByTrialDateRange()` to billing service; `updateRetentionFromSession()` to retention-data service; `recordSessionActivity()` to streaks service; `createPendingSessionSummary()` to summaries service. All 3 Inngest functions now zero-ORM. |
+| **N9** | HIGH | Coaching cards don't use Workers KV cache | OPEN — spec's primary KV use case, deferred to Layer 2 |
+| **N10** | HIGH | `consent_states` missing from scoped repository | ✅ FIXED 2026-02-19 — `consentStates` namespace added with `findMany` and `findFirst` |
+| **N11** | MEDIUM | Index naming uses `{table}_idx` suffix instead of `idx_{table}` prefix | DEFERRED — changing existing indexes requires migration; current convention is internally consistent |
+| **N12** | MEDIUM | Missing `queries/dashboard.ts` and `queries/retention.ts` per spec | OPEN — deferred to feature implementation |
+| **N13** | MEDIUM | No Axiom/Sentry/OpenTelemetry integration | Known gap — deferred to observability sprint |
+| **N14** | MEDIUM | `stripe-webhook.ts` has ~180 lines of business logic in route file | OPEN — 6 helper functions (`mapStripeStatus`, `refreshKvCache`, `handleSubscriptionEvent`, `handleSubscriptionDeleted`, `handlePaymentFailed`, `handlePaymentSucceeded`) should be in `services/stripe-webhook.ts`. Route file should only parse webhook, verify signature, and dispatch. |
+| **N15** | LOW | `session-completed.ts` imports `storeEmbedding` from `@eduagent/database` | ✅ FIXED (FIX-23) — `storeSessionEmbedding()` wrapper added to `services/embeddings.ts`. Inngest function now imports only from service layer. |
+| **N16** | LOW | API test files don't use `@eduagent/test-utils` shared mocks | OPEN — 5 test files define inline DB/Inngest mocks instead of using `createMockDb`/`createInngestStepMock` from shared package. Convention issue, not a bug. |
+| **N17** | LOW | API test files don't use `@eduagent/factory` builders | OPEN — 3 test files define inline mock data builders instead of using `buildSession`/`buildSubscription` etc. Partial justification: factory returns API shapes (ISO dates), tests need DB row shapes (Date objects). |
+| **N18** | HIGH | `flagContent` + `closeSession` null-session data integrity bugs | ✅ FIXED (FIX-21, FIX-22) — `flagContent` used sessionId as subjectId fallback; `closeSession` returned empty subjectId to Inngest event. Both now throw Error on null session. |
+| **N19** | LOW | 5 more mobile hooks missing explicit return types | ACCEPTED — `useCreateAssessment`, `useSubmitAnswer` (mutations), `useOverallProgress`, `useContinueSuggestion`, `useRetentionTopics` (queries). Unlike FIX-20 hooks which used named schema types (`Assessment`, `SubjectProgress`, etc.), these 5 return RPC-inferred types with no corresponding `@eduagent/schemas` export. Adding explicit annotations would require local type definitions that duplicate the API contract and break when routes change. TypeScript already infers correct types via Hono RPC — explicit annotation adds maintenance cost without type safety benefit. |
+| **N20** | MEDIUM | `billing.ts` route has Stripe SDK business logic inline | OPEN — 4 route handlers contain Stripe SDK orchestration (customer creation, checkout session creation, subscription update, payment intent creation) at lines 129-167, 190-204, 226-256, 326-331. Architecture rule: "Business logic in `services/`." Should be extracted to service functions. |
+| **N21** | LOW | `index.ts` import ordering lacks blank line group separators | ✅ FIXED (FIX-33) — Added blank line separators: external (hono) → @eduagent/* packages → middleware → type-only imports → routes. |
+| **N22** | LOW | CLAUDE.md refers to `ApiErrorSchema` but actual export is `apiErrorSchema` | ✅ FIXED (FIX-34) — Updated to `apiErrorSchema` (schema) / `ApiError` (type), matching actual exports in `packages/schemas/src/errors.ts`. |
+| **N23** | HIGH | `recordSessionActivity` silently no-ops on missing streak row | ✅ FIXED (FIX-29) — Added upsert logic: when no streak row exists, creates one via `db.insert(streaks)` with initial activity state (streak=1). First-session users now correctly start their streak. 4 new tests added. |
+| **N24** | HIGH | `consentStates` namespace missing from repository tests | ✅ FIXED 2026-02-19 — Added `consentStates` to all 3 parametric test arrays (`findMany`, `findMany with extraWhere`, `findFirst`) + shape assertion. 4 new tests. |
+| **N25** | MEDIUM | architecture.md Tailwind version 3.4.17 → 3.4.19 | ✅ FIXED 2026-02-19 — Updated all 3 occurrences to match `CLAUDE.md` and root `package.json`. |
+| **N26** | MEDIUM | architecture.md references `connection.ts` instead of `client.ts` | ✅ FIXED 2026-02-19 — Updated 2 occurrences (file tree + external integrations table). |
+| **N27** | MEDIUM | `startSession` does not verify subject ownership before creating session | ✅ FIXED (FIX-31) — Added `getSubject(db, profileId, subjectId)` ownership guard. Throws `'Subject not found'` if subject doesn't belong to the caller's profile. Prevents horizontal privilege escalation. Test added verifying insert is never called when subject is null. |
+| **N28** | MEDIUM | `prepareExchangeContext` runs 5+ sequential DB queries on hot path | ✅ FIXED (FIX-32) — Parallelized 5 independent queries after session load using `Promise.all()`. Latency reduced from sum-of-5 to max-of-5 on every learning exchange. |
+| **N29** | LOW | `canAddProfile` hardcoded profile limits instead of using TierConfig | ✅ FIXED (FIX-27) — Replaced hardcoded `{free:1, plus:1, family:4, pro:6}` with `getTierConfig(sub.tier).maxProfiles`. Eliminates maintenance risk of duplicated constants. |
+| **N30** | LOW | `quota-reset.test.ts` mocks DB internals instead of service boundary | OPEN — Production code delegates entirely to `resetExpiredQuotaCycles()` from billing service, but tests mock raw Drizzle query internals. Should mock at service boundary like `session-completed.test.ts` and `trial-expiry.test.ts` do. |
+| **N31** | MEDIUM | Event payload mismatch between `app/session.completed` emitter and consumer | PARTIALLY FIXED (FIX-30) — Removed dead `escalationRungs` destructuring from consumer. Remaining: `summaryStatus` and `qualityRating` are still destructured from event data but never sent by emitter. Both have fallback defaults (`'pending'` and `3`), so no runtime crash. The defaults are semantically correct (summary starts as pending, quality defaults to average). Cosmetic contract gap only. |
+| **N32** | HIGH | Stripe webhook 5-minute stale event window rejects valid Stripe retries | ✅ FIXED (FIX-28) — Increased from 5 minutes to 48 hours. Stripe retries for up to 72h; the idempotency guard in `updateSubscriptionFromWebhook` already handles duplicate/out-of-order events. Previous 5-minute window meant a single failed delivery = permanently lost event. |
+| **N33** | MEDIUM | PII (`parentEmail`) in `app/consent.requested` event payload | OPEN — Violates architecture rule "Never put secrets/connection strings in event payloads." The consent-reminders Inngest function receives `parentEmail` in event data (consent.ts:30) and uses it in `sendEmail()` calls. PII persists in Inngest event logs/dashboards. Handler should fetch email from DB via `getStepDatabase()` instead. Deferred: email provider is still a stub (TODO). |
+| **N34** | MEDIUM | `subjects.ts` routes returned 200 with `{ subject: null }` instead of 404 | ✅ FIXED (FIX-36) — GET `/subjects/:id` and PATCH `/subjects/:id` now return 404 with `ApiErrorSchema` envelope when subject not found. 2 new tests added. **Design note:** Sub-resource endpoints (curriculum, retention card, session summary, teaching preference) intentionally return 200 with `null` — this signals "not yet created" which is semantically different from 404 "parent doesn't exist." Primary resources (subjects, profiles, sessions) use 404 for not-found. |
+| **N35** | HIGH | Factory builders used UUID v4 (`randomUUID`) instead of UUID v7 | ✅ FIXED (FIX-37) — All 6 factory files now use `uuidv7()`. Test data PKs are now time-ordered, matching production DB behavior. |
+| **N36** | LOW | `buildCurriculum` incremented shared counter without using it | ✅ FIXED (FIX-38) — Dead `counter++` removed. |
+| **N37** | MEDIUM | NativeWind text color classes applied to `View` (no cascade in RN) | ✅ FIXED (FIX-39) — Split into `RELEVANCE_BG` and `RELEVANCE_TEXT` maps. |
+| **N38** | HIGH | `animateResponse` cleanup function dropped in interview screen | ✅ FIXED (FIX-40) — Added `animationCleanupRef` + `useEffect` cleanup pattern matching `session/index.tsx`. |
+| **N39** | MEDIUM | `session/index.tsx` coerces `practice`/`freeform` modes to `learning` session type | OPEN — `MODE_TITLES` defines 4 modes but `sessionType` only maps `homework` vs everything-else-as-`learning`. If API distinguishes these types for analytics, this loses information. Likely intentional at MVP (only 2 DB session types). |
+| **N40** | LOW | `as never` router casts in interview.tsx and session/index.tsx | OPEN — Suppress Expo Router typed route checking entirely. Correct fix: configure typed routes or use narrower cast. Cosmetic — routes work correctly at runtime. |
+| **N41** | LOW | `jwt.test.ts` `verifyJWT` signature path untested | OPEN — Only structural validation tested. Expiry/nbf rejection paths feasible without crypto mocking. `TODO` comment acknowledges gap. |
+| **N42** | MEDIUM | `stripe-webhook.test.ts` `mockUpdatedSubscription` missing 8 of 13 `SubscriptionRow` fields | OPEN — Mock shape incomplete; tests only exercise `id` and `accountId` fields. If route starts reading other fields, tests will pass with `undefined`. |
+| **N43** | LOW | `export.test.ts` 103-line inline DB mock instead of `createMockDb` from test-utils | OPEN — Duplicate scaffolding that will drift from schema. Same category as N16. |
+| **N44** | LOW | `streaks.test.ts` `getStreakData`/`getXpSummary` entirely stubbed with `it.todo()` | OPEN — Two exported functions have zero test coverage. |
+| **N45** | LOW | `book/index.tsx` fabricates topic name from UUID prefix (`Topic ${topicId.slice(0,8)}`) | OPEN — Retention endpoint does not include topic titles. Placeholder visible to users. Requires enriching retention response or client-side curriculum join. |
+
+### Previously Tracked Items — Status Update (2026-02-19)
+
+| Previous # | Current Status | Notes |
+|------------|---------------|-------|
+| CR5 (process.env in Inngest) | **Still open** — runtime guard added, full fix deferred to CF Workers deployment |
+| CR6 (unsafe double cast) | ✅ **CLOSED** — `Variables: { db: Database }` is now declared in Hono generic (stripe-webhook.ts:220-222), `c.get('db')` returns correct type without cast. Fixed externally. |
+| CR7 (architecture.md mobile tree) | ✅ **FIXED** (FIX-13) — Updated workspace tree, navigation tree, and detailed project tree to match actual codebase. ~120 lines corrected. |
+| CR8 (circular import cycle) | **Confirmed real** — cycle: `profile.ts` → `use-profiles.ts` → `api-client.ts` → `profile.ts` (via `useProfile` import at api-client.ts:16). Works at runtime due to JS module caching + React lazy hook resolution. Fix requires `useApiClient` to accept `profileId` param instead of importing `useProfile` — deferred as non-trivial API change. |
+| I5 (webhook replay check) | **CLOSED as false finding** — event-age check already implemented at stripe-webhook.ts:264-274 |
+| I8 (N+1 queries) | ✅ **CLOSED as false finding** — `getSubjectProgress` is only used for single-subject endpoint. `getFullProgress` (multi-subject) already uses batched `inArray()` queries (6 queries total regardless of N subjects). No N+1 pattern exists. |
+| I11 (payment-retry no-op) | ✅ **CLOSED as by design** — DESIGN NOTE (lines 14-28) explicitly states Stripe handles retries via Smart Retries. Function tracks attempt count and downgrades after 3 failures. Not a no-op: it runs `downgrade-to-free` step, calling `updateSubscriptionFromWebhook` + `resetMonthlyQuota`. |
+| I21 (missing repo tests) | ✅ **CLOSED** — all 4 namespaces (`parkingLotItems`, `teachingPreferences`, `curriculumAdaptations`, `onboardingDrafts`) now included in parametric test arrays for `findMany`, `findFirst`, and existence checks in `repository.test.ts`. |
+
+### Test Status (Post-Fix)
+
+```
+1,175 tests | 6 projects | 0 failures
+  - API:       911 tests (71 suites) + 4 todo
+  - Database:   72 tests (3 suites)
+  - Retention:  14 tests (1 suite)
+  - Factory:    10 tests (1 suite) [Nx reports as 8]
+  - Test-utils:  8 tests (1 suite)
+  - Mobile:    160 tests (28 suites)
+(Updated 2026-02-19: 40 fixes verified, FIX-37→40 factory UUID v7, dead counter, NativeWind color, animation cleanup)
+```
+
+### Database Schema Review (2026-02-19, Shadow Agent)
+
+A deep adversarial review of the database layer found 79 findings. Key items requiring action before production:
+
+| Category | Count | Severity | Status |
+|----------|:-----:|----------|--------|
+| **Enum casing: lowercase instead of SCREAMING_SNAKE** | 15 | ~~CRITICAL~~ | **FALSE FINDING** — lowercase enum values are correct PostgreSQL convention; SCREAMING_SNAKE applies to TypeScript constants, not DB enum values. See Shadow Agent False Findings. |
+| **Missing `updated_at` on mutable tables** | 4 HIGH + 3 other | HIGH | OPEN — schema migration needed (`parking_lot_items`, `top_up_credits`, `xp_ledger`, `family_links`) |
+| **Missing FK indexes** | 30 (14 HIGH) | HIGH | OPEN — additive migration, no data risk; prioritize `session_events.profile_id`, `session_summaries.session_id`, `learning_sessions.subject_id`, `curriculum_topics.curriculum_id` |
+| **Missing unique constraints** | 6 | HIGH | OPEN — `family_links(parent,child)`, `needs_deepening(profile,topic)`, `curriculum_adaptations(profile,topic)`, `onboarding_drafts(profile,subject)` |
+| **Scoped repo gaps** | 3 remaining | HIGH | ✅ FIXED (FIX-16) — added `notificationPreferences`, `learningModes`, `sessionEmbeddings` |
+| **Index naming convention** | 10 | MEDIUM | DEFERRED — `{table}_idx` suffix vs `idx_{table}` prefix; consistent but inverted from spec |
+| **Missing `queries/` files** | 2 | MEDIUM | DEFERRED — `queries/dashboard.ts`, `queries/retention.ts` per architecture spec |
+
+**Note on enum casing:** The 15 enum findings have been **reclassified as FALSE** — lowercase enum values (`learning`, `homework`, `active`, `completed`, etc.) are correct PostgreSQL convention. The SCREAMING_SNAKE rule applies to TypeScript constants, not database enum values. The 3 enums in `profiles.ts` that use uppercase (TEEN/LEARNER/PARENT, etc.) are the exception, not the rule.
+
+### Severity Summary (2026-02-19, cont. 7 updated)
+
+| Severity | Total Found | Fixed | Deferred | Open |
+|----------|-------------|-------|----------|------|
+| CRITICAL | 6 (DB enums reclassified as FALSE) | 3 (N1, N2, CR6) | 2 (N3, N4) | 1 (CR5) |
+| HIGH | 14 + ~24 DB | 14 (N5, N6, N7, N8, N10, N18, N23, N24, N32, N35, N38, CR7, I11, FIX-24) + 1 DB (FIX-16) | 1 (N9) | 0 + ~23 DB (indexes, constraints, timestamps) |
+| MEDIUM | 18 + ~29 DB | 10 (I8, I21, N25, N26, N27, N28, N31-partial, N34/FIX-36, N37/FIX-39) | 2 (N11, N13) + ~12 DB | 7 (N12, N14, N20, N33, N39, N42, CR8) + ~17 DB |
+| LOW | 14 | 7 (N15/FIX-23, N21/FIX-33, N22/FIX-34, N29/FIX-27, N36/FIX-38, FIX-30) | 1 (N19 — accepted) | 7 (N16, N17, N30, N40, N41, N43, N44, N45) |
+
+### Review History
+
+| Date | Session | Fixes Applied | Tests | Key Outcomes |
+|------|---------|:------------:|:-----:|-------------|
+| 2026-02-19 (AM) | Primary + 12 agents | FIX-1 → FIX-16 | 1,096 → 1,164 | Initial architecture review, 16 fixes, 10 false findings |
+| 2026-02-19 (PM) | Shadow review + FIX-17→20 | FIX-17 → FIX-20 | 1,164 | RetentionStatus consolidation, hardcoded color, return types |
+| 2026-02-19 (cont.) | Continuation review | FIX-21 → FIX-23 | 1,164 | Null-session data integrity bugs (FIX-21/22), storeEmbedding service wrapper (FIX-23), 3 review agents dispatched, DB enum reclassified as FALSE, 5 new open items (N14-N18) |
+| 2026-02-19 (cont. 2) | Post-commit review | test label fix | 1,164 | Reviewed commit `c5641bd` (72 files). Full verification scans: zero `.then()`, zero Hono in services, zero ORM in Inngest/routes, zero hex colors, zero default exports (except index.ts). 2 review agents + late shadow conventions agent triaged. Found N19 (5 return types), N20 (billing Stripe logic), N21 (import ordering), N22 (CLAUDE.md doc inconsistency). Fixed cosmetic `it.each` label in session.test.ts. Shadow agent's 11 "CRITICAL/HIGH" type findings triaged as FALSE/STALE (already fixed in FIX-8/14/20). |
+| 2026-02-19 (cont. 3) | Continuation review | FIX-24 → FIX-26 | 1,168 | Reviewed 43 file diff (1,546 insertions, 641 deletions). 3 parallel review agents dispatched. Full verification scans: zero `.then()`, zero Hono in services, zero ORM in Inngest/routes, zero hex colors. **FIX-24** billing cycle drift (nextReset from pool's own cycleResetAt, not now). **FIX-25** consentStates test coverage gap (+4 tests). **FIX-26** architecture.md Tailwind 3.4.19 + client.ts path. Found N23 (streak row missing for first-session users). Agent findings triaged: 2 false positives (session_start enum, topic ownership chain), rest already tracked (N19, FIX-17). |
+| 2026-02-19 (cont. 4) | Continuation review | FIX-27, FIX-28 | 1,168 | Reviewed 43 file diff (same uncommitted changeset). 3 parallel review agents dispatched (API services, Inngest/routes, mobile/schema). Full verification scans: zero `.then()`, zero Hono in services, zero ORM in Inngest/routes, zero `@eduagent/database` in mobile, only `export default app` in index.ts. **FIX-27** canAddProfile hardcoded profile limits → uses TierConfig.maxProfiles. **FIX-28** Stripe webhook stale event window 5min → 48h (Stripe retries up to 72h). Found N27-N31. All 1,168 tests passing. |
+| 2026-02-19 (cont. 5) | Continuation review | FIX-29 → FIX-34 | 1,173 | No new code changes detected — codebase stable at commit `c5641bd`. Addressed 6 open items: **FIX-29** streak upsert for first-session users (HIGH N23 → 4 new tests), **FIX-30** dead `escalationRungs` field in session-completed (N31 partial), **FIX-31** subject ownership guard in startSession (N27 → 1 new test + security fix), **FIX-32** parallelized 5 sequential queries on hot path (N28 → `Promise.all`), **FIX-33** index.ts import group separators (N21), **FIX-34** CLAUDE.md schema name fix (N22). All HIGH-severity application items resolved. 1,173 tests passing (105 suites). |
+| 2026-02-19 (cont. 6) | Deep scan review | FIX-35, FIX-36 | 1,175 | 4 parallel deep-scan agents dispatched (API error handling, mobile hooks, Inngest event drift, schema/service drift). **FIX-35** completed RetentionStatus barrel consolidation (4 files, removed 2 local type defs + 2 internal-path imports). **FIX-36** subjects route null→404 mapping (GET+PATCH returned 200 with `{subject:null}` instead of 404, 2 new tests). New findings: **N33** PII in consent event payload (MEDIUM, deferred), **N34** fixed. Agent triaged: global error handler covers route-level try-catch (not a gap); TanStack Query invalidation is by-design; `qualityRating` already tracked as N31. 1,175 tests passing (105 suites). |
+| 2026-02-19 (cont. 7) | Factory + mobile scan | FIX-37→40 | 1,175 | 3 parallel deep-scan agents dispatched (factory builders, mobile screens, API test quality). **FIX-37** (HIGH) all 6 factory files UUID v4→v7 + added `uuidv7` dependency. **FIX-38** dead counter increment in `buildCurriculum`. **FIX-39** (BUG) NativeWind text color on View instead of Text in curriculum-review — split `RELEVANCE_COLORS` into `RELEVANCE_BG` + `RELEVANCE_TEXT`. **FIX-40** (BUG) animation cleanup leak in interview.tsx — added ref+useEffect pattern matching session/index.tsx. New items: N35-N45 (factory/mobile/test observations). All HIGH-severity application items remain resolved. |

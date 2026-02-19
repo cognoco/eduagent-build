@@ -1,1 +1,1 @@
-export { RetentionSignal } from './RetentionSignal';
+export { RetentionSignal, type RetentionStatus } from './RetentionSignal';

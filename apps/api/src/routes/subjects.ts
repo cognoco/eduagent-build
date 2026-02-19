@@ -10,6 +10,7 @@ import {
   getSubject,
   updateSubject,
 } from '../services/subject';
+import { notFound } from '../errors';
 
 type SubjectRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -43,6 +44,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     const account = c.get('account');
     const profileId = c.get('profileId') ?? account.id;
     const subject = await getSubject(db, profileId, c.req.param('id'));
+    if (!subject) return notFound(c, 'Subject not found');
     return c.json({ subject });
   })
   .patch(
@@ -59,6 +61,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
         c.req.param('id'),
         input
       );
+      if (!subject) return notFound(c, 'Subject not found');
       return c.json({ subject });
     }
   );

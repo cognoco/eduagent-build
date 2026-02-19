@@ -1,9 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { SubjectProgress, TopicProgress } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 
-export function useSubjectProgress(subjectId: string) {
+export function useSubjectProgress(
+  subjectId: string
+): UseQueryResult<SubjectProgress> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
@@ -49,7 +51,10 @@ export function useContinueSuggestion() {
   });
 }
 
-export function useTopicProgress(subjectId: string, topicId: string) {
+export function useTopicProgress(
+  subjectId: string,
+  topicId: string
+): UseQueryResult<TopicProgress> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 

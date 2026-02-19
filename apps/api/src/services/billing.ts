@@ -4,12 +4,13 @@
 // Pure data layer — no Hono imports.
 // ---------------------------------------------------------------------------
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, sql, lte, gte } from 'drizzle-orm';
 import {
   subscriptions,
   quotaPools,
   topUpCredits,
   profiles,
+  byokWaitlist,
   type Database,
 } from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
@@ -506,7 +507,7 @@ export async function getProfileCountForSubscription(
 
 /**
  * Checks whether a subscription can accept another profile.
- * Family tier allows 4 profiles, Pro allows 6, others allow 1.
+ * Profile limits are defined per-tier in TierConfig.
  */
 export async function canAddProfile(
   db: Database,
@@ -520,15 +521,116 @@ export async function canAddProfile(
     return false;
   }
 
-  const maxProfiles: Record<string, number> = {
-    free: 1,
-    plus: 1,
-    family: 4,
-    pro: 6,
-  };
-
-  const max = maxProfiles[sub.tier] ?? 1;
+  const tierConfig = getTierConfig(
+    (sub.tier as 'free' | 'plus' | 'family' | 'pro') ?? 'free'
+  );
   const current = await getProfileCountForSubscription(db, subscriptionId);
 
-  return current < max;
+  return current < tierConfig.maxProfiles;
+}
+
+// ---------------------------------------------------------------------------
+// BYOK Waitlist
+// ---------------------------------------------------------------------------
+
+/**
+ * Adds an email to the BYOK (Bring Your Own Key) waitlist.
+ * Uses ON CONFLICT DO NOTHING for idempotency.
+ */
+export async function addToByokWaitlist(
+  db: Database,
+  email: string
+): Promise<void> {
+  await db
+    .insert(byokWaitlist)
+    .values({ email })
+    .onConflictDoNothing({ target: byokWaitlist.email });
+}
+
+// ---------------------------------------------------------------------------
+// Quota cycle reset (used by inngest/functions/quota-reset.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Finds all quota pools whose billing cycle has elapsed and resets them.
+ * For each pool: resets usedThisMonth to 0, updates monthlyLimit to match
+ * the subscription tier, and advances cycleResetAt by one month.
+ */
+export async function resetExpiredQuotaCycles(
+  db: Database,
+  now: Date
+): Promise<number> {
+  const dueForReset = await db.query.quotaPools.findMany({
+    where: lte(quotaPools.cycleResetAt, now),
+  });
+
+  let count = 0;
+
+  for (const pool of dueForReset) {
+    const sub = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.id, pool.subscriptionId),
+    });
+
+    const tierConfig = getTierConfig(
+      (sub?.tier as 'free' | 'plus' | 'family' | 'pro') ?? 'free'
+    );
+
+    // Advance from the pool's own cycle date to maintain billing cadence
+    const nextReset = new Date(pool.cycleResetAt);
+    nextReset.setMonth(nextReset.getMonth() + 1);
+
+    await db
+      .update(quotaPools)
+      .set({
+        usedThisMonth: 0,
+        monthlyLimit: tierConfig.monthlyQuota,
+        cycleResetAt: nextReset,
+        updatedAt: now,
+      })
+      .where(eq(quotaPools.id, pool.id));
+
+    count++;
+  }
+
+  return count;
+}
+
+// ---------------------------------------------------------------------------
+// Trial subscription queries (used by inngest/functions/trial-expiry.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Finds all trial subscriptions whose trialEndsAt has passed.
+ */
+export async function findExpiredTrials(
+  db: Database,
+  now: Date
+): Promise<SubscriptionRow[]> {
+  const rows = await db.query.subscriptions.findMany({
+    where: and(
+      eq(subscriptions.status, 'trial'),
+      lte(subscriptions.trialEndsAt, now)
+    ),
+  });
+  return rows.map(mapSubscriptionRow);
+}
+
+/**
+ * Finds subscriptions matching a given status whose trialEndsAt falls
+ * within a date range (inclusive). Used for trial warnings and soft-landing.
+ */
+export async function findSubscriptionsByTrialDateRange(
+  db: Database,
+  status: SubscriptionStatus,
+  rangeStart: Date,
+  rangeEnd: Date
+): Promise<SubscriptionRow[]> {
+  const rows = await db.query.subscriptions.findMany({
+    where: and(
+      eq(subscriptions.status, status),
+      gte(subscriptions.trialEndsAt, rangeStart),
+      lte(subscriptions.trialEndsAt, rangeEnd)
+    ),
+  });
+  return rows.map(mapSubscriptionRow);
 }

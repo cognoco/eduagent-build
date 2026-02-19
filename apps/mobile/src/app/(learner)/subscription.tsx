@@ -11,6 +11,7 @@ import {
 import { useState, useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useThemeColors } from '../../lib/theme';
 import { UsageMeter } from '../../components/common';
 import {
   useSubscription,
@@ -90,6 +91,7 @@ function PlanOption({
 export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const colors = useThemeColors();
   const [byokEmail, setByokEmail] = useState('');
 
   const { data: subscription, isLoading: subLoading } = useSubscription();
@@ -350,7 +352,7 @@ export default function SubscriptionScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   className="flex-1 bg-background rounded-button px-3 py-2.5 text-body text-text-primary mr-2"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.muted}
                   accessibilityLabel="Email for BYOK waitlist"
                 />
                 <Pressable

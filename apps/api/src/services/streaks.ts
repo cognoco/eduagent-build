@@ -3,7 +3,12 @@
 // Pure business logic (core functions) + DB query helpers for route wiring
 // ---------------------------------------------------------------------------
 
-import { createScopedRepository, type Database } from '@eduagent/database';
+import { eq, and } from 'drizzle-orm';
+import {
+  createScopedRepository,
+  streaks,
+  type Database,
+} from '@eduagent/database';
 import type { Streak, XpSummary } from '@eduagent/schemas';
 
 export interface StreakState {
@@ -266,4 +271,56 @@ export async function getXpSummary(
     topicsCompleted: completedTopics.size,
     topicsVerified: verifiedTopics.size,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Session activity recording (used by inngest/functions/session-completed.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Records a daily activity for streak tracking.
+ * Reads the current streak, applies the recordDailyActivity logic,
+ * and persists the updated state with defence-in-depth profileId scoping.
+ */
+export async function recordSessionActivity(
+  db: Database,
+  profileId: string,
+  today: string
+): Promise<void> {
+  const repo = createScopedRepository(db, profileId);
+  const streakRow = await repo.streaks.findFirst();
+
+  if (!streakRow) {
+    // First session ever — create streak row with initial activity
+    const initial = createInitialStreakState();
+    const update = recordDailyActivity(initial, today);
+    await db.insert(streaks).values({
+      profileId,
+      currentStreak: update.newState.currentStreak,
+      longestStreak: update.newState.longestStreak,
+      lastActivityDate: update.newState.lastActivityDate,
+      gracePeriodStartDate: update.newState.gracePeriodStartDate,
+    });
+    return;
+  }
+
+  const streakState: StreakState = {
+    currentStreak: streakRow.currentStreak,
+    longestStreak: streakRow.longestStreak,
+    lastActivityDate: streakRow.lastActivityDate,
+    gracePeriodStartDate: streakRow.gracePeriodStartDate,
+  };
+
+  const update = recordDailyActivity(streakState, today);
+
+  await db
+    .update(streaks)
+    .set({
+      currentStreak: update.newState.currentStreak,
+      longestStreak: update.newState.longestStreak,
+      lastActivityDate: update.newState.lastActivityDate,
+      gracePeriodStartDate: update.newState.gracePeriodStartDate,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(streaks.id, streakRow.id), eq(streaks.profileId, profileId)));
 }

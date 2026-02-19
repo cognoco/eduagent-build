@@ -1,5 +1,5 @@
 import type { LearningSession, SessionSummary } from '@eduagent/schemas';
-import { randomUUID } from 'crypto';
+import { uuidv7 } from 'uuidv7';
 
 let counter = 0;
 
@@ -9,8 +9,8 @@ export function buildSession(
   counter++;
   const now = new Date().toISOString();
   return {
-    id: randomUUID(),
-    subjectId: randomUUID(),
+    id: uuidv7(),
+    subjectId: uuidv7(),
     topicId: null,
     sessionType: 'learning',
     status: 'active',
@@ -28,8 +28,8 @@ export function buildSessionSummary(
   overrides?: Partial<SessionSummary>
 ): SessionSummary {
   return {
-    id: randomUUID(),
-    sessionId: randomUUID(),
+    id: uuidv7(),
+    sessionId: uuidv7(),
     content: `Summary content ${counter}`,
     aiFeedback: null,
     status: 'pending',

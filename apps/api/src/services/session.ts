@@ -8,6 +8,9 @@ import {
   learningSessions,
   sessionEvents,
   sessionSummaries,
+  curriculumTopics,
+  profiles,
+  retentionCards,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
@@ -74,18 +77,34 @@ export async function startSession(
   subjectId: string,
   input: SessionStartInput
 ): Promise<LearningSession> {
+  // Verify subject belongs to this profile (horizontal privilege guard)
+  const subject = await getSubject(db, profileId, subjectId);
+  if (!subject) {
+    throw new Error('Subject not found');
+  }
+
   const [row] = await db
     .insert(learningSessions)
     .values({
       profileId,
       subjectId,
       topicId: input.topicId ?? null,
-      sessionType: 'learning',
+      sessionType: input.sessionType ?? 'learning',
       status: 'active',
       escalationRung: 1,
       exchangeCount: 0,
     })
     .returning();
+
+  // Record session_start event for the audit log
+  await db.insert(sessionEvents).values({
+    sessionId: row.id,
+    profileId,
+    subjectId,
+    eventType: 'session_start' as const,
+    content: '',
+  });
+
   return mapSessionRow(row);
 }
 
@@ -121,17 +140,50 @@ async function prepareExchangeContext(
     throw new Error('Session not found');
   }
 
-  // 2. Load subject name for system prompt
-  const subject = await getSubject(db, profileId, session.subjectId);
+  // 2. Load all supplementary data in parallel (all independent after session load)
+  const [subject, topicRows, profileRows, retentionRows, events] =
+    await Promise.all([
+      getSubject(db, profileId, session.subjectId),
+      session.topicId
+        ? db
+            .select()
+            .from(curriculumTopics)
+            .where(eq(curriculumTopics.id, session.topicId))
+            .limit(1)
+        : Promise.resolve([]),
+      db.select().from(profiles).where(eq(profiles.id, profileId)).limit(1),
+      session.topicId
+        ? db
+            .select()
+            .from(retentionCards)
+            .where(
+              and(
+                eq(retentionCards.topicId, session.topicId),
+                eq(retentionCards.profileId, profileId)
+              )
+            )
+            .limit(1)
+        : Promise.resolve([]),
+      db.query.sessionEvents.findMany({
+        where: and(
+          eq(sessionEvents.sessionId, sessionId),
+          eq(sessionEvents.profileId, profileId)
+        ),
+        orderBy: asc(sessionEvents.createdAt),
+      }),
+    ]);
 
-  // 3. Load exchange history from session_events
-  const events = await db.query.sessionEvents.findMany({
-    where: and(
-      eq(sessionEvents.sessionId, sessionId),
-      eq(sessionEvents.profileId, profileId)
-    ),
-    orderBy: asc(sessionEvents.createdAt),
-  });
+  const topic = topicRows[0];
+  const [profile] = profileRows;
+  const retentionCard = retentionRows[0];
+
+  const workedExampleLevel: 'full' | 'fading' | 'problem_first' = retentionCard
+    ? retentionCard.repetitions <= 1
+      ? 'full'
+      : retentionCard.repetitions <= 4
+      ? 'fading'
+      : 'problem_first'
+    : 'full'; // default for new topics
   const exchangeHistory = events
     .filter(
       (e) => e.eventType === 'user_message' || e.eventType === 'ai_response'
@@ -143,12 +195,20 @@ async function prepareExchangeContext(
       content: e.content,
     }));
 
+  // 3b. Count questions at the current escalation rung
+  const questionsAtCurrentRung = events.filter(
+    (e) =>
+      e.eventType === 'ai_response' &&
+      (e.metadata as Record<string, unknown> | null)?.escalationRung ===
+        session.escalationRung
+  ).length;
+
   // 4. Evaluate escalation
   const escalationDecision = evaluateEscalation(
     {
       currentRung: session.escalationRung as EscalationRung,
       hintCount: 0,
-      questionsAtCurrentRung: 0,
+      questionsAtCurrentRung,
       totalExchanges: session.exchangeCount,
     },
     userMessage
@@ -162,11 +222,14 @@ async function prepareExchangeContext(
     sessionId,
     profileId,
     subjectName: subject?.name ?? 'Unknown',
-    topicTitle: undefined,
+    topicTitle: topic?.title,
+    topicDescription: topic?.description,
     sessionType: session.sessionType as 'learning' | 'homework',
     escalationRung: effectiveRung,
     exchangeHistory,
-    personaType: 'LEARNER',
+    personaType:
+      (profile?.personaType as 'TEEN' | 'LEARNER' | 'PARENT') ?? 'LEARNER',
+    workedExampleLevel,
   };
 
   return { session, context, effectiveRung };
@@ -181,7 +244,9 @@ async function persistExchangeResult(
   aiResponse: string,
   effectiveRung: EscalationRung
 ): Promise<number> {
-  // Persist events: user_message + ai_response
+  const previousRung = session.escalationRung;
+
+  // Persist events: user_message + ai_response (with rung metadata)
   await db.insert(sessionEvents).values([
     {
       sessionId,
@@ -196,8 +261,21 @@ async function persistExchangeResult(
       subjectId: session.subjectId,
       eventType: 'ai_response' as const,
       content: aiResponse,
+      metadata: { escalationRung: effectiveRung },
     },
   ]);
+
+  // Record escalation event if rung changed
+  if (previousRung !== effectiveRung) {
+    await db.insert(sessionEvents).values({
+      sessionId,
+      profileId,
+      subjectId: session.subjectId,
+      eventType: 'escalation' as const,
+      content: `Escalated from rung ${previousRung} to ${effectiveRung}`,
+      metadata: { fromRung: previousRung, toRung: effectiveRung },
+    });
+  }
 
   // Update session state
   const newExchangeCount = session.exchangeCount + 1;
@@ -312,13 +390,22 @@ export async function closeSession(
   profileId: string,
   sessionId: string,
   input: SessionCloseInput
-): Promise<{ message: string; sessionId: string }> {
+): Promise<{
+  message: string;
+  sessionId: string;
+  topicId: string | null;
+  subjectId: string;
+}> {
   void input;
   const session = await getSession(db, profileId, sessionId);
+  if (!session) {
+    throw new Error('Session not found');
+  }
+
   const now = new Date();
-  const durationSeconds = session
-    ? Math.round((now.getTime() - new Date(session.startedAt).getTime()) / 1000)
-    : null;
+  const durationSeconds = Math.round(
+    (now.getTime() - new Date(session.startedAt).getTime()) / 1000
+  );
 
   await db
     .update(learningSessions)
@@ -335,7 +422,12 @@ export async function closeSession(
       )
     );
 
-  return { message: 'Session closed', sessionId };
+  return {
+    message: 'Session closed',
+    sessionId,
+    topicId: session.topicId ?? null,
+    subjectId: session.subjectId,
+  };
 }
 
 export async function flagContent(
@@ -348,11 +440,14 @@ export async function flagContent(
 
   // Look up the session to get its subjectId
   const session = await getSession(db, profileId, sessionId);
+  if (!session) {
+    throw new Error('Session not found');
+  }
 
   await db.insert(sessionEvents).values({
     sessionId,
     profileId,
-    subjectId: session?.subjectId ?? sessionId, // fallback if session not found
+    subjectId: session.subjectId,
     eventType: 'flag',
     content: 'Content flagged',
   });
@@ -419,7 +514,12 @@ export async function submitSummary(
       status: finalStatus,
       updatedAt: new Date(),
     })
-    .where(eq(sessionSummaries.id, row.id));
+    .where(
+      and(
+        eq(sessionSummaries.id, row.id),
+        eq(sessionSummaries.profileId, profileId)
+      )
+    );
 
   return {
     summary: {

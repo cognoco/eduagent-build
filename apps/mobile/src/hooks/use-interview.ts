@@ -5,16 +5,11 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
+import type { InterviewState } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 
-interface InterviewState {
-  draftId: string;
-  status: 'in_progress' | 'completed' | 'expired';
-  exchangeCount: number;
-  subjectName: string;
-}
-
+// InterviewResponse is API-route-specific (includes exchangeCount, not extractedSignals)
 interface InterviewResponse {
   response: string;
   isComplete: boolean;

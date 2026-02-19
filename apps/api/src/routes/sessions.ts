@@ -22,6 +22,7 @@ import {
   submitSummary,
 } from '../services/session';
 import { notFound } from '../errors';
+import { inngest } from '../inngest/client';
 
 type SessionRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -134,6 +135,19 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         c.req.param('sessionId'),
         c.req.valid('json')
       );
+
+      // Dispatch background job for retention, streaks, coaching
+      await inngest.send({
+        name: 'app/session.completed',
+        data: {
+          profileId,
+          sessionId: result.sessionId,
+          topicId: result.topicId,
+          subjectId: result.subjectId,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
       return c.json(result);
     }
   )

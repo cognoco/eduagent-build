@@ -5,6 +5,7 @@ import {
   useStartSession,
   useSendMessage,
   useCloseSession,
+  useStreamMessage,
   useSessionSummary,
   useSubmitSummary,
 } from './use-sessions';
@@ -39,6 +40,7 @@ jest.mock('../lib/api', () => ({
 }));
 
 jest.mock('../lib/sse', () => ({
+  parseSSEStream: jest.fn(),
   streamSSE: jest.fn(),
 }));
 
@@ -71,6 +73,51 @@ describe('useStartSession', () => {
 
   afterEach(() => {
     queryClient.clear();
+  });
+
+  it('passes topicId and sessionType to the API', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          session: {
+            id: 'session-1',
+            subjectId: 'subject-1',
+            topicId: 'topic-1',
+            sessionType: 'homework',
+            status: 'active',
+            escalationRung: 1,
+            exchangeCount: 0,
+            startedAt: '2025-01-01T00:00:00Z',
+            lastActivityAt: '2025-01-01T00:00:00Z',
+            endedAt: null,
+            durationSeconds: null,
+          },
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useStartSession('subject-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate({
+        subjectId: 'subject-1',
+        topicId: 'topic-1',
+        sessionType: 'homework',
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    // Verify the fetch body includes topicId and sessionType
+    const [, fetchInit] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(fetchInit.body as string);
+    expect(body.topicId).toBe('topic-1');
+    expect(body.sessionType).toBe('homework');
   });
 
   it('calls POST /subjects/:subjectId/sessions', async () => {
@@ -309,5 +356,56 @@ describe('useSubmitSummary', () => {
     });
 
     expect(result.current.error).toBeInstanceOf(Error);
+  });
+});
+
+describe('useStreamMessage', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('uses overrideSessionId when provided, ignoring hook sessionId', async () => {
+    const { parseSSEStream } = require('../lib/sse') as {
+      parseSSEStream: jest.Mock;
+    };
+
+    // Mock fetch to return OK response
+    mockFetch.mockResolvedValueOnce(new Response('stream', { status: 200 }));
+
+    // Mock parseSSEStream to yield chunk + done events
+    parseSSEStream.mockReturnValueOnce(
+      (async function* () {
+        yield { type: 'chunk', content: 'Hello' };
+        yield { type: 'done', exchangeCount: 1, escalationRung: 1 };
+      })()
+    );
+
+    // Hook initialized with empty string (simulating no session yet)
+    const { result } = renderHook(() => useStreamMessage(''), {
+      wrapper: createWrapper(),
+    });
+
+    const onChunk = jest.fn();
+    const onDone = jest.fn();
+
+    await act(async () => {
+      // Pass 'real-session-id' as 4th arg (overrideSessionId)
+      await result.current.stream('Hello', onChunk, onDone, 'real-session-id');
+    });
+
+    // Should have called API (wouldn't be called if sessionId was '')
+    expect(mockFetch).toHaveBeenCalled();
+    // Verify the URL contains the override session ID
+    const [url] = mockFetch.mock.calls[0] as [string, ...unknown[]];
+    expect(url).toContain('real-session-id');
+    expect(onDone).toHaveBeenCalledWith({
+      exchangeCount: 1,
+      escalationRung: 1,
+    });
   });
 });

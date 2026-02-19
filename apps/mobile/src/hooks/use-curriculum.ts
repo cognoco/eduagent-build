@@ -5,26 +5,9 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
+import type { Curriculum } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
-
-interface CurriculumTopic {
-  id: string;
-  title: string;
-  description: string;
-  sortOrder: number;
-  relevance: string;
-  estimatedMinutes: number;
-  skipped: boolean;
-}
-
-interface Curriculum {
-  id: string;
-  subjectId: string;
-  version: number;
-  topics: CurriculumTopic[];
-  generatedAt: string;
-}
 
 export function useCurriculum(
   subjectId: string

@@ -5,6 +5,8 @@
 // TODO: Replace with actual provider call after embedding spike decision.
 // ---------------------------------------------------------------------------
 
+import { storeEmbedding, type Database } from '@eduagent/database';
+
 export interface EmbeddingResult {
   vector: number[];
   dimensions: number;
@@ -66,4 +68,30 @@ export async function generateEmbedding(
     model: config.model,
     provider: config.provider,
   };
+}
+
+// ---------------------------------------------------------------------------
+// DB-aware embedding storage (used by inngest/functions/session-completed.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates and stores an embedding for a session.
+ * Wraps generateEmbedding + storeEmbedding from @eduagent/database
+ * so Inngest functions only import from the service layer.
+ */
+export async function storeSessionEmbedding(
+  db: Database,
+  sessionId: string,
+  profileId: string,
+  topicId: string | null,
+  content: string
+): Promise<void> {
+  const result = await generateEmbedding(content);
+  await storeEmbedding(db, {
+    sessionId,
+    profileId,
+    topicId: topicId ?? undefined,
+    content,
+    embedding: result.vector,
+  });
 }

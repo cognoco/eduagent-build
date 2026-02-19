@@ -5,59 +5,26 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
+import type {
+  SubscriptionTier,
+  SubscriptionStatus,
+  Subscription,
+  Usage,
+  CheckoutRequest,
+  CheckoutResponse,
+  CancelResponse,
+  PortalResponse,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 
 // ---------------------------------------------------------------------------
-// Types (matching API response shapes from routes/billing.ts)
+// Types — prefer imports from @eduagent/schemas; local only for API-specific shapes
 // ---------------------------------------------------------------------------
 
-export type SubscriptionTier = 'free' | 'plus' | 'family' | 'pro';
-export type SubscriptionStatus =
-  | 'trial'
-  | 'active'
-  | 'past_due'
-  | 'cancelled'
-  | 'expired';
-export type WarningLevel = 'none' | 'soft' | 'hard' | 'exceeded';
-
-export interface SubscriptionData {
-  tier: SubscriptionTier;
-  status: SubscriptionStatus;
-  trialEndsAt: string | null;
-  currentPeriodEnd: string | null;
-  monthlyLimit: number;
-  usedThisMonth: number;
-  remainingQuestions: number;
-}
-
-export interface UsageData {
-  monthlyLimit: number;
-  usedThisMonth: number;
-  remainingQuestions: number;
-  topUpCreditsRemaining: number;
-  warningLevel: WarningLevel;
-  cycleResetAt: string;
-}
-
-interface CheckoutInput {
-  tier: 'plus' | 'family' | 'pro';
-  interval: 'monthly' | 'yearly';
-}
-
-interface CheckoutResult {
-  checkoutUrl: string;
-  sessionId: string;
-}
-
-interface CancelResult {
-  message: string;
-  currentPeriodEnd: string;
-}
-
-interface PortalResult {
-  portalUrl: string;
-}
+export type { SubscriptionTier, SubscriptionStatus };
+export type SubscriptionData = Subscription;
+export type UsageData = Usage;
 
 interface TopUpResult {
   topUp: {
@@ -111,14 +78,14 @@ export function useUsage(): UseQueryResult<UsageData> {
 // ---------------------------------------------------------------------------
 
 export function useCreateCheckout(): UseMutationResult<
-  CheckoutResult,
+  CheckoutResponse,
   Error,
-  CheckoutInput
+  CheckoutRequest
 > {
   const client = useApiClient();
 
   return useMutation({
-    mutationFn: async (input: CheckoutInput) => {
+    mutationFn: async (input: CheckoutRequest) => {
       const res = await client.subscription.checkout.$post({ json: input });
       return await res.json();
     },
@@ -126,7 +93,7 @@ export function useCreateCheckout(): UseMutationResult<
 }
 
 export function useCancelSubscription(): UseMutationResult<
-  CancelResult,
+  CancelResponse,
   Error,
   void
 > {
@@ -148,7 +115,7 @@ export function useCancelSubscription(): UseMutationResult<
 }
 
 export function useCreatePortalSession(): UseMutationResult<
-  PortalResult,
+  PortalResponse,
   Error,
   void
 > {

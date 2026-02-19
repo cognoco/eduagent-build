@@ -175,6 +175,21 @@ describe('subject routes', () => {
       expect(body).toHaveProperty('subject');
     });
 
+    it('returns 404 when subject not found', async () => {
+      const { getSubject } = jest.requireMock('../services/subject');
+      getSubject.mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        '/v1/subjects/nonexistent-id',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body).toHaveProperty('code', 'NOT_FOUND');
+    });
+
     it('returns 401 without auth header', async () => {
       const res = await app.request('/v1/subjects/some-id', {}, TEST_ENV);
 
@@ -202,6 +217,25 @@ describe('subject routes', () => {
 
       const body = await res.json();
       expect(body).toHaveProperty('subject');
+    });
+
+    it('returns 404 when subject not found', async () => {
+      const { updateSubject } = jest.requireMock('../services/subject');
+      updateSubject.mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        '/v1/subjects/nonexistent-id',
+        {
+          method: 'PATCH',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ name: 'Nope' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body).toHaveProperty('code', 'NOT_FOUND');
     });
 
     it('returns 401 without auth header', async () => {

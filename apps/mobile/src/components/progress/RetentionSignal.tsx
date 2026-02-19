@@ -1,6 +1,6 @@
 import { View, Text } from 'react-native';
 
-type RetentionStatus = 'strong' | 'fading' | 'weak' | 'forgotten';
+export type RetentionStatus = 'strong' | 'fading' | 'weak' | 'forgotten';
 
 interface RetentionSignalProps {
   status: RetentionStatus;

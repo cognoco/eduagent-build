@@ -1,5 +1,5 @@
 import type { ConsentRequest, ConsentResponse } from '@eduagent/schemas';
-import { randomUUID } from 'crypto';
+import { uuidv7 } from 'uuidv7';
 
 let counter = 0;
 
@@ -8,7 +8,7 @@ export function buildConsentRequest(
 ): ConsentRequest {
   counter++;
   return {
-    childProfileId: randomUUID(),
+    childProfileId: uuidv7(),
     parentEmail: `parent${counter}@example.com`,
     consentType: 'GDPR',
     ...overrides,
@@ -19,7 +19,7 @@ export function buildConsentResponse(
   overrides?: Partial<ConsentResponse>
 ): ConsentResponse {
   return {
-    token: `consent-token-${randomUUID()}`,
+    token: `consent-token-${uuidv7()}`,
     approved: true,
     ...overrides,
   };

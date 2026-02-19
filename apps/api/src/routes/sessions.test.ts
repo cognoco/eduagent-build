@@ -119,6 +119,8 @@ jest.mock('../services/session', () => ({
   closeSession: jest.fn().mockImplementation((_db, _profileId, sessionId) => ({
     message: 'Session closed',
     sessionId,
+    topicId: null,
+    subjectId: SUBJECT_ID,
   })),
   flagContent: jest.fn().mockResolvedValue({
     message: 'Content flagged for review. Thank you!',
@@ -155,6 +157,20 @@ jest.mock('../services/session', () => ({
   ),
 }));
 
+jest.mock('inngest/hono', () => ({
+  serve: jest.fn().mockReturnValue(jest.fn()),
+}));
+
+const mockInngestSend = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../inngest/client', () => ({
+  inngest: {
+    send: (...args: unknown[]) => mockInngestSend(...args),
+    createFunction: jest.fn().mockReturnValue(jest.fn()),
+  },
+}));
+
+import { inngest } from '../inngest/client';
 import app from '../index';
 
 const TEST_ENV = {
@@ -311,6 +327,18 @@ describe('session routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/sessions/:sessionId/close', () => {
+    let sendSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      sendSpy = jest
+        .spyOn(inngest, 'send')
+        .mockResolvedValue({ ids: [] } as never);
+    });
+
+    afterEach(() => {
+      sendSpy.mockRestore();
+    });
+
     it('returns 200 with session closed', async () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/close`,
@@ -327,6 +355,27 @@ describe('session routes', () => {
       const body = await res.json();
       expect(body.message).toBe('Session closed');
       expect(body.sessionId).toBe(SESSION_ID);
+    });
+
+    it('dispatches app/session.completed Inngest event on close', async () => {
+      await app.request(
+        `/v1/sessions/${SESSION_ID}/close`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      expect(sendSpy).toHaveBeenCalledWith({
+        name: 'app/session.completed',
+        data: expect.objectContaining({
+          sessionId: SESSION_ID,
+          subjectId: SUBJECT_ID,
+          timestamp: expect.any(String),
+        }),
+      });
     });
 
     it('returns 401 without auth header', async () => {

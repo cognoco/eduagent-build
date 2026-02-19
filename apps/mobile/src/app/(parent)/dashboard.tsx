@@ -8,9 +8,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../lib/theme';
 import { DashboardCard } from '../../components/common';
+import type { RetentionStatus } from '../../components/progress';
 import { useDashboard } from '../../hooks/use-dashboard';
-
-type RetentionStatus = 'strong' | 'fading' | 'weak';
 
 export default function DashboardScreen() {
   const { setPersona } = useTheme();

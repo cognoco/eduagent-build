@@ -1,4 +1,8 @@
 import { Hono } from 'hono';
+
+import { ERROR_CODES } from '@eduagent/schemas';
+import type { Database } from '@eduagent/database';
+
 import { authMiddleware } from './middleware/auth';
 import { databaseMiddleware } from './middleware/database';
 import { accountMiddleware } from './middleware/account';
@@ -6,9 +10,10 @@ import { profileScopeMiddleware } from './middleware/profile-scope';
 import { llmMiddleware } from './middleware/llm';
 import { meteringMiddleware } from './middleware/metering';
 import { requestLogger } from './middleware/request-logger';
+
 import type { AuthUser } from './middleware/auth';
-import type { Database } from '@eduagent/database';
 import type { Account } from './services/account';
+
 import { health } from './routes/health';
 import { auth } from './routes/auth';
 import { profileRoutes } from './routes/profiles';
@@ -103,6 +108,21 @@ app.route('/', settingsRoutes);
 app.route('/', dashboardRoutes);
 app.route('/', billingRoutes);
 app.route('/', stripeWebhookRoute);
+
+// Global error handler — catches unhandled exceptions and returns ApiErrorSchema envelope
+app.onError((err, c) => {
+  console.error('[unhandled]', err);
+  return c.json(
+    {
+      code: ERROR_CODES.INTERNAL_ERROR,
+      message:
+        c.env.ENVIRONMENT === 'production'
+          ? 'Internal server error'
+          : err.message || 'Internal server error',
+    },
+    500
+  );
+});
 
 export type AppType = typeof app;
 

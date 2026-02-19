@@ -1,7 +1,5 @@
 import { View, Text } from 'react-native';
-import { RetentionSignal } from '../progress/RetentionSignal';
-
-type RetentionStatus = 'strong' | 'fading' | 'weak' | 'forgotten';
+import { RetentionSignal, type RetentionStatus } from '../progress';
 
 interface SubjectInfo {
   name: string;

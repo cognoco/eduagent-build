@@ -2,6 +2,7 @@ import { eq, and, type SQL } from 'drizzle-orm';
 import type { Database } from './client.js';
 import {
   profiles,
+  consentStates,
   learningSessions,
   subjects,
   assessments,
@@ -15,6 +16,9 @@ import {
   parkingLotItems,
   teachingPreferences,
   curriculumAdaptations,
+  notificationPreferences,
+  learningModes,
+  sessionEmbeddings,
 } from './schema/index.js';
 
 export function createScopedRepository(db: Database, profileId: string) {
@@ -186,6 +190,58 @@ export function createScopedRepository(db: Database, profileId: string) {
       async findFirst(extraWhere?: SQL) {
         return db.query.curriculumAdaptations.findFirst({
           where: scopedWhere(curriculumAdaptations, extraWhere),
+        });
+      },
+    },
+
+    consentStates: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.consentStates.findMany({
+          where: scopedWhere(consentStates, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.consentStates.findFirst({
+          where: scopedWhere(consentStates, extraWhere),
+        });
+      },
+    },
+
+    notificationPreferences: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.notificationPreferences.findMany({
+          where: scopedWhere(notificationPreferences, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.notificationPreferences.findFirst({
+          where: scopedWhere(notificationPreferences, extraWhere),
+        });
+      },
+    },
+
+    learningModes: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.learningModes.findMany({
+          where: scopedWhere(learningModes, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.learningModes.findFirst({
+          where: scopedWhere(learningModes, extraWhere),
+        });
+      },
+    },
+
+    sessionEmbeddings: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.sessionEmbeddings.findMany({
+          where: scopedWhere(sessionEmbeddings, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.sessionEmbeddings.findFirst({
+          where: scopedWhere(sessionEmbeddings, extraWhere),
         });
       },
     },

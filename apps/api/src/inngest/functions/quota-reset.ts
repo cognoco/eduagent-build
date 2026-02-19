@@ -3,11 +3,9 @@
 // Daily cron: reset monthly quota for subscriptions whose billing cycle reset.
 // ---------------------------------------------------------------------------
 
-import { eq, lte } from 'drizzle-orm';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { quotaPools, subscriptions } from '@eduagent/database';
-import { getTierConfig } from '../../services/subscription';
+import { resetExpiredQuotaCycles } from '../../services/billing';
 
 export const quotaReset = inngest.createFunction(
   { id: 'quota-reset', name: 'Reset monthly quotas on billing cycle' },
@@ -17,40 +15,7 @@ export const quotaReset = inngest.createFunction(
 
     const resetCount = await step.run('reset-expired-cycles', async () => {
       const db = getStepDatabase();
-
-      // Find quota pools where cycleResetAt <= now (billing cycle has elapsed)
-      const dueForReset = await db.query.quotaPools.findMany({
-        where: lte(quotaPools.cycleResetAt, now),
-      });
-
-      let count = 0;
-      const nextReset = new Date(now);
-      nextReset.setMonth(nextReset.getMonth() + 1);
-
-      for (const pool of dueForReset) {
-        // Look up the subscription to get the correct tier quota
-        const sub = await db.query.subscriptions.findFirst({
-          where: eq(subscriptions.id, pool.subscriptionId),
-        });
-
-        const tierConfig = getTierConfig(
-          (sub?.tier as 'free' | 'plus' | 'family' | 'pro') ?? 'free'
-        );
-
-        await db
-          .update(quotaPools)
-          .set({
-            usedThisMonth: 0,
-            monthlyLimit: tierConfig.monthlyQuota,
-            cycleResetAt: nextReset,
-            updatedAt: now,
-          })
-          .where(eq(quotaPools.id, pool.id));
-
-        count++;
-      }
-
-      return count;
+      return resetExpiredQuotaCycles(db, now);
     });
 
     return {

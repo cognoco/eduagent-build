@@ -1,5 +1,5 @@
 import type { Subscription } from '@eduagent/schemas';
-import { randomUUID } from 'crypto';
+import { uuidv7 } from 'uuidv7';
 
 /** Builds a Subscription response object (API-facing shape from @eduagent/schemas). */
 export function buildSubscription(
@@ -31,8 +31,8 @@ export function buildQuotaPool(
 ) {
   const now = new Date().toISOString();
   return {
-    id: randomUUID(),
-    subscriptionId: randomUUID(),
+    id: uuidv7(),
+    subscriptionId: uuidv7(),
     monthlyLimit: 50,
     usedThisMonth: 0,
     cycleResetAt: now,
@@ -59,8 +59,8 @@ export function buildTopUpCredits(
     Date.now() + 30 * 24 * 60 * 60 * 1000
   ).toISOString();
   return {
-    id: randomUUID(),
-    subscriptionId: randomUUID(),
+    id: uuidv7(),
+    subscriptionId: uuidv7(),
     amount: 500,
     remaining: 500,
     purchasedAt: now,

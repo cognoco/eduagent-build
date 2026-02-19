@@ -1,60 +1,40 @@
-import { sessionCompleted } from './session-completed';
-
 // ---------------------------------------------------------------------------
-// Mock setup — database, retention package, streaks service
+// Session Completed — Tests
 // ---------------------------------------------------------------------------
-
-const mockFindFirstRetentionCard = jest.fn();
-const mockFindFirstStreak = jest.fn();
-const mockDbUpdate = jest.fn().mockReturnValue({
-  set: jest
-    .fn()
-    .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
-});
-const mockDbInsert = jest.fn().mockReturnValue({
-  values: jest.fn().mockResolvedValue(undefined),
-});
 
 jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn(() => ({
-    update: mockDbUpdate,
-    insert: mockDbInsert,
-    execute: jest.fn(),
-  })),
-  createScopedRepository: jest.fn(() => ({
-    retentionCards: { findFirst: mockFindFirstRetentionCard },
-    streaks: { findFirst: mockFindFirstStreak },
-  })),
-  retentionCards: { topicId: 'topicId', id: 'id', profileId: 'profileId' },
-  streaks: { id: 'id', profileId: 'profileId' },
-  sessionSummaries: {},
-  storeEmbedding: jest.fn().mockResolvedValue(undefined),
+  createDatabase: jest.fn(() => ({})),
 }));
 
-jest.mock('@eduagent/retention', () => ({
-  sm2: jest.fn(() => ({
-    card: {
-      easeFactor: 2.6,
-      interval: 6,
-      repetitions: 2,
-      lastReviewedAt: '2026-02-17T00:00:00.000Z',
-      nextReviewAt: '2026-02-23T00:00:00.000Z',
-    },
-    wasSuccessful: true,
-  })),
+const mockStoreSessionEmbedding = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../../services/embeddings', () => ({
+  storeSessionEmbedding: (...args: unknown[]) =>
+    mockStoreSessionEmbedding(...args),
 }));
+
+const mockUpdateRetentionFromSession = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../../services/retention-data', () => ({
+  updateRetentionFromSession: (...args: unknown[]) =>
+    mockUpdateRetentionFromSession(...args),
+}));
+
+const mockCreatePendingSessionSummary = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../../services/summaries', () => ({
+  createPendingSessionSummary: (...args: unknown[]) =>
+    mockCreatePendingSessionSummary(...args),
+}));
+
+const mockRecordSessionActivity = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('../../services/streaks', () => ({
-  recordDailyActivity: jest.fn(() => ({
-    newState: {
-      currentStreak: 5,
-      longestStreak: 10,
-      lastActivityDate: '2026-02-17',
-      gracePeriodStartDate: null,
-    },
-    streakBroken: false,
-  })),
+  recordSessionActivity: (...args: unknown[]) =>
+    mockRecordSessionActivity(...args),
 }));
+
+import { sessionCompleted } from './session-completed';
 
 // ---------------------------------------------------------------------------
 // Helpers — extract Inngest step handlers from the function
@@ -105,8 +85,6 @@ function createEventData(
 describe('sessionCompleted', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockFindFirstRetentionCard.mockResolvedValue(null);
-    mockFindFirstStreak.mockResolvedValue(null);
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
   });
 
@@ -138,120 +116,82 @@ describe('sessionCompleted', () => {
   });
 
   describe('update-retention step', () => {
-    it('calls sm2 and updates retention card when card exists', async () => {
-      const { sm2 } = jest.requireMock('@eduagent/retention');
-      mockFindFirstRetentionCard.mockResolvedValue({
-        id: 'card-001',
-        easeFactor: '2.50',
-        intervalDays: 1,
-        repetitions: 1,
-        lastReviewedAt: new Date('2026-02-16T00:00:00Z'),
-        nextReviewAt: new Date('2026-02-17T00:00:00Z'),
-      });
-
+    it('calls updateRetentionFromSession with correct args', async () => {
       await executeSteps(createEventData({ qualityRating: 4 }));
 
-      expect(sm2).toHaveBeenCalledWith({
-        quality: 4,
-        card: {
-          easeFactor: 2.5,
-          interval: 1,
-          repetitions: 1,
-          lastReviewedAt: '2026-02-16T00:00:00.000Z',
-          nextReviewAt: '2026-02-17T00:00:00.000Z',
-        },
-      });
-      expect(mockDbUpdate).toHaveBeenCalled();
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
+        expect.anything(), // db
+        'profile-001',
+        'topic-001',
+        4
+      );
     });
 
-    it('skips update when no retention card exists', async () => {
-      const { sm2 } = jest.requireMock('@eduagent/retention');
-      mockFindFirstRetentionCard.mockResolvedValue(null);
+    it('skips retention update when no topicId', async () => {
+      await executeSteps(createEventData({ topicId: null }));
 
-      await executeSteps(createEventData());
-
-      expect(sm2).not.toHaveBeenCalled();
+      expect(mockUpdateRetentionFromSession).not.toHaveBeenCalled();
     });
 
     it('defaults qualityRating to 3 when not provided', async () => {
-      const { sm2 } = jest.requireMock('@eduagent/retention');
-      mockFindFirstRetentionCard.mockResolvedValue({
-        id: 'card-001',
-        easeFactor: '2.50',
-        intervalDays: 1,
-        repetitions: 0,
-        lastReviewedAt: null,
-        nextReviewAt: null,
-      });
-
       await executeSteps(createEventData());
 
-      expect(sm2).toHaveBeenCalledWith(expect.objectContaining({ quality: 3 }));
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-001',
+        3
+      );
     });
   });
 
   describe('write-coaching-card step', () => {
-    it('inserts a session summary row', async () => {
+    it('creates a pending session summary', async () => {
       await executeSteps(createEventData());
 
-      expect(mockDbInsert).toHaveBeenCalled();
+      expect(mockCreatePendingSessionSummary).toHaveBeenCalledWith(
+        expect.anything(), // db
+        'session-001',
+        'profile-001',
+        'topic-001',
+        'pending'
+      );
     });
   });
 
   describe('update-dashboard step', () => {
-    it('calls recordDailyActivity when streak exists', async () => {
-      const { recordDailyActivity } = jest.requireMock(
-        '../../services/streaks'
-      );
-      mockFindFirstStreak.mockResolvedValue({
-        id: 'streak-001',
-        currentStreak: 4,
-        longestStreak: 10,
-        lastActivityDate: '2026-02-16',
-        gracePeriodStartDate: null,
-      });
-
+    it('calls recordSessionActivity with correct date', async () => {
       await executeSteps(createEventData());
 
-      expect(recordDailyActivity).toHaveBeenCalledWith(
-        {
-          currentStreak: 4,
-          longestStreak: 10,
-          lastActivityDate: '2026-02-16',
-          gracePeriodStartDate: null,
-        },
+      expect(mockRecordSessionActivity).toHaveBeenCalledWith(
+        expect.anything(), // db
+        'profile-001',
         '2026-02-17'
       );
-      expect(mockDbUpdate).toHaveBeenCalled();
     });
 
-    it('does not update streaks when no streak row exists', async () => {
-      const { recordDailyActivity } = jest.requireMock(
-        '../../services/streaks'
+    it('uses current date when no timestamp provided', async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      await executeSteps(createEventData({ timestamp: undefined }));
+
+      expect(mockRecordSessionActivity).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        today
       );
-      mockFindFirstStreak.mockResolvedValue(null);
-
-      await executeSteps(createEventData());
-
-      expect(recordDailyActivity).not.toHaveBeenCalled();
     });
   });
 
   describe('generate-embeddings step', () => {
-    it('calls storeEmbedding with session data', async () => {
-      const { storeEmbedding } = jest.requireMock('@eduagent/database');
-
+    it('calls storeSessionEmbedding with session data', async () => {
       await executeSteps(createEventData());
 
-      expect(storeEmbedding).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          sessionId: 'session-001',
-          profileId: 'profile-001',
-          topicId: 'topic-001',
-          content: expect.stringContaining('session-001'),
-          embedding: expect.arrayContaining([0]),
-        })
+      expect(mockStoreSessionEmbedding).toHaveBeenCalledWith(
+        expect.anything(), // db
+        'session-001',
+        'profile-001',
+        'topic-001',
+        expect.stringContaining('session-001')
       );
     });
   });

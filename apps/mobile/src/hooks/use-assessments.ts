@@ -1,9 +1,16 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 import type { Assessment } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 
-export function useAssessment(assessmentId: string) {
+export function useAssessment(
+  assessmentId: string
+): UseQueryResult<Assessment> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 

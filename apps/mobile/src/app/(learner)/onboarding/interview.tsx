@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -25,6 +25,14 @@ export default function InterviewScreen() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [interviewComplete, setInterviewComplete] = useState(false);
 
+  const animationCleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      animationCleanupRef.current?.();
+    };
+  }, []);
+
   const handleSend = useCallback(
     async (text: string) => {
       if (isStreaming || !subjectId) return;
@@ -36,13 +44,18 @@ export default function InterviewScreen() {
 
       try {
         const result = await sendInterview.mutateAsync(text);
-        animateResponse(result.response, setMessages, setIsStreaming, () => {
-          if (result.isComplete) {
-            setInterviewComplete(true);
+        animationCleanupRef.current = animateResponse(
+          result.response,
+          setMessages,
+          setIsStreaming,
+          () => {
+            if (result.isComplete) {
+              setInterviewComplete(true);
+            }
           }
-        });
+        );
       } catch {
-        animateResponse(
+        animationCleanupRef.current = animateResponse(
           "I'm having trouble connecting right now. Please try again.",
           setMessages,
           setIsStreaming

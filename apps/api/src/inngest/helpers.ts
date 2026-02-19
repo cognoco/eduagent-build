@@ -1,4 +1,4 @@
-import { createDatabase } from '@eduagent/database';
+import { createDatabase, type Database } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
 // Module-level DATABASE_URL — set by Inngest middleware on CF Workers,
@@ -31,7 +31,7 @@ export function resetDatabaseUrl(): void {
  * Caches the Drizzle instance per URL so multiple calls within a single
  * Inngest function execution reuse the same connection.
  */
-export function getStepDatabase() {
+export function getStepDatabase(): Database {
   const url = _databaseUrl ?? process.env['DATABASE_URL'];
   if (!url) {
     throw new Error(

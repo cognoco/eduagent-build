@@ -17,11 +17,18 @@ import {
   useChallengeCurriculum,
 } from '../../../hooks/use-curriculum';
 
-const RELEVANCE_COLORS: Record<string, string> = {
-  core: 'bg-primary/20 text-primary',
-  recommended: 'bg-accent/20 text-accent',
-  contemporary: 'bg-warning/20 text-warning',
-  emerging: 'bg-success/20 text-success',
+const RELEVANCE_BG: Record<string, string> = {
+  core: 'bg-primary/20',
+  recommended: 'bg-accent/20',
+  contemporary: 'bg-warning/20',
+  emerging: 'bg-success/20',
+};
+
+const RELEVANCE_TEXT: Record<string, string> = {
+  core: 'text-primary',
+  recommended: 'text-accent',
+  contemporary: 'text-warning',
+  emerging: 'text-success',
 };
 
 export default function CurriculumScreen() {
@@ -124,11 +131,17 @@ export default function CurriculumScreen() {
                   <View className="flex-row mt-2 items-center">
                     <View
                       className={`rounded-full px-2 py-0.5 mr-2 ${
-                        RELEVANCE_COLORS[topic.relevance] ??
-                        'bg-surface-elevated text-text-secondary'
+                        RELEVANCE_BG[topic.relevance] ?? 'bg-surface-elevated'
                       }`}
                     >
-                      <Text className="text-caption">{topic.relevance}</Text>
+                      <Text
+                        className={`text-caption ${
+                          RELEVANCE_TEXT[topic.relevance] ??
+                          'text-text-secondary'
+                        }`}
+                      >
+                        {topic.relevance}
+                      </Text>
                     </View>
                     <Text className="text-caption text-text-secondary">
                       ~{topic.estimatedMinutes} min

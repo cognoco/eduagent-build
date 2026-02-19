@@ -1,3 +1,5 @@
+import { sessionSummaries, type Database } from '@eduagent/database';
+import type { SummaryStatus } from '@eduagent/schemas';
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
 
@@ -101,4 +103,29 @@ function parseSummaryEvaluation(response: string): SummaryEvaluation {
     hasUnderstandingGaps: false,
     isAccepted: true,
   };
+}
+
+// ---------------------------------------------------------------------------
+// DB-aware session summary creation (used by inngest/functions/session-completed.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Creates a pending session summary record.
+ * The LLM-generated feedback is filled in later when routeAndCall() is wired.
+ */
+export async function createPendingSessionSummary(
+  db: Database,
+  sessionId: string,
+  profileId: string,
+  topicId: string | null,
+  status: SummaryStatus
+): Promise<void> {
+  await db.insert(sessionSummaries).values({
+    sessionId,
+    profileId,
+    topicId: topicId ?? null,
+    status,
+    content: null,
+    aiFeedback: null,
+  });
 }

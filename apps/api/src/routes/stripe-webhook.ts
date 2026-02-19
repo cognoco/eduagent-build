@@ -6,6 +6,7 @@
 
 import { Hono } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
+import { apiError } from '../errors';
 import { verifyWebhookSignature } from '../services/stripe';
 import { writeSubscriptionStatus } from '../services/kv';
 import {
@@ -60,6 +61,7 @@ async function refreshKvCache(
   const quota = await getQuotaPool(db, sub.id);
 
   const cached: CachedSubscriptionStatus = {
+    subscriptionId: sub.id,
     tier: sub.tier,
     status: sub.status,
     monthlyLimit: quota?.monthlyLimit ?? 0,
@@ -221,23 +223,21 @@ export const stripeWebhookRoute = new Hono<{
 }>().post('/stripe/webhook', async (c) => {
   const signature = c.req.header('stripe-signature');
   if (!signature) {
-    return c.json(
-      {
-        code: ERROR_CODES.MISSING_SIGNATURE,
-        message: 'Missing Stripe-Signature header',
-      },
-      400
+    return apiError(
+      c,
+      400,
+      ERROR_CODES.MISSING_SIGNATURE,
+      'Missing Stripe-Signature header'
     );
   }
 
   const webhookSecret = c.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
-    return c.json(
-      {
-        code: ERROR_CODES.INTERNAL_ERROR,
-        message: 'Webhook secret not configured',
-      },
-      500
+    return apiError(
+      c,
+      500,
+      ERROR_CODES.INTERNAL_ERROR,
+      'Webhook secret not configured'
     );
   }
 
@@ -248,12 +248,11 @@ export const stripeWebhookRoute = new Hono<{
   try {
     event = await verifyWebhookSignature(rawBody, signature, webhookSecret);
   } catch {
-    return c.json(
-      {
-        code: ERROR_CODES.MISSING_SIGNATURE,
-        message: 'Invalid webhook signature',
-      },
-      400
+    return apiError(
+      c,
+      400,
+      ERROR_CODES.MISSING_SIGNATURE,
+      'Invalid webhook signature'
     );
   }
 
@@ -261,15 +260,16 @@ export const stripeWebhookRoute = new Hono<{
   const kv = c.env.SUBSCRIPTION_KV;
   const eventTimestamp = new Date(event.created * 1000).toISOString();
 
-  // Reject stale events (>5 minutes old) to prevent replay attacks
+  // Reject stale events (>48 hours old) — Stripe retries for up to 72h,
+  // so we allow a wide window. The idempotency guard in
+  // updateSubscriptionFromWebhook handles duplicate/out-of-order events.
   const eventAge = Date.now() - event.created * 1000;
-  if (eventAge > 5 * 60 * 1000) {
-    return c.json(
-      {
-        code: ERROR_CODES.STALE_EVENT,
-        message: 'Event too old — rejected to prevent replay',
-      },
-      400
+  if (eventAge > 48 * 60 * 60 * 1000) {
+    return apiError(
+      c,
+      400,
+      ERROR_CODES.STALE_EVENT,
+      'Event too old — rejected to prevent replay'
     );
   }
 

@@ -47,6 +47,7 @@ const mockGetSubscriptionByAccountId = jest.fn();
 const mockEnsureFreeSubscription = jest.fn();
 const mockGetQuotaPool = jest.fn();
 const mockLinkStripeCustomer = jest.fn();
+const mockAddToByokWaitlist = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('../services/billing', () => ({
   getSubscriptionByAccountId: (...args: unknown[]) =>
@@ -55,6 +56,7 @@ jest.mock('../services/billing', () => ({
     mockEnsureFreeSubscription(...args),
   getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
   linkStripeCustomer: (...args: unknown[]) => mockLinkStripeCustomer(...args),
+  addToByokWaitlist: (...args: unknown[]) => mockAddToByokWaitlist(...args),
 }));
 
 // ---------------------------------------------------------------------------

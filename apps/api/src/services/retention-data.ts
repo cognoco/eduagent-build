@@ -21,6 +21,7 @@ import type {
   RelearnTopicInput,
   NeedsDeepeningStatus,
 } from '@eduagent/schemas';
+import { sm2 } from '@eduagent/retention';
 import { processRecallResult, type RetentionState } from './retention';
 
 // ---------------------------------------------------------------------------
@@ -298,6 +299,59 @@ export async function deleteTeachingPreference(
       and(
         eq(teachingPreferences.profileId, profileId),
         eq(teachingPreferences.subjectId, subjectId)
+      )
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Session-triggered retention update (used by inngest/functions/session-completed.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Updates a retention card via SM-2 after a session completes.
+ * Looks up the card by topicId, runs the SM-2 algorithm, and persists
+ * the result with defence-in-depth profileId scoping.
+ */
+export async function updateRetentionFromSession(
+  db: Database,
+  profileId: string,
+  topicId: string,
+  quality: number
+): Promise<void> {
+  const repo = createScopedRepository(db, profileId);
+  const card = await repo.retentionCards.findFirst(
+    eq(retentionCards.topicId, topicId)
+  );
+
+  if (!card) return;
+
+  const result = sm2({
+    quality,
+    card: {
+      easeFactor: Number(card.easeFactor),
+      interval: card.intervalDays,
+      repetitions: card.repetitions,
+      lastReviewedAt:
+        card.lastReviewedAt?.toISOString() ?? new Date().toISOString(),
+      nextReviewAt:
+        card.nextReviewAt?.toISOString() ?? new Date().toISOString(),
+    },
+  });
+
+  await db
+    .update(retentionCards)
+    .set({
+      easeFactor: String(result.card.easeFactor),
+      intervalDays: result.card.interval,
+      repetitions: result.card.repetitions,
+      lastReviewedAt: new Date(result.card.lastReviewedAt),
+      nextReviewAt: new Date(result.card.nextReviewAt),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(retentionCards.id, card.id),
+        eq(retentionCards.profileId, profileId)
       )
     );
 }

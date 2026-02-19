@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   useQuery,
   useMutation,
@@ -6,23 +6,14 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
+import type { LearningSession, SessionSummary } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { parseSSEStream } from '../lib/sse';
 
+// API-route-specific response wrappers (not in schemas)
 interface SessionStartResult {
-  session: {
-    id: string;
-    subjectId: string;
-    sessionType: string;
-    status: string;
-    escalationRung: number;
-    exchangeCount: number;
-    startedAt: string;
-    lastActivityAt: string;
-    endedAt: string | null;
-    durationSeconds: number | null;
-  };
+  session: LearningSession;
 }
 
 interface MessageResult {
@@ -35,14 +26,6 @@ interface MessageResult {
 interface CloseResult {
   message: string;
   sessionId: string;
-}
-
-interface SessionSummaryResult {
-  id: string;
-  sessionId: string;
-  content: string;
-  aiFeedback: string | null;
-  status: string;
 }
 
 interface SubmitSummaryResult {
@@ -60,13 +43,17 @@ export function useStartSession(
 ): UseMutationResult<
   SessionStartResult,
   Error,
-  { subjectId: string; topicId?: string }
+  { subjectId: string; topicId?: string; sessionType?: 'learning' | 'homework' }
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { subjectId: string; topicId?: string }) => {
+    mutationFn: async (input: {
+      subjectId: string;
+      topicId?: string;
+      sessionType?: 'learning' | 'homework';
+    }) => {
       const res = await client.subjects[':subjectId'].sessions.$post({
         param: { subjectId },
         json: input,
@@ -119,12 +106,16 @@ export function useStreamMessage(sessionId: string): {
   stream: (
     message: string,
     onChunk: (accumulated: string) => void,
-    onDone: (result: { exchangeCount: number; escalationRung: number }) => void
+    onDone: (result: { exchangeCount: number; escalationRung: number }) => void,
+    overrideSessionId?: string
   ) => Promise<void>;
   isStreaming: boolean;
 } {
   const client = useApiClient();
   const [isStreaming, setIsStreaming] = useState(false);
+  const isStreamingRef = useRef(false);
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
 
   const stream = useCallback(
     async (
@@ -133,14 +124,17 @@ export function useStreamMessage(sessionId: string): {
       onDone: (result: {
         exchangeCount: number;
         escalationRung: number;
-      }) => void
+      }) => void,
+      overrideSessionId?: string
     ): Promise<void> => {
-      if (isStreaming || !sessionId) return;
+      const effectiveSessionId = overrideSessionId ?? sessionIdRef.current;
+      if (isStreamingRef.current || !effectiveSessionId) return;
+      isStreamingRef.current = true;
       setIsStreaming(true);
 
       try {
         const res = await client.sessions[':sessionId'].stream.$post({
-          param: { sessionId },
+          param: { sessionId: effectiveSessionId },
           json: { message },
         });
 
@@ -157,10 +151,11 @@ export function useStreamMessage(sessionId: string): {
           }
         }
       } finally {
+        isStreamingRef.current = false;
         setIsStreaming(false);
       }
     },
-    [sessionId, isStreaming, client]
+    [client]
   );
 
   return { stream, isStreaming };
@@ -168,7 +163,7 @@ export function useStreamMessage(sessionId: string): {
 
 export function useSessionSummary(
   sessionId: string
-): UseQueryResult<SessionSummaryResult | null> {
+): UseQueryResult<SessionSummary | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 

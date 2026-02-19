@@ -2,17 +2,17 @@ import type {
   AssessmentRecord,
   RetentionCardResponse,
 } from '@eduagent/schemas';
-import { randomUUID } from 'crypto';
+import { uuidv7 } from 'uuidv7';
 
 export function buildAssessment(
   overrides?: Partial<AssessmentRecord>
 ): AssessmentRecord {
   const now = new Date().toISOString();
   return {
-    id: randomUUID(),
-    profileId: randomUUID(),
-    subjectId: randomUUID(),
-    topicId: randomUUID(),
+    id: uuidv7(),
+    profileId: uuidv7(),
+    subjectId: uuidv7(),
+    topicId: uuidv7(),
     sessionId: null,
     verificationDepth: 'recall',
     status: 'in_progress',
@@ -29,7 +29,7 @@ export function buildRetentionCard(
   overrides?: Partial<RetentionCardResponse>
 ): RetentionCardResponse {
   return {
-    topicId: randomUUID(),
+    topicId: uuidv7(),
     easeFactor: 2.5,
     intervalDays: 1,
     repetitions: 0,

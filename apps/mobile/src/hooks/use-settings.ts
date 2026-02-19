@@ -5,11 +5,12 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
+import type { NotificationPrefsInput, LearningMode } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 
 // ---------------------------------------------------------------------------
-// Types (matching API response shapes)
+// Types — NotificationPrefs is the API response shape (maxDailyPush required)
 // ---------------------------------------------------------------------------
 
 interface NotificationPrefs {
@@ -18,15 +19,6 @@ interface NotificationPrefs {
   pushEnabled: boolean;
   maxDailyPush: number;
 }
-
-interface NotificationPrefsInput {
-  reviewReminders: boolean;
-  dailyReminders: boolean;
-  pushEnabled: boolean;
-  maxDailyPush?: number;
-}
-
-type LearningMode = 'serious' | 'casual';
 
 // ---------------------------------------------------------------------------
 // Query hooks

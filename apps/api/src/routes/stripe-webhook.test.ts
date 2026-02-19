@@ -199,8 +199,8 @@ describe('signature verification', () => {
 // ---------------------------------------------------------------------------
 
 describe('stale event rejection', () => {
-  it('returns 400 for events older than 5 minutes', async () => {
-    const staleCreated = Math.floor(Date.now() / 1000) - 6 * 60; // 6 minutes ago
+  it('returns 400 for events older than 48 hours', async () => {
+    const staleCreated = Math.floor(Date.now() / 1000) - 49 * 60 * 60; // 49 hours ago
     const stripeSub = makeSubscription({ status: 'active' });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
       makeStripeEvent('customer.subscription.updated', stripeSub, staleCreated)
@@ -222,8 +222,8 @@ describe('stale event rejection', () => {
     expect(updateSubscriptionFromWebhook).not.toHaveBeenCalled();
   });
 
-  it('accepts events within the 5-minute window', async () => {
-    const recentCreated = Math.floor(Date.now() / 1000) - 2 * 60; // 2 minutes ago
+  it('accepts events within the 48-hour window', async () => {
+    const recentCreated = Math.floor(Date.now() / 1000) - 2 * 60 * 60; // 2 hours ago
     const stripeSub = makeSubscription({ status: 'active' });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
       makeStripeEvent('customer.subscription.updated', stripeSub, recentCreated)

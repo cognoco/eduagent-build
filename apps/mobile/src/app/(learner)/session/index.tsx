@@ -76,15 +76,24 @@ export default function SessionScreen() {
     if (activeSessionId) return activeSessionId;
     if (!subjectId) return null;
 
+    const sessionType =
+      effectiveMode === 'homework'
+        ? ('homework' as const)
+        : ('learning' as const);
+
     try {
-      const result = await startSession.mutateAsync({ subjectId });
+      const result = await startSession.mutateAsync({
+        subjectId,
+        topicId: topicId ?? undefined,
+        sessionType,
+      });
       const newId = result.session.id;
       setActiveSessionId(newId);
       return newId;
     } catch {
       return null;
     }
-  }, [activeSessionId, subjectId, startSession]);
+  }, [activeSessionId, subjectId, topicId, effectiveMode, startSession]);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -131,7 +140,8 @@ export default function SessionScreen() {
             setIsStreaming(false);
             setExchangeCount(result.exchangeCount);
             setEscalationRung(result.escalationRung);
-          }
+          },
+          sid
         );
       } catch {
         animationCleanupRef.current = animateResponse(

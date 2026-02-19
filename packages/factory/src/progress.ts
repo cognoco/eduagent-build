@@ -1,5 +1,5 @@
 import type { Streak } from '@eduagent/schemas';
-import { randomUUID } from 'crypto';
+import { uuidv7 } from 'uuidv7';
 
 export function buildStreak(overrides?: Partial<Streak>): Streak {
   return {
@@ -29,10 +29,10 @@ export function buildXpLedgerEntry(
 ) {
   const now = new Date().toISOString();
   return {
-    id: randomUUID(),
-    profileId: randomUUID(),
-    topicId: randomUUID(),
-    subjectId: randomUUID(),
+    id: uuidv7(),
+    profileId: uuidv7(),
+    topicId: uuidv7(),
+    subjectId: uuidv7(),
     amount: 10,
     status: 'pending' as const,
     earnedAt: now,

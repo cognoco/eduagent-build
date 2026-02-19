@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { RetentionCardResponse } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
@@ -19,7 +19,9 @@ export function useRetentionTopics(subjectId: string) {
   });
 }
 
-export function useTopicRetention(topicId: string) {
+export function useTopicRetention(
+  topicId: string
+): UseQueryResult<RetentionCardResponse> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 

@@ -1,7 +1,17 @@
+jest.mock('@eduagent/database', () => {
+  const actual = jest.requireActual('@eduagent/database');
+  return {
+    ...actual,
+    createScopedRepository: jest.fn(),
+  };
+});
+
+import { createScopedRepository, type Database } from '@eduagent/database';
 import {
   createInitialStreakState,
   recordDailyActivity,
   getStreakDisplayInfo,
+  recordSessionActivity,
   type StreakState,
 } from './streaks';
 
@@ -234,6 +244,104 @@ describe('getStreakDisplayInfo', () => {
 // ---------------------------------------------------------------------------
 // DB-aware functions (require mock database)
 // ---------------------------------------------------------------------------
+
+function createMockStreakDb(): {
+  db: Database;
+  insertValues: jest.Mock;
+  updateSet: jest.Mock;
+  updateWhere: jest.Mock;
+} {
+  const updateWhere = jest.fn().mockResolvedValue(undefined);
+  const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+  const insertValues = jest.fn().mockReturnValue({
+    returning: jest.fn().mockResolvedValue([]),
+  });
+
+  const db = {
+    insert: jest.fn().mockReturnValue({ values: insertValues }),
+    update: jest.fn().mockReturnValue({ set: updateSet }),
+  } as unknown as Database;
+
+  return { db, insertValues, updateSet, updateWhere };
+}
+
+describe('recordSessionActivity', () => {
+  it('creates a new streak row on first session (no existing streak)', async () => {
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      streaks: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+    const { db, insertValues } = createMockStreakDb();
+
+    await recordSessionActivity(db, 'profile-1', '2026-02-10');
+
+    expect(insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: 'profile-1',
+        currentStreak: 1,
+        longestStreak: 1,
+        lastActivityDate: '2026-02-10',
+        gracePeriodStartDate: null,
+      })
+    );
+  });
+
+  it('updates existing streak row on subsequent sessions', async () => {
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      streaks: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'streak-1',
+          profileId: 'profile-1',
+          currentStreak: 3,
+          longestStreak: 5,
+          lastActivityDate: '2026-02-09',
+          gracePeriodStartDate: null,
+        }),
+      },
+    });
+    const { db, updateSet } = createMockStreakDb();
+
+    await recordSessionActivity(db, 'profile-1', '2026-02-10');
+
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        currentStreak: 4,
+        longestStreak: 5,
+        lastActivityDate: '2026-02-10',
+      })
+    );
+  });
+
+  it('does not call update when inserting a new streak', async () => {
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      streaks: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+    const { db } = createMockStreakDb();
+
+    await recordSessionActivity(db, 'profile-1', '2026-02-10');
+
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('does not call insert when updating an existing streak', async () => {
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      streaks: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'streak-1',
+          profileId: 'profile-1',
+          currentStreak: 1,
+          longestStreak: 1,
+          lastActivityDate: '2026-02-09',
+          gracePeriodStartDate: null,
+        }),
+      },
+    });
+    const { db } = createMockStreakDb();
+
+    await recordSessionActivity(db, 'profile-1', '2026-02-10');
+
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+});
 
 describe('getStreakData', () => {
   it.todo('returns streak state with display info for profile');

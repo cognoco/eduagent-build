@@ -7,13 +7,13 @@ import {
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
-import { byokWaitlist } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import {
   getSubscriptionByAccountId,
   getQuotaPool,
   linkStripeCustomer,
+  addToByokWaitlist,
 } from '../services/billing';
 import {
   getWarningLevel,
@@ -336,10 +336,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const { email } = c.req.valid('json');
     const db = c.get('db');
 
-    await db
-      .insert(byokWaitlist)
-      .values({ email })
-      .onConflictDoNothing({ target: byokWaitlist.email });
+    await addToByokWaitlist(db, email);
 
     return c.json({ message: 'Added to BYOK waitlist', email }, 201);
   });
