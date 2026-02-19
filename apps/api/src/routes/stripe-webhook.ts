@@ -13,7 +13,11 @@ import {
   updateSubscriptionFromWebhook,
   getSubscriptionByAccountId,
   getQuotaPool,
+  activateSubscriptionFromCheckout,
+  updateQuotaPoolLimit,
 } from '../services/billing';
+import { getTierConfig } from '../services/subscription';
+
 import { inngest } from '../inngest/client';
 import type { Database } from '@eduagent/database';
 import type Stripe from 'stripe';
@@ -23,6 +27,17 @@ import type { WebhookSubscriptionUpdate } from '../services/billing';
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+const PAID_TIERS = new Set<string>(['plus', 'family', 'pro']);
+
+/** Validates and extracts a paid tier from metadata. */
+function extractPaidTier(
+  metadata: Record<string, string> | undefined | null
+): ('plus' | 'family' | 'pro') | null {
+  const tier = metadata?.tier;
+  if (!tier || !PAID_TIERS.has(tier)) return null;
+  return tier as 'plus' | 'family' | 'pro';
+}
 
 /** Maps a Stripe subscription status to our internal status. */
 function mapStripeStatus(
@@ -89,6 +104,14 @@ async function handleSubscriptionEvent(
     lastStripeEventTimestamp: eventTimestamp,
   };
 
+  // Extract tier from subscription metadata (stamped during checkout)
+  const tier = extractPaidTier(
+    stripeSubscription.metadata as Record<string, string> | undefined
+  );
+  if (tier) {
+    updates.tier = tier;
+  }
+
   if (stripeSubscription.current_period_start) {
     updates.currentPeriodStart = new Date(
       stripeSubscription.current_period_start * 1000
@@ -114,6 +137,11 @@ async function handleSubscriptionEvent(
   );
 
   if (updated) {
+    // If tier metadata present, sync quota pool limit to new tier
+    if (tier) {
+      const tierConfig = getTierConfig(tier);
+      await updateQuotaPoolLimit(db, updated.id, tierConfig.monthlyQuota);
+    }
     await refreshKvCache(kv, db, updated.accountId);
   }
 }
@@ -138,6 +166,36 @@ async function handleSubscriptionDeleted(
 
   if (updated) {
     await refreshKvCache(kv, db, updated.accountId);
+  }
+}
+
+async function handleCheckoutCompleted(
+  db: Database,
+  kv: KVNamespace | undefined,
+  session: Stripe.Checkout.Session,
+  eventTimestamp: string
+): Promise<void> {
+  const metadata = session.metadata as Record<string, string> | undefined;
+  const accountId = metadata?.accountId;
+  const tier = extractPaidTier(metadata);
+  const stripeSubscriptionId =
+    typeof session.subscription === 'string'
+      ? session.subscription
+      : session.subscription?.id;
+
+  // Graceful exit: missing critical data — log-worthy but not crash-worthy
+  if (!accountId || !tier || !stripeSubscriptionId) return;
+
+  const activated = await activateSubscriptionFromCheckout(
+    db,
+    accountId,
+    stripeSubscriptionId,
+    tier,
+    eventTimestamp
+  );
+
+  if (activated) {
+    await refreshKvCache(kv, db, activated.accountId);
   }
 }
 
@@ -274,6 +332,15 @@ export const stripeWebhookRoute = new Hono<{
   }
 
   switch (event.type) {
+    case 'checkout.session.completed':
+      await handleCheckoutCompleted(
+        db,
+        kv,
+        event.data.object as Stripe.Checkout.Session,
+        eventTimestamp
+      );
+      break;
+
     case 'customer.subscription.created':
     case 'customer.subscription.updated':
       await handleSubscriptionEvent(

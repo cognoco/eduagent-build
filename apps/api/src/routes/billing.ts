@@ -14,6 +14,7 @@ import {
   getQuotaPool,
   linkStripeCustomer,
   addToByokWaitlist,
+  ensureFreeSubscription,
 } from '../services/billing';
 import {
   getWarningLevel,
@@ -128,6 +129,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
       const stripe = createStripeClient(stripeKey);
 
+      // Ensure a subscription row exists so the webhook has something to link
+      await ensureFreeSubscription(db, account.id);
+
       // Resolve or create Stripe customer
       const subscription = await getSubscriptionByAccountId(db, account.id);
       let customerId = subscription?.stripeCustomerId;
@@ -149,6 +153,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         success_url: `${appUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${appUrl}/billing/cancel`,
         metadata: { accountId: account.id, tier, interval },
+        subscription_data: {
+          metadata: { accountId: account.id, tier },
+        },
       });
 
       if (!session.url) {

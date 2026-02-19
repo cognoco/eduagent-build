@@ -312,6 +312,78 @@ export async function ensureFreeSubscription(
 }
 
 // ---------------------------------------------------------------------------
+// Checkout activation (Story 5.1 — bridges Stripe subscription ID)
+// ---------------------------------------------------------------------------
+
+/**
+ * Updates the monthly limit on a quota pool without resetting usedThisMonth.
+ * Used for mid-cycle tier changes — preserves current usage count.
+ */
+export async function updateQuotaPoolLimit(
+  db: Database,
+  subscriptionId: string,
+  newLimit: number
+): Promise<void> {
+  await db
+    .update(quotaPools)
+    .set({
+      monthlyLimit: newLimit,
+      updatedAt: new Date(),
+    })
+    .where(eq(quotaPools.subscriptionId, subscriptionId));
+}
+
+/**
+ * Bridges a Stripe subscription ID to our internal subscription row.
+ * Called from `checkout.session.completed` webhook handler.
+ *
+ * - If no subscription exists → creates one via createSubscription()
+ * - If subscription exists with null stripeSubscriptionId → links it
+ * - If subscription already has a stripeSubscriptionId → returns existing (idempotent)
+ */
+export async function activateSubscriptionFromCheckout(
+  db: Database,
+  accountId: string,
+  stripeSubscriptionId: string,
+  tier: 'plus' | 'family' | 'pro',
+  eventTimestamp: string
+): Promise<SubscriptionRow | null> {
+  const existing = await getSubscriptionByAccountId(db, accountId);
+
+  if (!existing) {
+    const tierConfig = getTierConfig(tier);
+    return createSubscription(db, accountId, tier, tierConfig.monthlyQuota, {
+      stripeSubscriptionId,
+      status: 'active',
+    });
+  }
+
+  // Already linked — idempotent return (same or different Stripe sub ID)
+  if (existing.stripeSubscriptionId) {
+    return existing;
+  }
+
+  // Bridge: set stripeSubscriptionId, tier, status, timestamp
+  const tierConfig = getTierConfig(tier);
+  const [updated] = await db
+    .update(subscriptions)
+    .set({
+      stripeSubscriptionId,
+      tier,
+      status: 'active',
+      lastStripeEventTimestamp: new Date(eventTimestamp),
+      updatedAt: new Date(),
+    })
+    .where(eq(subscriptions.id, existing.id))
+    .returning();
+
+  // Update quota pool limit to match the new tier
+  await updateQuotaPoolLimit(db, existing.id, tierConfig.monthlyQuota);
+
+  return mapSubscriptionRow(updated);
+}
+
+// ---------------------------------------------------------------------------
 // Trial expiry helpers (used by Inngest trial-expiry function)
 // ---------------------------------------------------------------------------
 

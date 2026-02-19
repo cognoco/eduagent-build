@@ -15,6 +15,19 @@ jest.mock('../services/billing', () => ({
   getSubscriptionByAccountId: jest.fn(),
   ensureFreeSubscription: jest.fn(),
   getQuotaPool: jest.fn(),
+  activateSubscriptionFromCheckout: jest.fn(),
+  updateQuotaPoolLimit: jest.fn(),
+}));
+
+jest.mock('../services/subscription', () => ({
+  getTierConfig: jest.fn().mockReturnValue({
+    monthlyQuota: 500,
+    maxProfiles: 1,
+    priceMonthly: 18.99,
+    priceYearly: 168,
+    topUpPrice: 10,
+    topUpAmount: 500,
+  }),
 }));
 
 jest.mock('../inngest/client', () => ({
@@ -31,7 +44,10 @@ import {
   updateSubscriptionFromWebhook,
   getSubscriptionByAccountId,
   getQuotaPool,
+  activateSubscriptionFromCheckout,
+  updateQuotaPoolLimit,
 } from '../services/billing';
+import { getTierConfig } from '../services/subscription';
 import { inngest } from '../inngest/client';
 
 // ---------------------------------------------------------------------------
@@ -94,6 +110,17 @@ function makeInvoice(
   };
 }
 
+function makeCheckoutSession(
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
+  return {
+    id: 'cs_test_123',
+    subscription: 'sub_stripe_123',
+    metadata: { accountId: 'acc-1', tier: 'plus' },
+    ...overrides,
+  };
+}
+
 function mockUpdatedSubscription(overrides: Record<string, unknown> = {}) {
   return {
     id: 'sub-internal-1',
@@ -118,6 +145,10 @@ beforeEach(() => {
     monthlyLimit: 500,
     usedThisMonth: 42,
   });
+  (activateSubscriptionFromCheckout as jest.Mock).mockResolvedValue(
+    mockUpdatedSubscription()
+  );
+  (updateQuotaPoolLimit as jest.Mock).mockResolvedValue(undefined);
 });
 
 // ---------------------------------------------------------------------------
@@ -531,6 +562,247 @@ describe('invoice.payment_succeeded', () => {
     );
 
     expect(writeSubscriptionStatus).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Unknown event types
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// checkout.session.completed
+// ---------------------------------------------------------------------------
+
+describe('checkout.session.completed', () => {
+  it('calls activateSubscriptionFromCheckout with correct args', async () => {
+    const session = makeCheckoutSession();
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('checkout.session.completed', session)
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    expect(activateSubscriptionFromCheckout).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      'sub_stripe_123',
+      'plus',
+      expect.any(String)
+    );
+  });
+
+  it('refreshes KV cache after activation', async () => {
+    const session = makeCheckoutSession();
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('checkout.session.completed', session)
+    );
+
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+
+    expect(writeSubscriptionStatus).toHaveBeenCalled();
+  });
+
+  it('handles missing metadata gracefully (200, no crash)', async () => {
+    const session = makeCheckoutSession({ metadata: {} });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('checkout.session.completed', session)
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    expect(activateSubscriptionFromCheckout).not.toHaveBeenCalled();
+  });
+
+  it('handles missing subscription ID gracefully', async () => {
+    const session = makeCheckoutSession({ subscription: null });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('checkout.session.completed', session)
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    expect(activateSubscriptionFromCheckout).not.toHaveBeenCalled();
+  });
+
+  it('handles invalid tier gracefully', async () => {
+    const session = makeCheckoutSession({
+      metadata: { accountId: 'acc-1', tier: 'invalid' },
+    });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('checkout.session.completed', session)
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    expect(activateSubscriptionFromCheckout).not.toHaveBeenCalled();
+  });
+
+  it('skips KV refresh when activation returns null', async () => {
+    (activateSubscriptionFromCheckout as jest.Mock).mockResolvedValue(null);
+    const session = makeCheckoutSession();
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('checkout.session.completed', session)
+    );
+
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+
+    expect(writeSubscriptionStatus).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tier metadata in subscription events
+// ---------------------------------------------------------------------------
+
+describe('tier metadata in subscription events', () => {
+  it('passes tier from metadata to updateSubscriptionFromWebhook', async () => {
+    const stripeSub = makeSubscription({
+      status: 'active',
+      metadata: { tier: 'family' },
+    });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', stripeSub)
+    );
+
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'sub_stripe_123',
+      expect.objectContaining({ tier: 'family' })
+    );
+  });
+
+  it('updates quota pool when tier present', async () => {
+    const stripeSub = makeSubscription({
+      status: 'active',
+      metadata: { tier: 'pro' },
+    });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', stripeSub)
+    );
+
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+
+    expect(updateQuotaPoolLimit).toHaveBeenCalledWith(
+      mockDb,
+      'sub-internal-1',
+      expect.any(Number)
+    );
+  });
+
+  it('ignores invalid tier in metadata', async () => {
+    const stripeSub = makeSubscription({
+      status: 'active',
+      metadata: { tier: 'bogus' },
+    });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', stripeSub)
+    );
+
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'sub_stripe_123',
+      expect.not.objectContaining({ tier: expect.anything() })
+    );
+    expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
+  });
+
+  it('skips quota update when no tier in metadata', async () => {
+    const stripeSub = makeSubscription({ status: 'active' });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('customer.subscription.updated', stripeSub)
+    );
+
+    await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+
+    expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
   });
 });
 

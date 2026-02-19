@@ -16,6 +16,8 @@ import {
   getProfileCountForSubscription,
   canAddProfile,
   ensureFreeSubscription,
+  updateQuotaPoolLimit,
+  activateSubscriptionFromCheckout,
 } from './billing';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -691,5 +693,154 @@ describe('canAddProfile', () => {
     const result = await canAddProfile(db, subscriptionId);
 
     expect(result).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateQuotaPoolLimit
+// ---------------------------------------------------------------------------
+
+describe('updateQuotaPoolLimit', () => {
+  it('updates monthlyLimit on quota pool', async () => {
+    const db = createMockDb();
+
+    await updateQuotaPoolLimit(db, subscriptionId, 1500);
+
+    expect(db.update).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// activateSubscriptionFromCheckout
+// ---------------------------------------------------------------------------
+
+describe('activateSubscriptionFromCheckout', () => {
+  const stripeSubId = 'sub_stripe_checkout_1';
+  const eventTs = '2025-01-15T12:00:00.000Z';
+
+  it('links stripeSubscriptionId when existing sub has null', async () => {
+    const existing = mockSubscriptionRow({
+      stripeSubscriptionId: null,
+      tier: 'free',
+      status: 'trial',
+    });
+    const updated = mockSubscriptionRow({
+      stripeSubscriptionId: stripeSubId,
+      tier: 'plus',
+      status: 'active',
+    });
+    const db = createMockDb({
+      subscriptionFindFirst: existing,
+      updateReturning: [updated],
+    });
+
+    const result = await activateSubscriptionFromCheckout(
+      db,
+      accountId,
+      stripeSubId,
+      'plus',
+      eventTs
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.stripeSubscriptionId).toBe(stripeSubId);
+    expect(result!.tier).toBe('plus');
+    expect(result!.status).toBe('active');
+    // update called twice: once for subscription, once for quota pool limit
+    expect(db.update).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns existing (idempotent) when already linked to same ID', async () => {
+    const existing = mockSubscriptionRow({
+      stripeSubscriptionId: stripeSubId,
+      tier: 'plus',
+      status: 'active',
+    });
+    const db = createMockDb({ subscriptionFindFirst: existing });
+
+    const result = await activateSubscriptionFromCheckout(
+      db,
+      accountId,
+      stripeSubId,
+      'plus',
+      eventTs
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.stripeSubscriptionId).toBe(stripeSubId);
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('returns existing when linked to different ID (no overwrite)', async () => {
+    const existing = mockSubscriptionRow({
+      stripeSubscriptionId: 'sub_stripe_old',
+      tier: 'plus',
+      status: 'active',
+    });
+    const db = createMockDb({ subscriptionFindFirst: existing });
+
+    const result = await activateSubscriptionFromCheckout(
+      db,
+      accountId,
+      stripeSubId,
+      'family',
+      eventTs
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.stripeSubscriptionId).toBe('sub_stripe_old');
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('creates subscription when none exists', async () => {
+    const created = mockSubscriptionRow({
+      stripeSubscriptionId: stripeSubId,
+      tier: 'plus',
+      status: 'active',
+    });
+    const db = createMockDb({
+      subscriptionFindFirst: undefined,
+      insertReturning: [created],
+    });
+
+    const result = await activateSubscriptionFromCheckout(
+      db,
+      accountId,
+      stripeSubId,
+      'plus',
+      eventTs
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.tier).toBe('plus');
+    expect(result!.status).toBe('active');
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('updates quota pool limit to match tier', async () => {
+    const existing = mockSubscriptionRow({
+      stripeSubscriptionId: null,
+      tier: 'free',
+    });
+    const updated = mockSubscriptionRow({
+      stripeSubscriptionId: stripeSubId,
+      tier: 'family',
+      status: 'active',
+    });
+    const db = createMockDb({
+      subscriptionFindFirst: existing,
+      updateReturning: [updated],
+    });
+
+    await activateSubscriptionFromCheckout(
+      db,
+      accountId,
+      stripeSubId,
+      'family',
+      eventTs
+    );
+
+    // update called twice: subscription + quota pool
+    expect(db.update).toHaveBeenCalledTimes(2);
   });
 });
