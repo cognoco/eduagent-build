@@ -25,6 +25,7 @@ import {
   EXTENDED_TRIAL_MONTHLY_EQUIVALENT,
   TRIAL_EXTENDED_DAYS,
 } from '../../services/trial';
+import { sendPushNotification } from '../../services/notifications';
 
 export const trialExpiry = inngest.createFunction(
   { id: 'trial-expiry-check', name: 'Check and process trial expirations' },
@@ -102,9 +103,16 @@ export const trialExpiry = inngest.createFunction(
           targetDayEnd
         );
 
-        // TODO: Send push notifications via Expo Push SDK (ARCH-18)
-        // For now, we count how many warnings would be sent
-        sent += trialsToWarn.length;
+        for (const trial of trialsToWarn) {
+          const db2 = getStepDatabase();
+          const result = await sendPushNotification(db2, {
+            profileId: trial.accountId,
+            title: 'Trial ending soon',
+            body: warningMessage,
+            type: 'trial_expiry',
+          });
+          if (result.sent) sent++;
+        }
       }
 
       return sent;
@@ -137,8 +145,16 @@ export const trialExpiry = inngest.createFunction(
             targetDayEnd
           );
 
-          // TODO: Send push notifications via Expo Push SDK (ARCH-18)
-          sent += expiredTrials.length;
+          for (const trial of expiredTrials) {
+            const db2 = getStepDatabase();
+            const result = await sendPushNotification(db2, {
+              profileId: trial.accountId,
+              title: 'Your trial has ended',
+              body: message,
+              type: 'trial_expiry',
+            });
+            if (result.sent) sent++;
+          }
         }
 
         return sent;

@@ -47,6 +47,12 @@ jest.mock('../../services/trial', () => ({
   TRIAL_EXTENDED_DAYS: 14,
 }));
 
+const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
+jest.mock('../../services/notifications', () => ({
+  sendPushNotification: (...args: unknown[]) =>
+    mockSendPushNotification(...args),
+}));
+
 import { trialExpiry } from './trial-expiry';
 
 // ---------------------------------------------------------------------------
@@ -157,7 +163,7 @@ describe('trialExpiry', () => {
     );
   });
 
-  it('counts warnings for trials ending in 3 or 1 days', async () => {
+  it('sends push notification for trials ending in 3 days', async () => {
     const trialEndingSoon = {
       id: 'sub-3',
       accountId: 'acc-3',
@@ -180,9 +186,18 @@ describe('trialExpiry', () => {
       expect.any(Date),
       expect.any(Date)
     );
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        profileId: 'acc-3',
+        title: 'Trial ending soon',
+        body: '3 days left of your trial',
+        type: 'trial_expiry',
+      })
+    );
   });
 
-  it('counts soft-landing messages for recently expired trials', async () => {
+  it('sends push notification for recently expired trials (soft landing)', async () => {
     const recentlyExpired = {
       id: 'sub-4',
       accountId: 'acc-4',
@@ -208,6 +223,39 @@ describe('trialExpiry', () => {
       expect.any(Date),
       expect.any(Date)
     );
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        profileId: 'acc-4',
+        title: 'Your trial has ended',
+        body: 'giving you 15/day for 2 more weeks',
+        type: 'trial_expiry',
+      })
+    );
+  });
+
+  it('skips push count when notification is not sent', async () => {
+    const trialEndingSoon = {
+      id: 'sub-7',
+      accountId: 'acc-7',
+      status: 'trial',
+      trialEndsAt: '2025-01-18T12:00:00.000Z',
+    };
+
+    mockFindExpiredTrials.mockResolvedValueOnce([]);
+    mockFindSubscriptionsByTrialDateRange
+      .mockResolvedValueOnce([trialEndingSoon]) // 3-day warnings
+      .mockResolvedValue([]);
+    // Push notification was not sent (no token, daily cap, etc.)
+    mockSendPushNotification.mockResolvedValueOnce({
+      sent: false,
+      reason: 'no_push_token',
+    });
+
+    const { result } = await executeSteps();
+
+    expect(result.warningsSent).toBe(0);
+    expect(mockSendPushNotification).toHaveBeenCalled();
   });
 
   it('handles zero expired trials gracefully', async () => {
