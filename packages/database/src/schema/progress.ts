@@ -7,6 +7,7 @@ import {
   timestamp,
   pgEnum,
   index,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles.js';
 import { curriculumTopics, subjects } from './subjects.js';
@@ -95,6 +96,25 @@ export const learningModes = pgTable('learning_modes', {
     .references(() => profiles.id, { onDelete: 'cascade' })
     .unique(),
   mode: learningModeEnum('mode').notNull().default('serious'),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const coachingCardCache = pgTable('coaching_card_cache', {
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
+  profileId: uuid('profile_id')
+    .notNull()
+    .references(() => profiles.id, { onDelete: 'cascade' })
+    .unique(),
+  cardData: jsonb('card_data').notNull(),
+  contextHash: text('context_hash'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
