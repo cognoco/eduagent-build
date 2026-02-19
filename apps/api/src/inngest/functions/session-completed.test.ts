@@ -7,10 +7,15 @@ jest.mock('@eduagent/database', () => ({
 }));
 
 const mockStoreSessionEmbedding = jest.fn().mockResolvedValue(undefined);
+const mockExtractSessionContent = jest
+  .fn()
+  .mockResolvedValue('User: What is algebra?\n\nAI: Algebra is...');
 
 jest.mock('../../services/embeddings', () => ({
   storeSessionEmbedding: (...args: unknown[]) =>
     mockStoreSessionEmbedding(...args),
+  extractSessionContent: (...args: unknown[]) =>
+    mockExtractSessionContent(...args),
 }));
 
 const mockUpdateRetentionFromSession = jest.fn().mockResolvedValue(undefined);
@@ -25,6 +30,28 @@ const mockCreatePendingSessionSummary = jest.fn().mockResolvedValue(undefined);
 jest.mock('../../services/summaries', () => ({
   createPendingSessionSummary: (...args: unknown[]) =>
     mockCreatePendingSessionSummary(...args),
+}));
+
+const mockPrecomputeCoachingCard = jest.fn().mockResolvedValue({
+  id: 'card-1',
+  profileId: 'profile-001',
+  type: 'challenge',
+  title: 'Ready?',
+  body: 'Continue.',
+  priority: 3,
+  expiresAt: '2026-02-18T10:00:00.000Z',
+  createdAt: '2026-02-17T10:00:00.000Z',
+  topicId: 'topic-001',
+  difficulty: 'medium',
+  xpReward: 50,
+});
+const mockWriteCoachingCardCache = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../../services/coaching-cards', () => ({
+  precomputeCoachingCard: (...args: unknown[]) =>
+    mockPrecomputeCoachingCard(...args),
+  writeCoachingCardCache: (...args: unknown[]) =>
+    mockWriteCoachingCardCache(...args),
 }));
 
 const mockRecordSessionActivity = jest.fn().mockResolvedValue(undefined);
@@ -157,6 +184,20 @@ describe('sessionCompleted', () => {
         'pending'
       );
     });
+
+    it('precomputes and caches a coaching card', async () => {
+      await executeSteps(createEventData());
+
+      expect(mockPrecomputeCoachingCard).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001'
+      );
+      expect(mockWriteCoachingCardCache).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        expect.objectContaining({ type: expect.any(String) })
+      );
+    });
   });
 
   describe('update-dashboard step', () => {
@@ -183,15 +224,25 @@ describe('sessionCompleted', () => {
   });
 
   describe('generate-embeddings step', () => {
-    it('calls storeSessionEmbedding with session data', async () => {
+    it('extracts real session content for embedding', async () => {
+      await executeSteps(createEventData());
+
+      expect(mockExtractSessionContent).toHaveBeenCalledWith(
+        expect.anything(),
+        'session-001',
+        'profile-001'
+      );
+    });
+
+    it('calls storeSessionEmbedding with extracted content', async () => {
       await executeSteps(createEventData());
 
       expect(mockStoreSessionEmbedding).toHaveBeenCalledWith(
-        expect.anything(), // db
+        expect.anything(),
         'session-001',
         'profile-001',
         'topic-001',
-        expect.stringContaining('session-001')
+        'User: What is algebra?\n\nAI: Algebra is...'
       );
     });
   });

@@ -3,7 +3,14 @@ import { getStepDatabase } from '../helpers';
 import { updateRetentionFromSession } from '../../services/retention-data';
 import { createPendingSessionSummary } from '../../services/summaries';
 import { recordSessionActivity } from '../../services/streaks';
-import { storeSessionEmbedding } from '../../services/embeddings';
+import {
+  extractSessionContent,
+  storeSessionEmbedding,
+} from '../../services/embeddings';
+import {
+  precomputeCoachingCard,
+  writeCoachingCardCache,
+} from '../../services/coaching-cards';
 
 export const sessionCompleted = inngest.createFunction(
   { id: 'session-completed', name: 'Process session completion' },
@@ -36,6 +43,10 @@ export const sessionCompleted = inngest.createFunction(
         topicId ?? null,
         summaryStatus ?? 'pending'
       );
+
+      // Precompute coaching card and write to cache (ARCH-11)
+      const card = await precomputeCoachingCard(db, profileId);
+      await writeCoachingCardCache(db, profileId, card);
     });
 
     // Step 3: Update dashboard — streaks + XP
@@ -54,7 +65,7 @@ export const sessionCompleted = inngest.createFunction(
     // Step 4: Generate and store session embedding
     await step.run('generate-embeddings', async () => {
       const db = getStepDatabase();
-      const content = `Session ${sessionId} for topic ${topicId ?? 'unknown'}`;
+      const content = await extractSessionContent(db, sessionId, profileId);
       await storeSessionEmbedding(
         db,
         sessionId,
