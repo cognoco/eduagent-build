@@ -168,6 +168,48 @@ describe('homework routes', () => {
       expect(inputArg).toEqual({ sessionType: 'homework' });
     });
 
+    it('returns 403 when subject is paused', async () => {
+      const { SubjectInactiveError } = require('../services/session');
+      mockStartSession.mockRejectedValueOnce(
+        new SubjectInactiveError('paused')
+      );
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/homework`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('SUBJECT_INACTIVE');
+    });
+
+    it('returns 403 when subject is archived', async () => {
+      const { SubjectInactiveError } = require('../services/session');
+      mockStartSession.mockRejectedValueOnce(
+        new SubjectInactiveError('archived')
+      );
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/homework`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('SUBJECT_INACTIVE');
+    });
+
     it('returns 401 without auth header', async () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/homework`,
