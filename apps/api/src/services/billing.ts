@@ -312,6 +312,28 @@ export async function ensureFreeSubscription(
 }
 
 // ---------------------------------------------------------------------------
+// Cancel helpers (Story 5.4 — immediate local state update)
+// ---------------------------------------------------------------------------
+
+/**
+ * Sets `cancelledAt` on a subscription for immediate UX feedback.
+ * The webhook will also set this, but marking it locally avoids waiting
+ * for the async Stripe event to reflect in the GET /subscription response.
+ */
+export async function markSubscriptionCancelled(
+  db: Database,
+  subscriptionId: string
+): Promise<void> {
+  await db
+    .update(subscriptions)
+    .set({
+      cancelledAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(subscriptions.id, subscriptionId));
+}
+
+// ---------------------------------------------------------------------------
 // Checkout activation (Story 5.1 — bridges Stripe subscription ID)
 // ---------------------------------------------------------------------------
 
@@ -705,4 +727,356 @@ export async function findSubscriptionsByTrialDateRange(
     ),
   });
   return rows.map(mapSubscriptionRow);
+}
+
+// ---------------------------------------------------------------------------
+// Reverse trial soft landing (Story 5.2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Transitions a trial subscription to the extended trial (soft landing) period.
+ * Sets status to 'expired', tier to 'free', and quota pool to the extended
+ * trial monthly equivalent (15 questions/day * 30 = 450/month).
+ * Resets usedThisMonth so the user starts with a fresh allowance.
+ */
+export async function transitionToExtendedTrial(
+  db: Database,
+  subscriptionId: string,
+  extendedMonthlyQuota: number
+): Promise<void> {
+  await db
+    .update(subscriptions)
+    .set({
+      status: 'expired',
+      tier: 'free',
+      updatedAt: new Date(),
+    })
+    .where(eq(subscriptions.id, subscriptionId));
+
+  await db
+    .update(quotaPools)
+    .set({
+      monthlyLimit: extendedMonthlyQuota,
+      usedThisMonth: 0,
+      updatedAt: new Date(),
+    })
+    .where(eq(quotaPools.subscriptionId, subscriptionId));
+}
+
+/**
+ * Finds expired subscriptions whose trialEndsAt is between `daysAgo` and
+ * `daysAgo - 1` days before `now`. Used to identify subscriptions that have
+ * been in the extended trial for exactly N days.
+ */
+export async function findExpiredTrialsByDaysSinceEnd(
+  db: Database,
+  now: Date,
+  daysAgo: number
+): Promise<SubscriptionRow[]> {
+  const targetDate = new Date(now);
+  targetDate.setDate(targetDate.getDate() - daysAgo);
+  const dayStart = new Date(
+    targetDate.toISOString().slice(0, 10) + 'T00:00:00.000Z'
+  );
+  const dayEnd = new Date(
+    targetDate.toISOString().slice(0, 10) + 'T23:59:59.999Z'
+  );
+
+  return findSubscriptionsByTrialDateRange(db, 'expired', dayStart, dayEnd);
+}
+
+// ---------------------------------------------------------------------------
+// Top-up credit management (Story 5.3)
+// ---------------------------------------------------------------------------
+
+export interface TopUpCreditRow {
+  id: string;
+  subscriptionId: string;
+  amount: number;
+  remaining: number;
+  purchasedAt: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+function mapTopUpCreditRow(
+  row: typeof topUpCredits.$inferSelect
+): TopUpCreditRow {
+  return {
+    id: row.id,
+    subscriptionId: row.subscriptionId,
+    amount: row.amount,
+    remaining: row.remaining,
+    purchasedAt: row.purchasedAt.toISOString(),
+    expiresAt: row.expiresAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/**
+ * Aggregates total remaining credits across all unexpired top-up packs
+ * for a subscription.
+ */
+export async function getTopUpCreditsRemaining(
+  db: Database,
+  subscriptionId: string,
+  now: Date = new Date()
+): Promise<number> {
+  const result = await db
+    .select({
+      total: sql<number>`COALESCE(SUM(${topUpCredits.remaining}), 0)::int`,
+    })
+    .from(topUpCredits)
+    .where(
+      and(
+        eq(topUpCredits.subscriptionId, subscriptionId),
+        sql`${topUpCredits.remaining} > 0`,
+        sql`${topUpCredits.expiresAt} > ${now}`
+      )
+    );
+
+  return result[0]?.total ?? 0;
+}
+
+/** 12-month expiry constant for top-up credits. */
+const TOP_UP_EXPIRY_MONTHS = 12;
+
+/**
+ * Creates a top-up credit pack for a subscription.
+ * Credits expire 12 months after purchase.
+ *
+ * Only paid tiers (plus, family, pro) can purchase top-ups.
+ * Returns null if the subscription's tier is not eligible.
+ */
+export async function purchaseTopUpCredits(
+  db: Database,
+  subscriptionId: string,
+  amount: number,
+  now: Date = new Date()
+): Promise<TopUpCreditRow | null> {
+  // Verify subscription exists and tier is eligible
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, subscriptionId),
+  });
+
+  if (!sub || sub.tier === 'free') {
+    return null;
+  }
+
+  const expiresAt = new Date(now);
+  expiresAt.setMonth(expiresAt.getMonth() + TOP_UP_EXPIRY_MONTHS);
+
+  const [row] = await db
+    .insert(topUpCredits)
+    .values({
+      subscriptionId,
+      amount,
+      remaining: amount,
+      purchasedAt: now,
+      expiresAt,
+    })
+    .returning();
+
+  return mapTopUpCreditRow(row);
+}
+
+/**
+ * Finds top-up credit packs expiring within a date range.
+ * Used by the Inngest top-up expiry reminder function.
+ */
+export async function findExpiringTopUpCredits(
+  db: Database,
+  rangeStart: Date,
+  rangeEnd: Date
+): Promise<TopUpCreditRow[]> {
+  const rows = await db.query.topUpCredits.findMany({
+    where: and(
+      sql`${topUpCredits.remaining} > 0`,
+      gte(topUpCredits.expiresAt, rangeStart),
+      lte(topUpCredits.expiresAt, rangeEnd)
+    ),
+  });
+  return rows.map(mapTopUpCreditRow);
+}
+
+/**
+ * Counts how many top-up packs have been purchased for a subscription
+ * in the current billing cycle (since cycleStart).
+ * Used for the context-aware upgrade prompt: "3+ top-ups in a cycle".
+ */
+export async function countTopUpPurchasesSinceCycleStart(
+  db: Database,
+  subscriptionId: string,
+  cycleStart: Date
+): Promise<number> {
+  const result = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(topUpCredits)
+    .where(
+      and(
+        eq(topUpCredits.subscriptionId, subscriptionId),
+        gte(topUpCredits.purchasedAt, cycleStart)
+      )
+    );
+  return result[0]?.count ?? 0;
+}
+
+// ---------------------------------------------------------------------------
+// Mid-cycle tier change (Story 5.3)
+// ---------------------------------------------------------------------------
+
+export interface TierChangeResult {
+  previousTier: SubscriptionTier;
+  newTier: SubscriptionTier;
+  usedThisCycle: number;
+  newMonthlyLimit: number;
+  remainingQuestions: number;
+}
+
+/**
+ * Handles a mid-cycle tier change (upgrade or downgrade).
+ *
+ * On upgrade:  new tier's full allocation minus questions already consumed.
+ *   Example: Plus user consumed 200/500, upgrades to Family (1,500) -> remaining = 1,300.
+ *
+ * On downgrade: if consumed more than lower tier's allocation, 0 remaining until reset.
+ *   Example: Family user consumed 800, downgrades to Plus (500) -> 0 remaining.
+ *
+ * Stripe handles billing proration; this function updates only our quota pool.
+ */
+export async function handleTierChange(
+  db: Database,
+  subscriptionId: string,
+  newTier: SubscriptionTier
+): Promise<TierChangeResult | null> {
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, subscriptionId),
+  });
+
+  if (!sub) {
+    return null;
+  }
+
+  const pool = await db.query.quotaPools.findFirst({
+    where: eq(quotaPools.subscriptionId, subscriptionId),
+  });
+
+  if (!pool) {
+    return null;
+  }
+
+  const newConfig = getTierConfig(newTier);
+  const usedThisCycle = pool.usedThisMonth;
+  const newMonthlyLimit = newConfig.monthlyQuota;
+  const remainingQuestions = Math.max(0, newMonthlyLimit - usedThisCycle);
+
+  // Update quota pool limit (preserves usedThisMonth)
+  await updateQuotaPoolLimit(db, subscriptionId, newMonthlyLimit);
+
+  return {
+    previousTier: sub.tier,
+    newTier,
+    usedThisCycle,
+    newMonthlyLimit,
+    remainingQuestions,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Context-aware upgrade prompts (Story 5.3)
+// ---------------------------------------------------------------------------
+
+export type UpgradePromptReason =
+  | 'quota_cap_reached'
+  | 'adding_family_member'
+  | 'frequent_top_ups'
+  | 'max_profiles_reached';
+
+export interface UpgradePrompt {
+  reason: UpgradePromptReason;
+  suggestedTier: 'plus' | 'family' | 'pro';
+  message: string;
+}
+
+/**
+ * Determines whether a context-aware upgrade prompt should be shown.
+ *
+ * Trigger conditions from Story 5.3:
+ * - Free->Plus: at 50/month cap (quota_cap_reached)
+ * - Plus->Family: when adding family member (adding_family_member)
+ * - Plus->Family: when 3+ top-ups purchased in cycle (frequent_top_ups)
+ * - Family->Pro: when needing 5-6 users (max_profiles_reached)
+ */
+export function getUpgradePrompt(params: {
+  tier: SubscriptionTier;
+  usedThisMonth: number;
+  monthlyLimit: number;
+  topUpPurchasesThisCycle: number;
+  profileCount: number;
+  isAddingProfile: boolean;
+}): UpgradePrompt | null {
+  const {
+    tier,
+    usedThisMonth,
+    monthlyLimit,
+    topUpPurchasesThisCycle,
+    profileCount,
+    isAddingProfile,
+  } = params;
+
+  // Free -> Plus: user hit the 50/month cap
+  if (tier === 'free' && usedThisMonth >= monthlyLimit) {
+    return {
+      reason: 'quota_cap_reached',
+      suggestedTier: 'plus',
+      message:
+        "You've reached your free plan limit. Upgrade to Plus for 500 questions/month.",
+    };
+  }
+
+  // Plus -> Family: trying to add a family member
+  if (tier === 'plus' && isAddingProfile) {
+    return {
+      reason: 'adding_family_member',
+      suggestedTier: 'family',
+      message: 'Upgrade to Family to add up to 4 learner profiles.',
+    };
+  }
+
+  // Plus -> Family: 3+ top-ups purchased this cycle
+  if (tier === 'plus' && topUpPurchasesThisCycle >= 3) {
+    return {
+      reason: 'frequent_top_ups',
+      suggestedTier: 'family',
+      message:
+        "You've bought multiple top-ups this month. Family plan gives you 1,500 questions for less.",
+    };
+  }
+
+  // Family -> Pro: at profile limit or trying to add beyond 4
+  if (
+    tier === 'family' &&
+    (profileCount >= 4 || (isAddingProfile && profileCount >= 4))
+  ) {
+    return {
+      reason: 'max_profiles_reached',
+      suggestedTier: 'pro',
+      message:
+        'Need more profiles? Upgrade to Pro for up to 6 learners and 3,000 questions/month.',
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Returns the top-up price in EUR cents for a given tier.
+ * Free tier cannot purchase top-ups (returns null).
+ */
+export function getTopUpPriceCents(tier: SubscriptionTier): number | null {
+  const config = getTierConfig(tier);
+  if (config.topUpPrice === 0) {
+    return null;
+  }
+  return config.topUpPrice * 100;
 }

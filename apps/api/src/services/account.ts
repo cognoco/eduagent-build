@@ -6,6 +6,8 @@
 import { eq } from 'drizzle-orm';
 import { accounts, type Database } from '@eduagent/database';
 import { createSubscription } from './billing';
+import { computeTrialEndDate } from './trial';
+import { getTierConfig } from './subscription';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -15,6 +17,7 @@ export interface Account {
   id: string;
   clerkUserId: string;
   email: string;
+  timezone: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -28,6 +31,7 @@ function mapAccountRow(row: typeof accounts.$inferSelect): Account {
     id: row.id,
     clerkUserId: row.clerkUserId,
     email: row.email,
+    timezone: row.timezone,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -57,11 +61,17 @@ export async function findAccountByClerkId(
  * auth externally — the first time a JWT-verified user hits our API, we
  * lazily create their local account row. This avoids a separate "create
  * account" step and handles the webhook-vs-lazy-provision race gracefully.
+ *
+ * @param timezone - IANA timezone string (e.g. 'Europe/Prague') inferred from
+ *   device via `Intl.DateTimeFormat().resolvedOptions().timeZone`. Falls back
+ *   to UTC if null/undefined. Stored on the account record and used for
+ *   timezone-aware trial expiry (end of day in user's timezone).
  */
 export async function findOrCreateAccount(
   db: Database,
   clerkUserId: string,
-  email: string
+  email: string,
+  timezone?: string | null
 ): Promise<Account> {
   const existing = await findAccountByClerkId(db, clerkUserId);
   if (existing) return existing;
@@ -71,7 +81,7 @@ export async function findOrCreateAccount(
   // constraint on accounts.clerkUserId ensures only one row is created.
   const [row] = await db
     .insert(accounts)
-    .values({ clerkUserId, email })
+    .values({ clerkUserId, email, timezone: timezone ?? null })
     .onConflictDoNothing({ target: accounts.clerkUserId })
     .returning();
 
@@ -82,11 +92,13 @@ export async function findOrCreateAccount(
     return found;
   }
 
-  // FR108: Auto-create a 14-day trial subscription with Plus-tier limits.
-  // Quota is 500 (Plus-tier monthly quota) during the 14-day trial period.
+  // FR108: Auto-create a 14-day trial subscription with full Plus access.
+  // Trial expires at end of day (midnight) in user's timezone.
+  // Tier is 'plus' during trial to grant full Plus features.
   try {
-    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-    await createSubscription(db, row.id, 'free', 500, {
+    const plusTier = getTierConfig('plus');
+    const trialEndsAt = computeTrialEndDate(new Date(), timezone);
+    await createSubscription(db, row.id, 'plus', plusTier.monthlyQuota, {
       status: 'trial',
       trialEndsAt: trialEndsAt.toISOString(),
     });

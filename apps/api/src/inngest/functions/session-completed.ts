@@ -11,6 +11,7 @@ import {
   precomputeCoachingCard,
   writeCoachingCardCache,
 } from '../../services/coaching-cards';
+import { insertSessionXpEntry } from '../../services/xp';
 
 export const sessionCompleted = inngest.createFunction(
   { id: 'session-completed', name: 'Process session completion' },
@@ -58,8 +59,7 @@ export const sessionCompleted = inngest.createFunction(
 
       await recordSessionActivity(db, profileId, today);
 
-      // TODO: Insert XP ledger entry when mastery score is computed (Epic 3)
-      void subjectId;
+      await insertSessionXpEntry(db, profileId, topicId ?? null, subjectId);
     });
 
     // Step 4: Generate and store session embedding

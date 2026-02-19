@@ -1,4 +1,18 @@
-import { calculateTopicXp, verifyXp, decayXp } from './xp';
+jest.mock('@eduagent/database', () => {
+  const actual = jest.requireActual('@eduagent/database');
+  return {
+    ...actual,
+    createScopedRepository: jest.fn(),
+  };
+});
+
+import { createScopedRepository, type Database } from '@eduagent/database';
+import {
+  calculateTopicXp,
+  verifyXp,
+  decayXp,
+  insertSessionXpEntry,
+} from './xp';
 
 // ---------------------------------------------------------------------------
 // calculateTopicXp
@@ -85,5 +99,154 @@ describe('decayXp', () => {
     const result = decayXp(100, 1.0);
 
     expect(result).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// insertSessionXpEntry (DB-aware)
+// ---------------------------------------------------------------------------
+
+function createMockXpDb(): {
+  db: Database;
+  insertValues: jest.Mock;
+  queryAssessmentsFindFirst: jest.Mock;
+} {
+  const insertValues = jest.fn().mockResolvedValue(undefined);
+  const queryAssessmentsFindFirst = jest.fn().mockResolvedValue(null);
+
+  const db = {
+    query: {
+      assessments: {
+        findFirst: queryAssessmentsFindFirst,
+      },
+    },
+    insert: jest.fn().mockReturnValue({ values: insertValues }),
+  } as unknown as Database;
+
+  return { db, insertValues, queryAssessmentsFindFirst };
+}
+
+describe('insertSessionXpEntry', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('inserts XP when passed assessment exists and no prior entry', async () => {
+    const { db, insertValues, queryAssessmentsFindFirst } = createMockXpDb();
+
+    queryAssessmentsFindFirst.mockResolvedValue({
+      id: 'assessment-001',
+      profileId: 'profile-001',
+      topicId: 'topic-001',
+      status: 'passed',
+      masteryScore: '0.80',
+      verificationDepth: 'explain',
+    });
+
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      xpLedger: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+
+    await insertSessionXpEntry(db, 'profile-001', 'topic-001', 'subject-001');
+
+    expect(insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: 'profile-001',
+        topicId: 'topic-001',
+        subjectId: 'subject-001',
+        amount: 120, // 100 * 0.80 * 1.5 (explain)
+        status: 'pending',
+      })
+    );
+  });
+
+  it('skips when topicId is null', async () => {
+    const { db, insertValues, queryAssessmentsFindFirst } = createMockXpDb();
+
+    await insertSessionXpEntry(db, 'profile-001', null, 'subject-001');
+
+    expect(queryAssessmentsFindFirst).not.toHaveBeenCalled();
+    expect(insertValues).not.toHaveBeenCalled();
+  });
+
+  it('skips when no assessment exists', async () => {
+    const { db, insertValues, queryAssessmentsFindFirst } = createMockXpDb();
+
+    queryAssessmentsFindFirst.mockResolvedValue(null);
+
+    await insertSessionXpEntry(db, 'profile-001', 'topic-001', 'subject-001');
+
+    expect(insertValues).not.toHaveBeenCalled();
+  });
+
+  it('skips when assessment has no mastery score', async () => {
+    const { db, insertValues, queryAssessmentsFindFirst } = createMockXpDb();
+
+    queryAssessmentsFindFirst.mockResolvedValue({
+      id: 'assessment-001',
+      profileId: 'profile-001',
+      topicId: 'topic-001',
+      status: 'passed',
+      masteryScore: null,
+      verificationDepth: 'recall',
+    });
+
+    await insertSessionXpEntry(db, 'profile-001', 'topic-001', 'subject-001');
+
+    expect(insertValues).not.toHaveBeenCalled();
+  });
+
+  it('skips when XP entry already exists (dedup)', async () => {
+    const { db, insertValues, queryAssessmentsFindFirst } = createMockXpDb();
+
+    queryAssessmentsFindFirst.mockResolvedValue({
+      id: 'assessment-001',
+      profileId: 'profile-001',
+      topicId: 'topic-001',
+      status: 'passed',
+      masteryScore: '0.90',
+      verificationDepth: 'recall',
+    });
+
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      xpLedger: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'xp-001',
+          profileId: 'profile-001',
+          topicId: 'topic-001',
+          amount: 90,
+        }),
+      },
+    });
+
+    await insertSessionXpEntry(db, 'profile-001', 'topic-001', 'subject-001');
+
+    expect(insertValues).not.toHaveBeenCalled();
+  });
+
+  it('calculates correct XP amount (masteryScore x verificationDepth multiplier)', async () => {
+    const { db, insertValues, queryAssessmentsFindFirst } = createMockXpDb();
+
+    queryAssessmentsFindFirst.mockResolvedValue({
+      id: 'assessment-002',
+      profileId: 'profile-001',
+      topicId: 'topic-001',
+      status: 'passed',
+      masteryScore: '0.75',
+      verificationDepth: 'transfer',
+    });
+
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      xpLedger: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+
+    await insertSessionXpEntry(db, 'profile-001', 'topic-001', 'subject-001');
+
+    // 100 * 0.75 * 2.0 (transfer) = 150
+    expect(insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 150,
+      })
+    );
   });
 });

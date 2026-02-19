@@ -13,6 +13,7 @@ import { useSubjects } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
 import { useStreaks } from '../../hooks/use-streaks';
 import { useCoachingCard } from '../../hooks/use-coaching-card';
+import { useSubscriptionStatus } from '../../hooks/use-subscription';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -21,6 +22,7 @@ export default function HomeScreen() {
   const { data: overallProgress } = useOverallProgress();
   const { data: streak } = useStreaks();
   const coachingCard = useCoachingCard();
+  const { data: subStatus } = useSubscriptionStatus();
 
   // Build a lookup of retention status per subject from overall progress
   const subjectRetention = new Map<string, 'strong' | 'fading' | 'weak'>();
@@ -41,17 +43,31 @@ export default function HomeScreen() {
             Your coach has a plan
           </Text>
         </View>
-        {streak && streak.currentStreak > 0 ? (
-          <View className="bg-surface-elevated rounded-full px-3 py-2 items-center justify-center">
-            <Text className="text-text-primary text-body-sm font-semibold">
-              {streak.currentStreak}d
-            </Text>
-          </View>
-        ) : (
-          <View className="bg-surface-elevated rounded-full w-11 h-11 items-center justify-center">
-            <Text className="text-text-secondary text-body-sm">0d</Text>
-          </View>
-        )}
+        <View className="flex-row items-center">
+          {subStatus && subStatus.tier !== 'free' && (
+            <Pressable
+              onPress={() => router.push('/(learner)/subscription')}
+              className="bg-primary-soft rounded-full px-2.5 py-1.5 mr-2"
+              accessibilityLabel={`${subStatus.tier} plan`}
+              accessibilityRole="button"
+            >
+              <Text className="text-primary text-caption font-semibold capitalize">
+                {subStatus.tier}
+              </Text>
+            </Pressable>
+          )}
+          {streak && streak.currentStreak > 0 ? (
+            <View className="bg-surface-elevated rounded-full px-3 py-2 items-center justify-center">
+              <Text className="text-text-primary text-body-sm font-semibold">
+                {streak.currentStreak}d
+              </Text>
+            </View>
+          ) : (
+            <View className="bg-surface-elevated rounded-full w-11 h-11 items-center justify-center">
+              <Text className="text-text-secondary text-body-sm">0d</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       <ScrollView

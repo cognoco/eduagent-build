@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Account Service Tests
+// Account Service Tests (Story 5.2: timezone-aware trial provisioning)
 // ---------------------------------------------------------------------------
 
 import type { Database } from '@eduagent/database';
@@ -9,22 +9,48 @@ import { findAccountByClerkId, findOrCreateAccount } from './account';
 const mockCreateSubscription = jest.fn().mockResolvedValue({
   id: 'sub-trial',
   accountId: 'new-acc',
-  tier: 'free',
+  tier: 'plus',
   status: 'trial',
 });
 jest.mock('./billing', () => ({
   createSubscription: (...args: unknown[]) => mockCreateSubscription(...args),
 }));
 
+// Mock the trial service — computeTrialEndDate
+const mockComputeTrialEndDate = jest
+  .fn()
+  .mockReturnValue(new Date('2025-01-29T23:59:59.999Z'));
+jest.mock('./trial', () => ({
+  computeTrialEndDate: (...args: unknown[]) => mockComputeTrialEndDate(...args),
+}));
+
+// Mock the subscription service — getTierConfig
+jest.mock('./subscription', () => ({
+  getTierConfig: jest.fn().mockReturnValue({
+    monthlyQuota: 500,
+    maxProfiles: 1,
+    priceMonthly: 18.99,
+    priceYearly: 168,
+    topUpPrice: 10,
+    topUpAmount: 500,
+  }),
+}));
+
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 
 function mockAccountRow(
-  overrides?: Partial<{ id: string; clerkUserId: string; email: string }>
+  overrides?: Partial<{
+    id: string;
+    clerkUserId: string;
+    email: string;
+    timezone: string | null;
+  }>
 ) {
   return {
     id: overrides?.id ?? 'acc-1',
     clerkUserId: overrides?.clerkUserId ?? 'clerk_user_123',
     email: overrides?.email ?? 'user@example.com',
+    timezone: overrides?.timezone ?? null,
     createdAt: NOW,
     updatedAt: NOW,
     deletionScheduledAt: null,
@@ -74,9 +100,18 @@ describe('findAccountByClerkId', () => {
       id: 'acc-1',
       clerkUserId: 'clerk_user_123',
       email: 'user@example.com',
+      timezone: null,
       createdAt: '2025-01-15T10:00:00.000Z',
       updatedAt: '2025-01-15T10:00:00.000Z',
     });
+  });
+
+  it('maps timezone when present', async () => {
+    const row = mockAccountRow({ timezone: 'Europe/Prague' });
+    const db = createMockDb({ findFirstResult: row });
+    const result = await findAccountByClerkId(db, 'clerk_user_123');
+
+    expect(result!.timezone).toBe('Europe/Prague');
   });
 });
 
@@ -122,7 +157,7 @@ describe('findOrCreateAccount', () => {
     expect(db.insert).toHaveBeenCalled();
   });
 
-  it('auto-creates a trial subscription for new accounts (FR108)', async () => {
+  it('auto-creates a trial subscription with Plus tier for new accounts (FR108)', async () => {
     const newRow = mockAccountRow({
       id: 'new-acc',
       clerkUserId: 'clerk_user_789',
@@ -139,7 +174,7 @@ describe('findOrCreateAccount', () => {
     expect(mockCreateSubscription).toHaveBeenCalledWith(
       db,
       'new-acc',
-      'free',
+      'plus',
       500,
       expect.objectContaining({
         status: 'trial',
@@ -148,7 +183,7 @@ describe('findOrCreateAccount', () => {
     );
   });
 
-  it('sets trial to expire 14 days from creation', async () => {
+  it('uses computeTrialEndDate for timezone-aware trial expiry', async () => {
     const newRow = mockAccountRow({
       id: 'new-acc',
       clerkUserId: 'clerk_user_789',
@@ -159,21 +194,85 @@ describe('findOrCreateAccount', () => {
       insertReturning: [newRow],
     });
 
-    const before = Date.now();
-    await findOrCreateAccount(db, 'clerk_user_789', 'new@example.com');
-    const after = Date.now();
+    await findOrCreateAccount(
+      db,
+      'clerk_user_789',
+      'new@example.com',
+      'Europe/Prague'
+    );
 
-    const callArgs = mockCreateSubscription.mock.calls[0];
-    const options = callArgs[4] as { trialEndsAt: string };
-    const trialEndsAt = new Date(options.trialEndsAt).getTime();
-
-    const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
-    expect(trialEndsAt).toBeGreaterThanOrEqual(before + FOURTEEN_DAYS_MS);
-    expect(trialEndsAt).toBeLessThanOrEqual(after + FOURTEEN_DAYS_MS);
+    expect(mockComputeTrialEndDate).toHaveBeenCalledWith(
+      expect.any(Date),
+      'Europe/Prague'
+    );
   });
 
-  it('returns account with correct shape', async () => {
-    const row = mockAccountRow();
+  it('passes null timezone to computeTrialEndDate when not provided', async () => {
+    const newRow = mockAccountRow({
+      id: 'new-acc',
+      clerkUserId: 'clerk_user_789',
+      email: 'new@example.com',
+    });
+    const db = createMockDb({
+      findFirstResult: undefined,
+      insertReturning: [newRow],
+    });
+
+    await findOrCreateAccount(db, 'clerk_user_789', 'new@example.com');
+
+    expect(mockComputeTrialEndDate).toHaveBeenCalledWith(
+      expect.any(Date),
+      undefined
+    );
+  });
+
+  it('stores timezone on account row when provided', async () => {
+    const newRow = mockAccountRow({
+      id: 'new-acc',
+      clerkUserId: 'clerk_user_789',
+      email: 'new@example.com',
+      timezone: 'America/New_York',
+    });
+    const db = createMockDb({
+      findFirstResult: undefined,
+      insertReturning: [newRow],
+    });
+
+    await findOrCreateAccount(
+      db,
+      'clerk_user_789',
+      'new@example.com',
+      'America/New_York'
+    );
+
+    // Verify insert was called with timezone
+    const insertCall = (db.insert as jest.Mock).mock.results[0].value;
+    const valuesCall = insertCall.values as jest.Mock;
+    const values = valuesCall.mock.calls[0][0];
+    expect(values.timezone).toBe('America/New_York');
+  });
+
+  it('stores null timezone when not provided', async () => {
+    const newRow = mockAccountRow({
+      id: 'new-acc',
+      clerkUserId: 'clerk_user_789',
+      email: 'new@example.com',
+    });
+    const db = createMockDb({
+      findFirstResult: undefined,
+      insertReturning: [newRow],
+    });
+
+    await findOrCreateAccount(db, 'clerk_user_789', 'new@example.com');
+
+    const insertCall = (db.insert as jest.Mock).mock.results[0].value;
+    const valuesCall = insertCall.values as jest.Mock;
+    const values = valuesCall.mock.calls[0][0];
+    expect(values.timezone).toBeNull();
+  });
+
+  it('returns account with correct shape including timezone', async () => {
+    const row = mockAccountRow({ timezone: 'Asia/Tokyo' });
     const db = createMockDb({ findFirstResult: row });
     const result = await findOrCreateAccount(
       db,
@@ -184,8 +283,10 @@ describe('findOrCreateAccount', () => {
     expect(result).toHaveProperty('id');
     expect(result).toHaveProperty('clerkUserId');
     expect(result).toHaveProperty('email');
+    expect(result).toHaveProperty('timezone');
     expect(result).toHaveProperty('createdAt');
     expect(result).toHaveProperty('updatedAt');
+    expect(result.timezone).toBe('Asia/Tokyo');
   });
 
   it('returns ISO 8601 timestamps', async () => {

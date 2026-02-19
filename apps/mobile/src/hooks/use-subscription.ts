@@ -73,6 +73,30 @@ export function useUsage(): UseQueryResult<UsageData> {
   });
 }
 
+/** Lightweight subscription status for header badges — KV-backed (fast). */
+export interface SubscriptionStatusData {
+  tier: SubscriptionTier;
+  status: SubscriptionStatus;
+  monthlyLimit: number;
+  usedThisMonth: number;
+}
+
+export function useSubscriptionStatus(): UseQueryResult<SubscriptionStatusData> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['subscription-status', activeProfile?.id],
+    queryFn: async () => {
+      const res = await client.subscription.status.$get();
+      const data = await res.json();
+      return data.status;
+    },
+    enabled: !!activeProfile,
+    staleTime: 60_000, // 1 min — fast endpoint, no need for aggressive refetching
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Mutation hooks
 // ---------------------------------------------------------------------------

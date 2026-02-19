@@ -6,6 +6,7 @@ import { reviewReminder } from './functions/review-reminder';
 import { trialExpiry } from './functions/trial-expiry';
 import { paymentRetry } from './functions/payment-retry';
 import { quotaReset } from './functions/quota-reset';
+import { topupExpiryReminder } from './functions/topup-expiry-reminder';
 
 export {
   inngest,
@@ -16,6 +17,7 @@ export {
   trialExpiry,
   paymentRetry,
   quotaReset,
+  topupExpiryReminder,
 };
 
 // All Inngest functions to register with the serve handler
@@ -27,4 +29,5 @@ export const functions = [
   trialExpiry,
   paymentRetry,
   quotaReset,
+  topupExpiryReminder,
 ];

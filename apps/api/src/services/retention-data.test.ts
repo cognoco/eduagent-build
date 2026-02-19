@@ -10,9 +10,14 @@ jest.mock('./retention', () => ({
   processRecallResult: jest.fn(),
 }));
 
+jest.mock('./adaptive-teaching', () => ({
+  canExitNeedsDeepening: jest.fn(),
+}));
+
 import type { Database } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';
 import { processRecallResult } from './retention';
+import { canExitNeedsDeepening } from './adaptive-teaching';
 import {
   getSubjectRetention,
   getTopicRetention,
@@ -22,6 +27,7 @@ import {
   getTeachingPreference,
   setTeachingPreference,
   deleteTeachingPreference,
+  updateNeedsDeepeningProgress,
 } from './retention-data';
 
 const NOW = new Date('2026-02-15T10:00:00.000Z');
@@ -102,10 +108,12 @@ function setupScopedRepo({
     | ReturnType<typeof mockRetentionCardRow>
     | undefined,
   needsDeepeningFindMany = [] as Array<{
+    id?: string;
     topicId: string;
     subjectId: string;
     status: string;
     consecutiveSuccessCount: number;
+    profileId?: string;
   }>,
 } = {}) {
   (createScopedRepository as jest.Mock).mockReturnValue({
@@ -327,5 +335,124 @@ describe('deleteTeachingPreference', () => {
     const db = createMockDb();
     await deleteTeachingPreference(db, profileId, subjectId);
     expect(db.delete).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateNeedsDeepeningProgress
+// ---------------------------------------------------------------------------
+
+describe('updateNeedsDeepeningProgress', () => {
+  it('increments consecutiveSuccessCount when quality >= 3', async () => {
+    setupScopedRepo({
+      needsDeepeningFindMany: [
+        {
+          id: 'nd-1',
+          topicId,
+          subjectId,
+          status: 'active',
+          consecutiveSuccessCount: 1,
+          profileId,
+        },
+      ],
+    });
+    (canExitNeedsDeepening as jest.Mock).mockReturnValue(false);
+
+    const db = createMockDb();
+    await updateNeedsDeepeningProgress(db, profileId, topicId, 3);
+
+    expect(db.update).toHaveBeenCalled();
+    const setArg = (db.update as jest.Mock).mock.results[0].value.set.mock
+      .calls[0][0];
+    expect(setArg.consecutiveSuccessCount).toBe(2);
+    expect(setArg.status).toBe('active');
+  });
+
+  it('resets consecutiveSuccessCount to 0 when quality < 3', async () => {
+    setupScopedRepo({
+      needsDeepeningFindMany: [
+        {
+          id: 'nd-1',
+          topicId,
+          subjectId,
+          status: 'active',
+          consecutiveSuccessCount: 2,
+          profileId,
+        },
+      ],
+    });
+    (canExitNeedsDeepening as jest.Mock).mockReturnValue(false);
+
+    const db = createMockDb();
+    await updateNeedsDeepeningProgress(db, profileId, topicId, 2);
+
+    expect(db.update).toHaveBeenCalled();
+    const setArg = (db.update as jest.Mock).mock.results[0].value.set.mock
+      .calls[0][0];
+    expect(setArg.consecutiveSuccessCount).toBe(0);
+    expect(setArg.status).toBe('active');
+  });
+
+  it('resolves needs-deepening when count reaches 3', async () => {
+    setupScopedRepo({
+      needsDeepeningFindMany: [
+        {
+          id: 'nd-1',
+          topicId,
+          subjectId,
+          status: 'active',
+          consecutiveSuccessCount: 2,
+          profileId,
+        },
+      ],
+    });
+    (canExitNeedsDeepening as jest.Mock).mockReturnValue(true);
+
+    const db = createMockDb();
+    await updateNeedsDeepeningProgress(db, profileId, topicId, 4);
+
+    expect(db.update).toHaveBeenCalled();
+    const setArg = (db.update as jest.Mock).mock.results[0].value.set.mock
+      .calls[0][0];
+    expect(setArg.consecutiveSuccessCount).toBe(3);
+    expect(setArg.status).toBe('resolved');
+    expect(canExitNeedsDeepening).toHaveBeenCalledWith(
+      expect.objectContaining({
+        topicId,
+        subjectId,
+        consecutiveSuccessCount: 3,
+        status: 'active',
+      })
+    );
+  });
+
+  it('skips when no active needs-deepening record exists', async () => {
+    setupScopedRepo({
+      needsDeepeningFindMany: [
+        {
+          id: 'nd-1',
+          topicId,
+          subjectId,
+          status: 'resolved',
+          consecutiveSuccessCount: 3,
+          profileId,
+        },
+      ],
+    });
+
+    const db = createMockDb();
+    await updateNeedsDeepeningProgress(db, profileId, topicId, 4);
+
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('skips when topicId is null', async () => {
+    setupScopedRepo();
+
+    const db = createMockDb();
+    await updateNeedsDeepeningProgress(db, profileId, null, 4);
+
+    expect(createScopedRepository).not.toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
   });
 });

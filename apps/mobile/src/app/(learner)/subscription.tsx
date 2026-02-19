@@ -107,6 +107,7 @@ export default function SubscriptionScreen() {
   const status = subscription?.status ?? 'trial';
   const isTrial = status === 'trial';
   const isPaidTier = tier !== 'free';
+  const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
 
   const handleUpgrade = useCallback(
     async (selectedTier: 'plus' | 'family' | 'pro') => {
@@ -224,14 +225,44 @@ export default function SubscriptionScreen() {
               </Text>
               <View className="bg-primary-soft rounded-full px-2.5 py-1">
                 <Text className="text-caption font-semibold text-primary capitalize">
-                  {status === 'past_due' ? 'Past due' : status}
+                  {cancelAtPeriodEnd
+                    ? 'Cancelling'
+                    : status === 'past_due'
+                    ? 'Past due'
+                    : status}
                 </Text>
               </View>
             </View>
             <Text className="text-caption text-text-secondary mt-1">
               {TIER_LIMITS[tier]}
             </Text>
+            {subscription?.currentPeriodEnd && isPaidTier && (
+              <Text className="text-caption text-text-secondary mt-1">
+                {cancelAtPeriodEnd
+                  ? `Access until ${new Date(
+                      subscription.currentPeriodEnd
+                    ).toLocaleDateString()}`
+                  : `Renews ${new Date(
+                      subscription.currentPeriodEnd
+                    ).toLocaleDateString()}`}
+              </Text>
+            )}
           </View>
+
+          {/* Cancellation notice */}
+          {cancelAtPeriodEnd && subscription?.currentPeriodEnd && (
+            <View className="bg-warning-soft rounded-card px-4 py-3 mt-2">
+              <Text className="text-body-sm font-semibold text-warning">
+                Subscription ending
+              </Text>
+              <Text className="text-caption text-text-secondary mt-0.5">
+                Your subscription has been cancelled. You can continue using all
+                features until{' '}
+                {new Date(subscription.currentPeriodEnd).toLocaleDateString()}.
+                After that, your account will revert to the Free tier.
+              </Text>
+            </View>
+          )}
 
           {/* Usage meter */}
           {usage && (
@@ -320,17 +351,19 @@ export default function SubscriptionScreen() {
                   Manage billing
                 </Text>
               </Pressable>
-              <Pressable
-                onPress={handleCancel}
-                disabled={cancel.isPending}
-                className="bg-surface rounded-card px-4 py-3.5"
-                accessibilityLabel="Cancel subscription"
-                accessibilityRole="button"
-              >
-                <Text className="text-body text-danger">
-                  Cancel subscription
-                </Text>
-              </Pressable>
+              {!cancelAtPeriodEnd && (
+                <Pressable
+                  onPress={handleCancel}
+                  disabled={cancel.isPending}
+                  className="bg-surface rounded-card px-4 py-3.5"
+                  accessibilityLabel="Cancel subscription"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-body text-danger">
+                    Cancel subscription
+                  </Text>
+                </Pressable>
+              )}
             </View>
           )}
 

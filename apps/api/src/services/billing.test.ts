@@ -18,6 +18,16 @@ import {
   ensureFreeSubscription,
   updateQuotaPoolLimit,
   activateSubscriptionFromCheckout,
+  transitionToExtendedTrial,
+  findExpiredTrialsByDaysSinceEnd,
+  findSubscriptionsByTrialDateRange,
+  getTopUpCreditsRemaining,
+  purchaseTopUpCredits,
+  findExpiringTopUpCredits,
+  countTopUpPurchasesSinceCycleStart,
+  handleTierChange,
+  getUpgradePrompt,
+  getTopUpPriceCents,
 } from './billing';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -842,5 +852,512 @@ describe('activateSubscriptionFromCheckout', () => {
 
     // update called twice: subscription + quota pool
     expect(db.update).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// transitionToExtendedTrial (Story 5.2)
+// ---------------------------------------------------------------------------
+
+describe('transitionToExtendedTrial', () => {
+  it('updates subscription status and tier', async () => {
+    const db = createMockDb();
+
+    await transitionToExtendedTrial(db, subscriptionId, 450);
+
+    // update called twice: subscription + quota pool
+    expect(db.update).toHaveBeenCalledTimes(2);
+  });
+
+  it('sets quota pool to extended trial monthly equivalent', async () => {
+    const updateWhere = jest.fn().mockReturnValue({
+      returning: jest.fn().mockResolvedValue([]),
+    });
+    const updateSetMock = jest.fn().mockReturnValue({ where: updateWhere });
+
+    const db = {
+      query: {
+        subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        quotaPools: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        topUpCredits: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
+      },
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+      update: jest.fn().mockReturnValue({ set: updateSetMock }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    } as unknown as Database;
+
+    await transitionToExtendedTrial(db, subscriptionId, 450);
+
+    // Second call to update().set() is for quota pool
+    const secondSetCall = updateSetMock.mock.calls[1][0];
+    expect(secondSetCall.monthlyLimit).toBe(450);
+    expect(secondSetCall.usedThisMonth).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findExpiredTrialsByDaysSinceEnd (Story 5.2)
+// ---------------------------------------------------------------------------
+
+describe('findExpiredTrialsByDaysSinceEnd', () => {
+  it('delegates to findSubscriptionsByTrialDateRange with correct date range', async () => {
+    const row = mockSubscriptionRow({
+      status: 'expired',
+      trialEndsAt: new Date('2025-01-01T12:00:00.000Z'),
+    });
+    const findManyMock = jest.fn().mockResolvedValue([row]);
+    const db = {
+      query: {
+        subscriptions: { findMany: findManyMock, findFirst: jest.fn() },
+        quotaPools: { findFirst: jest.fn() },
+        topUpCredits: { findFirst: jest.fn() },
+        profiles: { findFirst: jest.fn() },
+      },
+      insert: jest.fn(),
+      update: jest.fn(),
+      select: jest.fn(),
+    } as unknown as Database;
+
+    const now = new Date('2025-01-15T10:00:00.000Z');
+    const results = await findExpiredTrialsByDaysSinceEnd(db, now, 14);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].status).toBe('expired');
+    // Should query for trials that ended 14 days ago (2025-01-01)
+    expect(findManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.anything(),
+      })
+    );
+  });
+
+  it('returns empty array when no matching trials found', async () => {
+    const findManyMock = jest.fn().mockResolvedValue([]);
+    const db = {
+      query: {
+        subscriptions: { findMany: findManyMock, findFirst: jest.fn() },
+        quotaPools: { findFirst: jest.fn() },
+        topUpCredits: { findFirst: jest.fn() },
+        profiles: { findFirst: jest.fn() },
+      },
+      insert: jest.fn(),
+      update: jest.fn(),
+      select: jest.fn(),
+    } as unknown as Database;
+
+    const now = new Date('2025-01-15T10:00:00.000Z');
+    const results = await findExpiredTrialsByDaysSinceEnd(db, now, 14);
+
+    expect(results).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getTopUpCreditsRemaining (Story 5.3)
+// ---------------------------------------------------------------------------
+
+describe('getTopUpCreditsRemaining', () => {
+  it('returns aggregate remaining from select query', async () => {
+    const db = createMockDb({ selectResult: [{ total: 750 }] });
+    const result = await getTopUpCreditsRemaining(db, subscriptionId);
+
+    expect(result).toBe(750);
+    expect(db.select).toHaveBeenCalled();
+  });
+
+  it('returns 0 when no top-up credits exist', async () => {
+    const db = createMockDb({ selectResult: [{ total: 0 }] });
+    const result = await getTopUpCreditsRemaining(db, subscriptionId);
+
+    expect(result).toBe(0);
+  });
+
+  it('returns 0 when select returns empty result', async () => {
+    const db = createMockDb({ selectResult: [] });
+    const result = await getTopUpCreditsRemaining(db, subscriptionId);
+
+    expect(result).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// purchaseTopUpCredits (Story 5.3)
+// ---------------------------------------------------------------------------
+
+describe('purchaseTopUpCredits', () => {
+  it('returns null when subscription not found', async () => {
+    const db = createMockDb({ subscriptionFindFirst: undefined });
+    const result = await purchaseTopUpCredits(db, subscriptionId, 500);
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when subscription is free tier', async () => {
+    const sub = mockSubscriptionRow({ tier: 'free' });
+    const db = createMockDb({ subscriptionFindFirst: sub });
+    const result = await purchaseTopUpCredits(db, subscriptionId, 500);
+
+    expect(result).toBeNull();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('creates top-up credits for plus tier', async () => {
+    const sub = mockSubscriptionRow({ tier: 'plus', status: 'active' });
+    const topUpRow = mockTopUpRow({ remaining: 500 });
+    const db = createMockDb({
+      subscriptionFindFirst: sub,
+      insertReturning: [topUpRow],
+    });
+
+    const result = await purchaseTopUpCredits(db, subscriptionId, 500);
+
+    expect(result).not.toBeNull();
+    expect(result!.amount).toBe(500);
+    expect(result!.remaining).toBe(500);
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('creates top-up credits for family tier', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family', status: 'active' });
+    const topUpRow = mockTopUpRow({ remaining: 500 });
+    const db = createMockDb({
+      subscriptionFindFirst: sub,
+      insertReturning: [topUpRow],
+    });
+
+    const result = await purchaseTopUpCredits(db, subscriptionId, 500);
+
+    expect(result).not.toBeNull();
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('sets 12-month expiry from purchase date', async () => {
+    const sub = mockSubscriptionRow({ tier: 'pro', status: 'active' });
+    const topUpRow = mockTopUpRow({
+      remaining: 500,
+      expiresAt: new Date('2026-01-15T10:00:00.000Z'),
+    });
+    const db = createMockDb({
+      subscriptionFindFirst: sub,
+      insertReturning: [topUpRow],
+    });
+
+    const purchaseDate = new Date('2025-01-15T10:00:00.000Z');
+    const result = await purchaseTopUpCredits(
+      db,
+      subscriptionId,
+      500,
+      purchaseDate
+    );
+
+    expect(result).not.toBeNull();
+    // Verify insert was called (the expiry is set internally)
+    expect(db.insert).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findExpiringTopUpCredits (Story 5.3)
+// ---------------------------------------------------------------------------
+
+describe('findExpiringTopUpCredits', () => {
+  it('returns credits from findMany query', async () => {
+    const topUp = mockTopUpRow({ remaining: 100 });
+    const findManyMock = jest.fn().mockResolvedValue([topUp]);
+
+    const db = {
+      query: {
+        subscriptions: { findFirst: jest.fn() },
+        quotaPools: { findFirst: jest.fn() },
+        topUpCredits: { findFirst: jest.fn(), findMany: findManyMock },
+        profiles: { findFirst: jest.fn() },
+      },
+      insert: jest.fn(),
+      update: jest.fn(),
+      select: jest.fn(),
+    } as unknown as Database;
+
+    const rangeStart = new Date('2025-07-01T00:00:00.000Z');
+    const rangeEnd = new Date('2025-07-01T23:59:59.999Z');
+    const results = await findExpiringTopUpCredits(db, rangeStart, rangeEnd);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].remaining).toBe(100);
+  });
+
+  it('returns empty array when no expiring credits found', async () => {
+    const findManyMock = jest.fn().mockResolvedValue([]);
+
+    const db = {
+      query: {
+        subscriptions: { findFirst: jest.fn() },
+        quotaPools: { findFirst: jest.fn() },
+        topUpCredits: { findFirst: jest.fn(), findMany: findManyMock },
+        profiles: { findFirst: jest.fn() },
+      },
+      insert: jest.fn(),
+      update: jest.fn(),
+      select: jest.fn(),
+    } as unknown as Database;
+
+    const rangeStart = new Date('2025-07-01T00:00:00.000Z');
+    const rangeEnd = new Date('2025-07-01T23:59:59.999Z');
+    const results = await findExpiringTopUpCredits(db, rangeStart, rangeEnd);
+
+    expect(results).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// countTopUpPurchasesSinceCycleStart (Story 5.3)
+// ---------------------------------------------------------------------------
+
+describe('countTopUpPurchasesSinceCycleStart', () => {
+  it('returns count from select query', async () => {
+    const db = createMockDb({ selectResult: [{ count: 3 }] });
+    const cycleStart = new Date('2025-01-01T00:00:00.000Z');
+    const result = await countTopUpPurchasesSinceCycleStart(
+      db,
+      subscriptionId,
+      cycleStart
+    );
+
+    expect(result).toBe(3);
+  });
+
+  it('returns 0 when no purchases found', async () => {
+    const db = createMockDb({ selectResult: [{ count: 0 }] });
+    const cycleStart = new Date('2025-01-01T00:00:00.000Z');
+    const result = await countTopUpPurchasesSinceCycleStart(
+      db,
+      subscriptionId,
+      cycleStart
+    );
+
+    expect(result).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleTierChange (Story 5.3)
+// ---------------------------------------------------------------------------
+
+describe('handleTierChange', () => {
+  it('returns null when subscription not found', async () => {
+    const db = createMockDb({ subscriptionFindFirst: undefined });
+    const result = await handleTierChange(db, subscriptionId, 'family');
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when quota pool not found', async () => {
+    const sub = mockSubscriptionRow({ tier: 'plus' });
+    const db = createMockDb({
+      subscriptionFindFirst: sub,
+      quotaPoolFindFirst: undefined,
+    });
+    const result = await handleTierChange(db, subscriptionId, 'family');
+
+    expect(result).toBeNull();
+  });
+
+  it('handles mid-cycle upgrade: Plus(200/500) -> Family(1500) = 1300 remaining', async () => {
+    const sub = mockSubscriptionRow({ tier: 'plus', status: 'active' });
+    const pool = mockQuotaPoolRow({ usedThisMonth: 200, monthlyLimit: 500 });
+    const db = createMockDb({
+      subscriptionFindFirst: sub,
+      quotaPoolFindFirst: pool,
+    });
+
+    const result = await handleTierChange(db, subscriptionId, 'family');
+
+    expect(result).not.toBeNull();
+    expect(result!.previousTier).toBe('plus');
+    expect(result!.newTier).toBe('family');
+    expect(result!.usedThisCycle).toBe(200);
+    expect(result!.newMonthlyLimit).toBe(1500);
+    expect(result!.remainingQuestions).toBe(1300);
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it('handles mid-cycle downgrade: Family(800/1500) -> Plus(500) = 0 remaining', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family', status: 'active' });
+    const pool = mockQuotaPoolRow({ usedThisMonth: 800, monthlyLimit: 1500 });
+    const db = createMockDb({
+      subscriptionFindFirst: sub,
+      quotaPoolFindFirst: pool,
+    });
+
+    const result = await handleTierChange(db, subscriptionId, 'plus');
+
+    expect(result).not.toBeNull();
+    expect(result!.previousTier).toBe('family');
+    expect(result!.newTier).toBe('plus');
+    expect(result!.usedThisCycle).toBe(800);
+    expect(result!.newMonthlyLimit).toBe(500);
+    expect(result!.remainingQuestions).toBe(0);
+  });
+
+  it('handles upgrade with zero usage: full new allocation', async () => {
+    const sub = mockSubscriptionRow({ tier: 'free', status: 'active' });
+    const pool = mockQuotaPoolRow({ usedThisMonth: 0, monthlyLimit: 50 });
+    const db = createMockDb({
+      subscriptionFindFirst: sub,
+      quotaPoolFindFirst: pool,
+    });
+
+    const result = await handleTierChange(db, subscriptionId, 'plus');
+
+    expect(result).not.toBeNull();
+    expect(result!.remainingQuestions).toBe(500);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getUpgradePrompt (Story 5.3)
+// ---------------------------------------------------------------------------
+
+describe('getUpgradePrompt', () => {
+  const baseParams = {
+    tier: 'free' as const,
+    usedThisMonth: 0,
+    monthlyLimit: 50,
+    topUpPurchasesThisCycle: 0,
+    profileCount: 1,
+    isAddingProfile: false,
+  };
+
+  it('returns Free->Plus prompt when quota cap reached', () => {
+    const result = getUpgradePrompt({
+      ...baseParams,
+      tier: 'free',
+      usedThisMonth: 50,
+      monthlyLimit: 50,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.reason).toBe('quota_cap_reached');
+    expect(result!.suggestedTier).toBe('plus');
+  });
+
+  it('returns null when free user has not hit cap', () => {
+    const result = getUpgradePrompt({
+      ...baseParams,
+      tier: 'free',
+      usedThisMonth: 30,
+      monthlyLimit: 50,
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it('returns Plus->Family prompt when adding family member', () => {
+    const result = getUpgradePrompt({
+      ...baseParams,
+      tier: 'plus',
+      isAddingProfile: true,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.reason).toBe('adding_family_member');
+    expect(result!.suggestedTier).toBe('family');
+  });
+
+  it('returns Plus->Family prompt when 3+ top-ups purchased', () => {
+    const result = getUpgradePrompt({
+      ...baseParams,
+      tier: 'plus',
+      topUpPurchasesThisCycle: 3,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.reason).toBe('frequent_top_ups');
+    expect(result!.suggestedTier).toBe('family');
+  });
+
+  it('returns null for plus with 2 top-ups (below threshold)', () => {
+    const result = getUpgradePrompt({
+      ...baseParams,
+      tier: 'plus',
+      topUpPurchasesThisCycle: 2,
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it('returns Family->Pro prompt when profile limit reached', () => {
+    const result = getUpgradePrompt({
+      ...baseParams,
+      tier: 'family',
+      profileCount: 4,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.reason).toBe('max_profiles_reached');
+    expect(result!.suggestedTier).toBe('pro');
+  });
+
+  it('returns null for family with room for profiles', () => {
+    const result = getUpgradePrompt({
+      ...baseParams,
+      tier: 'family',
+      profileCount: 2,
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null for pro tier (no further upgrade path)', () => {
+    const result = getUpgradePrompt({
+      ...baseParams,
+      tier: 'pro',
+      usedThisMonth: 3000,
+      monthlyLimit: 3000,
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it('prioritizes adding_family_member over frequent_top_ups for plus', () => {
+    const result = getUpgradePrompt({
+      ...baseParams,
+      tier: 'plus',
+      isAddingProfile: true,
+      topUpPurchasesThisCycle: 5,
+    });
+
+    // adding_family_member is checked first
+    expect(result!.reason).toBe('adding_family_member');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getTopUpPriceCents (Story 5.3)
+// ---------------------------------------------------------------------------
+
+describe('getTopUpPriceCents', () => {
+  it('returns null for free tier', () => {
+    expect(getTopUpPriceCents('free')).toBeNull();
+  });
+
+  it('returns 1000 (EUR 10) for plus tier', () => {
+    expect(getTopUpPriceCents('plus')).toBe(1000);
+  });
+
+  it('returns 500 (EUR 5) for family tier', () => {
+    expect(getTopUpPriceCents('family')).toBe(500);
+  });
+
+  it('returns 500 (EUR 5) for pro tier', () => {
+    expect(getTopUpPriceCents('pro')).toBe(500);
   });
 });

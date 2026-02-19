@@ -15,12 +15,16 @@ import {
   linkStripeCustomer,
   addToByokWaitlist,
   ensureFreeSubscription,
+  markSubscriptionCancelled,
+  getTopUpCreditsRemaining,
+  getTopUpPriceCents,
 } from '../services/billing';
 import {
   getWarningLevel,
   calculateRemainingQuestions,
 } from '../services/metering';
 import { createStripeClient } from '../services/stripe';
+import { readSubscriptionStatus } from '../services/kv';
 import { apiError, notFound } from '../errors';
 
 type BillingRouteEnv = {
@@ -35,6 +39,7 @@ type BillingRouteEnv = {
     STRIPE_PRICE_PRO_MONTHLY?: string;
     STRIPE_PRICE_PRO_YEARLY?: string;
     APP_URL?: string;
+    SUBSCRIPTION_KV?: KVNamespace;
   };
   Variables: {
     user: AuthUser;
@@ -72,6 +77,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           status: 'trial' as const,
           trialEndsAt: null,
           currentPeriodEnd: null,
+          cancelAtPeriodEnd: false,
           monthlyLimit: 50,
           usedThisMonth: 0,
           remainingQuestions: 50,
@@ -85,12 +91,17 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const usedThisMonth = quota?.usedThisMonth ?? 0;
     const remaining = Math.max(0, monthlyLimit - usedThisMonth);
 
+    // cancelAtPeriodEnd: subscription has a cancellation date but status is still active
+    const cancelAtPeriodEnd =
+      subscription.cancelledAt !== null && subscription.status === 'active';
+
     return c.json({
       subscription: {
         tier: subscription.tier,
         status: subscription.status,
         trialEndsAt: subscription.trialEndsAt,
         currentPeriodEnd: subscription.currentPeriodEnd,
+        cancelAtPeriodEnd,
         monthlyLimit,
         usedThisMonth,
         remainingQuestions: remaining,
@@ -204,6 +215,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       updated.current_period_end * 1000
     ).toISOString();
 
+    // Mark local DB row so cancelAtPeriodEnd is reflected immediately
+    await markSubscriptionCancelled(db, subscription.id);
+
     return c.json({
       message:
         'Subscription cancelled. Access continues until end of billing period.',
@@ -220,6 +234,20 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       const db = c.get('db');
       const account = c.get('account');
 
+      // Check tier eligibility — Free tier cannot purchase top-ups
+      const subscription = await getSubscriptionByAccountId(db, account.id);
+      const tier = subscription?.tier ?? 'free';
+      const priceCents = getTopUpPriceCents(tier);
+
+      if (priceCents === null) {
+        return apiError(
+          c,
+          403,
+          ERROR_CODES.FORBIDDEN,
+          'Top-up credits are not available on the Free tier. Upgrade to Plus or higher.'
+        );
+      }
+
       const stripeKey = c.env.STRIPE_SECRET_KEY;
       if (!stripeKey) {
         return apiError(
@@ -233,7 +261,6 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       const stripe = createStripeClient(stripeKey);
 
       // Resolve Stripe customer
-      const subscription = await getSubscriptionByAccountId(db, account.id);
       let customerId = subscription?.stripeCustomerId;
 
       if (!customerId) {
@@ -245,18 +272,22 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         await linkStripeCustomer(db, account.id, customerId);
       }
 
-      // Price per top-up pack in EUR cents (€4.99)
-      const TOP_UP_PRICE_CENTS = 499;
+      // Tier-based pricing: Plus €10/500, Family/Pro €5/500
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: TOP_UP_PRICE_CENTS,
+        amount: priceCents,
         currency: 'eur',
         customer: customerId,
-        metadata: { accountId: account.id, credits: String(amount) },
+        metadata: {
+          accountId: account.id,
+          credits: String(amount),
+          tier,
+        },
       });
 
       return c.json({
         topUp: {
           amount,
+          priceCents,
           clientSecret: paymentIntent.client_secret,
           paymentIntentId: paymentIntent.id,
         },
@@ -287,7 +318,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const quota = await getQuotaPool(db, subscription.id);
     const monthlyLimit = quota?.monthlyLimit ?? 50;
     const usedThisMonth = quota?.usedThisMonth ?? 0;
-    const topUpCreditsRemaining = 0; // TODO: aggregate from top_up_credits in Phase 4
+    const topUpCreditsRemaining = await getTopUpCreditsRemaining(
+      db,
+      subscription.id
+    );
     const remaining = calculateRemainingQuestions({
       monthlyLimit,
       usedThisMonth,
@@ -336,6 +370,52 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     });
 
     return c.json({ portalUrl: portalSession.url });
+  })
+
+  // Fast KV-backed subscription status (for header display)
+  .get('/subscription/status', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const kv = c.env.SUBSCRIPTION_KV;
+
+    // Try KV first (fast path)
+    if (kv) {
+      const cached = await readSubscriptionStatus(kv, account.id);
+      if (cached) {
+        return c.json({
+          status: {
+            tier: cached.tier,
+            status: cached.status,
+            monthlyLimit: cached.monthlyLimit,
+            usedThisMonth: cached.usedThisMonth,
+          },
+        });
+      }
+    }
+
+    // Fallback to DB
+    const subscription = await getSubscriptionByAccountId(db, account.id);
+    if (!subscription) {
+      return c.json({
+        status: {
+          tier: 'free' as const,
+          status: 'trial' as const,
+          monthlyLimit: 50,
+          usedThisMonth: 0,
+        },
+      });
+    }
+
+    const quota = await getQuotaPool(db, subscription.id);
+
+    return c.json({
+      status: {
+        tier: subscription.tier,
+        status: subscription.status,
+        monthlyLimit: quota?.monthlyLimit ?? 50,
+        usedThisMonth: quota?.usedThisMonth ?? 0,
+      },
+    });
   })
 
   // Join BYOK waitlist

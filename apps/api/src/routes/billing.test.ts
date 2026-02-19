@@ -48,6 +48,9 @@ const mockEnsureFreeSubscription = jest.fn();
 const mockGetQuotaPool = jest.fn();
 const mockLinkStripeCustomer = jest.fn();
 const mockAddToByokWaitlist = jest.fn().mockResolvedValue(undefined);
+const mockMarkSubscriptionCancelled = jest.fn().mockResolvedValue(undefined);
+const mockGetTopUpCreditsRemaining = jest.fn().mockResolvedValue(0);
+const mockGetTopUpPriceCents = jest.fn().mockReturnValue(499);
 
 jest.mock('../services/billing', () => ({
   getSubscriptionByAccountId: (...args: unknown[]) =>
@@ -57,6 +60,22 @@ jest.mock('../services/billing', () => ({
   getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
   linkStripeCustomer: (...args: unknown[]) => mockLinkStripeCustomer(...args),
   addToByokWaitlist: (...args: unknown[]) => mockAddToByokWaitlist(...args),
+  markSubscriptionCancelled: (...args: unknown[]) =>
+    mockMarkSubscriptionCancelled(...args),
+  getTopUpCreditsRemaining: (...args: unknown[]) =>
+    mockGetTopUpCreditsRemaining(...args),
+  getTopUpPriceCents: (...args: unknown[]) => mockGetTopUpPriceCents(...args),
+}));
+
+// ---------------------------------------------------------------------------
+// Mock KV service
+// ---------------------------------------------------------------------------
+
+const mockReadSubscriptionStatus = jest.fn();
+
+jest.mock('../services/kv', () => ({
+  readSubscriptionStatus: (...args: unknown[]) =>
+    mockReadSubscriptionStatus(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -146,6 +165,7 @@ beforeEach(() => {
   mockGetSubscriptionByAccountId.mockResolvedValue(null);
   mockGetQuotaPool.mockResolvedValue(null);
   mockLinkStripeCustomer.mockResolvedValue(null);
+  mockReadSubscriptionStatus.mockResolvedValue(null);
 });
 
 describe('billing routes', () => {
@@ -168,6 +188,7 @@ describe('billing routes', () => {
       const body = await res.json();
       expect(body.subscription.tier).toBe('free');
       expect(body.subscription.status).toBe('trial');
+      expect(body.subscription.cancelAtPeriodEnd).toBe(false);
       expect(body.subscription.monthlyLimit).toBe(50);
       expect(body.subscription.usedThisMonth).toBe(0);
       expect(body.subscription.remainingQuestions).toBe(50);
@@ -188,9 +209,34 @@ describe('billing routes', () => {
       const body = await res.json();
       expect(body.subscription.tier).toBe('plus');
       expect(body.subscription.status).toBe('active');
+      expect(body.subscription.cancelAtPeriodEnd).toBe(false);
       expect(body.subscription.monthlyLimit).toBe(500);
       expect(body.subscription.usedThisMonth).toBe(42);
       expect(body.subscription.remainingQuestions).toBe(458);
+    });
+
+    it('returns cancelAtPeriodEnd true when subscription is cancelled but active', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(
+        mockSubscription({
+          cancelledAt: '2025-01-20T00:00:00.000Z',
+          status: 'active',
+        })
+      );
+      mockGetQuotaPool.mockResolvedValue(mockQuotaPool());
+
+      const res = await app.request(
+        '/v1/subscription',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.subscription.cancelAtPeriodEnd).toBe(true);
+      expect(body.subscription.currentPeriodEnd).toBe(
+        '2025-02-15T00:00:00.000Z'
+      );
     });
 
     it('returns 401 without auth header', async () => {
@@ -333,6 +379,10 @@ describe('billing routes', () => {
       expect(mockSubscriptionsUpdate).toHaveBeenCalledWith('sub_test123', {
         cancel_at_period_end: true,
       });
+      expect(mockMarkSubscriptionCancelled).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1'
+      );
     });
 
     it('returns 404 when no subscription exists', async () => {
@@ -539,6 +589,54 @@ describe('billing routes', () => {
         TEST_ENV
       );
 
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /v1/subscription/status (KV-backed)
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/subscription/status', () => {
+    it('returns free-tier defaults when no subscription exists and no KV', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(null);
+
+      const res = await app.request(
+        '/v1/subscription/status',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.status.tier).toBe('free');
+      expect(body.status.status).toBe('trial');
+      expect(body.status.monthlyLimit).toBe(50);
+      expect(body.status.usedThisMonth).toBe(0);
+    });
+
+    it('returns DB-backed status when no KV namespace', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(mockQuotaPool());
+
+      const res = await app.request(
+        '/v1/subscription/status',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.status.tier).toBe('plus');
+      expect(body.status.status).toBe('active');
+      expect(body.status.monthlyLimit).toBe(500);
+      expect(body.status.usedThisMonth).toBe(42);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request('/v1/subscription/status', {}, TEST_ENV);
       expect(res.status).toBe(401);
     });
   });

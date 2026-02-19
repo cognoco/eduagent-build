@@ -29,6 +29,7 @@ export const accounts = pgTable('accounts', {
     .$defaultFn(() => generateUUIDv7()),
   clerkUserId: text('clerk_user_id').notNull().unique(),
   email: text('email').notNull().unique(),
+  timezone: text('timezone'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

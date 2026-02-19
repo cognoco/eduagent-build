@@ -17,6 +17,7 @@ export const subscriptionSchema = z.object({
   status: subscriptionStatusSchema,
   trialEndsAt: z.string().datetime().nullable(),
   currentPeriodEnd: z.string().datetime().nullable(),
+  cancelAtPeriodEnd: z.boolean(),
   monthlyLimit: z.number().int(),
   usedThisMonth: z.number().int(),
   remainingQuestions: z.number().int(),

@@ -3,6 +3,11 @@ import {
   getTrialPhase,
   getTrialWarningMessage,
   getSoftLandingMessage,
+  computeTrialEndDate,
+  daysBetween,
+  TRIAL_FULL_ACCESS_DAYS,
+  EXTENDED_TRIAL_DAILY_QUOTA,
+  EXTENDED_TRIAL_MONTHLY_EQUIVALENT,
 } from './trial';
 
 // ---------------------------------------------------------------------------
@@ -105,5 +110,108 @@ describe('getSoftLandingMessage', () => {
     expect(getSoftLandingMessage(2)).toBeNull();
     expect(getSoftLandingMessage(5)).toBeNull();
     expect(getSoftLandingMessage(10)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+describe('trial constants', () => {
+  it('has 14-day full access period', () => {
+    expect(TRIAL_FULL_ACCESS_DAYS).toBe(14);
+  });
+
+  it('has 15 questions/day extended trial limit', () => {
+    expect(EXTENDED_TRIAL_DAILY_QUOTA).toBe(15);
+  });
+
+  it('computes monthly equivalent as 15 * 30 = 450', () => {
+    expect(EXTENDED_TRIAL_MONTHLY_EQUIVALENT).toBe(450);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeTrialEndDate
+// ---------------------------------------------------------------------------
+
+describe('computeTrialEndDate', () => {
+  it('returns a date 14 days in the future', () => {
+    const now = new Date('2025-06-01T10:00:00.000Z');
+    const endDate = computeTrialEndDate(now, null);
+
+    const diffDays = daysBetween(now, endDate);
+    expect(diffDays).toBeGreaterThanOrEqual(13);
+    expect(diffDays).toBeLessThanOrEqual(14);
+  });
+
+  it('falls back to UTC when timezone is null', () => {
+    const now = new Date('2025-06-01T10:00:00.000Z');
+    const endDate = computeTrialEndDate(now, null);
+
+    // Should be end of day UTC on June 15
+    expect(endDate.getUTCFullYear()).toBe(2025);
+    expect(endDate.getUTCMonth()).toBe(5); // June = 5
+    expect(endDate.getUTCDate()).toBe(15);
+    expect(endDate.getUTCHours()).toBe(23);
+    expect(endDate.getUTCMinutes()).toBe(59);
+  });
+
+  it('falls back to UTC when timezone is undefined', () => {
+    const now = new Date('2025-06-01T10:00:00.000Z');
+    const endDate = computeTrialEndDate(now, undefined);
+
+    expect(endDate.getUTCDate()).toBe(15);
+    expect(endDate.getUTCHours()).toBe(23);
+  });
+
+  it('returns end of day in a positive-offset timezone', () => {
+    const now = new Date('2025-06-01T10:00:00.000Z');
+    const endDate = computeTrialEndDate(now, 'Europe/Prague');
+
+    // Prague is UTC+2 in June (CEST). End of day 23:59 CEST = 21:59 UTC.
+    expect(endDate.getUTCHours()).toBe(21);
+    expect(endDate.getUTCMinutes()).toBe(59);
+  });
+
+  it('returns end of day in a negative-offset timezone', () => {
+    const now = new Date('2025-06-01T10:00:00.000Z');
+    const endDate = computeTrialEndDate(now, 'America/New_York');
+
+    // New York is UTC-4 in June (EDT). End of day 23:59 EDT = 03:59+1 UTC.
+    // The date in UTC may be June 16 at 03:59
+    expect(endDate.getUTCMinutes()).toBe(59);
+  });
+
+  it('handles invalid timezone gracefully by falling back to UTC', () => {
+    const now = new Date('2025-06-01T10:00:00.000Z');
+    const endDate = computeTrialEndDate(now, 'Invalid/Timezone');
+
+    // Should fall back to UTC end-of-day
+    expect(endDate.getUTCHours()).toBe(23);
+    expect(endDate.getUTCMinutes()).toBe(59);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// daysBetween
+// ---------------------------------------------------------------------------
+
+describe('daysBetween', () => {
+  it('returns 0 for same date', () => {
+    const date = new Date('2025-06-01T10:00:00.000Z');
+    expect(daysBetween(date, date)).toBe(0);
+  });
+
+  it('returns 14 for dates 14 days apart', () => {
+    const start = new Date('2025-06-01T00:00:00.000Z');
+    const end = new Date('2025-06-15T00:00:00.000Z');
+    expect(daysBetween(start, end)).toBe(14);
+  });
+
+  it('returns floor value for partial days', () => {
+    const start = new Date('2025-06-01T10:00:00.000Z');
+    const end = new Date('2025-06-02T09:00:00.000Z');
+    expect(daysBetween(start, end)).toBe(0); // 23 hours = 0 full days
   });
 });

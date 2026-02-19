@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Trial Expiry — Tests
+// Trial Expiry — Tests (Story 5.2: Reverse Trial Soft Landing)
 // ---------------------------------------------------------------------------
 
 jest.mock('@eduagent/database', () => ({
@@ -15,16 +15,19 @@ jest.mock('../../services/subscription', () => ({
 
 const mockFindExpiredTrials = jest.fn().mockResolvedValue([]);
 const mockFindSubscriptionsByTrialDateRange = jest.fn().mockResolvedValue([]);
-const mockExpireTrialSubscription = jest.fn().mockResolvedValue(undefined);
+const mockTransitionToExtendedTrial = jest.fn().mockResolvedValue(undefined);
 const mockDowngradeQuotaPool = jest.fn().mockResolvedValue(undefined);
+const mockFindExpiredTrialsByDaysSinceEnd = jest.fn().mockResolvedValue([]);
 
 jest.mock('../../services/billing', () => ({
   findExpiredTrials: (...args: unknown[]) => mockFindExpiredTrials(...args),
   findSubscriptionsByTrialDateRange: (...args: unknown[]) =>
     mockFindSubscriptionsByTrialDateRange(...args),
-  expireTrialSubscription: (...args: unknown[]) =>
-    mockExpireTrialSubscription(...args),
+  transitionToExtendedTrial: (...args: unknown[]) =>
+    mockTransitionToExtendedTrial(...args),
   downgradeQuotaPool: (...args: unknown[]) => mockDowngradeQuotaPool(...args),
+  findExpiredTrialsByDaysSinceEnd: (...args: unknown[]) =>
+    mockFindExpiredTrialsByDaysSinceEnd(...args),
 }));
 
 jest.mock('../../services/trial', () => ({
@@ -40,6 +43,8 @@ jest.mock('../../services/trial', () => ({
     if (days === 14) return 'tomorrow you move to Free';
     return null;
   }),
+  EXTENDED_TRIAL_MONTHLY_EQUIVALENT: 450,
+  TRIAL_EXTENDED_DAYS: 14,
 }));
 
 import { trialExpiry } from './trial-expiry';
@@ -104,12 +109,13 @@ describe('trialExpiry', () => {
       status: 'completed',
       date: '2025-01-15',
       expiredCount: expect.any(Number),
+      extendedExpiredCount: expect.any(Number),
       warningsSent: expect.any(Number),
       softLandingSent: expect.any(Number),
     });
   });
 
-  it('transitions expired trials and resets quota', async () => {
+  it('transitions expired trials to extended trial (soft landing)', async () => {
     const expiredTrial = {
       id: 'sub-1',
       accountId: 'acc-1',
@@ -122,21 +128,39 @@ describe('trialExpiry', () => {
     const { result } = await executeSteps();
 
     expect(result.expiredCount).toBe(1);
-    expect(mockExpireTrialSubscription).toHaveBeenCalledWith(
-      expect.anything(),
-      'sub-1'
-    );
-    expect(mockDowngradeQuotaPool).toHaveBeenCalledWith(
+    expect(mockTransitionToExtendedTrial).toHaveBeenCalledWith(
       expect.anything(),
       'sub-1',
+      450
+    );
+    // Should NOT call downgradeQuotaPool for initial expiry (that happens at day 28)
+    expect(mockDowngradeQuotaPool).not.toHaveBeenCalled();
+  });
+
+  it('transitions extended trials to free tier after 14-day soft landing', async () => {
+    const extendedTrial = {
+      id: 'sub-2',
+      accountId: 'acc-2',
+      status: 'expired',
+      trialEndsAt: '2025-01-01T00:00:00.000Z',
+    };
+
+    mockFindExpiredTrialsByDaysSinceEnd.mockResolvedValueOnce([extendedTrial]);
+
+    const { result } = await executeSteps();
+
+    expect(result.extendedExpiredCount).toBe(1);
+    expect(mockDowngradeQuotaPool).toHaveBeenCalledWith(
+      expect.anything(),
+      'sub-2',
       50
     );
   });
 
   it('counts warnings for trials ending in 3 or 1 days', async () => {
     const trialEndingSoon = {
-      id: 'sub-2',
-      accountId: 'acc-2',
+      id: 'sub-3',
+      accountId: 'acc-3',
       status: 'trial',
       trialEndsAt: '2025-01-18T12:00:00.000Z',
     };
@@ -160,8 +184,8 @@ describe('trialExpiry', () => {
 
   it('counts soft-landing messages for recently expired trials', async () => {
     const recentlyExpired = {
-      id: 'sub-3',
-      accountId: 'acc-3',
+      id: 'sub-4',
+      accountId: 'acc-4',
       status: 'expired',
       trialEndsAt: '2025-01-14T00:00:00.000Z',
     };
@@ -188,12 +212,50 @@ describe('trialExpiry', () => {
 
   it('handles zero expired trials gracefully', async () => {
     mockFindExpiredTrials.mockResolvedValueOnce([]);
+    mockFindExpiredTrialsByDaysSinceEnd.mockResolvedValueOnce([]);
     mockFindSubscriptionsByTrialDateRange.mockResolvedValue([]);
 
     const { result } = await executeSteps();
 
     expect(result.expiredCount).toBe(0);
+    expect(result.extendedExpiredCount).toBe(0);
     expect(result.warningsSent).toBe(0);
     expect(result.softLandingSent).toBe(0);
+  });
+
+  it('processes both expired and extended expired in same run', async () => {
+    const newlyExpired = {
+      id: 'sub-5',
+      accountId: 'acc-5',
+      status: 'trial',
+      trialEndsAt: '2025-01-14T23:00:00.000Z',
+    };
+    const extendedExpired = {
+      id: 'sub-6',
+      accountId: 'acc-6',
+      status: 'expired',
+      trialEndsAt: '2025-01-01T00:00:00.000Z',
+    };
+
+    mockFindExpiredTrials.mockResolvedValueOnce([newlyExpired]);
+    mockFindExpiredTrialsByDaysSinceEnd.mockResolvedValueOnce([
+      extendedExpired,
+    ]);
+    mockFindSubscriptionsByTrialDateRange.mockResolvedValue([]);
+
+    const { result } = await executeSteps();
+
+    expect(result.expiredCount).toBe(1);
+    expect(result.extendedExpiredCount).toBe(1);
+    expect(mockTransitionToExtendedTrial).toHaveBeenCalledWith(
+      expect.anything(),
+      'sub-5',
+      450
+    );
+    expect(mockDowngradeQuotaPool).toHaveBeenCalledWith(
+      expect.anything(),
+      'sub-6',
+      50
+    );
   });
 });

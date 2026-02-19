@@ -1,7 +1,15 @@
 // ---------------------------------------------------------------------------
 // XP Tracking — Story 4.5
-// Pure business logic, no Hono imports
+// Business logic + DB-aware helpers, no Hono imports
 // ---------------------------------------------------------------------------
+
+import { eq, and } from 'drizzle-orm';
+import {
+  assessments,
+  xpLedger,
+  createScopedRepository,
+  type Database,
+} from '@eduagent/database';
 
 export interface XpEvent {
   profileId: string;
@@ -53,4 +61,56 @@ export function verifyXp(pendingAmount: number): number {
 export function decayXp(currentAmount: number, masteryDrop: number): number {
   const decayAmount = currentAmount * masteryDrop;
   return Math.max(0, Math.round(currentAmount - decayAmount));
+}
+
+// ---------------------------------------------------------------------------
+// DB-aware helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Inserts a pending XP ledger entry for a completed session.
+ *
+ * Looks up the latest passed assessment for the profile+topic,
+ * checks for duplicate entries, then calculates and inserts XP.
+ * No-ops when topicId is null, no passed assessment exists, or
+ * an XP entry already exists for that topic.
+ */
+export async function insertSessionXpEntry(
+  db: Database,
+  profileId: string,
+  topicId: string | null,
+  subjectId: string
+): Promise<void> {
+  if (!topicId) return;
+
+  // 1. Look up latest passed assessment for profile+topic
+  const assessment = await db.query.assessments.findFirst({
+    where: and(
+      eq(assessments.profileId, profileId),
+      eq(assessments.topicId, topicId),
+      eq(assessments.status, 'passed')
+    ),
+  });
+  if (!assessment || !assessment.masteryScore) return;
+
+  // 2. Check for existing XP entry (avoid duplicates)
+  const repo = createScopedRepository(db, profileId);
+  const existing = await repo.xpLedger.findFirst(eq(xpLedger.topicId, topicId));
+  if (existing) return;
+
+  // 3. Calculate and insert
+  const mastery = Number(assessment.masteryScore);
+  const depth = (assessment.verificationDepth ?? 'recall') as
+    | 'recall'
+    | 'explain'
+    | 'transfer';
+  const amount = calculateTopicXp(mastery, depth);
+
+  await db.insert(xpLedger).values({
+    profileId,
+    topicId,
+    subjectId,
+    amount,
+    status: 'pending',
+  });
 }

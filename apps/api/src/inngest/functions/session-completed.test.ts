@@ -61,6 +61,13 @@ jest.mock('../../services/streaks', () => ({
     mockRecordSessionActivity(...args),
 }));
 
+const mockInsertSessionXpEntry = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../../services/xp', () => ({
+  insertSessionXpEntry: (...args: unknown[]) =>
+    mockInsertSessionXpEntry(...args),
+}));
+
 import { sessionCompleted } from './session-completed';
 
 // ---------------------------------------------------------------------------
@@ -219,6 +226,28 @@ describe('sessionCompleted', () => {
         expect.anything(),
         'profile-001',
         today
+      );
+    });
+
+    it('calls insertSessionXpEntry with correct args', async () => {
+      await executeSteps(createEventData());
+
+      expect(mockInsertSessionXpEntry).toHaveBeenCalledWith(
+        expect.anything(), // db
+        'profile-001',
+        'topic-001',
+        'subject-001'
+      );
+    });
+
+    it('passes null topicId when topicId is undefined', async () => {
+      await executeSteps(createEventData({ topicId: undefined }));
+
+      expect(mockInsertSessionXpEntry).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        null,
+        'subject-001'
       );
     });
   });
