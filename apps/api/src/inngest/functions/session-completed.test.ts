@@ -71,6 +71,15 @@ jest.mock('../../services/xp', () => ({
     mockInsertSessionXpEntry(...args),
 }));
 
+const mockIncrementSummarySkips = jest.fn().mockResolvedValue(1);
+const mockResetSummarySkips = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../../services/settings', () => ({
+  incrementSummarySkips: (...args: unknown[]) =>
+    mockIncrementSummarySkips(...args),
+  resetSummarySkips: (...args: unknown[]) => mockResetSummarySkips(...args),
+}));
+
 import { sessionCompleted } from './session-completed';
 
 // ---------------------------------------------------------------------------
@@ -306,6 +315,52 @@ describe('sessionCompleted', () => {
         'topic-001',
         'User: What is algebra?\n\nAI: Algebra is...'
       );
+    });
+  });
+
+  describe('track-summary-skips step', () => {
+    it('increments skip count when summaryStatus is skipped', async () => {
+      await executeSteps(createEventData({ summaryStatus: 'skipped' }));
+
+      expect(mockIncrementSummarySkips).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001'
+      );
+      expect(mockResetSummarySkips).not.toHaveBeenCalled();
+    });
+
+    it('resets skip count when summaryStatus is submitted', async () => {
+      await executeSteps(createEventData({ summaryStatus: 'submitted' }));
+
+      expect(mockResetSummarySkips).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001'
+      );
+      expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
+    });
+
+    it('resets skip count when summaryStatus is accepted', async () => {
+      await executeSteps(createEventData({ summaryStatus: 'accepted' }));
+
+      expect(mockResetSummarySkips).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001'
+      );
+      expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
+    });
+
+    it('does not increment or reset when summaryStatus is pending', async () => {
+      await executeSteps(createEventData({ summaryStatus: 'pending' }));
+
+      expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
+      expect(mockResetSummarySkips).not.toHaveBeenCalled();
+    });
+
+    it('does not increment or reset when summaryStatus is undefined', async () => {
+      await executeSteps(createEventData({ summaryStatus: undefined }));
+
+      expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
+      expect(mockResetSummarySkips).not.toHaveBeenCalled();
     });
   });
 });

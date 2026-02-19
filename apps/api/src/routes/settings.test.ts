@@ -28,6 +28,20 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
+// Mock services imported transitively via sessions routes
+jest.mock('../services/interleaved', () => ({
+  startInterleavedSession: jest.fn().mockResolvedValue({
+    session: { id: 'mock-session' },
+    topics: [],
+  }),
+}));
+
+jest.mock('../services/recall-bridge', () => ({
+  generateRecallBridge: jest.fn().mockResolvedValue({
+    bridge: 'mock bridge',
+  }),
+}));
+
 jest.mock('../services/settings', () => ({
   getNotificationPrefs: jest.fn().mockResolvedValue({
     reviewReminders: false,

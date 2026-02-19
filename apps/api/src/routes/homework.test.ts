@@ -39,6 +39,43 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
+const mockStartSession = jest.fn();
+
+jest.mock('../services/session', () => ({
+  startSession: (...args: unknown[]) => mockStartSession(...args),
+  SubjectInactiveError: class SubjectInactiveError extends Error {
+    subjectStatus: string;
+    constructor(status: string) {
+      super(`Subject is ${status}`);
+      this.name = 'SubjectInactiveError';
+      this.subjectStatus = status;
+    }
+  },
+  getSession: jest.fn(),
+  processMessage: jest.fn(),
+  streamMessage: jest.fn(),
+  closeSession: jest.fn(),
+  flagContent: jest.fn(),
+  getSessionSummary: jest.fn(),
+  submitSummary: jest.fn(),
+}));
+
+jest.mock('../services/ocr', () => ({
+  getOcrProvider: jest.fn().mockReturnValue({
+    extractText: jest.fn().mockResolvedValue({
+      text: 'Stub OCR text for testing',
+      confidence: 0.95,
+      regions: [
+        {
+          text: 'Stub OCR text for testing',
+          confidence: 0.95,
+          boundingBox: { x: 0, y: 0, width: 100, height: 50 },
+        },
+      ],
+    }),
+  }),
+}));
+
 import app from '../index';
 
 const TEST_ENV = {
@@ -53,12 +90,31 @@ const AUTH_HEADERS = {
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 describe('homework routes', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   // -------------------------------------------------------------------------
   // POST /v1/subjects/:subjectId/homework
   // -------------------------------------------------------------------------
 
   describe('POST /v1/subjects/:subjectId/homework', () => {
     it('returns 201 with homework session', async () => {
+      const now = new Date().toISOString();
+      mockStartSession.mockResolvedValue({
+        id: 'session-001',
+        subjectId: SUBJECT_ID,
+        topicId: null,
+        sessionType: 'homework',
+        status: 'active',
+        escalationRung: 1,
+        exchangeCount: 0,
+        startedAt: now,
+        lastActivityAt: now,
+        endedAt: null,
+        durationSeconds: null,
+      });
+
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/homework`,
         {
@@ -78,6 +134,38 @@ describe('homework routes', () => {
       expect(body.session.status).toBe('active');
       expect(body.session.startedAt).toBeDefined();
       expect(body.session.endedAt).toBeNull();
+    });
+
+    it('calls startSession with homework sessionType', async () => {
+      mockStartSession.mockResolvedValue({
+        id: 'session-001',
+        subjectId: SUBJECT_ID,
+        topicId: null,
+        sessionType: 'homework',
+        status: 'active',
+        escalationRung: 1,
+        exchangeCount: 0,
+        startedAt: new Date().toISOString(),
+        lastActivityAt: new Date().toISOString(),
+        endedAt: null,
+        durationSeconds: null,
+      });
+
+      await app.request(
+        `/v1/subjects/${SUBJECT_ID}/homework`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      // Verify the service was called with correct subjectId and sessionType
+      expect(mockStartSession).toHaveBeenCalledTimes(1);
+      const [, , subjectArg, inputArg] = mockStartSession.mock.calls[0];
+      expect(subjectArg).toBe(SUBJECT_ID);
+      expect(inputArg).toEqual({ sessionType: 'homework' });
     });
 
     it('returns 401 without auth header', async () => {
@@ -120,11 +208,10 @@ describe('homework routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body).toEqual({
-        text: '',
-        confidence: 0,
-        regions: [],
-      });
+      expect(body.text).toBe('Stub OCR text for testing');
+      expect(body.confidence).toBe(0.95);
+      expect(body.regions).toHaveLength(1);
+      expect(body.regions[0].boundingBox).toBeDefined();
     });
 
     it('accepts image/png files', async () => {

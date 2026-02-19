@@ -6,6 +6,7 @@ import {
   useLearningMode,
   useUpdateNotificationSettings,
   useUpdateLearningMode,
+  useRegisterPushToken,
 } from './use-settings';
 
 const mockFetch = jest.fn();
@@ -198,6 +199,33 @@ describe('useUpdateLearningMode', () => {
 
     await act(async () => {
       await result.current.mutateAsync('casual');
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+  });
+});
+
+describe('useRegisterPushToken', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('calls POST with push token', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ registered: true }), { status: 200 })
+    );
+
+    const { result } = renderHook(() => useRegisterPushToken(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync('ExponentPushToken[abc123]');
     });
 
     expect(mockFetch).toHaveBeenCalled();

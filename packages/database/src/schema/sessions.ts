@@ -33,7 +33,11 @@ export const sessionEventTypeEnum = pgEnum('session_event_type', [
   'parking_lot_add',
 ]);
 
-export const sessionTypeEnum = pgEnum('session_type', ['learning', 'homework']);
+export const sessionTypeEnum = pgEnum('session_type', [
+  'learning',
+  'homework',
+  'interleaved',
+]);
 
 export const sessionStatusEnum = pgEnum('session_status', [
   'active',

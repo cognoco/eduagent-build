@@ -6,7 +6,7 @@
 /** Configuration input for creating a session timer */
 export interface SessionTimerConfig {
   personaType: 'TEEN' | 'LEARNER' | 'PARENT';
-  sessionType: 'learning' | 'homework';
+  sessionType: 'learning' | 'homework' | 'interleaved';
 }
 
 /** Timer state for an active session */

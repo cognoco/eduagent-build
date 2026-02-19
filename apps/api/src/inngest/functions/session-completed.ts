@@ -15,6 +15,10 @@ import {
   writeCoachingCardCache,
 } from '../../services/coaching-cards';
 import { insertSessionXpEntry } from '../../services/xp';
+import {
+  incrementSummarySkips,
+  resetSummarySkips,
+} from '../../services/settings';
 
 export const sessionCompleted = inngest.createFunction(
   { id: 'session-completed', name: 'Process session completion' },
@@ -84,6 +88,19 @@ export const sessionCompleted = inngest.createFunction(
         topicId ?? null,
         content
       );
+    });
+
+    // Step 5: Track consecutive summary skips (FR94 — Casual Explorer prompt)
+    await step.run('track-summary-skips', async () => {
+      const db = getStepDatabase();
+      if (summaryStatus === 'skipped') {
+        await incrementSummarySkips(db, profileId);
+      } else if (
+        summaryStatus === 'submitted' ||
+        summaryStatus === 'accepted'
+      ) {
+        await resetSummarySkips(db, profileId);
+      }
     });
 
     return { status: 'completed', sessionId };

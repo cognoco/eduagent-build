@@ -10,6 +10,7 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
+import { getLearningMode, getLearningModeRules } from './settings';
 
 export interface XpEvent {
   profileId: string;
@@ -98,7 +99,14 @@ export async function insertSessionXpEntry(
   const existing = await repo.xpLedger.findFirst(eq(xpLedger.topicId, topicId));
   if (existing) return;
 
-  // 3. Calculate and insert
+  // 3. Determine XP status based on learning mode
+  //    Casual: completion XP awarded as 'verified' immediately
+  //    Serious: XP starts as 'pending', verified on delayed recall
+  const { mode } = await getLearningMode(db, profileId);
+  const rules = getLearningModeRules(mode);
+  const xpStatus = rules.verifiedXpOnly ? 'pending' : 'verified';
+
+  // 4. Calculate and insert
   const mastery = Number(assessment.masteryScore);
   const depth = (assessment.verificationDepth ?? 'recall') as
     | 'recall'
@@ -111,6 +119,7 @@ export async function insertSessionXpEntry(
     topicId,
     subjectId,
     amount,
-    status: 'pending',
+    status: xpStatus,
+    verifiedAt: xpStatus === 'verified' ? new Date() : undefined,
   });
 }

@@ -133,7 +133,7 @@ export function evaluateEscalation(
  */
 export function getEscalationPromptGuidance(
   rung: EscalationRung,
-  sessionType: 'learning' | 'homework'
+  sessionType: 'learning' | 'homework' | 'interleaved'
 ): string {
   const homeworkGuard =
     sessionType === 'homework'

@@ -36,6 +36,11 @@ export const learningModeUpdateSchema = z.object({
 });
 export type LearningModeUpdate = z.infer<typeof learningModeUpdateSchema>;
 
+export const pushTokenRegisterSchema = z.object({
+  token: z.string().min(1),
+});
+export type PushTokenRegisterInput = z.infer<typeof pushTokenRegisterSchema>;
+
 export const subjectProgressSchema = z.object({
   subjectId: z.string().uuid(),
   name: z.string(),

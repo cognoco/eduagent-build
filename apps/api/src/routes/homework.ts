@@ -1,36 +1,43 @@
 import { Hono } from 'hono';
-import type { AuthEnv } from '../middleware/auth';
+import type { Database } from '@eduagent/database';
+import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
 import { OCR_CONSTRAINTS } from '@eduagent/schemas';
 import { validationError } from '../errors';
+import { startSession, SubjectInactiveError } from '../services/session';
+import { getOcrProvider } from '../services/ocr';
+import { apiError } from '../errors';
+import { ERROR_CODES } from '@eduagent/schemas';
 
-export const homeworkRoutes = new Hono<AuthEnv>()
+type HomeworkRouteEnv = {
+  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Variables: {
+    user: AuthUser;
+    db: Database;
+    account: Account;
+    profileId: string;
+  };
+};
+
+export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
   // Start a homework help session
   .post('/subjects/:subjectId/homework', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
     const subjectId = c.req.param('subjectId');
-    const now = new Date().toISOString();
 
-    // TODO: Verify subject belongs to user via c.get('user').userId
-    // TODO: Create session with sessionType='homework' in learning_sessions table
-    // TODO: Set up Homework Fast Lane context for accelerated scaffolding
-
-    return c.json(
-      {
-        session: {
-          id: 'placeholder',
-          subjectId,
-          topicId: null,
-          sessionType: 'homework' as const,
-          status: 'active' as const,
-          escalationRung: 1,
-          exchangeCount: 0,
-          startedAt: now,
-          lastActivityAt: now,
-          endedAt: null,
-          durationSeconds: null,
-        },
-      },
-      201
-    );
+    try {
+      const session = await startSession(db, profileId, subjectId, {
+        sessionType: 'homework',
+      });
+      return c.json({ session }, 201);
+    } catch (err) {
+      if (err instanceof SubjectInactiveError) {
+        return apiError(c, 403, ERROR_CODES.SUBJECT_INACTIVE, err.message);
+      }
+      throw err;
+    }
   })
 
   // Server-side OCR endpoint (fallback for ML Kit)
@@ -62,6 +69,8 @@ export const homeworkRoutes = new Hono<AuthEnv>()
       );
     }
 
-    // TODO: Integrate actual OCR provider (Google Vision / Tesseract / Workers AI)
-    return c.json({ text: '', confidence: 0, regions: [] });
+    const imageBuffer = await file.arrayBuffer();
+    const provider = getOcrProvider();
+    const result = await provider.extractText(imageBuffer, file.type);
+    return c.json(result);
   });

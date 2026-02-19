@@ -1,28 +1,148 @@
 import {
   sendPushNotification,
+  isExpoPushToken,
   formatReviewReminderBody,
   formatDailyReminderBody,
   MAX_DAILY_PUSH,
   type NotificationPayload,
 } from './notifications';
+import type { Database } from '@eduagent/database';
+
+// ---------------------------------------------------------------------------
+// Mock settings service (getPushToken, getDailyNotificationCount, logNotification)
+// ---------------------------------------------------------------------------
+
+const mockGetPushToken = jest.fn();
+const mockGetDailyNotificationCount = jest.fn();
+const mockLogNotification = jest.fn();
+
+jest.mock('./settings', () => ({
+  getPushToken: (...args: unknown[]) => mockGetPushToken(...args),
+  getDailyNotificationCount: (...args: unknown[]) =>
+    mockGetDailyNotificationCount(...args),
+  logNotification: (...args: unknown[]) => mockLogNotification(...args),
+}));
+
+// ---------------------------------------------------------------------------
+// Mock global fetch for Expo Push API
+// ---------------------------------------------------------------------------
+
+const mockFetchFn = jest.fn();
+global.fetch = mockFetchFn;
+
+const mockDb = {} as Database;
+
+// ---------------------------------------------------------------------------
+// isExpoPushToken
+// ---------------------------------------------------------------------------
+
+describe('isExpoPushToken', () => {
+  it('accepts ExponentPushToken format', () => {
+    expect(isExpoPushToken('ExponentPushToken[abc123]')).toBe(true);
+  });
+
+  it('accepts ExpoPushToken format', () => {
+    expect(isExpoPushToken('ExpoPushToken[abc123]')).toBe(true);
+  });
+
+  it('accepts alphanumeric token strings', () => {
+    expect(isExpoPushToken('abc-123_def')).toBe(true);
+  });
+
+  it('rejects tokens with invalid characters', () => {
+    expect(isExpoPushToken('invalid token with spaces')).toBe(false);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // sendPushNotification
 // ---------------------------------------------------------------------------
 
 describe('sendPushNotification', () => {
-  it('returns a mock success result', async () => {
-    const payload: NotificationPayload = {
-      profileId: 'profile-1',
-      title: 'Review Reminder',
-      body: 'Time to review!',
-      type: 'review_reminder',
-    };
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
-    const result = await sendPushNotification(payload);
+  const payload: NotificationPayload = {
+    profileId: 'profile-1',
+    title: 'Review Reminder',
+    body: 'Time to review!',
+    type: 'review_reminder',
+  };
 
-    expect(result.sent).toBe(true);
-    expect(result.ticketId).toBe('mock-ticket');
+  it('returns no_push_token when no token registered', async () => {
+    mockGetPushToken.mockResolvedValue(null);
+
+    const result = await sendPushNotification(mockDb, payload);
+
+    expect(result).toEqual({ sent: false, reason: 'no_push_token' });
+    expect(mockFetchFn).not.toHaveBeenCalled();
+  });
+
+  it('returns invalid_token when token format is bad', async () => {
+    mockGetPushToken.mockResolvedValue('invalid token with spaces');
+
+    const result = await sendPushNotification(mockDb, payload);
+
+    expect(result).toEqual({ sent: false, reason: 'invalid_token' });
+    expect(mockFetchFn).not.toHaveBeenCalled();
+  });
+
+  it('returns daily_cap_exceeded when cap reached', async () => {
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc123]');
+    mockGetDailyNotificationCount.mockResolvedValue(3);
+
+    const result = await sendPushNotification(mockDb, payload);
+
+    expect(result).toEqual({ sent: false, reason: 'daily_cap_exceeded' });
+    expect(mockFetchFn).not.toHaveBeenCalled();
+  });
+
+  it('sends via Expo Push API and returns ticket', async () => {
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc123]');
+    mockGetDailyNotificationCount.mockResolvedValue(1);
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: 'ticket-xyz', status: 'ok' } }),
+    });
+    mockLogNotification.mockResolvedValue(undefined);
+
+    const result = await sendPushNotification(mockDb, payload);
+
+    expect(result).toEqual({ sent: true, ticketId: 'ticket-xyz' });
+    expect(mockFetchFn).toHaveBeenCalledWith(
+      'https://exp.host/--/api/v2/push/send',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('ExponentPushToken[abc123]'),
+      })
+    );
+    expect(mockLogNotification).toHaveBeenCalledWith(
+      mockDb,
+      'profile-1',
+      'review_reminder',
+      'ticket-xyz'
+    );
+  });
+
+  it('returns error on non-200 Expo API response', async () => {
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc123]');
+    mockGetDailyNotificationCount.mockResolvedValue(0);
+    mockFetchFn.mockResolvedValue({ ok: false, status: 429 });
+
+    const result = await sendPushNotification(mockDb, payload);
+
+    expect(result).toEqual({ sent: false, reason: 'expo_api_error_429' });
+  });
+
+  it('returns network_error on fetch failure', async () => {
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc123]');
+    mockGetDailyNotificationCount.mockResolvedValue(0);
+    mockFetchFn.mockRejectedValue(new Error('fetch failed'));
+
+    const result = await sendPushNotification(mockDb, payload);
+
+    expect(result).toEqual({ sent: false, reason: 'network_error' });
   });
 });
 
@@ -50,6 +170,12 @@ describe('formatReviewReminderBody', () => {
     const body = formatReviewReminderBody(1, ['Maths']);
 
     expect(body).toContain('4 minutes');
+  });
+
+  it('multiplies time for multiple fading topics', () => {
+    const body = formatReviewReminderBody(3, ['Maths']);
+
+    expect(body).toContain('6 minutes');
   });
 });
 

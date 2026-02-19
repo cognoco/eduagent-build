@@ -1,9 +1,16 @@
 // ---------------------------------------------------------------------------
-// Push Notification Service Stub — Story 4.8
-// Pure business logic, no Hono imports
+// Push Notification Service — Story 4.8 (ARCH-18)
+// Pure business logic, no Hono imports.
+// Uses Expo Push API via fetch (CF Workers-compatible, no Node SDK needed).
 // ---------------------------------------------------------------------------
 
 import type { ConsentType } from '@eduagent/schemas';
+import type { Database } from '@eduagent/database';
+import {
+  getPushToken,
+  getDailyNotificationCount,
+  logNotification,
+} from './settings';
 
 export interface NotificationPayload {
   profileId: string;
@@ -23,6 +30,7 @@ export interface NotificationPayload {
 export interface NotificationResult {
   sent: boolean;
   ticketId?: string;
+  reason?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -32,22 +40,89 @@ export interface NotificationResult {
 /** Maximum push notifications per day per profile */
 export const MAX_DAILY_PUSH = 3;
 
+const EXPO_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send';
+
+// ---------------------------------------------------------------------------
+// Token validation
+// ---------------------------------------------------------------------------
+
+/** Checks if a string is a valid Expo push token format */
+export function isExpoPushToken(token: string): boolean {
+  return (
+    token.startsWith('ExponentPushToken[') ||
+    token.startsWith('ExpoPushToken[') ||
+    /^[a-zA-Z0-9-_]+$/.test(token)
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Core functions
 // ---------------------------------------------------------------------------
 
 /**
- * Sends a push notification.
+ * Sends a push notification via the Expo Push API.
  *
- * TODO: Integrate Expo Push SDK
- * Currently returns a mock result.
+ * Checks:
+ * 1. Push token exists for the profile
+ * 2. Token is a valid Expo Push Token
+ * 3. Daily notification cap not exceeded
+ *
+ * Logs the sent notification and returns the ticket ID.
  */
 export async function sendPushNotification(
+  db: Database,
   payload: NotificationPayload
 ): Promise<NotificationResult> {
-  void payload;
-  // TODO: Integrate Expo Push SDK
-  return { sent: true, ticketId: 'mock-ticket' };
+  // 1. Get push token
+  const token = await getPushToken(db, payload.profileId);
+  if (!token) {
+    return { sent: false, reason: 'no_push_token' };
+  }
+
+  // 2. Validate token format
+  if (!isExpoPushToken(token)) {
+    return { sent: false, reason: 'invalid_token' };
+  }
+
+  // 3. Check daily cap
+  const dailyCount = await getDailyNotificationCount(db, payload.profileId);
+  if (dailyCount >= MAX_DAILY_PUSH) {
+    return { sent: false, reason: 'daily_cap_exceeded' };
+  }
+
+  // 4. Send via Expo Push API
+  try {
+    const response = await fetch(EXPO_PUSH_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        to: token,
+        title: payload.title,
+        body: payload.body,
+        sound: 'default',
+        data: { type: payload.type },
+      }),
+    });
+
+    if (!response.ok) {
+      return { sent: false, reason: `expo_api_error_${response.status}` };
+    }
+
+    const result = (await response.json()) as {
+      data?: { id?: string; status?: string };
+    };
+    const ticketId = result.data?.id;
+
+    // 5. Log the notification
+    await logNotification(db, payload.profileId, payload.type, ticketId);
+
+    return { sent: true, ticketId };
+  } catch {
+    return { sent: false, reason: 'network_error' };
+  }
 }
 
 /**

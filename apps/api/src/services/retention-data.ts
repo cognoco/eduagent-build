@@ -21,11 +21,13 @@ import type {
   RecallTestSubmitInput,
   RelearnTopicInput,
   NeedsDeepeningStatus,
+  TopicStability,
 } from '@eduagent/schemas';
 import { sm2 } from '@eduagent/retention';
 import {
   processRecallResult,
   getRetentionStatus,
+  isTopicStable,
   type RetentionState,
 } from './retention';
 import { canExitNeedsDeepening } from './adaptive-teaching';
@@ -500,4 +502,42 @@ export async function updateRetentionFromSession(
         eq(retentionCards.profileId, profileId)
       )
     );
+}
+
+// ---------------------------------------------------------------------------
+// Topic stability (FR93)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns stability status for all retention cards owned by a profile.
+ * Optionally filters to a single subject via its curriculum chain.
+ */
+export async function getStableTopics(
+  db: Database,
+  profileId: string,
+  subjectId?: string
+): Promise<TopicStability[]> {
+  const repo = createScopedRepository(db, profileId);
+  const allCards = await repo.retentionCards.findMany();
+
+  let filteredCards = allCards;
+
+  if (subjectId) {
+    const curriculum = await db.query.curricula.findFirst({
+      where: eq(curricula.subjectId, subjectId),
+    });
+    if (!curriculum) return [];
+
+    const topics = await db.query.curriculumTopics.findMany({
+      where: eq(curriculumTopics.curriculumId, curriculum.id),
+    });
+    const topicIds = new Set(topics.map((t) => t.id));
+    filteredCards = allCards.filter((c) => topicIds.has(c.topicId));
+  }
+
+  return filteredCards.map((card) => ({
+    topicId: card.topicId,
+    isStable: isTopicStable(card.consecutiveSuccesses),
+    consecutiveSuccesses: card.consecutiveSuccesses,
+  }));
 }

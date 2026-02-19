@@ -63,7 +63,11 @@ export type OnboardingDraft = z.infer<typeof onboardingDraftSchema>;
 
 // Session schemas
 
-export const sessionTypeSchema = z.enum(['learning', 'homework']);
+export const sessionTypeSchema = z.enum([
+  'learning',
+  'homework',
+  'interleaved',
+]);
 export type SessionType = z.infer<typeof sessionTypeSchema>;
 
 export const sessionStartSchema = z.object({
@@ -122,6 +126,7 @@ export type LearningSession = z.infer<typeof learningSessionSchema>;
 
 export const sessionCloseSchema = z.object({
   reason: z.enum(['user_ended', 'hard_cap', 'silence_timeout']).optional(),
+  summaryStatus: summaryStatusSchema.optional(),
 });
 export type SessionCloseInput = z.infer<typeof sessionCloseSchema>;
 
@@ -191,3 +196,22 @@ export const OCR_CONSTRAINTS = {
   maxFileSizeBytes: 5 * 1024 * 1024,
   acceptedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
 } as const;
+
+// Interleaved session start — optional filters for topic selection
+
+export const interleavedSessionStartSchema = z.object({
+  subjectId: z.string().uuid().optional(),
+  topicCount: z.number().int().min(1).max(10).default(5),
+});
+export type InterleavedSessionStartInput = z.infer<
+  typeof interleavedSessionStartSchema
+>;
+
+// Recall bridge result — returned after homework success
+
+export const recallBridgeResultSchema = z.object({
+  questions: z.array(z.string()),
+  topicId: z.string().uuid(),
+  topicTitle: z.string(),
+});
+export type RecallBridgeResult = z.infer<typeof recallBridgeResultSchema>;

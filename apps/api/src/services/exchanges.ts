@@ -19,7 +19,7 @@ export interface ExchangeContext {
   subjectName: string;
   topicTitle?: string;
   topicDescription?: string;
-  sessionType: 'learning' | 'homework';
+  sessionType: 'learning' | 'homework' | 'interleaved';
   escalationRung: EscalationRung;
   exchangeHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
   personaType: 'TEEN' | 'LEARNER' | 'PARENT';
@@ -231,13 +231,24 @@ function getPersonaVoice(personaType: 'TEEN' | 'LEARNER' | 'PARENT'): string {
   }
 }
 
-function getSessionTypeGuidance(sessionType: 'learning' | 'homework'): string {
+function getSessionTypeGuidance(
+  sessionType: 'learning' | 'homework' | 'interleaved'
+): string {
   if (sessionType === 'homework') {
     return (
       'Session type: HOMEWORK HELP\n' +
       'CRITICAL: This is a homework session. You must use ONLY Socratic questioning.\n' +
       'NEVER provide direct answers. Guide the learner to discover the answer themselves.\n' +
       'Ask questions that break the problem into smaller, manageable pieces.'
+    );
+  }
+  if (sessionType === 'interleaved') {
+    return (
+      'Session type: INTERLEAVED RETRIEVAL\n' +
+      'This is a mixed-topic retrieval session. Topics are interleaved to strengthen discrimination and long-term retention.\n' +
+      'Ask retrieval questions that test understanding at the depth established in previous assessments.\n' +
+      'Context-switching between topics is intentional — it creates desirable difficulty that produces stronger memory traces.\n' +
+      'Keep each question focused on one topic. After the learner responds, move to a different topic.'
     );
   }
   return (

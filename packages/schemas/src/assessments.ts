@@ -156,3 +156,12 @@ export const needsDeepeningSchema = z.object({
   consecutiveSuccessCount: z.number().int(),
 });
 export type NeedsDeepeningStatus = z.infer<typeof needsDeepeningSchema>;
+
+// Topic stability — FR93: 5+ consecutive successful retrievals = "Stable"
+
+export const topicStabilitySchema = z.object({
+  topicId: z.string().uuid(),
+  isStable: z.boolean(),
+  consecutiveSuccesses: z.number().int(),
+});
+export type TopicStability = z.infer<typeof topicStabilitySchema>;

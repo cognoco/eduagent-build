@@ -105,3 +105,25 @@ export function useUpdateLearningMode(): UseMutationResult<
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// Push Token Registration
+// ---------------------------------------------------------------------------
+
+export function useRegisterPushToken(): UseMutationResult<
+  { registered: boolean },
+  Error,
+  string
+> {
+  const client = useApiClient();
+
+  return useMutation({
+    mutationFn: async (token: string) => {
+      const res = await client.settings['push-token'].$post({
+        json: { token },
+      });
+      const data = await res.json();
+      return data;
+    },
+  });
+}

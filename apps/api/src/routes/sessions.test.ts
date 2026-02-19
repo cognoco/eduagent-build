@@ -160,6 +160,23 @@ jest.mock('../services/session', () => ({
   ),
 }));
 
+jest.mock('../services/settings', () => ({
+  shouldPromptCasualSwitch: jest.fn().mockResolvedValue(false),
+}));
+
+jest.mock('../services/interleaved', () => ({
+  startInterleavedSession: jest.fn().mockResolvedValue({
+    session: { id: 'mock-session' },
+    topics: [],
+  }),
+}));
+
+jest.mock('../services/recall-bridge', () => ({
+  generateRecallBridge: jest.fn().mockResolvedValue({
+    bridge: 'mock bridge',
+  }),
+}));
+
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
@@ -175,6 +192,7 @@ jest.mock('../inngest/client', () => ({
 
 import { inngest } from '../inngest/client';
 import { processMessage, streamMessage } from '../services/session';
+import { shouldPromptCasualSwitch } from '../services/settings';
 import app from '../index';
 
 const TEST_ENV = {
@@ -343,7 +361,7 @@ describe('session routes', () => {
       sendSpy.mockRestore();
     });
 
-    it('returns 200 with session closed', async () => {
+    it('returns 200 with session closed and shouldPromptCasualSwitch', async () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/close`,
         {
@@ -359,15 +377,16 @@ describe('session routes', () => {
       const body = await res.json();
       expect(body.message).toBe('Session closed');
       expect(body.sessionId).toBe(SESSION_ID);
+      expect(body.shouldPromptCasualSwitch).toBe(false);
     });
 
-    it('dispatches app/session.completed Inngest event on close', async () => {
+    it('dispatches app/session.completed Inngest event with summaryStatus', async () => {
       await app.request(
         `/v1/sessions/${SESSION_ID}/close`,
         {
           method: 'POST',
           headers: AUTH_HEADERS,
-          body: JSON.stringify({}),
+          body: JSON.stringify({ summaryStatus: 'skipped' }),
         },
         TEST_ENV
       );
@@ -377,9 +396,29 @@ describe('session routes', () => {
         data: expect.objectContaining({
           sessionId: SESSION_ID,
           subjectId: SUBJECT_ID,
+          summaryStatus: 'skipped',
           timestamp: expect.any(String),
         }),
       });
+    });
+
+    it('returns shouldPromptCasualSwitch true when threshold exceeded', async () => {
+      (shouldPromptCasualSwitch as jest.Mock).mockResolvedValueOnce(true);
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/close`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.shouldPromptCasualSwitch).toBe(true);
     });
 
     it('returns 401 without auth header', async () => {

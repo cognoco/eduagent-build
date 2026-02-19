@@ -6,6 +6,7 @@ import {
   sessionCloseSchema,
   contentFlagSchema,
   summarySubmitSchema,
+  interleavedSessionStartSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -26,6 +27,9 @@ import {
 import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
 import { incrementQuota } from '../services/billing';
+import { shouldPromptCasualSwitch } from '../services/settings';
+import { startInterleavedSession } from '../services/interleaved';
+import { generateRecallBridge } from '../services/recall-bridge';
 
 type SessionRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -159,11 +163,12 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const db = c.get('db');
       const account = c.get('account');
       const profileId = c.get('profileId') ?? account.id;
+      const body = c.req.valid('json');
       const result = await closeSession(
         db,
         profileId,
         c.req.param('sessionId'),
-        c.req.valid('json')
+        body
       );
 
       // Dispatch background job for retention, streaks, coaching
@@ -174,11 +179,18 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           sessionId: result.sessionId,
           topicId: result.topicId,
           subjectId: result.subjectId,
+          summaryStatus: body.summaryStatus,
           timestamp: new Date().toISOString(),
         },
       });
 
-      return c.json(result);
+      // Check if we should prompt the learner to switch to Casual Explorer
+      const promptCasualSwitch = await shouldPromptCasualSwitch(db, profileId);
+
+      return c.json({
+        ...result,
+        shouldPromptCasualSwitch: promptCasualSwitch,
+      });
     }
   )
 
@@ -229,4 +241,52 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       );
       return c.json(result);
     }
-  );
+  )
+
+  // Start an interleaved retrieval session (FR92)
+  .post(
+    '/sessions/interleaved',
+    zValidator('json', interleavedSessionStartSchema),
+    async (c) => {
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
+      const input = c.req.valid('json');
+
+      try {
+        const result = await startInterleavedSession(db, profileId, input);
+        return c.json(result, 201);
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          err.message === 'No topics available for interleaved retrieval'
+        ) {
+          return apiError(c, 400, ERROR_CODES.VALIDATION_ERROR, err.message);
+        }
+        throw err;
+      }
+    }
+  )
+
+  // Generate recall bridge questions after homework success (Story 2.7)
+  .post('/sessions/:sessionId/recall-bridge', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const sessionId = c.req.param('sessionId');
+
+    const session = await getSession(db, profileId, sessionId);
+    if (!session) return notFound(c, 'Session not found');
+
+    if (session.sessionType !== 'homework') {
+      return apiError(
+        c,
+        400,
+        ERROR_CODES.VALIDATION_ERROR,
+        'Recall bridge is only available for homework sessions'
+      );
+    }
+
+    const result = await generateRecallBridge(db, profileId, sessionId);
+    return c.json(result);
+  });

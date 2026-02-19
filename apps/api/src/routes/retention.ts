@@ -17,6 +17,7 @@ import {
   getTeachingPreference,
   setTeachingPreference,
   deleteTeachingPreference,
+  getStableTopics,
 } from '../services/retention-data';
 
 type RetentionRouteEnv = {
@@ -134,4 +135,15 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
 
     await deleteTeachingPreference(db, profileId, subjectId);
     return c.json({ message: 'Teaching preference reset' });
+  })
+
+  // Get topic stability status (FR93)
+  .get('/retention/stability', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const subjectId = c.req.query('subjectId');
+
+    const topics = await getStableTopics(db, profileId, subjectId || undefined);
+    return c.json({ topics });
   });

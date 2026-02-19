@@ -4,6 +4,8 @@ import {
   isReviewDue,
   canRetestTopic,
   getRetentionStatus,
+  isTopicStable,
+  STABILITY_THRESHOLD,
   type RetentionState,
 } from './retention';
 
@@ -279,5 +281,28 @@ describe('getRetentionStatus', () => {
     });
 
     expect(getRetentionStatus(state)).toBe('forgotten');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isTopicStable (FR93)
+// ---------------------------------------------------------------------------
+
+describe('isTopicStable', () => {
+  it('returns false when below threshold', () => {
+    expect(isTopicStable(0)).toBe(false);
+    expect(isTopicStable(STABILITY_THRESHOLD - 1)).toBe(false);
+  });
+
+  it('returns true when at exactly the threshold', () => {
+    expect(isTopicStable(STABILITY_THRESHOLD)).toBe(true);
+  });
+
+  it('returns true when above threshold', () => {
+    expect(isTopicStable(STABILITY_THRESHOLD + 3)).toBe(true);
+  });
+
+  it('has threshold of 5', () => {
+    expect(STABILITY_THRESHOLD).toBe(5);
   });
 });

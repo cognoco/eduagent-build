@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import {
   notificationPrefsSchema,
   learningModeUpdateSchema,
+  pushTokenRegisterSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -12,6 +13,7 @@ import {
   upsertNotificationPrefs,
   getLearningMode,
   upsertLearningMode,
+  registerPushToken,
 } from '../services/settings';
 
 type SettingsRouteEnv = {
@@ -68,5 +70,19 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       const body = c.req.valid('json');
       const result = await upsertLearningMode(db, profileId, body.mode);
       return c.json({ mode: result.mode });
+    }
+  )
+
+  // Register push token
+  .post(
+    '/settings/push-token',
+    zValidator('json', pushTokenRegisterSchema),
+    async (c) => {
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
+      const body = c.req.valid('json');
+      await registerPushToken(db, profileId, body.token);
+      return c.json({ registered: true });
     }
   );

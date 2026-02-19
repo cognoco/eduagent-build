@@ -3,13 +3,15 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq } from 'drizzle-orm';
+import { eq, and, gte } from 'drizzle-orm';
 import {
   notificationPreferences,
+  notificationLog,
   learningModes,
   type Database,
 } from '@eduagent/database';
 import type { NotificationPrefsInput, LearningMode } from '@eduagent/schemas';
+import type { NotificationPayload } from './notifications';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -139,4 +141,182 @@ export async function upsertLearningMode(
   }
 
   return { mode };
+}
+
+// ---------------------------------------------------------------------------
+// Learning Mode Rules
+// ---------------------------------------------------------------------------
+
+export interface LearningModeRules {
+  masteryGates: boolean;
+  verifiedXpOnly: boolean;
+  mandatorySummaries: boolean;
+}
+
+/**
+ * Returns the behavioral rules for a given learning mode.
+ *
+ * Serious: mastery gates on, XP pending until delayed recall, summaries required.
+ * Casual: no mastery gates, XP awarded immediately as verified, summaries optional.
+ */
+export function getLearningModeRules(mode: LearningMode): LearningModeRules {
+  if (mode === 'casual') {
+    return {
+      masteryGates: false,
+      verifiedXpOnly: false,
+      mandatorySummaries: false,
+    };
+  }
+  return {
+    masteryGates: true,
+    verifiedXpOnly: true,
+    mandatorySummaries: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Summary Skip Tracking (for >10 consecutive skip prompt — FR94)
+// ---------------------------------------------------------------------------
+
+/** Threshold for prompting the learner to switch to Casual Explorer */
+export const CASUAL_SWITCH_PROMPT_THRESHOLD = 10;
+
+export async function getConsecutiveSummarySkips(
+  db: Database,
+  profileId: string
+): Promise<number> {
+  const row = await db.query.learningModes.findFirst({
+    where: eq(learningModes.profileId, profileId),
+  });
+  return row?.consecutiveSummarySkips ?? 0;
+}
+
+export async function incrementSummarySkips(
+  db: Database,
+  profileId: string
+): Promise<number> {
+  const existing = await db.query.learningModes.findFirst({
+    where: eq(learningModes.profileId, profileId),
+  });
+
+  const newCount = (existing?.consecutiveSummarySkips ?? 0) + 1;
+
+  if (existing) {
+    await db
+      .update(learningModes)
+      .set({ consecutiveSummarySkips: newCount, updatedAt: new Date() })
+      .where(eq(learningModes.profileId, profileId));
+  } else {
+    await db
+      .insert(learningModes)
+      .values({ profileId, consecutiveSummarySkips: newCount });
+  }
+
+  return newCount;
+}
+
+export async function resetSummarySkips(
+  db: Database,
+  profileId: string
+): Promise<void> {
+  const existing = await db.query.learningModes.findFirst({
+    where: eq(learningModes.profileId, profileId),
+  });
+
+  if (existing && existing.consecutiveSummarySkips > 0) {
+    await db
+      .update(learningModes)
+      .set({ consecutiveSummarySkips: 0, updatedAt: new Date() })
+      .where(eq(learningModes.profileId, profileId));
+  }
+}
+
+/**
+ * Returns true when the learner has skipped >= 10 consecutive summaries
+ * AND is currently in 'serious' mode. Used to prompt switching to Casual Explorer.
+ */
+export async function shouldPromptCasualSwitch(
+  db: Database,
+  profileId: string
+): Promise<boolean> {
+  const row = await db.query.learningModes.findFirst({
+    where: eq(learningModes.profileId, profileId),
+  });
+
+  const mode = row?.mode ?? 'serious';
+  const skips = row?.consecutiveSummarySkips ?? 0;
+
+  return mode === 'serious' && skips >= CASUAL_SWITCH_PROMPT_THRESHOLD;
+}
+
+// ---------------------------------------------------------------------------
+// Push Token Registration
+// ---------------------------------------------------------------------------
+
+export async function registerPushToken(
+  db: Database,
+  profileId: string,
+  token: string
+): Promise<void> {
+  const existing = await db.query.notificationPreferences.findFirst({
+    where: eq(notificationPreferences.profileId, profileId),
+  });
+
+  if (existing) {
+    await db
+      .update(notificationPreferences)
+      .set({ expoPushToken: token, updatedAt: new Date() })
+      .where(eq(notificationPreferences.profileId, profileId));
+  } else {
+    await db
+      .insert(notificationPreferences)
+      .values({ profileId, expoPushToken: token });
+  }
+}
+
+export async function getPushToken(
+  db: Database,
+  profileId: string
+): Promise<string | null> {
+  const row = await db.query.notificationPreferences.findFirst({
+    where: eq(notificationPreferences.profileId, profileId),
+  });
+  return row?.expoPushToken ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Notification Logging (daily cap enforcement)
+// ---------------------------------------------------------------------------
+
+export async function getDailyNotificationCount(
+  db: Database,
+  profileId: string
+): Promise<number> {
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+
+  const rows = await db
+    .select()
+    .from(notificationLog)
+    .where(
+      and(
+        eq(notificationLog.profileId, profileId),
+        gte(notificationLog.sentAt, startOfDay)
+      )
+    );
+
+  return rows.length;
+}
+
+export async function logNotification(
+  db: Database,
+  profileId: string,
+  type: NotificationPayload['type'],
+  ticketId?: string
+): Promise<void> {
+  await db.insert(notificationLog).values({
+    profileId,
+    type,
+    ticketId: ticketId ?? null,
+  });
 }

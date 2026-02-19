@@ -79,6 +79,7 @@ export const notificationPreferences = pgTable('notification_preferences', {
   dailyReminders: boolean('daily_reminders').notNull().default(false),
   pushEnabled: boolean('push_enabled').notNull().default(false),
   maxDailyPush: integer('max_daily_push').notNull().default(3),
+  expoPushToken: text('expo_push_token'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -86,6 +87,38 @@ export const notificationPreferences = pgTable('notification_preferences', {
     .notNull()
     .defaultNow(),
 });
+
+export const notificationTypeEnum = pgEnum('notification_type', [
+  'review_reminder',
+  'daily_reminder',
+  'trial_expiry',
+  'streak_warning',
+  'consent_request',
+  'consent_reminder',
+  'consent_warning',
+  'consent_expired',
+]);
+
+export const notificationLog = pgTable(
+  'notification_log',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    type: notificationTypeEnum('type').notNull(),
+    ticketId: text('ticket_id'),
+    sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('notification_log_profile_sent_idx').on(
+      table.profileId,
+      table.sentAt
+    ),
+  ]
+);
 
 export const learningModes = pgTable('learning_modes', {
   id: uuid('id')
@@ -96,6 +129,9 @@ export const learningModes = pgTable('learning_modes', {
     .references(() => profiles.id, { onDelete: 'cascade' })
     .unique(),
   mode: learningModeEnum('mode').notNull().default('serious'),
+  consecutiveSummarySkips: integer('consecutive_summary_skips')
+    .notNull()
+    .default(0),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

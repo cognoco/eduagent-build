@@ -239,7 +239,7 @@ async function prepareExchangeContext(
     subjectName: subject?.name ?? 'Unknown',
     topicTitle: topic?.title,
     topicDescription: topic?.description,
-    sessionType: session.sessionType as 'learning' | 'homework',
+    sessionType: session.sessionType as 'learning' | 'homework' | 'interleaved',
     escalationRung: effectiveRung,
     exchangeHistory,
     personaType:

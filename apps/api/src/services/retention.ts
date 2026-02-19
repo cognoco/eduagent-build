@@ -31,6 +31,9 @@ export interface RecallTestResult {
 /** Anti-cramming cooldown in milliseconds (24 hours — FR54) */
 const RETEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
+/** Topics with 5+ consecutive successful retrievals are "Stable" (FR93) */
+export const STABILITY_THRESHOLD = 5;
+
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
@@ -195,4 +198,12 @@ export function getRetentionStatus(
   if (ratio <= 2) return 'fading';
   if (ratio <= 4) return 'weak';
   return 'forgotten';
+}
+
+/**
+ * Returns true if a topic has achieved stability — 5+ consecutive
+ * successful retrievals across any session type (FR93).
+ */
+export function isTopicStable(consecutiveSuccesses: number): boolean {
+  return consecutiveSuccesses >= STABILITY_THRESHOLD;
 }
