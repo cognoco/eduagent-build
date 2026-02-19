@@ -79,6 +79,9 @@ testsprite_tests/
 nul
 temp/*
 
+# Git worktrees
+.worktrees/
+
 # Agent-Vibes
 .agentvibes/
 .claude/audio
