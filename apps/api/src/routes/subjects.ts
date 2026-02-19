@@ -28,7 +28,8 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     const account = c.get('account');
     // Use profileId from profile-scope middleware, fallback to account.id
     const profileId = c.get('profileId') ?? account.id;
-    const subjects = await listSubjects(db, profileId);
+    const includeInactive = c.req.query('includeInactive') === 'true';
+    const subjects = await listSubjects(db, profileId, { includeInactive });
     return c.json({ subjects });
   })
   .post('/subjects', zValidator('json', subjectCreateSchema), async (c) => {

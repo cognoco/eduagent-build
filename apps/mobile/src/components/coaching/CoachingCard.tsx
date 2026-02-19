@@ -1,4 +1,5 @@
-import { View, Text, Pressable } from 'react-native';
+import { type ReactNode } from 'react';
+import { BaseCoachingCard } from './BaseCoachingCard';
 
 interface CoachingCardProps {
   headline: string;
@@ -7,6 +8,7 @@ interface CoachingCardProps {
   secondaryLabel?: string;
   onPrimary: () => void;
   onSecondary?: () => void;
+  isLoading?: boolean;
 }
 
 export function CoachingCard({
@@ -16,35 +18,18 @@ export function CoachingCard({
   secondaryLabel,
   onPrimary,
   onSecondary,
-}: CoachingCardProps) {
+  isLoading,
+}: CoachingCardProps): ReactNode {
   return (
-    <View className="bg-coaching-card rounded-card p-5 mt-4">
-      <Text className="text-display font-bold text-text-primary leading-tight">
-        {headline}
-      </Text>
-      {subtext && (
-        <Text className="text-body text-text-secondary mt-2">{subtext}</Text>
-      )}
-      <Pressable
-        onPress={onPrimary}
-        className="bg-primary rounded-button py-3.5 mt-5 items-center"
-        style={{ minHeight: 48 }}
-      >
-        <Text className="text-text-inverse text-body font-semibold">
-          {primaryLabel}
-        </Text>
-      </Pressable>
-      {secondaryLabel && onSecondary && (
-        <Pressable
-          onPress={onSecondary}
-          className="mt-3 items-center py-2"
-          style={{ minHeight: 44 }}
-        >
-          <Text className="text-text-secondary text-body">
-            {secondaryLabel}
-          </Text>
-        </Pressable>
-      )}
-    </View>
+    <BaseCoachingCard
+      headline={headline}
+      subtext={subtext}
+      primaryLabel={primaryLabel}
+      onPrimary={onPrimary}
+      secondaryLabel={secondaryLabel}
+      onSecondary={onSecondary}
+      isLoading={isLoading}
+      testID="coaching-card"
+    />
   );
 }

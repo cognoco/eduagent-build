@@ -1,17 +1,31 @@
-import {
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, Pressable, ScrollView } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../lib/theme';
-import { DashboardCard } from '../../components/common';
+import { ParentDashboardSummary } from '../../components/coaching';
 import type { RetentionStatus } from '../../components/progress';
 import { useDashboard } from '../../hooks/use-dashboard';
 
+function CardSkeleton(): React.ReactNode {
+  return (
+    <View
+      className="bg-coaching-card rounded-card p-5 mt-4"
+      testID="dashboard-skeleton"
+    >
+      <View className="bg-border rounded h-6 w-1/2 mb-3" />
+      <View className="bg-border rounded h-4 w-full mb-2" />
+      <View className="bg-border rounded h-4 w-3/4 mb-4" />
+      <View className="flex-row gap-2 mb-4">
+        <View className="bg-border rounded-full h-7 w-24" />
+        <View className="bg-border rounded-full h-7 w-20" />
+      </View>
+      <View className="bg-border rounded-button h-12 w-full" />
+    </View>
+  );
+}
+
 export default function DashboardScreen() {
+  const router = useRouter();
   const { setPersona } = useTheme();
   const insets = useSafeAreaInsets();
   const { data: dashboard, isLoading: dashboardLoading } = useDashboard();
@@ -27,11 +41,13 @@ export default function DashboardScreen() {
       <ScrollView
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 24 }}
+        testID="dashboard-scroll"
       >
         {dashboardLoading ? (
-          <View className="py-8 items-center">
-            <ActivityIndicator />
-          </View>
+          <>
+            <CardSkeleton />
+            <CardSkeleton />
+          </>
         ) : dashboard?.children && dashboard.children.length > 0 ? (
           dashboard.children.map(
             (child: {
@@ -40,18 +56,26 @@ export default function DashboardScreen() {
               summary: string;
               sessionsThisWeek: number;
               sessionsLastWeek: number;
+              trend: string;
               subjects: { name: string; retentionStatus: string }[];
             }) => (
-              <DashboardCard
+              <ParentDashboardSummary
                 key={child.profileId}
-                name={child.displayName}
+                childName={child.displayName}
                 summary={child.summary}
-                sessions={child.sessionsThisWeek}
-                lastWeekSessions={child.sessionsLastWeek}
+                sessionsThisWeek={child.sessionsThisWeek}
+                sessionsLastWeek={child.sessionsLastWeek}
+                trend={child.trend as 'up' | 'down' | 'stable'}
                 subjects={child.subjects.map((s) => ({
                   name: s.name,
-                  retention: s.retentionStatus as RetentionStatus,
+                  retentionStatus: s.retentionStatus as RetentionStatus,
                 }))}
+                onDrillDown={() =>
+                  router.push({
+                    pathname: '/(parent)/child/[profileId]',
+                    params: { profileId: child.profileId },
+                  } as never)
+                }
               />
             )
           )

@@ -5,9 +5,10 @@
 // Pure business logic — no Hono imports.
 // ---------------------------------------------------------------------------
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
   coachingCardCache,
+  learningSessions,
   streaks,
   createScopedRepository,
   generateUUIDv7,
@@ -21,6 +22,9 @@ import { getStreakDisplayInfo, type StreakState } from './streaks';
 // ---------------------------------------------------------------------------
 
 const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+/** Profiles with fewer than this many completed sessions get cold-start fallback */
+const COLD_START_SESSION_THRESHOLD = 5;
 
 // ---------------------------------------------------------------------------
 // precomputeCoachingCard
@@ -206,4 +210,77 @@ export async function readCoachingCardCache(
   if (row.expiresAt.getTime() <= now.getTime()) return null;
 
   return row.cardData as CoachingCard;
+}
+
+// ---------------------------------------------------------------------------
+// Cold-start fallback actions
+// ---------------------------------------------------------------------------
+
+export interface ColdStartFallback {
+  actions: Array<{ key: string; label: string; description: string }>;
+}
+
+const COLD_START_FALLBACK: ColdStartFallback = {
+  actions: [
+    {
+      key: 'continue_learning',
+      label: 'Continue learning',
+      description: 'Pick up where you left off.',
+    },
+    {
+      key: 'start_new_topic',
+      label: 'Start a new topic',
+      description: 'Explore something new in your curriculum.',
+    },
+    {
+      key: 'review_progress',
+      label: 'Review progress',
+      description: 'See how far you have come.',
+    },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// getCoachingCardForProfile
+// ---------------------------------------------------------------------------
+
+export interface CoachingCardResponse {
+  coldStart: boolean;
+  card: CoachingCard | null;
+  fallback: ColdStartFallback | null;
+}
+
+/**
+ * Returns the coaching card for a profile.
+ *
+ * - Cold start (< 5 completed sessions): returns three-button fallback data.
+ * - Warm path: reads from cache (fast); on miss, computes fresh + writes cache.
+ */
+export async function getCoachingCardForProfile(
+  db: Database,
+  profileId: string
+): Promise<CoachingCardResponse> {
+  // Check session count for cold-start detection
+  const countResult = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(learningSessions)
+    .where(eq(learningSessions.profileId, profileId));
+
+  const sessionCount = countResult[0]?.count ?? 0;
+
+  if (sessionCount < COLD_START_SESSION_THRESHOLD) {
+    return { coldStart: true, card: null, fallback: COLD_START_FALLBACK };
+  }
+
+  // Warm path: try cache first
+  const cached = await readCoachingCardCache(db, profileId);
+  if (cached) {
+    return { coldStart: false, card: cached, fallback: null };
+  }
+
+  // Cache miss: compute fresh and write to cache
+  const card = await precomputeCoachingCard(db, profileId);
+  await writeCoachingCardCache(db, profileId, card);
+
+  return { coldStart: false, card, fallback: null };
 }

@@ -8,6 +8,7 @@ jest.mock('@eduagent/database', () => {
 
 jest.mock('./retention', () => ({
   processRecallResult: jest.fn(),
+  getRetentionStatus: jest.fn().mockReturnValue('weak'),
 }));
 
 jest.mock('./adaptive-teaching', () => ({
@@ -16,7 +17,7 @@ jest.mock('./adaptive-teaching', () => ({
 
 import type { Database } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';
-import { processRecallResult } from './retention';
+import { processRecallResult, getRetentionStatus } from './retention';
 import { canExitNeedsDeepening } from './adaptive-teaching';
 import {
   getSubjectRetention,
@@ -244,6 +245,128 @@ describe('processRecallTest', () => {
     expect(processRecallResult).toHaveBeenCalled();
     expect(db.update).toHaveBeenCalled();
   });
+
+  it('returns failureCount: 0 when no retention card exists', async () => {
+    setupScopedRepo({ retentionCardFindFirst: undefined });
+    const db = createMockDb();
+    const result = await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'Short answer',
+    });
+
+    expect(result.failureCount).toBe(0);
+  });
+
+  it('returns failureAction feedback_only on early failures', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.3,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 2,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'feedback_only',
+    });
+
+    const db = createMockDb();
+    const result = await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'Short',
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.failureCount).toBe(2);
+    expect(result.failureAction).toBe('feedback_only');
+    expect(result.remediation).toBeUndefined();
+  });
+
+  it('returns redirect_to_learning_book with remediation on 3+ failures', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.1,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 3,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'redirect_to_learning_book',
+    });
+
+    (getRetentionStatus as jest.Mock).mockReturnValue('weak');
+
+    const db = createMockDb();
+    const result = await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'Short',
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.failureCount).toBe(3);
+    expect(result.failureAction).toBe('redirect_to_learning_book');
+    expect(result.remediation).toBeDefined();
+    expect(result.remediation!.retentionStatus).toBe('weak');
+    expect(result.remediation!.failureCount).toBe(3);
+    expect(result.remediation!.cooldownEndsAt).toBeDefined();
+    expect(result.remediation!.options).toEqual([
+      'review_and_retest',
+      'relearn_topic',
+    ]);
+    expect(getRetentionStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ failureCount: 3 })
+    );
+  });
+
+  it('includes failureCount in success response', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.6,
+        intervalDays: 10,
+        repetitions: 4,
+        failureCount: 0,
+        consecutiveSuccesses: 3,
+        xpStatus: 'verified',
+        nextReviewAt: '2026-02-25T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+
+    const db = createMockDb();
+    const result = await processRecallTest(db, profileId, {
+      topicId,
+      answer:
+        'A detailed explanation of photosynthesis and its chemical processes',
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.failureCount).toBe(0);
+    expect(result.failureAction).toBeUndefined();
+    expect(result.remediation).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -251,9 +374,16 @@ describe('processRecallTest', () => {
 // ---------------------------------------------------------------------------
 
 describe('startRelearn', () => {
-  it('returns relearn confirmation', async () => {
+  it('returns relearn confirmation with resetPerformed', async () => {
     setupScopedRepo({ needsDeepeningFindMany: [] });
     const db = createMockDb();
+    // Mock session creation with returning
+    (db.insert as jest.Mock).mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ id: 'session-new' }]),
+      }),
+    });
+
     const result = await startRelearn(db, profileId, {
       topicId,
       method: 'different',
@@ -262,6 +392,133 @@ describe('startRelearn', () => {
     expect(result.message).toBe('Relearn started');
     expect(result.topicId).toBe(topicId);
     expect(result.method).toBe('different');
+    expect(result.resetPerformed).toBe(true);
+  });
+
+  it('resets the retention card to initial SM-2 state', async () => {
+    setupScopedRepo({ needsDeepeningFindMany: [] });
+    const db = createMockDb();
+    (db.insert as jest.Mock).mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ id: 'session-new' }]),
+      }),
+    });
+
+    await startRelearn(db, profileId, { topicId, method: 'same' });
+
+    expect(db.update).toHaveBeenCalled();
+    const setArg = (db.update as jest.Mock).mock.results[0].value.set.mock
+      .calls[0][0];
+    expect(setArg.easeFactor).toBe('2.50');
+    expect(setArg.intervalDays).toBe(1);
+    expect(setArg.repetitions).toBe(0);
+    expect(setArg.failureCount).toBe(0);
+    expect(setArg.consecutiveSuccesses).toBe(0);
+    expect(setArg.xpStatus).toBe('pending');
+    expect(setArg.nextReviewAt).toBeNull();
+    expect(setArg.lastReviewedAt).toBeNull();
+  });
+
+  it('creates a new learning session linked to topic', async () => {
+    setupScopedRepo({ needsDeepeningFindMany: [] });
+    const db = createMockDb();
+    (db.insert as jest.Mock).mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ id: 'new-session-123' }]),
+      }),
+    });
+
+    const result = await startRelearn(db, profileId, {
+      topicId,
+      method: 'same',
+    });
+
+    expect(result.sessionId).toBe('new-session-123');
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('includes preferredMethod when method is different', async () => {
+    setupScopedRepo({ needsDeepeningFindMany: [] });
+    const db = createMockDb();
+    (db.insert as jest.Mock).mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ id: 'session-new' }]),
+      }),
+    });
+
+    const result = await startRelearn(db, profileId, {
+      topicId,
+      method: 'different',
+      preferredMethod: 'I learn better with visual examples',
+    });
+
+    expect(result.method).toBe('different');
+    expect(result.preferredMethod).toBe('I learn better with visual examples');
+  });
+
+  it('does not include preferredMethod when method is same', async () => {
+    setupScopedRepo({ needsDeepeningFindMany: [] });
+    const db = createMockDb();
+    (db.insert as jest.Mock).mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ id: 'session-new' }]),
+      }),
+    });
+
+    const result = await startRelearn(db, profileId, {
+      topicId,
+      method: 'same',
+    });
+
+    expect(result.method).toBe('same');
+    expect(result.preferredMethod).toBeUndefined();
+  });
+
+  it('marks topic as needs-deepening when not already active', async () => {
+    setupScopedRepo({ needsDeepeningFindMany: [] });
+    const db = createMockDb();
+
+    // Track insert calls: first = needsDeepening, second = learningSessions
+    const insertCallArgs: unknown[] = [];
+    (db.insert as jest.Mock).mockImplementation((table) => {
+      insertCallArgs.push(table);
+      return {
+        values: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([{ id: 'session-new' }]),
+        }),
+      };
+    });
+
+    await startRelearn(db, profileId, { topicId, method: 'same' });
+
+    // Should have 2 insert calls: needsDeepening + learningSessions
+    expect(db.insert).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips needs-deepening insert when already active', async () => {
+    setupScopedRepo({
+      needsDeepeningFindMany: [
+        {
+          id: 'nd-1',
+          topicId,
+          subjectId,
+          status: 'active',
+          consecutiveSuccessCount: 1,
+          profileId,
+        },
+      ],
+    });
+    const db = createMockDb();
+    (db.insert as jest.Mock).mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ id: 'session-new' }]),
+      }),
+    });
+
+    await startRelearn(db, profileId, { topicId, method: 'same' });
+
+    // Only 1 insert call: learningSessions (no needsDeepening insert)
+    expect(db.insert).toHaveBeenCalledTimes(1);
   });
 });
 

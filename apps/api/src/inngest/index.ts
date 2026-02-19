@@ -7,6 +7,7 @@ import { trialExpiry } from './functions/trial-expiry';
 import { paymentRetry } from './functions/payment-retry';
 import { quotaReset } from './functions/quota-reset';
 import { topupExpiryReminder } from './functions/topup-expiry-reminder';
+import { subjectAutoArchive } from './functions/subject-auto-archive';
 
 export {
   inngest,
@@ -18,6 +19,7 @@ export {
   paymentRetry,
   quotaReset,
   topupExpiryReminder,
+  subjectAutoArchive,
 };
 
 // All Inngest functions to register with the serve handler
@@ -30,4 +32,5 @@ export const functions = [
   paymentRetry,
   quotaReset,
   topupExpiryReminder,
+  subjectAutoArchive,
 ];

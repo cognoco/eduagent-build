@@ -71,6 +71,12 @@ export default function ParentLayout() {
             ),
           }}
         />
+        <Tabs.Screen
+          name="child"
+          options={{
+            href: null,
+          }}
+        />
       </Tabs>
     </View>
   );

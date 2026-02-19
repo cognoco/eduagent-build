@@ -16,6 +16,7 @@ import {
   precomputeCoachingCard,
   writeCoachingCardCache,
   readCoachingCardCache,
+  getCoachingCardForProfile,
 } from './coaching-cards';
 import type { CoachingCard } from '@eduagent/schemas';
 
@@ -430,5 +431,113 @@ describe('readCoachingCardCache', () => {
     expect(result).not.toBeNull();
     expect(result!.type).toBe('challenge');
     expect(result!.profileId).toBe(profileId);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getCoachingCardForProfile
+// ---------------------------------------------------------------------------
+
+describe('getCoachingCardForProfile', () => {
+  function setupSessionCount(db: Database, count: number): void {
+    (db.select as jest.Mock).mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue([{ count }]),
+      }),
+    });
+  }
+
+  it('returns cold-start fallback when profile has fewer than 5 sessions', async () => {
+    setupScopedRepo({ retentionCardsFindMany: [] });
+    const db = createMockDb();
+    setupSessionCount(db, 3);
+
+    const result = await getCoachingCardForProfile(db, profileId);
+
+    expect(result.coldStart).toBe(true);
+    expect(result.card).toBeNull();
+    expect(result.fallback).not.toBeNull();
+    expect(result.fallback!.actions).toHaveLength(3);
+    expect(result.fallback!.actions[0].key).toBe('continue_learning');
+    expect(result.fallback!.actions[1].key).toBe('start_new_topic');
+    expect(result.fallback!.actions[2].key).toBe('review_progress');
+  });
+
+  it('returns cold-start fallback when profile has 0 sessions', async () => {
+    setupScopedRepo({ retentionCardsFindMany: [] });
+    const db = createMockDb();
+    setupSessionCount(db, 0);
+
+    const result = await getCoachingCardForProfile(db, profileId);
+
+    expect(result.coldStart).toBe(true);
+    expect(result.card).toBeNull();
+  });
+
+  it('returns cached card when cache is valid (warm path)', async () => {
+    setupScopedRepo({ retentionCardsFindMany: [] });
+    const db = createMockDb();
+    setupSessionCount(db, 10);
+
+    const cachedCard: CoachingCard = {
+      id: 'mock-uuid-v7',
+      profileId,
+      type: 'challenge',
+      title: 'Cached card',
+      body: 'From cache',
+      priority: 3,
+      expiresAt: new Date(NOW.getTime() + 12 * 60 * 60 * 1000).toISOString(),
+      createdAt: NOW.toISOString(),
+      topicId,
+      difficulty: 'easy',
+      xpReward: 10,
+    };
+    (db.query.coachingCardCache.findFirst as jest.Mock).mockResolvedValue({
+      id: 'cache-1',
+      profileId,
+      cardData: cachedCard,
+      expiresAt: new Date(NOW.getTime() + 12 * 60 * 60 * 1000),
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+
+    const result = await getCoachingCardForProfile(db, profileId);
+
+    expect(result.coldStart).toBe(false);
+    expect(result.card).not.toBeNull();
+    expect(result.card!.title).toBe('Cached card');
+    expect(result.fallback).toBeNull();
+  });
+
+  it('computes fresh card on cache miss and writes to cache', async () => {
+    setupScopedRepo({ retentionCardsFindMany: [] });
+    const db = createMockDb();
+    setupSessionCount(db, 10);
+
+    // Cache miss — returns null
+    (db.query.coachingCardCache.findFirst as jest.Mock).mockResolvedValue(null);
+
+    const result = await getCoachingCardForProfile(db, profileId);
+
+    expect(result.coldStart).toBe(false);
+    expect(result.card).not.toBeNull();
+    expect(result.card!.type).toBe('challenge'); // fallback since no retention cards
+    expect(result.fallback).toBeNull();
+    // Verify cache was written (insert called for the write)
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('treats exactly 5 sessions as warm (not cold start)', async () => {
+    setupScopedRepo({ retentionCardsFindMany: [] });
+    const db = createMockDb();
+    setupSessionCount(db, 5);
+
+    // Cache miss
+    (db.query.coachingCardCache.findFirst as jest.Mock).mockResolvedValue(null);
+
+    const result = await getCoachingCardForProfile(db, profileId);
+
+    expect(result.coldStart).toBe(false);
+    expect(result.card).not.toBeNull();
   });
 });

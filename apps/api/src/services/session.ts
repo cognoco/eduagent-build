@@ -71,6 +71,16 @@ function mapSummaryRow(
 // Core functions
 // ---------------------------------------------------------------------------
 
+export class SubjectInactiveError extends Error {
+  constructor(public readonly subjectStatus: 'paused' | 'archived') {
+    const action = subjectStatus === 'paused' ? 'resume' : 'restore';
+    super(
+      `Subject is ${subjectStatus} \u2014 ${action} it before starting a session`
+    );
+    this.name = 'SubjectInactiveError';
+  }
+}
+
 export async function startSession(
   db: Database,
   profileId: string,
@@ -81,6 +91,11 @@ export async function startSession(
   const subject = await getSubject(db, profileId, subjectId);
   if (!subject) {
     throw new Error('Subject not found');
+  }
+
+  // Enforce subject lifecycle — only active subjects may start sessions
+  if (subject.status !== 'active') {
+    throw new SubjectInactiveError(subject.status as 'paused' | 'archived');
   }
 
   const [row] = await db

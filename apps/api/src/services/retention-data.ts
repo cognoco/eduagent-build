@@ -12,6 +12,7 @@ import {
   retentionCards,
   needsDeepeningTopics,
   teachingPreferences,
+  learningSessions,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
@@ -22,7 +23,11 @@ import type {
   NeedsDeepeningStatus,
 } from '@eduagent/schemas';
 import { sm2 } from '@eduagent/retention';
-import { processRecallResult, type RetentionState } from './retention';
+import {
+  processRecallResult,
+  getRetentionStatus,
+  type RetentionState,
+} from './retention';
 import { canExitNeedsDeepening } from './adaptive-teaching';
 
 // ---------------------------------------------------------------------------
@@ -112,16 +117,31 @@ export async function getTopicRetention(
   return card ? mapRetentionCardRow(card) : null;
 }
 
-export async function processRecallTest(
-  db: Database,
-  profileId: string,
-  input: RecallTestSubmitInput
-): Promise<{
+/** Anti-cramming cooldown in milliseconds (24 hours — FR54) */
+const RETEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+export interface RecallTestRemediation {
+  retentionStatus: string;
+  failureCount: number;
+  cooldownEndsAt: string;
+  options: Array<'review_and_retest' | 'relearn_topic'>;
+}
+
+export interface RecallTestResponse {
   passed: boolean;
   masteryScore: number;
   xpChange: string;
   nextReviewAt: string;
-}> {
+  failureCount: number;
+  failureAction?: 'feedback_only' | 'redirect_to_learning_book';
+  remediation?: RecallTestRemediation;
+}
+
+export async function processRecallTest(
+  db: Database,
+  profileId: string,
+  input: RecallTestSubmitInput
+): Promise<RecallTestResponse> {
   const repo = createScopedRepository(db, profileId);
   const card = await repo.retentionCards.findFirst(
     eq(retentionCards.topicId, input.topicId)
@@ -134,6 +154,7 @@ export async function processRecallTest(
       masteryScore: 0.75,
       xpChange: 'verified',
       nextReviewAt: new Date().toISOString(),
+      failureCount: 0,
     };
   }
 
@@ -167,19 +188,59 @@ export async function processRecallTest(
       )
     );
 
-  return {
+  const response: RecallTestResponse = {
     passed: result.passed,
     masteryScore: result.passed ? 0.75 : 0.4,
     xpChange: result.xpChange,
     nextReviewAt: result.newState.nextReviewAt ?? new Date().toISOString(),
+    failureCount: result.newState.failureCount,
+    failureAction: result.failureAction,
   };
+
+  // Add remediation data when redirect is triggered (3+ failures)
+  if (result.failureAction === 'redirect_to_learning_book') {
+    const retentionStatus = getRetentionStatus(result.newState);
+    const cooldownEndsAt = new Date(
+      Date.now() + RETEST_COOLDOWN_MS
+    ).toISOString();
+
+    response.remediation = {
+      retentionStatus,
+      failureCount: result.newState.failureCount,
+      cooldownEndsAt,
+      options: ['review_and_retest', 'relearn_topic'],
+    };
+  }
+
+  return response;
+}
+
+export interface RelearnResponse {
+  message: string;
+  topicId: string;
+  method: string;
+  preferredMethod?: string;
+  sessionId: string | null;
+  resetPerformed: boolean;
 }
 
 export async function startRelearn(
   db: Database,
   profileId: string,
   input: RelearnTopicInput
-): Promise<{ message: string; topicId: string; method: string }> {
+): Promise<RelearnResponse> {
+  // Find subjectId through the topic's curriculum chain
+  const topic = await db.query.curriculumTopics.findFirst({
+    where: eq(curriculumTopics.id, input.topicId),
+  });
+  const curriculum = topic
+    ? await db.query.curricula.findFirst({
+        where: eq(curricula.id, topic.curriculumId),
+      })
+    : null;
+
+  const subjectId = curriculum?.subjectId ?? null;
+
   // Mark topic as needs deepening if not already
   const repo = createScopedRepository(db, profileId);
   const existing = await repo.needsDeepeningTopics.findMany(
@@ -187,32 +248,68 @@ export async function startRelearn(
   );
   const active = existing.find((d) => d.status === 'active');
 
-  if (!active) {
-    // Find subjectId through the topic's curriculum chain
-    const topic = await db.query.curriculumTopics.findFirst({
-      where: eq(curriculumTopics.id, input.topicId),
+  if (!active && subjectId) {
+    await db.insert(needsDeepeningTopics).values({
+      profileId,
+      subjectId,
+      topicId: input.topicId,
+      status: 'active',
     });
-    const curriculum = topic
-      ? await db.query.curricula.findFirst({
-          where: eq(curricula.id, topic.curriculumId),
-        })
-      : null;
-
-    if (curriculum) {
-      await db.insert(needsDeepeningTopics).values({
-        profileId,
-        subjectId: curriculum.subjectId,
-        topicId: input.topicId,
-        status: 'active',
-      });
-    }
   }
 
-  return {
+  // Reset retention card to initial SM-2 state (mastery reset)
+  let resetPerformed = false;
+  await db
+    .update(retentionCards)
+    .set({
+      easeFactor: '2.50',
+      intervalDays: 1,
+      repetitions: 0,
+      failureCount: 0,
+      consecutiveSuccesses: 0,
+      xpStatus: 'pending',
+      nextReviewAt: null,
+      lastReviewedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(retentionCards.topicId, input.topicId),
+        eq(retentionCards.profileId, profileId)
+      )
+    );
+  resetPerformed = true;
+
+  // Create a new learning session linked to this topic
+  let sessionId: string | null = null;
+  if (subjectId) {
+    const [session] = await db
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId,
+        topicId: input.topicId,
+        sessionType: 'learning',
+        status: 'active',
+      })
+      .returning();
+
+    sessionId = session?.id ?? null;
+  }
+
+  const response: RelearnResponse = {
     message: 'Relearn started',
     topicId: input.topicId,
     method: input.method,
+    sessionId,
+    resetPerformed,
   };
+
+  if (input.method === 'different' && input.preferredMethod) {
+    response.preferredMethod = input.preferredMethod;
+  }
+
+  return response;
 }
 
 export async function getSubjectNeedsDeepening(

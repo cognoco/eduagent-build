@@ -6,6 +6,7 @@ import {
   sessionCloseSchema,
   contentFlagSchema,
   summarySubmitSchema,
+  ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -13,6 +14,7 @@ import type { Account } from '../services/account';
 import { streamSSE } from 'hono/streaming';
 import {
   startSession,
+  SubjectInactiveError,
   getSession,
   processMessage,
   streamMessage,
@@ -21,7 +23,7 @@ import {
   getSessionSummary,
   submitSummary,
 } from '../services/session';
-import { notFound } from '../errors';
+import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
 import { incrementQuota } from '../services/billing';
 
@@ -47,8 +49,15 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
       const profileId = c.get('profileId') ?? account.id;
-      const session = await startSession(db, profileId, subjectId, input);
-      return c.json({ session }, 201);
+      try {
+        const session = await startSession(db, profileId, subjectId, input);
+        return c.json({ session }, 201);
+      } catch (err) {
+        if (err instanceof SubjectInactiveError) {
+          return apiError(c, 403, ERROR_CODES.SUBJECT_INACTIVE, err.message);
+        }
+        throw err;
+      }
     }
   )
 

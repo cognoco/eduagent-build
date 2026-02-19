@@ -90,6 +90,31 @@ describe('listSubjects', () => {
     expect(result[1].name).toBe('Science');
     expect(result[0].createdAt).toBe('2025-01-15T10:00:00.000Z');
   });
+
+  it('filters by active status by default', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      subjects: { findMany },
+    });
+    const db = createMockDb();
+    await listSubjects(db, profileId);
+
+    // Should pass a SQL where clause (not undefined)
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(findMany.mock.calls[0][0]).toBeDefined();
+  });
+
+  it('passes no status filter when includeInactive is true', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      subjects: { findMany },
+    });
+    const db = createMockDb();
+    await listSubjects(db, profileId, { includeInactive: true });
+
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(findMany.mock.calls[0][0]).toBeUndefined();
+  });
 });
 
 describe('createSubject', () => {

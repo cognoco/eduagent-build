@@ -36,10 +36,14 @@ function mapSubjectRow(row: typeof subjects.$inferSelect): Subject {
 
 export async function listSubjects(
   db: Database,
-  profileId: string
+  profileId: string,
+  options?: { includeInactive?: boolean }
 ): Promise<Subject[]> {
   const repo = createScopedRepository(db, profileId);
-  const rows = await repo.subjects.findMany();
+  const extraWhere = options?.includeInactive
+    ? undefined
+    : eq(subjects.status, 'active');
+  const rows = await repo.subjects.findMany(extraWhere);
   return rows.map(mapSubjectRow);
 }
 

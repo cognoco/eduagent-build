@@ -26,6 +26,7 @@ import type { Database } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';
 import {
   startSession,
+  SubjectInactiveError,
   getSession,
   processMessage,
   closeSession,
@@ -300,6 +301,50 @@ describe('startSession', () => {
         profileId,
       })
     );
+  });
+
+  it('throws SubjectInactiveError when subject is paused', async () => {
+    (getSubject as jest.Mock).mockResolvedValue({
+      id: subjectId,
+      profileId,
+      name: 'Mathematics',
+      status: 'paused',
+      createdAt: NOW.toISOString(),
+      updatedAt: NOW.toISOString(),
+    });
+    const db = createMockDb({ insertReturning: [mockSessionRow()] });
+
+    await expect(
+      startSession(db, profileId, subjectId, { subjectId })
+    ).rejects.toThrow(SubjectInactiveError);
+
+    await expect(
+      startSession(db, profileId, subjectId, { subjectId })
+    ).rejects.toThrow(/paused/);
+
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('throws SubjectInactiveError when subject is archived', async () => {
+    (getSubject as jest.Mock).mockResolvedValue({
+      id: subjectId,
+      profileId,
+      name: 'Mathematics',
+      status: 'archived',
+      createdAt: NOW.toISOString(),
+      updatedAt: NOW.toISOString(),
+    });
+    const db = createMockDb({ insertReturning: [mockSessionRow()] });
+
+    await expect(
+      startSession(db, profileId, subjectId, { subjectId })
+    ).rejects.toThrow(SubjectInactiveError);
+
+    await expect(
+      startSession(db, profileId, subjectId, { subjectId })
+    ).rejects.toThrow(/archived/);
+
+    expect(db.insert).not.toHaveBeenCalled();
   });
 });
 
