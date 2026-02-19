@@ -54,6 +54,7 @@ type Bindings = {
   STRIPE_PRICE_PRO_YEARLY?: string;
   STRIPE_CUSTOMER_PORTAL_URL?: string;
   SUBSCRIPTION_KV?: KVNamespace;
+  VOYAGE_API_KEY?: string;
 };
 
 type Variables = {

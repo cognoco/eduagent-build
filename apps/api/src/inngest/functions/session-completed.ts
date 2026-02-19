@@ -1,5 +1,5 @@
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, getStepVoyageApiKey } from '../helpers';
 import {
   updateRetentionFromSession,
   updateNeedsDeepeningProgress,
@@ -80,13 +80,15 @@ export const sessionCompleted = inngest.createFunction(
     // Step 4: Generate and store session embedding
     await step.run('generate-embeddings', async () => {
       const db = getStepDatabase();
+      const voyageApiKey = getStepVoyageApiKey();
       const content = await extractSessionContent(db, sessionId, profileId);
       await storeSessionEmbedding(
         db,
         sessionId,
         profileId,
         topicId ?? null,
-        content
+        content,
+        voyageApiKey
       );
     });
 

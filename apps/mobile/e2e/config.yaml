@@ -1,3 +1,8 @@
 # Maestro E2E Configuration
 # See: https://maestro.mobile.dev/reference/configuration
-appId: com.eduagent.mobile
+
+appId: com.zwizzly.eduagent
+
+# Default timeout for element lookups (milliseconds).
+# Increased from Maestro default (5s) to handle Expo dev build startup.
+defaultTimeout: 10000

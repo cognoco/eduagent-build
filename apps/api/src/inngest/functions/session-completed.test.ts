@@ -132,10 +132,12 @@ describe('sessionCompleted', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
+    process.env['VOYAGE_API_KEY'] = 'pa-test-key-123';
   });
 
   afterEach(() => {
     delete process.env['DATABASE_URL'];
+    delete process.env['VOYAGE_API_KEY'];
   });
 
   it('should be defined as an Inngest function', () => {
@@ -305,7 +307,7 @@ describe('sessionCompleted', () => {
       );
     });
 
-    it('calls storeSessionEmbedding with extracted content', async () => {
+    it('calls storeSessionEmbedding with extracted content and API key', async () => {
       await executeSteps(createEventData());
 
       expect(mockStoreSessionEmbedding).toHaveBeenCalledWith(
@@ -313,7 +315,8 @@ describe('sessionCompleted', () => {
         'session-001',
         'profile-001',
         'topic-001',
-        'User: What is algebra?\n\nAI: Algebra is...'
+        'User: What is algebra?\n\nAI: Algebra is...',
+        'pa-test-key-123'
       );
     });
   });

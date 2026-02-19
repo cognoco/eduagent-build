@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
-// Embedding Service Stub — Stories 2.11/3.10
+// Embedding Service — Stories 2.11/3.10
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
-// TODO: Replace with actual provider call after embedding spike decision.
+// Provider: Voyage AI voyage-3.5 (1024 dimensions)
 // ---------------------------------------------------------------------------
 
 import { eq, and } from 'drizzle-orm';
@@ -29,12 +29,15 @@ export interface EmbeddingConfig {
 // Configuration
 // ---------------------------------------------------------------------------
 
-/** Stub config — to be replaced with actual decision from embedding spike */
+/** Voyage AI voyage-3.5 — 1024-dimensional embeddings */
 const EMBEDDING_CONFIG: EmbeddingConfig = {
-  model: 'text-embedding-3-small',
-  provider: 'openai',
-  dimensions: 1536,
+  model: 'voyage-3.5',
+  provider: 'voyage',
+  dimensions: 1024,
 };
+
+/** Voyage AI API endpoint */
+const VOYAGE_API_URL = 'https://api.voyageai.com/v1/embeddings';
 
 // ---------------------------------------------------------------------------
 // Core functions
@@ -42,34 +45,60 @@ const EMBEDDING_CONFIG: EmbeddingConfig = {
 
 /**
  * Returns the current embedding configuration.
- *
- * TODO: Replace with actual decision from embedding spike.
  */
 export function getEmbeddingConfig(): EmbeddingConfig {
   return { ...EMBEDDING_CONFIG };
 }
 
 /**
- * Generates an embedding vector for the given text.
+ * Voyage AI API response shape (only the fields we use).
+ */
+interface VoyageEmbeddingResponse {
+  data: Array<{ embedding: number[] }>;
+  model: string;
+  usage: { total_tokens: number };
+}
+
+/**
+ * Generates an embedding vector for the given text using Voyage AI.
  *
- * Currently returns a mock embedding (array of zeros) of the configured
- * dimensions. This stub preserves the interface contract so that
- * downstream code can be built and tested before the actual embedding
- * provider is integrated.
- *
- * TODO: Replace with actual provider call.
+ * Calls the Voyage AI REST API with the configured model. The API key
+ * is passed as a parameter so the service layer stays decoupled from
+ * Hono env bindings.
  */
 export async function generateEmbedding(
-  text: string
+  text: string,
+  apiKey: string
 ): Promise<EmbeddingResult> {
   const config = getEmbeddingConfig();
 
-  // Mock: return a zero vector of the configured dimensions
-  const vector = new Array<number>(config.dimensions).fill(0);
+  const response = await fetch(VOYAGE_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      input: [text],
+      model: config.model,
+      input_type: 'document',
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(
+      `Voyage AI embedding request failed (${response.status}): ${body}`
+    );
+  }
+
+  const json = (await response.json()) as VoyageEmbeddingResponse;
+
+  const vector = json.data[0].embedding;
 
   return {
     vector,
-    dimensions: config.dimensions,
+    dimensions: vector.length,
     model: config.model,
     provider: config.provider,
   };
@@ -135,9 +164,10 @@ export async function storeSessionEmbedding(
   sessionId: string,
   profileId: string,
   topicId: string | null,
-  content: string
+  content: string,
+  apiKey: string
 ): Promise<void> {
-  const result = await generateEmbedding(content);
+  const result = await generateEmbedding(content, apiKey);
   await storeEmbedding(db, {
     sessionId,
     profileId,

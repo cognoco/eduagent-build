@@ -22,6 +22,9 @@ const envSchema = z.object({
   STRIPE_PRICE_PRO_MONTHLY: z.string().min(1).optional(),
   STRIPE_PRICE_PRO_YEARLY: z.string().min(1).optional(),
   STRIPE_CUSTOMER_PORTAL_URL: z.string().url().optional(),
+
+  // Voyage AI — embedding provider
+  VOYAGE_API_KEY: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

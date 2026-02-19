@@ -1,0 +1,35 @@
+# Flow 1: App Launch & Auth Gate
+# Validates: app starts, root layout renders, unauthenticated user
+# sees the sign-in screen (Clerk auth redirect).
+# Tags: smoke
+#
+# This is the most basic sanity check -- does the app boot and
+# show the expected entry point for a logged-out user?
+appId: com.zwizzly.eduagent
+tags:
+  - smoke
+---
+- launchApp:
+    clearState: true
+
+# The auth layout redirects unauthenticated users to sign-in.
+# Assert that the sign-in screen headline is visible.
+- assertVisible:
+    text: "Welcome back"
+    timeout: 15000
+
+# Verify key sign-in elements are present
+- assertVisible: "Sign in to continue learning"
+- assertVisible:
+    id: "google-sso-button"
+- assertVisible:
+    id: "sign-in-email"
+- assertVisible:
+    id: "sign-in-password"
+- assertVisible:
+    id: "sign-in-button"
+
+# Verify navigation to sign-up is available
+- assertVisible: "Sign up"
+
+- takeScreenshot: app-launch-auth-gate

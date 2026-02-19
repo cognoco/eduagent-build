@@ -48,3 +48,37 @@ export function getStepDatabase(): Database {
   _cachedDbUrl = url;
   return _cachedDb;
 }
+
+// ---------------------------------------------------------------------------
+// Module-level VOYAGE_API_KEY — set by Inngest middleware on CF Workers,
+// falls back to process.env for Node.js test environments.
+// ---------------------------------------------------------------------------
+
+let _voyageApiKey: string | undefined;
+
+/** Called by Inngest middleware to inject the VOYAGE_API_KEY binding. */
+export function setVoyageApiKey(key: string): void {
+  _voyageApiKey = key;
+}
+
+/** Reset the injected key — for test cleanup only. */
+export function resetVoyageApiKey(): void {
+  _voyageApiKey = undefined;
+}
+
+/**
+ * Returns the Voyage API key for use within Inngest step functions.
+ *
+ * Prefers the key injected via {@link setVoyageApiKey} (set by middleware on
+ * CF Workers). Falls back to `process.env['VOYAGE_API_KEY']` so tests running
+ * in Node.js keep working without middleware.
+ */
+export function getStepVoyageApiKey(): string {
+  const key = _voyageApiKey ?? process.env['VOYAGE_API_KEY'];
+  if (!key) {
+    throw new Error(
+      'VOYAGE_API_KEY not available — ensure Inngest middleware provides env bindings'
+    );
+  }
+  return key;
+}

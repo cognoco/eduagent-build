@@ -1,19 +1,67 @@
-# Smoke test: Create a subject and start onboarding interview
+# Flow 2: Create Subject & Start Onboarding Interview
+# Validates: authenticated home screen renders, subject creation modal,
+# form input, navigation to interview chat screen.
 # Tags: smoke, onboarding
-# Prerequisites: User is logged in, no subjects yet
-appId: com.eduagent.mobile
+#
+# Prerequisites:
+#   - User is signed in (either via test account or prior sign-in flow)
+#   - API is running and reachable
+#
+# NOTE: This flow assumes the user is already authenticated.
+# In a real CI setup, a _setup/ flow or test seeding endpoint would
+# handle sign-in before this flow runs.
+appId: com.zwizzly.eduagent
 tags:
   - smoke
   - onboarding
 ---
 - launchApp
-- assertVisible: "Ready to learn"
-- tapOn: "Add subject"
-- assertVisible: "New subject"
+
+# Assert home screen is visible (authenticated state).
+# The home screen shows "Ready to learn" as the main heading.
+- assertVisible:
+    text: "Ready to learn"
+    timeout: 15000
+
+# The home screen should show the subjects section
+- assertVisible: "Your subjects"
+
+# Tap "Add subject" button (testID: add-subject-button)
+# There are two instances (with subjects / empty state) but both
+# have the same testID and label text.
+- tapOn:
+    id: "add-subject-button"
+
+# The create-subject modal should appear
+- assertVisible:
+    text: "New subject"
+    timeout: 5000
+
+# Verify the instructional text is shown
+- assertVisible: "What would you like to learn?"
+
+# Type a subject name into the input (testID: create-subject-name)
 - tapOn:
     id: "create-subject-name"
-- inputText: "Mathematics"
-- tapOn: "Start Learning"
+- inputText: "World History"
+
+# Tap the submit button (testID: create-subject-submit, label: "Start Learning")
+- tapOn:
+    id: "create-subject-submit"
+
+# The app should navigate to the interview screen.
+# The ChatShell title will contain "Interview:" prefix.
 - assertVisible:
     text: "Interview"
+    timeout: 10000
+
+# The opening AI message should be visible in the chat
+- assertVisible:
+    text: "learning coach"
     timeout: 5000
+
+# Verify the chat input is available (testID: chat-input)
+- assertVisible:
+    id: "chat-input"
+
+- takeScreenshot: create-subject-interview

@@ -5,10 +5,10 @@ import { learningSessions } from './sessions.js';
 import { curriculumTopics } from './subjects.js';
 import { generateUUIDv7 } from '../utils/uuid.js';
 
-/** Custom pgvector type for Drizzle ORM — 1536 dimensions (OpenAI text-embedding-3-small) */
+/** Custom pgvector type for Drizzle ORM — 1024 dimensions (Voyage AI voyage-3.5) */
 const vector = customType<{ data: number[]; driverData: string }>({
   dataType() {
-    return 'vector(1536)';
+    return 'vector(1024)';
   },
   toDriver(value: number[]): string {
     return `[${value.join(',')}]`;
