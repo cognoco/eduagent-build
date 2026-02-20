@@ -35,7 +35,7 @@ jest.mock('../services/progress', () => ({
   getContinueSuggestion: jest.fn(),
 }));
 
-import app from '../index';
+import { app } from '../index';
 import {
   getSubjectProgress,
   getTopicProgress,

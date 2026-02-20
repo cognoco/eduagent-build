@@ -38,7 +38,7 @@ jest.mock('../services/parking-lot-data', () => ({
   }),
 }));
 
-import app from '../index';
+import { app } from '../index';
 import {
   getParkingLotItems,
   addParkingLotItem,

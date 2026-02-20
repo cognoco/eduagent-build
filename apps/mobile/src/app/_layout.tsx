@@ -11,6 +11,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeContext, useTokenVars, type Persona } from '../lib/theme';
 import { ProfileProvider, useProfile } from '../lib/profile';
 import { ErrorBoundary } from '../components/common';
+import { initSentry } from '../lib/sentry';
+
+// Initialize Sentry at module level — runs before any component renders
+initSentry();
 
 const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 

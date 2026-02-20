@@ -1,5 +1,10 @@
 import { Inngest, InngestMiddleware } from 'inngest';
-import { setDatabaseUrl, setVoyageApiKey } from './helpers';
+import {
+  setDatabaseUrl,
+  setVoyageApiKey,
+  setResendApiKey,
+  setEmailFrom,
+} from './helpers';
 
 /**
  * Middleware that captures Cloudflare Workers env bindings and injects
@@ -22,6 +27,12 @@ const envBindingMiddleware = new InngestMiddleware({
         }
         if (env && typeof env['VOYAGE_API_KEY'] === 'string') {
           setVoyageApiKey(env['VOYAGE_API_KEY']);
+        }
+        if (env && typeof env['RESEND_API_KEY'] === 'string') {
+          setResendApiKey(env['RESEND_API_KEY']);
+        }
+        if (env && typeof env['EMAIL_FROM'] === 'string') {
+          setEmailFrom(env['EMAIL_FROM']);
         }
         return {};
       },

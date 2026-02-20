@@ -193,7 +193,7 @@ jest.mock('../inngest/client', () => ({
 import { inngest } from '../inngest/client';
 import { processMessage, streamMessage } from '../services/session';
 import { shouldPromptCasualSwitch } from '../services/settings';
-import app from '../index';
+import { app } from '../index';
 
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',

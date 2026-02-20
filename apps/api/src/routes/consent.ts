@@ -8,7 +8,13 @@ import { notFound } from '../errors';
 import { inngest } from '../inngest/client';
 
 type ConsentRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string; APP_URL?: string };
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+    APP_URL?: string;
+    RESEND_API_KEY?: string;
+    EMAIL_FROM?: string;
+  };
   Variables: { user: AuthUser; db: Database };
 };
 
@@ -20,7 +26,10 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       const db = c.get('db');
       const input = c.req.valid('json');
       const appUrl = c.env.APP_URL ?? 'https://app.eduagent.com';
-      const consentState = await requestConsent(db, input, appUrl);
+      const consentState = await requestConsent(db, input, appUrl, {
+        resendApiKey: c.env.RESEND_API_KEY,
+        emailFrom: c.env.EMAIL_FROM,
+      });
 
       // Dispatch Inngest event for reminder workflow
       await inngest.send({

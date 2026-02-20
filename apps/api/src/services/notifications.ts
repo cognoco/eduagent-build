@@ -165,21 +165,66 @@ export interface EmailPayload {
     | 'consent_expired';
 }
 
+export interface EmailOptions {
+  resendApiKey?: string;
+  emailFrom?: string;
+}
+
 export interface EmailResult {
   sent: boolean;
   messageId?: string;
+  reason?: string;
 }
 
+const RESEND_API_URL = 'https://api.resend.com/emails';
+
 /**
- * Sends an email notification.
+ * Sends an email notification via the Resend API.
  *
- * TODO: Integrate email provider (Resend/SendGrid)
- * Currently returns a mock result.
+ * Uses pure fetch() — no SDK needed on Cloudflare Workers.
+ * Degrades gracefully when RESEND_API_KEY is not configured.
  */
-export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
-  void payload;
-  // TODO: Integrate email provider (Resend/SendGrid)
-  return { sent: true, messageId: 'mock-email-id' };
+export async function sendEmail(
+  payload: EmailPayload,
+  options?: EmailOptions
+): Promise<EmailResult> {
+  const apiKey = options?.resendApiKey;
+  if (!apiKey) {
+    console.warn('[email] RESEND_API_KEY not configured — skipping email send');
+    return { sent: false, reason: 'no_api_key' };
+  }
+
+  const from = options?.emailFrom ?? 'noreply@eduagent.com';
+
+  try {
+    const response = await fetch(RESEND_API_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [payload.to],
+        subject: payload.subject,
+        text: payload.body,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => 'unknown');
+      console.error(
+        `[email] Resend API error ${response.status}: ${errorBody}`
+      );
+      return { sent: false, reason: `resend_api_error_${response.status}` };
+    }
+
+    const result = (await response.json()) as { id?: string };
+    return { sent: true, messageId: result.id };
+  } catch {
+    console.error('[email] Network error sending email');
+    return { sent: false, reason: 'network_error' };
+  }
 }
 
 /**

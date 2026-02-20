@@ -39,7 +39,7 @@ jest.mock('../services/retention-data', () => ({
   deleteTeachingPreference: jest.fn(),
 }));
 
-import app from '../index';
+import { app } from '../index';
 import {
   getSubjectRetention,
   getTopicRetention,

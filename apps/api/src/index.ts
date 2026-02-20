@@ -1,7 +1,10 @@
 import { Hono } from 'hono';
+import * as Sentry from '@sentry/cloudflare';
 
 import { ERROR_CODES } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
+
+import { captureException } from './services/sentry';
 
 import { authMiddleware } from './middleware/auth';
 import { databaseMiddleware } from './middleware/database';
@@ -55,6 +58,10 @@ type Bindings = {
   STRIPE_CUSTOMER_PORTAL_URL?: string;
   SUBSCRIPTION_KV?: KVNamespace;
   VOYAGE_API_KEY?: string;
+  RESEND_API_KEY?: string;
+  EMAIL_FROM?: string;
+  SENTRY_DSN?: string;
+  COACHING_KV?: KVNamespace;
 };
 
 type Variables = {
@@ -132,6 +139,14 @@ app.route('/', routes);
 // Global error handler — catches unhandled exceptions and returns ApiErrorSchema envelope
 app.onError((err, c) => {
   console.error('[unhandled]', err);
+
+  // Report to Sentry with user/request context
+  captureException(err, {
+    userId: c.get('user')?.userId,
+    profileId: c.get('profileId'),
+    requestPath: c.req.path,
+  });
+
   return c.json(
     {
       code: ERROR_CODES.INTERNAL_ERROR,
@@ -146,5 +161,19 @@ app.onError((err, c) => {
 
 export type AppType = typeof routes;
 
-// Default export required by Cloudflare Workers
-export default app;
+// Named export for tests — the raw Hono app with `.request()` method.
+export { app };
+
+// Default export — wrapped with Sentry for error tracking on Cloudflare Workers.
+// withSentry() initializes the SDK per-request using env bindings.
+// When SENTRY_DSN is not set, the SDK no-ops gracefully.
+export default Sentry.withSentry(
+  (env) => ({
+    dsn: (env as unknown as Bindings).SENTRY_DSN,
+    tracesSampleRate:
+      (env as unknown as Bindings).ENVIRONMENT === 'production' ? 0.1 : 1.0,
+  }),
+  // Hono's app.fetch signature is compatible but not structurally identical
+  // to ExportedHandler — cast via unknown to bridge the gap.
+  { fetch: app.fetch } as unknown as ExportedHandler
+);

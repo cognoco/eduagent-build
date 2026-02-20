@@ -81,7 +81,7 @@ jest.mock('../services/interview', () => ({
   persistCurriculum: jest.fn().mockResolvedValue(undefined),
 }));
 
-import app from '../index';
+import { app } from '../index';
 import { getSubject } from '../services/subject';
 import {
   processInterviewExchange,

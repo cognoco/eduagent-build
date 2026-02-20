@@ -11,3 +11,13 @@ ENVIRONMENT = "development"
 #   CLERK_SECRET_KEY
 #   CLERK_PUBLISHABLE_KEY
 #   CLERK_JWKS_URL
+#   RESEND_API_KEY
+#   SENTRY_DSN
+
+# KV Namespaces
+# Create with: wrangler kv namespace create SUBSCRIPTION_KV
+# Then paste the returned id below.
+[[kv_namespaces]]
+binding = "SUBSCRIPTION_KV"
+id = "PLACEHOLDER_SUBSCRIPTION_KV_ID"
+preview_id = "PLACEHOLDER_SUBSCRIPTION_KV_PREVIEW_ID"

@@ -25,6 +25,13 @@ const envSchema = z.object({
 
   // Voyage AI — embedding provider
   VOYAGE_API_KEY: z.string().min(1).optional(),
+
+  // Resend — transactional email
+  RESEND_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM: z.string().email().default('noreply@eduagent.com'),
+
+  // Sentry — error tracking
+  SENTRY_DSN: z.string().url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

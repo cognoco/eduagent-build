@@ -10,7 +10,11 @@ import type {
   ConsentStatus,
   ConsentRequest,
 } from '@eduagent/schemas';
-import { sendEmail, formatConsentRequestEmail } from './notifications';
+import {
+  sendEmail,
+  formatConsentRequestEmail,
+  type EmailOptions,
+} from './notifications';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -87,7 +91,8 @@ export function checkConsentRequired(
 export async function requestConsent(
   db: Database,
   input: ConsentRequest,
-  appUrl: string
+  appUrl: string,
+  emailOptions?: EmailOptions
 ): Promise<ConsentState> {
   const token = crypto.randomUUID();
 
@@ -110,7 +115,8 @@ export async function requestConsent(
       'your child', // TODO: Look up child's display name from profileId
       input.consentType,
       tokenUrl
-    )
+    ),
+    emailOptions
   );
 
   return mapConsentRow(row);
