@@ -186,26 +186,47 @@ export default function HomeScreen() {
             <>
               {subjects.map(
                 (subject: { id: string; name: string; status: string }) => (
-                  <Pressable
+                  <View
                     key={subject.id}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(learner)/onboarding/curriculum-review',
-                        params: { subjectId: subject.id },
-                      } as never)
-                    }
-                    className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
-                    accessibilityLabel={`Open ${subject.name}`}
-                    accessibilityRole="button"
-                    testID={`home-subject-${subject.id}`}
+                    className="flex-row items-center bg-surface rounded-card px-4 py-3 mb-2"
                   >
-                    <Text className="text-body font-medium text-text-primary">
-                      {subject.name}
-                    </Text>
-                    <RetentionSignal
-                      status={subjectRetention.get(subject.id) ?? 'strong'}
-                    />
-                  </Pressable>
+                    <Pressable
+                      onPress={() =>
+                        router.push({
+                          pathname: '/(learner)/onboarding/curriculum-review',
+                          params: { subjectId: subject.id },
+                        } as never)
+                      }
+                      className="flex-1 flex-row items-center justify-between"
+                      accessibilityLabel={`Open ${subject.name}`}
+                      accessibilityRole="button"
+                      testID={`home-subject-${subject.id}`}
+                    >
+                      <Text className="text-body font-medium text-text-primary">
+                        {subject.name}
+                      </Text>
+                      <RetentionSignal
+                        status={subjectRetention.get(subject.id) ?? 'strong'}
+                      />
+                    </Pressable>
+                    <Pressable
+                      onPress={() =>
+                        router.push({
+                          pathname: '/(learner)/homework/camera',
+                          params: {
+                            subjectId: subject.id,
+                            subjectName: subject.name,
+                          },
+                        } as never)
+                      }
+                      className="ml-3 bg-primary/10 rounded-button min-w-[40px] min-h-[40px] items-center justify-center"
+                      accessibilityLabel={`Homework help for ${subject.name}`}
+                      accessibilityRole="button"
+                      testID={`homework-button-${subject.id}`}
+                    >
+                      <Text className="text-primary text-body">HW</Text>
+                    </Pressable>
+                  </View>
                 )
               )}
               <Pressable

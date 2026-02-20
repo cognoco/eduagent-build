@@ -36,18 +36,21 @@ export default function SessionScreen() {
     subjectName,
     sessionId: routeSessionId,
     topicId,
+    problemText,
   } = useLocalSearchParams<{
     mode?: string;
     subjectId?: string;
     subjectName?: string;
     sessionId?: string;
     topicId?: string;
+    problemText?: string;
   }>();
   const router = useRouter();
 
   const effectiveMode = mode ?? 'freeform';
-  const openingContent =
-    OPENING_MESSAGES[effectiveMode] ?? OPENING_MESSAGES.freeform;
+  const openingContent = problemText
+    ? "Got it. Let's work through this together."
+    : OPENING_MESSAGES[effectiveMode] ?? OPENING_MESSAGES.freeform;
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'opening', role: 'ai', content: openingContent },
@@ -153,6 +156,18 @@ export default function SessionScreen() {
     },
     [isStreaming, ensureSession, streamMessage]
   );
+
+  const hasAutoSentRef = useRef(false);
+
+  useEffect(() => {
+    if (problemText && !hasAutoSentRef.current) {
+      hasAutoSentRef.current = true;
+      const timer = setTimeout(() => {
+        handleSend(problemText);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [problemText, handleSend]);
 
   const handleEndSession = useCallback(async () => {
     if (!activeSessionId || isClosing) return;
