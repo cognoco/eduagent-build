@@ -133,6 +133,7 @@ export default function ForgotPasswordScreen() {
               editable={!loading}
               testID="reset-new-password"
               showRequirements
+              onSubmitEditing={onResetPress}
             />
           </View>
 

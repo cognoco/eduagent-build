@@ -139,7 +139,12 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 - SSE streaming: mobile SSE client + `useStreamMessage` hook for learning/homework sessions
 **Remaining stub routes (mock data):** progress, retention, streaks, settings, dashboard (real data), parking-lot, homework, billing, stripe-webhook.
 
-**Not yet integrated:** Stripe payments, email provider (Resend/SendGrid), Expo Push notifications, real embedding vectors (pgvector), OCR provider.
+**Not yet integrated:** Stripe payments, Expo Push notifications, real embedding vectors (pgvector), OCR provider.
+
+**Pre-launch configuration (not code):**
+- [ ] Clerk: configure custom email domain (SPF/DKIM/DMARC) so verification/consent emails don't land in spam
+- [ ] Sentry: create projects + set `SENTRY_DSN` secrets for API and mobile
+- [ ] Resend: set `RESEND_API_KEY` secret, verify sending domain
 
 ## Required Reading (before any implementation work)
 

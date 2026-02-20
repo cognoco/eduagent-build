@@ -192,6 +192,7 @@ export default function SignInScreen() {
             placeholder="Enter your password"
             editable={!loading}
             testID="sign-in-password"
+            onSubmitEditing={onSignInPress}
           />
         </View>
 

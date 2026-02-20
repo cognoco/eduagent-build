@@ -203,6 +203,7 @@ export default function SignUpScreen() {
             editable={!loading}
             testID="sign-up-password"
             showRequirements
+            onSubmitEditing={onSignUpPress}
           />
         </View>
 

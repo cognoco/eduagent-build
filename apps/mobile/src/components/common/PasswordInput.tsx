@@ -10,6 +10,8 @@ interface PasswordInputProps {
   testID?: string;
   /** Show "At least 8 characters" hint below the input */
   showRequirements?: boolean;
+  /** Called when Enter/Return is pressed (e.g. to submit the form) */
+  onSubmitEditing?: () => void;
 }
 
 export function PasswordInput({
@@ -19,6 +21,7 @@ export function PasswordInput({
   editable = true,
   testID,
   showRequirements = false,
+  onSubmitEditing,
 }: PasswordInputProps) {
   const colors = useThemeColors();
   const [visible, setVisible] = useState(false);
@@ -38,6 +41,8 @@ export function PasswordInput({
           editable={editable}
           autoCapitalize="none"
           autoComplete="password"
+          returnKeyType={onSubmitEditing ? 'go' : 'default'}
+          onSubmitEditing={onSubmitEditing}
           testID={testID}
         />
         <Pressable
