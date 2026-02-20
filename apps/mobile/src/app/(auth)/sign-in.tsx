@@ -33,6 +33,7 @@ export default function SignInScreen() {
   const { startSSOFlow: startAppleSSO } = useSSO();
 
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     void WebBrowser.warmUpAsync();
     return () => {
       void WebBrowser.coolDownAsync();
