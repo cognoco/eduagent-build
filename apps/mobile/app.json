@@ -34,7 +34,13 @@
           "backgroundColor": "#0f0f0f"
         }
       ],
-      ["expo-router", { "root": "./src/app" }]
+      ["expo-router", { "root": "./src/app" }],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "EduAgent needs camera access to photograph your homework."
+        }
+      ]
     ],
     "extra": {
       "eas": {

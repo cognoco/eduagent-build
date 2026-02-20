@@ -97,6 +97,13 @@ export default function LearnerLayout() {
             href: null,
           }}
         />
+        <Tabs.Screen
+          name="homework"
+          options={{
+            href: null,
+            tabBarStyle: { display: 'none' },
+          }}
+        />
       </Tabs>
     </View>
   );
