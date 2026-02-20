@@ -167,6 +167,7 @@ export default function SessionScreen() {
       }, 500);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [problemText, handleSend]);
 
   const handleEndSession = useCallback(async () => {
