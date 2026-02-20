@@ -18,9 +18,10 @@ jest.mock('expo-image-manipulator', () => ({
 }));
 
 // Mock expo-file-system
+const mockCopyAsync = jest.fn().mockResolvedValue(undefined);
 jest.mock('expo-file-system', () => ({
   cacheDirectory: 'file:///cache/',
-  copyAsync: jest.fn().mockResolvedValue(undefined),
+  copyAsync: (...args: unknown[]) => mockCopyAsync(...args),
 }));
 
 beforeEach(() => {
@@ -51,7 +52,7 @@ describe('useHomeworkOcr', () => {
     expect(result.current.failCount).toBe(0);
   });
 
-  it('resizes image to 1024px width before OCR', async () => {
+  it('copies image to stable cache path before processing', async () => {
     mockRecognize.mockResolvedValue({ text: 'some text' });
 
     const { result } = renderHook(() => useHomeworkOcr());
@@ -60,8 +61,24 @@ describe('useHomeworkOcr', () => {
       await result.current.process('file:///tmp/photo.jpg');
     });
 
+    expect(mockCopyAsync).toHaveBeenCalledWith({
+      from: 'file:///tmp/photo.jpg',
+      to: expect.stringMatching(/^file:\/\/\/cache\/homework-\d+\.jpg$/),
+    });
+  });
+
+  it('resizes cached image to 1024px width before OCR', async () => {
+    mockRecognize.mockResolvedValue({ text: 'some text' });
+
+    const { result } = renderHook(() => useHomeworkOcr());
+
+    await act(async () => {
+      await result.current.process('file:///tmp/photo.jpg');
+    });
+
+    // Verify resize receives the cached URI (not the original temp URI)
     expect(mockManipulateAsync).toHaveBeenCalledWith(
-      expect.any(String),
+      expect.stringMatching(/^file:\/\/\/cache\/homework-\d+\.jpg$/),
       [{ resize: { width: 1024 } }],
       { format: 'jpeg', compress: 0.8 }
     );

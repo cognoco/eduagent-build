@@ -125,6 +125,17 @@ describe('cameraReducer', () => {
     expect(state.errorMessage).toBeNull();
   });
 
+  it('allows RETAKE from preview state', () => {
+    const preview: CameraState = {
+      ...initialCameraState,
+      phase: 'preview',
+      imageUri: 'file:///cache/homework-123.jpg',
+    };
+    const state = cameraReducer(preview, { type: 'RETAKE' });
+    expect(state.phase).toBe('viewfinder');
+    expect(state.imageUri).toBeNull();
+  });
+
   it('allows RETAKE from result state', () => {
     const result: CameraState = {
       ...initialCameraState,

@@ -1,10 +1,13 @@
 import { useReducer, useRef, useEffect, useState, useCallback } from 'react';
-import { View, Text, Pressable, TextInput } from 'react-native';
+import { View, Text, Pressable, TextInput, Linking } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useThemeColors } from '../../../lib/theme';
 import { cameraReducer, initialCameraState } from './camera-reducer';
 import { useHomeworkOcr } from '../../../hooks/use-homework-ocr';
+
+type FlashMode = 'off' | 'on' | 'auto';
 
 export default function CameraScreen(): React.ReactNode {
   const router = useRouter();
@@ -13,6 +16,7 @@ export default function CameraScreen(): React.ReactNode {
     subjectName: string;
   }>();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
 
   const [permission, requestPermission] = useCameraPermissions();
   const [state, dispatch] = useReducer(cameraReducer, initialCameraState);
@@ -21,6 +25,7 @@ export default function CameraScreen(): React.ReactNode {
 
   const [editedText, setEditedText] = useState('');
   const [manualText, setManualText] = useState('');
+  const [flash, setFlash] = useState<FlashMode>('off');
 
   // Sync permission state into reducer
   useEffect(() => {
@@ -69,7 +74,7 @@ export default function CameraScreen(): React.ReactNode {
         subjectId: subjectId ?? '',
         subjectName: subjectName ?? '',
         problemText: editedText,
-        imageUri: state.imageUri ?? '',
+        imageUri: state.imageUri ?? undefined,
       },
     } as never);
   }, [router, subjectId, subjectName, editedText, state.imageUri]);
@@ -82,17 +87,22 @@ export default function CameraScreen(): React.ReactNode {
         subjectId: subjectId ?? '',
         subjectName: subjectName ?? '',
         problemText: manualText,
-        imageUri: state.imageUri ?? '',
       },
     } as never);
-  }, [router, subjectId, subjectName, manualText, state.imageUri]);
+  }, [router, subjectId, subjectName, manualText]);
 
   const handleClose = useCallback(() => {
     router.back();
   }, [router]);
 
+  const toggleFlash = useCallback(() => {
+    setFlash((prev) => (prev === 'off' ? 'on' : 'off'));
+  }, []);
+
   // ---- Permission phase ----
   if (state.phase === 'permission') {
+    const denied = permission && !permission.granted && !permission.canAskAgain;
+
     return (
       <View
         className="flex-1 bg-background items-center justify-center px-8"
@@ -102,20 +112,35 @@ export default function CameraScreen(): React.ReactNode {
           Camera Access Needed
         </Text>
         <Text className="text-body text-text-secondary text-center mb-8">
-          We need your camera to photograph homework problems so your AI tutor
-          can help you work through them step by step.
+          {denied
+            ? 'Camera access was denied. You can enable it in your device settings to photograph homework problems.'
+            : 'We need your camera to photograph homework problems so your AI tutor can help you work through them step by step.'}
         </Text>
-        <Pressable
-          testID="grant-permission-button"
-          onPress={requestPermission}
-          className="bg-primary rounded-button py-4 px-8 min-h-[48px] items-center justify-center"
-          accessibilityLabel="Allow camera access"
-          accessibilityRole="button"
-        >
-          <Text className="text-text-inverse text-body font-semibold">
-            Allow Camera
-          </Text>
-        </Pressable>
+        {denied ? (
+          <Pressable
+            testID="open-settings-button"
+            onPress={() => Linking.openSettings()}
+            className="bg-primary rounded-button py-4 px-8 min-h-[48px] items-center justify-center"
+            accessibilityLabel="Open device settings"
+            accessibilityRole="button"
+          >
+            <Text className="text-text-inverse text-body font-semibold">
+              Open Settings
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            testID="grant-permission-button"
+            onPress={requestPermission}
+            className="bg-primary rounded-button py-4 px-8 min-h-[48px] items-center justify-center"
+            accessibilityLabel="Allow camera access"
+            accessibilityRole="button"
+          >
+            <Text className="text-text-inverse text-body font-semibold">
+              Allow Camera
+            </Text>
+          </Pressable>
+        )}
         <Pressable
           testID="close-button"
           onPress={handleClose}
@@ -138,8 +163,9 @@ export default function CameraScreen(): React.ReactNode {
           testID="camera-view"
           style={{ flex: 1 }}
           facing="back"
+          flash={flash}
         >
-          {/* Close button */}
+          {/* Close button — top-left (standard camera app convention) */}
           <Pressable
             testID="close-button"
             onPress={handleClose}
@@ -153,14 +179,30 @@ export default function CameraScreen(): React.ReactNode {
 
           {/* Capture guide overlay */}
           <View className="flex-1 items-center justify-center px-6">
-            <View className="w-full aspect-[4/3] border-2 border-dashed border-white/60 rounded-card" />
+            <View className="w-full aspect-[4/3] border-2 border-dashed border-primary/60 rounded-card items-center justify-center">
+              <Text className="text-white/70 text-body-sm text-center">
+                Center your homework
+              </Text>
+            </View>
           </View>
 
-          {/* Capture button */}
+          {/* Bottom controls: flash toggle + capture button */}
           <View
-            className="items-center pb-4"
+            className="flex-row items-center justify-center px-8 pb-4"
             style={{ paddingBottom: insets.bottom + 16 }}
           >
+            <Pressable
+              testID="flash-toggle"
+              onPress={toggleFlash}
+              className="absolute left-8 w-12 h-12 items-center justify-center rounded-full bg-black/40"
+              accessibilityLabel={`Flash ${flash === 'off' ? 'off' : 'on'}`}
+              accessibilityRole="button"
+            >
+              <Text className="text-white text-body">
+                {flash === 'off' ? '⚡' : '⚡✓'}
+              </Text>
+            </Pressable>
+
             <Pressable
               testID="capture-button"
               onPress={handleCapture}
@@ -228,12 +270,13 @@ export default function CameraScreen(): React.ReactNode {
         <View className="w-full">
           <View className="w-full aspect-[4/3] bg-surface/50 rounded-card mb-6" />
           <View className="gap-3 px-2">
-            <View className="h-4 bg-surface rounded-full w-full" />
-            <View className="h-4 bg-surface rounded-full w-4/5" />
-            <View className="h-4 bg-surface rounded-full w-3/5" />
+            <View className="h-4 bg-surface-elevated rounded-full w-full" />
+            <View className="h-4 bg-surface-elevated rounded-full w-4/5" />
+            <View className="h-4 bg-surface-elevated rounded-full w-3/5" />
           </View>
           <Text className="text-body text-text-secondary text-center mt-6">
-            Reading your {subjectName ?? 'homework'}...
+            Reading your {subjectName ? `${subjectName} homework` : 'homework'}
+            ...
           </Text>
         </View>
       </View>
@@ -248,16 +291,16 @@ export default function CameraScreen(): React.ReactNode {
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       >
         <Pressable
-          testID="close-button"
+          testID="back-button"
           onPress={handleClose}
-          className="self-start w-12 h-12 items-center justify-center mt-2"
-          accessibilityLabel="Close"
+          className="self-start min-h-[48px] items-center justify-center mt-2"
+          accessibilityLabel="Go back"
           accessibilityRole="button"
         >
-          <Text className="text-h3 font-bold text-text-primary">X</Text>
+          <Text className="text-body font-medium text-primary">← Back</Text>
         </Pressable>
 
-        <Text className="text-h3 font-semibold text-text-primary mt-4 mb-3">
+        <Text className="text-body text-text-secondary mt-4 mb-3">
           Here&apos;s what I see:
         </Text>
 
@@ -268,6 +311,7 @@ export default function CameraScreen(): React.ReactNode {
           multiline
           className="bg-surface rounded-card p-4 text-body text-text-primary min-h-[120px]"
           textAlignVertical="top"
+          placeholderTextColor={colors.muted}
           accessibilityLabel="Recognized text, editable"
         />
 
@@ -320,20 +364,23 @@ export default function CameraScreen(): React.ReactNode {
 
         <View className="flex-1 justify-center">
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-            {state.errorMessage ?? 'Something went wrong'}
+            {showManualFallback
+              ? "Hmm, I'm having trouble reading that"
+              : state.errorMessage ?? 'Something went wrong'}
           </Text>
 
           {showManualFallback ? (
             <View className="mt-6">
               <Text className="text-body text-text-secondary text-center mb-4">
-                No worries -- you can type it out instead
+                Want to type it out instead?
               </Text>
               <TextInput
                 testID="manual-input"
                 value={manualText}
                 onChangeText={setManualText}
                 multiline
-                placeholder="Type or paste your problem here..."
+                placeholder="Type your problem here..."
+                placeholderTextColor={colors.muted}
                 className="bg-surface rounded-card p-4 text-body text-text-primary min-h-[120px] mb-4"
                 textAlignVertical="top"
                 accessibilityLabel="Type your problem manually"
@@ -356,7 +403,7 @@ export default function CameraScreen(): React.ReactNode {
                         : 'text-text-secondary'
                     }`}
                   >
-                    Continue
+                    Continue →
                   </Text>
                 </Pressable>
                 <Pressable
