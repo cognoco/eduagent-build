@@ -14,6 +14,7 @@ import { Link, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
+import { PasswordInput } from '../../components/common';
 
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -29,7 +30,7 @@ export default function SignUpScreen() {
   const [loading, setLoading] = useState(false);
 
   const canSubmitSignUp =
-    emailAddress.trim() !== '' && password !== '' && !loading;
+    emailAddress.trim() !== '' && password.length >= 8 && !loading;
   const canSubmitCode = code.trim() !== '' && !loading;
 
   const onSignUpPress = useCallback(async () => {
@@ -194,16 +195,16 @@ export default function SignUpScreen() {
         <Text className="text-body-sm font-semibold text-text-secondary mb-1">
           Password
         </Text>
-        <TextInput
-          className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
-          secureTextEntry
-          placeholder="Create a password"
-          placeholderTextColor={colors.muted}
-          value={password}
-          onChangeText={setPassword}
-          editable={!loading}
-          testID="sign-up-password"
-        />
+        <View className="mb-6">
+          <PasswordInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Create a password"
+            editable={!loading}
+            testID="sign-up-password"
+            showRequirements
+          />
+        </View>
 
         <Pressable
           onPress={onSignUpPress}

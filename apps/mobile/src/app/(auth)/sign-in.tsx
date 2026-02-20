@@ -16,6 +16,7 @@ import * as Linking from 'expo-linking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
+import { PasswordInput } from '../../components/common';
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -184,16 +185,15 @@ export default function SignInScreen() {
         <Text className="text-body-sm font-semibold text-text-secondary mb-1">
           Password
         </Text>
-        <TextInput
-          className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-2"
-          secureTextEntry
-          placeholder="Enter your password"
-          placeholderTextColor={colors.muted}
-          value={password}
-          onChangeText={setPassword}
-          editable={!loading}
-          testID="sign-in-password"
-        />
+        <View className="mb-2">
+          <PasswordInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Enter your password"
+            editable={!loading}
+            testID="sign-in-password"
+          />
+        </View>
 
         <View className="items-end mb-4">
           <Link href="/(auth)/forgot-password" asChild>

@@ -161,9 +161,9 @@ export function ChatShell({
             value={input}
             onChangeText={setInput}
             onSubmitEditing={handleSend}
-            multiline
             maxLength={5000}
             returnKeyType="send"
+            blurOnSubmit={false}
             editable={!isStreaming}
             testID="chat-input"
             accessibilityLabel="Message input"

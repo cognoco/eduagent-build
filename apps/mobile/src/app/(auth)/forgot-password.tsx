@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
+import { PasswordInput } from '../../components/common';
 
 export default function ForgotPasswordScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -29,7 +30,8 @@ export default function ForgotPasswordScreen() {
   const [loading, setLoading] = useState(false);
 
   const canSubmitEmail = emailAddress.trim() !== '' && !loading;
-  const canSubmitReset = code.trim() !== '' && newPassword !== '' && !loading;
+  const canSubmitReset =
+    code.trim() !== '' && newPassword.length >= 8 && !loading;
 
   const onSendCodePress = useCallback(async () => {
     if (!isLoaded || !canSubmitEmail) return;
@@ -123,16 +125,16 @@ export default function ForgotPasswordScreen() {
           <Text className="text-body-sm font-semibold text-text-secondary mb-1">
             New password
           </Text>
-          <TextInput
-            className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
-            secureTextEntry
-            placeholder="Enter new password"
-            placeholderTextColor={colors.muted}
-            value={newPassword}
-            onChangeText={setNewPassword}
-            editable={!loading}
-            testID="reset-new-password"
-          />
+          <View className="mb-6">
+            <PasswordInput
+              value={newPassword}
+              onChangeText={setNewPassword}
+              placeholder="Enter new password"
+              editable={!loading}
+              testID="reset-new-password"
+              showRequirements
+            />
+          </View>
 
           <Pressable
             onPress={onResetPress}
