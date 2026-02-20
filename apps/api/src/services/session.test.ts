@@ -22,6 +22,11 @@ jest.mock('./subject', () => ({
   getSubject: jest.fn(),
 }));
 
+jest.mock('./prior-learning', () => ({
+  fetchPriorTopics: jest.fn(),
+  buildPriorLearningContext: jest.fn(),
+}));
+
 import type { Database } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';
 import {
@@ -38,6 +43,7 @@ import { processExchange } from './exchanges';
 import { evaluateEscalation } from './escalation';
 import { evaluateSummary } from './summaries';
 import { getSubject } from './subject';
+import { fetchPriorTopics, buildPriorLearningContext } from './prior-learning';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 const profileId = 'test-profile-id';
@@ -196,6 +202,13 @@ beforeEach(() => {
     feedback: 'Great summary! You captured the key concepts.',
     hasUnderstandingGaps: false,
     isAccepted: true,
+  });
+
+  (fetchPriorTopics as jest.Mock).mockResolvedValue([]);
+  (buildPriorLearningContext as jest.Mock).mockReturnValue({
+    contextText: '',
+    topicsIncluded: 0,
+    truncated: false,
   });
 });
 
@@ -743,6 +756,55 @@ describe('escalation tracking', () => {
           metadata: expect.objectContaining({ escalationRung: 1 }),
         }),
       ])
+    );
+  });
+
+  it('includes prior learning context when topics exist (FR40)', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    const priorTopics = [
+      {
+        topicId: 't1',
+        title: 'Algebra Basics',
+        summary: 'Variables and equations',
+        completedAt: '2025-01-10T00:00:00Z',
+      },
+    ];
+    (fetchPriorTopics as jest.Mock).mockResolvedValue(priorTopics);
+    (buildPriorLearningContext as jest.Mock).mockReturnValue({
+      contextText:
+        'Prior Learning Context — topics the learner has already completed:\n\n- Algebra Basics',
+      topicsIncluded: 1,
+      truncated: false,
+    });
+
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'Teach me quadratics',
+    });
+
+    expect(fetchPriorTopics).toHaveBeenCalledWith(db, profileId, subjectId);
+    expect(buildPriorLearningContext).toHaveBeenCalledWith(priorTopics);
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        priorLearningContext: expect.stringContaining('Prior Learning Context'),
+      }),
+      'Teach me quadratics'
+    );
+  });
+
+  it('omits prior learning context for new learners (FR40 empty state)', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    // Default mock: fetchPriorTopics returns [], buildPriorLearningContext returns empty
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'First lesson',
+    });
+
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        priorLearningContext: expect.any(String),
+      }),
+      'First lesson'
     );
   });
 });

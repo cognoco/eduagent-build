@@ -31,6 +31,8 @@ import {
 import { evaluateEscalation } from './escalation';
 import { evaluateSummary } from './summaries';
 import { getSubject } from './subject';
+import { fetchPriorTopics, buildPriorLearningContext } from './prior-learning';
+import { retrieveRelevantMemory } from './memory';
 import type { EscalationRung } from './llm';
 
 // ---------------------------------------------------------------------------
@@ -147,7 +149,8 @@ async function prepareExchangeContext(
   db: Database,
   profileId: string,
   sessionId: string,
-  userMessage: string
+  userMessage: string,
+  options?: { voyageApiKey?: string }
 ): Promise<ExchangePrep> {
   // 1. Load session
   const session = await getSession(db, profileId, sessionId);
@@ -156,37 +159,46 @@ async function prepareExchangeContext(
   }
 
   // 2. Load all supplementary data in parallel (all independent after session load)
-  const [subject, topicRows, profileRows, retentionRows, events] =
-    await Promise.all([
-      getSubject(db, profileId, session.subjectId),
-      session.topicId
-        ? db
-            .select()
-            .from(curriculumTopics)
-            .where(eq(curriculumTopics.id, session.topicId))
-            .limit(1)
-        : Promise.resolve([]),
-      db.select().from(profiles).where(eq(profiles.id, profileId)).limit(1),
-      session.topicId
-        ? db
-            .select()
-            .from(retentionCards)
-            .where(
-              and(
-                eq(retentionCards.topicId, session.topicId),
-                eq(retentionCards.profileId, profileId)
-              )
+  const [
+    subject,
+    topicRows,
+    profileRows,
+    retentionRows,
+    events,
+    priorTopics,
+    memory,
+  ] = await Promise.all([
+    getSubject(db, profileId, session.subjectId),
+    session.topicId
+      ? db
+          .select()
+          .from(curriculumTopics)
+          .where(eq(curriculumTopics.id, session.topicId))
+          .limit(1)
+      : Promise.resolve([]),
+    db.select().from(profiles).where(eq(profiles.id, profileId)).limit(1),
+    session.topicId
+      ? db
+          .select()
+          .from(retentionCards)
+          .where(
+            and(
+              eq(retentionCards.topicId, session.topicId),
+              eq(retentionCards.profileId, profileId)
             )
-            .limit(1)
-        : Promise.resolve([]),
-      db.query.sessionEvents.findMany({
-        where: and(
-          eq(sessionEvents.sessionId, sessionId),
-          eq(sessionEvents.profileId, profileId)
-        ),
-        orderBy: asc(sessionEvents.createdAt),
-      }),
-    ]);
+          )
+          .limit(1)
+      : Promise.resolve([]),
+    db.query.sessionEvents.findMany({
+      where: and(
+        eq(sessionEvents.sessionId, sessionId),
+        eq(sessionEvents.profileId, profileId)
+      ),
+      orderBy: asc(sessionEvents.createdAt),
+    }),
+    fetchPriorTopics(db, profileId, session.subjectId),
+    retrieveRelevantMemory(db, profileId, userMessage, options?.voyageApiKey),
+  ]);
 
   const topic = topicRows[0];
   const [profile] = profileRows;
@@ -232,7 +244,10 @@ async function prepareExchangeContext(
     ? escalationDecision.newRung
     : (session.escalationRung as EscalationRung);
 
-  // 5. Build ExchangeContext
+  // 5. Build prior learning context (FR40 — bridge FR)
+  const priorLearning = buildPriorLearningContext(priorTopics);
+
+  // 6. Build ExchangeContext
   const context: ExchangeContext = {
     sessionId,
     profileId,
@@ -245,6 +260,7 @@ async function prepareExchangeContext(
     personaType:
       (profile?.personaType as 'TEEN' | 'LEARNER' | 'PARENT') ?? 'LEARNER',
     workedExampleLevel,
+    priorLearningContext: priorLearning.contextText || undefined,
   };
 
   return { session, context, effectiveRung };

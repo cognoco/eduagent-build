@@ -93,7 +93,15 @@ export default function SessionScreen() {
       const newId = result.session.id;
       setActiveSessionId(newId);
       return newId;
-    } catch {
+    } catch (err) {
+      // TODO: remove after debugging — surface the real API error
+      console.error('[ensureSession] failed:', err);
+      console.error(
+        '[ensureSession] subjectId:',
+        subjectId,
+        'mode:',
+        effectiveMode
+      );
       return null;
     }
   }, [activeSessionId, subjectId, topicId, effectiveMode, startSession]);

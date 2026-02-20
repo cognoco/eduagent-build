@@ -1,3 +1,20 @@
+# =============================================================================
+# EduAgent API — Cloudflare Workers Configuration
+# =============================================================================
+#
+# IMPORTANT: Cloudflare Workers **Paid plan (Standard)** is REQUIRED for
+# production. The free plan enforces a 10 ms CPU time limit per request, which
+# is far too low for LLM-powered tutoring sessions. The paid Standard plan
+# allows up to 30 s of CPU time per invocation.
+#
+# This is an **account-level** setting configured in the Cloudflare dashboard
+# under Workers & Pages → Plans, NOT a wrangler.toml field.
+#
+# Rate Limiting: Configure per-user rate limiting (target: 100 req/min per
+# authenticated user) via Cloudflare dashboard → WAF → Rate Limiting Rules.
+# This is NOT configured in wrangler.toml — it is a dashboard-level WAF rule.
+# =============================================================================
+
 name = "eduagent-api"
 main = "src/index.ts"
 compatibility_date = "2025-12-01"
@@ -5,19 +22,61 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 ENVIRONMENT = "development"
+# These vars have defaults in config.ts but can be overridden per environment:
+#   APP_URL       = "https://app.eduagent.com"
+#   LOG_LEVEL     = "info"          (debug | info | warn | error)
+#   EMAIL_FROM    = "noreply@eduagent.com"
 
-# Secrets — set via `wrangler secret put <NAME>`:
-#   DATABASE_URL
-#   CLERK_SECRET_KEY
-#   CLERK_PUBLISHABLE_KEY
-#   CLERK_JWKS_URL
-#   RESEND_API_KEY
-#   SENTRY_DSN
+# =============================================================================
+# Secrets — set via `wrangler secret put <NAME>`
+# Never commit secret values. Each must be set in every deployment environment.
+# =============================================================================
+#
+# --- Core ---
+#   DATABASE_URL              Neon PostgreSQL connection string
+#
+# --- Auth (Clerk) ---
+#   CLERK_SECRET_KEY          Clerk backend secret key
+#   CLERK_PUBLISHABLE_KEY     Clerk publishable key
+#   CLERK_JWKS_URL            Clerk JWKS endpoint URL for JWT verification
+#
+# --- LLM Providers ---
+#   GEMINI_API_KEY            Google Gemini API key (primary LLM provider)
+#   VOYAGE_API_KEY            Voyage AI API key (embedding provider)
+#
+# --- Background Jobs (Inngest) ---
+#   INNGEST_SIGNING_KEY       Inngest webhook signature verification key
+#   INNGEST_EVENT_KEY         Inngest event ingestion key
+#
+# --- Payments (Stripe) ---
+#   STRIPE_SECRET_KEY         Stripe backend secret key
+#   STRIPE_WEBHOOK_SECRET     Stripe webhook endpoint signing secret
+#   STRIPE_PRICE_PLUS_MONTHLY       Stripe Price ID for Plus monthly
+#   STRIPE_PRICE_PLUS_YEARLY        Stripe Price ID for Plus yearly
+#   STRIPE_PRICE_FAMILY_MONTHLY     Stripe Price ID for Family monthly
+#   STRIPE_PRICE_FAMILY_YEARLY      Stripe Price ID for Family yearly
+#   STRIPE_PRICE_PRO_MONTHLY        Stripe Price ID for Pro monthly
+#   STRIPE_PRICE_PRO_YEARLY         Stripe Price ID for Pro yearly
+#   STRIPE_CUSTOMER_PORTAL_URL      Stripe Customer Portal URL
+#
+# --- Email (Resend) ---
+#   RESEND_API_KEY            Resend transactional email API key
+#
+# --- Observability ---
+#   SENTRY_DSN                Sentry error tracking DSN
 
+# =============================================================================
 # KV Namespaces
-# Create with: wrangler kv namespace create SUBSCRIPTION_KV
+# Create with: wrangler kv namespace create <BINDING_NAME>
 # Then paste the returned id below.
+# =============================================================================
+
 [[kv_namespaces]]
 binding = "SUBSCRIPTION_KV"
 id = "PLACEHOLDER_SUBSCRIPTION_KV_ID"
 preview_id = "PLACEHOLDER_SUBSCRIPTION_KV_PREVIEW_ID"
+
+[[kv_namespaces]]
+binding = "COACHING_KV"
+id = "PLACEHOLDER_COACHING_KV_ID"
+preview_id = "PLACEHOLDER_COACHING_KV_PREVIEW_ID"

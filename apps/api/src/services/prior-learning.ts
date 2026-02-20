@@ -1,7 +1,15 @@
 // ---------------------------------------------------------------------------
 // Prior Learning Context Injection — Story 2.10
-// Pure business logic, no Hono imports
+// Pure business logic + DB-aware fetch (FR40 bridge)
 // ---------------------------------------------------------------------------
+
+import { eq, and, desc, isNotNull } from 'drizzle-orm';
+import {
+  learningSessions,
+  sessionSummaries,
+  curriculumTopics,
+  type Database,
+} from '@eduagent/database';
 
 /** A previously completed topic available for context injection */
 export interface PriorTopic {
@@ -136,4 +144,67 @@ function formatTopicsForContext(topics: PriorTopic[]): string {
   );
 
   return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// DB-aware fetch — FR40 bridge wiring
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetches completed topics for a subject to build prior learning context.
+ *
+ * Uses learningSessions (has subjectId) joined with curriculumTopics (titles)
+ * and sessionSummaries ("Your Words" learner summaries).
+ * Deduplicates by topicId, keeping the most recent session per topic.
+ */
+export async function fetchPriorTopics(
+  db: Database,
+  profileId: string,
+  subjectId: string
+): Promise<PriorTopic[]> {
+  const rows = await db
+    .select({
+      topicId: learningSessions.topicId,
+      title: curriculumTopics.title,
+      summary: sessionSummaries.content,
+      endedAt: learningSessions.endedAt,
+    })
+    .from(learningSessions)
+    .innerJoin(
+      curriculumTopics,
+      eq(curriculumTopics.id, learningSessions.topicId)
+    )
+    .leftJoin(
+      sessionSummaries,
+      and(
+        eq(sessionSummaries.sessionId, learningSessions.id),
+        eq(sessionSummaries.profileId, profileId)
+      )
+    )
+    .where(
+      and(
+        eq(learningSessions.profileId, profileId),
+        eq(learningSessions.subjectId, subjectId),
+        eq(learningSessions.status, 'completed'),
+        isNotNull(learningSessions.topicId)
+      )
+    )
+    .orderBy(desc(learningSessions.endedAt));
+
+  // Deduplicate by topicId (take most recent session per topic)
+  const seen = new Set<string>();
+  const topics: PriorTopic[] = [];
+
+  for (const row of rows) {
+    if (!row.topicId || seen.has(row.topicId)) continue;
+    seen.add(row.topicId);
+    topics.push({
+      topicId: row.topicId,
+      title: row.title,
+      summary: row.summary ?? undefined,
+      completedAt: row.endedAt?.toISOString() ?? new Date().toISOString(),
+    });
+  }
+
+  return topics;
 }

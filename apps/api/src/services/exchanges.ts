@@ -24,6 +24,7 @@ export interface ExchangeContext {
   exchangeHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
   personaType: 'TEEN' | 'LEARNER' | 'PARENT';
   priorLearningContext?: string;
+  embeddingMemoryContext?: string;
   workedExampleLevel?: 'full' | 'fading' | 'problem_first';
 }
 
@@ -99,6 +100,11 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // Prior learning context
   if (context.priorLearningContext) {
     sections.push(context.priorLearningContext);
+  }
+
+  // Embedding memory context (pgvector semantic retrieval)
+  if (context.embeddingMemoryContext) {
+    sections.push(context.embeddingMemoryContext);
   }
 
   // Worked example level

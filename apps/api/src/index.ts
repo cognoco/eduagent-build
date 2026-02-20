@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import * as Sentry from '@sentry/cloudflare';
 
 import { ERROR_CODES } from '@eduagent/schemas';
@@ -79,6 +80,28 @@ type Env = { Bindings: Bindings; Variables: Variables };
 // gives the RPC client a flat namespace (`client.profiles`, not `client.v1.profiles`).
 // ---------------------------------------------------------------------------
 const api = new Hono<Env>();
+
+// CORS — allow local dev and production origins; must run before auth so OPTIONS preflight succeeds
+api.use(
+  '*',
+  cors({
+    origin: (origin) => {
+      if (!origin) return '*';
+      // Allow any localhost port (Metro, Expo web, etc.)
+      if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return origin;
+      if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
+      // Production origins
+      if (origin.endsWith('.eduagent.app') || origin === 'https://eduagent.app')
+        return origin;
+      return '';
+    },
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Profile-Id'],
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    exposeHeaders: ['Content-Type'],
+    credentials: true,
+    maxAge: 3600,
+  })
+);
 
 // Request logging — runs before auth so every request (including public) is logged
 api.use('*', requestLogger);

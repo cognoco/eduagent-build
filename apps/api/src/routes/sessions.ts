@@ -90,7 +90,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           db,
           profileId,
           c.req.param('sessionId'),
-          c.req.valid('json')
+          c.req.valid('json'),
+          { voyageApiKey: c.env.VOYAGE_API_KEY }
         );
         return c.json(result);
       } catch (err) {
@@ -123,7 +124,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           db,
           profileId,
           sessionId,
-          input
+          input,
+          { voyageApiKey: c.env.VOYAGE_API_KEY }
         );
 
         return streamSSE(c, async (sseStream) => {
