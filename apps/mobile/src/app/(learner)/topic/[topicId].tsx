@@ -76,6 +76,10 @@ export default function TopicDetailScreen() {
   const masteryPercent = topicProgress?.masteryScore
     ? Math.round(topicProgress.masteryScore * 100)
     : null;
+  const failureCount =
+    (retentionCard as { failureCount?: number } | null)?.failureCount ?? 0;
+  const showRelearn =
+    failureCount >= 3 || topicProgress?.struggleStatus === 'needs_deepening';
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -207,7 +211,7 @@ export default function TopicDetailScreen() {
                     {retentionCard.intervalDays === 1 ? '' : 's'}
                   </Text>
                 </View>
-                <View className="flex-row justify-between items-center">
+                <View className="flex-row justify-between items-center mb-2">
                   <Text className="text-body-sm text-text-secondary">
                     Reviews
                   </Text>
@@ -215,6 +219,20 @@ export default function TopicDetailScreen() {
                     {retentionCard.repetitions}
                   </Text>
                 </View>
+                {failureCount > 0 && (
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-body-sm text-text-secondary">
+                      Failed attempts
+                    </Text>
+                    <Text
+                      className={`text-body-sm font-medium ${
+                        failureCount >= 3 ? 'text-warning' : 'text-text-primary'
+                      }`}
+                    >
+                      {failureCount}
+                    </Text>
+                  </View>
+                )}
               </>
             )}
           </View>
@@ -263,7 +281,7 @@ export default function TopicDetailScreen() {
             <Pressable
               onPress={() =>
                 router.push({
-                  pathname: '/assessment',
+                  pathname: '/(learner)/topic/recall-test',
                   params: {
                     subjectId,
                     topicId,
@@ -272,33 +290,36 @@ export default function TopicDetailScreen() {
               }
               className="flex-1 bg-surface-elevated rounded-button py-3 items-center mr-2"
               testID="request-retest-button"
-              accessibilityLabel="Request re-test"
-              accessibilityRole="button"
-            >
-              <Text className="text-body-sm font-medium text-text-primary">
-                Request Re-test
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: '/(learner)/session',
-                  params: {
-                    mode: 'learning',
-                    subjectId,
-                    topicId,
-                  },
-                })
+              accessibilityLabel={
+                failureCount >= 3 ? 'Review and re-test' : 'Recall check'
               }
-              className="flex-1 bg-surface-elevated rounded-button py-3 items-center"
-              testID="relearn-button"
-              accessibilityLabel="Relearn topic"
               accessibilityRole="button"
             >
               <Text className="text-body-sm font-medium text-text-primary">
-                Relearn Topic
+                {failureCount >= 3 ? 'Review and Re-test' : 'Recall Check'}
               </Text>
             </Pressable>
+            {showRelearn && (
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/(learner)/topic/relearn',
+                    params: {
+                      subjectId,
+                      topicId,
+                    },
+                  })
+                }
+                className="flex-1 bg-surface-elevated rounded-button py-3 items-center"
+                testID="relearn-button"
+                accessibilityLabel="Relearn topic"
+                accessibilityRole="button"
+              >
+                <Text className="text-body-sm font-medium text-text-primary">
+                  Relearn Topic
+                </Text>
+              </Pressable>
+            )}
           </View>
         </View>
       )}
