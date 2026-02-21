@@ -1,3 +1,4 @@
+import { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,9 +8,14 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CoachingCard } from '../../components/coaching';
+import { CoachingCard, AdaptiveEntryCard } from '../../components/coaching';
 import { RetentionSignal } from '../../components/progress';
-import { UsageMeter } from '../../components/common';
+import {
+  AnimatedEntry,
+  ProfileSwitcher,
+  UsageMeter,
+} from '../../components/common';
+import { useProfile } from '../../lib/profile';
 import { useSubjects } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
 import { useStreaks } from '../../hooks/use-streaks';
@@ -18,6 +24,7 @@ import {
   useSubscriptionStatus,
   type WarningLevel,
 } from '../../hooks/use-subscription';
+import { useTheme } from '../../lib/theme';
 
 /** Client-side warning level — mirrors server's getWarningLevel logic */
 function getWarningLevel(used: number, limit: number): WarningLevel {
@@ -43,6 +50,22 @@ export default function HomeScreen() {
   const { data: streak } = useStreaks();
   const coachingCard = useCoachingCard();
   const { data: subStatus } = useSubscriptionStatus();
+  const { persona } = useTheme();
+  const { profiles, activeProfile, switchProfile } = useProfile();
+
+  // First-time user redirect: send users with no subjects to create-subject
+  const hasRedirected = useRef(false);
+  useEffect(() => {
+    if (
+      !subjectsLoading &&
+      subjects &&
+      subjects.length === 0 &&
+      !hasRedirected.current
+    ) {
+      hasRedirected.current = true;
+      router.replace('/create-subject');
+    }
+  }, [subjectsLoading, subjects, router]);
 
   // Compute warning level and remaining questions from subscription status
   const warningLevel: WarningLevel = subStatus
@@ -71,7 +94,16 @@ export default function HomeScreen() {
             Your coach has a plan
           </Text>
         </View>
-        <View className="flex-row items-center">
+        <View className="flex-row items-center" style={{ zIndex: 50 }}>
+          {profiles.length > 1 && activeProfile && (
+            <View className="mr-2">
+              <ProfileSwitcher
+                profiles={profiles}
+                activeProfileId={activeProfile.id}
+                onSwitch={switchProfile}
+              />
+            </View>
+          )}
           {subStatus && (
             <Pressable
               onPress={() => router.push('/(learner)/subscription')}
@@ -151,115 +183,186 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {coachingCard.isLoading ? (
-          <View className="bg-coaching-card rounded-card p-5 mt-4 items-center py-8">
-            <ActivityIndicator />
-          </View>
-        ) : (
-          <CoachingCard
-            headline={coachingCard.headline}
-            subtext={coachingCard.subtext}
-            primaryLabel={coachingCard.primaryLabel}
-            secondaryLabel={coachingCard.secondaryLabel}
-            onPrimary={() => {
-              if (coachingCard.primaryRoute) {
-                router.push(coachingCard.primaryRoute as never);
-              }
-            }}
-            onSecondary={() => {
-              if (coachingCard.secondaryRoute) {
-                router.push(coachingCard.secondaryRoute as never);
-              }
-            }}
-          />
-        )}
-
-        <View className="mt-6">
-          <Text className="text-h3 font-semibold text-text-primary mb-3">
-            Your subjects
-          </Text>
-          {subjectsLoading ? (
-            <View className="py-4 items-center">
+        <AnimatedEntry>
+          {coachingCard.isLoading ? (
+            <View className="bg-coaching-card rounded-card p-5 mt-4 items-center py-8">
               <ActivityIndicator />
             </View>
-          ) : subjects && subjects.length > 0 ? (
-            <>
-              {subjects.map(
-                (subject: { id: string; name: string; status: string }) => (
-                  <View
-                    key={subject.id}
-                    className="flex-row items-center bg-surface rounded-card px-4 py-3 mb-2"
-                  >
+          ) : persona === 'teen' ? (
+            <AdaptiveEntryCard
+              headline={coachingCard.headline}
+              subtext={coachingCard.subtext}
+              actions={[
+                {
+                  label: 'Homework help',
+                  onPress: () => {
+                    router.push('/(learner)/homework/camera' as never);
+                  },
+                },
+                {
+                  label: 'Practice for a test',
+                  onPress: () => {
+                    if (coachingCard.primaryRoute) {
+                      router.push(coachingCard.primaryRoute as never);
+                    }
+                  },
+                },
+                {
+                  label: 'Just ask something',
+                  onPress: () =>
+                    router.push('/(learner)/session?mode=freeform' as never),
+                },
+              ]}
+            />
+          ) : (
+            <CoachingCard
+              headline={coachingCard.headline}
+              subtext={coachingCard.subtext}
+              primaryLabel={coachingCard.primaryLabel}
+              secondaryLabel={coachingCard.secondaryLabel}
+              onPrimary={() => {
+                if (coachingCard.primaryRoute) {
+                  router.push(coachingCard.primaryRoute as never);
+                }
+              }}
+              onSecondary={() => {
+                if (coachingCard.secondaryRoute) {
+                  router.push(coachingCard.secondaryRoute as never);
+                }
+              }}
+            />
+          )}
+        </AnimatedEntry>
+
+        {/* Subject Retention Strip */}
+        {!subjectsLoading && subjects && subjects.length > 0 && (
+          <AnimatedEntry delay={100}>
+            <View className="mt-4">
+              <Text className="text-caption font-semibold text-text-secondary mb-2 uppercase tracking-wider">
+                Retention
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8 }}
+                testID="retention-strip"
+              >
+                {subjects.map((subject) => {
+                  const status = subjectRetention.get(subject.id) ?? 'weak';
+                  return (
                     <Pressable
+                      key={subject.id}
                       onPress={() =>
                         router.push({
-                          pathname: '/(learner)/onboarding/curriculum-review',
+                          pathname: '/(learner)/book',
                           params: { subjectId: subject.id },
                         } as never)
                       }
-                      className="flex-1 flex-row items-center justify-between"
-                      accessibilityLabel={`Open ${subject.name}`}
+                      className="bg-surface rounded-card px-3 py-2 flex-row items-center"
+                      accessibilityLabel={`${subject.name}: retention ${status}`}
                       accessibilityRole="button"
-                      testID={`home-subject-${subject.id}`}
+                      testID={`retention-chip-${subject.id}`}
                     >
-                      <Text className="text-body font-medium text-text-primary">
+                      <RetentionSignal status={status} compact />
+                      <Text className="text-body-sm text-text-primary ml-2 font-medium">
                         {subject.name}
                       </Text>
-                      <RetentionSignal
-                        status={subjectRetention.get(subject.id) ?? 'strong'}
-                      />
                     </Pressable>
-                    <Pressable
-                      onPress={() =>
-                        router.push({
-                          pathname: '/(learner)/homework/camera',
-                          params: {
-                            subjectId: subject.id,
-                            subjectName: subject.name,
-                          },
-                        } as never)
-                      }
-                      className="ml-3 bg-primary/10 rounded-button min-w-[40px] min-h-[40px] items-center justify-center"
-                      accessibilityLabel={`Homework help for ${subject.name}`}
-                      accessibilityRole="button"
-                      testID={`homework-button-${subject.id}`}
-                    >
-                      <Text className="text-primary text-body">HW</Text>
-                    </Pressable>
-                  </View>
-                )
-              )}
-              <Pressable
-                onPress={() => router.push('/create-subject')}
-                className="bg-primary rounded-button py-3 mt-4 items-center"
-                testID="add-subject-button"
-                accessibilityLabel="Add subject"
-                accessibilityRole="button"
-              >
-                <Text className="text-text-inverse text-body font-semibold">
-                  Add subject
-                </Text>
-              </Pressable>
-            </>
-          ) : (
-            <View className="bg-surface rounded-card px-4 py-6 items-center">
-              <Text className="text-body text-text-secondary">
-                Start learning — add your first subject
-              </Text>
-              <Pressable
-                onPress={() => router.push('/create-subject')}
-                className="bg-primary rounded-button py-3 mt-4 items-center w-full"
-                testID="add-subject-button"
-                accessibilityLabel="Add subject"
-                accessibilityRole="button"
-              >
-                <Text className="text-text-inverse text-body font-semibold">
-                  Add subject
-                </Text>
-              </Pressable>
+                  );
+                })}
+              </ScrollView>
             </View>
-          )}
-        </View>
+          </AnimatedEntry>
+        )}
+
+        <AnimatedEntry delay={200}>
+          <View className="mt-6">
+            <Text className="text-h3 font-semibold text-text-primary mb-3">
+              Your subjects
+            </Text>
+            {subjectsLoading ? (
+              <View className="py-4 items-center">
+                <ActivityIndicator />
+              </View>
+            ) : subjects && subjects.length > 0 ? (
+              <>
+                {subjects.map(
+                  (subject: { id: string; name: string; status: string }) => (
+                    <View
+                      key={subject.id}
+                      className="flex-row items-center bg-surface rounded-card px-4 py-3 mb-2"
+                    >
+                      <Pressable
+                        onPress={() =>
+                          router.push({
+                            pathname: '/(learner)/onboarding/curriculum-review',
+                            params: { subjectId: subject.id },
+                          } as never)
+                        }
+                        className="flex-1 flex-row items-center justify-between"
+                        accessibilityLabel={`Open ${subject.name}`}
+                        accessibilityRole="button"
+                        testID={`home-subject-${subject.id}`}
+                      >
+                        <Text className="text-body font-medium text-text-primary">
+                          {subject.name}
+                        </Text>
+                        <RetentionSignal
+                          status={subjectRetention.get(subject.id) ?? 'strong'}
+                        />
+                      </Pressable>
+                      <Pressable
+                        onPress={() =>
+                          router.push({
+                            pathname: '/(learner)/homework/camera',
+                            params: {
+                              subjectId: subject.id,
+                              subjectName: subject.name,
+                            },
+                          } as never)
+                        }
+                        className="ml-3 bg-primary/10 rounded-button min-w-[40px] min-h-[40px] items-center justify-center"
+                        accessibilityLabel={`Homework help for ${subject.name}`}
+                        accessibilityRole="button"
+                        testID={`homework-button-${subject.id}`}
+                      >
+                        <Text className="text-primary text-body">HW</Text>
+                      </Pressable>
+                    </View>
+                  )
+                )}
+                <Pressable
+                  onPress={() => router.push('/create-subject')}
+                  className="bg-primary rounded-button py-3 mt-4 items-center"
+                  testID="add-subject-button"
+                  accessibilityLabel="Add subject"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-text-inverse text-body font-semibold">
+                    Add subject
+                  </Text>
+                </Pressable>
+              </>
+            ) : (
+              <View className="bg-surface rounded-card px-4 py-6 items-center">
+                <Text className="text-body text-text-secondary">
+                  Start learning — add your first subject
+                </Text>
+                <Pressable
+                  onPress={() => router.push('/create-subject')}
+                  className="bg-primary rounded-button py-3 mt-4 items-center w-full"
+                  testID="add-subject-button"
+                  accessibilityLabel="Add subject"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-text-inverse text-body font-semibold">
+                    Add subject
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        </AnimatedEntry>
       </ScrollView>
     </View>
   );

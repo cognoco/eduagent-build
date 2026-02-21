@@ -19,6 +19,7 @@
     "db:generate": "dotenv -e .env.development.local -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate:dev": "dotenv -e .env.development.local -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs migrate",
     "db:studio:dev": "dotenv -e .env.development.local -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs studio",
+    "test:integration": "jest --config tests/integration/jest.config.cjs --no-coverage",
     "test:e2e": "maestro test apps/mobile/e2e/flows/",
     "test:e2e:smoke": "maestro test apps/mobile/e2e/flows/ --include-tags=smoke",
     "test:e2e:record": "maestro record apps/mobile/e2e/flows/"

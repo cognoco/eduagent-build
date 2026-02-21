@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,14 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { useSignUp } from '@clerk/clerk-expo';
+import { useSignUp, useSSO } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
+import { PasswordInput } from '../../components/common';
 
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -27,10 +30,51 @@ export default function SignUpScreen() {
   const [pendingVerification, setPendingVerification] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+
+  const { startSSOFlow: startGoogleSSO } = useSSO();
+  const { startSSOFlow: startAppleSSO } = useSSO();
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    void WebBrowser.warmUpAsync();
+    return () => {
+      void WebBrowser.coolDownAsync();
+    };
+  }, []);
 
   const canSubmitSignUp =
-    emailAddress.trim() !== '' && password !== '' && !loading;
+    emailAddress.trim() !== '' && password.length >= 8 && !loading;
   const canSubmitCode = code.trim() !== '' && !loading;
+
+  const onSSOPress = useCallback(
+    async (strategy: 'oauth_google' | 'oauth_apple') => {
+      setError('');
+      setOauthLoading(strategy);
+
+      try {
+        const startSSO =
+          strategy === 'oauth_google' ? startGoogleSSO : startAppleSSO;
+
+        const { createdSessionId } = await startSSO({
+          strategy,
+          redirectUrl: Linking.createURL('/sso-callback', {
+            scheme: 'eduagent',
+          }),
+        });
+
+        if (createdSessionId && setActive) {
+          await setActive({ session: createdSessionId });
+          router.replace('/(learner)/home');
+        }
+      } catch (err: unknown) {
+        setError(extractClerkError(err));
+      } finally {
+        setOauthLoading(null);
+      }
+    },
+    [startGoogleSSO, startAppleSSO, setActive, router]
+  );
 
   const onSignUpPress = useCallback(async () => {
     if (!isLoaded || !canSubmitSignUp) return;
@@ -175,6 +219,48 @@ export default function SignUpScreen() {
           </View>
         )}
 
+        <Pressable
+          onPress={() => onSSOPress('oauth_google')}
+          disabled={oauthLoading !== null}
+          className="bg-surface rounded-button py-3.5 items-center mb-3 flex-row justify-center"
+          accessibilityLabel="Sign up with Google"
+          testID="sign-up-google-sso"
+        >
+          {oauthLoading === 'oauth_google' ? (
+            <ActivityIndicator />
+          ) : (
+            <Text className="text-body font-semibold text-text-primary">
+              Continue with Google
+            </Text>
+          )}
+        </Pressable>
+
+        {Platform.OS !== 'web' && (
+          <Pressable
+            onPress={() => onSSOPress('oauth_apple')}
+            disabled={oauthLoading !== null}
+            className="bg-surface rounded-button py-3.5 items-center mb-6 flex-row justify-center"
+            accessibilityLabel="Sign up with Apple"
+            testID="sign-up-apple-sso"
+          >
+            {oauthLoading === 'oauth_apple' ? (
+              <ActivityIndicator />
+            ) : (
+              <Text className="text-body font-semibold text-text-primary">
+                Continue with Apple
+              </Text>
+            )}
+          </Pressable>
+        )}
+
+        <View className="flex-row items-center mb-6">
+          <View className="flex-1 h-px bg-border" />
+          <Text className="text-body-sm text-text-secondary mx-4">
+            or continue with email
+          </Text>
+          <View className="flex-1 h-px bg-border" />
+        </View>
+
         <Text className="text-body-sm font-semibold text-text-secondary mb-1">
           Email
         </Text>
@@ -194,16 +280,17 @@ export default function SignUpScreen() {
         <Text className="text-body-sm font-semibold text-text-secondary mb-1">
           Password
         </Text>
-        <TextInput
-          className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
-          secureTextEntry
-          placeholder="Create a password"
-          placeholderTextColor={colors.muted}
-          value={password}
-          onChangeText={setPassword}
-          editable={!loading}
-          testID="sign-up-password"
-        />
+        <View className="mb-6">
+          <PasswordInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Create a password"
+            editable={!loading}
+            testID="sign-up-password"
+            showRequirements
+            onSubmitEditing={onSignUpPress}
+          />
+        </View>
 
         <Pressable
           onPress={onSignUpPress}

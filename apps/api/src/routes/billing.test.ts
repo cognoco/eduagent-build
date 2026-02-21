@@ -118,7 +118,7 @@ jest.mock('../services/stripe', () => ({
   }),
 }));
 
-import app from '../index';
+import { app } from '../index';
 
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',

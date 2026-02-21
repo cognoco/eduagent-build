@@ -8,6 +8,7 @@ jest.mock('@eduagent/database', () => {
 
 jest.mock('./exchanges', () => ({
   processExchange: jest.fn(),
+  detectUnderstandingCheck: jest.fn().mockReturnValue(false),
 }));
 
 jest.mock('./escalation', () => ({
@@ -20,6 +21,17 @@ jest.mock('./summaries', () => ({
 
 jest.mock('./subject', () => ({
   getSubject: jest.fn(),
+}));
+
+jest.mock('./prior-learning', () => ({
+  fetchPriorTopics: jest.fn(),
+  buildPriorLearningContext: jest.fn(),
+}));
+
+jest.mock('./memory', () => ({
+  retrieveRelevantMemory: jest
+    .fn()
+    .mockResolvedValue({ context: '', topicIds: [] }),
 }));
 
 import type { Database } from '@eduagent/database';
@@ -38,6 +50,8 @@ import { processExchange } from './exchanges';
 import { evaluateEscalation } from './escalation';
 import { evaluateSummary } from './summaries';
 import { getSubject } from './subject';
+import { fetchPriorTopics, buildPriorLearningContext } from './prior-learning';
+import { retrieveRelevantMemory } from './memory';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 const profileId = 'test-profile-id';
@@ -49,7 +63,7 @@ function mockSessionRow(
     id: string;
     subjectId: string;
     topicId: string | null;
-    sessionType: 'learning' | 'homework';
+    sessionType: 'learning' | 'homework' | 'interleaved';
     status: 'active' | 'paused' | 'completed' | 'auto_closed';
     escalationRung: number;
     exchangeCount: number;
@@ -98,15 +112,17 @@ function mockSummaryRow(
   };
 }
 
-/** Creates a mock select chain: db.select().from().where().limit() */
+/** Creates a mock select chain: db.select().from().where().limit() or db.select().from().where() */
 function mockSelectChain(result: unknown[] = []): {
   from: jest.Mock;
 } {
+  // whereReturn is both a thenable (for `await .where()`) and has .limit() (for `.where().limit()`)
+  const whereReturn = Object.assign(Promise.resolve(result), {
+    limit: jest.fn().mockResolvedValue(result),
+  });
   return {
     from: jest.fn().mockReturnValue({
-      where: jest.fn().mockReturnValue({
-        limit: jest.fn().mockResolvedValue(result),
-      }),
+      where: jest.fn().mockReturnValue(whereReturn),
     }),
   };
 }
@@ -196,6 +212,13 @@ beforeEach(() => {
     feedback: 'Great summary! You captured the key concepts.',
     hasUnderstandingGaps: false,
     isAccepted: true,
+  });
+
+  (fetchPriorTopics as jest.Mock).mockResolvedValue([]);
+  (buildPriorLearningContext as jest.Mock).mockReturnValue({
+    contextText: '',
+    topicsIncluded: 0,
+    truncated: false,
   });
 });
 
@@ -657,6 +680,112 @@ describe('processMessage', () => {
       'New topic'
     );
   });
+
+  it('populates interleavedTopics from metadata for interleaved sessions (FR92)', async () => {
+    const topicId = '770e8400-e29b-41d4-a716-446655440000';
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({
+        topicId,
+        sessionType: 'interleaved',
+      }),
+    });
+    const db = createMockDb({
+      selectResults: [
+        // 1. topic query (first topic from session.topicId)
+        [{ title: 'Algebra Basics', description: 'Linear equations' }],
+        // 2. profile
+        [{ personaType: 'LEARNER' }],
+        // 3. retention card
+        [{ repetitions: 2 }],
+        // 4. metadata query (interleaved session metadata)
+        [
+          {
+            metadata: {
+              interleavedTopics: [
+                {
+                  topicId: 'topic-001',
+                  topicTitle: 'Algebra Basics',
+                  subjectId: 'sub-1',
+                },
+                {
+                  topicId: 'topic-002',
+                  topicTitle: 'Probability',
+                  subjectId: 'sub-1',
+                },
+                {
+                  topicId: 'topic-003',
+                  topicTitle: 'Geometry',
+                  subjectId: 'sub-1',
+                },
+              ],
+            },
+          },
+        ],
+        // 5. inArray topic details query (after Promise.all)
+        [
+          {
+            id: 'topic-001',
+            title: 'Algebra Basics',
+            description: 'Linear equations',
+          },
+          {
+            id: 'topic-002',
+            title: 'Probability',
+            description: 'Independent events',
+          },
+          { id: 'topic-003', title: 'Geometry', description: 'Angle sums' },
+        ],
+      ],
+    });
+
+    await processMessage(db, profileId, sessionId, {
+      message: 'Start interleaved review',
+    });
+
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        interleavedTopics: [
+          {
+            topicId: 'topic-001',
+            title: 'Algebra Basics',
+            description: 'Linear equations',
+          },
+          {
+            topicId: 'topic-002',
+            title: 'Probability',
+            description: 'Independent events',
+          },
+          {
+            topicId: 'topic-003',
+            title: 'Geometry',
+            description: 'Angle sums',
+          },
+        ],
+        // Single-topic fields should be cleared for interleaved sessions
+        topicTitle: undefined,
+        topicDescription: undefined,
+        workedExampleLevel: undefined,
+      }),
+      'Start interleaved review'
+    );
+  });
+
+  it('does not set interleavedTopics for learning sessions (FR92 backward compat)', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ topicId: null }),
+    });
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'Normal learning',
+    });
+
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        interleavedTopics: undefined,
+      }),
+      'Normal learning'
+    );
+  });
 });
 
 describe('escalation tracking', () => {
@@ -745,6 +874,159 @@ describe('escalation tracking', () => {
       ])
     );
   });
+
+  it('includes prior learning context when topics exist (FR40)', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    const priorTopics = [
+      {
+        topicId: 't1',
+        title: 'Algebra Basics',
+        summary: 'Variables and equations',
+        completedAt: '2025-01-10T00:00:00Z',
+      },
+    ];
+    (fetchPriorTopics as jest.Mock).mockResolvedValue(priorTopics);
+    (buildPriorLearningContext as jest.Mock).mockReturnValue({
+      contextText:
+        'Prior Learning Context — topics the learner has already completed:\n\n- Algebra Basics',
+      topicsIncluded: 1,
+      truncated: false,
+    });
+
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'Teach me quadratics',
+    });
+
+    expect(fetchPriorTopics).toHaveBeenCalledWith(db, profileId, subjectId);
+    expect(buildPriorLearningContext).toHaveBeenCalledWith(priorTopics);
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        priorLearningContext: expect.stringContaining('Prior Learning Context'),
+      }),
+      'Teach me quadratics'
+    );
+  });
+
+  it('omits prior learning context for new learners (FR40 empty state)', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    // Default mock: fetchPriorTopics returns [], buildPriorLearningContext returns empty
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'First lesson',
+    });
+
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        priorLearningContext: expect.any(String),
+      }),
+      'First lesson'
+    );
+  });
+
+  it('includes embedding memory context in exchange context when available (Story 3.10)', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    (retrieveRelevantMemory as jest.Mock).mockResolvedValueOnce({
+      context:
+        'Related past learning:\n- Algebra Basics: learner understood variable substitution',
+      topicIds: ['topic-abc'],
+    });
+
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'Teach me quadratics',
+    });
+
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        embeddingMemoryContext: expect.stringContaining(
+          'Related past learning'
+        ),
+      }),
+      'Teach me quadratics'
+    );
+  });
+
+  it('omits embedding memory context when retrieval returns empty (Story 3.10 empty state)', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    // Default mock returns { context: '', topicIds: [] }
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'First lesson',
+    });
+
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        embeddingMemoryContext: expect.any(String),
+      }),
+      'First lesson'
+    );
+  });
+
+  it('stores behavioral metrics in ai_response metadata (UX-18)', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ escalationRung: 1 }),
+    });
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'Explain photosynthesis',
+    });
+
+    // The second values() call arg is an array with [user_message, ai_response]
+    const valuesFn = (db.insert as jest.Mock).mock.results[0].value.values;
+    expect(valuesFn).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: 'ai_response',
+          metadata: expect.objectContaining({
+            escalationRung: 1,
+            isUnderstandingCheck: expect.any(Boolean),
+            hintCountInSession: expect.any(Number),
+          }),
+        }),
+      ])
+    );
+  });
+
+  it('computes hintCount from events at rung >= 2', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ escalationRung: 3, exchangeCount: 4 }),
+    });
+    const db = createMockDb({
+      findManyEvents: [
+        {
+          eventType: 'ai_response',
+          content: 'r1',
+          createdAt: NOW,
+          metadata: { escalationRung: 1 },
+        },
+        {
+          eventType: 'ai_response',
+          content: 'r2',
+          createdAt: NOW,
+          metadata: { escalationRung: 2 },
+        },
+        {
+          eventType: 'ai_response',
+          content: 'r3',
+          createdAt: NOW,
+          metadata: { escalationRung: 3 },
+        },
+        { eventType: 'user_message', content: 'q', createdAt: NOW },
+      ],
+    });
+    await processMessage(db, profileId, sessionId, {
+      message: 'Still lost',
+    });
+
+    // hintCount should be 2 (rung 2 + rung 3), NOT 0
+    expect(evaluateEscalation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hintCount: 2,
+      }),
+      'Still lost'
+    );
+  });
 });
 
 describe('closeSession', () => {
@@ -755,6 +1037,52 @@ describe('closeSession', () => {
 
     expect(result.message).toBe('Session closed');
     expect(result.sessionId).toBe(sessionId);
+  });
+
+  it('returns sessionType for all session types', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    const db = createMockDb();
+    const result = await closeSession(db, profileId, sessionId, {});
+
+    expect(result.sessionType).toBe('learning');
+  });
+
+  it('returns undefined interleavedTopicIds for learning sessions', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    const db = createMockDb();
+    const result = await closeSession(db, profileId, sessionId, {});
+
+    expect(result.interleavedTopicIds).toBeUndefined();
+  });
+
+  it('returns interleavedTopicIds from metadata for interleaved sessions (FR92)', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ sessionType: 'interleaved' }),
+    });
+    const db = createMockDb({
+      selectResults: [
+        // metadata query
+        [
+          {
+            metadata: {
+              interleavedTopics: [
+                { topicId: 'topic-001' },
+                { topicId: 'topic-002' },
+                { topicId: 'topic-003' },
+              ],
+            },
+          },
+        ],
+      ],
+    });
+    const result = await closeSession(db, profileId, sessionId, {});
+
+    expect(result.sessionType).toBe('interleaved');
+    expect(result.interleavedTopicIds).toEqual([
+      'topic-001',
+      'topic-002',
+      'topic-003',
+    ]);
   });
 });
 

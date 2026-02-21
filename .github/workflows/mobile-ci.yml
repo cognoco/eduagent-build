@@ -128,9 +128,6 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build database package
-        run: pnpm exec nx run @eduagent/database:build
-
       - name: Run mobile tests
         run: pnpm exec nx run mobile:test
 

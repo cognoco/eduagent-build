@@ -37,7 +37,7 @@ jest.mock('../services/streaks', () => ({
   getStreakDisplayInfo: jest.fn(),
 }));
 
-import app from '../index';
+import { app } from '../index';
 import { getStreakData, getXpSummary } from '../services/streaks';
 
 const TEST_ENV = {

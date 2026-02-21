@@ -15,6 +15,9 @@ interface ParentDashboardSummaryProps {
   trend: 'up' | 'down' | 'stable';
   sessionsThisWeek: number;
   sessionsLastWeek: number;
+  totalTimeThisWeek: number;
+  totalTimeLastWeek: number;
+  retentionTrend?: 'improving' | 'declining' | 'stable';
   onDrillDown: () => void;
   isLoading?: boolean;
 }
@@ -31,6 +34,34 @@ const TREND_LABELS: Record<'up' | 'down' | 'stable', string> = {
   stable: 'same as',
 };
 
+const RETENTION_TREND_CONFIG: Record<
+  'improving' | 'declining' | 'stable',
+  { arrow: string; label: string; className: string }
+> = {
+  improving: {
+    arrow: '\u2191',
+    label: 'Improving',
+    className: 'text-retention-strong',
+  },
+  declining: {
+    arrow: '\u2193',
+    label: 'Declining',
+    className: 'text-retention-weak',
+  },
+  stable: {
+    arrow: '\u2192',
+    label: 'Stable',
+    className: 'text-text-secondary',
+  },
+};
+
+const formatTime = (mins: number): string => {
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+};
+
 export function ParentDashboardSummary({
   childName,
   summary,
@@ -38,10 +69,17 @@ export function ParentDashboardSummary({
   trend,
   sessionsThisWeek,
   sessionsLastWeek,
+  totalTimeThisWeek,
+  totalTimeLastWeek,
+  retentionTrend,
   onDrillDown,
   isLoading,
 }: ParentDashboardSummaryProps): ReactNode {
-  const trendText = `${sessionsThisWeek} sessions this week (${TREND_ARROWS[trend]} ${TREND_LABELS[trend]} ${sessionsLastWeek} last week)`;
+  const trendText = `${sessionsThisWeek} sessions, ${formatTime(
+    totalTimeThisWeek
+  )} this week (${TREND_ARROWS[trend]} ${
+    TREND_LABELS[trend]
+  } ${sessionsLastWeek} sessions, ${formatTime(totalTimeLastWeek)} last week)`;
 
   const metadata = (
     <>
@@ -51,6 +89,21 @@ export function ParentDashboardSummary({
       >
         {trendText}
       </Text>
+      {retentionTrend && (
+        <View
+          className="flex-row items-center mt-1.5"
+          testID="retention-trend-badge"
+          accessibilityLabel={`Retention: ${retentionTrend}`}
+        >
+          <Text className="text-caption text-text-secondary">Retention: </Text>
+          <Text
+            className={`text-caption font-semibold ${RETENTION_TREND_CONFIG[retentionTrend].className}`}
+          >
+            {RETENTION_TREND_CONFIG[retentionTrend].arrow}{' '}
+            {RETENTION_TREND_CONFIG[retentionTrend].label}
+          </Text>
+        </View>
+      )}
       {subjects.length > 0 && (
         <View className="flex-row flex-wrap gap-2 mt-2">
           {subjects.map((subject) => (

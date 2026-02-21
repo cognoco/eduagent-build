@@ -6,6 +6,20 @@ jest.mock('expo/src/winter/ImportMetaRegistry', () => ({
   },
 }));
 
+jest.mock('react-native-reanimated', () => {
+  const { View } = require('react-native');
+  return {
+    __esModule: true,
+    default: { View, Text: View, ScrollView: View },
+    FadeInUp: { delay: () => ({ duration: () => ({}) }) },
+    FadeOutDown: { duration: () => ({}) },
+    useAnimatedStyle: () => ({}),
+    useSharedValue: (v: unknown) => ({ value: v }),
+    withTiming: (v: unknown) => v,
+    withSpring: (v: unknown) => v,
+  };
+});
+
 jest.mock('@clerk/clerk-expo', () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ClerkProvider: ({ children }: any) => children,

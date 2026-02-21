@@ -130,16 +130,40 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 
 ## Current Status
 
-**Complete:**
-- Epics 0-5 API layer (868 unit tests + 7 integration tests, all passing)
-- All API route stubs wired to real services with DB persistence (interview, curriculum, assessment, consent)
-- Signal extraction from interviews + curriculum generation pipeline
-- Mobile screens: auth (Clerk), onboarding (subject creation → interview → curriculum), learner home, parent dashboard
-- Mobile-API integration: Clerk auth wired, TanStack Query hooks for all major flows
+**Complete — all routes production-ready:**
+- Epics 0-5: full API layer (900+ unit tests + 7 integration tests, all passing)
+- All 20 route groups wired to real services with DB persistence
+- Mobile: 20+ screens, all using real API calls via TanStack Query + Hono RPC
+- Background jobs: 8 Inngest functions (session-completed chain, trial-expiry, consent-reminders, account-deletion, review-reminder, payment-retry, quota-reset, subject-auto-archive)
+- Auth: Clerk (SSO + email/password), PasswordInput with show/hide + requirements
+- Billing: Stripe integration (checkout, portal, webhooks, KV-cached status, quota metering)
+- Email: Resend integration (consent emails, reminders)
+- Push: Expo Push API (trial warnings, review reminders, daily reminders)
+- Error tracking: Sentry (API via `@sentry/cloudflare`, mobile via `@sentry/react-native`)
+- Embeddings: Voyage AI (session content → pgvector storage in session-completed chain)
 - SSE streaming: mobile SSE client + `useStreamMessage` hook for learning/homework sessions
-**Remaining stub routes (mock data):** progress, retention, streaks, settings, dashboard (real data), parking-lot, homework, billing, stripe-webhook.
+- Coaching cards: precompute service, 24h cache, `GET /v1/coaching-card` route, `AdaptiveEntryCard` wired on home screen
+- Session close summary: `SessionCloseSummary` screen at `/session-summary/[sessionId]`, replaces raw exchange-count display
+- Parent dashboard: real data from DB via `familyLinks` (children list, session counts, time, retention signals)
+- Failed recall remediation (FR52-58): `processRecallTest()` returns `failureAction: redirect_to_learning_book` after 3+ failures; `startRelearn()` resets retention card and creates new session
+- Interleaved retrieval (FR92): `services/interleaved.ts`, `interleavedSessionStartSchema`, `GET /v1/retention/stability`, full stack implemented
+- Recall bridge after homework (FR Story 2.7): `POST /v1/sessions/:sessionId/recall-bridge` + `generateRecallBridge()` service
+- Homework camera capture (Story 2.5): ML Kit OCR on device, camera state machine + `useHomeworkOcr` hook + full camera UI; server-side `OcrProvider` interface with stub implementation in `services/ocr.ts`
+- XP ledger: `insertSessionXpEntry()` wired in session-completed Step 3
+- Needs-deepening auto-promotion (FR63): `updateNeedsDeepeningProgress()` wired in session-completed Step 1b
 
-**Not yet integrated:** Stripe payments, email provider (Resend/SendGrid), Expo Push notifications, real embedding vectors (pgvector), OCR provider.
+- UX audit remediation (55 gaps): consent gating (C16/COPPA), camera-first homework (C8), parent transcript view (C13), session mode configs (C7), math rendering (M21), animations (M22), dark mode, confidence scoring, retention trends, ProfileSwitcher, Inter font, Ionicons, WCAG contrast fixes, shared Button component
+
+**Not yet integrated:** OCR provider (server-side fallback; ML Kit primary on device).
+
+**Remaining feature gaps (FR-level):**
+- FR94: Learning mode toggle wired in mobile UI (API ready, DB ready)
+- Mobile push token: `useRegisterPushToken()` hook not implemented; tokens not registered on app open
+
+**Pre-launch configuration (not code):**
+- [ ] Clerk: configure custom email domain (SPF/DKIM/DMARC) so verification/consent emails don't land in spam
+- [ ] Sentry: create projects + set `SENTRY_DSN` secrets for API and mobile
+- [ ] Resend: set `RESEND_API_KEY` secret, verify sending domain
 
 ## Required Reading (before any implementation work)
 

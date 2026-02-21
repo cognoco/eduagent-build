@@ -1,19 +1,27 @@
 import { useReducer, useRef, useEffect, useState, useCallback } from 'react';
-import { View, Text, Pressable, TextInput, Linking } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  TextInput,
+  Linking,
+  ScrollView,
+} from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../../lib/theme';
 import { cameraReducer, initialCameraState } from './camera-reducer';
 import { useHomeworkOcr } from '../../../hooks/use-homework-ocr';
+import { useSubjects } from '../../../hooks/use-subjects';
 
 type FlashMode = 'off' | 'on' | 'auto';
 
 export default function CameraScreen(): React.ReactNode {
   const router = useRouter();
   const { subjectId, subjectName } = useLocalSearchParams<{
-    subjectId: string;
-    subjectName: string;
+    subjectId?: string;
+    subjectName?: string;
   }>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -22,6 +30,7 @@ export default function CameraScreen(): React.ReactNode {
   const [state, dispatch] = useReducer(cameraReducer, initialCameraState);
   const ocr = useHomeworkOcr();
   const cameraRef = useRef<CameraView>(null);
+  const { data: subjects } = useSubjects();
 
   const [editedText, setEditedText] = useState('');
   const [manualText, setManualText] = useState('');
@@ -66,30 +75,48 @@ export default function CameraScreen(): React.ReactNode {
     await ocr.retry();
   }, [ocr]);
 
+  const navigateToSession = useCallback(
+    (sid: string, sName: string, problemText: string, imageUri?: string) => {
+      router.replace({
+        pathname: '/(learner)/session',
+        params: {
+          mode: 'homework',
+          subjectId: sid,
+          subjectName: sName,
+          problemText,
+          ...(imageUri ? { imageUri } : {}),
+        },
+      } as never);
+    },
+    [router]
+  );
+
   const handleConfirmResult = useCallback(() => {
-    router.replace({
-      pathname: '/(learner)/session',
-      params: {
-        mode: 'homework',
-        subjectId: subjectId ?? '',
-        subjectName: subjectName ?? '',
-        problemText: editedText,
-        imageUri: state.imageUri ?? undefined,
-      },
-    } as never);
-  }, [router, subjectId, subjectName, editedText, state.imageUri]);
+    navigateToSession(
+      subjectId ?? '',
+      subjectName ?? '',
+      editedText,
+      state.imageUri ?? undefined
+    );
+  }, [navigateToSession, subjectId, subjectName, editedText, state.imageUri]);
+
+  const handlePickSubject = useCallback(
+    (sid: string, sName: string) => {
+      navigateToSession(sid, sName, editedText, state.imageUri ?? undefined);
+    },
+    [navigateToSession, editedText, state.imageUri]
+  );
 
   const handleManualContinue = useCallback(() => {
-    router.replace({
-      pathname: '/(learner)/session',
-      params: {
-        mode: 'homework',
-        subjectId: subjectId ?? '',
-        subjectName: subjectName ?? '',
-        problemText: manualText,
-      },
-    } as never);
-  }, [router, subjectId, subjectName, manualText]);
+    navigateToSession(subjectId ?? '', subjectName ?? '', manualText);
+  }, [navigateToSession, subjectId, subjectName, manualText]);
+
+  const handleManualPickSubject = useCallback(
+    (sid: string, sName: string) => {
+      navigateToSession(sid, sName, manualText);
+    },
+    [navigateToSession, manualText]
+  );
 
   const handleClose = useCallback(() => {
     router.back();
@@ -285,10 +312,14 @@ export default function CameraScreen(): React.ReactNode {
 
   // ---- Result phase ----
   if (state.phase === 'result') {
+    const needsSubjectPick = !subjectId;
+
     return (
-      <View
+      <ScrollView
         className="flex-1 bg-background px-6"
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        testID="result-scroll"
       >
         <Pressable
           testID="back-button"
@@ -315,31 +346,62 @@ export default function CameraScreen(): React.ReactNode {
           accessibilityLabel="Recognized text, editable"
         />
 
-        <View className="flex-row gap-4 mt-6">
-          <Pressable
-            testID="retake-button"
-            onPress={handleRetake}
-            className="flex-1 bg-surface rounded-button py-4 min-h-[48px] items-center justify-center"
-            accessibilityLabel="Retake photo"
-            accessibilityRole="button"
-          >
-            <Text className="text-body font-semibold text-text-primary">
-              Retake
+        {needsSubjectPick ? (
+          <View className="mt-6" testID="subject-picker">
+            <Text className="text-body font-semibold text-text-primary mb-3">
+              Which subject is this for?
             </Text>
-          </Pressable>
-          <Pressable
-            testID="confirm-button"
-            onPress={handleConfirmResult}
-            className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
-            accessibilityLabel="Start session with this problem"
-            accessibilityRole="button"
-          >
-            <Text className="text-body font-semibold text-text-inverse">
-              Let&apos;s go
-            </Text>
-          </Pressable>
-        </View>
-      </View>
+            {subjects?.map((s) => (
+              <Pressable
+                key={s.id}
+                onPress={() => handlePickSubject(s.id, s.name)}
+                className="bg-surface-elevated rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
+                accessibilityLabel={`Select ${s.name}`}
+                accessibilityRole="button"
+                testID={`subject-pick-${s.id}`}
+              >
+                <Text className="text-body text-text-primary">{s.name}</Text>
+              </Pressable>
+            ))}
+            <Pressable
+              testID="retake-button"
+              onPress={handleRetake}
+              className="bg-surface rounded-button py-4 mt-2 min-h-[48px] items-center justify-center"
+              accessibilityLabel="Retake photo"
+              accessibilityRole="button"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Retake
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View className="flex-row gap-4 mt-6">
+            <Pressable
+              testID="retake-button"
+              onPress={handleRetake}
+              className="flex-1 bg-surface rounded-button py-4 min-h-[48px] items-center justify-center"
+              accessibilityLabel="Retake photo"
+              accessibilityRole="button"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Retake
+              </Text>
+            </Pressable>
+            <Pressable
+              testID="confirm-button"
+              onPress={handleConfirmResult}
+              className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
+              accessibilityLabel="Start session with this problem"
+              accessibilityRole="button"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                Let&apos;s go
+              </Text>
+            </Pressable>
+          </View>
+        )}
+      </ScrollView>
     );
   }
 
@@ -386,26 +448,48 @@ export default function CameraScreen(): React.ReactNode {
                 accessibilityLabel="Type your problem manually"
               />
               <View className="gap-3">
-                <Pressable
-                  testID="manual-continue-button"
-                  onPress={handleManualContinue}
-                  disabled={!manualText.trim()}
-                  className={`rounded-button py-4 min-h-[48px] items-center justify-center ${
-                    manualText.trim() ? 'bg-primary' : 'bg-surface'
-                  }`}
-                  accessibilityLabel="Continue with typed problem"
-                  accessibilityRole="button"
-                >
-                  <Text
-                    className={`text-body font-semibold ${
-                      manualText.trim()
-                        ? 'text-text-inverse'
-                        : 'text-text-secondary'
+                {!subjectId && manualText.trim() ? (
+                  <>
+                    <Text className="text-body font-semibold text-text-primary mt-2 mb-1">
+                      Which subject is this for?
+                    </Text>
+                    {subjects?.map((s) => (
+                      <Pressable
+                        key={s.id}
+                        onPress={() => handleManualPickSubject(s.id, s.name)}
+                        className="bg-surface-elevated rounded-button py-3 px-4 min-h-[48px] justify-center"
+                        accessibilityLabel={`Select ${s.name}`}
+                        accessibilityRole="button"
+                        testID={`manual-subject-pick-${s.id}`}
+                      >
+                        <Text className="text-body text-text-primary">
+                          {s.name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </>
+                ) : (
+                  <Pressable
+                    testID="manual-continue-button"
+                    onPress={handleManualContinue}
+                    disabled={!manualText.trim()}
+                    className={`rounded-button py-4 min-h-[48px] items-center justify-center ${
+                      manualText.trim() ? 'bg-primary' : 'bg-surface'
                     }`}
+                    accessibilityLabel="Continue with typed problem"
+                    accessibilityRole="button"
                   >
-                    Continue →
-                  </Text>
-                </Pressable>
+                    <Text
+                      className={`text-body font-semibold ${
+                        manualText.trim()
+                          ? 'text-text-inverse'
+                          : 'text-text-secondary'
+                      }`}
+                    >
+                      Continue →
+                    </Text>
+                  </Pressable>
+                )}
                 <Pressable
                   testID="try-camera-again-button"
                   onPress={handleRetake}

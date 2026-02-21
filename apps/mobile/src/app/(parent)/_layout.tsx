@@ -1,21 +1,32 @@
 import { Tabs, Redirect } from 'expo-router';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@clerk/clerk-expo';
 import { useTheme, useThemeColors } from '../../lib/theme';
 
+const iconMap: Record<
+  string,
+  {
+    focused: keyof typeof Ionicons.glyphMap;
+    default: keyof typeof Ionicons.glyphMap;
+  }
+> = {
+  Dashboard: { focused: 'grid', default: 'grid-outline' },
+  Book: { focused: 'book', default: 'book-outline' },
+  More: { focused: 'menu', default: 'menu-outline' },
+};
+
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const colors = useThemeColors();
-  const icons: Record<string, string> = {
-    Dashboard: focused ? '●' : '○',
-    Book: focused ? '◆' : '◇',
-    More: focused ? '≡' : '☰',
-  };
+  const entry = iconMap[name];
   return (
-    <Text
-      style={{ fontSize: 20, color: focused ? colors.accent : colors.muted }}
-    >
-      {icons[name] ?? '○'}
-    </Text>
+    <Ionicons
+      name={
+        entry ? (focused ? entry.focused : entry.default) : 'ellipse-outline'
+      }
+      size={22}
+      color={focused ? colors.accent : colors.muted}
+    />
   );
 }
 

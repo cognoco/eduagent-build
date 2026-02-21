@@ -1,10 +1,12 @@
 import {
   sendPushNotification,
+  sendEmail,
   isExpoPushToken,
   formatReviewReminderBody,
   formatDailyReminderBody,
   MAX_DAILY_PUSH,
   type NotificationPayload,
+  type EmailPayload,
 } from './notifications';
 import type { Database } from '@eduagent/database';
 
@@ -205,5 +207,77 @@ describe('formatDailyReminderBody', () => {
 describe('MAX_DAILY_PUSH', () => {
   it('is set to 3', () => {
     expect(MAX_DAILY_PUSH).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sendEmail (Resend integration)
+// ---------------------------------------------------------------------------
+
+describe('sendEmail', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const emailPayload: EmailPayload = {
+    to: 'parent@example.com',
+    subject: 'Consent required',
+    body: 'Please approve your child.',
+    type: 'consent_request',
+  };
+
+  it('returns no_api_key when RESEND_API_KEY is not provided', async () => {
+    const result = await sendEmail(emailPayload);
+
+    expect(result).toEqual({ sent: false, reason: 'no_api_key' });
+    expect(mockFetchFn).not.toHaveBeenCalled();
+  });
+
+  it('sends email via Resend API and returns message ID', async () => {
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'msg-abc123' }),
+    });
+
+    const result = await sendEmail(emailPayload, {
+      resendApiKey: 're_test_key',
+      emailFrom: 'test@eduagent.com',
+    });
+
+    expect(result).toEqual({ sent: true, messageId: 'msg-abc123' });
+    expect(mockFetchFn).toHaveBeenCalledWith(
+      'https://api.resend.com/emails',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer re_test_key',
+        }),
+        body: expect.stringContaining('parent@example.com'),
+      })
+    );
+  });
+
+  it('returns error on Resend API failure (422)', async () => {
+    mockFetchFn.mockResolvedValue({
+      ok: false,
+      status: 422,
+      text: async () => 'Validation error',
+    });
+
+    const result = await sendEmail(emailPayload, {
+      resendApiKey: 're_test_key',
+    });
+
+    expect(result).toEqual({ sent: false, reason: 'resend_api_error_422' });
+  });
+
+  it('returns network_error on fetch failure', async () => {
+    mockFetchFn.mockRejectedValue(new Error('network down'));
+
+    const result = await sendEmail(emailPayload, {
+      resendApiKey: 're_test_key',
+    });
+
+    expect(result).toEqual({ sent: false, reason: 'network_error' });
   });
 });

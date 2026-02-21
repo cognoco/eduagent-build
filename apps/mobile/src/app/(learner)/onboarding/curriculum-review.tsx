@@ -197,6 +197,17 @@ export default function CurriculumScreen() {
               Start learning: {firstAvailableTopic.title}
             </Text>
           </Pressable>
+          <Pressable
+            onPress={() => router.replace('/(learner)/home')}
+            className="py-3 items-center mt-2"
+            testID="go-home-button"
+            accessibilityLabel="Go to home screen"
+            accessibilityRole="button"
+          >
+            <Text className="text-body text-primary font-semibold">
+              Explore first
+            </Text>
+          </Pressable>
         </View>
       )}
 

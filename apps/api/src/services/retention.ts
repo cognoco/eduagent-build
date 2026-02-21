@@ -101,6 +101,7 @@ export function processRecallResult(
       easeFactor: sm2Result.card.easeFactor,
       intervalDays: sm2Result.card.interval,
       repetitions: sm2Result.card.repetitions,
+      failureCount: 0,
       consecutiveSuccesses: state.consecutiveSuccesses + 1,
       xpStatus: newXpStatus,
       nextReviewAt: sm2Result.card.nextReviewAt,

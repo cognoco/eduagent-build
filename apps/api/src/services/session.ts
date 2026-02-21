@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, and, asc, inArray } from 'drizzle-orm';
 import {
   learningSessions,
   sessionEvents,
@@ -26,11 +26,14 @@ import type {
 import {
   processExchange,
   streamExchange,
+  detectUnderstandingCheck,
   type ExchangeContext,
 } from './exchanges';
 import { evaluateEscalation } from './escalation';
 import { evaluateSummary } from './summaries';
 import { getSubject } from './subject';
+import { fetchPriorTopics, buildPriorLearningContext } from './prior-learning';
+import { retrieveRelevantMemory } from './memory';
 import type { EscalationRung } from './llm';
 
 // ---------------------------------------------------------------------------
@@ -134,6 +137,18 @@ export async function getSession(
 }
 
 // ---------------------------------------------------------------------------
+// Behavioral metrics data contract — UX-18 (process visibility)
+// ---------------------------------------------------------------------------
+
+/** Per-exchange behavioral metrics stored in ai_response event metadata */
+export interface ExchangeBehavioralMetrics {
+  escalationRung: number;
+  isUnderstandingCheck: boolean;
+  timeToAnswerMs: number | null;
+  hintCountInSession: number;
+}
+
+// ---------------------------------------------------------------------------
 // Shared exchange preparation (used by processMessage + streamMessage)
 // ---------------------------------------------------------------------------
 
@@ -141,13 +156,16 @@ interface ExchangePrep {
   session: LearningSession;
   context: ExchangeContext;
   effectiveRung: EscalationRung;
+  hintCount: number;
+  lastAiResponseAt: Date | null;
 }
 
 async function prepareExchangeContext(
   db: Database,
   profileId: string,
   sessionId: string,
-  userMessage: string
+  userMessage: string,
+  options?: { voyageApiKey?: string }
 ): Promise<ExchangePrep> {
   // 1. Load session
   const session = await getSession(db, profileId, sessionId);
@@ -155,42 +173,100 @@ async function prepareExchangeContext(
     throw new Error('Session not found');
   }
 
+  const isInterleaved = session.sessionType === 'interleaved';
+
   // 2. Load all supplementary data in parallel (all independent after session load)
-  const [subject, topicRows, profileRows, retentionRows, events] =
-    await Promise.all([
-      getSubject(db, profileId, session.subjectId),
-      session.topicId
-        ? db
-            .select()
-            .from(curriculumTopics)
-            .where(eq(curriculumTopics.id, session.topicId))
-            .limit(1)
-        : Promise.resolve([]),
-      db.select().from(profiles).where(eq(profiles.id, profileId)).limit(1),
-      session.topicId
-        ? db
-            .select()
-            .from(retentionCards)
-            .where(
-              and(
-                eq(retentionCards.topicId, session.topicId),
-                eq(retentionCards.profileId, profileId)
-              )
+  const [
+    subject,
+    topicRows,
+    profileRows,
+    retentionRows,
+    events,
+    priorTopics,
+    memory,
+    metadataRows,
+  ] = await Promise.all([
+    getSubject(db, profileId, session.subjectId),
+    session.topicId
+      ? db
+          .select()
+          .from(curriculumTopics)
+          .where(eq(curriculumTopics.id, session.topicId))
+          .limit(1)
+      : Promise.resolve([]),
+    db.select().from(profiles).where(eq(profiles.id, profileId)).limit(1),
+    session.topicId
+      ? db
+          .select()
+          .from(retentionCards)
+          .where(
+            and(
+              eq(retentionCards.topicId, session.topicId),
+              eq(retentionCards.profileId, profileId)
             )
-            .limit(1)
-        : Promise.resolve([]),
-      db.query.sessionEvents.findMany({
-        where: and(
-          eq(sessionEvents.sessionId, sessionId),
-          eq(sessionEvents.profileId, profileId)
-        ),
-        orderBy: asc(sessionEvents.createdAt),
-      }),
-    ]);
+          )
+          .limit(1)
+      : Promise.resolve([]),
+    db.query.sessionEvents.findMany({
+      where: and(
+        eq(sessionEvents.sessionId, sessionId),
+        eq(sessionEvents.profileId, profileId)
+      ),
+      orderBy: asc(sessionEvents.createdAt),
+    }),
+    fetchPriorTopics(db, profileId, session.subjectId),
+    retrieveRelevantMemory(db, profileId, userMessage, options?.voyageApiKey),
+    // FR92: Load session metadata for interleaved topic list
+    isInterleaved
+      ? db
+          .select({ metadata: learningSessions.metadata })
+          .from(learningSessions)
+          .where(
+            and(
+              eq(learningSessions.id, sessionId),
+              eq(learningSessions.profileId, profileId)
+            )
+          )
+          .limit(1)
+      : Promise.resolve([]),
+  ]);
 
   const topic = topicRows[0];
   const [profile] = profileRows;
   const retentionCard = retentionRows[0];
+
+  // FR92: Resolve interleaved topic details (titles + descriptions)
+  let interleavedTopics: ExchangeContext['interleavedTopics'];
+  if (isInterleaved && metadataRows[0]?.metadata) {
+    const meta = metadataRows[0].metadata as {
+      interleavedTopics?: Array<{
+        topicId: string;
+        topicTitle: string;
+        subjectId: string;
+      }>;
+    };
+    const topicIds = meta.interleavedTopics?.map((t) => t.topicId) ?? [];
+    if (topicIds.length > 0) {
+      const topicDetails = await db
+        .select({
+          id: curriculumTopics.id,
+          title: curriculumTopics.title,
+          description: curriculumTopics.description,
+        })
+        .from(curriculumTopics)
+        .where(inArray(curriculumTopics.id, topicIds));
+      const detailMap = new Map(topicDetails.map((t) => [t.id, t]));
+      interleavedTopics = topicIds.map((id) => {
+        const detail = detailMap.get(id);
+        const metaTopic = meta.interleavedTopics!.find((t) => t.topicId === id);
+        return {
+          topicId: id,
+          title: detail?.title ?? metaTopic?.topicTitle ?? 'Unknown',
+          description: detail?.description ?? undefined,
+        };
+      });
+    }
+  }
 
   const workedExampleLevel: 'full' | 'fading' | 'problem_first' = retentionCard
     ? retentionCard.repetitions <= 1
@@ -210,19 +286,28 @@ async function prepareExchangeContext(
       content: e.content,
     }));
 
-  // 3b. Count questions at the current escalation rung
-  const questionsAtCurrentRung = events.filter(
+  // 3b. Count questions at the current escalation rung + compute hint count
+  const aiResponseEvents = events.filter((e) => e.eventType === 'ai_response');
+  const questionsAtCurrentRung = aiResponseEvents.filter(
     (e) =>
-      e.eventType === 'ai_response' &&
       (e.metadata as Record<string, unknown> | null)?.escalationRung ===
-        session.escalationRung
+      session.escalationRung
   ).length;
+  // Hint = AI response at escalation rung >= 2 (beyond basic Socratic)
+  const hintCount = aiResponseEvents.filter((e) => {
+    const rung = (e.metadata as Record<string, unknown> | null)?.escalationRung;
+    return typeof rung === 'number' && rung >= 2;
+  }).length;
+  const lastAiResponseAt =
+    aiResponseEvents.length > 0
+      ? aiResponseEvents[aiResponseEvents.length - 1].createdAt
+      : null;
 
   // 4. Evaluate escalation
   const escalationDecision = evaluateEscalation(
     {
       currentRung: session.escalationRung as EscalationRung,
-      hintCount: 0,
+      hintCount,
       questionsAtCurrentRung,
       totalExchanges: session.exchangeCount,
     },
@@ -232,22 +317,29 @@ async function prepareExchangeContext(
     ? escalationDecision.newRung
     : (session.escalationRung as EscalationRung);
 
-  // 5. Build ExchangeContext
+  // 5. Build prior learning context (FR40 — bridge FR)
+  const priorLearning = buildPriorLearningContext(priorTopics);
+
+  // 6. Build ExchangeContext
+  // For interleaved sessions: use the topic list, clear single-topic fields
   const context: ExchangeContext = {
     sessionId,
     profileId,
     subjectName: subject?.name ?? 'Unknown',
-    topicTitle: topic?.title,
-    topicDescription: topic?.description,
+    topicTitle: interleavedTopics ? undefined : topic?.title,
+    topicDescription: interleavedTopics ? undefined : topic?.description,
     sessionType: session.sessionType as 'learning' | 'homework' | 'interleaved',
     escalationRung: effectiveRung,
     exchangeHistory,
     personaType:
       (profile?.personaType as 'TEEN' | 'LEARNER' | 'PARENT') ?? 'LEARNER',
-    workedExampleLevel,
+    workedExampleLevel: interleavedTopics ? undefined : workedExampleLevel,
+    priorLearningContext: priorLearning.contextText || undefined,
+    embeddingMemoryContext: memory.context || undefined,
+    interleavedTopics,
   };
 
-  return { session, context, effectiveRung };
+  return { session, context, effectiveRung, hintCount, lastAiResponseAt };
 }
 
 async function persistExchangeResult(
@@ -257,11 +349,23 @@ async function persistExchangeResult(
   session: LearningSession,
   userMessage: string,
   aiResponse: string,
-  effectiveRung: EscalationRung
+  effectiveRung: EscalationRung,
+  behavioral?: Partial<ExchangeBehavioralMetrics>
 ): Promise<number> {
   const previousRung = session.escalationRung;
 
-  // Persist events: user_message + ai_response (with rung metadata)
+  // Build ai_response metadata — always includes escalationRung,
+  // enriched with behavioral metrics when available (UX-18)
+  const aiMetadata: Record<string, unknown> = {
+    escalationRung: effectiveRung,
+    ...(behavioral && {
+      isUnderstandingCheck: behavioral.isUnderstandingCheck,
+      timeToAnswerMs: behavioral.timeToAnswerMs,
+      hintCountInSession: behavioral.hintCountInSession,
+    }),
+  };
+
+  // Persist events: user_message + ai_response (with behavioral metadata)
   await db.insert(sessionEvents).values([
     {
       sessionId,
@@ -276,7 +380,7 @@ async function persistExchangeResult(
       subjectId: session.subjectId,
       eventType: 'ai_response' as const,
       content: aiResponse,
-      metadata: { escalationRung: effectiveRung },
+      metadata: aiMetadata,
     },
   ]);
 
@@ -325,21 +429,29 @@ export async function processMessage(
   db: Database,
   profileId: string,
   sessionId: string,
-  input: SessionMessageInput
+  input: SessionMessageInput,
+  options?: { voyageApiKey?: string }
 ): Promise<{
   response: string;
   escalationRung: number;
   isUnderstandingCheck: boolean;
   exchangeCount: number;
 }> {
-  const { session, context, effectiveRung } = await prepareExchangeContext(
-    db,
-    profileId,
-    sessionId,
-    input.message
-  );
+  const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
+    await prepareExchangeContext(
+      db,
+      profileId,
+      sessionId,
+      input.message,
+      options
+    );
 
   const result = await processExchange(context, input.message);
+
+  // Compute time-to-answer: ms between last AI response and now
+  const timeToAnswerMs = lastAiResponseAt
+    ? Date.now() - lastAiResponseAt.getTime()
+    : null;
 
   const newExchangeCount = await persistExchangeResult(
     db,
@@ -348,7 +460,12 @@ export async function processMessage(
     session,
     input.message,
     result.response,
-    effectiveRung
+    effectiveRung,
+    {
+      isUnderstandingCheck: result.isUnderstandingCheck,
+      timeToAnswerMs,
+      hintCountInSession: hintCount,
+    }
   );
 
   return {
@@ -367,19 +484,27 @@ export async function streamMessage(
   db: Database,
   profileId: string,
   sessionId: string,
-  input: SessionMessageInput
+  input: SessionMessageInput,
+  options?: { voyageApiKey?: string }
 ): Promise<{
   stream: AsyncIterable<string>;
   onComplete: (
     fullResponse: string
   ) => Promise<{ exchangeCount: number; escalationRung: number }>;
 }> {
-  const { session, context, effectiveRung } = await prepareExchangeContext(
-    db,
-    profileId,
-    sessionId,
-    input.message
-  );
+  const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
+    await prepareExchangeContext(
+      db,
+      profileId,
+      sessionId,
+      input.message,
+      options
+    );
+
+  // Compute time-to-answer before streaming begins
+  const timeToAnswerMs = lastAiResponseAt
+    ? Date.now() - lastAiResponseAt.getTime()
+    : null;
 
   const result = await streamExchange(context, input.message);
 
@@ -393,7 +518,12 @@ export async function streamMessage(
         session,
         input.message,
         fullResponse,
-        effectiveRung
+        effectiveRung,
+        {
+          isUnderstandingCheck: detectUnderstandingCheck(fullResponse),
+          timeToAnswerMs,
+          hintCountInSession: hintCount,
+        }
       );
       return { exchangeCount: newExchangeCount, escalationRung: effectiveRung };
     },
@@ -410,6 +540,8 @@ export async function closeSession(
   sessionId: string;
   topicId: string | null;
   subjectId: string;
+  sessionType: string;
+  interleavedTopicIds?: string[];
 }> {
   void input;
   const session = await getSession(db, profileId, sessionId);
@@ -437,11 +569,34 @@ export async function closeSession(
       )
     );
 
+  // FR92: Extract interleaved topic IDs from session metadata
+  let interleavedTopicIds: string[] | undefined;
+  if (session.sessionType === 'interleaved') {
+    const [row] = await db
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId)
+        )
+      )
+      .limit(1);
+    if (row?.metadata) {
+      const meta = row.metadata as {
+        interleavedTopics?: Array<{ topicId: string }>;
+      };
+      interleavedTopicIds = meta.interleavedTopics?.map((t) => t.topicId);
+    }
+  }
+
   return {
     message: 'Session closed',
     sessionId,
     topicId: session.topicId ?? null,
     subjectId: session.subjectId,
+    sessionType: session.sessionType,
+    interleavedTopicIds,
   };
 }
 

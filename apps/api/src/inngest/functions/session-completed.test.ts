@@ -80,6 +80,12 @@ jest.mock('../../services/settings', () => ({
   resetSummarySkips: (...args: unknown[]) => mockResetSummarySkips(...args),
 }));
 
+const mockCaptureException = jest.fn();
+
+jest.mock('../../services/sentry', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
 import { sessionCompleted } from './session-completed';
 
 // ---------------------------------------------------------------------------
@@ -158,9 +164,36 @@ describe('sessionCompleted', () => {
     );
   });
 
-  it('should return completed status with sessionId', async () => {
+  it('returns completed status with sessionId and outcomes', async () => {
     const { result } = await executeSteps(createEventData());
-    expect(result).toEqual({ status: 'completed', sessionId: 'session-001' });
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'completed',
+        sessionId: 'session-001',
+        outcomes: expect.any(Array),
+      })
+    );
+  });
+
+  it('returns all step outcomes', async () => {
+    const { result } = (await executeSteps(createEventData())) as any;
+    const stepNames = result.outcomes.map((o: any) => o.step);
+    expect(stepNames).toEqual([
+      'update-retention',
+      'update-needs-deepening',
+      'write-coaching-card',
+      'update-dashboard',
+      'generate-embeddings',
+      'track-summary-skips',
+    ]);
+  });
+
+  it('marks all steps as ok on success', async () => {
+    const { result } = (await executeSteps(createEventData())) as any;
+    const statuses = result.outcomes
+      .filter((o: any) => o.status !== 'skipped')
+      .map((o: any) => o.status);
+    expect(statuses).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok']);
   });
 
   describe('update-retention step', () => {
@@ -176,9 +209,15 @@ describe('sessionCompleted', () => {
     });
 
     it('skips retention update when no topicId', async () => {
-      await executeSteps(createEventData({ topicId: null }));
+      const { result } = (await executeSteps(
+        createEventData({ topicId: null })
+      )) as any;
 
       expect(mockUpdateRetentionFromSession).not.toHaveBeenCalled();
+      const retentionOutcome = result.outcomes.find(
+        (o: any) => o.step === 'update-retention'
+      );
+      expect(retentionOutcome.status).toBe('skipped');
     });
 
     it('defaults qualityRating to 3 when not provided', async () => {
@@ -189,6 +228,53 @@ describe('sessionCompleted', () => {
         'profile-001',
         'topic-001',
         3
+      );
+    });
+
+    it('loops over interleavedTopicIds when present (FR92)', async () => {
+      await executeSteps(
+        createEventData({
+          interleavedTopicIds: ['topic-a', 'topic-b', 'topic-c'],
+          qualityRating: 4,
+        })
+      );
+
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledTimes(3);
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-a',
+        4
+      );
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-b',
+        4
+      );
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-c',
+        4
+      );
+    });
+
+    it('prefers interleavedTopicIds over single topicId (FR92)', async () => {
+      await executeSteps(
+        createEventData({
+          topicId: 'topic-001',
+          interleavedTopicIds: ['topic-a', 'topic-b'],
+        })
+      );
+
+      // Should call for each interleaved topic, NOT for single topicId
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledTimes(2);
+      expect(mockUpdateRetentionFromSession).not.toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-001',
+        expect.anything()
       );
     });
   });
@@ -206,9 +292,15 @@ describe('sessionCompleted', () => {
     });
 
     it('skips needs-deepening update when no topicId', async () => {
-      await executeSteps(createEventData({ topicId: null }));
+      const { result } = (await executeSteps(
+        createEventData({ topicId: null })
+      )) as any;
 
       expect(mockUpdateNeedsDeepeningProgress).not.toHaveBeenCalled();
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'update-needs-deepening'
+      );
+      expect(outcome.status).toBe('skipped');
     });
 
     it('defaults qualityRating to 3 when not provided', async () => {
@@ -219,6 +311,35 @@ describe('sessionCompleted', () => {
         'profile-001',
         'topic-001',
         3
+      );
+    });
+
+    it('loops over interleavedTopicIds when present (FR92)', async () => {
+      await executeSteps(
+        createEventData({
+          interleavedTopicIds: ['topic-a', 'topic-b', 'topic-c'],
+          qualityRating: 5,
+        })
+      );
+
+      expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledTimes(3);
+      expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-a',
+        5
+      );
+      expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-b',
+        5
+      );
+      expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-c',
+        5
       );
     });
   });
@@ -364,6 +485,111 @@ describe('sessionCompleted', () => {
 
       expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
       expect(mockResetSummarySkips).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Error isolation — one failing step must not block others
+  // -------------------------------------------------------------------------
+
+  describe('error isolation', () => {
+    it('continues chain when embedding step fails', async () => {
+      mockStoreSessionEmbedding.mockRejectedValueOnce(
+        new Error('Voyage AI rate limit')
+      );
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const { result } = (await executeSteps(
+        createEventData({ summaryStatus: 'skipped' })
+      )) as any;
+
+      // Embedding failed, but other steps ran
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalled();
+      expect(mockPrecomputeCoachingCard).toHaveBeenCalled();
+      expect(mockRecordSessionActivity).toHaveBeenCalled();
+      expect(mockIncrementSummarySkips).toHaveBeenCalled();
+
+      // Sentry captured the error
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ profileId: 'profile-001' })
+      );
+
+      // Status reflects partial failure
+      expect(result.status).toBe('completed-with-errors');
+      const embeddingOutcome = result.outcomes.find(
+        (o: any) => o.step === 'generate-embeddings'
+      );
+      expect(embeddingOutcome.status).toBe('failed');
+      expect(embeddingOutcome.error).toContain('Voyage AI rate limit');
+
+      consoleSpy.mockRestore();
+    });
+
+    it('continues chain when coaching card step fails', async () => {
+      mockPrecomputeCoachingCard.mockRejectedValueOnce(
+        new Error('DB connection timeout')
+      );
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const { result } = (await executeSteps(createEventData())) as any;
+
+      // Steps after coaching card still ran
+      expect(mockRecordSessionActivity).toHaveBeenCalled();
+      expect(mockStoreSessionEmbedding).toHaveBeenCalled();
+
+      expect(result.status).toBe('completed-with-errors');
+      const cardOutcome = result.outcomes.find(
+        (o: any) => o.step === 'write-coaching-card'
+      );
+      expect(cardOutcome.status).toBe('failed');
+
+      consoleSpy.mockRestore();
+    });
+
+    it('continues chain when retention step fails', async () => {
+      mockUpdateRetentionFromSession.mockRejectedValueOnce(
+        new Error('SM-2 calculation error')
+      );
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const { result } = (await executeSteps(createEventData())) as any;
+
+      // All subsequent steps still ran
+      expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalled();
+      expect(mockPrecomputeCoachingCard).toHaveBeenCalled();
+      expect(mockRecordSessionActivity).toHaveBeenCalled();
+      expect(mockStoreSessionEmbedding).toHaveBeenCalled();
+
+      expect(result.status).toBe('completed-with-errors');
+
+      consoleSpy.mockRestore();
+    });
+
+    it('reports multiple failures independently', async () => {
+      mockUpdateRetentionFromSession.mockRejectedValueOnce(
+        new Error('SM-2 fail')
+      );
+      mockStoreSessionEmbedding.mockRejectedValueOnce(new Error('Voyage fail'));
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const { result } = (await executeSteps(createEventData())) as any;
+
+      // Two independent failures
+      const failed = result.outcomes.filter((o: any) => o.status === 'failed');
+      expect(failed).toHaveLength(2);
+      expect(failed.map((f: any) => f.step)).toEqual(
+        expect.arrayContaining(['update-retention', 'generate-embeddings'])
+      );
+
+      // Sentry called for each failure
+      expect(mockCaptureException).toHaveBeenCalledTimes(2);
+
+      // Non-failing steps still ran
+      expect(mockPrecomputeCoachingCard).toHaveBeenCalled();
+      expect(mockRecordSessionActivity).toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
     });
   });
 });

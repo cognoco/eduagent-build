@@ -229,7 +229,7 @@ jest.mock('../../apps/api/src/services/session', () => ({
   }),
 }));
 
-import app from '../../apps/api/src/index';
+import { app } from '../../apps/api/src/index';
 import {
   processInterviewExchange,
   extractSignals,

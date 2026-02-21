@@ -1,9 +1,13 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { Text, Pressable, Alert } from 'react-native';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { View, Text, Pressable, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ChatShell,
   animateResponse,
+  getModeConfig,
+  getOpeningMessage,
+  SessionTimer,
+  QuestionCounter,
   type ChatMessage,
 } from '../../../components/session';
 import {
@@ -11,23 +15,7 @@ import {
   useStartSession,
   useCloseSession,
 } from '../../../hooks/use-sessions';
-
-const OPENING_MESSAGES: Record<string, string> = {
-  homework:
-    "Got it. Let's work through this together.\n\nWhat do you think the first step is?",
-  learning:
-    "Great, let's pick up where we left off. What do you remember from our last session?",
-  practice:
-    "Let's see what you remember.\n\nQuick: what's the key concept we covered?",
-  freeform: "What's on your mind? I'm ready when you are.",
-};
-
-const MODE_TITLES: Record<string, string> = {
-  homework: 'Homework Help',
-  learning: 'Learning Session',
-  practice: 'Practice Session',
-  freeform: 'Chat',
-};
+import { useStreaks } from '../../../hooks/use-streaks';
 
 export default function SessionScreen() {
   const {
@@ -48,9 +36,14 @@ export default function SessionScreen() {
   const router = useRouter();
 
   const effectiveMode = mode ?? 'freeform';
-  const openingContent = problemText
-    ? "Got it. Let's work through this together."
-    : OPENING_MESSAGES[effectiveMode] ?? OPENING_MESSAGES.freeform;
+  const modeConfig = getModeConfig(effectiveMode);
+  const { data: streak } = useStreaks();
+  const sessionExperience = streak?.longestStreak ?? 0;
+  const openingContent = getOpeningMessage(
+    effectiveMode,
+    sessionExperience,
+    problemText
+  );
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'opening', role: 'ai', content: openingContent },
@@ -137,7 +130,13 @@ export default function SessionScreen() {
           (result) => {
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === streamId ? { ...m, streaming: false } : m
+                m.id === streamId
+                  ? {
+                      ...m,
+                      streaming: false,
+                      escalationRung: result.escalationRung,
+                    }
+                  : m
               )
             );
             setIsStreaming(false);
@@ -167,6 +166,7 @@ export default function SessionScreen() {
       }, 500);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [problemText, handleSend]);
 
   const handleEndSession = useCallback(async () => {
@@ -214,26 +214,46 @@ export default function SessionScreen() {
 
   const showEndSession = exchangeCount > 0;
 
+  const userMessageCount = useMemo(
+    () => messages.filter((m) => m.role === 'user').length,
+    [messages]
+  );
+
+  const endSessionButton = showEndSession ? (
+    <Pressable
+      onPress={handleEndSession}
+      disabled={isClosing || isStreaming}
+      className="ml-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
+      testID="end-session-button"
+      accessibilityLabel="End session"
+      accessibilityRole="button"
+    >
+      <Text className="text-body-sm font-semibold text-text-secondary">
+        {isClosing ? 'Closing...' : 'Done'}
+      </Text>
+    </Pressable>
+  ) : null;
+
+  const headerRight =
+    modeConfig.showTimer || showEndSession ? (
+      <View className="flex-row items-center">
+        {modeConfig.showTimer && <SessionTimer />}
+        {endSessionButton}
+      </View>
+    ) : undefined;
+
   return (
     <ChatShell
-      title={MODE_TITLES[effectiveMode] ?? 'Chat'}
+      title={modeConfig.title}
+      subtitle={modeConfig.subtitle}
+      placeholder={modeConfig.placeholder}
       messages={messages}
       onSend={handleSend}
       isStreaming={isStreaming}
-      rightAction={
-        showEndSession ? (
-          <Pressable
-            onPress={handleEndSession}
-            disabled={isClosing || isStreaming}
-            className="ml-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
-            testID="end-session-button"
-            accessibilityLabel="End session"
-            accessibilityRole="button"
-          >
-            <Text className="text-body-sm font-semibold text-text-secondary">
-              {isClosing ? 'Closing...' : 'Done'}
-            </Text>
-          </Pressable>
+      rightAction={headerRight}
+      footer={
+        modeConfig.showQuestionCount ? (
+          <QuestionCounter count={userMessageCount} />
         ) : undefined
       }
     />

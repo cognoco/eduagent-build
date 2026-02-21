@@ -69,9 +69,25 @@ export default function SubjectTopicsScreen() {
           </>
         ) : topics && topics.length > 0 ? (
           topics.map((topic) => (
-            <View
+            <Pressable
               key={topic.topicId}
+              onPress={() =>
+                router.push({
+                  pathname: '/(parent)/child/[profileId]/topic/[topicId]',
+                  params: {
+                    profileId: profileId!,
+                    topicId: topic.topicId,
+                    title: topic.title,
+                    completionStatus: topic.completionStatus,
+                    masteryScore: String(topic.masteryScore ?? ''),
+                    retentionStatus: topic.retentionStatus ?? '',
+                    subjectId: subjectId!,
+                  },
+                } as never)
+              }
               className="bg-surface rounded-card p-4 mt-3"
+              accessibilityLabel={`View ${topic.title} details`}
+              accessibilityRole="button"
               testID={`topic-card-${topic.topicId}`}
             >
               <View className="flex-row items-center justify-between mb-1">
@@ -99,7 +115,7 @@ export default function SubjectTopicsScreen() {
                     />
                   </View>
                 )}
-            </View>
+            </Pressable>
           ))
         ) : (
           <View className="py-8 items-center">

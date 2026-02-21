@@ -5,7 +5,10 @@ import {
   RetentionSignal,
   type RetentionStatus,
 } from '../../../../components/progress';
-import { useChildDetail } from '../../../../hooks/use-dashboard';
+import {
+  useChildDetail,
+  useChildSessions,
+} from '../../../../hooks/use-dashboard';
 
 function SubjectSkeleton(): React.ReactNode {
   return (
@@ -16,11 +19,30 @@ function SubjectSkeleton(): React.ReactNode {
   );
 }
 
+function formatDuration(seconds: number | null): string {
+  if (seconds === null || seconds === 0) return '--';
+  const mins = Math.round(seconds / 60);
+  if (mins < 1) return '<1 min';
+  return `${mins} min`;
+}
+
+function formatSessionDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default function ChildDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profileId } = useLocalSearchParams<{ profileId: string }>();
   const { data: child, isLoading } = useChildDetail(profileId);
+  const { data: sessions, isLoading: sessionsLoading } =
+    useChildSessions(profileId);
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -95,6 +117,61 @@ export default function ChildDetailScreen() {
           <View className="py-8 items-center">
             <Text className="text-body text-text-secondary">
               No subjects yet
+            </Text>
+          </View>
+        )}
+
+        {/* Recent Sessions */}
+        <Text className="text-h3 font-semibold text-text-primary mt-6 mb-2">
+          Recent Sessions
+        </Text>
+        {sessionsLoading ? (
+          <>
+            <SubjectSkeleton />
+            <SubjectSkeleton />
+          </>
+        ) : sessions && sessions.length > 0 ? (
+          sessions.map((session) => (
+            <Pressable
+              key={session.sessionId}
+              onPress={() =>
+                router.push({
+                  pathname: '/(parent)/child/[profileId]/session/[sessionId]',
+                  params: {
+                    profileId: profileId!,
+                    sessionId: session.sessionId,
+                  },
+                } as never)
+              }
+              className="bg-surface rounded-card p-4 mt-3"
+              accessibilityLabel={`View session from ${formatSessionDate(
+                session.startedAt
+              )}`}
+              accessibilityRole="button"
+              testID={`session-card-${session.sessionId}`}
+            >
+              <View className="flex-row items-center justify-between mb-1">
+                <Text className="text-body font-medium text-text-primary">
+                  {formatSessionDate(session.startedAt)}
+                </Text>
+                <Text className="text-caption text-text-secondary">
+                  {session.sessionType}
+                </Text>
+              </View>
+              <View className="flex-row items-center">
+                <Text className="text-caption text-text-secondary mr-4">
+                  {session.exchangeCount} exchanges
+                </Text>
+                <Text className="text-caption text-text-secondary">
+                  {formatDuration(session.durationSeconds)}
+                </Text>
+              </View>
+            </Pressable>
+          ))
+        ) : (
+          <View className="py-4 items-center">
+            <Text className="text-body text-text-secondary">
+              No sessions yet
             </Text>
           </View>
         )}

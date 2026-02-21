@@ -164,11 +164,29 @@ jest.mock('../services/settings', () => ({
   shouldPromptCasualSwitch: jest.fn().mockResolvedValue(false),
 }));
 
+const mockStartInterleavedSession = jest.fn().mockResolvedValue({
+  sessionId: 'interleaved-session-001',
+  topics: [
+    {
+      topicId: '550e8400-e29b-41d4-a716-446655440001',
+      subjectId: SUBJECT_ID,
+      topicTitle: 'Algebra Basics',
+      isStable: false,
+      consecutiveSuccesses: 1,
+    },
+    {
+      topicId: '550e8400-e29b-41d4-a716-446655440002',
+      subjectId: SUBJECT_ID,
+      topicTitle: 'Quadratic Equations',
+      isStable: true,
+      consecutiveSuccesses: 5,
+    },
+  ],
+});
+
 jest.mock('../services/interleaved', () => ({
-  startInterleavedSession: jest.fn().mockResolvedValue({
-    session: { id: 'mock-session' },
-    topics: [],
-  }),
+  startInterleavedSession: (...args: unknown[]) =>
+    mockStartInterleavedSession(...args),
 }));
 
 jest.mock('../services/recall-bridge', () => ({
@@ -193,7 +211,7 @@ jest.mock('../inngest/client', () => ({
 import { inngest } from '../inngest/client';
 import { processMessage, streamMessage } from '../services/session';
 import { shouldPromptCasualSwitch } from '../services/settings';
-import app from '../index';
+import { app } from '../index';
 
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
@@ -718,6 +736,130 @@ describe('session routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockIncrementQuota).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /v1/sessions/interleaved (FR92)
+  // -------------------------------------------------------------------------
+
+  describe('POST /v1/sessions/interleaved', () => {
+    beforeEach(() => {
+      mockStartInterleavedSession.mockClear();
+    });
+
+    it('returns 201 with session and topics', async () => {
+      const res = await app.request(
+        '/v1/sessions/interleaved',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ topicCount: 3 }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(201);
+
+      const body = await res.json();
+      expect(body.sessionId).toBe('interleaved-session-001');
+      expect(body.topics).toHaveLength(2);
+      expect(body.topics[0].topicTitle).toBe('Algebra Basics');
+      expect(body.topics[1].isStable).toBe(true);
+    });
+
+    it('accepts optional subjectId filter', async () => {
+      const res = await app.request(
+        '/v1/sessions/interleaved',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            subjectId: SUBJECT_ID,
+            topicCount: 5,
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(201);
+      expect(mockStartInterleavedSession).toHaveBeenCalledWith(
+        expect.anything(), // db
+        expect.any(String), // profileId
+        expect.objectContaining({
+          subjectId: SUBJECT_ID,
+          topicCount: 5,
+        })
+      );
+    });
+
+    it('returns 400 when no topics are available', async () => {
+      mockStartInterleavedSession.mockRejectedValueOnce(
+        new Error('No topics available for interleaved retrieval')
+      );
+
+      const res = await app.request(
+        '/v1/sessions/interleaved',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+
+      const body = await res.json();
+      expect(body.message).toBe(
+        'No topics available for interleaved retrieval'
+      );
+    });
+
+    it('returns 400 with invalid subjectId', async () => {
+      const res = await app.request(
+        '/v1/sessions/interleaved',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ subjectId: 'not-a-uuid' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        '/v1/sessions/interleaved',
+        {
+          method: 'POST',
+          body: JSON.stringify({}),
+          headers: { 'Content-Type': 'application/json' },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+
+    it('defaults topicCount to 5 when not provided', async () => {
+      await app.request(
+        '/v1/sessions/interleaved',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      expect(mockStartInterleavedSession).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(String),
+        expect.objectContaining({ topicCount: 5 })
+      );
     });
   });
 });

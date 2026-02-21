@@ -53,16 +53,20 @@ export default function SessionSummaryScreen() {
     router.replace('/(learner)/home');
   };
 
-  const rungLabel =
-    rung <= 1
-      ? 'Guided'
-      : rung <= 2
-      ? 'Scaffolded'
-      : rung <= 3
-      ? 'Exploratory'
-      : rung <= 4
-      ? 'Independent'
-      : 'Advanced';
+  const takeaways: string[] = [];
+  if (exchanges > 0) {
+    takeaways.push(
+      `You worked through ${exchanges} exchange${exchanges === 1 ? '' : 's'}`
+    );
+  }
+  if (rung >= 3) {
+    takeaways.push('You tackled some challenging concepts with guidance');
+  } else if (exchanges > 0) {
+    takeaways.push('You showed strong independent thinking');
+  }
+  if (takeaways.length === 0) {
+    takeaways.push('Great effort today');
+  }
 
   return (
     <KeyboardAvoidingView
@@ -92,24 +96,25 @@ export default function SessionSummaryScreen() {
         className="flex-1 px-4 pt-4"
         contentContainerStyle={{ paddingBottom: 24 }}
       >
-        {/* Stats */}
+        {/* Session takeaways (learner-friendly, no internal metrics) */}
         <View
-          className="flex-row bg-surface rounded-card p-4 mb-4"
-          testID="session-stats"
+          className="bg-surface rounded-card p-4 mb-4"
+          testID="session-takeaways"
         >
-          <View className="flex-1 items-center">
-            <Text className="text-h2 font-bold text-primary">{exchanges}</Text>
-            <Text className="text-caption text-text-secondary mt-1">
-              Exchanges
-            </Text>
-          </View>
-          <View className="w-px bg-surface-elevated" />
-          <View className="flex-1 items-center">
-            <Text className="text-h2 font-bold text-primary">{rung}</Text>
-            <Text className="text-caption text-text-secondary mt-1">
-              {rungLabel}
-            </Text>
-          </View>
+          <Text className="text-body font-semibold text-text-primary mb-2">
+            What happened
+          </Text>
+          {takeaways.map((t, i) => (
+            <View key={i} className="flex-row items-start mt-1">
+              <Text className="text-body text-text-secondary mr-2">
+                {'\u2022'}
+              </Text>
+              <Text className="text-body text-text-primary flex-1">{t}</Text>
+            </View>
+          ))}
+          <Text className="text-caption text-text-secondary mt-3">
+            Your coach will check in soon
+          </Text>
         </View>
 
         {/* Your Words section */}

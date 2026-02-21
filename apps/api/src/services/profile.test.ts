@@ -2,6 +2,10 @@
 // Profile Service Tests
 // ---------------------------------------------------------------------------
 
+jest.mock('./consent', () => ({
+  getConsentStatus: jest.fn().mockResolvedValue(null),
+}));
+
 import type { Database } from '@eduagent/database';
 import {
   listProfiles,
@@ -10,6 +14,7 @@ import {
   updateProfile,
   switchProfile,
 } from './profile';
+import { getConsentStatus } from './consent';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 const BIRTH = new Date('1990-01-15T00:00:00.000Z');
@@ -86,6 +91,23 @@ describe('listProfiles', () => {
     expect(result[0].displayName).toBe('Alice');
     expect(result[1].displayName).toBe('Bob');
     expect(result[0].createdAt).toBe('2025-01-15T10:00:00.000Z');
+  });
+
+  it('includes consentStatus from consent service', async () => {
+    const mockGetConsent = getConsentStatus as jest.Mock;
+    mockGetConsent
+      .mockResolvedValueOnce('PARENTAL_CONSENT_REQUESTED')
+      .mockResolvedValueOnce(null);
+
+    const rows = [
+      mockProfileRow({ id: 'child-1', displayName: 'Child' }),
+      mockProfileRow({ id: 'adult-1', displayName: 'Adult' }),
+    ];
+    const db = createMockDb({ findManyResult: rows });
+    const result = await listProfiles(db, 'account-123');
+
+    expect(result[0].consentStatus).toBe('PARENTAL_CONSENT_REQUESTED');
+    expect(result[1].consentStatus).toBeNull();
   });
 });
 

@@ -34,6 +34,7 @@ export function buildRetentionCard(
     intervalDays: 1,
     repetitions: 0,
     nextReviewAt: null,
+    lastReviewedAt: null,
     xpStatus: 'pending',
     failureCount: 0,
     ...overrides,

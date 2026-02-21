@@ -82,3 +82,43 @@ export function getStepVoyageApiKey(): string {
   }
   return key;
 }
+
+// ---------------------------------------------------------------------------
+// Module-level RESEND_API_KEY — set by Inngest middleware on CF Workers,
+// falls back to process.env for Node.js test environments.
+// ---------------------------------------------------------------------------
+
+let _resendApiKey: string | undefined;
+let _emailFrom: string | undefined;
+
+/** Called by Inngest middleware to inject the RESEND_API_KEY binding. */
+export function setResendApiKey(key: string): void {
+  _resendApiKey = key;
+}
+
+/** Called by Inngest middleware to inject the EMAIL_FROM binding. */
+export function setEmailFrom(from: string): void {
+  _emailFrom = from;
+}
+
+/** Reset the injected keys — for test cleanup only. */
+export function resetResendConfig(): void {
+  _resendApiKey = undefined;
+  _emailFrom = undefined;
+}
+
+/**
+ * Returns the Resend API key for use within Inngest step functions.
+ *
+ * Returns undefined if not configured — callers should degrade gracefully.
+ */
+export function getStepResendApiKey(): string | undefined {
+  return _resendApiKey ?? process.env['RESEND_API_KEY'];
+}
+
+/**
+ * Returns the EMAIL_FROM address for use within Inngest step functions.
+ */
+export function getStepEmailFrom(): string {
+  return _emailFrom ?? process.env['EMAIL_FROM'] ?? 'noreply@eduagent.com';
+}
