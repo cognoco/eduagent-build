@@ -243,12 +243,12 @@ describe('TopicDetailScreen', () => {
     fireEvent.press(screen.getByTestId('request-retest-button'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/assessment',
+      pathname: '/(learner)/topic/recall-test',
       params: { subjectId: 'sub-1', topicId: 'topic-1' },
     });
   });
 
-  it('navigates to learning session on Relearn press', () => {
+  it('navigates to relearn page on Relearn press', () => {
     mockUseTopicProgress.mockReturnValue({
       data: {
         topicId: 'topic-1',
@@ -256,7 +256,7 @@ describe('TopicDetailScreen', () => {
         description: '',
         completionStatus: 'completed',
         retentionStatus: 'strong',
-        struggleStatus: 'normal',
+        struggleStatus: 'needs_deepening',
         masteryScore: null,
         summaryExcerpt: null,
         xpStatus: null,
@@ -270,8 +270,8 @@ describe('TopicDetailScreen', () => {
     fireEvent.press(screen.getByTestId('relearn-button'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(learner)/session',
-      params: { mode: 'learning', subjectId: 'sub-1', topicId: 'topic-1' },
+      pathname: '/(learner)/topic/relearn',
+      params: { subjectId: 'sub-1', topicId: 'topic-1' },
     });
   });
 });
