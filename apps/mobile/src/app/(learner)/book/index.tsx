@@ -24,6 +24,7 @@ interface EnrichedTopic {
   retention: RetentionStatus;
   lastReviewedAt: string | null;
   repetitions: number;
+  failureCount: number;
 }
 
 function formatLastPracticed(iso: string | null): string | null {
@@ -98,6 +99,7 @@ export default function LearningBookScreen() {
             retention,
             lastReviewedAt: topic.lastReviewedAt,
             repetitions: topic.repetitions,
+            failureCount: topic.failureCount,
           });
         }
       }
@@ -229,6 +231,11 @@ export default function LearningBookScreen() {
                       </Text>
                     )}
                   </View>
+                  {topic.failureCount >= 3 && (
+                    <Text className="text-caption text-warning mt-0.5">
+                      Needs attention
+                    </Text>
+                  )}
                   {formatLastPracticed(topic.lastReviewedAt) && (
                     <Text className="text-caption text-text-tertiary mt-0.5">
                       Last practiced:{' '}

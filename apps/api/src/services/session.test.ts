@@ -28,6 +28,10 @@ jest.mock('./prior-learning', () => ({
   buildPriorLearningContext: jest.fn(),
 }));
 
+jest.mock('./retention-data', () => ({
+  getTeachingPreference: jest.fn().mockResolvedValue(null),
+}));
+
 jest.mock('./memory', () => ({
   retrieveRelevantMemory: jest
     .fn()
@@ -52,6 +56,7 @@ import { evaluateSummary } from './summaries';
 import { getSubject } from './subject';
 import { fetchPriorTopics, buildPriorLearningContext } from './prior-learning';
 import { retrieveRelevantMemory } from './memory';
+import { getTeachingPreference } from './retention-data';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 const profileId = 'test-profile-id';
@@ -1025,6 +1030,43 @@ describe('escalation tracking', () => {
         hintCount: 2,
       }),
       'Still lost'
+    );
+  });
+});
+
+describe('teaching preference (FR58)', () => {
+  it('includes teaching preference in exchange context when set', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    (getTeachingPreference as jest.Mock).mockResolvedValueOnce({
+      subjectId,
+      method: 'visual_diagrams',
+    });
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'Teach me',
+    });
+
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        teachingPreference: 'visual_diagrams',
+      }),
+      'Teach me'
+    );
+  });
+
+  it('omits teaching preference when none is set', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    // Default mock returns null
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'Hello',
+    });
+
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        teachingPreference: undefined,
+      }),
+      'Hello'
     );
   });
 });

@@ -215,6 +215,21 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain('interleaved session');
   });
 
+  it('includes teaching preference when set (FR58)', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      teachingPreference: 'visual_diagrams',
+    });
+    expect(prompt).toContain('Teaching method preference');
+    expect(prompt).toContain('visual_diagrams');
+    expect(prompt).toContain('Adapt your teaching style');
+  });
+
+  it('omits teaching preference when not set (FR58)', () => {
+    const prompt = buildSystemPrompt(baseContext);
+    expect(prompt).not.toContain('Teaching method preference');
+  });
+
   it('works without optional fields', () => {
     const minimalContext: ExchangeContext = {
       sessionId: 'sess-1',

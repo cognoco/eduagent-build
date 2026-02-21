@@ -34,6 +34,7 @@ import { evaluateSummary } from './summaries';
 import { getSubject } from './subject';
 import { fetchPriorTopics, buildPriorLearningContext } from './prior-learning';
 import { retrieveRelevantMemory } from './memory';
+import { getTeachingPreference } from './retention-data';
 import type { EscalationRung } from './llm';
 
 // ---------------------------------------------------------------------------
@@ -184,6 +185,7 @@ async function prepareExchangeContext(
     events,
     priorTopics,
     memory,
+    teachingPref,
     metadataRows,
   ] = await Promise.all([
     getSubject(db, profileId, session.subjectId),
@@ -216,6 +218,8 @@ async function prepareExchangeContext(
     }),
     fetchPriorTopics(db, profileId, session.subjectId),
     retrieveRelevantMemory(db, profileId, userMessage, options?.voyageApiKey),
+    // FR58: Load teaching method preference for adaptive teaching
+    getTeachingPreference(db, profileId, session.subjectId),
     // FR92: Load session metadata for interleaved topic list
     isInterleaved
       ? db
@@ -336,6 +340,7 @@ async function prepareExchangeContext(
     workedExampleLevel: interleavedTopics ? undefined : workedExampleLevel,
     priorLearningContext: priorLearning.contextText || undefined,
     embeddingMemoryContext: memory.context || undefined,
+    teachingPreference: teachingPref?.method,
     interleavedTopics,
   };
 

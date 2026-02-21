@@ -26,6 +26,8 @@ export interface ExchangeContext {
   priorLearningContext?: string;
   embeddingMemoryContext?: string;
   workedExampleLevel?: 'full' | 'fading' | 'problem_first';
+  /** Teaching method preference for adaptive teaching (FR58) */
+  teachingPreference?: string;
   /** Multiple topics for interleaved retrieval sessions (FR92) */
   interleavedTopics?: Array<{
     topicId: string;
@@ -127,6 +129,14 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // Worked example level
   if (context.workedExampleLevel) {
     sections.push(getWorkedExampleGuidance(context.workedExampleLevel));
+  }
+
+  // Teaching method preference (FR58)
+  if (context.teachingPreference) {
+    sections.push(
+      `Teaching method preference: The learner learns best with "${context.teachingPreference}". ` +
+        'Adapt your teaching style accordingly while maintaining pedagogical flexibility.'
+    );
   }
 
   // Cognitive load management

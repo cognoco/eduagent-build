@@ -1506,6 +1506,15 @@ So that I get appropriate support without being prematurely redirected.
 
 **FRs:** FR52, FR53, FR54, FR55
 
+✅ **Implementation status:** Completed.
+- API: `processRecallTest()` tracks failure count per-topic, returns `failureAction: redirect_to_learning_book` after 3+ failures with remediation data (cooldown, retention status, suggestions)
+- API: 24h anti-cramming cooldown (FR54) enforced in `processRecallTest()`
+- Mobile: `recall-test.tsx` screen — ChatShell-based recall check with animated AI feedback
+- Mobile: `RemediationCard` component — cooldown timer, "Review & Re-test" / "Relearn Topic" buttons
+- Mobile: Topic detail (`[topicId].tsx`) — failure count display, rewired buttons to recall-test and relearn screens
+- Mobile: Learning Book (`book/index.tsx`) — "Needs attention" indicator on topics with 3+ failures
+- Mobile: `useSubmitRecallTest()` mutation hook invalidates retention + progress queries
+
 ---
 
 ### Story 3.6: Relearn Topic with Method Adaptation
@@ -1526,6 +1535,14 @@ So that I can find a method that works better for me.
 **And** relearn resets the topic's mastery score to 0 and restarts SM-2 intervals
 
 **FRs:** FR56, FR57, FR58
+
+✅ **Implementation status:** Completed.
+- API: `startRelearn()` resets SM-2 retention card (easeFactor, interval, repetitions) and creates new learning session
+- API: `getTeachingPreference()` retrieves stored method preference per subject
+- API: Teaching preference injected into LLM system prompt via `ExchangeContext.teachingPreference` (FR58)
+- Mobile: `relearn.tsx` screen — two-phase UI: Same/Different method choice → teaching method grid (visual diagrams, step-by-step, real-world examples, practice problems)
+- Mobile: `useStartRelearn()` mutation hook with session redirect on success
+- Tests: exchanges.test.ts (teaching pref in/out), session.test.ts (teaching pref wiring)
 
 ---
 
