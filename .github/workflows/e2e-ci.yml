@@ -1,0 +1,99 @@
+name: E2E Tests
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/api/**'
+      - 'apps/mobile/**'
+      - 'packages/schemas/**'
+      - 'packages/database/**'
+      - '.github/workflows/e2e-ci.yml'
+  pull_request:
+    paths:
+      - 'apps/api/**'
+      - 'apps/mobile/**'
+      - 'packages/schemas/**'
+      - 'packages/database/**'
+      - '.github/workflows/e2e-ci.yml'
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  api-integration:
+    name: API Integration Tests
+    runs-on: ubuntu-latest
+    # Advisory — does not block PR merge
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: eduagent
+          POSTGRES_PASSWORD: eduagent
+          POSTGRES_DB: tests
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://eduagent:eduagent@localhost:5432/tests
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: tree:0
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install
+
+      - name: Apply database schema
+        run: pnpm --filter @eduagent/database db:push
+
+      - name: Run API integration tests
+        run: pnpm exec nx run api:test:integration
+
+  mobile-maestro:
+    name: Mobile Maestro Smoke Tests
+    runs-on: ubuntu-latest
+    # Advisory — does not block PR merge
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: tree:0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install
+
+      - name: Install Maestro CLI
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Run Maestro smoke tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          script: |
+            maestro test apps/mobile/e2e/flows/ --include-tags=smoke

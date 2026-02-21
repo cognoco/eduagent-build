@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 import { consentStates, profiles, type Database } from '@eduagent/database';
 import type {
   ConsentType,
@@ -105,6 +105,17 @@ export async function requestConsent(
       parentEmail: input.parentEmail,
       consentToken: token,
     })
+    .onConflictDoUpdate({
+      target: [consentStates.profileId, consentStates.consentType],
+      set: {
+        status: 'PARENTAL_CONSENT_REQUESTED',
+        parentEmail: input.parentEmail,
+        consentToken: token,
+        requestedAt: sql`now()`,
+        respondedAt: null,
+        updatedAt: sql`now()`,
+      },
+    })
     .returning();
 
   // Look up child's display name for personalized email
@@ -191,4 +202,30 @@ export async function getConsentStatus(
     orderBy: desc(consentStates.requestedAt),
   });
   return row?.status ?? null;
+}
+
+/**
+ * Returns the current consent state for a profile including parentEmail.
+ *
+ * Used by the GET /v1/consent/my-status endpoint so the mobile app can
+ * display which email address the consent request was sent to.
+ */
+export async function getProfileConsentState(
+  db: Database,
+  profileId: string
+): Promise<{
+  status: ConsentStatus;
+  parentEmail: string | null;
+  consentType: ConsentType;
+} | null> {
+  const row = await db.query.consentStates.findFirst({
+    where: eq(consentStates.profileId, profileId),
+    orderBy: desc(consentStates.requestedAt),
+  });
+  if (!row) return null;
+  return {
+    status: row.status,
+    parentEmail: row.parentEmail ?? null,
+    consentType: row.consentType,
+  };
 }

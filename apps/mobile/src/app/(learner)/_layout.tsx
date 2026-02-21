@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../lib/profile';
 import { useTheme, useThemeColors } from '../../lib/theme';
+import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
 
 const iconMap: Record<
   string,
@@ -45,6 +46,9 @@ function ConsentPendingGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
+  const { profiles, activeProfile, switchProfile } = useProfile();
+  const { data: consentData } = useConsentStatus();
+  const resendMutation = useRequestConsent();
   const [checking, setChecking] = React.useState(false);
 
   const onCheckAgain = async () => {
@@ -56,6 +60,18 @@ function ConsentPendingGate(): React.ReactElement {
     }
   };
 
+  const onResend = () => {
+    if (!activeProfile || !consentData?.parentEmail || !consentData.consentType)
+      return;
+    resendMutation.mutate({
+      childProfileId: activeProfile.id,
+      parentEmail: consentData.parentEmail,
+      consentType: consentData.consentType,
+    });
+  };
+
+  const parentEmail = consentData?.parentEmail;
+
   return (
     <View
       className="flex-1 bg-background items-center justify-center px-6"
@@ -63,11 +79,15 @@ function ConsentPendingGate(): React.ReactElement {
       testID="consent-pending-gate"
     >
       <Text className="text-h1 font-bold text-text-primary mb-4 text-center">
-        Almost there!
+        Waiting for approval
+      </Text>
+      <Text className="text-body text-text-secondary mb-2 text-center">
+        {parentEmail
+          ? `We sent an email to ${parentEmail}.`
+          : 'We sent an email to your parent or guardian.'}
       </Text>
       <Text className="text-body text-text-secondary mb-8 text-center">
-        We've sent an email to your parent or guardian. Once they approve,
-        you'll be able to start learning.
+        Once they approve, you'll have full access.
       </Text>
 
       <Pressable
@@ -86,6 +106,42 @@ function ConsentPendingGate(): React.ReactElement {
           </Text>
         )}
       </Pressable>
+
+      {parentEmail && consentData?.consentType && (
+        <Pressable
+          onPress={onResend}
+          disabled={resendMutation.isPending}
+          className="bg-surface rounded-button py-3.5 px-8 items-center mb-3 w-full"
+          testID="consent-resend"
+          accessibilityRole="button"
+          accessibilityLabel="Resend approval email"
+        >
+          {resendMutation.isPending ? (
+            <ActivityIndicator color={colors.accent} />
+          ) : (
+            <Text className="text-body font-semibold text-primary">
+              Resend email
+            </Text>
+          )}
+        </Pressable>
+      )}
+
+      {profiles.length > 1 && activeProfile && (
+        <Pressable
+          onPress={() => {
+            const other = profiles.find((p) => p.id !== activeProfile.id);
+            if (other) void switchProfile(other.id);
+          }}
+          className="py-3.5 px-8 items-center mb-3 w-full"
+          testID="consent-switch-profile"
+          accessibilityRole="button"
+          accessibilityLabel="Switch profile"
+        >
+          <Text className="text-body font-semibold text-text-secondary">
+            Switch profile
+          </Text>
+        </Pressable>
+      )}
 
       <Pressable
         onPress={() => signOut()}

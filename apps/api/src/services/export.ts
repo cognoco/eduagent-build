@@ -31,7 +31,7 @@ import {
   topUpCredits,
   type Database,
 } from '@eduagent/database';
-import type { DataExport } from '@eduagent/schemas';
+import type { DataExport, ConsentStatus } from '@eduagent/schemas';
 
 export async function generateExport(
   db: Database,
@@ -57,6 +57,27 @@ export async function generateExport(
           where: inArray(consentStates.profileId, profileIds),
         })
       : [];
+
+  // Build a map of profileId → most-recent consent status for profile export
+  const latestConsentByProfileId = new Map<
+    string,
+    { status: string; requestedAt: Date }
+  >();
+  for (const row of consentRows) {
+    const existing = latestConsentByProfileId.get(row.profileId);
+    if (!existing || row.requestedAt > existing.requestedAt) {
+      latestConsentByProfileId.set(row.profileId, {
+        status: row.status,
+        requestedAt: row.requestedAt,
+      });
+    }
+  }
+  const consentStatusByProfileId = new Map<string, ConsentStatus>(
+    [...latestConsentByProfileId.entries()].map(([pid, { status }]) => [
+      pid,
+      status as ConsentStatus,
+    ])
+  );
 
   // --- GDPR Article 15: query all profile-scoped personal data ---
   const subjectRows =
@@ -227,6 +248,7 @@ export async function generateExport(
         : null,
       personaType: row.personaType,
       isOwner: row.isOwner,
+      consentStatus: consentStatusByProfileId.get(row.id) ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     })),

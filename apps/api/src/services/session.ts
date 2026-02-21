@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, and, asc, inArray } from 'drizzle-orm';
 import {
   learningSessions,
   sessionEvents,
@@ -173,6 +173,8 @@ async function prepareExchangeContext(
     throw new Error('Session not found');
   }
 
+  const isInterleaved = session.sessionType === 'interleaved';
+
   // 2. Load all supplementary data in parallel (all independent after session load)
   const [
     subject,
@@ -182,6 +184,7 @@ async function prepareExchangeContext(
     events,
     priorTopics,
     memory,
+    metadataRows,
   ] = await Promise.all([
     getSubject(db, profileId, session.subjectId),
     session.topicId
@@ -213,11 +216,57 @@ async function prepareExchangeContext(
     }),
     fetchPriorTopics(db, profileId, session.subjectId),
     retrieveRelevantMemory(db, profileId, userMessage, options?.voyageApiKey),
+    // FR92: Load session metadata for interleaved topic list
+    isInterleaved
+      ? db
+          .select({ metadata: learningSessions.metadata })
+          .from(learningSessions)
+          .where(
+            and(
+              eq(learningSessions.id, sessionId),
+              eq(learningSessions.profileId, profileId)
+            )
+          )
+          .limit(1)
+      : Promise.resolve([]),
   ]);
 
   const topic = topicRows[0];
   const [profile] = profileRows;
   const retentionCard = retentionRows[0];
+
+  // FR92: Resolve interleaved topic details (titles + descriptions)
+  let interleavedTopics: ExchangeContext['interleavedTopics'];
+  if (isInterleaved && metadataRows[0]?.metadata) {
+    const meta = metadataRows[0].metadata as {
+      interleavedTopics?: Array<{
+        topicId: string;
+        topicTitle: string;
+        subjectId: string;
+      }>;
+    };
+    const topicIds = meta.interleavedTopics?.map((t) => t.topicId) ?? [];
+    if (topicIds.length > 0) {
+      const topicDetails = await db
+        .select({
+          id: curriculumTopics.id,
+          title: curriculumTopics.title,
+          description: curriculumTopics.description,
+        })
+        .from(curriculumTopics)
+        .where(inArray(curriculumTopics.id, topicIds));
+      const detailMap = new Map(topicDetails.map((t) => [t.id, t]));
+      interleavedTopics = topicIds.map((id) => {
+        const detail = detailMap.get(id);
+        const metaTopic = meta.interleavedTopics!.find((t) => t.topicId === id);
+        return {
+          topicId: id,
+          title: detail?.title ?? metaTopic?.topicTitle ?? 'Unknown',
+          description: detail?.description ?? undefined,
+        };
+      });
+    }
+  }
 
   const workedExampleLevel: 'full' | 'fading' | 'problem_first' = retentionCard
     ? retentionCard.repetitions <= 1
@@ -272,20 +321,22 @@ async function prepareExchangeContext(
   const priorLearning = buildPriorLearningContext(priorTopics);
 
   // 6. Build ExchangeContext
+  // For interleaved sessions: use the topic list, clear single-topic fields
   const context: ExchangeContext = {
     sessionId,
     profileId,
     subjectName: subject?.name ?? 'Unknown',
-    topicTitle: topic?.title,
-    topicDescription: topic?.description,
+    topicTitle: interleavedTopics ? undefined : topic?.title,
+    topicDescription: interleavedTopics ? undefined : topic?.description,
     sessionType: session.sessionType as 'learning' | 'homework' | 'interleaved',
     escalationRung: effectiveRung,
     exchangeHistory,
     personaType:
       (profile?.personaType as 'TEEN' | 'LEARNER' | 'PARENT') ?? 'LEARNER',
-    workedExampleLevel,
+    workedExampleLevel: interleavedTopics ? undefined : workedExampleLevel,
     priorLearningContext: priorLearning.contextText || undefined,
     embeddingMemoryContext: memory.context || undefined,
+    interleavedTopics,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };
@@ -378,7 +429,8 @@ export async function processMessage(
   db: Database,
   profileId: string,
   sessionId: string,
-  input: SessionMessageInput
+  input: SessionMessageInput,
+  options?: { voyageApiKey?: string }
 ): Promise<{
   response: string;
   escalationRung: number;
@@ -386,7 +438,13 @@ export async function processMessage(
   exchangeCount: number;
 }> {
   const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
-    await prepareExchangeContext(db, profileId, sessionId, input.message);
+    await prepareExchangeContext(
+      db,
+      profileId,
+      sessionId,
+      input.message,
+      options
+    );
 
   const result = await processExchange(context, input.message);
 
@@ -426,7 +484,8 @@ export async function streamMessage(
   db: Database,
   profileId: string,
   sessionId: string,
-  input: SessionMessageInput
+  input: SessionMessageInput,
+  options?: { voyageApiKey?: string }
 ): Promise<{
   stream: AsyncIterable<string>;
   onComplete: (
@@ -434,7 +493,13 @@ export async function streamMessage(
   ) => Promise<{ exchangeCount: number; escalationRung: number }>;
 }> {
   const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
-    await prepareExchangeContext(db, profileId, sessionId, input.message);
+    await prepareExchangeContext(
+      db,
+      profileId,
+      sessionId,
+      input.message,
+      options
+    );
 
   // Compute time-to-answer before streaming begins
   const timeToAnswerMs = lastAiResponseAt
@@ -475,6 +540,8 @@ export async function closeSession(
   sessionId: string;
   topicId: string | null;
   subjectId: string;
+  sessionType: string;
+  interleavedTopicIds?: string[];
 }> {
   void input;
   const session = await getSession(db, profileId, sessionId);
@@ -502,11 +569,34 @@ export async function closeSession(
       )
     );
 
+  // FR92: Extract interleaved topic IDs from session metadata
+  let interleavedTopicIds: string[] | undefined;
+  if (session.sessionType === 'interleaved') {
+    const [row] = await db
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId)
+        )
+      )
+      .limit(1);
+    if (row?.metadata) {
+      const meta = row.metadata as {
+        interleavedTopics?: Array<{ topicId: string }>;
+      };
+      interleavedTopicIds = meta.interleavedTopics?.map((t) => t.topicId);
+    }
+  }
+
   return {
     message: 'Session closed',
     sessionId,
     topicId: session.topicId ?? null,
     subjectId: session.subjectId,
+    sessionType: session.sessionType,
+    interleavedTopicIds,
   };
 }
 

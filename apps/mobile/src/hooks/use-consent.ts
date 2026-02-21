@@ -1,5 +1,14 @@
-import { useMutation, type UseMutationResult } from '@tanstack/react-query';
-import type { ConsentRequest, ConsentRequestResult } from '@eduagent/schemas';
+import {
+  useMutation,
+  useQuery,
+  type UseMutationResult,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+import type {
+  ConsentRequest,
+  ConsentRequestResult,
+  ConsentStatus,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 
 export function useRequestConsent(): UseMutationResult<
@@ -14,6 +23,30 @@ export function useRequestConsent(): UseMutationResult<
       input: ConsentRequest
     ): Promise<ConsentRequestResult> => {
       const res = await client.consent.request.$post({ json: input });
+      return await res.json();
+    },
+  });
+}
+
+export interface ConsentStatusData {
+  consentStatus: ConsentStatus | null;
+  parentEmail: string | null;
+  consentType: 'GDPR' | 'COPPA' | null;
+}
+
+/**
+ * Fetches consent status and parentEmail for the active profile.
+ *
+ * Used by the consent-pending screen to display which email the consent
+ * request was sent to, and to get the consentType for the resend mutation.
+ */
+export function useConsentStatus(): UseQueryResult<ConsentStatusData> {
+  const client = useApiClient();
+
+  return useQuery({
+    queryKey: ['consent-status'],
+    queryFn: async (): Promise<ConsentStatusData> => {
+      const res = await client.consent['my-status'].$get();
       return await res.json();
     },
   });

@@ -3,7 +3,11 @@ import { zValidator } from '@hono/zod-validator';
 import { consentRequestSchema, consentResponseSchema } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
-import { requestConsent, processConsentResponse } from '../services/consent';
+import {
+  requestConsent,
+  processConsentResponse,
+  getProfileConsentState,
+} from '../services/consent';
 import { notFound } from '../errors';
 import { inngest } from '../inngest/client';
 
@@ -15,7 +19,7 @@ type ConsentRouteEnv = {
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
   };
-  Variables: { user: AuthUser; db: Database };
+  Variables: { user: AuthUser; db: Database; profileId: string };
 };
 
 export const consentRoutes = new Hono<ConsentRouteEnv>()
@@ -73,4 +77,21 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         throw error;
       }
     }
-  );
+  )
+  .get('/consent/my-status', async (c) => {
+    const profileId = c.get('profileId');
+    if (!profileId) {
+      return c.json({
+        consentStatus: null,
+        parentEmail: null,
+        consentType: null,
+      });
+    }
+    const db = c.get('db');
+    const state = await getProfileConsentState(db, profileId);
+    return c.json({
+      consentStatus: state?.status ?? null,
+      parentEmail: state?.parentEmail ?? null,
+      consentType: state?.consentType ?? null,
+    });
+  });

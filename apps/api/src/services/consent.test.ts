@@ -69,7 +69,9 @@ function createMockDb({
     },
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
-        returning: jest.fn().mockResolvedValue(insertReturning),
+        onConflictDoUpdate: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue(insertReturning),
+        }),
       }),
     }),
     update: jest.fn().mockReturnValue({ set: updateSet }),

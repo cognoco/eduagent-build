@@ -63,19 +63,32 @@ export const sessionCompleted = inngest.createFunction(
       subjectId,
       summaryStatus,
       timestamp,
+      interleavedTopicIds,
     } = event.data;
 
     const outcomes: StepOutcome[] = [];
 
+    // FR92: Determine which topics need retention updates
+    // Interleaved sessions update all practiced topics; others update the single topicId
+    const retentionTopicIds: string[] = (
+      interleavedTopicIds as string[] | undefined
+    )?.length
+      ? (interleavedTopicIds as string[])
+      : topicId
+      ? [topicId]
+      : [];
+
     // Step 1: Update retention data via SM-2
     outcomes.push(
       await step.run('update-retention', async () => {
-        if (!topicId)
+        if (retentionTopicIds.length === 0)
           return { step: 'update-retention', status: 'skipped' as const };
         return runIsolated('update-retention', profileId, async () => {
           const db = getStepDatabase();
           const quality = event.data.qualityRating ?? 3;
-          await updateRetentionFromSession(db, profileId, topicId, quality);
+          for (const tid of retentionTopicIds) {
+            await updateRetentionFromSession(db, profileId, tid, quality);
+          }
         });
       })
     );
@@ -83,12 +96,14 @@ export const sessionCompleted = inngest.createFunction(
     // Step 1b: Update needs-deepening progress (FR63)
     outcomes.push(
       await step.run('update-needs-deepening', async () => {
-        if (!topicId)
+        if (retentionTopicIds.length === 0)
           return { step: 'update-needs-deepening', status: 'skipped' as const };
         return runIsolated('update-needs-deepening', profileId, async () => {
           const db = getStepDatabase();
           const quality = event.data.qualityRating ?? 3;
-          await updateNeedsDeepeningProgress(db, profileId, topicId, quality);
+          for (const tid of retentionTopicIds) {
+            await updateNeedsDeepeningProgress(db, profileId, tid, quality);
+          }
         });
       })
     );

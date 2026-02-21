@@ -151,6 +151,70 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('PROBLEM FIRST');
   });
 
+  it('renders numbered interleaved topic list when interleavedTopics provided', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      sessionType: 'interleaved',
+      topicTitle: undefined,
+      topicDescription: undefined,
+      interleavedTopics: [
+        {
+          topicId: 't1',
+          title: 'Algebra Basics',
+          description: 'Solving linear equations',
+        },
+        {
+          topicId: 't2',
+          title: 'Probability',
+          description: 'Independent events',
+        },
+        {
+          topicId: 't3',
+          title: 'Geometry',
+          description: 'Angle relationships',
+        },
+      ],
+    });
+    expect(prompt).toContain(
+      'Topics for this interleaved session (cycle between them):'
+    );
+    expect(prompt).toContain(
+      '1. Algebra Basics \u2014 Solving linear equations'
+    );
+    expect(prompt).toContain('2. Probability \u2014 Independent events');
+    expect(prompt).toContain('3. Geometry \u2014 Angle relationships');
+    // Single-topic field should NOT appear
+    expect(prompt).not.toContain('Current topic:');
+  });
+
+  it('omits description in interleaved list when topic has no description', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      sessionType: 'interleaved',
+      topicTitle: undefined,
+      interleavedTopics: [
+        { topicId: 't1', title: 'Algebra Basics' },
+        {
+          topicId: 't2',
+          title: 'Probability',
+          description: 'Independent events',
+        },
+      ],
+    });
+    expect(prompt).toContain('1. Algebra Basics\n');
+    expect(prompt).toContain('2. Probability \u2014 Independent events');
+  });
+
+  it('falls back to single topic when interleavedTopics is empty array', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      topicTitle: 'Quadratic Equations',
+      interleavedTopics: [],
+    });
+    expect(prompt).toContain('Current topic: Quadratic Equations');
+    expect(prompt).not.toContain('interleaved session');
+  });
+
   it('works without optional fields', () => {
     const minimalContext: ExchangeContext = {
       sessionId: 'sess-1',

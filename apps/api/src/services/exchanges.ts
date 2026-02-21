@@ -26,6 +26,12 @@ export interface ExchangeContext {
   priorLearningContext?: string;
   embeddingMemoryContext?: string;
   workedExampleLevel?: 'full' | 'fading' | 'problem_first';
+  /** Multiple topics for interleaved retrieval sessions (FR92) */
+  interleavedTopics?: Array<{
+    topicId: string;
+    title: string;
+    description?: string;
+  }>;
 }
 
 /** Result of processing a single exchange */
@@ -77,8 +83,19 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // Persona voice
   sections.push(getPersonaVoice(context.personaType));
 
-  // Topic scope
-  if (context.topicTitle) {
+  // Topic scope — interleaved sessions get a numbered list, others get a single topic
+  if (context.interleavedTopics && context.interleavedTopics.length > 0) {
+    const lines = context.interleavedTopics.map((t, i) => {
+      let line = `${i + 1}. ${t.title}`;
+      if (t.description) line += ` \u2014 ${t.description}`;
+      return line;
+    });
+    sections.push(
+      `Topics for this interleaved session (cycle between them):\n${lines.join(
+        '\n'
+      )}`
+    );
+  } else if (context.topicTitle) {
     let topicSection = `Current topic: ${context.topicTitle}`;
     if (context.topicDescription) {
       topicSection += `\nTopic description: ${context.topicDescription}`;

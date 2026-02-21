@@ -27,6 +27,7 @@ const ownerProfile: Profile = {
   birthDate: null,
   personaType: 'PARENT',
   isOwner: true,
+  consentStatus: null,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
 };
@@ -39,6 +40,7 @@ const childProfile: Profile = {
   birthDate: '2012-05-15',
   personaType: 'TEEN',
   isOwner: false,
+  consentStatus: null,
   createdAt: '2026-01-02T00:00:00Z',
   updatedAt: '2026-01-02T00:00:00Z',
 };

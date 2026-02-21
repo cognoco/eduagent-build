@@ -32,7 +32,11 @@ import { startInterleavedSession } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
 
 type SessionRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+    VOYAGE_API_KEY?: string;
+  };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -179,6 +183,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           sessionId: result.sessionId,
           topicId: result.topicId,
           subjectId: result.subjectId,
+          sessionType: result.sessionType,
+          interleavedTopicIds: result.interleavedTopicIds,
           summaryStatus: body.summaryStatus,
           timestamp: new Date().toISOString(),
         },

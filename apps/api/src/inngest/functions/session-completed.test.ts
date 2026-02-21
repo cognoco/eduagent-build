@@ -230,6 +230,53 @@ describe('sessionCompleted', () => {
         3
       );
     });
+
+    it('loops over interleavedTopicIds when present (FR92)', async () => {
+      await executeSteps(
+        createEventData({
+          interleavedTopicIds: ['topic-a', 'topic-b', 'topic-c'],
+          qualityRating: 4,
+        })
+      );
+
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledTimes(3);
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-a',
+        4
+      );
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-b',
+        4
+      );
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-c',
+        4
+      );
+    });
+
+    it('prefers interleavedTopicIds over single topicId (FR92)', async () => {
+      await executeSteps(
+        createEventData({
+          topicId: 'topic-001',
+          interleavedTopicIds: ['topic-a', 'topic-b'],
+        })
+      );
+
+      // Should call for each interleaved topic, NOT for single topicId
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledTimes(2);
+      expect(mockUpdateRetentionFromSession).not.toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-001',
+        expect.anything()
+      );
+    });
   });
 
   describe('update-needs-deepening step', () => {
@@ -264,6 +311,35 @@ describe('sessionCompleted', () => {
         'profile-001',
         'topic-001',
         3
+      );
+    });
+
+    it('loops over interleavedTopicIds when present (FR92)', async () => {
+      await executeSteps(
+        createEventData({
+          interleavedTopicIds: ['topic-a', 'topic-b', 'topic-c'],
+          qualityRating: 5,
+        })
+      );
+
+      expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledTimes(3);
+      expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-a',
+        5
+      );
+      expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-b',
+        5
+      );
+      expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'topic-c',
+        5
       );
     });
   });

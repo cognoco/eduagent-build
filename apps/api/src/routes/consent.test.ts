@@ -66,6 +66,25 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
+jest.mock('../services/profile', () => ({
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    accountId: 'test-account-id',
+    displayName: 'Test User',
+    avatarUrl: null,
+    birthDate: null,
+    personaType: 'TEEN',
+    isOwner: false,
+    consentStatus: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+  listProfiles: jest.fn().mockResolvedValue([]),
+  createProfile: jest.fn(),
+  updateProfile: jest.fn(),
+  switchProfile: jest.fn(),
+}));
+
 jest.mock('../services/consent', () => ({
   checkConsentRequired: jest.fn().mockReturnValue({
     required: true,
@@ -94,6 +113,7 @@ jest.mock('../services/consent', () => ({
       })
     ),
   getConsentStatus: jest.fn().mockResolvedValue(null),
+  getProfileConsentState: jest.fn().mockResolvedValue(null),
 }));
 
 import { app } from '../index';
@@ -328,6 +348,78 @@ describe('consent routes', () => {
       const body = await res.json();
       expect(body.code).toBe('NOT_FOUND');
       expect(body.message).toBe('Invalid consent token');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /v1/consent/my-status
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/consent/my-status', () => {
+    it('returns 200 with null values when no X-Profile-Id header', async () => {
+      const res = await app.request(
+        '/v1/consent/my-status',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.consentStatus).toBeNull();
+      expect(body.parentEmail).toBeNull();
+    });
+
+    it('returns 200 with null values when profile has no consent state', async () => {
+      const res = await app.request(
+        '/v1/consent/my-status',
+        {
+          headers: {
+            ...AUTH_HEADERS,
+            'X-Profile-Id': 'test-profile-id',
+          },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.consentStatus).toBeNull();
+      expect(body.parentEmail).toBeNull();
+    });
+
+    it('returns 200 with consent status and parentEmail when consent exists', async () => {
+      const { getProfileConsentState: mockGetState } = jest.requireMock(
+        '../services/consent'
+      ) as { getProfileConsentState: jest.Mock };
+      mockGetState.mockResolvedValueOnce({
+        status: 'PARENTAL_CONSENT_REQUESTED',
+        parentEmail: 'parent@example.com',
+      });
+
+      const res = await app.request(
+        '/v1/consent/my-status',
+        {
+          headers: {
+            ...AUTH_HEADERS,
+            'X-Profile-Id': 'test-profile-id',
+          },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.consentStatus).toBe('PARENTAL_CONSENT_REQUESTED');
+      expect(body.parentEmail).toBe('parent@example.com');
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request('/v1/consent/my-status', {}, TEST_ENV);
+
+      expect(res.status).toBe(401);
     });
   });
 });
