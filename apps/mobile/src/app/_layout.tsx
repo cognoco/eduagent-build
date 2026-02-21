@@ -1,20 +1,32 @@
 import '../../global.css';
 import { useState, useEffect, useMemo } from 'react';
-import { View } from 'react-native';
+import { View, useColorScheme } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeContext, useTokenVars, type Persona } from '../lib/theme';
+import type { ColorScheme } from '../lib/design-tokens';
 import { ProfileProvider, useProfile } from '../lib/profile';
 import { ErrorBoundary } from '../components/common';
 import { initSentry } from '../lib/sentry';
 
 // Initialize Sentry at module level — runs before any component renders
 initSentry();
+
+// Keep splash screen visible while fonts load
+SplashScreen.preventAutoHideAsync();
 
 const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -37,6 +49,10 @@ const queryClient = new QueryClient({
 function ThemedApp() {
   const { activeProfile } = useProfile();
   const [persona, setPersona] = useState<Persona>('teen');
+  const systemColorScheme = useColorScheme();
+  const [colorScheme, setColorScheme] = useState<ColorScheme>(
+    (systemColorScheme as ColorScheme) ?? 'light'
+  );
 
   // Derive persona from active profile's personaType
   useEffect(() => {
@@ -45,22 +61,32 @@ function ThemedApp() {
     }
   }, [activeProfile]);
 
-  const themeValue = useMemo(() => ({ persona, setPersona }), [persona]);
+  // Sync system color scheme changes
+  useEffect(() => {
+    if (systemColorScheme) {
+      setColorScheme(systemColorScheme as ColorScheme);
+    }
+  }, [systemColorScheme]);
+
+  const themeValue = useMemo(
+    () => ({ persona, setPersona, colorScheme, setColorScheme }),
+    [persona, colorScheme]
+  );
 
   return (
     <ThemeContext.Provider value={themeValue}>
-      <ThemedContent persona={persona} />
+      <ThemedContent colorScheme={colorScheme} />
     </ThemeContext.Provider>
   );
 }
 
 /** Inner component that reads ThemeContext to inject CSS variables via vars() */
-function ThemedContent({ persona }: { persona: Persona }) {
+function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
   const tokenVars = useTokenVars();
 
   return (
     <View style={[{ flex: 1 }, tokenVars]}>
-      <StatusBar style={persona === 'teen' ? 'light' : 'dark'} />
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(learner)" />
@@ -121,6 +147,21 @@ function ThemedContent({ persona }: { persona: Persona }) {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) return null;
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

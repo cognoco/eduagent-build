@@ -22,6 +22,20 @@ interface EnrichedTopic {
   name: string;
   subjectName: string;
   retention: RetentionStatus;
+  lastReviewedAt: string | null;
+  repetitions: number;
+}
+
+function formatLastPracticed(iso: string | null): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 export default function LearningBookScreen() {
@@ -75,12 +89,15 @@ export default function LearningBookScreen() {
               : topic.easeFactor >= 2.5
               ? 'strong'
               : 'fading';
+          const enriched = topic as unknown as { topicTitle?: string };
           allTopics.push({
             topicId: topic.topicId,
             subjectId: subject.id,
-            name: `Topic ${topic.topicId.slice(0, 8)}`,
+            name: enriched.topicTitle ?? topic.topicId,
             subjectName: subject.name,
             retention,
+            lastReviewedAt: topic.lastReviewedAt,
+            repetitions: topic.repetitions,
           });
         }
       }
@@ -201,9 +218,23 @@ export default function LearningBookScreen() {
                   <Text className="text-body font-medium text-text-primary">
                     {topic.name}
                   </Text>
-                  <Text className="text-caption text-text-secondary mt-1">
-                    {topic.subjectName}
-                  </Text>
+                  <View className="flex-row items-center mt-1">
+                    <Text className="text-caption text-text-secondary">
+                      {topic.subjectName}
+                    </Text>
+                    {topic.repetitions > 0 && (
+                      <Text className="text-caption text-text-secondary ml-2">
+                        {topic.repetitions}{' '}
+                        {topic.repetitions === 1 ? 'session' : 'sessions'}
+                      </Text>
+                    )}
+                  </View>
+                  {formatLastPracticed(topic.lastReviewedAt) && (
+                    <Text className="text-caption text-text-tertiary mt-0.5">
+                      Last practiced:{' '}
+                      {formatLastPracticed(topic.lastReviewedAt)}
+                    </Text>
+                  )}
                 </View>
                 <RetentionSignal status={topic.retention} />
               </View>

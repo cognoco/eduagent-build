@@ -63,6 +63,17 @@ jest.mock('../../../hooks/use-homework-ocr', () => ({
   }),
 }));
 
+// Mock subjects hook (used for inline subject picker when no subjectId provided)
+jest.mock('../../../hooks/use-subjects', () => ({
+  useSubjects: jest.fn().mockReturnValue({
+    data: [
+      { id: 'sub-123', name: 'Mathematics', status: 'active' },
+      { id: 'sub-456', name: 'Science', status: 'active' },
+    ],
+    isLoading: false,
+  }),
+}));
+
 // Import mocks after jest.mock
 const { useCameraPermissions } = require('expo-camera');
 const { useHomeworkOcr } = require('../../../hooks/use-homework-ocr');

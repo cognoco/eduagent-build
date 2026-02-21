@@ -63,6 +63,9 @@ function createMockDb({
       consentStates: {
         findFirst: jest.fn().mockResolvedValue(findFirstResult),
       },
+      profiles: {
+        findFirst: jest.fn().mockResolvedValue({ displayName: 'Test Child' }),
+      },
     },
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({

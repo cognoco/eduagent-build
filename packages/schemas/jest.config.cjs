@@ -26,10 +26,10 @@ module.exports = {
   ],
   coverageThreshold: {
     global: {
-      branches: 10, // TODO: Increase coverage threshold to 60% in Phase 2+ (Stage 5 requirement)
-      functions: 10, // TODO: Increase coverage threshold to 60% in Phase 2+ (Stage 5 requirement)
-      lines: 10, // TODO: Increase coverage threshold to 60% in Phase 2+ (Stage 5 requirement)
-      statements: 10, // TODO: Increase coverage threshold to 60% in Phase 2+ (Stage 5 requirement)
+      branches: 60,
+      functions: 60,
+      lines: 60,
+      statements: 60,
     },
   },
 };

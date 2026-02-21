@@ -107,12 +107,19 @@ export async function requestConsent(
     })
     .returning();
 
+  // Look up child's display name for personalized email
+  const childProfile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, input.childProfileId),
+    columns: { displayName: true },
+  });
+  const childName = childProfile?.displayName ?? 'your child';
+
   const tokenUrl = `${appUrl}/consent?token=${token}`;
 
   await sendEmail(
     formatConsentRequestEmail(
       input.parentEmail,
-      'your child', // TODO: Look up child's display name from profileId
+      childName,
       input.consentType,
       tokenUrl
     ),

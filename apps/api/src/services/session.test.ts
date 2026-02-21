@@ -8,6 +8,7 @@ jest.mock('@eduagent/database', () => {
 
 jest.mock('./exchanges', () => ({
   processExchange: jest.fn(),
+  detectUnderstandingCheck: jest.fn().mockReturnValue(false),
 }));
 
 jest.mock('./escalation', () => ({
@@ -27,6 +28,12 @@ jest.mock('./prior-learning', () => ({
   buildPriorLearningContext: jest.fn(),
 }));
 
+jest.mock('./memory', () => ({
+  retrieveRelevantMemory: jest
+    .fn()
+    .mockResolvedValue({ context: '', topicIds: [] }),
+}));
+
 import type { Database } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';
 import {
@@ -44,6 +51,7 @@ import { evaluateEscalation } from './escalation';
 import { evaluateSummary } from './summaries';
 import { getSubject } from './subject';
 import { fetchPriorTopics, buildPriorLearningContext } from './prior-learning';
+import { retrieveRelevantMemory } from './memory';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 const profileId = 'test-profile-id';
@@ -805,6 +813,110 @@ describe('escalation tracking', () => {
         priorLearningContext: expect.any(String),
       }),
       'First lesson'
+    );
+  });
+
+  it('includes embedding memory context in exchange context when available (Story 3.10)', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    (retrieveRelevantMemory as jest.Mock).mockResolvedValueOnce({
+      context:
+        'Related past learning:\n- Algebra Basics: learner understood variable substitution',
+      topicIds: ['topic-abc'],
+    });
+
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'Teach me quadratics',
+    });
+
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        embeddingMemoryContext: expect.stringContaining(
+          'Related past learning'
+        ),
+      }),
+      'Teach me quadratics'
+    );
+  });
+
+  it('omits embedding memory context when retrieval returns empty (Story 3.10 empty state)', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    // Default mock returns { context: '', topicIds: [] }
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'First lesson',
+    });
+
+    expect(processExchange).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        embeddingMemoryContext: expect.any(String),
+      }),
+      'First lesson'
+    );
+  });
+
+  it('stores behavioral metrics in ai_response metadata (UX-18)', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ escalationRung: 1 }),
+    });
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'Explain photosynthesis',
+    });
+
+    // The second values() call arg is an array with [user_message, ai_response]
+    const valuesFn = (db.insert as jest.Mock).mock.results[0].value.values;
+    expect(valuesFn).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: 'ai_response',
+          metadata: expect.objectContaining({
+            escalationRung: 1,
+            isUnderstandingCheck: expect.any(Boolean),
+            hintCountInSession: expect.any(Number),
+          }),
+        }),
+      ])
+    );
+  });
+
+  it('computes hintCount from events at rung >= 2', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ escalationRung: 3, exchangeCount: 4 }),
+    });
+    const db = createMockDb({
+      findManyEvents: [
+        {
+          eventType: 'ai_response',
+          content: 'r1',
+          createdAt: NOW,
+          metadata: { escalationRung: 1 },
+        },
+        {
+          eventType: 'ai_response',
+          content: 'r2',
+          createdAt: NOW,
+          metadata: { escalationRung: 2 },
+        },
+        {
+          eventType: 'ai_response',
+          content: 'r3',
+          createdAt: NOW,
+          metadata: { escalationRung: 3 },
+        },
+        { eventType: 'user_message', content: 'q', createdAt: NOW },
+      ],
+    });
+    await processMessage(db, profileId, sessionId, {
+      message: 'Still lost',
+    });
+
+    // hintCount should be 2 (rung 2 + rung 3), NOT 0
+    expect(evaluateEscalation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hintCount: 2,
+      }),
+      'Still lost'
     );
   });
 });

@@ -88,6 +88,7 @@ export const dashboardChildSchema = z.object({
     })
   ),
   guidedVsImmediateRatio: z.number().min(0).max(1),
+  retentionTrend: z.enum(['improving', 'declining', 'stable']),
 });
 export type DashboardChild = z.infer<typeof dashboardChildSchema>;
 

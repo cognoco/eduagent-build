@@ -68,3 +68,49 @@ export function useChildSubjectTopics(
     enabled: !!activeProfile && !!childProfileId && !!subjectId,
   });
 }
+
+export function useChildSessions(childProfileId: string | undefined) {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['dashboard', 'children', childProfileId, 'sessions'],
+    queryFn: async () => {
+      const res = await client.dashboard.children[':profileId'].sessions.$get({
+        param: { profileId: childProfileId! },
+      });
+      const data = await res.json();
+      return data.sessions;
+    },
+    enabled: !!activeProfile && !!childProfileId,
+  });
+}
+
+export function useChildSessionTranscript(
+  childProfileId: string | undefined,
+  sessionId: string | undefined
+) {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: [
+      'dashboard',
+      'children',
+      childProfileId,
+      'sessions',
+      sessionId,
+      'transcript',
+    ],
+    queryFn: async () => {
+      const res = await client.dashboard.children[':profileId'].sessions[
+        ':sessionId'
+      ].transcript.$get({
+        param: { profileId: childProfileId!, sessionId: sessionId! },
+      });
+      const data = await res.json();
+      return data.transcript;
+    },
+    enabled: !!activeProfile && !!childProfileId && !!sessionId,
+  });
+}

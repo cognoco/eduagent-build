@@ -4,7 +4,7 @@ import {
   fireEvent,
   waitFor,
 } from '@testing-library/react-native';
-import { useSignUp } from '@clerk/clerk-expo';
+import { useSignUp, useSSO } from '@clerk/clerk-expo';
 
 const mockReplace = jest.fn();
 
@@ -16,6 +16,8 @@ jest.mock('expo-router', () => ({
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
+
+const mockStartSSOFlow = jest.fn();
 
 const SignUpScreen = require('./sign-up').default;
 
@@ -36,14 +38,42 @@ describe('SignUpScreen', () => {
       },
       setActive: mockSetActive,
     });
+    (useSSO as jest.Mock).mockReturnValue({
+      startSSOFlow: mockStartSSOFlow,
+    });
   });
 
-  it('renders sign-up form initially', () => {
+  it('renders sign-up form with SSO buttons', () => {
     render(<SignUpScreen />);
 
+    expect(screen.getByTestId('sign-up-google-sso')).toBeTruthy();
     expect(screen.getByTestId('sign-up-email')).toBeTruthy();
     expect(screen.getByTestId('sign-up-password')).toBeTruthy();
     expect(screen.getByTestId('sign-up-button')).toBeTruthy();
+    expect(screen.getByText('or continue with email')).toBeTruthy();
+  });
+
+  it('handles Google SSO sign-up', async () => {
+    mockStartSSOFlow.mockResolvedValue({ createdSessionId: 'sess_google' });
+    mockSetActive.mockResolvedValue(undefined);
+
+    render(<SignUpScreen />);
+
+    fireEvent.press(screen.getByTestId('sign-up-google-sso'));
+
+    await waitFor(() => {
+      expect(mockStartSSOFlow).toHaveBeenCalledWith(
+        expect.objectContaining({ strategy: 'oauth_google' })
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockSetActive).toHaveBeenCalledWith({ session: 'sess_google' });
+    });
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+    });
   });
 
   it('transitions to verification phase after sign-up', async () => {
