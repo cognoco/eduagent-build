@@ -17,9 +17,9 @@ jest.mock('expo-image-manipulator', () => ({
   SaveFormat: { JPEG: 'jpeg' },
 }));
 
-// Mock expo-file-system
+// Mock expo-file-system/legacy
 const mockCopyAsync = jest.fn().mockResolvedValue(undefined);
-jest.mock('expo-file-system', () => ({
+jest.mock('expo-file-system/legacy', () => ({
   cacheDirectory: 'file:///cache/',
   copyAsync: (...args: unknown[]) => mockCopyAsync(...args),
 }));

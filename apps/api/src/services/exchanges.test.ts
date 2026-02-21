@@ -111,6 +111,21 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain('Prior Learning Context');
   });
 
+  it('includes embedding memory context when provided', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      embeddingMemoryContext:
+        'Related past learning:\n- Algebra: variable substitution mastered',
+    });
+    expect(prompt).toContain('Related past learning');
+    expect(prompt).toContain('variable substitution mastered');
+  });
+
+  it('omits embedding memory context when not provided', () => {
+    const prompt = buildSystemPrompt(baseContext);
+    expect(prompt).not.toContain('Related past learning');
+  });
+
   it('includes worked example guidance for "full" level', () => {
     const prompt = buildSystemPrompt({
       ...baseContext,

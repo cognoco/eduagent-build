@@ -65,7 +65,7 @@ jest.mock('../services/settings', () => ({
     .mockImplementation((_db, _profileId, mode) => Promise.resolve({ mode })),
 }));
 
-import app from '../index';
+import { app } from '../index';
 import {
   getNotificationPrefs,
   upsertNotificationPrefs,

@@ -110,6 +110,7 @@ export const retentionCardSchema = z.object({
   intervalDays: z.number().int(),
   repetitions: z.number().int(),
   nextReviewAt: z.string().datetime().nullable(),
+  lastReviewedAt: z.string().datetime().nullable(),
   xpStatus: z.enum(['pending', 'verified', 'decayed']),
   failureCount: z.number().int(),
 });

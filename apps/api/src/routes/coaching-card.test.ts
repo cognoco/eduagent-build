@@ -32,7 +32,7 @@ jest.mock('../services/coaching-cards', () => ({
   getCoachingCardForProfile: jest.fn(),
 }));
 
-import app from '../index';
+import { app } from '../index';
 import { getCoachingCardForProfile } from '../services/coaching-cards';
 
 const TEST_ENV = {

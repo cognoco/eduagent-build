@@ -18,6 +18,7 @@ export interface ChatMessage {
   role: 'ai' | 'user';
   content: string;
   streaming?: boolean;
+  escalationRung?: number;
 }
 
 interface ChatShellProps {
@@ -29,6 +30,7 @@ interface ChatShellProps {
   inputDisabled?: boolean;
   rightAction?: React.ReactNode;
   footer?: React.ReactNode;
+  placeholder?: string;
 }
 
 /**
@@ -82,6 +84,7 @@ export function ChatShell({
   inputDisabled = false,
   rightAction,
   footer,
+  placeholder = 'Type a message...',
 }: ChatShellProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -143,6 +146,7 @@ export function ChatShell({
             role={msg.role}
             content={msg.content}
             streaming={msg.streaming}
+            escalationRung={msg.escalationRung}
           />
         ))}
         {footer}
@@ -156,14 +160,14 @@ export function ChatShell({
         >
           <TextInput
             className="flex-1 bg-background rounded-input px-4 py-3 text-body text-text-primary mr-2"
-            placeholder="Type a message..."
+            placeholder={placeholder}
             placeholderTextColor={colors.muted}
             value={input}
             onChangeText={setInput}
             onSubmitEditing={handleSend}
-            multiline
             maxLength={5000}
             returnKeyType="send"
+            blurOnSubmit={false}
             editable={!isStreaming}
             testID="chat-input"
             accessibilityLabel="Message input"

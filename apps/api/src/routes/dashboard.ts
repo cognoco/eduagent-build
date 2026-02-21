@@ -6,6 +6,8 @@ import {
   getChildrenForParent,
   getChildDetail,
   getChildSubjectTopics,
+  getChildSessions,
+  getChildSessionTranscript,
 } from '../services/dashboard';
 
 type DashboardRouteEnv = {
@@ -57,6 +59,41 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     return c.json({ topics });
   })
 
+  // List child's sessions
+  .get('/dashboard/children/:profileId/sessions', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const parentProfileId = c.get('profileId') ?? account.id;
+    const childProfileId = c.req.param('profileId');
+
+    const sessions = await getChildSessions(
+      db,
+      parentProfileId,
+      childProfileId
+    );
+    return c.json({ sessions });
+  })
+
+  // Get session transcript
+  .get(
+    '/dashboard/children/:profileId/sessions/:sessionId/transcript',
+    async (c) => {
+      const db = c.get('db');
+      const account = c.get('account');
+      const parentProfileId = c.get('profileId') ?? account.id;
+      const childProfileId = c.req.param('profileId');
+      const sessionId = c.req.param('sessionId');
+
+      const transcript = await getChildSessionTranscript(
+        db,
+        parentProfileId,
+        childProfileId,
+        sessionId
+      );
+      return c.json({ transcript });
+    }
+  )
+
   // Get demo mode fixture data
   .get('/dashboard/demo', async (c) => {
     return c.json({
@@ -77,6 +114,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
             { name: 'Science', retentionStatus: 'fading' },
           ],
           guidedVsImmediateRatio: 0.6,
+          retentionTrend: 'stable',
         },
         {
           profileId: 'demo-child-2',
@@ -90,6 +128,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
           trend: 'stable',
           subjects: [{ name: 'English', retentionStatus: 'strong' }],
           guidedVsImmediateRatio: 0.3,
+          retentionTrend: 'improving',
         },
       ],
     });

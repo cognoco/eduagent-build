@@ -481,7 +481,7 @@ Users can start 14-day free trials, subscribe to premium tiers (Plus/Family/Pro)
 **Implementation notes:**
 - Stripe integration: Checkout, subscriptions, family billing, top-up credits
 - **Can be parallelized with Epics 2-4** — only touchpoint is metering middleware
-- **⚠️ Metering middleware stub:** Epics 2-4 use a STUB metering middleware (`always-allow` or generous default) until Epic 5 ships the real quota enforcement. This dependency must be explicit in story definitions for Epics 2-4.
+- **✅ Metering middleware implemented:** Real quota enforcement is live via `middleware/metering.ts` (402 on quota exceeded, KV-cached subscription status, atomic `decrementQuota` with TOCTOU guards, refund on LLM failure). The original stub plan was superseded — metering was built alongside Epics 2-4 rather than deferred to Story 5.6.
 - Webhook-synced subscription state in local DB. Never call Stripe during learning sessions — read from local cache.
 - Subscription state machine: trial → active → cancelled → expired
 - Workers KV for subscription status: write on webhook, read on metering check (ARCH-11)
@@ -931,7 +931,7 @@ So that I can learn interactively.
 **Then** session is auto-closed, partial progress saved to coaching card, learner starts fresh
 **And** exchanges are persisted per-event to `session_events` table — recovery is log replay, not in-memory state reconstruction
 
-**And** metering middleware uses STUB (`always-allow`) until Epic 5 ships real quota enforcement
+**And** metering middleware enforces real quota (✅ implemented — `middleware/metering.ts` with atomic decrement, KV caching, and 402 responses)
 
 **And** exchange processing pipeline implemented in `services/exchanges.ts` with explicit stages:
 1. **Load context:** session exchange history, current topic metadata, escalation rung state, learner profile
@@ -1026,6 +1026,12 @@ So that my learning is sustainable and effective.
 **And** timer precedence rules: (1) Session hard cap is absolute — when 20min (teen) or 30min (eager) is reached, session closes regardless of other timers. (2) Silence timer runs independently alongside session length. (3) After session nudge (15min/25min), if learner acknowledges ("one more question") then continues, silence timer resets from that acknowledgment. If learner goes silent after acknowledging the nudge, 3-minute gentle prompt still fires normally. (4) If hard cap triggers while silence timer is also counting, hard cap takes precedence — session closes with auto-save, silence prompt is suppressed. No competing UI prompts shown simultaneously.
 
 **FRs:** FR29, FR41 | **UX:** UX-10, UX-11, UX-12, UX-18
+
+✅ **UX-18 implementation status:** Behavioral confidence scoring data capture complete.
+- `ExchangeBehavioralMetrics` interface in `session.ts`: escalationRung, isUnderstandingCheck, timeToAnswerMs, hintCountInSession
+- Stored in `sessionEvents.metadata` JSONB on every `ai_response` event
+- `hintCount` computed from event history (AI responses at rung >= 2)
+- Dashboard wired: `countGuidedMetrics()` in `dashboard.ts` queries this data for guided/immediate ratio
 
 ---
 
@@ -1246,7 +1252,11 @@ So that new knowledge connects to existing understanding.
 
 **And** this story does NOT depend on Story 2.11 (embedding spike). Ships with session history queries only. pgvector similarity search is an Epic 3 enhancement.
 
-**⚠️ Bridge FR:** Session-scoped behavior reading lifecycle data. Works with empty state from day one. Enriched when Epic 3's retention data populates.
+**✅ Implementation status:**
+- Service layer complete: `services/prior-learning.ts` — `buildPriorLearningContext()` with recency+mastery heuristic, empty state handling, 13 passing tests.
+- Prompt injection: `ExchangeContext.priorLearningContext` field wired into `buildSystemPrompt()`.
+- Session orchestration: `fetchPriorTopics()` called in `prepareExchangeContext()` — queries completed sessions joined with topic titles and learner summaries.
+- Bridge FR fully connected from DB → service → prompt.
 
 **FRs:** FR40
 
@@ -1273,6 +1283,15 @@ So that Epic 3's Inngest chain can generate embeddings with a known configuratio
 
 **FRs:** (ARCH-16 requirement)
 
+✅ **Implementation status:** Completed.
+- Provider: Voyage AI `voyage-3.5` (1024 dimensions, cosine distance)
+- Decision documented in `docs/architecture.md` (ARCH-16 resolved)
+- `services/embeddings.ts`: generation + storage pipeline
+- `packages/database/src/schema/embeddings.ts`: pgvector schema + HNSW index
+- `packages/database/src/queries/embeddings.ts`: cosine distance query
+- Benchmark tool: `scripts/embedding-benchmark.ts`
+- Inngest chain step 4: generates embeddings after session completes
+
 ---
 
 ### Story 2.12: E2E Testing Framework Spike
@@ -1293,6 +1312,60 @@ So that subsequent epics can include E2E tests in CI.
 
 **FRs:** (ARCH-24 requirement)
 
+⚠️ **Implementation status:** In progress.
+- ✅ Framework chosen: Maestro (rationale in `docs/e2e-testing-strategy.md`)
+- ✅ 4 smoke flows written: `apps/mobile/e2e/flows/` (app-launch, create-subject, view-curriculum, start-session)
+- ✅ Local dev docs: `apps/mobile/e2e/README.md`
+- ✅ API integration tests in CI: 3 test files in `tests/integration/`
+- ✅ Flakiness baseline documented (strategy doc section 8)
+- ✅ CI workflow: `.github/workflows/e2e-ci.yml` (advisory, not blocking)
+- ⬜ Tier 2 full flows (blocked on feature completion)
+
+---
+
+### Story 2.13: Invisible Bridge to Learning (UX Decision #6)
+
+As a learner completing a homework session,
+I want the AI to offer to explain concepts I struggled with,
+So that I can optionally transition from homework to genuine understanding.
+
+**Status:** Planned (next sprint)
+
+**Acceptance Criteria:**
+
+**Given** a homework session where escalation reached rung >= 3 on any exchange
+**When** the session close response is generated
+**Then** a `bridgePrompt` string is included (e.g., "You struggled with quadratic factoring — want me to explain the pattern?")
+**And** the mobile SessionCloseSummary renders it as a secondary button
+
+**Given** the learner taps the bridge prompt
+**When** the bridge session starts
+**Then** a new learning session is created for the same topic with session type "learning"
+**And** the AI's opening references the specific struggle from the homework session
+
+**Given** the learner taps "Done" instead
+**When** they dismiss the session close
+**Then** no bridge session is created and the learner returns to home
+
+**Given** a homework session where no exchange reached escalation rung >= 3
+**When** the session close response is generated
+**Then** no bridge prompt is included (field omitted from response)
+
+**Data Contract:**
+- Extend session close API response: add optional `bridgePrompt?: string`
+- Bridge prompt generated by LLM call with inputs: topic title, escalation events from session, specific struggles
+- If no escalation >= rung 3 occurred → no bridge prompt → field omitted
+
+**Implementation Path:**
+1. `apps/api/src/services/bridge.ts` — `generateBridgePrompt(db, sessionId, profileId): Promise<string | null>`
+2. Extend `closeSession()` return type to include `bridgePrompt`
+3. Wire into session close route response
+4. Mobile: pass `bridgePrompt` from close response to `SessionCloseSummary` props
+5. Mobile: `onBridgeAccept` → create new learning session via existing mutation
+
+**Dependencies:** Story 2.1 (session infrastructure), Story 2.8 (session close flow)
+**FRs:** UX-6 (Invisible Bridge)
+
 ---
 
 ### Epic 2 Execution Order
@@ -1300,6 +1373,7 @@ So that subsequent epics can include E2E tests in CI.
 ```
 2.1 (Session Infra) → 2.2, 2.3, 2.4 (can parallel) → 2.5, 2.6, 2.7 (can parallel) → 2.8 (close flow) → 2.9, 2.10 (can parallel)
 2.11, 2.12 (spikes — independent, run anytime)
+2.13 (Invisible Bridge — depends on 2.1 + 2.8, planned for next sprint)
 ```
 
 ---
@@ -1847,7 +1921,7 @@ Clusters A-D are independent and can run in parallel.
 ## Epic 5: Subscription & Billing — Stories
 
 **Scope:** FR108-FR117 (10 FRs) + ARCH-11 (subscription status KV), ARCH-17 (two-layer rate limiting)
-**Note:** This epic can be parallelized with Epics 2-4. Only touchpoint is the metering middleware stub that Epics 2-4 use (`always-allow`) until Story 5.6 ships real quota enforcement.
+**Note:** This epic was parallelized with Epics 2-4. ✅ Metering middleware is fully implemented — the original stub plan was superseded by early delivery of real quota enforcement.
 **Stories:** 6
 
 ### Story 5.1: Stripe Integration & Webhook Sync
@@ -1980,9 +2054,10 @@ So that I can manage my usage and upgrade before hitting the ceiling.
 
 **Acceptance Criteria:**
 
-**Given** the metering middleware stub from Epics 2-4 (`always-allow`)
-**When** this story ships
-**Then** the stub is replaced with real quota enforcement via `decrement_quota` PostgreSQL function (ARCH-17)
+**✅ IMPLEMENTED** — Real quota enforcement shipped alongside Epics 2-4 (no stub phase needed).
+
+**Given** the metering system
+**Then** real quota enforcement via atomic `decrementQuota` in `services/billing.ts` with SQL WHERE guards (ARCH-17)
 **And** two-layer rate limiting: Cloudflare Workers (100 req/min per user, wrangler.toml) + quota metering middleware (per-profile questions/month) (ARCH-17)
 **And** question counting rules: each user message triggering an AI response counts. System messages, curriculum generation, and onboarding interview do NOT count.
 **And** quota is decremented once per user message, before the LLM call (optimistic decrement). Provider retries and failover within `routeAndCall()` count as one question regardless of how many providers are attempted. If the LLM call fails after all provider retries are exhausted, quota is refunded via `increment_quota`. The user sees an error and their question count is unchanged.
@@ -2006,7 +2081,7 @@ So that I can manage my usage and upgrade before hitting the ceiling.
 5.1 (Stripe foundation) → 5.2, 5.3, 5.4 (can parallel after Stripe infra) → 5.5 (family needs tiers) → 5.6 (metering needs all subscription states)
 ```
 
-**Cross-epic dependency:** Story 5.6 replaces the metering middleware stub used by Epics 2-4. Until 5.6 ships, learning sessions use `always-allow` metering. After 5.6 ships, metering is enforced.
+**Cross-epic dependency (resolved):** ✅ Metering was delivered alongside Epics 2-4 — the original stub→replace plan was superseded. Real quota enforcement is live: `middleware/metering.ts` (402 on exceeded), `services/metering.ts` (pure logic), `services/billing.ts` (atomic DB operations), mobile hooks (`useSubscriptionStatus`), Inngest cron (quota reset + trial expiry).
 
 ---
 
@@ -2031,6 +2106,15 @@ FR97: Users can specify native language for grammar explanations in their target
 FR99: Users receive explicit grammar instruction (direct teaching, not Socratic discovery — language learning requires different pedagogy).
 FR100: Users practice output (speaking/writing) every session.
 FR107: Users receive direct error correction (not Socratic hints — immediate correction is more effective for language errors).
+
+**⚠️ Architectural prerequisite — per-subject pedagogy mode:**
+FR99 and FR107 represent a **meaningful behavior change from the Socratic default** used everywhere else. The existing within-session three-strike `switch_to_direct` mechanism (Epic 3, `adaptive-teaching.ts`) only triggers after repeated wrong answers — it's a fallback, not a default mode. Language learning needs direct correction as the _default_ pedagogy, not a fallback.
+
+**Required before implementation:**
+- A `pedagogy_mode` enum or similar flag on the `subjects` table (or a new `subject_config` table) distinguishing `'socratic'` (default for all current subjects) from `'four_strands'` (language learning).
+- The existing `teaching_method` enum (`visual_diagrams`, `step_by_step`, etc.) stays orthogonal — it controls _how_ to explain, while `pedagogy_mode` controls _whether_ to use Socratic questioning or direct instruction as the baseline teaching approach.
+- `buildSystemPrompt()` in `services/exchanges.ts` must read `pedagogy_mode` and switch between Socratic escalation ladder prompts and direct instruction prompts accordingly.
+- Auto-detection of language learning intent (FR96, Story 6.1) should set `pedagogy_mode` on the subject at creation time.
 
 **FRs:** FR99, FR100, FR107
 

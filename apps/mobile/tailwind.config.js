@@ -41,6 +41,15 @@ module.exports = {
         'body-sm': ['14px', { lineHeight: '1.5' }],
         caption: ['12px', { lineHeight: '1.5' }],
       },
+      spacing: {
+        card: 'var(--spacing-card-padding)',
+      },
+      fontFamily: {
+        sans: ['Inter_400Regular'],
+        'sans-medium': ['Inter_500Medium'],
+        'sans-semibold': ['Inter_600SemiBold'],
+        'sans-bold': ['Inter_700Bold'],
+      },
     },
   },
   plugins: [],

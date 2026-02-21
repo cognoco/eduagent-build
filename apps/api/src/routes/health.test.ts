@@ -1,4 +1,4 @@
-import app from '../index';
+import { app } from '../index';
 
 describe('GET /v1/health', () => {
   it('returns status ok with timestamp', async () => {

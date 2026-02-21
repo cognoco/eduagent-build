@@ -12,6 +12,8 @@ describe('ParentDashboardSummary', () => {
     trend: 'up' as const,
     sessionsThisWeek: 4,
     sessionsLastWeek: 2,
+    totalTimeThisWeek: 85,
+    totalTimeLastWeek: 40,
     onDrillDown: jest.fn(),
   };
 
@@ -39,7 +41,9 @@ describe('ParentDashboardSummary', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
     expect(
-      screen.getByText('4 sessions this week (\u2191 up from 2 last week)')
+      screen.getByText(
+        '4 sessions, 1h 25m this week (\u2191 up from 2 sessions, 40m last week)'
+      )
     ).toBeTruthy();
   });
 
@@ -50,11 +54,15 @@ describe('ParentDashboardSummary', () => {
         trend="down"
         sessionsThisWeek={1}
         sessionsLastWeek={4}
+        totalTimeThisWeek={12}
+        totalTimeLastWeek={90}
       />
     );
 
     expect(
-      screen.getByText('1 sessions this week (\u2193 down from 4 last week)')
+      screen.getByText(
+        '1 sessions, 12m this week (\u2193 down from 4 sessions, 1h 30m last week)'
+      )
     ).toBeTruthy();
   });
 
@@ -65,11 +73,15 @@ describe('ParentDashboardSummary', () => {
         trend="stable"
         sessionsThisWeek={3}
         sessionsLastWeek={3}
+        totalTimeThisWeek={60}
+        totalTimeLastWeek={60}
       />
     );
 
     expect(
-      screen.getByText('3 sessions this week (\u2192 same as 3 last week)')
+      screen.getByText(
+        '3 sessions, 1h this week (\u2192 same as 3 sessions, 1h last week)'
+      )
     ).toBeTruthy();
   });
 
@@ -109,5 +121,38 @@ describe('ParentDashboardSummary', () => {
 
     expect(screen.getByText('Alex')).toBeTruthy();
     expect(screen.queryByText('Mathematics')).toBeNull();
+  });
+
+  it('renders retention trend badge when improving', () => {
+    render(
+      <ParentDashboardSummary {...defaultProps} retentionTrend="improving" />
+    );
+
+    expect(screen.getByTestId('retention-trend-badge')).toBeTruthy();
+    expect(screen.getByText(/Improving/)).toBeTruthy();
+  });
+
+  it('renders retention trend badge when declining', () => {
+    render(
+      <ParentDashboardSummary {...defaultProps} retentionTrend="declining" />
+    );
+
+    expect(screen.getByTestId('retention-trend-badge')).toBeTruthy();
+    expect(screen.getByText(/Declining/)).toBeTruthy();
+  });
+
+  it('renders retention trend badge when stable', () => {
+    render(
+      <ParentDashboardSummary {...defaultProps} retentionTrend="stable" />
+    );
+
+    expect(screen.getByTestId('retention-trend-badge')).toBeTruthy();
+    expect(screen.getByText(/Stable/)).toBeTruthy();
+  });
+
+  it('does not render retention trend when not provided', () => {
+    render(<ParentDashboardSummary {...defaultProps} />);
+
+    expect(screen.queryByTestId('retention-trend-badge')).toBeNull();
   });
 });

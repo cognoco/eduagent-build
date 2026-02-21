@@ -26,11 +26,14 @@ import type {
 import {
   processExchange,
   streamExchange,
+  detectUnderstandingCheck,
   type ExchangeContext,
 } from './exchanges';
 import { evaluateEscalation } from './escalation';
 import { evaluateSummary } from './summaries';
 import { getSubject } from './subject';
+import { fetchPriorTopics, buildPriorLearningContext } from './prior-learning';
+import { retrieveRelevantMemory } from './memory';
 import type { EscalationRung } from './llm';
 
 // ---------------------------------------------------------------------------
@@ -134,6 +137,18 @@ export async function getSession(
 }
 
 // ---------------------------------------------------------------------------
+// Behavioral metrics data contract — UX-18 (process visibility)
+// ---------------------------------------------------------------------------
+
+/** Per-exchange behavioral metrics stored in ai_response event metadata */
+export interface ExchangeBehavioralMetrics {
+  escalationRung: number;
+  isUnderstandingCheck: boolean;
+  timeToAnswerMs: number | null;
+  hintCountInSession: number;
+}
+
+// ---------------------------------------------------------------------------
 // Shared exchange preparation (used by processMessage + streamMessage)
 // ---------------------------------------------------------------------------
 
@@ -141,13 +156,16 @@ interface ExchangePrep {
   session: LearningSession;
   context: ExchangeContext;
   effectiveRung: EscalationRung;
+  hintCount: number;
+  lastAiResponseAt: Date | null;
 }
 
 async function prepareExchangeContext(
   db: Database,
   profileId: string,
   sessionId: string,
-  userMessage: string
+  userMessage: string,
+  options?: { voyageApiKey?: string }
 ): Promise<ExchangePrep> {
   // 1. Load session
   const session = await getSession(db, profileId, sessionId);
@@ -156,37 +174,46 @@ async function prepareExchangeContext(
   }
 
   // 2. Load all supplementary data in parallel (all independent after session load)
-  const [subject, topicRows, profileRows, retentionRows, events] =
-    await Promise.all([
-      getSubject(db, profileId, session.subjectId),
-      session.topicId
-        ? db
-            .select()
-            .from(curriculumTopics)
-            .where(eq(curriculumTopics.id, session.topicId))
-            .limit(1)
-        : Promise.resolve([]),
-      db.select().from(profiles).where(eq(profiles.id, profileId)).limit(1),
-      session.topicId
-        ? db
-            .select()
-            .from(retentionCards)
-            .where(
-              and(
-                eq(retentionCards.topicId, session.topicId),
-                eq(retentionCards.profileId, profileId)
-              )
+  const [
+    subject,
+    topicRows,
+    profileRows,
+    retentionRows,
+    events,
+    priorTopics,
+    memory,
+  ] = await Promise.all([
+    getSubject(db, profileId, session.subjectId),
+    session.topicId
+      ? db
+          .select()
+          .from(curriculumTopics)
+          .where(eq(curriculumTopics.id, session.topicId))
+          .limit(1)
+      : Promise.resolve([]),
+    db.select().from(profiles).where(eq(profiles.id, profileId)).limit(1),
+    session.topicId
+      ? db
+          .select()
+          .from(retentionCards)
+          .where(
+            and(
+              eq(retentionCards.topicId, session.topicId),
+              eq(retentionCards.profileId, profileId)
             )
-            .limit(1)
-        : Promise.resolve([]),
-      db.query.sessionEvents.findMany({
-        where: and(
-          eq(sessionEvents.sessionId, sessionId),
-          eq(sessionEvents.profileId, profileId)
-        ),
-        orderBy: asc(sessionEvents.createdAt),
-      }),
-    ]);
+          )
+          .limit(1)
+      : Promise.resolve([]),
+    db.query.sessionEvents.findMany({
+      where: and(
+        eq(sessionEvents.sessionId, sessionId),
+        eq(sessionEvents.profileId, profileId)
+      ),
+      orderBy: asc(sessionEvents.createdAt),
+    }),
+    fetchPriorTopics(db, profileId, session.subjectId),
+    retrieveRelevantMemory(db, profileId, userMessage, options?.voyageApiKey),
+  ]);
 
   const topic = topicRows[0];
   const [profile] = profileRows;
@@ -210,19 +237,28 @@ async function prepareExchangeContext(
       content: e.content,
     }));
 
-  // 3b. Count questions at the current escalation rung
-  const questionsAtCurrentRung = events.filter(
+  // 3b. Count questions at the current escalation rung + compute hint count
+  const aiResponseEvents = events.filter((e) => e.eventType === 'ai_response');
+  const questionsAtCurrentRung = aiResponseEvents.filter(
     (e) =>
-      e.eventType === 'ai_response' &&
       (e.metadata as Record<string, unknown> | null)?.escalationRung ===
-        session.escalationRung
+      session.escalationRung
   ).length;
+  // Hint = AI response at escalation rung >= 2 (beyond basic Socratic)
+  const hintCount = aiResponseEvents.filter((e) => {
+    const rung = (e.metadata as Record<string, unknown> | null)?.escalationRung;
+    return typeof rung === 'number' && rung >= 2;
+  }).length;
+  const lastAiResponseAt =
+    aiResponseEvents.length > 0
+      ? aiResponseEvents[aiResponseEvents.length - 1].createdAt
+      : null;
 
   // 4. Evaluate escalation
   const escalationDecision = evaluateEscalation(
     {
       currentRung: session.escalationRung as EscalationRung,
-      hintCount: 0,
+      hintCount,
       questionsAtCurrentRung,
       totalExchanges: session.exchangeCount,
     },
@@ -232,7 +268,10 @@ async function prepareExchangeContext(
     ? escalationDecision.newRung
     : (session.escalationRung as EscalationRung);
 
-  // 5. Build ExchangeContext
+  // 5. Build prior learning context (FR40 — bridge FR)
+  const priorLearning = buildPriorLearningContext(priorTopics);
+
+  // 6. Build ExchangeContext
   const context: ExchangeContext = {
     sessionId,
     profileId,
@@ -245,9 +284,11 @@ async function prepareExchangeContext(
     personaType:
       (profile?.personaType as 'TEEN' | 'LEARNER' | 'PARENT') ?? 'LEARNER',
     workedExampleLevel,
+    priorLearningContext: priorLearning.contextText || undefined,
+    embeddingMemoryContext: memory.context || undefined,
   };
 
-  return { session, context, effectiveRung };
+  return { session, context, effectiveRung, hintCount, lastAiResponseAt };
 }
 
 async function persistExchangeResult(
@@ -257,11 +298,23 @@ async function persistExchangeResult(
   session: LearningSession,
   userMessage: string,
   aiResponse: string,
-  effectiveRung: EscalationRung
+  effectiveRung: EscalationRung,
+  behavioral?: Partial<ExchangeBehavioralMetrics>
 ): Promise<number> {
   const previousRung = session.escalationRung;
 
-  // Persist events: user_message + ai_response (with rung metadata)
+  // Build ai_response metadata — always includes escalationRung,
+  // enriched with behavioral metrics when available (UX-18)
+  const aiMetadata: Record<string, unknown> = {
+    escalationRung: effectiveRung,
+    ...(behavioral && {
+      isUnderstandingCheck: behavioral.isUnderstandingCheck,
+      timeToAnswerMs: behavioral.timeToAnswerMs,
+      hintCountInSession: behavioral.hintCountInSession,
+    }),
+  };
+
+  // Persist events: user_message + ai_response (with behavioral metadata)
   await db.insert(sessionEvents).values([
     {
       sessionId,
@@ -276,7 +329,7 @@ async function persistExchangeResult(
       subjectId: session.subjectId,
       eventType: 'ai_response' as const,
       content: aiResponse,
-      metadata: { escalationRung: effectiveRung },
+      metadata: aiMetadata,
     },
   ]);
 
@@ -332,14 +385,15 @@ export async function processMessage(
   isUnderstandingCheck: boolean;
   exchangeCount: number;
 }> {
-  const { session, context, effectiveRung } = await prepareExchangeContext(
-    db,
-    profileId,
-    sessionId,
-    input.message
-  );
+  const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
+    await prepareExchangeContext(db, profileId, sessionId, input.message);
 
   const result = await processExchange(context, input.message);
+
+  // Compute time-to-answer: ms between last AI response and now
+  const timeToAnswerMs = lastAiResponseAt
+    ? Date.now() - lastAiResponseAt.getTime()
+    : null;
 
   const newExchangeCount = await persistExchangeResult(
     db,
@@ -348,7 +402,12 @@ export async function processMessage(
     session,
     input.message,
     result.response,
-    effectiveRung
+    effectiveRung,
+    {
+      isUnderstandingCheck: result.isUnderstandingCheck,
+      timeToAnswerMs,
+      hintCountInSession: hintCount,
+    }
   );
 
   return {
@@ -374,12 +433,13 @@ export async function streamMessage(
     fullResponse: string
   ) => Promise<{ exchangeCount: number; escalationRung: number }>;
 }> {
-  const { session, context, effectiveRung } = await prepareExchangeContext(
-    db,
-    profileId,
-    sessionId,
-    input.message
-  );
+  const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
+    await prepareExchangeContext(db, profileId, sessionId, input.message);
+
+  // Compute time-to-answer before streaming begins
+  const timeToAnswerMs = lastAiResponseAt
+    ? Date.now() - lastAiResponseAt.getTime()
+    : null;
 
   const result = await streamExchange(context, input.message);
 
@@ -393,7 +453,12 @@ export async function streamMessage(
         session,
         input.message,
         fullResponse,
-        effectiveRung
+        effectiveRung,
+        {
+          isUnderstandingCheck: detectUnderstandingCheck(fullResponse),
+          timeToAnswerMs,
+          hintCountInSession: hintCount,
+        }
       );
       return { exchangeCount: newExchangeCount, escalationRung: effectiveRung };
     },

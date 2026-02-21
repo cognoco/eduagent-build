@@ -7,11 +7,28 @@ import {
   useMemo,
 } from 'react';
 import { createElement, type ReactNode } from 'react';
+import { Platform } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
 import type { Profile } from '@eduagent/schemas';
 import { useProfiles } from '../hooks/use-profiles';
 import { useApiClient } from './api-client';
+
+// expo-secure-store is native-only; fall back to localStorage on web
+const isWeb = Platform.OS === 'web';
+const storage = {
+  getItem: async (key: string): Promise<string | null> => {
+    if (isWeb) return localStorage.getItem(key);
+    return SecureStore.getItemAsync(key);
+  },
+  setItem: async (key: string, value: string): Promise<void> => {
+    if (isWeb) {
+      localStorage.setItem(key, value);
+      return;
+    }
+    await SecureStore.setItemAsync(key, value);
+  },
+};
 
 export type { Profile };
 
@@ -51,7 +68,7 @@ export function ProfileProvider({
   // On mount: restore saved profile ID from SecureStore
   useEffect(() => {
     const restore = async () => {
-      const savedId = await SecureStore.getItemAsync(ACTIVE_PROFILE_KEY);
+      const savedId = await storage.getItem(ACTIVE_PROFILE_KEY);
       if (savedId) {
         setActiveProfileId(savedId);
       }
@@ -69,7 +86,7 @@ export function ProfileProvider({
     if (!savedExists) {
       const owner = profiles.find((p) => p.isOwner) ?? profiles[0];
       setActiveProfileId(owner.id);
-      void SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, owner.id);
+      void storage.setItem(ACTIVE_PROFILE_KEY, owner.id);
     }
   }, [profiles, activeProfileId, isRestoringId]);
 
@@ -82,7 +99,7 @@ export function ProfileProvider({
     async (profileId: string) => {
       await client.profiles.switch.$post({ json: { profileId } });
       setActiveProfileId(profileId);
-      await SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, profileId);
+      await storage.setItem(ACTIVE_PROFILE_KEY, profileId);
       await queryClient.invalidateQueries();
     },
     [client, queryClient]

@@ -48,6 +48,7 @@ jest.mock('../services/profile', () => ({
       birthDate: input.birthDate ?? null,
       personaType: input.personaType ?? 'LEARNER',
       isOwner: isOwner ?? false,
+      consentStatus: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     })),
@@ -59,6 +60,7 @@ jest.mock('../services/profile', () => ({
     birthDate: null,
     personaType: 'LEARNER',
     isOwner: false,
+    consentStatus: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }),
@@ -70,6 +72,7 @@ jest.mock('../services/profile', () => ({
     birthDate: null,
     personaType: 'LEARNER',
     isOwner: false,
+    consentStatus: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }),
@@ -78,7 +81,7 @@ jest.mock('../services/profile', () => ({
   }),
 }));
 
-import app from '../index';
+import { app } from '../index';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',

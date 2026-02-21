@@ -8,12 +8,17 @@ export type Persona = 'teen' | 'learner' | 'parent';
 export interface ThemeContextValue {
   persona: Persona;
   setPersona: (p: Persona) => void;
+  colorScheme: ColorScheme;
+  setColorScheme: (cs: ColorScheme) => void;
 }
 
 export const ThemeContext = createContext<ThemeContextValue>({
   persona: 'teen',
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   setPersona: () => {},
+  colorScheme: 'light',
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  setColorScheme: () => {},
 });
 
 export function useTheme(): ThemeContextValue {
@@ -30,8 +35,11 @@ export function useTheme(): ThemeContextValue {
 export type ThemeColors = (typeof tokens)[Persona][ColorScheme]['colors'];
 
 export function useThemeColors(): ThemeColors {
-  const { persona } = useTheme();
-  return useMemo(() => tokens[persona].light.colors, [persona]);
+  const { persona, colorScheme } = useTheme();
+  return useMemo(
+    () => tokens[persona][colorScheme].colors,
+    [persona, colorScheme]
+  );
 }
 
 /**
@@ -42,6 +50,9 @@ export function useThemeColors(): ThemeColors {
  * with runtime injection, enabling future dark mode via `useColorScheme()`.
  */
 export function useTokenVars(): ReturnType<typeof vars> {
-  const { persona } = useTheme();
-  return useMemo(() => vars(tokensToCssVars(tokens[persona].light)), [persona]);
+  const { persona, colorScheme } = useTheme();
+  return useMemo(
+    () => vars(tokensToCssVars(tokens[persona][colorScheme])),
+    [persona, colorScheme]
+  );
 }

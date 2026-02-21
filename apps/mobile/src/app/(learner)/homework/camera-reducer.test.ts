@@ -151,8 +151,8 @@ describe('cameraReducer', () => {
 
   it('returns same state for unknown actions', () => {
     const state = cameraReducer(initialCameraState, {
-      type: 'UNKNOWN' as CameraAction['type'],
-    });
+      type: 'UNKNOWN',
+    } as unknown as CameraAction);
     expect(state).toBe(initialCameraState);
   });
 });

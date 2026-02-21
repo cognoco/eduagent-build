@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { consentStatusSchema } from './consent.js';
 
 export const personaTypeSchema = z.enum(['TEEN', 'LEARNER', 'PARENT']);
 export type PersonaType = z.infer<typeof personaTypeSchema>;
@@ -29,6 +30,7 @@ export const profileSchema = z.object({
   birthDate: z.string().date().nullable(),
   personaType: personaTypeSchema,
   isOwner: z.boolean(),
+  consentStatus: consentStatusSchema.nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

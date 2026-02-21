@@ -46,6 +46,7 @@ function mapRetentionCardRow(
     intervalDays: row.intervalDays,
     repetitions: row.repetitions,
     nextReviewAt: row.nextReviewAt?.toISOString() ?? null,
+    lastReviewedAt: row.lastReviewedAt?.toISOString() ?? null,
     xpStatus: row.xpStatus as 'pending' | 'verified' | 'decayed',
     failureCount: row.failureCount,
   };
@@ -127,7 +128,10 @@ export async function getSubjectRetention(
   db: Database,
   profileId: string,
   subjectId: string
-): Promise<{ topics: RetentionCardResponse[]; reviewDueCount: number }> {
+): Promise<{
+  topics: (RetentionCardResponse & { topicTitle: string })[];
+  reviewDueCount: number;
+}> {
   const repo = createScopedRepository(db, profileId);
 
   // Verify subject belongs to profile
@@ -144,6 +148,7 @@ export async function getSubjectRetention(
     where: eq(curriculumTopics.curriculumId, curriculum.id),
   });
   const topicIds = topics.map((t) => t.id);
+  const topicTitleMap = new Map(topics.map((t) => [t.id, t.title]));
 
   // Get all retention cards for this profile, filter to subject's topics
   const allCards = await repo.retentionCards.findMany();
@@ -155,7 +160,10 @@ export async function getSubjectRetention(
   ).length;
 
   return {
-    topics: subjectCards.map(mapRetentionCardRow),
+    topics: subjectCards.map((card) => ({
+      ...mapRetentionCardRow(card),
+      topicTitle: topicTitleMap.get(card.topicId) ?? card.topicId,
+    })),
     reviewDueCount,
   };
 }
@@ -176,6 +184,9 @@ export async function getTopicRetention(
 const RETEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 export interface RecallTestRemediation {
+  action: 'redirect_to_learning_book';
+  topicId: string;
+  topicTitle: string;
   retentionStatus: string;
   failureCount: number;
   cooldownEndsAt: string;
@@ -263,6 +274,9 @@ export async function processRecallTest(
     ).toISOString();
 
     response.remediation = {
+      action: 'redirect_to_learning_book',
+      topicId: input.topicId,
+      topicTitle,
       retentionStatus,
       failureCount: result.newState.failureCount,
       cooldownEndsAt,

@@ -37,8 +37,16 @@ export function RetentionSignal({ status, compact }: RetentionSignalProps) {
   const { label, dotColor, textColor } = CONFIG[status];
 
   return (
-    <View className="flex-row items-center">
-      <View className={`w-2.5 h-2.5 rounded-full ${dotColor} mr-1.5`} />
+    <View
+      className="flex-row items-center"
+      accessibilityLabel={`Retention: ${label}`}
+      accessibilityRole="text"
+    >
+      <View
+        className={`w-2.5 h-2.5 rounded-full ${dotColor} ${
+          compact ? '' : 'mr-1.5'
+        }`}
+      />
       {!compact && (
         <Text className={`text-caption font-medium ${textColor}`}>{label}</Text>
       )}

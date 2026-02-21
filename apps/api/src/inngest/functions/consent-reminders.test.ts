@@ -4,6 +4,8 @@ const mockSendEmail = jest.fn();
 
 jest.mock('../helpers', () => ({
   getStepDatabase: jest.fn(() => ({})),
+  getStepResendApiKey: jest.fn(() => 're_test_key'),
+  getStepEmailFrom: jest.fn(() => 'noreply@eduagent.com'),
 }));
 
 jest.mock('../../services/consent', () => ({

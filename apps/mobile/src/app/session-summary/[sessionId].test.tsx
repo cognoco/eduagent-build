@@ -62,17 +62,17 @@ describe('SessionSummaryScreen', () => {
     queryClient.clear();
   });
 
-  it('renders session stats', () => {
+  it('renders session takeaways', () => {
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
     expect(screen.getByTestId('summary-title')).toBeTruthy();
     expect(screen.getByText('Session Complete')).toBeTruthy();
     expect(screen.getByText('Mathematics')).toBeTruthy();
-    expect(screen.getByTestId('session-stats')).toBeTruthy();
-    expect(screen.getByText('5')).toBeTruthy();
-    expect(screen.getByText('Exchanges')).toBeTruthy();
-    expect(screen.getByText('2')).toBeTruthy();
-    expect(screen.getByText('Scaffolded')).toBeTruthy();
+    expect(screen.getByTestId('session-takeaways')).toBeTruthy();
+    expect(screen.getByText('What happened')).toBeTruthy();
+    // 5 exchanges, rung 2 → "strong independent thinking"
+    expect(screen.getByText(/worked through 5 exchanges/)).toBeTruthy();
+    expect(screen.getByText(/strong independent thinking/)).toBeTruthy();
   });
 
   it('renders summary input', () => {

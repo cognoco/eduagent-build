@@ -10,12 +10,16 @@ import type {
   ProfileUpdateInput,
   Profile,
 } from '@eduagent/schemas';
+import { getConsentStatus } from './consent';
 
 // ---------------------------------------------------------------------------
 // Mapper — Drizzle Date → API ISO string
 // ---------------------------------------------------------------------------
 
-function mapProfileRow(row: typeof profiles.$inferSelect): Profile {
+function mapProfileRow(
+  row: typeof profiles.$inferSelect,
+  consentStatus: Profile['consentStatus'] = null
+): Profile {
   return {
     id: row.id,
     accountId: row.accountId,
@@ -24,6 +28,7 @@ function mapProfileRow(row: typeof profiles.$inferSelect): Profile {
     birthDate: row.birthDate ? row.birthDate.toISOString().split('T')[0] : null,
     personaType: row.personaType,
     isOwner: row.isOwner,
+    consentStatus,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -43,7 +48,13 @@ export async function listProfiles(
   const rows = await db.query.profiles.findMany({
     where: eq(profiles.accountId, accountId),
   });
-  return rows.map(mapProfileRow);
+  const mapped = await Promise.all(
+    rows.map(async (row) => {
+      const status = await getConsentStatus(db, row.id);
+      return mapProfileRow(row, status);
+    })
+  );
+  return mapped;
 }
 
 /**
@@ -86,7 +97,9 @@ export async function getProfile(
   const row = await db.query.profiles.findFirst({
     where: and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)),
   });
-  return row ? mapProfileRow(row) : null;
+  if (!row) return null;
+  const status = await getConsentStatus(db, row.id);
+  return mapProfileRow(row, status);
 }
 
 /**
@@ -109,7 +122,9 @@ export async function updateProfile(
     })
     .where(and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)))
     .returning();
-  return rows[0] ? mapProfileRow(rows[0]) : null;
+  if (!rows[0]) return null;
+  const status = await getConsentStatus(db, rows[0].id);
+  return mapProfileRow(rows[0], status);
 }
 
 /**

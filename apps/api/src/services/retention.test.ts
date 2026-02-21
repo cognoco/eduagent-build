@@ -107,6 +107,24 @@ describe('processRecallResult', () => {
     expect(result.xpChange).toBe('verified');
   });
 
+  it('resets failureCount to 0 on successful recall (FR52-58)', () => {
+    const state = createTestState({ failureCount: 2, repetitions: 1 });
+
+    const result = processRecallResult(state, 4);
+
+    expect(result.passed).toBe(true);
+    expect(result.newState.failureCount).toBe(0);
+  });
+
+  it('resets failureCount from 3+ to 0 on successful recall', () => {
+    const state = createTestState({ failureCount: 5, repetitions: 1 });
+
+    const result = processRecallResult(state, 3);
+
+    expect(result.passed).toBe(true);
+    expect(result.newState.failureCount).toBe(0);
+  });
+
   it('keeps XP pending on first success (no delayed recall yet)', () => {
     const state = createTestState({
       consecutiveSuccesses: 0,

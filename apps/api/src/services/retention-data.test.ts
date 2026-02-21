@@ -169,6 +169,7 @@ describe('getSubjectRetention', () => {
     expect(result.topics[0].topicId).toBe(topicId);
     expect(result.topics[0].easeFactor).toBe(2.5);
     expect(result.topics[0].intervalDays).toBe(7);
+    expect(result.topics[0].topicTitle).toBe('Topic 1');
   });
 
   it('counts overdue reviews', async () => {
@@ -334,6 +335,9 @@ describe('processRecallTest', () => {
     expect(result.failureCount).toBe(3);
     expect(result.failureAction).toBe('redirect_to_learning_book');
     expect(result.remediation).toBeDefined();
+    expect(result.remediation!.action).toBe('redirect_to_learning_book');
+    expect(result.remediation!.topicId).toBe(topicId);
+    expect(result.remediation!.topicTitle).toBe('Topic 1');
     expect(result.remediation!.retentionStatus).toBe('weak');
     expect(result.remediation!.failureCount).toBe(3);
     expect(result.remediation!.cooldownEndsAt).toBeDefined();
@@ -344,6 +348,79 @@ describe('processRecallTest', () => {
     expect(getRetentionStatus).toHaveBeenCalledWith(
       expect.objectContaining({ failureCount: 3 })
     );
+  });
+
+  it('persists failureCount: 0 on successful recall (FR52-58 reset)', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.6,
+        intervalDays: 10,
+        repetitions: 4,
+        failureCount: 0,
+        consecutiveSuccesses: 3,
+        xpStatus: 'verified',
+        nextReviewAt: '2026-02-25T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+
+    const db = createMockDb();
+    const result = await processRecallTest(db, profileId, {
+      topicId,
+      answer:
+        'A detailed explanation of photosynthesis and its chemical processes',
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.failureCount).toBe(0);
+
+    // Verify the DB update includes failureCount: 0
+    const setArg = (db.update as jest.Mock).mock.results[0].value.set.mock
+      .calls[0][0];
+    expect(setArg.failureCount).toBe(0);
+  });
+
+  it('includes topicTitle in remediation from topic lookup', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.1,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 4,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'redirect_to_learning_book',
+    });
+
+    (getRetentionStatus as jest.Mock).mockReturnValue('forgotten');
+
+    const db = createMockDb();
+    const result = await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'I have no idea',
+    });
+
+    expect(result.remediation).toBeDefined();
+    expect(result.remediation!.topicId).toBe(topicId);
+    expect(result.remediation!.topicTitle).toBe('Topic 1');
+    expect(result.remediation!.action).toBe('redirect_to_learning_book');
+    expect(result.remediation!.retentionStatus).toBe('forgotten');
+    expect(result.remediation!.failureCount).toBe(4);
   });
 
   it('includes failureCount in success response', async () => {

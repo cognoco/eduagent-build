@@ -1,10 +1,15 @@
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import {
+  getStepDatabase,
+  getStepResendApiKey,
+  getStepEmailFrom,
+} from '../helpers';
 import { getConsentStatus } from '../../services/consent';
 import { deleteProfile } from '../../services/deletion';
 import {
   sendEmail,
   formatConsentReminderEmail,
+  type EmailOptions,
 } from '../../services/notifications';
 
 export const consentReminder = inngest.createFunction(
@@ -13,6 +18,12 @@ export const consentReminder = inngest.createFunction(
   async ({ event, step }) => {
     const { profileId, parentEmail, consentType: _consentType } = event.data;
 
+    // Build email options from Inngest middleware-injected env vars
+    const emailOpts = (): EmailOptions => ({
+      resendApiKey: getStepResendApiKey(),
+      emailFrom: getStepEmailFrom(),
+    });
+
     // Day 7 reminder
     await step.sleep('wait-7-days', '7d');
     await step.run('send-day-7-reminder', async () => {
@@ -20,7 +31,8 @@ export const consentReminder = inngest.createFunction(
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
       await sendEmail(
-        formatConsentReminderEmail(parentEmail, 'your child', 23)
+        formatConsentReminderEmail(parentEmail, 'your child', 23),
+        emailOpts()
       );
     });
 
@@ -31,7 +43,8 @@ export const consentReminder = inngest.createFunction(
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
       await sendEmail(
-        formatConsentReminderEmail(parentEmail, 'your child', 16)
+        formatConsentReminderEmail(parentEmail, 'your child', 16),
+        emailOpts()
       );
     });
 
@@ -41,12 +54,16 @@ export const consentReminder = inngest.createFunction(
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
-      await sendEmail({
-        to: parentEmail,
-        subject: "Final warning: your child's EduAgent account will be removed",
-        body: `Without your consent, your child's account and data will be automatically removed in 5 days.`,
-        type: 'consent_warning',
-      });
+      await sendEmail(
+        {
+          to: parentEmail,
+          subject:
+            "Final warning: your child's EduAgent account will be removed",
+          body: `Without your consent, your child's account and data will be automatically removed in 5 days.`,
+          type: 'consent_warning',
+        },
+        emailOpts()
+      );
     });
 
     // Day 30 auto-delete — GDPR/COPPA requires deletion if consent not granted

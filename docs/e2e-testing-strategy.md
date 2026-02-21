@@ -2,7 +2,7 @@
 
 **Type:** Spike (planning deliverable)
 **Date:** 2026-02-17
-**Status:** Proposed
+**Status:** Active
 
 ---
 
@@ -351,3 +351,36 @@ This strategy should be implemented across future epics:
 4. **CI wiring** — Add `e2e-ci.yml` workflow with Android emulator for Maestro, add API integration tests to existing CI.
 5. **Smoke suite buildout** — Write Tier 1 flows as features are wired to real APIs (currently mobile uses mock data).
 6. **Nightly full suite** — Add scheduled workflow, Tier 2 flows, reporting.
+
+---
+
+## 8. Flakiness Baseline & Reliability Expectations
+
+### Expected Flake Rate
+
+Target: **<5%** for Maestro smoke flows on GitHub Actions Android emulator. API integration tests (Hono `app.request()` against PostgreSQL) should be **0% flake** — deterministic by design.
+
+### Retry Strategy
+
+- **Maestro:** Built-in retry per flow step (configurable in `config.yaml` via `retryCount`). Default: 1 retry per failed step.
+- **API integration tests:** No retry — tests are deterministic. Failures indicate real regressions.
+
+### Merge Policy
+
+- **PR level:** Advisory only (`continue-on-error: true` in `e2e-ci.yml`). E2E failures appear as warnings, not blockers.
+- **Nightly failures:** Create GitHub issues automatically. Track flake rate over time. Promote to PR-blocking when flake rate is stable below 2%.
+
+### CI Time Impact
+
+| Suite | Estimated Duration | Notes |
+|-------|--------------------|-------|
+| API integration | ~2-3 min | PostgreSQL service container boot + schema push + test execution |
+| Maestro smoke (4 flows) | ~5-8 min | Emulator boot (~2 min) + 4 flows (~1.5 min each) |
+| **Total E2E job** | ~8-11 min | Runs in parallel with main CI; does not increase overall PR gate time |
+
+### Known Limitations
+
+- **Emulator-only:** No real device testing in CI at MVP. Real device quirks (touch latency, screen size) are not covered.
+- **Android-only at MVP:** iOS Maestro CI requires macOS runners (~10x cost). Add iOS when revenue justifies.
+- **No network condition simulation:** Slow/offline network behavior is not tested. Add Maestro network condition commands post-MVP.
+- **EAS dev build dependency:** Maestro smoke tests require a pre-built Expo dev client APK. EAS build must be triggered before or cached from a prior successful build.

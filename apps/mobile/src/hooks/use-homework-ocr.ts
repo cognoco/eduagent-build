@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export type OcrStatus = 'idle' | 'processing' | 'done' | 'error';
 

@@ -8,7 +8,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Modal,
 } from 'react-native';
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
@@ -33,6 +37,43 @@ const LOCATION_OPTIONS: { value: LocationValue; label: string }[] = [
   { value: 'OTHER', label: 'Other' },
 ];
 
+function formatDateForDisplay(date: Date): string {
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+function formatDateForApi(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export function detectPersona(birthDate: Date): PersonaType {
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getDate() < birthDate.getDate())
+  ) {
+    age--;
+  }
+  if (age < 13) return 'TEEN';
+  if (age < 18) return 'LEARNER';
+  return 'PARENT';
+}
+
+const MAX_DATE = new Date();
+const MIN_DATE = new Date(
+  MAX_DATE.getFullYear() - 100,
+  MAX_DATE.getMonth(),
+  MAX_DATE.getDate()
+);
+
 export default function CreateProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -42,21 +83,41 @@ export default function CreateProfileScreen() {
   const { switchProfile } = useProfile();
 
   const [displayName, setDisplayName] = useState('');
-  const [birthDate, setBirthDate] = useState('');
+  const [birthDate, setBirthDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [personaType, setPersonaType] = useState<PersonaType>('LEARNER');
+  const [personaAutoDetected, setPersonaAutoDetected] = useState(false);
   const [location, setLocation] = useState<'EU' | 'US' | 'OTHER' | ''>('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const birthDateString = birthDate ? formatDateForApi(birthDate) : null;
+
   const { required: consentRequired, consentType } = checkConsentRequirement(
-    birthDate.trim() || null,
+    birthDateString,
     location || null
   );
 
-  const canSubmit = displayName.trim().length >= 1 && !loading;
+  const onDateChange = useCallback(
+    (_event: DateTimePickerEvent, selectedDate?: Date) => {
+      if (Platform.OS === 'android') {
+        setShowDatePicker(false);
+      }
+      if (selectedDate) {
+        setBirthDate(selectedDate);
+        const detected = detectPersona(selectedDate);
+        setPersonaType(detected);
+        setPersonaAutoDetected(true);
+      }
+    },
+    []
+  );
+
+  const canSubmit =
+    displayName.trim().length >= 1 && birthDate !== null && !loading;
 
   const onSubmit = useCallback(async () => {
-    if (!canSubmit) return;
+    if (!canSubmit || !birthDate) return;
 
     const trimmedName = displayName.trim();
     if (trimmedName.length > 50) {
@@ -76,10 +137,8 @@ export default function CreateProfileScreen() {
       } = {
         displayName: trimmedName,
         personaType,
+        birthDate: formatDateForApi(birthDate),
       };
-      if (birthDate.trim()) {
-        body.birthDate = birthDate.trim();
-      }
       if (location) {
         body.location = location;
       }
@@ -172,20 +231,100 @@ export default function CreateProfileScreen() {
         />
 
         <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-          Birth date (optional)
+          Birth date
         </Text>
-        <TextInput
-          className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor={colors.muted}
-          value={birthDate}
-          onChangeText={setBirthDate}
-          editable={!loading}
+        <Pressable
+          onPress={() => setShowDatePicker(true)}
+          className="bg-surface rounded-input px-4 py-3 mb-2"
+          disabled={loading}
+          accessibilityLabel="Select birth date"
           testID="create-profile-birthdate"
-        />
+        >
+          <Text
+            className={birthDate ? 'text-text-primary text-body' : 'text-body'}
+            style={birthDate ? undefined : { color: colors.muted }}
+          >
+            {birthDate
+              ? formatDateForDisplay(birthDate)
+              : 'Select date of birth'}
+          </Text>
+        </Pressable>
+
+        {Platform.OS === 'ios' && showDatePicker && (
+          <Modal transparent animationType="slide" testID="date-picker-modal">
+            <View className="flex-1 justify-end bg-black/30">
+              <View className="bg-surface rounded-t-2xl pb-8">
+                <View className="flex-row justify-end px-4 pt-3 pb-1">
+                  <Pressable
+                    onPress={() => setShowDatePicker(false)}
+                    className="min-h-[44px] min-w-[44px] items-center justify-center"
+                    accessibilityLabel="Close date picker"
+                    testID="date-picker-done"
+                  >
+                    <Text className="text-primary text-body font-semibold">
+                      Done
+                    </Text>
+                  </Pressable>
+                </View>
+                <DateTimePicker
+                  value={birthDate ?? new Date(2010, 0, 1)}
+                  mode="date"
+                  display="spinner"
+                  maximumDate={MAX_DATE}
+                  minimumDate={MIN_DATE}
+                  onChange={onDateChange}
+                  testID="date-picker"
+                />
+              </View>
+            </View>
+          </Modal>
+        )}
+
+        {Platform.OS === 'android' && showDatePicker && (
+          <DateTimePicker
+            value={birthDate ?? new Date(2010, 0, 1)}
+            mode="date"
+            display="default"
+            maximumDate={MAX_DATE}
+            minimumDate={MIN_DATE}
+            onChange={onDateChange}
+            testID="date-picker"
+          />
+        )}
+
+        {Platform.OS === 'web' && showDatePicker && (
+          <View className="mb-2">
+            <DateTimePicker
+              value={birthDate ?? new Date(2010, 0, 1)}
+              mode="date"
+              display="default"
+              maximumDate={MAX_DATE}
+              minimumDate={MIN_DATE}
+              onChange={onDateChange}
+              testID="date-picker"
+            />
+          </View>
+        )}
+
+        {personaAutoDetected && birthDate && (
+          <Text
+            className="text-body-sm text-text-secondary mb-4"
+            testID="persona-auto-hint"
+          >
+            Based on your age, we set your profile type to{' '}
+            {personaType === 'TEEN'
+              ? 'Teen'
+              : personaType === 'LEARNER'
+              ? 'Learner'
+              : 'Parent'}
+            . You can change it below.
+          </Text>
+        )}
+
+        {!personaAutoDetected && !birthDate && <View className="h-2" />}
 
         <Text className="text-body-sm font-semibold text-text-secondary mb-2">
-          Persona type
+          Profile type
         </Text>
         <View className="flex-row mb-8">
           {PERSONA_OPTIONS.map((option) => {
@@ -193,11 +332,15 @@ export default function CreateProfileScreen() {
             return (
               <Pressable
                 key={option.value}
-                onPress={() => setPersonaType(option.value)}
+                onPress={() => {
+                  setPersonaType(option.value);
+                  setPersonaAutoDetected(false);
+                }}
                 className={`flex-1 py-3 items-center rounded-button mr-2 last:mr-0 ${
                   isSelected ? 'bg-primary' : 'bg-surface'
                 }`}
                 disabled={loading}
+                accessibilityLabel={`Select ${option.label} profile type`}
                 testID={`persona-${option.value.toLowerCase()}`}
               >
                 <Text
@@ -212,7 +355,7 @@ export default function CreateProfileScreen() {
           })}
         </View>
 
-        {birthDate.trim() !== '' && (
+        {birthDate !== null && (
           <>
             <Text className="text-body-sm font-semibold text-text-secondary mb-2">
               Region

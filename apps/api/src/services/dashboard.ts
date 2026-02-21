@@ -3,11 +3,12 @@
 // Pure business logic + DB-aware query functions, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte } from 'drizzle-orm';
+import { eq, and, gte, inArray, desc } from 'drizzle-orm';
 import {
   familyLinks,
   profiles,
   learningSessions,
+  sessionEvents,
   curricula,
   curriculumTopics,
   type Database,
@@ -81,6 +82,25 @@ export function generateChildSummary(input: DashboardInput): string {
 }
 
 /**
+ * Calculates retention trend as a snapshot heuristic.
+ * Compares strong count vs weak+fading count across all subjects.
+ */
+export function calculateRetentionTrend(
+  subjectRetentionData: Array<{ status: 'strong' | 'fading' | 'weak' }>
+): 'improving' | 'declining' | 'stable' {
+  if (subjectRetentionData.length === 0) return 'stable';
+  const strongCount = subjectRetentionData.filter(
+    (s) => s.status === 'strong'
+  ).length;
+  const weakCount = subjectRetentionData.filter(
+    (s) => s.status === 'weak' || s.status === 'fading'
+  ).length;
+  if (strongCount > weakCount) return 'improving';
+  if (strongCount < weakCount) return 'declining';
+  return 'stable';
+}
+
+/**
  * Calculates the trend between current and previous values.
  */
 export function calculateTrend(
@@ -101,6 +121,39 @@ export function calculateTrend(
 export function calculateGuidedRatio(guided: number, total: number): number {
   if (total === 0) return 0;
   return Math.min(1, Math.max(0, guided / total));
+}
+
+/**
+ * Counts AI-response events in sessionEvents for a child within a date range,
+ * classifying those with escalationRung >= 3 as "guided".
+ *
+ * Rung 1-2 = Socratic (child thinking independently)
+ * Rung 3+ = Parallel Example / Transfer Bridge / Teaching Mode (AI had to demonstrate)
+ */
+export async function countGuidedMetrics(
+  db: Database,
+  childProfileId: string,
+  startDate: Date
+): Promise<{ guidedCount: number; totalProblemCount: number }> {
+  const events = await db.query.sessionEvents.findMany({
+    where: and(
+      eq(sessionEvents.profileId, childProfileId),
+      eq(sessionEvents.eventType, 'ai_response'),
+      gte(sessionEvents.createdAt, startDate)
+    ),
+  });
+
+  let guidedCount = 0;
+  for (const event of events) {
+    const meta = event.metadata as Record<string, unknown> | null;
+    const rung =
+      typeof meta?.escalationRung === 'number' ? meta.escalationRung : 0;
+    if (rung >= 3) {
+      guidedCount++;
+    }
+  }
+
+  return { guidedCount, totalProblemCount: events.length };
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +231,14 @@ export async function getChildrenForParent(
       )
       .reduce((sum, s) => sum + (s.durationSeconds ?? 0), 0);
 
-    // 6. Build DashboardInput for summary generation
+    // 6. Count guided metrics from session events
+    const guidedMetrics = await countGuidedMetrics(
+      db,
+      childProfileId,
+      startOfLastWeek
+    );
+
+    // 7. Build DashboardInput for summary generation
     const subjectRetentionData = progress.subjects.map((s) => ({
       name: s.name,
       status: s.retentionStatus,
@@ -192,12 +252,13 @@ export async function getChildrenForParent(
       totalTimeThisWeekMinutes: Math.round(totalTimeThisWeek / 60),
       totalTimeLastWeekMinutes: Math.round(totalTimeLastWeek / 60),
       subjectRetentionData,
-      guidedCount: 0,
-      totalProblemCount: 0,
+      guidedCount: guidedMetrics.guidedCount,
+      totalProblemCount: guidedMetrics.totalProblemCount,
     };
 
     const summary = generateChildSummary(dashboardInput);
     const trend = calculateTrend(sessionsThisWeek, sessionsLastWeek);
+    const retentionTrend = calculateRetentionTrend(subjectRetentionData);
 
     children.push({
       profileId: childProfileId,
@@ -212,7 +273,11 @@ export async function getChildrenForParent(
         name: s.name,
         retentionStatus: s.status,
       })),
-      guidedVsImmediateRatio: 0,
+      guidedVsImmediateRatio: calculateGuidedRatio(
+        guidedMetrics.guidedCount,
+        guidedMetrics.totalProblemCount
+      ),
+      retentionTrend,
     });
   }
 
@@ -275,4 +340,147 @@ export async function getChildSubjectTopics(
   );
 
   return results.filter((r): r is TopicProgress => r !== null);
+}
+
+// ---------------------------------------------------------------------------
+// Child session list + transcript (parent trust feature)
+// ---------------------------------------------------------------------------
+
+export interface ChildSession {
+  sessionId: string;
+  subjectId: string;
+  topicId: string | null;
+  sessionType: string;
+  startedAt: string;
+  endedAt: string | null;
+  exchangeCount: number;
+  escalationRung: number;
+  durationSeconds: number | null;
+}
+
+export interface TranscriptExchange {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  escalationRung?: number;
+}
+
+export interface ChildSessionTranscript {
+  session: {
+    sessionId: string;
+    subjectId: string;
+    topicId: string | null;
+    sessionType: string;
+    startedAt: string;
+    exchangeCount: number;
+  };
+  exchanges: TranscriptExchange[];
+}
+
+/**
+ * Lists recent sessions for a child, with parent access check.
+ * Returns up to 50 most recent sessions ordered by startedAt descending.
+ */
+export async function getChildSessions(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string
+): Promise<ChildSession[]> {
+  // Verify parent-child relationship
+  const link = await db.query.familyLinks.findFirst({
+    where: and(
+      eq(familyLinks.parentProfileId, parentProfileId),
+      eq(familyLinks.childProfileId, childProfileId)
+    ),
+  });
+  if (!link) return [];
+
+  const sessions = await db.query.learningSessions.findMany({
+    where: eq(learningSessions.profileId, childProfileId),
+    orderBy: desc(learningSessions.startedAt),
+    limit: 50,
+  });
+
+  return sessions.map((s) => ({
+    sessionId: s.id,
+    subjectId: s.subjectId,
+    topicId: s.topicId,
+    sessionType: s.sessionType,
+    startedAt: s.startedAt.toISOString(),
+    endedAt: s.endedAt?.toISOString() ?? null,
+    exchangeCount: s.exchangeCount,
+    escalationRung: s.escalationRung,
+    durationSeconds: s.durationSeconds,
+  }));
+}
+
+/**
+ * Gets full transcript of a session, with parent access check.
+ * Returns null when the session doesn't belong to the child or no link exists.
+ */
+export async function getChildSessionTranscript(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string,
+  sessionId: string
+): Promise<ChildSessionTranscript | null> {
+  // Verify parent-child relationship
+  const link = await db.query.familyLinks.findFirst({
+    where: and(
+      eq(familyLinks.parentProfileId, parentProfileId),
+      eq(familyLinks.childProfileId, childProfileId)
+    ),
+  });
+  if (!link) return null;
+
+  // Get session scoped to child
+  const session = await db.query.learningSessions.findFirst({
+    where: and(
+      eq(learningSessions.id, sessionId),
+      eq(learningSessions.profileId, childProfileId)
+    ),
+  });
+  if (!session) return null;
+
+  // Get message events ordered chronologically
+  const events = await db.query.sessionEvents.findMany({
+    where: and(
+      eq(sessionEvents.sessionId, sessionId),
+      inArray(sessionEvents.eventType, ['user_message', 'ai_response'])
+    ),
+    orderBy: sessionEvents.createdAt,
+  });
+
+  const exchanges: TranscriptExchange[] = events.map((e) => {
+    const exchange: TranscriptExchange = {
+      role: e.eventType === 'user_message' ? 'user' : 'assistant',
+      content: e.content,
+      timestamp: e.createdAt.toISOString(),
+    };
+
+    if (e.eventType === 'ai_response') {
+      const meta = e.metadata as Record<string, unknown> | null;
+      const rung =
+        typeof meta?.escalationRung === 'number'
+          ? meta.escalationRung
+          : undefined;
+      if (rung !== undefined) {
+        exchange.escalationRung = rung;
+      }
+    }
+
+    return exchange;
+  });
+
+  return {
+    session: {
+      sessionId: session.id,
+      subjectId: session.subjectId,
+      topicId: session.topicId,
+      sessionType: session.sessionType,
+      startedAt: session.startedAt.toISOString(),
+      exchangeCount: session.exchangeCount,
+    },
+    exchanges,
+  };
 }

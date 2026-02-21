@@ -114,8 +114,6 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 
 | Decision | Options to Evaluate | Blocking |
 |----------|-------------------|----------|
-| OCR provider | Cloud Vision API, ML Kit, Tesseract, Mathpix | Homework photo pipeline — critical path, different latency/accuracy/cost profiles |
-| Embedding generation | Pipeline architecture for per-user memory vectors | Memory retrieval system |
 | Push notification infrastructure | Expo Push, Firebase Cloud Messaging, OneSignal | Retention reminders, review nudges |
 | Code execution sandbox (v2.0) | Browser-based (WASM) vs server-side | Deferred — programming subjects |
 | Offline capability (v2.0) | Local cache strategy, sync protocol | Deferred |
@@ -307,6 +305,7 @@ Research noted pnpm symlink issues with Expo in some Nx setups. If encountered d
 | 8 | Data isolation | Scoped repository + Neon RLS defense-in-depth | Step 2 |
 | 9 | Monorepo + starter | Nx, forked from cognoco/nx-monorepo | Step 3 |
 | 10 | OCR strategy | ML Kit on-device primary, server-side fallback behind interface | Step 4 |
+| 11 | Embedding provider + model | Voyage AI voyage-3.5 (1024 dims), pgvector + HNSW, Inngest Step 4 | ARCH-16 spike |
 
 **Deferred Decisions (Post-MVP):**
 
@@ -1057,9 +1056,19 @@ The original `lib/` was accumulating too many unrelated concerns. Replaced with 
 **Embedding pipeline — separate from LLM orchestration:**
 
 Embeddings are structurally different from conversational LLM calls: single input → single vector output, no streaming, no routing decisions, no escalation rung. The pipeline:
-- **`services/embeddings.ts`** — Owns the embedding provider call (model TBD at implementation, likely OpenAI `text-embedding-3-small` or equivalent; behind an interface so provider is swappable). Extracts key concepts from session, generates embedding vectors, writes to pgvector.
+- **`services/embeddings.ts`** — Owns the embedding provider call (Voyage AI `voyage-3.5`, 1024 dimensions; behind an interface so provider is swappable). Content extracted from session events (`user_message` + `ai_response`), truncated to 8000 chars. Generates embedding vectors, writes to pgvector via `packages/database/src/queries/embeddings.ts`.
 - **`packages/database/src/queries/embeddings.ts`** — Vector similarity search queries. Uses raw SQL (`ORDER BY embedding <=> $1 LIMIT $n` with cosine distance), not Drizzle relational queries. Different query pattern than standard CRUD.
 - **`inngest/functions/session-completed.ts`** — Inngest step calls `services/embeddings.ts` as the final step after SM-2 and coaching card precompute.
+
+**Adaptive teaching modes — per-subject preferences and within-session switching:**
+
+Two complementary mechanisms control how the AI teaches:
+
+1. **Per-subject teaching method preferences** (FR64-66, Epic 3 Story 3.9): `teaching_preferences` table stores method per `(profile_id, subject_id)` — one of `visual_diagrams`, `step_by_step`, `real_world_examples`, `practice_problems`. CRUD via `services/retention-data.ts` (`get/set/deleteTeachingPreference`). Prompt templates in `services/adaptive-teaching.ts` (`buildMethodPreferencePrompt`). **Wiring note:** method preference is not yet injected into `ExchangeContext` — hook point exists in `buildSystemPrompt()` but the fetch + injection in `session.ts` is pending.
+
+2. **Within-session Socratic→Direct switching** (FR59-60, Epic 3): Three-strike rule in `services/adaptive-teaching.ts`. After 3 consecutive wrong answers on the same concept, `recordWrongAnswer()` returns `action: 'switch_to_direct'`, triggering `getDirectInstructionPrompt()` — clear explanation with concrete example, no more Socratic questioning. At 4+ strikes, `flag_needs_deepening` schedules the topic for revisiting. This is session-scoped (resets per session), not persistent.
+
+**Epic 6 extension point (v1.1):** Language learning (FR96-107) will require a third mechanism — a per-subject `teachingMode` distinguishing Socratic (default) from Four Strands methodology (language) and direct error correction. The existing `teaching_method` enum covers _how_ to teach (visual vs step-by-step); the new mode would control _what pedagogy_ to use. Likely implemented as an additional column on subjects or a new `pedagogy_mode` enum.
 
 **Onboarding as route-level split, not conditional rendering:**
 
@@ -1234,7 +1243,7 @@ Mobile App                          API (Hono on Workers)
 | Clerk | `middleware/auth.ts`, `middleware/jwt.ts` + `@clerk/clerk-expo` | JWKS verification, REST API | JWT + API key |
 | Stripe | `routes/stripe-webhook.ts`, `routes/billing.ts` | Webhook events, REST | Webhook signing secret |
 | LLM providers (currently Gemini only; Claude, GPT-4 planned) | `services/llm/router.ts` | REST + SSE | API keys per provider |
-| Embedding provider (TBD) | `services/embeddings.ts` | REST | API key |
+| Voyage AI (voyage-3.5) | `services/embeddings.ts` | REST (`https://api.voyageai.com/v1/embeddings`) | API key |
 | Inngest | `routes/inngest.ts` + `inngest/functions/*.ts` | Webhook | Inngest signing key |
 | Neon | `packages/database/client.ts` | PostgreSQL wire protocol (serverless driver) | Connection string |
 | Expo Push | `services/notifications.ts` | REST API | Expo push token |
@@ -1433,7 +1442,7 @@ MVP offline behavior is **read-only cached data, no offline writes**:
 
 | Item | Description | When |
 |------|-------------|------|
-| Embedding model/provider selection | Architecture has `services/embeddings.ts` and `queries/embeddings.ts` in place, but provider (OpenAI `text-embedding-3-small`, Cohere, etc.) and model dimension TBD | Epic 2 stories — needed when building memory retrieval |
+| Embedding model/provider selection | RESOLVED — Voyage AI `voyage-3.5` (1024 dimensions), pgvector + HNSW index, cosine distance. Benchmark tool at `scripts/embedding-benchmark.ts`. | Completed (ARCH-16 spike) |
 | Parental consent timeout Inngest job | Scheduled reminder emails (Day 7, 14, 25) + auto-delete (Day 30) | Epic 0 stories |
 | Notification preferences schema | `notification_preferences` JSONB on profiles table | Epic 4 stories |
 | Content flagging storage | How user-flagged content is persisted and reviewed | Epic 2 stories |
@@ -1529,6 +1538,7 @@ Detox/Maestro setup on CI with Expo is notoriously finicky — device farms, bui
 
 - E2E testing infrastructure (Detox or Maestro + CI) — spike during Epic 2
 - Inngest lifecycle chain integration test — include in Epic 3 stories
+- Embedding model/provider selection — COMPLETED. Voyage AI `voyage-3.5` selected after benchmark (`scripts/embedding-benchmark.ts`). 1024 dimensions, cosine distance, HNSW index.
 
 ---
 
@@ -1541,7 +1551,7 @@ Detox/Maestro setup on CI with Expo is notoriously finicky — device farms, bui
 
 **Deliverables:**
 
-- 10 critical architectural decisions resolved (all with specific versions)
+- 11 critical architectural decisions resolved (all with specific versions)
 - 5 deferred decisions documented with deferral rationale
 - 13 enforcement rules for AI agent consistency
 - Complete project directory structure (~100 files/directories)

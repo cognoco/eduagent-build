@@ -3,12 +3,15 @@ import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
+import type { LearningMode } from '@eduagent/schemas';
 import { useTheme, type Persona } from '../../lib/theme';
 import { useProfile } from '../../lib/profile';
 import { useExportData } from '../../hooks/use-account';
 import {
   useNotificationSettings,
   useUpdateNotificationSettings,
+  useLearningMode,
+  useUpdateLearningMode,
 } from '../../hooks/use-settings';
 import { useSubscription } from '../../hooks/use-subscription';
 
@@ -60,6 +63,65 @@ function ToggleRow({
   );
 }
 
+const LEARNING_MODE_OPTIONS: {
+  mode: LearningMode;
+  title: string;
+  description: string;
+}[] = [
+  {
+    mode: 'serious',
+    title: 'Serious Learner',
+    description: 'Mastery gates, verified XP, full assessment cycle',
+  },
+  {
+    mode: 'casual',
+    title: 'Casual Explorer',
+    description: 'No gates, completion XP, skip summaries freely',
+  },
+];
+
+function LearningModeOption({
+  title,
+  description,
+  selected,
+  disabled,
+  onPress,
+  testID,
+}: {
+  title: string;
+  description: string;
+  selected: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+  testID?: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      className={`bg-surface rounded-card px-4 py-3.5 mb-2 ${
+        selected ? 'border-2 border-primary' : 'border-2 border-transparent'
+      }`}
+      accessibilityLabel={`${title}: ${description}`}
+      accessibilityRole="radio"
+      accessibilityState={{ selected, disabled }}
+      testID={testID}
+    >
+      <View className="flex-row items-center justify-between">
+        <Text className="text-body font-semibold text-text-primary">
+          {title}
+        </Text>
+        {selected && (
+          <Text className="text-primary text-body font-semibold">Active</Text>
+        )}
+      </View>
+      <Text className="text-body-sm text-text-secondary mt-1">
+        {description}
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -73,6 +135,8 @@ export default function MoreScreen() {
   const { data: notifPrefs, isLoading: notifLoading } =
     useNotificationSettings();
   const updateNotifications = useUpdateNotificationSettings();
+  const { data: learningMode, isLoading: modeLoading } = useLearningMode();
+  const updateLearningMode = useUpdateLearningMode();
 
   const pushEnabled = notifPrefs?.pushEnabled ?? false;
   const weeklyDigest = notifPrefs?.dailyReminders ?? false;
@@ -97,6 +161,15 @@ export default function MoreScreen() {
       });
     },
     [updateNotifications, notifPrefs]
+  );
+
+  const handleSelectMode = useCallback(
+    (mode: LearningMode) => {
+      if (mode !== learningMode) {
+        updateLearningMode.mutate(mode);
+      }
+    },
+    [learningMode, updateLearningMode]
   );
 
   const handleExport = useCallback(async () => {
@@ -169,6 +242,21 @@ export default function MoreScreen() {
           onToggle={handleToggleDigest}
           disabled={notifLoading || updateNotifications.isPending}
         />
+
+        <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
+          Learning Mode
+        </Text>
+        {LEARNING_MODE_OPTIONS.map((opt) => (
+          <LearningModeOption
+            key={opt.mode}
+            title={opt.title}
+            description={opt.description}
+            selected={learningMode === opt.mode}
+            disabled={modeLoading || updateLearningMode.isPending}
+            onPress={() => handleSelectMode(opt.mode)}
+            testID={`learning-mode-${opt.mode}`}
+          />
+        ))}
 
         <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
           Account
