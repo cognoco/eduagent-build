@@ -8,7 +8,7 @@
 
 ## Context
 
-The project has 521+ unit/service tests (Jest 30, co-located) covering Epics 0-5. No E2E or integration test framework exists yet. The architecture doc explicitly removed Playwright (web E2E) from the fork and noted "Detox or Maestro for mobile E2E later." This document defines the strategy.
+The project has 1,631 unit/service tests (1,300 API + 331 mobile; Jest 30, co-located) plus 3 API integration test suites covering Epics 0-5. No E2E or integration test framework exists yet. The architecture doc explicitly removed Playwright (web E2E) from the fork and noted "Detox or Maestro for mobile E2E later." This document defines the strategy.
 
 ---
 
@@ -343,14 +343,14 @@ This follows the project convention: co-located unit tests in `*.test.ts`, integ
 
 ## 7. Implementation Sequence
 
-This strategy should be implemented across future epics:
+Progress as of 2026-02-22:
 
-1. **API integration test harness** — Add `test:integration` Nx target, transaction-per-test helper, first integration test for consent flow. Low effort, high value.
-2. **Inngest chain integration tests** — Test `session.completed` chain end-to-end using `inngest/test`. Validates the most complex async flow.
-3. **Maestro setup** — Install Maestro, write first smoke flow (sign-up -> consent), validate on local device.
-4. **CI wiring** — Add `e2e-ci.yml` workflow with Android emulator for Maestro, add API integration tests to existing CI.
-5. **Smoke suite buildout** — Write Tier 1 flows as features are wired to real APIs (currently mobile uses mock data).
-6. **Nightly full suite** — Add scheduled workflow, Tier 2 flows, reporting.
+1. **API integration test harness** — **DONE.** `tests/integration/` with 3 suites (auth-chain, health-cors, onboarding), `setup.ts`, and `jest.config.cjs`. Uses Hono `app.request()` against PostgreSQL service container.
+2. **Inngest chain integration tests** — TODO. Test `session.completed` chain end-to-end using `inngest/test`. Validates the most complex async flow.
+3. **Maestro setup** — **PARTIAL.** `apps/mobile/e2e/` created with `config.yaml`, 3 skeleton YAML flows (app-launch, start-session, create-subject/view-curriculum). Not yet runnable — requires EAS dev build APK and `testID` props on mobile components.
+4. **CI wiring** — **DONE.** `.github/workflows/e2e-ci.yml` with PostgreSQL service container for API integration tests + Maestro + Android emulator job. Advisory mode (`continue-on-error: true`).
+5. **Smoke suite buildout** — TODO. Write Tier 1 flows as features are wired to real APIs. Add `testID` props to mobile components for Maestro element targeting.
+6. **Nightly full suite** — TODO. Add scheduled workflow, Tier 2 flows, reporting.
 
 ---
 
