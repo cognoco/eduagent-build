@@ -50,6 +50,26 @@ appId: com.eduagent.mobile
 - assertVisible: "Waiting for parent approval"
 ```
 
+### `testID` Convention for Maestro Selectors
+
+Maestro locates elements via `testID` props (React Native) or accessibility labels. The mobile codebase already has **200+ `testID` attributes** following a consistent `kebab-case` pattern. Formalize this:
+
+**Naming convention:** `{context}-{element}` in kebab-case.
+
+| Pattern | Example | Component |
+|---------|---------|-----------|
+| `{screen}-{action}` | `sign-in-button`, `sign-out-button` | Auth screens |
+| `{screen}-{element}` | `create-subject-cancel`, `delete-account-confirm` | Action screens |
+| `{component}-{part}` | `profile-switcher-chip`, `profile-switcher-menu` | Shared components |
+| `{feature}-{state}` | `learning-book-loading`, `learning-book-empty` | Loading/empty states |
+| `{element-type}` | `chat-input`, `send-button`, `camera-view` | Inline elements |
+
+**Rules:**
+- All interactive elements (buttons, inputs, toggleable) **must** have a `testID`.
+- Use `accessibilityLabel` when the same string serves both a11y and E2E targeting (preferred for text-bearing elements).
+- Prefer `testID` for non-text elements (containers, loading indicators) where an accessibility label would be meaningless.
+- In Maestro YAML, reference via `id:` (maps to `testID`) or `tapOn:` (matches visible text / `accessibilityLabel`).
+
 ### Nx Integration
 
 Add a custom `e2e` target using `nx:run-commands`. Maestro flows live in `apps/mobile/e2e/`.
@@ -96,25 +116,50 @@ Nx target (add to mobile's inferred targets via `nx.json` `targetDefaults` or a 
 
 ### Approach: Hono `app.request()`
 
-Hono provides `app.request(url, init)` which exercises the full middleware chain (auth, validation, error handling) without starting an HTTP server. This is the recommended approach for API integration tests.
+Hono provides `app.request(url, init, env)` which exercises the full middleware chain (auth, validation, error handling) without starting an HTTP server. This is the recommended approach for API integration tests.
 
 ```typescript
 // tests/integration/onboarding.integration.test.ts
 import { app } from '../../apps/api/src/index.js';
 import { buildRegisterInput } from '@eduagent/factory';
 
+// Mock JWT verification — avoids real Clerk JWKS fetch
+jest.mock('../../apps/api/src/middleware/jwt', () => ({
+  decodeJWTHeader: jest.fn().mockReturnValue({ alg: 'RS256', kid: 'test-kid' }),
+  fetchJWKS: jest.fn().mockResolvedValue({
+    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
+  }),
+  verifyJWT: jest.fn().mockResolvedValue({
+    sub: 'user_integration_test',
+    email: 'integration@test.com',
+    exp: Math.floor(Date.now() / 1000) + 3600,
+  }),
+}));
+
+const AUTH_HEADERS = {
+  Authorization: 'Bearer valid.jwt.token',
+  'Content-Type': 'application/json',
+};
+
+const TEST_ENV = {
+  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  DATABASE_URL: 'postgresql://test:test@localhost/test',
+};
+
 test('register -> create profile -> consent flow', async () => {
   const input = buildRegisterInput();
   const res = await app.request('/v1/auth/register', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: AUTH_HEADERS,
     body: JSON.stringify(input),
-  });
+  }, TEST_ENV);
   expect(res.status).toBe(201);
   const body = await res.json();
   expect(body.profileId).toBeDefined();
 });
 ```
+
+> **Auth mocking pattern:** Integration tests mock `middleware/jwt.ts` to bypass Clerk JWKS verification. The `verifyJWT` mock returns a valid payload so the auth middleware sets `c.set('user', { userId, email })`. Pass `TEST_ENV` as the third argument to `app.request()` to provide Cloudflare Workers-style env bindings. See `tests/integration/onboarding.integration.test.ts` for the full working example.
 
 ### Test Database Strategy
 
@@ -128,41 +173,92 @@ The CI pipeline already uses a PostgreSQL 16 service container (see `.github/wor
 
 ### Seeding and Teardown
 
-Use `@eduagent/factory` builders for seeding. Wrap each test in a transaction that rolls back:
+Use `@eduagent/factory` builders for seeding.
+
+> **Driver constraint:** The project uses `@neondatabase/serverless` with the **neon-http** driver (`drizzle-orm/neon-http`), which is stateless and **does not support transactions**. Each query is an independent HTTP request — there is no persistent connection to hold a transaction open. The codebase intentionally avoids transactions, relying on `profileId` scoping for isolation and Inngest steps for durable multi-step operations.
+
+**Recommended isolation strategies:**
+
+| Strategy | When to use |
+|----------|-------------|
+| **DELETE cleanup in `afterEach`** | Default for most integration tests. Insert via factory, delete by known IDs after test. Simple and works with neon-http. |
+| **Fresh database per CI run** | Already configured — GitHub Actions PostgreSQL service container provides a clean database each workflow run. |
+| **`__test/reset` endpoint** | For Maestro E2E flows that need a clean slate between scenarios. Truncates all tables (test-only, guarded by `NODE_ENV=test`). |
+| **Per-test schema isolation** | For tests that must avoid cross-test interference within the same run. `CREATE SCHEMA test_<uuid>`, run queries against it, `DROP SCHEMA CASCADE` in teardown. |
 
 ```typescript
-import { db } from '@eduagent/database';
+// Example: DELETE cleanup pattern (works with neon-http)
+import { createDatabase } from '@eduagent/database';
+import { profiles } from '@eduagent/database';
+import { eq } from 'drizzle-orm';
 
-let tx: Transaction;
+const TEST_DB_URL = process.env['DATABASE_URL']!;
+const db = createDatabase(TEST_DB_URL);
 
-beforeEach(async () => {
-  tx = await db.transaction();
-});
+const createdIds: string[] = [];
 
 afterEach(async () => {
-  await tx.rollback();
+  for (const id of createdIds) {
+    await db.delete(profiles).where(eq(profiles.id, id));
+  }
+  createdIds.length = 0;
 });
 ```
 
-For tests requiring committed data (e.g., Inngest event triggers), use per-test schema isolation via `CREATE SCHEMA` or truncate tables between tests.
+If transaction support becomes necessary in the future, migration to the **neon-serverless WebSocket driver** (`drizzle-orm/neon-serverless`) would be required — but current architecture avoids this need.
 
 ### Inngest Integration Tests
 
-Use `inngest/test` mode to test event-driven chains without a running Inngest server:
+Test Inngest functions by **extracting the handler** via `(fn as any).fn` and passing a mock step object from `@eduagent/test-utils`. This is the established pattern used by all 9 existing Inngest test suites in the project:
 
 ```typescript
-import { inngest } from '../../apps/api/src/inngest/client.js';
+import { sessionCompleted } from '../../apps/api/src/inngest/functions/session-completed.js';
+import { createInngestStepMock } from '@eduagent/test-utils';
+
+// Mock service dependencies (not the Inngest framework)
+jest.mock('../../apps/api/src/services/retention', () => ({
+  updateRetentionFromSession: jest.fn().mockResolvedValue(undefined),
+}));
+
+function createEventData(overrides = {}) {
+  return {
+    data: {
+      sessionId: 'session-001',
+      profileId: 'profile-001',
+      ...overrides,
+    },
+  };
+}
+
+async function executeSteps(eventData = createEventData()) {
+  const step = createInngestStepMock();
+  const handler = (sessionCompleted as any).fn;
+  const result = await handler({ event: eventData, step });
+  return { result, step };
+}
 
 test('session.completed triggers SM-2 + coaching card + dashboard', async () => {
-  const { events, result } = await inngest.test(
-    'app/session.completed',
-    { sessionId: 'test-session-id', profileId: 'test-profile-id' }
+  const { result, step } = await executeSteps();
+
+  expect(result.status).toBe('completed');
+  expect(step.run).toHaveBeenCalledWith('update-retention', expect.any(Function));
+  expect(step.run).toHaveBeenCalledWith('write-coaching-card', expect.any(Function));
+  expect(step.run).toHaveBeenCalledWith('record-activity', expect.any(Function));
+});
+
+test('continues chain when one step fails (error isolation)', async () => {
+  const mockRetention = require('../../apps/api/src/services/retention');
+  mockRetention.updateRetentionFromSession.mockRejectedValueOnce(
+    new Error('DB timeout')
   );
-  expect(result.steps).toContain('update-sm2-schedule');
-  expect(result.steps).toContain('write-coaching-card');
-  expect(result.steps).toContain('update-dashboard');
+
+  const { result } = await executeSteps();
+  // Other steps ran despite retention failure
+  expect(result.status).toBe('completed-with-errors');
 });
 ```
+
+> **Why not `inngest.test()`?** Inngest v3 does not provide a built-in `inngest.test()` method. The project's pattern — direct handler invocation with `createInngestStepMock()` — is simpler, faster, and fully deterministic. The mock step's `run` method executes callbacks immediately, matching Inngest's step-at-a-time behavior. See `apps/api/src/inngest/functions/session-completed.test.ts` for the full 250+ line example.
 
 ---
 
@@ -213,7 +309,7 @@ Critical user flows, prioritized by risk and user impact. Tag flows as `smoke` (
 PR push
   |
   +--> ci.yml (existing)
-  |     lint -> typecheck -> test -> build
+  |     lint -> typecheck -> test -> build -> integration
   |
   +--> e2e-ci.yml (new)
         |
@@ -272,7 +368,12 @@ GitHub Actions emulator setup:
 
 Use `@eduagent/factory` for all test data. Never hardcode IDs or values in E2E flows.
 
-For Maestro flows, seed data via API calls in a `beforeAll`-equivalent setup flow:
+For Maestro flows, seed data via the test-only API endpoint. Maestro's `runScript` uses **GraalJS** (not Node.js), so it **cannot** `require()` or `import` npm packages like `@eduagent/factory`. Use Maestro's built-in HTTP module instead:
+
+```
+POST /v1/__test/seed   # Only available when NODE_ENV=test
+POST /v1/__test/reset   # Truncate all tables
+```
 
 ```yaml
 # e2e/flows/_setup/seed-test-user.yaml
@@ -284,16 +385,33 @@ appId: com.eduagent.mobile
       API_URL: ${API_URL}
 ```
 
-Or use a dedicated seeding endpoint (test-only, guarded by environment flag):
-
+```javascript
+// e2e/scripts/seed.js — runs in GraalJS (Maestro's embedded JS engine)
+// No require() or import — use Maestro's built-in http module only
+var response = http.post(API_URL + '/v1/__test/seed', {
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    scenario: 'onboarding-complete',
+    email: 'test-e2e@example.com',
+  }),
+});
+output.result = response.body;
 ```
-POST /v1/__test/seed   # Only available when NODE_ENV=test
-POST /v1/__test/reset   # Truncate all tables
+
+Alternatively, run a **Node.js seed script as a CI step before Maestro starts** — this allows full access to `@eduagent/factory` builders:
+
+```bash
+# In e2e-ci.yml, before the Maestro step:
+- name: Seed test data
+  run: npx tsx apps/mobile/e2e/scripts/seed-ci.ts
+  env:
+    API_URL: http://localhost:8787
+    DATABASE_URL: ${{ env.DATABASE_URL }}
 ```
 
 ### Isolation Between Parallel CI Runs
 
-- **API integration tests:** Transaction rollback per test (zero cleanup needed).
+- **API integration tests:** DELETE cleanup per test or fresh database per CI run (neon-http driver does not support transaction rollback — see Section 2).
 - **Mobile E2E:** Each CI run gets a fresh PostgreSQL database via the service container. No shared state between runs.
 - **Nightly full suite:** Dedicated Neon branch created at run start, destroyed at run end (if using Neon for nightly).
 
@@ -302,7 +420,7 @@ POST /v1/__test/reset   # Truncate all tables
 | Layer | Strategy |
 |-------|----------|
 | Unit tests | In-memory mocks — no cleanup needed |
-| API integration | Transaction rollback per test |
+| API integration | DELETE by known IDs in `afterEach`, or fresh DB per CI run |
 | Mobile E2E (CI) | Fresh database per workflow run |
 | Mobile E2E (local) | `__test/reset` endpoint or Docker Compose `down -v` |
 
@@ -313,7 +431,7 @@ POST /v1/__test/reset   # Truncate all tables
 ```
 apps/
   api/
-    project.json                    # Add test:integration target
+    project.json                    # Has test:integration target (DONE)
   mobile/
     e2e/
       flows/
@@ -323,21 +441,28 @@ apps/
         retention/                  # Epic 3 flows
         parent/                     # Epic 4 flows
         billing/                    # Epic 5 flows
-      scripts/                      # JS helpers for Maestro runScript
+      scripts/                      # GraalJS helpers for Maestro runScript (no Node.js APIs)
       config.yaml
 tests/
-  integration/                      # API integration tests (per project_context.md rule)
-    onboarding.integration.test.ts
-    learning.integration.test.ts
-    retention.integration.test.ts
-    billing.integration.test.ts
-    inngest-chains.integration.test.ts
+  integration/                      # API integration tests (DONE — 3 suites exist)
+    jest.config.cjs                 # ts-jest, maps @eduagent/* to source paths
+    setup.ts                        # Mock LLM provider, 30s timeout
+    auth-chain.integration.test.ts  # Auth middleware chain validation
+    health-cors.integration.test.ts # Health check + CORS
+    onboarding.integration.test.ts  # Register -> profile -> subject -> session
+    learning.integration.test.ts    # (planned)
+    retention.integration.test.ts   # (planned)
+    billing.integration.test.ts     # (planned)
+    inngest-chains.integration.test.ts  # (planned)
 .github/
   workflows/
-    e2e-ci.yml                      # New workflow for E2E
+    ci.yml                          # Main CI: lint, typecheck, test, build + integration
+    e2e-ci.yml                      # E2E workflow (DONE — Maestro + Android emulator)
 ```
 
-This follows the project convention: co-located unit tests in `*.test.ts`, integration/E2E tests in top-level `tests/` directory (per `docs/project_context.md`).
+This follows the project convention: co-located unit tests in `*.test.ts`, integration/E2E tests in top-level `tests/` directory (per `docs/project_context.md` rule 146). The `jest.config.cjs` maps `@eduagent/*` and `@eduagent/api` to source paths for Hono `app.request()` testing.
+
+> **Nx `affected` note:** The `api` project's `test:integration` target (`pnpm exec jest --config tests/integration/jest.config.cjs --maxWorkers=2`) runs integration tests explicitly. The main CI pipeline (`ci.yml`) invokes this target as a final step after all unit tests pass, so changes to `apps/api/` or `packages/` trigger integration tests automatically.
 
 ---
 
@@ -346,7 +471,7 @@ This follows the project convention: co-located unit tests in `*.test.ts`, integ
 Progress as of 2026-02-22:
 
 1. **API integration test harness** — **DONE.** `tests/integration/` with 3 suites (auth-chain, health-cors, onboarding), `setup.ts`, and `jest.config.cjs`. Uses Hono `app.request()` against PostgreSQL service container.
-2. **Inngest chain integration tests** — TODO. Test `session.completed` chain end-to-end using `inngest/test`. Validates the most complex async flow.
+2. **Inngest chain integration tests** — TODO. Test `session.completed` chain end-to-end using direct handler invocation + `createInngestStepMock()` (see Section 2). Validates the most complex async flow.
 3. **Maestro setup** — **PARTIAL.** `apps/mobile/e2e/` created with `config.yaml`, 3 skeleton YAML flows (app-launch, start-session, create-subject/view-curriculum). Not yet runnable — requires EAS dev build APK and `testID` props on mobile components.
 4. **CI wiring** — **DONE.** `.github/workflows/e2e-ci.yml` with PostgreSQL service container for API integration tests + Maestro + Android emulator job. Advisory mode (`continue-on-error: true`).
 5. **Smoke suite buildout** — TODO. Write Tier 1 flows as features are wired to real APIs. Add `testID` props to mobile components for Maestro element targeting.
@@ -383,4 +508,8 @@ Target: **<5%** for Maestro smoke flows on GitHub Actions Android emulator. API 
 - **Emulator-only:** No real device testing in CI at MVP. Real device quirks (touch latency, screen size) are not covered.
 - **Android-only at MVP:** iOS Maestro CI requires macOS runners (~10x cost). Add iOS when revenue justifies.
 - **No network condition simulation:** Slow/offline network behavior is not tested. Add Maestro network condition commands post-MVP.
-- **EAS dev build dependency:** Maestro smoke tests require a pre-built Expo dev client APK. EAS build must be triggered before or cached from a prior successful build.
+- **EAS dev build dependency:** Maestro smoke tests require a pre-built Expo dev client APK. Caching strategy:
+  - **Cache key:** Hash of `apps/mobile/package.json` + `apps/mobile/app.json` + `eas.json`. Any native dependency or config change invalidates the cache.
+  - **Storage:** GitHub Actions cache (`actions/cache`) storing the APK artifact. Alternatively, download the latest successful build from EAS via `eas build:list --json`.
+  - **Cache miss impact:** An EAS dev build takes ~10-20 minutes. On cache miss, the Maestro job should either skip gracefully (advisory mode) or use a pre-uploaded APK from a nightly build.
+  - **Fallback:** If no cached APK is available, skip Maestro E2E with a warning annotation. This prevents PR gate times from exploding on native dependency changes.
