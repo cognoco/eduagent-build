@@ -157,8 +157,15 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 **Not yet integrated:** OCR provider (server-side fallback; ML Kit primary on device).
 
 **Remaining feature gaps (FR-level):**
-- FR94: Learning mode toggle wired in mobile UI (API ready, DB ready)
-- Mobile push token: `useRegisterPushToken()` hook not implemented; tokens not registered on app open
+- Mobile push token: `useRegisterPushToken()` hook stub — tokens not registered on app open
+
+**UX gaps (from 2024 persona walkthroughs, not yet in canonical docs):**
+- Post-approval child landing screen — what child sees after parent grants GDPR consent
+- Parent account-owner landing — what parent sees after clicking consent email link in browser
+- Child-friendly paywall — age-appropriate "Ask Parent to Subscribe" instead of standard Stripe paywall
+- Profile switch PIN/biometric authentication
+- GDPR consent revocation UX flow
+- Preview mode button on pending-consent screen
 
 **Pre-launch configuration (not code):**
 - [ ] Clerk: configure custom email domain (SPF/DKIM/DMARC) so verification/consent emails don't land in spam

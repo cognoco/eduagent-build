@@ -931,6 +931,58 @@ describe('updateRetentionFromSession', () => {
     // SM-2 update was persisted
     expect(db.update).toHaveBeenCalled();
   });
+
+  it('skips SM-2 when card.updatedAt >= sessionTimestamp', async () => {
+    // Card was updated at 11:00, session started at 10:00
+    const card = mockRetentionCardRow();
+    card.updatedAt = new Date('2026-02-15T11:00:00.000Z');
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    const db = createMockDb();
+
+    await updateRetentionFromSession(
+      db,
+      profileId,
+      topicId,
+      4,
+      '2026-02-15T10:00:00.000Z'
+    );
+
+    // SM-2 should NOT run — card was already updated after session started
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('runs SM-2 when card.updatedAt < sessionTimestamp', async () => {
+    // Card was updated at 09:00, session started at 10:00
+    const card = mockRetentionCardRow();
+    card.updatedAt = new Date('2026-02-15T09:00:00.000Z');
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    const db = createMockDb();
+
+    await updateRetentionFromSession(
+      db,
+      profileId,
+      topicId,
+      4,
+      '2026-02-15T10:00:00.000Z'
+    );
+
+    // SM-2 should run — card was last updated before the session
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it('runs SM-2 when sessionTimestamp not provided (backward compat)', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    const db = createMockDb();
+
+    await updateRetentionFromSession(db, profileId, topicId, 4);
+
+    // SM-2 should run — no timestamp means no guard
+    expect(db.update).toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------

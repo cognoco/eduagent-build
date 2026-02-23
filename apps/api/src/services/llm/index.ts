@@ -1,4 +1,9 @@
-export { routeAndCall, routeAndStream, registerProvider } from './router';
+export {
+  routeAndCall,
+  routeAndStream,
+  registerProvider,
+  getRegisteredProviders,
+} from './router';
 export { mockProvider, createMockProvider } from './providers/mock';
 export { createGeminiProvider } from './providers/gemini';
 export type {
