@@ -39,6 +39,7 @@ import { coachingCardRoutes } from './routes/coaching-card';
 import { dashboardRoutes } from './routes/dashboard';
 import { billingRoutes } from './routes/billing';
 import { stripeWebhookRoute } from './routes/stripe-webhook';
+import { testSeedRoutes } from './routes/test-seed';
 
 type Bindings = {
   ENVIRONMENT: string;
@@ -148,7 +149,8 @@ const routes = api
   .route('/', coachingCardRoutes)
   .route('/', dashboardRoutes)
   .route('/', billingRoutes)
-  .route('/', stripeWebhookRoute);
+  .route('/', stripeWebhookRoute)
+  .route('/', testSeedRoutes);
 
 // ---------------------------------------------------------------------------
 // App — mounts routes under /v1 for the actual Cloudflare Worker runtime.
