@@ -4,7 +4,7 @@
 // services/retention.ts (pure SM-2 logic).
 // ---------------------------------------------------------------------------
 
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import {
   subjects,
   curricula,
@@ -121,6 +121,54 @@ export async function evaluateRecallQuality(
 }
 
 // ---------------------------------------------------------------------------
+// Auto-creation helper — ensures a retention card exists for a topic
+// ---------------------------------------------------------------------------
+
+/**
+ * Ensures a retention card exists for the given (profileId, topicId) pair.
+ * Uses INSERT ... ON CONFLICT DO NOTHING to handle races safely.
+ * Returns the existing or newly created card.
+ */
+export async function ensureRetentionCard(
+  db: Database,
+  profileId: string,
+  topicId: string
+): Promise<typeof retentionCards.$inferSelect> {
+  await db
+    .insert(retentionCards)
+    .values({
+      profileId,
+      topicId,
+      easeFactor: '2.50',
+      intervalDays: 1,
+      repetitions: 0,
+      failureCount: 0,
+      consecutiveSuccesses: 0,
+      xpStatus: 'pending',
+    })
+    .onConflictDoNothing({
+      target: [retentionCards.profileId, retentionCards.topicId],
+    });
+
+  // Read back the card (either newly created or pre-existing)
+  const card = await db.query.retentionCards.findFirst({
+    where: and(
+      eq(retentionCards.profileId, profileId),
+      eq(retentionCards.topicId, topicId)
+    ),
+  });
+
+  // Should never happen — the insert-or-noop guarantees the row exists
+  if (!card) {
+    throw new Error(
+      `Failed to ensure retention card for profile=${profileId} topic=${topicId}`
+    );
+  }
+
+  return card;
+}
+
+// ---------------------------------------------------------------------------
 // Core query functions
 // ---------------------------------------------------------------------------
 
@@ -213,16 +261,9 @@ export async function processRecallTest(
     eq(retentionCards.topicId, input.topicId)
   );
 
-  if (!card) {
-    // No retention card yet — treat as first successful recall
-    return {
-      passed: true,
-      masteryScore: 0.75,
-      xpChange: 'verified',
-      nextReviewAt: new Date().toISOString(),
-      failureCount: 0,
-    };
-  }
+  // Auto-create retention card on first encounter
+  const effectiveCard =
+    card ?? (await ensureRetentionCard(db, profileId, input.topicId));
 
   // Look up topic title for LLM evaluation context
   const topic = await db.query.curriculumTopics.findFirst({
@@ -231,7 +272,7 @@ export async function processRecallTest(
   const topicTitle = topic?.title ?? input.topicId;
 
   const quality = await evaluateRecallQuality(input.answer, topicTitle);
-  const state = rowToRetentionState(card);
+  const state = rowToRetentionState(effectiveCard);
   const result = processRecallResult(state, quality);
 
   // Persist updated retention card
@@ -252,7 +293,7 @@ export async function processRecallTest(
     })
     .where(
       and(
-        eq(retentionCards.id, card.id),
+        eq(retentionCards.id, effectiveCard.id),
         eq(retentionCards.profileId, profileId)
       )
     );
@@ -536,14 +577,26 @@ export async function updateRetentionFromSession(
   db: Database,
   profileId: string,
   topicId: string,
-  quality: number
+  quality: number,
+  sessionTimestamp?: string
 ): Promise<void> {
   const repo = createScopedRepository(db, profileId);
-  const card = await repo.retentionCards.findFirst(
+  const existing = await repo.retentionCards.findFirst(
     eq(retentionCards.topicId, topicId)
   );
 
-  if (!card) return;
+  // Auto-create retention card on first encounter
+  const card = existing ?? (await ensureRetentionCard(db, profileId, topicId));
+
+  // Double-counting guard: if the card was already updated after the session
+  // started (e.g. by processRecallTest), skip the async SM-2 recalculation.
+  if (
+    sessionTimestamp &&
+    card.updatedAt &&
+    card.updatedAt.getTime() >= new Date(sessionTimestamp).getTime()
+  ) {
+    return;
+  }
 
   const result = sm2({
     quality,

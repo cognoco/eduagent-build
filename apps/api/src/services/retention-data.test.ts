@@ -9,6 +9,19 @@ jest.mock('@eduagent/database', () => {
 jest.mock('./retention', () => ({
   processRecallResult: jest.fn(),
   getRetentionStatus: jest.fn().mockReturnValue('weak'),
+  isTopicStable: jest.fn().mockReturnValue(false),
+}));
+
+jest.mock('@eduagent/retention', () => ({
+  sm2: jest.fn().mockReturnValue({
+    card: {
+      easeFactor: 2.6,
+      interval: 6,
+      repetitions: 4,
+      lastReviewedAt: '2026-02-15T10:00:00.000Z',
+      nextReviewAt: '2026-02-21T10:00:00.000Z',
+    },
+  }),
 }));
 
 jest.mock('./adaptive-teaching', () => ({
@@ -36,7 +49,9 @@ import {
   setTeachingPreference,
   deleteTeachingPreference,
   updateNeedsDeepeningProgress,
+  updateRetentionFromSession,
   evaluateRecallQuality,
+  ensureRetentionCard,
 } from './retention-data';
 
 const NOW = new Date('2026-02-15T10:00:00.000Z');
@@ -70,7 +85,9 @@ function mockRetentionCardRow(
   };
 }
 
-function createMockDb(): Database {
+function createMockDb(options?: {
+  retentionCardFindFirstQuery?: ReturnType<typeof mockRetentionCardRow>;
+}): Database {
   return {
     query: {
       curricula: {
@@ -86,6 +103,13 @@ function createMockDb(): Database {
           title: 'Topic 1',
         }),
       },
+      retentionCards: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue(
+            options?.retentionCardFindFirstQuery ?? mockRetentionCardRow()
+          ),
+      },
       teachingPreferences: {
         findFirst: jest.fn().mockResolvedValue(null),
       },
@@ -98,6 +122,7 @@ function createMockDb(): Database {
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
         returning: jest.fn().mockResolvedValue([]),
+        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
       }),
     }),
     delete: jest.fn().mockReturnValue({
@@ -213,16 +238,52 @@ describe('getTopicRetention', () => {
 // ---------------------------------------------------------------------------
 
 describe('processRecallTest', () => {
-  it('returns default result when no retention card exists', async () => {
+  it('creates retention card and runs SM-2 when no card exists', async () => {
     setupScopedRepo({ retentionCardFindFirst: undefined });
-    const db = createMockDb();
+
+    // ensureRetentionCard creates a new card — mock the DB to return it
+    const newCard = mockRetentionCardRow({
+      xpStatus: 'pending',
+      nextReviewAt: null,
+    });
+    // Override: repetitions 0, intervalDays 1 (SM-2 defaults)
+    Object.assign(newCard, {
+      repetitions: 0,
+      intervalDays: 1,
+      easeFactor: '2.50',
+    });
+
+    const db = createMockDb({ retentionCardFindFirstQuery: newCard });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.5,
+        intervalDays: 1,
+        repetitions: 1,
+        failureCount: 0,
+        consecutiveSuccesses: 1,
+        xpStatus: 'verified',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+
     const result = await processRecallTest(db, profileId, {
       topicId,
       answer: 'Some answer text for the recall test',
     });
 
+    // Card was auto-created (insert called by ensureRetentionCard)
+    expect(db.insert).toHaveBeenCalled();
+    // SM-2 ran on the new card
+    expect(processRecallResult).toHaveBeenCalled();
     expect(result.passed).toBe(true);
-    expect(result.masteryScore).toBe(0.75);
+    expect(result.xpChange).toBe('verified');
+    // SM-2 update persisted
+    expect(db.update).toHaveBeenCalled();
   });
 
   it('delegates to processRecallResult when card exists', async () => {
@@ -258,9 +319,36 @@ describe('processRecallTest', () => {
     expect(db.update).toHaveBeenCalled();
   });
 
-  it('returns failureCount: 0 when no retention card exists', async () => {
+  it('returns failureCount from SM-2 when no card existed (auto-created)', async () => {
     setupScopedRepo({ retentionCardFindFirst: undefined });
-    const db = createMockDb();
+
+    const newCard = mockRetentionCardRow({
+      xpStatus: 'pending',
+      nextReviewAt: null,
+    });
+    Object.assign(newCard, {
+      repetitions: 0,
+      intervalDays: 1,
+      easeFactor: '2.50',
+    });
+    const db = createMockDb({ retentionCardFindFirstQuery: newCard });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.5,
+        intervalDays: 1,
+        repetitions: 1,
+        failureCount: 0,
+        consecutiveSuccesses: 1,
+        xpStatus: 'verified',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+
     const result = await processRecallTest(db, profileId, {
       topicId,
       answer: 'Short answer',
@@ -799,6 +887,76 @@ describe('updateNeedsDeepeningProgress', () => {
 
     expect(createScopedRepository).not.toHaveBeenCalled();
     expect(db.update).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateRetentionFromSession
+// ---------------------------------------------------------------------------
+
+describe('updateRetentionFromSession', () => {
+  it('creates card when missing and runs SM-2', async () => {
+    setupScopedRepo({ retentionCardFindFirst: undefined });
+
+    const newCard = mockRetentionCardRow({
+      xpStatus: 'pending',
+      nextReviewAt: null,
+    });
+    Object.assign(newCard, {
+      repetitions: 0,
+      intervalDays: 1,
+      easeFactor: '2.50',
+    });
+
+    const db = createMockDb({ retentionCardFindFirstQuery: newCard });
+
+    await updateRetentionFromSession(db, profileId, topicId, 4);
+
+    // Card was auto-created
+    expect(db.insert).toHaveBeenCalled();
+    // SM-2 update was persisted
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it('uses existing card when present', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    const db = createMockDb();
+
+    await updateRetentionFromSession(db, profileId, topicId, 3);
+
+    // No insert needed for existing card
+    expect(db.insert).not.toHaveBeenCalled();
+    // SM-2 update was persisted
+    expect(db.update).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ensureRetentionCard
+// ---------------------------------------------------------------------------
+
+describe('ensureRetentionCard', () => {
+  it('is idempotent — ON CONFLICT DO NOTHING', async () => {
+    const existingCard = mockRetentionCardRow();
+    const db = createMockDb({ retentionCardFindFirstQuery: existingCard });
+
+    const result = await ensureRetentionCard(db, profileId, topicId);
+
+    expect(db.insert).toHaveBeenCalled();
+    expect(result.topicId).toBe(topicId);
+    expect(result.profileId).toBe(profileId);
+  });
+
+  it('returns the card after insertion', async () => {
+    const newCard = mockRetentionCardRow({ xpStatus: 'pending' });
+    const db = createMockDb({ retentionCardFindFirstQuery: newCard });
+
+    const result = await ensureRetentionCard(db, profileId, topicId);
+
+    expect(result).toBeDefined();
+    expect(result.topicId).toBe(topicId);
   });
 });
 

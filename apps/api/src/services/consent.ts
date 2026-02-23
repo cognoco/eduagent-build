@@ -86,6 +86,37 @@ export function checkConsentRequired(
 }
 
 /**
+ * Creates a PENDING consent state row without sending email.
+ *
+ * Used during profile creation to record that consent is required.
+ * The actual email is sent later via `requestConsent()` when the parent
+ * email is provided by the client.
+ */
+export async function createPendingConsentState(
+  db: Database,
+  profileId: string,
+  consentType: ConsentType
+): Promise<ConsentState> {
+  const [row] = await db
+    .insert(consentStates)
+    .values({
+      profileId,
+      consentType,
+      status: 'PENDING',
+    })
+    .onConflictDoUpdate({
+      target: [consentStates.profileId, consentStates.consentType],
+      set: {
+        status: 'PENDING',
+        updatedAt: sql`now()`,
+      },
+    })
+    .returning();
+
+  return mapConsentRow(row);
+}
+
+/**
  * Creates a consent request and sends a notification email to the parent.
  */
 export async function requestConsent(

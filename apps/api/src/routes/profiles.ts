@@ -17,6 +17,53 @@ import {
   switchProfile,
 } from '../services/profile';
 
+// EU27 + EEA (IS, LI, NO) + CH + GB — GDPR-aligned jurisdictions
+const EU_COUNTRIES = new Set([
+  'AT',
+  'BE',
+  'BG',
+  'HR',
+  'CY',
+  'CZ',
+  'DK',
+  'EE',
+  'FI',
+  'FR',
+  'DE',
+  'GR',
+  'HU',
+  'IE',
+  'IT',
+  'LV',
+  'LT',
+  'LU',
+  'MT',
+  'NL',
+  'PL',
+  'PT',
+  'RO',
+  'SK',
+  'SI',
+  'ES',
+  'SE',
+  'IS',
+  'LI',
+  'NO', // EEA
+  'CH',
+  'GB', // GDPR-aligned
+]);
+
+/** Maps ISO 3166-1 alpha-2 country code to consent jurisdiction */
+export function mapCountryToLocation(
+  countryCode?: string
+): 'EU' | 'US' | 'OTHER' | undefined {
+  if (!countryCode) return undefined;
+  const upper = countryCode.toUpperCase();
+  if (EU_COUNTRIES.has(upper)) return 'EU';
+  if (upper === 'US') return 'US';
+  return 'OTHER';
+}
+
 type ProfileEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
   Variables: { user: AuthUser; db: Database; account: Account };
@@ -34,7 +81,19 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const account = c.get('account');
     const input = c.req.valid('json');
     const isFirstProfile = (await listProfiles(db, account.id)).length === 0;
-    const profile = await createProfile(db, account.id, input, isFirstProfile);
+
+    // Extract Cloudflare country for server-side consent determination
+    const cfCountry = (c.req.raw as unknown as { cf?: { country?: string } }).cf
+      ?.country;
+    const serverLocation = mapCountryToLocation(cfCountry);
+
+    const profile = await createProfile(
+      db,
+      account.id,
+      input,
+      isFirstProfile,
+      serverLocation
+    );
     return c.json({ profile }, 201);
   })
   .get('/profiles/:id', async (c) => {
