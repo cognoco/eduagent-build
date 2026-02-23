@@ -247,6 +247,7 @@ export async function generateExport(
         ? row.birthDate.toISOString().split('T')[0]
         : null,
       personaType: row.personaType,
+      location: row.location ?? null,
       isOwner: row.isOwner,
       consentStatus: consentStatusByProfileId.get(row.id) ?? null,
       createdAt: row.createdAt.toISOString(),
