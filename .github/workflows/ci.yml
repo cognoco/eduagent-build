@@ -72,3 +72,9 @@ jobs:
       # Run API integration tests against real PostgreSQL
       - name: API integration tests
         run: pnpm exec nx run api:test:integration
+
+      # Advisory check: flag stale counts in CLAUDE.md (does not block PRs)
+      - name: Validate CLAUDE.md counts
+        if: always()
+        continue-on-error: true
+        run: bash scripts/validate-doc-versions.sh

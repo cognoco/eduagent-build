@@ -131,10 +131,10 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 ## Current Status
 
 **Complete — all routes production-ready:**
-- Epics 0-5: full API layer (1,300 API tests + 331 mobile tests + 3 integration test suites, all passing)
-- All 20 route groups wired to real services with DB persistence
+- Epics 0-5: full API layer (1,302 API tests + 315 mobile tests + 8 integration test suites, all passing)
+- All 21 route groups wired to real services with DB persistence
 - Mobile: 20+ screens (41 test suites), all using real API calls via TanStack Query + Hono RPC
-- Background jobs: 8 Inngest functions (session-completed chain, trial-expiry, consent-reminders, account-deletion, review-reminder, payment-retry, quota-reset, subject-auto-archive)
+- Background jobs: 9 Inngest functions (session-completed chain, trial-expiry, consent-reminders, account-deletion, review-reminder, payment-retry, quota-reset, subject-auto-archive)
 - Auth: Clerk (SSO + email/password), PasswordInput with show/hide + requirements
 - Billing: Stripe integration (checkout, portal, webhooks, KV-cached status, quota metering)
 - Email: Resend integration (consent emails, reminders)
