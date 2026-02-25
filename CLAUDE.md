@@ -53,22 +53,18 @@ pnpm run db:generate                     # Generate migration
 
 ### For the AI Agent
 
-**Important:** Jest must run from the project directory (ts-jest resolves tsconfig relative to cwd). Set `TS_NODE_COMPILER_OPTIONS` to override `moduleResolution: "bundler"` from tsconfig.base.json.
-
 1. **After modifying a source file, run only related tests:**
    ```bash
-   cd apps/api && TS_NODE_COMPILER_OPTIONS='{"moduleResolution":"node10","module":"commonjs","customConditions":null}' pnpm exec jest --findRelatedTests src/services/consent.ts --no-coverage
+   pnpm exec jest --config apps/api/jest.config.ts --findRelatedTests apps/api/src/services/consent.ts --no-coverage
    ```
 2. **After modifying a package file, also test API consumers:**
    ```bash
-   # Package's own tests
-   cd packages/schemas && pnpm exec jest --findRelatedTests src/consent.ts --no-coverage
-   # API tests that consume the package (cross-project via moduleNameMapper)
-   cd apps/api && TS_NODE_COMPILER_OPTIONS='{"moduleResolution":"node10","module":"commonjs","customConditions":null}' pnpm exec jest --findRelatedTests ../../packages/schemas/src/consent.ts --no-coverage
+   pnpm exec jest --config packages/schemas/jest.config.cjs --findRelatedTests packages/schemas/src/consent.ts --no-coverage
+   pnpm exec jest --config apps/api/jest.config.ts --findRelatedTests packages/schemas/src/consent.ts --no-coverage
    ```
 3. **Never run `pnpm exec nx run-many -t test` or full suite locally** — that's for CI only.
 4. **Never run `pnpm exec nx affected -t test` locally** — the pre-commit hook handles this surgically.
-5. **To run a single test file:** `cd <project-dir> && pnpm exec jest <test-file> --no-coverage`
+5. **To run a single test file:** `pnpm exec jest --config <project-config> <test-file> --no-coverage`
 6. **To run a whole project's tests** (rare, only when truly needed):
    `pnpm exec nx test api --no-coverage`
 
@@ -158,9 +154,9 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 ## Current Status
 
 **Complete — all routes production-ready:**
-- Epics 0-5: full API layer (~1,443 API tests + ~404 mobile tests + 15 integration test suites, all passing)
+- Epics 0-5: full API layer (~1,329 API tests + ~325 mobile tests + 8 integration test suites, all passing)
 - All 23 route files wired to real services with DB persistence (including `consent-web` browser flow and `test-seed` E2E endpoints)
-- Mobile: 38+ screens (49 test suites), all using real API calls via TanStack Query + Hono RPC
+- Mobile: 30+ screens (42 test suites), all using real API calls via TanStack Query + Hono RPC
 - Background jobs: 10 Inngest functions (session-completed chain, trial-expiry, consent-reminders, consent-revocation, account-deletion, review-reminder, payment-retry, quota-reset, topup-expiry-reminder, subject-auto-archive)
 - Auth: Clerk (SSO + email/password), PasswordInput with show/hide + requirements
 - Billing: Stripe integration (checkout, portal, webhooks, KV-cached status, quota metering)
@@ -179,18 +175,17 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 - Homework camera capture (Story 2.5): ML Kit OCR on device, camera state machine + `useHomeworkOcr` hook + full camera UI; server-side `OcrProvider` interface with stub implementation in `services/ocr.ts`
 - XP ledger: `insertSessionXpEntry()` wired in session-completed Step 3, `useXpSummary` hook for client-side XP display
 - Needs-deepening auto-promotion (FR63): `updateNeedsDeepeningProgress()` wired in session-completed Step 1b
-- E2E testing infrastructure: `test-seed` route for deterministic test data, 10 integration suites in `tests/integration/` (auth-chain, onboarding, session-completed-chain, stripe-webhook, account-deletion, health-cors, profile-isolation, test-seed, learning-session, retention-lifecycle), Maestro foundation (seed.js, setup flows, Nx e2e target, 4 Tier 1 smoke flows), enhanced CI workflow with PostgreSQL + API server for mobile-maestro job
-- Expo web mode: `.npmrc` with `shamefully-hoist=true` enables `expo start --web` in pnpm monorepo (required for Metro/Babel transitive plugin resolution). Web deps (`react-dom`, `react-native-web`) in root and mobile `package.json`.
+- E2E testing infrastructure: `test-seed` route for deterministic test data, 8 integration suites in `tests/integration/` (auth-chain, onboarding, session-completed-chain, stripe-webhook, account-deletion, health-cors, profile-isolation, test-seed)
 
 - UX audit remediation (55 gaps): consent gating (C16/COPPA), camera-first homework (C8), parent transcript view (C13), session mode configs (C7), math rendering (M21), animations (M22), dark mode, confidence scoring, retention trends, ProfileSwitcher, Inter font, Ionicons, WCAG contrast fixes, shared Button component
 - UX persona walkthrough gaps (all resolved): post-approval child landing (`PostApprovalLanding` + SecureStore), parent account-owner landing (`consentWebRoutes` with personalized child name + deep links), child-friendly paywall (`ChildPaywall` with real stats + 24h rate-limit countdown), GDPR consent revocation (full stack: services, routes, Inngest 7-day grace period, child `ConsentWithdrawnGate`, parent withdraw/restore UI), preview mode on pending-consent screen (`PreviewSubjectBrowser` + `PreviewSampleCoaching`)
 
 **Not yet integrated:** OCR provider (server-side fallback; ML Kit primary on device).
 
-**Epic 3 extensions — now implemented:**
-- **EVALUATE verification type (Devil's Advocate, FR128-FR133)** — 8th verification type. AI presents flawed reasoning for student to critique (Bloom's Level 5-6). Strong-retention gating (`shouldTriggerEvaluate`), modified SM-2 quality floor (2-3 for failure), `evaluateDifficultyRung` 1-4 on retention card, three-strike escalation, `evaluate-data.ts` DB service, eligibility route (`GET /v1/topics/:topicId/evaluate-eligibility`), wired into session-completed Step 1c.
-- **Analogy Domain Preferences (Multiverse of Analogies, FR134-FR137)** — Per-subject analogy domain (cooking, sports, building, music, nature, gaming). Nullable `analogyDomain` on `teachingPreferences`, soft LLM prompt injection in `buildSystemPrompt()`, `AnalogyDomainPicker` component, settings routes, onboarding step (`analogy-preference.tsx` in subject onboarding flow).
-- **Feynman Stage / TEACH_BACK (FR138-FR143)** — 9th verification type. Student explains concept, AI plays "confused student". On-device STT (`expo-speech-recognition`) + TTS (`expo-speech`). Two-output pattern: visible follow-up + hidden `structured_assessment` JSON. Scoring rubric (accuracy 50%, completeness 30%, clarity 20%) → SM-2 quality. Voice UI: `VoiceRecordButton`, `VoiceToggle`, `useSpeechRecognition`, `useTextToSpeech`. Wired into session-completed Step 1c.
+**Designed but not yet implemented (documented in PRD, architecture, epics, UX spec):**
+- **EVALUATE verification type (Devil's Advocate, FR128-FR133)** — Epic 3 extension, MVP scope. 8th verification type where AI presents flawed reasoning for student to critique (Bloom's Level 5-6). Strong-retention gating only. Modified SM-2 quality floor (2-3 for failure, not 0-1). `evaluateDifficultyRung` 1-4 on retention card. Three-strike escalation: reveal flaw → lower difficulty → standard review.
+- **Analogy Domain Preferences (Multiverse of Analogies, FR134-FR137)** — Epic 3 extension, MVP scope. Per-subject analogy domain (cooking, sports, building, music, nature, gaming). Nullable column on `teachingPreferences` — null means no analogy preference. Soft prompt injection: "prefer analogies... don't force when direct explanation is clearer." Optional onboarding step + subject settings picker.
+- **Feynman Stage / TEACH_BACK (FR138-FR143)** — Epic 3 extension, MVP scope. 9th verification type: student explains concept verbally, AI plays "confused student" (Feynman Technique). On-device STT (`expo-speech-recognition`) + TTS (`expo-speech`), no cloud. Two-output pattern: conversational follow-up (visible) + structured assessment JSON in `session_events.structured_assessment` (hidden). Scoring rubric: accuracy 50%, completeness 30%, clarity 20% → SM-2 quality input.
 
 **Deferred — v1.1 (post-MVP, pre-launch):**
 - **Epic 7: Concept Map & Prerequisite-Aware Learning** (FR118-FR127) — `topic_prerequisites` join table (DAG), prerequisite-aware curriculum generation, graph-aware coaching cards ("newly unlocked" type), LLM context injection for weak/skipped prerequisites, Learning Book topological ordering with locked/unlocked indicators, concept map visualization (`react-native-svg` + Sugiyama layout). SM-2 stays pure per-topic — graph logic in coaching precomputation. Skip behavior: warn + orphan edges + log `prerequisiteContext` JSONB in `curriculumAdaptations`.
@@ -216,10 +211,6 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 **Read as needed:**
 
 - `docs/prd.md` — Product requirements (149 FRs)
-
-## Quality Rules
-
-- **Always test your own work before concluding a task.** Run the relevant tests for any code you write or modify. Do not declare a task complete until tests pass.
 
 ## Git Rules
 
