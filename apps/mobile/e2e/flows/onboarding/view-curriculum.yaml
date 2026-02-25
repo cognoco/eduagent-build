@@ -15,8 +15,9 @@ tags:
 - launchApp
 
 # Assert home screen renders with key elements
-- assertVisible:
-    text: "Ready to learn"
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
     timeout: 15000
 - assertVisible: "Your coach has a plan"
 - assertVisible: "Your subjects"
@@ -41,7 +42,6 @@ tags:
 # The Learning Book should show filter tabs and topic list
 - assertVisible:
     id: "subject-filter-tabs"
-    timeout: 5000
     optional: true
 
 - takeScreenshot: home-navigation
@@ -52,8 +52,9 @@ tags:
 # If subjects exist, tap the first subject to view its curriculum
 # This uses text matching since subject names are dynamic.
 # The curriculum review screen shows "Your Curriculum" or loading state.
-- assertVisible:
-    text: "Your subjects"
+- extendedWaitUntil:
+    visible:
+      text: "Your subjects"
     timeout: 5000
 
 - takeScreenshot: home-subjects-visible

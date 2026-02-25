@@ -19,8 +19,9 @@ tags:
 
 # Assert home screen is visible (authenticated state).
 # The home screen shows "Ready to learn" as the main heading.
-- assertVisible:
-    text: "Ready to learn"
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
     timeout: 15000
 
 # The home screen should show the subjects section
@@ -33,8 +34,9 @@ tags:
     id: "add-subject-button"
 
 # The create-subject modal should appear
-- assertVisible:
-    text: "New subject"
+- extendedWaitUntil:
+    visible:
+      text: "New subject"
     timeout: 5000
 
 # Verify the instructional text is shown
@@ -51,13 +53,15 @@ tags:
 
 # The app should navigate to the interview screen.
 # The ChatShell title will contain "Interview:" prefix.
-- assertVisible:
-    text: "Interview"
+- extendedWaitUntil:
+    visible:
+      text: "Interview"
     timeout: 10000
 
 # The opening AI message should be visible in the chat
-- assertVisible:
-    text: "learning coach"
+- extendedWaitUntil:
+    visible:
+      text: "learning coach"
     timeout: 5000
 
 # Verify the chat input is available (testID: chat-input)
