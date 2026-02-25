@@ -192,6 +192,68 @@ describe('Gemini Provider', () => {
     });
   });
 
+  describe('safety settings for minors', () => {
+    it('includes safetySettings for minors in every request', async () => {
+      fetchSpy.mockResolvedValue(
+        mockFetchResponse(geminiResponse('safe response'))
+      );
+
+      await provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG);
+
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(body.safetySettings).toHaveLength(5);
+      expect(body.safetySettings).toContainEqual({
+        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+        threshold: 'BLOCK_LOW_AND_ABOVE',
+      });
+      // All other categories use BLOCK_MEDIUM_AND_ABOVE
+      for (const category of [
+        'HARM_CATEGORY_HARASSMENT',
+        'HARM_CATEGORY_HATE_SPEECH',
+        'HARM_CATEGORY_DANGEROUS_CONTENT',
+        'HARM_CATEGORY_CIVIC_INTEGRITY',
+      ]) {
+        expect(body.safetySettings).toContainEqual({
+          category,
+          threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+        });
+      }
+    });
+
+    it('throws on prompt safety block', async () => {
+      fetchSpy.mockResolvedValue(
+        mockFetchResponse({
+          promptFeedback: { blockReason: 'SAFETY' },
+          candidates: [],
+        })
+      );
+
+      await expect(
+        provider.chat(
+          [{ role: 'user', content: 'harmful prompt' }],
+          DEFAULT_CONFIG
+        )
+      ).rejects.toThrow('content safety filters');
+    });
+
+    it('throws on candidate safety block', async () => {
+      fetchSpy.mockResolvedValue(
+        mockFetchResponse({
+          candidates: [
+            {
+              content: { parts: [] },
+              finishReason: 'SAFETY',
+            },
+          ],
+        })
+      );
+
+      await expect(
+        provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG)
+      ).rejects.toThrow('blocked by content safety filters');
+    });
+  });
+
   describe('chatStream()', () => {
     it('yields text chunks from SSE stream', async () => {
       const sse = sseChunks(['Hello ', 'world', '!']);
@@ -276,6 +338,37 @@ describe('Gemini Provider', () => {
       }
 
       expect(chunks).toEqual(['chunk']);
+    });
+
+    it('includes safetySettings in stream requests', async () => {
+      fetchSpy.mockResolvedValue(mockStreamResponse(sseChunks(['ok'])));
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _ of provider.chatStream(
+        [{ role: 'user', content: 'test' }],
+        DEFAULT_CONFIG
+      )) {
+        // consume stream
+      }
+
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(body.safetySettings).toHaveLength(5);
+    });
+
+    it('throws on safety block during stream', async () => {
+      const sse = `data: ${JSON.stringify({
+        candidates: [{ finishReason: 'SAFETY', content: { parts: [] } }],
+      })}`;
+      fetchSpy.mockResolvedValue(mockStreamResponse(sse));
+
+      await expect(async () => {
+        for await (const _ of provider.chatStream(
+          [{ role: 'user', content: 'test' }],
+          DEFAULT_CONFIG
+        )) {
+          // consume stream
+        }
+      }).rejects.toThrow('blocked by content safety filters');
     });
   });
 });

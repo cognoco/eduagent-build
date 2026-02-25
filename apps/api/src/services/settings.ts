@@ -320,3 +320,28 @@ export async function logNotification(
     ticketId: ticketId ?? null,
   });
 }
+
+/**
+ * Counts notifications of a specific type within the last N hours for a profile.
+ */
+export async function getRecentNotificationCount(
+  db: Database,
+  profileId: string,
+  type: NotificationPayload['type'],
+  hours: number
+): Promise<number> {
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+  const rows = await db
+    .select()
+    .from(notificationLog)
+    .where(
+      and(
+        eq(notificationLog.profileId, profileId),
+        eq(notificationLog.type, type),
+        gte(notificationLog.sentAt, since)
+      )
+    );
+
+  return rows.length;
+}

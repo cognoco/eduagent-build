@@ -1,5 +1,6 @@
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   RetentionSignal,
@@ -9,6 +10,11 @@ import {
   useChildDetail,
   useChildSessions,
 } from '../../../../hooks/use-dashboard';
+import {
+  useChildConsentStatus,
+  useRevokeConsent,
+  useRestoreConsent,
+} from '../../../../hooks/use-consent';
 
 function SubjectSkeleton(): React.ReactNode {
   return (
@@ -36,6 +42,18 @@ function formatSessionDate(iso: string): string {
   });
 }
 
+const GRACE_PERIOD_DAYS = 7;
+
+function getGracePeriodDaysRemaining(respondedAt: string | null): number {
+  if (!respondedAt) return GRACE_PERIOD_DAYS;
+  const revokedDate = new Date(respondedAt);
+  const deadline = new Date(revokedDate);
+  deadline.setDate(deadline.getDate() + GRACE_PERIOD_DAYS);
+  const now = new Date();
+  const msRemaining = deadline.getTime() - now.getTime();
+  return Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+}
+
 export default function ChildDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -43,6 +61,47 @@ export default function ChildDetailScreen() {
   const { data: child, isLoading } = useChildDetail(profileId);
   const { data: sessions, isLoading: sessionsLoading } =
     useChildSessions(profileId);
+  const { data: consentData } = useChildConsentStatus(profileId);
+  const revokeConsent = useRevokeConsent(profileId);
+  const restoreConsent = useRestoreConsent(profileId);
+
+  const isWithdrawn = consentData?.consentStatus === 'WITHDRAWN';
+  const daysRemaining = isWithdrawn
+    ? getGracePeriodDaysRemaining(consentData.respondedAt)
+    : 0;
+
+  const handleWithdrawConsent = useCallback(() => {
+    const childName = child?.displayName ?? 'this child';
+    Alert.alert(
+      `Withdraw consent for ${childName}?`,
+      `${childName}'s account and all learning data will be deleted after a 7-day grace period.\n\nYou can reverse this within 7 days.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Withdraw',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await revokeConsent.mutateAsync();
+            } catch {
+              Alert.alert(
+                'Error',
+                'Could not withdraw consent. Please try again.'
+              );
+            }
+          },
+        },
+      ]
+    );
+  }, [child?.displayName, revokeConsent]);
+
+  const handleCancelDeletion = useCallback(async () => {
+    try {
+      await restoreConsent.mutateAsync();
+    } catch {
+      Alert.alert('Error', 'Could not cancel deletion. Please try again.');
+    }
+  }, [restoreConsent]);
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -173,6 +232,66 @@ export default function ChildDetailScreen() {
             <Text className="text-body text-text-secondary">
               No sessions yet
             </Text>
+          </View>
+        )}
+
+        {/* Consent Management */}
+        {consentData?.consentStatus != null && (
+          <View className="mt-8 mb-4" testID="consent-section">
+            <Text className="text-h3 font-semibold text-text-primary mb-2">
+              {child?.displayName
+                ? `${child.displayName}'s Account`
+                : 'Account'}
+            </Text>
+
+            {isWithdrawn ? (
+              <View
+                className="bg-error/10 rounded-card p-4"
+                testID="grace-period-banner"
+              >
+                <Text className="text-body font-semibold text-error mb-1">
+                  Deletion pending
+                </Text>
+                <Text className="text-body-sm text-text-secondary mb-3">
+                  {daysRemaining > 0
+                    ? `Account and all learning data will be deleted in ${daysRemaining} ${
+                        daysRemaining === 1 ? 'day' : 'days'
+                      }.`
+                    : 'Deletion is being processed.'}
+                </Text>
+                {daysRemaining > 0 && (
+                  <Pressable
+                    onPress={handleCancelDeletion}
+                    disabled={restoreConsent.isPending}
+                    className="bg-primary rounded-lg py-3 items-center"
+                    accessibilityLabel="Cancel deletion"
+                    accessibilityRole="button"
+                    testID="cancel-deletion-button"
+                  >
+                    <Text className="text-body font-semibold text-on-primary">
+                      {restoreConsent.isPending
+                        ? 'Cancelling...'
+                        : 'Cancel Deletion'}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+            ) : consentData.consentStatus === 'CONSENTED' ? (
+              <Pressable
+                onPress={handleWithdrawConsent}
+                disabled={revokeConsent.isPending}
+                className="border border-error rounded-lg py-3 items-center"
+                accessibilityLabel="Withdraw consent"
+                accessibilityRole="button"
+                testID="withdraw-consent-button"
+              >
+                <Text className="text-body font-semibold text-error">
+                  {revokeConsent.isPending
+                    ? 'Withdrawing...'
+                    : 'Withdraw Consent'}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
         )}
       </ScrollView>

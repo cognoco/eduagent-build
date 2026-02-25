@@ -1,7 +1,13 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { checkConsentRequirement, useRequestConsent } from './use-consent';
+import {
+  checkConsentRequirement,
+  useRequestConsent,
+  useChildConsentStatus,
+  useRevokeConsent,
+  useRestoreConsent,
+} from './use-consent';
 
 const mockFetch = jest.fn();
 jest.mock('../lib/api-client', () => ({
@@ -137,5 +143,115 @@ describe('useRequestConsent', () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalled();
     });
+  });
+});
+
+describe('useChildConsentStatus', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient?.clear();
+  });
+
+  it('fetches consent status for a child profile', async () => {
+    const statusData = {
+      consentStatus: 'CONSENTED',
+      respondedAt: '2025-01-15T10:00:00.000Z',
+      consentType: 'GDPR',
+    };
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(statusData), { status: 200 })
+    );
+
+    const childId = '550e8400-e29b-41d4-a716-446655440000';
+    const { result } = renderHook(() => useChildConsentStatus(childId), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data?.consentStatus).toBe('CONSENTED');
+    expect(result.current.data?.respondedAt).toBe('2025-01-15T10:00:00.000Z');
+    expect(result.current.data?.consentType).toBe('GDPR');
+  });
+
+  it('does not fetch when childProfileId is undefined', () => {
+    renderHook(() => useChildConsentStatus(undefined), {
+      wrapper: createWrapper(),
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('useRevokeConsent', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient?.clear();
+  });
+
+  it('calls PUT /consent/:childProfileId/revoke', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          message:
+            'Consent revoked. Data will be deleted after 7-day grace period.',
+          consentStatus: 'WITHDRAWN',
+        }),
+        { status: 200 }
+      )
+    );
+
+    const childId = '550e8400-e29b-41d4-a716-446655440000';
+    const { result } = renderHook(() => useRevokeConsent(childId), {
+      wrapper: createWrapper(),
+    });
+
+    const data = await result.current.mutateAsync();
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(data.consentStatus).toBe('WITHDRAWN');
+  });
+});
+
+describe('useRestoreConsent', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient?.clear();
+  });
+
+  it('calls PUT /consent/:childProfileId/restore', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          message: 'Consent restored. Deletion cancelled.',
+          consentStatus: 'CONSENTED',
+        }),
+        { status: 200 }
+      )
+    );
+
+    const childId = '550e8400-e29b-41d4-a716-446655440000';
+    const { result } = renderHook(() => useRestoreConsent(childId), {
+      wrapper: createWrapper(),
+    });
+
+    const data = await result.current.mutateAsync();
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(data.consentStatus).toBe('CONSENTED');
   });
 });

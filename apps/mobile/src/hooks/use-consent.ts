@@ -1,6 +1,7 @@
 import {
   useMutation,
   useQuery,
+  useQueryClient,
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
@@ -76,6 +77,103 @@ export function checkConsentRequirement(
 
   return { required: false, consentType: null };
 }
+
+// ---------------------------------------------------------------------------
+// Parent-facing child consent hooks (revocation flow)
+// ---------------------------------------------------------------------------
+
+export interface ChildConsentData {
+  consentStatus: ConsentStatus | null;
+  respondedAt: string | null;
+  consentType: 'GDPR' | 'COPPA' | null;
+}
+
+/**
+ * Fetches consent status for a specific child (parent view).
+ * Includes `respondedAt` for grace-period countdown calculation.
+ */
+export function useChildConsentStatus(
+  childProfileId: string | undefined
+): UseQueryResult<ChildConsentData> {
+  const client = useApiClient();
+
+  return useQuery({
+    queryKey: ['consent', 'child', childProfileId],
+    queryFn: async (): Promise<ChildConsentData> => {
+      const res = await client.consent[':childProfileId'].status.$get({
+        param: { childProfileId: childProfileId! },
+      });
+      return await res.json();
+    },
+    enabled: !!childProfileId,
+  });
+}
+
+interface RevokeConsentResult {
+  message: string;
+  consentStatus: ConsentStatus;
+}
+
+/**
+ * Revokes consent for a child profile (parent-initiated).
+ * Invalidates child consent status and dashboard queries on success.
+ */
+export function useRevokeConsent(
+  childProfileId: string | undefined
+): UseMutationResult<RevokeConsentResult, Error, void> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (): Promise<RevokeConsentResult> => {
+      const res = await client.consent[':childProfileId'].revoke.$put({
+        param: { childProfileId: childProfileId! },
+      });
+      return await res.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['consent', 'child', childProfileId],
+      });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+interface RestoreConsentResult {
+  message: string;
+  consentStatus: ConsentStatus;
+}
+
+/**
+ * Restores consent for a child profile (cancels revocation).
+ * Invalidates child consent status and dashboard queries on success.
+ */
+export function useRestoreConsent(
+  childProfileId: string | undefined
+): UseMutationResult<RestoreConsentResult, Error, void> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (): Promise<RestoreConsentResult> => {
+      const res = await client.consent[':childProfileId'].restore.$put({
+        param: { childProfileId: childProfileId! },
+      });
+      return await res.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['consent', 'child', childProfileId],
+      });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function calculateAge(birthDate: string): number {
   const birth = new Date(birthDate);

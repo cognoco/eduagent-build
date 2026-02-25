@@ -8,11 +8,41 @@ import type { LLMProvider, ChatMessage, ModelConfig } from '../types';
 const GEMINI_BASE_URL =
   'https://generativelanguage.googleapis.com/v1beta/models';
 
+// ---------------------------------------------------------------------------
+// Safety settings — all users are minors (11-17)
+// ---------------------------------------------------------------------------
+
+interface GeminiSafetySetting {
+  category: string;
+  threshold: string;
+}
+
+const SAFETY_SETTINGS_FOR_MINORS: GeminiSafetySetting[] = [
+  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+  {
+    category: 'HARM_CATEGORY_HATE_SPEECH',
+    threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+  },
+  {
+    category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+    threshold: 'BLOCK_LOW_AND_ABOVE',
+  },
+  {
+    category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+    threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+  },
+  {
+    category: 'HARM_CATEGORY_CIVIC_INTEGRITY',
+    threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+  },
+];
+
 /** Gemini API request body shape */
 interface GeminiRequest {
   contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>;
   systemInstruction?: { parts: Array<{ text: string }> };
   generationConfig: { maxOutputTokens: number };
+  safetySettings: GeminiSafetySetting[];
 }
 
 /** Gemini API response shape */
@@ -21,6 +51,7 @@ interface GeminiResponse {
     content?: { parts?: Array<{ text?: string }> };
     finishReason?: string;
   }>;
+  promptFeedback?: { blockReason?: string };
   error?: { message: string; code: number };
 }
 
@@ -43,6 +74,7 @@ function toGeminiRequest(
   const request: GeminiRequest = {
     contents,
     generationConfig: { maxOutputTokens: config.maxTokens },
+    safetySettings: SAFETY_SETTINGS_FOR_MINORS,
   };
 
   if (systemMessages.length > 0) {
@@ -55,6 +87,20 @@ function toGeminiRequest(
 }
 
 function extractResponseText(data: GeminiResponse): string {
+  // Prompt-level safety block — the entire input was rejected
+  if (data.promptFeedback?.blockReason === 'SAFETY') {
+    throw new Error(
+      'Your message could not be processed due to content safety filters. Please rephrase and try again.'
+    );
+  }
+
+  // Candidate-level safety block — the generated output was rejected
+  if (data.candidates?.[0]?.finishReason === 'SAFETY') {
+    throw new Error(
+      'The response was blocked by content safety filters. Please try rephrasing your question.'
+    );
+  }
+
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) {
     if (data.error) {
@@ -132,12 +178,28 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
 
           try {
             const chunk = JSON.parse(jsonStr) as GeminiResponse;
+
+            // Safety block during streaming
+            if (chunk.promptFeedback?.blockReason === 'SAFETY') {
+              throw new Error(
+                'Your message could not be processed due to content safety filters. Please rephrase and try again.'
+              );
+            }
+            if (chunk.candidates?.[0]?.finishReason === 'SAFETY') {
+              throw new Error(
+                'The response was blocked by content safety filters. Please try rephrasing your question.'
+              );
+            }
+
             const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text;
             if (text) {
               yield text;
             }
-          } catch {
-            // Skip malformed JSON chunks
+          } catch (e) {
+            // Re-throw safety errors; skip malformed JSON
+            if (e instanceof Error && e.message.includes('safety filters')) {
+              throw e;
+            }
           }
         }
       }

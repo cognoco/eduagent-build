@@ -81,7 +81,7 @@ inputDocuments:
 
 4. **AUDIT-004: Retention cards never created in learning flow** — The SM-2 pipeline assumes `topic_schedules` records exist, but no code path creates them when a topic is first learned. Tests pass because they seed data. In production, the entire spaced repetition feature silently does nothing for new topics. **Fix:** Upsert retention card in `updateRetentionFromSession` or create during session start when a topic is first assigned. (owner: Backend Dev, timeline: immediate)
 
-**What we need from team:** Fix these 4 issues before QA begins writing tests. Tests written against the current code would validate broken behavior.
+**Status:** All 5 audit findings (AUDIT-001 through AUDIT-005) are now resolved. QA can proceed with test development.
 
 ---
 
@@ -120,11 +120,11 @@ These were discovered by a structured code audit (3 parallel agents, 46+ source 
 
 | Finding ID | Category | Description | Severity | Fix Complexity | Owner |
 |------------|----------|-------------|----------|---------------|-------|
-| **AUDIT-001** | **SEC** | Consent determination entirely client-side — trivially bypassable. ADR specifies server-side enforcement. | **CRITICAL** | Medium (add middleware + cf.country check) | Backend Dev |
-| **AUDIT-002** | **SEC** | No Gemini SafetySettings — raw LLM output to minors with no safety thresholds | **CRITICAL** | Low (configure SafetySettings in gemini.ts) | Backend Dev |
-| **AUDIT-003** | **OPS** | Mock provider silent fallback — missing API key = echo mode in production. Violates ADR rule #10. | **CRITICAL** | Low (throw at startup) | Backend Dev |
-| **AUDIT-004** | **DATA** | No retention card creation in learning flow — SM-2 pipeline silently broken for all new topics | **CRITICAL** | Medium (add upsert in updateRetentionFromSession) | Backend Dev |
-| **AUDIT-005** | **DATA** | processRecallTest hardcodes success for missing card — bypasses SM-2, awards free XP | **HIGH** | Low (return error instead of success) | Backend Dev |
+| **AUDIT-001** | **SEC** | ~~Consent determination entirely client-side~~ **RESOLVED** — `consentMiddleware` in `middleware/consent.ts` enforces server-side consent gating. 11 unit tests. | **CRITICAL** | Medium | Backend Dev |
+| **AUDIT-002** | **SEC** | ~~No Gemini SafetySettings~~ **RESOLVED** — `SAFETY_SETTINGS_FOR_MINORS` (5 categories) in `gemini.ts`. `BLOCK_LOW_AND_ABOVE` for sexually explicit, `BLOCK_MEDIUM_AND_ABOVE` for others. Safety block detection in sync + stream. 5 new tests. | **CRITICAL** | Low | Backend Dev |
+| **AUDIT-003** | **OPS** | ~~Mock provider silent fallback~~ **RESOLVED** — `llmMiddleware` throws on missing `GEMINI_API_KEY` when `ENVIRONMENT !== 'test'`. Health endpoint reports LLM status. | **CRITICAL** | Low | Backend Dev |
+| **AUDIT-004** | **DATA** | ~~No retention card creation in learning flow~~ **RESOLVED** — `ensureRetentionCard()` at `retention-data.ts:132-169` uses `INSERT ... ON CONFLICT DO NOTHING`. Called by `updateRetentionFromSession()` and `processRecallTest()`. Tests at lines 241-287, 910-919, 992-1013. | **CRITICAL** | Medium | Backend Dev |
+| **AUDIT-005** | **DATA** | ~~processRecallTest hardcodes success for missing card~~ **RESOLVED** — `processRecallTest()` at `retention-data.ts:254-329` auto-creates card via `ensureRetentionCard()`, then evaluates answer quality via LLM and runs SM-2 normally. Tested at lines 241-287. | **HIGH** | Low | Backend Dev |
 
 #### High-Priority Risks (Score >=6) - IMMEDIATE ATTENTION
 
@@ -350,8 +350,8 @@ These were discovered by a structured code audit (3 parallel agents, 46+ source 
 
 | # | Severity | Finding | Fix |
 |---|----------|---------|-----|
-| 1 | CRITICAL | No retention card creation in learning flow — SM-2 pipeline broken for all new topics | Upsert card in `updateRetentionFromSession` or on topic assignment |
-| 2 | HIGH | processRecallTest hardcodes success for missing card — bypasses SM-2, awards free XP | Return error or create card on-demand |
+| 1 | ~~CRITICAL~~ **RESOLVED** | ~~No retention card creation in learning flow~~ — `ensureRetentionCard()` upsert added in `retention-data.ts`. Tests at lines 241-287, 910-919, 992-1013. | **AUDIT-004 fixed** |
+| 2 | ~~HIGH~~ **RESOLVED** | ~~processRecallTest hardcodes success for missing card~~ — auto-creates card via `ensureRetentionCard()`, evaluates via LLM, runs SM-2 normally. Tested at lines 241-287. | **AUDIT-005 fixed** |
 | 3 | HIGH | Double-counting — sync `processRecallTest()` and async `session.completed` Inngest job both run SM-2 on same card | Skip `updateRetentionFromSession` when `sessionType === 'recall'` or add `lastUpdatedBySessionId` guard |
 | 4 | HIGH | Anti-cramming (FR54) never enforced — `canRetestTopic()` exists but is never called in request path | Wire into recall-test route handler |
 | 5 | MEDIUM | Needs-deepening quality defaults to 3 → always passes → premature topic resolution (FR63) | Use actual quality from recall test, not default |
@@ -364,8 +364,8 @@ These were discovered by a structured code audit (3 parallel agents, 46+ source 
 
 **Mitigation Strategy (revised):**
 
-1. **Create retention cards (AUDIT-004, immediate):** Add upsert logic in `updateRetentionFromSession` — if no `topic_schedules` record exists for the topic, create one with initial SM-2 values before running the algorithm. This is the highest-priority fix because without it, the entire retention feature is non-functional for organically created topics.
-2. **Fix processRecallTest for missing cards (AUDIT-005):** Return an error or create the card on-demand instead of hardcoding success. Currently awards XP and reports success for topics that have no retention tracking.
+1. ~~**Create retention cards (AUDIT-004, immediate):**~~ **RESOLVED** — `ensureRetentionCard()` at `retention-data.ts:132-169` uses `INSERT ... ON CONFLICT DO NOTHING`. Called by both `updateRetentionFromSession()` and `processRecallTest()`.
+2. ~~**Fix processRecallTest for missing cards (AUDIT-005):**~~ **RESOLVED** — `processRecallTest()` auto-creates card via `ensureRetentionCard()`, then evaluates answer quality via LLM and runs SM-2 normally.
 3. **Fix double-counting:** Add a guard in the `session.completed` Inngest handler: skip `updateRetentionFromSession` when `sessionType === 'recall'`, since `processRecallTest` already handled the SM-2 update synchronously.
 4. **Wire anti-cramming:** Call `canRetestTopic()` in the recall-test route handler before allowing a re-test. The function already exists and is well-implemented — it just needs one import and one call.
 5. **Fix needs-deepening quality:** Pass actual quality score from the recall test result instead of defaulting to 3. Current default means FR63 auto-promotion fires too easily.
@@ -373,8 +373,8 @@ These were discovered by a structured code audit (3 parallel agents, 46+ source 
 7. **Test edge cases:** quality score 0 (complete failure, 3+ failures → redirect to Learning Book), quality score 5 (perfect recall), interleaved session quality per-topic
 
 **Owner:** Backend Dev
-**Timeline:** AUDIT-004 and AUDIT-005 = immediate. Double-counting and anti-cramming = implementation phase.
-**Status:** Critical — audit findings require code changes before test development
+**Timeline:** ~~AUDIT-004 and AUDIT-005 = immediate.~~ **Both resolved.** Double-counting and anti-cramming = implementation phase.
+**Status:** AUDIT-004/005 resolved. Remaining items (double-counting, anti-cramming, needs-deepening) tracked for implementation phase.
 **Verification:** Integration test covering: card creation → recall → SM-2 → schedule update → coaching card chain. Separate test for anti-cramming enforcement.
 
 ---
@@ -396,7 +396,7 @@ These were discovered by a structured code audit (3 parallel agents, 46+ source 
 1. **EAS dev build APK** — Required before any Maestro flow can execute in CI
 2. **`__test/seed` endpoint** — Required before Maestro flows can create meaningful test scenarios
 3. **Sentry DSN configuration** — Required before error tracking can be validated (pre-launch config, not code)
-4. **AUDIT critical fixes (AUDIT-001 through AUDIT-004)** — Required before QA can write tests that validate intended behavior (NEW)
+4. ~~**AUDIT critical fixes (AUDIT-001 through AUDIT-005)**~~ **ALL RESOLVED** — AUDIT-001 (consent middleware), AUDIT-002 (Gemini SafetySettings), AUDIT-003 (fail-loud API key), AUDIT-004 (retention card creation), AUDIT-005 (processRecallTest)
 
 #### Risks to Plan
 
@@ -426,7 +426,7 @@ The fix pattern is also consistent: move trust boundaries server-side, add post-
 
 **Next Steps for Architecture Team:**
 
-1. **IMMEDIATE:** Fix AUDIT-001 through AUDIT-004 (4 critical code defects)
+1. ~~**IMMEDIATE:** Fix AUDIT-001 through AUDIT-005~~ **ALL RESOLVED** (5 code defects fixed)
 2. Review Quick Guide (BLOCKERS / CRITICAL FIXES / HIGH PRIORITY / INFO ONLY) and prioritize
 3. Assign owners and timelines for high-priority risks (>=6), now including raised scores for R-003 and R-004
 4. Validate revised assumptions — especially confirm Neon plan tier

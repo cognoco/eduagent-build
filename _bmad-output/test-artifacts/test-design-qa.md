@@ -143,11 +143,11 @@ test('authenticated request succeeds', async () => {
 
 | Finding ID | Category | Description | QA Impact |
 |------------|----------|-------------|-----------|
-| **AUDIT-001** | SEC | Consent determination entirely client-side — bypass trivial | P0-001, P0-004, P0-009, P0-010 blocked |
-| **AUDIT-002** | SEC | No Gemini SafetySettings for minors | P0-011 blocked |
-| **AUDIT-003** | OPS | Mock provider silent fallback | P0-012 blocked, all LLM tests potentially invalid |
-| **AUDIT-004** | DATA | No retention card creation in learning flow | P0-003 tests would pass with seeded data but miss real bug |
-| **AUDIT-005** | DATA | processRecallTest hardcodes success for missing card | P0-003 chain validation incomplete |
+| **AUDIT-001** | SEC | ~~Consent determination entirely client-side~~ **RESOLVED** — `consentMiddleware` in `middleware/consent.ts` enforces server-side consent gating on all data-collecting routes. 11 unit tests in `consent.test.ts`. | P0-001, P0-004, P0-009, P0-010 unblocked |
+| **AUDIT-002** | SEC | ~~No Gemini SafetySettings for minors~~ **RESOLVED** — `SAFETY_SETTINGS_FOR_MINORS` (5 categories) added to `gemini.ts`. `BLOCK_LOW_AND_ABOVE` for sexually explicit, `BLOCK_MEDIUM_AND_ABOVE` for all others. Safety block detection in both sync and streaming paths. 5 new tests. | P0-011 unblocked |
+| **AUDIT-003** | OPS | ~~Mock provider silent fallback~~ **RESOLVED** — `llmMiddleware` throws on missing `GEMINI_API_KEY` when `ENVIRONMENT !== 'test'`. Health endpoint reports LLM status. | P0-012 unblocked |
+| **AUDIT-004** | DATA | ~~No retention card creation in learning flow~~ **RESOLVED** — `ensureRetentionCard()` at `retention-data.ts:132-169` uses `INSERT ... ON CONFLICT DO NOTHING`. Called by `updateRetentionFromSession()` (Inngest session-completed step 1) and `processRecallTest()`. Tests at `retention-data.test.ts` lines 241-287, 910-919, 992-1013. | P0-003 unblocked |
+| **AUDIT-005** | DATA | ~~processRecallTest hardcodes success for missing card~~ **RESOLVED** — `processRecallTest()` at `retention-data.ts:254-329` auto-creates card via `ensureRetentionCard()`, then evaluates answer quality via LLM and runs SM-2 normally. Does NOT hardcode success. Tested at lines 241-287. | P0-003 chain validation complete |
 
 ### High-Priority Risks (Score >=6)
 
@@ -181,10 +181,10 @@ test('authenticated request succeeds', async () => {
 
 **QA testing cannot begin until ALL of the following are met:**
 
-- [ ] **AUDIT-001 fixed:** Server-side consent enforcement implemented (cf.country + API middleware)
-- [ ] **AUDIT-002 fixed:** Gemini SafetySettings configured in `gemini.ts`
-- [ ] **AUDIT-003 fixed:** Startup failure on missing API key in non-test environments
-- [ ] **AUDIT-004 fixed:** Retention card creation added to learning flow
+- [x] **AUDIT-001 fixed:** Server-side consent enforcement implemented — `consentMiddleware` in `middleware/consent.ts` (11 tests)
+- [x] **AUDIT-002 fixed:** Gemini SafetySettings configured in `gemini.ts` — 5 safety categories, sync + stream detection (5 tests)
+- [x] **AUDIT-003 fixed:** Startup failure on missing API key in non-test environments — `llmMiddleware` throws, health endpoint reports
+- [x] **AUDIT-004 fixed:** Retention card creation added to learning flow — `ensureRetentionCard()` upsert in `retention-data.ts`
 - [ ] `POST /v1/__test/seed` endpoint implemented and deployed to test environment
 - [ ] `POST /v1/__test/reset` endpoint implemented and deployed to test environment
 - [ ] EAS dev build APK produced and cached in GitHub Actions
@@ -551,11 +551,11 @@ This maps every critical and high audit finding to a specific test scenario, ens
 
 | Audit Finding | Severity | Test ID(s) | Verification |
 |--------------|----------|-----------|-------------|
-| AUDIT-001: Client-side consent | CRITICAL | P0-009 | API rejects data requests without CONSENTED status |
-| AUDIT-002: No SafetySettings | CRITICAL | P0-011 | SafetySettings configured, verified in test |
-| AUDIT-003: Mock fallback | CRITICAL | P0-012 | Startup throws without API key |
-| AUDIT-004: No card creation | CRITICAL | P0-003 (updated) | Card exists after first learning session |
-| AUDIT-005: Hardcoded success | HIGH | P0-003 (updated) | Missing card returns error, not success |
+| AUDIT-001: Client-side consent | CRITICAL | P0-009 | **RESOLVED** — `consentMiddleware` returns 403 `CONSENT_REQUIRED` for pending profiles. 11 unit tests in `consent.test.ts`. |
+| AUDIT-002: No SafetySettings | CRITICAL | P0-011 | **RESOLVED** — `SAFETY_SETTINGS_FOR_MINORS` in `gemini.ts`. 5 new tests verify categories, prompt/candidate/stream safety blocks. |
+| AUDIT-003: Mock fallback | CRITICAL | P0-012 | **RESOLVED** — `llmMiddleware` throws on missing key. Health endpoint reports LLM status. |
+| AUDIT-004: No card creation | CRITICAL | P0-003 (updated) | **RESOLVED** — `ensureRetentionCard()` upsert in `retention-data.ts`. Tests at lines 241-287, 910-919, 992-1013. |
+| AUDIT-005: Hardcoded success | HIGH | P0-003 (updated) | **RESOLVED** — `processRecallTest()` auto-creates card + evaluates via LLM. Does not hardcode success. Tested at lines 241-287. |
 | R-001 #3: No token expiry | HIGH | P0-010 | Expired token rejected |
 | R-001 #4: Approve/delete race | HIGH | P0-010 | Atomic delete condition verified |
 | R-001 #5: Mutable birthDate | HIGH | P0-009 | PATCH rejects birthDate change |

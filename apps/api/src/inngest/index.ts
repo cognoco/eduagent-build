@@ -1,5 +1,6 @@
 import { inngest } from './client';
 import { consentReminder } from './functions/consent-reminders';
+import { consentRevocation } from './functions/consent-revocation';
 import { scheduledDeletion } from './functions/account-deletion';
 import { sessionCompleted } from './functions/session-completed';
 import { reviewReminder } from './functions/review-reminder';
@@ -12,6 +13,7 @@ import { subjectAutoArchive } from './functions/subject-auto-archive';
 export {
   inngest,
   consentReminder,
+  consentRevocation,
   scheduledDeletion,
   sessionCompleted,
   reviewReminder,
@@ -25,6 +27,7 @@ export {
 // All Inngest functions to register with the serve handler
 export const functions = [
   consentReminder,
+  consentRevocation,
   scheduledDeletion,
   sessionCompleted,
   reviewReminder,

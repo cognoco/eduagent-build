@@ -31,6 +31,7 @@ const PUBLIC_PATHS = [
   '/v1/auth/',
   '/v1/stripe/',
   '/v1/consent/respond',
+  '/v1/consent-page',
   '/v1/__test/',
 ];
 

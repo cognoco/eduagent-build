@@ -654,6 +654,8 @@ So that each of my children has their own learning space.
 
 **FRs:** FR4, FR5, FR6
 
+**Phase 2 deferral:** Profile switch PIN/biometric authentication deferred per UX spec Party Mode revision (line 1631). Currently `profiles.tsx` is reachable via More tab — a child can switch to parent profile without authentication. Data isolation is enforced by `createScopedRepository(profileId)` but no auth gate protects the switch action itself. Phase 2 should add PIN/biometric verification before completing profile switch.
+
 ---
 
 ### Story 0.5: Parental Consent (GDPR & COPPA)

@@ -11,6 +11,8 @@ import { authMiddleware } from './middleware/auth';
 import { databaseMiddleware } from './middleware/database';
 import { accountMiddleware } from './middleware/account';
 import { profileScopeMiddleware } from './middleware/profile-scope';
+import type { ProfileMeta } from './middleware/profile-scope';
+import { consentMiddleware } from './middleware/consent';
 import { llmMiddleware } from './middleware/llm';
 import { meteringMiddleware } from './middleware/metering';
 import { requestLogger } from './middleware/request-logger';
@@ -22,6 +24,7 @@ import { health } from './routes/health';
 import { auth } from './routes/auth';
 import { profileRoutes } from './routes/profiles';
 import { consentRoutes } from './routes/consent';
+import { consentWebRoutes } from './routes/consent-web';
 import { accountRoutes } from './routes/account';
 import { inngestRoute } from './routes/inngest';
 import { subjectRoutes } from './routes/subjects';
@@ -71,6 +74,7 @@ type Variables = {
   db: Database;
   account: Account;
   profileId: string;
+  profileMeta: ProfileMeta;
   subscriptionId: string;
 };
 
@@ -119,6 +123,9 @@ api.use('*', accountMiddleware);
 // Profile scope middleware — reads X-Profile-Id header, verifies ownership; skips when absent
 api.use('*', profileScopeMiddleware);
 
+// Consent middleware — blocks data-collecting routes for profiles with pending consent (AUDIT-001)
+api.use('*', consentMiddleware);
+
 // Metering middleware — enforces quota on LLM-consuming routes (session messages/stream)
 api.use('*', meteringMiddleware);
 
@@ -133,6 +140,7 @@ const routes = api
   .route('/', auth)
   .route('/', profileRoutes)
   .route('/', consentRoutes)
+  .route('/', consentWebRoutes)
   .route('/', accountRoutes)
   .route('/', inngestRoute)
   .route('/', subjectRoutes)
