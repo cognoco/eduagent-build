@@ -52,6 +52,8 @@ jobs:
           fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
+        with:
+          standalone: true
 
       - uses: actions/setup-node@v4
         with:
@@ -77,6 +79,8 @@ jobs:
           filter: tree:0
 
       - uses: pnpm/action-setup@v4
+        with:
+          standalone: true
 
       - uses: actions/setup-node@v4
         with:

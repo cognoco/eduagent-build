@@ -203,7 +203,8 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
       expect.anything(), // db
       'profile-int-001',
       'topic-int-001',
-      4 // qualityRating
+      4, // qualityRating
+      '2026-02-23T10:00:00.000Z' // timestamp
     );
   });
 
@@ -214,7 +215,8 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
       expect.anything(),
       'profile-int-001',
       'topic-int-001',
-      3
+      3, // default qualityRating
+      '2026-02-23T10:00:00.000Z' // timestamp
     );
   });
 
@@ -400,7 +402,8 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
         expect.anything(),
         'profile-int-001',
         tid,
-        3 // default quality
+        3, // default quality
+        '2026-02-23T10:00:00.000Z' // timestamp
       );
     }
   });
