@@ -10,7 +10,11 @@ import type {
   ProfileUpdateInput,
   Profile,
 } from '@eduagent/schemas';
-import { getConsentStatus } from './consent';
+import {
+  getConsentStatus,
+  checkConsentRequired,
+  createPendingConsentState,
+} from './consent';
 
 // ---------------------------------------------------------------------------
 // Mapper — Drizzle Date → API ISO string
@@ -27,6 +31,7 @@ function mapProfileRow(
     avatarUrl: row.avatarUrl ?? null,
     birthDate: row.birthDate ? row.birthDate.toISOString().split('T')[0] : null,
     personaType: row.personaType,
+    location: row.location ?? null,
     isOwner: row.isOwner,
     consentStatus,
     createdAt: row.createdAt.toISOString(),
@@ -62,13 +67,20 @@ export async function listProfiles(
  *
  * The first profile created for an account is automatically marked as the
  * owner profile (isOwner = true). Subsequent profiles are non-owner.
+ *
+ * When `serverLocation` is provided (derived from cf.country by the route),
+ * the server determines consent requirements based on birthDate + location.
+ * If consent is required, a PENDING consent state row is created automatically.
  */
 export async function createProfile(
   db: Database,
   accountId: string,
   input: ProfileCreateInput,
-  isOwner?: boolean
+  isOwner?: boolean,
+  serverLocation?: 'EU' | 'US' | 'OTHER'
 ): Promise<Profile> {
+  const effectiveLocation = serverLocation ?? input.location ?? null;
+
   const [row] = await db
     .insert(profiles)
     .values({
@@ -77,10 +89,26 @@ export async function createProfile(
       avatarUrl: input.avatarUrl ?? null,
       birthDate: input.birthDate ? new Date(input.birthDate) : null,
       personaType: input.personaType ?? 'LEARNER',
+      location: effectiveLocation,
       isOwner: isOwner ?? false,
     })
     .returning();
-  return mapProfileRow(row);
+
+  // Server-side consent determination: if birthDate + location exist, check
+  let consentStatus: Profile['consentStatus'] = null;
+  if (input.birthDate && effectiveLocation) {
+    const check = checkConsentRequired(input.birthDate, effectiveLocation);
+    if (check.required && check.consentType) {
+      const state = await createPendingConsentState(
+        db,
+        row.id,
+        check.consentType
+      );
+      consentStatus = state.status;
+    }
+  }
+
+  return mapProfileRow(row, consentStatus);
 }
 
 /**

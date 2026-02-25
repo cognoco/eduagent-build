@@ -15,9 +15,15 @@ import {
   upsertLearningMode,
   registerPushToken,
 } from '../services/settings';
+import { notifyParentToSubscribe } from '../services/notifications';
 
 type SettingsRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+    RESEND_API_KEY?: string;
+    EMAIL_FROM?: string;
+  };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -85,4 +91,16 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       await registerPushToken(db, profileId, body.token);
       return c.json({ registered: true });
     }
-  );
+  )
+
+  // Notify parent to subscribe (child-friendly paywall)
+  .post('/settings/notify-parent-subscribe', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const result = await notifyParentToSubscribe(db, profileId, {
+      resendApiKey: c.env.RESEND_API_KEY,
+      emailFrom: c.env.EMAIL_FROM,
+    });
+    return c.json(result);
+  });

@@ -1920,3 +1920,396 @@ This is sustainable for a small team. Per-PR screen reader testing is aspiration
 | 26 | Model routing by conversation state | Fastest model first, escalate at Parallel Example / Teaching Mode rungs |
 | 27 | Coaching card two-path loading | Cached (<1s) vs fresh (1-2s skeleton) with context-hash freshness |
 | 28 | Phase 1 rescoped to homework-only proving flow | Profile Switcher deferred, SessionCloseSummary added, two child entry points |
+
+---
+
+## Gap Remediation Specs (Added 2026-02-23)
+
+_These sections address UX gaps identified during persona walkthroughs. Each follows the existing wireframe format with behavior notes, failure states, and component references._
+
+### Post-Approval Child Landing Screen
+
+**Context:** Journey 1 (Onboarding) — after parent approves GDPR/COPPA consent.
+
+**Actor:** Child (11-15) who was previously blocked by ConsentPendingGate.
+
+**Goal:** Celebrate approval and smoothly resume onboarding flow without confusion.
+
+**Trigger:** Child opens app AND `consentStatus` has transitioned from `PENDING` or `PARENTAL_CONSENT_REQUESTED` to `CONSENTED` since last app open. Detected by comparing stored previous consent status (AsyncStorage key: `lastKnownConsentStatus_{profileId}`) with current profile `consentStatus`.
+
+**Screen: PostApprovalLanding**
+
+```
+┌─────────────────────────────────┐
+│                                 │
+│         🎉 (celebratory)       │
+│                                 │
+│     You're approved!            │
+│     Time to start learning.     │
+│                                 │
+│     Your parent said yes —      │
+│     let's set up your first     │
+│     subject.                    │
+│                                 │
+│   ┌───────────────────────┐     │
+│   │      Let's Go →       │     │
+│   └───────────────────────┘     │
+│                                 │
+└─────────────────────────────────┘
+```
+
+**Behavior:**
+
+| State | Behavior |
+|-------|----------|
+| First time seeing this screen | Show once per profile. Track via AsyncStorage `postApprovalSeen_{profileId}` = `true`. |
+| Child already completed onboarding | Skip directly to Home. Check: profile has at least one subject. |
+| "Let's Go" tap | Navigate to Intent Screen (same as first-time user flow in Journey 1, Step 4). |
+| Already seen flag is set | Skip to normal learner layout. Never show again. |
+
+**Failure States:**
+
+1. **Consent approved but app was already open (hot reload):** AsyncStorage check + profile refetch on app foreground event (`AppState.addEventListener`). If consent changed while app was backgrounded, show landing on next foreground.
+2. **AsyncStorage write fails:** Fallback: show normal Home. Worst case: user sees the celebratory screen twice. Acceptable degradation.
+
+**Implementation Notes:**
+- Location: `apps/mobile/src/app/(learner)/_layout.tsx` — inserted between consent gate check and normal Tabs rendering.
+- Component: `PostApprovalLanding` (inline in layout or separate component file).
+- State tracking: AsyncStorage, not DB — this is transient one-time UI state.
+- Accessibility: celebration text has `accessibilityRole="header"`, CTA button meets 44px minimum touch target.
+
+**FRs:** Extension of FR9 (consent approval flow — child-side experience).
+
+---
+
+### Parent Account-Owner Landing (Browser Flow)
+
+**Context:** Journey 1 (Onboarding) — parent clicks consent approval link from email.
+
+**Actor:** Parent who received consent request email for their child.
+
+**Goal:** Confirm consent and understand next steps after approval.
+
+**Trigger:** Parent clicks `{APP_URL}/consent?token={token}` from email → `POST /v1/consent/respond` processes approval → redirect to this landing page.
+
+**Page: ConsentApprovalLanding (Web)**
+
+_This is a server-rendered HTML page, not a mobile screen. Served by the API or a static hosting path._
+
+```
+┌─────────────────────────────────────┐
+│  EduAgent logo                      │
+│                                     │
+│  Family account ready!              │
+│                                     │
+│  [Child's name]'s account is now    │
+│  active. They can start learning    │
+│  right away.                        │
+│                                     │
+│  ┌─────────────────────────────┐    │
+│  │  See [Child]'s Progress  →  │    │
+│  └─────────────────────────────┘    │
+│                                     │
+│  ┌─────────────────────────────┐    │
+│  │  Start My Own Learning   →  │    │
+│  └─────────────────────────────┘    │
+│                                     │
+│  ┌─────────────────────────────┐    │
+│  │  Close                      │    │
+│  └─────────────────────────────┘    │
+│                                     │
+│  📱 Download the app for the best   │
+│     experience → [App Store] [Play] │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**Behavior:**
+
+| Action | Result |
+|--------|--------|
+| "See [Child]'s Progress" | Deep link to app (`eduagent://parent/dashboard`). If app not installed, redirect to app store. |
+| "Start My Own Learning" | Deep link to app (`eduagent://onboarding?persona=learner`). If app not installed, redirect to app store. |
+| "Close" | Show "You can close this tab" message. |
+| Consent denied | Different page: "Consent declined. [Child]'s account will be removed. If this was a mistake, contact support." |
+| Token expired/invalid | Error page: "This link has expired or is invalid. Ask your child to resend the consent request from the app." |
+| Token already used | Show success page anyway (idempotent — parent may revisit the email link). |
+
+**Failure States:**
+
+1. **Parent doesn't have app installed:** All CTAs fall back to app store links. Smart app banner at top for iOS/Android detection.
+2. **Deep link fails:** All deep links have `https://` fallback that redirects to app store.
+
+**Implementation Notes:**
+- Location: New route in `apps/api/src/routes/consent.ts` — `GET /consent` serves HTML page (or redirect).
+- The current `POST /v1/consent/respond` already handles the approval logic. The landing page is a GET endpoint that renders after the POST succeeds.
+- Minimal HTML page — no React, no framework. Use inline CSS with the parent theme colors.
+- Smart App Banner: `<meta name="apple-itunes-app">` for iOS, Play Store intent for Android.
+- May be deferred if the current email→API JSON response flow is sufficient for MVP. The current flow returns JSON, which is not user-friendly in a browser.
+
+**FRs:** Extension of FR9 (consent response — parent-side browser experience).
+
+---
+
+### Child-Friendly Paywall
+
+**Context:** Subscription & Billing — when a child's subscription expires or trial ends.
+
+**Actor:** Child learner whose account's subscription has expired (detected: `subscription_status` is `expired` or `trialing_ended` AND profile has `accountOwnerId !== profileId`).
+
+**Goal:** Convert trial/expired children to paid subscriptions through parent notification, not direct payment. Maintain engagement and preserve learning motivation.
+
+**Screen: ChildPaywall (variant of SubscriptionScreen)**
+
+```
+┌─────────────────────────────────┐
+│  ← Back                        │
+│                                 │
+│  Nice work so far!              │
+│                                 │
+│  You learned 4 topics and       │
+│  earned 120 XP — keep going!    │
+│                                 │
+│  Your free trial has ended.     │
+│  Ask your parent to continue    │
+│  your learning journey.         │
+│                                 │
+│  ┌───────────────────────┐      │
+│  │  Notify My Parent  →  │      │
+│  └───────────────────────┘      │
+│                                 │
+│  While you wait, you can        │
+│  still browse your Learning     │
+│  Book and see your progress.    │
+│                                 │
+│  ┌───────────────────────┐      │
+│  │  Browse Learning Book  │      │
+│  └───────────────────────┘      │
+│                                 │
+└─────────────────────────────────┘
+```
+
+**Behavior:**
+
+| State | Behavior |
+|-------|----------|
+| "Notify My Parent" tap | Sends push notification + email to account owner (parent). Rate limited: 1 notification per 24 hours per child profile. |
+| Already notified (within 24h) | CTA changes to "Parent notified ✓" (disabled). Show time until re-send: "You can remind them again in X hours." |
+| Notification success | Toast: "We let your parent know!" |
+| While waiting | Read-only access to Learning Book, progress/achievements. Sessions and write operations blocked. |
+| "Browse Learning Book" tap | Navigate to `/(learner)/book`. |
+| Parent subscribes | Paywall disappears on next API call. TanStack Query invalidation refreshes subscription status. |
+
+**Parent Notification Content:**
+
+- **Push notification:** "[Child] wants to keep learning! They've mastered 4 topics and earned 120 XP. Subscribe to continue their journey."
+- **Email template:** Child stats summary (topics learned, XP earned, streak, retention signals) + "Subscribe Now" CTA → Stripe Checkout link. Same Resend email infrastructure as consent emails.
+
+**Failure States:**
+
+1. **Parent push token not registered:** Fall back to email only. Email always sent regardless of push availability.
+2. **Rate limit hit:** Disable button, show countdown. Never allow spam.
+3. **No parent email on file:** Show "Ask your parent to open the app and subscribe" (in-person prompt).
+
+**Design Guardrails:**
+- **No pricing display for children.** No tier labels, no dollar amounts, no payment forms.
+- **Coaching voice throughout.** Encouraging, not commercial. The tone is "you've done great, here's how to keep going" not "your trial ended, pay up."
+- **No dark patterns.** No urgency countdowns, no "your progress will be lost" threats. The child's Learning Book data persists regardless.
+
+**Implementation Notes:**
+- Location: `apps/mobile/src/app/(learner)/subscription.tsx` — add child detection at top of component. If `isChild`, render `ChildPaywall` variant instead of standard `SubscriptionScreen`.
+- Child detection: `activeProfile.accountOwnerId !== activeProfile.id` (child profiles have a parent account owner).
+- Notification endpoint: New `POST /v1/notifications/parent-subscribe` (or extend existing notification service).
+- Rate limiting: Check `notification_preferences` or a new `parent_notifications` table for last sent timestamp.
+
+**FRs:** Extension of FR96-FR107 (subscription management — child-appropriate variant).
+
+---
+
+### GDPR Consent Revocation
+
+**Context:** Journey 1 (Onboarding) — consent management, parent-initiated.
+
+**Actor:** Parent who previously approved GDPR/COPPA consent for their child.
+
+**Goal:** Allow parent to withdraw consent, triggering a graceful data deletion process with a safety window for reversal.
+
+**Entry Point:** Parent dashboard → child management area → "[Child]'s Account" → "Withdraw Consent"
+
+**Flow:**
+
+1. **Parent taps "Withdraw Consent"**
+   - Confirmation dialog:
+     ```
+     ┌────────────────────────────────┐
+     │  Withdraw consent for [Child]? │
+     │                                │
+     │  [Child]'s account and all     │
+     │  learning data will be deleted │
+     │  after a 7-day grace period.   │
+     │                                │
+     │  You can reverse this within   │
+     │  7 days.                       │
+     │                                │
+     │  [Cancel]    [Withdraw]        │
+     └────────────────────────────────┘
+     ```
+
+2. **After confirmation: `PUT /v1/consent/:childProfileId/revoke`**
+   - Sets `consentStates.status = 'WITHDRAWN'`
+   - Records `revokedAt` timestamp
+   - Dispatches Inngest event: `app/consent.revoked`
+
+3. **Grace period (7 days):**
+   - Child sees in-app message: "Your parent has withdrawn consent. Your account will be deleted on [date]."
+   - Child's access is fully blocked (like ConsentPendingGate but with different messaging).
+   - Parent sees "[Child]'s account — deletion pending (X days remaining)" with "Cancel Deletion" button.
+
+4. **Parent reversal (within 7 days):**
+   - "Cancel Deletion" → `PUT /v1/consent/:childProfileId/restore`
+   - Sets `consentStates.status = 'CONSENTED'`, clears `revokedAt`
+   - Cancels Inngest scheduled deletion
+   - Child regains full access immediately
+
+5. **After 7 days: Inngest function executes cascade delete**
+   - Same pattern as existing `account-deletion` Inngest function
+   - All child data deleted: profile, sessions, subjects, retention cards, summaries, XP, etc.
+   - Audit log entry created before deletion
+   - Parent receives confirmation email: "[Child]'s data has been permanently deleted."
+
+**Audit Trail:**
+
+| Event | Logged |
+|-------|--------|
+| Consent initially granted | `consentStates` row, timestamp |
+| Consent revoked | `consentStates.status = 'WITHDRAWN'`, `revokedAt` |
+| Revocation reversed | `consentStates.status = 'CONSENTED'`, `revokedAt` cleared |
+| Deletion executed | Separate audit log (or Inngest event history) |
+
+**Failure States:**
+
+1. **Parent revokes but child is mid-session:** Session ends gracefully. Child sees blocked screen on next navigation.
+2. **7-day Inngest function fails:** Retry with exponential backoff (Inngest default). If still failing after 3 retries, alert ops. Data must be deleted — GDPR compliance.
+3. **Parent tries to restore after 7 days:** Error: "Deletion is complete and cannot be reversed. You can create a new account for [Child]."
+
+**Child-Side Blocked Screen:**
+
+```
+┌─────────────────────────────────┐
+│                                 │
+│     Account deletion pending    │
+│                                 │
+│     Your parent has withdrawn   │
+│     consent for your account.   │
+│                                 │
+│     Your data will be deleted   │
+│     on [date].                  │
+│                                 │
+│     If you think this is a      │
+│     mistake, ask your parent    │
+│     to cancel the deletion.     │
+│                                 │
+│   ┌───────────────────────┐     │
+│   │     Sign out           │     │
+│   └───────────────────────┘     │
+│                                 │
+└─────────────────────────────────┘
+```
+
+**Implementation Notes:**
+- API: New routes in `apps/api/src/routes/consent.ts` — `PUT /v1/consent/:childProfileId/revoke` and `PUT /v1/consent/:childProfileId/restore`.
+- Service: New functions in `apps/api/src/services/consent.ts` — `revokeConsent()` and `restoreConsent()`.
+- Inngest: Reuse `account-deletion` pattern — schedule deletion 7 days out, cancellable via Inngest function cancellation.
+- Mobile: Extend `ConsentPendingGate` to detect `WITHDRAWN` status and show deletion-specific messaging.
+- Parent dashboard: Add "Withdraw Consent" button to child management area.
+
+**FRs:** Extension of FR11 (account/data deletion — parent-initiated for child), FR7-FR10 (consent lifecycle).
+
+---
+
+### Preview Mode on Pending-Consent Screen
+
+**Context:** Journey 1 (Onboarding) — while child waits for parental consent.
+
+**Actor:** Child (11-15) who completed registration but is blocked by `ConsentPendingGate`.
+
+**Goal:** Maintain engagement during the consent waiting period by offering a read-only preview of the app, reducing the risk of abandonment before parent approves.
+
+**Current State:** `ConsentPendingGate` shows a full-block screen with "Waiting for approval" message, "Check again" button, "Resend email" button, and sign-out.
+
+**Proposed Enhancement:** Add a "Preview while you wait" section below the existing buttons.
+
+**Screen: ConsentPendingGate (Enhanced)**
+
+```
+┌─────────────────────────────────┐
+│                                 │
+│     Waiting for approval        │
+│                                 │
+│     We sent an email to         │
+│     parent@example.com.         │
+│     Once they approve, you'll   │
+│     have full access.           │
+│                                 │
+│   ┌───────────────────────┐     │
+│   │     Check again        │     │
+│   └───────────────────────┘     │
+│   ┌───────────────────────┐     │
+│   │     Resend email       │     │
+│   └───────────────────────┘     │
+│                                 │
+│   ─── While you wait ──────    │
+│                                 │
+│   Here's a preview of what      │
+│   you'll learn:                 │
+│                                 │
+│   ┌───────────────────────┐     │
+│   │ 📚 Browse subjects     │     │
+│   │    See what you can    │     │
+│   │    learn               │     │
+│   └───────────────────────┘     │
+│   ┌───────────────────────┐     │
+│   │ 🎯 Sample coaching     │     │
+│   │    See how your coach  │     │
+│   │    works               │     │
+│   └───────────────────────┘     │
+│                                 │
+│   [Switch profile] [Sign out]   │
+│                                 │
+└─────────────────────────────────┘
+```
+
+**Preview Content:**
+
+| Feature | Available in Preview | Notes |
+|---------|---------------------|-------|
+| Curriculum browser | ✅ Read-only | Browse available subjects and their topic lists. No subject creation. |
+| Sample coaching card | ✅ Static | Pre-built example coaching card showing what daily experience looks like. |
+| Learning path overview | ✅ Static | Example learning path with mock topics showing how progress works. |
+| Start a session | ❌ Blocked | "You'll be able to start learning once your parent approves." |
+| Create a subject | ❌ Blocked | Subject creation requires full access. |
+| Camera/homework | ❌ Blocked | Requires active session capability. |
+| Settings | ❌ Blocked | No write operations during preview. |
+
+**Behavior:**
+
+| State | Behavior |
+|-------|----------|
+| "Browse subjects" tap | Open a read-only curriculum browser modal/sheet showing available subject categories (Math, Science, Languages, etc.) with sample topic lists. |
+| "Sample coaching" tap | Show a static coaching card example with explanatory callouts: "This is your daily opening — your coach will know what you need." |
+| Subject created during onboarding (pre-consent) | If a subject exists on the profile, show it in the preview with its curriculum. |
+| Consent approved while in preview | Query invalidation detects status change. `ConsentPendingGate` unmounts, normal layout renders. If `PostApprovalLanding` conditions met, show that first. |
+
+**Failure States:**
+
+1. **Preview data fails to load:** Preview section simply doesn't render. Core consent gate still works. Preview is progressive enhancement.
+2. **Child tries to navigate past preview:** All preview screens are modal/sheet — no tab navigation, no route changes. Dismissing returns to consent gate.
+
+**Implementation Notes:**
+- Location: `apps/mobile/src/app/(learner)/_layout.tsx` — enhance existing `ConsentPendingGate` component.
+- Preview content is static/hardcoded — no API calls needed for curriculum browser preview. This keeps it fast and independent of auth state.
+- Sample coaching card: reuse `CoachingCard` component with hardcoded props (headline, subtext, actions that show "Available after approval" toast).
+- The "Browse subjects" feature can use a simple `ScrollView` with hardcoded subject categories, not the real API.
+- Keep the existing gate behavior (Check again, Resend, Switch profile, Sign out) — preview is additive, not a replacement.
+
+**FRs:** UX enhancement for FR7/FR8 waiting period (consent pending experience).

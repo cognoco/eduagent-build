@@ -87,7 +87,13 @@ export const sessionCompleted = inngest.createFunction(
           const db = getStepDatabase();
           const quality = event.data.qualityRating ?? 3;
           for (const tid of retentionTopicIds) {
-            await updateRetentionFromSession(db, profileId, tid, quality);
+            await updateRetentionFromSession(
+              db,
+              profileId,
+              tid,
+              quality,
+              timestamp
+            );
           }
         });
       })

@@ -1,4 +1,9 @@
-import { routeAndCall, routeAndStream, registerProvider } from './router';
+import {
+  routeAndCall,
+  routeAndStream,
+  registerProvider,
+  getRegisteredProviders,
+} from './router';
 import { createMockProvider } from './providers/mock';
 
 // Register mock as 'gemini' so getModelConfig routing works
@@ -59,6 +64,14 @@ describe('LLM Router', () => {
       );
 
       expect(result.response).toContain('Tell me about TypeScript');
+    });
+  });
+
+  describe('getRegisteredProviders', () => {
+    it('returns array containing registered provider ids', () => {
+      const providers = getRegisteredProviders();
+      expect(providers).toContain('gemini');
+      expect(Array.isArray(providers)).toBe(true);
     });
   });
 

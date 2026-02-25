@@ -131,10 +131,10 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 ## Current Status
 
 **Complete — all routes production-ready:**
-- Epics 0-5: full API layer (1,300 API tests + 331 mobile tests + 3 integration test suites, all passing)
-- All 20 route groups wired to real services with DB persistence
+- Epics 0-5: full API layer (1,302 API tests + 315 mobile tests + 8 integration test suites, all passing)
+- All 21 route groups wired to real services with DB persistence
 - Mobile: 20+ screens (41 test suites), all using real API calls via TanStack Query + Hono RPC
-- Background jobs: 8 Inngest functions (session-completed chain, trial-expiry, consent-reminders, account-deletion, review-reminder, payment-retry, quota-reset, subject-auto-archive)
+- Background jobs: 9 Inngest functions (session-completed chain, trial-expiry, consent-reminders, account-deletion, review-reminder, payment-retry, quota-reset, subject-auto-archive)
 - Auth: Clerk (SSO + email/password), PasswordInput with show/hide + requirements
 - Billing: Stripe integration (checkout, portal, webhooks, KV-cached status, quota metering)
 - Email: Resend integration (consent emails, reminders)
@@ -156,9 +156,15 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 
 **Not yet integrated:** OCR provider (server-side fallback; ML Kit primary on device).
 
-**Remaining feature gaps (FR-level):**
-- FR94: Learning mode toggle wired in mobile UI (API ready, DB ready)
-- Mobile push token: `useRegisterPushToken()` hook not implemented; tokens not registered on app open
+**UX gaps (from 2024 persona walkthroughs, not yet in canonical docs):**
+- Post-approval child landing screen — what child sees after parent grants GDPR consent
+- Parent account-owner landing — what parent sees after clicking consent email link in browser
+- Child-friendly paywall — age-appropriate "Ask Parent to Subscribe" instead of standard Stripe paywall
+- GDPR consent revocation UX flow
+- Preview mode button on pending-consent screen
+
+**Deferred to Phase 2:**
+- Profile switch PIN/biometric authentication — deferred per UX spec Party Mode revision (line 1631). **Security note:** `profiles.tsx` is reachable via More tab — a child can switch to a parent profile with zero protection. Data isolation is enforced by `createScopedRepository(profileId)` (verified by `profile-isolation.test.ts`), but there is no authentication gate on the profile switch itself. Phase 2 should add PIN/biometric before profile switch completes.
 
 **Pre-launch configuration (not code):**
 - [ ] Clerk: configure custom email domain (SPF/DKIM/DMARC) so verification/consent emails don't land in spam

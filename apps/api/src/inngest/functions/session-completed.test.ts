@@ -197,14 +197,15 @@ describe('sessionCompleted', () => {
   });
 
   describe('update-retention step', () => {
-    it('calls updateRetentionFromSession with correct args', async () => {
+    it('calls updateRetentionFromSession with correct args including timestamp', async () => {
       await executeSteps(createEventData({ qualityRating: 4 }));
 
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
         expect.anything(), // db
         'profile-001',
         'topic-001',
-        4
+        4,
+        '2026-02-17T10:00:00.000Z' // timestamp from event data
       );
     });
 
@@ -227,7 +228,8 @@ describe('sessionCompleted', () => {
         expect.anything(),
         'profile-001',
         'topic-001',
-        3
+        3,
+        '2026-02-17T10:00:00.000Z'
       );
     });
 
@@ -244,19 +246,22 @@ describe('sessionCompleted', () => {
         expect.anything(),
         'profile-001',
         'topic-a',
-        4
+        4,
+        '2026-02-17T10:00:00.000Z'
       );
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
         expect.anything(),
         'profile-001',
         'topic-b',
-        4
+        4,
+        '2026-02-17T10:00:00.000Z'
       );
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
         expect.anything(),
         'profile-001',
         'topic-c',
-        4
+        4,
+        '2026-02-17T10:00:00.000Z'
       );
     });
 
@@ -274,6 +279,7 @@ describe('sessionCompleted', () => {
         expect.anything(),
         'profile-001',
         'topic-001',
+        expect.anything(),
         expect.anything()
       );
     });

@@ -10,6 +10,9 @@ jest.mock('../services/profile', () => ({
         accountId: 'test-account-id',
         displayName: 'Test',
         personaType: 'LEARNER',
+        birthDate: '2014-06-15',
+        location: 'EU',
+        consentStatus: 'CONSENTED',
       });
     }
     return Promise.resolve(null);
@@ -28,12 +31,13 @@ describe('profileScopeMiddleware', () => {
     app.use('*', profileScopeMiddleware);
     app.get('/test', (c) => {
       const profileId = c.get('profileId');
-      return c.json({ profileId: profileId ?? null });
+      const profileMeta = c.get('profileMeta' as never) ?? null;
+      return c.json({ profileId: profileId ?? null, profileMeta });
     });
     return app;
   }
 
-  it('sets profileId when X-Profile-Id header is valid', async () => {
+  it('sets profileId and profileMeta when X-Profile-Id header is valid', async () => {
     const app = createApp();
     const res = await app.request('/test', {
       headers: { 'X-Profile-Id': 'valid-profile-id' },
@@ -42,6 +46,11 @@ describe('profileScopeMiddleware', () => {
 
     expect(res.status).toBe(200);
     expect(body.profileId).toBe('valid-profile-id');
+    expect(body.profileMeta).toEqual({
+      birthDate: '2014-06-15',
+      location: 'EU',
+      consentStatus: 'CONSENTED',
+    });
   });
 
   it('skips when X-Profile-Id header is absent', async () => {

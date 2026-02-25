@@ -40,7 +40,8 @@
         {
           "cameraPermission": "EduAgent needs camera access to photograph your homework."
         }
-      ]
+      ],
+      "expo-notifications"
     ],
     "extra": {
       "eas": {

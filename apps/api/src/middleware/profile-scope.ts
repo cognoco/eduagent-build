@@ -9,8 +9,24 @@ import { getProfile } from '../services/profile';
 import type { Database } from '@eduagent/database';
 import { forbidden } from '../errors';
 
+export interface ProfileMeta {
+  birthDate: string | null;
+  location: 'EU' | 'US' | 'OTHER' | null;
+  consentStatus:
+    | 'PENDING'
+    | 'PARENTAL_CONSENT_REQUESTED'
+    | 'CONSENTED'
+    | 'WITHDRAWN'
+    | null;
+}
+
 export type ProfileScopeEnv = {
-  Variables: { db: Database; account: Account; profileId: string };
+  Variables: {
+    db: Database;
+    account: Account;
+    profileId: string;
+    profileMeta: ProfileMeta;
+  };
 };
 
 export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
@@ -32,6 +48,11 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
       return forbidden(c, 'Profile does not belong to this account');
     }
     c.set('profileId', profile.id);
+    c.set('profileMeta', {
+      birthDate: profile.birthDate,
+      location: profile.location,
+      consentStatus: profile.consentStatus,
+    });
     await next();
     return;
   }

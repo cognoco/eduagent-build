@@ -9,6 +9,7 @@ const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
   avatarUrl: null,
   birthDate: null,
   personaType: 'LEARNER',
+  location: null,
   isOwner: true,
   consentStatus: null,
   createdAt: '2025-01-01T00:00:00Z',

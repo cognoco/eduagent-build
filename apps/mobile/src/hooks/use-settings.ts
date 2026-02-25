@@ -127,3 +127,29 @@ export function useRegisterPushToken(): UseMutationResult<
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// Parent Subscribe Notification (child-friendly paywall)
+// ---------------------------------------------------------------------------
+
+interface ParentSubscribeResult {
+  sent: boolean;
+  rateLimited: boolean;
+  reason?: string;
+}
+
+export function useNotifyParentSubscribe(): UseMutationResult<
+  ParentSubscribeResult,
+  Error,
+  void
+> {
+  const client = useApiClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const res = await client.settings['notify-parent-subscribe'].$post();
+      const data = await res.json();
+      return data as ParentSubscribeResult;
+    },
+  });
+}

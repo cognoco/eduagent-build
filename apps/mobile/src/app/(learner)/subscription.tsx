@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   View,
   Text,
@@ -8,10 +9,12 @@ import {
   ActivityIndicator,
   Linking,
 } from 'react-native';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '../../lib/theme';
+import { useProfile } from '../../lib/profile';
 import { UsageMeter } from '../../components/common';
 import {
   useSubscription,
@@ -23,6 +26,8 @@ import {
   useJoinByokWaitlist,
   type SubscriptionTier,
 } from '../../hooks/use-subscription';
+import { useNotifyParentSubscribe } from '../../hooks/use-settings';
+import { useXpSummary } from '../../hooks/use-streaks';
 
 const TIER_LABELS: Record<SubscriptionTier, string> = {
   free: 'Free',
@@ -88,11 +93,204 @@ function PlanOption({
   );
 }
 
+const NOTIFY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function getNotifyStorageKey(profileId: string): string {
+  return `child-paywall-notified-at:${profileId}`;
+}
+
+function computeHoursRemaining(notifiedAtMs: number): number {
+  const elapsed = Date.now() - notifiedAtMs;
+  const remaining = NOTIFY_COOLDOWN_MS - elapsed;
+  return remaining > 0 ? Math.ceil(remaining / (60 * 60 * 1000)) : 0;
+}
+
+function ChildPaywall(): React.ReactElement {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { activeProfile } = useProfile();
+  const notifyParent = useNotifyParentSubscribe();
+  const { data: xpSummary } = useXpSummary();
+
+  const [notifiedAt, setNotifiedAt] = useState<number | null>(null);
+  const [hoursRemaining, setHoursRemaining] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const profileId = activeProfile?.id ?? '';
+
+  // Restore persisted notified timestamp on mount
+  useEffect(() => {
+    if (!profileId) return;
+    void SecureStore.getItemAsync(getNotifyStorageKey(profileId)).then(
+      (value) => {
+        if (!value) return;
+        const ts = Number(value);
+        if (Number.isNaN(ts)) return;
+        const hours = computeHoursRemaining(ts);
+        if (hours > 0) {
+          setNotifiedAt(ts);
+          setHoursRemaining(hours);
+        }
+      }
+    );
+  }, [profileId]);
+
+  // Update countdown every minute while rate-limited
+  useEffect(() => {
+    if (notifiedAt === null) return;
+    const update = () => {
+      const hours = computeHoursRemaining(notifiedAt);
+      setHoursRemaining(hours);
+      if (hours <= 0) {
+        setNotifiedAt(null);
+        if (timerRef.current) clearInterval(timerRef.current);
+      }
+    };
+    update();
+    timerRef.current = setInterval(update, 60_000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [notifiedAt]);
+
+  const isNotified = notifiedAt !== null && hoursRemaining > 0;
+
+  const handleNotify = useCallback(async () => {
+    try {
+      const result = await notifyParent.mutateAsync();
+      if (result.rateLimited) {
+        // Server says rate-limited — persist the current timestamp as fallback
+        const now = Date.now();
+        setNotifiedAt(now);
+        if (profileId) {
+          void SecureStore.setItemAsync(
+            getNotifyStorageKey(profileId),
+            String(now)
+          );
+        }
+      } else if (result.sent) {
+        const now = Date.now();
+        setNotifiedAt(now);
+        if (profileId) {
+          void SecureStore.setItemAsync(
+            getNotifyStorageKey(profileId),
+            String(now)
+          );
+        }
+        Alert.alert('Sent!', 'We let your parent know!');
+      } else {
+        Alert.alert(
+          'Ask your parent',
+          'Ask your parent to open the app and subscribe.'
+        );
+      }
+    } catch {
+      Alert.alert(
+        'Ask your parent',
+        'Ask your parent to open the app and subscribe.'
+      );
+    }
+  }, [notifyParent, profileId]);
+
+  const topicsLearned = xpSummary?.topicsCompleted ?? 0;
+  const totalXp = xpSummary?.totalXp ?? 0;
+  const hasStats = topicsLearned > 0 || totalXp > 0;
+
+  return (
+    <View
+      className="flex-1 bg-background"
+      style={{ paddingTop: insets.top }}
+      testID="child-paywall"
+    >
+      <View className="px-5 pt-4 pb-2 flex-row items-center">
+        <Pressable
+          onPress={() => router.back()}
+          className="mr-3 min-w-[44px] min-h-[44px] justify-center items-center"
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
+          <Text className="text-primary text-body font-semibold">Back</Text>
+        </Pressable>
+      </View>
+
+      <View className="flex-1 px-5 items-center justify-center">
+        <Text className="text-h1 font-bold text-text-primary mb-4 text-center">
+          Nice work so far!
+        </Text>
+        <Text className="text-body text-text-secondary mb-2 text-center">
+          {hasStats
+            ? `You learned ${topicsLearned} topic${
+                topicsLearned !== 1 ? 's' : ''
+              } and earned ${totalXp} XP \u2014 keep going!`
+            : "You've been making great progress \u2014 keep going!"}
+        </Text>
+        <Text className="text-body text-text-secondary mb-8 text-center">
+          Your free trial has ended. Ask your parent to continue your learning
+          journey.
+        </Text>
+
+        <Pressable
+          onPress={handleNotify}
+          disabled={notifyParent.isPending || isNotified}
+          className={`rounded-button py-3.5 px-8 items-center mb-3 w-full ${
+            isNotified ? 'bg-muted' : 'bg-primary'
+          }`}
+          testID="notify-parent-button"
+          accessibilityRole="button"
+          accessibilityLabel={
+            isNotified ? 'Parent already notified' : 'Notify my parent'
+          }
+        >
+          {notifyParent.isPending ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text
+              className={`text-body font-semibold ${
+                isNotified ? 'text-text-secondary' : 'text-text-inverse'
+              }`}
+            >
+              {isNotified ? 'Parent notified' : 'Notify My Parent'}
+            </Text>
+          )}
+        </Pressable>
+
+        {isNotified && (
+          <Text
+            className="text-body-sm text-text-secondary text-center mb-3"
+            testID="notify-countdown"
+          >
+            You can remind them again in{' '}
+            {hoursRemaining === 1 ? '1 hour' : `${hoursRemaining} hours`}.
+          </Text>
+        )}
+
+        <Text className="text-body-sm text-text-secondary text-center mb-6">
+          While you wait, you can still browse your Learning Book and see your
+          progress.
+        </Text>
+
+        <Pressable
+          onPress={() => router.push('/(learner)/book')}
+          className="bg-surface rounded-button py-3.5 px-8 items-center w-full"
+          testID="browse-book-button"
+          accessibilityRole="button"
+          accessibilityLabel="Browse Learning Book"
+        >
+          <Text className="text-body font-semibold text-primary">
+            Browse Learning Book
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
   const [byokEmail, setByokEmail] = useState('');
+  const { activeProfile } = useProfile();
 
   const { data: subscription, isLoading: subLoading } = useSubscription();
   const { data: usage, isLoading: usageLoading } = useUsage();
@@ -103,11 +301,6 @@ export default function SubscriptionScreen() {
   const byokWaitlist = useJoinByokWaitlist();
 
   const isLoading = subLoading || usageLoading;
-  const tier = subscription?.tier ?? 'free';
-  const status = subscription?.status ?? 'trial';
-  const isTrial = status === 'trial';
-  const isPaidTier = tier !== 'free';
-  const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
 
   const handleUpgrade = useCallback(
     async (selectedTier: 'plus' | 'family' | 'pro') => {
@@ -174,6 +367,20 @@ export default function SubscriptionScreen() {
       Alert.alert('Error', 'Could not join waitlist. Try again.');
     }
   }, [byokWaitlist, byokEmail]);
+
+  // Child profiles see child-friendly paywall (no pricing, no payment forms)
+  const isChild = activeProfile ? !activeProfile.isOwner : false;
+  const trialOrExpired =
+    subscription?.status === 'expired' || (!subscription && !subLoading);
+  if (isChild && trialOrExpired) {
+    return <ChildPaywall />;
+  }
+
+  const tier = subscription?.tier ?? 'free';
+  const status = subscription?.status ?? 'trial';
+  const isTrial = status === 'trial';
+  const isPaidTier = tier !== 'free';
+  const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>

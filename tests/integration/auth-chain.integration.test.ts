@@ -98,6 +98,7 @@ jest.mock('../../apps/api/src/services/llm', () => ({
   routeAndStream: jest.fn(),
   registerProvider: jest.fn(),
   createMockProvider: jest.fn(),
+  getRegisteredProviders: jest.fn().mockReturnValue([]),
 }));
 
 import { app } from '../../apps/api/src/index';

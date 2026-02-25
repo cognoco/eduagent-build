@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@clerk/clerk-expo';
 import { useTheme, useThemeColors } from '../../lib/theme';
+import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
 
 const iconMap: Record<
   string,
@@ -34,6 +35,9 @@ export default function ParentLayout() {
   const { isLoaded, isSignedIn } = useAuth();
   const { persona } = useTheme();
   const colors = useThemeColors();
+
+  // Register push token on app launch (runs once, guarded internally)
+  usePushTokenRegistration();
 
   if (!isLoaded) return null;
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;

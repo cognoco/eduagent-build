@@ -15,6 +15,7 @@ export const personaTypeEnum = pgEnum('persona_type', [
   'LEARNER',
   'PARENT',
 ]);
+export const locationTypeEnum = pgEnum('location_type', ['EU', 'US', 'OTHER']);
 export const consentTypeEnum = pgEnum('consent_type', ['GDPR', 'COPPA']);
 export const consentStatusEnum = pgEnum('consent_status', [
   'PENDING',
@@ -57,6 +58,7 @@ export const profiles = pgTable(
     avatarUrl: text('avatar_url'),
     birthDate: timestamp('birth_date', { mode: 'date' }),
     personaType: personaTypeEnum('persona_type').notNull().default('LEARNER'),
+    location: locationTypeEnum('location'),
     isOwner: boolean('is_owner').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()

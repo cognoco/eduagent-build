@@ -28,6 +28,10 @@ export function registerProvider(provider: LLMProvider): void {
   providers.set(provider.id, provider);
 }
 
+export function getRegisteredProviders(): string[] {
+  return [...providers.keys()];
+}
+
 // ---------------------------------------------------------------------------
 // Core orchestrator — all LLM calls go through here (ARCH-8)
 // ---------------------------------------------------------------------------

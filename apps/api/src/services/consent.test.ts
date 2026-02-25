@@ -15,6 +15,7 @@ jest.mock('./notifications', () => ({
 import type { Database } from '@eduagent/database';
 import {
   checkConsentRequired,
+  createPendingConsentState,
   requestConsent,
   processConsentResponse,
   getConsentStatus,
@@ -279,5 +280,41 @@ describe('getConsentStatus', () => {
     );
 
     expect(result).toBe('CONSENTED');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createPendingConsentState
+// ---------------------------------------------------------------------------
+
+describe('createPendingConsentState', () => {
+  it('creates a PENDING consent state row', async () => {
+    const row = mockConsentRow({ status: 'PENDING' });
+    const db = createMockDb({ insertReturning: [row] });
+
+    const result = await createPendingConsentState(
+      db,
+      '550e8400-e29b-41d4-a716-446655440000',
+      'GDPR'
+    );
+
+    expect(result.status).toBe('PENDING');
+    expect(result.profileId).toBe('550e8400-e29b-41d4-a716-446655440000');
+    expect(result.consentType).toBe('GDPR');
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('works with COPPA consent type', async () => {
+    const row = mockConsentRow({ status: 'PENDING', consentType: 'COPPA' });
+    const db = createMockDb({ insertReturning: [row] });
+
+    const result = await createPendingConsentState(
+      db,
+      '550e8400-e29b-41d4-a716-446655440000',
+      'COPPA'
+    );
+
+    expect(result.status).toBe('PENDING');
+    expect(result.consentType).toBe('COPPA');
   });
 });

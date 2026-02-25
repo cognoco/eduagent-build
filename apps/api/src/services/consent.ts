@@ -3,8 +3,13 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, desc, sql } from 'drizzle-orm';
-import { consentStates, profiles, type Database } from '@eduagent/database';
+import { eq, desc, and, sql } from 'drizzle-orm';
+import {
+  consentStates,
+  familyLinks,
+  profiles,
+  type Database,
+} from '@eduagent/database';
 import type {
   ConsentType,
   ConsentStatus,
@@ -83,6 +88,37 @@ export function checkConsentRequired(
   if (location === 'US' && age < 13)
     return { required: true, consentType: 'COPPA' };
   return { required: false, consentType: null };
+}
+
+/**
+ * Creates a PENDING consent state row without sending email.
+ *
+ * Used during profile creation to record that consent is required.
+ * The actual email is sent later via `requestConsent()` when the parent
+ * email is provided by the client.
+ */
+export async function createPendingConsentState(
+  db: Database,
+  profileId: string,
+  consentType: ConsentType
+): Promise<ConsentState> {
+  const [row] = await db
+    .insert(consentStates)
+    .values({
+      profileId,
+      consentType,
+      status: 'PENDING',
+    })
+    .onConflictDoUpdate({
+      target: [consentStates.profileId, consentStates.consentType],
+      set: {
+        status: 'PENDING',
+        updatedAt: sql`now()`,
+      },
+    })
+    .returning();
+
+  return mapConsentRow(row);
 }
 
 /**
@@ -205,6 +241,27 @@ export async function getConsentStatus(
 }
 
 /**
+ * Looks up a child's display name from a consent token.
+ * Used by the web consent page to personalise the approval screen.
+ * Returns null if the token is invalid or the profile doesn't exist.
+ */
+export async function getChildNameByToken(
+  db: Database,
+  token: string
+): Promise<string | null> {
+  const consent = await db.query.consentStates.findFirst({
+    where: eq(consentStates.consentToken, token),
+  });
+  if (!consent) return null;
+
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, consent.profileId),
+    columns: { displayName: true },
+  });
+  return profile?.displayName ?? null;
+}
+
+/**
  * Returns the current consent state for a profile including parentEmail.
  *
  * Used by the GET /v1/consent/my-status endpoint so the mobile app can
@@ -228,4 +285,133 @@ export async function getProfileConsentState(
     parentEmail: row.parentEmail ?? null,
     consentType: row.consentType,
   };
+}
+
+/**
+ * Returns the consent state for a child profile, verifiable by the parent.
+ *
+ * Used by `GET /v1/consent/:childProfileId/status` so the parent dashboard
+ * can show revocation state and grace-period countdown.
+ */
+export async function getChildConsentForParent(
+  db: Database,
+  childProfileId: string,
+  parentProfileId: string
+): Promise<ConsentState | null> {
+  // Verify parent-child relationship
+  const link = await db.query.familyLinks.findFirst({
+    where: and(
+      eq(familyLinks.childProfileId, childProfileId),
+      eq(familyLinks.parentProfileId, parentProfileId)
+    ),
+  });
+  if (!link) {
+    throw new Error('Not authorized to view consent for this profile');
+  }
+
+  const row = await db.query.consentStates.findFirst({
+    where: eq(consentStates.profileId, childProfileId),
+    orderBy: desc(consentStates.requestedAt),
+  });
+  if (!row) return null;
+  return mapConsentRow(row);
+}
+
+// ---------------------------------------------------------------------------
+// Consent Revocation (GDPR Art. 7(3))
+// ---------------------------------------------------------------------------
+
+/**
+ * Revokes consent for a child profile. Sets status to WITHDRAWN.
+ * Caller must verify the requesting user is the parent (via familyLinks).
+ *
+ * Returns the updated consent state. The caller should dispatch an Inngest
+ * event to schedule the 7-day grace period deletion.
+ */
+export async function revokeConsent(
+  db: Database,
+  childProfileId: string,
+  parentProfileId: string
+): Promise<ConsentState> {
+  // Verify parent-child relationship
+  const link = await db.query.familyLinks.findFirst({
+    where: and(
+      eq(familyLinks.childProfileId, childProfileId),
+      eq(familyLinks.parentProfileId, parentProfileId)
+    ),
+  });
+  if (!link) {
+    throw new Error('Not authorized to revoke consent for this profile');
+  }
+
+  // Find the consent state
+  const existing = await db.query.consentStates.findFirst({
+    where: eq(consentStates.profileId, childProfileId),
+    orderBy: desc(consentStates.requestedAt),
+  });
+  if (!existing) {
+    throw new Error('No consent record found for this profile');
+  }
+  if (existing.status === 'WITHDRAWN') {
+    return mapConsentRow(existing);
+  }
+
+  const now = new Date();
+  const [row] = await db
+    .update(consentStates)
+    .set({
+      status: 'WITHDRAWN',
+      respondedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(consentStates.id, existing.id))
+    .returning();
+
+  return mapConsentRow(row);
+}
+
+/**
+ * Restores consent that was previously revoked (within 7-day grace period).
+ * Sets status back to CONSENTED.
+ */
+export async function restoreConsent(
+  db: Database,
+  childProfileId: string,
+  parentProfileId: string
+): Promise<ConsentState> {
+  // Verify parent-child relationship
+  const link = await db.query.familyLinks.findFirst({
+    where: and(
+      eq(familyLinks.childProfileId, childProfileId),
+      eq(familyLinks.parentProfileId, parentProfileId)
+    ),
+  });
+  if (!link) {
+    throw new Error('Not authorized to restore consent for this profile');
+  }
+
+  // Find the consent state
+  const existing = await db.query.consentStates.findFirst({
+    where: eq(consentStates.profileId, childProfileId),
+    orderBy: desc(consentStates.requestedAt),
+  });
+  if (!existing) {
+    throw new Error('No consent record found for this profile');
+  }
+  if (existing.status !== 'WITHDRAWN') {
+    return mapConsentRow(existing);
+  }
+
+  const now = new Date();
+  const [row] = await db
+    .update(consentStates)
+    .set({
+      status: 'CONSENTED',
+      respondedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(consentStates.id, existing.id))
+    .returning();
+
+  return mapConsentRow(row);
 }

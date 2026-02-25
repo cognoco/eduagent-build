@@ -7,6 +7,9 @@ import {
   requestConsent,
   processConsentResponse,
   getProfileConsentState,
+  getChildConsentForParent,
+  revokeConsent,
+  restoreConsent,
 } from '../services/consent';
 import { notFound } from '../errors';
 import { inngest } from '../inngest/client';
@@ -94,4 +97,109 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       parentEmail: state?.parentEmail ?? null,
       consentType: state?.consentType ?? null,
     });
+  })
+
+  // Get consent status for a child (parent view, includes respondedAt for countdown)
+  .get('/consent/:childProfileId/status', async (c) => {
+    const db = c.get('db');
+    const parentProfileId = c.get('profileId');
+    const childProfileId = c.req.param('childProfileId');
+
+    try {
+      const state = await getChildConsentForParent(
+        db,
+        childProfileId,
+        parentProfileId
+      );
+      if (!state) {
+        return c.json({
+          consentStatus: null,
+          respondedAt: null,
+          consentType: null,
+        });
+      }
+      return c.json({
+        consentStatus: state.status,
+        respondedAt: state.respondedAt,
+        consentType: state.consentType,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Not authorized')) {
+        return c.json(
+          { error: 'Not authorized to view consent for this profile' },
+          403
+        );
+      }
+      throw error;
+    }
+  })
+
+  // Revoke consent for a child (parent-initiated, GDPR Art. 7(3))
+  .put('/consent/:childProfileId/revoke', async (c) => {
+    const db = c.get('db');
+    const parentProfileId = c.get('profileId');
+    const childProfileId = c.req.param('childProfileId');
+
+    try {
+      const state = await revokeConsent(db, childProfileId, parentProfileId);
+
+      // Schedule 7-day grace period deletion via Inngest
+      await inngest.send({
+        name: 'app/consent.revoked',
+        data: {
+          childProfileId,
+          parentProfileId,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      return c.json({
+        message:
+          'Consent revoked. Data will be deleted after 7-day grace period.',
+        consentStatus: state.status,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Not authorized')) {
+        return c.json(
+          { error: 'Not authorized to revoke consent for this profile' },
+          403
+        );
+      }
+      if (
+        error instanceof Error &&
+        error.message.includes('No consent record')
+      ) {
+        return notFound(c, 'No consent record found');
+      }
+      throw error;
+    }
+  })
+
+  // Restore consent (cancel revocation, within 7-day grace period)
+  .put('/consent/:childProfileId/restore', async (c) => {
+    const db = c.get('db');
+    const parentProfileId = c.get('profileId');
+    const childProfileId = c.req.param('childProfileId');
+
+    try {
+      const state = await restoreConsent(db, childProfileId, parentProfileId);
+      return c.json({
+        message: 'Consent restored. Deletion cancelled.',
+        consentStatus: state.status,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Not authorized')) {
+        return c.json(
+          { error: 'Not authorized to restore consent for this profile' },
+          403
+        );
+      }
+      if (
+        error instanceof Error &&
+        error.message.includes('No consent record')
+      ) {
+        return notFound(c, 'No consent record found');
+      }
+      throw error;
+    }
   });

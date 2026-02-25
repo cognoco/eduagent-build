@@ -4,12 +4,19 @@
 // Uses Expo Push API via fetch (CF Workers-compatible, no Node SDK needed).
 // ---------------------------------------------------------------------------
 
+import { eq } from 'drizzle-orm';
 import type { ConsentType } from '@eduagent/schemas';
-import type { Database } from '@eduagent/database';
+import {
+  familyLinks,
+  profiles,
+  consentStates,
+  type Database,
+} from '@eduagent/database';
 import {
   getPushToken,
   getDailyNotificationCount,
   logNotification,
+  getRecentNotificationCount,
 } from './settings';
 
 export interface NotificationPayload {
@@ -24,7 +31,8 @@ export interface NotificationPayload {
     | 'consent_request'
     | 'consent_reminder'
     | 'consent_warning'
-    | 'consent_expired';
+    | 'consent_expired'
+    | 'subscribe_request';
 }
 
 export interface NotificationResult {
@@ -162,7 +170,8 @@ export interface EmailPayload {
     | 'consent_request'
     | 'consent_reminder'
     | 'consent_warning'
-    | 'consent_expired';
+    | 'consent_expired'
+    | 'subscribe_request';
 }
 
 export interface EmailOptions {
@@ -259,4 +268,85 @@ export function formatConsentReminderEmail(
     body: `We're still waiting for your consent for ${childName}'s EduAgent account. You have ${daysRemaining} days remaining to respond before the account is automatically removed.`,
     type: 'consent_reminder',
   };
+}
+
+// ---------------------------------------------------------------------------
+// Parent Subscribe Notification — Child-Friendly Paywall
+// ---------------------------------------------------------------------------
+
+export interface ParentSubscribeResult {
+  sent: boolean;
+  rateLimited: boolean;
+  reason?: string;
+}
+
+/** Rate limit: 1 subscribe notification per 24 hours per child profile */
+const SUBSCRIBE_RATE_LIMIT_HOURS = 24;
+
+/**
+ * Notifies a child's parent to subscribe. Sends push notification + email.
+ * Rate limited to 1 notification per 24 hours per child profile.
+ */
+export async function notifyParentToSubscribe(
+  db: Database,
+  childProfileId: string,
+  emailOptions?: EmailOptions
+): Promise<ParentSubscribeResult> {
+  // 1. Check rate limit — look for recent subscribe_request notifications
+  const recentCount = await getRecentNotificationCount(
+    db,
+    childProfileId,
+    'subscribe_request',
+    SUBSCRIBE_RATE_LIMIT_HOURS
+  );
+  if (recentCount > 0) {
+    return { sent: false, rateLimited: true, reason: 'rate_limited' };
+  }
+
+  // 2. Find parent via familyLinks
+  const link = await db.query.familyLinks.findFirst({
+    where: eq(familyLinks.childProfileId, childProfileId),
+  });
+  if (!link) {
+    return { sent: false, rateLimited: false, reason: 'no_parent_link' };
+  }
+
+  // 3. Get child profile info
+  const childProfile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, childProfileId),
+    columns: { displayName: true },
+  });
+
+  const childName = childProfile?.displayName ?? 'Your child';
+
+  // 4. Send push notification to parent
+  await sendPushNotification(db, {
+    profileId: link.parentProfileId,
+    title: `${childName} wants to keep learning!`,
+    body: `${childName} has been making great progress. Subscribe to continue their learning journey.`,
+    type: 'subscribe_request',
+  });
+
+  // 5. Send email to parent (via consent state parentEmail)
+  const consentState = await db.query.consentStates.findFirst({
+    where: eq(consentStates.profileId, childProfileId),
+  });
+  const parentEmail = consentState?.parentEmail;
+
+  if (parentEmail) {
+    await sendEmail(
+      {
+        to: parentEmail,
+        subject: `${childName} wants to keep learning on EduAgent`,
+        body: `${childName} has been making great progress on EduAgent and wants to continue. Their free trial has ended. Subscribe to keep their learning going: https://app.eduagent.com/subscribe`,
+        type: 'subscribe_request',
+      },
+      emailOptions
+    );
+  }
+
+  // 6. Log notification for rate limiting
+  await logNotification(db, childProfileId, 'subscribe_request');
+
+  return { sent: true, rateLimited: false };
 }

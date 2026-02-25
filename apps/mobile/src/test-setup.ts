@@ -80,6 +80,20 @@ jest.mock('expo-linking', () => ({
   createURL: jest.fn().mockReturnValue('eduagent://sso-callback'),
 }));
 
+jest.mock('expo-notifications', () => ({
+  getPermissionsAsync: jest
+    .fn()
+    .mockResolvedValue({ status: 'granted', expires: 'never', granted: true }),
+  requestPermissionsAsync: jest
+    .fn()
+    .mockResolvedValue({ status: 'granted', expires: 'never', granted: true }),
+  getExpoPushTokenAsync: jest
+    .fn()
+    .mockResolvedValue({ data: 'ExponentPushToken[mock-token]', type: 'expo' }),
+  setNotificationChannelAsync: jest.fn().mockResolvedValue(null),
+  AndroidImportance: { DEFAULT: 3 },
+}));
+
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn().mockResolvedValue(null),
   setItemAsync: jest.fn().mockResolvedValue(undefined),

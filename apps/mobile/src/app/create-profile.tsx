@@ -133,7 +133,7 @@ export default function CreateProfileScreen() {
         displayName: string;
         personaType?: PersonaType;
         birthDate?: string;
-        location?: string;
+        location?: 'EU' | 'US' | 'OTHER';
       } = {
         displayName: trimmedName,
         personaType,
