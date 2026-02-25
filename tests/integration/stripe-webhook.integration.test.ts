@@ -25,32 +25,25 @@ jest.mock('../../apps/api/src/services/stripe', () => ({
 }));
 
 // --- Billing service mock (extended for webhook handlers) ---
+
+import {
+  jwtMock,
+  databaseMock,
+  inngestClientMock,
+  accountMock,
+  billingMock,
+  settingsMock,
+  sessionMock,
+  llmMock,
+} from './mocks';
+
 const mockUpdateSubscriptionFromWebhook = jest.fn();
 const mockActivateSubscriptionFromCheckout = jest.fn();
 const mockGetSubscriptionByAccountId = jest.fn();
 const mockUpdateQuotaPoolLimit = jest.fn();
 
 jest.mock('../../apps/api/src/services/billing', () => ({
-  // Base middleware mocks
-  ensureFreeSubscription: jest.fn().mockResolvedValue({
-    id: '00000000-0000-4000-8000-000000000005',
-    accountId: '00000000-0000-4000-8000-000000000001',
-    tier: 'free',
-    status: 'trial',
-    stripeSubscriptionId: null,
-  }),
-  getQuotaPool: jest.fn().mockResolvedValue({
-    id: '00000000-0000-4000-8000-000000000006',
-    subscriptionId: '00000000-0000-4000-8000-000000000005',
-    monthlyLimit: 50,
-    usedThisMonth: 0,
-  }),
-  decrementQuota: jest.fn().mockResolvedValue({
-    success: true,
-    remainingMonthly: 49,
-    remainingTopUp: 0,
-  }),
-  // Webhook-specific mocks
+  ...billingMock(),
   updateSubscriptionFromWebhook: mockUpdateSubscriptionFromWebhook,
   activateSubscriptionFromCheckout: mockActivateSubscriptionFromCheckout,
   getSubscriptionByAccountId: mockGetSubscriptionByAccountId,
@@ -69,66 +62,17 @@ jest.mock('../../apps/api/src/services/kv', () => ({
 
 // --- Base mocks (middleware chain requires these) ---
 
-jest.mock('../../apps/api/src/middleware/jwt', () => ({
-  decodeJWTHeader: jest.fn(),
-  fetchJWKS: jest.fn(),
-  verifyJWT: jest.fn(),
-}));
-
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn().mockReturnValue({}),
-}));
-
 const mockInngestSend = jest.fn().mockResolvedValue({ ids: [] });
 
-jest.mock('../../apps/api/src/inngest/client', () => {
-  let fnCounter = 0;
-  return {
-    inngest: {
-      send: mockInngestSend,
-      createFunction: jest.fn().mockImplementation((config) => {
-        const id = config?.id ?? `mock-fn-${fnCounter++}`;
-        const fn = jest.fn();
-        (fn as any).getConfig = () => [
-          { id, name: id, triggers: [], steps: {} },
-        ];
-        return fn;
-      }),
-    },
-  };
-});
-
-jest.mock('../../apps/api/src/services/account', () => ({
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: '00000000-0000-4000-8000-000000000001',
-    clerkUserId: 'user_test',
-    email: 'test@test.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
-
-jest.mock('../../apps/api/src/services/settings', () => ({
-  shouldPromptCasualSwitch: jest.fn().mockResolvedValue(false),
-}));
-
-jest.mock('../../apps/api/src/services/session', () => ({
-  startSession: jest.fn(),
-  getSession: jest.fn(),
-  processMessage: jest.fn(),
-  streamMessage: jest.fn(),
-  closeSession: jest.fn(),
-  flagContent: jest.fn(),
-  getSessionSummary: jest.fn(),
-  submitSummary: jest.fn(),
-}));
-
-jest.mock('../../apps/api/src/services/llm', () => ({
-  routeAndCall: jest.fn(),
-  routeAndStream: jest.fn(),
-  registerProvider: jest.fn(),
-  createMockProvider: jest.fn(),
-}));
+jest.mock('../../apps/api/src/middleware/jwt', () => jwtMock());
+jest.mock('@eduagent/database', () => databaseMock());
+jest.mock('../../apps/api/src/inngest/client', () =>
+  inngestClientMock(mockInngestSend)
+);
+jest.mock('../../apps/api/src/services/account', () => accountMock());
+jest.mock('../../apps/api/src/services/settings', () => settingsMock());
+jest.mock('../../apps/api/src/services/session', () => sessionMock());
+jest.mock('../../apps/api/src/services/llm', () => llmMock());
 
 import { app } from '../../apps/api/src/index';
 

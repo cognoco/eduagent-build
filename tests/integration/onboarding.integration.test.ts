@@ -76,17 +76,22 @@ jest.mock('../../apps/api/src/services/llm', () => ({
 }));
 
 // Mock JWT verification so we don't need a real Clerk instance
-jest.mock('../../apps/api/src/middleware/jwt', () => ({
-  decodeJWTHeader: jest.fn().mockReturnValue({ alg: 'RS256', kid: 'test-kid' }),
-  fetchJWKS: jest.fn().mockResolvedValue({
-    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
-  }),
-  verifyJWT: jest.fn().mockResolvedValue({
-    sub: 'user_integration_test',
-    email: 'integration@test.com',
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  }),
-}));
+import {
+  jwtMock,
+  databaseMock,
+  inngestClientMock,
+  accountMock,
+  billingMock,
+  settingsMock,
+  configureValidJWT,
+} from './mocks';
+
+const jwtMocks = jwtMock();
+configureValidJWT(jwtMocks, {
+  sub: 'user_integration_test',
+  email: 'integration@test.com',
+});
+jest.mock('../../apps/api/src/middleware/jwt', () => jwtMocks);
 
 // Test UUIDs — valid format to pass Zod .uuid() validation
 const ACCOUNT_ID = '00000000-0000-4000-8000-000000000001';
@@ -94,76 +99,19 @@ const SUBJECT_ID = '00000000-0000-4000-8000-000000000002';
 const SESSION_ID = '00000000-0000-4000-8000-000000000003';
 const SUMMARY_ID = '00000000-0000-4000-8000-000000000004';
 
-// Mock account service to avoid real Clerk dependency
-jest.mock('../../apps/api/src/services/account', () => ({
-  findOrCreateAccount: jest.fn().mockResolvedValue({
+jest.mock('../../apps/api/src/services/account', () =>
+  accountMock({
     id: ACCOUNT_ID,
     clerkUserId: 'user_integration_test',
     email: 'integration@test.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
+  })
+);
+jest.mock('@eduagent/database', () => databaseMock());
+jest.mock('../../apps/api/src/inngest/client', () => inngestClientMock());
+jest.mock('../../apps/api/src/services/settings', () => settingsMock());
+jest.mock('../../apps/api/src/services/billing', () => billingMock(ACCOUNT_ID));
 
-// Mock database to avoid needing real PostgreSQL for this smoke test
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn().mockReturnValue({}),
-}));
-
-// Mock Inngest client — session close dispatches background events via inngest.send(),
-// and Inngest function modules call inngest.createFunction() at import time.
-// The serve() handler calls fn.getConfig() on each function during setup.
-jest.mock('../../apps/api/src/inngest/client', () => {
-  let fnCounter = 0;
-  return {
-    inngest: {
-      send: jest.fn().mockResolvedValue({ ids: [] }),
-      createFunction: jest.fn().mockImplementation((config) => {
-        const id = config?.id ?? `mock-fn-${fnCounter++}`;
-        const fn = jest.fn();
-        (fn as any).getConfig = () => [
-          {
-            id,
-            name: id,
-            triggers: [],
-            steps: {},
-          },
-        ];
-        return fn;
-      }),
-    },
-  };
-});
-
-// Mock settings service — session close checks for casual switch prompt
-jest.mock('../../apps/api/src/services/settings', () => ({
-  shouldPromptCasualSwitch: jest.fn().mockResolvedValue(false),
-}));
-
-// Mock billing service — used by metering middleware on LLM-consuming routes
-const SUBSCRIPTION_ID = '00000000-0000-4000-8000-000000000005';
-jest.mock('../../apps/api/src/services/billing', () => ({
-  ensureFreeSubscription: jest.fn().mockResolvedValue({
-    id: SUBSCRIPTION_ID,
-    accountId: ACCOUNT_ID,
-    tier: 'free',
-    status: 'trial',
-    stripeSubscriptionId: null,
-  }),
-  getQuotaPool: jest.fn().mockResolvedValue({
-    id: '00000000-0000-4000-8000-000000000006',
-    subscriptionId: SUBSCRIPTION_ID,
-    monthlyLimit: 50,
-    usedThisMonth: 0,
-  }),
-  decrementQuota: jest.fn().mockResolvedValue({
-    success: true,
-    remainingMonthly: 49,
-    remainingTopUp: 0,
-  }),
-}));
-
-// Mock session service for smoke test
+// Mock session service for smoke test — custom return shapes needed
 jest.mock('../../apps/api/src/services/session', () => ({
   startSession: jest.fn().mockResolvedValue({
     id: SESSION_ID,

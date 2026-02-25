@@ -16,15 +16,21 @@
  */
 
 // --- Controllable JWT mock ---
-const mockDecodeJWTHeader = jest.fn();
-const mockFetchJWKS = jest.fn();
-const mockVerifyJWT = jest.fn();
 
-jest.mock('../../apps/api/src/middleware/jwt', () => ({
-  decodeJWTHeader: mockDecodeJWTHeader,
-  fetchJWKS: mockFetchJWKS,
-  verifyJWT: mockVerifyJWT,
-}));
+import {
+  jwtMock,
+  databaseMock,
+  inngestClientMock,
+  accountMock,
+  billingMock,
+  settingsMock,
+  sessionMock,
+  llmMock,
+  configureValidJWT as configureValidJWTHelper,
+} from './mocks';
+
+const jwtMocks = jwtMock();
+jest.mock('../../apps/api/src/middleware/jwt', () => jwtMocks);
 
 // --- Deletion service mock ---
 const mockScheduleDeletion = jest.fn();
@@ -47,83 +53,26 @@ jest.mock('../../apps/api/src/services/export', () => ({
 
 // --- Base mocks (middleware chain requires these) ---
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn().mockReturnValue({}),
-}));
-
+const MOCK_ACCOUNT_ID = '00000000-0000-4000-8000-000000000001';
 const mockInngestSend = jest.fn().mockResolvedValue({ ids: [] });
 
-jest.mock('../../apps/api/src/inngest/client', () => {
-  let fnCounter = 0;
-  return {
-    inngest: {
-      send: mockInngestSend,
-      createFunction: jest.fn().mockImplementation((config) => {
-        const id = config?.id ?? `mock-fn-${fnCounter++}`;
-        const fn = jest.fn();
-        (fn as any).getConfig = () => [
-          { id, name: id, triggers: [], steps: {} },
-        ];
-        return fn;
-      }),
-    },
-  };
-});
-
-const MOCK_ACCOUNT_ID = '00000000-0000-4000-8000-000000000001';
-
-jest.mock('../../apps/api/src/services/account', () => ({
-  findOrCreateAccount: jest.fn().mockResolvedValue({
+jest.mock('@eduagent/database', () => databaseMock());
+jest.mock('../../apps/api/src/inngest/client', () =>
+  inngestClientMock(mockInngestSend)
+);
+jest.mock('../../apps/api/src/services/account', () =>
+  accountMock({
     id: MOCK_ACCOUNT_ID,
     clerkUserId: 'user_deletion_test',
     email: 'deletion-test@test.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
-
-jest.mock('../../apps/api/src/services/billing', () => ({
-  ensureFreeSubscription: jest.fn().mockResolvedValue({
-    id: '00000000-0000-4000-8000-000000000005',
-    accountId: MOCK_ACCOUNT_ID,
-    tier: 'free',
-    status: 'trial',
-    stripeSubscriptionId: null,
-  }),
-  getQuotaPool: jest.fn().mockResolvedValue({
-    id: '00000000-0000-4000-8000-000000000006',
-    subscriptionId: '00000000-0000-4000-8000-000000000005',
-    monthlyLimit: 50,
-    usedThisMonth: 0,
-  }),
-  decrementQuota: jest.fn().mockResolvedValue({
-    success: true,
-    remainingMonthly: 49,
-    remainingTopUp: 0,
-  }),
-}));
-
-jest.mock('../../apps/api/src/services/settings', () => ({
-  shouldPromptCasualSwitch: jest.fn().mockResolvedValue(false),
-}));
-
-jest.mock('../../apps/api/src/services/session', () => ({
-  startSession: jest.fn(),
-  getSession: jest.fn(),
-  processMessage: jest.fn(),
-  streamMessage: jest.fn(),
-  closeSession: jest.fn(),
-  flagContent: jest.fn(),
-  getSessionSummary: jest.fn(),
-  submitSummary: jest.fn(),
-}));
-
-jest.mock('../../apps/api/src/services/llm', () => ({
-  routeAndCall: jest.fn(),
-  routeAndStream: jest.fn(),
-  registerProvider: jest.fn(),
-  createMockProvider: jest.fn(),
-}));
+  })
+);
+jest.mock('../../apps/api/src/services/billing', () =>
+  billingMock(MOCK_ACCOUNT_ID)
+);
+jest.mock('../../apps/api/src/services/settings', () => settingsMock());
+jest.mock('../../apps/api/src/services/session', () => sessionMock());
+jest.mock('../../apps/api/src/services/llm', () => llmMock());
 
 import { app } from '../../apps/api/src/index';
 
@@ -138,14 +87,9 @@ const AUTH_HEADERS = {
 };
 
 function configureValidJWT(): void {
-  mockDecodeJWTHeader.mockReturnValue({ alg: 'RS256', kid: 'test-kid' });
-  mockFetchJWKS.mockResolvedValue({
-    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
-  });
-  mockVerifyJWT.mockResolvedValue({
+  configureValidJWTHelper(jwtMocks, {
     sub: 'user_deletion_test',
     email: 'deletion-test@test.com',
-    exp: Math.floor(Date.now() / 1000) + 3600,
   });
 }
 
