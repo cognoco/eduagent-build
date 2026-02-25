@@ -3,7 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { usePushTokenRegistration } from './use-push-token-registration';
 
 // ---------------------------------------------------------------------------
-// Mock useRegisterPushToken
+// Mock useRegisterPushToken — mock-prefixed variable for Jest hoisting
 // ---------------------------------------------------------------------------
 
 const mockMutateAsync = jest.fn().mockResolvedValue({ registered: true });
@@ -12,10 +12,13 @@ jest.mock('./use-settings', () => ({
   useRegisterPushToken: () => ({ mutateAsync: mockMutateAsync }),
 }));
 
-jest.mock('expo-constants', () => ({
-  expoConfig: { extra: { eas: { projectId: 'test-project-id' } } },
-  easConfig: { projectId: 'test-project-id' },
-}));
+jest.mock('expo-constants', () => {
+  const constants = {
+    expoConfig: { extra: { eas: { projectId: 'test-project-id' } } },
+    easConfig: { projectId: 'test-project-id' },
+  };
+  return { __esModule: true, default: constants, ...constants };
+});
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -24,6 +27,8 @@ jest.mock('expo-constants', () => ({
 describe('usePushTokenRegistration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Restore resolved values after clearAllMocks
+    mockMutateAsync.mockResolvedValue({ registered: true });
   });
 
   it('requests permissions and registers push token', async () => {
