@@ -22,7 +22,7 @@ tags:
 - extendedWaitUntil:
     visible:
       text: "Ready to learn"
-    timeout: 60000
+    timeout: 15000
 
 # The coaching card's primary button starts a session.
 # Its testID is "coaching-card-primary".
@@ -53,6 +53,6 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 60000
+    timeout: 15000
 
 - takeScreenshot: learning-session-message-sent

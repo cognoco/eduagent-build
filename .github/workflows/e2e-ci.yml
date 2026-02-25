@@ -77,29 +77,8 @@ jobs:
     runs-on: ubuntu-latest
     # Advisory — does not block PR merge
     continue-on-error: true
-    timeout-minutes: 45
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: eduagent
-          POSTGRES_PASSWORD: eduagent
-          POSTGRES_DB: tests
-        options: >-
-          --health-cmd "pg_isready -U eduagent -d tests"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
     env:
       MAESTRO_CLI_NO_ANALYTICS: 1
-      DATABASE_URL: postgresql://eduagent:eduagent@localhost:5432/tests
-      NODE_ENV: test
-      CI: true
-      # Expo inlines EXPO_PUBLIC_* vars at JS bundle time.
-      # Clerk publishable key is needed for auth screens to render.
-      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -245,7 +224,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Run Maestro E2E tests
+      - name: Run Maestro smoke tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
