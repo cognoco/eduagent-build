@@ -103,7 +103,7 @@ export function useChildConsentStatus(
       const res = await client.consent[':childProfileId'].status.$get({
         param: { childProfileId: childProfileId! },
       });
-      return await res.json();
+      return (await res.json()) as ChildConsentData;
     },
     enabled: !!childProfileId,
   });
@@ -129,7 +129,7 @@ export function useRevokeConsent(
       const res = await client.consent[':childProfileId'].revoke.$put({
         param: { childProfileId: childProfileId! },
       });
-      return await res.json();
+      return (await res.json()) as RevokeConsentResult;
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
@@ -160,7 +160,7 @@ export function useRestoreConsent(
       const res = await client.consent[':childProfileId'].restore.$put({
         param: { childProfileId: childProfileId! },
       });
-      return await res.json();
+      return (await res.json()) as RestoreConsentResult;
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({

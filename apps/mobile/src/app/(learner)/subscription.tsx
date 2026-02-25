@@ -371,9 +371,7 @@ export default function SubscriptionScreen() {
   // Child profiles see child-friendly paywall (no pricing, no payment forms)
   const isChild = activeProfile ? !activeProfile.isOwner : false;
   const trialOrExpired =
-    subscription?.status === 'expired' ||
-    subscription?.status === 'trialing_ended' ||
-    (!subscription && !subLoading);
+    subscription?.status === 'expired' || (!subscription && !subLoading);
   if (isChild && trialOrExpired) {
     return <ChildPaywall />;
   }
