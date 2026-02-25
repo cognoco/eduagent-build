@@ -47,6 +47,27 @@ pnpm run db:push:dev                     # Push schema to dev DB
 pnpm run db:generate                     # Generate migration
 ```
 
+## Testing Rules (Local Development)
+
+**Pre-commit runs surgical tests** via `scripts/pre-commit-tests.sh` — NOT `nx affected`.
+
+### For the AI Agent
+
+1. **After modifying a source file, run only related tests:**
+   ```bash
+   pnpm exec jest --config apps/api/jest.config.ts --findRelatedTests apps/api/src/services/consent.ts --no-coverage
+   ```
+2. **After modifying a package file, also test API consumers:**
+   ```bash
+   pnpm exec jest --config packages/schemas/jest.config.cjs --findRelatedTests packages/schemas/src/consent.ts --no-coverage
+   pnpm exec jest --config apps/api/jest.config.ts --findRelatedTests packages/schemas/src/consent.ts --no-coverage
+   ```
+3. **Never run `pnpm exec nx run-many -t test` or full suite locally** — that's for CI only.
+4. **Never run `pnpm exec nx affected -t test` locally** — the pre-commit hook handles this surgically.
+5. **To run a single test file:** `pnpm exec jest --config <project-config> <test-file> --no-coverage`
+6. **To run a whole project's tests** (rare, only when truly needed):
+   `pnpm exec nx test api --no-coverage`
+
 ## Key Architecture Rules
 
 Read `docs/project_context.md` for the full rules. The critical ones:
@@ -131,39 +152,44 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 ## Current Status
 
 **Complete — all routes production-ready:**
-- Epics 0-5: full API layer (1,302 API tests + 315 mobile tests + 8 integration test suites, all passing)
-- All 21 route groups wired to real services with DB persistence
-- Mobile: 20+ screens (41 test suites), all using real API calls via TanStack Query + Hono RPC
-- Background jobs: 9 Inngest functions (session-completed chain, trial-expiry, consent-reminders, account-deletion, review-reminder, payment-retry, quota-reset, subject-auto-archive)
+- Epics 0-5: full API layer (~1,329 API tests + ~325 mobile tests + 8 integration test suites, all passing)
+- All 23 route files wired to real services with DB persistence (including `consent-web` browser flow and `test-seed` E2E endpoints)
+- Mobile: 30+ screens (42 test suites), all using real API calls via TanStack Query + Hono RPC
+- Background jobs: 10 Inngest functions (session-completed chain, trial-expiry, consent-reminders, consent-revocation, account-deletion, review-reminder, payment-retry, quota-reset, topup-expiry-reminder, subject-auto-archive)
 - Auth: Clerk (SSO + email/password), PasswordInput with show/hide + requirements
 - Billing: Stripe integration (checkout, portal, webhooks, KV-cached status, quota metering)
 - Email: Resend integration (consent emails, reminders)
-- Push: Expo Push API (trial warnings, review reminders, daily reminders)
+- Push: Expo Push API (trial warnings, review reminders, daily reminders) + `usePushTokenRegistration` hook auto-registers Expo push tokens on mount in both learner and parent layouts
+- Consent middleware: `consentMiddleware` blocks data-collecting routes for profiles with pending/revoked consent (AUDIT-001)
 - Error tracking: Sentry (API via `@sentry/cloudflare`, mobile via `@sentry/react-native`)
 - Embeddings: Voyage AI (session content → pgvector storage in session-completed chain)
 - SSE streaming: mobile SSE client + `useStreamMessage` hook for learning/homework sessions
 - Coaching cards: precompute service, 24h cache, `GET /v1/coaching-card` route, `AdaptiveEntryCard` wired on home screen
 - Session close summary: `SessionCloseSummary` screen at `/session-summary/[sessionId]`, replaces raw exchange-count display
-- Parent dashboard: real data from DB via `familyLinks` (children list, session counts, time, retention signals)
+- Parent dashboard: real data from DB via `familyLinks` (children list, session counts, time, retention signals) + consent management (withdraw/restore) on child detail screen
 - Failed recall remediation (FR52-58): `processRecallTest()` returns `failureAction: redirect_to_learning_book` after 3+ failures; `startRelearn()` resets retention card and creates new session
 - Interleaved retrieval (FR92): `services/interleaved.ts`, `interleavedSessionStartSchema`, `GET /v1/retention/stability`, full stack implemented
 - Recall bridge after homework (FR Story 2.7): `POST /v1/sessions/:sessionId/recall-bridge` + `generateRecallBridge()` service
 - Homework camera capture (Story 2.5): ML Kit OCR on device, camera state machine + `useHomeworkOcr` hook + full camera UI; server-side `OcrProvider` interface with stub implementation in `services/ocr.ts`
-- XP ledger: `insertSessionXpEntry()` wired in session-completed Step 3
+- XP ledger: `insertSessionXpEntry()` wired in session-completed Step 3, `useXpSummary` hook for client-side XP display
 - Needs-deepening auto-promotion (FR63): `updateNeedsDeepeningProgress()` wired in session-completed Step 1b
+- E2E testing infrastructure: `test-seed` route for deterministic test data, 8 integration suites in `tests/integration/` (auth-chain, onboarding, session-completed-chain, stripe-webhook, account-deletion, health-cors, profile-isolation, test-seed)
 
 - UX audit remediation (55 gaps): consent gating (C16/COPPA), camera-first homework (C8), parent transcript view (C13), session mode configs (C7), math rendering (M21), animations (M22), dark mode, confidence scoring, retention trends, ProfileSwitcher, Inter font, Ionicons, WCAG contrast fixes, shared Button component
+- UX persona walkthrough gaps (all resolved): post-approval child landing (`PostApprovalLanding` + SecureStore), parent account-owner landing (`consentWebRoutes` with personalized child name + deep links), child-friendly paywall (`ChildPaywall` with real stats + 24h rate-limit countdown), GDPR consent revocation (full stack: services, routes, Inngest 7-day grace period, child `ConsentWithdrawnGate`, parent withdraw/restore UI), preview mode on pending-consent screen (`PreviewSubjectBrowser` + `PreviewSampleCoaching`)
 
 **Not yet integrated:** OCR provider (server-side fallback; ML Kit primary on device).
 
-**UX gaps (from 2024 persona walkthroughs, not yet in canonical docs):**
-- Post-approval child landing screen — what child sees after parent grants GDPR consent
-- Parent account-owner landing — what parent sees after clicking consent email link in browser
-- Child-friendly paywall — age-appropriate "Ask Parent to Subscribe" instead of standard Stripe paywall
-- GDPR consent revocation UX flow
-- Preview mode button on pending-consent screen
+**Designed but not yet implemented (documented in PRD, architecture, epics, UX spec):**
+- **EVALUATE verification type (Devil's Advocate, FR128-FR133)** — Epic 3 extension, MVP scope. 8th verification type where AI presents flawed reasoning for student to critique (Bloom's Level 5-6). Strong-retention gating only. Modified SM-2 quality floor (2-3 for failure, not 0-1). `evaluateDifficultyRung` 1-4 on retention card. Three-strike escalation: reveal flaw → lower difficulty → standard review.
+- **Analogy Domain Preferences (Multiverse of Analogies, FR134-FR137)** — Epic 3 extension, MVP scope. Per-subject analogy domain (cooking, sports, building, music, nature, gaming). Nullable column on `teachingPreferences` — null means no analogy preference. Soft prompt injection: "prefer analogies... don't force when direct explanation is clearer." Optional onboarding step + subject settings picker.
+- **Feynman Stage / TEACH_BACK (FR138-FR143)** — Epic 3 extension, MVP scope. 9th verification type: student explains concept verbally, AI plays "confused student" (Feynman Technique). On-device STT (`expo-speech-recognition`) + TTS (`expo-speech`), no cloud. Two-output pattern: conversational follow-up (visible) + structured assessment JSON in `session_events.structured_assessment` (hidden). Scoring rubric: accuracy 50%, completeness 30%, clarity 20% → SM-2 quality input.
 
-**Deferred to Phase 2:**
+**Deferred — v1.1 (post-MVP, pre-launch):**
+- **Epic 7: Concept Map & Prerequisite-Aware Learning** (FR118-FR127) — `topic_prerequisites` join table (DAG), prerequisite-aware curriculum generation, graph-aware coaching cards ("newly unlocked" type), LLM context injection for weak/skipped prerequisites, Learning Book topological ordering with locked/unlocked indicators, concept map visualization (`react-native-svg` + Sugiyama layout). SM-2 stays pure per-topic — graph logic in coaching precomputation. Skip behavior: warn + orphan edges + log `prerequisiteContext` JSONB in `curriculumAdaptations`.
+- **Epic 8: Full Voice Mode** (FR144-FR145, FR147-FR149) — voice-first session mode for all session types. TTS Option A at launch (wait for complete response). Voice controls (pause, replay, speed). VAD is stretch. Accessibility needs spike (VoiceOver/TalkBack coexistence). FR146 (Language SPEAK/LISTEN voice) in Epic 6. Dependency chain: Epic 3 Cluster G (Feynman, MVP) → Epic 8 → Epic 6.
+
+**Deferred — Phase 2:**
 - Profile switch PIN/biometric authentication — deferred per UX spec Party Mode revision (line 1631). **Security note:** `profiles.tsx` is reachable via More tab — a child can switch to a parent profile with zero protection. Data isolation is enforced by `createScopedRepository(profileId)` (verified by `profile-isolation.test.ts`), but there is no authentication gate on the profile switch itself. Phase 2 should add PIN/biometric before profile switch completes.
 
 **Pre-launch configuration (not code):**
@@ -182,11 +208,11 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 
 **Read as needed:**
 
-- `docs/prd.md` — Product requirements (117 FRs)
+- `docs/prd.md` — Product requirements (149 FRs)
 
 ## Git Rules
 
 - **Never commit unless explicitly asked.**
 - **Never force push, reset --hard, or destructive git operations.**
 - Use commitlint conventional commits format.
-- Pre-commit hook runs lint-staged + affected tests.
+- Pre-commit hook runs lint-staged + surgical tests (only tests related to staged files).
