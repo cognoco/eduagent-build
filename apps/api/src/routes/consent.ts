@@ -21,7 +21,7 @@ import {
   ConsentAlreadyProcessedError,
   ConsentTokenExpiredError,
 } from '../services/consent';
-import { notFound, forbidden, apiError } from '../errors';
+import { notFound, forbidden } from '../errors';
 import { inngest } from '../inngest/client';
 
 type ConsentRouteEnv = {

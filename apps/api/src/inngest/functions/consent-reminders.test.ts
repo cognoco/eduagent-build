@@ -153,4 +153,14 @@ describe('consentReminder', () => {
     // Atomic delete still happens because consent status is PENDING
     expect(mockDbExecute).toHaveBeenCalled();
   });
+
+  it('does not send email when parentEmail is not found in DB', async () => {
+    // Pass null profile state so parentEmail lookup returns null
+    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING'], null);
+
+    // No emails sent because parentEmail lookup returns null
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    // Delete still happens because consent status is PENDING
+    expect(mockDeleteProfile).toHaveBeenCalledTimes(1);
+  });
 });
