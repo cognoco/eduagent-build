@@ -5,7 +5,11 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import type { NotificationPrefsInput, LearningMode } from '@eduagent/schemas';
+import type {
+  NotificationPrefsInput,
+  LearningMode,
+  AnalogyDomain,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 

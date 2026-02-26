@@ -4,6 +4,7 @@ import {
   notificationPrefsSchema,
   learningModeUpdateSchema,
   pushTokenRegisterSchema,
+  analogyDomainUpdateSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -16,6 +17,10 @@ import {
   registerPushToken,
 } from '../services/settings';
 import { notifyParentToSubscribe } from '../services/notifications';
+import {
+  getAnalogyDomain,
+  setAnalogyDomain,
+} from '../services/retention-data';
 
 type SettingsRouteEnv = {
   Bindings: {
@@ -103,4 +108,34 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       emailFrom: c.env.EMAIL_FROM,
     });
     return c.json(result);
-  });
+  })
+
+  // Get analogy domain preference for a subject (FR134-137)
+  .get('/settings/subjects/:subjectId/analogy-domain', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const subjectId = c.req.param('subjectId');
+    const analogyDomain = await getAnalogyDomain(db, profileId, subjectId);
+    return c.json({ analogyDomain });
+  })
+
+  // Update analogy domain preference for a subject (FR134-137)
+  .put(
+    '/settings/subjects/:subjectId/analogy-domain',
+    zValidator('json', analogyDomainUpdateSchema),
+    async (c) => {
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
+      const subjectId = c.req.param('subjectId');
+      const body = c.req.valid('json');
+      const analogyDomain = await setAnalogyDomain(
+        db,
+        profileId,
+        subjectId,
+        body.analogyDomain
+      );
+      return c.json({ analogyDomain });
+    }
+  );

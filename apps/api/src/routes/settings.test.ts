@@ -65,6 +65,15 @@ jest.mock('../services/settings', () => ({
     .mockImplementation((_db, _profileId, mode) => Promise.resolve({ mode })),
 }));
 
+jest.mock('../services/retention-data', () => ({
+  getAnalogyDomain: jest.fn().mockResolvedValue(null),
+  setAnalogyDomain: jest
+    .fn()
+    .mockImplementation((_db, _profileId, _subjectId, domain) =>
+      Promise.resolve(domain)
+    ),
+}));
+
 import { app } from '../index';
 import {
   getNotificationPrefs,
@@ -72,6 +81,10 @@ import {
   getLearningMode,
   upsertLearningMode,
 } from '../services/settings';
+import {
+  getAnalogyDomain,
+  setAnalogyDomain,
+} from '../services/retention-data';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
@@ -321,6 +334,146 @@ describe('settings routes', () => {
         {
           method: 'PUT',
           body: JSON.stringify({ mode: 'casual' }),
+          headers: { 'Content-Type': 'application/json' },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /v1/settings/subjects/:subjectId/analogy-domain
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/settings/subjects/:subjectId/analogy-domain', () => {
+    const subjectId = '550e8400-e29b-41d4-a716-446655440000';
+
+    it('returns 200 with null when no preference set', async () => {
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/analogy-domain`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.analogyDomain).toBeNull();
+    });
+
+    it('returns 200 with analogy domain when set', async () => {
+      (getAnalogyDomain as jest.Mock).mockResolvedValueOnce('cooking');
+
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/analogy-domain`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.analogyDomain).toBe('cooking');
+    });
+
+    it('calls getAnalogyDomain service', async () => {
+      await app.request(
+        `/v1/settings/subjects/${subjectId}/analogy-domain`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(getAnalogyDomain).toHaveBeenCalled();
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/analogy-domain`,
+        {},
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // PUT /v1/settings/subjects/:subjectId/analogy-domain
+  // -------------------------------------------------------------------------
+
+  describe('PUT /v1/settings/subjects/:subjectId/analogy-domain', () => {
+    const subjectId = '550e8400-e29b-41d4-a716-446655440000';
+
+    it('returns 200 with valid domain', async () => {
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/analogy-domain`,
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ analogyDomain: 'sports' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.analogyDomain).toBe('sports');
+    });
+
+    it('returns 200 when clearing domain (null)', async () => {
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/analogy-domain`,
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ analogyDomain: null }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.analogyDomain).toBeNull();
+    });
+
+    it('calls setAnalogyDomain service', async () => {
+      await app.request(
+        `/v1/settings/subjects/${subjectId}/analogy-domain`,
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ analogyDomain: 'gaming' }),
+        },
+        TEST_ENV
+      );
+
+      expect(setAnalogyDomain).toHaveBeenCalled();
+    });
+
+    it('returns 400 with invalid domain', async () => {
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/analogy-domain`,
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ analogyDomain: 'invalid_domain' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/analogy-domain`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ analogyDomain: 'cooking' }),
           headers: { 'Content-Type': 'application/json' },
         },
         TEST_ENV

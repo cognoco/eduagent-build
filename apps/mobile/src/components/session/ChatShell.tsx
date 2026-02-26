@@ -11,6 +11,10 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageBubble, type VerificationBadge } from './MessageBubble';
+import { VoiceRecordButton, VoiceTranscriptPreview } from './VoiceRecordButton';
+import { VoiceToggle } from './VoiceToggle';
+import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
+import { useTextToSpeech } from '../../hooks/use-text-to-speech';
 import { useThemeColors } from '../../lib/theme';
 
 export interface ChatMessage {
@@ -22,6 +26,9 @@ export interface ChatMessage {
   verificationBadge?: VerificationBadge;
 }
 
+/** Verification types that enable voice input/output in the session. */
+export type VoiceVerificationType = 'teach_back';
+
 interface ChatShellProps {
   title: string;
   subtitle?: string;
@@ -32,6 +39,8 @@ interface ChatShellProps {
   rightAction?: React.ReactNode;
   footer?: React.ReactNode;
   placeholder?: string;
+  /** When set to 'teach_back', enables voice input (STT) and output (TTS). */
+  verificationType?: VoiceVerificationType | string;
 }
 
 /**
@@ -86,6 +95,7 @@ export function ChatShell({
   rightAction,
   footer,
   placeholder = 'Type a message...',
+  verificationType,
 }: ChatShellProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -93,16 +103,122 @@ export function ChatShell({
   const scrollRef = useRef<ScrollView>(null);
   const [input, setInput] = useState('');
 
+  // Voice is enabled only for teach_back verification type
+  const isVoiceSession = verificationType === 'teach_back';
+
+  // Voice toggle — defaults ON for teach_back, session-scoped
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(isVoiceSession);
+
+  // STT hook
+  const {
+    isListening,
+    transcript,
+    startListening,
+    stopListening,
+    clearTranscript,
+  } = useSpeechRecognition();
+
+  // TTS hook
+  const { speak, stop: stopSpeaking } = useTextToSpeech();
+
+  // Track whether we have a transcript ready for preview
+  const [pendingTranscript, setPendingTranscript] = useState('');
+
+  // Track last spoken message id to avoid re-speaking
+  const lastSpokenIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
+
+  // Auto-TTS: speak new AI messages when voice is enabled (Option A — complete only)
+  useEffect(() => {
+    if (!isVoiceSession || !isVoiceEnabled) return;
+
+    // Find the last AI message that is NOT streaming
+    const lastAiMessage = [...messages]
+      .reverse()
+      .find((m) => m.role === 'ai' && !m.streaming);
+
+    if (!lastAiMessage) return;
+    if (lastAiMessage.id === lastSpokenIdRef.current) return;
+    if (!lastAiMessage.content.trim()) return;
+
+    lastSpokenIdRef.current = lastAiMessage.id;
+    speak(lastAiMessage.content);
+  }, [messages, isVoiceSession, isVoiceEnabled, speak]);
 
   const handleSend = useCallback(() => {
     if (!input.trim() || isStreaming) return;
     const text = input.trim();
     setInput('');
+    // Stop TTS when user sends a message
+    if (isVoiceSession) stopSpeaking();
     onSend(text);
-  }, [input, isStreaming, onSend]);
+  }, [input, isStreaming, onSend, isVoiceSession, stopSpeaking]);
+
+  // Voice record button toggle
+  const handleVoicePress = useCallback(async () => {
+    if (isListening) {
+      await stopListening();
+      // After stopping, the transcript from the hook may still be empty
+      // because expo-speech-recognition updates asynchronously.
+      // We snapshot the transcript in the next effect.
+    } else {
+      setPendingTranscript('');
+      // Stop TTS when user starts recording
+      stopSpeaking();
+      await startListening();
+    }
+  }, [isListening, stopListening, startListening, stopSpeaking]);
+
+  // Sync transcript from STT hook to pending transcript when recording stops
+  useEffect(() => {
+    if (!isListening && transcript.trim()) {
+      setPendingTranscript(transcript);
+    }
+  }, [isListening, transcript]);
+
+  // Voice transcript preview actions
+  const handleVoiceSend = useCallback(() => {
+    if (!pendingTranscript.trim() || isStreaming) return;
+    stopSpeaking();
+    onSend(pendingTranscript.trim());
+    setPendingTranscript('');
+    clearTranscript();
+  }, [pendingTranscript, isStreaming, onSend, clearTranscript, stopSpeaking]);
+
+  const handleVoiceDiscard = useCallback(() => {
+    setPendingTranscript('');
+    clearTranscript();
+  }, [clearTranscript]);
+
+  const handleVoiceReRecord = useCallback(async () => {
+    setPendingTranscript('');
+    clearTranscript();
+    stopSpeaking();
+    await startListening();
+  }, [clearTranscript, startListening, stopSpeaking]);
+
+  const handleVoiceToggle = useCallback(() => {
+    setIsVoiceEnabled((prev) => {
+      if (prev) stopSpeaking(); // muting stops current speech
+      return !prev;
+    });
+  }, [stopSpeaking]);
+
+  // Combine rightAction with VoiceToggle for teach_back sessions
+  const headerRightContent = isVoiceSession ? (
+    <View className="flex-row items-center">
+      <VoiceToggle
+        isVoiceEnabled={isVoiceEnabled}
+        onToggle={handleVoiceToggle}
+      />
+      {rightAction}
+    </View>
+  ) : (
+    rightAction
+  );
 
   return (
     <KeyboardAvoidingView
@@ -129,7 +245,7 @@ export function ChatShell({
           </Text>
           <Text className="text-caption text-text-secondary">{subtitle}</Text>
         </View>
-        {rightAction}
+        {headerRightContent}
       </View>
 
       {/* Messages */}
@@ -154,6 +270,16 @@ export function ChatShell({
         {footer}
       </ScrollView>
 
+      {/* Voice transcript preview (above input, only for teach_back) */}
+      {isVoiceSession && pendingTranscript && !isListening && (
+        <VoiceTranscriptPreview
+          transcript={pendingTranscript}
+          onSend={handleVoiceSend}
+          onDiscard={handleVoiceDiscard}
+          onReRecord={handleVoiceReRecord}
+        />
+      )}
+
       {/* Input */}
       {!inputDisabled && (
         <View
@@ -174,6 +300,15 @@ export function ChatShell({
             testID="chat-input"
             accessibilityLabel="Message input"
           />
+          {isVoiceSession && (
+            <View className="me-2">
+              <VoiceRecordButton
+                isListening={isListening}
+                onPress={handleVoicePress}
+                disabled={isStreaming}
+              />
+            </View>
+          )}
           <Pressable
             onPress={handleSend}
             disabled={!input.trim() || isStreaming}

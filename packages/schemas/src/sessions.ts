@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { chatExchangeSchema } from './common.js';
+import { verificationTypeSchema } from './assessments.js';
 
 // Interview schemas
 
@@ -113,6 +114,7 @@ export const learningSessionSchema = z.object({
   subjectId: z.string().uuid(),
   topicId: z.string().uuid().nullable(),
   sessionType: sessionTypeSchema,
+  verificationType: verificationTypeSchema.nullable(),
   status: sessionStatusSchema,
   escalationRung: escalationRungSchema,
   exchangeCount: z.number().int(),
