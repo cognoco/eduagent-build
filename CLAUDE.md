@@ -53,18 +53,22 @@ pnpm run db:generate                     # Generate migration
 
 ### For the AI Agent
 
+**Important:** Jest must run from the project directory (ts-jest resolves tsconfig relative to cwd). Set `TS_NODE_COMPILER_OPTIONS` to override `moduleResolution: "bundler"` from tsconfig.base.json.
+
 1. **After modifying a source file, run only related tests:**
    ```bash
-   pnpm exec jest --config apps/api/jest.config.ts --findRelatedTests apps/api/src/services/consent.ts --no-coverage
+   cd apps/api && TS_NODE_COMPILER_OPTIONS='{"moduleResolution":"node10","module":"commonjs","customConditions":null}' pnpm exec jest --findRelatedTests src/services/consent.ts --no-coverage
    ```
 2. **After modifying a package file, also test API consumers:**
    ```bash
-   pnpm exec jest --config packages/schemas/jest.config.cjs --findRelatedTests packages/schemas/src/consent.ts --no-coverage
-   pnpm exec jest --config apps/api/jest.config.ts --findRelatedTests packages/schemas/src/consent.ts --no-coverage
+   # Package's own tests
+   cd packages/schemas && pnpm exec jest --findRelatedTests src/consent.ts --no-coverage
+   # API tests that consume the package (cross-project via moduleNameMapper)
+   cd apps/api && TS_NODE_COMPILER_OPTIONS='{"moduleResolution":"node10","module":"commonjs","customConditions":null}' pnpm exec jest --findRelatedTests ../../packages/schemas/src/consent.ts --no-coverage
    ```
 3. **Never run `pnpm exec nx run-many -t test` or full suite locally** — that's for CI only.
 4. **Never run `pnpm exec nx affected -t test` locally** — the pre-commit hook handles this surgically.
-5. **To run a single test file:** `pnpm exec jest --config <project-config> <test-file> --no-coverage`
+5. **To run a single test file:** `cd <project-dir> && pnpm exec jest <test-file> --no-coverage`
 6. **To run a whole project's tests** (rare, only when truly needed):
    `pnpm exec nx test api --no-coverage`
 
@@ -152,7 +156,7 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 ## Current Status
 
 **Complete — all routes production-ready:**
-- Epics 0-5: full API layer (~1,329 API tests + ~325 mobile tests + 8 integration test suites, all passing)
+- Epics 0-5: full API layer (~1,329 API tests + ~325 mobile tests + 10 integration test suites, all passing)
 - All 23 route files wired to real services with DB persistence (including `consent-web` browser flow and `test-seed` E2E endpoints)
 - Mobile: 30+ screens (42 test suites), all using real API calls via TanStack Query + Hono RPC
 - Background jobs: 10 Inngest functions (session-completed chain, trial-expiry, consent-reminders, consent-revocation, account-deletion, review-reminder, payment-retry, quota-reset, topup-expiry-reminder, subject-auto-archive)
@@ -173,7 +177,7 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 - Homework camera capture (Story 2.5): ML Kit OCR on device, camera state machine + `useHomeworkOcr` hook + full camera UI; server-side `OcrProvider` interface with stub implementation in `services/ocr.ts`
 - XP ledger: `insertSessionXpEntry()` wired in session-completed Step 3, `useXpSummary` hook for client-side XP display
 - Needs-deepening auto-promotion (FR63): `updateNeedsDeepeningProgress()` wired in session-completed Step 1b
-- E2E testing infrastructure: `test-seed` route for deterministic test data, 8 integration suites in `tests/integration/` (auth-chain, onboarding, session-completed-chain, stripe-webhook, account-deletion, health-cors, profile-isolation, test-seed)
+- E2E testing infrastructure: `test-seed` route for deterministic test data, 10 integration suites in `tests/integration/` (auth-chain, onboarding, session-completed-chain, stripe-webhook, account-deletion, health-cors, profile-isolation, test-seed, learning-session, retention-lifecycle), Maestro foundation (seed.js, setup flows, Nx e2e target, 4 Tier 1 smoke flows), enhanced CI workflow with PostgreSQL + API server for mobile-maestro job
 
 - UX audit remediation (55 gaps): consent gating (C16/COPPA), camera-first homework (C8), parent transcript view (C13), session mode configs (C7), math rendering (M21), animations (M22), dark mode, confidence scoring, retention trends, ProfileSwitcher, Inter font, Ionicons, WCAG contrast fixes, shared Button component
 - UX persona walkthrough gaps (all resolved): post-approval child landing (`PostApprovalLanding` + SecureStore), parent account-owner landing (`consentWebRoutes` with personalized child name + deep links), child-friendly paywall (`ChildPaywall` with real stats + 24h rate-limit countdown), GDPR consent revocation (full stack: services, routes, Inngest 7-day grace period, child `ConsentWithdrawnGate`, parent withdraw/restore UI), preview mode on pending-consent screen (`PreviewSubjectBrowser` + `PreviewSampleCoaching`)
@@ -209,6 +213,10 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 **Read as needed:**
 
 - `docs/prd.md` — Product requirements (149 FRs)
+
+## Quality Rules
+
+- **Always test your own work before concluding a task.** Run the relevant tests for any code you write or modify. Do not declare a task complete until tests pass.
 
 ## Git Rules
 

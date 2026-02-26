@@ -468,13 +468,13 @@ This follows the project convention: co-located unit tests in `*.test.ts`, integ
 
 ## 7. Implementation Sequence
 
-Progress as of 2026-02-22:
+Progress as of 2026-02-26:
 
-1. **API integration test harness** — **DONE.** `tests/integration/` with 3 suites (auth-chain, health-cors, onboarding), `setup.ts`, and `jest.config.cjs`. Uses Hono `app.request()` against PostgreSQL service container.
-2. **Inngest chain integration tests** — TODO. Test `session.completed` chain end-to-end using direct handler invocation + `createInngestStepMock()` (see Section 2). Validates the most complex async flow.
-3. **Maestro setup** — **PARTIAL.** `apps/mobile/e2e/` created with `config.yaml`, 3 skeleton YAML flows (app-launch, start-session, create-subject/view-curriculum). Not yet runnable — requires EAS dev build APK and `testID` props on mobile components.
-4. **CI wiring** — **DONE.** `.github/workflows/e2e-ci.yml` with PostgreSQL service container for API integration tests + Maestro + Android emulator job. Advisory mode (`continue-on-error: true`).
-5. **Smoke suite buildout** — TODO. Write Tier 1 flows as features are wired to real APIs. Add `testID` props to mobile components for Maestro element targeting.
+1. **API integration test harness** — **DONE.** `tests/integration/` with 10 suites (auth-chain, health-cors, onboarding, account-deletion, profile-isolation, session-completed-chain, stripe-webhook, test-seed, learning-session, retention-lifecycle), `setup.ts`, `mocks.ts`, and `jest.config.cjs`. Uses Hono `app.request()` against PostgreSQL service container.
+2. **Inngest chain integration tests** — **DONE.** `session-completed-chain.integration.test.ts` validates all 6 steps, error isolation, skip logic, and FR92 interleaved topics.
+3. **Maestro setup** — **DONE.** `apps/mobile/e2e/` with `config.yaml`, `scripts/seed.js` (GraalJS), `_setup/seed-and-sign-in.yaml`, `_setup/sign-out.yaml`, Nx `e2e` target with smoke configuration, and 10 total YAML flows (4 existing + 2 setup + 4 Tier 1 smoke).
+4. **CI wiring** — **DONE.** `.github/workflows/e2e-ci.yml` with PostgreSQL service container for both jobs, API server background startup + health check for mobile-maestro job. Advisory mode (`continue-on-error: true`).
+5. **Smoke suite buildout** — **DONE.** 4 Tier 1 smoke flows written: `onboarding/sign-up-flow.yaml` (S1), `learning/first-session.yaml` (S2), `learning/core-learning.yaml` (S3), `retention/recall-review.yaml` (S4). Blocker: Clerk test user creation not yet in seed service; recall testIDs (`recall-question`, `recall-answer-input`, `recall-submit`) not yet added to mobile screens.
 6. **Nightly full suite** — TODO. Add scheduled workflow, Tier 2 flows, reporting.
 
 ---

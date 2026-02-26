@@ -1,0 +1,102 @@
+# Flow S1: Onboarding — Sign-Up to First Subject
+# Validates: full onboarding journey from sign-up through profile creation
+# to subject creation and interview screen.
+# Tags: smoke, onboarding
+#
+# Journey: UX Journey 1 (Onboarding)
+# Epics: Epic 0 (FR1-FR9), Epic 1 (FR13)
+#
+# NOTE: Steps 7-11 depend on Clerk test mode configuration. If Clerk
+# doesn't allow programmatic sign-up in test builds, use the seed
+# endpoint + sign-in instead. This flow tests the full sign-up path.
+appId: com.zwizzly.eduagent
+tags:
+  - smoke
+  - onboarding
+---
+# 1. Launch app with clean state
+- launchApp:
+    clearState: true
+
+# 2. Auth gate visible
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 15000
+
+# 3. Navigate to sign-up
+- tapOn: "Sign up"
+
+# 4. Sign-up screen visible
+- extendedWaitUntil:
+    visible:
+      id: "sign-up-email"
+    timeout: 5000
+
+# 5. Enter email
+- tapOn:
+    id: "sign-up-email"
+- inputText: "test-e2e-signup@example.com"
+
+# 6. Enter password
+- tapOn:
+    id: "sign-up-password"
+- inputText: "TestPass123!"
+
+# 7. Submit sign-up
+- tapOn:
+    id: "sign-up-button"
+
+# 8. Profile creation screen (or redirect to home)
+# After sign-up, the app should navigate to profile creation
+- extendedWaitUntil:
+    visible:
+      id: "profile-name-input"
+    timeout: 15000
+
+# 9. Enter profile name
+- tapOn:
+    id: "profile-name-input"
+- inputText: "Test Learner"
+
+# 10. Select learner persona
+- tapOn:
+    id: "profile-persona-learner"
+
+# 11. Submit profile
+- tapOn:
+    id: "profile-submit"
+
+# 12. Home screen reached
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 13. Add first subject
+- tapOn:
+    id: "add-subject-button"
+
+# 14. Subject creation modal visible
+- extendedWaitUntil:
+    visible:
+      text: "What would you like to learn?"
+    timeout: 5000
+
+# 15. Enter subject name
+- tapOn:
+    id: "create-subject-name"
+- inputText: "Mathematics"
+
+# 16. Submit subject
+- tapOn:
+    id: "create-subject-submit"
+
+# 17. Interview screen reached
+- extendedWaitUntil:
+    visible:
+      text: "Interview"
+    timeout: 10000
+
+# 18. Screenshot
+- takeScreenshot: onboarding-sign-up-complete

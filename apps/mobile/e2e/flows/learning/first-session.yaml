@@ -1,0 +1,61 @@
+# Flow S2: First Session — Interview to Coaching Card
+# Validates: seeded user sees coaching card, starts session, sends message,
+# receives AI response.
+# Tags: smoke, learning
+#
+# Journey: UX Journey 1 → 2 transition
+# Epics: Epic 1 (FR14-FR16)
+# Prerequisite: Seeded user with 1 subject (scenario: with-subject)
+appId: com.zwizzly.eduagent
+tags:
+  - smoke
+  - learning
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+# 2. Home screen visible
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Coaching card present
+- assertVisible:
+    id: "coaching-card"
+
+# 4. Coaching card has primary action
+- assertVisible:
+    id: "coaching-card-primary"
+
+# 5. Tap primary action → start session
+- tapOn:
+    id: "coaching-card-primary"
+
+# 6. Session screen loads (chat input visible)
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 10000
+
+# 7. Send a message
+- tapOn:
+    id: "chat-input"
+- inputText: "I want to learn the basics"
+
+# 8. Tap send
+- tapOn:
+    id: "send-button"
+
+# 9. AI responds (chat input re-enabled after streaming)
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+# 10. Screenshot
+- takeScreenshot: first-session-started

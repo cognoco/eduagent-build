@@ -73,6 +73,24 @@
       "dependsOn": ["^build"],
       "inputs": ["production", "^production"]
     },
+    "e2e": {
+      "dependsOn": ["build"],
+      "inputs": [
+        "{projectRoot}/e2e/**",
+        "{projectRoot}/src/**",
+        "{workspaceRoot}/packages/schemas/src/**"
+      ],
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "maestro test e2e/flows/",
+        "cwd": "apps/mobile"
+      },
+      "configurations": {
+        "smoke": {
+          "command": "maestro test e2e/flows/ --include-tags=smoke"
+        }
+      }
+    },
     "format:check": {
       "cache": true,
       "inputs": [
