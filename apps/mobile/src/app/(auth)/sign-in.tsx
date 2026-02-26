@@ -135,6 +135,8 @@ export default function SignInScreen() {
           disabled={oauthLoading !== null}
           className="bg-surface rounded-button py-3.5 items-center mb-3 flex-row justify-center"
           testID="google-sso-button"
+          accessibilityRole="button"
+          accessibilityLabel="Sign in with Google"
         >
           {oauthLoading === 'oauth_google' ? (
             <ActivityIndicator />
@@ -150,6 +152,8 @@ export default function SignInScreen() {
           disabled={oauthLoading !== null}
           className="bg-surface rounded-button py-3.5 items-center mb-6 flex-row justify-center"
           testID="apple-sso-button"
+          accessibilityRole="button"
+          accessibilityLabel="Sign in with Apple"
         >
           {oauthLoading === 'oauth_apple' ? (
             <ActivityIndicator />

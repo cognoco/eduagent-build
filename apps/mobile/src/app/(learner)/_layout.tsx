@@ -67,14 +67,15 @@ function usePostApprovalLanding(
     }
 
     const key = `postApprovalSeen_${profileId}`;
-    SecureStore.getItemAsync(key)
-      .then((value) => {
+    (async () => {
+      try {
+        const value = await SecureStore.getItemAsync(key);
         setShouldShow(value !== 'true');
         setChecked(true);
-      })
-      .catch(() => {
+      } catch {
         setChecked(true);
-      });
+      }
+    })();
   }, [profileId, consentStatus]);
 
   const dismiss = React.useCallback(() => {
@@ -156,7 +157,7 @@ function PreviewSubjectBrowser({
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={onDismiss}
-          className="mr-3 min-w-[44px] min-h-[44px] justify-center items-center"
+          className="me-3 min-w-[44px] min-h-[44px] justify-center items-center"
           accessibilityLabel="Back to waiting screen"
           accessibilityRole="button"
         >
@@ -185,7 +186,7 @@ function PreviewSubjectBrowser({
             {subject.topics.map((topic) => (
               <View key={topic} className="flex-row items-center mb-1">
                 <View
-                  className="w-2 h-2 rounded-full mr-2"
+                  className="w-2 h-2 rounded-full me-2"
                   style={{ backgroundColor: colors.muted }}
                 />
                 <Text className="text-body-sm text-text-secondary">
@@ -216,7 +217,7 @@ function PreviewSampleCoaching({
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={onDismiss}
-          className="mr-3 min-w-[44px] min-h-[44px] justify-center items-center"
+          className="me-3 min-w-[44px] min-h-[44px] justify-center items-center"
           accessibilityLabel="Back to waiting screen"
           accessibilityRole="button"
         >
@@ -259,19 +260,19 @@ function PreviewSampleCoaching({
             away the answer. You learn by thinking, not copying.
           </Text>
           <View className="flex-row items-start mb-2">
-            <Text className="text-body mr-2">{'\u{1F4F7}'}</Text>
+            <Text className="text-body me-2">{'\u{1F4F7}'}</Text>
             <Text className="text-body-sm text-text-secondary flex-1">
               Snap a photo of your homework to get started
             </Text>
           </View>
           <View className="flex-row items-start mb-2">
-            <Text className="text-body mr-2">{'\u{1F9E0}'}</Text>
+            <Text className="text-body me-2">{'\u{1F9E0}'}</Text>
             <Text className="text-body-sm text-text-secondary flex-1">
               Your coach remembers what you've learned
             </Text>
           </View>
           <View className="flex-row items-start">
-            <Text className="text-body mr-2">{'\u{1F4C8}'}</Text>
+            <Text className="text-body me-2">{'\u{1F4C8}'}</Text>
             <Text className="text-body-sm text-text-secondary flex-1">
               Track your progress and retention over time
             </Text>
@@ -474,7 +475,7 @@ function ConsentPendingGate(): React.ReactElement {
           accessibilityRole="button"
           accessibilityLabel="Browse subjects preview"
         >
-          <Text className="text-body mr-3">{'\u{1F4DA}'}</Text>
+          <Text className="text-body me-3">{'\u{1F4DA}'}</Text>
           <View className="flex-1">
             <Text className="text-body font-semibold text-text-primary">
               Browse subjects
@@ -491,7 +492,7 @@ function ConsentPendingGate(): React.ReactElement {
           accessibilityRole="button"
           accessibilityLabel="Sample coaching preview"
         >
-          <Text className="text-body mr-3">{'\u{1F3AF}'}</Text>
+          <Text className="text-body me-3">{'\u{1F3AF}'}</Text>
           <View className="flex-1">
             <Text className="text-body font-semibold text-text-primary">
               Sample coaching

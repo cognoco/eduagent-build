@@ -108,6 +108,7 @@ function computeHoursRemaining(notifiedAtMs: number): number {
 function ChildPaywall(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const colors = useThemeColors();
   const { activeProfile } = useProfile();
   const notifyParent = useNotifyParentSubscribe();
   const { data: xpSummary } = useXpSummary();
@@ -121,18 +122,19 @@ function ChildPaywall(): React.ReactElement {
   // Restore persisted notified timestamp on mount
   useEffect(() => {
     if (!profileId) return;
-    void SecureStore.getItemAsync(getNotifyStorageKey(profileId)).then(
-      (value) => {
-        if (!value) return;
-        const ts = Number(value);
-        if (Number.isNaN(ts)) return;
-        const hours = computeHoursRemaining(ts);
-        if (hours > 0) {
-          setNotifiedAt(ts);
-          setHoursRemaining(hours);
-        }
+    (async () => {
+      const value = await SecureStore.getItemAsync(
+        getNotifyStorageKey(profileId)
+      );
+      if (!value) return;
+      const ts = Number(value);
+      if (Number.isNaN(ts)) return;
+      const hours = computeHoursRemaining(ts);
+      if (hours > 0) {
+        setNotifiedAt(ts);
+        setHoursRemaining(hours);
       }
-    );
+    })();
   }, [profileId]);
 
   // Update countdown every minute while rate-limited
@@ -205,7 +207,7 @@ function ChildPaywall(): React.ReactElement {
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={() => router.back()}
-          className="mr-3 min-w-[44px] min-h-[44px] justify-center items-center"
+          className="me-3 min-w-[44px] min-h-[44px] justify-center items-center"
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
@@ -242,7 +244,7 @@ function ChildPaywall(): React.ReactElement {
           }
         >
           {notifyParent.isPending ? (
-            <ActivityIndicator color="#ffffff" />
+            <ActivityIndicator color={colors.textInverse} />
           ) : (
             <Text
               className={`text-body font-semibold ${
@@ -387,7 +389,7 @@ export default function SubscriptionScreen() {
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={() => router.back()}
-          className="mr-3 min-w-[44px] min-h-[44px] justify-center items-center"
+          className="me-3 min-w-[44px] min-h-[44px] justify-center items-center"
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
@@ -591,7 +593,7 @@ export default function SubscriptionScreen() {
                   placeholder="your@email.com"
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  className="flex-1 bg-background rounded-button px-3 py-2.5 text-body text-text-primary mr-2"
+                  className="flex-1 bg-background rounded-button px-3 py-2.5 text-body text-text-primary me-2"
                   placeholderTextColor={colors.muted}
                   accessibilityLabel="Email for BYOK waitlist"
                 />

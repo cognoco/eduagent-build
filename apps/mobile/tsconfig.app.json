@@ -5,7 +5,7 @@
     "types": ["node"],
     "rootDir": "src",
     "jsx": "react-jsx",
-    "noUnusedLocals": false,
+    "noUnusedLocals": true,
     "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo"
   },
   "files": ["../../node_modules/@nx/expo/typings/svg.d.ts"],
