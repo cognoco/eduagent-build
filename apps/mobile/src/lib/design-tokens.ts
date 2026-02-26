@@ -212,7 +212,7 @@ export const tokens: Record<Persona, Record<ColorScheme, ThemeTokens>> = {
         retentionFading: '#facc15',
         retentionWeak: '#f87171',
         retentionForgotten: '#6b7280',
-        coachingCard: '#1f2937',
+        coachingCard: '#1e293b',
         homeworkLane: '#d97706',
       },
       radii: { card: '10px', button: '8px', input: '6px' },
