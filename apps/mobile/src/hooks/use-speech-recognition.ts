@@ -24,6 +24,27 @@ export interface UseSpeechRecognitionResult {
 }
 
 /**
+ * Lazily resolve `ExpoSpeechRecognitionModule` from the dynamic import.
+ * Returns `null` if the package is not installed / fails to load.
+ */
+async function loadSpeechModule(): Promise<{
+  requestPermissionsAsync: () => Promise<{ granted: boolean }>;
+  start: (opts: {
+    lang: string;
+    interimResults: boolean;
+    continuous: boolean;
+  }) => void;
+  stop: () => void;
+} | null> {
+  try {
+    const mod = await import('expo-speech-recognition');
+    return mod.ExpoSpeechRecognitionModule ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Hook wrapping expo-speech-recognition for on-device STT.
  * Uses manual start/stop (no VAD per plan — VAD is stretch goal).
  *
@@ -48,12 +69,9 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
       setError(null);
       setStatus('requesting_permission');
 
-      // Dynamic import to avoid crash if package not installed
-      const ExpoSpeechRecognition = await import(
-        'expo-speech-recognition'
-      ).catch(() => null);
+      const speechModule = await loadSpeechModule();
 
-      if (!ExpoSpeechRecognition) {
+      if (!speechModule) {
         if (mountedRef.current) {
           setError('Speech recognition is not available on this device');
           setStatus('error');
@@ -62,7 +80,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
       }
 
       // Request permissions
-      const { granted } = await ExpoSpeechRecognition.requestPermissionsAsync();
+      const { granted } = await speechModule.requestPermissionsAsync();
       if (!granted) {
         if (mountedRef.current) {
           setError('Microphone permission is required for voice input');
@@ -76,33 +94,13 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
         setStatus('listening');
       }
 
-      // Start recognition
-      ExpoSpeechRecognition.start({
+      // Start recognition — event listeners are handled via useSpeechRecognitionEvent
+      // at the component level (VoiceRecordButton / ChatShell). This hook only
+      // manages the imperative start/stop lifecycle.
+      speechModule.start({
         lang: 'en-US',
         interimResults: true,
         continuous: true,
-      });
-
-      // Listen for results
-      ExpoSpeechRecognition.addResultListener(
-        (event: { results: Array<{ transcript: string }> }) => {
-          if (!mountedRef.current) return;
-          const result = event.results[0];
-          if (result?.transcript) {
-            setTranscript(result.transcript);
-          }
-        }
-      );
-
-      ExpoSpeechRecognition.addErrorListener((event: { error: string }) => {
-        if (!mountedRef.current) return;
-        setError(event.error);
-        setStatus('error');
-      });
-
-      ExpoSpeechRecognition.addEndListener(() => {
-        if (!mountedRef.current) return;
-        setStatus('idle');
       });
     } catch (err) {
       if (mountedRef.current) {
@@ -116,12 +114,10 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
 
   const stopListening = useCallback(async () => {
     try {
-      const ExpoSpeechRecognition = await import(
-        'expo-speech-recognition'
-      ).catch(() => null);
+      const speechModule = await loadSpeechModule();
 
-      if (ExpoSpeechRecognition) {
-        ExpoSpeechRecognition.stop();
+      if (speechModule) {
+        speechModule.stop();
       }
 
       if (mountedRef.current) {
