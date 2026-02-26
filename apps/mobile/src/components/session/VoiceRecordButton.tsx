@@ -62,7 +62,7 @@ export function VoiceRecordButton({
         <Ionicons
           name={isListening ? 'stop' : 'mic'}
           size={22}
-          color={isListening ? colors.inverse : colors.primary}
+          color={isListening ? colors.textInverse : colors.primary}
         />
       </Pressable>
     </Animated.View>
