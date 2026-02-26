@@ -207,7 +207,12 @@ export async function processConsentResponse(
       respondedAt: now,
       updatedAt: now,
     })
-    .where(eq(consentStates.id, row.id));
+    .where(
+      and(
+        eq(consentStates.id, row.id),
+        eq(consentStates.profileId, row.profileId)
+      )
+    );
 
   // 3. If denied (FR10): cascade-delete the child's profile.
   //    CASCADE FKs handle all child data (subjects, sessions, etc.)
@@ -364,7 +369,12 @@ export async function revokeConsent(
       respondedAt: now,
       updatedAt: now,
     })
-    .where(eq(consentStates.id, existing.id))
+    .where(
+      and(
+        eq(consentStates.id, existing.id),
+        eq(consentStates.profileId, childProfileId)
+      )
+    )
     .returning();
 
   return mapConsentRow(row);
@@ -410,11 +420,13 @@ export async function restoreConsent(
       respondedAt: now,
       updatedAt: now,
     })
-    .where(eq(consentStates.id, existing.id))
+    .where(
+      and(
+        eq(consentStates.id, existing.id),
+        eq(consentStates.profileId, childProfileId)
+      )
+    )
     .returning();
 
   return mapConsentRow(row);
 }
-
-
-

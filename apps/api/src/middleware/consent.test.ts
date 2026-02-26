@@ -46,6 +46,12 @@ const US_CHILD_META: ProfileMeta = {
   consentStatus: 'PARENTAL_CONSENT_REQUESTED',
 };
 
+const WITHDRAWN_CHILD_META: ProfileMeta = {
+  birthDate: '2014-06-15',
+  location: 'EU',
+  consentStatus: 'WITHDRAWN',
+};
+
 const CONSENTED_CHILD_META: ProfileMeta = {
   birthDate: '2014-06-15',
   location: 'EU',
@@ -164,6 +170,20 @@ describe('consentMiddleware', () => {
     const body = await res.json();
     expect(body.code).toBe('CONSENT_REQUIRED');
     expect(body.details.consentType).toBe('COPPA');
+  });
+
+  it('returns 403 for EU child with WITHDRAWN consent', async () => {
+    const app = createApp({
+      profileId: 'p-1',
+      profileMeta: WITHDRAWN_CHILD_META,
+    });
+    const res = await app.request('/v1/subjects');
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('CONSENT_WITHDRAWN');
+    expect(body.message).toContain('withdrawn');
+    expect(body.details.consentType).toBe('GDPR');
   });
 
   it('allows /v1/__test/ paths even with pending consent', async () => {

@@ -92,6 +92,19 @@ export const consentMiddleware = createMiddleware<ConsentEnv>(
       );
     }
 
+    // Block if consent has been withdrawn (GDPR Art. 7(3) — 7-day grace period)
+    if (meta.consentStatus === 'WITHDRAWN') {
+      return c.json(
+        {
+          code: ERROR_CODES.CONSENT_WITHDRAWN,
+          message:
+            'Consent has been withdrawn. Account data deletion is pending.',
+          details: { consentType },
+        },
+        403
+      );
+    }
+
     await next();
     return;
   }

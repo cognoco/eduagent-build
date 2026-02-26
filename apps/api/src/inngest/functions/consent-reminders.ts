@@ -4,7 +4,10 @@ import {
   getStepResendApiKey,
   getStepEmailFrom,
 } from '../helpers';
-import { getConsentStatus } from '../../services/consent';
+import {
+  getConsentStatus,
+  getProfileConsentState,
+} from '../../services/consent';
 import { deleteProfile } from '../../services/deletion';
 import {
   sendEmail,
@@ -16,7 +19,7 @@ export const consentReminder = inngest.createFunction(
   { id: 'consent-reminder', name: 'Send consent reminder' },
   { event: 'app/consent.requested' },
   async ({ event, step }) => {
-    const { profileId, parentEmail, consentType: _consentType } = event.data;
+    const { profileId } = event.data;
 
     // Build email options from Inngest middleware-injected env vars
     const emailOpts = (): EmailOptions => ({
@@ -24,12 +27,21 @@ export const consentReminder = inngest.createFunction(
       emailFrom: getStepEmailFrom(),
     });
 
+    /** Look up parentEmail from the DB (never from event payload — PII). */
+    async function lookupParentEmail(): Promise<string | null> {
+      const db = getStepDatabase();
+      const state = await getProfileConsentState(db, profileId);
+      return state?.parentEmail ?? null;
+    }
+
     // Day 7 reminder
     await step.sleep('wait-7-days', '7d');
     await step.run('send-day-7-reminder', async () => {
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
+      const parentEmail = await lookupParentEmail();
+      if (!parentEmail) return;
       await sendEmail(
         formatConsentReminderEmail(parentEmail, 'your child', 23),
         emailOpts()
@@ -42,6 +54,8 @@ export const consentReminder = inngest.createFunction(
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
+      const parentEmail = await lookupParentEmail();
+      if (!parentEmail) return;
       await sendEmail(
         formatConsentReminderEmail(parentEmail, 'your child', 16),
         emailOpts()
@@ -54,6 +68,8 @@ export const consentReminder = inngest.createFunction(
       const db = getStepDatabase();
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
+      const parentEmail = await lookupParentEmail();
+      if (!parentEmail) return;
       await sendEmail(
         {
           to: parentEmail,
