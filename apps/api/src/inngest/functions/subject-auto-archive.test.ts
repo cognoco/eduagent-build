@@ -2,36 +2,15 @@
 // Subject Auto-Archive — Tests
 // ---------------------------------------------------------------------------
 
-const mockDbUpdate = jest.fn().mockReturnValue({
-  set: jest.fn().mockReturnValue({
-    where: jest.fn().mockReturnValue({
-      returning: jest.fn().mockResolvedValue([]),
-    }),
-  }),
-});
-
-const mockDbSelect = jest.fn().mockReturnValue({
-  from: jest.fn().mockReturnValue({
-    where: jest.fn().mockReturnValue({
-      groupBy: jest.fn().mockResolvedValue([]),
-    }),
-  }),
-});
-
 jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn(() => ({
-    update: mockDbUpdate,
-    select: mockDbSelect,
-  })),
-  subjects: {
-    id: 'id',
-    status: 'status',
-    updatedAt: 'updated_at',
-  },
-  learningSessions: {
-    subjectId: 'subject_id',
-    lastActivityAt: 'last_activity_at',
-  },
+  createDatabase: jest.fn(() => ({})),
+}));
+
+const mockArchiveInactiveSubjects = jest.fn().mockResolvedValue([]);
+
+jest.mock('../../services/subject', () => ({
+  archiveInactiveSubjects: (...args: unknown[]) =>
+    mockArchiveInactiveSubjects(...args),
 }));
 
 import { subjectAutoArchive } from './subject-auto-archive';
@@ -101,31 +80,33 @@ describe('subjectAutoArchive', () => {
   });
 
   it('archives subjects with no recent activity', async () => {
-    // Mock that update returns 2 archived subjects
-    mockDbUpdate.mockReturnValueOnce({
-      set: jest.fn().mockReturnValue({
-        where: jest.fn().mockReturnValue({
-          returning: jest
-            .fn()
-            .mockResolvedValue([{ id: 'subject-1' }, { id: 'subject-2' }]),
-        }),
-      }),
-    });
+    mockArchiveInactiveSubjects.mockResolvedValueOnce([
+      { id: 'subject-1' },
+      { id: 'subject-2' },
+    ]);
 
     const { result } = await executeSteps();
 
     expect(result.archivedCount).toBe(2);
-    expect(mockDbUpdate).toHaveBeenCalled();
+    expect(mockArchiveInactiveSubjects).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes cutoff date to service function', async () => {
+    await executeSteps();
+
+    expect(mockArchiveInactiveSubjects).toHaveBeenCalledWith(
+      expect.anything(), // db instance
+      expect.any(Date)
+    );
+
+    const cutoffArg = mockArchiveInactiveSubjects.mock.calls[0][1] as Date;
+    const expectedCutoff = new Date(NOW);
+    expectedCutoff.setDate(expectedCutoff.getDate() - 30);
+    expect(cutoffArg.toISOString()).toBe(expectedCutoff.toISOString());
   });
 
   it('handles zero stale subjects gracefully', async () => {
-    mockDbUpdate.mockReturnValueOnce({
-      set: jest.fn().mockReturnValue({
-        where: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    mockArchiveInactiveSubjects.mockResolvedValueOnce([]);
 
     const { result } = await executeSteps();
 

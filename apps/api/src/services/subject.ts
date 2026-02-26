@@ -3,9 +3,10 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and } from 'drizzle-orm';
+import { eq, and, notInArray, sql } from 'drizzle-orm';
 import {
   subjects,
+  learningSessions,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
@@ -85,4 +86,43 @@ export async function updateSubject(
     .where(and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)))
     .returning();
   return rows[0] ? mapSubjectRow(rows[0]) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Auto-archive — used by subject-auto-archive Inngest function
+// ---------------------------------------------------------------------------
+
+/**
+ * Archive all active subjects with no learning session activity since
+ * `cutoffDate`. Returns the list of archived subject IDs.
+ *
+ * This is a cross-profile batch operation (no profileId scoping) — it runs
+ * from a cron job, not a user request.
+ */
+export async function archiveInactiveSubjects(
+  db: Database,
+  cutoffDate: Date
+): Promise<{ id: string }[]> {
+  const now = new Date();
+
+  // Subquery: subjects that had at least one session after the cutoff
+  const recentlyActiveSubjectIds = db
+    .select({ subjectId: learningSessions.subjectId })
+    .from(learningSessions)
+    .where(sql`${learningSessions.lastActivityAt} >= ${cutoffDate}`)
+    .groupBy(learningSessions.subjectId);
+
+  // Archive all active subjects NOT in the recently-active set
+  const result = await db
+    .update(subjects)
+    .set({ status: 'archived', updatedAt: now })
+    .where(
+      and(
+        eq(subjects.status, 'active'),
+        notInArray(subjects.id, recentlyActiveSubjectIds)
+      )
+    )
+    .returning({ id: subjects.id });
+
+  return result;
 }

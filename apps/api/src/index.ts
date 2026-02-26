@@ -7,6 +7,7 @@ import type { Database } from '@eduagent/database';
 
 import { captureException } from './services/sentry';
 
+import { envValidationMiddleware } from './middleware/env-validation';
 import { authMiddleware } from './middleware/auth';
 import { databaseMiddleware } from './middleware/database';
 import { accountMiddleware } from './middleware/account';
@@ -110,6 +111,9 @@ api.use(
 
 // Request logging — runs before auth so every request (including public) is logged
 api.use('*', requestLogger);
+
+// Env validation — validates c.env bindings on first request only; skipped in tests
+api.use('*', envValidationMiddleware);
 
 // Auth middleware — runs before all routes; public paths are skipped internally
 api.use('*', authMiddleware);

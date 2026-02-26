@@ -13,6 +13,7 @@ import {
   createSubject,
   getSubject,
   updateSubject,
+  archiveInactiveSubjects,
 } from './subject';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -185,5 +186,47 @@ describe('updateSubject', () => {
 
     expect(result).not.toBeNull();
     expect(result!.name).toBe('Updated Name');
+  });
+});
+
+describe('archiveInactiveSubjects', () => {
+  function createArchiveMockDb(archivedIds: { id: string }[] = []): Database {
+    // The select().from().where().groupBy() subquery is used inline,
+    // so we only need to mock the update chain.
+    return {
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            groupBy: jest.fn(), // subquery — never awaited directly
+          }),
+        }),
+      }),
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue(archivedIds),
+          }),
+        }),
+      }),
+    } as unknown as Database;
+  }
+
+  it('returns archived subject IDs', async () => {
+    const db = createArchiveMockDb([{ id: 's1' }, { id: 's2' }]);
+    const cutoff = new Date('2025-01-01T00:00:00Z');
+
+    const result = await archiveInactiveSubjects(db, cutoff);
+
+    expect(result).toEqual([{ id: 's1' }, { id: 's2' }]);
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it('returns empty array when no subjects to archive', async () => {
+    const db = createArchiveMockDb([]);
+    const cutoff = new Date('2025-01-01T00:00:00Z');
+
+    const result = await archiveInactiveSubjects(db, cutoff);
+
+    expect(result).toEqual([]);
   });
 });
