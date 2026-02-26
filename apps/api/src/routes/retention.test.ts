@@ -442,6 +442,60 @@ describe('retention routes', () => {
 
       expect(res.status).toBe(401);
     });
+
+    it('returns 200 with analogyDomain (FR134-137)', async () => {
+      (setTeachingPreference as jest.Mock).mockResolvedValue({
+        subjectId: SUBJECT_ID,
+        method: 'step_by_step',
+        analogyDomain: 'cooking',
+      });
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/teaching-preference`,
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            subjectId: SUBJECT_ID,
+            method: 'step_by_step',
+            analogyDomain: 'cooking',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.preference.analogyDomain).toBe('cooking');
+    });
+
+    it('accepts null analogyDomain to clear preference', async () => {
+      (setTeachingPreference as jest.Mock).mockResolvedValue({
+        subjectId: SUBJECT_ID,
+        method: 'step_by_step',
+        analogyDomain: null,
+      });
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/teaching-preference`,
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            subjectId: SUBJECT_ID,
+            method: 'step_by_step',
+            analogyDomain: null,
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.preference.analogyDomain).toBeNull();
+    });
   });
 
   // -------------------------------------------------------------------------

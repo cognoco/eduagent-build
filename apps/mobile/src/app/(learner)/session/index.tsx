@@ -223,7 +223,7 @@ export default function SessionScreen() {
     <Pressable
       onPress={handleEndSession}
       disabled={isClosing || isStreaming}
-      className="ml-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
+      className="ms-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
       testID="end-session-button"
       accessibilityLabel="End session"
       accessibilityRole="button"

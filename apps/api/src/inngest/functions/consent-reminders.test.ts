@@ -1,4 +1,5 @@
 const mockGetConsentStatus = jest.fn();
+const mockGetProfileConsentState = jest.fn();
 const mockDeleteProfile = jest.fn();
 const mockSendEmail = jest.fn();
 
@@ -10,6 +11,8 @@ jest.mock('../helpers', () => ({
 
 jest.mock('../../services/consent', () => ({
   getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
+  getProfileConsentState: (...args: unknown[]) =>
+    mockGetProfileConsentState(...args),
 }));
 
 jest.mock('../../services/deletion', () => ({
@@ -30,8 +33,19 @@ jest.mock('../../services/notifications', () => ({
 
 import { consentReminder } from './consent-reminders';
 
+interface ProfileConsentState {
+  status: string;
+  parentEmail: string | null;
+  consentType: string;
+}
+
 async function executeHandler(
-  statusSequence: (string | null)[]
+  statusSequence: (string | null)[],
+  profileState: ProfileConsentState | null = {
+    status: 'PARENTAL_CONSENT_REQUESTED',
+    parentEmail: 'parent@example.com',
+    consentType: 'GDPR',
+  }
 ): Promise<void> {
   let callIndex = 0;
   mockGetConsentStatus.mockImplementation(async () => {
@@ -39,6 +53,9 @@ async function executeHandler(
     callIndex++;
     return status;
   });
+
+  // parentEmail is looked up from DB via getProfileConsentState
+  mockGetProfileConsentState.mockResolvedValue(profileState);
 
   const mockStep = {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
@@ -52,7 +69,6 @@ async function executeHandler(
       name: 'app/consent.requested',
       data: {
         profileId: 'profile-1',
-        parentEmail: 'parent@example.com',
         consentType: 'GDPR',
       },
     },
@@ -125,5 +141,15 @@ describe('consentReminder', () => {
 
     expect(mockSendEmail).toHaveBeenCalledTimes(3);
     expect(mockDeleteProfile).not.toHaveBeenCalled();
+  });
+
+  it('does not send email when parentEmail is not found in DB', async () => {
+    // Pass null profile state so parentEmail lookup returns null
+    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING'], null);
+
+    // No emails sent because parentEmail lookup returns null
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    // Delete still happens because consent status is PENDING
+    expect(mockDeleteProfile).toHaveBeenCalledTimes(1);
   });
 });

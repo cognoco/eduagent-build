@@ -1,4 +1,4 @@
 pnpm exec lint-staged
 
-# Run affected tests
-NX_DAEMON=false pnpm exec nx affected -t test --base=HEAD~1
+# Surgical tests — only tests related to staged files (see scripts/pre-commit-tests.sh)
+bash scripts/pre-commit-tests.sh

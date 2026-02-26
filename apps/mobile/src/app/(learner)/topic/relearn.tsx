@@ -107,7 +107,7 @@ export default function RelearnScreen() {
       <View className="px-5 pt-4 pb-3 flex-row items-center">
         <Pressable
           onPress={() => router.back()}
-          className="mr-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
+          className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="relearn-back"
           accessibilityLabel="Go back"
           accessibilityRole="button"

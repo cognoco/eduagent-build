@@ -1,0 +1,56 @@
+# Reusable setup: Seed test data via API, then sign in via the app UI.
+#
+# Called by other flows via:
+#   - runFlow:
+#       file: _setup/seed-and-sign-in.yaml
+#       env:
+#         SEED_SCENARIO: with-subject
+#         API_URL: ${API_URL}
+#
+# Environment variables:
+#   SEED_SCENARIO  — Seed scenario key (e.g., "with-subject", "retention-due")
+#   API_URL        — Base URL for the API (default: http://10.0.2.2:8787 for Android emulator)
+#
+# After this flow completes, the app is authenticated and on the home screen.
+#
+# NOTE: The seed endpoint currently creates DB rows but does NOT create real
+# Clerk users. Until Clerk Backend API integration is added to the seed service,
+# sign-in will need a real test Clerk account or a deep-link auth bypass.
+# TODO: Implement Clerk test user creation in seed service.
+appId: com.zwizzly.eduagent
+---
+# Step 1: Seed test data via API
+- runScript:
+    file: ../../scripts/seed.js
+    env:
+      API_URL: ${API_URL}
+      SCENARIO: ${SEED_SCENARIO}
+    outputVariable: seedResult
+
+# Step 2: Launch app with clean state
+- launchApp:
+    clearState: true
+
+# Step 3: Wait for auth screen
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 15000
+
+# Step 4: Sign in with seeded credentials
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${output.seedResult.email}
+- tapOn:
+    id: "sign-in-password"
+# TODO: Replace with ${output.seedResult.password} once seed service
+# creates Clerk users with a known test password
+- inputText: "TestPass123!"
+- tapOn:
+    id: "sign-in-button"
+
+# Step 5: Wait for home screen (auth complete)
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000

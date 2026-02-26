@@ -44,7 +44,7 @@ export function RetentionSignal({ status, compact }: RetentionSignalProps) {
     >
       <View
         className={`w-2.5 h-2.5 rounded-full ${dotColor} ${
-          compact ? '' : 'mr-1.5'
+          compact ? '' : 'me-1.5'
         }`}
       />
       {!compact && (

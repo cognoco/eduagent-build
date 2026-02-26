@@ -8,7 +8,7 @@ import { useRegisterPushToken } from './use-settings';
  * Requests notification permissions and registers the Expo push token
  * with the API on first mount. Guarded by a ref to prevent duplicate calls.
  *
- * Should be called once in the learner layout after consent gate passes.
+ * Should be called once in each persona layout (learner and parent).
  */
 export function usePushTokenRegistration(): void {
   const hasRegistered = useRef(false);

@@ -230,6 +230,60 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain('Teaching method preference');
   });
 
+  it('includes analogy domain preference when set (FR134-137)', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      analogyDomain: 'cooking',
+    });
+    expect(prompt).toContain('Analogy preference');
+    expect(prompt).toContain('cooking');
+    expect(prompt).toContain("don't force an analogy");
+  });
+
+  it('omits analogy domain when not set', () => {
+    const prompt = buildSystemPrompt(baseContext);
+    expect(prompt).not.toContain('Analogy preference');
+  });
+
+  it('includes EVALUATE prompt section when verificationType is evaluate (FR128-133)', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      verificationType: 'evaluate',
+      evaluateDifficultyRung: 2,
+    });
+    expect(prompt).toContain('EVALUATE CHALLENGE');
+    expect(prompt).toContain("Devil's Advocate");
+    expect(prompt).toContain('Difficulty rung 2/4');
+    expect(prompt).toContain('challengePassed');
+  });
+
+  it('defaults EVALUATE difficulty rung to 1 when not specified', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      verificationType: 'evaluate',
+    });
+    expect(prompt).toContain('Difficulty rung 1/4');
+  });
+
+  it('includes TEACH_BACK prompt section when verificationType is teach_back (FR138-143)', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      verificationType: 'teach_back',
+    });
+    expect(prompt).toContain('TEACH BACK');
+    expect(prompt).toContain('Feynman Technique');
+    expect(prompt).toContain('curious but clueless student');
+    expect(prompt).toContain('completeness');
+    expect(prompt).toContain('accuracy');
+    expect(prompt).toContain('clarity');
+  });
+
+  it('omits EVALUATE/TEACH_BACK sections for standard verification', () => {
+    const prompt = buildSystemPrompt(baseContext);
+    expect(prompt).not.toContain('EVALUATE CHALLENGE');
+    expect(prompt).not.toContain('TEACH BACK');
+  });
+
   it('works without optional fields', () => {
     const minimalContext: ExchangeContext = {
       sessionId: 'sess-1',

@@ -19,8 +19,9 @@ tags:
 - launchApp
 
 # Assert home screen is visible
-- assertVisible:
-    text: "Ready to learn"
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
     timeout: 15000
 
 # The coaching card's primary button starts a session.
@@ -32,8 +33,9 @@ tags:
 # The session screen shows one of: "Learning Session", "Homework Help",
 # "Practice Session", or "Chat" in the ChatShell header.
 # We check for the chat input which is always present.
-- assertVisible:
-    id: "chat-input"
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
     timeout: 10000
 
 # Type a message in the chat input
@@ -48,8 +50,9 @@ tags:
 # Wait for the AI response to appear.
 # The send button should become re-enabled once streaming is done.
 # We verify the chat input is still present (session didn't crash).
-- assertVisible:
-    id: "chat-input"
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
     timeout: 15000
 
 - takeScreenshot: learning-session-message-sent

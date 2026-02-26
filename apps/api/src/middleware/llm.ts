@@ -17,7 +17,13 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
     const key = c.env?.GEMINI_API_KEY;
     if (key) {
       registerProvider(createGeminiProvider(key));
-    } else if (process.env['NODE_ENV'] === 'test') {
+    } else if (
+      c.env?.ENVIRONMENT === 'test' ||
+      // Fallback: Jest sets NODE_ENV at module level — process.env is
+      // acceptable here because this branch only fires in Node.js tests
+      // (CF Workers never reach this path without GEMINI_API_KEY).
+      process.env['NODE_ENV'] === 'test'
+    ) {
       console.warn(
         '[llm] GEMINI_API_KEY not set — skipping provider registration (test environment)'
       );

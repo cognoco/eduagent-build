@@ -159,6 +159,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 | Offline mode | Significant caching complexity | v2.0 |
 | Age 6-10 mode | Different UX, stricter COPPA requirements | v2.0 |
 | B2B/Team licensing | Focus on B2C first | v2.0 |
+| Concept Map visualization library choice | Deferred to implementation (Epic 7) | v1.1 |
 
 *See Product Brief for post-MVP roadmap (v1.5, v2.0).*
 
@@ -989,6 +990,8 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 - FR21: Users can have curriculum adapt after module completion based on performance
 - FR22: Users can see realistic time estimates per topic
 
+See also FR134-FR137 (Analogy Domain Preferences) for subject-level learning style customization.
+
 **Interview Abandonment:**
 - Interview progress auto-saved after each exchange
 - On return: "Continue your interview?" with summary of what was discussed
@@ -1123,6 +1126,8 @@ AI uses different assessment types based on subject and skill being verified:
 | **CREATE** | Produce original work | Essays, Code, Languages | "Write a function that sorts a list" |
 | **LISTEN** | Comprehend spoken language | Languages | "What did the speaker say about the weather?" |
 | **SPEAK** | Produce spoken language | Languages | "Describe your morning routine in Spanish" |
+| **EVALUATE** | Identify flaws in presented reasoning (Bloom L5-6) | All | "Here's an explanation of photosynthesis — can you spot what's wrong?" |
+| **TEACH_BACK** | Explain concept verbally; AI identifies gaps (Bloom L6) | All | "Teach me about photosynthesis — pretend I know nothing" |
 
 **Implementation:**
 - AI selects verification type based on learning objective and topic
@@ -1178,6 +1183,12 @@ AI uses different assessment types based on subject and skill being verified:
 - FR64: Users can store teaching method preference per subject (not global)
 - FR65: System auto-applies stored method preference when user starts session in that subject
 - FR66: Users can reset teaching method preferences from Settings
+
+See also FR128-FR133 (EVALUATE Verification) for devil's advocate verification mode.
+
+See also FR134-FR137 (Analogy Domain Preferences) for analogy-based teaching customization.
+
+See also FR138-FR143 (Feynman Stage) for teach-back verification via voice.
 
 ### Progress Tracking
 
@@ -1337,6 +1348,118 @@ Realistic time expectations based on Foreign Service Institute research (for Eng
 - Progress dashboard shows: "Hours studied: 124 / ~900 FSI estimate (14%)"
 - Manages expectations early to prevent dropout from unrealistic goals
 - CEFR milestones provide interim progress markers (A1 achievable in ~60-100 hours for Category I)
+
+### Concept Map — Prerequisite-Aware Learning (Epic 7 — v1.1)
+
+- FR118: Topic prerequisite graph — DAG data model with `topic_prerequisites` join table. Each edge has relationship type (REQUIRED or RECOMMENDED). Validated for cycle-freedom on insert.
+- FR119: Prerequisite-aware session ordering — when coaching card recommends a topic, check prerequisite completion first. If prerequisites incomplete, recommend prerequisite topic instead.
+- FR120: Skip warning on prerequisite topics — when student explicitly skips a prerequisite, show warning dialog explaining which dependent topics may be harder. Log skip decision in `curriculumAdaptations.prerequisiteContext` JSONB for coaching awareness.
+- FR121: Visual concept map — read-only DAG visualization showing topic nodes colored by retention status (green=strong, yellow=fading, red=weak, grey=not started). Edges show prerequisite relationships.
+- FR122: Prerequisite edge generation — when new subject is created, LLM generates initial prerequisite edges based on curriculum structure. When new topic is added to existing subject, targeted LLM call generates edges for the new topic only (not full regeneration).
+- FR123: Graph-aware coaching card — coaching card precomputation considers prerequisite graph. New card type: "newly unlocked" for topics whose prerequisites were just completed.
+- FR124: Orphan edge handling — when prerequisite topic is skipped, dependent topics remain accessible but coaching card notes missing foundation. The `prerequisiteContext` JSONB records which prerequisites were skipped and when.
+- FR125: Prerequisite context as teaching signal — when LLM teaches a topic whose prerequisite was skipped, the system prompt includes prerequisite context so the LLM can bridge knowledge gaps.
+- FR126: Topological sort for learning path — default topic ordering uses topological sort of the prerequisite graph, with ties broken by retention urgency.
+- FR127: Manual prerequisite override — parent or advanced learner can mark a prerequisite as "already known" to unlock dependent topics without completing the prerequisite in-app.
+
+**Prerequisite Relationship Types:**
+- **REQUIRED** — topic is locked until prerequisite reaches "strong" retention. Enforced by unlock logic (FR119).
+- **RECOMMENDED** — advisory only. Topic is unlocked regardless of prerequisite status. Coaching card and LLM context mention the gap but do not block progress.
+
+**Graph Constraints:**
+- Prerequisite graph must be a DAG (directed acyclic graph). Cycles are rejected on insert (FR118).
+- Each edge has a `relationshipType` enum: `REQUIRED | RECOMMENDED`.
+- Maximum depth: 5 levels. LLM prompt instructs shallow prerequisite chains to avoid deep lock cascades.
+
+**Visual Concept Map (FR121):**
+- Node colors: strong (green), fading (yellow), weak (red), grey (not started)
+- Edges: solid lines for REQUIRED, dashed lines for RECOMMENDED
+- Read-only visualization (tap a node to navigate to topic detail / start session)
+- Graph auto-layouts using force-directed algorithm; user can pan/zoom
+
+**Coaching Card Integration (FR123):**
+- Coaching card precomputation considers prerequisite graph
+- New card type: `topic-unlocked` for topics whose prerequisites were just completed
+- Card text: "You just unlocked [Topic Name]! Your mastery of [prerequisite list] means you're ready."
+
+**LLM Context Injection (FR124, FR125):**
+- When prerequisite was skipped, system prompt includes prerequisite context so LLM can bridge knowledge gaps
+- `prerequisiteContext` JSONB records which prerequisites were skipped and when
+- Context is advisory — LLM adapts teaching style but never refuses to teach a topic
+
+### Devil's Advocate / EVALUATE Verification (Epic 3 extension — MVP)
+
+- FR128: EVALUATE verification type — 8th verification type where AI presents deliberately flawed reasoning about a concept and student must identify the error. Targets Bloom's Taxonomy Level 5-6 (Evaluate/Create). Only triggers on topics with strong retention (easeFactor >= 2.5, repetitions > 0).
+- FR129: Strong-retention gating — EVALUATE challenges are never presented for new, weak, or fading topics. The verification selector checks retention card state before offering EVALUATE as an option.
+- FR130: Persona-appropriate framing — Teen (11-15): playful/competitive tone ("I think this explanation is right — can you prove me wrong?"). Learner (16+): academic/collaborative ("Here's a common explanation — what's the flaw in this reasoning?"). Uses existing `buildSystemPrompt()` persona voice system.
+- FR131: Difficulty calibration — EVALUATE difficulty tied to existing escalation rung system (1-4). Rung 1-2: obvious logical errors, clear factual mistakes. Rung 3-4: subtle misconceptions, plausible-but-wrong reasoning. `evaluateDifficultyRung` (integer 1-4, nullable, default null) stored on retention card alongside SM-2 state. Advances on consecutive success, demotes on failure.
+- FR132: Modified SM-2 scoring floor — EVALUATE failure maps to quality 2-3 (not 0-1). Rationale: missing a subtle flaw in presented reasoning ≠ not knowing the concept. Standard verification failure = quality 0-3. Without this floor, tricky EVALUATE challenges would tank retention scores unfairly. The SM-2 library (`packages/retention/`) math is unchanged — only the quality INPUT is different.
+- FR133: Three-strike escalation for EVALUATE — First failure: reveal the flaw with explanation (teach the analytical skill, not the concept). Second failure: lower difficulty rung, retry with more obvious flaw. Third consecutive failure: mark topic for standard review (not EVALUATE) — don't re-teach from scratch, the student knows the concept, just needs practice identifying flaws.
+
+**EVALUATE Scoring Model (FR132):**
+
+| Scenario | Standard Quality | EVALUATE Quality | Rationale |
+|----------|-----------------|-----------------|-----------|
+| Correct identification | 4-5 | 4-5 | Full understanding demonstrated |
+| Partial identification | 2-3 | 3 | Analytical skill developing |
+| Failed to identify flaw | 0-1 | 2-3 | Missing subtle flaw ≠ no knowledge |
+| "I don't know" response | 0 | 1 | Honest uncertainty, minimal penalty |
+
+**EVALUATE Difficulty Calibration:**
+
+| Rung | Flaw Type | Example |
+|------|-----------|---------|
+| 1 | Obvious factual error | "Water boils at 50°C" |
+| 2 | Clear logical mistake | Reversing cause and effect |
+| 3 | Subtle misconception | Conflating correlation with causation |
+| 4 | Plausible-but-wrong reasoning | Applying a rule correctly to the wrong domain |
+
+**Persona Framing:**
+
+| Persona | Opening Frame | Tone |
+|---|---|---|
+| Teen (11-15) | "I think this explanation is right — can you prove me wrong?" | Playful/competitive |
+| Learner (16+) | "Here's a common explanation — what's the flaw in this reasoning?" | Academic/collaborative |
+
+**LLM Prompt Requirements:**
+The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) common misconceptions for that topic, (c) the student's current mastery level, (d) the current EVALUATE difficulty rung. The prompt must generate a plausible-but-wrong explanation calibrated to difficulty — too obviously wrong is useless, too subtle is frustrating.
+
+### Analogy Domain Preferences — Multiverse of Analogies (Epic 3 extension — MVP)
+
+- FR134: Analogy domain selection — student can choose from 6 curated analogy domains per subject: cooking, sports, building, music, nature, gaming. Stored in `teachingPreferences.analogyDomain` (nullable — null means no analogy preference, direct explanation only). Changeable anytime from subject settings.
+- FR135: System prompt injection — when `analogyDomain` is set, `buildSystemPrompt()` appends: "When explaining abstract or unfamiliar concepts, prefer analogies from the domain of [domain]. Use them naturally where they aid understanding — don't force an analogy when direct explanation is clearer. Adapt analogy complexity to the learner's level." Prompt hash naturally invalidates cached prompts when domain changes.
+- FR136: Onboarding integration — optional "How do you like things explained?" step during subject onboarding interview. Presents 6 domain options as icons/labels. Skippable — defaults to null (no analogy preference).
+- FR137: Preference persistence and immediacy — analogy domain preference takes effect on the next exchange within the same session (no session restart required). `ExchangeContext` is rebuilt per exchange, so preference changes are picked up immediately.
+
+### Feynman Stage — Teach-Back Via Voice (Epic 3 extension — MVP)
+
+- FR138: TEACH_BACK verification type — 9th verification type. AI plays a "clueless but interested student." User explains the concept verbally. LLM analyzes transcript for completeness, accuracy, and clarity, then asks a clarifying question about the weakest area. Targets Bloom's Level 6 (Create). Only triggers on topics with moderate-to-strong retention (student must have learned the concept before teaching it back). Nothing solidifies knowledge like teaching it — this is the Feynman Technique at scale.
+- FR139: On-device speech-to-text — `expo-speech-recognition` wrapping iOS/Android native recognition. No cloud dependency, no additional billing, no network latency. Transcript appears as a user message in MessageThread. Audio permissions handled via standard Expo permission flow.
+- FR140: Structured assessment rubric — LLM outputs two-part response: (1) conversational "confused student" follow-up question (visible to student in MessageThread), (2) hidden JSON assessment stored in `session_events.structured_assessment` JSONB: `{ completeness: 0-5, accuracy: 0-5, clarity: 0-5, overallQuality: 0-5, weakestArea: string, gapIdentified: string }`. `overallQuality` maps directly to SM-2 quality input. Accuracy weighted highest (wrong > incomplete > unclear). Coaching card precomputation and parent dashboard consume the structured data downstream. Same two-output pattern as EVALUATE — student sees natural interaction, system gets machine-readable scoring.
+- FR141: Voice response (TTS) — `expo-speech` (built into Expo, no install) reads AI response aloud after SSE streaming completes (Option A: wait for complete response, then speak). Text streams visually into chat during generation, then audio plays once complete. No cloud dependency, no cost.
+- FR142: Voice toggle — session-level toggle to mute AI voice output. Not a persistent preference — same student may want voice at home, text at school. TEACH_BACK defaults to voice-on. Toggle visible in session header.
+- FR143: Recording UI — microphone button in chat input area, waveform/pulse animation while speaking, transcript preview before sending. "Tap to speak" affordance. Tap again to stop recording.
+
+**TEACH_BACK Scoring Model (FR140):**
+
+| Dimension | Weight | 5 (Excellent) | 3 (Adequate) | 1 (Poor) | 0 (Missing) |
+|-----------|--------|---------------|---------------|----------|-------------|
+| Completeness | 30% | All key concepts covered | Most concepts, minor gaps | Major concepts missing | No meaningful content |
+| Accuracy | 50% | Everything correct | Minor inaccuracies | Significant errors | Fundamentally wrong |
+| Clarity | 20% | Beginner would understand | Some confusing parts | Hard to follow | Incoherent |
+
+**TEACH_BACK Prompt Template (FR138):**
+
+> "You are a curious but clueless student. The user is trying to teach you [topic]. Analyze their explanation for: completeness (did they cover the key concepts?), accuracy (did they state anything incorrectly?), and clarity (would a beginner understand this?). Ask one clarifying question about the weakest area. Stay in character — be genuinely curious, not evaluative."
+
+### Full Voice Mode (Epic 8 — v1.1)
+
+- FR144: Voice-first session mode — any learning, homework, or interleaved session can be conducted via voice. Student speaks questions/answers, AI responds with voice. Toggle at session start: "Text mode" or "Voice mode." Session type is orthogonal to input mode.
+- FR145: TTS playback — Option A at launch: wait for complete SSE response, then play via `expo-speech`. Sentence-buffered Option B (accumulate tokens to sentence boundary, speak incrementally) documented as upgrade path — only built if user feedback shows delay matters. Sentence boundary detection is non-trivial (abbreviations, decimals, URLs, code) and not worth solving upfront.
+- FR146: Voice integration for Language SPEAK/LISTEN verification types — see Epic 6 (Language Learning). Epic 6 SPEAK/LISTEN stories depend on Epic 8.1-8.2 (voice infrastructure) completing first.
+- FR147: Voice session controls — pause/resume recording, replay last AI response, speed control for TTS playback (0.75x, 1x, 1.25x), interrupt AI mid-speech to respond.
+- FR148: Voice activity detection — OPTIONAL/STRETCH. Auto-detect silence to end recording. Manual tap-to-stop (from Feynman Stage) is the reliable default. VAD has false-positive issues in classrooms, with thinking pauses, and across devices. Only build if user feedback demands it.
+- FR149: Voice accessibility — screen reader (VoiceOver/TalkBack) coexistence with app TTS. Hard problem: both compete for audio channel. Requires spike/research before implementation. Options: detect active screen reader and defer to it (disable app TTS, rely on VoiceOver reading transcript), or implement audio ducking. Visual transcript always visible for deaf/HoH users.
 
 ### Subscription Management
 

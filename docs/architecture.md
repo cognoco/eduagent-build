@@ -30,7 +30,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 
 **Functional Requirements:**
 
-117 FRs across 7 epics. Language Learning (FR96-FR107) **deferred to v1.1** — architecture designs for extensibility but doesn't build. Effective MVP scope: ~105 FRs.
+149 FRs across 8 epics. Language Learning (FR96-FR107), Concept Map (FR118-FR127), and Full Voice Mode (FR144-FR145, FR147-FR149) **deferred to v1.1** — architecture designs for extensibility but doesn't build. FR146 (Language SPEAK/LISTEN voice) mapped to Epic 6. Effective MVP scope: 121 FRs.
 
 | PRD Category | FRs | Epic Mapping | Architectural Weight |
 |-------------|-----|-------------|---------------------|
@@ -46,6 +46,11 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | Engagement & Motivation | FR86-FR95 | Epic 4 | Medium — honest streak, retention XP, interleaved retrieval |
 | Language Learning (v1.1) | FR96-FR107 | Epic 6 | Deferred — Four Strands, CEFR tracking, vocabulary spaced repetition |
 | Subscription Management | FR108-FR117 | Epic 5 | Medium — tiered billing, family pools, top-up credits, reverse trial |
+| Concept Map (Prerequisite-Aware Learning) | FR118-FR127 | Epic 7 | v1.1 — DAG data model, graph-aware coaching, visual concept map |
+| EVALUATE Verification / Devil's Advocate | FR128-FR133 | Epic 3 | Medium — plausibly flawed reasoning for student critique, Bloom's Level 5-6, reuses escalation rung system |
+| Analogy Domain Preferences | FR134-FR137 | Epic 3 | Low — per-subject analogy domain selection, LLM prompt injection, reuses existing teaching preferences infrastructure |
+| Feynman Stage (TEACH_BACK) | FR138-FR143 | Epic 3 | MVP — teach-back verification via voice, on-device STT/TTS |
+| Full Voice Mode | FR144-FR145, FR147-FR149 | Epic 8 | v1.1 — voice-first sessions, TTS playback, voice controls, accessibility |
 
 **Non-Functional Requirements driving architecture:**
 
@@ -129,7 +134,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | **Session state management** | **Every exchange, hybrid model.** After each AI response completes, in one transaction: (1) **Append session event** (immutable log): `{ exchange_id, timestamp, user_message, ai_response, model_used, escalation_rung, hints_given, time_to_answer, confidence_signals }`. (2) **Upsert session summary row** (mutable current state): `{ session_id, current_rung, total_exchanges, topics_touched, last_exchange_at }`. Event log gives replay/audit/analytics. Summary row gives fast reads for "where are we." Both in same database transaction — not a separate save step. Cost negligible vs. LLM call; no data loss window. | Backend |
 | **Client recovery** | **Show partial, auto-retry with backoff.** Stream drops mid-token: freeze partial response in chat UI (student may have read it), show inline "reconnecting..." indicator, auto-retry same request at 1s/2s/4s backoff, max 3 attempts. If all fail: persona-appropriate error + manual retry button. Partial response handling: <20% received → replace on retry; >20% → append with visual separator. Never discard what the student already read. | Frontend |
 | **Event-driven lifecycle** | **Direct queue dispatch via Inngest.** `session.completed` → 4-5 known consumers (SM-2 recalculation → coaching card precomputation → parent dashboard update). Inngest step functions for multi-step chains. Fire-and-forget with retry — no full event sourcing at MVP. Lifecycle events (`session.started`, `session.completed`, `session.timed_out`) stored as special event types in the same append-only session event log — replay capability without a full event store. Ordering: per-session/per-profile natural ordering. Overlapping sessions (unlikely): last-write-wins on SM-2 row, recalculation is idempotent. | Backend |
-| **Retention & spaced repetition** | SM-2 as **library/module** (~50 lines pure math). Takes `{ previous_interval, previous_ease_factor, quality_score }` → returns `{ next_interval, next_ease_factor, next_review_date }`. Writes to `topic_schedules` table. Consumers are all readers: coaching card ("which topics due/overdue"), notification scheduler ("when is next review"), parent dashboard ("how many topics fading"). Library is the writer, everything else is a reader. Clean interface enables future service extraction. Called through event-driven lifecycle. | Backend |
+| **Retention & spaced repetition** | SM-2 as **library/module** (~50 lines pure math). Takes `{ previous_interval, previous_ease_factor, quality_score }` → returns `{ next_interval, next_ease_factor, next_review_date }`. Writes to `topic_schedules` table. Consumers are all readers: coaching card ("which topics due/overdue"), notification scheduler ("when is next review"), parent dashboard ("how many topics fading"). Library is the writer, everything else is a reader. Clean interface enables future service extraction. Called through event-driven lifecycle. **EVALUATE scoring (Epic 3 extension):** EVALUATE results feed into SM-2 as a new input source, but the math is unchanged. Modified scoring floor: EVALUATE failure = quality 2-3 (not 0-1) — missing a subtle flaw does not equal not knowing the concept. Prevents score tanking on topics the student actually knows. `evaluateDifficultyRung` (integer 1-4) stored alongside SM-2 state on the retention card; persists across sessions, default null (= never evaluated). | Backend |
 | **Data privacy & compliance** | **Consent state machine**: `PENDING → PARENTAL_CONSENT_REQUESTED → CONSENTED → WITHDRAWN`, enforced at repository layer (no data access without CONSENTED). **Deletion orchestrator**: knows every table and external system, anonymizes immediately, full deletion within 30 days, idempotent/retryable steps. | Full stack |
 | **Error boundaries & graceful degradation** | Per-dependency circuit breakers with specific thresholds: **LLM providers** — trip after 3 consecutive 5xx/timeouts within 30-second window, half-open after 60s (one probe request). Tight window intentional — 30s wait is already bad UX in tutoring. **OCR** — no circuit breaker; single-request 5s timeout, immediate text input fallback (failures are per-image, not systemic). **Stripe** — no circuit breaker; webhook delays are normal. Check subscription from local DB (webhook-synced), never call Stripe during learning session. 3-day grace period per PRD. **Neon** — if DB is down, almost nothing works. Cache coaching card + Learning Book on client after each successful load, show with "limited mode" banner. Don't build elaborate fallbacks — invest in Neon reliability instead. | Full stack |
 | **Observability** | Structured logging with **correlation IDs** (request → LLM call → background job chain). Every LLM call logged: model, tokens in/out, latency, context hash, routing decision, cost. SM-2 decisions logged: card, interval, ease factor, grade. OpenTelemetry recommended. | Backend |
@@ -205,7 +210,7 @@ apps/api/
 │   ├── middleware/       # Auth, JWT, profile-scope, request-logger, database, LLM, metering, account
 │   ├── inngest/         # Background job functions
 │   ├── config.ts        # Typed env config (Zod validated at startup)
-│   ├── errors.ts        # AppError class, typed error codes
+│   ├── errors.ts        # Error response helpers (apiError, notFound, forbidden, etc.)
 │   └── index.ts         # Hono app entry
 ├── wrangler.toml        # Cloudflare Workers config
 ├── project.json         # Nx targets: serve, build, deploy
@@ -339,6 +344,14 @@ Research noted pnpm symlink issues with Expo in some Nx setups. If encountered d
 - **Learning Book**: Full fetch per subject, filter/sort client-side with TanStack Query. Ceiling is a few hundred topics per power user — single query, under 10ms. Cursor pagination adds unnecessary client complexity for a dataset that fits in one response.
 - **Session history**: Cursor-based (`WHERE (created_at, id) < ($cursor_time, $cursor_id) ORDER BY created_at DESC, id DESC LIMIT $n`). Grows unbounded, pagination justified.
 
+**Prerequisite Graph (Epic 7, v1.1):**
+- New `topic_prerequisites` join table in `packages/database/src/schema/subjects.ts`: `prerequisite_topic_id` → `dependent_topic_id` with `relationship_type` enum (`REQUIRED | RECOMMENDED`)
+- Unique constraint on `(prerequisiteTopicId, dependentTopicId)`, check constraint prevents self-references
+- Cascade delete from `curriculumTopics` — removing a topic removes its edges
+- DAG validation: service-layer cycle detection via topological sort before insert (not a DB constraint — Drizzle doesn't support custom CHECK constraints with subqueries)
+- `curriculumAdaptations` table extended with nullable `prerequisiteContext` JSONB column to log orphaned dependents when a prerequisite is skipped. Zod schema for JSONB shape in `@eduagent/schemas`
+- SM-2 engine (`packages/retention/`) stays purely per-topic math — no graph awareness. Graph-aware flagging (dependent topics at-risk when prerequisite fades) lives in coaching card precomputation job, consuming SM-2 outputs + graph edges
+
 ### Authentication & Security
 
 **Auth provider:** Clerk. JWT-based. `@clerk/clerk-expo` on mobile, Clerk middleware on Hono API.
@@ -443,6 +456,12 @@ src/app/
 
 **Image handling:** Expo Image (built into SDK 54, optimized for React Native, handles caching and progressive loading). No additional library needed.
 
+**Voice infrastructure (Epic 3 TEACH_BACK + Epic 8 Voice Mode):**
+- **STT**: `expo-speech-recognition` for speech-to-text (on-device, no cloud dependency). Used in TEACH_BACK (MVP) and Full Voice Mode (v1.1).
+- **TTS**: `expo-speech` for text-to-speech (built into Expo, on-device). Reads AI response aloud after SSE streaming completes (Option A: wait for complete response).
+- **Recording UI state** in MessageThread: microphone button, waveform animation, transcript preview. Session-level mute toggle for TTS output (not a persistent preference).
+- **Audio permissions** via standard Expo permission flow (`expo-speech-recognition` requests microphone on first use).
+
 ### Mobile-API Integration Patterns
 
 **X-Profile-Id Header Convention:** All authenticated API requests include an `X-Profile-Id` header. The `useApiClient()` hook in `apps/mobile/src/lib/api-client.ts` automatically injects this from `ProfileProvider`. On the API side, routes extract it via `c.get('profileId')` set by `profileScopeMiddleware`. Falls back to `account.id` when the header is absent.
@@ -510,13 +529,19 @@ src/app/
 packages/database/src/schema/
 ├── profiles.ts        # profiles, family_links, consent_states
 ├── sessions.ts        # learning_sessions, session_events, session_summaries
-├── subjects.ts        # curricula, topics, learning_paths
+├── subjects.ts        # curricula, topics, learning_paths, topic_prerequisites (v1.1)
 ├── assessments.ts     # assessments, recall_tests, mastery_scores
 ├── billing.ts         # subscriptions, quota_pools, top_up_credits
 ├── progress.ts        # progress tracking, coaching states
 ├── embeddings.ts      # pgvector embeddings
 └── index.ts           # re-exports all schemas
 ```
+
+**EVALUATE schema changes (Epic 3 extension):** `verification_type` enum gains `EVALUATE` value. No structural changes to `session_events` table — existing columns store EVALUATE outcomes. Retention card schema (in `progress.ts`) extended with nullable `evaluateDifficultyRung` integer (1-4, default null = never evaluated).
+
+**Analogy Domain schema changes (Epic 3 extension):** `teachingPreferences` table gains nullable `analogyDomain` column (text, constrained by Zod enum). No new table — reuses existing per-profile, per-subject `teachingPreferences` structure. Zod schema: `analogyDomainSchema = z.enum(['cooking', 'sports', 'building', 'music', 'nature', 'gaming'])` in `@eduagent/schemas`. Extends existing `teachingPreferenceSchema` to include optional `analogyDomain`. Existing `PUT /v1/subjects/:subjectId/teaching-preference` route extended to accept `analogyDomain`.
+
+**TEACH_BACK schema changes (Epic 3 extension):** `verification_type` enum gains `TEACH_BACK` value. `session_events` table: new `structured_assessment` JSONB column (nullable) stores assessment rubric output — shared by TEACH_BACK and EVALUATE verification types. Zod schema `teachBackAssessmentSchema` in `@eduagent/schemas`: `{ completeness: z.number().min(0).max(5), accuracy: z.number().min(0).max(5), clarity: z.number().min(0).max(5), overallQuality: z.number().min(0).max(5), weakestArea: z.string(), gapIdentified: z.string() }`. `overallQuality` maps directly to SM-2 quality input.
 
 **API (Hono routes in `apps/api/`):**
 
@@ -623,14 +648,14 @@ import { sessionEventSchema } from '@eduagent/schemas/src/session/events';
 
 ```
 apps/mobile  →  @eduagent/schemas
-apps/mobile  →  @eduagent/retention
 apps/api     →  @eduagent/schemas
 apps/api     →  @eduagent/database
 apps/api     →  @eduagent/retention
 
-@eduagent/database  →  @eduagent/schemas    (DB schema references Zod types)
+@eduagent/database  →  (no workspace deps)   (uses drizzle-zod, not @eduagent/schemas directly)
 @eduagent/retention →  (no workspace deps)   (pure math, zero deps)
 @eduagent/schemas   →  (no workspace deps)   (leaf package)
+@eduagent/factory   →  @eduagent/schemas     (test builders use schema types)
 ```
 
 `packages/` never imports from `apps/`. `packages/schemas` never imports from `packages/database`. An agent importing a Drizzle type into a shared schema creates a circular dependency — the schema package must remain a leaf.
@@ -722,16 +747,20 @@ function buildPromptContext(session: Session) { ... }
 **Error handling (API):**
 
 ```typescript
+// Functional error helpers — no AppError class needed. Each helper returns a typed Hono Response.
+// apiError(c, status, code, message, details?) — base helper
+// notFound(c, message?) — 404 with ERROR_CODES.NOT_FOUND
+// unauthorized(c, message?) — 401 with ERROR_CODES.UNAUTHORIZED
+// forbidden(c, message?) — 403 with ERROR_CODES.FORBIDDEN
+// validationError(c, details) — 400 with ERROR_CODES.VALIDATION_ERROR
+
 app.onError((err, c) => {
-  if (err instanceof AppError) {
-    return c.json({ code: err.code, message: err.message, details: err.details }, err.status);
-  }
   logger.error({ correlationId: c.get('correlationId'), error: err.message, stack: err.stack });
   return c.json({ code: "INTERNAL_ERROR", message: "Something went wrong" }, 500);
 });
 ```
 
-Custom `AppError` class with typed codes. Never leak stack traces or internal details to client.
+Functional error response helpers with typed codes (no class hierarchy). All responses follow `{ code, message, details? }` envelope matching `apiErrorSchema` from `@eduagent/schemas`. Never leak stack traces or internal details to client.
 
 **Error handling (mobile):** TanStack Query `onError` callbacks per query/mutation. Global error boundary at root layout for unhandled crashes. Persona-appropriate error messages (coaching voice for learners, direct for parents).
 
@@ -754,7 +783,7 @@ Both client and server import the same Zod schemas — single source of truth pr
 2. Use the scoped repository (`createScopedRepository(profileId)`), never write raw `WHERE profile_id =` clauses
 3. Include `correlationId` in every log statement
 4. Use Inngest for any async work that should survive a request lifecycle
-5. Keep components persona-unaware — no conditional rendering based on persona type
+5. Keep components persona-unaware — no conditional rendering based on persona type. Exception: `(learner)/home.tsx` reads persona for adaptive entry card routing (page-level routing logic that doesn't fit in layout)
 6. Write co-located tests for every new route handler and component
 7. Use Drizzle relational queries for CRUD, `sql` template tag for complex aggregations
 8. Return typed `ApiError` envelope for all error responses, never ad-hoc JSON
@@ -970,7 +999,7 @@ eduagent/
 │   │   ├── src/
 │   │   │   ├── sessions.ts
 │   │   │   ├── profiles.ts
-│   │   │   ├── subjects.ts         # Curricula, topics, learning paths
+│   │   │   ├── subjects.ts         # Curricula, topics, learning paths, topic_prerequisites (v1.1)
 │   │   │   ├── assessments.ts
 │   │   │   ├── billing.ts          # Subscriptions, quota, top-ups
 │   │   │   ├── auth.ts             # Authentication schemas
@@ -988,7 +1017,7 @@ eduagent/
 │   │   │   ├── schema/
 │   │   │   │   ├── profiles.ts     # profiles, family_links, consent_states
 │   │   │   │   ├── sessions.ts     # learning_sessions, session_events, session_summaries
-│   │   │   │   ├── subjects.ts     # curricula, topics, learning_paths
+│   │   │   │   ├── subjects.ts     # curricula, topics, learning_paths, topic_prerequisites (v1.1)
 │   │   │   │   ├── assessments.ts  # assessments, recall_tests, mastery_scores
 │   │   │   │   ├── billing.ts      # subscriptions, quota_pools, top_up_credits
 │   │   │   │   ├── progress.ts     # progress tracking, coaching states
@@ -1051,6 +1080,40 @@ The original `lib/` was accumulating too many unrelated concerns. Replaced with 
 
 - **`services/`** — Business logic extracted from route handlers, including the `services/llm/` orchestration sub-module. Cross-service calls go through exported function interfaces (e.g., `exchanges.ts` calls `getTopicSchedules()` from `retention.ts`), never internal imports. When the dependency graph between services gets tangled, that's a refactoring signal.
 - **`services/llm/`** — LLM orchestration module, nested inside `services/`. `routeAndCall()` in `router.ts`, exported via `index.ts` barrel. Services import as `from './llm'`. Currently only Gemini provider (Flash for rung 1-2, Pro for rung 3+) and mock provider. Does NOT include embedding generation — embedding is a different call pattern (single vector output, not streaming conversation).
+
+**EVALUATE verification prompt (Epic 3 extension):**
+
+New prompt template in `services/llm/` for generating plausibly flawed explanations. The LLM presents reasoning that contains a deliberate error; the student must identify the flaw. Forces Bloom's Level 5-6 (Evaluate/Create). Trigger condition: strong retention topics only (`easeFactor >= 2.5` and `repetitions > 0` on the SM-2 retention card) — students must demonstrate solid foundational knowledge before being challenged with analytical critique.
+
+- **Prompt inputs:** topic key concepts, common misconceptions, student mastery level, current EVALUATE difficulty rung (1-4, stored on retention card as `evaluateDifficultyRung`).
+- **Difficulty calibration reuses the existing escalation rung system** — not a parallel mechanism. Rung 1-2: obvious flaw (wrong formula, reversed cause-effect). Rung 3-4: subtle flaw (correct reasoning with one incorrect premise, edge case error).
+- **Prompt engineering constraint:** the flawed argument must sound plausible. Too obvious = no learning value, too subtle = frustrating. The difficulty rung controls this balance.
+- **Persona-aware framing** injected via the existing persona voice system in `buildSystemPrompt()`.
+
+**Analogy Domain Injection (Epic 3 extension):**
+
+`buildSystemPrompt()` checks `ExchangeContext.analogyDomain` (nullable string). When set, appends instruction: *"When explaining abstract concepts, use analogies from the domain of [domain]. Maintain this analogy framework consistently throughout the session. Adapt analogy complexity to the learner's level."* When null, no analogy instruction is added — direct technical explanation.
+
+- **6 curated domains at launch:** cooking, sports, building, music, nature, gaming.
+- **Single universal list** (not split by persona) — the LLM already adjusts tone via `getPersonaVoice()`, so analogies naturally adapt to teen vs adult register.
+- **Domain selection is per-profile, per-subject** — stored alongside existing teaching method preference in `teachingPreferences` table. CRUD via `services/retention-data.ts` (same service that handles `get/set/deleteTeachingPreference`).
+- **Prompt hash keying:** existing `system_prompt_hash` approach handles invalidation automatically when domain changes — a different analogy domain produces a different system prompt, which produces a different hash, which naturally bypasses stale cached prompt templates.
+
+**TEACH_BACK verification prompt (Epic 3 extension):**
+
+TEACH_BACK is the 9th verification type — Feynman Technique at scale. The LLM plays a "clueless but interested student" role while the student explains a concept verbally. On-device STT (`expo-speech-recognition`) produces a transcript, sent as a normal user message to the exchange endpoint.
+
+- **Two-part LLM response:** (1) conversational follow-up question (visible to the student — maintains the "curious student" persona), (2) hidden structured assessment JSON stored in `session_events.structured_assessment` JSONB.
+- **Assessment schema:** `{ completeness: 0-5, accuracy: 0-5, clarity: 0-5, overallQuality: 0-5, weakestArea: string, gapIdentified: string }`. `overallQuality` maps directly to SM-2 quality input. Weighting: accuracy 50%, completeness 30%, clarity 20%.
+- **Same two-output pattern as EVALUATE** — natural student interaction + machine-readable scoring. The conversational response keeps the student engaged; the structured assessment feeds the retention system without exposing raw scores mid-session.
+- **Trigger condition:** moderate-to-strong retention topics only (student must know the concept before teaching it). Weaker than EVALUATE's threshold (`easeFactor >= 2.5`) — TEACH_BACK tests explanation ability, not analytical critique.
+- **TTS response:** `expo-speech` (built into Expo) reads the AI response aloud after SSE streaming completes (Option A: wait for complete response). Session-level mute toggle for TTS output, not a persistent preference.
+- **Persona-aware framing** injected via the existing persona voice system in `buildSystemPrompt()`.
+
+**Prerequisite context in system prompt (Epic 7, v1.1):**
+
+`buildSystemPrompt()` will include prerequisite context when available. When a student is learning a topic whose prerequisite was skipped (recorded in `prerequisiteContext` JSONB on `curriculumAdaptations`), the system prompt receives additional context listing the skipped prerequisites so the LLM can bridge knowledge gaps — e.g., providing brief refreshers or explicit callouts when the current topic depends on concepts the student has not formally studied. This is injected alongside the existing analogy domain and persona voice, using the same prompt assembly pipeline.
+
 - **`inngest/`** — Inngest client + all event handler functions in `inngest/functions/`. Each event handler is a step function (e.g., `session.completed` → SM-2 → coaching card → dashboard → embeddings). Isolated because Inngest functions have different execution context (durable, retryable, not request-scoped). Event handlers call into `services/` for actual logic.
 
 **Embedding pipeline — separate from LLM orchestration:**
@@ -1068,7 +1131,22 @@ Two complementary mechanisms control how the AI teaches:
 
 2. **Within-session Socratic→Direct switching** (FR59-60, Epic 3): Three-strike rule in `services/adaptive-teaching.ts`. After 3 consecutive wrong answers on the same concept, `recordWrongAnswer()` returns `action: 'switch_to_direct'`, triggering `getDirectInstructionPrompt()` — clear explanation with concrete example, no more Socratic questioning. At 4+ strikes, `flag_needs_deepening` schedules the topic for revisiting. This is session-scoped (resets per session), not persistent.
 
-**Epic 6 extension point (v1.1):** Language learning (FR96-107) will require a third mechanism — a per-subject `teachingMode` distinguishing Socratic (default) from Four Strands methodology (language) and direct error correction. The existing `teaching_method` enum covers _how_ to teach (visual vs step-by-step); the new mode would control _what pedagogy_ to use. Likely implemented as an additional column on subjects or a new `pedagogy_mode` enum.
+3. **EVALUATE failure escalation** (Epic 3 extension): EVALUATE (Devil's Advocate / Debate Mode) uses a distinct escalation path from standard verification failures. Failing to spot a subtle flaw is not the same as conceptual misunderstanding — the escalation reflects this:
+   - After EVALUATE failure: (1) reveal and explain the specific flaw (direct teaching on the misconception), (2) present a similar challenge at a lower difficulty rung, (3) if still failing, mark for standard review.
+   - This is NOT re-teaching from scratch. The student knows the concept; they missed a critical evaluation step. The response targets analytical skill, not foundational knowledge.
+   - Difficulty rung (`evaluateDifficultyRung` 1-4 on retention card) persists across sessions and advances independently of the Socratic escalation rung.
+
+**Epic 6 extension point (v1.1):** Language learning (FR96-107) will require a third mechanism — a per-subject `teachingMode` distinguishing Socratic (default) from Four Strands methodology (language) and direct error correction. The existing `teaching_method` enum covers _how_ to teach (visual vs step-by-step); the new mode would control _what pedagogy_ to use. Likely implemented as an additional column on subjects or a new `pedagogy_mode` enum. **Note:** FR146 (Language SPEAK/LISTEN voice) is mapped to Epic 6, not Epic 8. Epic 8 (Full Voice Mode stories 8.1-8.2) must complete before Epic 6 SPEAK/LISTEN stories can begin — voice infrastructure is the dependency.
+
+**Voice Mode Architecture (Epic 8 — v1.1):**
+
+Voice-first session mode, orthogonal to session type (learning/homework/interleaved). Builds on the STT/TTS infrastructure established by TEACH_BACK (Epic 3, MVP). No new cloud dependencies — the entire voice pipeline is on-device.
+
+- **TTS playback:** Option A at launch — wait for complete SSE response, then `expo-speech` reads aloud. Sentence-buffered Option B documented as upgrade path: sentence boundary detection is non-trivial (abbreviations like "Dr.", decimals like "3.14", URLs, code snippets all produce false splits). Option B requires a robust sentence tokenizer and introduces partial-playback/cancel complexity.
+- **Voice session controls:** pause/resume TTS, replay last response, speed control (0.75x/1x/1.25x via `expo-speech` rate parameter), interrupt (stop current TTS and begin new STT recording).
+- **VAD (FR148):** Optional/stretch — manual tap-to-stop is the reliable default. Voice Activity Detection has false positives in noisy environments (classrooms, public transport). If implemented, use `expo-speech-recognition`'s built-in silence detection with a conservative threshold (2s silence), not a custom VAD model.
+- **Voice accessibility (FR149):** Requires spike — VoiceOver/TalkBack compete with app TTS for the audio channel. Options: (1) detect screen reader active and defer (disable app TTS, rely on screen reader for all audio output), or (2) audio ducking (lower screen reader volume during app TTS). Visual transcript is always available as fallback. This is a genuine UX research question, not a simple implementation task.
+- **Epic 8 dependency chain:** Epic 8 stories 8.1-8.2 (voice infrastructure + voice session mode) must complete before Epic 6 (Language Learning) SPEAK/LISTEN stories. Voice is the platform; language learning is a consumer.
 
 **Onboarding as route-level split, not conditional rendering:**
 
@@ -1198,6 +1276,8 @@ Service Function (business logic)
 | **Epic 4: Progress** | `progress.ts`, `streaks.ts`, `dashboard.ts`, `parking-lot.ts` | `progress.ts`, `dashboard.ts`, `notifications.ts`, `streaks.ts`, `xp.ts`, `summaries.ts`, `parking-lot.ts` | `progress/*`, `book/*` | `progress.ts` | `schema/progress.ts` |
 | **Epic 5: Subscription** | `billing.ts`, `stripe-webhook.ts` | `billing.ts`, `subscription.ts`, `trial.ts`, `metering.ts` | `(auth)/upgrade.tsx` (inline) | `billing.ts` | `schema/billing.ts` |
 | **Epic 6: Language (v1.1)** | New route file | New service file | New component directory | New schema file | New schema file |
+| **Epic 7: Concept Map (v1.1)** | `curriculum.ts` (extend), `concept-map.ts` | `concept-map.ts` (new), `coaching-cards.ts` (extend) | `concept-map/` (new), `book/` (extend) | `subjects.ts` (extend `topic_prerequisites`), `curriculumAdaptations` (add JSONB column) | `@eduagent/schemas` (prerequisiteContext Zod schema) |
+| **Epic 8: Full Voice Mode (v1.1)** | `sessions.ts` (extend for voice mode flag) | `exchanges.ts` (extend for voice context) | `session/` (extend: voice controls, waveform), `hooks/use-voice.ts` (new) | `sessions.ts` (extend: voice mode schemas) | `schema/sessions.ts` (voice mode flag on sessions) |
 
 **Cross-Cutting Concerns Mapping:**
 
@@ -1346,7 +1426,7 @@ No contradictory decisions found. The Workers → Railway/Fly fallback path is c
 - Naming conventions are comprehensive (DB snake_case, API camelCase, code PascalCase/camelCase, Inngest `app/domain.action`)
 - Import ordering, export rules, and dependency direction are consistent and enforceable via ESLint
 - Co-located test pattern is uniform across routes, services, and components
-- Error handling follows single pattern: `AppError` → typed envelope → Zod schema in `packages/schemas`
+- Error handling follows single pattern: functional helpers (`apiError`, `forbidden`, etc.) → typed `{ code, message }` envelope → `apiErrorSchema` in `packages/schemas`
 - All 13 enforcement rules are non-contradictory and cover the most common agent mistakes
 
 **Structure Alignment:**
@@ -1366,14 +1446,16 @@ No contradictory decisions found. The Workers → Railway/Fly fallback path is c
 | Epic 0: Registration & Account Setup | Clerk auth, consent state machine, profile scoping, deletion orchestrator | Full |
 | Epic 1: Onboarding & Interview | LLM orchestration for curriculum gen, `(learner)/onboarding/` route split (interview + curriculum review), curricula schema | Full |
 | Epic 2: Learning Experience | SSE streaming, session state hybrid model, exchange processing, LLM routing by escalation rung, OCR pipeline (ML Kit + server fallback), homework integrity via prompt design | Full |
-| Epic 3: Assessment & Retention | SM-2 library, Inngest lifecycle chain, mastery scoring in schema, delayed recall scheduling, "Needs Deepening" topic flagging | Full |
+| Epic 3: Assessment & Retention | SM-2 library, Inngest lifecycle chain, mastery scoring in schema, delayed recall scheduling, "Needs Deepening" topic flagging, analogy domain injection in system prompt, TEACH_BACK verification (Feynman stage) with on-device STT/TTS | Full |
 | Epic 4: Progress & Motivation | Learning Book (full fetch), coaching card (KV cache), decay visualization, honest streak, notifications service | Full |
 | Epic 5: Subscription | Stripe webhook-synced, `decrement_quota` PostgreSQL function, KV-cached subscription status, family pool with row-level locking | Full |
 | Epic 6: Language Learning (v1.1) | Deferred. Route/service/schema/component extension points documented. No blocking architectural debt. | Deferred by design |
+| Epic 7: Concept Map (v1.1) | `topic_prerequisites` join table, DAG cycle detection service, graph-aware coaching card precomputation, `prerequisiteContext` JSONB on adaptations | Planned (v1.1) |
+| Epic 8: Full Voice Mode (v1.1) | On-device STT/TTS pipeline (`expo-speech-recognition` + `expo-speech`), voice session controls (pause/resume/replay/speed), VAD as stretch, voice accessibility spike needed. Dependency: Epic 8 before Epic 6 SPEAK/LISTEN | Planned (v1.1) |
 
-**Functional Requirements Coverage (105 MVP FRs):**
+**Functional Requirements Coverage (121 MVP FRs):**
 
-All 105 MVP functional requirements have architectural support. The architecture provides the structural slots, patterns, and infrastructure for every FR category. Specific algorithmic details (mastery formula, decay model, escalation thresholds, interleaved topic selection) are implementation concerns for individual stories — the architecture provides the right service files, database schemas, and integration patterns for those algorithms to live in.
+All 121 MVP functional requirements have architectural support. The architecture provides the structural slots, patterns, and infrastructure for every FR category. Specific algorithmic details (mastery formula, decay model, escalation thresholds, interleaved topic selection) are implementation concerns for individual stories — the architecture provides the right service files, database schemas, and integration patterns for those algorithms to live in.
 
 **Non-Functional Requirements Coverage:**
 
@@ -1413,7 +1495,7 @@ MVP offline behavior is **read-only cached data, no offline writes**:
 **Structure Completeness:**
 
 - Complete project tree with every file and directory specified
-- All 7 epics mapped to specific routes, services, components, schemas, and database files
+- All 8 epics mapped to specific routes, services, components, schemas, and database files
 - 13 cross-cutting concerns mapped to specific file locations
 - Integration points documented with protocol, auth, and data flow
 
@@ -1425,7 +1507,7 @@ MVP offline behavior is **read-only cached data, no offline writes**:
 
 ### Gap Analysis Results
 
-**No critical gaps found.** All 105 MVP functional requirements have architectural homes. The following are important items to address during the Epics & Stories phase — they are implementation details, not architectural decisions:
+**No critical gaps found.** All 121 MVP functional requirements have architectural homes. The following are important items to address during the Epics & Stories phase — they are implementation details, not architectural decisions:
 
 **Implementation details to specify in stories (not architecture):**
 
@@ -1447,6 +1529,7 @@ MVP offline behavior is **read-only cached data, no offline writes**:
 | Notification preferences schema | `notification_preferences` JSONB on profiles table | Epic 4 stories |
 | Content flagging storage | How user-flagged content is persisted and reviewed | Epic 2 stories |
 | Data export endpoint | GDPR data export format and endpoint | Epic 0 stories |
+| Concept Map / prerequisite DAG | Cycle detection algorithm, LLM structured output for edges, graph-aware coaching card logic, visualization library selection | Epic 7 stories |
 
 ### Risk Areas
 
@@ -1462,7 +1545,7 @@ Detox/Maestro setup on CI with Expo is notoriously finicky — device farms, bui
 
 **Requirements Analysis**
 
-- [x] Project context thoroughly analyzed (117 FRs mapped, NFRs with targets, UX spec implications)
+- [x] Project context thoroughly analyzed (149 FRs mapped, NFRs with targets, UX spec implications)
 - [x] Scale and complexity assessed (5 inflection points, high complexity confirmed)
 - [x] Technical constraints identified (decided stack with versions, remaining decisions with deferral rationale)
 - [x] Cross-cutting concerns mapped (14 concerns with architectural patterns and scope)
@@ -1486,7 +1569,7 @@ Detox/Maestro setup on CI with Expo is notoriously finicky — device farms, bui
 - [x] Complete directory structure defined (every file and directory)
 - [x] Component boundaries established (API, mobile, service, data)
 - [x] Integration points mapped (11 external services with protocol and auth)
-- [x] Requirements to structure mapping complete (7 epics + 13 cross-cutting concerns)
+- [x] Requirements to structure mapping complete (8 epics + 13 cross-cutting concerns)
 
 ### Architecture Readiness Assessment
 
@@ -1555,8 +1638,8 @@ Detox/Maestro setup on CI with Expo is notoriously finicky — device farms, bui
 - 5 deferred decisions documented with deferral rationale
 - 13 enforcement rules for AI agent consistency
 - Complete project directory structure (~100 files/directories)
-- 105 MVP functional requirements mapped to architectural components
-- 7 epics + 13 cross-cutting concerns mapped to specific file locations
+- 121 MVP functional requirements mapped to architectural components
+- 8 epics + 13 cross-cutting concerns mapped to specific file locations
 - 11 external service integrations documented with protocol and auth
 - 2 risk areas identified with mitigation strategies
 

@@ -102,6 +102,48 @@ export const quickCheckResponseSchema = z.object({
 });
 export type QuickCheckResponseInput = z.infer<typeof quickCheckResponseSchema>;
 
+// Verification type — standard, evaluate (Devil's Advocate), teach_back (Feynman)
+
+export const verificationTypeSchema = z.enum([
+  'standard',
+  'evaluate',
+  'teach_back',
+]);
+export type VerificationType = z.infer<typeof verificationTypeSchema>;
+
+// Analogy domain preference (FR134-137)
+
+export const analogyDomainSchema = z.enum([
+  'cooking',
+  'sports',
+  'building',
+  'music',
+  'nature',
+  'gaming',
+]);
+export type AnalogyDomain = z.infer<typeof analogyDomainSchema>;
+
+// EVALUATE assessment — hidden LLM output for Devil's Advocate challenges (FR128-133)
+
+export const evaluateAssessmentSchema = z.object({
+  challengePassed: z.boolean(),
+  flawIdentified: z.string().optional(),
+  quality: z.number().int().min(0).max(5),
+});
+export type EvaluateAssessment = z.infer<typeof evaluateAssessmentSchema>;
+
+// TEACH_BACK assessment — hidden LLM output for Feynman technique (FR138-143)
+
+export const teachBackAssessmentSchema = z.object({
+  completeness: z.number().min(0).max(5),
+  accuracy: z.number().min(0).max(5),
+  clarity: z.number().min(0).max(5),
+  overallQuality: z.number().min(0).max(5),
+  weakestArea: z.enum(['completeness', 'accuracy', 'clarity']),
+  gapIdentified: z.string().nullable(),
+});
+export type TeachBackAssessment = z.infer<typeof teachBackAssessmentSchema>;
+
 // Retention card response
 
 export const retentionCardSchema = z.object({
@@ -113,6 +155,7 @@ export const retentionCardSchema = z.object({
   lastReviewedAt: z.string().datetime().nullable(),
   xpStatus: z.enum(['pending', 'verified', 'decayed']),
   failureCount: z.number().int(),
+  evaluateDifficultyRung: z.number().int().min(1).max(4).nullable().optional(),
 });
 export type RetentionCardResponse = z.infer<typeof retentionCardSchema>;
 
@@ -146,6 +189,7 @@ export type TeachingMethod = z.infer<typeof teachingMethodSchema>;
 export const teachingPreferenceSchema = z.object({
   subjectId: z.string().uuid(),
   method: teachingMethodSchema,
+  analogyDomain: analogyDomainSchema.nullable().optional(),
 });
 export type TeachingPreferenceInput = z.infer<typeof teachingPreferenceSchema>;
 

@@ -11,7 +11,7 @@ import {
   revokeConsent,
   restoreConsent,
 } from '../services/consent';
-import { notFound } from '../errors';
+import { notFound, forbidden } from '../errors';
 import { inngest } from '../inngest/client';
 
 type ConsentRouteEnv = {
@@ -39,11 +39,12 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       });
 
       // Dispatch Inngest event for reminder workflow
+      // NOTE: parentEmail is intentionally omitted — PII must not be in event payloads.
+      // The consent-reminders function looks up parentEmail from the DB.
       await inngest.send({
         name: 'app/consent.requested',
         data: {
           profileId: consentState.profileId,
-          parentEmail: consentState.parentEmail,
           consentType: consentState.consentType,
           timestamp: new Date().toISOString(),
         },
@@ -125,10 +126,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       });
     } catch (error) {
       if (error instanceof Error && error.message.includes('Not authorized')) {
-        return c.json(
-          { error: 'Not authorized to view consent for this profile' },
-          403
-        );
+        return forbidden(c, 'Not authorized to view consent for this profile');
       }
       throw error;
     }
@@ -160,9 +158,9 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       });
     } catch (error) {
       if (error instanceof Error && error.message.includes('Not authorized')) {
-        return c.json(
-          { error: 'Not authorized to revoke consent for this profile' },
-          403
+        return forbidden(
+          c,
+          'Not authorized to revoke consent for this profile'
         );
       }
       if (
@@ -189,9 +187,9 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       });
     } catch (error) {
       if (error instanceof Error && error.message.includes('Not authorized')) {
-        return c.json(
-          { error: 'Not authorized to restore consent for this profile' },
-          403
+        return forbidden(
+          c,
+          'Not authorized to restore consent for this profile'
         );
       }
       if (

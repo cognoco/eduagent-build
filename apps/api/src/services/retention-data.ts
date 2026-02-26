@@ -454,24 +454,41 @@ export async function getTeachingPreference(
   db: Database,
   profileId: string,
   subjectId: string
-): Promise<{ subjectId: string; method: string } | null> {
+): Promise<{
+  subjectId: string;
+  method: string;
+  analogyDomain: string | null;
+} | null> {
   const rows = await db.query.teachingPreferences.findFirst({
     where: and(
       eq(teachingPreferences.profileId, profileId),
       eq(teachingPreferences.subjectId, subjectId)
     ),
   });
-  return rows ? { subjectId: rows.subjectId, method: rows.method } : null;
+  return rows
+    ? {
+        subjectId: rows.subjectId,
+        method: rows.method,
+        analogyDomain: rows.analogyDomain ?? null,
+      }
+    : null;
 }
 
 type TeachingMethod = (typeof teachingPreferences.$inferInsert)['method'];
+type AnalogyDomainColumn =
+  (typeof teachingPreferences.$inferInsert)['analogyDomain'];
 
 export async function setTeachingPreference(
   db: Database,
   profileId: string,
   subjectId: string,
-  method: string
-): Promise<{ subjectId: string; method: string }> {
+  method: string,
+  analogyDomain?: string | null
+): Promise<{
+  subjectId: string;
+  method: string;
+  analogyDomain: string | null;
+}> {
   // Check if preference exists
   const existing = await db.query.teachingPreferences.findFirst({
     where: and(
@@ -480,10 +497,18 @@ export async function setTeachingPreference(
     ),
   });
 
+  const updateFields: Record<string, unknown> = {
+    method: method as TeachingMethod,
+    updatedAt: new Date(),
+  };
+  if (analogyDomain !== undefined) {
+    updateFields.analogyDomain = (analogyDomain as AnalogyDomainColumn) ?? null;
+  }
+
   if (existing) {
     await db
       .update(teachingPreferences)
-      .set({ method: method as TeachingMethod, updatedAt: new Date() })
+      .set(updateFields)
       .where(
         and(
           eq(teachingPreferences.id, existing.id),
@@ -495,10 +520,18 @@ export async function setTeachingPreference(
       profileId,
       subjectId,
       method: method as TeachingMethod,
+      ...(analogyDomain !== undefined && {
+        analogyDomain: (analogyDomain as AnalogyDomainColumn) ?? null,
+      }),
     });
   }
 
-  return { subjectId, method };
+  const effectiveDomain =
+    analogyDomain !== undefined
+      ? analogyDomain ?? null
+      : existing?.analogyDomain ?? null;
+
+  return { subjectId, method, analogyDomain: effectiveDomain };
 }
 
 export async function deleteTeachingPreference(

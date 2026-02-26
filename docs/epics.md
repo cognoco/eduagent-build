@@ -18,7 +18,7 @@ This document provides the complete epic and story breakdown for EduAgent, decom
 
 ### Functional Requirements
 
-**Total: 117 FRs (105 MVP, 12 deferred to v1.1)**
+**Total: 149 FRs (121 MVP, 28 deferred to v1.1)**
 
 **User Management (FR1-FR12) — Epic 0:**
 
@@ -109,6 +109,31 @@ _These FRs happen within or at the close of a learning session. Distinct from Ep
 - FR65: System auto-applies stored method preference when user starts session in that subject
 - FR66: Users can reset teaching method preferences from Settings
 
+**EVALUATE Verification — Devil's Advocate (FR128-FR133) — Epic 3 extension:**
+
+- FR128: EVALUATE verification type — 8th type, Bloom L5-6, strong-retention gating
+- FR129: Strong-retention gating — never on new/weak/fading topics
+- FR130: Persona-appropriate framing — teen playful, adult academic
+- FR131: Difficulty calibration — `evaluateDifficultyRung` 1-4 on retention card, tied to escalation rung system
+- FR132: Modified SM-2 scoring floor — failure = quality 2-3, not 0-1
+- FR133: Three-strike escalation — reveal flaw → lower difficulty → standard review
+
+**Analogy Domain Preferences — Multiverse of Analogies (FR134-FR137) — Epic 3 extension:**
+
+- FR134: Analogy domain selection — 6 curated domains per subject, nullable
+- FR135: System prompt injection — softer wording: "prefer analogies... use naturally... don't force"
+- FR136: Onboarding integration — optional step during subject onboarding
+- FR137: Preference persistence — changeable anytime, takes effect next exchange
+
+**Feynman Stage — Teach-Back Via Voice (FR138-FR143) — Epic 3 extension:**
+
+- FR138: TEACH_BACK verification type — 9th type, Feynman Technique, AI plays "confused student," Bloom L6
+- FR139: On-device speech-to-text — `expo-speech-recognition`, no cloud dependency
+- FR140: Structured assessment rubric — two-output pattern (conversational + hidden JSON), completeness/accuracy/clarity scoring
+- FR141: Voice response (TTS) — `expo-speech`, Option A (wait for complete), no cloud
+- FR142: Voice toggle — session-level mute, not persistent preference
+- FR143: Recording UI — microphone button, waveform animation, transcript preview
+
 **Progress Tracking (FR67-FR76) — Epic 4:**
 
 - FR67: Users can view Learning Book with all past topics
@@ -174,6 +199,29 @@ _These FRs happen within or at the close of a learning session. Distinct from Ep
 - FR115: Users can choose monthly or yearly billing (with annual discount)
 - FR116: Users can add additional profiles to family account (per-profile pricing)
 - FR117: Users can view token usage against tier ceiling
+
+**Concept Map — Prerequisite-Aware Learning (FR118-FR127) — Epic 7 (v1.1):**
+
+- FR118: Topic prerequisite graph — DAG data model, `topic_prerequisites` join table, REQUIRED/RECOMMENDED relationship types, cycle detection
+- FR119: Prerequisite-aware session ordering — check prereq completion before recommending topic
+- FR120: Skip warning on prerequisite topics — dialog + log to `curriculumAdaptations.prerequisiteContext`
+- FR121: Visual concept map — read-only DAG visualization, nodes colored by retention status
+- FR122: Prerequisite edge generation — LLM generates edges on subject creation, targeted call for new topics
+- FR123: Graph-aware coaching card — new "newly unlocked" card type for topics with completed prerequisites
+- FR124: Orphan edge handling — skipped prereqs logged, dependents remain accessible
+- FR125: Prerequisite context as teaching signal — system prompt includes prereq context for gap bridging
+- FR126: Topological sort for learning path — default ordering uses DAG topological sort
+- FR127: Manual prerequisite override — parent/advanced learner marks prereq as "already known"
+
+**Full Voice Mode (FR144-FR145, FR147-FR149) — Epic 8 (v1.1):**
+
+- FR144: Voice-first session mode — any session type via voice, toggle at session start
+- FR145: TTS playback — Option A at launch (wait for complete), sentence-buffered Option B as documented upgrade path
+- FR147: Voice session controls — pause/resume, replay, speed (0.75x/1x/1.25x), interrupt
+- FR148: Voice activity detection — OPTIONAL/STRETCH, manual tap-to-stop is default, VAD has false-positive issues
+- FR149: Voice accessibility — VoiceOver/TalkBack coexistence with app TTS, needs spike/research first
+
+_Note: FR146 (Language SPEAK/LISTEN voice integration) is mapped to Epic 6 (Language Learning). Epic 6 SPEAK/LISTEN stories depend on Epic 8.1-8.2._
 
 ### NonFunctional Requirements
 
@@ -327,7 +375,7 @@ _Audited during Step 1 to determine if any are architectural blockers._
 
 **Session-scoped vs lifecycle-scoped retention boundary:**
 - **Epic 2 (session-scoped):** FR34-42 — summaries, parking lot, prior learning references, in-lesson checks. Happen within/at close of a session.
-- **Epic 3 (lifecycle-scoped):** FR43-66 — spaced repetition, delayed recall, mastery scoring, XP verification. Happen across sessions over time.
+- **Epic 3 (lifecycle-scoped):** FR43-66, FR128-143 — spaced repetition, delayed recall, mastery scoring, XP verification, EVALUATE verification, analogy domain preferences, Feynman Stage (TEACH_BACK via voice). Happen across sessions over time.
 - **FR40 is the bridge:** session-scoped behavior reading lifecycle data. Story in Epic 2, dependency on Epic 3's retention data model.
 
 **Homework as cohesive journey (within Epic 2):**
@@ -338,7 +386,7 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 
 ### FR Coverage Map
 
-**All 117 FRs mapped. 105 MVP (Epics 0-5), 12 deferred (Epic 6).**
+**All 149 FRs mapped. 121 MVP (Epics 0-5), 28 deferred (Epics 6, 7, 8).**
 
 | FR Range | Category | Epic | Scope |
 |----------|----------|------|-------|
@@ -350,17 +398,23 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 | FR43-FR51 | Learning Verification (lifecycle-scoped) | Epic 3 | MVP |
 | FR52-FR58 | Failed Recall Remediation | Epic 3 | MVP |
 | FR59-FR66 | Adaptive Teaching | Epic 3 | MVP |
+| FR128-FR133 | EVALUATE Verification (Devil's Advocate) | Epic 3 | MVP |
+| FR134-FR137 | Analogy Domain Preferences (Multiverse of Analogies) | Epic 3 | MVP |
+| FR138-FR143 | Feynman Stage (TEACH_BACK via Voice) | Epic 3 | MVP |
 | FR67-FR76 | Progress Tracking | Epic 4 | MVP |
 | FR77-FR85 | Multi-Subject Learning | Epic 4 | MVP |
 | FR86-FR95 | Engagement & Motivation | Epic 4 | MVP |
 | FR96-FR107 | Language Learning | Epic 6 | v1.1 |
 | FR108-FR117 | Subscription Management | Epic 5 | MVP |
+| FR118-FR127 | Concept Map (Prerequisite-Aware Learning) | Epic 7 | v1.1 |
+| FR144-FR145, FR147-FR149 | Full Voice Mode | Epic 8 | v1.1 |
+| FR146 | Language SPEAK/LISTEN Voice | Epic 6 | v1.1 |
 
-**Coverage verification:** 12 + 10 + 11 + 9 + 9 + 7 + 8 + 10 + 9 + 10 + 12 + 10 = **117 FRs, zero gaps.**
+**Coverage verification:** 12 + 10 + 11 + 8 + 1 + 9 + 7 + 8 + 6 + 4 + 6 + 10 + 9 + 10 + 12 + 10 + 10 + 5 + 1 = **149 FRs, zero gaps.**
 
 ## Epic List
 
-**7 epics total: 6 MVP (Epics 0-5), 1 deferred (Epic 6).**
+**9 epics total: 6 MVP (Epics 0-5), 3 deferred (Epics 6, 7, 8).**
 
 ### Epic 0: Project Foundation & User Registration
 
@@ -429,7 +483,7 @@ Users can learn through real-time AI tutoring sessions with Socratic guidance, g
 
 Users can take assessments with verified understanding, have knowledge tracked via SM-2 spaced repetition with delayed recall tests, receive adaptive teaching when struggling, and see mastery verified through multi-level recall (recall → explain → transfer).
 
-**FRs covered:** FR43-FR66 (24 FRs)
+**FRs covered:** FR43-FR66, FR128-FR143 (40 FRs)
 **ARCH requirements:** ARCH-10 (SM-2 pure math library), ARCH-11 (Workers KV coaching cards), ARCH-13 (Inngest lifecycle chain), ARCH-16 (pgvector embedding generation), ARCH-25 (Inngest integration test)
 **UX requirements:** UX-19 (verification depth levels: recall → explain → transfer)
 
@@ -441,6 +495,9 @@ Users can take assessments with verified understanding, have knowledge tracked v
 - Workers KV coaching cards: write-rare/read-often, 24h TTL safety net, overwritten on recompute (ARCH-11)
 - Three-strike adaptive teaching rule (FR59-60) with "Needs Deepening" topic management
 - Failed recall remediation flow: 3+ failures → Learning Book → Review & Re-test (24h cooldown) or Relearn Topic
+- EVALUATE verification (Devil's Advocate): AI presents flawed reasoning for strong-retention topics, student identifies errors. Uses escalation rung system for difficulty calibration, modified SM-2 scoring floor.
+- Multiverse of Analogies (FR134-FR137): per-subject analogy domain preference (6 curated domains), injected into LLM system prompt with softer wording ("prefer analogies... use naturally... don't force").
+- Feynman Stage (FR138-FR143): TEACH_BACK verification type — AI plays "confused student" for Bloom L6 mastery. On-device STT/TTS via `expo-speech-recognition` and `expo-speech`. Structured assessment rubric (completeness/accuracy/clarity) with two-output pattern. Session-level voice toggle.
 
 **Dependencies:** Epic 2 (session infrastructure, embedding spike decision)
 **Enables:** Epic 4 (progress/dashboard reads retention data)
@@ -496,7 +553,7 @@ Users can start 14-day free trials, subscribe to premium tiers (Plus/Family/Pro)
 
 Users can learn languages using Four Strands methodology with explicit grammar instruction, vocabulary spaced repetition, CEFR progress tracking, and time estimates based on FSI categories.
 
-**FRs covered:** FR96-FR107 (12 FRs)
+**FRs covered:** FR96-FR107 (12 FRs) + FR146 (Language SPEAK/LISTEN Voice, from Epic 8 dependency)
 
 **Implementation notes:**
 - Not in MVP scope. Deferred to v1.1.
@@ -504,8 +561,44 @@ Users can learn languages using Four Strands methodology with explicit grammar i
 - Auto-detection of language learning intent (FR96) switches teaching methodology
 - Vocabulary SR uses same SM-2 engine from Epic 3's `packages/retention/`
 - CEFR level tracking (A1→A2→B1→B2→C1→C2) as progress metric
+- FR146 (SPEAK/LISTEN voice integration) depends on Epic 8.1-8.2 (voice-first session toggle + TTS playback)
 
-**Dependencies:** Epics 0-3 (full learning infrastructure)
+**Dependencies:** Epics 0-3 (full learning infrastructure), Epic 8.1-8.2 (voice infrastructure for SPEAK/LISTEN stories)
+
+---
+
+### Epic 7: Concept Map — Prerequisite-Aware Learning (DEFERRED — v1.1)
+
+**Scope:** v1.1 (post-MVP, pre-launch)
+**FRs:** FR118-FR127 (10 FRs)
+
+Knowledge graph of topic prerequisite relationships. Currently curriculum topics are a flat ordered list (`sortOrder`). Epic 7 adds directed acyclic graph (DAG) edges between topics, enabling prerequisite-gated progression, graph-aware coaching, and visual knowledge map.
+
+**Key decisions:**
+- DAG data model (not graph DB) — separate `topic_prerequisites` join table with `REQUIRED | RECOMMENDED` relationship types
+- SM-2 stays pure per-topic — graph awareness in coaching precomputation only
+- Skip + orphan pattern: skipping a prerequisite warns user, deletes edges, logs orphaned dependents in `curriculumAdaptations.prerequisiteContext` JSONB for LLM context injection
+- Adding a topic: targeted LLM call for new edges only (not full graph regeneration)
+- Visualization deferred to implementation — likely `react-native-svg` + Sugiyama layout. No WebView. Small graphs (15-50 nodes per subject).
+
+**Dependencies:** Epic 3 (retention infrastructure), Epic 1 (curriculum/topic infrastructure)
+
+---
+
+### Epic 8: Full Voice Mode (DEFERRED — v1.1)
+
+Users can use voice as the primary input/output mode for any session type, with playback controls, accessibility considerations, and optional voice activity detection.
+
+**FRs covered:** FR144-FR145, FR147-FR149 (5 FRs). FR146 mapped to Epic 6.
+
+**Key decisions:**
+- On-device STT/TTS (no cloud) — reuses `expo-speech-recognition` and `expo-speech` infrastructure established by Feynman Stage (Epic 3 Cluster G)
+- Option A TTS at launch (wait for complete SSE response before audio playback). Sentence-buffered Option B documented as upgrade path.
+- VAD (voice activity detection) is STRETCH — manual tap-to-stop is the default. VAD has false-positive issues in noisy environments.
+- Voice accessibility (screen reader coexistence) needs spike/research before implementation.
+
+**Dependencies:** Epic 3 Cluster G (Feynman Stage establishes STT/TTS infrastructure). Epic 8 extends it to all session types. Epic 6 (Language Learning) SPEAK/LISTEN stories depend on Epic 8.1-8.2.
+**Enables:** Epic 6 SPEAK/LISTEN voice stories (v1.1)
 
 ---
 
@@ -513,16 +606,26 @@ Users can learn languages using Four Strands methodology with explicit grammar i
 
 ```
 Epic 0 ──→ Epic 1 ──→ Epic 2 ──→ Epic 3 ──→ Epic 4
-  │                                              │
-  └──────────→ Epic 5 (parallel from Epic 0) ────┘
-                                                 │
-                                          Epic 6 (v1.1)
+  │                      │           │           │
+  └──→ Epic 5 (parallel) ┘           │           │
+                                     │           │
+                              Epic 3 Cluster G (Feynman Stage, MVP)
+                                     │
+                              Epic 8 (Full Voice, v1.1)
+                                     │
+                              Epic 6 (v1.1) ─────┘ (SPEAK/LISTEN depends on Epic 8.1-8.2)
+                                     │
+                              Epic 7 (v1.1) ← depends on Epic 1 + Epic 3
 ```
 
 **Parallelization opportunities:**
 - Epic 5 can start after Epic 0, running in parallel with Epics 1-4
 - Epic 4's feature clusters (Learning Book, Multi-Subject, Engagement, Parent Dashboard) can be staffed in parallel
 - Epic 2 potential split (if >15 stories): Core Learning Sessions and Homework Help can parallelize after initial session infrastructure
+
+**Epic 7 dependencies:** Epic 3 (retention infrastructure — SM-2 data needed for graph-aware coaching) and Epic 1 (curriculum/topic infrastructure — `curriculumTopics` table must exist for prerequisite edges)
+
+**Epic 8 dependency chain:** Epic 3 Cluster G (Feynman Stage, MVP) establishes STT/TTS infrastructure → Epic 8 (Full Voice Mode, v1.1) extends it to all session types → Epic 6 (Language Learning SPEAK/LISTEN, v1.1) depends on Epic 8.1-8.2. This means Epic 8 core (8.1-8.2) must complete before Epic 6 language voice stories.
 
 ---
 
@@ -1382,8 +1485,8 @@ So that I can optionally transition from homework to genuine understanding.
 
 ## Epic 3: Assessment, Retention & Adaptive Teaching — Stories
 
-**Scope:** FR43-FR66 (24 FRs) + ARCH-10, ARCH-11, ARCH-13, ARCH-16, ARCH-25 + UX-19
-**Stories:** 10
+**Scope:** FR43-FR66, FR128-FR143 (40 FRs) + ARCH-10, ARCH-11, ARCH-13, ARCH-16, ARCH-25 + UX-19
+**Stories:** 18
 
 ### Cluster A: Verification & Mastery
 
@@ -1635,6 +1738,216 @@ So that the AI draws on semantically relevant past topics, not just recent ones.
 
 ---
 
+### Cluster E: EVALUATE Verification (Devil's Advocate)
+
+_Cluster E depends on Story 3.2 (mastery scoring must exist) and Story 3.8 (retention status "strong" requires SM-2 data). EVALUATE only triggers for strong-retention topics._
+
+### Story 3.11: EVALUATE Verification Type (Devil's Advocate)
+
+As a learner with strong retention on a topic,
+I want the AI to challenge my understanding with a flawed explanation,
+So that I can prove my mastery by identifying the error (Bloom's Level 5-6: Evaluate).
+
+**Acceptance Criteria:**
+
+**Given** a learner has strong retention on a topic (easeFactor ≥ 2.5 and repetitions > 0)
+**When** a verification is triggered for that topic
+**Then** EVALUATE may be selected as the verification type — AI presents a plausibly flawed explanation for the topic (FR128)
+**And** EVALUATE only triggers for topics with retention status "strong" (FR129)
+**And** `verification_type` enum gains `EVALUATE` value in `packages/database/src/schema/`
+**And** new LLM prompt template generates plausibly flawed explanation for the topic
+**And** prompt accesses: topic key concepts, common misconceptions, student mastery level, current EVALUATE difficulty rung
+**And** framing is persona-appropriate: teen ("Hmm, I think you might be wrong...") vs learner ("Here's a common misconception...") (FR130)
+**And** chat UI shows visual "challenge mode" indicator on the AI's flawed message
+**And** student response assessed by AI: did they correctly identify the specific flaw?
+
+**FRs:** FR128, FR129, FR130
+
+---
+
+### Story 3.12: EVALUATE Difficulty Calibration & Scoring
+
+As a system,
+I need to calibrate EVALUATE difficulty using the escalation rung system and score results with a modified SM-2 floor,
+So that tricky challenges don't unfairly tank retention scores.
+
+**Acceptance Criteria:**
+
+**Given** a learner encounters an EVALUATE verification
+**When** the difficulty is determined
+**Then** `evaluateDifficultyRung` (integer 1-4, nullable) is added to retention card schema (FR131)
+**And** first EVALUATE on a topic uses obvious flaw (rung 1-2): wrong formula, reversed cause-effect
+**And** if student catches it easily, next EVALUATE escalates to subtle flaw (rung 3-4): correct reasoning with one incorrect premise, edge case error
+**And** if student struggles, difficulty stays at current level
+**And** EVALUATE success: SM-2 quality 4-5 (same as standard verification)
+**And** EVALUATE failure: SM-2 quality 2-3 (NOT 0-1) — preserves retention score accuracy (FR132)
+**And** SM-2 engine math unchanged — only the quality input value is adjusted for EVALUATE type
+
+**FRs:** FR131, FR132
+
+---
+
+### Story 3.13: EVALUATE Three-Strike Escalation
+
+As a learner who fails an EVALUATE challenge,
+I want the AI to explain the specific flaw rather than re-teach the entire concept,
+So that my time isn't wasted on material I actually understand.
+
+**Acceptance Criteria:**
+
+**Given** a learner fails an EVALUATE verification
+**When** the failure is processed
+**Then** AI reveals and explains the specific flaw — direct teaching on the misconception, not the whole topic (FR133)
+**And** second attempt: present similar challenge at lower difficulty rung
+**And** third consecutive failure: mark topic for standard review (not EVALUATE), do not re-teach from scratch
+**And** failing to spot a subtle flaw does not trigger full concept re-teaching
+**And** escalation state tracked per topic in the session context
+
+**FRs:** FR133
+
+---
+
+### Cluster F: Analogy Domain Preferences (Multiverse of Analogies)
+
+_Dependency: After 3.4 (teaching preference infrastructure exists)._
+
+### Story 3.14: Analogy Domain Preference Storage & API
+
+As a learner,
+I want to choose an analogy domain for each subject (e.g., cooking, sports, nature),
+So that the AI tutor explains concepts using analogies from a world I relate to.
+
+**Acceptance Criteria:**
+
+**Given** the system needs a shared analogy domain type
+**When** the schema is defined
+**Then** `analogyDomainSchema` Zod enum in `@eduagent/schemas` with 6 values (`cooking`, `sports`, `building`, `music`, `nature`, `gaming`) is created and used by both API and mobile (FR134)
+
+**Given** the database needs to store the preference
+**When** the schema is updated
+**Then** nullable `analogyDomain` column is added to `teachingPreferences` table (FR134)
+
+**Given** a learner wants to set or change their analogy domain
+**When** they call `PUT /v1/subjects/:subjectId/teaching-preference`
+**Then** the endpoint accepts an optional `analogyDomain` field and persists it immediately (FR137)
+**And** `GET /v1/subjects/:subjectId/teaching-preference` returns `analogyDomain` (null when unset) (FR137)
+
+**Given** a learner is on the subject settings screen in the mobile app
+**When** they view teaching preferences
+**Then** an icon/label picker row shows 6 analogy domain options + "None/Default" (FR134)
+**And** selection is persisted immediately and reflected in next exchange (FR137)
+
+**Given** a learner is going through subject onboarding
+**When** they reach the teaching preferences step
+**Then** an optional analogy preference step is presented (skippable) (FR136)
+
+**FRs:** FR134, FR136, FR137
+
+---
+
+### Story 3.15: Analogy Domain Prompt Integration
+
+As a learner with an analogy domain preference set,
+I want the AI tutor to consistently use analogies from my chosen domain during sessions,
+So that explanations feel familiar and concepts click faster.
+
+**Acceptance Criteria:**
+
+**Given** the exchange context needs analogy awareness
+**When** `ExchangeContext` is prepared
+**Then** `ExchangeContext` is extended with a nullable `analogyDomain` field (FR135)
+**And** `prepareExchangeContext()` in `session.ts` fetches analogy domain from `teachingPreferences` (FR135)
+
+**Given** a learner has an analogy domain set (non-null)
+**When** `buildSystemPrompt()` constructs the LLM prompt
+**Then** an analogy instruction section is appended with softer wording — "prefer analogies from [domain]... use naturally... don't force" (FR135)
+
+**Given** a learner has no analogy domain set (null)
+**When** `buildSystemPrompt()` constructs the LLM prompt
+**Then** no analogy section is included in the prompt — AI uses direct technical explanation (FR135)
+
+**Given** the analogy domain changes between sessions
+**When** a new session starts
+**Then** the prompt hash changes naturally from the content change (no explicit logic needed)
+
+**Given** the integration needs verification
+**When** an integration test runs a session with analogy domain set
+**Then** the LLM response contains analogy-themed content from the chosen domain (FR135)
+
+**FRs:** FR135
+
+---
+
+### Cluster G: Feynman Stage — Teach-Back Via Voice
+
+_Dependency: After 3.2 (needs retention status infrastructure). Voice infra is self-contained (on-device STT/TTS)._
+
+### Story 3.16: TEACH_BACK Verification Type & Prompt Template
+
+As a learner with moderate-to-strong retention on a topic,
+I want the AI to play a "confused student" so I can teach the concept and prove deep understanding,
+So that I achieve Bloom Level 6 mastery through the Feynman Technique.
+
+**Acceptance Criteria:**
+
+**Given** a learner has moderate-to-strong retention on a topic
+**When** a verification is triggered
+**Then** TEACH_BACK may be selected as the verification type (FR138)
+**And** TEACH_BACK is the 9th verification type added to `verification_type` enum
+**And** retention gate enforced: TEACH_BACK only triggers for moderate-to-strong topics (student must know concept before teaching) (FR138)
+**And** LLM prompt template: "You are a curious but clueless student..." — AI asks naive follow-up questions, probes for gaps, never corrects directly (FR138)
+**And** two-output response pattern: conversational follow-up question (visible to student) + structured JSON assessment (hidden) (FR140)
+**And** `structured_assessment` JSONB column on `session_events` stores `{ completeness, accuracy, clarity, overallQuality, weakestArea, gapIdentified }` (FR140)
+**And** Zod schema `TeachBackAssessment` defined in `@eduagent/schemas` (FR140)
+**And** `overallQuality` maps to SM-2 quality input: accuracy 50%, completeness 30%, clarity 20% (FR140)
+
+**FRs:** FR138, FR140
+
+---
+
+### Story 3.17: Voice Input/Output Integration
+
+As a learner in a TEACH_BACK session,
+I want to explain concepts aloud and hear the AI's responses,
+So that the teach-back experience is natural and conversational.
+
+**Acceptance Criteria:**
+
+**Given** a learner is in a TEACH_BACK session (or any session with voice enabled)
+**When** they tap the microphone button
+**Then** `expo-speech-recognition` captures on-device speech-to-text — no cloud dependency, audio permissions via standard Expo flow (FR139)
+**And** microphone button appears in chat input area with waveform/pulse animation while recording (FR143)
+**And** transcript preview shown before sending — learner can edit or re-record (FR143)
+**And** tap to start recording, tap to stop recording (manual stop, no VAD) (FR143)
+**And** after SSE streaming completes, `expo-speech` reads AI response aloud (Option A: wait for complete response before TTS playback) (FR141)
+**And** session-level voice toggle in header — mute/unmute AI TTS (FR142)
+**And** TEACH_BACK sessions default to voice-on; other session types default to voice-off (FR142)
+**And** voice toggle is NOT a persistent preference — session-scoped only, resets on new session (FR142)
+
+**FRs:** FR139, FR141, FR142, FR143
+
+---
+
+### Story 3.18: TEACH_BACK Scoring Calibration & SM-2 Integration
+
+As a system,
+I need TEACH_BACK assessments to produce reliable SM-2 quality inputs and feed downstream features,
+So that teach-back results integrate seamlessly with retention tracking, coaching, and parent visibility.
+
+**Acceptance Criteria:**
+
+**Given** a TEACH_BACK session produces a structured assessment
+**When** scoring is computed
+**Then** rubric weights are applied: accuracy 50%, completeness 30%, clarity 20% (FR140)
+**And** `overallQuality` 0-5 maps directly to SM-2 quality input — no additional transformation
+**And** coaching card precomputation (Story 3.4) consumes `structured_assessment` for topic recommendations
+**And** parent dashboard shows teach-back performance summary: completeness/accuracy/clarity breakdown per session
+**And** integration test validates: TEACH_BACK session produces valid structured assessment JSON matching `TeachBackAssessment` schema + correct SM-2 quality mapping from rubric weights
+
+**FRs:** FR140 (scoring specifics)
+
+---
+
 ### Epic 3 Execution Order
 
 ```
@@ -1642,10 +1955,14 @@ Cluster A: 3.1 → 3.2 → 3.3 and 3.4 (parallel after 3.2)
 Cluster B: 3.5 → 3.6 (after 3.3 — delayed recall must exist to fail)
 Cluster C: 3.7 → 3.8 (after 3.2 — mastery scoring needed for struggle detection). 3.9 after 3.6 (method recording feeds preferences).
 Cluster D: 3.10 (after 3.4 — needs embeddings populated by Inngest chain)
+Cluster E: 3.11 → 3.12 → 3.13 (after 3.2 + 3.8 — needs mastery scoring and retention status "strong")
+Cluster F: 3.14 → 3.15 (after 3.4 — needs teaching preference infrastructure)
+Cluster G: 3.16 → 3.17 → 3.18 (after 3.2 — needs retention status)
 ```
 
 **Cross-epic dependency:** Story 3.4 depends on Epic 2 Story 2.11 (embedding spike decision).
 **SM-2 dual invocation:** Story 3.2 = synchronous during assessment (authoritative for assessed topics). Story 3.4 = async Inngest chain for non-assessed topics only (no-op if already calculated in 3.2).
+**EVALUATE scoring:** Story 3.12 modifies the quality input to SM-2, not the SM-2 math itself. The `packages/retention/` library remains unchanged.
 
 ---
 
@@ -2169,4 +2486,275 @@ FR104: Users practice fluency with time-pressured drills (speed and automaticity
 
 ### Epic 6 FR Coverage
 
-All 12 FRs (FR96-FR107) mapped across 5 placeholder stories. Full ACs deferred to v1.1 planning.
+All 12 FRs (FR96-FR107) + FR146 (Language SPEAK/LISTEN Voice, depends on Epic 8.1-8.2) mapped across 5 placeholder stories. Full ACs deferred to v1.1 planning.
+
+---
+
+## Epic 7: Concept Map — Prerequisite-Aware Learning (v1.1) — Stories
+
+**Scope:** FR118-FR127 (10 FRs), 6 stories
+**Dependencies:** Epic 3 (retention infrastructure), Epic 1 (curriculum/topic infrastructure)
+
+### Story 7.1: Topic Prerequisite Data Model
+
+As a system,
+I need a prerequisite graph data model and LLM edge generation,
+So that curriculum topics can express dependency relationships as a DAG.
+
+**Acceptance Criteria:**
+
+**Given** the database needs prerequisite support
+**When** the schema is created
+**Then** `topic_prerequisites` join table is created with `prerequisiteTopicId`, `dependentTopicId`, `relationshipType` (REQUIRED/RECOMMENDED enum), `createdAt`
+**And** DAG cycle detection is implemented in the service layer (topological sort validation before insert)
+**And** LLM generates initial prerequisite edges on subject creation as part of curriculum generation
+**And** targeted edge generation for new topics added to existing curriculum (not full graph regeneration)
+
+**FRs:** FR118, FR122
+
+---
+
+### Story 7.2: Prerequisite-Aware Session Ordering
+
+As a learner,
+I want my learning path to respect prerequisite order,
+So that I build knowledge on solid foundations.
+
+**Acceptance Criteria:**
+
+**Given** a curriculum with prerequisite edges
+**When** the coaching card recommends the next topic
+**Then** coaching card checks prerequisites before recommending — topics with incomplete REQUIRED prerequisites are not surfaced
+**And** default ordering uses topological sort (prerequisite depth)
+**And** ties within the same topological layer are broken by retention urgency (most urgent first)
+
+**FRs:** FR119, FR126
+
+---
+
+### Story 7.3: Skip Warning & Orphan Edge Handling
+
+As a learner skipping a topic,
+I want to understand the impact on dependent topics,
+So that I make informed decisions about what to skip.
+
+**Acceptance Criteria:**
+
+**Given** a learner wants to skip a topic that has dependents
+**When** the skip is initiated
+**Then** a warning dialog is shown listing dependent topics and relationship types
+**And** skip is logged in `curriculumAdaptations.prerequisiteContext` JSONB
+**And** dependent topics remain accessible (not locked) after prerequisite is skipped
+**And** coaching card notes missing foundation for topics with skipped prerequisites
+
+**FRs:** FR120, FR124
+
+---
+
+### Story 7.4: Prerequisite Context as Teaching Signal
+
+As a learner studying a topic with skipped prerequisites,
+I want the AI tutor to bridge knowledge gaps,
+So that I can still learn effectively despite missing foundations.
+
+**Acceptance Criteria:**
+
+**Given** a learner is in a session for a topic with prerequisite context
+**When** `buildSystemPrompt()` constructs the LLM prompt
+**Then** prerequisite context is included when available (e.g., "student skipped fractions, which was a prerequisite for this topic")
+**And** LLM bridges knowledge gaps for topics with skipped prerequisites by providing foundational context inline
+
+**FRs:** FR125
+
+---
+
+### Story 7.5: Graph-Aware Coaching Card
+
+As a learner progressing through a curriculum,
+I want coaching to reflect my prerequisite graph progress,
+So that I know when new topics are unlocked and when foundations are at risk.
+
+**Acceptance Criteria:**
+
+**Given** the coaching card precomputation runs
+**When** prerequisite graph data is available
+**Then** coaching precomputation considers prerequisite graph
+**And** new "newly unlocked" card type surfaces topics whose REQUIRED prerequisites have all reached strong retention
+**And** at-risk flagging warns when foundational prerequisites drop to fading/weak for dependent topics
+
+**FRs:** FR123
+
+---
+
+### Story 7.6: Visual Concept Map & Manual Override
+
+As a learner,
+I want to see a visual map of how my curriculum topics connect,
+And optionally mark prerequisites as "already known,"
+So that I can track my progress visually and customize my learning path.
+
+**Acceptance Criteria:**
+
+**Given** a learner navigates to the concept map view
+**When** the visualization loads
+**Then** read-only DAG visualization is rendered (library TBD — likely react-native-svg + Sugiyama layout)
+**And** nodes are colored by retention status (green = strong, yellow = fading, red = weak, gray = not started)
+**And** parent or advanced learner can mark a prerequisite as "already known" to unlock dependents without completing it
+
+**FRs:** FR121, FR127
+
+---
+
+### Epic 7 Execution Order
+
+```
+7.1 → 7.2 → 7.3 → 7.4 → 7.5 → 7.6 (sequential — each builds on previous)
+```
+
+### Epic 7 FR Coverage
+
+All 10 FRs (FR118-FR127) mapped across 6 stories. Implementation deferred to post-MVP, pre-launch phase.
+
+---
+
+## Epic 8: Full Voice Mode (v1.1) — Stories
+
+**Scope:** FR144-FR145, FR147-FR149 (5 FRs), 5 stories + 1 stretch
+**Dependencies:** Epic 3 Cluster G (Feynman Stage establishes STT/TTS infrastructure)
+**Status:** Deferred to v1.1. Stories defined with acceptance criteria. FR146 (Language SPEAK/LISTEN Voice) mapped to Epic 6 — depends on Epic 8.1-8.2.
+
+### Story 8.1: Voice-First Session Toggle
+
+As a learner starting a session,
+I want to choose between text mode and voice mode,
+So that I can learn using the input method that suits my current context.
+
+**Acceptance Criteria:**
+
+**Given** a learner is starting any session (learning, homework, interleaved)
+**When** the session start screen loads
+**Then** a toggle is presented: "Text mode" (default) / "Voice mode" (FR144)
+**And** session type is orthogonal to input mode — voice works with learning, homework, and interleaved sessions (FR144)
+**And** mode is stored on the session record (`input_mode` field: `text` | `voice`)
+**And** voice mode activates STT input + TTS output, reusing `expo-speech-recognition` and `expo-speech` infrastructure from Feynman Stage (Epic 3 Story 3.17) (FR144)
+**And** mode can be switched mid-session via the voice toggle (same toggle from Story 3.17, extended to all session types)
+
+**FRs:** FR144
+
+---
+
+### Story 8.2: TTS Playback — Option A
+
+As a learner in voice mode,
+I want the AI's response read aloud after streaming completes,
+So that I can listen to explanations while following along visually.
+
+**Acceptance Criteria:**
+
+**Given** a learner is in voice mode and the AI generates a response
+**When** SSE streaming completes (full response received)
+**Then** the complete response plays as audio via `expo-speech` (FR145)
+**And** text streams visually during generation — student reads along while waiting for audio (FR145)
+**And** audio plays once streaming is complete (Option A: wait for complete) (FR145)
+**And** playback respects voice toggle state — if muted, no audio plays (FR145)
+**And** documented upgrade path to sentence-buffered Option B: sentence boundary detection deferred because abbreviations, decimals, and URLs make naive detection unreliable. Option B requires a sentence segmentation library or LLM-side sentence markers. (FR145)
+
+**FRs:** FR145
+
+---
+
+### Story 8.3: Voice Session Controls
+
+As a learner in voice mode,
+I want playback controls so I can manage the audio experience,
+So that I can pause, replay, and adjust speed to match my learning pace.
+
+**Acceptance Criteria:**
+
+**Given** a learner is in voice mode
+**When** they interact with voice controls
+**Then** pause/resume recording mid-speech is supported (FR147)
+**And** replay last AI response button available — re-triggers `expo-speech` on the last response text (FR147)
+**And** TTS speed control: 0.75x, 1x (default), 1.25x — persisted for the session (FR147)
+**And** interrupt AI mid-speech: tapping microphone while TTS is playing stops playback and starts new recording (FR147)
+**And** voice controls are rendered in a compact toolbar below the chat input area
+
+**FRs:** FR147
+
+---
+
+### Story 8.4: Spike — Screen Reader + App TTS Coexistence
+
+As a development team,
+We need to understand how VoiceOver/TalkBack interacts with app-initiated TTS audio,
+So that voice mode is accessible and does not conflict with assistive technology.
+
+**Acceptance Criteria:**
+
+**Given** the app plays TTS audio via `expo-speech` while a screen reader is active
+**When** both attempt to produce audio simultaneously
+**Then** the spike documents observed behavior on iOS (VoiceOver) and Android (TalkBack) (FR149)
+**And** three approaches are documented with trade-offs: (1) defer to screen reader — disable app TTS when screen reader detected, (2) audio ducking — lower screen reader volume during app TTS, (3) manual user control — explicit "Play audio" button instead of auto-play (FR149)
+**And** recommended approach is selected with rationale
+**And** testing performed on physical iOS + Android devices (not simulators)
+**And** findings documented in architecture decisions (`docs/architecture.md`)
+
+**FRs:** FR149 (research prerequisite)
+
+---
+
+### Story 8.5: Voice Accessibility Implementation
+
+As a learner using assistive technology,
+I want voice mode to coexist with my screen reader,
+So that I can use voice features without losing accessibility support.
+
+**Acceptance Criteria:**
+
+**Given** the recommended approach from Story 8.4 spike
+**When** voice accessibility is implemented
+**Then** the chosen approach from the spike is fully implemented (FR149)
+**And** screen reader detection is integrated — app detects when VoiceOver/TalkBack is active
+**And** graceful fallback: visual transcript is always available regardless of audio state (FR149)
+**And** haptic feedback on recording state changes (start/stop recording) for non-visual confirmation
+**And** tested with VoiceOver on physical iOS device and TalkBack on physical Android device
+**And** all voice UI elements have proper accessibility labels and roles
+
+**Depends on:** Story 8.4
+
+**FRs:** FR149
+
+---
+
+### Story 8.6 (STRETCH): Voice Activity Detection
+
+As a learner in voice mode,
+I want recording to end automatically when I stop speaking,
+So that I don't have to manually tap to stop every time.
+
+**Acceptance Criteria:**
+
+**Given** a learner is recording in voice mode with VAD enabled
+**When** silence is detected for a configurable threshold (default 2 seconds)
+**Then** recording ends automatically without manual tap (FR148)
+**And** VAD can be toggled off — reverts to manual tap-to-stop (FR148)
+**And** tested in quiet and noisy environments — false-positive rate documented (FR148)
+**And** VAD sensitivity is configurable (low/medium/high) to accommodate different environments
+**And** this is a STRETCH story — only build if user feedback from manual tap-to-stop (Stories 3.17 + 8.1) shows demand
+
+**Note:** VAD is explicitly optional. Manual tap-to-stop is the default and may be sufficient for most users. False-positive issues (VAD triggering on background noise, pauses in speech, or breathing) are well-documented in speech recognition literature. Ship manual first, measure demand, then consider VAD.
+
+**FRs:** FR148
+
+---
+
+### Epic 8 Execution Order
+
+```
+8.1 (Voice Toggle) → 8.2 (TTS Playback) → 8.3 (Voice Controls) → 8.4 (Accessibility Spike) → 8.5 (Accessibility Implementation)
+Story 8.6 (STRETCH: VAD) is independent — build only if user feedback warrants it.
+```
+
+### Epic 8 FR Coverage
+
+All 5 FRs (FR144-FR145, FR147-FR149) mapped across 5 stories + 1 stretch. FR146 (Language SPEAK/LISTEN Voice) mapped to Epic 6 — depends on Epic 8.1-8.2. Implementation deferred to v1.1.

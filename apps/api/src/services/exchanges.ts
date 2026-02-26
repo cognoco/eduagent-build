@@ -6,6 +6,7 @@ import type {
   StreamResult,
 } from './llm';
 import { getEscalationPromptGuidance } from './escalation';
+import { getEvaluateRungDescription } from './evaluate';
 
 // ---------------------------------------------------------------------------
 // Core Exchange Processing Pipeline — Story 2.1
@@ -34,6 +35,12 @@ export interface ExchangeContext {
     title: string;
     description?: string;
   }>;
+  /** Verification type: standard (default), evaluate (Devil's Advocate), teach_back (Feynman) */
+  verificationType?: 'standard' | 'evaluate' | 'teach_back';
+  /** Preferred analogy domain for explanations (FR134-137) */
+  analogyDomain?: string;
+  /** EVALUATE difficulty rung 1-4 (FR128-133) */
+  evaluateDifficultyRung?: 1 | 2 | 3 | 4;
 }
 
 /** Result of processing a single exchange */
@@ -44,6 +51,8 @@ export interface ExchangeResult {
   provider: string;
   model: string;
   latencyMs: number;
+  /** Structured assessment from EVALUATE or TEACH_BACK LLM output */
+  structuredAssessment?: Record<string, unknown>;
 }
 
 /** Streaming variant result */
@@ -136,6 +145,48 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     sections.push(
       `Teaching method preference: The learner learns best with "${context.teachingPreference}". ` +
         'Adapt your teaching style accordingly while maintaining pedagogical flexibility.'
+    );
+  }
+
+  // Analogy domain preference (FR134-137)
+  if (context.analogyDomain) {
+    sections.push(
+      `Analogy preference: When explaining abstract or unfamiliar concepts, ` +
+        `prefer analogies from the domain of ${context.analogyDomain}. ` +
+        `Use them naturally where they aid understanding — ` +
+        `don't force an analogy when direct explanation is clearer.`
+    );
+  }
+
+  // EVALUATE verification type — Devil's Advocate (FR128-133)
+  if (context.verificationType === 'evaluate') {
+    const rung = context.evaluateDifficultyRung ?? 1;
+    const rungDescription = getEvaluateRungDescription(rung as 1 | 2 | 3 | 4);
+    sections.push(
+      "Session type: EVALUATE CHALLENGE (Devil's Advocate)\n" +
+        'Present a plausibly flawed explanation of the topic.\n' +
+        'The student must identify and explain the specific error.\n' +
+        `Difficulty rung ${rung}/4: ${rungDescription}\n` +
+        'After the student responds, assess whether they correctly identified the flaw.\n' +
+        'Output TWO sections:\n' +
+        '1. Your conversational response (visible to student)\n' +
+        '2. A JSON assessment block on a new line:\n' +
+        '{"challengePassed": true/false, "flawIdentified": "description of what they found", "quality": 0-5}'
+    );
+  }
+
+  // TEACH_BACK verification type — Feynman Technique (FR138-143)
+  if (context.verificationType === 'teach_back') {
+    sections.push(
+      'Session type: TEACH BACK (Feynman Technique)\n' +
+        'You are a curious but clueless student who wants to learn about the topic.\n' +
+        'The learner is the teacher — they must explain the concept to you.\n' +
+        'Ask naive follow-up questions. Probe for gaps in the explanation.\n' +
+        'Never correct the learner directly — they are the teacher.\n' +
+        'Output TWO sections:\n' +
+        '1. Your conversational follow-up question (visible to student)\n' +
+        '2. A JSON assessment block on a new line:\n' +
+        '{"completeness": 0-5, "accuracy": 0-5, "clarity": 0-5, "overallQuality": 0-5, "weakestArea": "completeness"|"accuracy"|"clarity", "gapIdentified": "description or null"}'
     );
   }
 

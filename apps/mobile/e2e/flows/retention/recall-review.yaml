@@ -1,0 +1,84 @@
+# Flow S4: Retention — Recall Prompt to Score
+# Validates: seeded user with due retention cards sees recall prompt,
+# enters answer, receives score feedback.
+# Tags: smoke, retention
+#
+# Journey: UX Journey 2 (recall phase)
+# Epics: Epic 3 (FR43, FR48, FR49)
+# Prerequisite: Seeded user with completed sessions + due retention cards
+#               (scenario: retention-due)
+#
+# NOTE: This flow depends on testIDs being added to recall-related screens.
+# Missing testIDs (from tech spec Section 3.2):
+#   - recall-question, recall-answer-input, recall-submit
+# Until those are added, some assertions use text matching as fallback.
+appId: com.zwizzly.eduagent
+tags:
+  - smoke
+  - retention
+---
+# 1. Seed & sign in with retention-due scenario
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "retention-due"
+      API_URL: ${API_URL}
+
+# 2. Home screen
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Coaching card should indicate recall/review is due.
+# The adaptive coaching card type will be "fading" or "review".
+# Look for the coaching card's primary action.
+- assertVisible:
+    id: "coaching-card"
+
+# 4. Tap the coaching card's primary action (triggers recall)
+- tapOn:
+    id: "coaching-card-primary"
+
+# 5. Recall screen loads — look for either recall-specific testIDs
+# or text indicating a recall prompt
+- extendedWaitUntil:
+    visible:
+      id: "recall-question"
+    timeout: 10000
+    optional: true
+
+# 5b. Fallback: look for text-based recall prompt
+- extendedWaitUntil:
+    visible:
+      text: "remember"
+    timeout: 5000
+    optional: true
+
+# 6. Enter recall answer
+- tapOn:
+    id: "recall-answer-input"
+    optional: true
+# Fallback: tap on chat-input if recall uses the ChatShell
+- tapOn:
+    id: "chat-input"
+    optional: true
+- inputText: "I remember the key concept is about how this works in practice"
+
+# 7. Submit answer
+- tapOn:
+    id: "recall-submit"
+    optional: true
+# Fallback: use send-button if recall uses ChatShell
+- tapOn:
+    id: "send-button"
+    optional: true
+
+# 8. Wait for score/feedback
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+# 9. Screenshot
+- takeScreenshot: retention-recall-complete

@@ -1,0 +1,24 @@
+# Reusable setup: Sign out of the app.
+#
+# Navigates to More tab → taps Sign Out → confirms the auth gate appears.
+# Used between flows that need a fresh auth state.
+appId: com.zwizzly.eduagent
+---
+# Navigate to More tab (bottom tab bar)
+- tapOn: "More"
+
+# Wait for More screen to load
+- extendedWaitUntil:
+    visible:
+      id: "more-settings"
+    timeout: 5000
+
+# Tap sign out
+- tapOn:
+    id: "sign-out-button"
+
+# Confirm sign-out by waiting for the auth gate
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 10000

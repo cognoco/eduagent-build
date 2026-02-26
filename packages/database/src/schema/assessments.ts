@@ -97,6 +97,7 @@ export const retentionCards = pgTable(
     failureCount: integer('failure_count').notNull().default(0),
     consecutiveSuccesses: integer('consecutive_successes').notNull().default(0),
     xpStatus: xpStatusEnum('xp_status').notNull().default('pending'),
+    evaluateDifficultyRung: integer('evaluate_difficulty_rung'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -138,6 +139,15 @@ export const needsDeepeningTopics = pgTable('needs_deepening_topics', {
     .defaultNow(),
 });
 
+export const analogyDomainEnum = pgEnum('analogy_domain', [
+  'cooking',
+  'sports',
+  'building',
+  'music',
+  'nature',
+  'gaming',
+]);
+
 export const teachingPreferences = pgTable('teaching_preferences', {
   id: uuid('id')
     .primaryKey()
@@ -149,6 +159,7 @@ export const teachingPreferences = pgTable('teaching_preferences', {
     .notNull()
     .references(() => subjects.id, { onDelete: 'cascade' }),
   method: teachingMethodEnum('method').notNull(),
+  analogyDomain: analogyDomainEnum('analogy_domain'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

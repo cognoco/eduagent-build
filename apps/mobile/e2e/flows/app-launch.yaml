@@ -14,8 +14,9 @@ tags:
 
 # The auth layout redirects unauthenticated users to sign-in.
 # Assert that the sign-in screen headline is visible.
-- assertVisible:
-    text: "Welcome back"
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
     timeout: 15000
 
 # Verify key sign-in elements are present

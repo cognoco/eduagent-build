@@ -341,6 +341,7 @@ async function prepareExchangeContext(
     priorLearningContext: priorLearning.contextText || undefined,
     embeddingMemoryContext: memory.context || undefined,
     teachingPreference: teachingPref?.method,
+    analogyDomain: teachingPref?.analogyDomain ?? undefined,
     interleavedTopics,
   };
 

@@ -25,7 +25,7 @@ export function SessionCloseSummary({
     <View>
       {takeaways.map((takeaway, index) => (
         <View key={index} className="flex-row items-start mt-1">
-          <Text className="text-body text-text-secondary mr-2">{'\u2022'}</Text>
+          <Text className="text-body text-text-secondary me-2">{'\u2022'}</Text>
           <Text className="text-body text-text-primary flex-1">{takeaway}</Text>
         </View>
       ))}

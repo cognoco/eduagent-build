@@ -671,6 +671,7 @@ _Revised from PRD Journeys 1-5. Changes driven by UX decisions (Steps 2-9) and c
 5. **Eager Learner's First Entry**
    - Coaching card: "Let's figure out where you are and what you want to learn."
    - Conversational interview (~3 minutes): subject, background, quick spot-check
+   - Optional analogy domain picker step (see "Analogy Domain Picker" in Epic 3 Extension section below — FR134-FR137)
    - AI generates personalized learning path
    - Learner can challenge order or skip known topics
    - First lesson begins immediately (Recall → Build → Apply → Close)
@@ -1512,6 +1513,7 @@ MessageThread (base — rendering, streaming, scroll, input)
 - Recall challenges formatted distinctly (question card styling within thread)
 - Coaching loop progress subtly visible (Recall → Build → Apply → Close, but never labeled)
 - Timer for fluency drills (language learning)
+- EVALUATE challenge mode: CHALLENGE badge + `bg-challenge` background applied to message container for devil's advocate interactions (see EVALUATE Verification UX Specs below — FR128-FR133)
 
 **FreeformChatWrapper:**
 - Minimal wrapper — mostly base MessageThread behavior
@@ -1565,7 +1567,7 @@ MessageThread (base — rendering, streaming, scroll, input)
 #### Learning Book Entry
 
 - **Purpose:** Topic entry in the learner's progress reference. Building block of the Learning Book.
-- **Content:** Topic name, retention signal, last practiced date, session count, building-block connections (v1.1)
+- **Content:** Topic name, retention signal, last practiced date, session count, building-block connections (v1.1 — see Epic 7 Concept Map specs below)
 - **States:** Strong, Fading, Weak, Forgotten, Never-started
 - **Variants:** Compact (list item), Expanded (with session history), Language (adds production vs recognition counts)
 
@@ -2313,3 +2315,709 @@ _This is a server-rendered HTML page, not a mobile screen. Served by the API or 
 - Keep the existing gate behavior (Check again, Resend, Switch profile, Sign out) — preview is additive, not a replacement.
 
 **FRs:** UX enhancement for FR7/FR8 waiting period (consent pending experience).
+
+---
+
+## Epic 7: Concept Map UX Specs (v1.1)
+
+_Prerequisite-aware learning — visual knowledge graph, topological ordering, and skip-dependency warnings. Post-MVP, pre-launch (Epic 7). These specs define the UX layer for the `topic_prerequisites` data model and prerequisite-aware curriculum features. FRs: FR118-FR127._
+
+### Skip-with-Prerequisite Warning Dialog
+
+**Context:** Curriculum management — when learner skips a topic that has dependents.
+
+**Actor:** Learner attempting to skip a curriculum topic.
+
+**Goal:** Inform the learner which topics depend on the one they're skipping, so they can make an informed decision.
+
+**Trigger:** Learner taps "Skip" on a topic that has entries in `topic_prerequisites` as a `prerequisiteTopicId`.
+
+**Dialog: PrerequisiteSkipWarning**
+
+```
+┌─────────────────────────────────┐
+│                                 │
+│  Skip [Topic Name]?             │
+│                                 │
+│  These topics build on it:      │
+│                                 │
+│  • Algebra (required)           │
+│  • Ratios (recommended)         │
+│                                 │
+│  Skipping may make them         │
+│  harder to learn.               │
+│                                 │
+│  [Keep]       [Skip Anyway]     │
+│                                 │
+└─────────────────────────────────┘
+```
+
+**Behavior:**
+
+| State | Behavior |
+|-------|----------|
+| No dependents | Standard skip flow (no warning dialog) |
+| REQUIRED dependents only | Warning emphasizes "required prerequisite" |
+| RECOMMENDED dependents only | Softer warning: "may be helpful for" |
+| Mixed REQUIRED + RECOMMENDED | List both with labels |
+| "Skip Anyway" tap | Topic marked skipped, prerequisite edges deleted, dependents become unlocked, `prerequisiteContext` logged |
+| "Keep" tap | Dialog dismissed, no changes |
+
+**Failure States:**
+
+1. **Edge query fails:** Fall back to standard skip (no warning). Skip still works; warning is progressive enhancement.
+
+**Implementation Notes:**
+- Dialog: `Alert.alert()` (consistent with existing confirmation patterns)
+- Service: extend `skipTopic()` in `services/curriculum.ts` to check for dependents and return warning payload
+- Mobile: check warning payload before confirming skip
+
+**FRs:** FR123, FR124
+
+---
+
+### Concept Map Visualization Screen
+
+**Context:** Learning Book — visual knowledge graph view.
+
+**Actor:** Learner viewing their curriculum progress.
+
+**Goal:** Provide a visual representation of topic relationships showing which topics are mastered, in progress, locked, or at risk.
+
+**Trigger:** Learner taps "Concept Map" toggle/tab in the Learning Book screen.
+
+**Screen: ConceptMapView**
+
+```
+┌─────────────────────────────────┐
+│  ← Learning Book    Concept Map │
+│                                 │
+│         [Fractions]             │
+│          ●  strong              │
+│         / \                     │
+│        /   \                    │
+│  [Algebra]  [Ratios]           │
+│   ○ fading   ● strong          │
+│      |                          │
+│  [Quadratics]                   │
+│   ◌ locked                      │
+│                                 │
+│  ● strong  ○ fading            │
+│  ◐ weak    ◌ locked            │
+│                                 │
+│  Tap a topic for details        │
+│                                 │
+└─────────────────────────────────┘
+```
+
+**Node tap expanded state:**
+
+```
+┌─────────────────────────────────┐
+│  ┌─────────────────────────┐    │
+│  │  Algebra                │    │
+│  │  Retention: fading      │    │
+│  │                         │    │
+│  │  Prerequisites:         │    │
+│  │  ✓ Fractions (strong)   │    │
+│  │                         │    │
+│  │  Unlocks:               │    │
+│  │  ◌ Quadratics (locked)  │    │
+│  │                         │    │
+│  │  [Start Review →]       │    │
+│  └─────────────────────────┘    │
+└─────────────────────────────────┘
+```
+
+**Behavior:**
+
+| State | Behavior |
+|-------|----------|
+| Topic node tap | Expand inline card showing retention status, prerequisites (with their status), dependents, and session CTA |
+| Locked topic tap | Card shows prerequisites needed, no session CTA: "Master [prerequisites] to unlock this topic" |
+| "Start Review" tap | Navigate to session for that topic |
+| Pinch/zoom | Scale the graph (optional — evaluate during implementation) |
+| No prerequisite data (pre-Epic 7 curricula) | Fall back to Learning Book list view. Concept Map tab hidden or shows "Prerequisite data not available for this curriculum" |
+| Subject filter | Graph shows only topics for selected subject (like Learning Book tabs) |
+
+**Design Guardrails:**
+- Node colors use NativeWind semantic tokens: `bg-success` (strong), `bg-warning` (fading), `bg-danger` (weak), `bg-muted` (locked)
+- Edge rendering: solid lines for REQUIRED prerequisites, dashed for RECOMMENDED
+- Graph layout: top-down Sugiyama/layered DAG. Foundation topics at top, advanced at bottom
+- Max ~50 nodes per subject — if curriculum is larger, group by curriculum section
+- No WebView — native `react-native-svg` rendering
+
+**Failure States:**
+
+1. **Graph layout algorithm fails (cycle in data):** Show list view fallback with error logged to Sentry. This shouldn't happen if DAG validation works correctly.
+2. **Too many nodes for readable layout:** Collapse to section-level view (group topics by curriculum section, show inter-section edges).
+3. **Prerequisite data loading fails:** Show standard Learning Book list. Concept Map is progressive enhancement.
+
+**Implementation Notes:**
+- Location: `apps/mobile/src/app/(learner)/book/concept-map.tsx` (new screen) or toggle within existing book/index.tsx
+- Layout: Custom Sugiyama layout algorithm (~100 LOC for small DAGs) or validated RN graph library — evaluate at implementation time
+- Rendering: `react-native-svg` for nodes, edges, and labels
+- Data: new API endpoint `GET /v1/curriculum/:subjectId/graph` returning topics + edges
+- Accessibility: nodes have `accessibilityLabel` with topic name + retention status. Graph navigable via sequential swipe (topological order).
+
+**FRs:** FR119, FR120
+
+---
+
+### Learning Book Prerequisite Ordering
+
+**Context:** Learning Book — list view enhancement.
+
+**Actor:** Learner browsing their Learning Book.
+
+**Goal:** Show topics in prerequisite order with locked/unlocked indicators, providing progression visibility even without the full graph visualization.
+
+**Current state:** Topics displayed in `sortOrder` (array index from curriculum generation). No locked/unlocked indicators.
+
+**Enhancement:** Topics sorted by topological order (prerequisite depth). Topics with unmastered REQUIRED prerequisites show locked indicator.
+
+**Screen: Learning Book (Enhanced)**
+
+```
+┌─────────────────────────────────┐
+│  Learning Book      [Map toggle]│
+│                                 │
+│  Mathematics                    │
+│                                 │
+│  ┌───────────────────────┐      │
+│  │ ● Fractions           │      │
+│  │   Strong · 3 reviews  │      │
+│  └───────────────────────┘      │
+│  ┌───────────────────────┐      │
+│  │ ○ Algebra             │      │
+│  │   Fading · 1 review   │      │
+│  └───────────────────────┘      │
+│  ┌───────────────────────┐      │
+│  │ ◌ Quadratic Equations │      │
+│  │   Locked · needs:     │      │
+│  │   Algebra             │      │
+│  └───────────────────────┘      │
+│                                 │
+└─────────────────────────────────┘
+```
+
+**Behavior:**
+
+| State | Behavior |
+|-------|----------|
+| Topic with all REQUIRED prerequisites strong | Unlocked, normal interaction |
+| Topic with unmastered REQUIRED prerequisites | Locked indicator, tap shows "Master [prerequisites] to unlock" |
+| Topic with no prerequisites | Always unlocked |
+| Pre-Epic 7 curriculum (no prerequisite data) | Display in `sortOrder` as before, no locked indicators |
+| "Map toggle" tap | Switch to Concept Map visualization |
+
+**Implementation Notes:**
+- Location: `apps/mobile/src/app/(learner)/book/index.tsx` (extend existing)
+- Sort: topological sort utility function, fallback to `sortOrder`
+- Locked state: check retention status of REQUIRED prerequisites via API
+
+**FRs:** FR119
+
+---
+
+### Coaching Card — Newly Unlocked Topic
+
+**Context:** Home screen coaching card — new recommendation type.
+
+**Actor:** Learner who has just mastered the last prerequisite for a topic.
+
+**Goal:** Surface the "aha moment" when a new topic becomes available, providing a dopamine hit for progression.
+
+**Trigger:** Coaching card precomputation detects that all REQUIRED prerequisites for a topic have reached `strong` retention.
+
+**Card variant: newly_unlocked**
+
+```
+┌─────────────────────────────────┐
+│                                 │
+│  🔓 New topic unlocked!        │
+│                                 │
+│  You've mastered Fractions —    │
+│  Algebra is now available.      │
+│                                 │
+│  ┌───────────────────────┐      │
+│  │   Start Algebra →      │      │
+│  └───────────────────────┘      │
+│                                 │
+└─────────────────────────────────┘
+```
+
+**Behavior:**
+
+| State | Behavior |
+|-------|----------|
+| Single topic unlocked | Show topic name and which prerequisite was the final unlock |
+| Multiple topics unlocked simultaneously | Show count: "2 new topics unlocked!" with list |
+| Topic already started by user | Don't show (user already discovered it) |
+| Card tap | Navigate to session for the unlocked topic |
+| Priority | Between `review_due` (higher) and `streak` (lower) — priority 5 |
+
+**Implementation Notes:**
+- Location: extend `apps/api/src/services/coaching-cards.ts` precomputation
+- New recommendation type: `newly_unlocked` with `topicId` and `unlockerTopicId`
+- Graph query: for each topic with all REQUIRED prerequisites, check if prerequisites are all at `strong` retention AND the topic itself has never been started
+
+**FRs:** FR122
+
+---
+
+## EVALUATE Verification UX Specs (Devil's Advocate)
+
+_Learning verification via devil's advocate challenges — the AI presents deliberately flawed reasoning and asks the learner to identify the error. Strengthens deep understanding for strong-retention topics. MVP scope, Epic 3 extension. FRs: FR128-FR133._
+
+### EVALUATE Challenge Interaction
+
+**Context:** Learning Verification (Epic 3) — strong retention topics only (easeFactor >= 2.5, repetitions > 0). The AI deliberately presents a flawed explanation and challenges the student to find the error.
+
+**Actor:** Learner with a topic at strong retention.
+
+**Goal:** Move beyond recall into critical analysis — can the learner not just remember, but evaluate reasoning?
+
+**Trigger:** Verification session selects EVALUATE mode for a topic that meets the strength threshold.
+
+**Screen 1: Initial Challenge**
+
+```
++-----------------------------------+
+|                                   |
+|  CHALLENGE                        |
+|  ~~~~~~~~~~                       |
+|                                   |
+|  AI: "I think when you multiply   |
+|  two negative numbers, you get    |
+|  a negative result. Like          |
+|  -3 x -4 = -12."                 |
+|                                   |
+|  "Can you spot what's wrong?"     |
+|                                   |
+|  +---------+  +----------------+  |
+|  | I think |  | I'm not sure,  |  |
+|  | I see   |  | explain more   |  |
+|  | it...   |  |                |  |
+|  +---------+  +----------------+  |
+|                                   |
++-----------------------------------+
+```
+
+**Screen 2: Success State**
+
+```
++-----------------------------------+
+|                                   |
+|  CHALLENGE                        |
+|  ~~~~~~~~~~                       |
+|                                   |
+|  Student: "That's wrong —         |
+|  multiplying two negatives gives  |
+|  a positive. -3 x -4 = 12."      |
+|                                   |
+|  AI: "Exactly right! You didn't   |
+|  just remember the rule — you     |
+|  caught the mistake. That's real  |
+|  understanding."                  |
+|                                   |
+|  [Continue]                       |
+|                                   |
++-----------------------------------+
+```
+
+**Screen 3: Failure State**
+
+```
++-----------------------------------+
+|                                   |
+|  CHALLENGE                        |
+|  ~~~~~~~~~~                       |
+|                                   |
+|  Student: "Yeah, that looks       |
+|  right to me."                    |
+|                                   |
+|  AI: "Good instinct to check,     |
+|  but actually — multiplying two   |
+|  negatives gives a positive.      |
+|  -3 x -4 = 12, not -12."         |
+|                                   |
+|  "No worries — spotting these     |
+|  takes practice."                 |
+|                                   |
+|  [Got it]                         |
+|                                   |
++-----------------------------------+
+```
+
+**Behavior:**
+
+| State | Behavior |
+|-------|----------|
+| Correct identification | Quality 4-5, congratulate, advance difficulty rung |
+| Partial identification | Quality 3, acknowledge partial insight, hint at full flaw |
+| Failed to identify | Quality 2-3 (NOT 0-1), reveal flaw with explanation |
+| "I don't know" | Quality 1, encourage attempt, reveal flaw gently |
+| 2nd consecutive failure | Lower difficulty rung, retry with more obvious flaw |
+| 3rd consecutive failure | Exit EVALUATE, mark for standard review |
+
+**Persona Framing:**
+
+| Persona | Opening Frame | Tone |
+|---------|--------------|------|
+| Teen (11-15) | "I think this is right — can you prove me wrong?" | Playful, competitive |
+| Learner (16+) | "Here's a common explanation — what's the flaw?" | Academic, collaborative |
+
+**Design Guardrails:**
+
+1. CHALLENGE badge must be visible throughout the interaction — NativeWind class: `bg-challenge`
+2. One EVALUATE round per verification session — do not chain multiple challenges
+3. Never present EVALUATE during homework sessions
+4. Never challenge topics the student has shown frustration with (struggle status: `needs_deepening` or `blocked`)
+5. Visual differentiation from standard messages: distinct border/background color + CHALLENGE badge. Must be clearly distinguishable at a glance.
+
+**Failure Edge Cases:**
+
+1. **Flaw too obvious:** LLM should calibrate flaw subtlety based on `evaluateDifficultyRung` on the retention card. Higher rungs produce more nuanced flaws.
+2. **No flaw generated (LLM fails to produce a valid flawed explanation):** Fall back to standard verification question. EVALUATE is progressive enhancement.
+3. **Student misinterprets as real confusion:** CHALLENGE badge + explicit "Can you spot what's wrong?" framing prevents this. Badge must remain visible for the entire exchange.
+
+**Implementation Notes:**
+- Reuses existing MessageThread with visual differentiation — not a separate wrapper. CHALLENGE badge and `bg-challenge` background applied to the message container. See MessageThread decomposition above.
+- `buildEvaluatePrompt` template in `services/llm/prompts/` constructs the flawed-explanation prompt
+- `evaluateDifficultyRung` stored on retention card, controls flaw subtlety (1 = obvious flaw, 5 = subtle flaw)
+- Route: same session routes — EVALUATE is a verification sub-mode, not a separate session type
+- Threshold check: `easeFactor >= 2.5 AND repetitions > 0` in verification topic selection
+
+**FRs:** FR128-FR133
+
+---
+
+## Epic 3 Extension: Analogy Domain Preference UX Specs (Multiverse of Analogies)
+
+_Per-subject analogy domain selection — lets learners choose a real-world domain (cooking, sports, building, music, nature, gaming) that the LLM uses consistently for analogies during sessions. MVP scope, Epic 3 extension. See also: subject onboarding interview (Journey 1, Step 5) and subject settings. FRs: FR134-FR137._
+
+### Analogy Domain Picker (Subject Settings)
+
+**Context:** Subject settings screen (extends existing subject configuration alongside any future teaching method preference).
+
+**Actor:** Learner (teen or adult).
+
+**Goal:** Choose an analogy domain that makes abstract concepts easier to understand.
+
+**Trigger:** Student opens subject settings, or during subject onboarding interview.
+
+**Screen: Subject Settings (analogy row)**
+
+```
+┌─────────────────────────────────────┐
+│  Math Settings                      │
+│─────────────────────────────────────│
+│                                     │
+│  Teaching Method                    │
+│  ┌──────────┐ ┌──────────┐        │
+│  │ Visual   │ │Step-by-  │ ...    │
+│  │ Diagrams │ │  Step    │        │
+│  └──────────┘ └──────────┘        │
+│                                     │
+│  Analogy Flavor                     │
+│  How should I explain things?       │
+│                                     │
+│  ┌────┐ ┌────┐ ┌────┐ ┌────┐     │
+│  │ 🍳 │ │ ⚽ │ │ 🏗️ │ │ 🎵 │     │
+│  │Cook │ │Sprt│ │Bld │ │Musc│     │
+│  └────┘ └────┘ └────┘ └────┘     │
+│  ┌────┐ ┌────┐ ┌─────────────┐   │
+│  │ 🌿 │ │ 🎮 │ │   None      │   │
+│  │Natr│ │Game│ │  (default)  │   │
+│  └────┘ └────┘ └─────────────┘   │
+│                                     │
+│  Selected: Cooking                  │
+│  "I'll use kitchen analogies to     │
+│   explain concepts in Math"         │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**Screen: Onboarding Interview (optional step)**
+
+```
+┌─────────────────────────────────────┐
+│                                     │
+│  How do you like things explained?  │
+│                                     │
+│  Pick an analogy style (optional)   │
+│                                     │
+│  ┌────┐ ┌────┐ ┌────┐ ┌────┐     │
+│  │ 🍳 │ │ ⚽ │ │ 🏗️ │ │ 🎵 │     │
+│  │Cook-│ │Sprts│ │Build│ │Music│    │
+│  │ ing │ │    │ │ ing │ │    │     │
+│  └────┘ └────┘ └────┘ └────┘     │
+│  ┌────┐ ┌────┐                     │
+│  │ 🌿 │ │ 🎮 │                     │
+│  │Natr │ │Game │                    │
+│  └────┘ └────┘                     │
+│                                     │
+│  ┌─────────────────────────────┐   │
+│  │        Skip for now          │   │
+│  └─────────────────────────────┘   │
+│                                     │
+│  ┌─────────────────────────────┐   │
+│  │          Continue            │   │
+│  └─────────────────────────────┘   │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**Behavior:**
+
+| State | Behavior |
+|-------|----------|
+| No domain selected (default) | No analogy instruction in prompt. Direct technical explanation. |
+| Domain selected | LLM uses analogies from that domain consistently throughout session |
+| Domain changed mid-session | New domain takes effect on next exchange (no session restart) |
+| Skip during onboarding | `analogyDomain` stays null, can be set later in subject settings |
+| Domain removed (set to None) | Reverts to default (null), next exchange uses direct explanation |
+
+**Design Guardrails:**
+
+1. Maximum 6 domains at launch — do not add more without LLM quality testing across subjects
+2. Single universal domain list (not split by persona) — LLM adjusts tone via existing persona voice
+3. Selection preview text adapts per subject: "I'll use [domain] analogies to explain concepts in [Subject]"
+4. Icons use standard emoji, not custom assets — reduces maintenance and works cross-platform
+5. "None (default)" option is always visible — students should never feel forced into an analogy style
+6. No analogy persistence in session history — if domain changes, past messages don't retroactively change
+
+**Implementation Notes:**
+- Component: `AnalogyDomainPicker` — reusable in subject settings and onboarding
+- NativeWind: selected state uses `bg-primary/10 border-primary`, unselected uses `bg-surface border-border`
+- Accessibility: each option has `accessibilityLabel` with full domain name (not abbreviation)
+- File locations: picker in `apps/mobile/src/components/settings/`, onboarding step in subject creation flow
+- Domain list: `cooking`, `sports`, `building`, `music`, `nature`, `gaming` (stored as enum string in DB)
+- API: `PATCH /v1/settings/subject/:subjectId` with `analogyDomain` field (nullable)
+- LLM integration: `analogyDomain` injected into system prompt via `routeAndCall()` context
+
+**FRs:** FR134-FR137
+
+---
+
+## Feynman Stage UX Specs — Teach-Back Via Voice (Epic 3 Extension)
+
+_Verbal teach-back verification — the learner explains a concept aloud, on-device STT transcribes it, and the AI plays "confused student" to probe gaps. Strengthens deep understanding for moderate-to-strong retention topics. MVP scope, Epic 3 extension. FRs: FR138-FR143._
+
+### TEACH_BACK Interaction
+
+**Context:** Learning Verification (Epic 3) — moderate-to-strong retention topics. The learner teaches the concept verbally; the AI identifies gaps by asking naive follow-up questions.
+
+**Actor:** Learner (teen or adult).
+
+**Goal:** Explain a concept verbally; AI identifies gaps in understanding.
+
+**Trigger:** Verification selector offers TEACH_BACK for topics with solid retention.
+
+**Screen 1: Recording State**
+
+```
+┌─────────────────────────────────────┐
+│  TEACH ME                     ⚙️    │
+│─────────────────────────────────────│
+│                                     │
+│  ┌─────────────────────────────┐   │
+│  │ 🤔 Teach me about           │   │
+│  │ photosynthesis — pretend I   │   │
+│  │ know nothing about it!       │   │
+│  └─────────────────────────────┘   │
+│                                     │
+│  ┌─────────────────────────────┐   │
+│  │  🔴 Recording...             │   │
+│  │  ∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿∿     │   │
+│  │  "So photosynthesis is when  │   │
+│  │   plants use sunlight to..." │   │
+│  │                              │   │
+│  │     [ Tap to stop ]          │   │
+│  └─────────────────────────────┘   │
+│                                     │
+│  🔇 Voice  ─────────────────────   │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**Screen 2: Transcript Preview (Before Sending)**
+
+```
+┌─────────────────────────────────────┐
+│                                     │
+│  Your explanation:                  │
+│  ┌─────────────────────────────┐   │
+│  │ "Photosynthesis is when      │   │
+│  │  plants use sunlight to make │   │
+│  │  food. They take in CO2 and  │   │
+│  │  water and produce glucose   │   │
+│  │  and oxygen."                │   │
+│  └─────────────────────────────┘   │
+│                                     │
+│  ┌──────────┐  ┌──────────────┐   │
+│  │ Re-record │  │    Send  ➤   │   │
+│  └──────────┘  └──────────────┘   │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**Screen 3: AI "Confused Student" Response**
+
+```
+┌─────────────────────────────────────┐
+│                                     │
+│  You said:                          │
+│  "Photosynthesis is when plants     │
+│   use sunlight to make food..."     │
+│                                     │
+│  ┌─────────────────────────────┐   │
+│  │ 🤔 That makes sense! But     │   │
+│  │ wait — you said plants "make │   │
+│  │ food." What exactly IS the   │   │
+│  │ food? Like, what molecule    │   │
+│  │ are they actually producing? │   │
+│  │                    🔊 ──●──  │   │
+│  └─────────────────────────────┘   │
+│                                     │
+│  ┌─────────────────────────────┐   │
+│  │  🎤  Tap to explain more     │   │
+│  └─────────────────────────────┘   │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**Behavior:**
+
+| State | Behavior |
+|-------|----------|
+| Mic button tapped | Recording starts, waveform animation, on-device STT transcribes |
+| Tap to stop | Recording ends, transcript preview shown with Re-record / Send options |
+| Re-record | Clears transcript, starts new recording |
+| Send | Transcript sent as user message, LLM streams "confused student" response |
+| Response complete | TTS reads response aloud (if voice toggle on). Student can respond verbally again. |
+| Voice toggle off | TTS disabled, student reads response. Recording still available for input. |
+| Multiple rounds | Back-and-forth continues until LLM assesses understanding is sufficient |
+
+**Persona Framing:**
+
+| Persona | AI Opening | Tone |
+|---------|-----------|------|
+| Teen (11-15) | "Teach me about [topic] — pretend I know nothing!" | Enthusiastic, curious, uses simple questions |
+| Learner (16+) | "I'd like to understand [topic]. Can you walk me through it?" | Thoughtfully curious, asks precise clarifying questions |
+
+**Design Guardrails:**
+
+1. TEACH ME badge visible throughout — NativeWind class: `bg-teach`, distinct from `bg-challenge`
+2. Transcript preview is mandatory before sending — student must see what was transcribed and can re-record
+3. Voice toggle visible in session header, defaults to ON for TEACH_BACK
+4. On-device STT only — no audio sent to cloud, no recording stored
+5. Waveform animation provides visual feedback that recording is active
+6. Re-record option prevents anxiety about "getting it wrong" on first try
+7. Assessment JSON never shown to student — they only see the conversational follow-up
+
+**Implementation Notes:**
+- `expo-speech-recognition` for STT, `expo-speech` for TTS
+- Recording state machine: idle -> recording -> preview -> sent
+- `structured_assessment` JSONB on `session_events` (shared column with EVALUATE)
+- `bg-teach` NativeWind class for TEACH_BACK badge
+- Reuses existing MessageThread with visual differentiation — TEACH ME badge and `bg-teach` background applied to the message container
+- Route: same session routes — TEACH_BACK is a verification sub-mode, not a separate session type
+
+**FRs:** FR138-FR143
+
+---
+
+## Epic 8: Full Voice Mode UX Specs (v1.1)
+
+_Voice-first tutoring sessions — the learner conducts an entire session via spoken conversation with STT input and TTS output. Applies to any session type (learning, homework, interleaved). v1.1 scope. FRs: FR144-FR145, FR147-FR149._
+
+### Voice-First Session
+
+**Context:** Any session type (learning, homework, interleaved).
+
+**Actor:** Learner (teen or adult).
+
+**Goal:** Conduct entire tutoring session via voice conversation.
+
+**Trigger:** Student selects "Voice mode" at session start.
+
+**Screen 1: Session Start Toggle**
+
+```
+┌─────────────────────────────────────┐
+│                                     │
+│  Start Session: Chemistry           │
+│                                     │
+│  How would you like to learn?       │
+│                                     │
+│  ┌───────────────┐ ┌─────────────┐ │
+│  │  📝 Text      │ │  🎤 Voice   │ │
+│  │  Type your    │ │  Speak your │ │
+│  │  responses    │ │  responses  │ │
+│  └───────────────┘ └─────────────┘ │
+│                                     │
+│  ┌─────────────────────────────┐   │
+│  │        Begin Session         │   │
+│  └─────────────────────────────┘   │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**Screen 2: Voice Session Controls**
+
+```
+┌─────────────────────────────────────┐
+│  Chemistry          🔊 1x  ⚙️      │
+│─────────────────────────────────────│
+│                                     │
+│  ┌─────────────────────────────┐   │
+│  │ Let's think about why        │   │
+│  │ exothermic reactions release │   │
+│  │ energy...                    │   │
+│  │                   🔊 ──●──   │   │
+│  └─────────────────────────────┘   │
+│                                     │
+│  ┌────┐ ┌────┐ ┌────┐ ┌───────┐  │
+│  │ ⏸️  │ │ 🔄 │ │ 🐢 │ │  🎤   │  │
+│  │Pause│ │Rply│ │Spd │ │ Speak │  │
+│  └────┘ └────┘ └────┘ └───────┘  │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**Behavior:**
+
+| State | Behavior |
+|-------|----------|
+| Voice mode selected | STT + TTS activated, mic button replaces text input |
+| AI speaking | Text streams visually + audio plays after complete (Option A) |
+| Speed button | Cycles: 0.75x -> 1x -> 1.25x. Applies to TTS playback. |
+| Replay button | Re-plays last AI response audio |
+| Pause button | Pauses TTS playback mid-speech |
+| Student interrupts | Tapping mic while AI speaks stops TTS, starts recording |
+| Switch to text mid-session | Toggle in header, switches input method without restarting |
+
+**Design Guardrails:**
+
+1. Visual transcript always visible alongside audio — accessibility requirement for deaf/HoH users
+2. Voice mode toggle persists for current session only — not a global preference
+3. Speed control applies to TTS only, not STT
+4. Option A TTS (wait for complete) at launch — sentence-buffered Option B is a documented upgrade path
+5. VAD (auto-stop on silence) is stretch — manual tap-to-stop is the default
+
+**Accessibility Notes (Requires Spike — Story 8.4):**
+
+- VoiceOver/TalkBack and app TTS compete for audio channel
+- Investigation needed: defer to screen reader (disable app TTS when detected) vs audio ducking
+- Visual transcript is the accessibility fallback — always rendered regardless of voice mode
+- Haptic feedback on recording state transitions
+
+**Implementation Notes:**
+- Reuses Feynman Stage STT/TTS infrastructure (`expo-speech-recognition` + `expo-speech`)
+- Session mode stored on session record, UI adapts input area
+- Voice controls toolbar component: `VoiceSessionControls`
+- Voice mode is a session-start option, not an onboarding step — see Journey 1 (Onboarding) for onboarding flow; voice mode selection appears on the session creation screen after onboarding is complete
+
+**FRs:** FR144-FR145, FR147-FR149

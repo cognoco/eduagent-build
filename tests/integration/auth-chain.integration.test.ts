@@ -14,92 +14,32 @@
  */
 
 // --- Controllable JWT mock ---
-const mockDecodeJWTHeader = jest.fn();
-const mockFetchJWKS = jest.fn();
-const mockVerifyJWT = jest.fn();
 
-jest.mock('../../apps/api/src/middleware/jwt', () => ({
-  decodeJWTHeader: mockDecodeJWTHeader,
-  fetchJWKS: mockFetchJWKS,
-  verifyJWT: mockVerifyJWT,
-}));
+import {
+  jwtMock,
+  databaseMock,
+  inngestClientMock,
+  accountMock,
+  billingMock,
+  settingsMock,
+  sessionMock,
+  llmMock,
+  configureValidJWT as configureValidJWTHelper,
+  configureInvalidJWT as configureInvalidJWTHelper,
+} from './mocks';
 
-// --- Base mocks (same as other integration tests) ---
+const jwtMocks = jwtMock();
+jest.mock('../../apps/api/src/middleware/jwt', () => jwtMocks);
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn().mockReturnValue({}),
-}));
+// --- Base mocks ---
 
-jest.mock('../../apps/api/src/inngest/client', () => {
-  let fnCounter = 0;
-  return {
-    inngest: {
-      send: jest.fn().mockResolvedValue({ ids: [] }),
-      createFunction: jest.fn().mockImplementation((config) => {
-        const id = config?.id ?? `mock-fn-${fnCounter++}`;
-        const fn = jest.fn();
-        (fn as any).getConfig = () => [
-          { id, name: id, triggers: [], steps: {} },
-        ];
-        return fn;
-      }),
-    },
-  };
-});
-
-jest.mock('../../apps/api/src/services/account', () => ({
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: '00000000-0000-4000-8000-000000000001',
-    clerkUserId: 'user_test',
-    email: 'test@test.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
-
-jest.mock('../../apps/api/src/services/billing', () => ({
-  ensureFreeSubscription: jest.fn().mockResolvedValue({
-    id: '00000000-0000-4000-8000-000000000005',
-    accountId: '00000000-0000-4000-8000-000000000001',
-    tier: 'free',
-    status: 'trial',
-    stripeSubscriptionId: null,
-  }),
-  getQuotaPool: jest.fn().mockResolvedValue({
-    id: '00000000-0000-4000-8000-000000000006',
-    subscriptionId: '00000000-0000-4000-8000-000000000005',
-    monthlyLimit: 50,
-    usedThisMonth: 0,
-  }),
-  decrementQuota: jest.fn().mockResolvedValue({
-    success: true,
-    remainingMonthly: 49,
-    remainingTopUp: 0,
-  }),
-}));
-
-jest.mock('../../apps/api/src/services/settings', () => ({
-  shouldPromptCasualSwitch: jest.fn().mockResolvedValue(false),
-}));
-
-jest.mock('../../apps/api/src/services/session', () => ({
-  startSession: jest.fn(),
-  getSession: jest.fn(),
-  processMessage: jest.fn(),
-  streamMessage: jest.fn(),
-  closeSession: jest.fn(),
-  flagContent: jest.fn(),
-  getSessionSummary: jest.fn(),
-  submitSummary: jest.fn(),
-}));
-
-jest.mock('../../apps/api/src/services/llm', () => ({
-  routeAndCall: jest.fn(),
-  routeAndStream: jest.fn(),
-  registerProvider: jest.fn(),
-  createMockProvider: jest.fn(),
-  getRegisteredProviders: jest.fn().mockReturnValue([]),
-}));
+jest.mock('@eduagent/database', () => databaseMock());
+jest.mock('../../apps/api/src/inngest/client', () => inngestClientMock());
+jest.mock('../../apps/api/src/services/account', () => accountMock());
+jest.mock('../../apps/api/src/services/billing', () => billingMock());
+jest.mock('../../apps/api/src/services/settings', () => settingsMock());
+jest.mock('../../apps/api/src/services/session', () => sessionMock());
+jest.mock('../../apps/api/src/services/llm', () => llmMock());
 
 import { app } from '../../apps/api/src/index';
 
@@ -109,22 +49,15 @@ const TEST_ENV = {
 
 // Helper: configure JWT mock to return a valid payload
 function configureValidJWT(): void {
-  mockDecodeJWTHeader.mockReturnValue({ alg: 'RS256', kid: 'test-kid' });
-  mockFetchJWKS.mockResolvedValue({
-    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
-  });
-  mockVerifyJWT.mockResolvedValue({
+  configureValidJWTHelper(jwtMocks, {
     sub: 'user_auth_test',
     email: 'auth@test.com',
-    exp: Math.floor(Date.now() / 1000) + 3600,
   });
 }
 
 // Helper: configure JWT mock to throw (simulates invalid/expired token)
 function configureInvalidJWT(): void {
-  mockDecodeJWTHeader.mockImplementation(() => {
-    throw new Error('Invalid JWT');
-  });
+  configureInvalidJWTHelper(jwtMocks);
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +162,7 @@ describe('Integration: Auth chain — protected paths', () => {
 
     // Auth middleware passed — downstream may return any status, but NOT 401
     expect(res.status).not.toBe(401);
-    expect(mockVerifyJWT).toHaveBeenCalled();
+    expect(jwtMocks.verifyJWT).toHaveBeenCalled();
   });
 
   it('returns 401 when CLERK_JWKS_URL is missing', async () => {

@@ -87,9 +87,26 @@ describe('llmMiddleware', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('warns in test environment when key missing (no throw)', async () => {
+  it('warns in test environment when key missing (no throw) — process.env fallback', async () => {
     process.env['NODE_ENV'] = 'test';
     const c = createMockContext({});
+    const next = jest.fn().mockResolvedValue(undefined);
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+    await llmMiddleware(c, next);
+
+    expect(registerProvider).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('GEMINI_API_KEY not set')
+    );
+    expect(next).toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+  });
+
+  it('warns in test environment when key missing (no throw) — c.env.ENVIRONMENT', async () => {
+    process.env['NODE_ENV'] = 'development';
+    const c = createMockContext({ ENVIRONMENT: 'test' });
     const next = jest.fn().mockResolvedValue(undefined);
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
 

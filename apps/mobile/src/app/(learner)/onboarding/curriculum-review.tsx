@@ -73,7 +73,7 @@ export default function CurriculumScreen() {
       <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
         <Pressable
           onPress={() => router.back()}
-          className="mr-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
+          className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="curriculum-back"
         >
           <Text className="text-primary text-h3">&larr;</Text>
@@ -129,7 +129,7 @@ export default function CurriculumScreen() {
               testID={`topic-${topic.id}`}
             >
               <View className="flex-row items-start justify-between">
-                <View className="flex-1 mr-3">
+                <View className="flex-1 me-3">
                   <Text className="text-body font-semibold text-text-primary">
                     {topic.sortOrder + 1}. {topic.title}
                   </Text>
@@ -138,7 +138,7 @@ export default function CurriculumScreen() {
                   </Text>
                   <View className="flex-row mt-2 items-center">
                     <View
-                      className={`rounded-full px-2 py-0.5 mr-2 ${
+                      className={`rounded-full px-2 py-0.5 me-2 ${
                         RELEVANCE_BG[topic.relevance] ?? 'bg-surface-elevated'
                       }`}
                     >
@@ -237,7 +237,7 @@ export default function CurriculumScreen() {
             <View className="flex-row">
               <Pressable
                 onPress={() => setShowChallengeModal(false)}
-                className="flex-1 rounded-button py-3 items-center bg-surface mr-2"
+                className="flex-1 rounded-button py-3 items-center bg-surface me-2"
                 testID="challenge-cancel"
               >
                 <Text className="text-body text-text-primary">Cancel</Text>

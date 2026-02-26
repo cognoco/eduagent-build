@@ -301,9 +301,9 @@ importers:
       '@eduagent/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas
-      '@expo-google-fonts/inter':
-        specifier: ^0.4.2
-        version: 0.4.2
+      '@expo-google-fonts/atkinson-hyperlegible':
+        specifier: ^0.4.1
+        version: 0.4.1
       '@expo/metro-config':
         specifier: ~54.0.11
         version: 54.0.11(bufferutil@4.1.0)(expo@54.0.29)(utf-8-validate@5.0.10)
@@ -355,6 +355,12 @@ importers:
       expo-secure-store:
         specifier: ^15.0.8
         version: 15.0.8(expo@54.0.29)
+      expo-speech:
+        specifier: ^55.0.8
+        version: 55.0.8(expo@54.0.29)
+      expo-speech-recognition:
+        specifier: ^3.1.1
+        version: 3.1.1(expo@54.0.29)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))(react@19.1.0)
       expo-splash-screen:
         specifier: ~31.0.12
         version: 31.0.12(expo@54.0.29)
@@ -2282,8 +2288,8 @@ packages:
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@expo-google-fonts/inter@0.4.2':
-    resolution: {integrity: sha512-syfiImMaDmq7cFi0of+waE2M4uSCyd16zgyWxdPOY7fN2VBmSLKEzkfbZgeOjJq61kSqPBNNtXjggiQiSD6gMQ==}
+  '@expo-google-fonts/atkinson-hyperlegible@0.4.1':
+    resolution: {integrity: sha512-Xr1XAguU7oEVHy28WxCBmdjPT2BNwH5lFZF2adHb9Cy6qtNgXwDzeAgvESkoq4mQmYW5RzqJZknqQxrTkEm0Xw==}
 
   '@expo/cli@54.0.19':
     resolution: {integrity: sha512-Za+Ena29uYkq2c1Lbh+r3VrooR/mW7c9dahoH4WvL1T9ttbfAeu7sJmCuWZo88bZ4bFsOpE5fYne71DK11iSrQ==}
@@ -7693,6 +7699,18 @@ packages:
   expo-server@1.0.5:
     resolution: {integrity: sha512-IGR++flYH70rhLyeXF0Phle56/k4cee87WeQ4mamS+MkVAVP+dDlOHf2nN06Z9Y2KhU0Gp1k+y61KkghF7HdhA==}
     engines: {node: '>=20.16.0'}
+
+  expo-speech-recognition@3.1.1:
+    resolution: {integrity: sha512-+1rviv+ZecAokY8PUfr3XJuhS4t0uKccewIPPUk5ooeEt5xKEWr6XYpKm3ggapPdJQbgMTjWbmSPT1ahTMyIqA==}
+    peerDependencies:
+      expo: '*'
+      react: 19.1.0
+      react-native: '*'
+
+  expo-speech@55.0.8:
+    resolution: {integrity: sha512-RbQaCkzONPtOzTO/zCt2/K2gm6aGf2Ra2inqv6N4YYS5yUXR/g+ZoQxlqM0DWJOHWWtOtBEHV2QobydI3k04+A==}
+    peerDependencies:
+      expo: '*'
 
   expo-splash-screen@31.0.12:
     resolution: {integrity: sha512-o466xFYh7Fld7CuBrzx5I12LONo7a4xzOSbxS+buOEObL/Wp4Xu4QhXg80ZY7puCGbJbtm7Ltjgg5olnWOU/Rg==}
@@ -14489,7 +14507,7 @@ snapshots:
       '@eslint/core': 0.17.0
       levn: 0.4.1
 
-  '@expo-google-fonts/inter@0.4.2': {}
+  '@expo-google-fonts/atkinson-hyperlegible@0.4.1': {}
 
   '@expo/cli@54.0.19(bufferutil@4.1.0)(expo-router@6.0.23)(expo@54.0.29)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))(utf-8-validate@5.0.10)':
     dependencies:
@@ -21430,7 +21448,7 @@ snapshots:
   expo-auth-session@7.0.10(expo@54.0.29)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))(react@19.1.0):
     dependencies:
       expo-application: 7.0.8(expo@54.0.29)
-      expo-constants: 18.0.12(expo@54.0.29)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))
+      expo-constants: 18.0.13(expo@54.0.29)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))
       expo-crypto: 15.0.8(expo@54.0.29)
       expo-linking: 8.0.11(expo@54.0.29)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))(react@19.1.0)
       expo-web-browser: 15.0.10(expo@54.0.29)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))
@@ -21631,6 +21649,16 @@ snapshots:
       expo: 54.0.29(@babel/core@7.28.5)(@expo/metro-runtime@6.1.2)(bufferutil@4.1.0)(expo-router@6.0.23)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))(react@19.1.0)(utf-8-validate@5.0.10)
 
   expo-server@1.0.5: {}
+
+  expo-speech-recognition@3.1.1(expo@54.0.29)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))(react@19.1.0):
+    dependencies:
+      expo: 54.0.29(@babel/core@7.28.5)(@expo/metro-runtime@6.1.2)(bufferutil@4.1.0)(expo-router@6.0.23)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))(react@19.1.0)(utf-8-validate@5.0.10)
+      react: 19.1.0
+      react-native: 0.81.5(@babel/core@7.28.5)(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10)
+
+  expo-speech@55.0.8(expo@54.0.29):
+    dependencies:
+      expo: 54.0.29(@babel/core@7.28.5)(@expo/metro-runtime@6.1.2)(bufferutil@4.1.0)(expo-router@6.0.23)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))(react@19.1.0)(utf-8-validate@5.0.10)
 
   expo-splash-screen@31.0.12(expo@54.0.29):
     dependencies:

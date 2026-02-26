@@ -132,7 +132,12 @@ export async function skipTopic(
       skipped: true,
       updatedAt: new Date(),
     })
-    .where(eq(curriculumTopics.id, topicId));
+    .where(
+      and(
+        eq(curriculumTopics.id, topicId),
+        eq(curriculumTopics.curriculumId, curriculum.id)
+      )
+    );
 
   // Record the adaptation
   await db.insert(curriculumAdaptations).values({

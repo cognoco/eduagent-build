@@ -58,12 +58,12 @@ export function ProfileSwitcher({
         accessibilityState={{ expanded: isOpen }}
         testID="profile-switcher-chip"
       >
-        <View className="w-7 h-7 rounded-full bg-primary items-center justify-center mr-2">
+        <View className="w-7 h-7 rounded-full bg-primary items-center justify-center me-2">
           <Text className="text-text-inverse text-caption font-bold">
             {initials}
           </Text>
         </View>
-        <Text className="text-body-sm font-medium text-text-primary mr-1">
+        <Text className="text-body-sm font-medium text-text-primary me-1">
           {activeProfile?.displayName ?? 'Profile'}
         </Text>
         <Text className="text-text-secondary text-caption">
@@ -122,7 +122,7 @@ export function ProfileSwitcher({
                   testID={`profile-option-${profile.id}`}
                 >
                   <View
-                    className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${
+                    className={`w-8 h-8 rounded-full items-center justify-center me-3 ${
                       isActive ? 'bg-primary' : 'bg-border'
                     }`}
                   >
@@ -153,7 +153,7 @@ export function ProfileSwitcher({
                     </Text>
                   </View>
                   {isActive && (
-                    <Text className="text-primary text-body-sm ml-2">
+                    <Text className="text-primary text-body-sm ms-2">
                       {'\u2713'}
                     </Text>
                   )}

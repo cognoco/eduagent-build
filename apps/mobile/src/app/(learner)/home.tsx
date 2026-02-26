@@ -96,7 +96,7 @@ export default function HomeScreen() {
         </View>
         <View className="flex-row items-center" style={{ zIndex: 50 }}>
           {profiles.length > 1 && activeProfile && (
-            <View className="mr-2">
+            <View className="me-2">
               <ProfileSwitcher
                 profiles={profiles}
                 activeProfileId={activeProfile.id}
@@ -107,7 +107,7 @@ export default function HomeScreen() {
           {subStatus && (
             <Pressable
               onPress={() => router.push('/(learner)/subscription')}
-              className="bg-primary-soft rounded-full px-2.5 py-1.5 mr-2"
+              className="bg-primary-soft rounded-full px-2.5 py-1.5 me-2"
               accessibilityLabel={`${remaining} questions remaining`}
               accessibilityRole="button"
               testID="header-quota-badge"
@@ -264,7 +264,7 @@ export default function HomeScreen() {
                       testID={`retention-chip-${subject.id}`}
                     >
                       <RetentionSignal status={status} compact />
-                      <Text className="text-body-sm text-text-primary ml-2 font-medium">
+                      <Text className="text-body-sm text-text-primary ms-2 font-medium">
                         {subject.name}
                       </Text>
                     </Pressable>
@@ -321,7 +321,7 @@ export default function HomeScreen() {
                             },
                           } as never)
                         }
-                        className="ml-3 bg-primary/10 rounded-button min-w-[40px] min-h-[40px] items-center justify-center"
+                        className="ms-3 bg-primary/10 rounded-button min-w-[40px] min-h-[40px] items-center justify-center"
                         accessibilityLabel={`Homework help for ${subject.name}`}
                         accessibilityRole="button"
                         testID={`homework-button-${subject.id}`}
