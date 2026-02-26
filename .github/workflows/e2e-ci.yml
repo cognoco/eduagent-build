@@ -74,8 +74,25 @@ jobs:
     # Advisory — does not block PR merge
     continue-on-error: true
     timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: eduagent
+          POSTGRES_PASSWORD: eduagent
+          POSTGRES_DB: tests
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     env:
       MAESTRO_CLI_NO_ANALYTICS: 1
+      DATABASE_URL: postgresql://eduagent:eduagent@localhost:5432/tests
+      NODE_ENV: test
+      CI: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -95,11 +112,34 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      # React Native native builds (Gradle) run `node` scripts that expect
+      # flat node_modules. pnpm's default isolated layout breaks this.
+      # Hoist only in CI — local dev keeps strict isolation.
+      - name: Configure pnpm for native builds
+        run: echo "shamefully-hoist=true" > .npmrc
+
       - run: pnpm install
 
       # Build workspace deps that the mobile app imports at prebuild time
       - name: Build schemas package
         run: pnpm exec nx run schemas:build
+
+      # Apply database schema for seed endpoint and API routes
+      - name: Apply database schema
+        run: pnpm --filter @eduagent/database db:push
+
+      # Start API server in background (NODE_ENV=test enables __test/* routes)
+      - name: Start API server (background)
+        run: |
+          pnpm exec nx dev api &
+          echo "Waiting for API server..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8787/v1/health > /dev/null 2>&1; then
+              echo "API server ready"
+              break
+            fi
+            sleep 1
+          done
 
       # Generate native Android project from Expo config
       - name: Expo prebuild (Android)
@@ -109,7 +149,7 @@ jobs:
       # Compile debug APK via Gradle
       - name: Build debug APK
         working-directory: apps/mobile/android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Install Maestro CLI
         run: |
@@ -132,3 +172,5 @@ jobs:
           script: |
             adb install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
             maestro test apps/mobile/e2e/flows/ --include-tags=smoke
+        env:
+          API_URL: http://10.0.2.2:8787
