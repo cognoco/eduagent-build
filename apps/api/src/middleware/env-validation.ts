@@ -20,20 +20,22 @@ type EnvValidationEnv = {
 let validated = false;
 
 export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
-  async (c, next): Promise<Response | void> => {
+  async (c, next) => {
     if (!validated) {
       // Skip in test environments — tests mock env bindings selectively
-      if (process.env['NODE_ENV'] !== 'test') {
-        try {
-          validateEnv(c.env as Record<string, string | undefined>);
-        } catch (err) {
-          const message =
-            err instanceof Error
-              ? err.message
-              : 'Environment validation failed';
-          console.error('[env-validation]', message);
-          return c.json({ code: 'ENV_VALIDATION_ERROR', message }, 500);
-        }
+      if (process.env['NODE_ENV'] === 'test') {
+        validated = true;
+        await next();
+        return;
+      }
+
+      try {
+        validateEnv(c.env as Record<string, string | undefined>);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'Environment validation failed';
+        console.error('[env-validation]', message);
+        return c.json({ code: 'ENV_VALIDATION_ERROR', message }, 500);
       }
       validated = true;
     }
