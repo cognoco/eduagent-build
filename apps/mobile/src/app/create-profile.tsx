@@ -336,7 +336,7 @@ export default function CreateProfileScreen() {
                   setPersonaType(option.value);
                   setPersonaAutoDetected(false);
                 }}
-                className={`flex-1 py-3 items-center rounded-button mr-2 last:mr-0 ${
+                className={`flex-1 py-3 items-center rounded-button me-2 last:me-0 ${
                   isSelected ? 'bg-primary' : 'bg-surface'
                 }`}
                 disabled={loading}
@@ -367,7 +367,7 @@ export default function CreateProfileScreen() {
                   <Pressable
                     key={option.value}
                     onPress={() => setLocation(option.value)}
-                    className={`flex-1 py-3 items-center rounded-button mr-2 last:mr-0 ${
+                    className={`flex-1 py-3 items-center rounded-button me-2 last:me-0 ${
                       isSelected ? 'bg-primary' : 'bg-surface'
                     }`}
                     disabled={loading}

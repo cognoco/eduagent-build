@@ -44,7 +44,7 @@ export default function SessionTranscriptScreen() {
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={() => router.back()}
-          className="mr-3 py-2 pr-2"
+          className="me-3 py-2 pe-2"
           accessibilityLabel="Go back"
           accessibilityRole="button"
           testID="back-button"
@@ -114,7 +114,7 @@ export default function SessionTranscriptScreen() {
                   {exchange.escalationRung !== undefined &&
                     exchange.escalationRung !== null &&
                     exchange.escalationRung >= 3 && (
-                      <Text className="text-caption text-text-secondary ml-2">
+                      <Text className="text-caption text-text-secondary ms-2">
                         Guided
                       </Text>
                     )}

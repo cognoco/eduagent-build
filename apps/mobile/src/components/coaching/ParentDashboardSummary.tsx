@@ -111,7 +111,7 @@ export function ParentDashboardSummary({
               key={subject.name}
               className="flex-row items-center bg-background rounded-full px-3 py-1.5"
             >
-              <Text className="text-caption text-text-primary mr-2">
+              <Text className="text-caption text-text-primary me-2">
                 {subject.name}
               </Text>
               <RetentionSignal status={subject.retentionStatus} />

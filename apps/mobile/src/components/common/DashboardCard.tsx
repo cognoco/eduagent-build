@@ -32,7 +32,7 @@ export function DashboardCard({
   return (
     <View className="bg-surface rounded-card p-4 mt-3">
       <View className="flex-row items-center mb-2">
-        <View className="bg-primary-soft rounded-full w-10 h-10 items-center justify-center mr-3">
+        <View className="bg-primary-soft rounded-full w-10 h-10 items-center justify-center me-3">
           <Text className="text-primary text-h3 font-bold">{name[0]}</Text>
         </View>
         <View className="flex-1">
@@ -54,7 +54,7 @@ export function DashboardCard({
             key={subject.name}
             className="flex-row items-center bg-background rounded-full px-3 py-1.5"
           >
-            <Text className="text-caption text-text-primary mr-2">
+            <Text className="text-caption text-text-primary me-2">
               {subject.name}
             </Text>
             <RetentionSignal status={subject.retention} compact />

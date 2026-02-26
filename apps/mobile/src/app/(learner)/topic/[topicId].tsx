@@ -87,7 +87,7 @@ export default function TopicDetailScreen() {
       <View className="px-5 pt-4 pb-3 flex-row items-center">
         <Pressable
           onPress={() => router.back()}
-          className="mr-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
+          className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="topic-detail-back"
           accessibilityLabel="Go back"
           accessibilityRole="button"
@@ -288,7 +288,7 @@ export default function TopicDetailScreen() {
                   },
                 })
               }
-              className="flex-1 bg-surface-elevated rounded-button py-3 items-center mr-2"
+              className="flex-1 bg-surface-elevated rounded-button py-3 items-center me-2"
               testID="request-retest-button"
               accessibilityLabel={
                 failureCount >= 3 ? 'Review and re-test' : 'Recall check'

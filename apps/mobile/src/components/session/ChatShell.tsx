@@ -117,7 +117,7 @@ export function ChatShell({
       >
         <Pressable
           onPress={() => router.back()}
-          className="mr-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
+          className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
@@ -161,7 +161,7 @@ export function ChatShell({
           style={{ paddingBottom: Math.max(insets.bottom, 8) }}
         >
           <TextInput
-            className="flex-1 bg-background rounded-input px-4 py-3 text-body text-text-primary mr-2"
+            className="flex-1 bg-background rounded-input px-4 py-3 text-body text-text-primary me-2"
             placeholder={placeholder}
             placeholderTextColor={colors.muted}
             value={input}

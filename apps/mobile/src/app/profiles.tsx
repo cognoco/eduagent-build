@@ -77,7 +77,7 @@ export default function ProfilesScreen() {
                 className="flex-row items-center bg-surface rounded-card px-4 py-3.5 mb-2"
                 testID={`profile-row-${profile.id}`}
               >
-                <View className="w-10 h-10 rounded-full bg-primary items-center justify-center mr-3">
+                <View className="w-10 h-10 rounded-full bg-primary items-center justify-center me-3">
                   <Text className="text-body font-bold text-text-inverse">
                     {initial}
                   </Text>

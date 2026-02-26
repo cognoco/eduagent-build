@@ -180,7 +180,7 @@ export default function LearningBookScreen() {
                 {subject.name}
               </Text>
               {retentionMap.has(subject.id) && (
-                <View className="ml-2">
+                <View className="ms-2">
                   <RetentionSignal
                     status={retentionMap.get(subject.id)!}
                     compact
@@ -216,7 +216,7 @@ export default function LearningBookScreen() {
               testID={`topic-row-${topic.topicId}`}
             >
               <View className="flex-row items-center justify-between">
-                <View className="flex-1 mr-3">
+                <View className="flex-1 me-3">
                   <Text className="text-body font-medium text-text-primary">
                     {topic.name}
                   </Text>
@@ -225,7 +225,7 @@ export default function LearningBookScreen() {
                       {topic.subjectName}
                     </Text>
                     {topic.repetitions > 0 && (
-                      <Text className="text-caption text-text-secondary ml-2">
+                      <Text className="text-caption text-text-secondary ms-2">
                         {topic.repetitions}{' '}
                         {topic.repetitions === 1 ? 'session' : 'sessions'}
                       </Text>

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useReducedMotion } from 'react-native-reanimated';
 
 interface AnimatedFadeProps {
   children: ReactNode;
@@ -7,6 +8,10 @@ interface AnimatedFadeProps {
 }
 
 export function AnimatedFade({ children, duration = 200 }: AnimatedFadeProps) {
+  const reduceMotion = useReducedMotion();
+
+  if (reduceMotion) return <>{children}</>;
+
   return (
     <Animated.View
       entering={FadeIn.duration(duration)}

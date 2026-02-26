@@ -106,7 +106,7 @@ export default function SessionSummaryScreen() {
           </Text>
           {takeaways.map((t, i) => (
             <View key={i} className="flex-row items-start mt-1">
-              <Text className="text-body text-text-secondary mr-2">
+              <Text className="text-body text-text-secondary me-2">
                 {'\u2022'}
               </Text>
               <Text className="text-body text-text-primary flex-1">{t}</Text>
