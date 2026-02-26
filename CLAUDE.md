@@ -119,15 +119,17 @@ Read `docs/project_context.md` for the full rules. The critical ones:
 - Event naming: `app/{domain}.{action}` (e.g., `app/session.completed`).
 - Event handlers call services. Inngest functions orchestrate steps.
 - Never put secrets/connection strings in event payloads. Use `getStepDatabase()` for DB access in steps.
+- Never put PII (emails, names) in event payloads — look up in step functions via DB query instead. Event payloads are logged and visible in Inngest's dashboard.
 
 ## Dependency Direction (strictly enforced)
 
 ```
-apps/mobile  →  @eduagent/schemas, @eduagent/retention
+apps/mobile  →  @eduagent/schemas
 apps/api     →  @eduagent/schemas, @eduagent/database, @eduagent/retention
-@eduagent/database  →  @eduagent/schemas
+@eduagent/database  →  (no workspace deps)
 @eduagent/retention →  (no workspace deps)
 @eduagent/schemas   →  (no workspace deps — leaf package)
+@eduagent/factory   →  @eduagent/schemas (test builders)
 ```
 
 This applies to imports, `tsconfig.json` references, AND `package.json` deps. Packages never import from apps. Circular dependencies are build-breaking errors.
@@ -151,7 +153,7 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 | Add Zustand/global state | TanStack Query or React Context |
 | Render per-persona in components | CSS variables — components persona-unaware |
 | Hardcode hex colors in components | NativeWind semantic classes (`bg-surface`, `text-primary`) |
-| Check `persona` inside components | Only root `_layout.tsx` reads persona |
+| Check `persona` inside components | Only `_layout.tsx` files read persona. Exception: `(learner)/home.tsx` reads persona for adaptive entry card routing (documented architectural exception — routing logic that doesn't fit in layout) |
 
 ## Current Status
 

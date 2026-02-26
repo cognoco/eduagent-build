@@ -210,7 +210,7 @@ apps/api/
 │   ├── middleware/       # Auth, JWT, profile-scope, request-logger, database, LLM, metering, account
 │   ├── inngest/         # Background job functions
 │   ├── config.ts        # Typed env config (Zod validated at startup)
-│   ├── errors.ts        # AppError class, typed error codes
+│   ├── errors.ts        # Error response helpers (apiError, notFound, forbidden, etc.)
 │   └── index.ts         # Hono app entry
 ├── wrangler.toml        # Cloudflare Workers config
 ├── project.json         # Nx targets: serve, build, deploy
@@ -648,14 +648,14 @@ import { sessionEventSchema } from '@eduagent/schemas/src/session/events';
 
 ```
 apps/mobile  →  @eduagent/schemas
-apps/mobile  →  @eduagent/retention
 apps/api     →  @eduagent/schemas
 apps/api     →  @eduagent/database
 apps/api     →  @eduagent/retention
 
-@eduagent/database  →  @eduagent/schemas    (DB schema references Zod types)
+@eduagent/database  →  (no workspace deps)   (uses drizzle-zod, not @eduagent/schemas directly)
 @eduagent/retention →  (no workspace deps)   (pure math, zero deps)
 @eduagent/schemas   →  (no workspace deps)   (leaf package)
+@eduagent/factory   →  @eduagent/schemas     (test builders use schema types)
 ```
 
 `packages/` never imports from `apps/`. `packages/schemas` never imports from `packages/database`. An agent importing a Drizzle type into a shared schema creates a circular dependency — the schema package must remain a leaf.
@@ -747,16 +747,20 @@ function buildPromptContext(session: Session) { ... }
 **Error handling (API):**
 
 ```typescript
+// Functional error helpers — no AppError class needed. Each helper returns a typed Hono Response.
+// apiError(c, status, code, message, details?) — base helper
+// notFound(c, message?) — 404 with ERROR_CODES.NOT_FOUND
+// unauthorized(c, message?) — 401 with ERROR_CODES.UNAUTHORIZED
+// forbidden(c, message?) — 403 with ERROR_CODES.FORBIDDEN
+// validationError(c, details) — 400 with ERROR_CODES.VALIDATION_ERROR
+
 app.onError((err, c) => {
-  if (err instanceof AppError) {
-    return c.json({ code: err.code, message: err.message, details: err.details }, err.status);
-  }
   logger.error({ correlationId: c.get('correlationId'), error: err.message, stack: err.stack });
   return c.json({ code: "INTERNAL_ERROR", message: "Something went wrong" }, 500);
 });
 ```
 
-Custom `AppError` class with typed codes. Never leak stack traces or internal details to client.
+Functional error response helpers with typed codes (no class hierarchy). All responses follow `{ code, message, details? }` envelope matching `apiErrorSchema` from `@eduagent/schemas`. Never leak stack traces or internal details to client.
 
 **Error handling (mobile):** TanStack Query `onError` callbacks per query/mutation. Global error boundary at root layout for unhandled crashes. Persona-appropriate error messages (coaching voice for learners, direct for parents).
 
@@ -779,7 +783,7 @@ Both client and server import the same Zod schemas — single source of truth pr
 2. Use the scoped repository (`createScopedRepository(profileId)`), never write raw `WHERE profile_id =` clauses
 3. Include `correlationId` in every log statement
 4. Use Inngest for any async work that should survive a request lifecycle
-5. Keep components persona-unaware — no conditional rendering based on persona type
+5. Keep components persona-unaware — no conditional rendering based on persona type. Exception: `(learner)/home.tsx` reads persona for adaptive entry card routing (page-level routing logic that doesn't fit in layout)
 6. Write co-located tests for every new route handler and component
 7. Use Drizzle relational queries for CRUD, `sql` template tag for complex aggregations
 8. Return typed `ApiError` envelope for all error responses, never ad-hoc JSON
@@ -1422,7 +1426,7 @@ No contradictory decisions found. The Workers → Railway/Fly fallback path is c
 - Naming conventions are comprehensive (DB snake_case, API camelCase, code PascalCase/camelCase, Inngest `app/domain.action`)
 - Import ordering, export rules, and dependency direction are consistent and enforceable via ESLint
 - Co-located test pattern is uniform across routes, services, and components
-- Error handling follows single pattern: `AppError` → typed envelope → Zod schema in `packages/schemas`
+- Error handling follows single pattern: functional helpers (`apiError`, `forbidden`, etc.) → typed `{ code, message }` envelope → `apiErrorSchema` in `packages/schemas`
 - All 13 enforcement rules are non-contradictory and cover the most common agent mistakes
 
 **Structure Alignment:**
