@@ -31,6 +31,8 @@ export const sessionEventTypeEnum = pgEnum('session_event_type', [
   'check_response',
   'summary_submission',
   'parking_lot_add',
+  'evaluate_challenge',
+  'teach_back_response',
 ]);
 
 export const sessionTypeEnum = pgEnum('session_type', [
@@ -97,6 +99,7 @@ export const sessionEvents = pgTable(
     eventType: sessionEventTypeEnum('event_type').notNull(),
     content: text('content').notNull(),
     metadata: jsonb('metadata').default({}),
+    structuredAssessment: jsonb('structured_assessment'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -120,6 +123,7 @@ export const learningSessions = pgTable(
       onDelete: 'cascade',
     }),
     sessionType: sessionTypeEnum('session_type').notNull().default('learning'),
+    verificationType: text('verification_type'),
     status: sessionStatusEnum('status').notNull().default('active'),
     escalationRung: integer('escalation_rung').notNull().default(1),
     exchangeCount: integer('exchange_count').notNull().default(0),

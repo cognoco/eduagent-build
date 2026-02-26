@@ -105,7 +105,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     return c.json({ preference });
   })
 
-  // Set teaching method preference
+  // Set teaching method preference (with optional analogy domain)
   .put(
     '/subjects/:subjectId/teaching-preference',
     zValidator('json', teachingPreferenceSchema),
@@ -114,13 +114,14 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
       const account = c.get('account');
       const profileId = c.get('profileId') ?? account.id;
       const subjectId = c.req.param('subjectId');
-      const { method } = c.req.valid('json');
+      const { method, analogyDomain } = c.req.valid('json');
 
       const preference = await setTeachingPreference(
         db,
         profileId,
         subjectId,
-        method
+        method,
+        analogyDomain
       );
       return c.json({ preference });
     }

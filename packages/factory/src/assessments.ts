@@ -1,6 +1,8 @@
 import type {
   AssessmentRecord,
   RetentionCardResponse,
+  EvaluateAssessment,
+  TeachBackAssessment,
 } from '@eduagent/schemas';
 import { uuidv7 } from 'uuidv7';
 
@@ -37,6 +39,31 @@ export function buildRetentionCard(
     lastReviewedAt: null,
     xpStatus: 'pending',
     failureCount: 0,
+    ...overrides,
+  };
+}
+
+export function buildEvaluateAssessment(
+  overrides?: Partial<EvaluateAssessment>
+): EvaluateAssessment {
+  return {
+    challengePassed: true,
+    flawIdentified: 'The formula was applied incorrectly',
+    quality: 4,
+    ...overrides,
+  };
+}
+
+export function buildTeachBackAssessment(
+  overrides?: Partial<TeachBackAssessment>
+): TeachBackAssessment {
+  return {
+    completeness: 4,
+    accuracy: 4,
+    clarity: 3,
+    overallQuality: 4,
+    weakestArea: 'clarity',
+    gapIdentified: null,
     ...overrides,
   };
 }

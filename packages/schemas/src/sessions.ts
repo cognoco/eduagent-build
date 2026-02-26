@@ -74,6 +74,7 @@ export const sessionStartSchema = z.object({
   subjectId: z.string().uuid(),
   topicId: z.string().uuid().optional(),
   sessionType: sessionTypeSchema.default('learning'),
+  verificationType: z.enum(['standard', 'evaluate', 'teach_back']).optional(),
 });
 export type SessionStartInput = z.infer<typeof sessionStartSchema>;
 

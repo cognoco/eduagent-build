@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MessageBubble } from './MessageBubble';
+import { MessageBubble, type VerificationBadge } from './MessageBubble';
 import { useThemeColors } from '../../lib/theme';
 
 export interface ChatMessage {
@@ -19,6 +19,7 @@ export interface ChatMessage {
   content: string;
   streaming?: boolean;
   escalationRung?: number;
+  verificationBadge?: VerificationBadge;
 }
 
 interface ChatShellProps {
@@ -147,6 +148,7 @@ export function ChatShell({
             content={msg.content}
             streaming={msg.streaming}
             escalationRung={msg.escalationRung}
+            verificationBadge={msg.verificationBadge}
           />
         ))}
         {footer}

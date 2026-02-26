@@ -44,6 +44,8 @@ export {
 export {
   buildAssessment,
   buildRetentionCard,
+  buildEvaluateAssessment,
+  buildTeachBackAssessment,
   resetAssessmentCounter,
 } from './assessments.js';
 

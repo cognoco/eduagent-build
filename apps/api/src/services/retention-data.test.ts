@@ -746,7 +746,11 @@ describe('getTeachingPreference', () => {
       method: 'visual_diagrams',
     });
     const result = await getTeachingPreference(db, profileId, subjectId);
-    expect(result).toEqual({ subjectId, method: 'visual_diagrams' });
+    expect(result).toEqual({
+      subjectId,
+      method: 'visual_diagrams',
+      analogyDomain: null,
+    });
   });
 });
 
@@ -759,7 +763,50 @@ describe('setTeachingPreference', () => {
       subjectId,
       'step_by_step'
     );
-    expect(result).toEqual({ subjectId, method: 'step_by_step' });
+    expect(result).toEqual({
+      subjectId,
+      method: 'step_by_step',
+      analogyDomain: null,
+    });
+  });
+
+  it('inserts preference with analogyDomain', async () => {
+    const db = createMockDb();
+    const result = await setTeachingPreference(
+      db,
+      profileId,
+      subjectId,
+      'step_by_step',
+      'cooking'
+    );
+    expect(result).toEqual({
+      subjectId,
+      method: 'step_by_step',
+      analogyDomain: 'cooking',
+    });
+  });
+
+  it('clears analogyDomain when null passed', async () => {
+    const db = createMockDb();
+    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
+      id: 'pref-1',
+      profileId,
+      subjectId,
+      method: 'visual_diagrams',
+      analogyDomain: 'sports',
+    });
+    const result = await setTeachingPreference(
+      db,
+      profileId,
+      subjectId,
+      'visual_diagrams',
+      null
+    );
+    expect(result).toEqual({
+      subjectId,
+      method: 'visual_diagrams',
+      analogyDomain: null,
+    });
   });
 });
 
