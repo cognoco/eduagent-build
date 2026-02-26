@@ -20,7 +20,7 @@ type EnvValidationEnv = {
 let validated = false;
 
 export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
-  async (c, next) => {
+  async (c, next): Promise<Response | void> => {
     if (!validated) {
       // Skip in test environments — tests mock env bindings selectively
       if (process.env['NODE_ENV'] !== 'test') {
