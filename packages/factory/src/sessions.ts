@@ -13,6 +13,7 @@ export function buildSession(
     subjectId: uuidv7(),
     topicId: null,
     sessionType: 'learning',
+    verificationType: null,
     status: 'active',
     escalationRung: 1,
     exchangeCount: 0,

@@ -1,3 +1,4 @@
+export { AnalogyDomainPicker } from './AnalogyDomainPicker';
 export { AnimatedEntry } from './AnimatedEntry';
 export { AnimatedFade } from './AnimatedFade';
 export { Button } from './Button';

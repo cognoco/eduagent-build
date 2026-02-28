@@ -550,6 +550,73 @@ export async function deleteTeachingPreference(
 }
 
 // ---------------------------------------------------------------------------
+// Analogy domain preference (FR134-137)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the analogy domain preference for a given profile + subject.
+ * Returns null when no preference or no analogy domain is set.
+ */
+export async function getAnalogyDomain(
+  db: Database,
+  profileId: string,
+  subjectId: string
+): Promise<string | null> {
+  const row = await db.query.teachingPreferences.findFirst({
+    where: and(
+      eq(teachingPreferences.profileId, profileId),
+      eq(teachingPreferences.subjectId, subjectId)
+    ),
+  });
+  return row?.analogyDomain ?? null;
+}
+
+/**
+ * Sets the analogy domain preference for a given profile + subject.
+ * Upserts the teachingPreferences row (default method: 'step_by_step').
+ * Returns the effective analogy domain value after the update.
+ */
+export async function setAnalogyDomain(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  analogyDomain: string | null
+): Promise<string | null> {
+  const existing = await db.query.teachingPreferences.findFirst({
+    where: and(
+      eq(teachingPreferences.profileId, profileId),
+      eq(teachingPreferences.subjectId, subjectId)
+    ),
+  });
+
+  const domainValue = (analogyDomain as AnalogyDomainColumn) ?? null;
+
+  if (existing) {
+    await db
+      .update(teachingPreferences)
+      .set({
+        analogyDomain: domainValue,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(teachingPreferences.id, existing.id),
+          eq(teachingPreferences.profileId, profileId)
+        )
+      );
+  } else {
+    await db.insert(teachingPreferences).values({
+      profileId,
+      subjectId,
+      method: 'step_by_step' as TeachingMethod,
+      analogyDomain: domainValue,
+    });
+  }
+
+  return analogyDomain;
+}
+
+// ---------------------------------------------------------------------------
 // Session-triggered retention update (used by inngest/functions/session-completed.ts)
 // ---------------------------------------------------------------------------
 

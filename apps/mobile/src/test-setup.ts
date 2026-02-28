@@ -11,12 +11,14 @@ jest.mock('react-native-reanimated', () => {
   return {
     __esModule: true,
     default: { View, Text: View, ScrollView: View },
-    FadeInUp: { delay: () => ({ duration: () => ({}) }) },
+    FadeInUp: { delay: () => ({ duration: () => ({}) }), duration: () => ({}) },
     FadeOutDown: { duration: () => ({}) },
     useAnimatedStyle: () => ({}),
     useSharedValue: (v: unknown) => ({ value: v }),
     withTiming: (v: unknown) => v,
     withSpring: (v: unknown) => v,
+    withRepeat: (v: unknown) => v,
+    cancelAnimation: () => undefined,
   };
 });
 
