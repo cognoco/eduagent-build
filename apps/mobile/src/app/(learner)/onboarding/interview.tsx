@@ -84,7 +84,7 @@ export default function InterviewScreen() {
             <Pressable
               onPress={() =>
                 router.replace({
-                  pathname: '/(learner)/onboarding/curriculum-review',
+                  pathname: '/(learner)/onboarding/analogy-preference',
                   params: { subjectId },
                 } as never)
               }
