@@ -1,4 +1,11 @@
-import { View, Text, Pressable, ScrollView, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  Alert,
+  RefreshControl,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../lib/theme';
@@ -82,7 +89,12 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { setPersona } = useTheme();
   const insets = useSafeAreaInsets();
-  const { data: dashboard, isLoading: dashboardLoading } = useDashboard();
+  const {
+    data: dashboard,
+    isLoading: dashboardLoading,
+    refetch,
+    isRefetching,
+  } = useDashboard();
 
   const isDemo = dashboard?.demoMode === true;
 
@@ -104,7 +116,7 @@ export default function DashboardScreen() {
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2">
-        <Text className="text-h1 font-bold text-text-primary">Dashboard</Text>
+        <Text className="text-h1 font-bold text-text-primary">Home</Text>
         <Text className="text-body-sm text-text-secondary mt-1">
           {isDemo
             ? "Here's what your dashboard will look like"
@@ -115,6 +127,12 @@ export default function DashboardScreen() {
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 24 }}
         testID="dashboard-scroll"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => refetch()}
+          />
+        }
       >
         {dashboardLoading ? (
           <>

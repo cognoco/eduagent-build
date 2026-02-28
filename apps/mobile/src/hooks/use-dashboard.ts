@@ -25,6 +25,9 @@ export function useDashboard(): UseQueryResult<DashboardData> {
       return data;
     },
     enabled: !!activeProfile,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 }
 
