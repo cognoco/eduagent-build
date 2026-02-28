@@ -72,7 +72,7 @@ export const tokens: Record<Persona, Record<ColorScheme, ThemeTokens>> = {
         homeworkLane: '#d97706',
       },
       radii: { card: '16px', button: '12px', input: '10px' },
-      spacing: { cardPadding: '20px' },
+      spacing: { cardPadding: '24px' },
     },
     dark: {
       colors: {
@@ -100,7 +100,7 @@ export const tokens: Record<Persona, Record<ColorScheme, ThemeTokens>> = {
         homeworkLane: '#f59e0b',
       },
       radii: { card: '16px', button: '12px', input: '10px' },
-      spacing: { cardPadding: '20px' },
+      spacing: { cardPadding: '24px' },
     },
   },
   learner: {
@@ -188,7 +188,7 @@ export const tokens: Record<Persona, Record<ColorScheme, ThemeTokens>> = {
         homeworkLane: '#b45309',
       },
       radii: { card: '10px', button: '8px', input: '6px' },
-      spacing: { cardPadding: '14px' },
+      spacing: { cardPadding: '16px' },
     },
     dark: {
       colors: {
@@ -216,7 +216,7 @@ export const tokens: Record<Persona, Record<ColorScheme, ThemeTokens>> = {
         homeworkLane: '#d97706',
       },
       radii: { card: '10px', button: '8px', input: '6px' },
-      spacing: { cardPadding: '14px' },
+      spacing: { cardPadding: '16px' },
     },
   },
 };

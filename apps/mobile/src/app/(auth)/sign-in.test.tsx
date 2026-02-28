@@ -7,10 +7,10 @@ import {
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
 
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockReplace }),
-  Link: ({ children }: { children: React.ReactNode }) => children,
+  useRouter: () => ({ replace: mockReplace, push: mockPush }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
