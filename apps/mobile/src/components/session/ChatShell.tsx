@@ -41,6 +41,8 @@ interface ChatShellProps {
   placeholder?: string;
   /** When set to 'teach_back', enables voice input (STT) and output (TTS). */
   verificationType?: VoiceVerificationType | string;
+  /** Optional testID for the message scroll area (used by E2E flows). */
+  messagesTestID?: string;
 }
 
 /**
@@ -96,6 +98,7 @@ export function ChatShell({
   footer,
   placeholder = 'Type a message...',
   verificationType,
+  messagesTestID,
 }: ChatShellProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -252,6 +255,7 @@ export function ChatShell({
       <ScrollView
         ref={scrollRef}
         className="flex-1 px-4 pt-4"
+        testID={messagesTestID ?? 'chat-messages'}
         contentContainerStyle={{ paddingBottom: 16 }}
         onContentSizeChange={() =>
           scrollRef.current?.scrollToEnd({ animated: true })

@@ -13,10 +13,9 @@
 #
 # After this flow completes, the app is authenticated and on the home screen.
 #
-# NOTE: The seed endpoint currently creates DB rows but does NOT create real
-# Clerk users. Until Clerk Backend API integration is added to the seed service,
-# sign-in will need a real test Clerk account or a deep-link auth bypass.
-# TODO: Implement Clerk test user creation in seed service.
+# The seed endpoint creates a real Clerk user (when CLERK_SECRET_KEY is set)
+# and returns the password in the response. Maestro uses these credentials
+# to sign in via the Clerk-powered login UI.
 appId: com.zwizzly.eduagent
 ---
 # Step 1: Seed test data via API
@@ -43,9 +42,7 @@ appId: com.zwizzly.eduagent
 - inputText: ${output.seedResult.email}
 - tapOn:
     id: "sign-in-password"
-# TODO: Replace with ${output.seedResult.password} once seed service
-# creates Clerk users with a known test password
-- inputText: "TestPass123!"
+- inputText: ${output.seedResult.password}
 - tapOn:
     id: "sign-in-button"
 

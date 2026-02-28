@@ -8,10 +8,12 @@
 # Prerequisite: Seeded user with completed sessions + due retention cards
 #               (scenario: retention-due)
 #
-# NOTE: This flow depends on testIDs being added to recall-related screens.
-# Missing testIDs (from tech spec Section 3.2):
-#   - recall-question, recall-answer-input, recall-submit
-# Until those are added, some assertions use text matching as fallback.
+# testID mapping (recall-test.tsx uses ChatShell):
+#   - recall-test-screen    → screen wrapper
+#   - recall-messages       → message scroll area
+#   - chat-input            → text input (from ChatShell)
+#   - send-button           → send button (from ChatShell)
+#   - remediation-card      → shown after 3+ failures
 appId: com.zwizzly.eduagent
 tags:
   - smoke
@@ -31,8 +33,6 @@ tags:
     timeout: 15000
 
 # 3. Coaching card should indicate recall/review is due.
-# The adaptive coaching card type will be "fading" or "review".
-# Look for the coaching card's primary action.
 - assertVisible:
     id: "coaching-card"
 
@@ -40,41 +40,26 @@ tags:
 - tapOn:
     id: "coaching-card-primary"
 
-# 5. Recall screen loads — look for either recall-specific testIDs
-# or text indicating a recall prompt
+# 5. Recall screen loads — verify the recall-test wrapper
 - extendedWaitUntil:
     visible:
-      id: "recall-question"
+      id: "recall-test-screen"
     timeout: 10000
-    optional: true
 
-# 5b. Fallback: look for text-based recall prompt
-- extendedWaitUntil:
-    visible:
-      text: "remember"
-    timeout: 5000
-    optional: true
+# 5b. Verify the opening recall prompt is visible
+- assertVisible:
+    text: "what you remember"
 
-# 6. Enter recall answer
-- tapOn:
-    id: "recall-answer-input"
-    optional: true
-# Fallback: tap on chat-input if recall uses the ChatShell
+# 6. Enter recall answer via ChatShell's chat-input
 - tapOn:
     id: "chat-input"
-    optional: true
 - inputText: "I remember the key concept is about how this works in practice"
 
-# 7. Submit answer
-- tapOn:
-    id: "recall-submit"
-    optional: true
-# Fallback: use send-button if recall uses ChatShell
+# 7. Submit answer via ChatShell's send-button
 - tapOn:
     id: "send-button"
-    optional: true
 
-# 8. Wait for score/feedback
+# 8. Wait for AI feedback response
 - extendedWaitUntil:
     visible:
       id: "chat-input"
