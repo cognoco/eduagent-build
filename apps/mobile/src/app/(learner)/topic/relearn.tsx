@@ -135,9 +135,23 @@ export default function RelearnScreen() {
           contentContainerStyle={{ paddingBottom: 40 }}
         >
           <Text className="text-body text-text-secondary mb-6">
-            Your previous approach didn't stick. Would you like to try a
-            different teaching method?
+            Every topic needs its own approach. Let's find what clicks for you!
           </Text>
+
+          <Pressable
+            onPress={() => setPhase('method')}
+            className="bg-primary rounded-card p-4 mb-3"
+            testID="relearn-different-method"
+            accessibilityLabel="Try a different teaching method (recommended)"
+            accessibilityRole="button"
+          >
+            <Text className="text-body font-semibold text-text-inverse mb-1">
+              Different Method
+            </Text>
+            <Text className="text-body-sm text-text-inverse opacity-80">
+              Choose a new teaching style that might work better for you
+            </Text>
+          </Pressable>
 
           <Pressable
             onPress={handleSameMethod}
@@ -151,21 +165,6 @@ export default function RelearnScreen() {
             </Text>
             <Text className="text-body-sm text-text-secondary">
               Review the topic again using your current learning approach
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => setPhase('method')}
-            className="bg-primary rounded-card p-4 mb-3"
-            testID="relearn-different-method"
-            accessibilityLabel="Try a different teaching method"
-            accessibilityRole="button"
-          >
-            <Text className="text-body font-semibold text-text-inverse mb-1">
-              Different Method
-            </Text>
-            <Text className="text-body-sm text-text-inverse opacity-80">
-              Choose a new teaching style that might work better for you
             </Text>
           </Pressable>
         </ScrollView>

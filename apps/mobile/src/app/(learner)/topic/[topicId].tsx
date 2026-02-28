@@ -40,8 +40,8 @@ const COMPLETION_LABELS: Record<string, string> = {
 
 const STRUGGLE_LABELS: Record<string, string> = {
   normal: 'Normal',
-  needs_deepening: 'Needs deepening',
-  blocked: 'Blocked',
+  needs_deepening: 'Exploring further',
+  blocked: 'Paused \u2014 needs a different approach',
 };
 
 export default function TopicDetailScreen() {
@@ -149,9 +149,9 @@ export default function TopicDetailScreen() {
             {topicProgress.struggleStatus !== 'normal' && (
               <View className="flex-row justify-between items-center mb-2">
                 <Text className="text-body-sm text-text-secondary">
-                  Struggle
+                  Learning path
                 </Text>
-                <Text className="text-body-sm font-medium text-warning">
+                <Text className="text-body-sm font-medium text-info">
                   {STRUGGLE_LABELS[topicProgress.struggleStatus] ??
                     topicProgress.struggleStatus}
                 </Text>
@@ -172,8 +172,14 @@ export default function TopicDetailScreen() {
                 <Text className="text-body-sm text-text-secondary">
                   XP Status
                 </Text>
-                <Text className="text-body-sm font-medium text-text-primary capitalize">
-                  {topicProgress.xpStatus}
+                <Text className="text-body-sm font-medium text-text-primary">
+                  {topicProgress.xpStatus === 'earned'
+                    ? 'XP earned \u2713'
+                    : topicProgress.xpStatus === 'decayed'
+                    ? 'XP needs refresh'
+                    : topicProgress.xpStatus === 'locked'
+                    ? 'Complete to earn XP'
+                    : topicProgress.xpStatus}
                 </Text>
               </View>
             )}
@@ -186,7 +192,7 @@ export default function TopicDetailScreen() {
             </Text>
             <View className="flex-row justify-between items-center mb-2">
               <Text className="text-body-sm text-text-secondary">
-                Retention
+                Memory strength
               </Text>
               <RetentionSignal status={retentionStatus} />
             </View>
@@ -222,11 +228,11 @@ export default function TopicDetailScreen() {
                 {failureCount > 0 && (
                   <View className="flex-row justify-between items-center">
                     <Text className="text-body-sm text-text-secondary">
-                      Failed attempts
+                      Practice rounds
                     </Text>
                     <Text
                       className={`text-body-sm font-medium ${
-                        failureCount >= 3 ? 'text-warning' : 'text-text-primary'
+                        failureCount >= 3 ? 'text-info' : 'text-text-primary'
                       }`}
                     >
                       {failureCount}

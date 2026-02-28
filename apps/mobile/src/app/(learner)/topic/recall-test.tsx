@@ -16,7 +16,7 @@ const OPENING_MESSAGE: ChatMessage = {
   id: 'ai-opening',
   role: 'ai',
   content:
-    "Let's check what you remember about this topic. In your own words, explain what you've learned.",
+    "What comes to mind about this topic? Just share what you remember \u2014 there's no wrong answer.",
 };
 
 function deriveStatus(retentionStatus?: string): RetentionStatus {
@@ -65,7 +65,7 @@ export default function RecallTestScreen() {
             if (result.passed) {
               // Success — animate a congratulatory response
               cleanupRef.current = animateResponse(
-                "Great job! You've demonstrated strong recall of this topic. Your retention has been updated.",
+                "Nice \u2014 your memory of this is solid! Head back to your Learning Book whenever you're ready.",
                 setMessages,
                 setIsStreaming,
                 () => {
@@ -137,7 +137,7 @@ export default function RecallTestScreen() {
   ) : inputDisabled ? (
     <View className="mt-4 items-center">
       <Text className="text-body-sm text-text-secondary">
-        You can go back to continue learning.
+        Head back to your Learning Book whenever you're ready.
       </Text>
     </View>
   ) : undefined;

@@ -9,6 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageBubble, type VerificationBadge } from './MessageBubble';
 import { VoiceRecordButton, VoiceTranscriptPreview } from './VoiceRecordButton';
@@ -237,7 +238,7 @@ export function ChatShell({
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
-          <Text className="text-primary text-h3">←</Text>
+          <Ionicons name="chevron-back" size={24} color={colors.primary} />
         </Pressable>
         <View className="flex-1">
           <Text className="text-body font-semibold text-text-primary">
@@ -321,15 +322,13 @@ export function ChatShell({
             accessibilityLabel="Send message"
             accessibilityRole="button"
           >
-            <Text
-              className={`text-body font-semibold ${
-                input.trim() && !isStreaming
-                  ? 'text-text-inverse'
-                  : 'text-text-secondary'
-              }`}
-            >
-              Send
-            </Text>
+            <Ionicons
+              name="send"
+              size={20}
+              color={
+                input.trim() && !isStreaming ? colors.textInverse : colors.muted
+              }
+            />
           </Pressable>
         </View>
       )}
