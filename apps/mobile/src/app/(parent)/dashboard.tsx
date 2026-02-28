@@ -1,4 +1,4 @@
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../lib/theme';
@@ -87,7 +87,14 @@ export default function DashboardScreen() {
   const isDemo = dashboard?.demoMode === true;
 
   const handleDrillDown = (profileId: string): void => {
-    if (isDemo) return;
+    if (isDemo) {
+      Alert.alert(
+        'Preview Mode',
+        "Link your child's account to see real data.",
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     router.push({
       pathname: '/(parent)/child/[profileId]',
       params: { profileId },
@@ -140,14 +147,16 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        <Pressable
-          onPress={() => setPersona('teen')}
-          className="mt-6 items-center py-3 min-h-[44px] justify-center"
-        >
-          <Text className="text-body-sm text-text-secondary underline">
-            Switch to Teen view (demo)
-          </Text>
-        </Pressable>
+        {__DEV__ && (
+          <Pressable
+            onPress={() => setPersona('teen')}
+            className="mt-6 items-center py-3 min-h-[44px] justify-center"
+          >
+            <Text className="text-body-sm text-text-secondary underline">
+              Switch to Teen view (demo)
+            </Text>
+          </Pressable>
+        )}
       </ScrollView>
     </View>
   );
