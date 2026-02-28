@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { View, Text, ActivityIndicator, Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
 /**
@@ -15,5 +15,12 @@ export default function SSOCallbackScreen() {
     void WebBrowser.maybeCompleteAuthSession();
   }, []);
 
-  return null;
+  return (
+    <View className="flex-1 bg-background items-center justify-center">
+      <ActivityIndicator size="large" />
+      <Text className="text-body text-text-secondary mt-4">
+        Finishing sign-in...
+      </Text>
+    </View>
+  );
 }
