@@ -49,6 +49,7 @@ function mapRetentionCardRow(
     lastReviewedAt: row.lastReviewedAt?.toISOString() ?? null,
     xpStatus: row.xpStatus as 'pending' | 'verified' | 'decayed',
     failureCount: row.failureCount,
+    evaluateDifficultyRung: row.evaluateDifficultyRung as 1 | 2 | 3 | 4 | null,
   };
 }
 
