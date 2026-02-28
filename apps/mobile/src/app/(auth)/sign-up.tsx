@@ -3,20 +3,19 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from 'react-native';
 import { useSignUp, useSSO } from '@clerk/clerk-expo';
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
 import { PasswordInput } from '../../components/common';
+import { Button } from '../../components/common/Button';
 
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -30,6 +29,7 @@ export default function SignUpScreen() {
   const [pendingVerification, setPendingVerification] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 
   const { startSSOFlow: startGoogleSSO } = useSSO();
@@ -121,6 +121,27 @@ export default function SignUpScreen() {
     }
   }, [isLoaded, canSubmitCode, signUp, setActive, router, code]);
 
+  const onResendCode = useCallback(async () => {
+    if (!isLoaded || resending) return;
+
+    setError('');
+    setResending(true);
+
+    try {
+      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+    } catch (err: unknown) {
+      setError(extractClerkError(err));
+    } finally {
+      setResending(false);
+    }
+  }, [isLoaded, resending, signUp]);
+
+  const onBackFromVerification = useCallback(() => {
+    setPendingVerification(false);
+    setCode('');
+    setError('');
+  }, []);
+
   if (pendingVerification) {
     return (
       <KeyboardAvoidingView
@@ -146,7 +167,10 @@ export default function SignUpScreen() {
           </Text>
 
           {error !== '' && (
-            <View className="bg-danger/10 rounded-card px-4 py-3 mb-4">
+            <View
+              className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+              accessibilityRole="alert"
+            >
               <Text className="text-danger text-body-sm">{error}</Text>
             </View>
           )}
@@ -165,26 +189,35 @@ export default function SignUpScreen() {
             testID="sign-up-code"
           />
 
-          <Pressable
+          <Button
+            variant="primary"
+            label="Verify"
             onPress={onVerifyPress}
             disabled={!canSubmitCode}
-            className={`rounded-button py-3.5 items-center ${
-              canSubmitCode ? 'bg-primary' : 'bg-surface-elevated'
-            }`}
+            loading={loading}
             testID="sign-up-verify-button"
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.textInverse} />
-            ) : (
-              <Text
-                className={`text-body font-semibold ${
-                  canSubmitCode ? 'text-text-inverse' : 'text-text-secondary'
-                }`}
-              >
-                Verify
-              </Text>
-            )}
-          </Pressable>
+          />
+
+          <View className="flex-row justify-center mt-4">
+            <Button
+              variant="tertiary"
+              size="small"
+              label="Resend code"
+              onPress={onResendCode}
+              loading={resending}
+              testID="sign-up-resend-code"
+            />
+          </View>
+
+          <View className="flex-row justify-center mt-2">
+            <Button
+              variant="tertiary"
+              size="small"
+              label="Use a different email"
+              onPress={onBackFromVerification}
+              testID="sign-up-back-from-verify"
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     );
@@ -214,43 +247,36 @@ export default function SignUpScreen() {
         </Text>
 
         {error !== '' && (
-          <View className="bg-danger/10 rounded-card px-4 py-3 mb-4">
+          <View
+            className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+            accessibilityRole="alert"
+          >
             <Text className="text-danger text-body-sm">{error}</Text>
           </View>
         )}
 
-        <Pressable
-          onPress={() => onSSOPress('oauth_google')}
-          disabled={oauthLoading !== null}
-          className="bg-surface rounded-button py-3.5 items-center mb-3 flex-row justify-center"
-          accessibilityLabel="Sign up with Google"
-          testID="sign-up-google-sso"
-        >
-          {oauthLoading === 'oauth_google' ? (
-            <ActivityIndicator />
-          ) : (
-            <Text className="text-body font-semibold text-text-primary">
-              Continue with Google
-            </Text>
-          )}
-        </Pressable>
+        <View className="mb-3">
+          <Button
+            variant="secondary"
+            label="Continue with Google"
+            onPress={() => onSSOPress('oauth_google')}
+            disabled={oauthLoading !== null}
+            loading={oauthLoading === 'oauth_google'}
+            testID="sign-up-google-sso"
+          />
+        </View>
 
         {Platform.OS !== 'web' && (
-          <Pressable
-            onPress={() => onSSOPress('oauth_apple')}
-            disabled={oauthLoading !== null}
-            className="bg-surface rounded-button py-3.5 items-center mb-6 flex-row justify-center"
-            accessibilityLabel="Sign up with Apple"
-            testID="sign-up-apple-sso"
-          >
-            {oauthLoading === 'oauth_apple' ? (
-              <ActivityIndicator />
-            ) : (
-              <Text className="text-body font-semibold text-text-primary">
-                Continue with Apple
-              </Text>
-            )}
-          </Pressable>
+          <View className="mb-6">
+            <Button
+              variant="secondary"
+              label="Continue with Apple"
+              onPress={() => onSSOPress('oauth_apple')}
+              disabled={oauthLoading !== null}
+              loading={oauthLoading === 'oauth_apple'}
+              testID="sign-up-apple-sso"
+            />
+          </View>
         )}
 
         <View className="flex-row items-center mb-6">
@@ -292,38 +318,26 @@ export default function SignUpScreen() {
           />
         </View>
 
-        <Pressable
+        <Button
+          variant="primary"
+          label="Sign up"
           onPress={onSignUpPress}
           disabled={!canSubmitSignUp}
-          className={`rounded-button py-3.5 items-center ${
-            canSubmitSignUp ? 'bg-primary' : 'bg-surface-elevated'
-          }`}
+          loading={loading}
           testID="sign-up-button"
-        >
-          {loading ? (
-            <ActivityIndicator color={colors.textInverse} />
-          ) : (
-            <Text
-              className={`text-body font-semibold ${
-                canSubmitSignUp ? 'text-text-inverse' : 'text-text-secondary'
-              }`}
-            >
-              Sign up
-            </Text>
-          )}
-        </Pressable>
+        />
 
-        <View className="flex-row justify-center mt-6">
+        <View className="flex-row justify-center items-center mt-6">
           <Text className="text-body-sm text-text-secondary">
             Already have an account?{' '}
           </Text>
-          <Link href="/(auth)/sign-in" asChild>
-            <Pressable className="min-h-[44px] justify-center">
-              <Text className="text-body-sm text-primary font-semibold">
-                Sign in
-              </Text>
-            </Pressable>
-          </Link>
+          <Button
+            variant="tertiary"
+            size="small"
+            label="Sign in"
+            onPress={() => router.push('/(auth)/sign-in')}
+            testID="sign-in-link"
+          />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
