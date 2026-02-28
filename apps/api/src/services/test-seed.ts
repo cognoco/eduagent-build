@@ -57,7 +57,8 @@ export type SeedScenario =
   | 'parent-with-children'
   | 'trial-active'
   | 'trial-expired'
-  | 'multi-subject';
+  | 'multi-subject'
+  | 'homework-ready';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -665,6 +666,47 @@ async function seedMultiSubject(
   };
 }
 
+async function seedHomeworkReady(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Homework Learner',
+    personaType: 'LEARNER',
+  });
+
+  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Algebra'
+  );
+
+  // Completed learning session — gives the learner context for homework
+  const sessionId = generateUUIDv7();
+  await db.insert(learningSessions).values({
+    id: sessionId,
+    profileId,
+    subjectId,
+    topicId: topicIds[0],
+    sessionType: 'learning',
+    status: 'completed',
+    exchangeCount: 6,
+    endedAt: pastDate(1),
+  });
+
+  return {
+    scenario: 'homework-ready',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId, sessionId, topicId: topicIds[0] },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -678,6 +720,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'trial-active': seedTrialActive,
   'trial-expired': seedTrialExpired,
   'multi-subject': seedMultiSubject,
+  'homework-ready': seedHomeworkReady,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];

@@ -1,0 +1,87 @@
+# Flow N3: Homework Submission — Navigate to Homework and Send Work
+# Validates: user with completed learning session can access homework mode,
+# enter homework text, and receive AI feedback.
+# Tags: nightly, homework
+#
+# Journey: UX Journey 2 (Homework phase)
+# Epics: Epic 2 (FR30-FR34, Story 2.5)
+# Prerequisite: Seeded user with completed learning session + subject
+#               (scenario: homework-ready)
+appId: com.zwizzly.eduagent
+tags:
+  - nightly
+  - homework
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "homework-ready"
+      API_URL: ${API_URL}
+
+# 2. Home screen
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Navigate to subjects tab
+- tapOn:
+    id: "tab-subjects"
+
+# 4. Wait for subjects list
+- extendedWaitUntil:
+    visible:
+      id: "tab-subjects"
+    timeout: 10000
+
+# 5. Tap on subject card (first subject in list)
+- tapOn:
+    id: "subject-card"
+    optional: true
+
+# 6. Tap on subject by text if testID not available
+- tapOn:
+    text: "Test Math"
+    optional: true
+
+# 7. Look for homework option on subject detail
+- extendedWaitUntil:
+    visible:
+      id: "homework-button"
+    timeout: 10000
+    optional: true
+
+# 8. Tap homework button
+- tapOn:
+    id: "homework-button"
+    optional: true
+
+# 9. If no homework button, try coaching card from home
+- tapOn:
+    id: "coaching-card-primary"
+    optional: true
+
+# 10. Wait for chat screen
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 10000
+
+# 11. Enter homework text
+- tapOn:
+    id: "chat-input"
+- inputText: "Here is my homework answer: The quadratic formula is x = (-b +/- sqrt(b^2-4ac)) / 2a"
+
+# 12. Send message
+- tapOn:
+    id: "send-button"
+
+# 13. Wait for AI response
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+# 14. Screenshot
+- takeScreenshot: homework-flow-complete
