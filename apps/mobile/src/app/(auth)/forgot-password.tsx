@@ -3,8 +3,6 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -15,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
 import { PasswordInput } from '../../components/common';
+import { Button } from '../../components/common/Button';
 
 export default function ForgotPasswordScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -28,6 +27,7 @@ export default function ForgotPasswordScreen() {
   const [pendingReset, setPendingReset] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
 
   const canSubmitEmail = emailAddress.trim() !== '' && !loading;
   const canSubmitReset =
@@ -78,6 +78,31 @@ export default function ForgotPasswordScreen() {
     }
   }, [isLoaded, canSubmitReset, signIn, setActive, router, code, newPassword]);
 
+  const onResendCode = useCallback(async () => {
+    if (!isLoaded || resending) return;
+
+    setError('');
+    setResending(true);
+
+    try {
+      await signIn.create({
+        strategy: 'reset_password_email_code',
+        identifier: emailAddress,
+      });
+    } catch (err: unknown) {
+      setError(extractClerkError(err));
+    } finally {
+      setResending(false);
+    }
+  }, [isLoaded, resending, signIn, emailAddress]);
+
+  const onBackFromReset = useCallback(() => {
+    setPendingReset(false);
+    setCode('');
+    setNewPassword('');
+    setError('');
+  }, []);
+
   if (pendingReset) {
     return (
       <KeyboardAvoidingView
@@ -103,7 +128,10 @@ export default function ForgotPasswordScreen() {
           </Text>
 
           {error !== '' && (
-            <View className="bg-danger/10 rounded-card px-4 py-3 mb-4">
+            <View
+              className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+              accessibilityRole="alert"
+            >
               <Text className="text-danger text-body-sm">{error}</Text>
             </View>
           )}
@@ -137,26 +165,35 @@ export default function ForgotPasswordScreen() {
             />
           </View>
 
-          <Pressable
+          <Button
+            variant="primary"
+            label="Reset password"
             onPress={onResetPress}
             disabled={!canSubmitReset}
-            className={`rounded-button py-3.5 items-center ${
-              canSubmitReset ? 'bg-primary' : 'bg-surface-elevated'
-            }`}
+            loading={loading}
             testID="reset-password-button"
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.textInverse} />
-            ) : (
-              <Text
-                className={`text-body font-semibold ${
-                  canSubmitReset ? 'text-text-inverse' : 'text-text-secondary'
-                }`}
-              >
-                Reset password
-              </Text>
-            )}
-          </Pressable>
+          />
+
+          <View className="flex-row justify-center mt-4">
+            <Button
+              variant="tertiary"
+              size="small"
+              label="Resend code"
+              onPress={onResendCode}
+              loading={resending}
+              testID="reset-resend-code"
+            />
+          </View>
+
+          <View className="flex-row justify-center mt-2">
+            <Button
+              variant="tertiary"
+              size="small"
+              label="Use a different email"
+              onPress={onBackFromReset}
+              testID="reset-back-from-code"
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     );
@@ -186,7 +223,10 @@ export default function ForgotPasswordScreen() {
         </Text>
 
         {error !== '' && (
-          <View className="bg-danger/10 rounded-card px-4 py-3 mb-4">
+          <View
+            className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+            accessibilityRole="alert"
+          >
             <Text className="text-danger text-body-sm">{error}</Text>
           </View>
         )}
@@ -207,37 +247,23 @@ export default function ForgotPasswordScreen() {
           testID="forgot-password-email"
         />
 
-        <Pressable
+        <Button
+          variant="primary"
+          label="Send reset code"
           onPress={onSendCodePress}
           disabled={!canSubmitEmail}
-          className={`rounded-button py-3.5 items-center ${
-            canSubmitEmail ? 'bg-primary' : 'bg-surface-elevated'
-          }`}
+          loading={loading}
           testID="send-reset-code-button"
-        >
-          {loading ? (
-            <ActivityIndicator color={colors.textInverse} />
-          ) : (
-            <Text
-              className={`text-body font-semibold ${
-                canSubmitEmail ? 'text-text-inverse' : 'text-text-secondary'
-              }`}
-            >
-              Send reset code
-            </Text>
-          )}
-        </Pressable>
+        />
 
         <View className="flex-row justify-center mt-6">
-          <Pressable
+          <Button
+            variant="tertiary"
+            size="small"
+            label="Back to sign in"
             onPress={() => router.back()}
-            className="min-h-[44px] justify-center"
             testID="back-to-sign-in"
-          >
-            <Text className="text-body-sm text-primary font-semibold">
-              Back to sign in
-            </Text>
-          </Pressable>
+          />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
