@@ -12,11 +12,12 @@ function formatTime(totalSeconds: number): string {
 
 export function SessionTimer() {
   const [elapsed, setElapsed] = useState(0);
+  const startTimeRef = useRef(Date.now());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     intervalRef.current = setInterval(() => {
-      setElapsed((prev) => prev + 1);
+      setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
     }, 1000);
 
     return () => {
