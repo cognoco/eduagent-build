@@ -3,8 +3,6 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCreateSubject } from '../hooks/use-subjects';
 import { useThemeColors } from '../lib/theme';
+import { Button } from '../components/common/Button';
 
 export default function CreateSubjectScreen() {
   const insets = useSafeAreaInsets();
@@ -61,17 +60,20 @@ export default function CreateSubjectScreen() {
           <Text className="text-h1 font-bold text-text-primary">
             New subject
           </Text>
-          <Pressable
+          <Button
+            variant="tertiary"
+            size="small"
+            label="Cancel"
             onPress={() => router.back()}
-            className="min-h-[44px] min-w-[44px] items-center justify-center"
             testID="create-subject-cancel"
-          >
-            <Text className="text-body text-primary font-semibold">Cancel</Text>
-          </Pressable>
+          />
         </View>
 
         {error !== '' && (
-          <View className="bg-danger/10 rounded-card px-4 py-3 mb-4">
+          <View
+            className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+            accessibilityRole="alert"
+          >
             <Text
               className="text-danger text-body-sm"
               testID="create-subject-error"
@@ -101,29 +103,14 @@ export default function CreateSubjectScreen() {
           autoFocus
         />
 
-        <Pressable
+        <Button
+          variant="primary"
+          label="Start Learning"
           onPress={onSubmit}
           disabled={!canSubmit}
-          className={`rounded-button py-3.5 items-center ${
-            canSubmit ? 'bg-primary' : 'bg-surface-elevated'
-          }`}
+          loading={createSubject.isPending}
           testID="create-subject-submit"
-        >
-          {createSubject.isPending ? (
-            <ActivityIndicator
-              color={colors.textInverse}
-              testID="create-subject-loading"
-            />
-          ) : (
-            <Text
-              className={`text-body font-semibold ${
-                canSubmit ? 'text-text-inverse' : 'text-text-secondary'
-              }`}
-            >
-              Start Learning
-            </Text>
-          )}
-        </Pressable>
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );
