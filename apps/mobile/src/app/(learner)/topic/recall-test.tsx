@@ -143,15 +143,18 @@ export default function RecallTestScreen() {
   ) : undefined;
 
   return (
-    <ChatShell
-      title="Recall Check"
-      subtitle="Test your memory"
-      messages={messages}
-      onSend={handleSend}
-      isStreaming={isStreaming}
-      inputDisabled={inputDisabled}
-      footer={footer}
-      placeholder="Explain what you remember..."
-    />
+    <View testID="recall-test-screen" style={{ flex: 1 }}>
+      <ChatShell
+        title="Recall Check"
+        subtitle="Test your memory"
+        messages={messages}
+        onSend={handleSend}
+        isStreaming={isStreaming}
+        inputDisabled={inputDisabled}
+        footer={footer}
+        placeholder="Explain what you remember..."
+        messagesTestID="recall-messages"
+      />
+    </View>
   );
 }

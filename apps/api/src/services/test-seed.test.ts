@@ -81,6 +81,7 @@ describe('seedScenario', () => {
           accountId: expect.any(String),
           profileId: expect.any(String),
           email: 'test@example.com',
+          password: expect.any(String),
           ids: expect.any(Object),
         })
       );
@@ -134,7 +135,7 @@ describe('resetDatabase', () => {
 
     const result = await resetDatabase(db);
 
-    expect(result).toEqual({ deletedCount: 2 });
+    expect(result).toEqual({ deletedCount: 2, clerkUsersDeleted: 0 });
     expect(db.delete).toHaveBeenCalled();
     expect(deleteWhere).toHaveBeenCalled();
   });
@@ -152,6 +153,6 @@ describe('resetDatabase', () => {
 
     const result = await resetDatabase(db);
 
-    expect(result).toEqual({ deletedCount: 0 });
+    expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
   });
 });

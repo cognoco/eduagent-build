@@ -186,7 +186,10 @@ export default function TopicDetailScreen() {
           </View>
 
           {/* Retention card */}
-          <View className="bg-surface rounded-card p-4 mb-3">
+          <View
+            className="bg-surface rounded-card p-4 mb-3"
+            testID="retention-card"
+          >
             <Text className="text-body-sm font-semibold text-text-primary mb-3">
               Retention
             </Text>

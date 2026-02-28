@@ -20,10 +20,11 @@ import {
   resetDatabase,
   VALID_SCENARIOS,
   type SeedScenario,
+  type SeedEnv,
 } from '../services/test-seed';
 
 type TestEnv = {
-  Bindings: { ENVIRONMENT: string };
+  Bindings: { ENVIRONMENT: string; CLERK_SECRET_KEY?: string };
   Variables: { db: Database };
 };
 
@@ -57,15 +58,25 @@ testSeedRoutes.post(
   async (c) => {
     const db = c.get('db');
     const { scenario, email } = c.req.valid('json');
-    const result = await seedScenario(db, scenario, email);
+    const seedEnv: SeedEnv = {
+      CLERK_SECRET_KEY: c.env.CLERK_SECRET_KEY,
+    };
+    const result = await seedScenario(db, scenario, email, seedEnv);
     return c.json(result, 201);
   }
 );
 
 testSeedRoutes.post('/__test/reset', async (c) => {
   const db = c.get('db');
-  const { deletedCount } = await resetDatabase(db);
-  return c.json({ message: 'Database reset complete', deletedCount });
+  const seedEnv: SeedEnv = {
+    CLERK_SECRET_KEY: c.env.CLERK_SECRET_KEY,
+  };
+  const { deletedCount, clerkUsersDeleted } = await resetDatabase(db, seedEnv);
+  return c.json({
+    message: 'Database reset complete',
+    deletedCount,
+    clerkUsersDeleted,
+  });
 });
 
 testSeedRoutes.get('/__test/scenarios', (c) => {

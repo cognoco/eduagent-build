@@ -108,7 +108,8 @@ describe('Integration: POST /__test/seed', () => {
     expect(mockSeedScenario).toHaveBeenCalledWith(
       expect.anything(),
       'onboarding-complete',
-      'test-e2e@example.com'
+      'test-e2e@example.com',
+      expect.objectContaining({})
     );
   });
 
@@ -135,7 +136,8 @@ describe('Integration: POST /__test/seed', () => {
     expect(mockSeedScenario).toHaveBeenCalledWith(
       expect.anything(),
       'learning-active',
-      'test-e2e@example.com' // default
+      'test-e2e@example.com', // default
+      expect.objectContaining({})
     );
   });
 
@@ -238,7 +240,10 @@ describe('Integration: POST /__test/reset', () => {
   });
 
   it('returns 200 with success message and deletedCount', async () => {
-    mockResetDatabase.mockResolvedValue({ deletedCount: 3 });
+    mockResetDatabase.mockResolvedValue({
+      deletedCount: 3,
+      clerkUsersDeleted: 0,
+    });
 
     const res = await app.request(
       '/v1/__test/reset',
@@ -250,7 +255,10 @@ describe('Integration: POST /__test/reset', () => {
     const body = await res.json();
     expect(body.message).toBe('Database reset complete');
     expect(body.deletedCount).toBe(3);
-    expect(mockResetDatabase).toHaveBeenCalledWith(expect.anything());
+    expect(mockResetDatabase).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({})
+    );
   });
 
   it('returns 403 in production environment', async () => {

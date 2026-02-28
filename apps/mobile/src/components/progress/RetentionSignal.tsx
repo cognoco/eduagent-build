@@ -39,6 +39,7 @@ export function RetentionSignal({ status, compact }: RetentionSignalProps) {
   return (
     <View
       className="flex-row items-center"
+      testID={`retention-signal-${status}`}
       accessibilityLabel={`Retention: ${label}`}
       accessibilityRole="text"
     >
