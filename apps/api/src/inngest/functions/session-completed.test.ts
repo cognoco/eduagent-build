@@ -80,6 +80,16 @@ jest.mock('../../services/settings', () => ({
   resetSummarySkips: (...args: unknown[]) => mockResetSummarySkips(...args),
 }));
 
+const mockProcessEvaluateCompletion = jest.fn().mockResolvedValue(undefined);
+const mockProcessTeachBackCompletion = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../../services/verification-completion', () => ({
+  processEvaluateCompletion: (...args: unknown[]) =>
+    mockProcessEvaluateCompletion(...args),
+  processTeachBackCompletion: (...args: unknown[]) =>
+    mockProcessTeachBackCompletion(...args),
+}));
+
 const mockCaptureException = jest.fn();
 
 jest.mock('../../services/sentry', () => ({
@@ -181,6 +191,7 @@ describe('sessionCompleted', () => {
     expect(stepNames).toEqual([
       'update-retention',
       'update-needs-deepening',
+      'process-verification-completion',
       'write-coaching-card',
       'update-dashboard',
       'generate-embeddings',
@@ -188,12 +199,17 @@ describe('sessionCompleted', () => {
     ]);
   });
 
-  it('marks all steps as ok on success', async () => {
+  it('marks all steps as ok on success (verification step skipped for standard)', async () => {
     const { result } = (await executeSteps(createEventData())) as any;
     const statuses = result.outcomes
       .filter((o: any) => o.status !== 'skipped')
       .map((o: any) => o.status);
     expect(statuses).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok']);
+    // verification-completion step should be skipped for standard sessions
+    const verificationOutcome = result.outcomes.find(
+      (o: any) => o.step === 'process-verification-completion'
+    );
+    expect(verificationOutcome.status).toBe('skipped');
   });
 
   describe('update-retention step', () => {
@@ -445,6 +461,95 @@ describe('sessionCompleted', () => {
         'User: What is algebra?\n\nAI: Algebra is...',
         'pa-test-key-123'
       );
+    });
+  });
+
+  describe('process-verification-completion step', () => {
+    it('skips when verificationType is not set', async () => {
+      const { result } = (await executeSteps(createEventData())) as any;
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'process-verification-completion'
+      );
+      expect(outcome.status).toBe('skipped');
+      expect(mockProcessEvaluateCompletion).not.toHaveBeenCalled();
+      expect(mockProcessTeachBackCompletion).not.toHaveBeenCalled();
+    });
+
+    it('skips when verificationType is standard', async () => {
+      await executeSteps(createEventData({ verificationType: 'standard' }));
+      expect(mockProcessEvaluateCompletion).not.toHaveBeenCalled();
+      expect(mockProcessTeachBackCompletion).not.toHaveBeenCalled();
+    });
+
+    it('calls processEvaluateCompletion for evaluate sessions', async () => {
+      const { result } = (await executeSteps(
+        createEventData({ verificationType: 'evaluate' })
+      )) as any;
+
+      expect(mockProcessEvaluateCompletion).toHaveBeenCalledWith(
+        expect.anything(), // db
+        'profile-001',
+        'session-001',
+        'topic-001'
+      );
+      expect(mockProcessTeachBackCompletion).not.toHaveBeenCalled();
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'process-verification-completion'
+      );
+      expect(outcome.status).toBe('ok');
+    });
+
+    it('calls processTeachBackCompletion for teach_back sessions (FR138-143)', async () => {
+      const { result } = (await executeSteps(
+        createEventData({ verificationType: 'teach_back' })
+      )) as any;
+
+      expect(mockProcessTeachBackCompletion).toHaveBeenCalledWith(
+        expect.anything(), // db
+        'profile-001',
+        'session-001',
+        'topic-001'
+      );
+      expect(mockProcessEvaluateCompletion).not.toHaveBeenCalled();
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'process-verification-completion'
+      );
+      expect(outcome.status).toBe('ok');
+    });
+
+    it('skips when topicId is null (no topic to assess)', async () => {
+      const { result } = (await executeSteps(
+        createEventData({ verificationType: 'teach_back', topicId: null })
+      )) as any;
+
+      expect(mockProcessTeachBackCompletion).not.toHaveBeenCalled();
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'process-verification-completion'
+      );
+      expect(outcome.status).toBe('skipped');
+    });
+
+    it('isolates errors without blocking other steps', async () => {
+      mockProcessTeachBackCompletion.mockRejectedValueOnce(
+        new Error('Assessment parse error')
+      );
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const { result } = (await executeSteps(
+        createEventData({ verificationType: 'teach_back' })
+      )) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'process-verification-completion'
+      );
+      expect(outcome.status).toBe('failed');
+      expect(outcome.error).toContain('Assessment parse error');
+
+      // Other steps still ran
+      expect(mockPrecomputeCoachingCard).toHaveBeenCalled();
+      expect(mockRecordSessionActivity).toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
     });
   });
 

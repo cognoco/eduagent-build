@@ -22,12 +22,12 @@ const CONFIG: Record<
     textColor: 'text-retention-fading',
   },
   weak: {
-    label: 'Weak',
+    label: 'Getting started',
     dotColor: 'bg-retention-weak',
     textColor: 'text-retention-weak',
   },
   forgotten: {
-    label: 'Forgotten',
+    label: 'Needs refresh',
     dotColor: 'bg-retention-forgotten',
     textColor: 'text-retention-forgotten',
   },
