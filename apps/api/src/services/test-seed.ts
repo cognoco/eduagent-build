@@ -66,6 +66,12 @@ export interface SeedEnv {
   CLERK_SECRET_KEY?: string;
 }
 
+/** Environment bindings needed by the seed service */
+export interface SeedEnv {
+  /** Clerk secret key for Backend API calls. Optional — falls back to fake IDs. */
+  CLERK_SECRET_KEY?: string;
+}
+
 export interface SeedResult {
   scenario: SeedScenario;
   accountId: string;
