@@ -3,20 +3,19 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from 'react-native';
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
 import { PasswordInput } from '../../components/common';
+import { Button } from '../../components/common/Button';
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -125,44 +124,35 @@ export default function SignInScreen() {
         </Text>
 
         {error !== '' && (
-          <View className="bg-danger/10 rounded-card px-4 py-3 mb-4">
+          <View
+            className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+            accessibilityRole="alert"
+          >
             <Text className="text-danger text-body-sm">{error}</Text>
           </View>
         )}
 
-        <Pressable
-          onPress={() => onSSOPress('oauth_google')}
-          disabled={oauthLoading !== null}
-          className="bg-surface rounded-button py-3.5 items-center mb-3 flex-row justify-center"
-          testID="google-sso-button"
-          accessibilityRole="button"
-          accessibilityLabel="Sign in with Google"
-        >
-          {oauthLoading === 'oauth_google' ? (
-            <ActivityIndicator />
-          ) : (
-            <Text className="text-body font-semibold text-text-primary">
-              Continue with Google
-            </Text>
-          )}
-        </Pressable>
+        <View className="mb-3">
+          <Button
+            variant="secondary"
+            label="Continue with Google"
+            onPress={() => onSSOPress('oauth_google')}
+            disabled={oauthLoading !== null}
+            loading={oauthLoading === 'oauth_google'}
+            testID="google-sso-button"
+          />
+        </View>
 
-        <Pressable
-          onPress={() => onSSOPress('oauth_apple')}
-          disabled={oauthLoading !== null}
-          className="bg-surface rounded-button py-3.5 items-center mb-6 flex-row justify-center"
-          testID="apple-sso-button"
-          accessibilityRole="button"
-          accessibilityLabel="Sign in with Apple"
-        >
-          {oauthLoading === 'oauth_apple' ? (
-            <ActivityIndicator />
-          ) : (
-            <Text className="text-body font-semibold text-text-primary">
-              Continue with Apple
-            </Text>
-          )}
-        </Pressable>
+        <View className="mb-6">
+          <Button
+            variant="secondary"
+            label="Continue with Apple"
+            onPress={() => onSSOPress('oauth_apple')}
+            disabled={oauthLoading !== null}
+            loading={oauthLoading === 'oauth_apple'}
+            testID="apple-sso-button"
+          />
+        </View>
 
         <View className="flex-row items-center mb-6">
           <View className="flex-1 h-px bg-border" />
@@ -201,50 +191,35 @@ export default function SignInScreen() {
         </View>
 
         <View className="items-end mb-4">
-          <Link href="/(auth)/forgot-password" asChild>
-            <Pressable
-              className="min-h-[44px] justify-center"
-              testID="forgot-password-link"
-            >
-              <Text className="text-body-sm text-primary font-semibold">
-                Forgot password?
-              </Text>
-            </Pressable>
-          </Link>
+          <Button
+            variant="tertiary"
+            size="small"
+            label="Forgot password?"
+            onPress={() => router.push('/(auth)/forgot-password')}
+            testID="forgot-password-link"
+          />
         </View>
 
-        <Pressable
+        <Button
+          variant="primary"
+          label="Sign in"
           onPress={onSignInPress}
           disabled={!canSubmit}
-          className={`rounded-button py-3.5 items-center ${
-            canSubmit ? 'bg-primary' : 'bg-surface-elevated'
-          }`}
+          loading={loading}
           testID="sign-in-button"
-        >
-          {loading ? (
-            <ActivityIndicator color={colors.textInverse} />
-          ) : (
-            <Text
-              className={`text-body font-semibold ${
-                canSubmit ? 'text-text-inverse' : 'text-text-secondary'
-              }`}
-            >
-              Sign in
-            </Text>
-          )}
-        </Pressable>
+        />
 
-        <View className="flex-row justify-center mt-6">
+        <View className="flex-row justify-center items-center mt-6">
           <Text className="text-body-sm text-text-secondary">
             Don&apos;t have an account?{' '}
           </Text>
-          <Link href="/(auth)/sign-up" asChild>
-            <Pressable className="min-h-[44px] justify-center">
-              <Text className="text-body-sm text-primary font-semibold">
-                Sign up
-              </Text>
-            </Pressable>
-          </Link>
+          <Button
+            variant="tertiary"
+            size="small"
+            label="Sign up"
+            onPress={() => router.push('/(auth)/sign-up')}
+            testID="sign-up-link"
+          />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

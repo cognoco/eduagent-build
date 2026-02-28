@@ -3,8 +3,6 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,6 +11,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRequestConsent } from '../hooks/use-consent';
 import { useThemeColors } from '../lib/theme';
+import { Button } from '../components/common/Button';
 
 export default function ConsentScreen() {
   const insets = useSafeAreaInsets();
@@ -28,6 +27,7 @@ export default function ConsentScreen() {
   const [parentEmail, setParentEmail] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [resending, setResending] = useState(false);
 
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail);
   const canSubmit = isValidEmail && !isPending && !success;
@@ -54,6 +54,23 @@ export default function ConsentScreen() {
       setError(message);
     }
   }, [canSubmit, profileId, consentType, parentEmail, mutateAsync]);
+
+  const onResendEmail = useCallback(async () => {
+    if (!profileId || !consentType || resending) return;
+
+    setResending(true);
+    try {
+      await mutateAsync({
+        childProfileId: profileId,
+        parentEmail: parentEmail.trim(),
+        consentType,
+      });
+    } catch {
+      // Silently ignore resend errors — the user already has a success state
+    } finally {
+      setResending(false);
+    }
+  }, [profileId, consentType, parentEmail, mutateAsync, resending]);
 
   return (
     <KeyboardAvoidingView
@@ -86,15 +103,22 @@ export default function ConsentScreen() {
               They'll need to approve before you can start learning. You can
               close this screen.
             </Text>
-            <Pressable
+            <Button
+              variant="primary"
+              label="Done"
               onPress={() => router.back()}
-              className="bg-primary rounded-button py-3.5 items-center"
               testID="consent-done"
-            >
-              <Text className="text-body font-semibold text-text-inverse">
-                Done
-              </Text>
-            </Pressable>
+            />
+            <View className="flex-row justify-center mt-4">
+              <Button
+                variant="tertiary"
+                size="small"
+                label="Resend email"
+                onPress={onResendEmail}
+                loading={resending}
+                testID="consent-resend-email"
+              />
+            </View>
           </View>
         ) : (
           <>
@@ -103,7 +127,10 @@ export default function ConsentScreen() {
             </Text>
 
             {error !== '' && (
-              <View className="bg-danger/10 rounded-card px-4 py-3 mb-4">
+              <View
+                className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+                accessibilityRole="alert"
+              >
                 <Text
                   className="text-danger text-body-sm"
                   testID="consent-error"
@@ -129,29 +156,14 @@ export default function ConsentScreen() {
               testID="consent-email"
             />
 
-            <Pressable
+            <Button
+              variant="primary"
+              label="Send consent request"
               onPress={onSubmit}
               disabled={!canSubmit}
-              className={`rounded-button py-3.5 items-center ${
-                canSubmit ? 'bg-primary' : 'bg-surface-elevated'
-              }`}
+              loading={isPending}
               testID="consent-submit"
-            >
-              {isPending ? (
-                <ActivityIndicator
-                  color={colors.textInverse}
-                  testID="consent-loading"
-                />
-              ) : (
-                <Text
-                  className={`text-body font-semibold ${
-                    canSubmit ? 'text-text-inverse' : 'text-text-secondary'
-                  }`}
-                >
-                  Send consent request
-                </Text>
-              )}
-            </Pressable>
+            />
           </>
         )}
       </ScrollView>

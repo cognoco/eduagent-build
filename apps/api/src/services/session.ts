@@ -578,6 +578,7 @@ export async function closeSession(
   topicId: string | null;
   subjectId: string;
   sessionType: string;
+  verificationType: string | null;
   interleavedTopicIds?: string[];
 }> {
   void input;
@@ -633,6 +634,7 @@ export async function closeSession(
     topicId: session.topicId ?? null,
     subjectId: session.subjectId,
     sessionType: session.sessionType,
+    verificationType: session.verificationType ?? null,
     interleavedTopicIds,
   };
 }

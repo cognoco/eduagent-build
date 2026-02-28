@@ -1,4 +1,11 @@
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  Alert,
+  RefreshControl,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../lib/theme';
@@ -82,12 +89,24 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { setPersona } = useTheme();
   const insets = useSafeAreaInsets();
-  const { data: dashboard, isLoading: dashboardLoading } = useDashboard();
+  const {
+    data: dashboard,
+    isLoading: dashboardLoading,
+    refetch,
+    isRefetching,
+  } = useDashboard();
 
   const isDemo = dashboard?.demoMode === true;
 
   const handleDrillDown = (profileId: string): void => {
-    if (isDemo) return;
+    if (isDemo) {
+      Alert.alert(
+        'Preview Mode',
+        "Link your child's account to see real data.",
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     router.push({
       pathname: '/(parent)/child/[profileId]',
       params: { profileId },
@@ -97,7 +116,7 @@ export default function DashboardScreen() {
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2">
-        <Text className="text-h1 font-bold text-text-primary">Dashboard</Text>
+        <Text className="text-h1 font-bold text-text-primary">Home</Text>
         <Text className="text-body-sm text-text-secondary mt-1">
           {isDemo
             ? "Here's what your dashboard will look like"
@@ -108,6 +127,12 @@ export default function DashboardScreen() {
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 24 }}
         testID="dashboard-scroll"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => refetch()}
+          />
+        }
       >
         {dashboardLoading ? (
           <>
@@ -140,14 +165,16 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        <Pressable
-          onPress={() => setPersona('teen')}
-          className="mt-6 items-center py-3 min-h-[44px] justify-center"
-        >
-          <Text className="text-body-sm text-text-secondary underline">
-            Switch to Teen view (demo)
-          </Text>
-        </Pressable>
+        {__DEV__ && (
+          <Pressable
+            onPress={() => setPersona('teen')}
+            className="mt-6 items-center py-3 min-h-[44px] justify-center"
+          >
+            <Text className="text-body-sm text-text-secondary underline">
+              Switch to Teen view (demo)
+            </Text>
+          </Pressable>
+        )}
       </ScrollView>
     </View>
   );

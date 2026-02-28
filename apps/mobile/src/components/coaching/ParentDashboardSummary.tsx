@@ -55,6 +55,45 @@ const RETENTION_TREND_CONFIG: Record<
   },
 };
 
+const AGGREGATE_SIGNAL_CONFIG: Record<
+  'on-track' | 'needs-attention' | 'falling-behind',
+  { dotColor: string; label: string; textColor: string }
+> = {
+  'on-track': {
+    dotColor: 'bg-retention-strong',
+    label: 'On Track',
+    textColor: 'text-retention-strong',
+  },
+  'needs-attention': {
+    dotColor: 'bg-retention-fading',
+    label: 'Needs Attention',
+    textColor: 'text-retention-fading',
+  },
+  'falling-behind': {
+    dotColor: 'bg-retention-weak',
+    label: 'Falling Behind',
+    textColor: 'text-retention-weak',
+  },
+};
+
+type AggregateSignal = keyof typeof AGGREGATE_SIGNAL_CONFIG;
+
+function deriveAggregateSignal(
+  subjects: SubjectInfo[]
+): AggregateSignal | null {
+  if (subjects.length === 0) return null;
+
+  const hasWeakOrForgotten = subjects.some(
+    (s) => s.retentionStatus === 'weak' || s.retentionStatus === 'forgotten'
+  );
+  if (hasWeakOrForgotten) return 'falling-behind';
+
+  const hasFading = subjects.some((s) => s.retentionStatus === 'fading');
+  if (hasFading) return 'needs-attention';
+
+  return 'on-track';
+}
+
 const formatTime = (mins: number): string => {
   if (mins < 60) return `${mins}m`;
   const h = Math.floor(mins / 60);
@@ -75,6 +114,8 @@ export function ParentDashboardSummary({
   onDrillDown,
   isLoading,
 }: ParentDashboardSummaryProps): ReactNode {
+  const aggregateSignal = deriveAggregateSignal(subjects);
+
   const trendText = `${sessionsThisWeek} sessions, ${formatTime(
     totalTimeThisWeek
   )} this week (${TREND_ARROWS[trend]} ${
@@ -83,13 +124,36 @@ export function ParentDashboardSummary({
 
   const metadata = (
     <>
+      {aggregateSignal ? (
+        <View
+          className="flex-row items-center mt-1"
+          testID="aggregate-signal"
+          accessibilityLabel={`Overall status: ${AGGREGATE_SIGNAL_CONFIG[aggregateSignal].label}`}
+        >
+          <View
+            className={`w-3 h-3 rounded-full ${AGGREGATE_SIGNAL_CONFIG[aggregateSignal].dotColor} me-2`}
+          />
+          <Text
+            className={`text-body-sm font-semibold ${AGGREGATE_SIGNAL_CONFIG[aggregateSignal].textColor}`}
+          >
+            {AGGREGATE_SIGNAL_CONFIG[aggregateSignal].label}
+          </Text>
+        </View>
+      ) : (
+        <Text
+          className="text-caption text-text-secondary mt-1"
+          testID="aggregate-signal-empty"
+        >
+          No data yet
+        </Text>
+      )}
       <Text
         className="text-caption text-text-secondary mt-1"
         accessibilityLabel={`Trend: ${trendText}`}
       >
         {trendText}
       </Text>
-      {retentionTrend && (
+      {retentionTrend ? (
         <View
           className="flex-row items-center mt-1.5"
           testID="retention-trend-badge"
@@ -103,6 +167,13 @@ export function ParentDashboardSummary({
             {RETENTION_TREND_CONFIG[retentionTrend].label}
           </Text>
         </View>
+      ) : (
+        <Text
+          className="text-caption text-text-secondary mt-1.5"
+          testID="retention-trend-empty"
+        >
+          No data yet
+        </Text>
       )}
       {subjects.length > 0 && (
         <View className="flex-row flex-wrap gap-2 mt-2">

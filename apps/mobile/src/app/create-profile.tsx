@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   Pressable,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -20,6 +19,7 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile, type Profile } from '../lib/profile';
 import { checkConsentRequirement } from '../hooks/use-consent';
 import { useThemeColors } from '../lib/theme';
+import { Button } from '../components/common/Button';
 
 type PersonaType = 'TEEN' | 'LEARNER' | 'PARENT';
 
@@ -196,17 +196,20 @@ export default function CreateProfileScreen() {
           <Text className="text-h1 font-bold text-text-primary">
             New profile
           </Text>
-          <Pressable
+          <Button
+            variant="tertiary"
+            size="small"
+            label="Cancel"
             onPress={() => router.back()}
-            className="min-h-[44px] min-w-[44px] items-center justify-center"
             testID="create-profile-cancel"
-          >
-            <Text className="text-body text-primary font-semibold">Cancel</Text>
-          </Pressable>
+          />
         </View>
 
         {error !== '' && (
-          <View className="bg-danger/10 rounded-card px-4 py-3 mb-4">
+          <View
+            className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+            accessibilityRole="alert"
+          >
             <Text
               className="text-danger text-body-sm"
               testID="create-profile-error"
@@ -387,29 +390,14 @@ export default function CreateProfileScreen() {
           </>
         )}
 
-        <Pressable
+        <Button
+          variant="primary"
+          label="Create profile"
           onPress={onSubmit}
           disabled={!canSubmit}
-          className={`rounded-button py-3.5 items-center ${
-            canSubmit ? 'bg-primary' : 'bg-surface-elevated'
-          }`}
+          loading={loading}
           testID="create-profile-submit"
-        >
-          {loading ? (
-            <ActivityIndicator
-              color={colors.textInverse}
-              testID="create-profile-loading"
-            />
-          ) : (
-            <Text
-              className={`text-body font-semibold ${
-                canSubmit ? 'text-text-inverse' : 'text-text-secondary'
-              }`}
-            >
-              Create profile
-            </Text>
-          )}
-        </Pressable>
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );

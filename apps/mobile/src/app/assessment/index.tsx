@@ -11,7 +11,7 @@ import {
 } from '../../hooks/use-assessments';
 
 const OPENING_MESSAGE =
-  "Time for a knowledge check. I'll ask you a few questions to see how well you've understood the material. Ready?";
+  "Let's see what you've picked up so far. I'll ask a few questions \u2014 just do your best, and I'll help fill in any gaps.";
 
 export default function AssessmentScreen() {
   const { subjectId, topicId } = useLocalSearchParams<{
@@ -57,9 +57,9 @@ export default function AssessmentScreen() {
               {
                 id: `assessment-done-${Date.now()}`,
                 role: 'ai',
-                content: `Assessment complete! Your mastery score: ${Math.round(
+                content: `You've got a solid grasp of most of this \u2014 ${Math.round(
                   evaluation.masteryScore * 100
-                )}%`,
+                )}% mastery! The areas to revisit will show up in your Learning Book.`,
               },
             ]);
           }

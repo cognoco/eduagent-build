@@ -171,8 +171,10 @@ describe('useCoachingCard', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(result.current.headline).toBe('Ready to learn?');
-    expect(result.current.subtext).toContain('Start a new topic');
+    expect(result.current.headline).toBe(
+      "I'm still getting to know you. What are you working on today?"
+    );
+    expect(result.current.subtext).toContain('Your coach is ready');
   });
 
   it('shows loading state initially', async () => {

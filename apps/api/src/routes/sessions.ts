@@ -184,6 +184,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           topicId: result.topicId,
           subjectId: result.subjectId,
           sessionType: result.sessionType,
+          verificationType: result.verificationType,
           interleavedTopicIds: result.interleavedTopicIds,
           summaryStatus: body.summaryStatus,
           timestamp: new Date().toISOString(),

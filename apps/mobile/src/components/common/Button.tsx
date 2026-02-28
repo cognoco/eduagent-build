@@ -36,7 +36,7 @@ const variantClasses: Record<
 };
 
 const sizeClasses: Record<ButtonSize, { container: string; text: string }> = {
-  default: { container: 'py-3.5 px-6', text: 'text-body' },
+  default: { container: 'py-3 px-6', text: 'text-body' },
   small: { container: 'py-2 px-4', text: 'text-body-sm' },
 };
 
@@ -61,6 +61,7 @@ export function Button({
       onPress={onPress}
       disabled={isDisabled}
       className={`rounded-button items-center ${s.container} ${bgClass}`}
+      style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: isDisabled }}
@@ -71,7 +72,9 @@ export function Button({
           color={variant === 'primary' ? colors.textInverse : colors.primary}
         />
       ) : (
-        <Text className={`font-semibold ${s.text} ${v.text}`}>{label}</Text>
+        <Text className={`font-sans-semibold ${s.text} ${v.text}`}>
+          {label}
+        </Text>
       )}
     </Pressable>
   );

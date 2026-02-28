@@ -51,8 +51,8 @@ export function RemediationCard({
     >
       <View className="flex-row items-center justify-between mb-3">
         <RetentionSignal status={retentionStatus} />
-        <Text className="text-body-sm font-medium text-warning">
-          Failed {failureCount} {failureCount === 1 ? 'time' : 'times'}
+        <Text className="text-body-sm font-medium text-text-secondary">
+          Practice round {failureCount}
         </Text>
       </View>
 

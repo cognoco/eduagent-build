@@ -217,3 +217,32 @@ export const topicStabilitySchema = z.object({
   consecutiveSuccesses: z.number().int(),
 });
 export type TopicStability = z.infer<typeof topicStabilitySchema>;
+
+// EVALUATE eligibility — FR128-129: strong-retention gating check
+
+export const evaluateEligibilitySchema = z.object({
+  eligible: z.boolean(),
+  topicId: z.string().uuid(),
+  topicTitle: z.string(),
+  currentRung: z.number().int().min(1).max(4),
+  easeFactor: z.number(),
+  repetitions: z.number().int(),
+  reason: z.string().optional(),
+});
+export type EvaluateEligibility = z.infer<typeof evaluateEligibilitySchema>;
+
+// EVALUATE difficulty rung — FR131: difficulty calibration
+
+export const evaluateDifficultyRungSchema = z.number().int().min(1).max(4);
+export type EvaluateDifficultyRung = z.infer<
+  typeof evaluateDifficultyRungSchema
+>;
+
+// EVALUATE failure action — FR133: three-strike escalation
+
+export const evaluateFailureActionSchema = z.object({
+  action: z.enum(['reveal_flaw', 'lower_difficulty', 'exit_to_standard']),
+  message: z.string(),
+  newDifficultyRung: z.number().int().min(1).max(4).optional(),
+});
+export type EvaluateFailureAction = z.infer<typeof evaluateFailureActionSchema>;

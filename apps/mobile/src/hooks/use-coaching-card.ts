@@ -62,10 +62,38 @@ export function useCoachingCard(): CoachingCardState {
       };
     }
 
-    // Default card when no suggestion exists
+    // Default card when no suggestion exists — progressive coaching voice
+    const sessionStreak = streak?.currentStreak ?? 0;
+    const coldStartHeadlines: Record<
+      number,
+      { headline: string; subtext: string }
+    > = {
+      0: {
+        headline:
+          "I'm still getting to know you. What are you working on today?",
+        subtext: 'Your coach is ready when you are.',
+      },
+      1: {
+        headline: 'What have we got today?',
+        subtext: 'Pick up where you left off or try something new.',
+      },
+      2: {
+        headline: "Back again \u2014 what's on the homework list?",
+        subtext: "You're building momentum. Keep it going!",
+      },
+      3: {
+        headline: 'What are we tackling?',
+        subtext: "Three sessions in \u2014 you're on a roll.",
+      },
+    };
+    const { headline, subtext } = coldStartHeadlines[sessionStreak] ?? {
+      headline: 'What are you working on today?',
+      subtext: 'Your coach is ready when you are.',
+    };
+
     return {
-      headline: 'Ready to learn?',
-      subtext: 'Start a new topic or explore something on your mind.',
+      headline,
+      subtext,
       primaryLabel: "Let's go",
       secondaryLabel: 'I have something else in mind',
       primaryRoute: '/(learner)/session?mode=freeform',

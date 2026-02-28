@@ -26,6 +26,7 @@ module.exports = {
         'retention-weak': 'var(--color-retention-weak)',
         'retention-forgotten': 'var(--color-retention-forgotten)',
         'coaching-card': 'var(--color-coaching-card)',
+        'homework-lane': 'var(--color-homework-lane)',
       },
       borderRadius: {
         card: 'var(--radius-card)',

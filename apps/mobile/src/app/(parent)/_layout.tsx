@@ -12,7 +12,7 @@ const iconMap: Record<
     default: keyof typeof Ionicons.glyphMap;
   }
 > = {
-  Dashboard: { focused: 'grid', default: 'grid-outline' },
+  Home: { focused: 'home', default: 'home-outline' },
   Book: { focused: 'book', default: 'book-outline' },
   More: { focused: 'menu', default: 'menu-outline' },
 };
@@ -62,9 +62,9 @@ export default function ParentLayout() {
         <Tabs.Screen
           name="dashboard"
           options={{
-            title: 'Dashboard',
+            title: 'Home',
             tabBarIcon: ({ focused }) => (
-              <TabIcon name="Dashboard" focused={focused} />
+              <TabIcon name="Home" focused={focused} />
             ),
           }}
         />
