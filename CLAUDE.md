@@ -160,7 +160,7 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 **Complete — all routes production-ready:**
 - Epics 0-5: full API layer (~1412 API tests + ~387 mobile tests + 10 integration test suites, all passing)
 - All 23 route files wired to real services with DB persistence (including `consent-web` browser flow and `test-seed` E2E endpoints)
-- Mobile: 30+ screens (47 test suites), all using real API calls via TanStack Query + Hono RPC
+- Mobile: 38+ screens (101 test suites), all using real API calls via TanStack Query + Hono RPC
 - Background jobs: 10 Inngest functions (session-completed chain, trial-expiry, consent-reminders, consent-revocation, account-deletion, review-reminder, payment-retry, quota-reset, topup-expiry-reminder, subject-auto-archive)
 - Auth: Clerk (SSO + email/password), PasswordInput with show/hide + requirements
 - Billing: Stripe integration (checkout, portal, webhooks, KV-cached status, quota metering)
@@ -180,6 +180,7 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 - XP ledger: `insertSessionXpEntry()` wired in session-completed Step 3, `useXpSummary` hook for client-side XP display
 - Needs-deepening auto-promotion (FR63): `updateNeedsDeepeningProgress()` wired in session-completed Step 1b
 - E2E testing infrastructure: `test-seed` route for deterministic test data, 10 integration suites in `tests/integration/` (auth-chain, onboarding, session-completed-chain, stripe-webhook, account-deletion, health-cors, profile-isolation, test-seed, learning-session, retention-lifecycle), Maestro foundation (seed.js, setup flows, Nx e2e target, 4 Tier 1 smoke flows), enhanced CI workflow with PostgreSQL + API server for mobile-maestro job
+- Expo web mode: `.npmrc` with `shamefully-hoist=true` enables `expo start --web` in pnpm monorepo (required for Metro/Babel transitive plugin resolution). Web deps (`react-dom`, `react-native-web`) in root and mobile `package.json`.
 
 - UX audit remediation (55 gaps): consent gating (C16/COPPA), camera-first homework (C8), parent transcript view (C13), session mode configs (C7), math rendering (M21), animations (M22), dark mode, confidence scoring, retention trends, ProfileSwitcher, Inter font, Ionicons, WCAG contrast fixes, shared Button component
 - UX persona walkthrough gaps (all resolved): post-approval child landing (`PostApprovalLanding` + SecureStore), parent account-owner landing (`consentWebRoutes` with personalized child name + deep links), child-friendly paywall (`ChildPaywall` with real stats + 24h rate-limit countdown), GDPR consent revocation (full stack: services, routes, Inngest 7-day grace period, child `ConsentWithdrawnGate`, parent withdraw/restore UI), preview mode on pending-consent screen (`PreviewSubjectBrowser` + `PreviewSampleCoaching`)
