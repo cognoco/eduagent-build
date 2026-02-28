@@ -51,7 +51,8 @@ function mapSessionRow(
     subjectId: row.subjectId,
     topicId: row.topicId ?? null,
     sessionType: row.sessionType,
-    verificationType: (row.verificationType as 'standard' | 'evaluate' | 'teach_back') ?? null,
+    verificationType:
+      (row.verificationType as 'standard' | 'evaluate' | 'teach_back') ?? null,
     status: row.status,
     escalationRung: row.escalationRung,
     exchangeCount: row.exchangeCount,
@@ -247,7 +248,11 @@ async function prepareExchangeContext(
   let verificationType: 'standard' | 'evaluate' | 'teach_back' | undefined;
   if (session.verificationType && session.verificationType !== 'standard') {
     verificationType = session.verificationType as 'evaluate' | 'teach_back';
-  } else if (retentionCard && !isInterleaved && session.sessionType === 'learning') {
+  } else if (
+    retentionCard &&
+    !isInterleaved &&
+    session.sessionType === 'learning'
+  ) {
     const ease = Number(retentionCard.easeFactor);
     const reps = retentionCard.repetitions;
     if (shouldTriggerEvaluate(ease, reps)) {
@@ -258,9 +263,10 @@ async function prepareExchangeContext(
   }
 
   // Load evaluateDifficultyRung from retention card for evaluate sessions
-  const evaluateDifficultyRung = verificationType === 'evaluate' && retentionCard
-    ? ((retentionCard.evaluateDifficultyRung ?? 1) as 1 | 2 | 3 | 4)
-    : undefined;
+  const evaluateDifficultyRung =
+    verificationType === 'evaluate' && retentionCard
+      ? ((retentionCard.evaluateDifficultyRung ?? 1) as 1 | 2 | 3 | 4)
+      : undefined;
 
   // FR92: Resolve interleaved topic details (titles + descriptions)
   let interleavedTopics: ExchangeContext['interleavedTopics'];

@@ -82,9 +82,7 @@ describe('SubjectSettingsScreen', () => {
   it('renders the description text', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    expect(
-      screen.getByText(/Choose a domain for analogies/)
-    ).toBeTruthy();
+    expect(screen.getByText(/Choose a domain for analogies/)).toBeTruthy();
   });
 
   it('renders the analogy domain picker', () => {

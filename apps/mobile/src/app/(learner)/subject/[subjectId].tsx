@@ -17,8 +17,7 @@ export default function SubjectSettingsScreen() {
   }>();
 
   const safeSubjectId = subjectId ?? '';
-  const { data: analogyDomain, isLoading } =
-    useAnalogyDomain(safeSubjectId);
+  const { data: analogyDomain, isLoading } = useAnalogyDomain(safeSubjectId);
   const { mutate: updateAnalogyDomain, isPending } =
     useUpdateAnalogyDomain(safeSubjectId);
 

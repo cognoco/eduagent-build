@@ -15,7 +15,11 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({ muted: '#888', primary: '#007AFF', textInverse: '#fff' }),
+  useThemeColors: () => ({
+    muted: '#888',
+    primary: '#007AFF',
+    textInverse: '#fff',
+  }),
 }));
 
 jest.mock('../../lib/math-format', () => ({
@@ -220,7 +224,11 @@ describe('ChatShell', () => {
     });
 
     it('calls stopListening when mic is pressed while listening', async () => {
-      mockSttState = { ...mockSttState, isListening: true, status: 'listening' };
+      mockSttState = {
+        ...mockSttState,
+        isListening: true,
+        status: 'listening',
+      };
       renderChatShell({ verificationType: 'teach_back' });
 
       await act(async () => {
@@ -352,7 +360,9 @@ describe('ChatShell', () => {
       // Re-render with new message (would normally trigger speak)
       // Since we can't easily re-render with new messages in this test setup,
       // we verify the toggle changed state
-      expect(screen.getByTestId('voice-toggle').props.accessibilityState.checked).toBe(false);
+      expect(
+        screen.getByTestId('voice-toggle').props.accessibilityState.checked
+      ).toBe(false);
     });
 
     it('does NOT speak for non-teach_back sessions', () => {

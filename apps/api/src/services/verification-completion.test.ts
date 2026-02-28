@@ -44,9 +44,7 @@ const topicId = 'topic-001';
 // DB mock helpers
 // ---------------------------------------------------------------------------
 
-function createMockDb({
-  selectResults = [] as unknown[][],
-} = {}): Database {
+function createMockDb({ selectResults = [] as unknown[][] } = {}): Database {
   let selectCallIndex = 0;
   const selectMock = jest.fn(() => {
     const result = selectResults[selectCallIndex] ?? [];

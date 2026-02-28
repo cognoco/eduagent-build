@@ -81,10 +81,7 @@ import {
   getLearningMode,
   upsertLearningMode,
 } from '../services/settings';
-import {
-  getAnalogyDomain,
-  setAnalogyDomain,
-} from '../services/retention-data';
+import { getAnalogyDomain, setAnalogyDomain } from '../services/retention-data';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',

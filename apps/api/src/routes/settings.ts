@@ -17,10 +17,7 @@ import {
   registerPushToken,
 } from '../services/settings';
 import { notifyParentToSubscribe } from '../services/notifications';
-import {
-  getAnalogyDomain,
-  setAnalogyDomain,
-} from '../services/retention-data';
+import { getAnalogyDomain, setAnalogyDomain } from '../services/retention-data';
 
 type SettingsRouteEnv = {
   Bindings: {

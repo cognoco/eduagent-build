@@ -126,7 +126,9 @@ export type AnalogyDomain = z.infer<typeof analogyDomainSchema>;
 export const analogyDomainUpdateSchema = z.object({
   analogyDomain: analogyDomainSchema.nullable(),
 });
-export type AnalogyDomainUpdateInput = z.infer<typeof analogyDomainUpdateSchema>;
+export type AnalogyDomainUpdateInput = z.infer<
+  typeof analogyDomainUpdateSchema
+>;
 
 // EVALUATE assessment — hidden LLM output for Devil's Advocate challenges (FR128-133)
 
