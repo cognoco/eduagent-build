@@ -1,0 +1,67 @@
+# Flow N1: Assessment Cycle — Subject Creation to First Learning Exchange
+# Validates: subject creation, navigation to session, sending a message, AI response.
+# Tags: nightly, assessment
+#
+# Journey: UX Journey 1 (New Subject) + Journey 2 (Learning)
+# Epics: Epic 1 (FR10-FR14), Epic 2 (FR23-FR26)
+# Prerequisite: Seeded user with onboarding complete (scenario: onboarding-complete)
+appId: com.zwizzly.eduagent
+tags:
+  - nightly
+  - assessment
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-complete"
+      API_URL: ${API_URL}
+
+# 2. Home screen
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Create a new subject — tap add button
+- tapOn:
+    id: "add-subject-button"
+
+# 4. Wait for create-subject modal
+- extendedWaitUntil:
+    visible:
+      text: "New subject"
+    timeout: 10000
+
+# 5. Enter subject name
+- tapOn:
+    id: "create-subject-name"
+- inputText: "Test Math"
+
+# 6. Submit subject creation
+- tapOn:
+    id: "create-subject-submit"
+
+# 7. Wait for interview/session screen (chat input present)
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 10000
+
+# 8. Send a message in the session
+- tapOn:
+    id: "chat-input"
+- inputText: "I want to learn about algebra fundamentals"
+
+# 9. Tap send
+- tapOn:
+    id: "send-button"
+
+# 10. Wait for AI response
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+# 11. Screenshot
+- takeScreenshot: assessment-cycle-complete

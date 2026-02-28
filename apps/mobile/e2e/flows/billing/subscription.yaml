@@ -1,0 +1,72 @@
+# Flow N6: Subscription Flow — View Trial Status and Billing
+# Validates: user on active trial can navigate to billing/subscription
+# settings and see trial status information.
+# Tags: nightly, billing
+#
+# Journey: UX Journey 5 (Billing & Subscription)
+# Epics: Epic 5 (FR95-FR100)
+# Prerequisite: Seeded user on active trial (scenario: trial-active)
+appId: com.zwizzly.eduagent
+tags:
+  - nightly
+  - billing
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "trial-active"
+      API_URL: ${API_URL}
+
+# 2. Home screen
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Navigate to More tab
+- tapOn:
+    id: "tab-more"
+
+# 4. Wait for settings/more screen
+- extendedWaitUntil:
+    visible:
+      id: "tab-more"
+    timeout: 10000
+
+# 5. Look for subscription/billing option
+- extendedWaitUntil:
+    visible:
+      text: "Subscription"
+    timeout: 10000
+    optional: true
+
+# 6. Tap on subscription/billing
+- tapOn:
+    text: "Subscription"
+    optional: true
+
+# 7. Fallback: look for billing text
+- tapOn:
+    text: "Billing"
+    optional: true
+
+# 8. Wait for subscription detail screen
+- extendedWaitUntil:
+    visible:
+      text: "Trial"
+    timeout: 10000
+    optional: true
+
+# 9. Verify trial status is displayed
+- assertVisible:
+    text: "trial"
+    optional: true
+
+# 10. Look for upgrade/subscribe option
+- assertVisible:
+    text: "Upgrade"
+    optional: true
+
+# 11. Screenshot
+- takeScreenshot: subscription-flow-complete

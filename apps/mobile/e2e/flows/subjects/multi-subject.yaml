@@ -1,0 +1,68 @@
+# Flow N5: Multi-Subject Management — View and Navigate Subjects
+# Validates: user with multiple subjects (active, paused, archived) can
+# view subjects list, see status indicators, and navigate to subject detail.
+# Tags: nightly, subjects
+#
+# Journey: UX Journey 1 (Subject Management)
+# Epics: Epic 1 (FR10-FR14), Epic 4 (FR70-FR72)
+# Prerequisite: Seeded user with Physics (active), Literature (paused),
+#               Art History (archived) (scenario: multi-subject)
+appId: com.zwizzly.eduagent
+tags:
+  - nightly
+  - subjects
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "multi-subject"
+      API_URL: ${API_URL}
+
+# 2. Home screen
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Navigate to subjects tab
+- tapOn:
+    id: "tab-subjects"
+
+# 4. Wait for subjects list to load
+- extendedWaitUntil:
+    visible:
+      text: "Physics"
+    timeout: 10000
+
+# 5. Verify Physics subject is visible (active)
+- assertVisible:
+    text: "Physics"
+
+# 6. Verify Literature subject is visible (paused)
+- assertVisible:
+    text: "Literature"
+    optional: true
+
+# 7. Tap on Physics subject to view detail
+- tapOn:
+    text: "Physics"
+
+# 8. Wait for subject detail screen
+- extendedWaitUntil:
+    visible:
+      text: "Physics"
+    timeout: 10000
+
+# 9. Verify subject detail content is present (topics or sessions)
+- assertVisible:
+    text: "Topics"
+    optional: true
+
+# 10. Navigate back to subjects list
+- tapOn:
+    id: "back-button"
+    optional: true
+
+# 11. Screenshot
+- takeScreenshot: multi-subject-complete

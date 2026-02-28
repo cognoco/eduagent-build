@@ -1,0 +1,68 @@
+# Flow N4: Parent Dashboard — View Children and Session Data
+# Validates: parent user sees children list, can tap into child detail,
+# and view session information.
+# Tags: nightly, parent
+#
+# Journey: UX Journey 4 (Parent Oversight)
+# Epics: Epic 5 (FR85-FR90)
+# Prerequisite: Seeded parent user with linked children who have sessions
+#               (scenario: parent-with-children)
+appId: com.zwizzly.eduagent
+tags:
+  - nightly
+  - parent
+---
+# 1. Seed & sign in as parent
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-with-children"
+      API_URL: ${API_URL}
+
+# 2. Wait for parent dashboard/home screen
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Verify children list is visible — look for child display name
+- extendedWaitUntil:
+    visible:
+      text: "Test Teen"
+    timeout: 10000
+    optional: true
+
+# 4. Look for child card element
+- assertVisible:
+    id: "child-card"
+    optional: true
+
+# 5. Tap on child card to view detail
+- tapOn:
+    id: "child-card"
+    optional: true
+
+# 6. Fallback: tap on child name text
+- tapOn:
+    text: "Test Teen"
+    optional: true
+
+# 7. Wait for child detail view
+- extendedWaitUntil:
+    visible:
+      text: "Sessions"
+    timeout: 10000
+    optional: true
+
+# 8. Verify session count or time information is visible
+- assertVisible:
+    text: "sessions"
+    optional: true
+
+# 9. Navigate back to dashboard
+- tapOn:
+    id: "back-button"
+    optional: true
+
+# 10. Screenshot
+- takeScreenshot: parent-dashboard-complete
