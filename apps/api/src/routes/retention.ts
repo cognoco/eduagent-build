@@ -19,6 +19,7 @@ import {
   deleteTeachingPreference,
   getStableTopics,
 } from '../services/retention-data';
+import { checkEvaluateEligibility } from '../services/evaluate-data';
 
 type RetentionRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -147,4 +148,15 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
 
     const topics = await getStableTopics(db, profileId, subjectId || undefined);
     return c.json({ topics });
+  })
+
+  // Check EVALUATE eligibility for a topic (FR128-129)
+  .get('/topics/:topicId/evaluate-eligibility', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const topicId = c.req.param('topicId');
+
+    const eligibility = await checkEvaluateEligibility(db, profileId, topicId);
+    return c.json(eligibility);
   });
