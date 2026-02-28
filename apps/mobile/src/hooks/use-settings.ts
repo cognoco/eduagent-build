@@ -157,3 +157,52 @@ export function useNotifyParentSubscribe(): UseMutationResult<
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// Analogy Domain (FR134-137)
+// ---------------------------------------------------------------------------
+
+export function useAnalogyDomain(
+  subjectId: string
+): UseQueryResult<AnalogyDomain | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['settings', 'analogy-domain', activeProfile?.id, subjectId],
+    queryFn: async () => {
+      const res = await client.settings.subjects[':subjectId'][
+        'analogy-domain'
+      ].$get({ param: { subjectId } });
+      const data = await res.json();
+      return data.analogyDomain as AnalogyDomain | null;
+    },
+    enabled: !!activeProfile && !!subjectId,
+  });
+}
+
+export function useUpdateAnalogyDomain(
+  subjectId: string
+): UseMutationResult<AnalogyDomain | null, Error, AnalogyDomain | null> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
+
+  return useMutation({
+    mutationFn: async (analogyDomain: AnalogyDomain | null) => {
+      const res = await client.settings.subjects[':subjectId'][
+        'analogy-domain'
+      ].$put({
+        param: { subjectId },
+        json: { analogyDomain },
+      });
+      const data = await res.json();
+      return data.analogyDomain as AnalogyDomain | null;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['settings', 'analogy-domain', activeProfile?.id, subjectId],
+      });
+    },
+  });
+}
