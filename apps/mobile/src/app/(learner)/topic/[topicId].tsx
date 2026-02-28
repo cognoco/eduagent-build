@@ -173,11 +173,11 @@ export default function TopicDetailScreen() {
                   XP Status
                 </Text>
                 <Text className="text-body-sm font-medium text-text-primary">
-                  {topicProgress.xpStatus === 'earned'
+                  {topicProgress.xpStatus === 'verified'
                     ? 'XP earned \u2713'
                     : topicProgress.xpStatus === 'decayed'
                     ? 'XP needs refresh'
-                    : topicProgress.xpStatus === 'locked'
+                    : topicProgress.xpStatus === 'pending'
                     ? 'Complete to earn XP'
                     : topicProgress.xpStatus}
                 </Text>
