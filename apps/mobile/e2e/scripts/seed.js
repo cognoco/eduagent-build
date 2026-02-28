@@ -9,7 +9,8 @@
 //         SCENARIO: with-subject
 //       outputVariable: seedResult
 //
-// After execution, access via: ${output.seedResult.email}, etc.
+// After execution, access via: ${output.seedResult.email},
+// ${output.seedResult.password}, etc.
 
 const scenario = __maestro.env['SCENARIO'] || 'onboarding-complete';
 const apiUrl = __maestro.env['API_URL'] || 'http://10.0.2.2:8787';
@@ -33,6 +34,7 @@ const data = JSON.parse(response.body);
 output.accountId = data.accountId;
 output.profileId = data.profileId;
 output.email = data.email;
+output.password = data.password;
 output.scenario = scenario;
 
 // Spread scenario-specific IDs (subjectId, topicId, sessionIds, etc.)

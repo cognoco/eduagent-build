@@ -6,8 +6,12 @@
  *
  * All seed accounts use `clerk_seed_` prefix in clerkUserId so resetDatabase()
  * can safely scope deletions to test data only.
+ *
+ * When CLERK_SECRET_KEY is present, creates real Clerk users so Maestro flows
+ * can sign in via the app's Clerk-powered login UI. When absent (e.g., unit
+ * tests), falls back to generating fake `clerk_seed_*` IDs.
  */
-import { like } from 'drizzle-orm';
+import { like, inArray, or } from 'drizzle-orm';
 import {
   accounts,
   profiles,
@@ -35,6 +39,12 @@ import {
 /** Prefix used for all seed-created Clerk user IDs */
 export const SEED_CLERK_PREFIX = 'clerk_seed_';
 
+/** Standard test password for all seed-created Clerk users */
+const SEED_PASSWORD = 'TestPass123!';
+
+/** Clerk REST API base URL */
+const CLERK_API_BASE = 'https://api.clerk.com/v1';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -49,17 +59,117 @@ export type SeedScenario =
   | 'trial-expired'
   | 'multi-subject';
 
+/** Environment bindings needed by the seed service */
+export interface SeedEnv {
+  /** Clerk secret key for Backend API calls. Optional — falls back to fake IDs. */
+  CLERK_SECRET_KEY?: string;
+}
+
 export interface SeedResult {
   scenario: SeedScenario;
   accountId: string;
   profileId: string;
   email: string;
+  /** Password for Clerk sign-in. Present when Clerk user was created. */
+  password: string;
   /** Additional IDs specific to the scenario */
   ids: Record<string, string>;
 }
 
 export interface ResetResult {
   deletedCount: number;
+  clerkUsersDeleted: number;
+}
+
+// ---------------------------------------------------------------------------
+// Clerk REST API helpers
+// ---------------------------------------------------------------------------
+
+interface ClerkUser {
+  id: string;
+  email_addresses: Array<{ email_address: string }>;
+}
+
+/**
+ * Creates a real Clerk user via the Backend API.
+ * Returns the Clerk user ID (e.g., `user_2abc...`).
+ *
+ * If CLERK_SECRET_KEY is not set, generates a fake `clerk_seed_*` ID instead.
+ */
+async function createClerkTestUser(
+  email: string,
+  env: SeedEnv
+): Promise<{ clerkUserId: string; password: string }> {
+  if (!env.CLERK_SECRET_KEY) {
+    // Fallback for environments without Clerk (unit tests, CI without secrets)
+    return {
+      clerkUserId: `${SEED_CLERK_PREFIX}${generateUUIDv7()}`,
+      password: SEED_PASSWORD,
+    };
+  }
+
+  const res = await fetch(`${CLERK_API_BASE}/users`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email_address: [email],
+      password: SEED_PASSWORD,
+      skip_password_checks: true,
+      // Mark as test user with external_id for cleanup
+      external_id: `${SEED_CLERK_PREFIX}${generateUUIDv7()}`,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Clerk user creation failed (${res.status}): ${body}`);
+  }
+
+  const user = (await res.json()) as ClerkUser;
+  return { clerkUserId: user.id, password: SEED_PASSWORD };
+}
+
+/**
+ * Deletes all Clerk users that were created by the seed service.
+ * Identifies seed users by external_id prefix `clerk_seed_`.
+ * Returns the Clerk user IDs that were deleted (for DB cleanup).
+ */
+async function deleteClerkTestUsers(
+  env: SeedEnv
+): Promise<{ count: number; clerkUserIds: string[] }> {
+  if (!env.CLERK_SECRET_KEY) return { count: 0, clerkUserIds: [] };
+
+  // List users with our seed prefix in external_id
+  const listRes = await fetch(
+    `${CLERK_API_BASE}/users?external_id_prefix=${encodeURIComponent(
+      SEED_CLERK_PREFIX
+    )}&limit=100`,
+    {
+      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+    }
+  );
+
+  if (!listRes.ok) return { count: 0, clerkUserIds: [] };
+
+  const users = (await listRes.json()) as ClerkUser[];
+  let deleted = 0;
+  const deletedIds: string[] = [];
+
+  for (const user of users) {
+    const delRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+    });
+    if (delRes.ok) {
+      deleted++;
+      deletedIds.push(user.id);
+    }
+  }
+
+  return { count: deleted, clerkUserIds: deletedIds };
 }
 
 // ---------------------------------------------------------------------------
@@ -154,11 +264,18 @@ async function createSubjectWithCurriculum(
 // Scenario Seeders
 // ---------------------------------------------------------------------------
 
+type SeederFn = (
+  db: Database,
+  email: string,
+  env: SeedEnv
+) => Promise<SeedResult>;
+
 async function seedOnboardingComplete(
   db: Database,
-  email: string
+  email: string,
+  env: SeedEnv
 ): Promise<SeedResult> {
-  const clerkUserId = `${SEED_CLERK_PREFIX}${generateUUIDv7()}`;
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Learner',
@@ -179,15 +296,17 @@ async function seedOnboardingComplete(
     accountId,
     profileId,
     email,
+    password,
     ids: {},
   };
 }
 
 async function seedLearningActive(
   db: Database,
-  email: string
+  email: string,
+  env: SeedEnv
 ): Promise<SeedResult> {
-  const clerkUserId = `${SEED_CLERK_PREFIX}${generateUUIDv7()}`;
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Active Learner',
@@ -240,15 +359,17 @@ async function seedLearningActive(
     accountId,
     profileId,
     email,
+    password,
     ids: { subjectId, sessionId, topicId: topicIds[0] },
   };
 }
 
 async function seedRetentionDue(
   db: Database,
-  email: string
+  email: string,
+  env: SeedEnv
 ): Promise<SeedResult> {
-  const clerkUserId = `${SEED_CLERK_PREFIX}${generateUUIDv7()}`;
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Review Learner',
@@ -280,15 +401,17 @@ async function seedRetentionDue(
     accountId,
     profileId,
     email,
+    password,
     ids: { subjectId, retentionCardId: cardValues[0].id },
   };
 }
 
 async function seedFailedRecall3x(
   db: Database,
-  email: string
+  email: string,
+  env: SeedEnv
 ): Promise<SeedResult> {
-  const clerkUserId = `${SEED_CLERK_PREFIX}${generateUUIDv7()}`;
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Struggling Learner',
@@ -344,15 +467,17 @@ async function seedFailedRecall3x(
     accountId,
     profileId,
     email,
+    password,
     ids: { subjectId, topicId: targetTopicId },
   };
 }
 
 async function seedParentWithChildren(
   db: Database,
-  email: string
+  email: string,
+  env: SeedEnv
 ): Promise<SeedResult> {
-  const clerkUserId = `${SEED_CLERK_PREFIX}${generateUUIDv7()}`;
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
   // Parent profile
@@ -410,15 +535,17 @@ async function seedParentWithChildren(
     accountId,
     profileId: parentProfileId,
     email,
+    password,
     ids: { parentProfileId, childProfileId, subjectId, sessionId },
   };
 }
 
 async function seedTrialActive(
   db: Database,
-  email: string
+  email: string,
+  env: SeedEnv
 ): Promise<SeedResult> {
-  const clerkUserId = `${SEED_CLERK_PREFIX}${generateUUIDv7()}`;
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Trial User',
@@ -449,15 +576,17 @@ async function seedTrialActive(
     accountId,
     profileId,
     email,
+    password,
     ids: { subscriptionId },
   };
 }
 
 async function seedTrialExpired(
   db: Database,
-  email: string
+  email: string,
+  env: SeedEnv
 ): Promise<SeedResult> {
-  const clerkUserId = `${SEED_CLERK_PREFIX}${generateUUIDv7()}`;
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Expired Trial User',
@@ -488,15 +617,17 @@ async function seedTrialExpired(
     accountId,
     profileId,
     email,
+    password,
     ids: { subscriptionId },
   };
 }
 
 async function seedMultiSubject(
   db: Database,
-  email: string
+  email: string,
+  env: SeedEnv
 ): Promise<SeedResult> {
-  const clerkUserId = `${SEED_CLERK_PREFIX}${generateUUIDv7()}`;
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Multi-Subject Learner',
@@ -529,6 +660,7 @@ async function seedMultiSubject(
     accountId,
     profileId,
     email,
+    password,
     ids: { activeSubjectId, pausedSubjectId, archivedSubjectId },
   };
 }
@@ -537,10 +669,7 @@ async function seedMultiSubject(
 // Public API
 // ---------------------------------------------------------------------------
 
-const SCENARIO_MAP: Record<
-  SeedScenario,
-  (db: Database, email: string) => Promise<SeedResult>
-> = {
+const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'onboarding-complete': seedOnboardingComplete,
   'learning-active': seedLearningActive,
   'retention-due': seedRetentionDue,
@@ -556,22 +685,38 @@ export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];
 export async function seedScenario(
   db: Database,
   scenario: SeedScenario,
-  email: string
+  email: string,
+  env: SeedEnv = {}
 ): Promise<SeedResult> {
   const seeder = SCENARIO_MAP[scenario];
   if (!seeder) {
     throw new Error(`Unknown scenario: ${scenario}`);
   }
-  return seeder(db, email);
+  return seeder(db, email, env);
 }
 
-export async function resetDatabase(db: Database): Promise<ResetResult> {
-  // Only delete accounts created by the seed service (clerk_seed_* prefix).
+export async function resetDatabase(
+  db: Database,
+  env: SeedEnv = {}
+): Promise<ResetResult> {
+  // Delete Clerk test users first (before DB cleanup removes the mapping).
+  // Collects real Clerk user IDs so we can also delete their DB accounts.
+  const { count: clerkUsersDeleted, clerkUserIds } = await deleteClerkTestUsers(
+    env
+  );
+
+  // Build WHERE clause: match fake clerk_seed_* IDs OR real Clerk user IDs
+  // that were created by the seed service.
+  const conditions = [like(accounts.clerkUserId, `${SEED_CLERK_PREFIX}%`)];
+  if (clerkUserIds.length > 0) {
+    conditions.push(inArray(accounts.clerkUserId, clerkUserIds));
+  }
+
   // Child tables (profiles, subjects, sessions, etc.) cascade automatically.
   const deleted = await db
     .delete(accounts)
-    .where(like(accounts.clerkUserId, `${SEED_CLERK_PREFIX}%`))
+    .where(or(...conditions))
     .returning({ id: accounts.id });
 
-  return { deletedCount: deleted.length };
+  return { deletedCount: deleted.length, clerkUsersDeleted };
 }

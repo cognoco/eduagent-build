@@ -209,15 +209,17 @@ output(JSON.stringify(data));
 
 The following screens/components need `testID` props added before flows can target them:
 
-| Component | Missing testIDs | Priority |
-|-----------|----------------|----------|
-| `RecallCheckScreen` (if exists) | `recall-question`, `recall-answer-input`, `recall-submit` | Tier 1 (Retention flow) |
-| `RetentionCard` (in recall list) | `retention-card-*`, `review-now-button` | Tier 1 |
-| Interleaved session components | `interleaved-topic-*`, `interleaved-answer` | Tier 2 |
-| Subscription/billing screens | `subscribe-button`, `plan-card-*`, `trial-banner` | Tier 2 |
-| Streak display | `streak-count`, `streak-badge` | Tier 2 |
+| Component | Missing testIDs | Priority | Status |
+|-----------|----------------|----------|--------|
+| `RecallCheckScreen` | `recall-test-screen` (wrapper), `recall-messages` (via ChatShell `messagesTestID`). Uses `chat-input` + `send-button` from ChatShell. | Tier 1 (Retention flow) | **DONE** |
+| `RetentionSignal` | `retention-signal-{status}` (e.g., `retention-signal-strong`, `retention-signal-fading`) | Tier 1 | **DONE** |
+| `TopicDetailScreen` retention section | `retention-card` (retention info card) | Tier 1 | **DONE** |
+| `ChatShell` | `chat-messages` (default) or custom via `messagesTestID` prop | Tier 1 | **DONE** |
+| Interleaved session components | `interleaved-topic-*`, `interleaved-answer` | Tier 2 | Pending |
+| Subscription/billing screens | `subscribe-button`, `plan-card-*`, `trial-banner` | Tier 2 | Pending |
+| Streak display | `streak-count`, `streak-badge` | Tier 2 | Pending |
 
-> **Action:** Add missing testIDs as part of each flow's implementation story. Don't pre-add them all — add as needed per flow.
+> **Action:** Add remaining Tier 2 testIDs as part of each flow's implementation story.
 
 ---
 

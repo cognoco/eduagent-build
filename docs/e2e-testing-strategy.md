@@ -474,7 +474,7 @@ Progress as of 2026-02-26:
 2. **Inngest chain integration tests** — **DONE.** `session-completed-chain.integration.test.ts` validates all 6 steps, error isolation, skip logic, and FR92 interleaved topics.
 3. **Maestro setup** — **DONE.** `apps/mobile/e2e/` with `config.yaml`, `scripts/seed.js` (GraalJS), `_setup/seed-and-sign-in.yaml`, `_setup/sign-out.yaml`, Nx `e2e` target with smoke configuration, and 10 total YAML flows (4 existing + 2 setup + 4 Tier 1 smoke).
 4. **CI wiring** — **DONE.** `.github/workflows/e2e-ci.yml` with PostgreSQL service container for both jobs, API server background startup + health check for mobile-maestro job. Advisory mode (`continue-on-error: true`).
-5. **Smoke suite buildout** — **DONE.** 4 Tier 1 smoke flows written: `onboarding/sign-up-flow.yaml` (S1), `learning/first-session.yaml` (S2), `learning/core-learning.yaml` (S3), `retention/recall-review.yaml` (S4). Blocker: Clerk test user creation not yet in seed service; recall testIDs (`recall-question`, `recall-answer-input`, `recall-submit`) not yet added to mobile screens.
+5. **Smoke suite buildout** — **DONE.** 4 Tier 1 smoke flows written: `onboarding/sign-up-flow.yaml` (S1), `learning/first-session.yaml` (S2), `learning/core-learning.yaml` (S3), `retention/recall-review.yaml` (S4). Recall testIDs resolved: `recall-test-screen` (wrapper), `recall-messages` (ChatShell `messagesTestID`), re-uses `chat-input`/`send-button`. Remaining blocker: Clerk test user creation not yet in seed service.
 6. **Nightly full suite** — TODO. Add scheduled workflow, Tier 2 flows, reporting.
 
 ---
