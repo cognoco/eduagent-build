@@ -7,17 +7,20 @@ jest.mock('expo/src/winter/ImportMetaRegistry', () => ({
 }));
 
 jest.mock('react-native-reanimated', () => {
-  const { View } = require('react-native');
+  const { View, Text } = require('react-native');
+  const chainable = { delay: () => chainable, duration: () => chainable };
   return {
     __esModule: true,
-    default: { View, Text: View, ScrollView: View },
-    FadeInUp: { delay: () => ({ duration: () => ({}) }), duration: () => ({}) },
-    FadeOutDown: { duration: () => ({}) },
+    default: { View, Text, ScrollView: View },
+    FadeIn: chainable,
+    FadeInUp: chainable,
+    FadeOutDown: chainable,
     useAnimatedStyle: () => ({}),
     useSharedValue: (v: unknown) => ({ value: v }),
     withTiming: (v: unknown) => v,
     withSpring: (v: unknown) => v,
     withRepeat: (v: unknown) => v,
+    withSequence: (v: unknown) => v,
     cancelAnimation: () => undefined,
   };
 });

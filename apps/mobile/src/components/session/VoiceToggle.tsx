@@ -21,7 +21,7 @@ export function VoiceToggle({ isVoiceEnabled, onToggle }: VoiceToggleProps) {
       onPress={onToggle}
       className="p-2 min-h-[44px] min-w-[44px] items-center justify-center"
       accessibilityLabel={isVoiceEnabled ? 'Mute AI voice' : 'Unmute AI voice'}
-      accessibilityRole="button"
+      accessibilityRole="switch"
       accessibilityState={{ checked: isVoiceEnabled }}
       testID="voice-toggle"
     >

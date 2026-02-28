@@ -155,7 +155,7 @@ jobs:
         working-directory: apps/mobile
         run: |
           mkdir -p android/app/src/main/assets
-          npx expo export:embed \
+          node ../../node_modules/@expo/cli/build/bin/cli export:embed \
             --platform android \
             --dev false \
             --entry-file index.js \

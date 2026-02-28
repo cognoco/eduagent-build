@@ -121,6 +121,7 @@ describe('ParentDashboardSummary', () => {
 
     expect(screen.getByText('Alex')).toBeTruthy();
     expect(screen.queryByText('Mathematics')).toBeNull();
+    expect(screen.getByTestId('aggregate-signal-empty')).toBeTruthy();
   });
 
   it('renders retention trend badge when improving', () => {
@@ -150,9 +151,66 @@ describe('ParentDashboardSummary', () => {
     expect(screen.getByText(/Stable/)).toBeTruthy();
   });
 
-  it('does not render retention trend when not provided', () => {
+  it('shows "No data yet" when retention trend not provided', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
     expect(screen.queryByTestId('retention-trend-badge')).toBeNull();
+    expect(screen.getByTestId('retention-trend-empty')).toBeTruthy();
+  });
+
+  it('renders "Needs Attention" aggregate signal when any subject is fading', () => {
+    render(<ParentDashboardSummary {...defaultProps} />);
+
+    expect(screen.getByTestId('aggregate-signal')).toBeTruthy();
+    expect(screen.getByText('Needs Attention')).toBeTruthy();
+  });
+
+  it('renders "On Track" aggregate signal when all subjects are strong', () => {
+    render(
+      <ParentDashboardSummary
+        {...defaultProps}
+        subjects={[
+          { name: 'Mathematics', retentionStatus: 'strong' },
+          { name: 'Science', retentionStatus: 'strong' },
+        ]}
+      />
+    );
+
+    expect(screen.getByTestId('aggregate-signal')).toBeTruthy();
+    expect(screen.getByText('On Track')).toBeTruthy();
+  });
+
+  it('renders "Falling Behind" aggregate signal when any subject is weak', () => {
+    render(
+      <ParentDashboardSummary
+        {...defaultProps}
+        subjects={[
+          { name: 'Mathematics', retentionStatus: 'strong' },
+          { name: 'Science', retentionStatus: 'weak' },
+        ]}
+      />
+    );
+
+    expect(screen.getByTestId('aggregate-signal')).toBeTruthy();
+    expect(screen.getByText('Falling Behind')).toBeTruthy();
+  });
+
+  it('renders "Falling Behind" aggregate signal when any subject is forgotten', () => {
+    render(
+      <ParentDashboardSummary
+        {...defaultProps}
+        subjects={[{ name: 'Mathematics', retentionStatus: 'forgotten' }]}
+      />
+    );
+
+    expect(screen.getByTestId('aggregate-signal')).toBeTruthy();
+    expect(screen.getByText('Falling Behind')).toBeTruthy();
+  });
+
+  it('renders "No data yet" for aggregate signal when no subjects', () => {
+    render(<ParentDashboardSummary {...defaultProps} subjects={[]} />);
+
+    expect(screen.getByTestId('aggregate-signal-empty')).toBeTruthy();
+    expect(screen.queryByTestId('aggregate-signal')).toBeNull();
   });
 });

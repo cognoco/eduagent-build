@@ -19,6 +19,10 @@ import {
   incrementSummarySkips,
   resetSummarySkips,
 } from '../../services/settings';
+import {
+  processEvaluateCompletion,
+  processTeachBackCompletion,
+} from '../../services/verification-completion';
 import { captureException } from '../../services/sentry';
 
 // ---------------------------------------------------------------------------
@@ -64,6 +68,7 @@ export const sessionCompleted = inngest.createFunction(
       summaryStatus,
       timestamp,
       interleavedTopicIds,
+      verificationType,
     } = event.data;
 
     const outcomes: StepOutcome[] = [];
@@ -111,6 +116,49 @@ export const sessionCompleted = inngest.createFunction(
             await updateNeedsDeepeningProgress(db, profileId, tid, quality);
           }
         });
+      })
+    );
+
+    // Step 1c: Process verification-specific completion (EVALUATE / TEACH_BACK)
+    // Parses structured assessment from LLM output, maps to SM-2 quality,
+    // and stores in session_events for audit trail + downstream features.
+    outcomes.push(
+      await step.run('process-verification-completion', async () => {
+        const vType = verificationType as string | null | undefined;
+        if (!vType || (vType !== 'evaluate' && vType !== 'teach_back')) {
+          return {
+            step: 'process-verification-completion',
+            status: 'skipped' as const,
+          };
+        }
+        if (!topicId) {
+          return {
+            step: 'process-verification-completion',
+            status: 'skipped' as const,
+          };
+        }
+        return runIsolated(
+          'process-verification-completion',
+          profileId,
+          async () => {
+            const db = getStepDatabase();
+            if (vType === 'evaluate') {
+              await processEvaluateCompletion(
+                db,
+                profileId,
+                sessionId,
+                topicId
+              );
+            } else {
+              await processTeachBackCompletion(
+                db,
+                profileId,
+                sessionId,
+                topicId
+              );
+            }
+          }
+        );
       })
     );
 

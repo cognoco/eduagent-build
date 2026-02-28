@@ -167,7 +167,7 @@ describe('TopicDetailScreen', () => {
 
     render(<TopicDetailScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByText('Needs deepening')).toBeTruthy();
+    expect(screen.getByText('Exploring further')).toBeTruthy();
   });
 
   it('navigates back on back button press', () => {
