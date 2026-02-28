@@ -170,29 +170,30 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
   });
 
   // -----------------------------------------------------------------------
-  // Happy path — all 6 steps execute successfully
+  // Happy path — all 7 steps execute successfully
   // -----------------------------------------------------------------------
 
-  it('executes all 6 steps and returns completed status', async () => {
+  it('executes all 7 steps and returns completed status', async () => {
     const result = await executeChain(createEventData());
 
     expect(result.status).toBe('completed');
     expect(result.sessionId).toBe('session-int-001');
-    expect(result.outcomes).toHaveLength(6);
+    expect(result.outcomes).toHaveLength(7);
 
     const stepNames = result.outcomes.map((o) => o.step);
     expect(stepNames).toEqual([
       'update-retention',
       'update-needs-deepening',
+      'process-verification-completion',
       'write-coaching-card',
       'update-dashboard',
       'generate-embeddings',
       'track-summary-skips',
     ]);
 
-    // All steps should be 'ok'
+    // All steps should be 'ok' or 'skipped' (verification skipped when no verificationType)
     for (const outcome of result.outcomes) {
-      expect(outcome.status).toBe('ok');
+      expect(['ok', 'skipped']).toContain(outcome.status);
     }
   });
 
@@ -323,12 +324,12 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
     expect(embeddingOutcome?.status).toBe('failed');
     expect(embeddingOutcome?.error).toContain('Voyage AI unavailable');
 
-    // Other steps should still be 'ok'
+    // Other steps should still be 'ok' or 'skipped'
     const otherSteps = result.outcomes.filter(
       (o) => o.step !== 'generate-embeddings'
     );
     for (const step of otherSteps) {
-      expect(step.status).toBe('ok');
+      expect(['ok', 'skipped']).toContain(step.status);
     }
 
     // Sentry should have captured the error
