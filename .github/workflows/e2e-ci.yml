@@ -149,6 +149,8 @@ jobs:
       # Bundle JS into the APK so the app works without a Metro dev server.
       # Debug builds normally fetch JS from Metro at runtime, but in CI
       # there is no Metro server. Pre-bundling embeds the JS in the APK.
+      # --config points at the Expo-based Metro config (avoids missing
+      # @react-native/metro-config error).
       - name: Bundle JS for offline APK
         working-directory: apps/mobile
         run: |
@@ -157,6 +159,7 @@ jobs:
             --platform android \
             --dev false \
             --entry-file index.js \
+            --config metro.config.js \
             --bundle-output android/app/src/main/assets/index.android.bundle \
             --assets-dest android/app/src/main/res
 
