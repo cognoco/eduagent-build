@@ -35,6 +35,8 @@ import { getSubject } from './subject';
 import { fetchPriorTopics, buildPriorLearningContext } from './prior-learning';
 import { retrieveRelevantMemory } from './memory';
 import { getTeachingPreference } from './retention-data';
+import { shouldTriggerEvaluate } from './evaluate';
+import { shouldTriggerTeachBack } from './teach-back';
 import type { EscalationRung } from './llm';
 
 // ---------------------------------------------------------------------------
@@ -49,6 +51,7 @@ function mapSessionRow(
     subjectId: row.subjectId,
     topicId: row.topicId ?? null,
     sessionType: row.sessionType,
+    verificationType: (row.verificationType as 'standard' | 'evaluate' | 'teach_back') ?? null,
     status: row.status,
     escalationRung: row.escalationRung,
     exchangeCount: row.exchangeCount,
@@ -109,6 +112,7 @@ export async function startSession(
       subjectId,
       topicId: input.topicId ?? null,
       sessionType: input.sessionType ?? 'learning',
+      verificationType: input.verificationType ?? null,
       status: 'active',
       escalationRung: 1,
       exchangeCount: 0,
@@ -239,6 +243,25 @@ async function prepareExchangeContext(
   const [profile] = profileRows;
   const retentionCard = retentionRows[0];
 
+  // Determine verification type: explicit from session, or auto-select from retention card
+  let verificationType: 'standard' | 'evaluate' | 'teach_back' | undefined;
+  if (session.verificationType && session.verificationType !== 'standard') {
+    verificationType = session.verificationType as 'evaluate' | 'teach_back';
+  } else if (retentionCard && !isInterleaved && session.sessionType === 'learning') {
+    const ease = Number(retentionCard.easeFactor);
+    const reps = retentionCard.repetitions;
+    if (shouldTriggerEvaluate(ease, reps)) {
+      verificationType = 'evaluate';
+    } else if (shouldTriggerTeachBack(ease, reps)) {
+      verificationType = 'teach_back';
+    }
+  }
+
+  // Load evaluateDifficultyRung from retention card for evaluate sessions
+  const evaluateDifficultyRung = verificationType === 'evaluate' && retentionCard
+    ? ((retentionCard.evaluateDifficultyRung ?? 1) as 1 | 2 | 3 | 4)
+    : undefined;
+
   // FR92: Resolve interleaved topic details (titles + descriptions)
   let interleavedTopics: ExchangeContext['interleavedTopics'];
   if (isInterleaved && metadataRows[0]?.metadata) {
@@ -343,6 +366,8 @@ async function prepareExchangeContext(
     teachingPreference: teachingPref?.method,
     analogyDomain: teachingPref?.analogyDomain ?? undefined,
     interleavedTopics,
+    verificationType,
+    evaluateDifficultyRung,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };

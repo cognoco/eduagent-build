@@ -48,6 +48,8 @@ import {
   getTeachingPreference,
   setTeachingPreference,
   deleteTeachingPreference,
+  getAnalogyDomain,
+  setAnalogyDomain,
   updateNeedsDeepeningProgress,
   updateRetentionFromSession,
   evaluateRecallQuality,
@@ -815,6 +817,81 @@ describe('deleteTeachingPreference', () => {
     const db = createMockDb();
     await deleteTeachingPreference(db, profileId, subjectId);
     expect(db.delete).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getAnalogyDomain / setAnalogyDomain (FR134-137)
+// ---------------------------------------------------------------------------
+
+describe('getAnalogyDomain', () => {
+  it('returns null when no preference exists', async () => {
+    const db = createMockDb();
+    const result = await getAnalogyDomain(db, profileId, subjectId);
+    expect(result).toBeNull();
+  });
+
+  it('returns analogy domain when set', async () => {
+    const db = createMockDb();
+    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
+      id: 'pref-1',
+      profileId,
+      subjectId,
+      method: 'step_by_step',
+      analogyDomain: 'cooking',
+    });
+    const result = await getAnalogyDomain(db, profileId, subjectId);
+    expect(result).toBe('cooking');
+  });
+
+  it('returns null when preference exists but no analogy domain', async () => {
+    const db = createMockDb();
+    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
+      id: 'pref-1',
+      profileId,
+      subjectId,
+      method: 'step_by_step',
+      analogyDomain: null,
+    });
+    const result = await getAnalogyDomain(db, profileId, subjectId);
+    expect(result).toBeNull();
+  });
+});
+
+describe('setAnalogyDomain', () => {
+  it('inserts new preference with default method when none exists', async () => {
+    const db = createMockDb();
+    const result = await setAnalogyDomain(db, profileId, subjectId, 'sports');
+    expect(result).toBe('sports');
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('updates existing preference', async () => {
+    const db = createMockDb();
+    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
+      id: 'pref-1',
+      profileId,
+      subjectId,
+      method: 'visual_diagrams',
+      analogyDomain: 'cooking',
+    });
+    const result = await setAnalogyDomain(db, profileId, subjectId, 'gaming');
+    expect(result).toBe('gaming');
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it('clears analogy domain when null passed', async () => {
+    const db = createMockDb();
+    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
+      id: 'pref-1',
+      profileId,
+      subjectId,
+      method: 'step_by_step',
+      analogyDomain: 'music',
+    });
+    const result = await setAnalogyDomain(db, profileId, subjectId, null);
+    expect(result).toBeNull();
+    expect(db.update).toHaveBeenCalled();
   });
 });
 

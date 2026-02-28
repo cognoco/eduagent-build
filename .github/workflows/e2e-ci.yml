@@ -146,7 +146,15 @@ jobs:
         working-directory: apps/mobile
         run: npx expo prebuild --platform android --no-install
 
-      # Compile debug APK via Gradle
+      # Enable JS bundling for debug builds. Debug APKs normally fetch JS
+      # from a Metro dev server at runtime, but in CI there is no Metro.
+      # Injecting `bundleInDebug = true` makes Gradle run `expo export:embed`
+      # with the correct entry file resolution, embedding the JS in the APK.
+      - name: Enable debug JS bundling
+        working-directory: apps/mobile
+        run: sed -i 's/react {/react {\n        bundleInDebug = true/' android/app/build.gradle
+
+      # Compile debug APK via Gradle (now bundles JS via export:embed)
       - name: Build debug APK
         working-directory: apps/mobile/android
         run: ./gradlew assembleDebug --no-daemon --stacktrace

@@ -1,3 +1,4 @@
+#!/usr/bin/env sh
 pnpm exec lint-staged
 
 # Surgical tests — only tests related to staged files (see scripts/pre-commit-tests.sh)

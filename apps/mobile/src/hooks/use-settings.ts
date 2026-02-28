@@ -5,7 +5,11 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import type { NotificationPrefsInput, LearningMode } from '@eduagent/schemas';
+import type {
+  NotificationPrefsInput,
+  LearningMode,
+  AnalogyDomain,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 
@@ -150,6 +154,55 @@ export function useNotifyParentSubscribe(): UseMutationResult<
       const res = await client.settings['notify-parent-subscribe'].$post();
       const data = await res.json();
       return data as ParentSubscribeResult;
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Analogy Domain (FR134-137)
+// ---------------------------------------------------------------------------
+
+export function useAnalogyDomain(
+  subjectId: string
+): UseQueryResult<AnalogyDomain | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['settings', 'analogy-domain', activeProfile?.id, subjectId],
+    queryFn: async () => {
+      const res = await client.settings.subjects[':subjectId'][
+        'analogy-domain'
+      ].$get({ param: { subjectId } });
+      const data = await res.json();
+      return data.analogyDomain as AnalogyDomain | null;
+    },
+    enabled: !!activeProfile && !!subjectId,
+  });
+}
+
+export function useUpdateAnalogyDomain(
+  subjectId: string
+): UseMutationResult<AnalogyDomain | null, Error, AnalogyDomain | null> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
+
+  return useMutation({
+    mutationFn: async (analogyDomain: AnalogyDomain | null) => {
+      const res = await client.settings.subjects[':subjectId'][
+        'analogy-domain'
+      ].$put({
+        param: { subjectId },
+        json: { analogyDomain },
+      });
+      const data = await res.json();
+      return data.analogyDomain as AnalogyDomain | null;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['settings', 'analogy-domain', activeProfile?.id, subjectId],
+      });
     },
   });
 }
