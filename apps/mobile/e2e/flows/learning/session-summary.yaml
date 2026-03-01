@@ -1,0 +1,134 @@
+# Flow: Session Summary — Full submission with AI feedback
+# Validates: session close → summary screen → write summary → AI feedback → return home.
+# Tags: nightly, learning, summary
+#
+# Journey: UX Journey 2 (Daily Learning Loop)
+# Epics: Epic 2 (FR41 — Session Close Summary)
+# Prerequisite: Seeded user with subject + coaching card (scenario: learning-active)
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(learner)/session/index.tsx
+#   - apps/mobile/src/app/session-summary/[sessionId].tsx
+appId: com.mentomate.app
+tags:
+  - nightly
+  - learning
+  - summary
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+# 2. Home screen
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Start session via coaching card
+- tapOn:
+    id: "coaching-card-primary"
+
+# 4. Session active — chat input present
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 10000
+
+# 5. Exchange 1: opening question
+- tapOn:
+    id: "chat-input"
+- inputText: "Explain the concept to me"
+- tapOn:
+    id: "send-button"
+
+# 6. Wait for AI response
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+# 7. Exchange 2: follow-up
+- tapOn:
+    id: "chat-input"
+- inputText: "Can you give me an example of how this works?"
+- tapOn:
+    id: "send-button"
+
+# 8. Wait for AI response
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+# 9. Exchange 3: confirm understanding
+- tapOn:
+    id: "chat-input"
+- inputText: "That makes sense, thank you"
+- tapOn:
+    id: "send-button"
+
+# 10. Wait for AI response — end-session button appears after first exchange
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+# 11. Tap end-session button (testID: end-session-button)
+- tapOn:
+    id: "end-session-button"
+
+# 12. Confirm the end session alert — tap "End Session" button in the Alert dialog
+- tapOn:
+    text: "End Session"
+
+# 13. Wait for session summary screen to load
+- extendedWaitUntil:
+    visible:
+      id: "summary-title"
+    timeout: 20000
+
+# 14. Screenshot: summary screen before writing
+- takeScreenshot: session-summary-screen
+
+# 15. Verify session takeaways are visible
+- assertVisible:
+    id: "session-takeaways"
+
+# 16. Tap summary input and write a summary
+- tapOn:
+    id: "summary-input"
+- inputText: "I learned about the key concepts and how they apply in practice"
+
+# 17. Tap submit summary button
+- tapOn:
+    id: "submit-summary-button"
+
+# 18. Wait for AI feedback (the mutation submits and returns feedback)
+- extendedWaitUntil:
+    visible:
+      id: "ai-feedback"
+    timeout: 20000
+
+# 19. Verify summary-submitted state is showing
+- assertVisible:
+    id: "summary-submitted"
+
+# 20. Screenshot: summary with AI feedback
+- takeScreenshot: session-summary-feedback
+
+# 21. Tap continue button to return home
+- tapOn:
+    id: "continue-button"
+
+# 22. Verify we returned to home screen
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 10000
+
+# 23. Final screenshot
+- takeScreenshot: session-summary-complete

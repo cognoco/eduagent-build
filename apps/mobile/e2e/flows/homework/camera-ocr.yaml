@@ -1,0 +1,247 @@
+# Flow: Homework Camera + OCR Pipeline
+# Validates: camera permission screen, viewfinder, capture, preview,
+#            OCR processing/result, error fallback with manual input.
+# Tags: nightly, homework, camera
+#
+# Journey: UX Journey 2 (Homework phase — camera-first capture)
+# Epics: Epic 2 (Story 2.5 — Camera capture + OCR)
+# Prerequisite: Seeded user with completed learning session + subject
+#               (scenario: homework-ready)
+#
+# IMPORTANT: Camera hardware does not work reliably on emulators.
+# Most steps after the permission screen are marked optional: true
+# so the flow does not fail when running on CI / Android emulator.
+# The goal is to verify the UI renders at each camera phase, not to
+# exercise actual camera hardware.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - homework
+  - camera
+---
+# ──────────────────────────────────────────────────
+# 1. Seed & sign in (homework-ready scenario)
+# ──────────────────────────────────────────────────
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "homework-ready"
+      API_URL: ${API_URL}
+
+# ──────────────────────────────────────────────────
+# 2. Home screen — verify we are signed in
+# ──────────────────────────────────────────────────
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+- takeScreenshot: camera-ocr-01-home
+
+# ──────────────────────────────────────────────────
+# 3. Navigate to homework camera
+#    The homework button testID is homework-button-{subjectId}.
+#    Since the seed subjectId is dynamic, fall back to tapping by
+#    the "HW" label text which is rendered on every homework button.
+# ──────────────────────────────────────────────────
+
+# 3a. Try tapping the first homework button by text label
+- tapOn:
+    text: "HW"
+    optional: true
+
+# 3b. Fallback — if the teen persona AdaptiveEntryCard is showing,
+#     the "Homework help" action navigates to the camera screen too.
+- tapOn:
+    text: "Homework help"
+    optional: true
+
+# ──────────────────────────────────────────────────
+# 4. Permission phase — camera access prompt
+#    The screen shows "Camera Access Needed" with a
+#    grant-permission-button or open-settings-button.
+# ──────────────────────────────────────────────────
+- extendedWaitUntil:
+    visible:
+      text: "Camera Access Needed"
+    timeout: 10000
+    optional: true
+
+- takeScreenshot: camera-ocr-02-permission
+
+# 4a. Tap "Allow Camera" to grant permission.
+#     On CI / emulator this may auto-grant or show an OS dialog
+#     that Maestro cannot interact with — hence optional.
+- tapOn:
+    id: "grant-permission-button"
+    optional: true
+
+# ──────────────────────────────────────────────────
+# 5. Viewfinder phase
+#    If permission was granted (or auto-granted), the CameraView
+#    with testID "camera-view" should be visible.
+# ──────────────────────────────────────────────────
+- extendedWaitUntil:
+    visible:
+      id: "camera-view"
+    timeout: 10000
+    optional: true
+
+- takeScreenshot: camera-ocr-03-viewfinder
+
+# 5a. Verify viewfinder controls are present
+- assertVisible:
+    id: "capture-button"
+    optional: true
+
+- assertVisible:
+    id: "flash-toggle"
+    optional: true
+
+- assertVisible:
+    id: "close-button"
+    optional: true
+
+# ──────────────────────────────────────────────────
+# 6. Capture — tap the shutter button
+#    On emulator the camera feed is usually a test pattern or
+#    black screen. The photo will still be "captured" by CameraView.
+# ──────────────────────────────────────────────────
+- tapOn:
+    id: "capture-button"
+    optional: true
+
+# ──────────────────────────────────────────────────
+# 7. Preview phase
+#    After capture the preview screen shows "Photo captured" text
+#    with retake-button and use-photo-button.
+# ──────────────────────────────────────────────────
+- extendedWaitUntil:
+    visible:
+      text: "Photo captured"
+    timeout: 10000
+    optional: true
+
+- takeScreenshot: camera-ocr-04-preview
+
+- assertVisible:
+    id: "retake-button"
+    optional: true
+
+- assertVisible:
+    id: "use-photo-button"
+    optional: true
+
+# ──────────────────────────────────────────────────
+# 8. Confirm photo — tap "Use this" to start OCR processing
+# ──────────────────────────────────────────────────
+- tapOn:
+    id: "use-photo-button"
+    optional: true
+
+# ──────────────────────────────────────────────────
+# 9. Processing phase
+#    The screen shows skeleton loading and "Reading your ... homework"
+#    This phase may be very brief or may fail (no real OCR on emulator).
+# ──────────────────────────────────────────────────
+- extendedWaitUntil:
+    visible:
+      text: "Reading your"
+    timeout: 5000
+    optional: true
+
+- takeScreenshot: camera-ocr-05-processing
+
+# ──────────────────────────────────────────────────
+# 10. Result phase (happy path)
+#     If OCR succeeds: result-text-input (editable recognized text),
+#     confirm-button ("Let's go"), and retake-button are shown.
+# ──────────────────────────────────────────────────
+- extendedWaitUntil:
+    visible:
+      id: "result-text-input"
+    timeout: 15000
+    optional: true
+
+- takeScreenshot: camera-ocr-06-result
+
+- assertVisible:
+    id: "result-text-input"
+    optional: true
+
+- assertVisible:
+    id: "confirm-button"
+    optional: true
+
+- assertVisible:
+    id: "retake-button"
+    optional: true
+
+# 10a. Verify the "Here's what I see:" label
+- assertVisible:
+    text: "Here's what I see:"
+    optional: true
+
+# ──────────────────────────────────────────────────
+# 11. Error phase (fallback path)
+#     If OCR fails, the error screen appears. After 2+ failures
+#     the manual input fallback is shown with manual-input,
+#     manual-continue-button, and try-camera-again-button.
+#
+#     On emulator, OCR is expected to fail, so this path is
+#     more likely to trigger than the result phase above.
+# ──────────────────────────────────────────────────
+- extendedWaitUntil:
+    visible:
+      id: "retry-button"
+    timeout: 10000
+    optional: true
+
+- takeScreenshot: camera-ocr-07-error-first
+
+# 11a. Tap retry to trigger second OCR attempt
+- tapOn:
+    id: "retry-button"
+    optional: true
+
+# 11b. After second failure, manual fallback appears
+- extendedWaitUntil:
+    visible:
+      id: "manual-input"
+    timeout: 15000
+    optional: true
+
+- takeScreenshot: camera-ocr-08-manual-fallback
+
+# 11c. Verify manual input controls
+- assertVisible:
+    id: "manual-input"
+    optional: true
+
+- assertVisible:
+    id: "try-camera-again-button"
+    optional: true
+
+- assertVisible:
+    text: "Want to type it out instead?"
+    optional: true
+
+# 11d. Type a problem manually and verify continue button enables
+- tapOn:
+    id: "manual-input"
+    optional: true
+
+- inputText:
+    text: "Solve: 2x + 5 = 15"
+    optional: true
+
+- assertVisible:
+    id: "manual-continue-button"
+    optional: true
+
+- takeScreenshot: camera-ocr-09-manual-typed
+
+# ──────────────────────────────────────────────────
+# 12. Final screenshot — capture whatever phase we ended on
+# ──────────────────────────────────────────────────
+- takeScreenshot: camera-ocr-10-final

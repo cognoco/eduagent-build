@@ -1,0 +1,125 @@
+# Flow A2: Auth Screen Navigation
+# Validates: navigation between all auth screens (sign-in, sign-up,
+# forgot-password) and that each screen renders correctly.
+# Tags: nightly, auth
+#
+# Journey: Auth screen discovery
+# Screens: sign-in → sign-up → sign-in → forgot-password → sign-in
+#
+# This flow does NOT perform actual authentication. It verifies that all
+# auth screens are reachable and that navigation links work correctly.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - auth
+---
+# 1. Launch app with clean state
+- launchApp:
+    clearState: true
+
+# ── Sign-in screen ──────────────────────────────────────────────────
+
+# 2. Wait for auth gate (sign-in screen)
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 15000
+
+# 3. Verify all sign-in screen elements
+- assertVisible: "Sign in to continue learning"
+- assertVisible:
+    id: "google-sso-button"
+- assertVisible:
+    id: "sign-in-email"
+- assertVisible:
+    id: "sign-in-password"
+- assertVisible:
+    id: "sign-in-button"
+- assertVisible:
+    id: "forgot-password-link"
+- assertVisible:
+    id: "sign-up-link"
+
+- takeScreenshot: auth-nav-sign-in
+
+# ── Navigate to sign-up ─────────────────────────────────────────────
+
+# 4. Tap sign-up link
+- tapOn:
+    id: "sign-up-link"
+
+# 5. Verify sign-up screen is visible
+- extendedWaitUntil:
+    visible:
+      text: "Create account"
+    timeout: 5000
+
+- assertVisible: "Start your learning journey"
+- assertVisible:
+    id: "sign-up-email"
+- assertVisible:
+    id: "sign-up-password"
+- assertVisible:
+    id: "sign-up-button"
+- assertVisible:
+    id: "sign-in-link"
+
+- takeScreenshot: auth-nav-sign-up
+
+# ── Navigate back to sign-in ────────────────────────────────────────
+
+# 6. Tap sign-in link on sign-up screen
+- tapOn:
+    id: "sign-in-link"
+
+# 7. Verify back on sign-in screen
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 5000
+
+- assertVisible:
+    id: "sign-in-email"
+- assertVisible:
+    id: "sign-in-button"
+
+# ── Navigate to forgot-password ─────────────────────────────────────
+
+# 8. Tap forgot-password link
+- tapOn:
+    id: "forgot-password-link"
+
+# 9. Verify forgot-password screen is visible
+- extendedWaitUntil:
+    visible:
+      text: "Forgot password?"
+    timeout: 5000
+
+- assertVisible: "We'll send a reset code to your email"
+- assertVisible:
+    id: "forgot-password-email"
+- assertVisible:
+    id: "send-reset-code-button"
+- assertVisible:
+    id: "back-to-sign-in"
+
+- takeScreenshot: auth-nav-forgot-password
+
+# ── Navigate back to sign-in ────────────────────────────────────────
+
+# 10. Tap back-to-sign-in link
+- tapOn:
+    id: "back-to-sign-in"
+
+# 11. Verify back on sign-in screen
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 5000
+
+- assertVisible:
+    id: "sign-in-email"
+- assertVisible:
+    id: "sign-in-button"
+
+- takeScreenshot: auth-nav-back-to-sign-in
