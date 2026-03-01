@@ -153,17 +153,25 @@ jobs:
       # Bundle JS into the APK so the app works without a Metro dev server.
       # Debug builds normally fetch JS from Metro at runtime, but in CI
       # there is no Metro server. Pre-bundling embeds the JS in the APK.
-      # MUST use `npx expo export:embed` (not direct node path) so that
-      # the Expo CLI bootstraps properly — reads app.json, sets
-      # EXPO_ROUTER_APP_ROOT from the expo-router plugin config, and
-      # activates the babel-preset-expo transforms that inline it.
+      #
+      # Key decisions:
+      # - Direct node path (not npx expo): npx resolves to the hoisted
+      #   binary at workspace root, making Metro use the wrong project root.
+      #   The direct path + working-directory keeps cwd = apps/mobile.
+      # - --dev true: production mode (`--dev false`) blocks process.env
+      #   access which expo-router needs for EXPO_ROUTER_APP_ROOT. Since
+      #   this is a debug APK for Maestro smoke tests, dev mode is fine.
+      # - EXPO_ROUTER_APP_ROOT: set from app.json expo-router plugin config
+      #   so Metro's require.context resolves the route tree.
       - name: Bundle JS for offline APK
         working-directory: apps/mobile
+        env:
+          EXPO_ROUTER_APP_ROOT: ./src/app
         run: |
           mkdir -p android/app/src/main/assets
-          npx expo export:embed \
+          node ../../node_modules/@expo/cli/build/bin/cli export:embed \
             --platform android \
-            --dev false \
+            --dev true \
             --entry-file index.js \
             --bundle-output android/app/src/main/assets/index.android.bundle \
             --assets-dest android/app/src/main/res
