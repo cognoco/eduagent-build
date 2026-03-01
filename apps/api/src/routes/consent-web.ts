@@ -92,6 +92,18 @@ function pageLayout(title: string, body: string): string {
 
 export const consentWebRoutes = new Hono<ConsentWebEnv>()
 
+  // Security headers for all consent-web HTML responses
+  .use('*', async (c, next) => {
+    await next();
+    c.header('X-Frame-Options', 'DENY');
+    c.header('X-Content-Type-Options', 'nosniff');
+    c.header(
+      'Content-Security-Policy',
+      "default-src 'self'; style-src 'unsafe-inline'; script-src 'none'"
+    );
+    c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  })
+
   /**
    * GET /consent-page?token=X
    *
