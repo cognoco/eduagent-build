@@ -73,10 +73,10 @@ ENVIRONMENT = "development"
 
 [[kv_namespaces]]
 binding = "SUBSCRIPTION_KV"
-id = "PLACEHOLDER_SUBSCRIPTION_KV_ID"
-preview_id = "PLACEHOLDER_SUBSCRIPTION_KV_PREVIEW_ID"
+id = "dc05e0f9269c43e78dabd5ef984dcd64"
+preview_id = "dc05e0f9269c43e78dabd5ef984dcd64"
 
 [[kv_namespaces]]
 binding = "COACHING_KV"
-id = "PLACEHOLDER_COACHING_KV_ID"
-preview_id = "PLACEHOLDER_COACHING_KV_PREVIEW_ID"
+id = "f5232eccbccf42538f71cba5fa2ac565"
+preview_id = "f5232eccbccf42538f71cba5fa2ac565"
