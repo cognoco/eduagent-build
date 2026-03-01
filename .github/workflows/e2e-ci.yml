@@ -157,6 +157,8 @@ jobs:
       # Expo replaces @react-native/metro-config with @expo/metro-config.
       - name: Bundle JS for offline APK
         working-directory: apps/mobile
+        env:
+          EXPO_ROUTER_APP_ROOT: ./src/app
         run: |
           mkdir -p android/app/src/main/assets
           node ../../node_modules/@expo/cli/build/bin/cli export:embed \
