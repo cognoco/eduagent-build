@@ -48,7 +48,8 @@ export default function HomeScreen() {
   const { data: subjects, isLoading: subjectsLoading } = useSubjects();
   const { data: overallProgress } = useOverallProgress();
   const { data: streak } = useStreaks();
-  const coachingCard = useCoachingCard();
+  const firstSubjectId = subjects?.find((s) => s.status === 'active')?.id;
+  const coachingCard = useCoachingCard(firstSubjectId);
   const { data: subStatus } = useSubscriptionStatus();
   const { persona } = useTheme();
   const { profiles, activeProfile, switchProfile } = useProfile();
@@ -210,7 +211,11 @@ export default function HomeScreen() {
                 {
                   label: 'Just ask something',
                   onPress: () =>
-                    router.push('/(learner)/session?mode=freeform' as never),
+                    router.push(
+                      (firstSubjectId
+                        ? `/(learner)/session?mode=freeform&subjectId=${firstSubjectId}`
+                        : '/(learner)/session?mode=freeform') as never
+                    ),
                 },
               ]}
             />
