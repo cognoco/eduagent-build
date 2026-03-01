@@ -7,7 +7,7 @@
 # Epics: Epic 5 (FR85-FR90)
 # Prerequisite: Seeded parent user with linked children who have sessions
 #               (scenario: parent-with-children)
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - nightly
   - parent

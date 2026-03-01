@@ -7,7 +7,7 @@
 # Epics: Epic 1 (FR10-FR14), Epic 4 (FR70-FR72)
 # Prerequisite: Seeded user with Physics (active), Literature (paused),
 #               Art History (archived) (scenario: multi-subject)
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - nightly
   - subjects

@@ -1,19 +1,19 @@
 {
   "expo": {
-    "name": "EduAgent",
-    "slug": "eduagent",
+    "name": "MentoMate",
+    "slug": "mentomate",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "eduagent",
+    "scheme": "mentomate",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "com.zwizzly.eduagent",
+      "bundleIdentifier": "com.mentomate.app",
       "supportsTablet": true
     },
     "android": {
-      "package": "com.zwizzly.eduagent",
+      "package": "com.mentomate.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0f0f0f"
@@ -38,7 +38,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "EduAgent needs camera access to photograph your homework."
+          "cameraPermission": "MentoMate needs camera access to photograph your homework."
         }
       ],
       "expo-notifications",
@@ -52,15 +52,15 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "EduAgent needs microphone access for voice-based learning."
+          "microphonePermission": "MentoMate needs microphone access for voice-based learning."
         }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": "3a5f3e57-c57c-4b2d-bb78-eec6dbdd13fc"
+        "projectId": "cbb7c7e1-cf56-45f2-9df8-f043bb8bb361"
       }
     },
-    "owner": "zwizzly"
+    "owner": "zuzanka14"
   }
 }

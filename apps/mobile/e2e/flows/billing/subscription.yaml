@@ -6,7 +6,7 @@
 # Journey: UX Journey 5 (Billing & Subscription)
 # Epics: Epic 5 (FR95-FR100)
 # Prerequisite: Seeded user on active trial (scenario: trial-active)
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - nightly
   - billing

@@ -74,7 +74,7 @@ e2e/
      - smoke
      - onboarding
    ```
-5. Keep `appId: com.zwizzly.eduagent` in each flow file, or rely on `config.yaml`.
+5. Keep `appId: com.mentomate.app` in each flow file, or rely on `config.yaml`.
 
 ## Notes
 

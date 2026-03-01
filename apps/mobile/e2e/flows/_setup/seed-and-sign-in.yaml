@@ -16,7 +16,7 @@
 # The seed endpoint creates a real Clerk user (when CLERK_SECRET_KEY is set)
 # and returns the password in the response. Maestro uses these credentials
 # to sign in via the Clerk-powered login UI.
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 ---
 # Step 1: Seed test data via API
 - runScript:

@@ -113,7 +113,7 @@ describe('ProfileProvider', () => {
 
     expect(result.current.activeProfile?.id).toBe('owner-id');
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
-      'eduagent_active_profile_id',
+      'mentomate_active_profile_id',
       'owner-id'
     );
   });
@@ -138,7 +138,7 @@ describe('ProfileProvider', () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(3); // profiles GET + switch POST + invalidation refetch
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
-      'eduagent_active_profile_id',
+      'mentomate_active_profile_id',
       'child-id'
     );
     expect(result.current.activeProfile?.id).toBe('child-id');

@@ -7,7 +7,7 @@
 # Epics: Epic 2 (FR30-FR34, Story 2.5)
 # Prerequisite: Seeded user with completed learning session + subject
 #               (scenario: homework-ready)
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - nightly
   - homework

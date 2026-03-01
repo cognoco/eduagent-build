@@ -29,5 +29,5 @@ export function getApiUrl(): string {
     }) as string;
   }
 
-  return 'https://api.eduagent.app';
+  return 'https://api.mentomate.com';
 }

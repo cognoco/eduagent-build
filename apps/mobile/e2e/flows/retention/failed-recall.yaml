@@ -13,7 +13,7 @@
 #   - chat-input            -> text input (from ChatShell)
 #   - send-button           -> send button (from ChatShell)
 #   - remediation-card      -> shown after 3+ failures
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - nightly
   - retention

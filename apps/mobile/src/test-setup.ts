@@ -82,7 +82,7 @@ jest.mock('expo-web-browser', () => ({
 }));
 
 jest.mock('expo-linking', () => ({
-  createURL: jest.fn().mockReturnValue('eduagent://sso-callback'),
+  createURL: jest.fn().mockReturnValue('mentomate://sso-callback'),
 }));
 
 jest.mock('expo-notifications', () => ({

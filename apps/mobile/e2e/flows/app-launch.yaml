@@ -5,7 +5,7 @@
 #
 # This is the most basic sanity check -- does the app boot and
 # show the expected entry point for a logged-out user?
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - smoke
 ---

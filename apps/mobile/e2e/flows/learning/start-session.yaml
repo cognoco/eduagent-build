@@ -11,7 +11,7 @@
 # which typically links to a session for the user's active subject.
 # If no coaching card is present, the flow will not proceed past
 # the home screen. In CI, seed data should ensure a coaching card.
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - smoke
   - learning
