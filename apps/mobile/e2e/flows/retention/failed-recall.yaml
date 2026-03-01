@@ -13,6 +13,10 @@
 #   - chat-input            -> text input (from ChatShell)
 #   - send-button           -> send button (from ChatShell)
 #   - remediation-card      -> shown after 3+ failures
+#   - review-retest-button  -> "Review and Re-test" on remediation card
+#   - relearn-topic-button  -> "Relearn Topic" on remediation card
+#   - relearn-different-method -> choice: try different method (relearn screen)
+#   - relearn-same-method   -> choice: continue same method (relearn screen)
 appId: com.mentomate.app
 tags:
   - nightly
