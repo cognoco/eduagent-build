@@ -1,0 +1,93 @@
+# Flow N8: Retention Review — Due Cards to Feedback
+# Validates: user with retention cards due can start a review session,
+# enter an answer, submit it, and receive scoring feedback.
+# Tags: nightly, retention
+#
+# Journey: UX Journey 2 (Recall phase — success path)
+# Epics: Epic 3 (FR43, FR48, FR49)
+# Prerequisite: Seeded user with completed sessions + due retention cards
+#               (scenario: retention-due)
+#
+# NOTE: This flow is a nightly companion to the smoke-tier recall-review.yaml.
+# It exercises the full review cycle including answer evaluation and feedback.
+#
+# testID mapping:
+#   - recall-test-screen    -> screen wrapper
+#   - chat-input            -> text input (from ChatShell)
+#   - send-button           -> send button (from ChatShell)
+appId: com.zwizzly.eduagent
+tags:
+  - nightly
+  - retention
+---
+# 1. Seed & sign in with retention-due scenario
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "retention-due"
+      API_URL: ${API_URL}
+
+# 2. Home screen
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Look for review prompt on home screen (coaching card or banner)
+- assertVisible:
+    id: "coaching-card"
+
+# 4. Tap coaching card to start review
+- tapOn:
+    id: "coaching-card-primary"
+
+# 5. Wait for recall/review screen
+- extendedWaitUntil:
+    visible:
+      id: "recall-test-screen"
+    timeout: 10000
+
+# 6. Verify the recall prompt is shown
+- assertVisible:
+    text: "what you remember"
+    optional: true
+
+# 7. Enter answer
+- tapOn:
+    id: "chat-input"
+- inputText: "The key concept involves understanding the relationship between the variables and applying the formula correctly"
+
+# 8. Submit answer
+- tapOn:
+    id: "send-button"
+
+# 9. Wait for AI feedback response
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+# 10. Take screenshot of feedback
+- takeScreenshot: retention-review-feedback
+
+# 11. Enter a second recall answer (if multiple cards due)
+- tapOn:
+    id: "chat-input"
+    optional: true
+- inputText: "The second concept relates to how these principles are applied in practice"
+  optional: true
+
+# 12. Submit second answer (optional)
+- tapOn:
+    id: "send-button"
+    optional: true
+
+# 13. Wait for second feedback
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+    optional: true
+
+# 14. Screenshot
+- takeScreenshot: retention-review-complete

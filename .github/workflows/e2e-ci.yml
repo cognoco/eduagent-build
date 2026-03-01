@@ -17,6 +17,10 @@ on:
       - 'packages/schemas/**'
       - 'packages/database/**'
       - '.github/workflows/e2e-ci.yml'
+  schedule:
+    # Nightly run — smoke + nightly flows at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
 
 permissions:
   actions: read
@@ -69,7 +73,7 @@ jobs:
         run: pnpm exec nx run api:test:integration
 
   mobile-maestro:
-    name: Mobile Maestro Smoke Tests
+    name: Mobile Maestro E2E Tests
     runs-on: ubuntu-latest
     # Advisory — does not block PR merge
     continue-on-error: true
@@ -93,6 +97,9 @@ jobs:
       DATABASE_URL: postgresql://eduagent:eduagent@localhost:5432/tests
       NODE_ENV: test
       CI: true
+      # Expo inlines EXPO_PUBLIC_* vars at JS bundle time.
+      # Clerk publishable key is needed for auth screens to render.
+      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -149,18 +156,33 @@ jobs:
       # Bundle JS into the APK so the app works without a Metro dev server.
       # Debug builds normally fetch JS from Metro at runtime, but in CI
       # there is no Metro server. Pre-bundling embeds the JS in the APK.
-      # Uses `expo export:embed` instead of `react-native bundle` because
-      # Expo replaces @react-native/metro-config with @expo/metro-config.
+      #
+      # Key decisions:
+      # - Direct node path (not npx expo): npx resolves to the hoisted
+      #   binary at workspace root, making Metro use the wrong project root.
+      #   The direct path + working-directory keeps cwd = apps/mobile.
+      # - --dev true: production mode (`--dev false`) blocks process.env
+      #   access which expo-router needs for EXPO_ROUTER_APP_ROOT. Since
+      #   this is a debug APK for Maestro smoke tests, dev mode is fine.
+      # - EXPO_ROUTER_APP_ROOT: set from app.json expo-router plugin config
+      #   so Metro's require.context resolves the route tree.
       - name: Bundle JS for offline APK
         working-directory: apps/mobile
         run: |
           mkdir -p android/app/src/main/assets
+
+          # expo-router's _ctx.android.js uses require.context(process.env.EXPO_ROUTER_APP_ROOT)
+          # which needs a static string literal. The full Expo CLI pipeline inlines this,
+          # but export:embed skips that step. Patch it manually.
+          find ../../node_modules -name "_ctx.android.js" -path "*/expo-router/*" \
+            -exec sed -i "s|process.env.EXPO_ROUTER_APP_ROOT|'./src/app'|g" {} +
+
           node ../../node_modules/@expo/cli/build/bin/cli export:embed \
             --platform android \
-            --dev false \
-            --entry-file index.js \
-            --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res
+            --dev true \
+            --entry-file "$(pwd)/index.js" \
+            --bundle-output "$(pwd)/android/app/src/main/assets/index.android.bundle" \
+            --assets-dest "$(pwd)/android/app/src/main/res"
 
       # Compile debug APK via Gradle (now includes the pre-bundled JS)
       - name: Build debug APK
@@ -179,7 +201,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Run Maestro smoke tests
+      - name: Run Maestro E2E tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -187,6 +209,6 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
             adb install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-            maestro test apps/mobile/e2e/flows/ --include-tags=smoke
+            maestro test apps/mobile/e2e/flows/ --include-tags=${{ github.event_name == 'schedule' && 'smoke,nightly' || github.event_name == 'workflow_dispatch' && 'smoke,nightly' || 'smoke' }}
         env:
           API_URL: http://10.0.2.2:8787

@@ -8,7 +8,7 @@ import {
   unique,
   index,
 } from 'drizzle-orm/pg-core';
-import { generateUUIDv7 } from '../utils/uuid.js';
+import { generateUUIDv7 } from '../utils/uuid';
 
 export const personaTypeEnum = pgEnum('persona_type', [
   'TEEN',

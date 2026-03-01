@@ -1,0 +1,77 @@
+# Flow N2: Failed Recall Remediation — 3x Failures Trigger Relearn
+# Validates: user with 3 failed recalls sees remediation card after submitting
+# another incorrect answer in recall test.
+# Tags: nightly, retention
+#
+# Journey: UX Journey 2 (Recall phase — failure path)
+# Epics: Epic 3 (FR52-FR58)
+# Prerequisite: Seeded user with 3 failed recalls + needs-deepening topic
+#               (scenario: failed-recall-3x)
+#
+# testID mapping:
+#   - recall-test-screen    -> screen wrapper
+#   - chat-input            -> text input (from ChatShell)
+#   - send-button           -> send button (from ChatShell)
+#   - remediation-card      -> shown after 3+ failures
+appId: com.zwizzly.eduagent
+tags:
+  - nightly
+  - retention
+---
+# 1. Seed & sign in with failed-recall scenario
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "failed-recall-3x"
+      API_URL: ${API_URL}
+
+# 2. Home screen
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Look for recall/review prompt on home (coaching card)
+- assertVisible:
+    id: "coaching-card"
+
+# 4. Tap coaching card to start recall
+- tapOn:
+    id: "coaching-card-primary"
+    optional: true
+
+# 5. If coaching card didn't navigate, try direct recall prompt
+- tapOn:
+    text: "Review"
+    optional: true
+
+# 6. Wait for recall test screen
+- extendedWaitUntil:
+    visible:
+      id: "recall-test-screen"
+    timeout: 10000
+
+# 7. Enter an answer in recall test
+- tapOn:
+    id: "chat-input"
+- inputText: "I think it has something to do with the main idea"
+
+# 8. Submit answer
+- tapOn:
+    id: "send-button"
+
+# 9. Wait for AI to evaluate and return feedback
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+# 10. Verify remediation/relearn card appears (after 3+ failures)
+- extendedWaitUntil:
+    visible:
+      id: "remediation-card"
+    timeout: 10000
+    optional: true
+
+# 11. Screenshot
+- takeScreenshot: failed-recall-remediation

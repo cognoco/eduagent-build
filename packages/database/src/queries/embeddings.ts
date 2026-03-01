@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
-import type { Database } from '../client.js';
-import { sessionEmbeddings } from '../schema/embeddings.js';
-import { generateUUIDv7 } from '../utils/uuid.js';
+import type { Database } from '../client';
+import { sessionEmbeddings } from '../schema/embeddings';
+import { generateUUIDv7 } from '../utils/uuid';
 
 export interface SimilarTopic {
   id: string;

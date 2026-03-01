@@ -1,5 +1,5 @@
 import { eq, and, type SQL, type Column } from 'drizzle-orm';
-import type { Database } from './client.js';
+import type { Database } from './client';
 import {
   profiles,
   consentStates,
@@ -19,7 +19,7 @@ import {
   notificationPreferences,
   learningModes,
   sessionEmbeddings,
-} from './schema/index.js';
+} from './schema/index';
 
 export function createScopedRepository(db: Database, profileId: string) {
   function scopedWhere(

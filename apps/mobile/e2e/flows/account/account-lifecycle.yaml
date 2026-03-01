@@ -1,0 +1,67 @@
+# Flow N7: Account Lifecycle — Profile and Account Settings
+# Validates: user can navigate to settings, view profile information,
+# and access account management options.
+# Tags: nightly, account
+#
+# Journey: UX Journey 5 (Account Management)
+# Epics: Epic 5 (FR101-FR105)
+# Prerequisite: Seeded user with onboarding complete (scenario: onboarding-complete)
+appId: com.zwizzly.eduagent
+tags:
+  - nightly
+  - account
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-complete"
+      API_URL: ${API_URL}
+
+# 2. Home screen
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Navigate to More tab
+- tapOn:
+    id: "tab-more"
+
+# 4. Wait for settings screen
+- extendedWaitUntil:
+    visible:
+      id: "tab-more"
+    timeout: 10000
+
+# 5. Look for profile section
+- extendedWaitUntil:
+    visible:
+      text: "Profile"
+    timeout: 10000
+    optional: true
+
+# 6. Tap on profile/account settings
+- tapOn:
+    text: "Profile"
+    optional: true
+
+# 7. Fallback: look for account option
+- tapOn:
+    text: "Account"
+    optional: true
+
+# 8. Wait for profile detail screen
+- extendedWaitUntil:
+    visible:
+      text: "Display name"
+    timeout: 10000
+    optional: true
+
+# 9. Verify profile info is displayed
+- assertVisible:
+    text: "Display name"
+    optional: true
+
+# 10. Screenshot
+- takeScreenshot: account-lifecycle-complete

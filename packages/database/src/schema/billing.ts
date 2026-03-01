@@ -7,8 +7,8 @@ import {
   pgEnum,
   index,
 } from 'drizzle-orm/pg-core';
-import { accounts } from './profiles.js';
-import { generateUUIDv7 } from '../utils/uuid.js';
+import { accounts } from './profiles';
+import { generateUUIDv7 } from '../utils/uuid';
 
 export const subscriptionStatusEnum = pgEnum('subscription_status', [
   'trial',

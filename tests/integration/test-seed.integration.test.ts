@@ -30,6 +30,7 @@ jest.mock('../../apps/api/src/services/test-seed', () => ({
     'trial-active',
     'trial-expired',
     'multi-subject',
+    'homework-ready',
   ],
 }));
 
@@ -205,6 +206,7 @@ describe('Integration: POST /__test/seed', () => {
     'trial-active',
     'trial-expired',
     'multi-subject',
+    'homework-ready',
   ] as const)('accepts scenario: %s', async (scenario) => {
     mockSeedScenario.mockResolvedValue({
       scenario,
@@ -310,6 +312,7 @@ describe('Integration: GET /__test/scenarios', () => {
       'trial-active',
       'trial-expired',
       'multi-subject',
+      'homework-ready',
     ]);
   });
 
