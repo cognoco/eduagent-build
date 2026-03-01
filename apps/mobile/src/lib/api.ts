@@ -29,5 +29,5 @@ export function getApiUrl(): string {
     }) as string;
   }
 
-  return 'https://eduagent-api.zuzana-kopecna.workers.dev';
+  return 'https://api.mentomate.com';
 }

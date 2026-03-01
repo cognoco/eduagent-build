@@ -103,9 +103,9 @@ compatibility_flags = ["nodejs_compat"]
 
 [env.production.vars]
 ENVIRONMENT = "production"
-APP_URL = "https://app.eduagent.app"
+APP_URL = "https://app.mentomate.com"
 LOG_LEVEL = "info"
-EMAIL_FROM = "noreply@eduagent.com"
+EMAIL_FROM = "noreply@mentomate.com"
 
 [[env.production.kv_namespaces]]
 binding = "SUBSCRIPTION_KV"

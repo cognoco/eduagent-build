@@ -52,7 +52,7 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "EduAgent needs microphone access for voice-based learning."
+          "microphonePermission": "MentoMate needs microphone access for voice-based learning."
         }
       ]
     ],
