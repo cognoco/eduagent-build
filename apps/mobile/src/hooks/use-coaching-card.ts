@@ -12,7 +12,12 @@ interface CoachingCardState {
   isLoading: boolean;
 }
 
-export function useCoachingCard(): CoachingCardState {
+/**
+ * @param defaultSubjectId — fallback subject ID for freeform routes.
+ *   When provided, freeform "Chat" sessions include a subjectId so the
+ *   API can create a session. Pass the user's first active subject ID.
+ */
+export function useCoachingCard(defaultSubjectId?: string): CoachingCardState {
   const { data: suggestion, isLoading: suggestionLoading } =
     useContinueSuggestion();
   const { data: streak, isLoading: streakLoading } = useStreaks();
@@ -20,6 +25,9 @@ export function useCoachingCard(): CoachingCardState {
   const isLoading = suggestionLoading || streakLoading;
 
   return useMemo(() => {
+    const freeformRoute = defaultSubjectId
+      ? `/(learner)/session?mode=freeform&subjectId=${defaultSubjectId}`
+      : '/(learner)/session?mode=freeform';
     if (isLoading) {
       return {
         headline: 'Preparing your session...',
@@ -43,8 +51,8 @@ export function useCoachingCard(): CoachingCardState {
         secondaryLabel: 'I have something else in mind',
         primaryRoute: suggestion
           ? `/session?mode=practice&subjectId=${suggestion.subjectId}&topicId=${suggestion.topicId}`
-          : '/(learner)/session?mode=freeform',
-        secondaryRoute: '/(learner)/session?mode=freeform',
+          : freeformRoute,
+        secondaryRoute: freeformRoute,
         isLoading: false,
       };
     }
@@ -57,7 +65,7 @@ export function useCoachingCard(): CoachingCardState {
         primaryLabel: "Let's go",
         secondaryLabel: 'I have something else in mind',
         primaryRoute: `/session?mode=practice&subjectId=${suggestion.subjectId}&topicId=${suggestion.topicId}`,
-        secondaryRoute: '/(learner)/session?mode=freeform',
+        secondaryRoute: freeformRoute,
         isLoading: false,
       };
     }
@@ -96,9 +104,9 @@ export function useCoachingCard(): CoachingCardState {
       subtext,
       primaryLabel: "Let's go",
       secondaryLabel: 'I have something else in mind',
-      primaryRoute: '/(learner)/session?mode=freeform',
-      secondaryRoute: '/(learner)/session?mode=freeform',
+      primaryRoute: freeformRoute,
+      secondaryRoute: freeformRoute,
       isLoading: false,
     };
-  }, [isLoading, suggestion, streak]);
+  }, [isLoading, suggestion, streak, defaultSubjectId]);
 }

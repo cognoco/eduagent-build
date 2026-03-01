@@ -8,6 +8,7 @@ const envSchema = z.object({
   CLERK_SECRET_KEY: z.string().min(1).optional(),
   CLERK_PUBLISHABLE_KEY: z.string().min(1).optional(),
   CLERK_JWKS_URL: z.string().url().optional(),
+  CLERK_AUDIENCE: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
   APP_URL: z.string().url().default('https://app.eduagent.com'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
@@ -32,6 +33,9 @@ const envSchema = z.object({
 
   // Sentry — error tracking
   SENTRY_DSN: z.string().url().optional(),
+
+  // Test seed — shared secret for /__test/* routes (optional, dev/staging only)
+  TEST_SEED_SECRET: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

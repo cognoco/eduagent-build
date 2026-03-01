@@ -15,6 +15,7 @@ export interface AuthUser {
 export type AuthEnv = {
   Bindings: {
     CLERK_JWKS_URL?: string;
+    CLERK_AUDIENCE?: string;
   };
   Variables: {
     user: AuthUser;
@@ -53,7 +54,8 @@ function deriveIssuerFromJwksUrl(jwksUrl: string): string {
 
 async function verifyClerkJWT(
   token: string,
-  jwksUrl: string | undefined
+  jwksUrl: string | undefined,
+  audience: string | undefined
 ): Promise<{ sub: string; email?: string }> {
   if (!jwksUrl) {
     throw new Error('CLERK_JWKS_URL is not configured');
@@ -72,9 +74,9 @@ async function verifyClerkJWT(
     throw new Error(`No matching JWK found for kid: ${header.kid}`);
   }
 
-  // Verify signature and validate claims (including issuer)
+  // Verify signature and validate claims (issuer + optional audience)
   const issuer = deriveIssuerFromJwksUrl(jwksUrl);
-  const payload = await verifyJWT(token, jwk, { issuer });
+  const payload = await verifyJWT(token, jwk, { issuer, audience });
 
   return {
     sub: payload.sub,
@@ -105,7 +107,11 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
   const token = authHeader.slice(7);
 
   try {
-    const result = await verifyClerkJWT(token, c.env.CLERK_JWKS_URL);
+    const result = await verifyClerkJWT(
+      token,
+      c.env.CLERK_JWKS_URL,
+      c.env.CLERK_AUDIENCE
+    );
     c.set('user', {
       userId: result.sub,
       email: result.email,

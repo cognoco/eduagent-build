@@ -24,7 +24,11 @@ import {
 } from '../services/test-seed';
 
 type TestEnv = {
-  Bindings: { ENVIRONMENT: string; CLERK_SECRET_KEY?: string };
+  Bindings: {
+    ENVIRONMENT: string;
+    CLERK_SECRET_KEY?: string;
+    TEST_SEED_SECRET?: string;
+  };
   Variables: { db: Database };
 };
 
@@ -36,7 +40,7 @@ const seedInputSchema = z.object({
 export const testSeedRoutes = new Hono<TestEnv>();
 
 // ---------------------------------------------------------------------------
-// Production guard — single middleware protects ALL /__test/* routes
+// Environment + secret guard — protects ALL /__test/* routes
 // ---------------------------------------------------------------------------
 testSeedRoutes.use('/__test/*', async (c, next) => {
   if (c.env.ENVIRONMENT === 'production') {
@@ -45,6 +49,23 @@ testSeedRoutes.use('/__test/*', async (c, next) => {
       403
     );
   }
+
+  // When TEST_SEED_SECRET is configured, require it via X-Test-Secret header.
+  // This prevents unauthorized access to seed/reset endpoints on dev/staging.
+  const secret = c.env.TEST_SEED_SECRET;
+  if (secret) {
+    const headerSecret = c.req.header('X-Test-Secret');
+    if (headerSecret !== secret) {
+      return c.json(
+        {
+          code: ERROR_CODES.FORBIDDEN,
+          message: 'Invalid or missing test secret',
+        },
+        403
+      );
+    }
+  }
+
   return next();
 });
 

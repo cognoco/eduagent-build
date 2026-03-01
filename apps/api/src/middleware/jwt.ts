@@ -88,12 +88,13 @@ interface CachedJWKS {
   fetchedAt: number;
 }
 
-let jwksCache: CachedJWKS | null = null;
+const jwksCacheByUrl = new Map<string, CachedJWKS>();
 
 export async function fetchJWKS(url: string): Promise<JWKS> {
   const now = Date.now();
-  if (jwksCache && now - jwksCache.fetchedAt < JWKS_CACHE_TTL_MS) {
-    return { keys: jwksCache.keys };
+  const cached = jwksCacheByUrl.get(url);
+  if (cached && now - cached.fetchedAt < JWKS_CACHE_TTL_MS) {
+    return { keys: cached.keys };
   }
 
   const res = await fetch(url);
@@ -102,7 +103,7 @@ export async function fetchJWKS(url: string): Promise<JWKS> {
   }
 
   const jwks = (await res.json()) as JWKS;
-  jwksCache = { keys: jwks.keys, fetchedAt: now };
+  jwksCacheByUrl.set(url, { keys: jwks.keys, fetchedAt: now });
   return jwks;
 }
 
@@ -110,7 +111,7 @@ export async function fetchJWKS(url: string): Promise<JWKS> {
  * Exported for testing — allows tests to clear the in-memory JWKS cache.
  */
 export function clearJWKSCache(): void {
-  jwksCache = null;
+  jwksCacheByUrl.clear();
 }
 
 // ---------------------------------------------------------------------------
