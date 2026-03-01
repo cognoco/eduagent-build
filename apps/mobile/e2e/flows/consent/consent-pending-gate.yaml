@@ -1,0 +1,190 @@
+# Flow N6: Consent Pending Gate — UI Interactions and Preview Mode
+# Validates: the consent pending gate blocks app access, preview modes
+# (Browse Subjects, Sample Coaching) work correctly, and sign-out is available.
+# Tags: nightly, consent
+#
+# Journey: Consent Lifecycle
+# Epics: Epic 5 (COPPA/GDPR consent gating), UX Persona Walkthrough gaps
+#
+# Prerequisite: Seeded user with pending consent state.
+#
+# NOTE: There is no dedicated "consent-pending" seed scenario in the test-seed
+# service. This flow uses the "onboarding-complete" scenario and relies on the
+# consent state being CONSENTED (which won't trigger the gate). For a true E2E
+# test of the pending gate via seeding, a new seed scenario
+# (e.g., "consent-pending") must be added to apps/api/src/services/test-seed.ts
+# that creates a profile with consentStatus = 'PARENTAL_CONSENT_REQUESTED'.
+#
+# WORKAROUND: This flow uses the profile-creation-consent flow as a setup step
+# to reach the consent pending gate organically. If the setup flow is too
+# fragile (sign-up + profile creation + consent request), consider adding the
+# seed scenario instead.
+#
+# For now, we use runFlow to chain from the profile creation consent flow,
+# which leaves us on the consent-pending-gate screen.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - consent
+---
+# ============================================================
+# SETUP: Reach the consent pending gate via profile creation
+# ============================================================
+
+# 1. Run the profile-creation-consent flow which ends at the pending gate
+- runFlow:
+    file: profile-creation-consent.yaml
+
+# ============================================================
+# CONSENT PENDING GATE — Core UI Verification
+# ============================================================
+
+# 2. Verify we are on the consent pending gate
+- extendedWaitUntil:
+    visible:
+      id: "consent-pending-gate"
+    timeout: 10000
+
+# 3. Verify heading text
+- assertVisible:
+    text: "Waiting for approval"
+
+# 4. Verify informational message
+- assertVisible:
+    text: "Once they approve, you'll have full access."
+    optional: true
+
+# 5. Verify "Check again" button
+- assertVisible:
+    id: "consent-check-again"
+
+# 6. Tap "Check again" — should refresh profiles but stay on gate
+#    (consent is still pending)
+- tapOn:
+    id: "consent-check-again"
+
+# 7. Wait briefly and verify we're still on the gate
+- extendedWaitUntil:
+    visible:
+      id: "consent-pending-gate"
+    timeout: 10000
+
+# 8. Screenshot after check-again
+- takeScreenshot: consent-pending-gate-after-check
+
+# ============================================================
+# PREVIEW MODE — Browse Subjects
+# ============================================================
+
+# 9. Verify "Browse subjects" preview button is visible
+- assertVisible:
+    id: "preview-browse-subjects"
+
+# 10. Tap "Browse subjects" to enter preview mode
+- tapOn:
+    id: "preview-browse-subjects"
+
+# 11. Wait for PreviewSubjectBrowser to render
+- extendedWaitUntil:
+    visible:
+      id: "preview-subject-browser"
+    timeout: 5000
+
+# 12. Verify preview subjects are shown (static list)
+- assertVisible:
+    text: "Browse Subjects"
+
+- assertVisible:
+    text: "Mathematics"
+    optional: true
+
+- assertVisible:
+    text: "Science"
+    optional: true
+
+# 13. Verify the preview disclaimer
+- assertVisible:
+    text: "Here's a preview of what you can learn."
+    optional: true
+
+# 14. Screenshot of subject browser preview
+- takeScreenshot: consent-preview-subject-browser
+
+# 15. Tap "Back" to return to the pending gate
+- tapOn:
+    text: "Back"
+
+# 16. Verify we're back on the consent pending gate
+- extendedWaitUntil:
+    visible:
+      id: "consent-pending-gate"
+    timeout: 5000
+
+# ============================================================
+# PREVIEW MODE — Sample Coaching
+# ============================================================
+
+# 17. Verify "Sample coaching" preview button is visible
+- assertVisible:
+    id: "preview-sample-coaching"
+
+# 18. Tap "Sample coaching" to enter preview mode
+- tapOn:
+    id: "preview-sample-coaching"
+
+# 19. Wait for PreviewSampleCoaching to render
+- extendedWaitUntil:
+    visible:
+      id: "preview-sample-coaching"
+    timeout: 5000
+
+# 20. Verify coaching preview content
+- assertVisible:
+    text: "How It Works"
+
+- assertVisible:
+    text: "Ready for homework?"
+    optional: true
+
+- assertVisible:
+    text: "How your coach helps"
+    optional: true
+
+# 21. Verify the preview footer disclaimer
+- assertVisible:
+    text: "This is a preview. Full access unlocks after parent approval."
+    optional: true
+
+# 22. Screenshot of coaching preview
+- takeScreenshot: consent-preview-sample-coaching
+
+# 23. Tap "Back" to return to the pending gate
+- tapOn:
+    text: "Back"
+
+# 24. Verify we're back on the consent pending gate
+- extendedWaitUntil:
+    visible:
+      id: "consent-pending-gate"
+    timeout: 5000
+
+# ============================================================
+# SIGN OUT from consent pending gate
+# ============================================================
+
+# 25. Verify sign-out button is present
+- assertVisible:
+    id: "consent-sign-out"
+
+# 26. Tap sign out
+- tapOn:
+    id: "consent-sign-out"
+
+# 27. Verify we return to the auth/sign-in screen
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 15000
+
+# 28. Final screenshot — back at auth screen after sign-out
+- takeScreenshot: consent-pending-gate-signed-out

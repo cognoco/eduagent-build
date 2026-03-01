@@ -1,0 +1,95 @@
+# Flow N8: Delete Account — Deletion UI + Grace Period + Cancellation
+# Validates: user can navigate to delete account screen, see confirmation UI,
+# and cancel to keep their account. Does NOT actually delete the account.
+# Tags: nightly, account, gdpr
+#
+# Journey: UX Journey 5 (Account Management)
+# Epics: Epic 5 (FR101-FR105)
+# Prerequisite: Seeded user with onboarding complete (scenario: onboarding-complete)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - account
+  - gdpr
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-complete"
+      API_URL: ${API_URL}
+
+# 2. Verify home screen loaded
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Navigate to More tab
+- tapOn:
+    id: "tab-more"
+
+# 4. Wait for More screen to load
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+# 5. Scroll down to find Delete account row
+- scrollUntilVisible:
+    element:
+      text: "Delete account"
+    direction: DOWN
+    timeout: 10000
+
+# 6. Tap Delete account
+- tapOn:
+    text: "Delete account"
+
+# 7. Wait for delete account screen to appear
+- extendedWaitUntil:
+    visible:
+      text: "Delete account"
+    timeout: 10000
+
+# 8. Verify informational text about permanent deletion
+- assertVisible:
+    text: "permanently delete your account"
+    optional: true
+
+# 9. Verify 7-day grace period notice
+- assertVisible:
+    text: "7-day grace period"
+    optional: true
+
+# 10. Verify the confirm button is present (red danger button)
+- assertVisible:
+    id: "delete-account-confirm"
+
+# 11. Verify the cancel button is present
+- assertVisible:
+    id: "delete-account-cancel"
+
+# 12. Verify the close button is present
+- assertVisible:
+    id: "delete-account-close"
+
+# 13. Screenshot of the delete account confirmation screen
+- takeScreenshot: delete-account-confirmation
+
+# 14. Tap cancel to go back without deleting
+- tapOn:
+    id: "delete-account-cancel"
+
+# 15. Verify we're back on the More screen
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+# 16. Verify account is intact — sign-out button still visible
+- assertVisible:
+    id: "sign-out-button"
+
+# 17. Final screenshot — back to normal state
+- takeScreenshot: delete-account-cancelled

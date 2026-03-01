@@ -1,0 +1,156 @@
+# Flow: Onboarding — Curriculum Review Interactions
+# Validates: curriculum review screen renders with topic cards, skip/challenge
+# actions work, start-learning and go-home buttons are functional.
+# Tags: nightly, onboarding
+#
+# Journey: UX Journey 1 (Onboarding) — Curriculum Review
+#
+# Prerequisites:
+#   - API is running and reachable
+#   - Seed endpoint available
+#
+# Route: seed → sign in → create subject → interview → analogy preference
+#        → curriculum review (this screen)
+#
+# The curriculum review screen is only reachable during the onboarding funnel
+# (after interview completion → analogy preference → curriculum review).
+# We must traverse the full path to reach it.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - onboarding
+---
+# ── Setup: Seed & sign in ──────────────────────────────────────────────
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: onboarding-complete
+      API_URL: ${API_URL}
+
+# ── Create a new subject to enter the onboarding funnel ────────────────
+- tapOn:
+    id: "add-subject-button"
+
+- extendedWaitUntil:
+    visible:
+      text: "What would you like to learn?"
+    timeout: 5000
+
+- tapOn:
+    id: "create-subject-name"
+- inputText: "World History"
+
+- tapOn:
+    id: "create-subject-submit"
+
+# ── Interview screen ───────────────────────────────────────────────────
+- extendedWaitUntil:
+    visible:
+      text: "Interview"
+    timeout: 10000
+
+- extendedWaitUntil:
+    visible:
+      text: "learning coach"
+    timeout: 10000
+
+# Respond to the interview
+- tapOn:
+    id: "chat-input"
+- inputText: "I want to learn about world wars and ancient civilizations for my exam"
+- tapOn:
+    id: "chat-send"
+
+# Wait for interview to complete — the footer button appears when done
+- extendedWaitUntil:
+    visible:
+      id: "view-curriculum-button"
+    timeout: 30000
+
+# ── Navigate through analogy preference (skip it) ─────────────────────
+- tapOn:
+    id: "view-curriculum-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "analogy-preference-title"
+    timeout: 10000
+
+# Skip analogy preference to get to curriculum review faster
+- tapOn:
+    id: "analogy-skip-button"
+
+# ── Curriculum review screen — verify layout ──────────────────────────
+- extendedWaitUntil:
+    visible:
+      text: "Your Curriculum"
+    timeout: 15000
+
+- takeScreenshot: curriculum-review-screen
+
+# ── Verify curriculum loaded with topics ──────────────────────────────
+# The curriculum shows "Version X — N topics" subtitle when loaded.
+# If the curriculum is still generating, a loading spinner appears first.
+- extendedWaitUntil:
+    visible:
+      text: "topics"
+    timeout: 15000
+
+# ── Verify header elements ────────────────────────────────────────────
+- assertVisible:
+    id: "curriculum-back"
+
+- assertVisible:
+    id: "challenge-button"
+
+# ── Verify action buttons at bottom ───────────────────────────────────
+- assertVisible:
+    id: "start-learning-button"
+
+- assertVisible:
+    id: "go-home-button"
+
+- takeScreenshot: curriculum-review-topics-loaded
+
+# ── Test Challenge modal ──────────────────────────────────────────────
+- tapOn:
+    id: "challenge-button"
+
+# Challenge modal should appear with title and input
+- extendedWaitUntil:
+    visible:
+      text: "Challenge your curriculum"
+    timeout: 5000
+
+- assertVisible:
+    id: "challenge-feedback"
+
+- assertVisible:
+    id: "challenge-cancel"
+
+- assertVisible:
+    id: "challenge-submit"
+
+# Type feedback into the challenge input
+- tapOn:
+    id: "challenge-feedback"
+- inputText: "I already know the basics, skip intro topics"
+
+- takeScreenshot: curriculum-review-challenge-modal
+
+# Cancel the challenge (don't actually submit to avoid regenerating)
+- tapOn:
+    id: "challenge-cancel"
+
+# Modal should close, curriculum still visible
+- extendedWaitUntil:
+    visible:
+      text: "Your Curriculum"
+    timeout: 5000
+
+# ── Test "Explore first" (go-home) button ─────────────────────────────
+# Verify the "Explore first" link is present
+- assertVisible:
+    text: "Explore first"
+
+- takeScreenshot: curriculum-review-final

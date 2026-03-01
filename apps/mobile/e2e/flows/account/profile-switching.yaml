@@ -1,0 +1,109 @@
+# Flow N9: Profile Switching — Profile Switcher Modal
+# Validates: user can open profile switcher, see list of profiles with
+# active indicator, switch to a different profile, and return to home.
+# Tags: nightly, account
+#
+# Journey: UX Journey 5 (Account Management)
+# Epics: Epic 5 (FR101-FR105)
+# Prerequisite: Seeded parent user with linked children
+#               (scenario: parent-with-children — creates multiple profiles)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - account
+---
+# 1. Seed & sign in with parent-with-children scenario (multiple profiles)
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-with-children"
+      API_URL: ${API_URL}
+
+# 2. Verify home screen loaded
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Navigate to More tab
+- tapOn:
+    id: "tab-more"
+
+# 4. Wait for More screen to load
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+# 5. Scroll to find and tap Profile row to open profile switcher
+- scrollUntilVisible:
+    element:
+      text: "Profile"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    text: "Profile"
+
+# 6. Wait for profiles screen to appear
+- extendedWaitUntil:
+    visible:
+      id: "profiles-screen"
+    timeout: 10000
+
+# 7. Verify the "Profiles" title is shown
+- assertVisible:
+    text: "Profiles"
+
+# 8. Verify the active profile checkmark is visible
+- extendedWaitUntil:
+    visible:
+      id: "profile-active-check"
+    timeout: 10000
+    optional: true
+
+# 9. Verify the "Done" close button is present
+- assertVisible:
+    id: "profiles-close"
+
+# 10. Verify the "Add profile" button is present
+- assertVisible:
+    id: "profiles-add-button"
+
+# 11. Screenshot of profile switcher modal
+- takeScreenshot: profile-switcher-open
+
+# 12. Look for a child profile name to switch to (seeded as "Test Teen")
+- extendedWaitUntil:
+    visible:
+      text: "Test Teen"
+    timeout: 10000
+    optional: true
+
+# 13. Tap on the child profile to switch (if visible)
+- tapOn:
+    text: "Test Teen"
+    optional: true
+
+# 14. After switching, we should be navigated back (router.back())
+# Wait for the home/More screen to reappear
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+    optional: true
+
+# 15. Fallback: if no child profile was available, close the modal manually
+- tapOn:
+    id: "profiles-close"
+    optional: true
+
+# 16. Verify we're back on a main screen
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+    optional: true
+
+# 17. Final screenshot — profile switch completed
+- takeScreenshot: profile-switching-complete

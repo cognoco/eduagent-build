@@ -1,0 +1,140 @@
+# Flow: Onboarding — Analogy Domain Preference Selection
+# Validates: analogy preference screen renders after interview completion,
+# domain options are visible and selectable, continue and skip paths both
+# navigate to curriculum review.
+# Tags: nightly, onboarding
+#
+# Journey: UX Journey 1 (Onboarding) — Analogy Domain Preferences (FR134-FR137)
+#
+# Prerequisites:
+#   - API is running and reachable
+#   - Seed endpoint available
+#
+# Route: create subject → interview → analogy preference → curriculum review
+# The analogy preference screen sits between interview completion and
+# curriculum review in the onboarding funnel.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - onboarding
+---
+# ── Setup: Seed & sign in ──────────────────────────────────────────────
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: onboarding-complete
+      API_URL: ${API_URL}
+
+# ── Create a new subject to enter the onboarding funnel ────────────────
+- tapOn:
+    id: "add-subject-button"
+
+- extendedWaitUntil:
+    visible:
+      text: "What would you like to learn?"
+    timeout: 5000
+
+- tapOn:
+    id: "create-subject-name"
+- inputText: "Biology"
+
+- tapOn:
+    id: "create-subject-submit"
+
+# ── Interview screen ───────────────────────────────────────────────────
+- extendedWaitUntil:
+    visible:
+      text: "Interview"
+    timeout: 10000
+
+# Wait for the AI opening message to appear
+- extendedWaitUntil:
+    visible:
+      text: "learning coach"
+    timeout: 10000
+
+# Respond to the interview to move it toward completion.
+# The interview requires at least one exchange before it can complete.
+- tapOn:
+    id: "chat-input"
+- inputText: "I want to learn about cells and genetics for my school exam"
+- tapOn:
+    id: "chat-send"
+
+# Wait for AI response — interview may complete in 1-3 exchanges.
+# The interview-complete footer shows "Interview complete!" text
+# and a "View Curriculum" button once the AI decides enough info is gathered.
+- extendedWaitUntil:
+    visible:
+      id: "view-curriculum-button"
+    timeout: 30000
+
+- takeScreenshot: analogy-pref-interview-complete
+
+# ── Navigate to analogy preference screen ──────────────────────────────
+- tapOn:
+    id: "view-curriculum-button"
+
+# ── Analogy preference screen — verify layout ─────────────────────────
+- extendedWaitUntil:
+    visible:
+      id: "analogy-preference-title"
+    timeout: 10000
+
+- assertVisible:
+    text: "How do you like things explained?"
+
+- assertVisible:
+    text: "Pick an analogy style"
+
+- takeScreenshot: analogy-preference-screen
+
+# ── Verify all domain options are visible ──────────────────────────────
+- assertVisible:
+    id: "analogy-domain-picker"
+
+- assertVisible:
+    id: "analogy-domain-none"
+
+- assertVisible:
+    id: "analogy-domain-cooking"
+
+- assertVisible:
+    id: "analogy-domain-sports"
+
+- assertVisible:
+    id: "analogy-domain-building"
+
+- assertVisible:
+    id: "analogy-domain-music"
+
+- assertVisible:
+    id: "analogy-domain-nature"
+
+- assertVisible:
+    id: "analogy-domain-gaming"
+
+# ── Verify action buttons are visible ──────────────────────────────────
+- assertVisible:
+    id: "analogy-continue-button"
+
+- assertVisible:
+    id: "analogy-skip-button"
+
+# ── Select a domain (cooking) ─────────────────────────────────────────
+- tapOn:
+    id: "analogy-domain-cooking"
+
+- takeScreenshot: analogy-preference-cooking-selected
+
+# ── Tap Continue → navigate to curriculum review ───────────────────────
+- tapOn:
+    id: "analogy-continue-button"
+
+# Curriculum review screen should appear
+- extendedWaitUntil:
+    visible:
+      text: "Your Curriculum"
+    timeout: 15000
+
+- takeScreenshot: analogy-pref-to-curriculum-review
