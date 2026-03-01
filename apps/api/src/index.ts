@@ -103,7 +103,11 @@ api.use(
     },
     allowHeaders: ['Content-Type', 'Authorization', 'X-Profile-Id'],
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    exposeHeaders: ['Content-Type'],
+    exposeHeaders: [
+      'Content-Type',
+      'X-Quota-Remaining',
+      'X-Quota-Warning-Level',
+    ],
     credentials: true,
     maxAge: 3600,
   })

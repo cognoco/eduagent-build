@@ -80,3 +80,33 @@ preview_id = "dc05e0f9269c43e78dabd5ef984dcd64"
 binding = "COACHING_KV"
 id = "f5232eccbccf42538f71cba5fa2ac565"
 preview_id = "f5232eccbccf42538f71cba5fa2ac565"
+
+# =============================================================================
+# Production Environment
+# =============================================================================
+# Deploy with: wrangler deploy --env production
+# Set secrets with: wrangler secret put <NAME> --env production
+#
+# Before first production deploy, create KV namespaces:
+#   wrangler kv namespace create SUBSCRIPTION_KV --env production
+#   wrangler kv namespace create COACHING_KV --env production
+# Then replace the placeholder IDs below with the returned namespace IDs.
+# =============================================================================
+
+[env.production]
+compatibility_date = "2025-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[env.production.vars]
+ENVIRONMENT = "production"
+APP_URL = "https://app.eduagent.app"
+LOG_LEVEL = "info"
+EMAIL_FROM = "noreply@eduagent.com"
+
+[[env.production.kv_namespaces]]
+binding = "SUBSCRIPTION_KV"
+id = "PRODUCTION_SUBSCRIPTION_KV_ID_PLACEHOLDER"
+
+[[env.production.kv_namespaces]]
+binding = "COACHING_KV"
+id = "PRODUCTION_COACHING_KV_ID_PLACEHOLDER"
