@@ -41,7 +41,20 @@
           "cameraPermission": "EduAgent needs camera access to photograph your homework."
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "SENTRY_ORG_PLACEHOLDER",
+          "project": "SENTRY_PROJECT_PLACEHOLDER"
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "EduAgent needs microphone access for voice-based learning."
+        }
+      ]
     ],
     "extra": {
       "eas": {
