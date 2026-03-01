@@ -25,41 +25,30 @@ tags:
       text: "Ready to learn"
     timeout: 15000
 
-# 3. Navigate to subjects tab
+# 3. Navigate to homework from home screen
+#    The homework button testID is homework-button-{subjectId}.
+#    Since the seed subjectId is dynamic, try tapping by the "HW"
+#    text label rendered on every homework button.
 - tapOn:
-    id: "tab-subjects"
-
-# 4. Wait for subjects list
-- extendedWaitUntil:
-    visible:
-      id: "tab-subjects"
-    timeout: 10000
-
-# 5. Tap on subject card (first subject in list)
-- tapOn:
-    id: "subject-card"
+    text: "HW"
     optional: true
 
-# 6. Tap on subject by text if testID not available
+# 4. Fallback — tap the "Homework help" action on the AdaptiveEntryCard
+#    (visible for teen persona) which also navigates to homework.
 - tapOn:
-    text: "Test Math"
+    text: "Homework help"
     optional: true
 
-# 7. Look for homework option on subject detail
-- extendedWaitUntil:
-    visible:
-      id: "homework-button"
-    timeout: 10000
+# 5. Camera permission may appear first — grant or skip
+- tapOn:
+    id: "grant-permission-button"
     optional: true
 
-# 8. Tap homework button
+# 6. If camera screen appears, close it and use manual input instead
+#    (camera hardware is unreliable on emulator — the original flow
+#    tests the text-input homework path, not camera capture)
 - tapOn:
-    id: "homework-button"
-    optional: true
-
-# 9. If no homework button, try coaching card from home
-- tapOn:
-    id: "coaching-card-primary"
+    id: "close-button"
     optional: true
 
 # 10. Wait for chat screen
