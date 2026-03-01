@@ -74,9 +74,9 @@ async function verifyClerkJWT(
     throw new Error(`No matching JWK found for kid: ${header.kid}`);
   }
 
-  // Verify signature and validate claims (including issuer)
+  // Verify signature and validate claims (issuer + optional audience)
   const issuer = deriveIssuerFromJwksUrl(jwksUrl);
-  const payload = await verifyJWT(token, jwk, { issuer });
+  const payload = await verifyJWT(token, jwk, { issuer, audience });
 
   return {
     sub: payload.sub,
