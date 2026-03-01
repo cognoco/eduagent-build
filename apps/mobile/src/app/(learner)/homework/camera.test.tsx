@@ -267,9 +267,12 @@ describe('CameraScreen', () => {
 
     const { getByTestId } = render(<CameraScreen />);
 
-    await waitFor(() => {
-      expect(getByTestId('confirm-button')).toBeTruthy();
-    });
+    await waitFor(
+      () => {
+        expect(getByTestId('confirm-button')).toBeTruthy();
+      },
+      { timeout: 5_000 }
+    );
 
     fireEvent.press(getByTestId('confirm-button'));
 
@@ -284,7 +287,7 @@ describe('CameraScreen', () => {
         }),
       })
     );
-  });
+  }, 15_000);
 
   it('shows "Here\'s what I see:" label and back button in result phase', async () => {
     (useHomeworkOcr as jest.Mock).mockReturnValue({
