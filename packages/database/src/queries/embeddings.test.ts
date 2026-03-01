@@ -1,11 +1,11 @@
-import { findSimilarTopics, storeEmbedding } from './embeddings.js';
-import type { Database } from '../client.js';
+import { findSimilarTopics, storeEmbedding } from './embeddings';
+import type { Database } from '../client';
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-jest.mock('../utils/uuid.js', () => ({
+jest.mock('../utils/uuid', () => ({
   generateUUIDv7: jest.fn(() => '01933b3c-0000-7000-8000-000000000099'),
 }));
 

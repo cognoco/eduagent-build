@@ -18,9 +18,9 @@ import {
   notificationPreferences,
   learningModes,
   sessionEmbeddings,
-} from './schema/index.js';
-import { createScopedRepository } from './repository.js';
-import type { Database } from './client.js';
+} from './schema/index';
+import { createScopedRepository } from './repository';
+import type { Database } from './client';
 
 // ---------------------------------------------------------------------------
 // Mock database

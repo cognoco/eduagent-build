@@ -9,10 +9,10 @@ import {
   index,
   jsonb,
 } from 'drizzle-orm/pg-core';
-import { profiles } from './profiles.js';
-import { curriculumTopics, subjects } from './subjects.js';
-import { xpStatusEnum } from './assessments.js';
-import { generateUUIDv7 } from '../utils/uuid.js';
+import { profiles } from './profiles';
+import { curriculumTopics, subjects } from './subjects';
+import { xpStatusEnum } from './assessments';
+import { generateUUIDv7 } from '../utils/uuid';
 
 export const learningModeEnum = pgEnum('learning_mode', ['serious', 'casual']);
 

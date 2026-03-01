@@ -8,8 +8,8 @@ import {
   pgEnum,
   index,
 } from 'drizzle-orm/pg-core';
-import { profiles } from './profiles.js';
-import { generateUUIDv7 } from '../utils/uuid.js';
+import { profiles } from './profiles';
+import { generateUUIDv7 } from '../utils/uuid';
 
 export const subjectStatusEnum = pgEnum('subject_status', [
   'active',

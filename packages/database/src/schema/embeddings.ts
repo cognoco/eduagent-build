@@ -1,9 +1,9 @@
 import { pgTable, uuid, text, timestamp, index } from 'drizzle-orm/pg-core';
 import { customType } from 'drizzle-orm/pg-core';
-import { profiles } from './profiles.js';
-import { learningSessions } from './sessions.js';
-import { curriculumTopics } from './subjects.js';
-import { generateUUIDv7 } from '../utils/uuid.js';
+import { profiles } from './profiles';
+import { learningSessions } from './sessions';
+import { curriculumTopics } from './subjects';
+import { generateUUIDv7 } from '../utils/uuid';
 
 /** Custom pgvector type for Drizzle ORM — 1024 dimensions (Voyage AI voyage-3.5) */
 const vector = customType<{ data: number[]; driverData: string }>({

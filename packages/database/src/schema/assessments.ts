@@ -9,10 +9,10 @@ import {
   unique,
   index,
 } from 'drizzle-orm/pg-core';
-import { profiles } from './profiles.js';
-import { subjects, curriculumTopics } from './subjects.js';
-import { learningSessions } from './sessions.js';
-import { generateUUIDv7 } from '../utils/uuid.js';
+import { profiles } from './profiles';
+import { subjects, curriculumTopics } from './subjects';
+import { learningSessions } from './sessions';
+import { generateUUIDv7 } from '../utils/uuid';
 
 export const verificationDepthEnum = pgEnum('verification_depth', [
   'recall',

@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { eq, and, sql } from 'drizzle-orm';
-import { createScopedRepository } from './repository.js';
+import { createScopedRepository } from './repository';
 import {
   profiles,
   subjects,
@@ -17,8 +17,8 @@ import {
   xpLedger,
   sessionSummaries,
   notificationPreferences,
-} from './schema/index.js';
-import type { Database } from './client.js';
+} from './schema/index';
+import type { Database } from './client';
 
 // ---------------------------------------------------------------------------
 // Test profile IDs (UUID v7 format)

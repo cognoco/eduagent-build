@@ -9,9 +9,9 @@ import {
   pgEnum,
   index,
 } from 'drizzle-orm/pg-core';
-import { profiles } from './profiles.js';
-import { subjects, curriculumTopics } from './subjects.js';
-import { generateUUIDv7 } from '../utils/uuid.js';
+import { profiles } from './profiles';
+import { subjects, curriculumTopics } from './subjects';
+import { generateUUIDv7 } from '../utils/uuid';
 
 export const draftStatusEnum = pgEnum('draft_status', [
   'in_progress',
