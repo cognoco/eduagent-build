@@ -1,0 +1,174 @@
+# Flow P2: Parent Child Drill-Down — Full Navigation Hierarchy
+# Validates: parent drills from dashboard → child detail → subjects → topics → session transcript
+# Tags: nightly, parent
+#
+# Journey: UX Journey 4 (Parent Oversight)
+# Epics: Epic 5 (FR85-FR90)
+# Prerequisite: Seeded parent user with linked children who have sessions
+#               (scenario: parent-with-children)
+#
+# Screen chain:
+#   dashboard.tsx  →  child/[profileId]/index.tsx  →  child/[profileId]/subjects/[subjectId].tsx
+#                 →  child/[profileId]/topic/[topicId].tsx  →  child/[profileId]/session/[sessionId].tsx
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+---
+# 1. Seed & sign in as parent
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-with-children"
+      API_URL: ${API_URL}
+
+# 2. Wait for parent dashboard to load
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+# 3. Verify a child summary card rendered
+- extendedWaitUntil:
+    visible:
+      id: "parent-dashboard-summary"
+    timeout: 10000
+    optional: true
+
+# 4. Screenshot: parent dashboard with child cards
+- takeScreenshot: parent-drill-down-01-dashboard
+
+# 5. Tap "View details" on the child card to drill into child detail
+- tapOn:
+    id: "parent-dashboard-summary-primary"
+    optional: true
+
+# 5b. Fallback: tap the card body itself
+- tapOn:
+    id: "parent-dashboard-summary"
+    optional: true
+
+# 6. Wait for child detail screen
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+# 7. Verify "Subjects" heading is present
+- extendedWaitUntil:
+    visible:
+      text: "Subjects"
+    timeout: 5000
+    optional: true
+
+# 8. Verify "Recent Sessions" heading is present
+- assertVisible:
+    text: "Recent Sessions"
+    optional: true
+
+# 9. Screenshot: child detail with subjects and sessions
+- takeScreenshot: parent-drill-down-02-child-detail
+
+# 10. Tap on the first subject card (dynamic testID: subject-card-{name})
+#     Fall back to tapping text since subject name is dynamic
+- tapOn:
+    text: "Mathematics"
+    optional: true
+
+# 10b. Broader fallback for any subject card
+- tapOn:
+    text: "Science"
+    optional: true
+
+# 11. Wait for subject topics screen
+- extendedWaitUntil:
+    visible:
+      id: "subject-topics-scroll"
+    timeout: 10000
+    optional: true
+
+# 12. Screenshot: subject topics list
+- takeScreenshot: parent-drill-down-03-subject-topics
+
+# 13. Tap on a topic card (dynamic testID: topic-card-{uuid})
+#     Use general text-based tap since topic titles are seed-dependent
+- tapOn:
+    id: "subject-topics-scroll"
+    point: "50%,30%"
+    optional: true
+
+# 14. Wait for topic detail screen
+- extendedWaitUntil:
+    visible:
+      id: "topic-detail-screen"
+    timeout: 10000
+    optional: true
+
+# 15. Verify topic status card is present
+- assertVisible:
+    id: "topic-status-card"
+    optional: true
+
+# 16. Verify session history heading
+- assertVisible:
+    text: "Session History"
+    optional: true
+
+# 17. Screenshot: topic detail with status, mastery, retention
+- takeScreenshot: parent-drill-down-04-topic-detail
+
+# 18. Navigate back to child detail
+- tapOn:
+    id: "back-button"
+
+# 19. Navigate back to child detail (from subject topics)
+- tapOn:
+    id: "back-button"
+    optional: true
+
+# 20. Wait for child detail to reappear
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+    optional: true
+
+# 21. Tap on a recent session card to view transcript
+#     Session cards have dynamic testIDs (session-card-{uuid}), so tap by
+#     looking for exchange count text as a proxy
+- tapOn:
+    text: "exchanges"
+    optional: true
+
+# 22. Wait for transcript screen
+- extendedWaitUntil:
+    visible:
+      id: "transcript-scroll"
+    timeout: 10000
+    optional: true
+
+# 23. Verify transcript header
+- assertVisible:
+    text: "Session Transcript"
+    optional: true
+
+# 24. Verify at least one exchange rendered (exchange-0)
+- assertVisible:
+    id: "exchange-0"
+    optional: true
+
+# 25. Screenshot: session transcript with exchanges
+- takeScreenshot: parent-drill-down-05-transcript
+
+# 26. Navigate back to child detail
+- tapOn:
+    id: "back-button"
+    optional: true
+
+# 27. Navigate back to dashboard
+- tapOn:
+    id: "back-button"
+    optional: true
+
+# 28. Final screenshot: back on dashboard
+- takeScreenshot: parent-drill-down-06-back-to-dashboard

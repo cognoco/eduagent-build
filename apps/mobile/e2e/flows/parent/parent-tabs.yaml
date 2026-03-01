@@ -1,0 +1,99 @@
+# Flow P4: Parent Tab Navigation — Dashboard, Learning Book, More
+# Validates: parent can navigate between the three bottom tabs and each
+# screen renders its expected content.
+# Tags: nightly, parent
+#
+# Journey: UX Journey 4 (Parent Oversight)
+# Tab bar (from (parent)/_layout.tsx):
+#   "Home"          → dashboard.tsx    (testID: dashboard-scroll)
+#   "Learning Book" → book.tsx         (re-exports learner book; testID: subject-filter-tabs)
+#   "More"          → more.tsx         (testID: sign-out-button)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+---
+# 1. Seed & sign in as parent
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-with-children"
+      API_URL: ${API_URL}
+
+# 2. Wait for parent dashboard (default tab: Home)
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+# 3. Verify "Home" heading on dashboard
+- assertVisible:
+    text: "Home"
+
+# 4. Screenshot: Home tab (dashboard)
+- takeScreenshot: parent-tabs-01-home
+
+# ---------- Learning Book tab ----------
+
+# 5. Tap "Learning Book" tab
+- tapOn:
+    text: "Learning Book"
+
+# 6. Wait for Learning Book to render
+- extendedWaitUntil:
+    visible:
+      id: "subject-filter-tabs"
+    timeout: 10000
+    optional: true
+
+# 7. Screenshot: Learning Book tab
+- takeScreenshot: parent-tabs-02-learning-book
+
+# ---------- More tab ----------
+
+# 8. Tap "More" tab
+- tapOn:
+    text: "More"
+
+# 9. Wait for More screen heading
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+# 10. Verify sign-out button is present
+- assertVisible:
+    id: "sign-out-button"
+
+# 11. Verify appearance section
+- assertVisible:
+    text: "Appearance"
+    optional: true
+
+# 12. Verify notifications section
+- assertVisible:
+    text: "Notifications"
+    optional: true
+
+# 13. Verify account section
+- assertVisible:
+    text: "Account"
+    optional: true
+
+# 14. Screenshot: More tab (settings)
+- takeScreenshot: parent-tabs-03-more
+
+# ---------- Back to Home tab ----------
+
+# 15. Tap "Home" tab to return to dashboard
+- tapOn:
+    text: "Home"
+
+# 16. Verify dashboard is visible again
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 10000
+
+# 17. Final screenshot: back on Home tab
+- takeScreenshot: parent-tabs-04-back-to-home

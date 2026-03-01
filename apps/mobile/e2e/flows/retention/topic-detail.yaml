@@ -1,0 +1,118 @@
+# Flow N9: Topic Detail — Retention Metrics and Actions
+# Validates: user can navigate to topic detail screen from Learning Book,
+# view retention metrics (mastery, memory strength, interval), and see
+# action buttons (start review, recall check).
+# Tags: nightly, retention
+#
+# Journey: UX Journey 2 (Retention management)
+# Epics: Epic 3 (FR43, FR48)
+# Prerequisite: Seeded user with completed sessions + due retention cards
+#               (scenario: retention-due)
+#
+# testID mapping (topic/[topicId].tsx):
+#   - topic-detail-back       -> back button
+#   - topic-detail-loading    -> loading state
+#   - topic-detail-empty      -> empty/not-found state
+#   - retention-card          -> retention metrics card
+#   - start-review-button     -> primary action: start review session
+#   - request-retest-button   -> recall check / review-and-retest
+#   - relearn-button          -> relearn (only after 3+ failures or needs_deepening)
+#
+# testID mapping (book/index.tsx):
+#   - subject-filter-tabs     -> subject filter strip
+#   - learning-book-loading   -> loading spinner
+#   - learning-book-empty     -> empty state
+#   - topic-row-{topicId}     -> individual topic row
+appId: com.mentomate.app
+tags:
+  - nightly
+  - retention
+---
+# 1. Seed & sign in with retention-due scenario
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "retention-due"
+      API_URL: ${API_URL}
+
+# 2. Home screen
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Navigate to Learning Book tab
+- tapOn: "Learning Book"
+
+# 4. Wait for Learning Book to load
+- extendedWaitUntil:
+    visible:
+      text: "Learning Book"
+    timeout: 10000
+
+# 5. Wait for topic list to finish loading (loading spinner disappears)
+- extendedWaitUntil:
+    notVisible:
+      id: "learning-book-loading"
+    timeout: 10000
+    optional: true
+
+# 6. Verify topic rows are present (not empty state)
+- assertNotVisible:
+    id: "learning-book-empty"
+    optional: true
+
+# 7. Tap the first visible topic row (text-based fallback since topicId is dynamic)
+- tapOn:
+    text: "session"
+    optional: true
+
+# 7b. Alternative: tap any visible topic row content
+- tapOn:
+    text: "Last practiced"
+    optional: true
+
+# 8. Wait for topic detail screen to load
+- extendedWaitUntil:
+    visible:
+      id: "retention-card"
+    timeout: 10000
+
+# 9. Verify retention card shows memory strength label
+- assertVisible:
+    text: "Memory strength"
+
+# 10. Verify retention card shows interval info
+- assertVisible:
+    text: "Interval"
+    optional: true
+
+# 11. Verify retention card shows review count
+- assertVisible:
+    text: "Reviews"
+    optional: true
+
+# 12. Verify progress section shows mastery or status
+- assertVisible:
+    text: "Progress"
+
+# 13. Verify start-review-button is present
+- assertVisible:
+    id: "start-review-button"
+
+# 14. Verify request-retest-button is present
+- assertVisible:
+    id: "request-retest-button"
+
+# 15. Screenshot of topic detail with retention metrics
+- takeScreenshot: topic-detail-retention
+
+# 16. Tap back to return to Learning Book
+- tapOn:
+    id: "topic-detail-back"
+
+# 17. Verify we're back on Learning Book
+- extendedWaitUntil:
+    visible:
+      text: "Learning Book"
+    timeout: 5000

@@ -1,0 +1,146 @@
+# Flow N10: Relearn Method Selection — Failed Recall Triggers Relearn
+# Validates: user with 3+ failed recalls can navigate to topic detail,
+# see the relearn button, choose a different teaching method, and start
+# a relearn session.
+# Tags: nightly, retention
+#
+# Journey: UX Journey 2 (Recall failure path — remediation)
+# Epics: Epic 3 (FR52-FR58)
+# Prerequisite: Seeded user with 3 failed recalls + needs-deepening topic
+#               (scenario: failed-recall-3x)
+#
+# testID mapping (topic/[topicId].tsx):
+#   - relearn-button              -> visible after 3+ failures or needs_deepening
+#   - start-review-button         -> primary review action
+#   - retention-card              -> retention metrics card
+#
+# testID mapping (topic/relearn.tsx):
+#   - relearn-back                -> back button
+#   - relearn-loading             -> submitting state
+#   - relearn-different-method    -> choice: try different method (recommended)
+#   - relearn-same-method         -> choice: continue same method
+#   - relearn-method-visual_diagrams    -> method picker option
+#   - relearn-method-step_by_step      -> method picker option
+#   - relearn-method-real_world_examples -> method picker option
+#   - relearn-method-practice_problems  -> method picker option
+#   - relearn-back-to-choice     -> back from method picker to choice phase
+appId: com.mentomate.app
+tags:
+  - nightly
+  - retention
+---
+# 1. Seed & sign in with failed-recall scenario (3+ failures)
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "failed-recall-3x"
+      API_URL: ${API_URL}
+
+# 2. Home screen
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Navigate to Learning Book tab to find the struggling topic
+- tapOn: "Learning Book"
+
+# 4. Wait for Learning Book to load
+- extendedWaitUntil:
+    visible:
+      text: "Learning Book"
+    timeout: 10000
+
+# 5. Wait for topics to load
+- extendedWaitUntil:
+    notVisible:
+      id: "learning-book-loading"
+    timeout: 10000
+    optional: true
+
+# 6. Look for "Needs attention" indicator (3+ failures marker)
+- assertVisible:
+    text: "Needs attention"
+    optional: true
+
+# 7. Tap the topic that needs attention
+- tapOn:
+    text: "Needs attention"
+    optional: true
+
+# 7b. Fallback: tap a topic row by its content
+- tapOn:
+    text: "session"
+    optional: true
+
+# 8. Wait for topic detail screen
+- extendedWaitUntil:
+    visible:
+      id: "retention-card"
+    timeout: 10000
+
+# 9. Verify relearn button is visible (only shows after 3+ failures)
+- assertVisible:
+    id: "relearn-button"
+
+# 10. Tap relearn button
+- tapOn:
+    id: "relearn-button"
+
+# 11. Verify relearn screen loads with choice phase
+- extendedWaitUntil:
+    visible:
+      text: "Relearn Topic"
+    timeout: 10000
+
+# 12. Verify the choice phase prompt text
+- assertVisible:
+    text: "Every topic needs its own approach"
+
+# 13. Verify both choice options are present
+- assertVisible:
+    id: "relearn-different-method"
+- assertVisible:
+    id: "relearn-same-method"
+
+# 14. Screenshot of relearn choice phase
+- takeScreenshot: relearn-choice-phase
+
+# 15. Tap "Different Method" (recommended option)
+- tapOn:
+    id: "relearn-different-method"
+
+# 16. Verify method picker phase loads
+- extendedWaitUntil:
+    visible:
+      text: "Pick a teaching style"
+    timeout: 5000
+
+# 17. Verify all 4 method options are present
+- assertVisible:
+    id: "relearn-method-visual_diagrams"
+- assertVisible:
+    id: "relearn-method-step_by_step"
+- assertVisible:
+    id: "relearn-method-real_world_examples"
+- assertVisible:
+    id: "relearn-method-practice_problems"
+
+# 18. Screenshot of method picker
+- takeScreenshot: relearn-method-picker
+
+# 19. Select "Visual Diagrams" method
+- tapOn:
+    id: "relearn-method-visual_diagrams"
+
+# 20. Wait for relearn session to start (navigates to session screen)
+# The relearn mutation calls the API and navigates on success.
+# Either loading state or session screen should appear.
+- extendedWaitUntil:
+    visible:
+      id: "relearn-loading"
+    timeout: 5000
+    optional: true
+
+# 21. Screenshot after method selection (loading or session)
+- takeScreenshot: relearn-session-starting
