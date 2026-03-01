@@ -35,6 +35,16 @@ export default function SessionSummaryScreen() {
   const exchanges = parseInt(exchangeCount ?? '0', 10);
   const rung = parseInt(escalationRung ?? '1', 10);
 
+  if (!sessionId) {
+    return (
+      <View className="flex-1 bg-background items-center justify-center px-6">
+        <Text className="text-text-secondary text-body text-center">
+          Session not found.
+        </Text>
+      </View>
+    );
+  }
+
   const handleSubmit = async (): Promise<void> => {
     if (summaryText.trim().length < 10 || submitSummary.isPending) return;
 

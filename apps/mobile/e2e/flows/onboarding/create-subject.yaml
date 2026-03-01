@@ -10,7 +10,7 @@
 # NOTE: This flow assumes the user is already authenticated.
 # In a real CI setup, a _setup/ flow or test seeding endpoint would
 # handle sign-in before this flow runs.
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - smoke
   - onboarding

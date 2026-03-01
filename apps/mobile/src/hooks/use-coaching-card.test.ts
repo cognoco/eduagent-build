@@ -177,6 +177,89 @@ describe('useCoachingCard', () => {
     expect(result.current.subtext).toContain('Your coach is ready');
   });
 
+  it('includes subjectId in freeform routes when defaultSubjectId is provided', async () => {
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/progress/continue')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ suggestion: null }), { status: 200 })
+        );
+      }
+      if (url.includes('/streaks')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              streak: {
+                currentStreak: 0,
+                longestStreak: 0,
+                lastActivityDate: null,
+                gracePeriodStartDate: null,
+                isOnGracePeriod: false,
+                graceDaysRemaining: 0,
+              },
+            }),
+            { status: 200 }
+          )
+        );
+      }
+      return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
+    });
+
+    const { result } = renderHook(() => useCoachingCard('subject-abc'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Freeform routes must include subjectId so the API can create a session
+    expect(result.current.primaryRoute).toContain('subjectId=subject-abc');
+    expect(result.current.secondaryRoute).toContain('subjectId=subject-abc');
+    expect(result.current.primaryRoute).toContain('mode=freeform');
+  });
+
+  it('omits subjectId from freeform routes when no defaultSubjectId', async () => {
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/progress/continue')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ suggestion: null }), { status: 200 })
+        );
+      }
+      if (url.includes('/streaks')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              streak: {
+                currentStreak: 0,
+                longestStreak: 0,
+                lastActivityDate: null,
+                gracePeriodStartDate: null,
+                isOnGracePeriod: false,
+                graceDaysRemaining: 0,
+              },
+            }),
+            { status: 200 }
+          )
+        );
+      }
+      return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
+    });
+
+    const { result } = renderHook(() => useCoachingCard(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Without defaultSubjectId, routes should NOT contain subjectId
+    expect(result.current.primaryRoute).not.toContain('subjectId');
+    expect(result.current.primaryRoute).toContain('mode=freeform');
+  });
+
   it('shows loading state initially', async () => {
     // Delay the responses so loading state is visible
     mockFetch.mockImplementation(

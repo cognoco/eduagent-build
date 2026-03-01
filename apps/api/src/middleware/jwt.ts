@@ -88,12 +88,13 @@ interface CachedJWKS {
   fetchedAt: number;
 }
 
-let jwksCache: CachedJWKS | null = null;
+const jwksCacheByUrl = new Map<string, CachedJWKS>();
 
 export async function fetchJWKS(url: string): Promise<JWKS> {
   const now = Date.now();
-  if (jwksCache && now - jwksCache.fetchedAt < JWKS_CACHE_TTL_MS) {
-    return { keys: jwksCache.keys };
+  const cached = jwksCacheByUrl.get(url);
+  if (cached && now - cached.fetchedAt < JWKS_CACHE_TTL_MS) {
+    return { keys: cached.keys };
   }
 
   const res = await fetch(url);
@@ -102,7 +103,7 @@ export async function fetchJWKS(url: string): Promise<JWKS> {
   }
 
   const jwks = (await res.json()) as JWKS;
-  jwksCache = { keys: jwks.keys, fetchedAt: now };
+  jwksCacheByUrl.set(url, { keys: jwks.keys, fetchedAt: now });
   return jwks;
 }
 
@@ -110,7 +111,7 @@ export async function fetchJWKS(url: string): Promise<JWKS> {
  * Exported for testing — allows tests to clear the in-memory JWKS cache.
  */
 export function clearJWKSCache(): void {
-  jwksCache = null;
+  jwksCacheByUrl.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +134,18 @@ async function importRSAPublicKey(jwk: JWK): Promise<CryptoKey> {
   );
 }
 
-export async function verifyJWT(token: string, jwk: JWK): Promise<JWTPayload> {
+export interface VerifyJWTOptions {
+  /** Expected issuer (iss claim). If provided, the token's iss must match exactly. */
+  issuer?: string;
+  /** Expected audience (aud claim). If provided, the token's aud must include this value. */
+  audience?: string;
+}
+
+export async function verifyJWT(
+  token: string,
+  jwk: JWK,
+  options?: VerifyJWTOptions
+): Promise<JWTPayload> {
   const parts = token.split('.');
   if (parts.length !== 3) {
     throw new Error('Invalid JWT: expected 3 segments');
@@ -170,6 +182,27 @@ export async function verifyJWT(token: string, jwk: JWK): Promise<JWTPayload> {
 
   if (payload.nbf !== undefined && payload.nbf > now) {
     throw new Error('Invalid JWT: token not yet valid');
+  }
+
+  // Validate issuer claim
+  if (options?.issuer) {
+    if (payload.iss !== options.issuer) {
+      throw new Error(
+        `Invalid JWT: issuer mismatch (expected ${options.issuer}, got ${
+          payload.iss ?? 'none'
+        })`
+      );
+    }
+  }
+
+  // Validate audience claim (only when both config value and token claim exist)
+  if (options?.audience && payload.aud !== undefined) {
+    const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+    if (!audiences.includes(options.audience)) {
+      throw new Error(
+        `Invalid JWT: audience mismatch (expected ${options.audience})`
+      );
+    }
   }
 
   return payload;

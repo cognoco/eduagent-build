@@ -37,6 +37,16 @@ export default function SubjectTopicsScreen() {
     subjectId
   );
 
+  if (!profileId || !subjectId) {
+    return (
+      <View className="flex-1 bg-background items-center justify-center px-6">
+        <Text className="text-text-secondary text-body text-center">
+          Unable to load subject details.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">

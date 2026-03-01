@@ -17,8 +17,14 @@ const apiUrl = __maestro.env['API_URL'] || 'http://10.0.2.2:8787';
 const email =
   __maestro.env['EMAIL'] || 'test-e2e-' + Date.now() + '@example.com';
 
+const headers = { 'Content-Type': 'application/json' };
+const testSecret = __maestro.env['TEST_SEED_SECRET'];
+if (testSecret) {
+  headers['X-Test-Secret'] = testSecret;
+}
+
 const response = http.post(apiUrl + '/v1/__test/seed', {
-  headers: { 'Content-Type': 'application/json' },
+  headers: headers,
   body: JSON.stringify({ scenario: scenario, email: email }),
 });
 

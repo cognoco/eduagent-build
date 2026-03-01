@@ -13,7 +13,11 @@
 #   - chat-input            -> text input (from ChatShell)
 #   - send-button           -> send button (from ChatShell)
 #   - remediation-card      -> shown after 3+ failures
-appId: com.zwizzly.eduagent
+#   - review-retest-button  -> "Review and Re-test" on remediation card
+#   - relearn-topic-button  -> "Relearn Topic" on remediation card
+#   - relearn-different-method -> choice: try different method (relearn screen)
+#   - relearn-same-method   -> choice: continue same method (relearn screen)
+appId: com.mentomate.app
 tags:
   - nightly
   - retention
@@ -73,5 +77,38 @@ tags:
     timeout: 10000
     optional: true
 
-# 11. Screenshot
+# 11. Screenshot of remediation card
 - takeScreenshot: failed-recall-remediation
+
+# 12. Verify "Review and Re-test" button on remediation card
+- assertVisible:
+    id: "review-retest-button"
+    optional: true
+
+# 13. Verify "Relearn Topic" button on remediation card
+- assertVisible:
+    id: "relearn-topic-button"
+    optional: true
+
+# 14. Tap "Relearn Topic" to navigate to relearn method selection
+- tapOn:
+    id: "relearn-topic-button"
+    optional: true
+
+# 15. Verify relearn screen loads with choice phase
+- extendedWaitUntil:
+    visible:
+      text: "Relearn Topic"
+    timeout: 10000
+    optional: true
+
+# 16. Verify both method choice options are present
+- assertVisible:
+    id: "relearn-different-method"
+    optional: true
+- assertVisible:
+    id: "relearn-same-method"
+    optional: true
+
+# 17. Screenshot of relearn screen reached from remediation card
+- takeScreenshot: failed-recall-to-relearn

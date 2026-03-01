@@ -15,7 +15,7 @@
 #   - recall-test-screen    -> screen wrapper
 #   - chat-input            -> text input (from ChatShell)
 #   - send-button           -> send button (from ChatShell)
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - nightly
   - retention

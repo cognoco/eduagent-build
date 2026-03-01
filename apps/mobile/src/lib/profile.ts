@@ -39,7 +39,7 @@ export interface ProfileContextValue {
   isLoading: boolean;
 }
 
-const ACTIVE_PROFILE_KEY = 'eduagent_active_profile_id';
+const ACTIVE_PROFILE_KEY = 'mentomate_active_profile_id';
 
 export const ProfileContext = createContext<ProfileContextValue>({
   profiles: [],

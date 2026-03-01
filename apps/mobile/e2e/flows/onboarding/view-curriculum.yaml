@@ -7,7 +7,7 @@
 #   - User is signed in
 #   - At least one subject exists with a generated curriculum
 #   - API is running and reachable
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - smoke
   - onboarding

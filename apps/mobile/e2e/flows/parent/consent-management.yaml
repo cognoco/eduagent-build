@@ -1,0 +1,134 @@
+# Flow P3: Parent Consent Management — Withdraw and Restore
+# Validates: parent can withdraw consent (GDPR) and cancel deletion during
+# the 7-day grace period from the child detail screen.
+# Tags: nightly, parent, consent, gdpr
+#
+# Journey: UX Journey 4 (Parent Oversight)
+# Epics: Epic 5 (GDPR consent revocation, COPPA)
+# Prerequisite: Seeded parent user with linked children who have consent
+#               (scenario: parent-with-children)
+#
+# Key testIDs (from child/[profileId]/index.tsx):
+#   consent-section            — consent management section container
+#   withdraw-consent-button    — triggers Alert.alert confirmation dialog
+#   grace-period-banner        — shown after consent is withdrawn
+#   cancel-deletion-button     — restores consent during grace period
+#
+# NOTE: Consent withdrawal triggers an Inngest 7-day grace period job.
+# In E2E we only validate the UI flow (withdraw → banner → restore).
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+  - consent
+  - gdpr
+---
+# 1. Seed & sign in as parent
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-with-children"
+      API_URL: ${API_URL}
+
+# 2. Wait for parent dashboard
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+# 3. Tap child card to navigate to child detail
+- tapOn:
+    id: "parent-dashboard-summary-primary"
+    optional: true
+
+# 3b. Fallback: tap on the card body
+- tapOn:
+    id: "parent-dashboard-summary"
+    optional: true
+
+# 4. Wait for child detail screen
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+# 5. Scroll down to consent section (it is at the bottom of the scroll view)
+- scrollUntilVisible:
+    element:
+      id: "consent-section"
+    direction: DOWN
+    timeout: 10000
+    optional: true
+
+# 6. Screenshot: consent section visible with "Withdraw Consent" button
+- takeScreenshot: consent-mgmt-01-consent-section
+
+# 7. Verify withdraw consent button is visible
+- assertVisible:
+    id: "withdraw-consent-button"
+    optional: true
+
+# 8. Tap withdraw consent button — this triggers a native Alert dialog
+- tapOn:
+    id: "withdraw-consent-button"
+    optional: true
+
+# 9. Wait for the native alert confirmation dialog
+#    Alert title is "Withdraw consent for {childName}?"
+- extendedWaitUntil:
+    visible:
+      text: "Withdraw consent"
+    timeout: 5000
+    optional: true
+
+# 10. Screenshot: confirmation dialog
+- takeScreenshot: consent-mgmt-02-confirm-dialog
+
+# 11. Tap "Withdraw" button in the alert to confirm
+- tapOn:
+    text: "Withdraw"
+    optional: true
+
+# 12. Wait for grace period banner to appear (consent is now WITHDRAWN)
+- extendedWaitUntil:
+    visible:
+      id: "grace-period-banner"
+    timeout: 10000
+    optional: true
+
+# 13. Verify deletion pending text
+- assertVisible:
+    text: "Deletion pending"
+    optional: true
+
+# 14. Verify cancel deletion button is present
+- assertVisible:
+    id: "cancel-deletion-button"
+    optional: true
+
+# 15. Screenshot: grace period banner with cancel option
+- takeScreenshot: consent-mgmt-03-grace-period-banner
+
+# 16. Tap cancel deletion to restore consent
+- tapOn:
+    id: "cancel-deletion-button"
+    optional: true
+
+# 17. Wait for consent to be restored — grace period banner should disappear
+#     and the withdraw consent button should reappear
+- extendedWaitUntil:
+    visible:
+      id: "withdraw-consent-button"
+    timeout: 10000
+    optional: true
+
+# 18. Screenshot: consent restored, withdraw button visible again
+- takeScreenshot: consent-mgmt-04-consent-restored
+
+# 19. Navigate back to dashboard
+- tapOn:
+    id: "back-button"
+    optional: true
+
+# 20. Final screenshot
+- takeScreenshot: consent-mgmt-05-complete

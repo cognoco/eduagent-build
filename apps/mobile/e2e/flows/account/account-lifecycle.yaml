@@ -6,7 +6,7 @@
 # Journey: UX Journey 5 (Account Management)
 # Epics: Epic 5 (FR101-FR105)
 # Prerequisite: Seeded user with onboarding complete (scenario: onboarding-complete)
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - nightly
   - account

@@ -5,7 +5,7 @@
 # Journey: UX Journey 2 (Daily Learning Loop)
 # Epics: Epic 2 (FR23-FR26, FR41)
 # Prerequisite: Seeded user with subject + coaching card (scenario: learning-active)
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - smoke
   - learning
@@ -73,23 +73,23 @@ tags:
     timeout: 15000
 
 # 11. Session close — either auto-closes after exchange cap or manual
-# Look for summary screen or close button
+# Look for summary screen title (testID: summary-title from session-summary/[sessionId].tsx)
 # NOTE: Session auto-close depends on exchange count config. If still active,
 # the flow verifies the session survived 3 exchanges without crashing.
 - extendedWaitUntil:
     visible:
-      id: "summary-score"
+      id: "summary-title"
     timeout: 20000
     optional: true
 
-# 12. If summary screen appeared, verify content
+# 12. If summary screen appeared, verify takeaways content
 - assertVisible:
-    id: "summary-topics"
+    id: "session-takeaways"
     optional: true
 
-# 13. Close summary and return to home
+# 13. Skip summary and return to home (testID: skip-summary-button)
 - tapOn:
-    id: "summary-close"
+    id: "skip-summary-button"
     optional: true
 
 # 14. Verify we can reach home

@@ -5,7 +5,7 @@
 # Journey: UX Journey 1 (New Subject) + Journey 2 (Learning)
 # Epics: Epic 1 (FR10-FR14), Epic 2 (FR23-FR26)
 # Prerequisite: Seeded user with onboarding complete (scenario: onboarding-complete)
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - nightly
   - assessment

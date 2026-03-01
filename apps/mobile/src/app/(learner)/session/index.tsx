@@ -103,8 +103,11 @@ export default function SessionScreen() {
       try {
         const sid = await ensureSession();
         if (!sid) {
+          const errorMessage = subjectId
+            ? "I'm having trouble starting a session. Please try again."
+            : 'Please select a subject first so I can help you learn.';
           animationCleanupRef.current = animateResponse(
-            "I'm having trouble starting a session. Please try again.",
+            errorMessage,
             setMessages,
             setIsStreaming
           );

@@ -51,6 +51,7 @@ type Bindings = {
   CLERK_SECRET_KEY?: string;
   CLERK_PUBLISHABLE_KEY?: string;
   CLERK_JWKS_URL?: string;
+  CLERK_AUDIENCE?: string;
   GEMINI_API_KEY?: string;
   LOG_LEVEL?: string;
   STRIPE_SECRET_KEY?: string;
@@ -67,6 +68,7 @@ type Bindings = {
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
   SENTRY_DSN?: string;
+  TEST_SEED_SECRET?: string;
   COACHING_KV?: KVNamespace;
 };
 
@@ -103,7 +105,11 @@ api.use(
     },
     allowHeaders: ['Content-Type', 'Authorization', 'X-Profile-Id'],
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    exposeHeaders: ['Content-Type'],
+    exposeHeaders: [
+      'Content-Type',
+      'X-Quota-Remaining',
+      'X-Quota-Warning-Level',
+    ],
     credentials: true,
     maxAge: 3600,
   })
