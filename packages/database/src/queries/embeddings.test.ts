@@ -1,5 +1,5 @@
-import { findSimilarTopics, storeEmbedding } from './embeddings.js';
-import type { Database } from '../client.js';
+import { findSimilarTopics, storeEmbedding } from './embeddings';
+import type { Database } from '../client';
 
 // ---------------------------------------------------------------------------
 // Mocks
