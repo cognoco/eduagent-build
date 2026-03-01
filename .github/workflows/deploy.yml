@@ -1,0 +1,203 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      api_environment:
+        description: 'API deploy environment'
+        required: false
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+          - skip
+      mobile_profile:
+        description: 'Mobile EAS build profile'
+        required: false
+        default: 'skip'
+        type: choice
+        options:
+          - skip
+          - preview
+          - production
+      mobile_platform:
+        description: 'Mobile target platform'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - android
+          - ios
+          - all
+
+permissions:
+  actions: read
+  contents: read
+
+# Never deploy in parallel — one deployment at a time
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # API: Cloudflare Workers deployment
+  # ---------------------------------------------------------------------------
+
+  api-quality-gate:
+    name: API Quality Gate
+    if: |
+      (github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && inputs.api_environment != 'skip')
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: eduagent
+          POSTGRES_PASSWORD: eduagent
+          POSTGRES_DB: tests
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://eduagent:eduagent@localhost:5432/tests
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: tree:0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          standalone: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply database schema
+        run: pnpm --filter @eduagent/database db:push
+
+      - name: Lint
+        run: pnpm exec nx run api:lint
+
+      - name: Typecheck
+        run: pnpm exec nx run api:typecheck
+
+      - name: Unit tests
+        run: pnpm exec nx run api:test
+
+      - name: Integration tests
+        run: pnpm exec nx run api:test:integration
+
+  api-confirm-production:
+    name: Confirm Production Deploy
+    needs: api-quality-gate
+    if: |
+      github.event_name == 'workflow_dispatch' && inputs.api_environment == 'production'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Production deployment confirmed
+        run: echo "Production deployment approved via GitHub Environment protection rules."
+
+  api-deploy:
+    name: Deploy API (${{ github.event_name == 'push' && 'staging' || inputs.api_environment }})
+    needs: [api-quality-gate, api-confirm-production]
+    # Run after quality gate; skip confirmation for non-production
+    if: |
+      always() &&
+      needs.api-quality-gate.result == 'success' &&
+      (needs.api-confirm-production.result == 'success' || needs.api-confirm-production.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          standalone: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build API
+        run: pnpm exec nx run api:build
+
+      - name: Deploy to Cloudflare Workers
+        working-directory: apps/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
+          echo "Deploying API to ${DEPLOY_ENV}"
+          pnpm exec wrangler deploy --env "${DEPLOY_ENV}"
+
+  # ---------------------------------------------------------------------------
+  # Mobile: EAS Build deployment
+  # ---------------------------------------------------------------------------
+
+  mobile-confirm-production:
+    name: Confirm Production Build
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      inputs.mobile_profile == 'production'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Production build confirmed
+        run: echo "Production mobile build approved via GitHub Environment protection rules."
+
+  mobile-deploy:
+    name: Build Mobile (${{ inputs.mobile_profile }})
+    needs: mobile-confirm-production
+    if: |
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.mobile_profile != 'skip' &&
+      (needs.mobile-confirm-production.result == 'success' || needs.mobile-confirm-production.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          standalone: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build with EAS
+        working-directory: apps/mobile
+        run: |
+          echo "Building profile: ${{ inputs.mobile_profile }}, platform: ${{ inputs.mobile_platform }}"
+          eas build \
+            --profile ${{ inputs.mobile_profile }} \
+            --platform ${{ inputs.mobile_platform }} \
+            --non-interactive

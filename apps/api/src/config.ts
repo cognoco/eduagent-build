@@ -36,6 +36,38 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
+// ---------------------------------------------------------------------------
+// Production-critical keys — must be present when ENVIRONMENT === 'production'
+// ---------------------------------------------------------------------------
+
+const PRODUCTION_REQUIRED_KEYS: readonly (keyof Env)[] = [
+  'CLERK_SECRET_KEY',
+  'CLERK_JWKS_URL',
+  'GEMINI_API_KEY',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'VOYAGE_API_KEY',
+  'RESEND_API_KEY',
+] as const;
+
+/**
+ * Validates that all production-critical keys are present.
+ * Returns an array of missing key names (empty if all present).
+ */
+export function validateProductionKeys(env: Env): string[] {
+  if (env.ENVIRONMENT !== 'production') {
+    return [];
+  }
+
+  const missing: string[] = [];
+  for (const key of PRODUCTION_REQUIRED_KEYS) {
+    if (!env[key]) {
+      missing.push(key);
+    }
+  }
+  return missing;
+}
+
 export function validateEnv(raw: Record<string, string | undefined>): Env {
   const result = envSchema.safeParse(raw);
   if (!result.success) {
@@ -44,5 +76,14 @@ export function validateEnv(raw: Record<string, string | undefined>): Env {
       `Invalid environment: ${JSON.stringify(formatted.fieldErrors)}`
     );
   }
-  return result.data;
+
+  const env = result.data;
+  const missingKeys = validateProductionKeys(env);
+  if (missingKeys.length > 0) {
+    throw new Error(
+      `Production environment missing required keys: ${missingKeys.join(', ')}`
+    );
+  }
+
+  return env;
 }

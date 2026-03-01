@@ -133,7 +133,18 @@ async function importRSAPublicKey(jwk: JWK): Promise<CryptoKey> {
   );
 }
 
-export async function verifyJWT(token: string, jwk: JWK): Promise<JWTPayload> {
+export interface VerifyJWTOptions {
+  /** Expected issuer (iss claim). If provided, the token's iss must match exactly. */
+  issuer?: string;
+  /** Expected audience (aud claim). If provided, the token's aud must include this value. */
+  audience?: string;
+}
+
+export async function verifyJWT(
+  token: string,
+  jwk: JWK,
+  options?: VerifyJWTOptions
+): Promise<JWTPayload> {
   const parts = token.split('.');
   if (parts.length !== 3) {
     throw new Error('Invalid JWT: expected 3 segments');
@@ -170,6 +181,27 @@ export async function verifyJWT(token: string, jwk: JWK): Promise<JWTPayload> {
 
   if (payload.nbf !== undefined && payload.nbf > now) {
     throw new Error('Invalid JWT: token not yet valid');
+  }
+
+  // Validate issuer claim
+  if (options?.issuer) {
+    if (payload.iss !== options.issuer) {
+      throw new Error(
+        `Invalid JWT: issuer mismatch (expected ${options.issuer}, got ${
+          payload.iss ?? 'none'
+        })`
+      );
+    }
+  }
+
+  // Validate audience claim (only when both config value and token claim exist)
+  if (options?.audience && payload.aud !== undefined) {
+    const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+    if (!audiences.includes(options.audience)) {
+      throw new Error(
+        `Invalid JWT: audience mismatch (expected ${options.audience})`
+      );
+    }
   }
 
   return payload;

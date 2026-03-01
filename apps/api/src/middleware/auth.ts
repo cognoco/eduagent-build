@@ -43,6 +43,14 @@ function isPublicPath(path: string): boolean {
 // Clerk JWT verification helper
 // ---------------------------------------------------------------------------
 
+/**
+ * Derives the expected Clerk issuer URL from the JWKS URL.
+ * Example: "https://clerk.example.com/.well-known/jwks.json" → "https://clerk.example.com"
+ */
+function deriveIssuerFromJwksUrl(jwksUrl: string): string {
+  return jwksUrl.replace(/\/\.well-known\/jwks\.json$/, '');
+}
+
 async function verifyClerkJWT(
   token: string,
   jwksUrl: string | undefined
@@ -64,8 +72,9 @@ async function verifyClerkJWT(
     throw new Error(`No matching JWK found for kid: ${header.kid}`);
   }
 
-  // Verify signature and validate claims
-  const payload = await verifyJWT(token, jwk);
+  // Verify signature and validate claims (including issuer)
+  const issuer = deriveIssuerFromJwksUrl(jwksUrl);
+  const payload = await verifyJWT(token, jwk, { issuer });
 
   return {
     sub: payload.sub,
