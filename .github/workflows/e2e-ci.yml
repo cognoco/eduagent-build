@@ -172,9 +172,9 @@ jobs:
           node ../../node_modules/@expo/cli/build/bin/cli export:embed \
             --platform android \
             --dev true \
-            --entry-file index.js \
-            --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res
+            --entry-file "$(pwd)/index.js" \
+            --bundle-output "$(pwd)/android/app/src/main/assets/index.android.bundle" \
+            --assets-dest "$(pwd)/android/app/src/main/res"
 
       # Compile debug APK via Gradle (now includes the pre-bundled JS)
       - name: Build debug APK
