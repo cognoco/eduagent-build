@@ -126,6 +126,16 @@ export default function RecallTestScreen() {
     });
   }, [router, topicId, subjectId]);
 
+  if (!topicId) {
+    return (
+      <View className="flex-1 bg-background items-center justify-center px-6">
+        <Text className="text-text-secondary text-body text-center">
+          Topic not found.
+        </Text>
+      </View>
+    );
+  }
+
   const footer = remediationData ? (
     <RemediationCard
       retentionStatus={remediationData.retentionStatus}

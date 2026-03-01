@@ -95,8 +95,10 @@ export default function RelearnScreen() {
 
   if (!topicId || !subjectId) {
     return (
-      <View className="flex-1 bg-background items-center justify-center">
-        <Text className="text-text-secondary">Missing topic information</Text>
+      <View className="flex-1 bg-background items-center justify-center px-6">
+        <Text className="text-text-secondary text-body text-center">
+          Missing required parameters. Please go back and try again.
+        </Text>
       </View>
     );
   }

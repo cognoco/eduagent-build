@@ -6,6 +6,7 @@ import {
   TextInput,
   Linking,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -92,8 +93,15 @@ export default function CameraScreen(): React.ReactNode {
   );
 
   const handleConfirmResult = useCallback(() => {
+    if (!subjectId) {
+      Alert.alert(
+        'No subject selected',
+        'Please go back and select a subject first.'
+      );
+      return;
+    }
     navigateToSession(
-      subjectId ?? '',
+      subjectId,
       subjectName ?? '',
       editedText,
       state.imageUri ?? undefined
@@ -108,7 +116,14 @@ export default function CameraScreen(): React.ReactNode {
   );
 
   const handleManualContinue = useCallback(() => {
-    navigateToSession(subjectId ?? '', subjectName ?? '', manualText);
+    if (!subjectId) {
+      Alert.alert(
+        'No subject selected',
+        'Please go back and select a subject first.'
+      );
+      return;
+    }
+    navigateToSession(subjectId, subjectName ?? '', manualText);
   }, [navigateToSession, subjectId, subjectName, manualText]);
 
   const handleManualPickSubject = useCallback(
