@@ -218,6 +218,8 @@ jobs:
       #   which crash in embedded (offline) APKs.
       - name: Bundle JS for offline APK
         working-directory: apps/mobile
+        env:
+          EXPO_ROUTER_APP_ROOT: ./src/app
         run: |
           mkdir -p android/app/src/main/assets
 
