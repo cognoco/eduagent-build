@@ -8,7 +8,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.mentomate.com"
+        "EXPO_PUBLIC_API_URL": "https://eduagent-api.zuzana-kopecna.workers.dev"
       }
     },
     "development": {
@@ -24,7 +24,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api-staging.mentomate.com"
+        "EXPO_PUBLIC_API_URL": "https://eduagent-api.zuzana-kopecna.workers.dev"
       }
     }
   },
