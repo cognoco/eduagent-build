@@ -4,6 +4,7 @@ import {
   text,
   timestamp,
   boolean,
+  integer,
   pgEnum,
   unique,
   index,
@@ -109,6 +110,7 @@ export const consentStates = pgTable(
       .defaultNow(),
     respondedAt: timestamp('responded_at', { withTimezone: true }),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
+    resendCount: integer('resend_count').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

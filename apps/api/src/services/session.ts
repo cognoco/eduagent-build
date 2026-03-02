@@ -89,6 +89,18 @@ export class SubjectInactiveError extends Error {
   }
 }
 
+/** Maximum exchanges allowed per session (defense-in-depth — issue #15) */
+const MAX_EXCHANGES_PER_SESSION = 50;
+
+export class SessionExchangeLimitError extends Error {
+  constructor(public readonly exchangeCount: number) {
+    super(
+      `Session has reached the maximum of ${MAX_EXCHANGES_PER_SESSION} exchanges`
+    );
+    this.name = 'SessionExchangeLimitError';
+  }
+}
+
 export async function startSession(
   db: Database,
   profileId: string,
@@ -395,6 +407,8 @@ async function persistExchangeResult(
   // enriched with behavioral metrics when available (UX-18)
   const aiMetadata: Record<string, unknown> = {
     escalationRung: effectiveRung,
+    sessionType: session.sessionType,
+    ...(session.sessionType === 'homework' && { isHomework: true }),
     ...(behavioral && {
       isUnderstandingCheck: behavioral.isUnderstandingCheck,
       timeToAnswerMs: behavioral.timeToAnswerMs,
@@ -483,6 +497,11 @@ export async function processMessage(
       options
     );
 
+  // Defense-in-depth: cap exchanges per session (issue #15)
+  if (session.exchangeCount >= MAX_EXCHANGES_PER_SESSION) {
+    throw new SessionExchangeLimitError(session.exchangeCount);
+  }
+
   const result = await processExchange(context, input.message);
 
   // Compute time-to-answer: ms between last AI response and now
@@ -537,6 +556,11 @@ export async function streamMessage(
       input.message,
       options
     );
+
+  // Defense-in-depth: cap exchanges per session (issue #15)
+  if (session.exchangeCount >= MAX_EXCHANGES_PER_SESSION) {
+    throw new SessionExchangeLimitError(session.exchangeCount);
+  }
 
   // Compute time-to-answer before streaming begins
   const timeToAnswerMs = lastAiResponseAt

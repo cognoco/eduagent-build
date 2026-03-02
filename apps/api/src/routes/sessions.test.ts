@@ -84,13 +84,45 @@ const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
 const EVENT_ID = '770e8400-e29b-41d4-a716-446655440000';
 
-jest.mock('../services/session', () => ({
-  startSession: jest
-    .fn()
-    .mockImplementation((_db, _profileId, subjectId, input) => ({
+jest.mock('../services/session', () => {
+  class _SubjectInactiveError extends Error {
+    subjectStatus: string;
+    constructor(status: string) {
+      super(`Subject is ${status}`);
+      this.name = 'SubjectInactiveError';
+      this.subjectStatus = status;
+    }
+  }
+  class _SessionExchangeLimitError extends Error {
+    exchangeCount: number;
+    constructor(count: number) {
+      super(`Session has reached the maximum of 50 exchanges`);
+      this.name = 'SessionExchangeLimitError';
+      this.exchangeCount = count;
+    }
+  }
+  return {
+    SubjectInactiveError: _SubjectInactiveError,
+    SessionExchangeLimitError: _SessionExchangeLimitError,
+    startSession: jest
+      .fn()
+      .mockImplementation((_db, _profileId, subjectId, input) => ({
+        id: SESSION_ID,
+        subjectId,
+        topicId: input.topicId ?? null,
+        sessionType: 'learning',
+        status: 'active',
+        escalationRung: 1,
+        exchangeCount: 0,
+        startedAt: new Date().toISOString(),
+        lastActivityAt: new Date().toISOString(),
+        endedAt: null,
+        durationSeconds: null,
+      })),
+    getSession: jest.fn().mockResolvedValue({
       id: SESSION_ID,
-      subjectId,
-      topicId: input.topicId ?? null,
+      subjectId: SUBJECT_ID,
+      topicId: null,
       sessionType: 'learning',
       status: 'active',
       escalationRung: 1,
@@ -99,66 +131,56 @@ jest.mock('../services/session', () => ({
       lastActivityAt: new Date().toISOString(),
       endedAt: null,
       durationSeconds: null,
-    })),
-  getSession: jest.fn().mockResolvedValue({
-    id: SESSION_ID,
-    subjectId: SUBJECT_ID,
-    topicId: null,
-    sessionType: 'learning',
-    status: 'active',
-    escalationRung: 1,
-    exchangeCount: 0,
-    startedAt: new Date().toISOString(),
-    lastActivityAt: new Date().toISOString(),
-    endedAt: null,
-    durationSeconds: null,
-  }),
-  processMessage: jest.fn().mockResolvedValue({
-    response: 'Mock AI tutor response',
-    escalationRung: 1,
-    isUnderstandingCheck: false,
-    exchangeCount: 1,
-  }),
-  closeSession: jest.fn().mockImplementation((_db, _profileId, sessionId) => ({
-    message: 'Session closed',
-    sessionId,
-    topicId: null,
-    subjectId: SUBJECT_ID,
-  })),
-  flagContent: jest.fn().mockResolvedValue({
-    message: 'Content flagged for review. Thank you!',
-  }),
-  getSessionSummary: jest.fn().mockResolvedValue({
-    id: 'summary-1',
-    sessionId: SESSION_ID,
-    content: 'Test summary',
-    aiFeedback: null,
-    status: 'submitted',
-  }),
-  submitSummary: jest
-    .fn()
-    .mockImplementation((_db, _profileId, sessionId, input) => ({
-      summary: {
-        id: 'summary-1',
+    }),
+    processMessage: jest.fn().mockResolvedValue({
+      response: 'Mock AI tutor response',
+      escalationRung: 1,
+      isUnderstandingCheck: false,
+      exchangeCount: 1,
+    }),
+    closeSession: jest
+      .fn()
+      .mockImplementation((_db, _profileId, sessionId) => ({
+        message: 'Session closed',
         sessionId,
-        content: input.content,
-        aiFeedback: 'Great summary! You captured the key concepts.',
-        status: 'accepted',
-      },
-    })),
-  streamMessage: jest.fn().mockImplementation(() =>
-    Promise.resolve({
-      stream: (async function* () {
-        yield 'Hello ';
-        yield 'world!';
-      })(),
-      onComplete: jest.fn().mockResolvedValue({
-        exchangeCount: 1,
-        escalationRung: 1,
-      }),
-    })
-  ),
-}));
+        topicId: null,
+        subjectId: SUBJECT_ID,
+      })),
+    flagContent: jest.fn().mockResolvedValue({
+      message: 'Content flagged for review. Thank you!',
+    }),
+    getSessionSummary: jest.fn().mockResolvedValue({
+      id: 'summary-1',
+      sessionId: SESSION_ID,
+      content: 'Test summary',
+      aiFeedback: null,
+      status: 'submitted',
+    }),
+    submitSummary: jest
+      .fn()
+      .mockImplementation((_db, _profileId, sessionId, input) => ({
+        summary: {
+          id: 'summary-1',
+          sessionId,
+          content: input.content,
+          aiFeedback: 'Great summary! You captured the key concepts.',
+          status: 'accepted',
+        },
+      })),
+    streamMessage: jest.fn().mockImplementation(() =>
+      Promise.resolve({
+        stream: (async function* () {
+          yield 'Hello ';
+          yield 'world!';
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          exchangeCount: 1,
+          escalationRung: 1,
+        }),
+      })
+    ),
+  };
+});
 
 jest.mock('../services/settings', () => ({
   shouldPromptCasualSwitch: jest.fn().mockResolvedValue(false),

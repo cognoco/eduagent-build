@@ -4,7 +4,7 @@
 // services/retention.ts (pure SM-2 logic).
 // ---------------------------------------------------------------------------
 
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import {
   subjects,
   curricula,
@@ -28,6 +28,7 @@ import {
   processRecallResult,
   getRetentionStatus,
   isTopicStable,
+  canRetestTopic,
   type RetentionState,
 } from './retention';
 import { canExitNeedsDeepening } from './adaptive-teaching';
@@ -111,13 +112,13 @@ export async function evaluateRecallQuality(
 
     if (Number.isNaN(parsed) || parsed < 0 || parsed > 5) {
       // Fallback: length heuristic
-      return answer.length > 50 ? 4 : 2;
+      return answer.length > 100 ? 4 : answer.length > 20 ? 3 : 2;
     }
 
     return parsed;
   } catch {
     // LLM failure fallback
-    return answer.length > 50 ? 4 : 2;
+    return answer.length > 100 ? 4 : answer.length > 20 ? 3 : 2;
   }
 }
 
@@ -199,9 +200,13 @@ export async function getSubjectRetention(
   const topicIds = topics.map((t) => t.id);
   const topicTitleMap = new Map(topics.map((t) => [t.id, t.title]));
 
-  // Get all retention cards for this profile, filter to subject's topics
-  const allCards = await repo.retentionCards.findMany();
-  const subjectCards = allCards.filter((c) => topicIds.includes(c.topicId));
+  // Get retention cards for this subject's topics (DB-level filter — issue #22.2)
+  const subjectCards =
+    topicIds.length > 0
+      ? await repo.retentionCards.findMany(
+          inArray(retentionCards.topicId, topicIds)
+        )
+      : [];
 
   const now = new Date();
   const reviewDueCount = subjectCards.filter(
@@ -250,6 +255,8 @@ export interface RecallTestResponse {
   failureCount: number;
   failureAction?: 'feedback_only' | 'redirect_to_learning_book';
   remediation?: RecallTestRemediation;
+  cooldownActive?: boolean;
+  cooldownEndsAt?: string;
 }
 
 export async function processRecallTest(
@@ -266,6 +273,26 @@ export async function processRecallTest(
   const effectiveCard =
     card ?? (await ensureRetentionCard(db, profileId, input.topicId));
 
+  // FR54: Anti-cramming cooldown — 24-hour minimum between recall tests
+  const state = rowToRetentionState(effectiveCard);
+  const lastTestAt = effectiveCard.lastReviewedAt?.toISOString() ?? null;
+  if (!canRetestTopic(state, lastTestAt)) {
+    const cooldownEndsAt = new Date(
+      new Date(lastTestAt!).getTime() + RETEST_COOLDOWN_MS
+    ).toISOString();
+    return {
+      passed: false,
+      masteryScore: 0,
+      xpChange: 'none',
+      nextReviewAt:
+        effectiveCard.nextReviewAt?.toISOString() ?? new Date().toISOString(),
+      failureCount: effectiveCard.failureCount,
+      failureAction: 'feedback_only',
+      cooldownActive: true,
+      cooldownEndsAt,
+    };
+  }
+
   // Look up topic title for LLM evaluation context
   const topic = await db.query.curriculumTopics.findFirst({
     where: eq(curriculumTopics.id, input.topicId),
@@ -273,7 +300,7 @@ export async function processRecallTest(
   const topicTitle = topic?.title ?? input.topicId;
 
   const quality = await evaluateRecallQuality(input.answer, topicTitle);
-  const state = rowToRetentionState(effectiveCard);
+  // state was already computed above for cooldown check — reuse it
   const result = processRecallResult(state, quality);
 
   // Persist updated retention card
@@ -372,8 +399,7 @@ export async function startRelearn(
   }
 
   // Reset retention card to initial SM-2 state (mastery reset)
-  let resetPerformed = false;
-  await db
+  const resetRows = await db
     .update(retentionCards)
     .set({
       easeFactor: '2.50',
@@ -391,8 +417,9 @@ export async function startRelearn(
         eq(retentionCards.topicId, input.topicId),
         eq(retentionCards.profileId, profileId)
       )
-    );
-  resetPerformed = true;
+    )
+    .returning();
+  const resetPerformed = resetRows.length > 0;
 
   // Create a new learning session linked to this topic
   let sessionId: string | null = null;
@@ -743,11 +770,6 @@ export async function getStableTopics(
   profileId: string,
   subjectId?: string
 ): Promise<TopicStability[]> {
-  const repo = createScopedRepository(db, profileId);
-  const allCards = await repo.retentionCards.findMany();
-
-  let filteredCards = allCards;
-
   if (subjectId) {
     const curriculum = await db.query.curricula.findFirst({
       where: eq(curricula.subjectId, subjectId),
@@ -757,11 +779,27 @@ export async function getStableTopics(
     const topics = await db.query.curriculumTopics.findMany({
       where: eq(curriculumTopics.curriculumId, curriculum.id),
     });
-    const topicIds = new Set(topics.map((t) => t.id));
-    filteredCards = allCards.filter((c) => topicIds.has(c.topicId));
+    const topicIds = topics.map((t) => t.id);
+    if (topicIds.length === 0) return [];
+
+    // DB-level filter via scoped repo — issue #22.2
+    const repo = createScopedRepository(db, profileId);
+    const filteredCards = await repo.retentionCards.findMany(
+      inArray(retentionCards.topicId, topicIds)
+    );
+
+    return filteredCards.map((card) => ({
+      topicId: card.topicId,
+      isStable: isTopicStable(card.consecutiveSuccesses),
+      consecutiveSuccesses: card.consecutiveSuccesses,
+    }));
   }
 
-  return filteredCards.map((card) => ({
+  // No subject filter — return all cards for this profile
+  const repo = createScopedRepository(db, profileId);
+  const allCards = await repo.retentionCards.findMany();
+
+  return allCards.map((card) => ({
     topicId: card.topicId,
     isStable: isTopicStable(card.consecutiveSuccesses),
     consecutiveSuccesses: card.consecutiveSuccesses,

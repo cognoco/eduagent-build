@@ -1,10 +1,11 @@
 const mockGetConsentStatus = jest.fn();
 const mockGetProfileConsentState = jest.fn();
 const mockDeleteProfile = jest.fn();
+const mockDbExecute = jest.fn().mockResolvedValue(undefined);
 const mockSendEmail = jest.fn();
 
 jest.mock('../helpers', () => ({
-  getStepDatabase: jest.fn(() => ({})),
+  getStepDatabase: jest.fn(() => ({ execute: mockDbExecute })),
   getStepResendApiKey: jest.fn(() => 're_test_key'),
   getStepEmailFrom: jest.fn(() => 'noreply@eduagent.com'),
 }));
@@ -115,9 +116,9 @@ describe('consentReminder', () => {
     // All four steps return PENDING
     await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING']);
 
-    // 3 reminder emails + 1 delete call
+    // 3 reminder emails + 1 atomic delete via db.execute
     expect(mockSendEmail).toHaveBeenCalledTimes(3);
-    expect(mockDeleteProfile).toHaveBeenCalledTimes(1);
+    expect(mockDbExecute).toHaveBeenCalled();
   });
 
   it('stops sending when consent is granted mid-sequence', async () => {
@@ -125,7 +126,7 @@ describe('consentReminder', () => {
     await executeHandler(['PENDING', 'CONSENTED', 'CONSENTED', 'CONSENTED']);
 
     expect(mockSendEmail).toHaveBeenCalledTimes(1);
-    expect(mockDeleteProfile).not.toHaveBeenCalled();
+    expect(mockDbExecute).not.toHaveBeenCalled();
   });
 
   it('does not delete when status becomes null at day 30', async () => {
@@ -133,14 +134,14 @@ describe('consentReminder', () => {
     await executeHandler(['PENDING', 'PENDING', 'PENDING', null]);
 
     expect(mockSendEmail).toHaveBeenCalledTimes(3);
-    expect(mockDeleteProfile).not.toHaveBeenCalled();
+    expect(mockDbExecute).not.toHaveBeenCalled();
   });
 
   it('does not delete when status is WITHDRAWN at day 30', async () => {
     await executeHandler(['PENDING', 'PENDING', 'PENDING', 'WITHDRAWN']);
 
     expect(mockSendEmail).toHaveBeenCalledTimes(3);
-    expect(mockDeleteProfile).not.toHaveBeenCalled();
+    expect(mockDbExecute).not.toHaveBeenCalled();
   });
 
   it('does not send email when parentEmail is not found in DB', async () => {
@@ -149,7 +150,7 @@ describe('consentReminder', () => {
 
     // No emails sent because parentEmail lookup returns null
     expect(mockSendEmail).not.toHaveBeenCalled();
-    // Delete still happens because consent status is PENDING
-    expect(mockDeleteProfile).toHaveBeenCalledTimes(1);
+    // Atomic delete still happens because consent status is PENDING
+    expect(mockDbExecute).toHaveBeenCalled();
   });
 });

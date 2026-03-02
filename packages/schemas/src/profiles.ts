@@ -17,7 +17,9 @@ export const profileCreateSchema = z.object({
 
 export type ProfileCreateInput = z.infer<typeof profileCreateSchema>;
 
-export const profileUpdateSchema = profileCreateSchema.partial();
+export const profileUpdateSchema = profileCreateSchema
+  .partial()
+  .omit({ birthDate: true, location: true });
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 
 export const profileSwitchSchema = z.object({

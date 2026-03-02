@@ -200,7 +200,9 @@ describe('sessionCompleted', () => {
   });
 
   it('marks all steps as ok on success (verification step skipped for standard)', async () => {
-    const { result } = (await executeSteps(createEventData())) as any;
+    const { result } = (await executeSteps(
+      createEventData({ qualityRating: 4 })
+    )) as any;
     const statuses = result.outcomes
       .filter((o: any) => o.status !== 'skipped')
       .map((o: any) => o.status);
@@ -237,16 +239,14 @@ describe('sessionCompleted', () => {
       expect(retentionOutcome.status).toBe('skipped');
     });
 
-    it('defaults qualityRating to 3 when not provided', async () => {
-      await executeSteps(createEventData());
+    it('skips retention update when qualityRating not provided (issue #19)', async () => {
+      const { result } = (await executeSteps(createEventData())) as any;
 
-      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
-        expect.anything(),
-        'profile-001',
-        'topic-001',
-        3,
-        '2026-02-17T10:00:00.000Z'
+      expect(mockUpdateRetentionFromSession).not.toHaveBeenCalled();
+      const retentionOutcome = result.outcomes.find(
+        (o: any) => o.step === 'update-retention'
       );
+      expect(retentionOutcome.status).toBe('skipped');
     });
 
     it('loops over interleavedTopicIds when present (FR92)', async () => {
@@ -286,6 +286,7 @@ describe('sessionCompleted', () => {
         createEventData({
           topicId: 'topic-001',
           interleavedTopicIds: ['topic-a', 'topic-b'],
+          qualityRating: 4,
         })
       );
 
@@ -325,15 +326,14 @@ describe('sessionCompleted', () => {
       expect(outcome.status).toBe('skipped');
     });
 
-    it('defaults qualityRating to 3 when not provided', async () => {
-      await executeSteps(createEventData());
+    it('skips needs-deepening update when qualityRating not provided (issue #19)', async () => {
+      const { result } = (await executeSteps(createEventData())) as any;
 
-      expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
-        expect.anything(),
-        'profile-001',
-        'topic-001',
-        3
+      expect(mockUpdateNeedsDeepeningProgress).not.toHaveBeenCalled();
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'update-needs-deepening'
       );
+      expect(outcome.status).toBe('skipped');
     });
 
     it('loops over interleavedTopicIds when present (FR92)', async () => {
@@ -611,7 +611,7 @@ describe('sessionCompleted', () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       const { result } = (await executeSteps(
-        createEventData({ summaryStatus: 'skipped' })
+        createEventData({ summaryStatus: 'skipped', qualityRating: 4 })
       )) as any;
 
       // Embedding failed, but other steps ran
@@ -664,7 +664,9 @@ describe('sessionCompleted', () => {
       );
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      const { result } = (await executeSteps(createEventData())) as any;
+      const { result } = (await executeSteps(
+        createEventData({ qualityRating: 4 })
+      )) as any;
 
       // All subsequent steps still ran
       expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalled();
@@ -684,7 +686,9 @@ describe('sessionCompleted', () => {
       mockStoreSessionEmbedding.mockRejectedValueOnce(new Error('Voyage fail'));
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      const { result } = (await executeSteps(createEventData())) as any;
+      const { result } = (await executeSteps(
+        createEventData({ qualityRating: 4 })
+      )) as any;
 
       // Two independent failures
       const failed = result.outcomes.filter((o: any) => o.status === 'failed');

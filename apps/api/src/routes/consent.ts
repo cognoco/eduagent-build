@@ -1,8 +1,14 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { consentRequestSchema, consentResponseSchema } from '@eduagent/schemas';
+import {
+  consentRequestSchema,
+  consentResponseSchema,
+  ERROR_CODES,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
+import { getProfile } from '../services/profile';
 import {
   requestConsent,
   processConsentResponse,
@@ -11,7 +17,7 @@ import {
   revokeConsent,
   restoreConsent,
 } from '../services/consent';
-import { notFound, forbidden } from '../errors';
+import { notFound, forbidden, apiError } from '../errors';
 import { inngest } from '../inngest/client';
 
 type ConsentRouteEnv = {
@@ -22,7 +28,12 @@ type ConsentRouteEnv = {
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
   };
-  Variables: { user: AuthUser; db: Database; profileId: string };
+  Variables: {
+    user: AuthUser;
+    db: Database;
+    account: Account;
+    profileId: string;
+  };
 };
 
 export const consentRoutes = new Hono<ConsentRouteEnv>()
@@ -31,12 +42,38 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     zValidator('json', consentRequestSchema),
     async (c) => {
       const db = c.get('db');
+      const account = c.get('account');
       const input = c.req.valid('json');
+
+      // Verify the childProfileId belongs to the authenticated user's account
+      const childProfile = await getProfile(
+        db,
+        input.childProfileId,
+        account.id
+      );
+      if (!childProfile) {
+        return forbidden(
+          c,
+          'Not authorized to request consent for this profile'
+        );
+      }
+
       const appUrl = c.env.APP_URL ?? 'https://app.eduagent.com';
-      const consentState = await requestConsent(db, input, appUrl, {
-        resendApiKey: c.env.RESEND_API_KEY,
-        emailFrom: c.env.EMAIL_FROM,
-      });
+      let consentState;
+      try {
+        consentState = await requestConsent(db, input, appUrl, {
+          resendApiKey: c.env.RESEND_API_KEY,
+          emailFrom: c.env.EMAIL_FROM,
+        });
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === 'Maximum consent resend limit reached'
+        ) {
+          return apiError(c, 429, ERROR_CODES.VALIDATION_ERROR, error.message);
+        }
+        throw error;
+      }
 
       // Dispatch Inngest event for reminder workflow
       // NOTE: parentEmail is intentionally omitted — PII must not be in event payloads.
@@ -77,6 +114,18 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           error.message === 'Invalid consent token'
         ) {
           return notFound(c, 'Invalid consent token');
+        }
+        if (
+          error instanceof Error &&
+          error.message === 'This consent request has already been processed'
+        ) {
+          return c.json({ error: error.message }, 409);
+        }
+        if (
+          error instanceof Error &&
+          error.message === 'Consent token has expired'
+        ) {
+          return c.json({ error: error.message }, 410);
         }
         throw error;
       }
