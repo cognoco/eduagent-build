@@ -11,19 +11,84 @@ jest.mock('react-native-reanimated', () => {
   const chainable = { delay: () => chainable, duration: () => chainable };
   return {
     __esModule: true,
-    default: { View, Text, ScrollView: View },
+    default: {
+      View,
+      Text,
+      ScrollView: View,
+      createAnimatedComponent: (c: unknown) => c,
+    },
     FadeIn: chainable,
     FadeInUp: chainable,
     FadeOutDown: chainable,
     useAnimatedStyle: () => ({}),
+    useAnimatedProps: () => ({}),
     useSharedValue: (v: unknown) => ({ value: v }),
+    useReducedMotion: () => false,
     withTiming: (v: unknown) => v,
     withSpring: (v: unknown) => v,
     withRepeat: (v: unknown) => v,
     withSequence: (v: unknown) => v,
+    withDelay: (_d: number, v: unknown) => v,
     cancelAnimation: () => undefined,
+    runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
+    Easing: {
+      linear: undefined,
+      ease: undefined,
+      bezier: () => undefined,
+      inOut: () => undefined,
+    },
   };
 });
+
+jest.mock('react-native-svg', () => {
+  const { View } = require('react-native');
+  return {
+    __esModule: true,
+    default: View,
+    Svg: View,
+    Rect: View,
+    Circle: View,
+    Path: View,
+    Line: View,
+    G: View,
+    Defs: View,
+    LinearGradient: View,
+    Stop: View,
+    Polygon: View,
+  };
+});
+
+jest.mock('react-native-purchases', () => ({
+  __esModule: true,
+  default: {
+    configure: jest.fn(),
+    setLogLevel: jest.fn(),
+    logIn: jest.fn().mockResolvedValue({
+      customerInfo: { entitlements: { active: {} } },
+      created: false,
+    }),
+    logOut: jest.fn().mockResolvedValue({ entitlements: { active: {} } }),
+    getOfferings: jest.fn().mockResolvedValue({ current: null, all: {} }),
+    getCustomerInfo: jest.fn().mockResolvedValue({
+      entitlements: { active: {}, all: {} },
+      activeSubscriptions: [],
+    }),
+    purchasePackage: jest.fn().mockResolvedValue({
+      productIdentifier: '',
+      customerInfo: { entitlements: { active: {} } },
+    }),
+    restorePurchases: jest.fn().mockResolvedValue({
+      entitlements: { active: {}, all: {} },
+    }),
+  },
+  LOG_LEVEL: {
+    VERBOSE: 'VERBOSE',
+    DEBUG: 'DEBUG',
+    INFO: 'INFO',
+    WARN: 'WARN',
+    ERROR: 'ERROR',
+  },
+}));
 
 jest.mock('@clerk/clerk-expo', () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

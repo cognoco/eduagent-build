@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@clerk/clerk-expo';
 import { useTheme, useThemeColors } from '../../lib/theme';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
+import { useRevenueCatIdentity } from '../../hooks/use-revenuecat';
 
 const iconMap: Record<
   string,
@@ -38,6 +39,9 @@ export default function ParentLayout() {
 
   // Register push token on app launch (runs once, guarded internally)
   usePushTokenRegistration();
+
+  // Sync Clerk auth state with RevenueCat identity (runs on auth change)
+  useRevenueCatIdentity();
 
   if (!isLoaded) return null;
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;

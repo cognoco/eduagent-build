@@ -17,6 +17,7 @@ import { useProfile } from '../../lib/profile';
 import { useTheme, useThemeColors } from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
+import { useRevenueCatIdentity } from '../../hooks/use-revenuecat';
 
 const iconMap: Record<
   string,
@@ -548,6 +549,9 @@ export default function LearnerLayout() {
 
   // Register push token on app launch (runs once, guarded internally)
   usePushTokenRegistration();
+
+  // Sync Clerk auth state with RevenueCat identity (runs on auth change)
+  useRevenueCatIdentity();
 
   // Show alert when a profile was removed server-side (consent denied / auto-deleted)
   React.useEffect(() => {
