@@ -16,6 +16,7 @@ import { streamSSE } from 'hono/streaming';
 import {
   startSession,
   SubjectInactiveError,
+  SessionExchangeLimitError,
   getSession,
   processMessage,
   streamMessage,
@@ -98,6 +99,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         );
         return c.json(result);
       } catch (err) {
+        if (err instanceof SessionExchangeLimitError) {
+          return apiError(c, 429, ERROR_CODES.VALIDATION_ERROR, err.message);
+        }
         // Refund quota on LLM failure — user should not be charged for a failed exchange
         if (subscriptionId) {
           await incrementQuota(db, subscriptionId);

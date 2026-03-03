@@ -3,6 +3,8 @@ export {
   routeAndStream,
   registerProvider,
   getRegisteredProviders,
+  CircuitOpenError,
+  _resetCircuits,
 } from './router';
 export { mockProvider, createMockProvider } from './providers/mock';
 export { createGeminiProvider } from './providers/gemini';

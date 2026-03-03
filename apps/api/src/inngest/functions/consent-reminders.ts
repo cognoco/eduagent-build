@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { inngest } from '../client';
 import {
   getStepDatabase,
@@ -8,7 +9,6 @@ import {
   getConsentStatus,
   getProfileConsentState,
 } from '../../services/consent';
-import { deleteProfile } from '../../services/deletion';
 import {
   sendEmail,
   formatConsentReminderEmail,
@@ -86,11 +86,21 @@ export const consentReminder = inngest.createFunction(
     await step.sleep('wait-5-more-days', '5d');
     await step.run('auto-delete-account', async () => {
       const db = getStepDatabase();
+      // Fast guard: bail out if consent was already granted/withdrawn.
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
-      // Consent not granted (PENDING) — delete the profile.
+      // Atomic delete — only deletes if no CONSENTED/WITHDRAWN consent exists.
+      // This eliminates the TOCTOU race where a parent approves consent between
+      // the status check above and the delete below.
       // FK cascades remove all child records (subjects, sessions, consent_states, etc.).
-      await deleteProfile(db, profileId);
+      await db.execute(sql`
+        DELETE FROM profiles WHERE id = ${profileId}
+        AND NOT EXISTS (
+          SELECT 1 FROM consent_states
+          WHERE consent_states.profile_id = ${profileId}
+          AND consent_states.status IN ('CONSENTED', 'WITHDRAWN')
+        )
+      `);
     });
   }
 );

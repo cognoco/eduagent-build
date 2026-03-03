@@ -15,6 +15,8 @@ export const ERROR_CODES = {
   MISSING_SIGNATURE: 'MISSING_SIGNATURE',
   STALE_EVENT: 'STALE_EVENT',
   SUBJECT_INACTIVE: 'SUBJECT_INACTIVE',
+  CONFLICT: 'CONFLICT',
+  GONE: 'GONE',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

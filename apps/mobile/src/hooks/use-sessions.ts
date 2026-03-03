@@ -77,7 +77,7 @@ export function useSendMessage(
         param: { sessionId },
         json: input,
       });
-      return await res.json();
+      return (await res.json()) as MessageResult;
     },
   });
 }
@@ -94,7 +94,7 @@ export function useCloseSession(
         param: { sessionId },
         json: {},
       });
-      return await res.json();
+      return (await res.json()) as CloseResult;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['sessions'] });
@@ -192,7 +192,7 @@ export function useSubmitSummary(
         param: { sessionId },
         json: input,
       });
-      return await res.json();
+      return (await res.json()) as SubmitSummaryResult;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({

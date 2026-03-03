@@ -85,36 +85,47 @@ jest.mock('../services/profile', () => ({
   switchProfile: jest.fn(),
 }));
 
-jest.mock('../services/consent', () => ({
-  checkConsentRequired: jest.fn().mockReturnValue({
-    required: true,
-    consentType: 'GDPR',
-  }),
-  requestConsent: jest.fn().mockResolvedValue({
-    id: 'consent-1',
-    profileId: '550e8400-e29b-41d4-a716-446655440000',
-    consentType: 'GDPR',
-    status: 'PARENTAL_CONSENT_REQUESTED',
-    parentEmail: 'parent@example.com',
-    requestedAt: new Date().toISOString(),
-    respondedAt: null,
-  }),
-  processConsentResponse: jest
-    .fn()
-    .mockImplementation((_db: unknown, _token: string, approved: boolean) =>
-      Promise.resolve({
-        id: 'consent-1',
-        profileId: 'mock-profile-id',
-        consentType: 'GDPR',
-        status: approved ? 'CONSENTED' : 'WITHDRAWN',
-        parentEmail: 'parent@example.com',
-        requestedAt: new Date().toISOString(),
-        respondedAt: new Date().toISOString(),
-      })
-    ),
-  getConsentStatus: jest.fn().mockResolvedValue(null),
-  getProfileConsentState: jest.fn().mockResolvedValue(null),
-}));
+jest.mock('../services/consent', () => {
+  const actual = jest.requireActual('../services/consent') as Record<
+    string,
+    unknown
+  >;
+  return {
+    // Preserve real error classes so instanceof checks work in route handlers
+    ConsentResendLimitError: actual.ConsentResendLimitError,
+    ConsentTokenNotFoundError: actual.ConsentTokenNotFoundError,
+    ConsentAlreadyProcessedError: actual.ConsentAlreadyProcessedError,
+    ConsentTokenExpiredError: actual.ConsentTokenExpiredError,
+    checkConsentRequired: jest.fn().mockReturnValue({
+      required: true,
+      consentType: 'GDPR',
+    }),
+    requestConsent: jest.fn().mockResolvedValue({
+      id: 'consent-1',
+      profileId: '550e8400-e29b-41d4-a716-446655440000',
+      consentType: 'GDPR',
+      status: 'PARENTAL_CONSENT_REQUESTED',
+      parentEmail: 'parent@example.com',
+      requestedAt: new Date().toISOString(),
+      respondedAt: null,
+    }),
+    processConsentResponse: jest
+      .fn()
+      .mockImplementation((_db: unknown, _token: string, approved: boolean) =>
+        Promise.resolve({
+          id: 'consent-1',
+          profileId: 'mock-profile-id',
+          consentType: 'GDPR',
+          status: approved ? 'CONSENTED' : 'WITHDRAWN',
+          parentEmail: 'parent@example.com',
+          requestedAt: new Date().toISOString(),
+          respondedAt: new Date().toISOString(),
+        })
+      ),
+    getConsentStatus: jest.fn().mockResolvedValue(null),
+    getProfileConsentState: jest.fn().mockResolvedValue(null),
+  };
+});
 
 import { app } from '../index';
 
@@ -328,7 +339,10 @@ describe('consent routes', () => {
       ) as {
         processConsentResponse: jest.Mock;
       };
-      mockProcess.mockRejectedValueOnce(new Error('Invalid consent token'));
+      const { ConsentTokenNotFoundError } = jest.requireActual(
+        '../services/consent'
+      ) as { ConsentTokenNotFoundError: new () => Error };
+      mockProcess.mockRejectedValueOnce(new ConsentTokenNotFoundError());
 
       const res = await app.request(
         '/v1/consent/respond',

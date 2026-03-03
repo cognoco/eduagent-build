@@ -6,6 +6,7 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useClerk } from '@clerk/clerk-expo';
@@ -538,10 +539,26 @@ export default function LearnerLayout() {
   const { isLoaded, isSignedIn } = useAuth();
   const { persona } = useTheme();
   const colors = useThemeColors();
-  const { activeProfile, isLoading: isProfileLoading } = useProfile();
+  const {
+    activeProfile,
+    isLoading: isProfileLoading,
+    profileWasRemoved,
+    acknowledgeProfileRemoval,
+  } = useProfile();
 
   // Register push token on app launch (runs once, guarded internally)
   usePushTokenRegistration();
+
+  // Show alert when a profile was removed server-side (consent denied / auto-deleted)
+  React.useEffect(() => {
+    if (profileWasRemoved) {
+      Alert.alert(
+        'Profile Removed',
+        'One of your profiles has been removed because parental consent was not received in time. You have been switched to your main profile.',
+        [{ text: 'OK', onPress: acknowledgeProfileRemoval }]
+      );
+    }
+  }, [profileWasRemoved, acknowledgeProfileRemoval]);
 
   // Post-approval landing: show once after parent approves GDPR/COPPA consent
   const [showPostApproval, dismissPostApproval] = usePostApprovalLanding(

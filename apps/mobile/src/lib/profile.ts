@@ -37,6 +37,10 @@ export interface ProfileContextValue {
   activeProfile: Profile | null;
   switchProfile: (profileId: string) => Promise<void>;
   isLoading: boolean;
+  /** Set when a saved profile was removed server-side and we fell back to owner */
+  profileWasRemoved: boolean;
+  /** Clear the profileWasRemoved flag after user acknowledges */
+  acknowledgeProfileRemoval: () => void;
 }
 
 const ACTIVE_PROFILE_KEY = 'mentomate_active_profile_id';
@@ -47,6 +51,9 @@ export const ProfileContext = createContext<ProfileContextValue>({
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   switchProfile: async () => {},
   isLoading: true,
+  profileWasRemoved: false,
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  acknowledgeProfileRemoval: () => {},
 });
 
 export function useProfile(): ProfileContextValue {
@@ -64,6 +71,7 @@ export function ProfileProvider({
 
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [isRestoringId, setIsRestoringId] = useState(true);
+  const [profileWasRemoved, setProfileWasRemoved] = useState(false);
 
   // On mount: restore saved profile ID from SecureStore
   useEffect(() => {
@@ -84,6 +92,10 @@ export function ProfileProvider({
 
     const savedExists = profiles.some((p) => p.id === activeProfileId);
     if (!savedExists) {
+      // Profile was removed server-side (consent denied / auto-deleted)
+      if (activeProfileId) {
+        setProfileWasRemoved(true);
+      }
       const owner = profiles.find((p) => p.isOwner) ?? profiles[0];
       setActiveProfileId(owner.id);
       void storage.setItem(ACTIVE_PROFILE_KEY, owner.id);
@@ -105,11 +117,29 @@ export function ProfileProvider({
     [client, queryClient]
   );
 
+  const acknowledgeProfileRemoval = useCallback(() => {
+    setProfileWasRemoved(false);
+  }, []);
+
   const isLoading = isProfilesLoading || isRestoringId;
 
   const value = useMemo<ProfileContextValue>(
-    () => ({ profiles, activeProfile, switchProfile, isLoading }),
-    [profiles, activeProfile, switchProfile, isLoading]
+    () => ({
+      profiles,
+      activeProfile,
+      switchProfile,
+      isLoading,
+      profileWasRemoved,
+      acknowledgeProfileRemoval,
+    }),
+    [
+      profiles,
+      activeProfile,
+      switchProfile,
+      isLoading,
+      profileWasRemoved,
+      acknowledgeProfileRemoval,
+    ]
   );
 
   return createElement(ProfileContext.Provider, { value }, children);

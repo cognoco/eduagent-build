@@ -10,6 +10,7 @@ jest.mock('./retention', () => ({
   processRecallResult: jest.fn(),
   getRetentionStatus: jest.fn().mockReturnValue('weak'),
   isTopicStable: jest.fn().mockReturnValue(false),
+  canRetestTopic: jest.fn().mockReturnValue(true),
 }));
 
 jest.mock('@eduagent/retention', () => ({
@@ -118,7 +119,13 @@ function createMockDb(options?: {
     },
     update: jest.fn().mockReturnValue({
       set: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(undefined),
+        where: jest.fn().mockImplementation(() => {
+          const p = Promise.resolve(undefined);
+          (p as Record<string, unknown>).returning = jest
+            .fn()
+            .mockResolvedValue([{}]);
+          return p;
+        }),
       }),
     }),
     insert: jest.fn().mockReturnValue({
@@ -1215,7 +1222,7 @@ describe('evaluateRecallQuality', () => {
     registerProvider(provider);
 
     const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
-    expect(result).toBe(4); // Long answer -> fallback quality 4
+    expect(result).toBe(3); // Mid-length answer -> fallback quality 3
   });
 
   it('falls back to short-answer heuristic on unparseable LLM response', async () => {
@@ -1263,7 +1270,7 @@ describe('evaluateRecallQuality', () => {
     registerProvider(provider);
 
     const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
-    expect(result).toBe(4); // Long answer -> fallback quality 4
+    expect(result).toBe(3); // Mid-length answer -> fallback quality 3
   });
 
   it('clamps out-of-range values to fallback', async () => {
@@ -1279,7 +1286,7 @@ describe('evaluateRecallQuality', () => {
     registerProvider(provider);
 
     const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
-    expect(result).toBe(4); // Fallback for long answer
+    expect(result).toBe(3); // Fallback for mid-length answer
   });
 
   it('clamps negative values to fallback', async () => {

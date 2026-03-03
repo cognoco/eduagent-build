@@ -33,6 +33,85 @@ export function getRegisteredProviders(): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// Circuit breaker (architecture doc line 134)
+//
+// 3 consecutive 5xx/timeouts → OPEN (fail fast)
+// After 60s → HALF_OPEN (try one request)
+// If succeeds → CLOSED; if fails → OPEN again
+// ---------------------------------------------------------------------------
+
+type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+
+interface CircuitBreaker {
+  state: CircuitState;
+  consecutiveFailures: number;
+  lastFailureAt: number;
+}
+
+const CIRCUIT_FAILURE_THRESHOLD = 3;
+const CIRCUIT_RECOVERY_MS = 60_000; // 60 seconds
+
+// NOTE: Module-level Map state is per-isolate and non-durable on Cloudflare
+// Workers. Under cold starts or multi-isolate deployments, each instance has
+// independent circuit state. This is acceptable for MVP defence-in-depth but
+// does not guarantee global consistency. Upgrade path: Durable Objects for
+// shared circuit state across isolates.
+const circuits = new Map<string, CircuitBreaker>();
+
+function getCircuit(providerId: string): CircuitBreaker {
+  let cb = circuits.get(providerId);
+  if (!cb) {
+    cb = { state: 'CLOSED', consecutiveFailures: 0, lastFailureAt: 0 };
+    circuits.set(providerId, cb);
+  }
+  return cb;
+}
+
+function recordSuccess(providerId: string): void {
+  const cb = getCircuit(providerId);
+  cb.state = 'CLOSED';
+  cb.consecutiveFailures = 0;
+}
+
+function recordFailure(providerId: string): void {
+  const cb = getCircuit(providerId);
+  cb.consecutiveFailures++;
+  cb.lastFailureAt = Date.now();
+  if (cb.consecutiveFailures >= CIRCUIT_FAILURE_THRESHOLD) {
+    cb.state = 'OPEN';
+  }
+}
+
+function canAttempt(providerId: string): boolean {
+  const cb = getCircuit(providerId);
+  if (cb.state === 'CLOSED') return true;
+  if (cb.state === 'OPEN') {
+    // Check if recovery period has elapsed → transition to HALF_OPEN
+    if (Date.now() - cb.lastFailureAt >= CIRCUIT_RECOVERY_MS) {
+      cb.state = 'HALF_OPEN';
+      return true;
+    }
+    return false;
+  }
+  // HALF_OPEN: allow one trial request
+  return true;
+}
+
+/** Exported for testing only */
+export function _resetCircuits(): void {
+  circuits.clear();
+}
+
+export class CircuitOpenError extends Error {
+  constructor(provider: string) {
+    super(
+      `LLM provider "${provider}" is temporarily unavailable. Please try again in a moment.`
+    );
+    this.name = 'CircuitOpenError';
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Core orchestrator — all LLM calls go through here (ARCH-8)
 // ---------------------------------------------------------------------------
 
@@ -47,15 +126,24 @@ export async function routeAndCall(
     throw new Error(`No provider registered for: ${config.provider}`);
   }
 
-  const start = Date.now();
-  const response = await provider.chat(messages, config);
+  if (!canAttempt(config.provider)) {
+    throw new CircuitOpenError(config.provider);
+  }
 
-  return {
-    response,
-    provider: config.provider,
-    model: config.model,
-    latencyMs: Date.now() - start,
-  };
+  const start = Date.now();
+  try {
+    const response = await provider.chat(messages, config);
+    recordSuccess(config.provider);
+    return {
+      response,
+      provider: config.provider,
+      model: config.model,
+      latencyMs: Date.now() - start,
+    };
+  } catch (err) {
+    recordFailure(config.provider);
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -72,9 +160,25 @@ export async function routeAndStream(
     throw new Error(`No provider registered for: ${config.provider}`);
   }
 
-  return {
-    stream: provider.chatStream(messages, config),
-    provider: config.provider,
-    model: config.model,
-  };
+  if (!canAttempt(config.provider)) {
+    throw new CircuitOpenError(config.provider);
+  }
+
+  // NOTE: recordSuccess fires when chatStream() returns the lazy iterable,
+  // before any data flows. A provider that fails on the first next() call
+  // is silently credited as healthy. This is a known limitation — wrapping
+  // the iterable to record on first chunk would be more accurate but adds
+  // complexity. The caller's try/catch around iteration handles the failure.
+  try {
+    const stream = provider.chatStream(messages, config);
+    recordSuccess(config.provider);
+    return {
+      stream,
+      provider: config.provider,
+      model: config.model,
+    };
+  } catch (err) {
+    recordFailure(config.provider);
+    throw err;
+  }
 }

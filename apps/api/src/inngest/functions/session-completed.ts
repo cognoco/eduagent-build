@@ -84,13 +84,21 @@ export const sessionCompleted = inngest.createFunction(
       : [];
 
     // Step 1: Update retention data via SM-2
+    // Conservative: skip retention update when no quality rating was provided,
+    // rather than defaulting to 3 (which inflates metrics). Issue #19.
     outcomes.push(
       await step.run('update-retention', async () => {
         if (retentionTopicIds.length === 0)
           return { step: 'update-retention', status: 'skipped' as const };
+        const quality = event.data.qualityRating as number | undefined;
+        if (quality == null) {
+          console.warn(
+            `[session-completed] No qualityRating for session ${sessionId} — skipping retention update`
+          );
+          return { step: 'update-retention', status: 'skipped' as const };
+        }
         return runIsolated('update-retention', profileId, async () => {
           const db = getStepDatabase();
-          const quality = event.data.qualityRating ?? 3;
           for (const tid of retentionTopicIds) {
             await updateRetentionFromSession(
               db,
@@ -105,13 +113,17 @@ export const sessionCompleted = inngest.createFunction(
     );
 
     // Step 1b: Update needs-deepening progress (FR63)
+    // Same conservative approach: skip when quality is not provided.
     outcomes.push(
       await step.run('update-needs-deepening', async () => {
         if (retentionTopicIds.length === 0)
           return { step: 'update-needs-deepening', status: 'skipped' as const };
+        const quality = event.data.qualityRating as number | undefined;
+        if (quality == null) {
+          return { step: 'update-needs-deepening', status: 'skipped' as const };
+        }
         return runIsolated('update-needs-deepening', profileId, async () => {
           const db = getStepDatabase();
-          const quality = event.data.qualityRating ?? 3;
           for (const tid of retentionTopicIds) {
             await updateNeedsDeepeningProgress(db, profileId, tid, quality);
           }

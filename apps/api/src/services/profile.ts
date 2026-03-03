@@ -81,6 +81,17 @@ export async function createProfile(
 ): Promise<Profile> {
   const effectiveLocation = serverLocation ?? input.location ?? null;
 
+  // Pre-compute consent check (single call — used for both age gate and consent state)
+  const consentCheck =
+    input.birthDate && effectiveLocation
+      ? checkConsentRequired(input.birthDate, effectiveLocation)
+      : null;
+
+  // Enforce minimum age (PRD line 386: ages 6-10 out of scope)
+  if (consentCheck?.belowMinimumAge) {
+    throw new Error('Users must be at least 11 years old to create a profile');
+  }
+
   const [row] = await db
     .insert(profiles)
     .values({
@@ -94,18 +105,15 @@ export async function createProfile(
     })
     .returning();
 
-  // Server-side consent determination: if birthDate + location exist, check
+  // Server-side consent determination: if consent is required, create PENDING state
   let consentStatus: Profile['consentStatus'] = null;
-  if (input.birthDate && effectiveLocation) {
-    const check = checkConsentRequired(input.birthDate, effectiveLocation);
-    if (check.required && check.consentType) {
-      const state = await createPendingConsentState(
-        db,
-        row.id,
-        check.consentType
-      );
-      consentStatus = state.status;
-    }
+  if (consentCheck?.required && consentCheck.consentType) {
+    const state = await createPendingConsentState(
+      db,
+      row.id,
+      consentCheck.consentType
+    );
+    consentStatus = state.status;
   }
 
   return mapProfileRow(row, consentStatus);
@@ -145,7 +153,6 @@ export async function updateProfile(
     .update(profiles)
     .set({
       ...input,
-      birthDate: input.birthDate ? new Date(input.birthDate) : undefined,
       updatedAt: new Date(),
     })
     .where(and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)))

@@ -22,6 +22,38 @@ import {
 } from './notifications';
 
 // ---------------------------------------------------------------------------
+// Custom error classes — used by route layer for reliable instanceof checks
+// ---------------------------------------------------------------------------
+
+export class ConsentResendLimitError extends Error {
+  constructor() {
+    super('Maximum consent resend limit reached');
+    this.name = 'ConsentResendLimitError';
+  }
+}
+
+export class ConsentTokenNotFoundError extends Error {
+  constructor() {
+    super('Invalid consent token');
+    this.name = 'ConsentTokenNotFoundError';
+  }
+}
+
+export class ConsentAlreadyProcessedError extends Error {
+  constructor() {
+    super('This consent request has already been processed');
+    this.name = 'ConsentAlreadyProcessedError';
+  }
+}
+
+export class ConsentTokenExpiredError extends Error {
+  constructor() {
+    super('Consent token has expired');
+    this.name = 'ConsentTokenExpiredError';
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -71,9 +103,13 @@ function calculateAge(birthDate: string): number {
 // Core functions
 // ---------------------------------------------------------------------------
 
+/** Minimum age to use the platform (PRD line 386: "Ages 6-10 Out of Scope") */
+export const MINIMUM_AGE = 11;
+
 /**
  * Determines whether parental consent is required based on age and location.
  *
+ * - Users under 11 are rejected entirely (PRD line 386)
  * - EU children under 16 require GDPR consent
  * - US children under 13 require COPPA consent
  * - All others do not require consent
@@ -81,8 +117,21 @@ function calculateAge(birthDate: string): number {
 export function checkConsentRequired(
   birthDate: string,
   location: 'EU' | 'US' | 'OTHER'
-): { required: boolean; consentType: ConsentType | null } {
+): {
+  required: boolean;
+  consentType: ConsentType | null;
+  belowMinimumAge?: boolean;
+} {
   const age = calculateAge(birthDate);
+  if (age < MINIMUM_AGE) {
+    // Under 11 → blocked at profile creation. For EU/US, also consent-gate
+    // existing profiles so middleware blocks access.
+    if (location === 'EU')
+      return { required: true, consentType: 'GDPR', belowMinimumAge: true };
+    if (location === 'US')
+      return { required: true, consentType: 'COPPA', belowMinimumAge: true };
+    return { required: false, consentType: null, belowMinimumAge: true };
+  }
   if (location === 'EU' && age < 16)
     return { required: true, consentType: 'GDPR' };
   if (location === 'US' && age < 13)
@@ -121,6 +170,9 @@ export async function createPendingConsentState(
   return mapConsentRow(row);
 }
 
+/** Maximum number of consent resends (PRD lines 415, 420) */
+const MAX_CONSENT_RESENDS = 3;
+
 /**
  * Creates a consent request and sends a notification email to the parent.
  */
@@ -132,6 +184,12 @@ export async function requestConsent(
 ): Promise<ConsentState> {
   const token = crypto.randomUUID();
 
+  // Token expires in 7 days (PRD line 414)
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  // Atomic upsert with resend limit enforced in the UPDATE WHERE clause.
+  // This avoids the TOCTOU race where two concurrent requests both read
+  // resendCount=2, both pass the check, and both increment to 3.
   const [row] = await db
     .insert(consentStates)
     .values({
@@ -140,6 +198,8 @@ export async function requestConsent(
       status: 'PARENTAL_CONSENT_REQUESTED',
       parentEmail: input.parentEmail,
       consentToken: token,
+      expiresAt,
+      resendCount: 0,
     })
     .onConflictDoUpdate({
       target: [consentStates.profileId, consentStates.consentType],
@@ -147,12 +207,21 @@ export async function requestConsent(
         status: 'PARENTAL_CONSENT_REQUESTED',
         parentEmail: input.parentEmail,
         consentToken: token,
+        expiresAt,
+        resendCount: sql`${consentStates.resendCount} + 1`,
         requestedAt: sql`now()`,
         respondedAt: null,
         updatedAt: sql`now()`,
       },
+      setWhere: sql`${consentStates.resendCount} < ${MAX_CONSENT_RESENDS}`,
     })
     .returning();
+
+  // If no row returned, the conflict existed but the setWhere prevented the
+  // update — meaning the resend limit was reached.
+  if (!row) {
+    throw new ConsentResendLimitError();
+  }
 
   // Look up child's display name for personalized email
   const childProfile = await db.query.profiles.findFirst({
@@ -193,7 +262,17 @@ export async function processConsentResponse(
   });
 
   if (!row) {
-    throw new Error('Invalid consent token');
+    throw new ConsentTokenNotFoundError();
+  }
+
+  // 1b. Replay protection — reject if already processed
+  if (row.status === 'CONSENTED' || row.status === 'WITHDRAWN') {
+    throw new ConsentAlreadyProcessedError();
+  }
+
+  // 1c. Token expiry check (PRD line 414: 7-day link expiry)
+  if (row.expiresAt && new Date() > row.expiresAt) {
+    throw new ConsentTokenExpiredError();
   }
 
   // 2. Update status

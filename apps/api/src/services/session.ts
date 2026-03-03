@@ -89,6 +89,18 @@ export class SubjectInactiveError extends Error {
   }
 }
 
+/** Maximum exchanges allowed per session (defense-in-depth — issue #15) */
+const MAX_EXCHANGES_PER_SESSION = 50;
+
+export class SessionExchangeLimitError extends Error {
+  constructor(public readonly exchangeCount: number) {
+    super(
+      `Session has reached the maximum of ${MAX_EXCHANGES_PER_SESSION} exchanges`
+    );
+    this.name = 'SessionExchangeLimitError';
+  }
+}
+
 export async function startSession(
   db: Database,
   profileId: string,
@@ -164,6 +176,26 @@ interface ExchangePrep {
   effectiveRung: EscalationRung;
   hintCount: number;
   lastAiResponseAt: Date | null;
+}
+
+/**
+ * Lightweight exchange-limit guard. Uses the scoped repository to load
+ * the session and check if the exchange cap has been reached, before
+ * the expensive prepareExchangeContext query set runs.
+ */
+async function checkExchangeLimit(
+  db: Database,
+  profileId: string,
+  sessionId: string
+): Promise<void> {
+  const repo = createScopedRepository(db, profileId);
+  const row = await repo.sessions.findFirst(eq(learningSessions.id, sessionId));
+  if (!row) {
+    throw new Error('Session not found');
+  }
+  if (row.exchangeCount >= MAX_EXCHANGES_PER_SESSION) {
+    throw new SessionExchangeLimitError(row.exchangeCount);
+  }
 }
 
 async function prepareExchangeContext(
@@ -395,6 +427,8 @@ async function persistExchangeResult(
   // enriched with behavioral metrics when available (UX-18)
   const aiMetadata: Record<string, unknown> = {
     escalationRung: effectiveRung,
+    sessionType: session.sessionType,
+    ...(session.sessionType === 'homework' && { isHomework: true }),
     ...(behavioral && {
       isUnderstandingCheck: behavioral.isUnderstandingCheck,
       timeToAnswerMs: behavioral.timeToAnswerMs,
@@ -474,6 +508,10 @@ export async function processMessage(
   isUnderstandingCheck: boolean;
   exchangeCount: number;
 }> {
+  // Early exchange limit check — runs before expensive prepareExchangeContext
+  // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
+  await checkExchangeLimit(db, profileId, sessionId);
+
   const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
     await prepareExchangeContext(
       db,
@@ -529,6 +567,10 @@ export async function streamMessage(
     fullResponse: string
   ) => Promise<{ exchangeCount: number; escalationRung: number }>;
 }> {
+  // Early exchange limit check — runs before expensive prepareExchangeContext
+  // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
+  await checkExchangeLimit(db, profileId, sessionId);
+
   const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
     await prepareExchangeContext(
       db,
