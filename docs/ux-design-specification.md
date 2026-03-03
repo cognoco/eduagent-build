@@ -2105,7 +2105,7 @@ _This is a server-rendered HTML page, not a mobile screen. Served by the API or 
 **Parent Notification Content:**
 
 - **Push notification:** "[Child] wants to keep learning! They've mastered 4 topics and earned 120 XP. Subscribe to continue their journey."
-- **Email template:** Child stats summary (topics learned, XP earned, streak, retention signals) + "Subscribe Now" CTA → Stripe Checkout link. Same Resend email infrastructure as consent emails.
+- **Email template:** Child stats summary (topics learned, XP earned, streak, retention signals) + "Subscribe Now" CTA → deep link into app's subscription screen (native IAP via RevenueCat, not web checkout). Same Resend email infrastructure as consent emails.
 
 **Failure States:**
 

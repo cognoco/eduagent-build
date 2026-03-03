@@ -154,6 +154,7 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 | Render per-persona in components | CSS variables — components persona-unaware |
 | Hardcode hex colors in components | NativeWind semantic classes (`bg-surface`, `text-primary`) |
 | Check `persona` inside components | Only `_layout.tsx` files read persona. Exception: `(learner)/home.tsx` reads persona for adaptive entry card routing (documented architectural exception — routing logic that doesn't fit in layout) |
+| Use Stripe for mobile billing | Native IAP via RevenueCat (`react-native-purchases`). Apple/Google reject Stripe for digital services. Stripe stays for future web. See Epic 9. |
 
 ## Current Status
 
@@ -163,7 +164,7 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 - Mobile: 38+ screens (49 test suites), all using real API calls via TanStack Query + Hono RPC
 - Background jobs: 10 Inngest functions (session-completed chain, trial-expiry, consent-reminders, consent-revocation, account-deletion, review-reminder, payment-retry, quota-reset, topup-expiry-reminder, subject-auto-archive)
 - Auth: Clerk (SSO + email/password), PasswordInput with show/hide + requirements
-- Billing: Stripe integration (checkout, portal, webhooks, KV-cached status, quota metering)
+- Billing: Stripe integration built (checkout, portal, webhooks, KV-cached status, quota metering) — **mobile must add native IAP (RevenueCat) before App Store submission** (Epic 9). Stripe code kept for future web client.
 - Email: Resend integration (consent emails, reminders)
 - Push: Expo Push API (trial warnings, review reminders, daily reminders) + `usePushTokenRegistration` hook auto-registers Expo push tokens on mount in both learner and parent layouts
 - Consent middleware: `consentMiddleware` blocks data-collecting routes for profiles with pending/revoked consent (AUDIT-001)
@@ -187,6 +188,8 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 
 **Not yet integrated:** OCR provider (server-side fallback; ML Kit primary on device).
 
+**Epic 9 (pre-launch): Native In-App Purchases** — Adds Apple StoreKit 2 / Google Play Billing via RevenueCat SDK for mobile. Both app stores **require** native IAP for digital services (AI tutoring). Existing Stripe code is **kept intact** (dormant) for future web client and B2B/school licensing — do not remove it. Business logic (quota metering, subscription tiers, KV caching) is payment-agnostic and unchanged. See `docs/epics.md` Epic 9 for full stories.
+
 **Epic 3 extensions — now implemented:**
 - **EVALUATE verification type (Devil's Advocate, FR128-FR133)** — 8th verification type. AI presents flawed reasoning for student to critique (Bloom's Level 5-6). Strong-retention gating (`shouldTriggerEvaluate`), modified SM-2 quality floor (2-3 for failure), `evaluateDifficultyRung` 1-4 on retention card, three-strike escalation, `evaluate-data.ts` DB service, eligibility route (`GET /v1/topics/:topicId/evaluate-eligibility`), wired into session-completed Step 1c.
 - **Analogy Domain Preferences (Multiverse of Analogies, FR134-FR137)** — Per-subject analogy domain (cooking, sports, building, music, nature, gaming). Nullable `analogyDomain` on `teachingPreferences`, soft LLM prompt injection in `buildSystemPrompt()`, `AnalogyDomainPicker` component, settings routes, onboarding step (`analogy-preference.tsx` in subject onboarding flow).
@@ -203,6 +206,9 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 - [ ] Clerk: configure custom email domain (SPF/DKIM/DMARC) so verification/consent emails don't land in spam
 - [ ] Sentry: create projects + set `SENTRY_DSN` secrets for API and mobile
 - [ ] Resend: set `RESEND_API_KEY` secret, verify sending domain
+- [ ] Apple Developer Program enrollment ($99/year) — required for App Store + IAP
+- [ ] Google Play Developer account ($25 one-time) — required for Play Store + IAP
+- [ ] RevenueCat project setup — connect both stores, configure entitlements & offerings (see Epic 9)
 
 ## Required Reading (before any implementation work)
 

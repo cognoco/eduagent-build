@@ -108,7 +108,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | Mobile Framework | Expo (React Native) | Cross-platform iOS/Android/Web, App Store presence |
 | Database | Neon (PostgreSQL) + pgvector | Serverless scale-to-zero, branching for dev/staging |
 | Authentication | Clerk | Expo SDK, social login, multi-tenant, cost-effective |
-| Payments | Stripe | Checkout, subscriptions, family billing, top-up credits |
+| Payments | RevenueCat (native IAP) + Stripe (dormant, for future web) | Mobile: Apple StoreKit 2 + Google Play Billing via RevenueCat. **Stripe will not pass App Store review** for digital services — see Epic 9. Stripe code kept for future web client and B2B. |
 | AI/LLM | Multi-provider (Claude, GPT-4, Gemini Flash) | Routing by conversation state, cost optimization |
 | Vector Search | pgvector (in Neon) | Per-user embeddings, JOINs with relational data |
 | Backend Framework | Hono (Cloudflare Workers preferred, Railway/Fly fallback) | Edge deployment, scale-to-zero matching Neon, lightweight. Not Express. Same framework either runtime — easy migration if Workers constraints bite. |

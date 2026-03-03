@@ -405,7 +405,7 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 | FR77-FR85 | Multi-Subject Learning | Epic 4 | MVP |
 | FR86-FR95 | Engagement & Motivation | Epic 4 | MVP |
 | FR96-FR107 | Language Learning | Epic 6 | v1.1 |
-| FR108-FR117 | Subscription Management | Epic 5 | MVP |
+| FR108-FR117 | Subscription Management | Epic 5 (Stripe, kept for web) + Epic 9 (native IAP for mobile) | MVP + pre-launch |
 | FR118-FR127 | Concept Map (Prerequisite-Aware Learning) | Epic 7 | v1.1 |
 | FR144-FR145, FR147-FR149 | Full Voice Mode | Epic 8 | v1.1 |
 | FR146 | Language SPEAK/LISTEN Voice | Epic 6 | v1.1 |
@@ -414,7 +414,7 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 
 ## Epic List
 
-**9 epics total: 6 MVP (Epics 0-5), 3 deferred (Epics 6, 7, 8).**
+**10 epics total: 6 MVP (Epics 0-5), 1 pre-launch (Epic 9), 3 deferred (Epics 6, 7, 8).**
 
 ### Epic 0: Project Foundation & User Registration
 
@@ -602,13 +602,35 @@ Users can use voice as the primary input/output mode for any session type, with 
 
 ---
 
+### Epic 9: Native In-App Purchases (PRE-LAUNCH — before App Store submission)
+
+Add native Apple/Google in-app purchases for mobile billing via RevenueCat. The existing Stripe-based billing (Epic 5) was built assuming web checkout, but both Apple App Store and Google Play Store **require** native IAP for digital services (AI tutoring = digital service). Apps that bypass IAP for digital content are rejected. Existing Stripe code is preserved (dormant) for future web client and B2B/school licensing.
+
+**FRs covered:** FR108-FR117 (same as Epic 5 — adds mobile IAP path, preserves Stripe for web)
+**ARCH requirements:** ARCH-11 (subscription status KV — write source changes from Stripe webhook to IAP/RevenueCat webhook), ARCH-17 (quota metering unchanged — reads from KV regardless of payment source)
+
+**Implementation notes:**
+- **RevenueCat recommended** — abstracts Apple StoreKit 2 + Google Play Billing into unified SDK (`react-native-purchases`). Free tier up to $2,500/mo revenue.
+- Adds mobile IAP path. **Does not remove Stripe code** — kept intact for future web client and B2B/school licensing.
+- Preserves: quota metering (`services/metering.ts`), subscription tier definitions (`@eduagent/schemas`), KV caching pattern, trial logic (via App Store promotional offers or RevenueCat trials)
+- Requires: Apple Developer Program ($99/year), Google Play Developer account ($25 one-time)
+- Store commission: 30% (15% via Apple Small Business Program / Google reduced rate)
+- **Web client path (post-launch):** When a web app is added, Stripe becomes the active web payment provider (2.9% fee, no IAP restrictions). The metering middleware is already payment-agnostic. A cross-platform entitlement sync story will be needed at that point.
+
+**Dependencies:** Epic 5 (existing billing infrastructure to adapt), Epic 0 (auth, profiles)
+**Enables:** App Store submission. Without this, Apple/Google will reject the app.
+
+---
+
 ### Epic Dependency Graph
 
 ```
 Epic 0 ──→ Epic 1 ──→ Epic 2 ──→ Epic 3 ──→ Epic 4
   │                      │           │           │
   └──→ Epic 5 (parallel) ┘           │           │
-                                     │           │
+         │                           │           │
+         └──→ Epic 9 (pre-launch) ←──┘ (adds native IAP for mobile, Stripe kept for web)
+                                     │
                               Epic 3 Cluster G (Feynman Stage, MVP)
                                      │
                               Epic 8 (Full Voice, v1.1)
@@ -622,6 +644,7 @@ Epic 0 ──→ Epic 1 ──→ Epic 2 ──→ Epic 3 ──→ Epic 4
 - Epic 5 can start after Epic 0, running in parallel with Epics 1-4
 - Epic 4's feature clusters (Learning Book, Multi-Subject, Engagement, Parent Dashboard) can be staffed in parallel
 - Epic 2 potential split (if >15 stories): Core Learning Sessions and Homework Help can parallelize after initial session infrastructure
+- Epic 9 can start once Epic 5 infrastructure is understood — it adds the mobile IAP path while preserving metering/quota logic
 
 **Epic 7 dependencies:** Epic 3 (retention infrastructure — SM-2 data needed for graph-aware coaching) and Epic 1 (curriculum/topic infrastructure — `curriculumTopics` table must exist for prerequisite edges)
 
@@ -2758,3 +2781,259 @@ Story 8.6 (STRETCH: VAD) is independent — build only if user feedback warrants
 ### Epic 8 FR Coverage
 
 All 5 FRs (FR144-FR145, FR147-FR149) mapped across 5 stories + 1 stretch. FR146 (Language SPEAK/LISTEN Voice) mapped to Epic 6 — depends on Epic 8.1-8.2. Implementation deferred to v1.1.
+
+---
+
+## Epic 9: Native In-App Purchases (PRE-LAUNCH) — Stories
+
+**Goal:** Add native Apple/Google in-app purchases for mobile billing via RevenueCat. Both app stores require native IAP for digital services — the existing Stripe-only billing will be rejected during App Store review. Existing Stripe code is preserved (dormant) for future web client and B2B/school licensing.
+**FRs:** FR108-FR117 (same business requirements as Epic 5 — payment mechanism changes for mobile, business logic preserved)
+**Stories:** 8 (7 implementation + 1 spike)
+**Recommended SDK:** RevenueCat (`react-native-purchases`) — abstracts both stores into unified API.
+
+**Future consideration:** When a web client is added, Stripe becomes the active web payment provider (no IAP restrictions on web, 2.9% vs 30% fee). At that point, add a cross-platform entitlement sync story so users who subscribe on one platform are recognized on the other. The metering middleware is already payment-agnostic — it reads from KV regardless of payment source — so the sync work is contained to the billing layer.
+
+### Story 9.1: Store Account Setup & Product Configuration
+
+As a development team,
+We need Apple and Google developer accounts with subscription products configured,
+So that we can test and deploy native in-app purchases.
+
+**Acceptance Criteria:**
+
+**Given** the app needs to sell subscriptions via app stores
+**When** store accounts are set up
+**Then** Apple Developer Program account is active ($99/year enrollment)
+**And** Google Play Developer account is active ($25 one-time enrollment)
+**And** subscription products are created in App Store Connect matching existing tiers:
+  - `com.eduagent.plus.monthly` (€18.99/mo)
+  - `com.eduagent.plus.yearly` (annual with ~25% discount)
+  - `com.eduagent.family.monthly` (€28.99/mo)
+  - `com.eduagent.family.yearly`
+  - `com.eduagent.pro.monthly` (€48.99/mo)
+  - `com.eduagent.pro.yearly`
+**And** matching subscription products created in Google Play Console with identical pricing
+**And** Apple subscription group created ("EduAgent Plans") for upgrade/downgrade paths
+**And** Google base plans configured with equivalent upgrade/downgrade behavior
+**And** sandbox/test accounts configured for both stores (Apple Sandbox testers, Google license testers)
+**And** 14-day free trial configured as introductory offer on both stores
+
+**FRs:** FR108, FR111, FR115
+**Note:** This is a manual setup story — no code, just store configuration. Must be completed before any SDK integration.
+
+---
+
+### Story 9.2: RevenueCat Setup & SDK Integration
+
+As a mobile app,
+I need RevenueCat SDK integrated so I can offer native purchases on both platforms,
+So that users can subscribe using Apple Pay / Google Pay / card via native store UI.
+
+**Acceptance Criteria:**
+
+**Given** store products are configured (Story 9.1)
+**When** RevenueCat is integrated
+**Then** RevenueCat project created at app.revenuecat.com with both App Store and Play Store apps connected
+**And** RevenueCat "Entitlements" created: `plus`, `family`, `pro` — mapped to store products from Story 9.1
+**And** RevenueCat "Offerings" configured with "Current" offering containing all packages
+**And** `react-native-purchases` SDK installed in `apps/mobile` (`pnpm add react-native-purchases`)
+**And** SDK initialized on app start with RevenueCat API key (platform-specific keys for iOS/Android)
+**And** `REVENUECAT_API_KEY_IOS` and `REVENUECAT_API_KEY_ANDROID` stored as Expo environment variables
+**And** RevenueCat user identity set to Clerk user ID on sign-in (`Purchases.logIn(clerkUserId)`) — ensures subscription follows the user, not the device
+**And** anonymous-to-identified user migration handled (RevenueCat `logIn` merges anonymous purchases)
+**And** basic purchase flow works: fetch offerings → display packages → call `purchasePackage()` → entitlement active
+
+**FRs:** (infrastructure — no direct FR)
+
+---
+
+### Story 9.3: Subscription Purchase UI (Mobile)
+
+As a user,
+I want to see available plans and subscribe using my device's native payment method,
+So that I can upgrade my account securely through Apple/Google.
+
+**Acceptance Criteria:**
+
+**Given** RevenueCat SDK is integrated (Story 9.2)
+**When** user navigates to the subscription screen
+**Then** `apps/mobile/src/app/(learner)/subscription.tsx` is updated to use RevenueCat offerings instead of Stripe checkout
+**And** available packages displayed with localized pricing (RevenueCat returns store-localized prices)
+**And** current plan highlighted, upgrade/downgrade options shown based on entitlement state
+**And** purchase triggers native store payment sheet (Apple/Google) — no custom payment form
+**And** purchase result updates local state immediately via `customerInfo.entitlements`
+**And** error handling for: user cancelled, payment failed, network error, store unavailable
+**And** restore purchases button available (required by App Store Review Guidelines §3.1.1)
+**And** loading states during purchase flow (store sheets can be slow)
+**And** family plan shows profile count and shared pool info (same UX as current, different payment backend)
+**And** context-aware upgrade prompts (same triggers as Epic 5 Story 5.3) use RevenueCat offerings
+**And** hooks replaced: `useCreateCheckout` → RevenueCat `purchasePackage()`, `useCreatePortalSession` → deep link to store settings, `useCancelSubscription` → deep link to store settings (Apple/Google manage cancellation, not the app)
+**And** "Manage billing" button deep links to iOS Settings / Google Play Subscriptions instead of Stripe Customer Portal
+
+**FRs:** FR111, FR115, FR116
+
+---
+
+### Story 9.4: Backend Webhook & Subscription Sync
+
+As the API,
+I need to receive subscription lifecycle events from RevenueCat,
+So that subscription state stays synced in the database and KV cache.
+
+**Acceptance Criteria:**
+
+**Given** a subscription event occurs (purchase, renewal, cancellation, billing issue, expiration)
+**When** RevenueCat sends a webhook to the API
+**Then** new route `POST /v1/revenuecat-webhook` handles RevenueCat server notifications
+**And** webhook validates RevenueCat authorization header (shared secret, NOT Clerk JWT — same pattern as Stripe webhook)
+**And** subscription state synced to local database — same tables and state machine as Epic 5 (`trial → active → past_due → cancelled → expired`)
+**And** Workers KV (`SUBSCRIPTION_KV`) updated with current subscription status (same key structure, different write source)
+**And** `services/subscription.ts` updated to accept RevenueCat event payloads alongside (or replacing) Stripe payloads
+**And** idempotent handling: duplicate webhook events processed safely (RevenueCat includes event UUID)
+**And** RevenueCat `app_user_id` (= Clerk user ID from Story 9.2) used to find the correct account/profile
+**And** `REVENUECAT_WEBHOOK_SECRET` added to `config.ts` as optional secret (same pattern as `STRIPE_WEBHOOK_SECRET`)
+**And** existing `middleware/metering.ts` continues to work unchanged — it reads from KV, doesn't care about payment source
+**And** Inngest `payment-retry` function removed or disabled — Apple/Google handle payment retry logic themselves on their own schedule
+**And** grace period handling: Apple and Google control subscription renewal retry timing, not the app. RevenueCat normalizes this via `BILLING_ISSUE` events and `billing_issues_detected_at` timestamps. The PRD's "3-day grace period" (Epic 5 Story 5.1) is replaced by **platform-defined grace periods** — Apple's is 16-60 days (configurable in App Store Connect), Google's is up to 30 days (configurable in Play Console). Update the PRD to say "platform-defined grace period with email notification on billing issue detection" rather than hardcoded 3-day.
+**And** on `BILLING_ISSUE` event from RevenueCat: send user notification (push + email), set subscription status to `past_due` in DB and KV, but do NOT revoke access immediately — platform manages retry and eventual expiration
+
+**FRs:** (infrastructure — enables FR108-FR117)
+**ARCH:** ARCH-11 (KV write source changes)
+**PRD update required:** FR "3-day grace period with automatic retry on Day 1, 2, 3" → "Platform-defined grace period (Apple: configurable 16-60 days; Google: configurable up to 30 days). Email notification on billing issue detection. Access revoked only when platform confirms subscription expiration."
+
+---
+
+### Story 9.5: Trial & Subscription Lifecycle via Store
+
+As a new user,
+I want to start a free trial that transitions to a paid subscription,
+So that I can try the full app before paying.
+
+**Acceptance Criteria:**
+
+**Given** 14-day trial is configured as introductory offer in both stores (Story 9.1)
+**When** a new user subscribes with trial
+**Then** RevenueCat reports trial entitlement immediately — user gets full Plus access
+**And** trial expiry warnings sent at 3 days, 1 day, last day (same as Epic 5 Story 5.2) — triggered by RevenueCat's `EXPIRATION` event or scheduled check
+**And** trial-to-paid conversion handled automatically by stores — RevenueCat webhook notifies API of state change
+**And** if user cancels during trial, access continues until trial end (store policy)
+**And** reverse trial soft landing (Days 15-28 extended access, Day 29+ Free tier) — implemented via API-side logic checking trial end date, NOT via store subscription state
+**And** subscription cancellation: user manages via App Store Settings / Google Play Subscriptions (deep link provided in app)
+**And** cancellation effective at end of billing period — progress preserved, reverts to Free tier
+**And** subscription status shown in app loaded from Workers KV (fast read) — same as Epic 5 Story 5.4
+
+**FRs:** FR108, FR109, FR110, FR112, FR113
+
+---
+
+### Story 9.6: Top-Up Credits via IAP
+
+As a user who has hit their question ceiling,
+I want to purchase additional questions as a one-time in-app purchase,
+So that I can keep learning without upgrading my subscription tier.
+
+**Acceptance Criteria:**
+
+**Given** the user is on a paid tier and has exhausted their monthly quota
+**When** they choose to purchase a top-up
+**Then** top-up credits offered as consumable IAP products (not subscriptions):
+  - `com.eduagent.topup.500` — 500 questions (priced per tier: €10 Plus, €5 Family/Pro)
+**And** consumable products configured in both App Store Connect and Google Play Console
+**And** RevenueCat handles consumable purchase flow and receipt validation server-side
+**And** credits are granted **only** on server-side webhook confirmation from RevenueCat — **never trust the client-side `purchasePackage()` callback alone**. Apple/Google can delay purchase confirmations, and client-side callbacks are spoofable. The flow is: client initiates purchase → store processes → RevenueCat validates receipt server-side → RevenueCat webhook fires → API grants credits.
+**And** client shows "Purchase processing..." state after `purchasePackage()` returns, polling subscription status from KV until webhook confirmation arrives. Typical delay: <5s, but can be 30s+ on store outages.
+**And** on webhook confirmation, API increments quota pool via `services/billing.ts` top-up logic (existing)
+**And** top-up FIFO ordering preserved: monthly quota consumed first, then top-ups oldest-first
+**And** 12-month top-up expiry preserved (existing Inngest `topup-expiry-reminder` function)
+**And** top-ups are NOT available on Free tier (same restriction as Epic 5)
+**And** idempotent credit grant: webhook handler checks for existing top-up record with RevenueCat transaction ID before granting — prevents double-credit on webhook retry
+
+**⚠️ Family billing constraint — consumable IAP limitation:**
+Apple Family Sharing works for subscriptions but **does NOT support consumable purchases**. This means:
+- The subscription itself (Plus/Family/Pro) can be shared via Apple Family Sharing — the billing parent subscribes, family members get access.
+- **Top-up credits cannot be purchased by family members and shared to the pool.** Only the billing parent (subscription owner) can purchase top-ups that feed the shared question pool.
+- On Google Play, family sharing for consumables is similarly unsupported.
+- **Product decision required:** Either (a) restrict top-up purchases to the billing parent account only (simplest, aligns with store constraints), or (b) allow any family member to purchase top-ups but credits go to their individual quota (breaks shared pool model), or (c) allow any family member to purchase but route the credit to the shared pool via API logic (store doesn't know about sharing — the API links the purchase to the family pool via `app_user_id` → account → family group). **Option (c) is recommended** — each member purchases individually, but the API credits the family's shared pool based on account family membership.
+
+**FRs:** FR111 (top-up credits), FR116 (family account profile pricing)
+
+---
+
+### Story 9.7: Remove Stripe from Mobile Flows
+
+As a development team,
+We need to disconnect Stripe from the mobile payment path so the app uses native IAP exclusively,
+So that the app passes App Store review while keeping Stripe code intact for a future web client.
+
+**Acceptance Criteria:**
+
+**Given** RevenueCat integration is complete and tested (Stories 9.2-9.6)
+**When** mobile Stripe removal is performed
+**Then** `apps/mobile/src/app/(learner)/subscription.tsx` uses RevenueCat offerings — no Stripe checkout redirect
+**And** `apps/mobile/src/hooks/use-subscription.ts` reads entitlement from RevenueCat SDK (with KV-cached API fallback for offline)
+**And** mobile app has zero runtime dependency on Stripe SDK or Stripe API calls
+**And** `routes/revenuecat-webhook.ts` is the active webhook handler for mobile billing
+**And** Stripe environment variables (`STRIPE_SECRET_KEY`, etc.) moved from production-required to optional in `config.ts`
+**And** `wrangler.toml` secrets documentation updated: RevenueCat secrets required, Stripe secrets optional
+**And** Inngest `payment-retry.ts` disabled — Apple/Google handle payment retry themselves
+**And** Inngest `quota-reset.ts` preserved unchanged (payment-agnostic)
+**And** BYOK waitlist (FR114) preserved — not payment-related
+
+**What stays untouched (for future web client):**
+- `routes/stripe-webhook.ts` — kept in codebase, just not called by mobile
+- `routes/billing.ts` — Stripe checkout/portal endpoints remain, unused by mobile
+- `services/stripe.ts` — fully preserved
+- All Stripe test files — kept passing, not deleted
+- No `BillingProvider` abstraction needed yet — that's premature until a web client exists. For now, mobile uses RevenueCat, Stripe code sits idle.
+
+**FRs:** (cleanup — no direct FR)
+**Note:** When a web client is added post-launch, Stripe becomes the active web payment path (2.9% fee vs 30% IAP). At that point, add a cross-platform entitlement sync story and a thin routing layer. The metering middleware already works regardless of payment source.
+
+---
+
+### Story 9.8: Spike — Family Billing Model Under IAP Constraints
+
+As a development team,
+We need to validate that the family billing model (shared question pool, single billing parent) works within Apple and Google IAP constraints,
+So that we don't ship a family tier that can't actually be purchased or shared correctly.
+
+**Acceptance Criteria:**
+
+**Given** the PRD specifies Family tier with shared question pool (FR116, Epic 5 Story 5.5)
+**When** the spike investigates Apple Family Sharing + Google Play family features
+**Then** the following questions are answered with tested evidence:
+
+1. **Apple Family Sharing for subscriptions:** Can the billing parent subscribe to Family tier and share access with family members? Does RevenueCat support detecting Family Sharing entitlements and mapping them to our profile/account model?
+2. **Google Play family subscriptions:** Same investigation for Google's family group features.
+3. **Shared pool feasibility:** If family members have individual `app_user_id`s in RevenueCat, can the API still route them to a single shared quota pool? (Likely yes — the API resolves `app_user_id` → Clerk user → account → family group → shared pool. Store doesn't need to know about sharing.)
+4. **Consumable top-ups in family context:** Confirmed — Apple Family Sharing does NOT support consumable IAP. Document the chosen approach for family top-ups (see Story 9.6 options a/b/c).
+5. **Profile limits:** Can store-side configuration enforce "max 4 profiles on Family, max 6 on Pro"? (Likely no — profile limits are API-enforced, not store-enforced. Store only knows about the subscription tier, not profile count.)
+6. **Family member onboarding flow:** When a family member opens the app, how do they get access? Options: (a) Apple/Google Family Sharing auto-grants entitlement, (b) invite link from billing parent that links profiles in our DB, (c) both.
+
+**And** findings documented in `docs/architecture.md` under a new "Family Billing Under IAP" section
+**And** if any PRD requirements (FR116, Epic 5 Story 5.5) are infeasible under IAP constraints, specific product change proposals documented for review
+
+**FRs:** FR116 (family profile billing)
+**Note:** This spike should run early (after Story 9.1) — its findings may affect Stories 9.3, 9.4, and 9.6.
+
+---
+
+### Epic 9 Execution Order
+
+```
+9.1 (Store setup, manual) → 9.8 (Family billing spike, parallel with 9.2) → 9.2 (RevenueCat SDK) → 9.3 (Purchase UI) + 9.4 (Backend webhook, parallel with 9.3) → 9.5 (Trial lifecycle) → 9.6 (Top-ups, depends on 9.8 findings) → 9.7 (Remove Stripe from mobile)
+```
+
+**Critical path:** Story 9.1 is a blocker — cannot test anything without store accounts and products. Start this immediately if App Store submission is on the horizon. Story 9.8 (family billing spike) should run early as its findings may force product changes to Stories 9.3, 9.4, and 9.6.
+
+### Epic 9 FR Coverage
+
+FR108-FR117 business requirements preserved from Epic 5. Only the payment mechanism changes (Stripe → native IAP via RevenueCat). Quota metering (ARCH-17), subscription KV caching (ARCH-11), and tier definitions (`@eduagent/schemas`) remain unchanged.
+
+**PRD updates required by this epic:**
+- Payment failure grace period: "3-day with retry on Day 1, 2, 3" → "Platform-defined grace period (Apple: configurable 16-60 days; Google: configurable up to 30 days)"
+- Family top-up credits: may need product clarification based on Story 9.8 spike findings (Apple Family Sharing does not support consumable IAP sharing)
+
+### Why This Epic Exists
+
+The original architecture (docs/architecture.md) specified "Payments | Stripe" without accounting for Apple App Store and Google Play Store policies. Both stores **require** native in-app purchases for digital services. AI-powered tutoring qualifies as a digital service. An app using Stripe web checkout for digital content subscriptions will be rejected during App Store review (Apple Review Guidelines §3.1.1, Google Play Billing Policy). This epic was added to close that gap before the first store submission.
