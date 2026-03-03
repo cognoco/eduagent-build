@@ -8,26 +8,42 @@ import {
   Alert,
   ActivityIndicator,
   Linking,
+  Platform,
 } from 'react-native';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import Purchases from 'react-native-purchases';
+import type {
+  PurchasesPackage,
+  PurchasesOffering,
+  CustomerInfo,
+  PurchasesError,
+} from 'react-native-purchases';
+import { PURCHASES_ERROR_CODE, PACKAGE_TYPE } from 'react-native-purchases';
+import { useQueryClient } from '@tanstack/react-query';
 import { useThemeColors } from '../../lib/theme';
 import { useProfile } from '../../lib/profile';
 import { UsageMeter } from '../../components/common';
 import {
   useSubscription,
   useUsage,
-  useCreateCheckout,
-  useCancelSubscription,
-  useCreatePortalSession,
-  usePurchaseTopUp,
   useJoinByokWaitlist,
   type SubscriptionTier,
 } from '../../hooks/use-subscription';
+import {
+  useOfferings,
+  useCustomerInfo,
+  usePurchase,
+  useRestorePurchases,
+} from '../../hooks/use-revenuecat';
 import { useNotifyParentSubscribe } from '../../hooks/use-settings';
 import { useXpSummary } from '../../hooks/use-streaks';
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
 const TIER_LABELS: Record<SubscriptionTier, string> = {
   free: 'Free',
@@ -43,41 +59,132 @@ const TIER_LIMITS: Record<SubscriptionTier, string> = {
   pro: '2,000 questions/month',
 };
 
-interface PlanOptionProps {
-  tier: 'plus' | 'family' | 'pro';
-  currentTier: SubscriptionTier;
-  onSelect: (tier: 'plus' | 'family' | 'pro') => void;
-  isPending: boolean;
+/** Map RevenueCat PACKAGE_TYPE to human-readable period labels. */
+const PACKAGE_PERIOD_LABEL: Partial<Record<PACKAGE_TYPE, string>> = {
+  [PACKAGE_TYPE.MONTHLY]: 'Monthly',
+  [PACKAGE_TYPE.ANNUAL]: 'Annual',
+  [PACKAGE_TYPE.SIX_MONTH]: '6 Months',
+  [PACKAGE_TYPE.THREE_MONTH]: '3 Months',
+  [PACKAGE_TYPE.TWO_MONTH]: '2 Months',
+  [PACKAGE_TYPE.WEEKLY]: 'Weekly',
+  [PACKAGE_TYPE.LIFETIME]: 'Lifetime',
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function getPackagePeriodLabel(pkg: PurchasesPackage): string {
+  return PACKAGE_PERIOD_LABEL[pkg.packageType] ?? pkg.identifier;
 }
 
-function PlanOption({
-  tier,
-  currentTier,
-  onSelect,
-  isPending,
-}: PlanOptionProps) {
-  const isCurrentPlan = tier === currentTier;
+/**
+ * Checks whether a RevenueCat error represents a user-initiated cancellation.
+ * User cancellations are not real errors — the user simply dismissed the
+ * native payment sheet.
+ */
+function isPurchaseCancelledError(error: unknown): boolean {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as PurchasesError).code ===
+      PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR
+  ) {
+    return true;
+  }
+  return false;
+}
 
+/**
+ * Checks whether a RevenueCat error is a network error.
+ */
+function isNetworkError(error: unknown): boolean {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    ((error as PurchasesError).code === PURCHASES_ERROR_CODE.NETWORK_ERROR ||
+      (error as PurchasesError).code ===
+        PURCHASES_ERROR_CODE.OFFLINE_CONNECTION_ERROR)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Returns the active entitlement identifier (e.g. "pro", "plus") from
+ * CustomerInfo, or null if no entitlement is active.
+ */
+function getActiveEntitlement(
+  customerInfo: CustomerInfo | null | undefined
+): string | null {
+  if (!customerInfo) return null;
+  const activeEntitlements = customerInfo.entitlements.active;
+  const keys = Object.keys(activeEntitlements);
+  if (keys.length === 0) return null;
+  // Return the first active entitlement — for a single-entitlement setup
+  return keys[0] ?? null;
+}
+
+/**
+ * Opens the platform-specific subscription management page.
+ */
+async function openSubscriptionManagement(): Promise<void> {
+  if (Platform.OS === 'ios') {
+    await Linking.openURL('https://apps.apple.com/account/subscriptions');
+  } else {
+    await Linking.openURL(
+      'https://play.google.com/store/account/subscriptions'
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PackageOption — displays a single purchasable package
+// ---------------------------------------------------------------------------
+
+interface PackageOptionProps {
+  pkg: PurchasesPackage;
+  isCurrentPlan: boolean;
+  onSelect: (pkg: PurchasesPackage) => void;
+  isPurchasing: boolean;
+}
+
+function PackageOption({
+  pkg,
+  isCurrentPlan,
+  onSelect,
+  isPurchasing,
+}: PackageOptionProps): React.ReactElement {
   return (
     <Pressable
-      onPress={() => !isCurrentPlan && onSelect(tier)}
-      disabled={isCurrentPlan || isPending}
+      onPress={() => !isCurrentPlan && onSelect(pkg)}
+      disabled={isCurrentPlan || isPurchasing}
       className={`bg-surface rounded-card px-4 py-3.5 mb-2 ${
         isCurrentPlan ? 'border border-primary' : ''
       }`}
-      accessibilityLabel={`${isCurrentPlan ? 'Current plan' : 'Upgrade to'} ${
-        TIER_LABELS[tier]
-      }`}
+      accessibilityLabel={`${isCurrentPlan ? 'Current plan' : 'Subscribe to'} ${
+        pkg.product.title
+      } ${pkg.product.priceString}`}
       accessibilityRole="button"
+      testID={`package-option-${pkg.identifier}`}
     >
       <View className="flex-row items-center justify-between">
-        <View>
+        <View className="flex-1 mr-2">
           <Text className="text-body font-semibold text-text-primary">
-            {TIER_LABELS[tier]}
+            {pkg.product.title}
           </Text>
           <Text className="text-caption text-text-secondary mt-0.5">
-            {TIER_LIMITS[tier]}
+            {pkg.product.priceString} /{' '}
+            {getPackagePeriodLabel(pkg).toLowerCase()}
           </Text>
+          {pkg.product.description ? (
+            <Text className="text-caption text-text-secondary mt-0.5">
+              {pkg.product.description}
+            </Text>
+          ) : null}
         </View>
         {isCurrentPlan ? (
           <Text className="text-caption font-semibold text-primary">
@@ -85,13 +192,17 @@ function PlanOption({
           </Text>
         ) : (
           <Text className="text-caption font-semibold text-primary">
-            Upgrade
+            {isPurchasing ? 'Processing...' : 'Subscribe'}
           </Text>
         )}
       </View>
     </Pressable>
   );
 }
+
+// ---------------------------------------------------------------------------
+// ChildPaywall — shown when a child profile has expired trial
+// ---------------------------------------------------------------------------
 
 const NOTIFY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -287,6 +398,10 @@ function ChildPaywall(): React.ReactElement {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Main Subscription Screen
+// ---------------------------------------------------------------------------
+
 export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -294,70 +409,168 @@ export default function SubscriptionScreen() {
   const [byokEmail, setByokEmail] = useState('');
   const { activeProfile } = useProfile();
 
+  const queryClient = useQueryClient();
+
+  // API hooks for usage display and subscription state
   const { data: subscription, isLoading: subLoading } = useSubscription();
   const { data: usage, isLoading: usageLoading } = useUsage();
-  const checkout = useCreateCheckout();
-  const cancel = useCancelSubscription();
-  const portal = useCreatePortalSession();
-  const topUp = usePurchaseTopUp();
   const byokWaitlist = useJoinByokWaitlist();
 
-  const isLoading = subLoading || usageLoading;
+  // Top-up IAP state
+  const [topUpPurchasing, setTopUpPurchasing] = useState(false);
+  const [topUpPolling, setTopUpPolling] = useState(false);
 
-  const handleUpgrade = useCallback(
-    async (selectedTier: 'plus' | 'family' | 'pro') => {
+  // RevenueCat hooks
+  const { data: offerings, isLoading: offeringsLoading } = useOfferings();
+  const { data: customerInfo, isLoading: customerInfoLoading } =
+    useCustomerInfo();
+  const purchase = usePurchase();
+  const restore = useRestorePurchases();
+
+  const isLoading =
+    subLoading || usageLoading || offeringsLoading || customerInfoLoading;
+
+  const activeEntitlement = getActiveEntitlement(customerInfo);
+  const hasActiveSubscription = activeEntitlement !== null;
+
+  // ---------------------------------------------------------------------------
+  // Purchase handler — triggers native store payment sheet
+  // ---------------------------------------------------------------------------
+
+  const handlePurchase = useCallback(
+    async (pkg: PurchasesPackage) => {
       try {
-        const result = await checkout.mutateAsync({
-          tier: selectedTier,
-          interval: 'monthly',
-        });
-        await Linking.openURL(result.checkoutUrl);
-      } catch {
-        Alert.alert('Checkout error', 'Could not open checkout. Try again.');
+        await purchase.mutateAsync(pkg);
+        Alert.alert('Success', 'Your subscription is now active!');
+      } catch (error: unknown) {
+        if (isPurchaseCancelledError(error)) {
+          // User cancelled — not an error, just dismiss silently
+          return;
+        }
+        if (isNetworkError(error)) {
+          Alert.alert(
+            'Network error',
+            'Please check your internet connection and try again.'
+          );
+          return;
+        }
+        Alert.alert(
+          'Purchase failed',
+          'Something went wrong. Please try again.'
+        );
       }
     },
-    [checkout]
+    [purchase]
   );
 
-  const handleCancel = useCallback(() => {
-    Alert.alert(
-      'Cancel subscription',
-      'Your access continues until the end of your billing period. Are you sure?',
-      [
-        { text: 'Keep plan', style: 'cancel' },
-        {
-          text: 'Cancel',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const result = await cancel.mutateAsync();
-              Alert.alert('Cancelled', result.message);
-            } catch {
-              Alert.alert('Error', 'Could not cancel. Please try again.');
-            }
-          },
-        },
-      ]
-    );
-  }, [cancel]);
+  // ---------------------------------------------------------------------------
+  // Restore purchases handler
+  // ---------------------------------------------------------------------------
+
+  const handleRestore = useCallback(async () => {
+    try {
+      const info = await restore.mutateAsync();
+      const restoredEntitlement = getActiveEntitlement(info);
+      if (restoredEntitlement) {
+        Alert.alert('Restored', 'Your subscription has been restored.');
+      } else {
+        Alert.alert(
+          'No subscriptions found',
+          'We could not find any previous purchases to restore.'
+        );
+      }
+    } catch {
+      Alert.alert(
+        'Restore failed',
+        'Could not restore purchases. Please try again.'
+      );
+    }
+  }, [restore]);
+
+  // ---------------------------------------------------------------------------
+  // Manage billing — deep link to platform subscription management
+  // ---------------------------------------------------------------------------
 
   const handleManageBilling = useCallback(async () => {
     try {
-      const result = await portal.mutateAsync();
-      await Linking.openURL(result.portalUrl);
+      await openSubscriptionManagement();
     } catch {
-      Alert.alert('Error', 'Could not open billing portal. Try again.');
+      Alert.alert('Error', 'Could not open subscription management.');
     }
-  }, [portal]);
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Top-up handler — RevenueCat consumable IAP + poll for webhook confirmation
+  // ---------------------------------------------------------------------------
 
   const handleTopUp = useCallback(async () => {
-    try {
-      await topUp.mutateAsync();
-      Alert.alert('Top-up', '500 additional credits purchased.');
-    } catch {
-      Alert.alert('Error', 'Could not purchase top-up. Try again.');
+    // Find the top-up package from offerings
+    // RevenueCat consumables can be in a separate offering or as a non-subscription package
+    const topUpOffering = offerings?.all?.['top_up'] ?? offerings?.current;
+    const topUpPkg = topUpOffering?.availablePackages.find((p) =>
+      p.product.identifier.includes('topup')
+    );
+
+    if (!topUpPkg) {
+      Alert.alert('Error', 'Top-up package not available.');
+      return;
     }
-  }, [topUp]);
+
+    setTopUpPurchasing(true);
+    try {
+      await Purchases.purchasePackage(topUpPkg);
+    } catch (error: unknown) {
+      setTopUpPurchasing(false);
+      if (isPurchaseCancelledError(error)) return;
+      if (isNetworkError(error)) {
+        Alert.alert(
+          'Network error',
+          'Please check your internet connection and try again.'
+        );
+        return;
+      }
+      Alert.alert('Purchase failed', 'Something went wrong. Please try again.');
+      return;
+    }
+
+    // Purchase succeeded on store side — now poll API for webhook confirmation
+    setTopUpPurchasing(false);
+    setTopUpPolling(true);
+
+    const baseCredits = usage?.topUpCreditsRemaining ?? 0;
+    const maxAttempts = 15; // ~30 seconds with 2s interval
+    const pollIntervalMs = 2000;
+    let confirmed = false;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      await queryClient.invalidateQueries({ queryKey: ['usage'] });
+      // Brief wait for the query to refetch
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const freshUsage = queryClient.getQueryData<{
+        topUpCreditsRemaining: number;
+      }>(['usage', activeProfile?.id]);
+      if (freshUsage && freshUsage.topUpCreditsRemaining > baseCredits) {
+        confirmed = true;
+        break;
+      }
+    }
+
+    setTopUpPolling(false);
+
+    if (confirmed) {
+      Alert.alert('Top-up', '500 additional credits have been added!');
+    } else {
+      Alert.alert(
+        'Processing',
+        'Your purchase is being processed. Credits will appear shortly.'
+      );
+    }
+  }, [offerings, usage, queryClient, activeProfile?.id]);
+
+  // ---------------------------------------------------------------------------
+  // BYOK waitlist handler (kept from existing Stripe logic)
+  // ---------------------------------------------------------------------------
 
   const handleByokSubmit = useCallback(async () => {
     if (!byokEmail.trim()) return;
@@ -370,7 +583,10 @@ export default function SubscriptionScreen() {
     }
   }, [byokWaitlist, byokEmail]);
 
-  // Child profiles see child-friendly paywall (no pricing, no payment forms)
+  // ---------------------------------------------------------------------------
+  // Child profile gate — child sees the child-friendly paywall
+  // ---------------------------------------------------------------------------
+
   const isChild = activeProfile ? !activeProfile.isOwner : false;
   const trialOrExpired =
     subscription?.status === 'expired' || (!subscription && !subLoading);
@@ -378,14 +594,26 @@ export default function SubscriptionScreen() {
     return <ChildPaywall />;
   }
 
+  // ---------------------------------------------------------------------------
+  // Derive API-side subscription state for display
+  // ---------------------------------------------------------------------------
+
   const tier = subscription?.tier ?? 'free';
   const status = subscription?.status ?? 'trial';
   const isTrial = status === 'trial';
   const isPaidTier = tier !== 'free';
   const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
 
+  // Get the current offering's available packages
+  const currentOffering: PurchasesOffering | null = offerings?.current ?? null;
+  const availablePackages = currentOffering?.availablePackages ?? [];
+
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+    <View
+      className="flex-1 bg-background"
+      style={{ paddingTop: insets.top }}
+      testID="subscription-screen"
+    >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={() => router.back()}
@@ -401,7 +629,10 @@ export default function SubscriptionScreen() {
       </View>
 
       {isLoading ? (
-        <View className="flex-1 items-center justify-center">
+        <View
+          className="flex-1 items-center justify-center"
+          testID="subscription-loading"
+        >
           <ActivityIndicator />
         </View>
       ) : (
@@ -427,14 +658,19 @@ export default function SubscriptionScreen() {
           <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-4">
             Current plan
           </Text>
-          <View className="bg-surface rounded-card px-4 py-3.5">
+          <View
+            className="bg-surface rounded-card px-4 py-3.5"
+            testID="current-plan"
+          >
             <View className="flex-row items-center justify-between">
               <Text className="text-body font-semibold text-text-primary">
                 {TIER_LABELS[tier]}
               </Text>
               <View className="bg-primary-soft rounded-full px-2.5 py-1">
                 <Text className="text-caption font-semibold text-primary capitalize">
-                  {cancelAtPeriodEnd
+                  {hasActiveSubscription
+                    ? 'Active'
+                    : cancelAtPeriodEnd
                     ? 'Cancelling'
                     : status === 'past_due'
                     ? 'Past due'
@@ -497,82 +733,136 @@ export default function SubscriptionScreen() {
             </View>
           )}
 
-          {/* Upgrade options */}
-          <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
-            Plans
-          </Text>
-          <PlanOption
-            tier="plus"
-            currentTier={tier}
-            onSelect={handleUpgrade}
-            isPending={checkout.isPending}
-          />
-          <PlanOption
-            tier="family"
-            currentTier={tier}
-            onSelect={handleUpgrade}
-            isPending={checkout.isPending}
-          />
-          <PlanOption
-            tier="pro"
-            currentTier={tier}
-            onSelect={handleUpgrade}
-            isPending={checkout.isPending}
-          />
+          {/* RevenueCat Offerings — available packages */}
+          {availablePackages.length > 0 && (
+            <View testID="offerings-section">
+              <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
+                Plans
+              </Text>
+              {availablePackages.map((pkg) => {
+                // Check if this package matches the user's active entitlement
+                const isCurrentPlan =
+                  hasActiveSubscription &&
+                  customerInfo?.activeSubscriptions.includes(
+                    pkg.product.identifier
+                  ) === true;
+                return (
+                  <PackageOption
+                    key={pkg.identifier}
+                    pkg={pkg}
+                    isCurrentPlan={isCurrentPlan}
+                    onSelect={handlePurchase}
+                    isPurchasing={purchase.isPending}
+                  />
+                );
+              })}
+            </View>
+          )}
+
+          {/* No offerings fallback (RevenueCat not configured or web) */}
+          {availablePackages.length === 0 && !offeringsLoading && (
+            <View testID="no-offerings">
+              <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
+                Plans
+              </Text>
+              <View className="bg-surface rounded-card px-4 py-3.5">
+                <Text className="text-body-sm text-text-secondary">
+                  In-app purchases are not available on this device. Please use
+                  the mobile app to subscribe.
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Restore purchases — required by App Store 3.1.1 */}
+          <View className="mt-4">
+            <Pressable
+              onPress={handleRestore}
+              disabled={restore.isPending}
+              className="bg-surface rounded-card px-4 py-3.5"
+              accessibilityLabel="Restore purchases"
+              accessibilityRole="button"
+              testID="restore-purchases-button"
+            >
+              <View className="flex-row items-center justify-center">
+                {restore.isPending ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.primary}
+                    testID="restore-loading"
+                  />
+                ) : (
+                  <Text className="text-body font-semibold text-primary">
+                    Restore Purchases
+                  </Text>
+                )}
+              </View>
+            </Pressable>
+          </View>
 
           {/* Top-up */}
           {isPaidTier && (
-            <View className="mt-6">
+            <View className="mt-6" testID="top-up-section">
               <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2">
                 Need more questions?
               </Text>
               <Pressable
                 onPress={handleTopUp}
-                disabled={topUp.isPending}
+                disabled={topUpPurchasing || topUpPolling}
                 className="bg-surface rounded-card px-4 py-3.5"
                 accessibilityLabel="Buy 500 credits"
                 accessibilityRole="button"
+                testID="top-up-button"
               >
-                <Text className="text-body font-semibold text-primary">
-                  Buy 500 credits
-                </Text>
-                <Text className="text-caption text-text-secondary mt-0.5">
-                  One-time purchase. Credits never expire.
-                </Text>
+                {topUpPurchasing || topUpPolling ? (
+                  <View className="flex-row items-center">
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.primary}
+                      testID="top-up-spinner"
+                    />
+                    <Text className="text-body font-semibold text-primary ml-2">
+                      {topUpPolling
+                        ? 'Purchase processing...'
+                        : 'Opening store...'}
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <Text className="text-body font-semibold text-primary">
+                      Buy 500 credits
+                    </Text>
+                    <Text className="text-caption text-text-secondary mt-0.5">
+                      One-time purchase. Credits expire in 12 months.
+                    </Text>
+                  </>
+                )}
               </Pressable>
             </View>
           )}
 
-          {/* Manage billing / Cancel */}
-          {isPaidTier && status === 'active' && (
-            <View className="mt-6">
+          {/* Manage billing — deep links to platform subscription management */}
+          {hasActiveSubscription && (
+            <View className="mt-6" testID="manage-section">
               <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2">
                 Manage
               </Text>
               <Pressable
                 onPress={handleManageBilling}
-                disabled={portal.isPending}
                 className="bg-surface rounded-card px-4 py-3.5 mb-2"
                 accessibilityLabel="Manage billing"
                 accessibilityRole="button"
+                testID="manage-billing-button"
               >
                 <Text className="text-body text-text-primary">
                   Manage billing
                 </Text>
+                <Text className="text-caption text-text-secondary mt-0.5">
+                  {Platform.OS === 'ios'
+                    ? 'Opens App Store subscriptions'
+                    : 'Opens Google Play subscriptions'}
+                </Text>
               </Pressable>
-              {!cancelAtPeriodEnd && (
-                <Pressable
-                  onPress={handleCancel}
-                  disabled={cancel.isPending}
-                  className="bg-surface rounded-card px-4 py-3.5"
-                  accessibilityLabel="Cancel subscription"
-                  accessibilityRole="button"
-                >
-                  <Text className="text-body text-danger">
-                    Cancel subscription
-                  </Text>
-                </Pressable>
-              )}
             </View>
           )}
 

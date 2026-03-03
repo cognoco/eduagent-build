@@ -116,6 +116,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   })
 
   // Create Stripe Checkout session
+  // Dormant for mobile — kept for future web client. Mobile uses RevenueCat IAP.
   .post(
     '/subscription/checkout',
     zValidator('json', checkoutRequestSchema),
@@ -192,6 +193,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   )
 
   // Cancel subscription (set cancel_at_period_end)
+  // Dormant for mobile — kept for future web client. Mobile cancellation
+  // handled by platform subscription management (App Store / Google Play).
   .post('/subscription/cancel', async (c) => {
     const db = c.get('db');
     const account = c.get('account');
@@ -232,6 +235,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   })
 
   // Purchase top-up credits via Stripe Payment Intent
+  // Dormant for mobile — kept for future web client. Mobile top-ups use
+  // RevenueCat consumable IAP (see subscription.tsx handleTopUp).
   .post(
     '/subscription/top-up',
     zValidator('json', topUpRequestSchema),
@@ -348,6 +353,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   })
 
   // Create Stripe Customer Portal session
+  // Dormant for mobile — kept for future web client. Mobile billing managed
+  // through platform subscription management (App Store / Google Play).
   .post('/subscription/portal', async (c) => {
     const db = c.get('db');
     const account = c.get('account');

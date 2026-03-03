@@ -19,9 +19,14 @@ import type { ColorScheme } from '../lib/design-tokens';
 import { ProfileProvider, useProfile } from '../lib/profile';
 import { ErrorBoundary } from '../components/common';
 import { initSentry } from '../lib/sentry';
+import { configureRevenueCat } from '../lib/revenuecat';
 
 // Initialize Sentry at module level — runs before any component renders
 initSentry();
+
+// Initialize RevenueCat at module level — runs before any component renders.
+// No-ops gracefully when API keys are not set (dev/web).
+configureRevenueCat();
 
 // Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();

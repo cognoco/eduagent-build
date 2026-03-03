@@ -46,6 +46,8 @@ export const subscriptions = pgTable('subscriptions', {
   lastStripeEventTimestamp: timestamp('last_stripe_event_timestamp', {
     withTimezone: true,
   }),
+  revenuecatOriginalAppUserId: text('revenuecat_original_app_user_id'),
+  lastRevenuecatEventId: text('last_revenuecat_event_id'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -88,6 +90,7 @@ export const topUpCredits = pgTable(
       .notNull()
       .defaultNow(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    revenuecatTransactionId: text('revenuecat_transaction_id'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
