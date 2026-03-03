@@ -209,16 +209,18 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
     );
   });
 
-  it('defaults qualityRating to 3 when not provided', async () => {
-    await executeChain(createEventData({ qualityRating: undefined }));
-
-    expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
-      expect.anything(),
-      'profile-int-001',
-      'topic-int-001',
-      3, // default qualityRating
-      '2026-02-23T10:00:00.000Z' // timestamp
+  it('skips retention update when qualityRating not provided (Issue #19)', async () => {
+    const result = await executeChain(
+      createEventData({ qualityRating: undefined })
     );
+
+    // With Issue #19, missing qualityRating skips retention entirely
+    // rather than defaulting to 3 (which inflated metrics)
+    expect(mockUpdateRetentionFromSession).not.toHaveBeenCalled();
+    const retentionOutcome = result.outcomes.find(
+      (o: StepOutcome) => o.step === 'update-retention'
+    );
+    expect(retentionOutcome?.status).toBe('skipped');
   });
 
   it('calls coaching card precompute and cache', async () => {
@@ -391,6 +393,7 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
       createEventData({
         interleavedTopicIds,
         topicId: 'topic-int-001', // ignored when interleavedTopicIds present
+        qualityRating: 4,
       })
     );
 
@@ -403,7 +406,7 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
         expect.anything(),
         'profile-int-001',
         tid,
-        3, // default quality
+        4,
         '2026-02-23T10:00:00.000Z' // timestamp
       );
     }

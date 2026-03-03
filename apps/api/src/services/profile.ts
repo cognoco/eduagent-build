@@ -153,7 +153,6 @@ export async function updateProfile(
     .update(profiles)
     .set({
       ...input,
-      birthDate: input.birthDate ? new Date(input.birthDate) : undefined,
       updatedAt: new Date(),
     })
     .where(and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)))
