@@ -44,9 +44,9 @@ jest.mock('../../components/common', () => ({
 // RevenueCat hooks mocks
 const mockMutateAsyncPurchase = jest.fn();
 const mockMutateAsyncRestore = jest.fn();
-let mockOfferings = null;
+let mockOfferings: ReturnType<typeof makeMockOfferings> | null = null;
 let mockOfferingsLoading = false;
-let mockCustomerInfo = null;
+let mockCustomerInfo: ReturnType<typeof makeMockCustomerInfo> | null = null;
 let mockCustomerInfoLoading = false;
 let mockPurchaseIsPending = false;
 let mockRestoreIsPending = false;
@@ -71,9 +71,9 @@ jest.mock('../../hooks/use-revenuecat', () => ({
 }));
 
 // Subscription hooks mocks
-let mockSubscription;
+let mockSubscription: Record<string, unknown> | undefined;
 let mockSubLoading = false;
-let mockUsage;
+let mockUsage: Record<string, unknown> | undefined;
 let mockUsageLoading = false;
 
 jest.mock('../../hooks/use-subscription', () => ({
@@ -137,7 +137,7 @@ function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  return function Wrapper({ children }) {
+  return function Wrapper({ children }: { children: React.ReactNode }) {
     return React.createElement(
       QueryClientProvider,
       { client: queryClient },
@@ -146,8 +146,11 @@ function createWrapper() {
   };
 }
 
-function makeMockPackage(overrides) {
-  const { productOverrides, ...pkgOverrides } = overrides || {};
+function makeMockPackage(overrides?: Record<string, unknown>) {
+  const { productOverrides, ...pkgOverrides } = (overrides || {}) as Record<
+    string,
+    unknown
+  >;
   return {
     identifier: '$rc_monthly',
     packageType: 'MONTHLY',
@@ -173,7 +176,7 @@ function makeMockPackage(overrides) {
       subscriptionOptions: null,
       presentedOfferingIdentifier: null,
       presentedOfferingContext: null,
-      ...(productOverrides || {}),
+      ...((productOverrides as Record<string, unknown>) || {}),
     },
     offeringIdentifier: 'default',
     presentedOfferingContext: {
@@ -186,7 +189,7 @@ function makeMockPackage(overrides) {
   };
 }
 
-function makeMockOfferings(packages) {
+function makeMockOfferings(packages: ReturnType<typeof makeMockPackage>[]) {
   return {
     all: {
       default: {
@@ -199,7 +202,11 @@ function makeMockOfferings(packages) {
         sixMonth: null,
         threeMonth: null,
         twoMonth: null,
-        monthly: packages.find((p) => p.packageType === 'MONTHLY') || null,
+        monthly:
+          packages.find(
+            (p: ReturnType<typeof makeMockPackage>) =>
+              p.packageType === 'MONTHLY'
+          ) || null,
         weekly: null,
         webCheckoutUrl: null,
       },
@@ -214,14 +221,20 @@ function makeMockOfferings(packages) {
       sixMonth: null,
       threeMonth: null,
       twoMonth: null,
-      monthly: packages.find((p) => p.packageType === 'MONTHLY') || null,
+      monthly:
+        packages.find(
+          (p: ReturnType<typeof makeMockPackage>) => p.packageType === 'MONTHLY'
+        ) || null,
       weekly: null,
       webCheckoutUrl: null,
     },
   };
 }
 
-function makeMockCustomerInfo(overrides) {
+function makeMockCustomerInfo(overrides?: {
+  activeEntitlements?: Record<string, unknown>;
+  activeSubscriptions?: string[];
+}) {
   const opts = overrides || {};
   return {
     entitlements: {
