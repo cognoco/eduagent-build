@@ -668,12 +668,12 @@ export default function SubscriptionScreen() {
               </Text>
               <View className="bg-primary-soft rounded-full px-2.5 py-1">
                 <Text className="text-caption font-semibold text-primary capitalize">
-                  {hasActiveSubscription
-                    ? 'Active'
-                    : cancelAtPeriodEnd
+                  {cancelAtPeriodEnd
                     ? 'Cancelling'
                     : status === 'past_due'
                     ? 'Past due'
+                    : hasActiveSubscription
+                    ? 'Active'
                     : status}
                 </Text>
               </View>

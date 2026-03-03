@@ -215,7 +215,7 @@ describe('auth validation', () => {
     expect(body.code).toBe('UNAUTHORIZED');
   });
 
-  it('returns 500 when webhook secret is not configured', async () => {
+  it('returns 401 when webhook secret is not configured (no info leak)', async () => {
     const res = await app.request(
       '/revenuecat/webhook',
       {
@@ -229,9 +229,9 @@ describe('auth validation', () => {
       {} // no REVENUECAT_WEBHOOK_SECRET
     );
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(401);
     const body = await res.json();
-    expect(body.code).toBe('INTERNAL_ERROR');
+    expect(body.code).toBe('UNAUTHORIZED');
   });
 
   it('returns 401 when token does not match secret', async () => {
@@ -553,14 +553,35 @@ describe('EXPIRATION', () => {
     expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
   });
 
-  it('triggers soft landing when DB status is trial (regardless of period_type)', async () => {
+  it('does NOT trigger soft landing when period_type is NORMAL even if DB status is trial', async () => {
     (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
       mockSubscriptionRow({ status: 'trial', tier: 'plus' })
     );
 
-    // Even with period_type NORMAL, if the DB says trial, use soft landing
+    // period_type is the authoritative signal — NORMAL means paid-period expiration
     const res = await makeRequest(
       makeWebhookPayload('EXPIRATION', { period_type: 'NORMAL' })
+    );
+    expect(res.status).toBe(200);
+
+    // Should NOT soft-land — this is a paid-period expiration
+    expect(transitionToExtendedTrial).not.toHaveBeenCalled();
+    // Should downgrade to free tier instead
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({ status: 'expired', tier: 'free' })
+    );
+  });
+
+  it('falls back to DB trial status when period_type is absent', async () => {
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({ status: 'trial', tier: 'plus' })
+    );
+
+    // No period_type → fall back to DB status
+    const res = await makeRequest(
+      makeWebhookPayload('EXPIRATION', { period_type: undefined })
     );
     expect(res.status).toBe(200);
 
@@ -860,6 +881,20 @@ describe('NON_RENEWING_PURCHASE', () => {
 
     const res = await makeRequest(payload);
     expect(res.status).toBe(200);
+    expect(purchaseTopUpCredits).not.toHaveBeenCalled();
+  });
+
+  it('rejects when both transaction IDs are missing (prevents duplicate credits)', async () => {
+    const payload = makeWebhookPayload('NON_RENEWING_PURCHASE', {
+      product_id: 'com.eduagent.topup.500',
+      // no store_transaction_id or transaction_id
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.received).toBe(false);
+    expect(body.error).toBe('Missing transaction ID');
     expect(purchaseTopUpCredits).not.toHaveBeenCalled();
   });
 

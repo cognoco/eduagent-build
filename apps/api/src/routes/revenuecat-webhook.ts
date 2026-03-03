@@ -31,6 +31,19 @@ import type { CachedSubscriptionStatus } from '../services/kv';
 import type { SubscriptionStatus } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
+// Timing-safe string comparison (prevents timing attacks on webhook secret)
+// ---------------------------------------------------------------------------
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  const aBytes = new TextEncoder().encode(a);
+  const bBytes = new TextEncoder().encode(b);
+  let result = 0;
+  for (let i = 0; i < aBytes.length; i++) result |= aBytes[i]! ^ bBytes[i]!;
+  return result === 0;
+}
+
+// ---------------------------------------------------------------------------
 // Zod schema for RevenueCat webhook payload
 // ---------------------------------------------------------------------------
 
@@ -274,11 +287,13 @@ async function handleExpiration(
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
 
-  // Check if this is a trial expiration — use period_type from event
-  // and verify the current subscription status in DB
+  // Check if this is a trial expiration — use period_type from the event
+  // as the authoritative signal (safe regardless of webhook delivery order).
+  // Fallback to DB status only when period_type is absent.
   const existingSub = await getSubscriptionByAccountId(db, accountId);
   const isTrialExpiration =
-    event.period_type === 'TRIAL' || existingSub?.status === 'trial';
+    event.period_type === 'TRIAL' ||
+    (event.period_type == null && existingSub?.status === 'trial');
 
   if (isTrialExpiration && existingSub) {
     // Trial expiration triggers the reverse trial soft landing:
@@ -346,7 +361,7 @@ async function handleBillingIssue(
 }
 
 async function handleSubscriberAlias(
-  db: Database,
+  _db: Database,
   _kv: KVNamespace | undefined,
   event: RevenueCatWebhookPayload['event']
 ): Promise<void> {
@@ -357,7 +372,6 @@ async function handleSubscriberAlias(
     transferredFrom: event.transferred_from,
     transferredTo: event.transferred_to,
   });
-  void db; // satisfy linter — db available for future use
 }
 
 async function handleProductChange(
@@ -399,12 +413,23 @@ async function handleNonRenewingPurchase(
   const transactionId =
     event.store_transaction_id ?? event.transaction_id ?? null;
 
+  // Reject if no transaction ID — without it we cannot guarantee idempotency
+  // and webhook retries would grant duplicate credits.
+  if (!transactionId) {
+    console.error('[revenuecat] NON_RENEWING_PURCHASE missing transaction ID', {
+      eventId: event.id,
+      productId: event.product_id,
+    });
+    return {
+      status: 400,
+      body: { received: false, error: 'Missing transaction ID' },
+    };
+  }
+
   // Idempotency: check if this transaction has already been granted
-  if (transactionId) {
-    const alreadyGranted = await isTopUpAlreadyGranted(db, transactionId);
-    if (alreadyGranted) {
-      return null; // silently skip — already granted
-    }
+  const alreadyGranted = await isTopUpAlreadyGranted(db, transactionId);
+  if (alreadyGranted) {
+    return null; // silently skip — already granted
   }
 
   // Look up the account's subscription to verify tier eligibility
@@ -480,15 +505,16 @@ export const revenuecatWebhookRoute = new Hono<{
   const webhookSecret = c.env.REVENUECAT_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
+    console.error('[revenuecat] REVENUECAT_WEBHOOK_SECRET is not configured');
     return apiError(
       c,
-      500,
-      ERROR_CODES.INTERNAL_ERROR,
-      'Webhook secret not configured'
+      401,
+      ERROR_CODES.UNAUTHORIZED,
+      'Invalid webhook authorization'
     );
   }
 
-  if (token !== webhookSecret) {
+  if (!timingSafeEqual(token, webhookSecret)) {
     return apiError(
       c,
       401,
@@ -560,7 +586,7 @@ export const revenuecatWebhookRoute = new Hono<{
     case 'NON_RENEWING_PURCHASE': {
       const result = await handleNonRenewingPurchase(db, kv, event);
       if (result) {
-        return c.json(result.body, result.status as 403);
+        return c.json(result.body, result.status as 400 | 403);
       }
       break;
     }
