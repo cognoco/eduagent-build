@@ -77,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     # Advisory — does not block PR merge
     continue-on-error: true
-    timeout-minutes: 30
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16-alpine
@@ -175,9 +175,9 @@ jobs:
       # - Direct node path (not npx expo): npx resolves to the hoisted
       #   binary at workspace root, making Metro use the wrong project root.
       #   The direct path + working-directory keeps cwd = apps/mobile.
-      # - --dev true: production mode (`--dev false`) blocks process.env
-      #   access which expo-router needs for EXPO_ROUTER_APP_ROOT. Since
-      #   this is a debug APK for Maestro smoke tests, dev mode is fine.
+      # - --dev false: dev mode tries to open DevTools WebSocket connections
+      #   which crash in embedded (offline) APKs. The EXPO_ROUTER_APP_ROOT
+      #   sed patch below makes process.env access safe for production mode.
       # - EXPO_ROUTER_APP_ROOT: set from app.json expo-router plugin config
       #   so Metro's require.context resolves the route tree.
       - name: Bundle JS for offline APK
@@ -193,7 +193,7 @@ jobs:
 
           node ../../node_modules/@expo/cli/build/bin/cli export:embed \
             --platform android \
-            --dev true \
+            --dev false \
             --entry-file "$(pwd)/index.js" \
             --bundle-output "$(pwd)/android/app/src/main/assets/index.android.bundle" \
             --assets-dest "$(pwd)/android/app/src/main/res"
