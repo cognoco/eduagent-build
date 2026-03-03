@@ -9,22 +9,15 @@
 //         SCENARIO: with-subject
 //       outputVariable: seedResult
 //
-// After execution, access via: ${output.seedResult.email},
-// ${output.seedResult.password}, etc.
+// After execution, access via: ${output.seedResult.email}, etc.
 
 const scenario = __maestro.env['SCENARIO'] || 'onboarding-complete';
 const apiUrl = __maestro.env['API_URL'] || 'http://10.0.2.2:8787';
 const email =
   __maestro.env['EMAIL'] || 'test-e2e-' + Date.now() + '@example.com';
 
-const headers = { 'Content-Type': 'application/json' };
-const testSecret = __maestro.env['TEST_SEED_SECRET'];
-if (testSecret) {
-  headers['X-Test-Secret'] = testSecret;
-}
-
 const response = http.post(apiUrl + '/v1/__test/seed', {
-  headers: headers,
+  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ scenario: scenario, email: email }),
 });
 
@@ -40,7 +33,6 @@ const data = JSON.parse(response.body);
 output.accountId = data.accountId;
 output.profileId = data.profileId;
 output.email = data.email;
-output.password = data.password;
 output.scenario = scenario;
 
 // Spread scenario-specific IDs (subjectId, topicId, sessionIds, etc.)

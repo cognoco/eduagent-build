@@ -22,7 +22,7 @@ tags:
 - extendedWaitUntil:
     visible:
       text: "Ready to learn"
-    timeout: 60000
+    timeout: 15000
 
 # The home screen should show the subjects section
 - assertVisible: "Your subjects"

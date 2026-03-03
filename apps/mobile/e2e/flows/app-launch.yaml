@@ -14,11 +14,10 @@ tags:
 
 # The auth layout redirects unauthenticated users to sign-in.
 # Assert that the sign-in screen headline is visible.
-# CI emulators use swiftshader (software rendering) — cold start takes 30-60s.
 - extendedWaitUntil:
     visible:
       text: "Welcome back"
-    timeout: 90000
+    timeout: 15000
 
 # Verify key sign-in elements are present
 - assertVisible: "Sign in to continue learning"

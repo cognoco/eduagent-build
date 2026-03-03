@@ -9,7 +9,7 @@
 # NOTE: Steps 7-11 depend on Clerk test mode configuration. If Clerk
 # doesn't allow programmatic sign-up in test builds, use the seed
 # endpoint + sign-in instead. This flow tests the full sign-up path.
-appId: com.mentomate.app
+appId: com.zwizzly.eduagent
 tags:
   - smoke
   - onboarding
@@ -22,7 +22,7 @@ tags:
 - extendedWaitUntil:
     visible:
       text: "Welcome back"
-    timeout: 60000
+    timeout: 15000
 
 # 3. Navigate to sign-up
 - tapOn: "Sign up"
@@ -52,7 +52,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "profile-name-input"
-    timeout: 60000
+    timeout: 15000
 
 # 9. Enter profile name
 - tapOn:
@@ -71,7 +71,7 @@ tags:
 - extendedWaitUntil:
     visible:
       text: "Ready to learn"
-    timeout: 60000
+    timeout: 15000
 
 # 13. Add first subject
 - tapOn:
