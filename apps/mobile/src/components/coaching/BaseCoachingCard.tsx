@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { View, Text, Pressable } from 'react-native';
+import { ShimmerSkeleton } from '../common';
 
 export interface BaseCoachingCardProps {
   headline: string;
@@ -17,15 +18,16 @@ export interface BaseCoachingCardProps {
 
 function Skeleton(): ReactNode {
   return (
-    <View
-      className="bg-coaching-card rounded-card p-5 mt-4"
-      accessibilityLabel="Loading coaching card"
-      testID="coaching-card-skeleton"
-    >
-      <View className="bg-border rounded h-6 w-3/4 mb-3" />
-      <View className="bg-border rounded h-4 w-1/2 mb-5" />
-      <View className="bg-border rounded-button h-12 w-full" />
-    </View>
+    <ShimmerSkeleton testID="coaching-card-skeleton">
+      <View
+        className="bg-coaching-card rounded-card p-5 mt-4"
+        accessibilityLabel="Loading coaching card"
+      >
+        <View className="bg-border rounded h-6 w-3/4 mb-3" />
+        <View className="bg-border rounded h-4 w-1/2 mb-5" />
+        <View className="bg-border rounded-button h-12 w-full" />
+      </View>
+    </ShimmerSkeleton>
   );
 }
 

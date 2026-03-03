@@ -13,6 +13,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { useSubmitSummary } from '../../hooks/use-sessions';
+import { CheckmarkPopAnimation } from '../../components/common';
 
 export default function SessionSummaryScreen() {
   const { sessionId, subjectName, exchangeCount, escalationRung } =
@@ -199,6 +200,9 @@ export default function SessionSummaryScreen() {
               className="bg-surface rounded-card p-4"
               testID="summary-submitted"
             >
+              <View className="items-center mb-3">
+                <CheckmarkPopAnimation size={56} />
+              </View>
               <Text className="text-body text-text-primary mb-2">
                 {summaryText}
               </Text>
