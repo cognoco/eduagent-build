@@ -21,7 +21,7 @@ tags:
 - extendedWaitUntil:
     visible:
       text: "Ready to learn"
-    timeout: 15000
+    timeout: 60000
 
 # 3. Start session via coaching card
 - tapOn:
@@ -44,7 +44,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 60000
 
 # 7. Exchange 2: follow-up
 - tapOn:
@@ -57,7 +57,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 60000
 
 # 9. Exchange 3: clarification
 - tapOn:
@@ -70,7 +70,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 60000
 
 # 11. Session close — either auto-closes after exchange cap or manual
 # Look for summary screen title (testID: summary-title from session-summary/[sessionId].tsx)

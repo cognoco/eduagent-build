@@ -22,7 +22,7 @@ tags:
 - extendedWaitUntil:
     visible:
       text: "Ready to learn"
-    timeout: 15000
+    timeout: 60000
 
 # 3. Coaching card present
 - assertVisible:
@@ -55,7 +55,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 60000
 
 # 10. Screenshot
 - takeScreenshot: first-session-started

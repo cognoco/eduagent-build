@@ -40,7 +40,7 @@ jobs:
           POSTGRES_PASSWORD: eduagent
           POSTGRES_DB: tests
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U eduagent -d tests"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -86,7 +86,7 @@ jobs:
           POSTGRES_PASSWORD: eduagent
           POSTGRES_DB: tests
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U eduagent -d tests"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -119,9 +119,19 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      # React Native native builds (Gradle) run `node` scripts that expect
-      # flat node_modules. pnpm's default isolated layout breaks this.
-      # Hoist only in CI — local dev keeps strict isolation.
+      # --- Phase 1: strict pnpm install + schema push ---
+      # db:push MUST run before shamefully-hoist. In strict mode, pnpm
+      # isolates drizzle-kit so it can't find @neondatabase/serverless
+      # (which only supports Neon's WebSocket protocol, not plain PostgreSQL).
+      # This lets drizzle-kit fall back to its built-in pg driver.
+      - run: pnpm install
+
+      - name: Apply database schema
+        run: pnpm --filter @eduagent/database db:push
+
+      # --- Phase 2: hoisted install for React Native native builds ---
+      # Gradle runs `node` scripts that expect flat node_modules.
+      # pnpm's default isolated layout breaks this. Hoist only in CI.
       - name: Configure pnpm for native builds
         run: echo "shamefully-hoist=true" > .npmrc
 
@@ -130,10 +140,6 @@ jobs:
       # Build workspace deps that the mobile app imports at prebuild time
       - name: Build schemas package
         run: pnpm exec nx run schemas:build
-
-      # Apply database schema for seed endpoint and API routes
-      - name: Apply database schema
-        run: pnpm --filter @eduagent/database db:push
 
       # Write .dev.vars so wrangler dev can pass secrets into the Workers runtime.
       # wrangler dev runs in an isolated V8 sandbox — it does NOT inherit shell
@@ -217,6 +223,29 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
             adb install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-            maestro test apps/mobile/e2e/flows/ --include-tags=${{ github.event_name == 'schedule' && 'smoke,nightly' || github.event_name == 'workflow_dispatch' && 'smoke,nightly' || 'smoke' }}
+
+            # Wait for app to be fully launchable, then take a diagnostic screenshot
+            sleep 5
+            adb shell am start -n com.mentomate.app/.MainActivity
+            sleep 15
+            mkdir -p maestro-screenshots
+            adb exec-out screencap -p > maestro-screenshots/pre-test-app-state.png || true
+
+            maestro test apps/mobile/e2e/flows/ --include-tags=${{ github.event_name == 'schedule' && 'smoke,nightly' || github.event_name == 'workflow_dispatch' && 'smoke,nightly' || 'smoke' }} --output maestro-screenshots/ || MAESTRO_EXIT=$?
+
+            # Capture final screen state on failure
+            if [ "${MAESTRO_EXIT:-0}" -ne 0 ]; then
+              adb exec-out screencap -p > maestro-screenshots/failure-final-state.png || true
+              adb logcat -d -t 500 > maestro-screenshots/logcat.txt || true
+            fi
+            exit ${MAESTRO_EXIT:-0}
         env:
           API_URL: http://10.0.2.2:8787
+
+      - name: Upload Maestro artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-results
+          path: maestro-screenshots/
+          retention-days: 7

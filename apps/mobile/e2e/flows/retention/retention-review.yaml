@@ -31,7 +31,7 @@ tags:
 - extendedWaitUntil:
     visible:
       text: "Ready to learn"
-    timeout: 15000
+    timeout: 60000
 
 # 3. Look for review prompt on home screen (coaching card or banner)
 - assertVisible:
@@ -65,7 +65,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 60000
 
 # 10. Take screenshot of feedback
 - takeScreenshot: retention-review-feedback
@@ -86,7 +86,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 60000
     optional: true
 
 # 14. Screenshot

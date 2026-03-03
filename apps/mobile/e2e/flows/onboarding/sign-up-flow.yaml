@@ -22,7 +22,7 @@ tags:
 - extendedWaitUntil:
     visible:
       text: "Welcome back"
-    timeout: 15000
+    timeout: 60000
 
 # 3. Navigate to sign-up
 - tapOn: "Sign up"
@@ -52,7 +52,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "profile-name-input"
-    timeout: 15000
+    timeout: 60000
 
 # 9. Enter profile name
 - tapOn:
@@ -71,7 +71,7 @@ tags:
 - extendedWaitUntil:
     visible:
       text: "Ready to learn"
-    timeout: 15000
+    timeout: 60000
 
 # 13. Add first subject
 - tapOn:

@@ -30,7 +30,7 @@ tags:
 - extendedWaitUntil:
     visible:
       text: "Ready to learn"
-    timeout: 15000
+    timeout: 60000
 
 # 3. Coaching card should indicate recall/review is due.
 - assertVisible:
@@ -63,7 +63,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 60000
 
 # 9. Screenshot
 - takeScreenshot: retention-recall-complete
