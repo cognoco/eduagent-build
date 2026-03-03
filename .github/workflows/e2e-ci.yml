@@ -135,6 +135,14 @@ jobs:
       - name: Apply database schema
         run: pnpm --filter @eduagent/database db:push
 
+      # Write .dev.vars so wrangler dev can pass secrets into the Workers runtime.
+      # wrangler dev runs in an isolated V8 sandbox — it does NOT inherit shell
+      # env vars. It reads non-secret bindings from wrangler.toml [vars] and
+      # secret bindings from .dev.vars in the project directory.
+      - name: Write wrangler .dev.vars for API
+        run: |
+          printf "DATABASE_URL=%s\nNODE_ENV=test\nTEST_SEED_SECRET=test-secret\n" "$DATABASE_URL" > apps/api/.dev.vars
+
       # Start API server in background (NODE_ENV=test enables __test/* routes)
       - name: Start API server (background)
         run: |
