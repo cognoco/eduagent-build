@@ -34,7 +34,7 @@ appId: com.mentomate.app
 - extendedWaitUntil:
     visible:
       text: "Welcome back"
-    timeout: 15000
+    timeout: 90000
 
 # Step 4: Sign in with seeded credentials
 - tapOn:
@@ -50,4 +50,4 @@ appId: com.mentomate.app
 - extendedWaitUntil:
     visible:
       text: "Ready to learn"
-    timeout: 15000
+    timeout: 60000

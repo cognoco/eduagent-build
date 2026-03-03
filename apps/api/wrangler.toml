@@ -86,6 +86,36 @@ id = "f5232eccbccf42538f71cba5fa2ac565"
 preview_id = "f5232eccbccf42538f71cba5fa2ac565"
 
 # =============================================================================
+# Staging Environment
+# =============================================================================
+# Deploy with: wrangler deploy --env staging
+# Set secrets with: wrangler secret put <NAME> --env staging
+#
+# Before first staging deploy, create KV namespaces:
+#   wrangler kv namespace create SUBSCRIPTION_KV --env staging
+#   wrangler kv namespace create COACHING_KV --env staging
+# Then replace the placeholder IDs below with the returned namespace IDs.
+# =============================================================================
+
+[env.staging]
+compatibility_date = "2025-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+APP_URL = "https://staging.mentomate.com"
+LOG_LEVEL = "debug"
+EMAIL_FROM = "noreply@mentomate.com"
+
+[[env.staging.kv_namespaces]]
+binding = "SUBSCRIPTION_KV"
+id = "947a17b55bac4e1eb7968a110019cd22"
+
+[[env.staging.kv_namespaces]]
+binding = "COACHING_KV"
+id = "baf0be70bf5f441e9d00eb14362ca82b"
+
+# =============================================================================
 # Production Environment
 # =============================================================================
 # Deploy with: wrangler deploy --env production

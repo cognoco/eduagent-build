@@ -162,7 +162,8 @@ jobs:
       - name: Setup Expo
         uses: expo/expo-github-action@v8
         with:
-          eas-version: latest
+          eas-version: 18.x
+          packager: npm
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build Android preview APK
@@ -195,7 +196,8 @@ jobs:
       - name: Setup Expo
         uses: expo/expo-github-action@v8
         with:
-          eas-version: latest
+          eas-version: 18.x
+          packager: npm
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build with EAS
