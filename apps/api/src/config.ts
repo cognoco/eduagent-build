@@ -36,6 +36,9 @@ const envSchema = z.object({
 
   // Test seed — shared secret for /__test/* routes (optional, dev/staging only)
   TEST_SEED_SECRET: z.string().min(1).optional(),
+
+  // RevenueCat — webhook authentication
+  REVENUECAT_WEBHOOK_SECRET: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

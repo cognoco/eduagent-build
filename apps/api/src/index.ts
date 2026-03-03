@@ -44,6 +44,7 @@ import { dashboardRoutes } from './routes/dashboard';
 import { billingRoutes } from './routes/billing';
 import { stripeWebhookRoute } from './routes/stripe-webhook';
 import { testSeedRoutes } from './routes/test-seed';
+import { revenuecatWebhookRoute } from './routes/revenuecat-webhook';
 
 type Bindings = {
   ENVIRONMENT: string;
@@ -69,6 +70,7 @@ type Bindings = {
   EMAIL_FROM?: string;
   SENTRY_DSN?: string;
   TEST_SEED_SECRET?: string;
+  REVENUECAT_WEBHOOK_SECRET?: string;
   COACHING_KV?: KVNamespace;
 };
 
@@ -168,6 +170,7 @@ const routes = api
   .route('/', dashboardRoutes)
   .route('/', billingRoutes)
   .route('/', stripeWebhookRoute)
+  .route('/', revenuecatWebhookRoute)
   .route('/', testSeedRoutes);
 
 // ---------------------------------------------------------------------------

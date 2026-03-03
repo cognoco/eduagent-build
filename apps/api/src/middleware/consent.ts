@@ -29,6 +29,7 @@ const EXEMPT_PREFIXES = [
   '/v1/profiles',
   '/v1/billing/',
   '/v1/stripe/',
+  '/v1/revenuecat/',
   '/v1/inngest',
   '/v1/__test/',
 ];

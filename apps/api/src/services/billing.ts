@@ -1331,3 +1331,161 @@ export async function getFamilyPoolStatus(
     maxProfiles: tierConfig.maxProfiles,
   };
 }
+
+// ---------------------------------------------------------------------------
+// RevenueCat webhook helpers (Epic 9)
+// ---------------------------------------------------------------------------
+
+export interface RevenuecatWebhookUpdate {
+  tier?: SubscriptionTier;
+  status?: SubscriptionStatus;
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  cancelledAt?: string | null;
+}
+
+/**
+ * Checks whether a RevenueCat event has already been processed.
+ * Uses `lastRevenuecatEventId` on the subscription row for idempotency.
+ */
+export async function isRevenuecatEventProcessed(
+  db: Database,
+  accountId: string,
+  eventId: string
+): Promise<boolean> {
+  const sub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.accountId, accountId),
+  });
+  if (!sub) return false;
+  return sub.lastRevenuecatEventId === eventId;
+}
+
+/**
+ * Updates a subscription from a RevenueCat webhook event.
+ * Writes `lastRevenuecatEventId` for idempotency.
+ */
+export async function updateSubscriptionFromRevenuecatWebhook(
+  db: Database,
+  accountId: string,
+  updates: RevenuecatWebhookUpdate & { eventId: string }
+): Promise<SubscriptionRow | null> {
+  const existing = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.accountId, accountId),
+  });
+
+  if (!existing) return null;
+
+  const setValues: Record<string, unknown> = {
+    lastRevenuecatEventId: updates.eventId,
+    updatedAt: new Date(),
+  };
+
+  if (updates.tier !== undefined) {
+    setValues.tier = updates.tier;
+  }
+  if (updates.status !== undefined) {
+    setValues.status = updates.status;
+  }
+  if (updates.currentPeriodStart !== undefined) {
+    setValues.currentPeriodStart = new Date(updates.currentPeriodStart);
+  }
+  if (updates.currentPeriodEnd !== undefined) {
+    setValues.currentPeriodEnd = new Date(updates.currentPeriodEnd);
+  }
+  if (updates.cancelledAt !== undefined) {
+    setValues.cancelledAt = updates.cancelledAt
+      ? new Date(updates.cancelledAt)
+      : null;
+  }
+
+  const [updated] = await db
+    .update(subscriptions)
+    .set(setValues)
+    .where(eq(subscriptions.id, existing.id))
+    .returning();
+
+  return mapSubscriptionRow(updated);
+}
+
+/**
+ * Activates (or creates) a subscription from a RevenueCat purchase event.
+ * Similar to `activateSubscriptionFromCheckout` but keyed by accountId
+ * instead of stripeSubscriptionId.
+ */
+export async function activateSubscriptionFromRevenuecat(
+  db: Database,
+  accountId: string,
+  tier: 'plus' | 'family' | 'pro',
+  eventId: string,
+  options?: {
+    currentPeriodStart?: string;
+    currentPeriodEnd?: string;
+    revenuecatOriginalAppUserId?: string;
+  }
+): Promise<SubscriptionRow> {
+  const existing = await getSubscriptionByAccountId(db, accountId);
+  const tierConfig = getTierConfig(tier);
+
+  if (!existing) {
+    // Create new subscription + quota pool
+    const [subRow] = await db
+      .insert(subscriptions)
+      .values({
+        accountId,
+        tier,
+        status: 'active',
+        lastRevenuecatEventId: eventId,
+        revenuecatOriginalAppUserId:
+          options?.revenuecatOriginalAppUserId ?? null,
+        currentPeriodStart: options?.currentPeriodStart
+          ? new Date(options.currentPeriodStart)
+          : null,
+        currentPeriodEnd: options?.currentPeriodEnd
+          ? new Date(options.currentPeriodEnd)
+          : null,
+      })
+      .returning();
+
+    const now = new Date();
+    const cycleResetAt = new Date(now);
+    cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
+
+    await db.insert(quotaPools).values({
+      subscriptionId: subRow.id,
+      monthlyLimit: tierConfig.monthlyQuota,
+      usedThisMonth: 0,
+      cycleResetAt,
+    });
+
+    return mapSubscriptionRow(subRow);
+  }
+
+  // Update existing subscription
+  const setValues: Record<string, unknown> = {
+    tier,
+    status: 'active',
+    lastRevenuecatEventId: eventId,
+    updatedAt: new Date(),
+  };
+
+  if (options?.revenuecatOriginalAppUserId) {
+    setValues.revenuecatOriginalAppUserId = options.revenuecatOriginalAppUserId;
+  }
+  if (options?.currentPeriodStart) {
+    setValues.currentPeriodStart = new Date(options.currentPeriodStart);
+  }
+  if (options?.currentPeriodEnd) {
+    setValues.currentPeriodEnd = new Date(options.currentPeriodEnd);
+  }
+
+  const [updated] = await db
+    .update(subscriptions)
+    .set(setValues)
+    .where(eq(subscriptions.id, existing.id))
+    .returning();
+
+  // Update quota pool limit to match the new tier
+  await updateQuotaPoolLimit(db, existing.id, tierConfig.monthlyQuota);
+
+  return mapSubscriptionRow(updated);
+}
