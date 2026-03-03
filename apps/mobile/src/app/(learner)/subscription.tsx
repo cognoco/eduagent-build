@@ -14,6 +14,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import Purchases from 'react-native-purchases';
 import type {
   PurchasesPackage,
   PurchasesOffering,
@@ -21,13 +22,13 @@ import type {
   PurchasesError,
 } from 'react-native-purchases';
 import { PURCHASES_ERROR_CODE, PACKAGE_TYPE } from 'react-native-purchases';
+import { useQueryClient } from '@tanstack/react-query';
 import { useThemeColors } from '../../lib/theme';
 import { useProfile } from '../../lib/profile';
 import { UsageMeter } from '../../components/common';
 import {
   useSubscription,
   useUsage,
-  usePurchaseTopUp,
   useJoinByokWaitlist,
   type SubscriptionTier,
 } from '../../hooks/use-subscription';
@@ -408,11 +409,16 @@ export default function SubscriptionScreen() {
   const [byokEmail, setByokEmail] = useState('');
   const { activeProfile } = useProfile();
 
-  // Existing Stripe-based hooks for usage display and API-side subscription state
+  const queryClient = useQueryClient();
+
+  // API hooks for usage display and subscription state
   const { data: subscription, isLoading: subLoading } = useSubscription();
   const { data: usage, isLoading: usageLoading } = useUsage();
-  const topUp = usePurchaseTopUp();
   const byokWaitlist = useJoinByokWaitlist();
+
+  // Top-up IAP state
+  const [topUpPurchasing, setTopUpPurchasing] = useState(false);
+  const [topUpPolling, setTopUpPolling] = useState(false);
 
   // RevenueCat hooks
   const { data: offerings, isLoading: offeringsLoading } = useOfferings();
@@ -494,17 +500,73 @@ export default function SubscriptionScreen() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Top-up handler (kept from existing Stripe logic)
+  // Top-up handler — RevenueCat consumable IAP + poll for webhook confirmation
   // ---------------------------------------------------------------------------
 
   const handleTopUp = useCallback(async () => {
-    try {
-      await topUp.mutateAsync();
-      Alert.alert('Top-up', '500 additional credits purchased.');
-    } catch {
-      Alert.alert('Error', 'Could not purchase top-up. Try again.');
+    // Find the top-up package from offerings
+    // RevenueCat consumables can be in a separate offering or as a non-subscription package
+    const topUpOffering = offerings?.all?.['top_up'] ?? offerings?.current;
+    const topUpPkg = topUpOffering?.availablePackages.find((p) =>
+      p.product.identifier.includes('topup')
+    );
+
+    if (!topUpPkg) {
+      Alert.alert('Error', 'Top-up package not available.');
+      return;
     }
-  }, [topUp]);
+
+    setTopUpPurchasing(true);
+    try {
+      await Purchases.purchasePackage(topUpPkg);
+    } catch (error: unknown) {
+      setTopUpPurchasing(false);
+      if (isPurchaseCancelledError(error)) return;
+      if (isNetworkError(error)) {
+        Alert.alert(
+          'Network error',
+          'Please check your internet connection and try again.'
+        );
+        return;
+      }
+      Alert.alert('Purchase failed', 'Something went wrong. Please try again.');
+      return;
+    }
+
+    // Purchase succeeded on store side — now poll API for webhook confirmation
+    setTopUpPurchasing(false);
+    setTopUpPolling(true);
+
+    const baseCredits = usage?.topUpCreditsRemaining ?? 0;
+    const maxAttempts = 15; // ~30 seconds with 2s interval
+    const pollIntervalMs = 2000;
+    let confirmed = false;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      await queryClient.invalidateQueries({ queryKey: ['usage'] });
+      // Brief wait for the query to refetch
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const freshUsage = queryClient.getQueryData<{
+        topUpCreditsRemaining: number;
+      }>(['usage', activeProfile?.id]);
+      if (freshUsage && freshUsage.topUpCreditsRemaining > baseCredits) {
+        confirmed = true;
+        break;
+      }
+    }
+
+    setTopUpPolling(false);
+
+    if (confirmed) {
+      Alert.alert('Top-up', '500 additional credits have been added!');
+    } else {
+      Alert.alert(
+        'Processing',
+        'Your purchase is being processed. Credits will appear shortly.'
+      );
+    }
+  }, [offerings, usage, queryClient, activeProfile?.id]);
 
   // ---------------------------------------------------------------------------
   // BYOK waitlist handler (kept from existing Stripe logic)
@@ -740,23 +802,41 @@ export default function SubscriptionScreen() {
 
           {/* Top-up */}
           {isPaidTier && (
-            <View className="mt-6">
+            <View className="mt-6" testID="top-up-section">
               <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2">
                 Need more questions?
               </Text>
               <Pressable
                 onPress={handleTopUp}
-                disabled={topUp.isPending}
+                disabled={topUpPurchasing || topUpPolling}
                 className="bg-surface rounded-card px-4 py-3.5"
                 accessibilityLabel="Buy 500 credits"
                 accessibilityRole="button"
+                testID="top-up-button"
               >
-                <Text className="text-body font-semibold text-primary">
-                  Buy 500 credits
-                </Text>
-                <Text className="text-caption text-text-secondary mt-0.5">
-                  One-time purchase. Credits never expire.
-                </Text>
+                {topUpPurchasing || topUpPolling ? (
+                  <View className="flex-row items-center">
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.primary}
+                      testID="top-up-spinner"
+                    />
+                    <Text className="text-body font-semibold text-primary ml-2">
+                      {topUpPolling
+                        ? 'Purchase processing...'
+                        : 'Opening store...'}
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <Text className="text-body font-semibold text-primary">
+                      Buy 500 credits
+                    </Text>
+                    <Text className="text-caption text-text-secondary mt-0.5">
+                      One-time purchase. Credits expire in 12 months.
+                    </Text>
+                  </>
+                )}
               </Pressable>
             </View>
           )}

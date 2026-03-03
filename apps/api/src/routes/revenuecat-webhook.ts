@@ -19,6 +19,8 @@ import {
   activateSubscriptionFromRevenuecat,
   updateQuotaPoolLimit,
   transitionToExtendedTrial,
+  isTopUpAlreadyGranted,
+  purchaseTopUpCredits,
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
 import { getTierConfig } from '../services/subscription';
@@ -52,6 +54,8 @@ const revenuecatWebhookSchema = z.object({
     new_product_id: z.string().optional(),
     cancel_reason: z.string().optional(),
     grace_period_expiration_at_ms: z.number().optional(),
+    transaction_id: z.string().optional(),
+    store_transaction_id: z.string().optional(),
   }),
 });
 
@@ -77,6 +81,24 @@ const PRODUCT_TIER_MAP: Record<string, 'plus' | 'family' | 'pro'> = {
   'com.eduagent.pro.monthly.android': 'pro',
   'com.eduagent.pro.yearly.android': 'pro',
 };
+
+/**
+ * Maps consumable product IDs to the number of top-up credits granted.
+ */
+const CONSUMABLE_PRODUCT_CREDITS: Record<string, number> = {
+  'com.eduagent.topup.500': 500,
+  'com.eduagent.topup.500.android': 500,
+};
+
+/**
+ * Returns the credit amount for a consumable product ID, or null if not a top-up product.
+ */
+function getTopUpCreditsForProduct(
+  productId: string | undefined
+): number | null {
+  if (!productId) return null;
+  return CONSUMABLE_PRODUCT_CREDITS[productId] ?? null;
+}
 
 /**
  * Extracts the tier from a product ID using the product-to-tier map.
@@ -362,6 +384,55 @@ async function handleProductChange(
   }
 }
 
+async function handleNonRenewingPurchase(
+  db: Database,
+  kv: KVNamespace | undefined,
+  event: RevenueCatWebhookPayload['event']
+): Promise<{ status: number; body: Record<string, unknown> } | null> {
+  const accountId = await resolveAccountId(db, event.app_user_id);
+  if (!accountId) return null;
+
+  const credits = getTopUpCreditsForProduct(event.product_id);
+  if (credits === null) return null;
+
+  // Resolve the transaction ID for idempotency (prefer store_transaction_id)
+  const transactionId =
+    event.store_transaction_id ?? event.transaction_id ?? null;
+
+  // Idempotency: check if this transaction has already been granted
+  if (transactionId) {
+    const alreadyGranted = await isTopUpAlreadyGranted(db, transactionId);
+    if (alreadyGranted) {
+      return null; // silently skip — already granted
+    }
+  }
+
+  // Look up the account's subscription to verify tier eligibility
+  const sub = await getSubscriptionByAccountId(db, accountId);
+  if (!sub || sub.tier === 'free') {
+    return {
+      status: 403,
+      body: {
+        received: true,
+        error: 'Top-ups are not available on the free tier',
+      },
+    };
+  }
+
+  // Grant credits via the shared pool (family accounts share the same subscription)
+  await purchaseTopUpCredits(
+    db,
+    sub.id,
+    credits,
+    new Date(),
+    transactionId ?? undefined
+  );
+
+  await refreshKvCache(kv, db, accountId);
+
+  return null;
+}
+
 async function handleUncancellation(
   db: Database,
   kv: KVNamespace | undefined,
@@ -486,6 +557,13 @@ export const revenuecatWebhookRoute = new Hono<{
     case 'UNCANCELLATION':
       await handleUncancellation(db, kv, event);
       break;
+    case 'NON_RENEWING_PURCHASE': {
+      const result = await handleNonRenewingPurchase(db, kv, event);
+      if (result) {
+        return c.json(result.body, result.status as 403);
+      }
+      break;
+    }
   }
 
   return c.json({ received: true });

@@ -90,6 +90,7 @@ export const topUpCredits = pgTable(
       .notNull()
       .defaultNow(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    revenuecatTransactionId: text('revenuecat_transaction_id'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

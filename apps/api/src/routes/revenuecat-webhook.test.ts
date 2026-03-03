@@ -20,6 +20,17 @@ jest.mock('../services/billing', () => ({
   activateSubscriptionFromRevenuecat: jest.fn(),
   updateQuotaPoolLimit: jest.fn().mockResolvedValue(undefined),
   transitionToExtendedTrial: jest.fn().mockResolvedValue(undefined),
+  isTopUpAlreadyGranted: jest.fn().mockResolvedValue(false),
+  purchaseTopUpCredits: jest.fn().mockResolvedValue({
+    id: 'topup-1',
+    subscriptionId: 'sub-internal-1',
+    amount: 500,
+    remaining: 500,
+    purchasedAt: new Date().toISOString(),
+    expiresAt: new Date().toISOString(),
+    revenuecatTransactionId: 'txn_test_123',
+    createdAt: new Date().toISOString(),
+  }),
 }));
 
 jest.mock('../services/account', () => ({
@@ -59,6 +70,8 @@ import {
   activateSubscriptionFromRevenuecat,
   updateQuotaPoolLimit,
   transitionToExtendedTrial,
+  isTopUpAlreadyGranted,
+  purchaseTopUpCredits,
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
 import { getTierConfig } from '../services/subscription';
@@ -168,6 +181,17 @@ beforeEach(() => {
   (ensureFreeSubscription as jest.Mock).mockResolvedValue(
     mockSubscriptionRow({ tier: 'free' })
   );
+  (isTopUpAlreadyGranted as jest.Mock).mockResolvedValue(false);
+  (purchaseTopUpCredits as jest.Mock).mockResolvedValue({
+    id: 'topup-1',
+    subscriptionId: 'sub-internal-1',
+    amount: 500,
+    remaining: 500,
+    purchasedAt: new Date().toISOString(),
+    expiresAt: new Date().toISOString(),
+    revenuecatTransactionId: 'txn_test_123',
+    createdAt: new Date().toISOString(),
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -760,5 +784,130 @@ describe('free-tier auto-provisioning', () => {
   it('calls ensureFreeSubscription before processing event', async () => {
     await makeRequest(makeWebhookPayload('INITIAL_PURCHASE'));
     expect(ensureFreeSubscription).toHaveBeenCalledWith(mockDb, 'acc-1');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NON_RENEWING_PURCHASE (consumable top-up via IAP)
+// ---------------------------------------------------------------------------
+
+describe('NON_RENEWING_PURCHASE', () => {
+  it('grants 500 credits via purchaseTopUpCredits', async () => {
+    const payload = makeWebhookPayload('NON_RENEWING_PURCHASE', {
+      product_id: 'com.eduagent.topup.500',
+      store_transaction_id: 'txn_apple_123',
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+
+    expect(purchaseTopUpCredits).toHaveBeenCalledWith(
+      mockDb,
+      'sub-internal-1',
+      500,
+      expect.any(Date),
+      'txn_apple_123'
+    );
+  });
+
+  it('rejects top-up on free tier with 403', async () => {
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({ tier: 'free', status: 'active' })
+    );
+
+    const payload = makeWebhookPayload('NON_RENEWING_PURCHASE', {
+      product_id: 'com.eduagent.topup.500',
+      store_transaction_id: 'txn_apple_456',
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(403);
+
+    const body = await res.json();
+    expect(body.error).toContain('free tier');
+    expect(purchaseTopUpCredits).not.toHaveBeenCalled();
+  });
+
+  it('is idempotent — duplicate transaction ID does not double-grant', async () => {
+    (isTopUpAlreadyGranted as jest.Mock).mockResolvedValue(true);
+
+    const payload = makeWebhookPayload('NON_RENEWING_PURCHASE', {
+      product_id: 'com.eduagent.topup.500',
+      store_transaction_id: 'txn_apple_duplicate',
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+    expect(purchaseTopUpCredits).not.toHaveBeenCalled();
+  });
+
+  it('refreshes KV cache after top-up', async () => {
+    const payload = makeWebhookPayload('NON_RENEWING_PURCHASE', {
+      product_id: 'com.eduagent.topup.500',
+      store_transaction_id: 'txn_apple_789',
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+    expect(writeSubscriptionStatus).toHaveBeenCalled();
+  });
+
+  it('handles unknown consumable product ID gracefully', async () => {
+    const payload = makeWebhookPayload('NON_RENEWING_PURCHASE', {
+      product_id: 'com.unknown.product',
+      store_transaction_id: 'txn_unknown',
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+    expect(purchaseTopUpCredits).not.toHaveBeenCalled();
+  });
+
+  it('falls back to transaction_id when store_transaction_id is absent', async () => {
+    const payload = makeWebhookPayload('NON_RENEWING_PURCHASE', {
+      product_id: 'com.eduagent.topup.500',
+      transaction_id: 'txn_fallback_123',
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+
+    expect(purchaseTopUpCredits).toHaveBeenCalledWith(
+      mockDb,
+      'sub-internal-1',
+      500,
+      expect.any(Date),
+      'txn_fallback_123'
+    );
+  });
+
+  it('grants credits for Android product ID', async () => {
+    const payload = makeWebhookPayload('NON_RENEWING_PURCHASE', {
+      product_id: 'com.eduagent.topup.500.android',
+      store_transaction_id: 'txn_google_123',
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+
+    expect(purchaseTopUpCredits).toHaveBeenCalledWith(
+      mockDb,
+      'sub-internal-1',
+      500,
+      expect.any(Date),
+      'txn_google_123'
+    );
+  });
+
+  it('handles anonymous app_user_id gracefully', async () => {
+    const payload = makeWebhookPayload('NON_RENEWING_PURCHASE', {
+      app_user_id: '$RCAnonymousID:abc123',
+      product_id: 'com.eduagent.topup.500',
+      store_transaction_id: 'txn_anon_123',
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+    expect(purchaseTopUpCredits).not.toHaveBeenCalled();
   });
 });

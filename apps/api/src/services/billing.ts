@@ -796,6 +796,7 @@ export interface TopUpCreditRow {
   remaining: number;
   purchasedAt: string;
   expiresAt: string;
+  revenuecatTransactionId: string | null;
   createdAt: string;
 }
 
@@ -809,6 +810,7 @@ function mapTopUpCreditRow(
     remaining: row.remaining,
     purchasedAt: row.purchasedAt.toISOString(),
     expiresAt: row.expiresAt.toISOString(),
+    revenuecatTransactionId: row.revenuecatTransactionId,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -842,17 +844,34 @@ export async function getTopUpCreditsRemaining(
 const TOP_UP_EXPIRY_MONTHS = 12;
 
 /**
+ * Checks whether a top-up credit pack with the given RevenueCat transaction ID
+ * has already been granted. Used for idempotency on webhook retries.
+ */
+export async function isTopUpAlreadyGranted(
+  db: Database,
+  transactionId: string
+): Promise<boolean> {
+  const existing = await db.query.topUpCredits.findFirst({
+    where: eq(topUpCredits.revenuecatTransactionId, transactionId),
+  });
+  return !!existing;
+}
+
+/**
  * Creates a top-up credit pack for a subscription.
  * Credits expire 12 months after purchase.
  *
  * Only paid tiers (plus, family, pro) can purchase top-ups.
  * Returns null if the subscription's tier is not eligible.
+ *
+ * Accepts an optional `transactionId` for RevenueCat IAP idempotency tracking.
  */
 export async function purchaseTopUpCredits(
   db: Database,
   subscriptionId: string,
   amount: number,
-  now: Date = new Date()
+  now: Date = new Date(),
+  transactionId?: string
 ): Promise<TopUpCreditRow | null> {
   // Verify subscription exists and tier is eligible
   const sub = await db.query.subscriptions.findFirst({
@@ -874,6 +893,7 @@ export async function purchaseTopUpCredits(
       remaining: amount,
       purchasedAt: now,
       expiresAt,
+      revenuecatTransactionId: transactionId ?? null,
     })
     .returning();
 
