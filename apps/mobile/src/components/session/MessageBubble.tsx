@@ -21,6 +21,74 @@ interface MessageBubbleProps {
   verificationBadge?: VerificationBadge;
 }
 
+function ThinkingDot({ delay }: { delay: number }): React.ReactElement {
+  const opacity = useSharedValue(0.3);
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 400 }),
+        withTiming(0.3, { duration: 400 })
+      ),
+      -1,
+      false
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      entering={FadeIn.delay(delay).duration(300)}
+      style={animatedStyle}
+      className="w-2 h-2 rounded-full bg-text-secondary"
+    />
+  );
+}
+
+function ThinkingIndicator(): React.ReactElement {
+  return (
+    <View
+      className="flex-row gap-1 py-2 px-1 items-center"
+      testID="thinking-indicator"
+      accessibilityLabel="AI is thinking"
+    >
+      {[0, 1, 2].map((i) => (
+        <ThinkingDot key={i} delay={i * 200} />
+      ))}
+    </View>
+  );
+}
+
+function BlinkingCursor(): React.ReactElement {
+  const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.2, { duration: 400 }),
+        withTiming(1, { duration: 400 })
+      ),
+      -1,
+      false
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.Text style={animatedStyle} className="text-accent">
+      {' \u258C'}
+    </Animated.Text>
+  );
+}
+
 const GUIDED_LABELS: Record<number, string> = {
   3: 'Step-by-step',
   4: 'Let me show you',
@@ -49,7 +117,7 @@ export function MessageBubble({
   streaming,
   escalationRung,
   verificationBadge,
-}: MessageBubbleProps) {
+}: MessageBubbleProps): React.ReactElement {
   const isAI = role === 'ai';
   const displayContent = isAI ? formatMathContent(content) : content;
   const isGuided = isAI && (escalationRung ?? 0) >= 3;
@@ -60,6 +128,7 @@ export function MessageBubble({
     isAI && verificationBadge
       ? VERIFICATION_BADGE_CONFIG[verificationBadge]
       : undefined;
+  const isThinking = streaming && !content;
 
   return (
     <Animated.View

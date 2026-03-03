@@ -12,6 +12,10 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageBubble, type VerificationBadge } from './MessageBubble';
+import { VoiceRecordButton, VoiceTranscriptPreview } from './VoiceRecordButton';
+import { VoiceToggle } from './VoiceToggle';
+import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
+import { useTextToSpeech } from '../../hooks/use-text-to-speech';
 import { useThemeColors } from '../../lib/theme';
 
 export interface ChatMessage {
