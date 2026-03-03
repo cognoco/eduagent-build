@@ -19,6 +19,7 @@ jest.mock('../services/billing', () => ({
   updateSubscriptionFromRevenuecatWebhook: jest.fn(),
   activateSubscriptionFromRevenuecat: jest.fn(),
   updateQuotaPoolLimit: jest.fn().mockResolvedValue(undefined),
+  transitionToExtendedTrial: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../services/account', () => ({
@@ -34,6 +35,10 @@ jest.mock('../services/subscription', () => ({
     topUpPrice: 10,
     topUpAmount: 500,
   }),
+}));
+
+jest.mock('../services/trial', () => ({
+  EXTENDED_TRIAL_MONTHLY_EQUIVALENT: 450,
 }));
 
 jest.mock('../inngest/client', () => ({
@@ -53,6 +58,7 @@ import {
   updateSubscriptionFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
   updateQuotaPoolLimit,
+  transitionToExtendedTrial,
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
 import { getTierConfig } from '../services/subscription';
@@ -297,6 +303,7 @@ describe('INITIAL_PURCHASE', () => {
       expect.any(String),
       expect.objectContaining({
         revenuecatOriginalAppUserId: 'clerk_user_123',
+        isTrial: false,
       })
     );
   });
@@ -336,6 +343,49 @@ describe('INITIAL_PURCHASE', () => {
     // Unknown user — can't resolve account
     expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
   });
+
+  it('sets trial status when period_type is TRIAL', async () => {
+    const expirationMs = Date.now() + 14 * 86400000;
+    const payload = makeWebhookPayload('INITIAL_PURCHASE', {
+      period_type: 'TRIAL',
+      product_id: 'com.eduagent.plus.monthly',
+      expiration_at_ms: expirationMs,
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+
+    expect(activateSubscriptionFromRevenuecat).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      'plus',
+      expect.any(String),
+      expect.objectContaining({
+        isTrial: true,
+        trialEndsAt: new Date(expirationMs).toISOString(),
+      })
+    );
+  });
+
+  it('sets active status when period_type is NORMAL', async () => {
+    const payload = makeWebhookPayload('INITIAL_PURCHASE', {
+      period_type: 'NORMAL',
+      product_id: 'com.eduagent.plus.monthly',
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+
+    expect(activateSubscriptionFromRevenuecat).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      'plus',
+      expect.any(String),
+      expect.objectContaining({
+        isTrial: false,
+      })
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -353,6 +403,7 @@ describe('RENEWAL', () => {
       expect.objectContaining({
         status: 'active',
         cancelledAt: null,
+        trialEndsAt: null,
       })
     );
   });
@@ -371,6 +422,34 @@ describe('RENEWAL', () => {
     const res = await makeRequest(makeWebhookPayload('RENEWAL'));
     expect(res.status).toBe(200);
     expect(writeSubscriptionStatus).toHaveBeenCalled();
+  });
+
+  it('converts trial to active on RENEWAL after trial', async () => {
+    // Simulate existing subscription in trial state
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({
+        status: 'trial',
+        trialEndsAt: new Date(Date.now() + 86400000).toISOString(),
+      })
+    );
+
+    const res = await makeRequest(
+      makeWebhookPayload('RENEWAL', {
+        period_type: 'NORMAL',
+        product_id: 'com.eduagent.plus.monthly',
+      })
+    );
+    expect(res.status).toBe(200);
+
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({
+        status: 'active',
+        trialEndsAt: null,
+        cancelledAt: null,
+      })
+    );
   });
 });
 
@@ -405,8 +484,11 @@ describe('CANCELLATION', () => {
 // ---------------------------------------------------------------------------
 
 describe('EXPIRATION', () => {
-  it('downgrades to free tier on expiration', async () => {
-    const res = await makeRequest(makeWebhookPayload('EXPIRATION'));
+  it('downgrades to free tier on non-trial expiration', async () => {
+    // Default mock: getSubscriptionByAccountId returns status: 'active'
+    const res = await makeRequest(
+      makeWebhookPayload('EXPIRATION', { period_type: 'NORMAL' })
+    );
     expect(res.status).toBe(200);
 
     expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
@@ -419,10 +501,82 @@ describe('EXPIRATION', () => {
     );
   });
 
-  it('updates quota pool to free tier limit', async () => {
-    const res = await makeRequest(makeWebhookPayload('EXPIRATION'));
+  it('updates quota pool to free tier limit on non-trial expiration', async () => {
+    const res = await makeRequest(
+      makeWebhookPayload('EXPIRATION', { period_type: 'NORMAL' })
+    );
     expect(res.status).toBe(200);
     expect(updateQuotaPoolLimit).toHaveBeenCalled();
+  });
+
+  it('triggers soft landing on trial expiration (period_type TRIAL)', async () => {
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({ status: 'trial', tier: 'plus' })
+    );
+
+    const res = await makeRequest(
+      makeWebhookPayload('EXPIRATION', { period_type: 'TRIAL' })
+    );
+    expect(res.status).toBe(200);
+
+    // Should call transitionToExtendedTrial with 450 monthly quota
+    expect(transitionToExtendedTrial).toHaveBeenCalledWith(
+      mockDb,
+      'sub-internal-1',
+      450
+    );
+    // Should NOT call updateQuotaPoolLimit (soft landing uses transitionToExtendedTrial)
+    expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
+  });
+
+  it('triggers soft landing when DB status is trial (regardless of period_type)', async () => {
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({ status: 'trial', tier: 'plus' })
+    );
+
+    // Even with period_type NORMAL, if the DB says trial, use soft landing
+    const res = await makeRequest(
+      makeWebhookPayload('EXPIRATION', { period_type: 'NORMAL' })
+    );
+    expect(res.status).toBe(200);
+
+    expect(transitionToExtendedTrial).toHaveBeenCalledWith(
+      mockDb,
+      'sub-internal-1',
+      450
+    );
+  });
+
+  it('records eventId for idempotency after trial soft landing', async () => {
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({ status: 'trial', tier: 'plus' })
+    );
+
+    const res = await makeRequest(
+      makeWebhookPayload('EXPIRATION', { period_type: 'TRIAL' })
+    );
+    expect(res.status).toBe(200);
+
+    // Should call updateSubscriptionFromRevenuecatWebhook to record eventId
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({
+        eventId: expect.any(String),
+      })
+    );
+  });
+
+  it('refreshes KV cache after trial soft landing', async () => {
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
+      mockSubscriptionRow({ status: 'trial', tier: 'plus' })
+    );
+
+    const res = await makeRequest(
+      makeWebhookPayload('EXPIRATION', { period_type: 'TRIAL' })
+    );
+    expect(res.status).toBe(200);
+    expect(writeSubscriptionStatus).toHaveBeenCalled();
   });
 });
 

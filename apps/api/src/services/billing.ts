@@ -1342,6 +1342,7 @@ export interface RevenuecatWebhookUpdate {
   currentPeriodStart?: string;
   currentPeriodEnd?: string;
   cancelledAt?: string | null;
+  trialEndsAt?: string | null;
 }
 
 /**
@@ -1397,6 +1398,11 @@ export async function updateSubscriptionFromRevenuecatWebhook(
       ? new Date(updates.cancelledAt)
       : null;
   }
+  if (updates.trialEndsAt !== undefined) {
+    setValues.trialEndsAt = updates.trialEndsAt
+      ? new Date(updates.trialEndsAt)
+      : null;
+  }
 
   const [updated] = await db
     .update(subscriptions)
@@ -1421,10 +1427,15 @@ export async function activateSubscriptionFromRevenuecat(
     currentPeriodStart?: string;
     currentPeriodEnd?: string;
     revenuecatOriginalAppUserId?: string;
+    /** When true, sets status to 'trial' and stores trialEndsAt (expiration_at_ms). */
+    isTrial?: boolean;
+    /** ISO 8601 trial end date. Required when isTrial is true. */
+    trialEndsAt?: string;
   }
 ): Promise<SubscriptionRow> {
   const existing = await getSubscriptionByAccountId(db, accountId);
   const tierConfig = getTierConfig(tier);
+  const status = options?.isTrial ? 'trial' : 'active';
 
   if (!existing) {
     // Create new subscription + quota pool
@@ -1433,7 +1444,7 @@ export async function activateSubscriptionFromRevenuecat(
       .values({
         accountId,
         tier,
-        status: 'active',
+        status,
         lastRevenuecatEventId: eventId,
         revenuecatOriginalAppUserId:
           options?.revenuecatOriginalAppUserId ?? null,
@@ -1442,6 +1453,9 @@ export async function activateSubscriptionFromRevenuecat(
           : null,
         currentPeriodEnd: options?.currentPeriodEnd
           ? new Date(options.currentPeriodEnd)
+          : null,
+        trialEndsAt: options?.trialEndsAt
+          ? new Date(options.trialEndsAt)
           : null,
       })
       .returning();
@@ -1463,7 +1477,7 @@ export async function activateSubscriptionFromRevenuecat(
   // Update existing subscription
   const setValues: Record<string, unknown> = {
     tier,
-    status: 'active',
+    status,
     lastRevenuecatEventId: eventId,
     updatedAt: new Date(),
   };
@@ -1476,6 +1490,9 @@ export async function activateSubscriptionFromRevenuecat(
   }
   if (options?.currentPeriodEnd) {
     setValues.currentPeriodEnd = new Date(options.currentPeriodEnd);
+  }
+  if (options?.trialEndsAt) {
+    setValues.trialEndsAt = new Date(options.trialEndsAt);
   }
 
   const [updated] = await db

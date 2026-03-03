@@ -18,9 +18,11 @@ import {
   updateSubscriptionFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
   updateQuotaPoolLimit,
+  transitionToExtendedTrial,
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
 import { getTierConfig } from '../services/subscription';
+import { EXTENDED_TRIAL_MONTHLY_EQUIVALENT } from '../services/trial';
 import { inngest } from '../inngest/client';
 import type { Database } from '@eduagent/database';
 import type { CachedSubscriptionStatus } from '../services/kv';
@@ -160,6 +162,9 @@ async function handleInitialPurchase(
   const tier = extractTierFromProductId(event.product_id);
   if (!tier) return;
 
+  // RevenueCat sets period_type to "TRIAL" for introductory offer / free trial
+  const isTrial = event.period_type === 'TRIAL';
+
   const sub = await activateSubscriptionFromRevenuecat(
     db,
     accountId,
@@ -173,6 +178,11 @@ async function handleInitialPurchase(
         ? new Date(event.expiration_at_ms).toISOString()
         : undefined,
       revenuecatOriginalAppUserId: event.original_app_user_id,
+      isTrial,
+      trialEndsAt:
+        isTrial && event.expiration_at_ms
+          ? new Date(event.expiration_at_ms).toISOString()
+          : undefined,
     }
   );
 
@@ -189,6 +199,8 @@ async function handleRenewal(
 
   const tier = extractTierFromProductId(event.product_id);
 
+  // RENEWAL after a trial converts status to 'active' and clears trialEndsAt.
+  // This handles both trial-to-paid conversion and regular renewal.
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
     status: 'active',
@@ -200,6 +212,7 @@ async function handleRenewal(
       ? new Date(event.expiration_at_ms).toISOString()
       : undefined,
     cancelledAt: null,
+    trialEndsAt: null, // Clear trial end date on conversion / renewal
   });
 
   if (updated && tier) {
@@ -239,7 +252,34 @@ async function handleExpiration(
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
 
-  // On expiration, downgrade to free tier
+  // Check if this is a trial expiration — use period_type from event
+  // and verify the current subscription status in DB
+  const existingSub = await getSubscriptionByAccountId(db, accountId);
+  const isTrialExpiration =
+    event.period_type === 'TRIAL' || existingSub?.status === 'trial';
+
+  if (isTrialExpiration && existingSub) {
+    // Trial expiration triggers the reverse trial soft landing:
+    // Days 15-28: extended access at 450 questions/month (15/day)
+    // The daily trial-expiry Inngest function handles Day 29+ transition to free.
+    await transitionToExtendedTrial(
+      db,
+      existingSub.id,
+      EXTENDED_TRIAL_MONTHLY_EQUIVALENT
+    );
+
+    // Record the event for idempotency
+    await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
+      eventId: event.id,
+      // transitionToExtendedTrial already set status to 'expired' and tier to 'free'
+      // but we need to record the eventId without overwriting those values
+    });
+
+    await refreshKvCache(kv, db, accountId);
+    return;
+  }
+
+  // Non-trial expiration: downgrade to free tier immediately
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
     status: 'expired',
