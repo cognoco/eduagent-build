@@ -91,9 +91,9 @@ export function BookPageFlipAnimation({
       );
     }
 
-    page1.value = buildFlipSequence(0);
-    page2.value = buildFlipSequence(STAGGER_MS);
-    page3.value = buildFlipSequence(STAGGER_MS * 2);
+    page1.value = buildFlipSequence(0) as number;
+    page2.value = buildFlipSequence(STAGGER_MS) as number;
+    page3.value = buildFlipSequence(STAGGER_MS * 2) as number;
   }, [reduceMotion, page1, page2, page3]);
 
   const page1Props = useAnimatedProps(() => ({
