@@ -22,6 +22,38 @@ import {
 } from './notifications';
 
 // ---------------------------------------------------------------------------
+// Custom error classes — used by route layer for reliable instanceof checks
+// ---------------------------------------------------------------------------
+
+export class ConsentResendLimitError extends Error {
+  constructor() {
+    super('Maximum consent resend limit reached');
+    this.name = 'ConsentResendLimitError';
+  }
+}
+
+export class ConsentTokenNotFoundError extends Error {
+  constructor() {
+    super('Invalid consent token');
+    this.name = 'ConsentTokenNotFoundError';
+  }
+}
+
+export class ConsentAlreadyProcessedError extends Error {
+  constructor() {
+    super('This consent request has already been processed');
+    this.name = 'ConsentAlreadyProcessedError';
+  }
+}
+
+export class ConsentTokenExpiredError extends Error {
+  constructor() {
+    super('Consent token has expired');
+    this.name = 'ConsentTokenExpiredError';
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -150,24 +182,14 @@ export async function requestConsent(
   appUrl: string,
   emailOptions?: EmailOptions
 ): Promise<ConsentState> {
-  // Check resend limit (PRD: max 3 resends)
-  const existing = await db.query.consentStates.findFirst({
-    where: and(
-      eq(consentStates.profileId, input.childProfileId),
-      eq(consentStates.consentType, input.consentType)
-    ),
-  });
-  if (existing && existing.resendCount >= MAX_CONSENT_RESENDS) {
-    throw new Error('Maximum consent resend limit reached');
-  }
-
   const token = crypto.randomUUID();
 
   // Token expires in 7 days (PRD line 414)
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  const newResendCount = existing ? existing.resendCount + 1 : 0;
-
+  // Atomic upsert with resend limit enforced in the UPDATE WHERE clause.
+  // This avoids the TOCTOU race where two concurrent requests both read
+  // resendCount=2, both pass the check, and both increment to 3.
   const [row] = await db
     .insert(consentStates)
     .values({
@@ -177,7 +199,7 @@ export async function requestConsent(
       parentEmail: input.parentEmail,
       consentToken: token,
       expiresAt,
-      resendCount: newResendCount,
+      resendCount: 0,
     })
     .onConflictDoUpdate({
       target: [consentStates.profileId, consentStates.consentType],
@@ -186,13 +208,20 @@ export async function requestConsent(
         parentEmail: input.parentEmail,
         consentToken: token,
         expiresAt,
-        resendCount: newResendCount,
+        resendCount: sql`${consentStates.resendCount} + 1`,
         requestedAt: sql`now()`,
         respondedAt: null,
         updatedAt: sql`now()`,
       },
+      setWhere: sql`${consentStates.resendCount} < ${MAX_CONSENT_RESENDS}`,
     })
     .returning();
+
+  // If no row returned, the conflict existed but the setWhere prevented the
+  // update — meaning the resend limit was reached.
+  if (!row) {
+    throw new ConsentResendLimitError();
+  }
 
   // Look up child's display name for personalized email
   const childProfile = await db.query.profiles.findFirst({
@@ -233,17 +262,17 @@ export async function processConsentResponse(
   });
 
   if (!row) {
-    throw new Error('Invalid consent token');
+    throw new ConsentTokenNotFoundError();
   }
 
   // 1b. Replay protection — reject if already processed
   if (row.status === 'CONSENTED' || row.status === 'WITHDRAWN') {
-    throw new Error('This consent request has already been processed');
+    throw new ConsentAlreadyProcessedError();
   }
 
   // 1c. Token expiry check (PRD line 414: 7-day link expiry)
   if (row.expiresAt && new Date() > row.expiresAt) {
-    throw new Error('Consent token has expired');
+    throw new ConsentTokenExpiredError();
   }
 
   // 2. Update status

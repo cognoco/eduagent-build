@@ -51,6 +51,11 @@ interface CircuitBreaker {
 const CIRCUIT_FAILURE_THRESHOLD = 3;
 const CIRCUIT_RECOVERY_MS = 60_000; // 60 seconds
 
+// NOTE: Module-level Map state is per-isolate and non-durable on Cloudflare
+// Workers. Under cold starts or multi-isolate deployments, each instance has
+// independent circuit state. This is acceptable for MVP defence-in-depth but
+// does not guarantee global consistency. Upgrade path: Durable Objects for
+// shared circuit state across isolates.
 const circuits = new Map<string, CircuitBreaker>();
 
 function getCircuit(providerId: string): CircuitBreaker {
@@ -159,8 +164,11 @@ export async function routeAndStream(
     throw new CircuitOpenError(config.provider);
   }
 
-  // For streaming, we record success when the stream object is returned
-  // without error. Individual chunk failures are handled by the caller.
+  // NOTE: recordSuccess fires when chatStream() returns the lazy iterable,
+  // before any data flows. A provider that fails on the first next() call
+  // is silently credited as healthy. This is a known limitation — wrapping
+  // the iterable to record on first chunk would be more accurate but adds
+  // complexity. The caller's try/catch around iteration handles the failure.
   try {
     const stream = provider.chatStream(messages, config);
     recordSuccess(config.provider);

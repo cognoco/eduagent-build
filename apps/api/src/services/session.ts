@@ -178,6 +178,26 @@ interface ExchangePrep {
   lastAiResponseAt: Date | null;
 }
 
+/**
+ * Lightweight exchange-limit guard. Uses the scoped repository to load
+ * the session and check if the exchange cap has been reached, before
+ * the expensive prepareExchangeContext query set runs.
+ */
+async function checkExchangeLimit(
+  db: Database,
+  profileId: string,
+  sessionId: string
+): Promise<void> {
+  const repo = createScopedRepository(db, profileId);
+  const row = await repo.sessions.findFirst(eq(learningSessions.id, sessionId));
+  if (!row) {
+    throw new Error('Session not found');
+  }
+  if (row.exchangeCount >= MAX_EXCHANGES_PER_SESSION) {
+    throw new SessionExchangeLimitError(row.exchangeCount);
+  }
+}
+
 async function prepareExchangeContext(
   db: Database,
   profileId: string,
@@ -488,6 +508,10 @@ export async function processMessage(
   isUnderstandingCheck: boolean;
   exchangeCount: number;
 }> {
+  // Early exchange limit check — runs before expensive prepareExchangeContext
+  // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
+  await checkExchangeLimit(db, profileId, sessionId);
+
   const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
     await prepareExchangeContext(
       db,
@@ -496,11 +520,6 @@ export async function processMessage(
       input.message,
       options
     );
-
-  // Defense-in-depth: cap exchanges per session (issue #15)
-  if (session.exchangeCount >= MAX_EXCHANGES_PER_SESSION) {
-    throw new SessionExchangeLimitError(session.exchangeCount);
-  }
 
   const result = await processExchange(context, input.message);
 
@@ -548,6 +567,10 @@ export async function streamMessage(
     fullResponse: string
   ) => Promise<{ exchangeCount: number; escalationRung: number }>;
 }> {
+  // Early exchange limit check — runs before expensive prepareExchangeContext
+  // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
+  await checkExchangeLimit(db, profileId, sessionId);
+
   const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
     await prepareExchangeContext(
       db,
@@ -556,11 +579,6 @@ export async function streamMessage(
       input.message,
       options
     );
-
-  // Defense-in-depth: cap exchanges per session (issue #15)
-  if (session.exchangeCount >= MAX_EXCHANGES_PER_SESSION) {
-    throw new SessionExchangeLimitError(session.exchangeCount);
-  }
 
   // Compute time-to-answer before streaming begins
   const timeToAnswerMs = lastAiResponseAt

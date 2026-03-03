@@ -16,6 +16,10 @@ import {
   getChildConsentForParent,
   revokeConsent,
   restoreConsent,
+  ConsentResendLimitError,
+  ConsentTokenNotFoundError,
+  ConsentAlreadyProcessedError,
+  ConsentTokenExpiredError,
 } from '../services/consent';
 import { notFound, forbidden, apiError } from '../errors';
 import { inngest } from '../inngest/client';
@@ -66,10 +70,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           emailFrom: c.env.EMAIL_FROM,
         });
       } catch (error) {
-        if (
-          error instanceof Error &&
-          error.message === 'Maximum consent resend limit reached'
-        ) {
+        if (error instanceof ConsentResendLimitError) {
           return apiError(c, 429, ERROR_CODES.VALIDATION_ERROR, error.message);
         }
         throw error;
@@ -109,23 +110,14 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           message: input.approved ? 'Consent granted' : 'Consent denied',
         });
       } catch (error) {
-        if (
-          error instanceof Error &&
-          error.message === 'Invalid consent token'
-        ) {
-          return notFound(c, 'Invalid consent token');
+        if (error instanceof ConsentTokenNotFoundError) {
+          return notFound(c, error.message);
         }
-        if (
-          error instanceof Error &&
-          error.message === 'This consent request has already been processed'
-        ) {
-          return c.json({ error: error.message }, 409);
+        if (error instanceof ConsentAlreadyProcessedError) {
+          return apiError(c, 409, ERROR_CODES.CONFLICT, error.message);
         }
-        if (
-          error instanceof Error &&
-          error.message === 'Consent token has expired'
-        ) {
-          return c.json({ error: error.message }, 410);
+        if (error instanceof ConsentTokenExpiredError) {
+          return apiError(c, 410, ERROR_CODES.GONE, error.message);
         }
         throw error;
       }
