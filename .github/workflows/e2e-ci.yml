@@ -189,10 +189,22 @@ jobs:
       # but export:embed skips that step. We must inline them ourselves.
       - name: Patch expo-router context files for offline bundling
         run: |
+          # require.context resolves paths relative to the FILE that contains
+          # the call, not relative to projectRoot. In the pnpm store, _ctx.android.js
+          # lives deep in node_modules/.pnpm/expo-router@.../node_modules/expo-router/,
+          # so a relative "./src/app" would resolve to a non-existent directory there.
+          # Use an absolute path instead — require.context is compile-time only,
+          # so the absolute CI path is resolved by Metro during bundling and never
+          # evaluated on the device at runtime.
+          APP_ROOT="$(cd apps/mobile && pwd)/src/app"
+          echo "Patching EXPO_ROUTER_APP_ROOT → $APP_ROOT"
           find node_modules/.pnpm -path "*/expo-router/_ctx*.js" -exec \
-            sed -i 's|process\.env\.EXPO_ROUTER_APP_ROOT|"./src/app"|g' {} +
+            sed -i "s|process\.env\.EXPO_ROUTER_APP_ROOT|\"$APP_ROOT\"|g" {} +
           find node_modules/.pnpm -path "*/expo-router/_ctx*.js" -exec \
             sed -i 's|process\.env\.EXPO_ROUTER_IMPORT_MODE|"lazy"|g' {} +
+          # Verify the patch worked
+          echo "--- Patched _ctx.android.js (first match) ---"
+          find node_modules/.pnpm -path "*/expo-router/_ctx.android.js" -exec head -3 {} \; -quit
 
       # Bundle JS into the APK so the app works without a Metro dev server.
       # Debug builds normally fetch JS from Metro at runtime, but in CI
@@ -251,11 +263,11 @@ jobs:
 
             maestro test apps/mobile/e2e/flows/ --include-tags=${{ github.event_name == 'schedule' && 'smoke,nightly' || github.event_name == 'workflow_dispatch' && 'smoke,nightly' || 'smoke' }} --output maestro-screenshots/ || MAESTRO_EXIT=$?
 
-            # Capture final screen state on failure
-            if [ "${MAESTRO_EXIT:-0}" -ne 0 ]; then
-              adb exec-out screencap -p > maestro-screenshots/failure-final-state.png || true
-              adb logcat -d -t 500 > maestro-screenshots/logcat.txt || true
-            fi
+            # Capture final screen state and logcat on failure.
+            # android-emulator-runner splits script lines into separate shell
+            # invocations, so if/fi blocks don't work. Use inline conditionals.
+            test "${MAESTRO_EXIT:-0}" -ne 0 && adb exec-out screencap -p > maestro-screenshots/failure-final-state.png || true
+            test "${MAESTRO_EXIT:-0}" -ne 0 && adb logcat -d -t 500 > maestro-screenshots/logcat.txt || true
             exit ${MAESTRO_EXIT:-0}
         env:
           API_URL: http://10.0.2.2:8787
