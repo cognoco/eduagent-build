@@ -9,7 +9,6 @@ import {
   getConsentStatus,
   getProfileConsentState,
 } from '../../services/consent';
-import { deleteProfile } from '../../services/deletion';
 import {
   sendEmail,
   formatConsentReminderEmail,

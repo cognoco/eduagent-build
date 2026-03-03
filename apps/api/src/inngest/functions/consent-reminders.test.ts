@@ -1,6 +1,5 @@
 const mockGetConsentStatus = jest.fn();
 const mockGetProfileConsentState = jest.fn();
-const mockDeleteProfile = jest.fn();
 const mockDbExecute = jest.fn().mockResolvedValue(undefined);
 const mockSendEmail = jest.fn();
 
@@ -14,10 +13,6 @@ jest.mock('../../services/consent', () => ({
   getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
   getProfileConsentState: (...args: unknown[]) =>
     mockGetProfileConsentState(...args),
-}));
-
-jest.mock('../../services/deletion', () => ({
-  deleteProfile: (...args: unknown[]) => mockDeleteProfile(...args),
 }));
 
 jest.mock('../../services/notifications', () => ({
@@ -109,7 +104,7 @@ describe('consentReminder', () => {
     await executeHandler([null, null, null, null]);
 
     expect(mockSendEmail).not.toHaveBeenCalled();
-    expect(mockDeleteProfile).not.toHaveBeenCalled();
+    expect(mockDbExecute).not.toHaveBeenCalled();
   });
 
   it('sends reminders when status is PENDING', async () => {
@@ -152,15 +147,5 @@ describe('consentReminder', () => {
     expect(mockSendEmail).not.toHaveBeenCalled();
     // Atomic delete still happens because consent status is PENDING
     expect(mockDbExecute).toHaveBeenCalled();
-  });
-
-  it('does not send email when parentEmail is not found in DB', async () => {
-    // Pass null profile state so parentEmail lookup returns null
-    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING'], null);
-
-    // No emails sent because parentEmail lookup returns null
-    expect(mockSendEmail).not.toHaveBeenCalled();
-    // Delete still happens because consent status is PENDING
-    expect(mockDeleteProfile).toHaveBeenCalledTimes(1);
   });
 });
