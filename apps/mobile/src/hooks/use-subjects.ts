@@ -35,7 +35,7 @@ export function useCreateSubject(): UseMutationResult<
   return useMutation({
     mutationFn: async (input: { name: string }) => {
       const res = await client.subjects.$post({ json: input });
-      return await res.json();
+      return (await res.json()) as { subject: Subject };
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['subjects'] });

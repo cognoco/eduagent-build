@@ -24,7 +24,7 @@ export function useRequestConsent(): UseMutationResult<
       input: ConsentRequest
     ): Promise<ConsentRequestResult> => {
       const res = await client.consent.request.$post({ json: input });
-      return await res.json();
+      return (await res.json()) as ConsentRequestResult;
     },
   });
 }
@@ -48,7 +48,7 @@ export function useConsentStatus(): UseQueryResult<ConsentStatusData> {
     queryKey: ['consent-status'],
     queryFn: async (): Promise<ConsentStatusData> => {
       const res = await client.consent['my-status'].$get();
-      return await res.json();
+      return (await res.json()) as ConsentStatusData;
     },
   });
 }

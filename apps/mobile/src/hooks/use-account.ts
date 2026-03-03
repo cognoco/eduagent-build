@@ -16,7 +16,7 @@ export function useDeleteAccount(): UseMutationResult<
   return useMutation({
     mutationFn: async (): Promise<AccountDeletionResponse> => {
       const res = await client.account.delete.$post({ json: {} });
-      return await res.json();
+      return (await res.json()) as AccountDeletionResponse;
     },
   });
 }
@@ -31,7 +31,7 @@ export function useCancelDeletion(): UseMutationResult<
   return useMutation({
     mutationFn: async (): Promise<CancelDeletionResponse> => {
       const res = await client.account['cancel-deletion'].$post({ json: {} });
-      return await res.json();
+      return (await res.json()) as CancelDeletionResponse;
     },
   });
 }
@@ -42,7 +42,7 @@ export function useExportData(): UseMutationResult<DataExport, Error, void> {
   return useMutation({
     mutationFn: async (): Promise<DataExport> => {
       const res = await client.account.export.$get();
-      return await res.json();
+      return (await res.json()) as DataExport;
     },
   });
 }

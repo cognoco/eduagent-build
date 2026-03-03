@@ -190,7 +190,7 @@ export function useJoinByokWaitlist(): UseMutationResult<
   return useMutation({
     mutationFn: async (input: { email: string }) => {
       const res = await client['byok-waitlist'].$post({ json: input });
-      return await res.json();
+      return (await res.json()) as ByokWaitlistResult;
     },
   });
 }
