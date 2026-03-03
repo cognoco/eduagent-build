@@ -5,6 +5,7 @@ export { BookPageFlipAnimation } from './BookPageFlipAnimation';
 export { Button } from './Button';
 export { CheckmarkPopAnimation } from './CheckmarkPopAnimation';
 export { ErrorBoundary } from './ErrorBoundary';
+export { OfflineBanner } from './OfflineBanner';
 export { PasswordInput } from './PasswordInput';
 export { PenWritingAnimation } from './PenWritingAnimation';
 export { ProfileSwitcher } from './ProfileSwitcher';
