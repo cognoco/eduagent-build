@@ -158,9 +158,9 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 ## Current Status
 
 **Complete — all routes production-ready:**
-- Epics 0-5: full API layer (~1,329 API tests + ~325 mobile tests + 10 integration test suites, all passing)
+- Epics 0-5: full API layer (~1,443 API tests + ~404 mobile tests + 15 integration test suites, all passing)
 - All 23 route files wired to real services with DB persistence (including `consent-web` browser flow and `test-seed` E2E endpoints)
-- Mobile: 30+ screens (42 test suites), all using real API calls via TanStack Query + Hono RPC
+- Mobile: 38+ screens (49 test suites), all using real API calls via TanStack Query + Hono RPC
 - Background jobs: 10 Inngest functions (session-completed chain, trial-expiry, consent-reminders, consent-revocation, account-deletion, review-reminder, payment-retry, quota-reset, topup-expiry-reminder, subject-auto-archive)
 - Auth: Clerk (SSO + email/password), PasswordInput with show/hide + requirements
 - Billing: Stripe integration (checkout, portal, webhooks, KV-cached status, quota metering)
@@ -180,16 +180,17 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 - XP ledger: `insertSessionXpEntry()` wired in session-completed Step 3, `useXpSummary` hook for client-side XP display
 - Needs-deepening auto-promotion (FR63): `updateNeedsDeepeningProgress()` wired in session-completed Step 1b
 - E2E testing infrastructure: `test-seed` route for deterministic test data, 10 integration suites in `tests/integration/` (auth-chain, onboarding, session-completed-chain, stripe-webhook, account-deletion, health-cors, profile-isolation, test-seed, learning-session, retention-lifecycle), Maestro foundation (seed.js, setup flows, Nx e2e target, 4 Tier 1 smoke flows), enhanced CI workflow with PostgreSQL + API server for mobile-maestro job
+- Expo web mode: `.npmrc` with `shamefully-hoist=true` enables `expo start --web` in pnpm monorepo (required for Metro/Babel transitive plugin resolution). Web deps (`react-dom`, `react-native-web`) in root and mobile `package.json`.
 
 - UX audit remediation (55 gaps): consent gating (C16/COPPA), camera-first homework (C8), parent transcript view (C13), session mode configs (C7), math rendering (M21), animations (M22), dark mode, confidence scoring, retention trends, ProfileSwitcher, Inter font, Ionicons, WCAG contrast fixes, shared Button component
 - UX persona walkthrough gaps (all resolved): post-approval child landing (`PostApprovalLanding` + SecureStore), parent account-owner landing (`consentWebRoutes` with personalized child name + deep links), child-friendly paywall (`ChildPaywall` with real stats + 24h rate-limit countdown), GDPR consent revocation (full stack: services, routes, Inngest 7-day grace period, child `ConsentWithdrawnGate`, parent withdraw/restore UI), preview mode on pending-consent screen (`PreviewSubjectBrowser` + `PreviewSampleCoaching`)
 
 **Not yet integrated:** OCR provider (server-side fallback; ML Kit primary on device).
 
-**Designed but not yet implemented (documented in PRD, architecture, epics, UX spec):**
-- **EVALUATE verification type (Devil's Advocate, FR128-FR133)** — Epic 3 extension, MVP scope. 8th verification type where AI presents flawed reasoning for student to critique (Bloom's Level 5-6). Strong-retention gating only. Modified SM-2 quality floor (2-3 for failure, not 0-1). `evaluateDifficultyRung` 1-4 on retention card. Three-strike escalation: reveal flaw → lower difficulty → standard review.
-- **Analogy Domain Preferences (Multiverse of Analogies, FR134-FR137)** — Epic 3 extension, MVP scope. Per-subject analogy domain (cooking, sports, building, music, nature, gaming). Nullable column on `teachingPreferences` — null means no analogy preference. Soft prompt injection: "prefer analogies... don't force when direct explanation is clearer." Optional onboarding step + subject settings picker.
-- **Feynman Stage / TEACH_BACK (FR138-FR143)** — Epic 3 extension, MVP scope. 9th verification type: student explains concept verbally, AI plays "confused student" (Feynman Technique). On-device STT (`expo-speech-recognition`) + TTS (`expo-speech`), no cloud. Two-output pattern: conversational follow-up (visible) + structured assessment JSON in `session_events.structured_assessment` (hidden). Scoring rubric: accuracy 50%, completeness 30%, clarity 20% → SM-2 quality input.
+**Epic 3 extensions — now implemented:**
+- **EVALUATE verification type (Devil's Advocate, FR128-FR133)** — 8th verification type. AI presents flawed reasoning for student to critique (Bloom's Level 5-6). Strong-retention gating (`shouldTriggerEvaluate`), modified SM-2 quality floor (2-3 for failure), `evaluateDifficultyRung` 1-4 on retention card, three-strike escalation, `evaluate-data.ts` DB service, eligibility route (`GET /v1/topics/:topicId/evaluate-eligibility`), wired into session-completed Step 1c.
+- **Analogy Domain Preferences (Multiverse of Analogies, FR134-FR137)** — Per-subject analogy domain (cooking, sports, building, music, nature, gaming). Nullable `analogyDomain` on `teachingPreferences`, soft LLM prompt injection in `buildSystemPrompt()`, `AnalogyDomainPicker` component, settings routes, onboarding step (`analogy-preference.tsx` in subject onboarding flow).
+- **Feynman Stage / TEACH_BACK (FR138-FR143)** — 9th verification type. Student explains concept, AI plays "confused student". On-device STT (`expo-speech-recognition`) + TTS (`expo-speech`). Two-output pattern: visible follow-up + hidden `structured_assessment` JSON. Scoring rubric (accuracy 50%, completeness 30%, clarity 20%) → SM-2 quality. Voice UI: `VoiceRecordButton`, `VoiceToggle`, `useSpeechRecognition`, `useTextToSpeech`. Wired into session-completed Step 1c.
 
 **Deferred — v1.1 (post-MVP, pre-launch):**
 - **Epic 7: Concept Map & Prerequisite-Aware Learning** (FR118-FR127) — `topic_prerequisites` join table (DAG), prerequisite-aware curriculum generation, graph-aware coaching cards ("newly unlocked" type), LLM context injection for weak/skipped prerequisites, Learning Book topological ordering with locked/unlocked indicators, concept map visualization (`react-native-svg` + Sugiyama layout). SM-2 stays pure per-topic — graph logic in coaching precomputation. Skip behavior: warn + orphan edges + log `prerequisiteContext` JSONB in `curriculumAdaptations`.

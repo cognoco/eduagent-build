@@ -77,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     # Advisory — does not block PR merge
     continue-on-error: true
-    timeout-minutes: 30
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16-alpine
@@ -86,7 +86,7 @@ jobs:
           POSTGRES_PASSWORD: eduagent
           POSTGRES_DB: tests
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U eduagent -d tests"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -97,6 +97,9 @@ jobs:
       DATABASE_URL: postgresql://eduagent:eduagent@localhost:5432/tests
       NODE_ENV: test
       CI: true
+      # Expo inlines EXPO_PUBLIC_* vars at JS bundle time.
+      # Clerk publishable key is needed for auth screens to render.
+      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -116,9 +119,19 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      # React Native native builds (Gradle) run `node` scripts that expect
-      # flat node_modules. pnpm's default isolated layout breaks this.
-      # Hoist only in CI — local dev keeps strict isolation.
+      # --- Phase 1: strict pnpm install + schema push ---
+      # db:push MUST run before shamefully-hoist. In strict mode, pnpm
+      # isolates drizzle-kit so it can't find @neondatabase/serverless
+      # (which only supports Neon's WebSocket protocol, not plain PostgreSQL).
+      # This lets drizzle-kit fall back to its built-in pg driver.
+      - run: pnpm install
+
+      - name: Apply database schema
+        run: pnpm --filter @eduagent/database db:push
+
+      # --- Phase 2: hoisted install for React Native native builds ---
+      # Gradle runs `node` scripts that expect flat node_modules.
+      # pnpm's default isolated layout breaks this. Hoist only in CI.
       - name: Configure pnpm for native builds
         run: echo "shamefully-hoist=true" > .npmrc
 
@@ -128,9 +141,13 @@ jobs:
       - name: Build schemas package
         run: pnpm exec nx run schemas:build
 
-      # Apply database schema for seed endpoint and API routes
-      - name: Apply database schema
-        run: pnpm --filter @eduagent/database db:push
+      # Write .dev.vars so wrangler dev can pass secrets into the Workers runtime.
+      # wrangler dev runs in an isolated V8 sandbox — it does NOT inherit shell
+      # env vars. It reads non-secret bindings from wrangler.toml [vars] and
+      # secret bindings from .dev.vars in the project directory.
+      - name: Write wrangler .dev.vars for API
+        run: |
+          printf "DATABASE_URL=%s\nNODE_ENV=test\nTEST_SEED_SECRET=test-secret\n" "$DATABASE_URL" > apps/api/.dev.vars
 
       # Start API server in background (NODE_ENV=test enables __test/* routes)
       - name: Start API server (background)
@@ -150,22 +167,66 @@ jobs:
         working-directory: apps/mobile
         run: npx expo prebuild --platform android --no-install
 
+      # Cache Gradle build outputs to avoid 25-minute native recompilation.
+      # Key includes gradle files + native dependency versions so cache
+      # invalidates when native deps change.
+      - name: Cache Gradle build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            apps/mobile/android/.gradle
+            apps/mobile/android/app/build
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/gradle/wrapper/gradle-wrapper.properties', 'apps/mobile/package.json') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # expo-router's _ctx*.js files use require.context(process.env.EXPO_ROUTER_APP_ROOT).
+      # require.context is evaluated at COMPILE TIME by Metro's static analysis —
+      # it rejects dynamic expressions like process.env.*. The full Expo CLI
+      # pipeline has a Babel plugin that replaces these with string literals,
+      # but export:embed skips that step. We must inline them ourselves.
+      - name: Patch expo-router context files for offline bundling
+        run: |
+          # require.context resolves paths relative to the FILE that contains
+          # the call, not relative to projectRoot. In the pnpm store, _ctx.android.js
+          # lives deep in node_modules/.pnpm/expo-router@.../node_modules/expo-router/,
+          # so a relative "./src/app" would resolve to a non-existent directory there.
+          # Use an absolute path instead — require.context is compile-time only,
+          # so the absolute CI path is resolved by Metro during bundling and never
+          # evaluated on the device at runtime.
+          APP_ROOT="$(cd apps/mobile && pwd)/src/app"
+          echo "Patching EXPO_ROUTER_APP_ROOT → $APP_ROOT"
+          find node_modules/.pnpm -path "*/expo-router/_ctx*.js" -exec \
+            sed -i "s|process\.env\.EXPO_ROUTER_APP_ROOT|\"$APP_ROOT\"|g" {} +
+          find node_modules/.pnpm -path "*/expo-router/_ctx*.js" -exec \
+            sed -i 's|process\.env\.EXPO_ROUTER_IMPORT_MODE|"lazy"|g' {} +
+          # Verify the patch worked
+          echo "--- Patched _ctx.android.js (first match) ---"
+          find node_modules/.pnpm -path "*/expo-router/_ctx.android.js" -exec head -3 {} \; -quit
+
       # Bundle JS into the APK so the app works without a Metro dev server.
       # Debug builds normally fetch JS from Metro at runtime, but in CI
       # there is no Metro server. Pre-bundling embeds the JS in the APK.
-      # --config points at the Expo-based Metro config (avoids missing
-      # @react-native/metro-config error).
+      #
+      # Key decisions:
+      # - Direct node path (not npx expo): npx resolves to the hoisted
+      #   binary at workspace root, making Metro use the wrong project root.
+      #   The direct path + working-directory keeps cwd = apps/mobile.
+      # - --dev false: dev mode tries to open DevTools WebSocket connections
+      #   which crash in embedded (offline) APKs.
       - name: Bundle JS for offline APK
         working-directory: apps/mobile
         run: |
           mkdir -p android/app/src/main/assets
-          npx react-native bundle \
+
+          node ../../node_modules/@expo/cli/build/bin/cli export:embed \
             --platform android \
             --dev false \
-            --entry-file index.js \
-            --config metro.config.js \
-            --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res
+            --entry-file "$(pwd)/index.js" \
+            --bundle-output "$(pwd)/android/app/src/main/assets/index.android.bundle" \
+            --assets-dest "$(pwd)/android/app/src/main/res"
 
       # Compile debug APK via Gradle (now includes the pre-bundled JS)
       - name: Build debug APK
@@ -184,7 +245,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Run Maestro smoke tests
+      - name: Run Maestro E2E tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -192,6 +253,29 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
             adb install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-            maestro test apps/mobile/e2e/flows/ --include-tags=smoke
+
+            # Wait for app to be fully launchable, then take a diagnostic screenshot
+            sleep 5
+            adb shell am start -n com.mentomate.app/.MainActivity
+            sleep 15
+            mkdir -p maestro-screenshots
+            adb exec-out screencap -p > maestro-screenshots/pre-test-app-state.png || true
+
+            maestro test apps/mobile/e2e/flows/ --include-tags=${{ github.event_name == 'schedule' && 'smoke,nightly' || github.event_name == 'workflow_dispatch' && 'smoke,nightly' || 'smoke' }} --output maestro-screenshots/ || MAESTRO_EXIT=$?
+
+            # Capture final screen state and logcat on failure.
+            # android-emulator-runner splits script lines into separate shell
+            # invocations, so if/fi blocks don't work. Use inline conditionals.
+            test "${MAESTRO_EXIT:-0}" -ne 0 && adb exec-out screencap -p > maestro-screenshots/failure-final-state.png || true
+            test "${MAESTRO_EXIT:-0}" -ne 0 && adb logcat -d -t 500 > maestro-screenshots/logcat.txt || true
+            exit ${MAESTRO_EXIT:-0}
         env:
           API_URL: http://10.0.2.2:8787
+
+      - name: Upload Maestro artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-results
+          path: maestro-screenshots/
+          retention-days: 7
