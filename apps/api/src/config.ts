@@ -13,7 +13,7 @@ const envSchema = z.object({
   APP_URL: z.string().url().default('https://app.eduagent.com'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
-  // Stripe — required in production, optional for dev/test
+  // Stripe — optional. Dormant until web client added; mobile uses RevenueCat IAP.
   STRIPE_SECRET_KEY: z.string().min(1).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
   STRIPE_PRICE_PLUS_MONTHLY: z.string().min(1).optional(),
@@ -45,14 +45,14 @@ export type Env = z.infer<typeof envSchema>;
 
 // ---------------------------------------------------------------------------
 // Production-critical keys — must be present when ENVIRONMENT === 'production'
+// Stripe secrets optional — dormant until web client added.
+// Mobile billing uses native IAP via RevenueCat (Apple/Google handle payments).
 // ---------------------------------------------------------------------------
 
 const PRODUCTION_REQUIRED_KEYS: readonly (keyof Env)[] = [
   'CLERK_SECRET_KEY',
   'CLERK_JWKS_URL',
   'GEMINI_API_KEY',
-  'STRIPE_SECRET_KEY',
-  'STRIPE_WEBHOOK_SECRET',
   'VOYAGE_API_KEY',
   'RESEND_API_KEY',
 ] as const;

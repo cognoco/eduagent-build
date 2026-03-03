@@ -101,9 +101,15 @@ export function useSubscriptionStatus(): UseQueryResult<SubscriptionStatusData> 
 }
 
 // ---------------------------------------------------------------------------
-// Mutation hooks
+// Mutation hooks — Stripe (web client)
+// ---------------------------------------------------------------------------
+// Kept for future web client — not used by mobile IAP flow.
+// Mobile billing uses native IAP via RevenueCat (see use-revenuecat.ts).
+// These hooks call Stripe checkout/portal/cancel API routes which are
+// dormant for mobile but will be activated when a web client is added.
 // ---------------------------------------------------------------------------
 
+/** Kept for future web client — not used by mobile IAP flow. */
 export function useCreateCheckout(): UseMutationResult<
   CheckoutResponse,
   Error,
@@ -119,6 +125,7 @@ export function useCreateCheckout(): UseMutationResult<
   });
 }
 
+/** Kept for future web client — not used by mobile IAP flow. */
 export function useCancelSubscription(): UseMutationResult<
   CancelResponse,
   Error,
@@ -141,6 +148,7 @@ export function useCancelSubscription(): UseMutationResult<
   });
 }
 
+/** Kept for future web client — not used by mobile IAP flow. */
 export function useCreatePortalSession(): UseMutationResult<
   PortalResponse,
   Error,
@@ -156,6 +164,7 @@ export function useCreatePortalSession(): UseMutationResult<
   });
 }
 
+/** Kept for future web client — not used by mobile IAP flow. */
 export function usePurchaseTopUp(): UseMutationResult<
   TopUpResult,
   Error,
