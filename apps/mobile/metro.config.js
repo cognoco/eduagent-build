@@ -1,9 +1,12 @@
+const path = require('path');
 const { getDefaultConfig } = require('@expo/metro-config');
 const { mergeConfig } = require('metro-config');
 const { withNativeWind } = require('nativewind/metro');
 
 const defaultConfig = getDefaultConfig(__dirname);
 const { assetExts, sourceExts } = defaultConfig.resolver;
+
+const monorepoRoot = path.resolve(__dirname, '../..');
 
 /**
  * Metro configuration
@@ -13,6 +16,7 @@ const { assetExts, sourceExts } = defaultConfig.resolver;
  */
 const customConfig = {
   projectRoot: __dirname,
+  watchFolders: [monorepoRoot],
   cacheVersion: '@eduagent/mobile',
   transformer: {
     babelTransformerPath: require.resolve('react-native-svg-transformer'),
@@ -21,6 +25,10 @@ const customConfig = {
     assetExts: assetExts.filter((ext) => ext !== 'svg'),
     sourceExts: [...sourceExts, 'cjs', 'mjs', 'svg'],
     blockList: [/\.test\.[jt]sx?$/, /\.worktrees\/.*/],
+    nodeModulesPaths: [
+      path.resolve(__dirname, 'node_modules'),
+      path.resolve(monorepoRoot, 'node_modules'),
+    ],
   },
 };
 
