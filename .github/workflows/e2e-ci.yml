@@ -182,6 +182,18 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
+      # expo-router's _ctx*.js files use require.context(process.env.EXPO_ROUTER_APP_ROOT).
+      # require.context is evaluated at COMPILE TIME by Metro's static analysis —
+      # it rejects dynamic expressions like process.env.*. The full Expo CLI
+      # pipeline has a Babel plugin that replaces these with string literals,
+      # but export:embed skips that step. We must inline them ourselves.
+      - name: Patch expo-router context files for offline bundling
+        run: |
+          find node_modules/.pnpm -path "*/expo-router/_ctx*.js" -exec \
+            sed -i 's|process\.env\.EXPO_ROUTER_APP_ROOT|"./src/app"|g' {} +
+          find node_modules/.pnpm -path "*/expo-router/_ctx*.js" -exec \
+            sed -i 's|process\.env\.EXPO_ROUTER_IMPORT_MODE|"lazy"|g' {} +
+
       # Bundle JS into the APK so the app works without a Metro dev server.
       # Debug builds normally fetch JS from Metro at runtime, but in CI
       # there is no Metro server. Pre-bundling embeds the JS in the APK.
@@ -191,18 +203,9 @@ jobs:
       #   binary at workspace root, making Metro use the wrong project root.
       #   The direct path + working-directory keeps cwd = apps/mobile.
       # - --dev false: dev mode tries to open DevTools WebSocket connections
-      #   which crash in embedded (offline) APKs. The EXPO_ROUTER_APP_ROOT
-      #   sed patch below makes process.env access safe for production mode.
-      # - EXPO_ROUTER_APP_ROOT: set from app.json expo-router plugin config
-      #   so Metro's require.context resolves the route tree.
+      #   which crash in embedded (offline) APKs.
       - name: Bundle JS for offline APK
         working-directory: apps/mobile
-        env:
-          # expo-router discovers routes via require.context(process.env.EXPO_ROUTER_APP_ROOT).
-          # The full Expo CLI pipeline inlines these, but export:embed skips that step.
-          # Setting them as real env vars lets Metro's transform inline them at bundle time.
-          EXPO_ROUTER_APP_ROOT: ./src/app
-          EXPO_ROUTER_IMPORT_MODE: lazy
         run: |
           mkdir -p android/app/src/main/assets
 
