@@ -197,14 +197,14 @@ jobs:
       #   so Metro's require.context resolves the route tree.
       - name: Bundle JS for offline APK
         working-directory: apps/mobile
+        env:
+          # expo-router discovers routes via require.context(process.env.EXPO_ROUTER_APP_ROOT).
+          # The full Expo CLI pipeline inlines these, but export:embed skips that step.
+          # Setting them as real env vars lets Metro's transform inline them at bundle time.
+          EXPO_ROUTER_APP_ROOT: ./src/app
+          EXPO_ROUTER_IMPORT_MODE: lazy
         run: |
           mkdir -p android/app/src/main/assets
-
-          # expo-router's _ctx.android.js uses require.context(process.env.EXPO_ROUTER_APP_ROOT)
-          # which needs a static string literal. The full Expo CLI pipeline inlines this,
-          # but export:embed skips that step. Patch it manually.
-          find ../../node_modules -name "_ctx.android.js" -path "*/expo-router/*" \
-            -exec sed -i "s|process.env.EXPO_ROUTER_APP_ROOT|'./src/app'|g" {} +
 
           node ../../node_modules/@expo/cli/build/bin/cli export:embed \
             --platform android \
