@@ -1,8 +1,12 @@
 export { AnalogyDomainPicker } from './AnalogyDomainPicker';
 export { AnimatedEntry } from './AnimatedEntry';
 export { AnimatedFade } from './AnimatedFade';
+export { BookPageFlipAnimation } from './BookPageFlipAnimation';
 export { Button } from './Button';
+export { CheckmarkPopAnimation } from './CheckmarkPopAnimation';
 export { ErrorBoundary } from './ErrorBoundary';
 export { PasswordInput } from './PasswordInput';
+export { PenWritingAnimation } from './PenWritingAnimation';
 export { ProfileSwitcher } from './ProfileSwitcher';
+export { ShimmerSkeleton } from './ShimmerSkeleton';
 export { UsageMeter } from './UsageMeter';

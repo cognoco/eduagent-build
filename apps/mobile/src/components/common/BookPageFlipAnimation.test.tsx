@@ -1,0 +1,40 @@
+import { render } from '@testing-library/react-native';
+import { BookPageFlipAnimation } from './BookPageFlipAnimation';
+
+describe('BookPageFlipAnimation', () => {
+  it('renders without crashing', () => {
+    const { getByTestId } = render(<BookPageFlipAnimation testID="book" />);
+    expect(getByTestId('book')).toBeTruthy();
+  });
+
+  it('applies accessibility attributes', () => {
+    const { getByTestId } = render(<BookPageFlipAnimation testID="book" />);
+    const el = getByTestId('book');
+    expect(el.props.accessibilityLabel).toBe('Loading content');
+    expect(el.props.accessibilityRole).toBe('image');
+  });
+
+  it('accepts custom size and color props', () => {
+    const { getByTestId } = render(
+      <BookPageFlipAnimation testID="book" size={80} color="#3b82f6" />
+    );
+    expect(getByTestId('book')).toBeTruthy();
+  });
+
+  it('renders in reduced motion mode without crashing', () => {
+    const reanimated = require('react-native-reanimated');
+    const original = reanimated.useReducedMotion;
+    reanimated.useReducedMotion = () => true;
+
+    const { getByTestId } = render(<BookPageFlipAnimation testID="book" />);
+    expect(getByTestId('book')).toBeTruthy();
+
+    reanimated.useReducedMotion = original;
+  });
+
+  it('uses default props when none provided', () => {
+    expect(() => {
+      render(<BookPageFlipAnimation />);
+    }).not.toThrow();
+  });
+});
