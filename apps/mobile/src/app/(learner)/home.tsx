@@ -50,8 +50,10 @@ export default function HomeScreen() {
   }, [subjectsLoading, subjects, router]);
 
   // Only show a gentle banner when the learner has hit their limit
+  // Guard for monthlyLimit > 0: unlimited plans (limit=0) should never show this
   const isExceeded =
     subStatus !== undefined &&
+    subStatus.monthlyLimit > 0 &&
     subStatus.usedThisMonth >= subStatus.monthlyLimit;
 
   // Build a lookup of retention status per subject from overall progress

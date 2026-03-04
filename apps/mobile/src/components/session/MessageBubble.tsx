@@ -91,16 +91,18 @@ function BlinkingCursor(): React.ReactElement {
   );
 }
 
-const ESCALATION_STYLES: Record<
-  number,
-  {
-    label: string;
-    bg: string;
-    border: string;
-    icon: keyof typeof Ionicons.glyphMap;
-    colorKey: 'primary' | 'info' | 'success';
-    textClass: string;
-  }
+const ESCALATION_STYLES: Partial<
+  Record<
+    number,
+    {
+      label: string;
+      bg: string;
+      border: string;
+      icon: keyof typeof Ionicons.glyphMap;
+      colorKey: 'primary' | 'info' | 'success';
+      textClass: string;
+    }
+  >
 > = {
   3: {
     label: 'Step-by-step',
