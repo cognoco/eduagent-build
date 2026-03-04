@@ -10,7 +10,10 @@ import {
   useNotificationSettings,
   useUpdateNotificationSettings,
 } from '../../hooks/use-settings';
-import { useSubscription } from '../../hooks/use-subscription';
+import {
+  useSubscription,
+  useSubscriptionStatus,
+} from '../../hooks/use-subscription';
 import { useDashboard } from '../../hooks/use-dashboard';
 
 function SettingsRow({
@@ -71,6 +74,7 @@ export default function ParentMoreScreen() {
   const exportData = useExportData();
 
   const { data: subscription } = useSubscription();
+  const { data: subStatus } = useSubscriptionStatus();
   const { data: dashboard } = useDashboard();
   const { data: notifPrefs, isLoading: notifLoading } =
     useNotificationSettings();
@@ -202,6 +206,28 @@ export default function ParentMoreScreen() {
           }
           onPress={() => router.push('/(parent)/dashboard')}
         />
+        {subStatus && (
+          <View
+            className="bg-surface rounded-card px-4 py-3 mb-2"
+            testID="parent-quota-summary"
+          >
+            <Text className="text-body-sm text-text-secondary">
+              {subStatus.usedThisMonth} / {subStatus.monthlyLimit} questions
+              used this month
+            </Text>
+            {subStatus.usedThisMonth >= subStatus.monthlyLimit && (
+              <Text className="text-caption text-warning font-medium mt-1">
+                Monthly limit reached
+              </Text>
+            )}
+            {subStatus.usedThisMonth >= subStatus.monthlyLimit * 0.95 &&
+              subStatus.usedThisMonth < subStatus.monthlyLimit && (
+                <Text className="text-caption text-warning font-medium mt-1">
+                  Almost at monthly limit
+                </Text>
+              )}
+          </View>
+        )}
         <SettingsRow label="Help & Support" />
         <SettingsRow label="Export my data" onPress={handleExport} />
         <SettingsRow

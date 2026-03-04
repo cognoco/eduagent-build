@@ -90,9 +90,9 @@ describe('ParentDashboardSummary', () => {
 
     expect(screen.getByText('Mathematics')).toBeTruthy();
     expect(screen.getByText('Science')).toBeTruthy();
-    // RetentionSignal renders labels like "Strong", "Fading"
-    expect(screen.getByText('Strong')).toBeTruthy();
-    expect(screen.getByText('Fading')).toBeTruthy();
+    // RetentionSignal renders organic labels
+    expect(screen.getByText('Thriving')).toBeTruthy();
+    expect(screen.getByText('Warming up')).toBeTruthy();
   });
 
   it('calls onDrillDown when card pressed', () => {

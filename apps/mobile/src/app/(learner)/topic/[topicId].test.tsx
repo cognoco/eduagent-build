@@ -137,7 +137,7 @@ describe('TopicDetailScreen', () => {
     ).toBeTruthy();
     expect(screen.getByText('Completed')).toBeTruthy();
     expect(screen.getByText('85%')).toBeTruthy();
-    expect(screen.getByText('Strong')).toBeTruthy();
+    expect(screen.getByText('Thriving')).toBeTruthy();
     expect(screen.getByText('14 days')).toBeTruthy();
     expect(screen.getByText('5')).toBeTruthy();
     expect(

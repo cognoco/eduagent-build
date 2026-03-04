@@ -116,7 +116,7 @@ describe('LearningBookScreen', () => {
 
     expect(screen.getByTestId('topic-row-topic-1')).toBeTruthy();
     expect(screen.getByText('Math')).toBeTruthy();
-    expect(screen.getByText('Strong')).toBeTruthy();
+    expect(screen.getByText('Thriving')).toBeTruthy();
   });
 
   it('navigates to topic detail on topic press', () => {

@@ -26,6 +26,7 @@ module.exports = {
         'retention-weak': 'var(--color-retention-weak)',
         'retention-forgotten': 'var(--color-retention-forgotten)',
         'coaching-card': 'var(--color-coaching-card)',
+        'coach-bubble': 'var(--color-coach-bubble)',
         'homework-lane': 'var(--color-homework-lane)',
       },
       borderRadius: {
