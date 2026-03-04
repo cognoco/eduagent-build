@@ -212,8 +212,9 @@ export default function ParentMoreScreen() {
             testID="parent-quota-summary"
           >
             <Text className="text-body-sm text-text-secondary">
-              {subStatus.usedThisMonth} / {subStatus.monthlyLimit} questions
-              used this month
+              {subStatus.monthlyLimit > 0
+                ? `${subStatus.usedThisMonth} / ${subStatus.monthlyLimit} questions used this month`
+                : `${subStatus.usedThisMonth} questions used this month`}
             </Text>
             {subStatus.monthlyLimit > 0 &&
               subStatus.usedThisMonth >= subStatus.monthlyLimit && (
