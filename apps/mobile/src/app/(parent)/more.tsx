@@ -215,12 +215,14 @@ export default function ParentMoreScreen() {
               {subStatus.usedThisMonth} / {subStatus.monthlyLimit} questions
               used this month
             </Text>
-            {subStatus.usedThisMonth >= subStatus.monthlyLimit && (
-              <Text className="text-caption text-warning font-medium mt-1">
-                Monthly limit reached
-              </Text>
-            )}
-            {subStatus.usedThisMonth >= subStatus.monthlyLimit * 0.95 &&
+            {subStatus.monthlyLimit > 0 &&
+              subStatus.usedThisMonth >= subStatus.monthlyLimit && (
+                <Text className="text-caption text-warning font-medium mt-1">
+                  Monthly limit reached
+                </Text>
+              )}
+            {subStatus.monthlyLimit > 0 &&
+              subStatus.usedThisMonth >= subStatus.monthlyLimit * 0.95 &&
               subStatus.usedThisMonth < subStatus.monthlyLimit && (
                 <Text className="text-caption text-warning font-medium mt-1">
                   Almost at monthly limit

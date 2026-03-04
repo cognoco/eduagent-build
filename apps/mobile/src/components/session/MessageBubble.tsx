@@ -99,6 +99,7 @@ const ESCALATION_STYLES: Record<
     border: string;
     icon: keyof typeof Ionicons.glyphMap;
     colorKey: 'primary' | 'info' | 'success';
+    textClass: string;
   }
 > = {
   3: {
@@ -107,6 +108,7 @@ const ESCALATION_STYLES: Record<
     border: 'border-l-2 border-primary',
     icon: 'bulb-outline',
     colorKey: 'primary',
+    textClass: 'text-primary',
   },
   4: {
     label: 'Let me show you',
@@ -114,6 +116,7 @@ const ESCALATION_STYLES: Record<
     border: 'border-l-[3px] border-info',
     icon: 'search-outline',
     colorKey: 'info',
+    textClass: 'text-info',
   },
   5: {
     label: 'Teaching mode',
@@ -121,6 +124,7 @@ const ESCALATION_STYLES: Record<
     border: 'border-l-4 border-success',
     icon: 'book-outline',
     colorKey: 'success',
+    textClass: 'text-success',
   },
 };
 
@@ -194,7 +198,7 @@ export function MessageBubble({
               style={{ marginRight: 4 }}
             />
             <Text
-              className={`text-caption font-semibold text-${escalation.colorKey}`}
+              className={`text-caption font-semibold ${escalation.textClass}`}
             >
               {escalation.label}
             </Text>
