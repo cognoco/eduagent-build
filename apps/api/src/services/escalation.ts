@@ -185,7 +185,13 @@ export function getEscalationPromptGuidance(
         `Provide a full, clear explanation of the concept or method.\n` +
         `Walk through the solution, but STOP before the very last step.\n` +
         `Ask the learner to complete the final step themselves.\n` +
-        `This preserves learner agency even in full-teaching mode.` +
+        `This preserves learner agency even in full-teaching mode.\n\n` +
+        `Rung 5 exit protocol (apply after 3+ exchanges at this rung without progress):\n` +
+        `If the learner is still stuck after three exchanges at rung 5, this topic needs a different approach.\n` +
+        `- Deliver the full worked example collaboratively. Frame it as exploration, not failure.\n` +
+        `- Suggest a break: "This is a tough one — let's come back to it fresh later."\n` +
+        `- End your response with the marker [NEEDS_DEEPENING] on its own line (the system will flag this topic for review).\n` +
+        `- Do NOT loop. Do not keep asking variants of the same question. The learner has given their best effort.` +
         homeworkGuard
       );
 

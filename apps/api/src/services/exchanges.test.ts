@@ -51,7 +51,7 @@ describe('buildSystemPrompt', () => {
 
   it('includes persona voice for TEEN', () => {
     const prompt = buildSystemPrompt(baseContext);
-    expect(prompt).toContain('Casual and encouraging');
+    expect(prompt).toContain('Peer-adjacent and matter-of-fact');
   });
 
   it('includes persona voice for LEARNER', () => {
@@ -59,12 +59,12 @@ describe('buildSystemPrompt', () => {
       ...baseContext,
       personaType: 'LEARNER',
     });
-    expect(prompt).toContain('Professional and focused');
+    expect(prompt).toContain('Sharp and collegial');
   });
 
   it('includes persona voice for PARENT', () => {
     const prompt = buildSystemPrompt({ ...baseContext, personaType: 'PARENT' });
-    expect(prompt).toContain('Supportive and patient');
+    expect(prompt).toContain('Professional and data-forward');
   });
 
   it('includes learning session guidance', () => {
@@ -251,7 +251,7 @@ describe('buildSystemPrompt', () => {
       verificationType: 'evaluate',
       evaluateDifficultyRung: 2,
     });
-    expect(prompt).toContain('EVALUATE CHALLENGE');
+    expect(prompt).toContain('THINK DEEPER');
     expect(prompt).toContain("Devil's Advocate");
     expect(prompt).toContain('Difficulty rung 2/4');
     expect(prompt).toContain('challengePassed');
@@ -280,7 +280,7 @@ describe('buildSystemPrompt', () => {
 
   it('omits EVALUATE/TEACH_BACK sections for standard verification', () => {
     const prompt = buildSystemPrompt(baseContext);
-    expect(prompt).not.toContain('EVALUATE CHALLENGE');
+    expect(prompt).not.toContain('THINK DEEPER');
     expect(prompt).not.toContain('TEACH BACK');
   });
 

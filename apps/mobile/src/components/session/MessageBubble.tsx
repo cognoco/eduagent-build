@@ -9,7 +9,9 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
 import { formatMathContent } from '../../lib/math-format';
+import { useThemeColors } from '../../lib/theme';
 
 export type VerificationBadge = 'evaluate' | 'teach_back';
 
@@ -89,10 +91,43 @@ function BlinkingCursor(): React.ReactElement {
   );
 }
 
-const GUIDED_LABELS: Record<number, string> = {
-  3: 'Step-by-step',
-  4: 'Let me show you',
-  5: 'Teaching mode',
+const ESCALATION_STYLES: Partial<
+  Record<
+    number,
+    {
+      label: string;
+      bg: string;
+      border: string;
+      icon: keyof typeof Ionicons.glyphMap;
+      colorKey: 'primary' | 'info' | 'success';
+      textClass: string;
+    }
+  >
+> = {
+  3: {
+    label: 'Step-by-step',
+    bg: 'bg-primary-soft',
+    border: 'border-l-2 border-primary',
+    icon: 'bulb-outline',
+    colorKey: 'primary',
+    textClass: 'text-primary',
+  },
+  4: {
+    label: 'Let me show you',
+    bg: 'bg-info/10',
+    border: 'border-l-[3px] border-info',
+    icon: 'search-outline',
+    colorKey: 'info',
+    textClass: 'text-info',
+  },
+  5: {
+    label: 'Teaching mode',
+    bg: 'bg-success/10',
+    border: 'border-l-4 border-success',
+    icon: 'book-outline',
+    colorKey: 'success',
+    textClass: 'text-success',
+  },
 };
 
 const VERIFICATION_BADGE_CONFIG: Record<
@@ -100,9 +135,9 @@ const VERIFICATION_BADGE_CONFIG: Record<
   { label: string; bgClass: string; textClass: string }
 > = {
   evaluate: {
-    label: 'CHALLENGE',
-    bgClass: 'bg-warning/20',
-    textClass: 'text-warning',
+    label: 'THINK DEEPER',
+    bgClass: 'bg-info/20',
+    textClass: 'text-info',
   },
   teach_back: {
     label: 'TEACH ME',
@@ -119,31 +154,28 @@ export function MessageBubble({
   verificationBadge,
 }: MessageBubbleProps): React.ReactElement {
   const isAI = role === 'ai';
+  const colors = useThemeColors();
   const displayContent = isAI ? formatMathContent(content) : content;
-  const isGuided = isAI && (escalationRung ?? 0) >= 3;
-  const guidedLabel = escalationRung
-    ? GUIDED_LABELS[escalationRung]
-    : undefined;
+  const escalation =
+    isAI && escalationRung ? ESCALATION_STYLES[escalationRung] : undefined;
   const badge =
     isAI && verificationBadge
       ? VERIFICATION_BADGE_CONFIG[verificationBadge]
       : undefined;
   const isThinking = streaming && !content;
 
+  const bubbleBg = escalation
+    ? `${escalation.bg} ${escalation.border}`
+    : isAI
+    ? 'bg-coach-bubble'
+    : 'bg-primary';
+
   return (
     <Animated.View
       entering={FadeInUp.duration(250)}
       className={`mb-3 max-w-[85%] ${isAI ? 'self-start' : 'self-end'}`}
     >
-      <View
-        className={`rounded-2xl px-4 py-3 ${
-          isGuided
-            ? 'bg-primary-soft border-l-2 border-primary'
-            : isAI
-            ? 'bg-surface-elevated'
-            : 'bg-primary'
-        }`}
-      >
+      <View className={`rounded-2xl px-4 py-3 ${bubbleBg}`}>
         {badge && (
           <View
             className={`self-start rounded-full px-2 py-0.5 mb-1 ${badge.bgClass}`}
@@ -156,13 +188,23 @@ export function MessageBubble({
             </Text>
           </View>
         )}
-        {isGuided && guidedLabel && (
-          <Text
-            className="text-caption font-semibold text-primary mb-1"
+        {escalation && (
+          <View
+            className="flex-row items-center mb-1"
             accessibilityLabel="Guided response"
           >
-            {guidedLabel}
-          </Text>
+            <Ionicons
+              name={escalation.icon}
+              size={14}
+              color={colors[escalation.colorKey]}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              className={`text-caption font-semibold ${escalation.textClass}`}
+            >
+              {escalation.label}
+            </Text>
+          </View>
         )}
         {isThinking ? (
           <ThinkingIndicator />

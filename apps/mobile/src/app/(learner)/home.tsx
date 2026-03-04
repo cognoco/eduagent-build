@@ -13,7 +13,6 @@ import { RetentionSignal } from '../../components/progress';
 import {
   AnimatedEntry,
   ProfileSwitcher,
-  UsageMeter,
   PenWritingAnimation,
 } from '../../components/common';
 import { useProfile } from '../../lib/profile';
@@ -21,27 +20,8 @@ import { useSubjects } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
 import { useStreaks } from '../../hooks/use-streaks';
 import { useCoachingCard } from '../../hooks/use-coaching-card';
-import {
-  useSubscriptionStatus,
-  type WarningLevel,
-} from '../../hooks/use-subscription';
+import { useSubscriptionStatus } from '../../hooks/use-subscription';
 import { useTheme } from '../../lib/theme';
-
-/** Client-side warning level — mirrors server's getWarningLevel logic */
-function getWarningLevel(used: number, limit: number): WarningLevel {
-  if (limit <= 0) return 'exceeded';
-  const ratio = used / limit;
-  if (ratio >= 1) return 'exceeded';
-  if (ratio >= 0.95) return 'hard';
-  if (ratio >= 0.8) return 'soft';
-  return 'none';
-}
-
-const WARNING_MESSAGES: Record<Exclude<WarningLevel, 'none'>, string> = {
-  soft: "You're approaching your monthly limit",
-  hard: 'questions remaining this month',
-  exceeded: 'Monthly limit reached — upgrade or buy top-up credits',
-};
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -69,13 +49,12 @@ export default function HomeScreen() {
     }
   }, [subjectsLoading, subjects, router]);
 
-  // Compute warning level and remaining questions from subscription status
-  const warningLevel: WarningLevel = subStatus
-    ? getWarningLevel(subStatus.usedThisMonth, subStatus.monthlyLimit)
-    : 'none';
-  const remaining = subStatus
-    ? Math.max(0, subStatus.monthlyLimit - subStatus.usedThisMonth)
-    : 0;
+  // Only show a gentle banner when the learner has hit their limit
+  // Guard for monthlyLimit > 0: unlimited plans (limit=0) should never show this
+  const isExceeded =
+    subStatus !== undefined &&
+    subStatus.monthlyLimit > 0 &&
+    subStatus.usedThisMonth >= subStatus.monthlyLimit;
 
   // Build a lookup of retention status per subject from overall progress
   const subjectRetention = new Map<string, 'strong' | 'fading' | 'weak'>();
@@ -106,19 +85,6 @@ export default function HomeScreen() {
               />
             </View>
           )}
-          {subStatus && (
-            <Pressable
-              onPress={() => router.push('/(learner)/subscription')}
-              className="bg-primary-soft rounded-full px-2.5 py-1.5 me-2"
-              accessibilityLabel={`${remaining} questions remaining`}
-              accessibilityRole="button"
-              testID="header-quota-badge"
-            >
-              <Text className="text-primary text-caption font-semibold">
-                {remaining}Q
-              </Text>
-            </Pressable>
-          )}
           {streak && streak.currentStreak > 0 ? (
             <View className="bg-surface-elevated rounded-full px-3 py-2 items-center justify-center">
               <Text className="text-text-primary text-body-sm font-semibold">
@@ -138,50 +104,15 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
         testID="home-scroll-view"
       >
-        {subStatus && (
-          <View className="mt-3" testID="usage-display">
-            <UsageMeter
-              used={subStatus.usedThisMonth}
-              limit={subStatus.monthlyLimit}
-              warningLevel={warningLevel}
-            />
-            {warningLevel === 'hard' && (
-              <Pressable
-                onPress={() => router.push('/(learner)/subscription')}
-                className="bg-warning/10 rounded-card px-4 py-2.5 mt-2"
-                accessibilityLabel={`${remaining} ${WARNING_MESSAGES.hard}`}
-                accessibilityRole="button"
-                testID="quota-warning-hard"
-              >
-                <Text className="text-caption text-warning font-semibold">
-                  {remaining} {WARNING_MESSAGES.hard}
-                </Text>
-              </Pressable>
-            )}
-            {warningLevel === 'soft' && (
-              <View
-                className="bg-retention-fading/10 rounded-card px-4 py-2.5 mt-2"
-                accessibilityLabel={WARNING_MESSAGES.soft}
-                testID="quota-warning-soft"
-              >
-                <Text className="text-caption text-retention-fading font-medium">
-                  {WARNING_MESSAGES.soft}
-                </Text>
-              </View>
-            )}
-            {warningLevel === 'exceeded' && (
-              <Pressable
-                onPress={() => router.push('/(learner)/subscription')}
-                className="bg-danger/10 rounded-card px-4 py-2.5 mt-2"
-                accessibilityLabel={WARNING_MESSAGES.exceeded}
-                accessibilityRole="button"
-                testID="quota-warning-exceeded"
-              >
-                <Text className="text-caption text-danger font-semibold">
-                  {WARNING_MESSAGES.exceeded}
-                </Text>
-              </Pressable>
-            )}
+        {isExceeded && (
+          <View
+            className="bg-surface-elevated rounded-card px-4 py-3 mt-3"
+            testID="exceeded-gentle-banner"
+            accessibilityLabel="You've done great today! Let's continue tomorrow."
+          >
+            <Text className="text-body-sm text-text-secondary text-center">
+              You've done great today! Let's continue tomorrow.
+            </Text>
           </View>
         )}
 

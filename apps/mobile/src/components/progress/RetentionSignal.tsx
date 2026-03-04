@@ -1,4 +1,6 @@
 import { View, Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useThemeColors } from '../../lib/theme';
 
 export type RetentionStatus = 'strong' | 'fading' | 'weak' | 'forgotten';
 
@@ -9,32 +11,46 @@ interface RetentionSignalProps {
 
 const CONFIG: Record<
   RetentionStatus,
-  { label: string; dotColor: string; textColor: string }
+  {
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    colorKey:
+      | 'retentionStrong'
+      | 'retentionFading'
+      | 'retentionWeak'
+      | 'retentionForgotten';
+    textColor: string;
+  }
 > = {
   strong: {
-    label: 'Strong',
-    dotColor: 'bg-retention-strong',
+    label: 'Thriving',
+    icon: 'leaf',
+    colorKey: 'retentionStrong',
     textColor: 'text-retention-strong',
   },
   fading: {
-    label: 'Fading',
-    dotColor: 'bg-retention-fading',
+    label: 'Warming up',
+    icon: 'flame',
+    colorKey: 'retentionFading',
     textColor: 'text-retention-fading',
   },
   weak: {
-    label: 'Getting started',
-    dotColor: 'bg-retention-weak',
+    label: 'Growing',
+    icon: 'sparkles',
+    colorKey: 'retentionWeak',
     textColor: 'text-retention-weak',
   },
   forgotten: {
-    label: 'Needs refresh',
-    dotColor: 'bg-retention-forgotten',
+    label: 'Resting',
+    icon: 'leaf-outline',
+    colorKey: 'retentionForgotten',
     textColor: 'text-retention-forgotten',
   },
 };
 
 export function RetentionSignal({ status, compact }: RetentionSignalProps) {
-  const { label, dotColor, textColor } = CONFIG[status];
+  const { label, icon, colorKey, textColor } = CONFIG[status];
+  const colors = useThemeColors();
 
   return (
     <View
@@ -43,10 +59,11 @@ export function RetentionSignal({ status, compact }: RetentionSignalProps) {
       accessibilityLabel={`Retention: ${label}`}
       accessibilityRole="text"
     >
-      <View
-        className={`w-2.5 h-2.5 rounded-full ${dotColor} ${
-          compact ? '' : 'me-1.5'
-        }`}
+      <Ionicons
+        name={icon}
+        size={compact ? 14 : 16}
+        color={colors[colorKey]}
+        style={compact ? undefined : { marginRight: 6 }}
       />
       {!compact && (
         <Text className={`text-caption font-medium ${textColor}`}>{label}</Text>

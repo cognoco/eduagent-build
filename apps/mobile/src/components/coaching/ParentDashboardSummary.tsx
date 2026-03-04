@@ -1,7 +1,9 @@
 import { type ReactNode } from 'react';
 import { View, Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { BaseCoachingCard } from './BaseCoachingCard';
 import { RetentionSignal, type RetentionStatus } from '../progress';
+import { useThemeColors } from '../../lib/theme';
 
 interface SubjectInfo {
   name: string;
@@ -57,20 +59,28 @@ const RETENTION_TREND_CONFIG: Record<
 
 const AGGREGATE_SIGNAL_CONFIG: Record<
   'on-track' | 'needs-attention' | 'falling-behind',
-  { dotColor: string; label: string; textColor: string }
+  {
+    icon: keyof typeof Ionicons.glyphMap;
+    colorKey: 'retentionStrong' | 'retentionFading' | 'retentionWeak';
+    label: string;
+    textColor: string;
+  }
 > = {
   'on-track': {
-    dotColor: 'bg-retention-strong',
+    icon: 'leaf',
+    colorKey: 'retentionStrong',
     label: 'On Track',
     textColor: 'text-retention-strong',
   },
   'needs-attention': {
-    dotColor: 'bg-retention-fading',
+    icon: 'flame',
+    colorKey: 'retentionFading',
     label: 'Needs Attention',
     textColor: 'text-retention-fading',
   },
   'falling-behind': {
-    dotColor: 'bg-retention-weak',
+    icon: 'sparkles',
+    colorKey: 'retentionWeak',
     label: 'Falling Behind',
     textColor: 'text-retention-weak',
   },
@@ -114,6 +124,7 @@ export function ParentDashboardSummary({
   onDrillDown,
   isLoading,
 }: ParentDashboardSummaryProps): ReactNode {
+  const colors = useThemeColors();
   const aggregateSignal = deriveAggregateSignal(subjects);
 
   const trendText = `${sessionsThisWeek} sessions, ${formatTime(
@@ -130,8 +141,11 @@ export function ParentDashboardSummary({
           testID="aggregate-signal"
           accessibilityLabel={`Overall status: ${AGGREGATE_SIGNAL_CONFIG[aggregateSignal].label}`}
         >
-          <View
-            className={`w-3 h-3 rounded-full ${AGGREGATE_SIGNAL_CONFIG[aggregateSignal].dotColor} me-2`}
+          <Ionicons
+            name={AGGREGATE_SIGNAL_CONFIG[aggregateSignal].icon}
+            size={16}
+            color={colors[AGGREGATE_SIGNAL_CONFIG[aggregateSignal].colorKey]}
+            style={{ marginRight: 8 }}
           />
           <Text
             className={`text-body-sm font-semibold ${AGGREGATE_SIGNAL_CONFIG[aggregateSignal].textColor}`}

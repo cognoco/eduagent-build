@@ -26,9 +26,10 @@
   --color-muted: #525252;
   --color-retention-strong: #22c55e;
   --color-retention-fading: #eab308;
-  --color-retention-weak: #ef4444;
+  --color-retention-weak: #f97316;
   --color-retention-forgotten: #737373;
   --color-coaching-card: #262626;
+  --color-coach-bubble: rgba(139, 92, 246, 0.12);
   --color-homework-lane: #f59e0b;
   --spacing-card-padding: 20px;
   --radius-card: 16px;

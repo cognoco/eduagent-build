@@ -71,7 +71,9 @@ run_jest() {
 
   echo "pre-commit-tests: [${project_dir}] jest --findRelatedTests (${files})"
   # shellcheck disable=SC2086
-  if ! (cd "$WORKSPACE_ROOT/$project_dir" && pnpm exec jest --findRelatedTests $abs_files --no-coverage --bail); then
+  # --passWithNoTests: files like route screens or CSS may have no related tests;
+  # without this flag, jest exits 1 and blocks the commit unnecessarily.
+  if ! (cd "$WORKSPACE_ROOT/$project_dir" && pnpm exec jest --findRelatedTests $abs_files --no-coverage --bail --passWithNoTests); then
     FAILED=1
   fi
 }
