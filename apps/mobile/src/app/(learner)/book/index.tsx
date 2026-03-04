@@ -1,17 +1,12 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   RetentionSignal,
   type RetentionStatus,
 } from '../../../components/progress';
+import { BookPageFlipAnimation } from '../../../components/common';
 import { useSubjects } from '../../../hooks/use-subjects';
 import { useOverallProgress } from '../../../hooks/use-progress';
 import { useRetentionTopics } from '../../../hooks/use-retention';
@@ -198,7 +193,7 @@ export default function LearningBookScreen() {
       >
         {isLoading ? (
           <View className="py-8 items-center" testID="learning-book-loading">
-            <ActivityIndicator />
+            <BookPageFlipAnimation size={100} />
           </View>
         ) : filteredTopics.length > 0 ? (
           filteredTopics.map((topic) => (

@@ -14,6 +14,7 @@ import {
   AnimatedEntry,
   ProfileSwitcher,
   UsageMeter,
+  PenWritingAnimation,
 } from '../../components/common';
 import { useProfile } from '../../lib/profile';
 import { useSubjects } from '../../hooks/use-subjects';
@@ -187,7 +188,7 @@ export default function HomeScreen() {
         <AnimatedEntry>
           {coachingCard.isLoading ? (
             <View className="bg-coaching-card rounded-card p-5 mt-4 items-center py-8">
-              <ActivityIndicator />
+              <PenWritingAnimation size={100} />
             </View>
           ) : persona === 'teen' ? (
             <AdaptiveEntryCard

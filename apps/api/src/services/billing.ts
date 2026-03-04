@@ -1396,7 +1396,7 @@ export async function updateSubscriptionFromRevenuecatWebhook(
 
   if (!existing) return null;
 
-  const setValues: Record<string, unknown> = {
+  const setValues: Partial<typeof subscriptions.$inferInsert> = {
     lastRevenuecatEventId: updates.eventId,
     updatedAt: new Date(),
   };

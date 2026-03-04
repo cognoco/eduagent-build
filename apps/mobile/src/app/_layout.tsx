@@ -17,7 +17,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeContext, useTokenVars, type Persona } from '../lib/theme';
 import type { ColorScheme } from '../lib/design-tokens';
 import { ProfileProvider, useProfile } from '../lib/profile';
-import { ErrorBoundary } from '../components/common';
+import { ErrorBoundary, OfflineBanner } from '../components/common';
+import { useNetworkStatus } from '../hooks/use-network-status';
 import { initSentry } from '../lib/sentry';
 import { configureRevenueCat } from '../lib/revenuecat';
 
@@ -86,10 +87,12 @@ function ThemedApp() {
 /** Inner component that reads ThemeContext to inject CSS variables via vars() */
 function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
   const tokenVars = useTokenVars();
+  const { isOffline } = useNetworkStatus();
 
   return (
     <View style={[{ flex: 1 }, tokenVars]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      {isOffline && <OfflineBanner />}
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(learner)" />
