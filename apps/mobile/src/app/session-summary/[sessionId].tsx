@@ -13,7 +13,10 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { useSubmitSummary } from '../../hooks/use-sessions';
-import { CheckmarkPopAnimation } from '../../components/common';
+import {
+  CheckmarkPopAnimation,
+  CelebrationAnimation,
+} from '../../components/common';
 
 export default function SessionSummaryScreen() {
   const { sessionId, subjectName, exchangeCount, escalationRung } =
@@ -90,12 +93,19 @@ export default function SessionSummaryScreen() {
         className="px-4 py-3 bg-surface border-b border-surface-elevated"
         style={{ paddingTop: insets.top + 8 }}
       >
-        <Text
-          className="text-h3 font-semibold text-text-primary"
-          testID="summary-title"
-        >
-          Session Complete
-        </Text>
+        <View className="flex-row items-center">
+          <CelebrationAnimation
+            size={36}
+            color={colors.success}
+            accentColor={colors.accent}
+          />
+          <Text
+            className="text-h3 font-semibold text-text-primary ms-2"
+            testID="summary-title"
+          >
+            Session Complete
+          </Text>
+        </View>
         {subjectName ? (
           <Text className="text-caption text-text-secondary mt-1">
             {subjectName}

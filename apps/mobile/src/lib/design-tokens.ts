@@ -78,7 +78,7 @@ export const tokens: Record<Persona, Record<ColorScheme, ThemeTokens>> = {
     },
     dark: {
       colors: {
-        background: '#0f0f0f',
+        background: '#18181b',
         surface: '#1a1a1a',
         surfaceElevated: '#262626',
         textPrimary: '#f5f5f5',
@@ -169,16 +169,16 @@ export const tokens: Record<Persona, Record<ColorScheme, ThemeTokens>> = {
   parent: {
     light: {
       colors: {
-        background: '#ffffff',
+        background: '#fdfcfb',
         surface: '#f8fafc',
         surfaceElevated: '#f1f5f9',
         textPrimary: '#0f172a',
         textSecondary: '#5c6b82',
         textInverse: '#ffffff',
-        primary: '#4f46e5',
-        primarySoft: 'rgba(79, 70, 229, 0.08)',
-        secondary: '#6366f1',
-        accent: '#6366f1',
+        primary: '#0d9488',
+        primarySoft: 'rgba(13, 148, 136, 0.08)',
+        secondary: '#0f766e',
+        accent: '#14b8a6',
         success: '#15803d',
         warning: '#a16207',
         danger: '#b91c1c',
@@ -189,11 +189,11 @@ export const tokens: Record<Persona, Record<ColorScheme, ThemeTokens>> = {
         retentionFading: '#a16207',
         retentionWeak: '#c2410c',
         retentionForgotten: '#737373',
-        coachingCard: '#f1f5f9',
-        coachBubble: 'rgba(79, 70, 229, 0.05)',
+        coachingCard: '#f0fdfa',
+        coachBubble: 'rgba(13, 148, 136, 0.05)',
         homeworkLane: '#b45309',
       },
-      radii: { card: '10px', button: '8px', input: '6px' },
+      radii: { card: '12px', button: '10px', input: '8px' },
       spacing: { cardPadding: '16px' },
     },
     dark: {
@@ -204,10 +204,10 @@ export const tokens: Record<Persona, Record<ColorScheme, ThemeTokens>> = {
         textPrimary: '#f1f5f9',
         textSecondary: '#a8b8cc',
         textInverse: '#111827',
-        primary: '#818cf8',
-        primarySoft: 'rgba(129, 140, 248, 0.12)',
-        secondary: '#a5b4fc',
-        accent: '#a5b4fc',
+        primary: '#2dd4bf',
+        primarySoft: 'rgba(45, 212, 191, 0.12)',
+        secondary: '#5eead4',
+        accent: '#5eead4',
         success: '#4ade80',
         warning: '#facc15',
         danger: '#f87171',
@@ -219,13 +219,324 @@ export const tokens: Record<Persona, Record<ColorScheme, ThemeTokens>> = {
         retentionWeak: '#fb923c',
         retentionForgotten: '#6b7280',
         coachingCard: '#1e293b',
-        coachBubble: 'rgba(129, 140, 248, 0.08)',
+        coachBubble: 'rgba(45, 212, 191, 0.08)',
         homeworkLane: '#d97706',
       },
-      radii: { card: '10px', button: '8px', input: '6px' },
+      radii: { card: '12px', button: '10px', input: '8px' },
       spacing: { cardPadding: '16px' },
     },
   },
+};
+
+/** Accent color overrides — only the colors that shift with the user's choice. */
+export interface AccentPreset {
+  id: string;
+  label: string;
+  swatch: string;
+  light: AccentColors;
+  dark: AccentColors;
+}
+
+interface AccentColors {
+  primary: string;
+  primarySoft: string;
+  secondary: string;
+  accent: string;
+  coachBubble: string;
+}
+
+export const accentPresets: Record<Persona, AccentPreset[]> = {
+  teen: [
+    {
+      id: 'violet',
+      label: 'Violet',
+      swatch: '#7c3aed',
+      light: {
+        primary: '#7c3aed',
+        primarySoft: 'rgba(124, 58, 237, 0.10)',
+        secondary: '#8b5cf6',
+        accent: '#a855f7',
+        coachBubble: 'rgba(139, 92, 246, 0.08)',
+      },
+      dark: {
+        primary: '#8b5cf6',
+        primarySoft: 'rgba(139, 92, 246, 0.15)',
+        secondary: '#a78bfa',
+        accent: '#a855f7',
+        coachBubble: 'rgba(139, 92, 246, 0.12)',
+      },
+    },
+    {
+      id: 'electric',
+      label: 'Electric Blue',
+      swatch: '#2563eb',
+      light: {
+        primary: '#2563eb',
+        primarySoft: 'rgba(37, 99, 235, 0.10)',
+        secondary: '#3b82f6',
+        accent: '#60a5fa',
+        coachBubble: 'rgba(37, 99, 235, 0.08)',
+      },
+      dark: {
+        primary: '#3b82f6',
+        primarySoft: 'rgba(59, 130, 246, 0.15)',
+        secondary: '#60a5fa',
+        accent: '#60a5fa',
+        coachBubble: 'rgba(59, 130, 246, 0.12)',
+      },
+    },
+    {
+      id: 'hotpink',
+      label: 'Hot Pink',
+      swatch: '#db2777',
+      light: {
+        primary: '#db2777',
+        primarySoft: 'rgba(219, 39, 119, 0.10)',
+        secondary: '#ec4899',
+        accent: '#f472b6',
+        coachBubble: 'rgba(219, 39, 119, 0.08)',
+      },
+      dark: {
+        primary: '#ec4899',
+        primarySoft: 'rgba(236, 72, 153, 0.15)',
+        secondary: '#f472b6',
+        accent: '#f472b6',
+        coachBubble: 'rgba(236, 72, 153, 0.12)',
+      },
+    },
+    {
+      id: 'emerald',
+      label: 'Emerald',
+      swatch: '#059669',
+      light: {
+        primary: '#059669',
+        primarySoft: 'rgba(5, 150, 105, 0.10)',
+        secondary: '#10b981',
+        accent: '#34d399',
+        coachBubble: 'rgba(5, 150, 105, 0.08)',
+      },
+      dark: {
+        primary: '#10b981',
+        primarySoft: 'rgba(16, 185, 129, 0.15)',
+        secondary: '#34d399',
+        accent: '#34d399',
+        coachBubble: 'rgba(16, 185, 129, 0.12)',
+      },
+    },
+    {
+      id: 'amber',
+      label: 'Amber',
+      swatch: '#d97706',
+      light: {
+        primary: '#d97706',
+        primarySoft: 'rgba(217, 119, 6, 0.10)',
+        secondary: '#f59e0b',
+        accent: '#fbbf24',
+        coachBubble: 'rgba(217, 119, 6, 0.08)',
+      },
+      dark: {
+        primary: '#f59e0b',
+        primarySoft: 'rgba(245, 158, 11, 0.15)',
+        secondary: '#fbbf24',
+        accent: '#fbbf24',
+        coachBubble: 'rgba(245, 158, 11, 0.12)',
+      },
+    },
+  ],
+  learner: [
+    {
+      id: 'indigo',
+      label: 'Indigo',
+      swatch: '#4f46e5',
+      light: {
+        primary: '#4f46e5',
+        primarySoft: 'rgba(79, 70, 229, 0.1)',
+        secondary: '#818cf8',
+        accent: '#818cf8',
+        coachBubble: 'rgba(79, 70, 229, 0.06)',
+      },
+      dark: {
+        primary: '#818cf8',
+        primarySoft: 'rgba(129, 140, 248, 0.15)',
+        secondary: '#a5b4fc',
+        accent: '#a5b4fc',
+        coachBubble: 'rgba(129, 140, 248, 0.10)',
+      },
+    },
+    {
+      id: 'teal',
+      label: 'Teal',
+      swatch: '#0d9488',
+      light: {
+        primary: '#0d9488',
+        primarySoft: 'rgba(13, 148, 136, 0.10)',
+        secondary: '#14b8a6',
+        accent: '#14b8a6',
+        coachBubble: 'rgba(13, 148, 136, 0.06)',
+      },
+      dark: {
+        primary: '#2dd4bf',
+        primarySoft: 'rgba(45, 212, 191, 0.15)',
+        secondary: '#5eead4',
+        accent: '#5eead4',
+        coachBubble: 'rgba(45, 212, 191, 0.10)',
+      },
+    },
+    {
+      id: 'rose',
+      label: 'Rose',
+      swatch: '#e11d48',
+      light: {
+        primary: '#e11d48',
+        primarySoft: 'rgba(225, 29, 72, 0.10)',
+        secondary: '#f43f5e',
+        accent: '#fb7185',
+        coachBubble: 'rgba(225, 29, 72, 0.06)',
+      },
+      dark: {
+        primary: '#fb7185',
+        primarySoft: 'rgba(251, 113, 133, 0.15)',
+        secondary: '#fda4af',
+        accent: '#fda4af',
+        coachBubble: 'rgba(251, 113, 133, 0.10)',
+      },
+    },
+    {
+      id: 'sky',
+      label: 'Sky',
+      swatch: '#0284c7',
+      light: {
+        primary: '#0284c7',
+        primarySoft: 'rgba(2, 132, 199, 0.10)',
+        secondary: '#0ea5e9',
+        accent: '#38bdf8',
+        coachBubble: 'rgba(2, 132, 199, 0.06)',
+      },
+      dark: {
+        primary: '#38bdf8',
+        primarySoft: 'rgba(56, 189, 248, 0.15)',
+        secondary: '#7dd3fc',
+        accent: '#7dd3fc',
+        coachBubble: 'rgba(56, 189, 248, 0.10)',
+      },
+    },
+    {
+      id: 'purple',
+      label: 'Purple',
+      swatch: '#7c3aed',
+      light: {
+        primary: '#7c3aed',
+        primarySoft: 'rgba(124, 58, 237, 0.10)',
+        secondary: '#8b5cf6',
+        accent: '#a78bfa',
+        coachBubble: 'rgba(124, 58, 237, 0.06)',
+      },
+      dark: {
+        primary: '#a78bfa',
+        primarySoft: 'rgba(167, 139, 250, 0.15)',
+        secondary: '#c4b5fd',
+        accent: '#c4b5fd',
+        coachBubble: 'rgba(167, 139, 250, 0.10)',
+      },
+    },
+  ],
+  parent: [
+    {
+      id: 'teal',
+      label: 'Teal',
+      swatch: '#0d9488',
+      light: {
+        primary: '#0d9488',
+        primarySoft: 'rgba(13, 148, 136, 0.08)',
+        secondary: '#0f766e',
+        accent: '#14b8a6',
+        coachBubble: 'rgba(13, 148, 136, 0.05)',
+      },
+      dark: {
+        primary: '#2dd4bf',
+        primarySoft: 'rgba(45, 212, 191, 0.12)',
+        secondary: '#5eead4',
+        accent: '#5eead4',
+        coachBubble: 'rgba(45, 212, 191, 0.08)',
+      },
+    },
+    {
+      id: 'indigo',
+      label: 'Indigo',
+      swatch: '#4f46e5',
+      light: {
+        primary: '#4f46e5',
+        primarySoft: 'rgba(79, 70, 229, 0.08)',
+        secondary: '#6366f1',
+        accent: '#6366f1',
+        coachBubble: 'rgba(79, 70, 229, 0.05)',
+      },
+      dark: {
+        primary: '#818cf8',
+        primarySoft: 'rgba(129, 140, 248, 0.12)',
+        secondary: '#a5b4fc',
+        accent: '#a5b4fc',
+        coachBubble: 'rgba(129, 140, 248, 0.08)',
+      },
+    },
+    {
+      id: 'slate',
+      label: 'Slate',
+      swatch: '#475569',
+      light: {
+        primary: '#475569',
+        primarySoft: 'rgba(71, 85, 105, 0.08)',
+        secondary: '#64748b',
+        accent: '#64748b',
+        coachBubble: 'rgba(71, 85, 105, 0.05)',
+      },
+      dark: {
+        primary: '#94a3b8',
+        primarySoft: 'rgba(148, 163, 184, 0.12)',
+        secondary: '#cbd5e1',
+        accent: '#cbd5e1',
+        coachBubble: 'rgba(148, 163, 184, 0.08)',
+      },
+    },
+    {
+      id: 'emerald',
+      label: 'Emerald',
+      swatch: '#059669',
+      light: {
+        primary: '#059669',
+        primarySoft: 'rgba(5, 150, 105, 0.08)',
+        secondary: '#10b981',
+        accent: '#10b981',
+        coachBubble: 'rgba(5, 150, 105, 0.05)',
+      },
+      dark: {
+        primary: '#34d399',
+        primarySoft: 'rgba(52, 211, 153, 0.12)',
+        secondary: '#6ee7b7',
+        accent: '#6ee7b7',
+        coachBubble: 'rgba(52, 211, 153, 0.08)',
+      },
+    },
+    {
+      id: 'navy',
+      label: 'Navy',
+      swatch: '#1e40af',
+      light: {
+        primary: '#1e40af',
+        primarySoft: 'rgba(30, 64, 175, 0.08)',
+        secondary: '#3b82f6',
+        accent: '#3b82f6',
+        coachBubble: 'rgba(30, 64, 175, 0.05)',
+      },
+      dark: {
+        primary: '#60a5fa',
+        primarySoft: 'rgba(96, 165, 250, 0.12)',
+        secondary: '#93c5fd',
+        accent: '#93c5fd',
+        coachBubble: 'rgba(96, 165, 250, 0.08)',
+      },
+    },
+  ],
 };
 
 /** Convert tokens to CSS variable dictionary for NativeWind vars() */

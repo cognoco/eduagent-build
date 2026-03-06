@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { useTheme, type Persona } from '../../lib/theme';
+import { AccentPicker } from '../../components/common';
 import { useProfile } from '../../lib/profile';
 import { useExportData } from '../../hooks/use-account';
 import {
@@ -161,6 +162,10 @@ export default function ParentMoreScreen() {
             )}
           </Pressable>
         ))}
+
+        <View className="mt-4">
+          <AccentPicker />
+        </View>
 
         <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
           Notifications

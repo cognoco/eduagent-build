@@ -66,7 +66,7 @@ export function RetentionSignal({ status, compact }: RetentionSignalProps) {
         style={compact ? undefined : { marginRight: 6 }}
       />
       {!compact && (
-        <Text className={`text-caption font-medium ${textColor}`}>{label}</Text>
+        <Text className={`text-body-sm font-medium ${textColor}`}>{label}</Text>
       )}
     </View>
   );
