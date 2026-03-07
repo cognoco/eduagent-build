@@ -9,9 +9,9 @@ describe('validateProductionKeys', () => {
   const BASE_ENV: Env = {
     ENVIRONMENT: 'development',
     DATABASE_URL: 'postgresql://localhost/test',
-    APP_URL: 'https://app.eduagent.com',
+    APP_URL: 'https://app.mentomate.com',
     LOG_LEVEL: 'info',
-    EMAIL_FROM: 'noreply@eduagent.com',
+    EMAIL_FROM: 'noreply@mentomate.com',
   };
 
   it('returns empty array for non-production environments', () => {

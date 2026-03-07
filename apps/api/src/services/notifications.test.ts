@@ -241,7 +241,7 @@ describe('sendEmail', () => {
 
     const result = await sendEmail(emailPayload, {
       resendApiKey: 're_test_key',
-      emailFrom: 'test@eduagent.com',
+      emailFrom: 'test@mentomate.com',
     });
 
     expect(result).toEqual({ sent: true, messageId: 'msg-abc123' });

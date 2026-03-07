@@ -1,8 +1,10 @@
+export { AccentPicker } from './AccentPicker';
 export { AnalogyDomainPicker } from './AnalogyDomainPicker';
 export { AnimatedEntry } from './AnimatedEntry';
 export { AnimatedFade } from './AnimatedFade';
 export { BookPageFlipAnimation } from './BookPageFlipAnimation';
 export { Button } from './Button';
+export { CelebrationAnimation } from './CelebrationAnimation';
 export { CheckmarkPopAnimation } from './CheckmarkPopAnimation';
 export { ErrorBoundary } from './ErrorBoundary';
 export { OfflineBanner } from './OfflineBanner';

@@ -120,5 +120,5 @@ export function getStepResendApiKey(): string | undefined {
  * Returns the EMAIL_FROM address for use within Inngest step functions.
  */
 export function getStepEmailFrom(): string {
-  return _emailFrom ?? process.env['EMAIL_FROM'] ?? 'noreply@eduagent.com';
+  return _emailFrom ?? process.env['EMAIL_FROM'] ?? 'noreply@mentomate.com';
 }

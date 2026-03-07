@@ -20,7 +20,7 @@ import type {
 // Interview service — pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-const INTERVIEW_SYSTEM_PROMPT = `You are EduAgent, an AI learning coach conducting a brief assessment interview.
+const INTERVIEW_SYSTEM_PROMPT = `You are MentoMate, an AI learning coach conducting a brief assessment interview.
 Ask about the learner's goals, prior experience, and current knowledge level for the given subject.
 Keep questions conversational and brief. After 3-5 exchanges when you have enough signal,
 respond with the special marker [INTERVIEW_COMPLETE] at the end of your response.`;
@@ -50,7 +50,7 @@ function mapDraftRow(
 // Signal extraction prompt
 // ---------------------------------------------------------------------------
 
-const SIGNAL_EXTRACTION_PROMPT = `You are EduAgent's signal extractor. Analyze the interview conversation and extract structured signals.
+const SIGNAL_EXTRACTION_PROMPT = `You are MentoMate's signal extractor. Analyze the interview conversation and extract structured signals.
 
 Return a JSON object with this exact structure:
 {

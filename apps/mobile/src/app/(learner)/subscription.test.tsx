@@ -155,8 +155,8 @@ function makeMockPackage(overrides?: Record<string, unknown>) {
     identifier: '$rc_monthly',
     packageType: 'MONTHLY',
     product: {
-      identifier: 'eduagent_monthly',
-      title: 'EduAgent Plus Monthly',
+      identifier: 'mentomate_monthly',
+      title: 'MentoMate Plus Monthly',
       description: '500 questions per month',
       price: 9.99,
       priceString: '$9.99',
@@ -319,8 +319,8 @@ describe('SubscriptionScreen', () => {
       identifier: '$rc_annual',
       packageType: 'ANNUAL',
       productOverrides: {
-        identifier: 'eduagent_annual',
-        title: 'EduAgent Plus Annual',
+        identifier: 'mentomate_annual',
+        title: 'MentoMate Plus Annual',
         price: 99.99,
         priceString: '$99.99',
       },
@@ -333,8 +333,8 @@ describe('SubscriptionScreen', () => {
     expect(screen.getByTestId('offerings-section')).toBeTruthy();
     expect(screen.getByTestId('package-option-$rc_monthly')).toBeTruthy();
     expect(screen.getByTestId('package-option-$rc_annual')).toBeTruthy();
-    expect(screen.getByText('EduAgent Plus Monthly')).toBeTruthy();
-    expect(screen.getByText('EduAgent Plus Annual')).toBeTruthy();
+    expect(screen.getByText('MentoMate Plus Monthly')).toBeTruthy();
+    expect(screen.getByText('MentoMate Plus Annual')).toBeTruthy();
     expect(screen.getByText('$9.99 / monthly')).toBeTruthy();
     expect(screen.getByText('$99.99 / annual')).toBeTruthy();
   });
@@ -371,7 +371,7 @@ describe('SubscriptionScreen', () => {
     mockOfferings = makeMockOfferings([monthlyPkg]);
     mockCustomerInfo = makeMockCustomerInfo({
       activeEntitlements: { pro: { isActive: true, identifier: 'pro' } },
-      activeSubscriptions: ['eduagent_monthly'],
+      activeSubscriptions: ['mentomate_monthly'],
     });
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -399,11 +399,11 @@ describe('SubscriptionScreen', () => {
     const monthlyPkg = makeMockPackage();
     mockOfferings = makeMockOfferings([monthlyPkg]);
     mockMutateAsyncPurchase.mockResolvedValue({
-      productIdentifier: 'eduagent_monthly',
+      productIdentifier: 'mentomate_monthly',
       customerInfo: makeMockCustomerInfo(),
       transaction: {
         transactionIdentifier: 'txn-1',
-        productIdentifier: 'eduagent_monthly',
+        productIdentifier: 'mentomate_monthly',
         purchaseDate: '2026-03-01',
       },
     });

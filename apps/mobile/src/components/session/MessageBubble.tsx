@@ -51,13 +51,42 @@ function ThinkingDot({ delay }: { delay: number }): React.ReactElement {
   );
 }
 
+function PencilTapIcon(): React.ReactElement {
+  const translateY = useSharedValue(0);
+
+  useEffect(() => {
+    translateY.value = withRepeat(
+      withSequence(
+        withTiming(-2, { duration: 300 }),
+        withTiming(0, { duration: 300 })
+      ),
+      -1,
+      false
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  const colors = useThemeColors();
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <Ionicons name="pencil" size={14} color={colors.accent} />
+    </Animated.View>
+  );
+}
+
 function ThinkingIndicator(): React.ReactElement {
   return (
     <View
-      className="flex-row gap-1 py-2 px-1 items-center"
+      className="flex-row gap-1.5 py-2 px-1 items-center"
       testID="thinking-indicator"
-      accessibilityLabel="AI is thinking"
+      accessibilityLabel="Your coach is thinking"
     >
+      <PencilTapIcon />
       {[0, 1, 2].map((i) => (
         <ThinkingDot key={i} delay={i * 200} />
       ))}

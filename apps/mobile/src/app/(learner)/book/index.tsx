@@ -7,6 +7,7 @@ import {
   type RetentionStatus,
 } from '../../../components/progress';
 import { BookPageFlipAnimation } from '../../../components/common';
+import { useThemeColors } from '../../../lib/theme';
 import { useSubjects } from '../../../hooks/use-subjects';
 import { useOverallProgress } from '../../../hooks/use-progress';
 import { useRetentionTopics } from '../../../hooks/use-retention';
@@ -37,6 +38,7 @@ function formatLastPracticed(iso: string | null): string | null {
 export default function LearningBookScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const themeColors = useThemeColors();
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(
     null
   );
@@ -193,7 +195,7 @@ export default function LearningBookScreen() {
       >
         {isLoading ? (
           <View className="py-8 items-center" testID="learning-book-loading">
-            <BookPageFlipAnimation size={100} />
+            <BookPageFlipAnimation size={100} color={themeColors.accent} />
           </View>
         ) : filteredTopics.length > 0 ? (
           filteredTopics.map((topic) => (

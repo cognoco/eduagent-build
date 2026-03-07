@@ -1,6 +1,7 @@
 import '../../global.css';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, useColorScheme } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -14,7 +15,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ThemeContext, useTokenVars, type Persona } from '../lib/theme';
+import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
+import {
+  ThemeContext,
+  useTheme,
+  useTokenVars,
+  type Persona,
+} from '../lib/theme';
 import type { ColorScheme } from '../lib/design-tokens';
 import { ProfileProvider, useProfile } from '../lib/profile';
 import { ErrorBoundary, OfflineBanner } from '../components/common';
@@ -50,12 +57,17 @@ const queryClient = new QueryClient({
   },
 });
 
+const ACCENT_STORE_PREFIX = 'accentPreset_';
+
 function ThemedApp() {
   const { activeProfile } = useProfile();
   const [persona, setPersona] = useState<Persona>('teen');
   const systemColorScheme = useColorScheme();
   const [colorScheme, setColorScheme] = useState<ColorScheme>(
     (systemColorScheme as ColorScheme) ?? 'light'
+  );
+  const [accentPresetId, setAccentPresetIdState] = useState<string | null>(
+    null
   );
 
   // Derive persona from active profile's personaType
@@ -72,9 +84,44 @@ function ThemedApp() {
     }
   }, [systemColorScheme]);
 
+  // Load accent preset from SecureStore when profile changes
+  useEffect(() => {
+    if (!activeProfile?.id) return;
+    const key = `${ACCENT_STORE_PREFIX}${activeProfile.id}`;
+    (async () => {
+      try {
+        const stored = await SecureStore.getItemAsync(key);
+        setAccentPresetIdState(stored);
+      } catch {
+        setAccentPresetIdState(null);
+      }
+    })();
+  }, [activeProfile?.id]);
+
+  const setAccentPresetId = useCallback(
+    (id: string | null) => {
+      setAccentPresetIdState(id);
+      if (!activeProfile?.id) return;
+      const key = `${ACCENT_STORE_PREFIX}${activeProfile.id}`;
+      if (id) {
+        void SecureStore.setItemAsync(key, id);
+      } else {
+        void SecureStore.deleteItemAsync(key);
+      }
+    },
+    [activeProfile?.id]
+  );
+
   const themeValue = useMemo(
-    () => ({ persona, setPersona, colorScheme, setColorScheme }),
-    [persona, colorScheme]
+    () => ({
+      persona,
+      setPersona,
+      colorScheme,
+      setColorScheme,
+      accentPresetId,
+      setAccentPresetId,
+    }),
+    [persona, colorScheme, accentPresetId, setAccentPresetId]
   );
 
   return (
@@ -87,67 +134,98 @@ function ThemedApp() {
 /** Inner component that reads ThemeContext to inject CSS variables via vars() */
 function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
   const tokenVars = useTokenVars();
+  const { persona } = useTheme();
   const { isOffline } = useNetworkStatus();
+  const reduceMotion = useReducedMotion();
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    isFirstRender.current = false;
+  }, []);
 
   return (
     <View style={[{ flex: 1 }, tokenVars]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       {isOffline && <OfflineBanner />}
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(learner)" />
-        <Stack.Screen name="(parent)" />
-        <Stack.Screen name="sso-callback" />
-        <Stack.Screen
-          name="assessment"
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="session-summary"
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="profiles"
-          options={{
-            presentation: 'modal',
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="create-profile"
-          options={{
-            presentation: 'modal',
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="consent"
-          options={{
-            presentation: 'modal',
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="delete-account"
-          options={{
-            presentation: 'modal',
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="create-subject"
-          options={{
-            presentation: 'modal',
-            animation: 'slide_from_bottom',
-          }}
-        />
-      </Stack>
+      <Animated.View
+        key={persona}
+        entering={
+          isFirstRender.current || reduceMotion
+            ? undefined
+            : FadeIn.duration(250)
+        }
+        style={{ flex: 1 }}
+      >
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(learner)" />
+          <Stack.Screen name="(parent)" />
+          <Stack.Screen name="sso-callback" />
+          <Stack.Screen
+            name="assessment"
+            options={{
+              presentation: 'fullScreenModal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+          <Stack.Screen
+            name="session-summary"
+            options={{
+              presentation: 'fullScreenModal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+          <Stack.Screen
+            name="profiles"
+            options={{
+              presentation: 'modal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+          <Stack.Screen
+            name="create-profile"
+            options={{
+              presentation: 'modal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+          <Stack.Screen
+            name="consent"
+            options={{
+              presentation: 'modal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+          <Stack.Screen
+            name="delete-account"
+            options={{
+              presentation: 'modal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+          <Stack.Screen
+            name="create-subject"
+            options={{
+              presentation: 'modal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+          <Stack.Screen
+            name="privacy"
+            options={{
+              presentation: 'modal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+          <Stack.Screen
+            name="terms"
+            options={{
+              presentation: 'modal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+        </Stack>
+      </Animated.View>
     </View>
   );
 }

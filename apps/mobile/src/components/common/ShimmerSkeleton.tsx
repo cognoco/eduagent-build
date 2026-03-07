@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import Animated, {
@@ -11,11 +11,14 @@ import Animated, {
   useReducedMotion,
 } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
+import { useThemeColors } from '../../lib/theme';
 
 interface ShimmerSkeletonProps {
   children: ReactNode;
   /** Duration of one shimmer sweep in ms (default: 1200) */
   duration?: number;
+  /** Shimmer highlight color (default: theme textSecondary) */
+  shimmerColor?: string;
   testID?: string;
 }
 
@@ -37,9 +40,15 @@ const HIGHLIGHT_OPACITY = 0.15;
 export function ShimmerSkeleton({
   children,
   duration = 1200,
+  shimmerColor,
   testID,
 }: ShimmerSkeletonProps): ReactNode {
   const reduceMotion = useReducedMotion();
+  const themeColors = useThemeColors();
+  const resolvedColor = useMemo(
+    () => shimmerColor ?? themeColors.textSecondary,
+    [shimmerColor, themeColors.textSecondary]
+  );
   const [containerWidth, setContainerWidth] = useState(0);
   const translateX = useSharedValue(0);
 
@@ -90,13 +99,13 @@ export function ShimmerSkeleton({
           <Svg width={bandWidth} height="100%">
             <Defs>
               <LinearGradient id="shimmerGrad" x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0" stopColor="#ffffff" stopOpacity="0" />
+                <Stop offset="0" stopColor={resolvedColor} stopOpacity="0" />
                 <Stop
                   offset="0.5"
-                  stopColor="#ffffff"
+                  stopColor={resolvedColor}
                   stopOpacity={String(HIGHLIGHT_OPACITY)}
                 />
-                <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+                <Stop offset="1" stopColor={resolvedColor} stopOpacity="0" />
               </LinearGradient>
             </Defs>
             <Rect

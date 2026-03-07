@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import type { LearningMode } from '@eduagent/schemas';
 import { useTheme, type Persona } from '../../lib/theme';
+import { AccentPicker } from '../../components/common';
 import { useProfile } from '../../lib/profile';
 import { useExportData } from '../../hooks/use-account';
 import {
@@ -227,6 +228,10 @@ export default function MoreScreen() {
           </Pressable>
         ))}
 
+        <View className="mt-4">
+          <AccentPicker />
+        </View>
+
         <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
           Notifications
         </Text>
@@ -278,6 +283,14 @@ export default function MoreScreen() {
           onPress={() => router.push('/(learner)/subscription')}
         />
         <SettingsRow label="Help & Support" />
+        <SettingsRow
+          label="Privacy Policy"
+          onPress={() => router.push('/privacy')}
+        />
+        <SettingsRow
+          label="Terms of Service"
+          onPress={() => router.push('/terms')}
+        />
         <SettingsRow label="Export my data" onPress={handleExport} />
         <SettingsRow
           label="Delete account"
@@ -298,7 +311,7 @@ export default function MoreScreen() {
 
         <View className="mt-8 items-center">
           <Text className="text-caption text-text-secondary">
-            EduAgent v1.0.0
+            MentoMate v1.0.0
           </Text>
         </View>
       </ScrollView>
