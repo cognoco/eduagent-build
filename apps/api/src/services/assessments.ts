@@ -40,7 +40,7 @@ const DEPTH_ORDER: VerificationDepth[] = ['recall', 'explain', 'transfer'];
 // System prompts
 // ---------------------------------------------------------------------------
 
-const QUICK_CHECK_SYSTEM_PROMPT = `You are EduAgent's assessment engine. Generate 2-3 inline comprehension questions for a quick check.
+const QUICK_CHECK_SYSTEM_PROMPT = `You are MentoMate's assessment engine. Generate 2-3 inline comprehension questions for a quick check.
 
 Rules:
 - Questions must require the learner to EXPLAIN their reasoning, not just give final answers (FR44).
@@ -55,7 +55,7 @@ Respond in this exact JSON format:
 
 Generate exactly 2-3 questions.`;
 
-const ASSESSMENT_EVAL_SYSTEM_PROMPT = `You are EduAgent's assessment evaluator. Evaluate the learner's answer at the specified verification depth.
+const ASSESSMENT_EVAL_SYSTEM_PROMPT = `You are MentoMate's assessment evaluator. Evaluate the learner's answer at the specified verification depth.
 
 Verification depths:
 - recall: Can the learner remember key facts and definitions?

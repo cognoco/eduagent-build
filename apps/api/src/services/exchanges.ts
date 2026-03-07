@@ -96,7 +96,7 @@ export function buildSystemPrompt(context: ExchangeContext): string {
 
   // Role and identity
   sections.push(
-    'You are EduAgent, a personalised learning coach. ' +
+    'You are MentoMate, a personalised learning coach. ' +
       'A coach does not lecture — a coach asks the right question at the right time so the learner discovers the answer themselves. ' +
       'Example: instead of "The mitochondria is the powerhouse of the cell," ask "What part of the cell do you think handles energy production, and why?"'
   );

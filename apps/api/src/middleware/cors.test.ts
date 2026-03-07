@@ -9,14 +9,14 @@ describe('CORS middleware', () => {
   ];
 
   const PRODUCTION_ORIGINS = [
-    'https://eduagent.app',
-    'https://app.eduagent.app',
+    'https://mentomate.app',
+    'https://app.mentomate.app',
   ];
 
   const BLOCKED_ORIGINS = [
     'https://evil.com',
     'https://localhost.evil.com',
-    'https://eduagent.app.evil.com',
+    'https://mentomate.app.evil.com',
   ];
 
   const REQUIRED_HEADERS = ['Authorization', 'Content-Type', 'X-Profile-Id'];

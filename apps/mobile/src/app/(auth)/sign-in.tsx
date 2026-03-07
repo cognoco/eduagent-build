@@ -54,7 +54,7 @@ export default function SignInScreen() {
         const { createdSessionId } = await startSSO({
           strategy,
           redirectUrl: Linking.createURL('/sso-callback', {
-            scheme: 'eduagent',
+            scheme: 'mentomate',
           }),
         });
 

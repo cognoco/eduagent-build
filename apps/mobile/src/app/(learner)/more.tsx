@@ -283,6 +283,14 @@ export default function MoreScreen() {
           onPress={() => router.push('/(learner)/subscription')}
         />
         <SettingsRow label="Help & Support" />
+        <SettingsRow
+          label="Privacy Policy"
+          onPress={() => router.push('/privacy')}
+        />
+        <SettingsRow
+          label="Terms of Service"
+          onPress={() => router.push('/terms')}
+        />
         <SettingsRow label="Export my data" onPress={handleExport} />
         <SettingsRow
           label="Delete account"
@@ -303,7 +311,7 @@ export default function MoreScreen() {
 
         <View className="mt-8 items-center">
           <Text className="text-caption text-text-secondary">
-            EduAgent v1.0.0
+            MentoMate v1.0.0
           </Text>
         </View>
       </ScrollView>

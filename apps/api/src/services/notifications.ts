@@ -203,7 +203,7 @@ export async function sendEmail(
     return { sent: false, reason: 'no_api_key' };
   }
 
-  const from = options?.emailFrom ?? 'noreply@eduagent.com';
+  const from = options?.emailFrom ?? 'noreply@mentomate.com';
 
   try {
     const response = await fetch(RESEND_API_URL, {
@@ -248,8 +248,8 @@ export function formatConsentRequestEmail(
   const regulation = consentType === 'GDPR' ? 'GDPR (EU)' : 'COPPA (US)';
   return {
     to: parentEmail,
-    subject: `Parental consent required for ${childName}'s EduAgent account`,
-    body: `Your child ${childName} wants to use EduAgent. Under ${regulation}, we need your consent. Please click the link to approve or deny: ${tokenUrl}`,
+    subject: `Parental consent required for ${childName}'s MentoMate account`,
+    body: `Your child ${childName} wants to use MentoMate. Under ${regulation}, we need your consent. Please click the link to approve or deny: ${tokenUrl}`,
     type: 'consent_request',
   };
 }
@@ -264,8 +264,8 @@ export function formatConsentReminderEmail(
 ): EmailPayload {
   return {
     to: parentEmail,
-    subject: `Reminder: Consent pending for ${childName}'s EduAgent account`,
-    body: `We're still waiting for your consent for ${childName}'s EduAgent account. You have ${daysRemaining} days remaining to respond before the account is automatically removed.`,
+    subject: `Reminder: Consent pending for ${childName}'s MentoMate account`,
+    body: `We're still waiting for your consent for ${childName}'s MentoMate account. You have ${daysRemaining} days remaining to respond before the account is automatically removed.`,
     type: 'consent_reminder',
   };
 }
@@ -337,8 +337,8 @@ export async function notifyParentToSubscribe(
     await sendEmail(
       {
         to: parentEmail,
-        subject: `${childName} wants to keep learning on EduAgent`,
-        body: `${childName} has been making great progress on EduAgent and wants to continue. Their free trial has ended. Subscribe to keep their learning going: https://app.eduagent.com/subscribe`,
+        subject: `${childName} wants to keep learning on MentoMate`,
+        body: `${childName} has been making great progress on MentoMate and wants to continue. Their free trial has ended. Subscribe to keep their learning going: https://app.mentomate.com/subscribe`,
         type: 'subscribe_request',
       },
       emailOptions

@@ -20,7 +20,7 @@ export interface SummaryEvaluation {
 // System prompt for summary evaluation
 // ---------------------------------------------------------------------------
 
-const SUMMARY_EVAL_SYSTEM_PROMPT = `You are EduAgent's summary evaluator. A learner has written a summary of what they learned about a topic.
+const SUMMARY_EVAL_SYSTEM_PROMPT = `You are MentoMate's summary evaluator. A learner has written a summary of what they learned about a topic.
 
 Your job is to evaluate the summary for understanding and completeness.
 
