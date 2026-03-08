@@ -4,6 +4,7 @@ import Animated, {
   FadeIn,
   FadeInUp,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withSequence,
@@ -53,8 +54,10 @@ function ThinkingDot({ delay }: { delay: number }): React.ReactElement {
 
 function PencilTapIcon(): React.ReactElement {
   const translateY = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reduceMotion) return;
     translateY.value = withRepeat(
       withSequence(
         withTiming(-2, { duration: 300 }),
@@ -64,7 +67,7 @@ function PencilTapIcon(): React.ReactElement {
       false
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [reduceMotion]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],

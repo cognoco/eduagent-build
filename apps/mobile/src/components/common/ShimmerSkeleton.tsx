@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import Animated, {
@@ -11,13 +11,15 @@ import Animated, {
   useReducedMotion,
 } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
-import { useThemeColors } from '../../lib/theme';
+
+/** Neutral shimmer highlight — works on both light and dark surfaces */
+const DEFAULT_SHIMMER_COLOR = '#9ca3af';
 
 interface ShimmerSkeletonProps {
   children: ReactNode;
   /** Duration of one shimmer sweep in ms (default: 1200) */
   duration?: number;
-  /** Shimmer highlight color (default: theme textSecondary) */
+  /** Shimmer highlight color (default: neutral gray) */
   shimmerColor?: string;
   testID?: string;
 }
@@ -44,11 +46,7 @@ export function ShimmerSkeleton({
   testID,
 }: ShimmerSkeletonProps): ReactNode {
   const reduceMotion = useReducedMotion();
-  const themeColors = useThemeColors();
-  const resolvedColor = useMemo(
-    () => shimmerColor ?? themeColors.textSecondary,
-    [shimmerColor, themeColors.textSecondary]
-  );
+  const resolvedColor = shimmerColor ?? DEFAULT_SHIMMER_COLOR;
   const [containerWidth, setContainerWidth] = useState(0);
   const translateX = useSharedValue(0);
 

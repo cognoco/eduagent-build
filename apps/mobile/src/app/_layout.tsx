@@ -15,7 +15,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  useReducedMotion,
+} from 'react-native-reanimated';
 import {
   ThemeContext,
   useTheme,
@@ -26,7 +31,7 @@ import type { ColorScheme } from '../lib/design-tokens';
 import { ProfileProvider, useProfile } from '../lib/profile';
 import { ErrorBoundary, OfflineBanner } from '../components/common';
 import { useNetworkStatus } from '../hooks/use-network-status';
-import { initSentry } from '../lib/sentry';
+import { initSentry, Sentry } from '../lib/sentry';
 import { configureRevenueCat } from '../lib/revenuecat';
 
 // Initialize Sentry at module level — runs before any component renders
@@ -104,9 +109,9 @@ function ThemedApp() {
       if (!activeProfile?.id) return;
       const key = `${ACCENT_STORE_PREFIX}${activeProfile.id}`;
       if (id) {
-        void SecureStore.setItemAsync(key, id);
+        SecureStore.setItemAsync(key, id).catch(Sentry.captureException);
       } else {
-        void SecureStore.deleteItemAsync(key);
+        SecureStore.deleteItemAsync(key).catch(Sentry.captureException);
       }
     },
     [activeProfile?.id]
@@ -137,25 +142,28 @@ function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
   const { persona } = useTheme();
   const { isOffline } = useNetworkStatus();
   const reduceMotion = useReducedMotion();
-  const isFirstRender = useRef(true);
+  const opacity = useSharedValue(1);
+  const prevPersona = useRef(persona);
 
   useEffect(() => {
-    isFirstRender.current = false;
-  }, []);
+    if (prevPersona.current !== persona && !reduceMotion) {
+      // Brief fade on persona switch without destroying the React tree
+      opacity.value = 0.6;
+      opacity.value = withTiming(1, { duration: 250 });
+    }
+    prevPersona.current = persona;
+  }, [persona, reduceMotion, opacity]);
+
+  const fadeStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    flex: 1,
+  }));
 
   return (
     <View style={[{ flex: 1 }, tokenVars]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       {isOffline && <OfflineBanner />}
-      <Animated.View
-        key={persona}
-        entering={
-          isFirstRender.current || reduceMotion
-            ? undefined
-            : FadeIn.duration(250)
-        }
-        style={{ flex: 1 }}
-      >
+      <Animated.View style={fadeStyle}>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(learner)" />
