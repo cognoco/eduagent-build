@@ -15,6 +15,8 @@ export interface EscalationState {
   retentionStatus?: 'new' | 'strong' | 'fading' | 'weak' | 'forgotten';
   /** Whether the previous AI response contained [PARTIAL_PROGRESS] (Gap 3) */
   previousResponseHadPartialProgress?: boolean;
+  /** Consecutive exchanges held by partial progress (Gap 3 cap) */
+  consecutiveHolds?: number;
 }
 
 /** Result of evaluating whether to escalate */
@@ -36,6 +38,9 @@ const QUESTIONS_BEFORE_ESCALATION_FADING = 2;
 
 /** Minimum response length to consider as engaged (not a yes/no/guess) */
 const ENGAGED_RESPONSE_MIN_LENGTH = 30;
+
+/** Max consecutive holds from partial progress before escalation resumes (Gap 3 cap) */
+const MAX_PARTIAL_PROGRESS_HOLDS = 2;
 
 /** Phrases that indicate the learner is stuck — valid input, not failure (UX-16) */
 const STUCK_INDICATORS = [
@@ -165,8 +170,12 @@ export function evaluateEscalation(
   const hasPartialProgress =
     isEngagedResponse || state.previousResponseHadPartialProgress === true;
 
-  // If partial progress: hold at current rung — don't escalate
-  if (hasPartialProgress) {
+  // Cap: after MAX_PARTIAL_PROGRESS_HOLDS consecutive holds, resume normal escalation
+  const holdCount = state.consecutiveHolds ?? 0;
+  const withinHoldBudget = holdCount < MAX_PARTIAL_PROGRESS_HOLDS;
+
+  // If partial progress and within budget: hold at current rung — don't escalate
+  if (hasPartialProgress && withinHoldBudget) {
     return {
       shouldEscalate: false,
       newRung: state.currentRung,

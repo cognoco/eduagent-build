@@ -291,7 +291,7 @@ export async function notifyParentToSubscribe(
   db: Database,
   childProfileId: string,
   emailOptions?: EmailOptions,
-  appUrl = 'https://app.mentomate.com'
+  appUrl?: string
 ): Promise<ParentSubscribeResult> {
   // 1. Check rate limit — look for recent subscribe_request notifications
   const recentCount = await getRecentNotificationCount(
@@ -339,7 +339,11 @@ export async function notifyParentToSubscribe(
       {
         to: parentEmail,
         subject: `${childName} wants to keep learning on MentoMate`,
-        body: `${childName} has been making great progress on MentoMate and wants to continue. Their free trial has ended. Subscribe to keep their learning going: ${appUrl}/subscribe`,
+        body: `${childName} has been making great progress on MentoMate and wants to continue. Their free trial has ended.${
+          appUrl
+            ? ` Subscribe to keep their learning going: ${appUrl}/subscribe`
+            : ''
+        }`,
         type: 'subscribe_request',
       },
       emailOptions

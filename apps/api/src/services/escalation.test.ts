@@ -302,6 +302,37 @@ describe('partial progress detection', () => {
   it('detectPartialProgress returns false without marker', () => {
     expect(detectPartialProgress('Good attempt! Keep trying.')).toBe(false);
   });
+
+  it('escalates after MAX_PARTIAL_PROGRESS_HOLDS consecutive holds (cap)', () => {
+    const state: EscalationState = {
+      ...baseState,
+      consecutiveHolds: 2,
+    };
+
+    const decision = evaluateEscalation(
+      state,
+      'I think the answer involves the mitochondria because it produces energy for the cell'
+    );
+
+    // Despite engaged response, hold budget is exhausted — escalate normally
+    expect(decision.shouldEscalate).toBe(true);
+    expect(decision.newRung).toBe(2);
+  });
+
+  it('holds when within hold budget', () => {
+    const state: EscalationState = {
+      ...baseState,
+      consecutiveHolds: 1,
+    };
+
+    const decision = evaluateEscalation(
+      state,
+      'I think the answer involves the mitochondria because it produces energy for the cell'
+    );
+
+    expect(decision.shouldEscalate).toBe(false);
+    expect(decision.reason).toContain('Partial progress');
+  });
 });
 
 // ---------------------------------------------------------------------------

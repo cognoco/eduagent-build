@@ -78,7 +78,14 @@ function ThemedApp() {
   // Derive persona from active profile's personaType
   useEffect(() => {
     if (activeProfile) {
-      setPersona(activeProfile.personaType.toLowerCase() as Persona);
+      const candidate = activeProfile.personaType.toLowerCase();
+      if (
+        candidate === 'teen' ||
+        candidate === 'learner' ||
+        candidate === 'parent'
+      ) {
+        setPersona(candidate);
+      }
     }
   }, [activeProfile]);
 

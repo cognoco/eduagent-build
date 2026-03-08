@@ -100,10 +100,15 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     const db = c.get('db');
     const account = c.get('account');
     const profileId = c.get('profileId') ?? account.id;
-    const result = await notifyParentToSubscribe(db, profileId, {
-      resendApiKey: c.env.RESEND_API_KEY,
-      emailFrom: c.env.EMAIL_FROM,
-    });
+    const result = await notifyParentToSubscribe(
+      db,
+      profileId,
+      {
+        resendApiKey: c.env.RESEND_API_KEY,
+        emailFrom: c.env.EMAIL_FROM,
+      },
+      c.env.APP_URL
+    );
     return c.json(result);
   })
 

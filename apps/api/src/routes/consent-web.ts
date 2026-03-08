@@ -18,6 +18,20 @@ type ConsentWebEnv = {
 };
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Escape user-supplied strings for safe HTML interpolation (XSS prevention) */
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// ---------------------------------------------------------------------------
 // Shared HTML layout
 // ---------------------------------------------------------------------------
 
@@ -144,9 +158,13 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
     return c.html(
       pageLayout(
         'Parental Consent',
-        `<h1>Consent required for ${childName}</h1>
-         <p>${childName} wants to use MentoMate, an AI-powered learning platform. Under applicable privacy regulations, we need your consent.</p>
-         <p>By approving, you allow us to process ${childName}'s learning data to provide personalised tutoring.</p>
+        `<h1>Consent required for ${escapeHtml(childName)}</h1>
+         <p>${escapeHtml(
+           childName
+         )} wants to use MentoMate, an AI-powered learning platform. Under applicable privacy regulations, we need your consent.</p>
+         <p>By approving, you allow us to process ${escapeHtml(
+           childName
+         )}'s learning data to provide personalised tutoring.</p>
          <a href="${confirmUrl}?token=${encodeURIComponent(
           token
         )}&approved=true" class="btn btn-primary">
@@ -196,9 +214,11 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
           pageLayout(
             'Family Account Ready',
             `<h1>Family account ready!</h1>
-             <p>${childName}'s account is now active. They can start learning right away.</p>
+             <p>${escapeHtml(
+               childName
+             )}'s account is now active. They can start learning right away.</p>
              <a href="mentomate://parent/dashboard" class="btn btn-primary">
-               See ${childName}'s Progress
+               See ${escapeHtml(childName)}'s Progress
              </a>
              <a href="mentomate://onboarding?persona=learner" class="btn btn-secondary">
                Start My Own Learning
@@ -208,7 +228,6 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
              </button>
              <div class="app-links">
                <p>Download the app for the best experience</p>
-               <a href="https://apps.apple.com/app/mentomate/id000000000" class="btn btn-secondary" style="margin-bottom:8px">App Store</a>
                <a href="https://play.google.com/store/apps/details?id=com.mentomate.app" class="btn btn-secondary">Google Play</a>
              </div>`
           )
@@ -220,7 +239,9 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         pageLayout(
           'Consent Declined',
           `<h1>Consent declined</h1>
-           <p>${childName}'s account will be removed. Their data will not be processed.</p>
+           <p>${escapeHtml(
+             childName
+           )}'s account will be removed. Their data will not be processed.</p>
            <p class="info">If this was a mistake, your child can send a new consent request from the app.</p>
            <button onclick="document.body.innerHTML='<div style=\\'text-align:center;padding:60px;font-size:18px;color:#888\\'>You can close this tab.</div>'" class="btn btn-outline">
              Close

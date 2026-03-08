@@ -96,7 +96,7 @@ api.use(
   '*',
   cors({
     origin: (origin) => {
-      if (!origin) return '*';
+      if (!origin) return '';
       // Allow any localhost port (Metro, Expo web, etc.)
       if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return origin;
       if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
