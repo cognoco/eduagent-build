@@ -6,31 +6,30 @@
 # For WHPX emulator: bundle loading takes 2-5 minutes.
 appId: com.mentomate.app
 ---
-- launchApp
+- launchApp:
+    clearState: true
 
 # Try to tap the server entry if the launcher is showing.
 # On cached launches this won't be visible — that's OK (optional).
 - extendedWaitUntil:
     visible: "http://10.0.2.2:8081"
-    timeout: 10000
+    timeout: 15000
     optional: true
 
 - tapOn:
     text: "http://10.0.2.2:8081"
     optional: true
 
-# Wait for the app to finish loading. The dev menu overlay may appear
-# with "Continue" button covering the sign-in screen. Try to dismiss it.
+# Wait for the sign-in screen. On WHPX this takes 2-5 minutes for
+# fresh bundle loads. The dev menu overlay may appear on top — if
+# "Welcome back" isn't found after 300s, the dev menu might be blocking.
 - extendedWaitUntil:
-    visible: "Continue"
+    visible: "Welcome back"
     timeout: 300000
-    optional: true
 
+# If we get here, sign-in screen is accessible.
+# Dismiss dev menu overlay if it's still showing (it may not block
+# the text detection in all cases).
 - tapOn:
     text: "Continue"
     optional: true
-
-# Now the sign-in screen should be fully accessible.
-- extendedWaitUntil:
-    visible: "Welcome back"
-    timeout: 30000

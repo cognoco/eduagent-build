@@ -85,7 +85,7 @@ Created `e2e/flows/_setup/launch-devclient.yaml` — reusable setup flow that ha
 4. Wait for sign-in screen ("Welcome back")
 5. Handles both first-launch and cached-launch scenarios
 
-All dev-client E2E flows should use `runFlow: _setup/launch-devclient.yaml` instead of `launchApp: clearState: true`.
+All dev-client E2E flows should use `runFlow: _setup/launch-devclient.yaml` which handles dev-client launcher, dev menu overlay, and state reset via `clearState: true`.
 
 ### P-2: Existing flows need dev-client variants (PARTIAL)
 
@@ -122,7 +122,7 @@ Document the BUG-5 behavior in a conventions file:
 - **Maestro taps work** — Maestro's UI automation engine reliably taps elements by ID/text, unlike `adb shell input tap` which is unreliable on slow WHPX emulator
 - **BACK key works** — `adb shell input keyevent KEYCODE_BACK` is reliable for dismissing dialogs and keyboard
 - **Bundle caching** — After first load, subsequent launches are much faster (~30s vs. 3-5 min) due to Hermes bytecode cache. However, `launchApp` in Maestro can trigger a full reload
-- **Maestro debug artifacts** saved at `C:\Users\ZuzanaKopečná\.maestro\tests\<timestamp>\`
+- **Maestro debug artifacts** saved at `C:\Users\<your-username>\.maestro\tests\<timestamp>\`
 - **Screenshot PNGs** — Maestro saves screenshots in the flow's working directory (project root). These should be `.gitignore`d
 - **State persistence** — React state (typed email/password) persists between Maestro flows within the same app session. Flows should not assume clean fields
 - **Dev menu timing** — The dev menu overlay appears during/after bundle load and blocks Maestro element queries. The `launch-devclient.yaml` flow handles this by waiting for "Continue" button

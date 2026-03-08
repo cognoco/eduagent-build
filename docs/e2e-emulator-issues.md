@@ -24,8 +24,8 @@ Caused by: java.lang.ClassNotFoundException: maestro.cli.AppKt
 - Running the Windows .bat launcher (`maestro.bat`) — same error
 
 **Observations:**
-- The username path contains diacritical characters: `C:\Users\ZuzanaKopečná\`
-- Java's `jar tf` command on `jvm-version.jar` in the same path failed with: `java.nio.file.InvalidPathException: Illegal char <?> at index 19: C:\Users\ZuzanaKope?ná\.maestro\bin\jvm-version.jar`
+- The username path contains diacritical characters: `C:\Users\<your-username>\`
+- Java's `jar tf` command on `jvm-version.jar` in the same path failed with: `java.nio.file.InvalidPathException: Illegal char <?> at index 19: C:\Users\<your-username>\.maestro\bin\jvm-version.jar`
 - Java cannot resolve the file path due to character encoding mismatch between Git Bash (MSYS2) and Java's Windows path parser
 
 **Workaround applied:** Copied Maestro installation to `C:\tools\maestro\` (ASCII-only path).
@@ -33,7 +33,7 @@ Caused by: java.lang.ClassNotFoundException: maestro.cli.AppKt
 **Second failure at new path:** Maestro's jansi native library extracts to `%TEMP%` which still resolves to the user profile path with diacritics:
 ```
 Failed to load native library: jansi-2.4.1-fed648149b32e3a9-jansi.dll
-java.lang.UnsatisfiedLinkError: C:\Users\ZuzanaKope?ná\AppData\Local\Temp\jansi-2.4.1-...
+java.lang.UnsatisfiedLinkError: C:\Users\<your-username>\AppData\Local\Temp\jansi-2.4.1-...
 ```
 
 **Workaround applied:** Overriding `TEMP` and `TMP` environment variables to `C:\tools\maestro\tmp` before launching. After this, `maestro --version` returned `2.2.0` successfully.
@@ -60,7 +60,7 @@ java.lang.UnsatisfiedLinkError: C:\Users\ZuzanaKope?ná\AppData\Local\Temp\jansi
 - `USER_INFO | Emulator is performing a full startup. This may take upto two minutes, or more.`
 - The emulator window displayed a **black rectangle** — no Android boot animation or home screen appeared
 
-**ADB version:** 36.0.2 — the ADB binary path also showed mangled characters: `C:\Users\ZuzanaKopecná\AppData\Local\Android\Sdk\platform-tools\adb.exe`
+**ADB version:** 36.0.2 — the ADB binary path also showed mangled characters: `C:\Users\<your-username>\AppData\Local\Android\Sdk\platform-tools\adb.exe`
 
 ---
 
@@ -125,7 +125,7 @@ Only WHPX was detected. No AEHD or HAXM.
 
 ## Resolution: Android Emulator Boot Failure (2026-03-04)
 
-**Root cause:** The Unicode character `č` (U+010D) in the user profile path `C:\Users\ZuzanaKopečná\` causes Windows `LoadLibrary` to silently fail when loading DLLs from paths containing this character. This affects:
+**Root cause:** The Unicode character `č` (U+010D) in the user profile path `C:\Users\<your-username>\` causes Windows `LoadLibrary` to silently fail when loading DLLs from paths containing this character. This affects:
 - QEMU subprocess (hangs during initialization — 1s CPU over 90s instead of actively booting)
 - Vulkan DLL loading (`vulkan-1.dll` fails with empty error string)
 - Qt software OpenGL (`opengl32sw.dll` — "module could not be found")
@@ -152,7 +152,7 @@ Only WHPX was detected. No AEHD or HAXM.
 
 **Maintenance note:** When Android SDK Manager updates the emulator, it writes to the original Unicode path. After updates, re-copy:
 ```powershell
-robocopy "C:\Users\ZuzanaKopečná\AppData\Local\Android\Sdk\emulator" "C:\Android\Sdk\emulator" /E /NP /PURGE
+robocopy "C:\Users\<your-username>\AppData\Local\Android\Sdk\emulator" "C:\Android\Sdk\emulator" /E /NP /PURGE
 ```
 
 ---
@@ -227,13 +227,13 @@ LicenceNotAcceptedException: Failed to install the following Android SDK package
 **Fix:** Copy license files from original SDK and create junctions for SDK components:
 ```powershell
 # Copy licenses
-Copy-Item 'C:\Users\ZuzanaKopečná\AppData\Local\Android\Sdk\licenses\*' 'C:\Android\Sdk\licenses\' -Force
+Copy-Item 'C:\Users\<your-username>\AppData\Local\Android\Sdk\licenses\*' 'C:\Android\Sdk\licenses\' -Force
 
 # Create junctions for data-only SDK components
 $dirs = @('ndk', 'build-tools', 'platforms', 'extras', 'sources', 'skins')
 foreach ($d in $dirs) {
     New-Item -ItemType Junction -Path "C:\Android\Sdk\$d" `
-        -Target "C:\Users\ZuzanaKopečná\AppData\Local\Android\Sdk\$d"
+        -Target "C:\Users\<your-username>\AppData\Local\Android\Sdk\$d"
 }
 ```
 
@@ -255,12 +255,12 @@ rm C:\Android\Sdk\cmake
 
 # Copy binaries (cmake.exe, ninja.exe, etc.)
 mkdir -p C:\Android\Sdk\cmake\3.22.1\bin
-cp "C:\Users\ZuzanaKopečná\AppData\Local\Android\Sdk\cmake\3.22.1\bin\*" \
+cp "C:\Users\<your-username>\AppData\Local\Android\Sdk\cmake\3.22.1\bin\*" \
    C:\Android\Sdk\cmake\3.22.1\bin/
 
 # Junction for CMake modules (data files, no CreateProcess)
 New-Item -ItemType Junction -Path 'C:\Android\Sdk\cmake\3.22.1\share' `
-    -Target 'C:\Users\ZuzanaKopečná\AppData\Local\Android\Sdk\cmake\3.22.1\share'
+    -Target 'C:\Users\<your-username>\AppData\Local\Android\Sdk\cmake\3.22.1\share'
 ```
 
 **Key insight:** Junctions are safe for data files (CMake modules, system images, NDK toolchains) but NOT for executables or JARs that get spawned via `CreateProcess` or loaded via `LoadLibrary`/`System.loadLibrary`.
@@ -492,7 +492,7 @@ wsl
 ```
 This drops you into the Ubuntu shell. Your Windows drives are mounted at `/mnt/c/`, `/mnt/d/`, etc.
 
-The WSL2 Linux username is `key_to` and the home directory is `/home/key_to/`.
+The WSL2 Linux username is `<wsl-user>` and the home directory is `/home/<wsl-user>/`.
 
 ### Environment variables (in `~/.bashrc`)
 
@@ -563,8 +563,8 @@ cd android
 **Important:** The repo in `~/projects/eduagent-build` is a separate clone from the Windows repo at `C:\Dev\Projects\Products\Apps\eduagent-build`. After pulling/pushing changes on Windows, you need to `git pull` inside WSL2 too.
 
 A `local.properties` file must exist at `apps/mobile/android/local.properties` with:
-```
-sdk.dir=/home/key_to/Android/Sdk
+```properties
+sdk.dir=/home/<wsl-user>/Android/Sdk
 ```
 This file is `.gitignore`d so it won't conflict. `expo prebuild` does NOT create it automatically in WSL2.
 
@@ -599,7 +599,7 @@ C:/Android/Sdk/platform-tools/adb.exe install C:/tools/tmp/app-debug.apk
 
 **What happened:** After building the dev-client APK in WSL2 (with `expo-dev-client@~6.0.20`) and installing it on the Windows emulator, the app showed "There was a problem loading the project" with:
 
-```
+```text
 UnableToResolveError
 originModulePath: C:\Dev\...\apps\mobile/.
 targetModuleName: ./apps/mobile/index

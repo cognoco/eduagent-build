@@ -16,7 +16,7 @@ const monorepoRoot = path.resolve(__dirname, '../..');
  */
 const customConfig = {
   projectRoot: __dirname,
-  server: { unstable_serverRoot: monorepoRoot },
+  server: { unstable_serverRoot: monorepoRoot }, // Required for expo-dev-client in monorepo — see docs/e2e-emulator-issues.md Issue 8
   watchFolders: [monorepoRoot],
   cacheVersion: '@eduagent/mobile',
   transformer: {
