@@ -1,0 +1,28 @@
+# Reusable setup: Launch app via Expo Go deep link.
+#
+# Called by Expo Go-adapted flows via:
+#   - runFlow: _setup/launch-expogo.yaml
+#
+# After this flow completes, the app is loaded and the sign-in screen is visible.
+appId: host.exp.exponent
+---
+- launchApp
+
+- openLink: exp://localhost:8081
+
+# Expo Go shows a developer menu onboarding dialog on first project load.
+# The dialog uses native UI that Maestro can't find by text.
+# Tap the X close button (top-right of the bottom sheet) via coordinates.
+# On 1080x1920 screen: X is at roughly (760, 480).
+# If no dialog is present, this tap lands on harmless empty space.
+- waitForAnimationToEnd:
+    timeout: 5000
+
+- tapOn:
+    point: "70%,25%"
+
+# Wait for sign-in screen (auth gate).
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 60000

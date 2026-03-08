@@ -34,4 +34,6 @@ const customConfig = {
 
 module.exports = withNativeWind(mergeConfig(defaultConfig, customConfig), {
   input: './global.css',
+  // Windows: bypass virtual module system (Map key path mismatches)
+  forceWriteFileSystem: process.platform === 'win32',
 });
