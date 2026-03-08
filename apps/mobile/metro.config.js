@@ -16,6 +16,7 @@ const monorepoRoot = path.resolve(__dirname, '../..');
  */
 const customConfig = {
   projectRoot: __dirname,
+  server: { unstable_serverRoot: monorepoRoot },
   watchFolders: [monorepoRoot],
   cacheVersion: '@eduagent/mobile',
   transformer: {

@@ -1,0 +1,94 @@
+# Auth Form Validation — dev-client variant
+# Tests sign-in form edge cases: empty submit, email input, password toggle.
+# Does NOT relaunch app (assumes app is already on sign-in screen).
+appId: com.mentomate.app
+tags:
+  - devclient
+  - auth
+---
+# ── Verify sign-in screen ──────────────────────────────────────────
+# NOTE: Do NOT use `hideKeyboard` without a preceding input —
+# on Android it sends BACK which can exit the app (BUG-5).
+
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 10000
+
+# ── Test 1: Tap sign-in with empty fields ───────────────────────────
+
+- tapOn:
+    id: "sign-in-button"
+
+# Should show validation error or stay on same screen
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 5000
+
+- takeScreenshot: sign-in-empty-submit
+
+# ── Test 2: Enter email only, no password ───────────────────────────
+
+- tapOn:
+    id: "sign-in-email"
+- inputText: "test@example.com"
+
+# BUG-3: Keyboard covers buttons — must dismiss before tapping
+- hideKeyboard
+
+- tapOn:
+    id: "sign-in-button"
+
+# Should still be on sign-in screen (password required)
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 5000
+
+- takeScreenshot: sign-in-email-only
+
+# ── Test 3: Password visibility toggle ─────────────────────────────
+
+- tapOn:
+    id: "sign-in-password"
+- inputText: "TestPassword123"
+
+- hideKeyboard
+
+# Verify the password show/hide toggle (testID = {testID}-toggle)
+# BUG-4: Toggle testID not found by Maestro — may be Pressable testID issue on Android
+- assertVisible:
+    id: "sign-in-password-toggle"
+    optional: true
+
+# Verify toggle via text instead (Show/Hide)
+- assertVisible: "Show"
+
+- takeScreenshot: sign-in-password-entered
+
+# ── Test 4: Verify sign-up link still works ─────────────────────────
+# Keyboard was already dismissed after Test 3.
+# Do NOT call hideKeyboard again — it sends BACK on Android (BUG-5).
+
+- tapOn:
+    id: "sign-up-link"
+
+- extendedWaitUntil:
+    visible:
+      text: "Create account"
+    timeout: 10000
+
+- assertVisible:
+    id: "sign-up-email"
+
+- takeScreenshot: sign-in-validation-end
+
+# Navigate back to sign-in for next test
+- tapOn:
+    id: "sign-in-link"
+
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 10000

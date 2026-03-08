@@ -1,0 +1,36 @@
+# Launch dev-client and connect to Metro
+# Handles TWO cases:
+#   1. First launch: dev-client launcher shows server list → tap to connect
+#   2. Cached launch: dev-client auto-connects → bundle loads directly
+# Also handles dev menu overlay (auto-appears on load — BUG-2).
+# For WHPX emulator: bundle loading takes 2-5 minutes.
+appId: com.mentomate.app
+---
+- launchApp
+
+# Try to tap the server entry if the launcher is showing.
+# On cached launches this won't be visible — that's OK (optional).
+- extendedWaitUntil:
+    visible: "http://10.0.2.2:8081"
+    timeout: 10000
+    optional: true
+
+- tapOn:
+    text: "http://10.0.2.2:8081"
+    optional: true
+
+# Wait for the app to finish loading. The dev menu overlay may appear
+# with "Continue" button covering the sign-in screen. Try to dismiss it.
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 300000
+    optional: true
+
+- tapOn:
+    text: "Continue"
+    optional: true
+
+# Now the sign-in screen should be fully accessible.
+- extendedWaitUntil:
+    visible: "Welcome back"
+    timeout: 30000

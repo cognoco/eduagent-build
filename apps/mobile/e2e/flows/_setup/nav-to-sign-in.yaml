@@ -1,0 +1,13 @@
+# Navigate to sign-in from wherever we are
+appId: com.mentomate.app
+---
+- tapOn:
+    id: "sign-in-link"
+    optional: true
+- tapOn:
+    id: "back-to-sign-in"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 10000

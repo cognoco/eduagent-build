@@ -1,0 +1,19 @@
+# Quick check — validate sign-in screen without relaunching
+# (app must already be on the sign-in screen)
+appId: com.mentomate.app
+tags:
+  - quick
+---
+# Verify key sign-in elements are present
+- assertVisible: "Welcome back"
+- assertVisible: "Sign in to continue learning"
+- assertVisible:
+    id: "google-sso-button"
+- assertVisible:
+    id: "sign-in-email"
+- assertVisible:
+    id: "sign-in-password"
+- assertVisible:
+    id: "sign-in-button"
+- assertVisible: "Sign up"
+- takeScreenshot: quick-check-sign-in

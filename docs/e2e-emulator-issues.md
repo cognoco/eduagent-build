@@ -466,6 +466,201 @@ The error existed before adding expo-dev-client, but was masked because we were 
 
 ---
 
+## WSL2 Build Environment (2026-03-08)
+
+**Why WSL2:** Issue 7 blocks Android APK builds on Windows due to pnpm's strict module isolation. The plan is to build the APK inside WSL2 (where Gradle runs on Linux with no Unicode path issues and potentially different module resolution behavior), keep the emulator running on Windows (where GPU acceleration works), and bridge them via ADB.
+
+**Status:** WSL2 environment installed, configured, and **working**. APK builds successfully in WSL2 and installs on the Windows emulator.
+
+### What's installed
+
+| Component | Version | Location |
+|-----------|---------|----------|
+| Ubuntu | 24.04.1 LTS (Noble Numbat) | WSL2 distro |
+| Node.js | 22.22.1 | via NodeSource apt repo |
+| npm | 10.9.2 | bundled with Node |
+| pnpm | 10.19.0 | `sudo npm install -g pnpm` |
+| Java | OpenJDK 17.0.18 | `openjdk-17-jdk` apt package |
+| Android SDK | cmdline-tools, platform-tools, platforms;android-34, build-tools;35.0.0, ndk;27.1.12297006 | `~/Android/Sdk` |
+| git | 2.43.0 | pre-installed with Ubuntu |
+
+### How to access WSL2
+
+From any Windows terminal (PowerShell, Git Bash, Windows Terminal):
+```bash
+wsl
+```
+This drops you into the Ubuntu shell. Your Windows drives are mounted at `/mnt/c/`, `/mnt/d/`, etc.
+
+The WSL2 Linux username is `key_to` and the home directory is `/home/key_to/`.
+
+### Environment variables (in `~/.bashrc`)
+
+```bash
+export ANDROID_HOME=~/Android/Sdk
+export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
+```
+
+### How this was set up (for reference)
+
+1. **Install Ubuntu on WSL2** (from admin PowerShell on Windows):
+   ```powershell
+   wsl --install -d Ubuntu
+   ```
+   Reboots, then Ubuntu opens and asks for Linux username/password.
+
+2. **Inside WSL2:**
+   ```bash
+   # Node 22
+   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+   sudo apt-get install -y nodejs
+
+   # pnpm (needs sudo for global install on Linux)
+   sudo npm install -g pnpm
+
+   # Java 17
+   sudo apt-get install -y openjdk-17-jdk
+
+   # unzip (not pre-installed on Ubuntu 24.04 minimal)
+   sudo apt install -y unzip
+
+   # Android SDK
+   mkdir -p ~/Android/Sdk/cmdline-tools
+   cd ~/Android/Sdk/cmdline-tools
+   curl -o tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+   unzip tools.zip && mv cmdline-tools latest && rm tools.zip
+
+   export ANDROID_HOME=~/Android/Sdk
+   export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
+   yes | sdkmanager --licenses
+   sdkmanager "platform-tools" "platforms;android-34" "build-tools;35.0.0" "ndk;27.1.12297006"
+
+   # Persist env vars
+   echo 'export ANDROID_HOME=~/Android/Sdk' >> ~/.bashrc
+   echo 'export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH' >> ~/.bashrc
+   ```
+
+### Building the APK (tested and working)
+
+The repo is cloned to WSL2's native Linux filesystem (NOT `/mnt/c/` — that's slow):
+
+```bash
+# One-time clone (already done)
+cd ~/projects
+git clone /mnt/c/Dev/Projects/Products/Apps/eduagent-build eduagent-build
+
+# Install deps
+cd ~/projects/eduagent-build
+pnpm install                          # 31 seconds
+
+# Prebuild + build
+cd apps/mobile
+npx expo prebuild --platform android  # generates android/ directory
+cd android
+./gradlew assembleDebug               # ~11 minutes first build, faster on subsequent builds
+```
+
+**Important:** The repo in `~/projects/eduagent-build` is a separate clone from the Windows repo at `C:\Dev\Projects\Products\Apps\eduagent-build`. After pulling/pushing changes on Windows, you need to `git pull` inside WSL2 too.
+
+A `local.properties` file must exist at `apps/mobile/android/local.properties` with:
+```
+sdk.dir=/home/key_to/Android/Sdk
+```
+This file is `.gitignore`d so it won't conflict. `expo prebuild` does NOT create it automatically in WSL2.
+
+### Installing the APK on the Windows emulator
+
+ADB on WSL2 cannot directly access the Windows emulator. Instead, copy the APK to a Windows-accessible path and use Windows ADB:
+
+```bash
+# From WSL2: copy APK to Windows
+cp ~/projects/eduagent-build/apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk /mnt/c/tools/tmp/app-debug.apk
+
+# From Windows: install on emulator (emulator must be running)
+C:\Android\Sdk\platform-tools\adb.exe install C:\tools\tmp\app-debug.apk
+```
+
+Or as a one-liner from Windows Git Bash / Claude's Bash:
+```bash
+wsl -- bash -c "cp ~/projects/eduagent-build/apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk /mnt/c/tools/tmp/app-debug.apk"
+C:/Android/Sdk/platform-tools/adb.exe install C:/tools/tmp/app-debug.apk
+```
+
+**Note:** The `\\wsl$\Ubuntu\...` UNC path does NOT work with `adb install` — it can't stat the file. Copy to a Windows drive first.
+
+### What failed / what we didn't use
+
+- **ADB bridge from WSL2 to Windows emulator** — not needed. Simpler to copy the APK to Windows and use Windows ADB.
+- **Building from `/mnt/c/`** — not attempted, expected to be extremely slow due to WSL2 ↔ Windows filesystem overhead.
+
+---
+
+## Issue 8: Metro `unstable_serverRoot` — Dev-Client Bundle URL Mismatch in Monorepo (2026-03-08)
+
+**What happened:** After building the dev-client APK in WSL2 (with `expo-dev-client@~6.0.20`) and installing it on the Windows emulator, the app showed "There was a problem loading the project" with:
+
+```
+UnableToResolveError
+originModulePath: C:\Dev\...\apps\mobile/.
+targetModuleName: ./apps/mobile/index
+Unable to resolve module ./apps/mobile/index from C:\Dev\...\apps\mobile/.
+```
+
+URL requested by dev-client: `http://10.0.2.2:8081/apps/mobile/index.bundle?platform=android&dev=true&...`
+
+**Root cause:** In a monorepo, the expo-dev-client always constructs the bundle URL as `/<projectRoot-relative-to-monorepo>/index.bundle`. Since our project is at `apps/mobile/` within the monorepo, the dev-client requests `/apps/mobile/index.bundle`.
+
+Metro's `server.unstable_serverRoot` controls how URL paths map to file paths. The wrong value causes a double-path resolution:
+
+| `unstable_serverRoot` value | URL `/apps/mobile/index.bundle` resolves to | Result |
+|---|---|---|
+| `__dirname` (= `apps/mobile/`) | `apps/mobile/` + `apps/mobile/index` = **double path** | 404 |
+| `monorepoRoot` (= `../..`) | monorepo root + `apps/mobile/index` = **correct** | 200 |
+
+**What was tried first (wrong):** Setting `unstable_serverRoot: __dirname` — this made `/index.bundle` work (HTTP 200 via curl), but the dev-client never requests `/index.bundle`. It always requests `/apps/mobile/index.bundle`, which caused the double-path error.
+
+**Fix applied in `apps/mobile/metro.config.js`:**
+```javascript
+const monorepoRoot = path.resolve(__dirname, '../..');
+
+const customConfig = {
+  projectRoot: __dirname,
+  server: { unstable_serverRoot: monorepoRoot },
+  watchFolders: [monorepoRoot],
+  // ...
+};
+```
+
+**Key insight:** The dev-client's bundle URL construction and Metro's `unstable_serverRoot` must agree. In a monorepo where `projectRoot !== monorepoRoot`, set `unstable_serverRoot` to the monorepo root so the dev-client's `/<relative-project-path>/index.bundle` URL resolves correctly.
+
+**Note:** This also needs to be applied in the WSL2 clone at `~/projects/eduagent-build/apps/mobile/metro.config.js`.
+
+---
+
+## Issue 9: ANR Dialogs on WHPX Emulator During Bundle Loading (2026-03-08)
+
+**What happened:** During bundle loading (27-30 seconds for 2900 modules), Android repeatedly shows ANR dialogs:
+- "MentoMate isn't responding" — Wait / Close app
+- "System UI isn't responding" — Close app / Wait
+- "Bluetooth keeps stopping" — App info / Close app
+
+These dialogs block the app and must be dismissed manually by tapping "Wait".
+
+**Why this happens:** WHPX (Windows Hypervisor Platform) is significantly slower than HAXM or AEHD. The Hermes JS engine blocks the main thread while parsing and executing the large JS bundle, triggering Android's ANR detection (5-second no-response threshold).
+
+**Observations from logcat:**
+- Bundle download: ~27 seconds for 2900 modules
+- Choreographer: "Skipped 55/96/193/208 frames!" (normal is 0)
+- Frame render times: 800ms - 4400ms (normal: 16ms @ 60fps)
+- After `loadJSBundleFromMetro()`, there was a 26-minute gap with zero logs before any React context activity — Hermes was stuck parsing
+
+**ADB-based dismissal (unreliable):**
+- `adb shell input keyevent KEYCODE_BACK` — sometimes works, sometimes doesn't
+- `adb shell input tap <x> <y>` — often doesn't register on the slow emulator
+- Tapping "Wait" physically on the emulator window is the most reliable approach
+
+---
+
 ## E2E Test Strategy — Current State (2026-03-08)
 
 ### What works today
@@ -519,8 +714,13 @@ Full E2E testing (with native modules) requires a dev-client APK build, which is
 | CMake library builds | Working | init.gradle redirects `.cxx` to `C:\B\<module>` |
 | CMake app build | Working | Ninja 1.12.1 handles >260 char paths |
 | Expo Go (JS-only) | Working | Smoke tests run via `exp://localhost:8081` deep link |
-| Android APK build | **BLOCKED** | `@sentry/react-native` config plugin can't resolve `@expo/config-plugins` under pnpm (Issue 7) |
-| expo-dev-client | **Not installed** | Removed during troubleshooting; blocked by Issue 7 |
+| Android APK build | **BLOCKED on Windows** | `@sentry/react-native` config plugin can't resolve `@expo/config-plugins` under pnpm (Issue 7) |
+| Android APK build (WSL2) | **Working** | Bypasses Issue 7. Build in WSL2, copy APK to Windows. |
+| expo-dev-client | **Installed (WSL2 only)** | `expo-dev-client@~6.0.20` in WSL2 clone. Not on Windows (Issue 7). |
+| Metro → dev-client | **Working** | With `unstable_serverRoot: monorepoRoot` fix (Issue 8) |
+| Dev-client bundle loading | **Slow (ANR)** | WHPX emulator takes minutes to parse 2900-module bundle (Issue 9) |
+| WSL2 Ubuntu 24.04 | **Working** | Node 22, pnpm 10, Java 17, Android SDK. APK builds successfully (11 min). |
+| APK install (WSL2→Win) | **Working** | Copy APK to `C:\tools\tmp\`, install with Windows `adb.exe` |
 | Windows Long Paths | Enabled | `LongPathsEnabled=1` (good practice, not required for ninja fix) |
 
 ### What's installed where
@@ -536,12 +736,18 @@ Full E2E testing (with native modules) requires a dev-client APK build, which is
 | `C:\tools\maestro\` | Maestro CLI installation | ASCII path for Java/JNI |
 | `C:\B\` | CMake `.cxx` build intermediates | Short path for init.gradle redirect |
 | `C:\E\` | (Can be removed) Was used for short-path build attempts | No longer needed with ninja 1.12.1 |
+| WSL2 `~/Android/Sdk` | Android SDK (Linux) | For Gradle builds inside WSL2 |
+| WSL2 `~/.bashrc` | ANDROID_HOME + PATH exports | Persistent env vars for WSL2 |
 
-**Bottom line:** All Unicode path issues (Issues 1–5) are fully resolved. The Gradle/Kotlin/CMake toolchain builds successfully from the original project path. However, **Android APK builds are currently blocked by Issue 7** — pnpm's strict module isolation prevents `@sentry/react-native`'s Expo config plugin from finding `@expo/config-plugins`. This has no solution yet.
+**Bottom line:** All Unicode path issues (Issues 1–5) are fully resolved. Android APK builds are blocked on Windows by Issue 7 (pnpm + Sentry config plugin), but **the WSL2 hybrid approach works**: build in WSL2, copy APK to Windows, install on emulator with Windows ADB. The Metro bundle URL mismatch (Issue 8) is resolved with `unstable_serverRoot: monorepoRoot`. The WHPX emulator is very slow (Issue 9) but functional.
 
-**What works:** Expo Go smoke tests via Maestro (no native build needed). Day-to-day development with `npx expo start` and Expo Go is unaffected.
+**What works:** Expo Go smoke tests via Maestro. Day-to-day dev with `npx expo start`. Full APK builds via WSL2. Dev-client APK on emulator with Metro on Windows.
 
-**What's blocked:** Building a native APK (dev-client or release). This blocks full E2E testing with native modules (camera, STT, IAP).
+**What's blocked on Windows only:** Native APK build via `npx expo run:android` (Issue 7). Use WSL2 instead.
+
+**What's slow but functional:** WHPX emulator — ANR dialogs during bundle loading require manual dismissal. Bundle loading + Hermes parsing takes ~15-20 minutes on first launch (subsequent launches are faster with Hermes bytecode cache).
+
+**Confirmed working (2026-03-08):** Dev-client APK loads the sign-in screen (Clerk auth with Google SSO, Apple SSO, email/password). Dark mode renders correctly. Developer menu shows `Runtime version: exposdk:54.0.0`.
 
 The Unicode path fixes that ARE working:
 1. ASCII SDK path (`C:\Android\Sdk`) for executables
