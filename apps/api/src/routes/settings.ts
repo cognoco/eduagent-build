@@ -25,6 +25,7 @@ type SettingsRouteEnv = {
     CLERK_JWKS_URL?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
+    APP_URL?: string;
   };
   Variables: {
     user: AuthUser;
@@ -100,10 +101,15 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     const db = c.get('db');
     const account = c.get('account');
     const profileId = c.get('profileId') ?? account.id;
-    const result = await notifyParentToSubscribe(db, profileId, {
-      resendApiKey: c.env.RESEND_API_KEY,
-      emailFrom: c.env.EMAIL_FROM,
-    });
+    const result = await notifyParentToSubscribe(
+      db,
+      profileId,
+      {
+        resendApiKey: c.env.RESEND_API_KEY,
+        emailFrom: c.env.EMAIL_FROM,
+      },
+      c.env.APP_URL
+    );
     return c.json(result);
   })
 

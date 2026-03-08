@@ -11,6 +11,12 @@ export interface EscalationState {
   hintCount: number;
   questionsAtCurrentRung: number;
   totalExchanges: number;
+  /** SM-2 retention status — affects escalation speed (Gap 4) */
+  retentionStatus?: 'new' | 'strong' | 'fading' | 'weak' | 'forgotten';
+  /** Whether the previous AI response contained [PARTIAL_PROGRESS] (Gap 3) */
+  previousResponseHadPartialProgress?: boolean;
+  /** Consecutive exchanges held by partial progress (Gap 3 cap) */
+  consecutiveHolds?: number;
 }
 
 /** Result of evaluating whether to escalate */
@@ -24,8 +30,17 @@ export interface EscalationDecision {
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Number of questions at a rung before escalation is considered */
+/** Default number of questions at a rung before escalation is considered */
 const QUESTIONS_BEFORE_ESCALATION = 3;
+
+/** Reduced threshold for fading retention — escalate faster (Gap 4) */
+const QUESTIONS_BEFORE_ESCALATION_FADING = 2;
+
+/** Minimum response length to consider as engaged (not a yes/no/guess) */
+const ENGAGED_RESPONSE_MIN_LENGTH = 30;
+
+/** Max consecutive holds from partial progress before escalation resumes (Gap 3 cap) */
+const MAX_PARTIAL_PROGRESS_HOLDS = 2;
 
 /** Phrases that indicate the learner is stuck — valid input, not failure (UX-16) */
 const STUCK_INDICATORS = [
@@ -60,6 +75,39 @@ export function createInitialEscalationState(): EscalationState {
   };
 }
 
+/**
+ * Returns the appropriate starting escalation rung based on SM-2 retention
+ * status (Gap 4). Weak/forgotten topics skip the early Socratic rungs that
+ * would frustrate a student who has already lost the concept.
+ *
+ * strong    → rung 1 (default)
+ * fading    → rung 1 (but threshold reduced to 2 — see evaluateEscalation)
+ * weak      → rung 2 (skip open-ended Socratic, go to narrowed questions)
+ * forgotten → rung 3 (go straight to parallel example — they need to see it again)
+ * new       → rung 1
+ */
+export function getRetentionAwareStartingRung(
+  retentionStatus?: 'new' | 'strong' | 'fading' | 'weak' | 'forgotten'
+): EscalationRung {
+  switch (retentionStatus) {
+    case 'forgotten':
+      return 3 as EscalationRung;
+    case 'weak':
+      return 2 as EscalationRung;
+    default:
+      return 1 as EscalationRung;
+  }
+}
+
+/**
+ * Detects the [PARTIAL_PROGRESS] marker in an AI response.
+ * The LLM self-reports when a student's answer shows partial understanding
+ * — they have part of the concept right but are missing a key piece.
+ */
+export function detectPartialProgress(aiResponse: string): boolean {
+  return aiResponse.includes('[PARTIAL_PROGRESS]');
+}
+
 // ---------------------------------------------------------------------------
 // Escalation evaluation
 // ---------------------------------------------------------------------------
@@ -76,6 +124,15 @@ export function createInitialEscalationState(): EscalationState {
  * "I don't know" is treated as a valid signal (UX-16) and triggers faster
  * escalation (after 1 exchange at current rung) rather than being treated
  * as failure.
+ *
+ * Partial progress detection (Gap 3): If the learner's response shows
+ * genuine engagement (heuristic: length + not stuck) OR the previous AI
+ * response contained [PARTIAL_PROGRESS], the escalation counter is frozen.
+ * The student can stay at a rung indefinitely as long as they're making
+ * progress — escalation only fires when engagement drops.
+ *
+ * Retention-aware thresholds (Gap 4): fading retention reduces the
+ * questions-before-escalation threshold from 3 to 2.
  */
 export function evaluateEscalation(
   state: EscalationState,
@@ -85,8 +142,6 @@ export function evaluateEscalation(
   const isStuck = STUCK_INDICATORS.some((phrase) =>
     normalised.includes(phrase)
   );
-
-  const updatedExchanges = state.questionsAtCurrentRung + 1;
 
   // Never escalate beyond rung 5
   if (state.currentRung >= 5) {
@@ -107,8 +162,40 @@ export function evaluateEscalation(
     };
   }
 
-  // Standard path — escalate after QUESTIONS_BEFORE_ESCALATION at current rung
-  if (updatedExchanges >= QUESTIONS_BEFORE_ESCALATION) {
+  // Partial progress detection (Gap 3):
+  // Heuristic: response is long enough to be a genuine attempt, not a stuck indicator
+  const isEngagedResponse = normalised.length >= ENGAGED_RESPONSE_MIN_LENGTH;
+
+  // Authoritative signal: LLM [PARTIAL_PROGRESS] marker from the previous AI response.
+  // Length heuristic alone is insufficient (verbose wrong answers would stall escalation).
+  // Hold only when: LLM signalled progress, OR both engaged length AND at early exchanges.
+  const hasPartialProgress =
+    state.previousResponseHadPartialProgress === true ||
+    (isEngagedResponse &&
+      state.questionsAtCurrentRung < QUESTIONS_BEFORE_ESCALATION);
+
+  // Cap: after MAX_PARTIAL_PROGRESS_HOLDS consecutive holds, resume normal escalation
+  const holdCount = state.consecutiveHolds ?? 0;
+  const withinHoldBudget = holdCount < MAX_PARTIAL_PROGRESS_HOLDS;
+
+  // If partial progress and within budget: hold at current rung — don't escalate
+  if (hasPartialProgress && withinHoldBudget) {
+    return {
+      shouldEscalate: false,
+      newRung: state.currentRung,
+      reason: 'Partial progress detected — holding at current rung',
+    };
+  }
+
+  // Retention-aware threshold (Gap 4): fading retention escalates faster
+  const questionsThreshold =
+    state.retentionStatus === 'fading'
+      ? QUESTIONS_BEFORE_ESCALATION_FADING
+      : QUESTIONS_BEFORE_ESCALATION;
+
+  // Standard path — escalate after threshold exchanges at current rung
+  const updatedExchanges = state.questionsAtCurrentRung + 1;
+  if (updatedExchanges >= questionsThreshold) {
     const nextRung = Math.min(state.currentRung + 1, 5) as EscalationRung;
     return {
       shouldEscalate: true,
@@ -152,10 +239,15 @@ export function getEscalationPromptGuidance(
 
     case 2:
       return (
-        `Escalation Rung 2 — Socratic Questions (Deeper):\n` +
-        `Ask more specific guiding questions. Narrow the focus.\n` +
+        `Escalation Rung 2 — Socratic Questions (Narrowed):\n` +
+        `Your question must have a binary or single-variable answer.\n` +
+        `Not "what happens when X?" but "does X increase or decrease?"\n` +
+        `Provide a partial framework and ask the learner to fill in one blank.\n` +
         `Reference what the learner already knows to build bridges.\n` +
-        `If the learner expresses confusion, acknowledge it positively — they haven't got it *yet*.` +
+        `If the learner expresses confusion, acknowledge it positively — they haven't got it *yet*.\n\n` +
+        `Do NOT ask the same question with different wording.\n` +
+        `Do NOT ask a question that requires the learner to hold more than one variable in mind simultaneously.\n` +
+        `Do NOT ask open-ended questions at this rung — every question must be answerable in one sentence or less.` +
         homeworkGuard
       );
 
@@ -198,4 +290,19 @@ export function getEscalationPromptGuidance(
     default:
       return '';
   }
+}
+
+/**
+ * Returns the partial-progress signaling instruction appended to the system
+ * prompt. Kept separate from rung guidance so it applies uniformly.
+ */
+export function getPartialProgressInstruction(): string {
+  return (
+    'Progress signaling:\n' +
+    "If the learner's response shows partial understanding — they have part of the concept right " +
+    'but are missing a key piece — include [PARTIAL_PROGRESS] on its own line at the end of your response.\n' +
+    'This tells the system the learner is moving forward and should not be escalated prematurely.\n' +
+    'Do NOT use [PARTIAL_PROGRESS] if the learner is simply guessing, repeating what you said, or producing a wrong answer with no correct elements.\n' +
+    'Do NOT use [PARTIAL_PROGRESS] for responses that are just "yes" or "no" without justification.'
+  );
 }

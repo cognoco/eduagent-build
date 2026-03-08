@@ -15,7 +15,17 @@ jest.mock('react-native-safe-area-context', () => ({
 const mockSetPersona = jest.fn();
 
 jest.mock('../../lib/theme', () => ({
-  useTheme: () => ({ persona: 'learner', setPersona: mockSetPersona }),
+  useTheme: () => ({
+    persona: 'learner',
+    setPersona: mockSetPersona,
+    accentPresetId: null,
+    setAccentPresetId: jest.fn(),
+  }),
+  useThemeColors: () => ({
+    surface: '#ffffff',
+    primary: '#6366f1',
+    textInverse: '#ffffff',
+  }),
 }));
 
 jest.mock('../../lib/profile', () => ({

@@ -1,0 +1,46 @@
+diff --git a/dist/metro/index.js b/dist/metro/index.js
+index c91ba6a..394cd59 100644
+--- a/dist/metro/index.js
++++ b/dist/metro/index.js
+@@ -46,7 +46,7 @@ function getConfig(config, options) {
+             ...config.transformer,
+             ...{
+                 cssInterop_transformerPath: config.transformerPath,
+-                cssInterop_outputDirectory: path_1.default.relative(process.cwd(), outputDirectory),
++                cssInterop_outputDirectory: outputDirectory,
+             },
+             async getTransformOptions(entryPoints, transformOptions, getDependenciesOf) {
+                 debug(`getTransformOptions.dev ${transformOptions.dev}`);
+@@ -122,7 +122,7 @@ function getConfig(config, options) {
+                 }
+                 const resolver = originalResolver ?? context.resolveRequest;
+                 const resolved = resolver(context, moduleName, platform);
+-                if (!("filePath" in resolved && resolved.filePath === options.input)) {
++                if (!("filePath" in resolved && resolved.filePath.replace(/\\/g, '/') === options.input.replace(/\\/g, '/'))) {
+                     return resolved;
+                 }
+                 platform = platform || "native";
+diff --git a/dist/metro/transformer.js b/dist/metro/transformer.js
+index 2f475cd..8b8c842 100644
+--- a/dist/metro/transformer.js
++++ b/dist/metro/transformer.js
+@@ -10,11 +10,17 @@ async function transform(config, projectRoot, filename, data, options) {
+     const transform = config.cssInterop_transformerPath
+         ? require(config.cssInterop_transformerPath).transform
+         : metro_transform_worker_1.default.transform;
+-    if (path_1.default.dirname(filename) !== config.cssInterop_outputDirectory ||
++    if (path_1.default.resolve(projectRoot, path_1.default.dirname(filename)).replace(/\\/g, '/') !== (config.cssInterop_outputDirectory || '').replace(/\\/g, '/') ||
+         filename.endsWith(".css")) {
+         return transform(config, projectRoot, filename, data, options);
+     }
+-    const fakeFile = `import { injectData } from "react-native-css-interop/dist/runtime/native/styles";injectData({});`;
++    // Resolve styles.js from projectRoot to get the same copy used by app components
++    // (pnpm may create multiple copies with different peer dep contexts)
++    let stylesImport = "react-native-css-interop/dist/runtime/native/styles";
++    try {
++        stylesImport = require.resolve(stylesImport, { paths: [projectRoot] }).replace(/\\/g, '/');
++    } catch(e) {}
++    const fakeFile = `import { injectData } from "${stylesImport}";injectData({});`;
+     const result = await transform(config, projectRoot, filename, Buffer.from(fakeFile), options);
+     const output = result.output[0];
+     const code = output.data.code.replace("({})", data.toString("utf-8"));

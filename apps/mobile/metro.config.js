@@ -24,7 +24,7 @@ const customConfig = {
   resolver: {
     assetExts: assetExts.filter((ext) => ext !== 'svg'),
     sourceExts: [...sourceExts, 'cjs', 'mjs', 'svg'],
-    blockList: [/\.test\.[jt]sx?$/, /\.worktrees\/.*/],
+    blockList: [/\.test\.[jt]sx?$/, /[/\\]\.worktrees[/\\].*/],
     nodeModulesPaths: [
       path.resolve(__dirname, 'node_modules'),
       path.resolve(monorepoRoot, 'node_modules'),
@@ -34,4 +34,6 @@ const customConfig = {
 
 module.exports = withNativeWind(mergeConfig(defaultConfig, customConfig), {
   input: './global.css',
+  // Windows: bypass virtual module system (Map key path mismatches)
+  forceWriteFileSystem: process.platform === 'win32',
 });

@@ -221,10 +221,8 @@ export async function sendEmail(
     });
 
     if (!response.ok) {
-      const errorBody = await response.text().catch(() => 'unknown');
-      console.error(
-        `[email] Resend API error ${response.status}: ${errorBody}`
-      );
+      // Log only status code — error body may contain PII (echoed email addresses)
+      console.error(`[email] Resend API error: status ${response.status}`);
       return { sent: false, reason: `resend_api_error_${response.status}` };
     }
 
@@ -290,7 +288,8 @@ const SUBSCRIBE_RATE_LIMIT_HOURS = 24;
 export async function notifyParentToSubscribe(
   db: Database,
   childProfileId: string,
-  emailOptions?: EmailOptions
+  emailOptions?: EmailOptions,
+  appUrl?: string
 ): Promise<ParentSubscribeResult> {
   // 1. Check rate limit — look for recent subscribe_request notifications
   const recentCount = await getRecentNotificationCount(
@@ -338,7 +337,11 @@ export async function notifyParentToSubscribe(
       {
         to: parentEmail,
         subject: `${childName} wants to keep learning on MentoMate`,
-        body: `${childName} has been making great progress on MentoMate and wants to continue. Their free trial has ended. Subscribe to keep their learning going: https://app.mentomate.com/subscribe`,
+        body: `${childName} has been making great progress on MentoMate and wants to continue. Their free trial has ended.${
+          appUrl
+            ? ` Subscribe to keep their learning going: ${appUrl}/subscribe`
+            : ''
+        }`,
         type: 'subscribe_request',
       },
       emailOptions

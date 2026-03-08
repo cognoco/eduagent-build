@@ -111,11 +111,11 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="5. AI Processing">
           <Paragraph>
-            Learning sessions are processed by third-party AI models (currently
-            Google Gemini) to generate educational responses. Session content
-            may be sent to AI providers for processing but is not used to train
-            their models. We do not share personally identifiable information
-            with AI providers — only learning content.
+            Learning sessions are processed by third-party AI model providers to
+            generate educational responses. Session content may be sent to AI
+            providers for processing but is not used to train their models. We
+            do not share personally identifiable information with AI providers —
+            only learning content.
           </Paragraph>
         </Section>
 

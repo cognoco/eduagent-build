@@ -118,6 +118,9 @@
     ],
     "overrides": {
       "react": "19.1.0"
+    },
+    "patchedDependencies": {
+      "react-native-css-interop@0.2.1": "patches/react-native-css-interop@0.2.1.patch"
     }
   }
 }

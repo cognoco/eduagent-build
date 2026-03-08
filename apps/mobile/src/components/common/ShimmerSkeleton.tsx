@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { useEffect, useState, useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, View, useColorScheme } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -11,13 +11,16 @@ import Animated, {
   useReducedMotion,
 } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
-import { useThemeColors } from '../../lib/theme';
+
+/** Scheme-aware shimmer highlight — visible on both light and dark surfaces */
+const SHIMMER_COLOR_LIGHT = 'rgba(0,0,0,0.12)';
+const SHIMMER_COLOR_DARK = 'rgba(255,255,255,0.25)';
 
 interface ShimmerSkeletonProps {
   children: ReactNode;
   /** Duration of one shimmer sweep in ms (default: 1200) */
   duration?: number;
-  /** Shimmer highlight color (default: theme textSecondary) */
+  /** Shimmer highlight color (default: scheme-aware) */
   shimmerColor?: string;
   testID?: string;
 }
@@ -44,11 +47,10 @@ export function ShimmerSkeleton({
   testID,
 }: ShimmerSkeletonProps): ReactNode {
   const reduceMotion = useReducedMotion();
-  const themeColors = useThemeColors();
-  const resolvedColor = useMemo(
-    () => shimmerColor ?? themeColors.textSecondary,
-    [shimmerColor, themeColors.textSecondary]
-  );
+  const scheme = useColorScheme();
+  const resolvedColor =
+    shimmerColor ??
+    (scheme === 'dark' ? SHIMMER_COLOR_DARK : SHIMMER_COLOR_LIGHT);
   const [containerWidth, setContainerWidth] = useState(0);
   const translateX = useSharedValue(0);
 

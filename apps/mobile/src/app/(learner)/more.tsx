@@ -129,7 +129,7 @@ export default function MoreScreen() {
   const { signOut } = useAuth();
   const { user } = useUser();
   const { activeProfile } = useProfile();
-  const { persona, setPersona } = useTheme();
+  const { persona, setPersona, accentPresetId, setAccentPresetId } = useTheme();
   const exportData = useExportData();
 
   const { data: subscription } = useSubscription();
@@ -229,7 +229,11 @@ export default function MoreScreen() {
         ))}
 
         <View className="mt-4">
-          <AccentPicker />
+          <AccentPicker
+            persona={persona}
+            accentPresetId={accentPresetId}
+            setAccentPresetId={setAccentPresetId}
+          />
         </View>
 
         <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">

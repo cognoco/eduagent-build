@@ -5,7 +5,10 @@ import type {
   RouteResult,
   StreamResult,
 } from './llm';
-import { getEscalationPromptGuidance } from './escalation';
+import {
+  getEscalationPromptGuidance,
+  getPartialProgressInstruction,
+} from './escalation';
 import { getEvaluateRungDescription } from './evaluate';
 
 // ---------------------------------------------------------------------------
@@ -56,6 +59,8 @@ export interface ExchangeResult {
   isUnderstandingCheck: boolean;
   /** Whether the LLM flagged this topic for deepening (rung 5 exit) */
   needsDeepening: boolean;
+  /** Whether the LLM signalled partial progress (Gap 3) */
+  partialProgress: boolean;
   provider: string;
   model: string;
   latencyMs: number;
@@ -261,17 +266,8 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     );
   }
 
-  // Scaffolding ladder — difficulty reduction on consecutive failed attempts
-  sections.push(
-    'Scaffolding ladder (apply across all escalation rungs):\n' +
-      'Track how many consecutive attempts the student has made on the same concept without success, based on the conversation so far.\n' +
-      '- After attempt 1 with no correct answer: reframe the question with reduced scope. Narrow the focus to a smaller piece of the concept.\n' +
-      '- After attempt 2: introduce a concrete analogy or partial anchor — something tangible the student can grab onto.\n' +
-      '- After attempt 3: deliver the concept as a worked example, NEVER as a correction. Frame it as "let\'s explore this together." Immediately follow with an easier related question to restore momentum.\n' +
-      '- NEVER repeat the same question phrasing twice. Each attempt must use different language and a different angle.\n' +
-      '- NEVER signal that the student has "failed" at any point. The worked example is collaborative exploration, not a fallback.\n' +
-      'Flag the concept internally for review — the student should not be aware this is happening.'
-  );
+  // Partial progress signaling — LLM self-reports student progress (Gap 3)
+  sections.push(getPartialProgressInstruction());
 
   // Cognitive load management
   sections.push(
@@ -338,14 +334,24 @@ export async function processExchange(
 
   const isUnderstandingCheck = detectUnderstandingCheck(result.response);
   const needsDeepening = detectNeedsDeepening(result.response);
+  const partialProgress = detectPartialProgress(result.response);
+
+  // Strip system markers from the visible response
+  let cleanResponse = result.response;
+  if (needsDeepening) {
+    cleanResponse = cleanResponse.replace(/\[NEEDS_DEEPENING\]/g, '');
+  }
+  if (partialProgress) {
+    cleanResponse = cleanResponse.replace(/\[PARTIAL_PROGRESS\]/g, '');
+  }
+  cleanResponse = cleanResponse.trimEnd();
 
   return {
-    response: needsDeepening
-      ? result.response.replace(/\[NEEDS_DEEPENING\]/g, '').trimEnd()
-      : result.response,
+    response: cleanResponse,
     newEscalationRung: context.escalationRung,
     isUnderstandingCheck,
     needsDeepening,
+    partialProgress,
     provider: result.provider,
     model: result.model,
     latencyMs: result.latencyMs,
@@ -484,5 +490,10 @@ export function detectUnderstandingCheck(response: string): boolean {
 
 /** Detect whether the LLM flagged this topic as needing deepening (rung 5 exit) */
 export function detectNeedsDeepening(response: string): boolean {
-  return response.includes('[NEEDS_DEEPENING]');
+  return /(?:^|\n)\[NEEDS_DEEPENING\]\s*$/.test(response);
+}
+
+/** Detect whether the LLM signalled partial progress (Gap 3) */
+export function detectPartialProgress(response: string): boolean {
+  return /(?:^|\n)\[PARTIAL_PROGRESS\]\s*$/.test(response);
 }

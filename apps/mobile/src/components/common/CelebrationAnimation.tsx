@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, {
@@ -67,13 +67,15 @@ export function CelebrationAnimation({
   const progress = useSharedValue(0);
   const opacity = useSharedValue(1);
   const centerScale = useSharedValue(0);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
     if (reduceMotion) {
       progress.value = 1;
       opacity.value = 1;
       centerScale.value = 1;
-      onComplete?.();
+      onCompleteRef.current?.();
       return;
     }
 
@@ -93,12 +95,13 @@ export function CelebrationAnimation({
     opacity.value = withDelay(
       BURST_MS,
       withTiming(0, { duration: FADE_MS }, (finished) => {
-        if (finished && onComplete) {
-          runOnJS(onComplete)();
+        if (finished && onCompleteRef.current) {
+          runOnJS(onCompleteRef.current)();
         }
       })
     );
-  }, [reduceMotion, progress, opacity, centerScale, onComplete]);
+    // onComplete intentionally omitted — stabilised via ref
+  }, [reduceMotion, progress, opacity, centerScale]);
 
   const containerStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

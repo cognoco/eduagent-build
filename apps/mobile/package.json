@@ -12,6 +12,7 @@
     "@clerk/clerk-expo": "^2.19.23",
     "@eduagent/schemas": "workspace:*",
     "@expo-google-fonts/atkinson-hyperlegible": "^0.4.1",
+    "@expo/config-plugins": "54.0.4",
     "@expo/metro-config": "~54.0.11",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-community/datetimepicker": "^8.6.0",

@@ -1,0 +1,22 @@
+# App Launch smoke test — adapted for Expo Go (local dev)
+# Mirrors app-launch.yaml but uses Expo Go appId + deep link
+appId: host.exp.exponent
+tags:
+  - smoke
+  - local
+---
+- runFlow: _setup/launch-expogo.yaml
+
+# Verify key sign-in elements are present
+- assertVisible: "Sign in to continue learning"
+- assertVisible:
+    id: "google-sso-button"
+- assertVisible:
+    id: "sign-in-email"
+- assertVisible:
+    id: "sign-in-password"
+- assertVisible:
+    id: "sign-in-button"
+
+# Verify navigation to sign-up is available
+- assertVisible: "Sign up"

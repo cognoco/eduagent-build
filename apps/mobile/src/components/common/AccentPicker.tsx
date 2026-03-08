@@ -1,15 +1,26 @@
 import { View, Text, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../../lib/theme';
+import type { Persona } from '../../lib/theme';
+import { useThemeColors } from '../../lib/theme';
 import { accentPresets } from '../../lib/design-tokens';
 
+interface AccentPickerProps {
+  persona: Persona;
+  accentPresetId: string | null;
+  setAccentPresetId: (id: string | null) => void;
+}
+
 /**
- * Row of accent color swatches for the current persona.
+ * Row of accent color swatches for the given persona.
  * Tap a swatch to change the app's accent color.
  * Shows a checkmark on the active selection.
  */
-export function AccentPicker(): React.ReactElement {
-  const { persona, accentPresetId, setAccentPresetId } = useTheme();
+export function AccentPicker({
+  persona,
+  accentPresetId,
+  setAccentPresetId,
+}: AccentPickerProps): React.ReactElement {
+  const colors = useThemeColors();
   const presets = accentPresets[persona];
   const defaultId = presets[0]?.id ?? null;
   const activeId = accentPresetId ?? defaultId;
@@ -43,7 +54,7 @@ export function AccentPicker(): React.ReactElement {
                   borderRadius: 20,
                   backgroundColor: preset.swatch,
                   borderWidth: isActive ? 3 : 0,
-                  borderColor: isActive ? 'rgba(255,255,255,0.9)' : undefined,
+                  borderColor: isActive ? colors.surface : undefined,
                   alignItems: 'center',
                   justifyContent: 'center',
                   // Outer ring for active state
@@ -55,7 +66,7 @@ export function AccentPicker(): React.ReactElement {
                 }}
               >
                 {isActive && (
-                  <Ionicons name="checkmark" size={18} color="#ffffff" />
+                  <Ionicons name="checkmark" size={18} color={colors.surface} />
                 )}
               </View>
               <Text className="text-caption text-text-secondary mt-1">
