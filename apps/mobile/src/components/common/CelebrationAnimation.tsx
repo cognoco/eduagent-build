@@ -175,7 +175,7 @@ function AnimatedParticle({
   endY: number;
   r: number;
   color: string;
-  progress: Animated.SharedValue<number>;
+  progress: { value: number };
 }): ReactNode {
   const animatedProps = useAnimatedProps(() => ({
     cx: cx + (endX - cx) * progress.value,

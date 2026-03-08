@@ -11,6 +11,7 @@
     "ios": {
       "bundleIdentifier": "com.mentomate.app",
       "supportsTablet": true,
+      "usesAppleSignIn": true,
       "privacyManifests": {
         "NSPrivacyAccessedAPITypes": [
           {
