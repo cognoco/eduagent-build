@@ -190,13 +190,29 @@ Caused by: java.io.IOException: The filename, directory name, or volume label sy
 
 The daemon writes temp files to `%TEMP%` which resolves to the Unicode user profile path.
 
-**Fix:** Override `TEMP` and `TMP` to ASCII paths:
+**Temporary fix (env vars only):** Override `TEMP` and `TMP` to ASCII paths:
 ```bash
 export TEMP="C:\\tools\\tmp"
 export TMP="C:\\tools\\tmp"
 ```
 
-**Note:** Kotlin falls back to in-process compilation after daemon failure ("Using fallback strategy: Compile without Kotlin daemon"), so the build proceeds but is slower.
+Without the permanent fix below, Kotlin falls back to in-process compilation after daemon failure ("Using fallback strategy: Compile without Kotlin daemon"), so the build proceeds but is slower.
+
+**Permanent fix (gradle.properties — added 2026-03-08):**
+
+The Kotlin compile daemon spawns as a separate JVM process that does **not** reliably inherit `TEMP`/`TMP` environment variables. Even with `TEMP=C:/tools/tmp` set in the shell, the daemon JVM may still use the default Windows temp path (which contains Unicode characters). The fix is to pass `-Djava.io.tmpdir` directly to both the Gradle JVM and the Kotlin daemon JVM via `gradle.properties`:
+
+```properties
+# In apps/mobile/android/gradle.properties:
+org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m -Djava.io.tmpdir=C:/tools/tmp
+
+# Kotlin daemon JVM args — redirect tmpdir to ASCII path (Windows Unicode username fix)
+kotlin.daemon.jvmargs=-Djava.io.tmpdir=C:/tools/tmp
+```
+
+This makes the Kotlin daemon work properly (not just fallback in-process compilation) and eliminates the need to manually set `TEMP`/`TMP` in the shell for Gradle builds (though setting them is still needed for Maestro).
+
+**⚠️ IMPORTANT:** `expo prebuild --clean` wipes and regenerates the entire `android/` directory, including `gradle.properties`. After any clean prebuild, you MUST re-apply these two lines to `apps/mobile/android/gradle.properties`. The lines are committed to git, so `git checkout apps/mobile/android/gradle.properties` will restore them if prebuild overwrites the file.
 
 ### 5c: NDK License Not Accepted
 
@@ -387,7 +403,111 @@ export TMP="C:\\tools\\maestro\\tmp"
 
 ---
 
-## Current Status (2026-03-07)
+## Issue 6: expo-dev-client — SDK Version Mismatch (2026-03-08)
+
+**Context:** To run E2E tests against a custom dev-client APK (with the app's native modules), we need `expo-dev-client`. Expo Go works for smoke tests but cannot load native modules like `expo-camera`, `expo-speech-recognition`, or `react-native-purchases`.
+
+**What happened:** Installing expo-dev-client with pnpm installed the wrong SDK version:
+
+```bash
+# WRONG — installs v55 (SDK 55) on an SDK 54 project
+pnpm add --filter @eduagent/mobile expo-dev-client
+# Resolved to expo-dev-client@55.0.11
+
+# CORRECT — npx expo install resolves the SDK-compatible version
+npx expo install expo-dev-client
+# Resolved to expo-dev-client@~6.0.20 (SDK 54 compatible)
+```
+
+**Symptom of version mismatch:** With expo-dev-client@55 on SDK 54, the app compiles and installs successfully but shows a **black screen** on launch — no crash, no error in logcat, just a permanently black screen. This is because the dev-client launcher UI is SDK 55 and incompatible with the SDK 54 runtime.
+
+**Key lesson:** Always use `npx expo install <package>` for Expo SDK packages — it resolves the correct version range for the current SDK. Never use `pnpm add` directly for Expo packages.
+
+**Current state:** expo-dev-client was **removed** from the project during troubleshooting because adding it triggered Issue 7 (below). It needs to be re-added once Issue 7 is resolved.
+
+---
+
+## Issue 7: pnpm Cannot Resolve `@expo/config-plugins` for Sentry (UNSOLVED — 2026-03-08)
+
+**What happened:** After adding `expo-dev-client`, running `npx expo run:android` failed during Gradle's `createExpoConfig` task:
+
+```
+A/A/loading @sentry/react-native plugin
+Error: Cannot find module '@expo/config-plugins'
+Require stack:
+- ...\node_modules\@sentry\react-native\expo.js
+```
+
+**Root cause:** `@sentry/react-native`'s Expo config plugin (`expo.js`) does `require('@expo/config-plugins')` at runtime during Gradle's `createExpoConfig` task. Under pnpm's strict module isolation, `@sentry/react-native` cannot see `@expo/config-plugins` because it's not a direct dependency of `@sentry/react-native` — it's a dependency of `expo` itself.
+
+**Why this is critical:** This blocks **ALL** Android APK builds, not just dev-client builds. Any `npx expo run:android` or `npx expo prebuild` + `./gradlew assembleDebug` will fail.
+
+**What was tried (all failed):**
+
+1. **`shamefully-hoist=true` in `.npmrc`** — Already present in the project. Does not fix this because `shamefully-hoist` only affects top-level hoisting; Sentry's config plugin runs from deep within pnpm's `.pnpm/` structure where it can't see hoisted peers.
+
+2. **Add `@expo/config-plugins` as direct dependency:**
+   ```bash
+   pnpm add --filter @eduagent/mobile @expo/config-plugins@54.0.4
+   ```
+   This adds it to `apps/mobile/node_modules/@expo/config-plugins`, but the Gradle build runs Sentry's `expo.js` from Sentry's own `node_modules` scope, not from the app's scope. The direct dependency doesn't help.
+
+3. **`npx expo prebuild`** — Regenerates the `android/` directory but doesn't fix the module resolution. The error occurs during Gradle's invocation of `expo config`, not during prebuild itself.
+
+4. **`npx expo prebuild --clean`** — Same result. Also wipes `gradle.properties` fixes (Issue 5b).
+
+5. **Remove expo-dev-client entirely** — The error persists even after removing expo-dev-client. Once `@sentry/react-native` is present in the project with its Expo config plugin, the resolution failure blocks any native build.
+
+**Analysis:**
+
+This is a fundamental incompatibility between pnpm's strict module isolation and Expo's config plugin system. The config plugin system expects npm/yarn-style flat `node_modules` where any package can `require()` any other package. pnpm deliberately prevents this to enforce correct dependency declarations.
+
+The error existed before adding expo-dev-client, but was masked because we were using Expo Go (which doesn't run native builds). Any attempt to build a native APK triggers it.
+
+---
+
+## E2E Test Strategy — Current State (2026-03-08)
+
+### What works today
+
+| Approach | Status | Limitations |
+|----------|--------|-------------|
+| **Expo Go smoke tests** | Working | No native modules (camera, STT, IAP). App loads via `exp://localhost:8081` deep link. |
+| **Maestro CLI** | Working | At `C:\tools\maestro` with TEMP override |
+| **Emulator** | Working | From ASCII SDK path |
+| **Metro bundler** | Working | `npx expo start` serves JS bundle |
+
+### Expo Go E2E flows (available now)
+
+These flows use `appId: host.exp.exponent` and work without a native build:
+
+```
+apps/mobile/e2e/flows/
+  _setup/launch-expogo.yaml    # Reusable: launch Expo Go + deep link
+  app-launch-expogo.yaml       # Smoke: verify sign-in screen elements
+```
+
+**Running Expo Go smoke tests:**
+```bash
+# Terminal 1: Start Metro
+cd apps/mobile && npx expo start
+
+# Terminal 2: Run Maestro (ensure emulator is running)
+export TEMP="C:\\tools\\tmp" && export TMP="C:\\tools\\tmp"
+/c/tools/maestro/bin/maestro test e2e/flows/app-launch-expogo.yaml
+```
+
+### Dev-client E2E flows (blocked by Issue 7)
+
+Full E2E testing (with native modules) requires a dev-client APK build, which is currently blocked by Issue 7. Once resolved:
+
+1. `npx expo install expo-dev-client` (resolves to `~6.0.20` for SDK 54)
+2. `npx expo run:android` (builds debug APK with dev-client)
+3. Write flows with `appId: com.mentomate.app` targeting the dev-client
+
+---
+
+## Current Status (2026-03-08)
 
 | Component | Status | Notes |
 |-----------|--------|-------|
@@ -395,10 +515,12 @@ export TMP="C:\\tools\\maestro\\tmp"
 | ADB | Working | v36.0.2 at `C:\Android\Sdk\platform-tools` |
 | Maestro CLI | Working | v2.2.0 at `C:\tools\maestro` with TEMP override |
 | Gradle daemon | Working | With `GRADLE_USER_HOME=C:\tools\gradle` |
-| Kotlin compiler | Working (fallback) | Daemon fails but in-process compilation works |
+| Kotlin compiler | Working | `gradle.properties` has `kotlin.daemon.jvmargs=-Djava.io.tmpdir=C:/tools/tmp` (permanent fix) |
 | CMake library builds | Working | init.gradle redirects `.cxx` to `C:\B\<module>` |
 | CMake app build | Working | Ninja 1.12.1 handles >260 char paths |
-| Android APK build | **Working** | BUILD SUCCESSFUL (5m 21s), APK installed on emulator |
+| Expo Go (JS-only) | Working | Smoke tests run via `exp://localhost:8081` deep link |
+| Android APK build | **BLOCKED** | `@sentry/react-native` config plugin can't resolve `@expo/config-plugins` under pnpm (Issue 7) |
+| expo-dev-client | **Not installed** | Removed during troubleshooting; blocked by Issue 7 |
 | Windows Long Paths | Enabled | `LongPathsEnabled=1` (good practice, not required for ninja fix) |
 
 ### What's installed where
@@ -415,8 +537,15 @@ export TMP="C:\\tools\\maestro\\tmp"
 | `C:\B\` | CMake `.cxx` build intermediates | Short path for init.gradle redirect |
 | `C:\E\` | (Can be removed) Was used for short-path build attempts | No longer needed with ninja 1.12.1 |
 
-**Bottom line:** The Android debug APK builds successfully from the original project path. All issues caused by Unicode characters in the user profile path and pnpm's long hash-based paths have been resolved through a combination of:
+**Bottom line:** All Unicode path issues (Issues 1–5) are fully resolved. The Gradle/Kotlin/CMake toolchain builds successfully from the original project path. However, **Android APK builds are currently blocked by Issue 7** — pnpm's strict module isolation prevents `@sentry/react-native`'s Expo config plugin from finding `@expo/config-plugins`. This has no solution yet.
+
+**What works:** Expo Go smoke tests via Maestro (no native build needed). Day-to-day development with `npx expo start` and Expo Go is unaffected.
+
+**What's blocked:** Building a native APK (dev-client or release). This blocks full E2E testing with native modules (camera, STT, IAP).
+
+The Unicode path fixes that ARE working:
 1. ASCII SDK path (`C:\Android\Sdk`) for executables
 2. Env var overrides (`GRADLE_USER_HOME`, `TEMP`/`TMP`) for Java/Kotlin tooling
-3. Gradle init.gradle to redirect CMake `.cxx` intermediates to `C:\B\`
-4. Ninja 1.12.1 upgrade to handle >260 char source file paths
+3. `gradle.properties` with `-Djava.io.tmpdir=C:/tools/tmp` for Kotlin daemon (permanent fix)
+4. Gradle init.gradle to redirect CMake `.cxx` intermediates to `C:\B\`
+5. Ninja 1.12.1 upgrade to handle >260 char source file paths
