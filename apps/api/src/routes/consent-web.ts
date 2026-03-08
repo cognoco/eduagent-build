@@ -223,9 +223,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
              <a href="mentomate://onboarding?persona=learner" class="btn btn-secondary">
                Start My Own Learning
              </a>
-             <button onclick="document.body.innerHTML='<div style=\\'text-align:center;padding:60px;font-size:18px;color:#888\\'>You can close this tab.</div>'" class="btn btn-outline">
-               Close
-             </button>
+             <p class="info">You may now close this tab.</p>
              <div class="app-links">
                <p>Download the app for the best experience</p>
                <a href="https://play.google.com/store/apps/details?id=com.mentomate.app" class="btn btn-secondary">Google Play</a>
@@ -243,9 +241,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
              childName
            )}'s account will be removed. Their data will not be processed.</p>
            <p class="info">If this was a mistake, your child can send a new consent request from the app.</p>
-           <button onclick="document.body.innerHTML='<div style=\\'text-align:center;padding:60px;font-size:18px;color:#888\\'>You can close this tab.</div>'" class="btn btn-outline">
-             Close
-           </button>`
+           <p class="info">You may now close this tab.</p>`
         )
       );
     } catch (error) {

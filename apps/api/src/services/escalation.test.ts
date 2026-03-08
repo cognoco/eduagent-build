@@ -252,15 +252,30 @@ describe('partial progress detection', () => {
     totalExchanges: 2,
   };
 
-  it('holds rung when response is long enough (engaged heuristic)', () => {
+  it('holds rung when response is long enough at early exchanges (engaged heuristic)', () => {
     const decision = evaluateEscalation(
-      baseState,
+      baseState, // questionsAtCurrentRung: 2 (below threshold 3)
       'I think the answer involves the mitochondria because it produces energy for the cell'
     );
 
     expect(decision.shouldEscalate).toBe(false);
     expect(decision.newRung).toBe(1);
     expect(decision.reason).toContain('Partial progress');
+  });
+
+  it('does NOT hold on verbose wrong answer past threshold without LLM signal', () => {
+    const state: EscalationState = {
+      ...baseState,
+      questionsAtCurrentRung: 3, // at threshold — heuristic alone insufficient
+    };
+
+    const decision = evaluateEscalation(
+      state,
+      'I think I know but I am not really sure about this to be honest with you'
+    );
+
+    expect(decision.shouldEscalate).toBe(true);
+    expect(decision.newRung).toBe(2);
   });
 
   it('holds rung when previous AI response had [PARTIAL_PROGRESS]', () => {

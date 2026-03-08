@@ -25,6 +25,7 @@ type SettingsRouteEnv = {
     CLERK_JWKS_URL?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
+    APP_URL?: string;
   };
   Variables: {
     user: AuthUser;

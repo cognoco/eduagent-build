@@ -166,9 +166,13 @@ export function evaluateEscalation(
   // Heuristic: response is long enough to be a genuine attempt, not a stuck indicator
   const isEngagedResponse = normalised.length >= ENGAGED_RESPONSE_MIN_LENGTH;
 
-  // Two-signal approach: heuristic engagement OR LLM [PARTIAL_PROGRESS] marker
+  // Authoritative signal: LLM [PARTIAL_PROGRESS] marker from the previous AI response.
+  // Length heuristic alone is insufficient (verbose wrong answers would stall escalation).
+  // Hold only when: LLM signalled progress, OR both engaged length AND at early exchanges.
   const hasPartialProgress =
-    isEngagedResponse || state.previousResponseHadPartialProgress === true;
+    state.previousResponseHadPartialProgress === true ||
+    (isEngagedResponse &&
+      state.questionsAtCurrentRung < QUESTIONS_BEFORE_ESCALATION);
 
   // Cap: after MAX_PARTIAL_PROGRESS_HOLDS consecutive holds, resume normal escalation
   const holdCount = state.consecutiveHolds ?? 0;

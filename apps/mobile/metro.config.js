@@ -24,7 +24,7 @@ const customConfig = {
   resolver: {
     assetExts: assetExts.filter((ext) => ext !== 'svg'),
     sourceExts: [...sourceExts, 'cjs', 'mjs', 'svg'],
-    blockList: [/\.test\.[jt]sx?$/, /\.worktrees\/.*/],
+    blockList: [/\.test\.[jt]sx?$/, /[/\\]\.worktrees[/\\].*/],
     nodeModulesPaths: [
       path.resolve(__dirname, 'node_modules'),
       path.resolve(monorepoRoot, 'node_modules'),

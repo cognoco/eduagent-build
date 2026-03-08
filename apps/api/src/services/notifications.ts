@@ -221,10 +221,8 @@ export async function sendEmail(
     });
 
     if (!response.ok) {
-      const errorBody = await response.text().catch(() => 'unknown');
-      console.error(
-        `[email] Resend API error ${response.status}: ${errorBody}`
-      );
+      // Log only status code — error body may contain PII (echoed email addresses)
+      console.error(`[email] Resend API error: status ${response.status}`);
       return { sent: false, reason: `resend_api_error_${response.status}` };
     }
 
