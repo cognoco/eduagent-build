@@ -29,7 +29,11 @@ import {
   detectUnderstandingCheck,
   type ExchangeContext,
 } from './exchanges';
-import { evaluateEscalation } from './escalation';
+import {
+  evaluateEscalation,
+  getRetentionAwareStartingRung,
+  detectPartialProgress,
+} from './escalation';
 import { evaluateSummary } from './summaries';
 import { getSubject } from './subject';
 import { fetchPriorTopics, buildPriorLearningContext } from './prior-learning';
@@ -37,6 +41,7 @@ import { retrieveRelevantMemory } from './memory';
 import { getTeachingPreference } from './retention-data';
 import { shouldTriggerEvaluate } from './evaluate';
 import { shouldTriggerTeachBack } from './teach-back';
+import { getRetentionStatus, type RetentionState } from './retention';
 import type { EscalationRung } from './llm';
 
 // ---------------------------------------------------------------------------
@@ -351,7 +356,36 @@ async function prepareExchangeContext(
       content: e.content,
     }));
 
-  // 3b. Count questions at the current escalation rung + compute hint count
+  // 3b. Compute SM-2 retention status from retention card (Gap 4)
+  let retentionStatusValue:
+    | 'new'
+    | 'strong'
+    | 'fading'
+    | 'weak'
+    | 'forgotten'
+    | undefined;
+  let daysSinceLastReview: number | undefined;
+  if (retentionCard) {
+    const retState: RetentionState = {
+      topicId: retentionCard.topicId,
+      easeFactor: Number(retentionCard.easeFactor),
+      intervalDays: retentionCard.intervalDays,
+      repetitions: retentionCard.repetitions,
+      failureCount: retentionCard.failureCount,
+      consecutiveSuccesses: retentionCard.consecutiveSuccesses,
+      xpStatus: retentionCard.xpStatus as 'pending' | 'verified' | 'decayed',
+      nextReviewAt: retentionCard.nextReviewAt?.toISOString() ?? null,
+      lastReviewedAt: retentionCard.lastReviewedAt?.toISOString() ?? null,
+    };
+    retentionStatusValue = getRetentionStatus(retState);
+    if (retentionCard.lastReviewedAt) {
+      daysSinceLastReview =
+        (Date.now() - retentionCard.lastReviewedAt.getTime()) /
+        (1000 * 60 * 60 * 24);
+    }
+  }
+
+  // 3c. Count questions at the current escalation rung + compute hint count
   const aiResponseEvents = events.filter((e) => e.eventType === 'ai_response');
   const questionsAtCurrentRung = aiResponseEvents.filter(
     (e) =>
@@ -368,19 +402,35 @@ async function prepareExchangeContext(
       ? aiResponseEvents[aiResponseEvents.length - 1].createdAt
       : null;
 
-  // 4. Evaluate escalation
+  // 3d. Check the last AI response for [PARTIAL_PROGRESS] marker (Gap 3)
+  const lastAiResponse =
+    aiResponseEvents.length > 0
+      ? aiResponseEvents[aiResponseEvents.length - 1].content
+      : '';
+  const previousResponseHadPartialProgress =
+    detectPartialProgress(lastAiResponse);
+
+  // 4. Evaluate escalation (retention-aware + partial-progress-aware)
+  // On first exchange: use retention-aware starting rung (Gap 4)
+  const currentRung =
+    session.exchangeCount === 0 && retentionStatusValue
+      ? getRetentionAwareStartingRung(retentionStatusValue)
+      : (session.escalationRung as EscalationRung);
+
   const escalationDecision = evaluateEscalation(
     {
-      currentRung: session.escalationRung as EscalationRung,
+      currentRung,
       hintCount,
       questionsAtCurrentRung,
       totalExchanges: session.exchangeCount,
+      retentionStatus: retentionStatusValue,
+      previousResponseHadPartialProgress,
     },
     userMessage
   );
   const effectiveRung = escalationDecision.shouldEscalate
     ? escalationDecision.newRung
-    : (session.escalationRung as EscalationRung);
+    : currentRung;
 
   // 5. Build prior learning context (FR40 — bridge FR)
   const priorLearning = buildPriorLearningContext(priorTopics);
@@ -406,6 +456,16 @@ async function prepareExchangeContext(
     interleavedTopics,
     verificationType,
     evaluateDifficultyRung,
+    // Gap 4: Populate retention status for prompt-level awareness
+    retentionStatus: retentionStatusValue
+      ? {
+          status: retentionStatusValue,
+          easeFactor: retentionCard
+            ? Number(retentionCard.easeFactor)
+            : undefined,
+          daysSinceLastReview,
+        }
+      : undefined,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };

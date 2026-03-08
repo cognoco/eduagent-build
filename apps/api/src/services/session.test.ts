@@ -13,6 +13,8 @@ jest.mock('./exchanges', () => ({
 
 jest.mock('./escalation', () => ({
   evaluateEscalation: jest.fn(),
+  getRetentionAwareStartingRung: jest.fn().mockReturnValue(1),
+  detectPartialProgress: jest.fn().mockReturnValue(false),
 }));
 
 jest.mock('./summaries', () => ({
@@ -30,6 +32,10 @@ jest.mock('./prior-learning', () => ({
 
 jest.mock('./retention-data', () => ({
   getTeachingPreference: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock('./retention', () => ({
+  getRetentionStatus: jest.fn().mockReturnValue('strong'),
 }));
 
 jest.mock('./memory', () => ({

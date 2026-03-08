@@ -2,6 +2,9 @@ import {
   createInitialEscalationState,
   evaluateEscalation,
   getEscalationPromptGuidance,
+  getRetentionAwareStartingRung,
+  detectPartialProgress,
+  getPartialProgressInstruction,
 } from './escalation';
 import type { EscalationState } from './escalation';
 
@@ -225,5 +228,163 @@ describe('getEscalationPromptGuidance', () => {
       const guidance = getEscalationPromptGuidance(rung, 'homework');
       expect(guidance).toContain('NEVER give the answer directly');
     }
+  });
+
+  it('rung 2 includes negative constraints', () => {
+    const guidance = getEscalationPromptGuidance(2, 'learning');
+
+    expect(guidance).toContain('Do NOT ask the same question');
+    expect(guidance).toContain('Do NOT ask a question that requires');
+    expect(guidance).toContain('Do NOT ask open-ended questions');
+    expect(guidance).toContain('binary or single-variable');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Partial progress detection (Gap 3)
+// ---------------------------------------------------------------------------
+
+describe('partial progress detection', () => {
+  const baseState: EscalationState = {
+    currentRung: 1,
+    hintCount: 0,
+    questionsAtCurrentRung: 2,
+    totalExchanges: 2,
+  };
+
+  it('holds rung when response is long enough (engaged heuristic)', () => {
+    const decision = evaluateEscalation(
+      baseState,
+      'I think the answer involves the mitochondria because it produces energy for the cell'
+    );
+
+    expect(decision.shouldEscalate).toBe(false);
+    expect(decision.newRung).toBe(1);
+    expect(decision.reason).toContain('Partial progress');
+  });
+
+  it('holds rung when previous AI response had [PARTIAL_PROGRESS]', () => {
+    const state: EscalationState = {
+      ...baseState,
+      previousResponseHadPartialProgress: true,
+    };
+
+    const decision = evaluateEscalation(state, 'yes');
+
+    expect(decision.shouldEscalate).toBe(false);
+    expect(decision.newRung).toBe(1);
+    expect(decision.reason).toContain('Partial progress');
+  });
+
+  it('still escalates on stuck indicator even with long response', () => {
+    const decision = evaluateEscalation(
+      baseState,
+      "I don't know what the answer is, I'm completely lost and confused"
+    );
+
+    expect(decision.shouldEscalate).toBe(true);
+    expect(decision.newRung).toBe(2);
+  });
+
+  it('escalates short non-engaged responses past threshold', () => {
+    const decision = evaluateEscalation(baseState, 'no');
+
+    expect(decision.shouldEscalate).toBe(true);
+    expect(decision.newRung).toBe(2);
+  });
+
+  it('detectPartialProgress returns true for marker', () => {
+    expect(detectPartialProgress('Good attempt!\n[PARTIAL_PROGRESS]')).toBe(
+      true
+    );
+  });
+
+  it('detectPartialProgress returns false without marker', () => {
+    expect(detectPartialProgress('Good attempt! Keep trying.')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Retention-aware starting rung (Gap 4)
+// ---------------------------------------------------------------------------
+
+describe('getRetentionAwareStartingRung', () => {
+  it('returns rung 1 for strong retention', () => {
+    expect(getRetentionAwareStartingRung('strong')).toBe(1);
+  });
+
+  it('returns rung 1 for fading retention (threshold is reduced instead)', () => {
+    expect(getRetentionAwareStartingRung('fading')).toBe(1);
+  });
+
+  it('returns rung 2 for weak retention', () => {
+    expect(getRetentionAwareStartingRung('weak')).toBe(2);
+  });
+
+  it('returns rung 3 for forgotten retention', () => {
+    expect(getRetentionAwareStartingRung('forgotten')).toBe(3);
+  });
+
+  it('returns rung 1 for new topics', () => {
+    expect(getRetentionAwareStartingRung('new')).toBe(1);
+  });
+
+  it('returns rung 1 when undefined', () => {
+    expect(getRetentionAwareStartingRung(undefined)).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Retention-aware escalation speed (Gap 4)
+// ---------------------------------------------------------------------------
+
+describe('retention-aware escalation speed', () => {
+  it('escalates after 2 exchanges for fading retention (reduced threshold)', () => {
+    const state: EscalationState = {
+      currentRung: 1,
+      hintCount: 0,
+      questionsAtCurrentRung: 1,
+      totalExchanges: 1,
+      retentionStatus: 'fading',
+    };
+
+    const decision = evaluateEscalation(state, 'no');
+
+    expect(decision.shouldEscalate).toBe(true);
+    expect(decision.newRung).toBe(2);
+  });
+
+  it('does not escalate after 1 exchange for strong retention', () => {
+    const state: EscalationState = {
+      currentRung: 1,
+      hintCount: 0,
+      questionsAtCurrentRung: 1,
+      totalExchanges: 1,
+      retentionStatus: 'strong',
+    };
+
+    const decision = evaluateEscalation(state, 'no');
+
+    expect(decision.shouldEscalate).toBe(false);
+    expect(decision.newRung).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getPartialProgressInstruction
+// ---------------------------------------------------------------------------
+
+describe('getPartialProgressInstruction', () => {
+  it('includes PARTIAL_PROGRESS marker instruction', () => {
+    const instruction = getPartialProgressInstruction();
+
+    expect(instruction).toContain('[PARTIAL_PROGRESS]');
+    expect(instruction).toContain('partial understanding');
+  });
+
+  it('includes negative constraints for marker usage', () => {
+    const instruction = getPartialProgressInstruction();
+
+    expect(instruction).toContain('Do NOT use [PARTIAL_PROGRESS] if');
   });
 });
