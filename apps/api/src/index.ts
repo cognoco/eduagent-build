@@ -101,7 +101,10 @@ api.use(
       if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return origin;
       if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
       // Production origins
-      if (origin.endsWith('.eduagent.app') || origin === 'https://eduagent.app')
+      if (
+        origin.endsWith('.mentomate.app') ||
+        origin === 'https://mentomate.app'
+      )
         return origin;
       return '';
     },

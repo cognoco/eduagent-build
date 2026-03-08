@@ -162,7 +162,7 @@ describe('consent-web routes', () => {
       expect(res.status).toBe(200);
       const html = await res.text();
       expect(html).toContain('Consent required for Emma');
-      expect(html).toContain('Emma wants to use EduAgent');
+      expect(html).toContain('Emma wants to use MentoMate');
     });
   });
 

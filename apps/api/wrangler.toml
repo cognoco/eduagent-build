@@ -2,13 +2,10 @@
 # MentoMate API — Cloudflare Workers Configuration
 # =============================================================================
 #
-# IMPORTANT: Cloudflare Workers **Paid plan (Standard)** is REQUIRED for
-# production. The free plan enforces a 10 ms CPU time limit per request, which
-# is far too low for LLM-powered tutoring sessions. The paid Standard plan
-# allows up to 30 s of CPU time per invocation.
-#
-# This is an **account-level** setting configured in the Cloudflare dashboard
-# under Workers & Pages → Plans, NOT a wrangler.toml field.
+# Free plan (100K req/day) is fine for launch. The 10ms CPU time limit is
+# per-request CPU only — I/O waits (Gemini, Neon, Resend, Voyage) don't count.
+# If LLM routes hit "Worker exceeded CPU time limit" errors under load,
+# upgrade to Workers Standard ($5/month, 30s CPU) — instant, no migration.
 #
 # Rate Limiting: Configure per-user rate limiting (target: 100 req/min per
 # authenticated user) via Cloudflare dashboard → WAF → Rate Limiting Rules.

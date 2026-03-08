@@ -10,7 +10,7 @@ const envSchema = z.object({
   CLERK_JWKS_URL: z.string().url().optional(),
   CLERK_AUDIENCE: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
-  APP_URL: z.string().url().default('https://app.eduagent.com'),
+  APP_URL: z.string().url().default('https://app.mentomate.com'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
   // Stripe — optional. Dormant until web client added; mobile uses RevenueCat IAP.
@@ -29,7 +29,7 @@ const envSchema = z.object({
 
   // Resend — transactional email
   RESEND_API_KEY: z.string().min(1).optional(),
-  EMAIL_FROM: z.string().email().default('noreply@eduagent.com'),
+  EMAIL_FROM: z.string().email().default('noreply@mentomate.com'),
 
   // Sentry — error tracking
   SENTRY_DSN: z.string().url().optional(),

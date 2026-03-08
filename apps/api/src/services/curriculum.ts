@@ -18,7 +18,7 @@ import type {
 // Curriculum generation service — pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-const CURRICULUM_SYSTEM_PROMPT = `You are EduAgent's curriculum designer. Based on the assessment interview,
+const CURRICULUM_SYSTEM_PROMPT = `You are MentoMate's curriculum designer. Based on the assessment interview,
 generate a personalized learning curriculum. Return a JSON array of topics with this structure:
 [{"title": "Topic Name", "description": "What the learner will learn", "relevance": "core|recommended|contemporary|emerging", "estimatedMinutes": 30}]
 Order topics pedagogically. Include 8-15 topics.`;
@@ -248,7 +248,7 @@ export async function explainTopicOrdering(
     {
       role: 'system',
       content:
-        'You are EduAgent, explaining why a topic appears at its position in a personalized curriculum. Be concise (2-3 sentences).',
+        'You are MentoMate, explaining why a topic appears at its position in a personalized curriculum. Be concise (2-3 sentences).',
     },
     {
       role: 'user',

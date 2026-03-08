@@ -74,7 +74,7 @@ export const consentReminder = inngest.createFunction(
         {
           to: parentEmail,
           subject:
-            "Final warning: your child's EduAgent account will be removed",
+            "Final warning: your child's MentoMate account will be removed",
           body: `Without your consent, your child's account and data will be automatically removed in 5 days.`,
           type: 'consent_warning',
         },

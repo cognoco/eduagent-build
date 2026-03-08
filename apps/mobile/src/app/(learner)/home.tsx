@@ -21,7 +21,7 @@ import { useOverallProgress } from '../../hooks/use-progress';
 import { useStreaks } from '../../hooks/use-streaks';
 import { useCoachingCard } from '../../hooks/use-coaching-card';
 import { useSubscriptionStatus } from '../../hooks/use-subscription';
-import { useTheme } from '../../lib/theme';
+import { useTheme, useThemeColors } from '../../lib/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -33,6 +33,7 @@ export default function HomeScreen() {
   const coachingCard = useCoachingCard(firstSubjectId);
   const { data: subStatus } = useSubscriptionStatus();
   const { persona } = useTheme();
+  const themeColors = useThemeColors();
   const { profiles, activeProfile, switchProfile } = useProfile();
 
   // First-time user redirect: send users with no subjects to create-subject
@@ -69,10 +70,14 @@ export default function HomeScreen() {
       <View className="px-5 pt-4 pb-2 flex-row justify-between items-center">
         <View>
           <Text className="text-h1 font-bold text-text-primary">
-            Ready to learn
+            {persona === 'teen'
+              ? "What's on your mind?"
+              : "Let's explore together!"}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            Your coach has a plan
+            {persona === 'teen'
+              ? 'Your coach has ideas'
+              : 'Your coach is ready'}
           </Text>
         </View>
         <View className="flex-row items-center" style={{ zIndex: 50 }}>
@@ -119,7 +124,7 @@ export default function HomeScreen() {
         <AnimatedEntry>
           {coachingCard.isLoading ? (
             <View className="bg-coaching-card rounded-card p-5 mt-4 items-center py-8">
-              <PenWritingAnimation size={100} />
+              <PenWritingAnimation size={100} color={themeColors.accent} />
             </View>
           ) : persona === 'teen' ? (
             <AdaptiveEntryCard

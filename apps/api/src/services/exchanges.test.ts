@@ -297,7 +297,7 @@ describe('buildSystemPrompt', () => {
 
     const prompt = buildSystemPrompt(minimalContext);
     expect(prompt).toContain('Science');
-    expect(prompt).toContain('EduAgent');
+    expect(prompt).toContain('MentoMate');
   });
 });
 

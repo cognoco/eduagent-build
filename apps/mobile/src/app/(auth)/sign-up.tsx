@@ -59,7 +59,7 @@ export default function SignUpScreen() {
         const { createdSessionId } = await startSSO({
           strategy,
           redirectUrl: Linking.createURL('/sso-callback', {
-            scheme: 'eduagent',
+            scheme: 'mentomate',
           }),
         });
 
@@ -326,6 +326,26 @@ export default function SignUpScreen() {
           loading={loading}
           testID="sign-up-button"
         />
+
+        <Text className="text-caption text-text-secondary text-center mt-3 px-2">
+          By signing up, you agree to our{' '}
+          <Text
+            className="text-primary"
+            onPress={() => router.push('/terms')}
+            accessibilityRole="link"
+          >
+            Terms of Service
+          </Text>{' '}
+          and{' '}
+          <Text
+            className="text-primary"
+            onPress={() => router.push('/privacy')}
+            accessibilityRole="link"
+          >
+            Privacy Policy
+          </Text>
+          .
+        </Text>
 
         <View className="flex-row justify-center items-center mt-6">
           <Text className="text-body-sm text-text-secondary">
