@@ -208,7 +208,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
              </button>
              <div class="app-links">
                <p>Download the app for the best experience</p>
-               <a href="https://apps.apple.com/app/mentomate" class="btn btn-secondary" style="margin-bottom:8px">App Store</a>
+               <a href="https://apps.apple.com/app/mentomate/id000000000" class="btn btn-secondary" style="margin-bottom:8px">App Store</a>
                <a href="https://play.google.com/store/apps/details?id=com.mentomate.app" class="btn btn-secondary">Google Play</a>
              </div>`
           )

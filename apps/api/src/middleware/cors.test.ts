@@ -9,14 +9,15 @@ describe('CORS middleware', () => {
   ];
 
   const PRODUCTION_ORIGINS = [
-    'https://mentomate.app',
-    'https://app.mentomate.app',
+    'https://mentomate.com',
+    'https://app.mentomate.com',
   ];
 
   const BLOCKED_ORIGINS = [
     'https://evil.com',
     'https://localhost.evil.com',
-    'https://mentomate.app.evil.com',
+    'https://mentomate.com.evil.com',
+    'http://app.mentomate.com', // http rejected for production
   ];
 
   const REQUIRED_HEADERS = ['Authorization', 'Content-Type', 'X-Profile-Id'];

@@ -100,12 +100,18 @@ api.use(
       // Allow any localhost port (Metro, Expo web, etc.)
       if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return origin;
       if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
-      // Production origins
-      if (
-        origin.endsWith('.mentomate.app') ||
-        origin === 'https://mentomate.app'
-      )
-        return origin;
+      // Production origins — require https
+      try {
+        const url = new URL(origin);
+        if (
+          url.protocol === 'https:' &&
+          (url.hostname.endsWith('.mentomate.com') ||
+            url.hostname === 'mentomate.com')
+        )
+          return origin;
+      } catch {
+        // Invalid URL — reject
+      }
       return '';
     },
     allowHeaders: ['Content-Type', 'Authorization', 'X-Profile-Id'],
