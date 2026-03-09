@@ -1,0 +1,89 @@
+# Flow: Empty First User — Brand-new user with 0 subjects
+# Validates: user with completed onboarding but no subjects is redirected to
+# the create-subject screen, can enter a subject name, and is navigated to the
+# onboarding interview where the AI greeting appears.
+# Tags: nightly, edge, onboarding
+#
+# Journey: UX Journey 1 (First-time User Onboarding)
+# Epics: Epic 1
+# Prerequisite: Seeded user with completed onboarding but no subjects
+#               (scenario: onboarding-complete — creates learner profile,
+#                consent granted, but 0 subjects)
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(learner)/home.tsx (redirects to /create-subject when 0 subjects)
+#   - apps/mobile/src/app/create-subject.tsx (create-subject-name, create-subject-submit,
+#     create-subject-cancel)
+#   - apps/mobile/src/app/(learner)/onboarding/interview.tsx (chat-input, ChatShell)
+#
+# NOTE: The seed-and-sign-in setup flow waits for id: "home-scroll-view" as its
+# final step. With 0 subjects, the home screen immediately redirects to
+# /create-subject. The setup flow's last wait may timeout — that's expected.
+# Auth is still completed by that point. We add our own extended wait for
+# the create-subject screen.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - edge
+  - onboarding
+---
+# 1. Seed & sign in — onboarding-complete creates a user with 0 subjects
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-complete"
+      API_URL: ${API_URL}
+
+# 2. Wait for create-subject screen — home.tsx redirects here when subjects=0.
+#    The setup flow may have timed out waiting for home-scroll-view, but auth
+#    is complete. We use a generous timeout for the redirect to settle.
+- extendedWaitUntil:
+    visible:
+      id: "create-subject-name"
+    timeout: 20000
+
+# 3. Verify "New subject" heading is visible
+- assertVisible:
+    text: "New subject"
+
+# 4. Verify cancel button is present
+- assertVisible:
+    id: "create-subject-cancel"
+
+# 5. Verify submit button is present
+- assertVisible:
+    id: "create-subject-submit"
+
+# 6. Screenshot: create-subject screen (empty state)
+- takeScreenshot: empty-first-user-01-create-subject
+
+# 7. Type a subject name
+- tapOn:
+    id: "create-subject-name"
+- inputText: "Biology"
+- hideKeyboard
+
+# 8. Tap "Start Learning" submit button
+- tapOn:
+    id: "create-subject-submit"
+
+# 9. Wait for interview screen — the create-subject mutation navigates to
+#    /(learner)/onboarding/interview after creating the subject.
+#    The interview ChatShell always has a chat-input.
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 20000
+
+# 10. Verify the interview title contains the subject name
+- assertVisible:
+    text: "Biology"
+    optional: true
+
+# 11. Verify AI opening message is visible — the interview screen always
+#     starts with "Hi! I'm your learning coach..." greeting.
+- assertVisible:
+    text: "learning coach"
+
+# 12. Screenshot: interview screen with AI greeting
+- takeScreenshot: empty-first-user-02-interview

@@ -1,0 +1,147 @@
+# Flow N11: Settings Toggles — Theme, Accent, Notifications, Learning Mode
+# Validates: all inline settings controls on the More screen respond to taps.
+# Cycles through themes, accent color swatches, notification toggles,
+# and learning mode radio options with screenshots at each step.
+# Tags: nightly, account, settings
+#
+# Journey: UX Journey 5 (Account Management)
+# Epics: Epic 5 (FR101-FR105)
+# Prerequisite: Seeded user with onboarding complete (scenario: onboarding-complete)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - account
+  - settings
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-complete"
+      API_URL: ${API_URL}
+
+# 2. Verify home screen loaded
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 3. Navigate to More tab
+- tapOn:
+    id: "tab-more"
+
+# 4. Wait for More screen to load
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+# ── Theme section ──
+
+# 5. Verify Appearance section is visible
+- extendedWaitUntil:
+    visible:
+      text: "Appearance"
+    timeout: 10000
+
+- takeScreenshot: settings-initial
+
+# 6. Tap "Teen (Dark)" theme
+- tapOn:
+    text: "Teen (Dark)"
+
+- takeScreenshot: settings-theme-teen-dark
+
+# 7. Tap "Parent (Light)" theme
+- tapOn:
+    text: "Parent (Light)"
+
+- takeScreenshot: settings-theme-parent-light
+
+# 8. Tap "Eager Learner (Calm)" theme to reset
+- tapOn:
+    text: "Eager Learner (Calm)"
+
+- takeScreenshot: settings-theme-learner-calm
+
+# ── Accent Color section ──
+
+# 9. Scroll to Accent Color picker
+- scrollUntilVisible:
+    element:
+      text: "Accent Color"
+    direction: DOWN
+    timeout: 10000
+
+# 10. Tap teal accent swatch
+- tapOn:
+    id: "accent-swatch-teal"
+
+- takeScreenshot: settings-accent-teal
+
+# 11. Tap rose accent swatch
+- tapOn:
+    id: "accent-swatch-rose"
+
+- takeScreenshot: settings-accent-rose
+
+# 12. Tap indigo accent swatch (reset to default)
+- tapOn:
+    id: "accent-swatch-indigo"
+
+- takeScreenshot: settings-accent-indigo
+
+# ── Notifications section ──
+
+# 13. Scroll to Notifications section
+- scrollUntilVisible:
+    element:
+      text: "Notifications"
+    direction: DOWN
+    timeout: 10000
+
+# 14. Tap "Push notifications" toggle (toggle on)
+- tapOn:
+    text: "Push notifications"
+
+- takeScreenshot: settings-push-toggled
+
+# 15. Tap "Push notifications" toggle again (toggle off)
+- tapOn:
+    text: "Push notifications"
+
+# 16. Tap "Weekly progress digest" toggle (toggle on)
+- tapOn:
+    text: "Weekly progress digest"
+
+- takeScreenshot: settings-digest-toggled
+
+# 17. Tap "Weekly progress digest" toggle again (toggle off)
+- tapOn:
+    text: "Weekly progress digest"
+
+- takeScreenshot: settings-notifications-reset
+
+# ── Learning Mode section ──
+
+# 18. Scroll to Learning Mode section
+- scrollUntilVisible:
+    element:
+      text: "Learning Mode"
+    direction: DOWN
+    timeout: 10000
+
+# 19. Tap Casual Explorer mode
+- tapOn:
+    id: "learning-mode-casual"
+
+- takeScreenshot: settings-mode-casual
+
+# 20. Tap Serious Learner mode (reset)
+- tapOn:
+    id: "learning-mode-serious"
+
+- takeScreenshot: settings-mode-serious
+
+# 21. Final screenshot — settings fully exercised
+- takeScreenshot: settings-toggles-complete

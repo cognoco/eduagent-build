@@ -1,0 +1,85 @@
+# Flow: Post-Approval Landing — One-Time "You're Approved!" Screen
+# Validates: after parent approves consent, the child sees a celebratory
+# "You're approved!" screen exactly once. Tapping "Let's Go" dismisses it
+# and loads the home screen. Uses clearState to reset SecureStore so the
+# postApprovalSeen key is fresh.
+# Tags: nightly, consent
+#
+# Journey: Consent Lifecycle (post-approval UX)
+# Epics: Epic 5 (COPPA/GDPR consent gating), UX Persona Walkthrough
+# Prerequisite: Seeded user with CONSENTED status (scenario: onboarding-complete)
+#
+# NOTE: This flow does NOT use runFlow seed-and-sign-in because that flow
+# waits for home-scroll-view — but the post-approval landing gate appears
+# BEFORE the tab navigator loads. Instead, seed + sign-in are inlined here.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - consent
+---
+# 1. Seed test data — onboarding-complete gives CONSENTED status
+- runScript:
+    file: ../../scripts/seed.js
+    env:
+      API_URL: ${API_URL}
+      SCENARIO: "onboarding-complete"
+    outputVariable: seedResult
+
+# 2. Launch app with clean state (clears SecureStore so postApprovalSeen is fresh)
+- launchApp:
+    clearState: true
+
+# 3. Wait for auth screen
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 15000
+
+# 4. Sign in with seeded credentials
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${output.seedResult.email}
+- hideKeyboard
+
+- tapOn:
+    id: "sign-in-password"
+- inputText: "TestPass123!"
+- hideKeyboard
+
+- tapOn:
+    id: "sign-in-button"
+
+# 5. Wait for post-approval landing (NOT home screen — the gate shows first)
+- extendedWaitUntil:
+    visible:
+      id: "post-approval-landing"
+    timeout: 15000
+
+# 6. Verify celebratory heading
+- assertVisible:
+    text: "You're approved!"
+
+# 7. Verify supporting text
+- assertVisible:
+    text: "Your parent said yes"
+    optional: true
+
+# 8. Screenshot of post-approval landing
+- takeScreenshot: post-approval-landing
+
+# 9. Verify "Let's Go" button
+- assertVisible:
+    id: "post-approval-continue"
+
+# 10. Tap "Let's Go" to dismiss
+- tapOn:
+    id: "post-approval-continue"
+
+# 11. Wait for home screen — loads after dismissal
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 12. Final screenshot — home screen after post-approval
+- takeScreenshot: post-approval-landing-dismissed

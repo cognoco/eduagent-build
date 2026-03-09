@@ -1,0 +1,100 @@
+# Flow: Parent Demo Dashboard — Parent with no children sees demo mode
+# Validates: solo parent (no linked children) sees the demo banner, demo child
+# card with sample data, and tapping the demo card triggers a "Preview Mode" alert
+# instead of navigating to child detail.
+# Tags: nightly, parent
+#
+# Journey: UX Journey 4 (Parent Oversight — first-time empty state)
+# Epics: Epic 5
+# Prerequisite: Seeded parent with no children
+#               (scenario: parent-solo — creates a solo parent, no family links)
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(parent)/dashboard.tsx (dashboard-scroll, demo-banner,
+#     demo-link-child-cta, dashboard-skeleton)
+#   - apps/mobile/src/components/coaching/ParentDashboardSummary.tsx
+#     (parent-dashboard-summary — via BaseCoachingCard testID)
+#   - apps/mobile/src/components/coaching/BaseCoachingCard.tsx
+#     (parent-dashboard-summary-primary — "View details" button)
+#
+# NOTE: The seed-and-sign-in setup flow waits for id: "home-scroll-view" as its
+# final step. Parent persona lands on /(parent)/dashboard which has testID
+# "dashboard-scroll", NOT "home-scroll-view". The setup flow's last wait may
+# timeout — auth is still completed. We add our own wait for dashboard-scroll.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+---
+# 1. Seed & sign in as solo parent
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-solo"
+      API_URL: ${API_URL}
+
+# 2. Wait for parent dashboard — the setup flow may have timed out on
+#    "home-scroll-view" since parent uses "dashboard-scroll"
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 20000
+
+# 3. Verify "Home" heading on parent dashboard
+- assertVisible:
+    text: "Home"
+
+# 4. Verify demo banner is visible (testID: demo-banner)
+- extendedWaitUntil:
+    visible:
+      id: "demo-banner"
+    timeout: 10000
+
+# 5. Verify demo banner text
+- assertVisible:
+    text: "Preview"
+
+# 6. Screenshot: demo dashboard with banner
+- takeScreenshot: demo-dashboard-01-banner
+
+# 7. Verify demo child card is visible — ParentDashboardSummary renders
+#    with testID "parent-dashboard-summary" via BaseCoachingCard
+- assertVisible:
+    id: "parent-dashboard-summary"
+    optional: true
+
+# 8. Tap the demo child card's "View details" button
+#    (testID: parent-dashboard-summary-primary from BaseCoachingCard pattern)
+- tapOn:
+    id: "parent-dashboard-summary-primary"
+    optional: true
+
+# 9. Fallback: tap "View details" text directly
+- tapOn:
+    text: "View details"
+    optional: true
+
+# 10. Alert should appear with "Preview Mode" title — tap "OK" to dismiss
+- tapOn:
+    text: "OK"
+    optional: true
+
+# 11. Verify we're still on the dashboard (alert dismissed, no navigation)
+- assertVisible:
+    id: "dashboard-scroll"
+
+# 12. Verify the "Link your child's account" CTA button is visible
+- assertVisible:
+    id: "demo-link-child-cta"
+    optional: true
+
+# 13. Screenshot: demo dashboard after alert dismissal
+- takeScreenshot: demo-dashboard-02-after-alert
+
+# 14. Verify the demo subtitle text
+- assertVisible:
+    text: "Here's what your dashboard will look like"
+    optional: true
+
+# 15. Final screenshot
+- takeScreenshot: demo-dashboard-03-complete

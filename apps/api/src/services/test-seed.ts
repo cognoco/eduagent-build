@@ -58,7 +58,10 @@ export type SeedScenario =
   | 'trial-active'
   | 'trial-expired'
   | 'multi-subject'
-  | 'homework-ready';
+  | 'homework-ready'
+  | 'trial-expired-child'
+  | 'consent-withdrawn'
+  | 'parent-solo';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -707,6 +710,167 @@ async function seedHomeworkReady(
   };
 }
 
+async function seedTrialExpiredChild(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  // Expired subscription — child hits the paywall
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'free',
+    status: 'expired',
+    trialEndsAt: pastDate(3),
+    currentPeriodStart: pastDate(17),
+    currentPeriodEnd: pastDate(3),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: 50,
+    usedThisMonth: 50,
+    cycleResetAt: futureDate(13),
+  });
+
+  // Parent profile (account owner)
+  const parentProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Paywall Parent',
+    personaType: 'PARENT',
+    isOwner: true,
+  });
+
+  // Child profile (non-owner teen)
+  const childProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Paywall Teen',
+    personaType: 'TEEN',
+    isOwner: false,
+  });
+
+  // Family link
+  await db.insert(familyLinks).values({
+    id: generateUUIDv7(),
+    parentProfileId,
+    childProfileId,
+  });
+
+  // Consent for child
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: childProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  // Give child a subject with topics so "Browse Learning Book" has content
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    childProfileId,
+    'Science',
+    'active',
+    4
+  );
+
+  return {
+    scenario: 'trial-expired-child',
+    accountId,
+    profileId: childProfileId,
+    email,
+    password,
+    ids: { parentProfileId, childProfileId, subscriptionId, subjectId },
+  };
+}
+
+async function seedConsentWithdrawn(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  // Parent profile (account owner)
+  const parentProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Withdrawn Parent',
+    personaType: 'PARENT',
+    isOwner: true,
+  });
+
+  // Child profile (non-owner teen) with withdrawn consent
+  const childProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Withdrawn Teen',
+    personaType: 'TEEN',
+    isOwner: false,
+  });
+
+  // Family link
+  await db.insert(familyLinks).values({
+    id: generateUUIDv7(),
+    parentProfileId,
+    childProfileId,
+  });
+
+  // Consent state: WITHDRAWN
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: childProfileId,
+    consentType: 'GDPR',
+    status: 'WITHDRAWN',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  return {
+    scenario: 'consent-withdrawn',
+    accountId,
+    profileId: childProfileId,
+    email,
+    password,
+    ids: { parentProfileId, childProfileId },
+  };
+}
+
+async function seedParentSolo(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  // Solo parent profile — no children, no family links
+  const parentProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Solo Parent',
+    personaType: 'PARENT',
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: parentProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  return {
+    scenario: 'parent-solo',
+    accountId,
+    profileId: parentProfileId,
+    email,
+    password,
+    ids: { parentProfileId },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -721,6 +885,9 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'trial-expired': seedTrialExpired,
   'multi-subject': seedMultiSubject,
   'homework-ready': seedHomeworkReady,
+  'trial-expired-child': seedTrialExpiredChild,
+  'consent-withdrawn': seedConsentWithdrawn,
+  'parent-solo': seedParentSolo,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];

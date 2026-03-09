@@ -1,0 +1,106 @@
+# Flow: Subscription Details — Verify Trial-Active UI Elements
+# Validates: subscription screen renders correctly for a trial-active user,
+# including trial banner, current plan, usage meter, restore purchases,
+# BYOK section, and RevenueCat offerings (optional in emulator).
+# Tags: nightly, billing
+#
+# Journey: UX Journey 5 (Billing & Subscription)
+# Epics: Epic 5 (FR95-FR100), Epic 9 (RevenueCat IAP)
+# Prerequisite: Seeded user on active trial (scenario: trial-active)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - billing
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "trial-active"
+      API_URL: ${API_URL}
+
+# 2. Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 3. Navigate to More tab
+- tapOn:
+    id: "tab-more"
+
+# 4. Wait for More screen
+- extendedWaitUntil:
+    visible:
+      id: "tab-more"
+    timeout: 10000
+
+# 5. Tap Subscription menu item
+- extendedWaitUntil:
+    visible:
+      text: "Subscription"
+    timeout: 10000
+
+- tapOn:
+    text: "Subscription"
+
+# 6. Verify subscription screen loaded
+- extendedWaitUntil:
+    visible:
+      id: "subscription-screen"
+    timeout: 10000
+
+# 7. Verify trial banner text
+- assertVisible:
+    text: "Trial active"
+
+# 8. Screenshot of trial banner
+- takeScreenshot: subscription-details-trial-banner
+
+# 9. Verify current plan section
+- assertVisible:
+    id: "current-plan"
+
+# 10. Verify usage section heading
+- assertVisible:
+    text: "Usage this month"
+
+# 11. Screenshot of plan and usage
+- takeScreenshot: subscription-details-plan-usage
+
+# 12. Scroll down to reveal restore purchases and BYOK
+- scrollUntilVisible:
+    element:
+      id: "restore-purchases-button"
+    direction: DOWN
+    timeout: 10000
+
+# 13. Verify restore purchases button
+- assertVisible:
+    id: "restore-purchases-button"
+
+# 14. Verify BYOK section text
+- scrollUntilVisible:
+    element:
+      text: "Bring your own key (coming soon)"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    text: "Bring your own key (coming soon)"
+
+# 15. Screenshot of restore + BYOK section
+- takeScreenshot: subscription-details-restore-byok
+
+# 16. Verify RevenueCat offerings section (optional — emulator has no store)
+- assertVisible:
+    id: "offerings-section"
+    optional: true
+
+# 17. If no offerings, verify fallback message
+- assertVisible:
+    id: "no-offerings"
+    optional: true
+
+# 18. Final screenshot
+- takeScreenshot: subscription-details-complete

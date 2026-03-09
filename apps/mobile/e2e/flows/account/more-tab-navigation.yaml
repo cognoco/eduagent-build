@@ -1,0 +1,270 @@
+# Flow N10: More Tab Navigation — Verify All Destinations
+# Validates: every link on the More screen navigates to the correct
+# destination and renders expected content. Sign-out is tested last
+# to confirm auth gate reappears.
+# Tags: nightly, account, navigation
+#
+# Journey: UX Journey 5 (Account Management)
+# Epics: Epic 5 (FR101-FR105)
+# Prerequisite: Seeded user with onboarding complete (scenario: onboarding-complete)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - account
+  - navigation
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-complete"
+      API_URL: ${API_URL}
+
+# 2. Verify home screen loaded
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 3. Navigate to More tab
+- tapOn:
+    id: "tab-more"
+
+# 4. Wait for More screen to load
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+- takeScreenshot: more-tab-loaded
+
+# ── Destination 1: Profile ──
+
+# 5. Scroll to Profile row
+- scrollUntilVisible:
+    element:
+      text: "Profile"
+    direction: DOWN
+    timeout: 10000
+
+# 6. Tap Profile
+- tapOn:
+    text: "Profile"
+
+# 7. Wait for profiles screen
+- extendedWaitUntil:
+    visible:
+      id: "profiles-screen"
+    timeout: 10000
+
+- takeScreenshot: nav-profile
+
+# 8. Close profiles modal
+- tapOn:
+    id: "profiles-close"
+
+# 9. Wait for More screen to reappear
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+# ── Destination 2: Subscription ──
+
+# 10. Scroll to Subscription row
+- scrollUntilVisible:
+    element:
+      text: "Subscription"
+    direction: DOWN
+    timeout: 10000
+
+# 11. Tap Subscription
+- tapOn:
+    text: "Subscription"
+
+# 12. Wait for subscription screen or loading indicator
+- extendedWaitUntil:
+    visible:
+      id: "subscription-screen"
+    timeout: 10000
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: "subscription-loading"
+    timeout: 5000
+    optional: true
+
+- takeScreenshot: nav-subscription
+
+# 13. Go back to More
+- back
+
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+# ── Destination 3: Help & Support (no-op) ──
+
+# 14. Scroll to Help & Support
+- scrollUntilVisible:
+    element:
+      text: "Help & Support"
+    direction: DOWN
+    timeout: 10000
+
+# 15. Tap Help & Support (no-op — should stay on More screen)
+- tapOn:
+    text: "Help & Support"
+
+# 16. Verify still on More screen
+- assertVisible:
+    text: "More"
+
+- takeScreenshot: nav-help-noop
+
+# ── Destination 4: Privacy Policy ──
+
+# 17. Scroll to Privacy Policy
+- scrollUntilVisible:
+    element:
+      text: "Privacy Policy"
+    direction: DOWN
+    timeout: 10000
+
+# 18. Tap Privacy Policy
+- tapOn:
+    text: "Privacy Policy"
+
+# 19. Wait for Privacy Policy content to render
+- extendedWaitUntil:
+    visible:
+      text: "Privacy Policy"
+    timeout: 10000
+
+- assertVisible:
+    text: "Who We Are"
+    optional: true
+
+- takeScreenshot: nav-privacy-policy
+
+# 20. Go back to More
+- back
+
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+# ── Destination 5: Terms of Service ──
+
+# 21. Scroll to Terms of Service
+- scrollUntilVisible:
+    element:
+      text: "Terms of Service"
+    direction: DOWN
+    timeout: 10000
+
+# 22. Tap Terms of Service
+- tapOn:
+    text: "Terms of Service"
+
+# 23. Wait for Terms content to render
+- extendedWaitUntil:
+    visible:
+      text: "Terms of Service"
+    timeout: 10000
+
+- assertVisible:
+    text: "Acceptance of Terms"
+    optional: true
+
+- takeScreenshot: nav-terms-of-service
+
+# 24. Go back to More
+- back
+
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+# ── Destination 6: Export my data ──
+
+# 25. Scroll to Export my data
+- scrollUntilVisible:
+    element:
+      text: "Export my data"
+    direction: DOWN
+    timeout: 10000
+
+# 26. Tap Export my data (triggers alert)
+- tapOn:
+    text: "Export my data"
+
+# 27. Dismiss alert if shown (may show success or error)
+- tapOn:
+    text: "OK"
+    optional: true
+
+- takeScreenshot: nav-export-data
+
+# ── Destination 7: Delete account ──
+
+# 28. Scroll to Delete account
+- scrollUntilVisible:
+    element:
+      text: "Delete account"
+    direction: DOWN
+    timeout: 10000
+
+# 29. Tap Delete account
+- tapOn:
+    text: "Delete account"
+
+# 30. Wait for delete account screen
+- extendedWaitUntil:
+    visible:
+      text: "Delete account"
+    timeout: 10000
+
+# 31. Verify confirm and cancel buttons are present
+- assertVisible:
+    id: "delete-account-confirm"
+
+- assertVisible:
+    id: "delete-account-cancel"
+
+- takeScreenshot: nav-delete-account
+
+# 32. Tap cancel to go back
+- tapOn:
+    id: "delete-account-cancel"
+
+# 33. Wait for More screen
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+# ── Destination 8: Sign Out (LAST) ──
+
+# 34. Scroll to Sign out button
+- scrollUntilVisible:
+    element:
+      id: "sign-out-button"
+    direction: DOWN
+    timeout: 10000
+
+# 35. Tap Sign out
+- tapOn:
+    id: "sign-out-button"
+
+# 36. Verify auth gate reappears
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 15000
+
+- takeScreenshot: nav-signed-out
