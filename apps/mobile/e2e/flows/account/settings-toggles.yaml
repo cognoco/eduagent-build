@@ -101,6 +101,17 @@ tags:
       text: "Appearance"
     timeout: 10000
 
+# 10. Restore Eager Learner persona — accent presets are persona-specific:
+# teen has violet/electric/hotpink, eager-learner has indigo/teal/rose.
+# The accent tests below use eager-learner preset IDs.
+- tapOn:
+    text: "Eager Learner (Calm)"
+
+- extendedWaitUntil:
+    visible:
+      text: "Appearance"
+    timeout: 10000
+
 # ── Accent Color section ──
 
 # 9. Scroll to Accent Color picker
