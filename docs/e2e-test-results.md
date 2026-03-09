@@ -1,6 +1,6 @@
 # E2E Test Results — Dev-Client on Android Emulator
 
-**Date:** 2026-03-08
+**Date:** 2026-03-08 (updated 2026-03-09)
 **Environment:** Windows 11 + WHPX emulator (New_Device, API 34, 1080x1920)
 **Build:** Dev-client APK built in WSL2 with expo-dev-client@~6.0.20
 **Metro:** Windows, `unstable_serverRoot: monorepoRoot`
@@ -15,9 +15,15 @@
 | 1 | `app-launch-devclient.yaml` | PASS | 8 | Dev-client launcher → server connect → bundle load → sign-in verified |
 | 2 | `auth/sign-in-navigation-devclient.yaml` | PASS | 31 | All 3 auth screens + round-trip navigation verified |
 | 3 | `auth/forgot-password-devclient.yaml` | PASS | 19 | Forgot-password screen, email entry, submit, back to sign-in |
-| 4 | `auth/sign-in-validation-devclient.yaml` | PASS | 21 | Empty submit, email-only submit, password toggle, sign-up link |
+| 4 | `auth/sign-in-validation-devclient.yaml` | PASS | 22 | Empty submit, email-only submit, password toggle (testID found), sign-up link |
+| 5 | `auth/sign-up-screen-devclient.yaml` | PASS | 25 | SSO buttons, form fields, password requirements, Terms/Privacy, scroll to bottom |
 
-**Total: 4 flows, 79 assertions, all PASS**
+**Total: 5 flows, 105 assertions, all PASS**
+
+### Session 2 (2026-03-09) — via bundle proxy (BUG-7 workaround)
+
+Re-ran all dev-client test flows through the bundle proxy (port 8082). Flows 2-5 confirmed passing.
+Bundle proxy required because BUG-7 (OkHttp chunked encoding error) became 100% reproducible.
 
 ---
 
@@ -66,6 +72,33 @@
 **Impact:** Any E2E flow that calls `hideKeyboard` without a preceding text input (or after the keyboard was already dismissed) will break by navigating away from the expected screen.
 **Workaround:** Never call `hideKeyboard` unless text was just entered. Never call it twice in a row. Document this in all flows with a comment.
 
+### BUG-7: OkHttp chunked encoding error blocks bundle download (Windows)
+
+**Severity:** High (blocks all E2E testing without workaround)
+**What:** Metro on Windows sends multipart/chunked HTTP responses for bundle downloads. OkHttp's `MultipartStreamReader` fails to parse the chunked transfer encoding with:
+```
+java.net.ProtocolException: Expected leading [0-9a-fA-F] character but was 0xd
+```
+The `0xd` byte is a carriage return (`\r`). The error occurs in `Http1ExchangeCodec$ChunkedSource.readChunkSize()` when reading the chunk-size line of a chunked transfer-encoded response.
+**Observed in:** Every bundle download attempt from Metro on Windows to the Android emulator via the dev-client's `BundleDownloader.kt`. 100% reproducible after Metro restart.
+**Root cause:** Metro's multipart streaming response (used for progress updates during bundling) contains chunked transfer encoding that OkHttp cannot parse. The dev-client sends `Accept: multipart/mixed` (line 88 of `BundleDownloader.kt`), which triggers Metro's multipart response mode. The issue is specific to Metro running on Windows — `curl` from the host fetches the bundle correctly, but the emulator's OkHttp client fails.
+**Workaround:** A Node.js proxy (`e2e/bundle-proxy.js`) that strips the `Accept: multipart/mixed` header, causing Metro to respond with a plain (non-multipart) bundle. The proxy listens on port 8082, forwards to Metro on 8081. Configure `adb reverse tcp:8082 tcp:8082` and connect the dev-client to `http://10.0.2.2:8082`.
+**Impact on E2E:** Without the proxy, the app shows "Bundling 100.0%" indefinitely — the bundle download fails silently and the app never loads. With the proxy, bundle loading works reliably.
+
+### BUG-8: Dev-client launcher text not in Maestro accessibility tree
+
+**Severity:** Low (testing infrastructure only)
+**What:** When the app is launched manually via `adb shell am start`, Maestro's `hierarchy` command shows no text elements from the dev-client launcher (e.g., "http://10.0.2.2:8081" is not found). However, when launched via Maestro's own `launchApp` command, the same text IS visible and tappable.
+**Root cause:** Maestro's `launchApp` performs additional accessibility setup beyond `adb am start`. Without this setup, the dev-client launcher's React Native views don't expose their text to Maestro's accessibility queries.
+**Workaround:** Always use Maestro's `launchApp` command, not manual `adb shell am start`, when Maestro needs to interact with the launcher.
+
+### BUG-9: Sign-up screen "Already have an account?" text includes trailing space
+
+**Severity:** Low (testing only)
+**What:** The JSX `Already have an account?{' '}` renders with a trailing space that becomes part of the accessibility text (`"Already have an account? "`). Maestro's exact text matching fails if the assertion doesn't include the trailing space.
+**Root cause:** React Native's `<Text>` component concatenates `{' '}` spacers into the parent text node's value, which is then exposed to accessibility.
+**Workaround:** Include the trailing space in Maestro assertions: `assertVisible: "Already have an account? "`.
+
 ### BUG-6: Stale `appId` in `onboarding/sign-up-flow.yaml`
 
 **Severity:** Low (test file only)
@@ -93,6 +126,7 @@ The committed E2E flows use `launchApp: clearState: true` which resets the dev-c
 - `auth/sign-in-navigation-devclient.yaml` — auth screen navigation
 - `auth/forgot-password-devclient.yaml` — forgot password flow
 - `auth/sign-in-validation-devclient.yaml` — form validation edge cases
+- `auth/sign-up-screen-devclient.yaml` — sign-up screen rendering + password requirements
 
 Remaining flows (behind auth gate) need API + seed data to test.
 
@@ -106,6 +140,17 @@ All existing flow timeouts (5-15s) are insufficient for the WHPX emulator. For d
 ### P-4: Fix KeyboardAvoidingView on Android (BUG-3)
 
 The `behavior={undefined}` on Android in all auth screens should be changed. This is a real user-facing UX bug — users would need to manually dismiss the keyboard to reach submit buttons. Priority: Medium (should be fixed before release).
+
+### P-6: Bundle proxy for Windows E2E testing (DONE)
+
+Created `e2e/bundle-proxy.js` — a Node.js proxy that strips multipart/chunked encoding from Metro's responses, working around BUG-7. Usage:
+1. Start Metro: `pnpm exec expo start`
+2. Start proxy: `node e2e/bundle-proxy.js` (listens on port 8082)
+3. Forward port: `adb reverse tcp:8082 tcp:8082`
+4. In dev-client launcher, add server `http://10.0.2.2:8082`
+5. Connect — bundle loads reliably without chunked encoding errors
+
+The proxy is only needed on Windows. On macOS/Linux, Metro's multipart responses work correctly with OkHttp.
 
 ### P-5: Add `hideKeyboard` guidelines to E2E conventions
 
@@ -126,3 +171,8 @@ Document the BUG-5 behavior in a conventions file:
 - **Screenshot PNGs** — Maestro saves screenshots in the flow's working directory (project root). These should be `.gitignore`d
 - **State persistence** — React state (typed email/password) persists between Maestro flows within the same app session. Flows should not assume clean fields
 - **Dev menu timing** — The dev menu overlay appears during/after bundle load and blocks Maestro element queries. The `launch-devclient.yaml` flow handles this by waiting for "Continue" button
+- **Bundle proxy** — Required on Windows due to BUG-7 (OkHttp chunked encoding error). Start `node e2e/bundle-proxy.js` on port 8082, connect dev-client to `http://10.0.2.2:8082`. Without the proxy, bundle downloads fail 100% of the time.
+- **Maestro `launchApp` required** — For Maestro to see dev-client launcher text, the app must be launched via Maestro's `launchApp`, not `adb shell am start` (BUG-8). Use `launchApp` in setup flows.
+- **Trailing spaces in JSX** — React Native `{' '}` spacers become part of the accessibility text. Maestro assertions must include them (BUG-9).
+- **Sign-up screen scroll** — The sign-up screen's "Already have an account?" link is below the fold. E2E flows must `scroll` before asserting bottom elements.
+- **TEMP/TMP override** — Maestro on Windows requires `TEMP=C:/tools/tmp TMP=C:/tools/tmp` to avoid Unicode path issues with jansi native library (Windows username contains `č`).

@@ -1,0 +1,87 @@
+# Sign-up screen rendering — dev-client variant
+# Tests that all sign-up screen elements render correctly.
+# Does NOT relaunch app (assumes app is already on sign-in screen).
+appId: com.mentomate.app
+tags:
+  - devclient
+  - auth
+---
+# ── Navigate to sign-up ─────────────────────────────────────────────
+
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 10000
+
+- tapOn:
+    id: "sign-up-link"
+
+- extendedWaitUntil:
+    visible:
+      text: "Create account"
+    timeout: 10000
+
+# ── Verify all sign-up screen elements ──────────────────────────────
+
+- assertVisible: "Start your learning journey"
+
+# SSO buttons (sign-up screen uses sign-up-google-sso, not google-sso-button)
+- assertVisible:
+    id: "sign-up-google-sso"
+    optional: true
+- assertVisible: "Continue with Google"
+- assertVisible: "Continue with Apple"
+
+# Divider
+- assertVisible: "or continue with email"
+
+# Form fields
+- assertVisible:
+    id: "sign-up-email"
+- assertVisible:
+    id: "sign-up-password"
+
+# Password requirements hint
+- assertVisible: "At least 8 characters"
+
+# Submit button
+- assertVisible:
+    id: "sign-up-button"
+
+# Terms & Privacy links
+- assertVisible: "Terms of Service"
+- assertVisible: "Privacy Policy"
+
+# Scroll down to reveal bottom elements (Terms, Privacy, sign-in link)
+- scroll
+
+# Navigation back to sign-in
+# Note: trailing space from JSX {' '} spacer — must include it for exact match
+- assertVisible: "Already have an account? "
+- assertVisible:
+    id: "sign-in-link"
+
+- takeScreenshot: sign-up-screen-full
+
+# ── Test password requirements indicator ────────────────────────────
+
+- tapOn:
+    id: "sign-up-password"
+- inputText: "short"
+
+- hideKeyboard
+
+# "At least 8 characters" should still be visible (unmet requirement)
+- assertVisible: "At least 8 characters"
+
+- takeScreenshot: sign-up-password-short
+
+# ── Navigate back to sign-in ────────────────────────────────────────
+
+- tapOn:
+    id: "sign-in-link"
+
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 10000
