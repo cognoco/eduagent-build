@@ -1,0 +1,10 @@
+# Tap the Metro server entry on the dev-client launcher.
+# Tries both 8081 (direct Metro) and 8082 (bundle proxy).
+appId: com.mentomate.app
+---
+- tapOn:
+    text: "http://10.0.2.2:8081"
+    optional: true
+- tapOn:
+    text: "http://10.0.2.2:8082"
+    optional: true

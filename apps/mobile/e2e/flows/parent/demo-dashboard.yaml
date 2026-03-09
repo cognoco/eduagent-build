@@ -33,12 +33,8 @@ tags:
       SEED_SCENARIO: "parent-solo"
       API_URL: ${API_URL}
 
-# 2. Wait for parent dashboard — the setup flow may have timed out on
-#    "home-scroll-view" since parent uses "dashboard-scroll"
-- extendedWaitUntil:
-    visible:
-      id: "dashboard-scroll"
-    timeout: 20000
+# 2. Switch to parent persona (seed-and-sign-in lands on learner home)
+- runFlow: ../_setup/switch-to-parent.yaml
 
 # 3. Verify "Home" heading on parent dashboard
 - assertVisible:

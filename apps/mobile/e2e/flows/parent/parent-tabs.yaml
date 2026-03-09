@@ -20,11 +20,8 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Wait for parent dashboard (default tab: Home)
-- extendedWaitUntil:
-    visible:
-      id: "dashboard-scroll"
-    timeout: 15000
+# 2. Switch to parent persona (seed-and-sign-in lands on learner home)
+- runFlow: ../_setup/switch-to-parent.yaml
 
 # 3. Verify "Home" heading on dashboard
 - assertVisible:
@@ -61,9 +58,12 @@ tags:
       text: "More"
     timeout: 10000
 
-# 10. Verify sign-out button is present
-- assertVisible:
-    id: "sign-out-button"
+# 10. Scroll to sign-out button (may be below the fold)
+- scrollUntilVisible:
+    element:
+      id: "sign-out-button"
+    direction: DOWN
+    timeout: 10000
 
 # 11. Verify appearance section
 - assertVisible:

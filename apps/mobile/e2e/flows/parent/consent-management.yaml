@@ -30,11 +30,8 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Wait for parent dashboard
-- extendedWaitUntil:
-    visible:
-      id: "dashboard-scroll"
-    timeout: 15000
+# 2. Switch to parent persona (seed-and-sign-in lands on learner home)
+- runFlow: ../_setup/switch-to-parent.yaml
 
 # 3. Tap child card to navigate to child detail
 - tapOn:

@@ -1,21 +1,20 @@
 # Launch dev-client and connect to Metro
-# Uses clearState: true so the launcher always shows.
+# BUG-19: clearState moved to seed-and-run.sh (Maestro clearState unreliable).
+# Assumes app state was already cleared via ADB by the caller script.
 # Handles dev menu overlay (always appears on bundle load — BUG-2).
 # For WHPX emulator: bundle loading takes 2-5 minutes.
 appId: com.mentomate.app
 ---
-- launchApp:
-    clearState: true
+- launchApp
 
 # With clearState, the dev-client launcher always shows.
 # Wait for the server entry and tap it to start bundle loading.
-# Port 8082 = bundle proxy (BUG-7 workaround for OkHttp chunked encoding).
-# For direct Metro connection, change to 8081.
+# METRO_URL is set by seed-and-run.sh (default: http://10.0.2.2:8081).
 - extendedWaitUntil:
-    visible: "http://10.0.2.2:8082"
+    visible: ${METRO_URL}
     timeout: 60000
 
-- tapOn: "http://10.0.2.2:8082"
+- tapOn: ${METRO_URL}
 
 # The dev menu overlay ALWAYS appears after bundle load and BLOCKS
 # Maestro from seeing elements behind it. Wait for the "Continue"

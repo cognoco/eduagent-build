@@ -38,11 +38,10 @@ tags:
       text: "Appearance"
     timeout: 10000
 
-# ── Theme section ──
-# BUG-17: Parent theme redirects to /(parent)/dashboard. Test order:
-#   1. Teen (Dark) — stays in learner route group
-#   2. Eager Learner (Calm) — stays in learner route group (reset)
-#   3. Parent (Light) — last, with redirect + switch-back handling
+# ── Theme section (learner-safe themes only) ──
+# BUG-17: Parent theme redirects to /(parent)/dashboard.
+# BUG-18: switch-to-teen can crash the app (navigation race condition).
+# Test Teen ↔ Eager Learner here. Parent theme tested last (step 21).
 
 - takeScreenshot: settings-initial
 
@@ -58,7 +57,7 @@ tags:
       text: "Appearance"
     timeout: 10000
 
-# 6. Tap "Eager Learner (Calm)" theme (reset to default)
+# 6. Tap "Eager Learner (Calm)" theme (reset to default for accent tests)
 - tapOn:
     text: "Eager Learner (Calm)"
 
@@ -70,7 +69,100 @@ tags:
       text: "Appearance"
     timeout: 10000
 
-# 7. Tap "Parent (Light)" — triggers redirect to parent dashboard (BUG-17)
+# ── Accent Color section ──
+# Accent presets are persona-specific: eager-learner has indigo/teal/rose.
+# We're already on Eager Learner from step 6.
+
+# 7. Scroll to Accent Color picker
+- scrollUntilVisible:
+    element:
+      text: "Accent Color"
+    direction: DOWN
+    timeout: 10000
+
+# 8. Tap teal accent swatch
+- tapOn:
+    id: "accent-swatch-teal"
+
+- takeScreenshot: settings-accent-teal
+
+# 9. Tap rose accent swatch
+- tapOn:
+    id: "accent-swatch-rose"
+
+- takeScreenshot: settings-accent-rose
+
+# 10. Tap indigo accent swatch (reset to default)
+- tapOn:
+    id: "accent-swatch-indigo"
+
+- takeScreenshot: settings-accent-indigo
+
+# ── Notifications section ──
+
+# 11. Scroll to Notifications section
+- scrollUntilVisible:
+    element:
+      text: "Notifications"
+    direction: DOWN
+    timeout: 10000
+
+# 12. Tap "Push notifications" toggle (toggle on)
+- tapOn:
+    text: "Push notifications"
+
+- takeScreenshot: settings-push-toggled
+
+# 13. Tap "Push notifications" toggle again (toggle off)
+- tapOn:
+    text: "Push notifications"
+
+# 14. Tap "Weekly progress digest" toggle (toggle on)
+- tapOn:
+    text: "Weekly progress digest"
+
+- takeScreenshot: settings-digest-toggled
+
+# 15. Tap "Weekly progress digest" toggle again (toggle off)
+- tapOn:
+    text: "Weekly progress digest"
+
+- takeScreenshot: settings-notifications-reset
+
+# ── Learning Mode section ──
+
+# 16. Scroll until the Casual Explorer radio button is visible
+- scrollUntilVisible:
+    element:
+      id: "learning-mode-casual"
+    direction: DOWN
+    timeout: 10000
+
+# 17. Tap Casual Explorer mode
+- tapOn:
+    id: "learning-mode-casual"
+
+- takeScreenshot: settings-mode-casual
+
+# 18. Tap Serious Learner mode (reset)
+- tapOn:
+    id: "learning-mode-serious"
+
+- takeScreenshot: settings-mode-serious
+
+# 19. Scroll back to top for Parent theme test
+- scrollUntilVisible:
+    element:
+      text: "Appearance"
+    direction: UP
+    timeout: 10000
+
+# ── Parent theme test (last — may crash the app via BUG-18) ──
+# BUG-17: Tapping Parent (Light) redirects to /(parent)/dashboard.
+# BUG-18: switch-to-teen crashes ~50% of the time. Placed last so
+# the core settings validations above are already captured.
+
+# 20. Tap "Parent (Light)" — triggers redirect to parent dashboard
 - tapOn:
     text: "Parent (Light)"
 
@@ -82,114 +174,15 @@ tags:
 
 - takeScreenshot: settings-theme-parent-redirect
 
-# 8. Switch back to Teen via dev-only button on parent dashboard
+# 21. Switch back to Teen via dev-only button on parent dashboard
 - tapOn:
     id: "switch-to-teen"
 
-# Wait for learner home screen
+# Wait for learner home screen — extra time for persona switch navigation
 - extendedWaitUntil:
     visible:
       id: "home-scroll-view"
-    timeout: 15000
+    timeout: 30000
 
-# 9. Return to More tab to continue testing other sections
-- tapOn:
-    text: "More"
-
-- extendedWaitUntil:
-    visible:
-      text: "Appearance"
-    timeout: 10000
-
-# 10. Restore Eager Learner persona — accent presets are persona-specific:
-# teen has violet/electric/hotpink, eager-learner has indigo/teal/rose.
-# The accent tests below use eager-learner preset IDs.
-- tapOn:
-    text: "Eager Learner (Calm)"
-
-- extendedWaitUntil:
-    visible:
-      text: "Appearance"
-    timeout: 10000
-
-# ── Accent Color section ──
-
-# 9. Scroll to Accent Color picker
-- scrollUntilVisible:
-    element:
-      text: "Accent Color"
-    direction: DOWN
-    timeout: 10000
-
-# 10. Tap teal accent swatch
-- tapOn:
-    id: "accent-swatch-teal"
-
-- takeScreenshot: settings-accent-teal
-
-# 11. Tap rose accent swatch
-- tapOn:
-    id: "accent-swatch-rose"
-
-- takeScreenshot: settings-accent-rose
-
-# 12. Tap indigo accent swatch (reset to default)
-- tapOn:
-    id: "accent-swatch-indigo"
-
-- takeScreenshot: settings-accent-indigo
-
-# ── Notifications section ──
-
-# 13. Scroll to Notifications section
-- scrollUntilVisible:
-    element:
-      text: "Notifications"
-    direction: DOWN
-    timeout: 10000
-
-# 14. Tap "Push notifications" toggle (toggle on)
-- tapOn:
-    text: "Push notifications"
-
-- takeScreenshot: settings-push-toggled
-
-# 15. Tap "Push notifications" toggle again (toggle off)
-- tapOn:
-    text: "Push notifications"
-
-# 16. Tap "Weekly progress digest" toggle (toggle on)
-- tapOn:
-    text: "Weekly progress digest"
-
-- takeScreenshot: settings-digest-toggled
-
-# 17. Tap "Weekly progress digest" toggle again (toggle off)
-- tapOn:
-    text: "Weekly progress digest"
-
-- takeScreenshot: settings-notifications-reset
-
-# ── Learning Mode section ──
-
-# 18. Scroll to Learning Mode section
-- scrollUntilVisible:
-    element:
-      text: "Learning Mode"
-    direction: DOWN
-    timeout: 10000
-
-# 19. Tap Casual Explorer mode
-- tapOn:
-    id: "learning-mode-casual"
-
-- takeScreenshot: settings-mode-casual
-
-# 20. Tap Serious Learner mode (reset)
-- tapOn:
-    id: "learning-mode-serious"
-
-- takeScreenshot: settings-mode-serious
-
-# 21. Final screenshot — settings fully exercised
+# 22. Final screenshot — all settings fully exercised
 - takeScreenshot: settings-toggles-complete

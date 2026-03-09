@@ -16,17 +16,17 @@ tags:
 # PHASE 1: Sign In
 # ═══════════════════════════════════════════════════════════════════
 
-# Clear state to reset auth tokens, ensuring we start on sign-in screen.
-# This also resets the dev-client — need to reconnect to Metro.
-- launchApp:
-    clearState: true
+# BUG-19: clearState moved to seed-and-run.sh (Maestro clearState unreliable).
+# App state already cleared via ADB before Maestro starts.
+- launchApp
 
 # Dev-client launcher: wait for server entry and tap it
+# METRO_URL is set by seed-and-run.sh (default: http://10.0.2.2:8081).
 - extendedWaitUntil:
-    visible: "http://10.0.2.2:8082"
+    visible: ${METRO_URL}
     timeout: 60000
 
-- tapOn: "http://10.0.2.2:8082"
+- tapOn: ${METRO_URL}
 
 # Dev menu overlay always appears after bundle load (BUG-2) — dismiss it
 - extendedWaitUntil:

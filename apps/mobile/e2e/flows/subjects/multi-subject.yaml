@@ -25,10 +25,11 @@ tags:
       id: "home-scroll-view"
     timeout: 15000
 
-# 3. Navigate to Learning Book tab (BUG-15: use text, not testID)
-# Note: There is no separate "subjects" tab — subjects are in Learning Book
+# 3. Navigate to Learning Book tab
+# BUG-15: tabBarTestID doesn't propagate on Android.
+# "Learning Book" text may wrap to 2 lines. Use point tap on center-bottom tab.
 - tapOn:
-    text: "Learning Book"
+    point: "50%,97%"
 
 # 4. Wait for subjects list to load
 - extendedWaitUntil:

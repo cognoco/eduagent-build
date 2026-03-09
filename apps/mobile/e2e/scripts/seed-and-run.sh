@@ -17,6 +17,8 @@
 #   API_URL       — API base URL (default: http://localhost:8787)
 #   EMAIL         — Test user email (default: test-e2e@example.com)
 #   MAESTRO_PATH  — Path to maestro binary (default: /c/tools/maestro/bin/maestro)
+#   METRO_URL     — Metro server URL for dev-client (default: http://10.0.2.2:8081)
+#                   Use http://10.0.2.2:8082 for bundle proxy (BUG-7 workaround)
 #
 # Prerequisites:
 #   - API server running at API_URL
@@ -36,10 +38,34 @@ EXTRA_ARGS=("$@")
 API_URL="${API_URL:-http://localhost:8787}"
 EMAIL="${EMAIL:-test-e2e@example.com}"
 MAESTRO="${MAESTRO_PATH:-/c/tools/maestro/bin/maestro}"
+METRO_URL="${METRO_URL:-http://10.0.2.2:8081}"
+ADB="${ADB_PATH:-/c/Android/Sdk/platform-tools/adb.exe}"
+APP_ID="com.mentomate.app"
 
 # ── Ensure TEMP/TMP are set (Maestro needs ASCII paths on Windows) ──
 export TEMP="${TEMP:-C:\\tools\\tmp}"
 export TMP="${TMP:-C:\\tools\\tmp}"
+
+# ── Detect target device from --udid in extra args ──
+DEVICE_FLAG=""
+for i in "${!EXTRA_ARGS[@]}"; do
+  if [[ "${EXTRA_ARGS[$i]}" == "--udid" ]] && [ $((i+1)) -lt ${#EXTRA_ARGS[@]} ]; then
+    DEVICE_FLAG="-s ${EXTRA_ARGS[$((i+1))]}"
+    break
+  fi
+done
+
+# ── Pre-step: Clear state + launch app via ADB (BUG-19) ──
+# Maestro's launchApp (with or without clearState) fails intermittently on
+# WHPX emulators, especially with concurrent sessions. Workaround: clear state
+# and launch the app ourselves via ADB, then have Maestro start from
+# the dev-client launcher screen (no launchApp step in flows).
+echo "[seed-and-run] Clearing app state and launching via ADB ..."
+$ADB $DEVICE_FLAG shell am force-stop "$APP_ID" 2>/dev/null || true
+$ADB $DEVICE_FLAG shell pm clear "$APP_ID" 2>/dev/null || true
+sleep 2
+$ADB $DEVICE_FLAG shell am start -n "$APP_ID/.MainActivity" 2>/dev/null || true
+sleep 3
 
 # ── Step 1: Seed via API ──
 echo "[seed-and-run] Seeding scenario='${SCENARIO}' email='${EMAIL}' ..."
@@ -79,6 +105,7 @@ MAESTRO_ENV_ARGS=(
   -e "PROFILE_ID=${SEED_PROFILE_ID}"
   -e "SCENARIO=${SCENARIO}"
   -e "API_URL=${API_URL}"
+  -e "METRO_URL=${METRO_URL}"
 )
 
 # Add scenario-specific IDs as env vars (e.g., -e SUBJECT_ID=xxx -e TOPIC_ID=yyy)
