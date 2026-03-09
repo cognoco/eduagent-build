@@ -27,13 +27,15 @@ tags:
     timeout: 15000
 
 # 3. Navigate to More tab
+# BUG-15: tabBarTestID doesn't propagate to Android resource-id.
+# Use text matching instead.
 - tapOn:
-    id: "tab-more"
+    text: "More"
 
-# 4. Wait for More screen to load
+# 4. Wait for More screen to load (Appearance section confirms we're on settings)
 - extendedWaitUntil:
     visible:
-      text: "More"
+      text: "Appearance"
     timeout: 10000
 
 # ── Theme section ──

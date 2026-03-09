@@ -1,0 +1,5 @@
+# Helper: dismiss a dev tools bottom sheet by pressing BACK.
+# Called conditionally from seed-and-sign-in.yaml when the sheet is detected.
+appId: com.mentomate.app
+---
+- pressKey: back

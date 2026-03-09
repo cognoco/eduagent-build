@@ -36,8 +36,12 @@ tags:
 - tapOn: "Continue"
 
 # A second dev tools sheet may appear (MentoMate, Connected to, Reload, etc.)
-# Press BACK to dismiss any overlay. On the sign-in screen (root), BACK is safe.
-- pressKey: back
+# Only press BACK if the sheet is visible — otherwise BACK exits the app
+# since the sign-in screen is the navigation root (BUG-14).
+- runFlow:
+    when:
+      visible: "Reload"
+    file: _setup/dismiss-devtools.yaml
 
 # Now sign-in screen should be visible
 - extendedWaitUntil:

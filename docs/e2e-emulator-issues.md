@@ -1108,16 +1108,21 @@ Line 14: `const scenario = __maestro.env['SCENARIO'] || 'onboarding-complete';`
 - The DB idempotent seeding works — `seedScenario()` deletes existing data before inserting.
 - The comprehensive flow (`post-auth-comprehensive-devclient.yaml`) works with hardcoded credentials (65/65 steps passing).
 
-**Impact:** 38 flows depend on `seed-and-sign-in.yaml` → `seed.js`. All 38 are blocked until the `runScript` env vars are resolved. The 8 standalone auth flows (no seeding) and the 1 comprehensive flow (hardcoded) are unaffected.
+**Impact:** 38 flows depend on `seed-and-sign-in.yaml` → `seed.js`. All 38 were blocked until the shell wrapper workaround was built.
 
-### How the seeding chain works
+### Workaround: Shell wrapper (`seed-and-run.sh`) — WORKING
 
-The E2E seed infrastructure has 4 layers. Layers 1-3 are working. Layer 4 (Maestro→JS bridge) is broken.
+**Date:** 2026-03-09
+
+The `runScript` + GraalJS bridge is bypassed entirely. Instead, a shell wrapper script (`apps/mobile/e2e/scripts/seed-and-run.sh`) handles seeding via `curl` + `node` (for JSON parsing) on the host machine, then passes credentials to Maestro via `-e` CLI env vars.
+
+**New architecture (3 layers, GraalJS bypassed):**
 
 ```
-Layer 4: Maestro flow (YAML)          ← BROKEN: runScript env vars
-  calls ↓
-Layer 3: seed.js (GraalJS script)     ← Written, not testable
+Layer 3: seed-and-run.sh (bash)       ← NEW: replaces broken GraalJS bridge
+  1. curl -X POST /v1/__test/seed → JSON response
+  2. node -e "..." → parse email, password, accountId, etc.
+  3. maestro test -e EMAIL=... -e PASSWORD=... <flow-file>
   calls ↓
 Layer 2: API endpoint                  ← WORKING (verified via curl)
   POST /v1/__test/seed { scenario, email }
@@ -1130,6 +1135,32 @@ Layer 1: test-seed.ts service          ← WORKING (321 tests pass)
   - Runs scenario seeder (creates account, profile, subjects, sessions, etc.)
   - Returns all IDs + password to caller
 ```
+
+**Updated `seed-and-sign-in.yaml`:**
+- Removed `runScript` step entirely (seeding is done by the shell wrapper before Maestro starts)
+- Changed `${output.email}` → `${EMAIL}` and `${output.password}` → `${PASSWORD}` (now read from Maestro CLI env vars)
+- Flow now only handles: app launch → dev-client connection → sign-in → home screen verification
+
+**Usage:**
+```bash
+cd apps/mobile/e2e
+TEMP='C:\tools\tmp' TMP='C:\tools\tmp' ./scripts/seed-and-run.sh <scenario> <flow-file>
+
+# Examples:
+./scripts/seed-and-run.sh onboarding-complete flows/account/settings-toggles.yaml
+./scripts/seed-and-run.sh learning-active flows/learning/core-learning.yaml
+./scripts/seed-and-run.sh retention-due flows/retention/recall-review.yaml
+```
+
+**Verified working (2026-03-09):**
+- Seeding via curl → JSON parsing → credential extraction: works
+- Maestro receives `${EMAIL}` and `${PASSWORD}` via `-e` flags: works
+- `seed-and-sign-in.yaml` sub-flow: all 16 steps pass (launch → Metro → dev menu → sign-in → home)
+- Conditional dev tools sheet dismissal (BUG-14 fix): works
+
+### Previous seeding architecture (for reference)
+
+The original design had 4 layers. Layer 3 (seed.js) is now bypassed by the shell wrapper.
 
 **Layer 1 — `apps/api/src/services/test-seed.ts`** (working):
 - 12 seed scenarios implemented: `onboarding-complete`, `learning-active`, `retention-due`, `failed-recall-3x`, `parent-with-children`, `trial-active`, `trial-expired`, `multi-subject`, `homework-ready`, `trial-expired-child`, `consent-withdrawn`, `parent-solo`
@@ -1144,23 +1175,23 @@ Layer 1: test-seed.ts service          ← WORKING (321 tests pass)
 - Returns `{ scenario, accountId, profileId, email, password, ids: { subjectId, topicId, ... } }`
 - Verified working: `curl -X POST http://localhost:8787/v1/__test/seed -H "Content-Type: application/json" -d '{"scenario":"onboarding-complete"}'` returns 201 with full response
 
-**Layer 3 — `apps/mobile/e2e/scripts/seed.js`** (written, not testable):
-- Runs in Maestro's GraalJS engine (no Node.js, no `require`)
+**Layer 3 — `apps/mobile/e2e/scripts/seed.js`** (bypassed):
+- Originally ran in Maestro's GraalJS engine — now **bypassed** by `seed-and-run.sh`
+- Kept for reference but not used in the current architecture
 - Reads env vars via `__maestro.env['SCENARIO']` and `__maestro.env['API_URL']`
-- Calls `http.post()` (Maestro built-in) to hit the seed endpoint
-- Sets `output.email`, `output.password`, `output.accountId`, `output.profileId` + all scenario IDs
-- **Cannot be tested** because `__maestro` is undefined (this issue)
+- Cannot work because `__maestro` is undefined when called from `runFlow` sub-flow
 
-**Layer 4 — `apps/mobile/e2e/flows/_setup/seed-and-sign-in.yaml`** (written, not testable):
-- Called by 38 flows via `runFlow: _setup/seed-and-sign-in.yaml` with `env: { SEED_SCENARIO, API_URL }`
-- Step 1: `runScript` → seed.js (seeds API + Clerk)
-- Step 2: `launchApp: clearState: true`
-- Steps 3-4: Dev-client launcher + dev menu overlay handling
-- Steps 5-7: Sign in with `${output.email}` / `${output.password}` from seed.js
-- Step 8: Wait for `home-scroll-view` (auth complete)
-- **Cannot be tested** because seed.js crashes (this issue)
+**Layer 4 — `apps/mobile/e2e/flows/_setup/seed-and-sign-in.yaml`** (working):
+- Called by 33 flows via `runFlow: _setup/seed-and-sign-in.yaml`
+- `runScript` step removed — seeding done by `seed-and-run.sh` before Maestro starts
+- Reads `${EMAIL}` / `${PASSWORD}` from Maestro CLI env vars (set by wrapper's `-e` flags)
+- Step 1: `launchApp: clearState: true`
+- Steps 2-3: Dev-client launcher + conditional dev menu overlay handling
+- Steps 4-5: Sign in with `${EMAIL}` / `${PASSWORD}`
+- Step 6: Wait for `home-scroll-view` (auth complete)
+- **Verified working** (2026-03-09): all 16 steps pass
 
-**Changes made to the seed infrastructure (working at the API level, blocked at the Maestro level):**
+**Changes made to the seed infrastructure:**
 
 | File | Change | Status |
 |------|--------|--------|
@@ -1168,8 +1199,9 @@ Layer 1: test-seed.ts service          ← WORKING (321 tests pass)
 | `apps/api/src/services/test-seed.ts` | Idempotent DB seeding (deletes existing account before insert) | Working |
 | `apps/api/src/services/test-seed.ts` | PATCH password + `bypass_client_trust` after user creation | Working |
 | `apps/api/src/services/test-seed.ts` | Password changed to `Mentomate2026xK` (non-breached, no special chars) | Working |
-| `apps/mobile/e2e/scripts/seed.js` | Added `output.password` export, fixed default email | Not testable (blocked by `__maestro` issue) |
-| `apps/mobile/e2e/flows/_setup/seed-and-sign-in.yaml` | Dev-client launcher, keyboard dismiss, dynamic password | Not testable (blocked by `__maestro` issue) |
+| `apps/mobile/e2e/scripts/seed-and-run.sh` | Shell wrapper: curl + node JSON parsing + Maestro `-e` flags | **Working** |
+| `apps/mobile/e2e/flows/_setup/seed-and-sign-in.yaml` | Removed runScript, uses `${EMAIL}`/`${PASSWORD}` from CLI env vars | **Working** |
+| `apps/mobile/e2e/flows/_setup/dismiss-devtools.yaml` | Helper flow: `pressKey: back` (called conditionally) | **Working** |
 | `apps/mobile/e2e/flows/_setup/launch-devclient.yaml` | Port 8082, `pressKey: back` for dev tools sheet | Updated |
 | `apps/mobile/e2e/flows/_setup/connect-server.yaml` | Port 8082, `pressKey: back` for dev tools sheet | Updated |
 
@@ -1179,6 +1211,30 @@ Layer 1: test-seed.ts service          ← WORKING (321 tests pass)
 |----------|-------|--------|
 | Comprehensive (hardcoded credentials) | 1 | **Passing** (65/65 steps) |
 | Standalone auth (no seed needed) | 8 | **Not yet run** (should work) |
-| Seed-dependent (via `runFlow: seed-and-sign-in.yaml`) | 38 | **Blocked** by Issue 13 |
+| Seed-dependent (via `seed-and-run.sh` + `seed-and-sign-in.yaml`) | 33 | **Unblocked** — seed chain working, individual flows need testing |
 | Consent (special setup) | 2 | **Blocked** (need custom seed + consent state) |
 | Camera/native (ML Kit OCR) | 1 | **Blocked** (emulator has no camera) |
+
+### Known issues in individual flows (found during first seed-dependent run)
+
+**BUG-14: `pressKey: back` exits app from navigation root**
+- When no dev tools sheet is present after "Continue" overlay, `pressKey: back` navigates back from the sign-in screen (navigation root) to the dev-client launcher, exiting the app.
+- The second dev tools sheet (showing "Reload", "Connected to", etc.) appears non-deterministically.
+- **Fix:** Conditional execution using `runFlow: when: visible: "Reload"` — only press Back if the sheet is detected.
+- Applied in: `seed-and-sign-in.yaml`, `post-auth-comprehensive-devclient.yaml`
+
+**BUG-15: `tabBarTestID` not propagating to Android accessibility tree**
+- `tabBarTestID: 'tab-more'` set in Expo Router `Tabs.Screen` options does not appear as `resource-id` in the Android UIAutomator hierarchy. The element has `resource-id=""`.
+- Affects all `tapOn: id: "tab-*"` references in flows.
+- **Workaround:** Use `tapOn: text: "More"` (text-based matching) instead of `tapOn: id: "tab-more"`.
+
+**BUG-16: Maestro regex metacharacters in theme names**
+- Theme names like `Eager Learner (Calm)` and `Parent (Light)` contain parentheses, which Maestro interprets as regex capture groups.
+- `tapOn: text: "Eager Learner (Calm)"` fails because `(Calm)` is treated as a regex group.
+- **Workaround:** Escape parentheses in Maestro text matchers: `"Eager Learner \\(Calm\\)"`, or use testIDs on theme buttons.
+
+**BUG-17: Parent theme switch redirects away from More screen**
+- Tapping "Parent (Light)" theme button changes persona to `parent`, triggering `_layout.tsx:575`: `if (persona === 'parent') return <Redirect href="/(parent)/dashboard" />`.
+- The More screen is replaced by the parent dashboard, making subsequent theme taps fail.
+- The comprehensive flow handled this by testing Eager Learner ↔ Teen first, then Parent last with explicit redirect handling.
+- Individual flows that test theme switching need the same ordering strategy.
