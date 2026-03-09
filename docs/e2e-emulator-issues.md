@@ -749,6 +749,60 @@ Full E2E testing (with native modules) requires a dev-client APK build, which is
 
 **Confirmed working (2026-03-08):** Dev-client APK loads the sign-in screen (Clerk auth with Google SSO, Apple SSO, email/password). Dark mode renders correctly. Developer menu shows `Runtime version: exposdk:54.0.0`.
 
+---
+
+## Issue 10: API Server — `.dev.vars` Required for Post-Auth E2E Testing (2026-03-09)
+
+**What happened:** The API server (`pnpm exec nx dev api`) starts but returns `ENV_VALIDATION_ERROR` on all requests because Wrangler dev has no secrets configured.
+
+**Root cause:** Wrangler dev for Cloudflare Workers reads secrets from `apps/api/.dev.vars` (gitignored). Without this file, `DATABASE_URL` (the only required env var) is undefined and config validation fails on every request.
+
+**Additional gotcha — LLM middleware:** Even after adding `DATABASE_URL`, the `llmMiddleware` (applied globally via `api.use('*', ...)` in `src/index.ts:154`) throws if `GEMINI_API_KEY` is missing. This blocks ALL routes including health, profiles, subjects — not just LLM routes. A placeholder value is sufficient; the provider only fails when an actual LLM call is made.
+
+**Additional gotcha — Auth middleware:** Authenticated routes require `CLERK_JWKS_URL` to verify JWTs. Without it, all authenticated API calls return 401. The JWKS URL is derived from the Clerk publishable key:
+
+```bash
+# Decode the publishable key to get the Clerk frontend API domain
+echo "pk_test_<base64-part>" | sed 's/pk_test_//' | base64 -d
+# Output: <domain>$  (e.g., whole-iguana-9.clerk.accounts.dev$)
+# JWKS URL: https://<domain>/.well-known/jwks.json
+```
+
+**Fix — Create `apps/api/.dev.vars`:**
+
+```bash
+# apps/api/.dev.vars (gitignored — never commit)
+
+DATABASE_URL=<your-neon-connection-string>
+CLERK_SECRET_KEY=<your-clerk-secret-key>
+CLERK_PUBLISHABLE_KEY=<your-clerk-publishable-key>
+CLERK_JWKS_URL=https://<clerk-domain>/.well-known/jwks.json
+VOYAGE_API_KEY=<your-voyage-api-key>
+
+# Placeholder — LLM middleware requires this to exist.
+# Actual LLM calls will fail but all data endpoints work.
+GEMINI_API_KEY=placeholder-for-e2e-testing
+```
+
+Copy values from the root `.env.development.local` file.
+
+**After creating/editing `.dev.vars`, restart the API server** — wrangler reads the file only at startup.
+
+**Network access from emulator:** The mobile app uses `http://10.0.2.2:8787` on Android (the emulator's alias for the host's `127.0.0.1`). No `adb reverse` is needed for the API port — the emulator's special `10.0.2.2` address reaches the host directly.
+
+### Complete E2E Testing Setup (all services)
+
+| Service | Command | Port | Required For |
+|---------|---------|------|-------------|
+| API server | `pnpm exec nx dev api` | 8787 | All post-auth data (profiles, subjects, sessions, etc.) |
+| Metro bundler | `cd apps/mobile && pnpm exec expo start` | 8081 | JS bundle serving |
+| Bundle proxy | `node apps/mobile/e2e/bundle-proxy.js` | 8082 | Windows only — BUG-7 workaround (OkHttp chunked encoding) |
+| Android emulator | `C:\Android\Sdk\emulator\emulator -avd New_Device` | 5554 | Device target |
+
+**Port forwarding:**
+- `adb reverse tcp:8082 tcp:8082` — only needed for bundle proxy (BUG-7)
+- Port 8787 does NOT need `adb reverse` — emulator uses `10.0.2.2:8787` natively
+
 The Unicode path fixes that ARE working:
 1. ASCII SDK path (`C:\Android\Sdk`) for executables
 2. Env var overrides (`GRADLE_USER_HOME`, `TEMP`/`TMP`) for Java/Kotlin tooling
