@@ -225,30 +225,54 @@ tags:
       text: "Appearance"
     timeout: 10000
 
-# Switch to Eager Learner theme
+# Switch to Eager Learner theme (stays in learner route group — safe)
 - tapOn: "Eager Learner (Calm)"
 - takeScreenshot: 10-theme-eager-learner
-
-# Switch to Parent theme — wait for re-render to settle after theme change
-- extendedWaitUntil:
-    visible:
-      text: "Parent (Light)"
-    timeout: 10000
-
-- tapOn: "Parent (Light)"
-- takeScreenshot: 11-theme-parent
 
 # Switch back to Teen (Dark)
 # BUG-11: After theme switch, the screen re-renders with new CSS variables.
 # Maestro's text recognition can fail during the transition. Wait for the
-# Appearance section to be visible before tapping.
+# Appearance section header to be visible before tapping.
 - extendedWaitUntil:
     visible:
       text: "Appearance"
     timeout: 10000
 
 - tapOn: "Teen (Dark)"
-- takeScreenshot: 12-theme-teen-restored
+- takeScreenshot: 11-theme-teen-restored
+
+# ── Parent theme → redirects to (parent)/dashboard ──
+# BUG-12: Selecting "Parent (Light)" on the More screen triggers a persona
+# routing guard in (learner)/_layout.tsx (line 575):
+#   if (persona === 'parent') return <Redirect href="/(parent)/dashboard" />;
+# This navigates away from the More screen to the Parent dashboard.
+# Verify the redirect works, then switch back via the "Switch to Teen view"
+# link on the parent dashboard.
+- tapOn: "More"
+- extendedWaitUntil:
+    visible:
+      text: "Appearance"
+    timeout: 10000
+
+- tapOn: "Parent (Light)"
+
+- extendedWaitUntil:
+    visible:
+      text: "How your children are doing"
+    timeout: 15000
+
+- takeScreenshot: 12-parent-dashboard-redirect
+
+# The parent dashboard has a "Switch to Teen view (demo)" link
+- tapOn:
+    id: "switch-to-teen"
+
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+- takeScreenshot: 13-back-to-teen-home
 
 # ═══════════════════════════════════════════════════════════════════
 # PHASE 6: Done — all post-auth screens verified
@@ -258,4 +282,4 @@ tags:
 # (Ho..., boo...) and making point-based taps imprecise.
 # BUG-10: Hidden tab screens still show in dev-client tab bar.
 
-- takeScreenshot: 13-test-complete
+- takeScreenshot: 14-test-complete

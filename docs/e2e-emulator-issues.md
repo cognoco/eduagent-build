@@ -950,9 +950,9 @@ const patchRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
 
 ## BUG-11: Maestro Text Recognition Fails During NativeWind Theme Transitions (2026-03-09)
 
-**What happens:** When switching themes on the More screen (e.g., from "Eager Learner (Calm)" to "Parent (Light)"), Maestro's `tapOn` command for the next theme option can fail with "element not found." The text is visually present on screen but Maestro can't find it.
+**What happens:** When switching themes on the More screen (e.g., from "Eager Learner (Calm)" to "Teen (Dark)"), Maestro's `tapOn` command for the next theme option can fail with "element not found." The text is visually present on screen but Maestro can't find it.
 
-**Root cause:** NativeWind themes use CSS variables (`--color-text-primary`, `--color-background`, etc.) injected at the root layout. When `setPersona()` fires, React re-renders the entire component tree with new variable values. This causes a brief visual transition (e.g., dark → light) during which the accessibility tree may be unstable. Maestro's `tapOn` fires immediately after the previous step completes, potentially hitting this unstable window.
+**Root cause:** NativeWind themes use CSS variables (`--color-text-primary`, `--color-background`, etc.) injected at the root layout. When `setPersona()` fires, React re-renders the entire component tree with new variable values. This causes a brief visual transition (e.g., dark → calm) during which the accessibility tree may be unstable. Maestro's `tapOn` fires immediately after the previous step completes, potentially hitting this unstable window.
 
 **Workaround:** Add `extendedWaitUntil` with a text assertion between theme switches:
 
@@ -970,6 +970,27 @@ This gives the UI time to complete the theme transition before Maestro attempts 
 
 ---
 
+## BUG-12: Parent Theme Switch Triggers Persona Routing Redirect (2026-03-09)
+
+**What happens:** Selecting "Parent (Light)" on the More screen doesn't just change the color scheme — it triggers a full navigation redirect to `/(parent)/dashboard`. The test user lands on the parent home screen ("How your children are doing", "No children linked yet") instead of staying on the More screen.
+
+**Root cause:** The `(learner)/_layout.tsx` has a persona routing guard at line 575:
+```typescript
+if (persona === 'parent') return <Redirect href="/(parent)/dashboard" />;
+```
+When `setPersona('parent')` fires from the More screen's Appearance section, the layout detects persona mismatch and immediately redirects. This is by design — each persona has its own route group (`(learner)/`, `(parent)/`) with layout guards that enforce persona-route consistency.
+
+**Impact on E2E:** Cannot test "switch to Parent theme and back" as a simple theme toggle. The flow must account for the redirect to parent dashboard.
+
+**Workaround in E2E flow:**
+1. Test Eager Learner ↔ Teen switching first (both stay in learner route group)
+2. Then switch to Parent — verify the redirect to parent dashboard works
+3. Use the "Switch to Teen view (demo)" button (dev-only, `testID="switch-to-teen"`) to navigate back
+
+**Additional note — Maestro text matching vs testID:** The "Switch to Teen view (demo)" text is rendered inside a `<Pressable>` wrapping a `<Text>`. Maestro's regex-based `tapOn: "Switch to Teen view"` failed to find this element despite the text being visually present. A `testID="switch-to-teen"` was added to the `Pressable` for reliable identification. This pattern (text-based matching failing on styled pressable+text combos) may recur — prefer `testID` for tappable elements.
+
+---
+
 ## Comprehensive Post-Auth E2E Flow (2026-03-09)
 
 A full post-auth Maestro flow is available at:
@@ -984,7 +1005,7 @@ apps/mobile/e2e/flows/post-auth-comprehensive-devclient.yaml
 4. Android emulator running with dev-client APK installed
 5. Seeded test user in Clerk with `bypass_client_trust: true` (Issue 11)
 
-**What it tests (58 steps):**
+**What it tests (65 steps):**
 
 | Phase | Screens/Features | Steps |
 |-------|-----------------|-------|
@@ -992,7 +1013,7 @@ apps/mobile/e2e/flows/post-auth-comprehensive-devclient.yaml
 | 2. Home Screen | ScrollView, subjects, retention strip, coaching card | 8 |
 | 3. More Tab | Appearance, Notifications, Learning Mode, Account sections | 20 |
 | 4. Sub-Screens | Privacy Policy, Terms of Service (navigate + back) | 8 |
-| 5. Theme Switching | Teen → Eager Learner → Parent → Teen | 7 |
+| 5. Theme Switching | Eager Learner ↔ Teen, then Parent redirect → dashboard → back | 14 |
 
 **Test user credentials:**
 - Email: `test-e2e@example.com`
@@ -1025,14 +1046,15 @@ export TEMP="C:\\tools\\tmp" && export TMP="C:\\tools\\tmp"
 | Metro → dev-client | **Working** | With `unstable_serverRoot: monorepoRoot` (Issue 8) |
 | API server (local) | **Working** | Requires `.dev.vars` (Issue 10) |
 | Clerk test user seeding | **Working** | POST + PATCH for password + bypass_client_trust (Issues 11-12) |
-| Post-auth E2E (Maestro) | **Working** | 57/58 steps passing (BUG-11 fix pending retest) |
+| Post-auth E2E (Maestro) | **Working** | All 65 steps passing |
 | Tab navigation (E2E) | **Limited** | Hidden tabs visible in dev-client (BUG-10) |
-| Theme switching (E2E) | **Working (with workaround)** | extendedWaitUntil between switches (BUG-11) |
+| Theme switching (E2E) | **Working** | extendedWaitUntil for timing (BUG-11), parent redirect handled (BUG-12) |
 
 **What works end-to-end:** Seed test data → sign in → home screen → More tab full verification → Privacy Policy → Terms of Service → theme cycling. All via Maestro automation.
 
 **Known limitations:**
 - Tab bar taps unreliable for "Home" and "Learning Book" (BUG-10, dev-client only)
 - Theme switch timing requires `extendedWaitUntil` workaround (BUG-11)
+- Parent theme switch redirects to `(parent)/dashboard` (BUG-12, by design)
 - WHPX emulator slow — ANR dialogs during bundle loading (Issue 9)
 - Single emulator = serialized E2E flows (no parallel test execution)
