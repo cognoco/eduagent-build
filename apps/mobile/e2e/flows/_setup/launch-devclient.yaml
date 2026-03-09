@@ -1,0 +1,30 @@
+# Launch dev-client and connect to Metro
+# Uses clearState: true so the launcher always shows.
+# Handles dev menu overlay (always appears on bundle load — BUG-2).
+# For WHPX emulator: bundle loading takes 2-5 minutes.
+appId: com.mentomate.app
+---
+- launchApp:
+    clearState: true
+
+# With clearState, the dev-client launcher always shows.
+# Wait for the server entry and tap it to start bundle loading.
+- extendedWaitUntil:
+    visible: "http://10.0.2.2:8081"
+    timeout: 60000
+
+- tapOn: "http://10.0.2.2:8081"
+
+# The dev menu overlay ALWAYS appears after bundle load and BLOCKS
+# Maestro from seeing elements behind it. Wait for the "Continue"
+# button on the dev menu, then dismiss it.
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 600000
+
+- tapOn: "Continue"
+
+# Now the sign-in screen should be fully accessible.
+- extendedWaitUntil:
+    visible: "Welcome back"
+    timeout: 30000

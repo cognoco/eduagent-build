@@ -1,0 +1,21 @@
+# Tap the Metro server entry on the dev-client launcher.
+# Assumes the launcher is already showing. Does NOT relaunch.
+appId: com.mentomate.app
+---
+- extendedWaitUntil:
+    visible: "http://10.0.2.2:8081"
+    timeout: 30000
+
+- tapOn: "http://10.0.2.2:8081"
+
+# Wait for bundle load + dev menu
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 600000
+
+- tapOn: "Continue"
+
+# Verify sign-in screen
+- extendedWaitUntil:
+    visible: "Welcome back"
+    timeout: 30000

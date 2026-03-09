@@ -1,0 +1,104 @@
+# Auth Screen Navigation — dev-client variant
+# Tests navigation between sign-in, sign-up, and forgot-password screens.
+# Does NOT relaunch app (assumes app is already on sign-in screen).
+appId: com.mentomate.app
+tags:
+  - devclient
+  - auth
+---
+# ── Sign-in screen ──────────────────────────────────────────────────
+
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 10000
+
+- assertVisible: "Sign in to continue learning"
+- assertVisible:
+    id: "google-sso-button"
+- assertVisible:
+    id: "sign-in-email"
+- assertVisible:
+    id: "sign-in-password"
+- assertVisible:
+    id: "sign-in-button"
+- assertVisible:
+    id: "forgot-password-link"
+- assertVisible:
+    id: "sign-up-link"
+
+- takeScreenshot: auth-nav-sign-in
+
+# ── Navigate to sign-up ─────────────────────────────────────────────
+
+- tapOn:
+    id: "sign-up-link"
+
+- extendedWaitUntil:
+    visible:
+      text: "Create account"
+    timeout: 10000
+
+- assertVisible: "Start your learning journey"
+- assertVisible:
+    id: "sign-up-email"
+- assertVisible:
+    id: "sign-up-password"
+- assertVisible:
+    id: "sign-up-button"
+- assertVisible:
+    id: "sign-in-link"
+
+- takeScreenshot: auth-nav-sign-up
+
+# ── Navigate back to sign-in ────────────────────────────────────────
+
+- tapOn:
+    id: "sign-in-link"
+
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 10000
+
+- assertVisible:
+    id: "sign-in-email"
+- assertVisible:
+    id: "sign-in-button"
+
+# ── Navigate to forgot-password ─────────────────────────────────────
+
+- tapOn:
+    id: "forgot-password-link"
+
+- extendedWaitUntil:
+    visible:
+      text: "Forgot password?"
+    timeout: 10000
+
+- assertVisible: "We'll send a reset code to your email"
+- assertVisible:
+    id: "forgot-password-email"
+- assertVisible:
+    id: "send-reset-code-button"
+- assertVisible:
+    id: "back-to-sign-in"
+
+- takeScreenshot: auth-nav-forgot-password
+
+# ── Navigate back to sign-in ────────────────────────────────────────
+
+- tapOn:
+    id: "back-to-sign-in"
+
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 10000
+
+- assertVisible:
+    id: "sign-in-email"
+- assertVisible:
+    id: "sign-in-button"
+
+- takeScreenshot: auth-nav-back-to-sign-in

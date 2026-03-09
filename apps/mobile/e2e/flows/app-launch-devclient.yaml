@@ -1,0 +1,25 @@
+# App Launch smoke test — for dev-client APK on emulator
+# Handles the dev-client launcher, waits for bundle loading,
+# then validates the sign-in screen.
+appId: com.mentomate.app
+tags:
+  - smoke
+  - devclient
+---
+- runFlow: _setup/launch-devclient.yaml
+
+# Verify key sign-in elements are present
+- assertVisible: "Sign in to continue learning"
+- assertVisible:
+    id: "google-sso-button"
+- assertVisible:
+    id: "sign-in-email"
+- assertVisible:
+    id: "sign-in-password"
+- assertVisible:
+    id: "sign-in-button"
+
+# Verify navigation to sign-up is available
+- assertVisible: "Sign up"
+
+- takeScreenshot: app-launch-devclient
