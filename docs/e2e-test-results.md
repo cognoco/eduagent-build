@@ -10,6 +10,8 @@
 
 ## Test Results Summary
 
+### Session 1 (2026-03-08) — Auth Flows (Pre-Auth)
+
 | # | Flow | Status | Steps | Notes |
 |---|------|--------|-------|-------|
 | 1 | `app-launch-devclient.yaml` | PASS | 8 | Dev-client launcher → server connect → bundle load → sign-in verified |
@@ -18,12 +20,60 @@
 | 4 | `auth/sign-in-validation-devclient.yaml` | PASS | 22 | Empty submit, email-only submit, password toggle (testID found), sign-up link |
 | 5 | `auth/sign-up-screen-devclient.yaml` | PASS | 25 | SSO buttons, form fields, password requirements, Terms/Privacy, scroll to bottom |
 
-**Total: 5 flows, 105 assertions, all PASS**
+**Session 1 total: 5 flows, 105 assertions, all PASS**
 
-### Session 2 (2026-03-09) — via bundle proxy (BUG-7 workaround)
+### Session 2 (2026-03-09) — Bundle Proxy Re-test
 
 Re-ran all dev-client test flows through the bundle proxy (port 8082). Flows 2-5 confirmed passing.
 Bundle proxy required because BUG-7 (OkHttp chunked encoding error) became 100% reproducible.
+
+### Session 3 (2026-03-09) — Comprehensive Post-Auth Flow
+
+| # | Flow | Status | Steps | Notes |
+|---|------|--------|-------|-------|
+| 6 | `post-auth-comprehensive-devclient.yaml` | PASS | 65 | Full post-auth E2E: sign-in → home → More tab → sub-screens → themes → parent redirect |
+
+**Details:**
+
+| Phase | What was tested | Steps | Notes |
+|-------|----------------|-------|-------|
+| 1. Sign In | Dev-client launcher → Clerk auth (CAPTCHA bypass, PATCH password) | 15 | Seeded user `test-e2e@example.com` / `Mentomate2026xK` |
+| 2. Home Screen | ScrollView, subjects, coaching card, add-subject button | 8 | `retention-strip` not visible (WARNED, optional) |
+| 3. More Tab | Appearance (3 themes), Notifications (2 toggles), Learning Mode (2 options), Account (7 items) | 20 | Full scroll-through with screenshots |
+| 4. Sub-Screens | Privacy Policy, Terms of Service — navigate in + BACK | 8 | Both screens load and return correctly |
+| 5. Theme Switching | Eager Learner ↔ Teen (inline), Parent → dashboard redirect → switch back | 14 | Parent theme triggers `(learner)/_layout.tsx` routing guard (BUG-12) |
+
+**Clerk auth for E2E:** Seed endpoint creates real Clerk user with `bypass_client_trust: true` (CAPTCHA bypass). Password set via PATCH (POST has encoding bug for special chars — Issue 12).
+
+**Test user:** `test-e2e@example.com` / `Mentomate2026xK` (scenario: `learning-active`)
+
+### Session 3 (continued) — Seed-and-Sign-In Setup Flow
+
+| # | Flow | Status | Steps | Notes |
+|---|------|--------|-------|-------|
+| — | `_setup/seed-and-sign-in.yaml` | BLOCKED | — | `__maestro` undefined in GraalJS sub-flow (Issue 13) |
+
+**What was tried:**
+- Updated `seed-and-sign-in.yaml` with dev-client launcher handling, keyboard dismiss, dynamic password
+- Updated `seed.js` to export `output.password`, fixed default email
+- Made seed API idempotent (find-or-create Clerk user, delete DB data before re-seed)
+- Seed API verified working via `curl` — returns `{ email, password, accountId, profileId, ids }`
+- Maestro `runScript` with `env` block: `__maestro` object is `undefined` in GraalJS when script runs inside `runFlow` sub-flow
+- Maestro `outputVariable` property: not recognized by Maestro 2.2.0
+
+**Impact:** 38 flows that depend on `seed-and-sign-in.yaml` remain blocked by Issue 13.
+
+### Cumulative Totals
+
+| Category | Flows | Status |
+|----------|-------|--------|
+| Pre-auth (standalone) | 5 | **All PASS** |
+| Post-auth (comprehensive, hardcoded creds) | 1 | **PASS** (65 steps) |
+| Pre-auth (not yet run) | 3 | Should work (standalone, no seed) |
+| Seed-dependent | 38 | **BLOCKED** (Issue 13: Maestro `runScript` env vars) |
+| Consent (special setup) | 2 | **BLOCKED** (need custom seed + consent state) |
+| Camera/native | 1 | **BLOCKED** (emulator has no camera) |
+| **Total** | **50** | **6 passing, 3 runnable, 41 blocked** |
 
 ---
 
@@ -104,6 +154,29 @@ The `0xd` byte is a carriage return (`\r`). The error occurs in `Http1ExchangeCo
 **Severity:** Low (test file only)
 **What:** The existing `onboarding/sign-up-flow.yaml` uses `appId: com.zwizzly.eduagent` instead of the correct `appId: com.mentomate.app`. This flow would fail to connect to the app on the emulator.
 **Fix:** Update `appId` to `com.mentomate.app`.
+
+### BUG-10: Hidden Expo Router tabs render in dev-client tab bar
+
+**Severity:** Medium (E2E testing only, not user-facing in production)
+**What:** Expo Router tabs with `href: null` (hidden from tab bar) still render as visible tabs in dev-client builds. All tab labels truncate: "Home" → "Ho...", "Learning Book" → "boo...", "More" stays readable. Hidden screens like onboarding, session, topic show as "onb...", "ses..." etc.
+**Impact:** Point-based and text-based tab taps are unreliable. "Ho..." is ambiguous, and extra tabs shift positions.
+**Workaround:** Navigate using explicit routes or use "More" tab (short enough to not truncate). Avoid tapping "Home" or "Learning Book" tabs in E2E.
+**Note:** Production builds correctly hide tabs with `href: null`.
+
+### BUG-11: Maestro text recognition fails during NativeWind theme transitions
+
+**Severity:** Low (E2E testing only)
+**What:** After switching themes on the More screen, Maestro's `tapOn` for the next theme option fails with "element not found" even though the text is visually present.
+**Root cause:** `setPersona()` triggers a full React tree re-render with new CSS variables. The accessibility tree is briefly unstable during this transition.
+**Workaround:** Add `extendedWaitUntil` with a text assertion between theme switches.
+
+### BUG-12: Parent theme switch redirects away from More screen
+
+**Severity:** Expected behavior (not a bug — documenting for E2E awareness)
+**What:** Selecting "Parent (Light)" on the More screen triggers `<Redirect href="/(parent)/dashboard" />` in `(learner)/_layout.tsx:575`. The user lands on the parent dashboard, not the More screen.
+**Root cause:** Each persona has its own route group with a layout guard. Changing persona to `parent` while in the `(learner)` route group triggers the cross-redirect.
+**Impact on E2E:** Cannot test "switch to Parent and back" as a simple toggle. Flow must handle the redirect.
+**Workaround:** Use `testID="switch-to-teen"` on the parent dashboard's demo link to navigate back.
 
 ---
 
