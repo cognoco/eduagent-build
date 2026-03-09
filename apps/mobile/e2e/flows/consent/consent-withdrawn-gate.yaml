@@ -11,39 +11,28 @@
 # NOTE: This flow does NOT use runFlow seed-and-sign-in because that flow
 # waits for home-scroll-view — but the consent-withdrawn gate appears
 # BEFORE the tab navigator loads, blocking all app access.
+#
+# Seeding is handled by seed-and-run.sh BEFORE Maestro starts.
+# Credentials arrive as ${EMAIL} and ${PASSWORD} env vars.
+# Usage: ./scripts/seed-and-run.sh consent-withdrawn flows/consent/consent-withdrawn-gate.yaml
 appId: com.mentomate.app
 tags:
   - nightly
   - consent
   - gdpr
 ---
-# 1. Seed test data — consent-withdrawn gives WITHDRAWN consent status
-- runScript:
-    file: ../../scripts/seed.js
-    env:
-      API_URL: ${API_URL}
-      SCENARIO: "consent-withdrawn"
-    outputVariable: seedResult
+# 1. Launch dev-client, connect to Metro, dismiss dev menu.
+- runFlow: ../_setup/launch-devclient.yaml
 
-# 2. Launch app with clean state
-- launchApp:
-    clearState: true
-
-# 3. Wait for auth screen
-- extendedWaitUntil:
-    visible:
-      text: "Welcome back"
-    timeout: 15000
-
-# 4. Sign in with seeded credentials
+# 2. Sign in with seeded credentials (from seed-and-run.sh env vars)
 - tapOn:
     id: "sign-in-email"
-- inputText: ${output.seedResult.email}
+- inputText: ${EMAIL}
 - hideKeyboard
 
 - tapOn:
     id: "sign-in-password"
-- inputText: "TestPass123!"
+- inputText: ${PASSWORD}
 - hideKeyboard
 
 - tapOn:

@@ -25,14 +25,14 @@ tags:
       id: "home-scroll-view"
     timeout: 15000
 
-# 3. Navigate to More tab
+# 3. Navigate to More tab (BUG-15: use text, not testID)
 - tapOn:
-    id: "tab-more"
+    text: "More"
 
 # 4. Wait for More screen
 - extendedWaitUntil:
     visible:
-      id: "tab-more"
+      text: "Appearance"
     timeout: 10000
 
 # 5. Tap Subscription menu item

@@ -11,18 +11,16 @@
 # which typically links to a session for the user's active subject.
 # If no coaching card is present, the flow will not proceed past
 # the home screen. In CI, seed data should ensure a coaching card.
+# Seeding handled by seed-and-run.sh. Uses learning-active scenario (needs subjects + coaching card).
+# Usage: ./scripts/seed-and-run.sh learning-active flows/learning/start-session.yaml
 appId: com.mentomate.app
 tags:
   - smoke
   - learning
 ---
-- launchApp
-
-# Assert home screen is visible
-- extendedWaitUntil:
-    visible:
-      id: "home-scroll-view"
-    timeout: 15000
+# 1. Seed, launch dev-client, sign in.
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
 
 # The coaching card's primary button starts a session.
 # Its testID is "coaching-card-primary".

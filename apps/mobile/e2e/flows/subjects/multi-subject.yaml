@@ -25,9 +25,10 @@ tags:
       id: "home-scroll-view"
     timeout: 15000
 
-# 3. Navigate to subjects tab
+# 3. Navigate to Learning Book tab (BUG-15: use text, not testID)
+# Note: There is no separate "subjects" tab — subjects are in Learning Book
 - tapOn:
-    id: "tab-subjects"
+    text: "Learning Book"
 
 # 4. Wait for subjects list to load
 - extendedWaitUntil:

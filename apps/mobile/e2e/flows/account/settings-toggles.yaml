@@ -39,32 +39,67 @@ tags:
     timeout: 10000
 
 # ── Theme section ──
-
-# 5. Verify Appearance section is visible
-- extendedWaitUntil:
-    visible:
-      text: "Appearance"
-    timeout: 10000
+# BUG-17: Parent theme redirects to /(parent)/dashboard. Test order:
+#   1. Teen (Dark) — stays in learner route group
+#   2. Eager Learner (Calm) — stays in learner route group (reset)
+#   3. Parent (Light) — last, with redirect + switch-back handling
 
 - takeScreenshot: settings-initial
 
-# 6. Tap "Teen (Dark)" theme
+# 5. Tap "Teen (Dark)" theme
 - tapOn:
     text: "Teen (Dark)"
 
 - takeScreenshot: settings-theme-teen-dark
 
-# 7. Tap "Parent (Light)" theme
-- tapOn:
-    text: "Parent (Light)"
+# BUG-11: Wait for theme re-render to stabilize before next tap
+- extendedWaitUntil:
+    visible:
+      text: "Appearance"
+    timeout: 10000
 
-- takeScreenshot: settings-theme-parent-light
-
-# 8. Tap "Eager Learner (Calm)" theme to reset
+# 6. Tap "Eager Learner (Calm)" theme (reset to default)
 - tapOn:
     text: "Eager Learner (Calm)"
 
 - takeScreenshot: settings-theme-learner-calm
+
+# BUG-11: stabilize
+- extendedWaitUntil:
+    visible:
+      text: "Appearance"
+    timeout: 10000
+
+# 7. Tap "Parent (Light)" — triggers redirect to parent dashboard (BUG-17)
+- tapOn:
+    text: "Parent (Light)"
+
+# Verify redirect to parent dashboard
+- extendedWaitUntil:
+    visible:
+      text: "How your children are doing"
+    timeout: 15000
+
+- takeScreenshot: settings-theme-parent-redirect
+
+# 8. Switch back to Teen via dev-only button on parent dashboard
+- tapOn:
+    id: "switch-to-teen"
+
+# Wait for learner home screen
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 9. Return to More tab to continue testing other sections
+- tapOn:
+    text: "More"
+
+- extendedWaitUntil:
+    visible:
+      text: "Appearance"
+    timeout: 10000
 
 # ── Accent Color section ──
 

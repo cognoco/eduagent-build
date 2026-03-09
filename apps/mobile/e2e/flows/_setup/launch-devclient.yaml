@@ -26,9 +26,12 @@ appId: com.mentomate.app
 
 - tapOn: "Continue"
 
-# A second dev tools sheet may appear — dismiss with BACK.
-# On the sign-in screen (root), BACK is a safe no-op.
-- pressKey: back
+# A second dev tools sheet may appear — only dismiss if visible (BUG-14).
+# Unconditional BACK exits the app from navigation root.
+- runFlow:
+    when:
+      visible: "Reload"
+    file: dismiss-devtools.yaml
 
 # Now the sign-in screen should be fully accessible.
 - extendedWaitUntil:

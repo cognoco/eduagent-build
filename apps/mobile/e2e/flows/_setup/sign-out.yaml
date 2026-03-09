@@ -6,7 +6,7 @@ appId: com.mentomate.app
 ---
 # Navigate to More tab (bottom tab bar)
 - tapOn:
-    id: "tab-more"
+    text: "More"
 
 # Wait for More screen to load
 - extendedWaitUntil:

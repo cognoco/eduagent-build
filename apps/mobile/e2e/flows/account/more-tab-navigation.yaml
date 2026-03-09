@@ -28,7 +28,7 @@ tags:
 
 # 3. Navigate to More tab
 - tapOn:
-    id: "tab-more"
+    text: "More"
 
 # 4. Wait for More screen to load
 - extendedWaitUntil:

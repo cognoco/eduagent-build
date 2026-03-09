@@ -7,22 +7,16 @@
 #   - User is signed in (either via test account or prior sign-in flow)
 #   - API is running and reachable
 #
-# NOTE: This flow assumes the user is already authenticated.
-# In a real CI setup, a _setup/ flow or test seeding endpoint would
-# handle sign-in before this flow runs.
+# Seeding handled by seed-and-run.sh. Uses onboarding-complete scenario.
+# Usage: ./scripts/seed-and-run.sh onboarding-complete flows/onboarding/create-subject.yaml
 appId: com.mentomate.app
 tags:
   - smoke
   - onboarding
 ---
-- launchApp
-
-# Assert home screen is visible (authenticated state).
-# The home screen has testID "home-scroll-view" on its ScrollView.
-- extendedWaitUntil:
-    visible:
-      id: "home-scroll-view"
-    timeout: 15000
+# 1. Seed, launch dev-client, sign in.
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
 
 # The home screen should show the subjects section
 - assertVisible: "Your subjects"

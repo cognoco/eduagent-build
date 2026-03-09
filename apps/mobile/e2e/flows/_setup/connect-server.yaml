@@ -16,8 +16,11 @@ appId: com.mentomate.app
 
 - tapOn: "Continue"
 
-# Dismiss possible second dev tools sheet
-- pressKey: back
+# Dismiss possible second dev tools sheet (BUG-14: only if visible)
+- runFlow:
+    when:
+      visible: "Reload"
+    file: dismiss-devtools.yaml
 
 # Verify sign-in screen
 - extendedWaitUntil:

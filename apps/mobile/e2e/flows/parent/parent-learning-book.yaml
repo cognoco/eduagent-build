@@ -45,9 +45,9 @@ tags:
 # 4. Screenshot: parent dashboard before navigating
 - takeScreenshot: parent-learning-book-01-dashboard
 
-# 5. Tap Learning Book tab (tabBarTestID: tab-book)
+# 5. Tap Learning Book tab (BUG-15: use text, not testID)
 - tapOn:
-    id: "tab-book"
+    text: "Learning Book"
 
 # 6. Wait for Learning Book heading to render
 - extendedWaitUntil:
@@ -80,9 +80,9 @@ tags:
 # 11. Screenshot: Learning Book content
 - takeScreenshot: parent-learning-book-02-content
 
-# 12. Navigate back to Home tab
+# 12. Navigate back to Home tab (BUG-15: use text, not testID)
 - tapOn:
-    id: "tab-home"
+    text: "Home"
 
 # 13. Verify dashboard is visible again
 - extendedWaitUntil:
