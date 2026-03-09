@@ -1,4 +1,8 @@
-# Navigate to sign-in from wherever we are
+# Navigate to sign-in from wherever we are.
+# Expected entry states: sign-up screen or forgot-password screen.
+# Both taps are optional because only one will match the current screen.
+# If invoked from an unrelated screen, the extendedWaitUntil below will
+# fail with a timeout — that's intentional (fail-fast, not silent).
 appId: com.mentomate.app
 ---
 - tapOn:

@@ -9,7 +9,7 @@
 # NOTE: Steps 7-11 depend on Clerk test mode configuration. If Clerk
 # doesn't allow programmatic sign-up in test builds, use the seed
 # endpoint + sign-in instead. This flow tests the full sign-up path.
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - smoke
   - onboarding

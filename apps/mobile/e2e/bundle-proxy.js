@@ -73,6 +73,14 @@ const server = http.createServer((req, res) => {
               }
             }
           }
+
+          // Multipart extraction failed — don't send raw multipart as JS
+          console.error('Failed to extract JS bundle from multipart response');
+          res.writeHead(502, { 'content-type': 'text/plain' });
+          res.end(
+            'Bundle proxy: failed to extract JS bundle from multipart response'
+          );
+          return;
         }
 
         res.writeHead(proxyRes.statusCode, responseHeaders);
@@ -88,6 +96,17 @@ const server = http.createServer((req, res) => {
   });
 
   req.pipe(proxyReq);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(
+      `Port ${PROXY_PORT} is already in use. Kill the existing process or use a different port.`
+    );
+  } else {
+    console.error('Server error:', err.message);
+  }
+  process.exit(1);
 });
 
 server.listen(PROXY_PORT, () => {
