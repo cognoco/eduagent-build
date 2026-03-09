@@ -5,7 +5,7 @@
 # Journey: UX Journey 2 (Daily Learning Loop)
 # Epics: Epic 2 (FR23-FR26, FR41)
 # Prerequisite: Seeded user with subject + coaching card (scenario: learning-active)
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - smoke
   - learning
@@ -20,7 +20,7 @@ tags:
 # 2. Home screen
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
 
 # 3. Start session via coaching card
@@ -95,7 +95,7 @@ tags:
 # 14. Verify we can reach home
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 10000
     optional: true
 

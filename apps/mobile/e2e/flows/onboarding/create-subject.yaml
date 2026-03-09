@@ -18,10 +18,10 @@ tags:
 - launchApp
 
 # Assert home screen is visible (authenticated state).
-# The home screen shows "Ready to learn" as the main heading.
+# The home screen has testID "home-scroll-view" on its ScrollView.
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
 
 # The home screen should show the subjects section

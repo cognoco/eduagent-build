@@ -70,7 +70,7 @@ tags:
 # 12. Home screen reached
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
 
 # 13. Add first subject

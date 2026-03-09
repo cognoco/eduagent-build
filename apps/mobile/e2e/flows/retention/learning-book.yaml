@@ -35,7 +35,7 @@ tags:
 # 2. Home screen
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
 
 # 3. Verify retention strip is visible on home screen

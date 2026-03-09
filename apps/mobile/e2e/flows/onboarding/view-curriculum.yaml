@@ -17,7 +17,7 @@ tags:
 # Assert home screen renders with key elements
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
 - assertVisible: "Your coach has a plan"
 - assertVisible: "Your subjects"

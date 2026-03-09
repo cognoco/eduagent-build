@@ -6,7 +6,7 @@
 # Journey: UX Journey 1 → 2 transition
 # Epics: Epic 1 (FR14-FR16)
 # Prerequisite: Seeded user with 1 subject (scenario: with-subject)
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - smoke
   - learning
@@ -21,7 +21,7 @@ tags:
 # 2. Home screen visible
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
 
 # 3. Coaching card present

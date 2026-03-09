@@ -17,7 +17,7 @@
 # Clerk users. Until Clerk Backend API integration is added to the seed service,
 # sign-in will need a real test Clerk account or a deep-link auth bypass.
 # TODO: Implement Clerk test user creation in seed service.
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 ---
 # Step 1: Seed test data via API
 - runScript:
@@ -52,5 +52,5 @@ appId: com.zwizzly.eduagent
 # Step 5: Wait for home screen (auth complete)
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000

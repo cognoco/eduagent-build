@@ -22,7 +22,7 @@ tags:
 # 2. Verify home screen loaded
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
 
 # 3. Navigate to More tab
@@ -89,7 +89,7 @@ tags:
 # Wait for the home/More screen to reappear
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
     optional: true
 

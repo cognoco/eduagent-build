@@ -33,7 +33,7 @@ tags:
 # ──────────────────────────────────────────────────
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
 
 - takeScreenshot: camera-ocr-01-home

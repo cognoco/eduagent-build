@@ -54,7 +54,7 @@ export function AdaptiveEntryCard({
       onPrimary={primary.onPress}
       footer={secondaryButtons}
       isLoading={isLoading}
-      testID="adaptive-entry-card"
+      testID="coaching-card"
     />
   );
 }

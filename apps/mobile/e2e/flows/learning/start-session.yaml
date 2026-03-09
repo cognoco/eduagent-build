@@ -21,7 +21,7 @@ tags:
 # Assert home screen is visible
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
 
 # The coaching card's primary button starts a session.
