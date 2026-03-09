@@ -809,3 +809,230 @@ The Unicode path fixes that ARE working:
 3. `gradle.properties` with `-Djava.io.tmpdir=C:/tools/tmp` for Kotlin daemon (permanent fix)
 4. Gradle init.gradle to redirect CMake `.cxx` intermediates to `C:\B\`
 5. Ninja 1.12.1 upgrade to handle >260 char source file paths
+
+---
+
+## Issue 11: Clerk CAPTCHA Blocks Automated Sign-In on Android Emulator (2026-03-09)
+
+**What happened:** After seeding a Clerk test user via the Backend API and successfully verifying the password works (`POST /v1/users/:id/verify_password` → `verified: true`), sign-in via the app's Clerk React Native SDK fails silently. The sign-in completes without an error but returns a non-`complete` status, and the app shows "Sign-in could not be completed."
+
+**Root cause:** Clerk has Cloudflare Turnstile CAPTCHA enabled on the instance. The environment config (`GET /v1/environment`) reveals:
+
+```json
+{
+  "user_settings": {
+    "sign_in": {
+      "captcha_enabled": true,
+      "captcha_provider": "turnstile",
+      "captcha_public_key": "0x4AAAAAAAWXJGBD7bONzLBd",
+      "captcha_widget_type": "invisible"
+    }
+  }
+}
+```
+
+Even though the CAPTCHA widget is "invisible", Clerk's frontend API performs bot detection checks during sign-in. The Android emulator (or the React Native environment) fails these checks, blocking automated sign-in. The CAPTCHA is designed for web browsers and doesn't work in native mobile apps during E2E testing.
+
+**Fix applied — `bypass_client_trust` flag:**
+
+Clerk's Backend API supports a per-user flag `bypass_client_trust` that skips CAPTCHA/bot checks for that user. Set it via PATCH after user creation:
+
+```bash
+# Set bypass_client_trust on the test user
+curl -X PATCH "https://api.clerk.com/v1/users/<user_id>" \
+  -H "Authorization: Bearer <clerk_secret_key>" \
+  -H "Content-Type: application/json" \
+  -d '{"bypass_client_trust": true}'
+```
+
+**Implementation in `apps/api/src/services/test-seed.ts`:**
+
+The seed service's `ensureClerkTestUser()` function now patches the user after creation to set both the password (see Issue 12) and `bypass_client_trust: true`:
+
+```typescript
+const patchRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+  method: 'PATCH',
+  headers: {
+    Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    password: SEED_PASSWORD,
+    skip_password_checks: true,
+    bypass_client_trust: true,
+  }),
+});
+```
+
+**Key insight:** Clerk's CAPTCHA settings are instance-wide and cannot be disabled per-environment. The `bypass_client_trust` flag is the official way to allow automated testing without disabling CAPTCHA for all users.
+
+**Clerk testing tokens alternative:** Clerk also offers `POST /v1/testing_tokens` which returns a short-lived token for bypassing bot detection. However, this is designed for web browser testing (Playwright/Cypress) and requires injecting the token into the browser's `window.__clerk_testing_token`. It is not directly usable in React Native. The `bypass_client_trust` per-user flag is the correct approach for mobile E2E.
+
+---
+
+## Issue 12: Clerk Backend API — POST /users Password Encoding Bug (2026-03-09)
+
+**What happened:** Creating a Clerk user via `POST /v1/users` with a `password` field containing special characters (`!`, `-`) results in the password being silently corrupted. The `POST /v1/users/:id/verify_password` endpoint reports `verified: false` for the exact password that was provided during creation.
+
+**Reproduction:**
+
+```bash
+# Create user with password containing special chars
+curl -X POST "https://api.clerk.com/v1/users" \
+  -H "Authorization: Bearer sk_test_..." \
+  -H "Content-Type: application/json" \
+  -d '{"email_address": ["test@example.com"], "password": "EduAgent-E2e-Kx9!2026"}'
+
+# Verify — FAILS even though the password was just set
+curl -X POST "https://api.clerk.com/v1/users/<id>/verify_password" \
+  -H "Authorization: Bearer sk_test_..." \
+  -H "Content-Type: application/json" \
+  -d '{"password": "EduAgent-E2e-Kx9!2026"}'
+# Returns: { "verified": false }
+```
+
+Tested passwords:
+| Password | Via POST /users | Via PATCH /users | verify_password |
+|----------|----------------|-----------------|-----------------|
+| `TestPass123!` | Created OK | — | FAILS (`verified: false`) |
+| `EduAgent-E2e-Kx9!2026` | Created OK | — | FAILS (`verified: false`) |
+| `Mentomate2026xK` | Created OK | — | OK (`verified: true`) |
+| `Mentomate2026xK` | — | Patched OK | OK (`verified: true`) |
+
+**Root cause hypothesis:** The `POST /v1/users` endpoint may not correctly handle URL-encoded or JSON-escaped special characters in the password field. Characters like `!` and `-` are being silently altered during hashing. The `PATCH /v1/users/:id` endpoint does not have this bug.
+
+**Workaround applied:**
+
+1. Create user via `POST /v1/users` **without** a password (or with a simple alphanumeric one)
+2. Set the password via `PATCH /v1/users/:id` with `skip_password_checks: true`
+
+```typescript
+// Step 1: Create user (no password in POST body)
+const createRes = await fetch(`${CLERK_API_BASE}/users`, {
+  method: 'POST',
+  body: JSON.stringify({ email_address: [email] }),
+});
+
+// Step 2: Reliably set password via PATCH
+const patchRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+  method: 'PATCH',
+  body: JSON.stringify({
+    password: 'Mentomate2026xK',
+    skip_password_checks: true,
+  }),
+});
+```
+
+**Additional note — HaveIBeenPwned:** Even if a password is set correctly, Clerk checks it against the HaveIBeenPwned database during **sign-in** (not just during creation). `TestPass123!` was flagged as breached. Using `skip_password_checks: true` during creation does NOT skip the HIBP check at sign-in time. Use a non-breached password like `Mentomate2026xK`.
+
+---
+
+## BUG-10: Hidden Expo Router Tabs Render in Dev-Client Tab Bar (2026-03-09)
+
+**What happens:** Expo Router tabs with `href: null` (used to hide screens from the tab bar) still render as visible tabs in the dev-client build. This causes all tab labels to truncate:
+
+| Tab | Expected label | Actual label |
+|-----|---------------|--------------|
+| Home | "Home" | "Ho..." |
+| Learning Book | "Learning Book" | "boo..." |
+| More | "More" | "More" (short enough) |
+| Onboarding, Session, Topic, etc. | Hidden | Visible as "onb...", "ses...", etc. |
+
+**Impact on E2E:** Point-based and text-based taps on "Home" or "Learning Book" tabs are unreliable. "Ho..." is ambiguous (could match other text) and point-based taps at the expected tab position hit the wrong tab because the extra hidden tabs shift positions.
+
+**Root cause:** The `href: null` prop in Expo Router's `<Tabs.Screen>` options is intended to hide the tab from the tab bar. This works correctly in production builds and Expo Go, but the dev-client may not apply this filtering, rendering all registered tab screens.
+
+**Workaround:** Navigate between sections using explicit `router.push()` calls or `pressKey: back` instead of tapping tab bar labels. The comprehensive E2E flow uses "More" tab (short enough to not truncate) and avoids tapping "Home" or "Learning Book" tabs directly.
+
+**Note:** This only affects dev-client builds. Production builds correctly hide tabs with `href: null`.
+
+---
+
+## BUG-11: Maestro Text Recognition Fails During NativeWind Theme Transitions (2026-03-09)
+
+**What happens:** When switching themes on the More screen (e.g., from "Eager Learner (Calm)" to "Parent (Light)"), Maestro's `tapOn` command for the next theme option can fail with "element not found." The text is visually present on screen but Maestro can't find it.
+
+**Root cause:** NativeWind themes use CSS variables (`--color-text-primary`, `--color-background`, etc.) injected at the root layout. When `setPersona()` fires, React re-renders the entire component tree with new variable values. This causes a brief visual transition (e.g., dark → light) during which the accessibility tree may be unstable. Maestro's `tapOn` fires immediately after the previous step completes, potentially hitting this unstable window.
+
+**Workaround:** Add `extendedWaitUntil` with a text assertion between theme switches:
+
+```yaml
+# Wait for the re-rendered screen to stabilize before tapping
+- extendedWaitUntil:
+    visible:
+      text: "Appearance"
+    timeout: 10000
+
+- tapOn: "Teen (Dark)"
+```
+
+This gives the UI time to complete the theme transition before Maestro attempts text recognition.
+
+---
+
+## Comprehensive Post-Auth E2E Flow (2026-03-09)
+
+A full post-auth Maestro flow is available at:
+```
+apps/mobile/e2e/flows/post-auth-comprehensive-devclient.yaml
+```
+
+**Prerequisites:**
+1. API running at `localhost:8787` with `.dev.vars` configured (Issue 10)
+2. Metro bundler running at `localhost:8081`
+3. Bundle proxy at `localhost:8082` (BUG-7 workaround)
+4. Android emulator running with dev-client APK installed
+5. Seeded test user in Clerk with `bypass_client_trust: true` (Issue 11)
+
+**What it tests (58 steps):**
+
+| Phase | Screens/Features | Steps |
+|-------|-----------------|-------|
+| 1. Sign In | Dev-client launcher → sign-in form → auth | 15 |
+| 2. Home Screen | ScrollView, subjects, retention strip, coaching card | 8 |
+| 3. More Tab | Appearance, Notifications, Learning Mode, Account sections | 20 |
+| 4. Sub-Screens | Privacy Policy, Terms of Service (navigate + back) | 8 |
+| 5. Theme Switching | Teen → Eager Learner → Parent → Teen | 7 |
+
+**Test user credentials:**
+- Email: `test-e2e@example.com`
+- Password: `Mentomate2026xK`
+- Created by: `POST /v1/__test/seed` (scenario: `learning-active`)
+
+**Running:**
+```bash
+export TEMP="C:\\tools\\tmp" && export TMP="C:\\tools\\tmp"
+/c/tools/maestro/bin/maestro test apps/mobile/e2e/flows/post-auth-comprehensive-devclient.yaml
+```
+
+---
+
+## Current Status (2026-03-09)
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Emulator boot | Working | From ASCII SDK path (`C:\Android\Sdk`) |
+| ADB | Working | v36.0.2 at `C:\Android\Sdk\platform-tools` |
+| Maestro CLI | Working | v2.2.0 at `C:\tools\maestro` with TEMP override |
+| Gradle daemon | Working | With `GRADLE_USER_HOME=C:\tools\gradle` |
+| Kotlin compiler | Working | `gradle.properties` has `kotlin.daemon.jvmargs=-Djava.io.tmpdir=C:/tools/tmp` |
+| CMake library builds | Working | init.gradle redirects `.cxx` to `C:\B\<module>` |
+| CMake app build | Working | Ninja 1.12.1 handles >260 char paths |
+| Expo Go (JS-only) | Working | Smoke tests run via `exp://localhost:8081` deep link |
+| Android APK build | **BLOCKED on Windows** | pnpm + Sentry config plugin (Issue 7) |
+| Android APK build (WSL2) | **Working** | Bypasses Issue 7 |
+| expo-dev-client | **Installed (WSL2 only)** | `expo-dev-client@~6.0.20` |
+| Metro → dev-client | **Working** | With `unstable_serverRoot: monorepoRoot` (Issue 8) |
+| API server (local) | **Working** | Requires `.dev.vars` (Issue 10) |
+| Clerk test user seeding | **Working** | POST + PATCH for password + bypass_client_trust (Issues 11-12) |
+| Post-auth E2E (Maestro) | **Working** | 57/58 steps passing (BUG-11 fix pending retest) |
+| Tab navigation (E2E) | **Limited** | Hidden tabs visible in dev-client (BUG-10) |
+| Theme switching (E2E) | **Working (with workaround)** | extendedWaitUntil between switches (BUG-11) |
+
+**What works end-to-end:** Seed test data → sign in → home screen → More tab full verification → Privacy Policy → Terms of Service → theme cycling. All via Maestro automation.
+
+**Known limitations:**
+- Tab bar taps unreliable for "Home" and "Learning Book" (BUG-10, dev-client only)
+- Theme switch timing requires `extendedWaitUntil` workaround (BUG-11)
+- WHPX emulator slow — ANR dialogs during bundle loading (Issue 9)
+- Single emulator = serialized E2E flows (no parallel test execution)

@@ -39,8 +39,11 @@ import {
 /** Prefix used for all seed-created Clerk user IDs */
 export const SEED_CLERK_PREFIX = 'clerk_seed_';
 
-/** Standard test password for all seed-created Clerk users */
-const SEED_PASSWORD = 'TestPass123!';
+/** Standard test password for all seed-created Clerk users.
+ * Must NOT appear in HaveIBeenPwned — Clerk blocks sign-in for breached passwords.
+ * Avoid special characters (!, -, etc.) — they may cause encoding issues in Clerk's
+ * Backend API user creation endpoint. */
+const SEED_PASSWORD = 'Mentomate2026xK';
 
 /** Clerk REST API base URL */
 const CLERK_API_BASE = 'https://api.clerk.com/v1';
@@ -112,6 +115,7 @@ async function createClerkTestUser(
     };
   }
 
+  // Step 1: Create user (password set here may silently fail for special chars)
   const res = await fetch(`${CLERK_API_BASE}/users`, {
     method: 'POST',
     headers: {
@@ -133,6 +137,29 @@ async function createClerkTestUser(
   }
 
   const user = (await res.json()) as ClerkUser;
+
+  // Step 2: PATCH to reliably set password + bypass CAPTCHA for E2E testing.
+  // The POST /users endpoint silently corrupts passwords with certain characters.
+  // PATCH /users/:id is reliable. bypass_client_trust disables Turnstile CAPTCHA
+  // so Maestro/automated sign-in works on Android emulators.
+  const patchRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      password: SEED_PASSWORD,
+      skip_password_checks: true,
+      bypass_client_trust: true,
+    }),
+  });
+
+  if (!patchRes.ok) {
+    const body = await patchRes.text();
+    throw new Error(`Clerk user PATCH failed (${patchRes.status}): ${body}`);
+  }
+
   return { clerkUserId: user.id, password: SEED_PASSWORD };
 }
 
