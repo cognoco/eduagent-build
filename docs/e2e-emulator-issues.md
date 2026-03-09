@@ -1110,6 +1110,56 @@ Line 14: `const scenario = __maestro.env['SCENARIO'] || 'onboarding-complete';`
 
 **Impact:** 38 flows depend on `seed-and-sign-in.yaml` → `seed.js`. All 38 are blocked until the `runScript` env vars are resolved. The 8 standalone auth flows (no seeding) and the 1 comprehensive flow (hardcoded) are unaffected.
 
+### How the seeding chain works
+
+The E2E seed infrastructure has 4 layers. Layers 1-3 are working. Layer 4 (Maestro→JS bridge) is broken.
+
+```
+Layer 4: Maestro flow (YAML)          ← BROKEN: runScript env vars
+  calls ↓
+Layer 3: seed.js (GraalJS script)     ← Written, not testable
+  calls ↓
+Layer 2: API endpoint                  ← WORKING (verified via curl)
+  POST /v1/__test/seed { scenario, email }
+  returns { email, password, accountId, profileId, ids }
+  calls ↓
+Layer 1: test-seed.ts service          ← WORKING (321 tests pass)
+  - findClerkUserByEmail() → reuses existing Clerk user or creates new one
+  - PATCH password + bypass_client_trust on Clerk user
+  - Deletes existing DB account for this email (idempotent)
+  - Runs scenario seeder (creates account, profile, subjects, sessions, etc.)
+  - Returns all IDs + password to caller
+```
+
+**Layer 1 — `apps/api/src/services/test-seed.ts`** (working):
+- 12 seed scenarios implemented: `onboarding-complete`, `learning-active`, `retention-due`, `failed-recall-3x`, `parent-with-children`, `trial-active`, `trial-expired`, `multi-subject`, `homework-ready`, `trial-expired-child`, `consent-withdrawn`, `parent-solo`
+- Creates real Clerk users via Backend API (find-or-create pattern)
+- Sets password via PATCH (avoids POST encoding bug — Issue 12)
+- Sets `bypass_client_trust: true` (CAPTCHA bypass — Issue 11)
+- Idempotent: deletes existing DB data for the email before seeding
+
+**Layer 2 — `POST /v1/__test/seed`** (working):
+- Guarded by `ENVIRONMENT !== 'production'` and optional `X-Test-Secret` header
+- Validates input via Zod (`scenario` + `email`)
+- Returns `{ scenario, accountId, profileId, email, password, ids: { subjectId, topicId, ... } }`
+- Verified working: `curl -X POST http://localhost:8787/v1/__test/seed -H "Content-Type: application/json" -d '{"scenario":"onboarding-complete"}'` returns 201 with full response
+
+**Layer 3 — `apps/mobile/e2e/scripts/seed.js`** (written, not testable):
+- Runs in Maestro's GraalJS engine (no Node.js, no `require`)
+- Reads env vars via `__maestro.env['SCENARIO']` and `__maestro.env['API_URL']`
+- Calls `http.post()` (Maestro built-in) to hit the seed endpoint
+- Sets `output.email`, `output.password`, `output.accountId`, `output.profileId` + all scenario IDs
+- **Cannot be tested** because `__maestro` is undefined (this issue)
+
+**Layer 4 — `apps/mobile/e2e/flows/_setup/seed-and-sign-in.yaml`** (written, not testable):
+- Called by 38 flows via `runFlow: _setup/seed-and-sign-in.yaml` with `env: { SEED_SCENARIO, API_URL }`
+- Step 1: `runScript` → seed.js (seeds API + Clerk)
+- Step 2: `launchApp: clearState: true`
+- Steps 3-4: Dev-client launcher + dev menu overlay handling
+- Steps 5-7: Sign in with `${output.email}` / `${output.password}` from seed.js
+- Step 8: Wait for `home-scroll-view` (auth complete)
+- **Cannot be tested** because seed.js crashes (this issue)
+
 **Changes made to the seed infrastructure (working at the API level, blocked at the Maestro level):**
 
 | File | Change | Status |
