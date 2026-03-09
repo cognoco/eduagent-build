@@ -104,30 +104,33 @@ Bundle proxy required because BUG-7 (OkHttp chunked encoding error) became 100% 
 | 4 | `auth/sign-up-screen-devclient.yaml` | PASS | 25 | SSO, form fields, password reqs, Terms/Privacy |
 | 5 | `auth/forgot-password-devclient.yaml` | PASS | 19 | Email entry, submit, back to sign-in |
 
-**Production auth flows — EXPECTED FAIL (dev-client build installed):**
+### Session 4 (continued) — Production Auth Flows Fixed
 
-| # | Flow | Status | Notes |
-|---|------|--------|-------|
-| — | `app-launch.yaml` | FAIL | `launchApp` opens DevLauncherActivity, not sign-in screen |
-| — | `auth/sign-in-navigation.yaml` | SKIP | Same — needs production APK |
-| — | `auth/forgot-password.yaml` | SKIP | Same — needs production APK |
+The 3 production auth flows (`app-launch.yaml`, `sign-in-navigation.yaml`, `forgot-password.yaml`) originally failed because they used `launchApp: clearState: true` + direct "Welcome back" wait, but the installed build is a dev-client APK which boots to the Expo dev launcher first.
 
-These 3 flows are duplicates of the dev-client variants for production builds. They will work once a production APK (`assembleRelease`) is installed.
+**Fix:** Replaced inline `launchApp` + wait with `runFlow: _setup/launch-devclient.yaml` in all 3 flows. Also fixed `forgot-password.yaml` keyboard dismiss — `hideKeyboard` exited the app (BUG-5), replaced with tap-on-heading pattern.
+
+| # | Flow | Status | Steps | Notes |
+|---|------|--------|-------|-------|
+| 8 | `app-launch.yaml` | PASS | 8 | Now uses `launch-devclient.yaml` setup |
+| 9 | `auth/sign-in-navigation.yaml` | PASS | 40 | All 3 auth screens + round-trip, dev-client launch |
+| 10 | `auth/forgot-password.yaml` | PASS | 19 | Tap-heading keyboard dismiss (BUG-3/5 workaround) |
+
+**Keyboard dismiss pattern discovered:** Instead of `hideKeyboard` (sends BACK key — BUG-5 exits app if keyboard already dismissed), tap a non-input element like the screen heading. This defocuses the `TextInput` and naturally dismisses the keyboard.
 
 ### Cumulative Totals
 
 | Category | Flows | Status |
 |----------|-------|--------|
-| Pre-auth dev-client (standalone) | 5 | **All PASS** |
+| Pre-auth (all variants, standalone) | 8 | **All PASS** |
 | Post-auth (comprehensive, hardcoded creds) | 1 | **PASS** (65 steps) |
-| Pre-auth production (needs prod APK) | 3 | **EXPECTED FAIL** (dev-client installed) |
+| Quick-check / misc | 1 | **PASS** (simple screenshot) |
 | Seed-dependent (seeded flows) | 38 | **BLOCKED** (Issue 13: Maestro `runScript` env vars) |
 | Consent with inline seed (no runScript) | 2 | **BLOCKED** (need API running + Clerk) |
 | Camera/native | 1 | **BLOCKED** (emulator has no camera) |
-| Quick-check / misc | 1 | **PASS** (simple screenshot) |
-| **Total** | **51** | **7 passing, 44 blocked** |
+| **Total** | **51** | **10 passing, 41 blocked** |
 
-**Flow inventory:** 45 unique test flows + 6 setup helpers + 9 dev-client variants = 59 YAML files total (some overlap between dev-client and production variants testing same journeys).
+**Flow inventory:** 45 unique test flows + 6 setup helpers + 9 dev-client variants = 59 YAML files total.
 
 ---
 

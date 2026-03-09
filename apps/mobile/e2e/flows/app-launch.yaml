@@ -9,15 +9,8 @@ appId: com.mentomate.app
 tags:
   - smoke
 ---
-- launchApp:
-    clearState: true
-
-# The auth layout redirects unauthenticated users to sign-in.
-# Assert that the sign-in screen headline is visible.
-- extendedWaitUntil:
-    visible:
-      text: "Welcome back"
-    timeout: 15000
+# Launch dev-client, connect to Metro, dismiss dev menu.
+- runFlow: _setup/launch-devclient.yaml
 
 # Verify key sign-in elements are present
 - assertVisible: "Sign in to continue learning"

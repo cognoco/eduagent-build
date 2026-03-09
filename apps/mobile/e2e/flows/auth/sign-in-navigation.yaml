@@ -13,17 +13,10 @@ tags:
   - nightly
   - auth
 ---
-# 1. Launch app with clean state
-- launchApp:
-    clearState: true
+# 1. Launch dev-client, connect to Metro, dismiss dev menu.
+- runFlow: ../_setup/launch-devclient.yaml
 
 # ── Sign-in screen ──────────────────────────────────────────────────
-
-# 2. Wait for auth gate (sign-in screen)
-- extendedWaitUntil:
-    visible:
-      text: "Welcome back"
-    timeout: 15000
 
 # 3. Verify all sign-in screen elements
 - assertVisible: "Sign in to continue learning"
