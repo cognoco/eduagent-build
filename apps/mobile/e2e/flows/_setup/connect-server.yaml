@@ -1,12 +1,13 @@
 # Tap the Metro server entry on the dev-client launcher.
 # Assumes the launcher is already showing. Does NOT relaunch.
+# Port 8082 = bundle proxy (BUG-7 workaround for OkHttp chunked encoding).
 appId: com.mentomate.app
 ---
 - extendedWaitUntil:
-    visible: "http://10.0.2.2:8081"
+    visible: "http://10.0.2.2:8082"
     timeout: 30000
 
-- tapOn: "http://10.0.2.2:8081"
+- tapOn: "http://10.0.2.2:8082"
 
 # Wait for bundle load + dev menu
 - extendedWaitUntil:
@@ -14,6 +15,9 @@ appId: com.mentomate.app
     timeout: 600000
 
 - tapOn: "Continue"
+
+# Dismiss possible second dev tools sheet
+- pressKey: back
 
 # Verify sign-in screen
 - extendedWaitUntil:

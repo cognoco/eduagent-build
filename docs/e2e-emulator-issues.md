@@ -1050,7 +1050,7 @@ export TEMP="C:\\tools\\tmp" && export TMP="C:\\tools\\tmp"
 | Tab navigation (E2E) | **Limited** | Hidden tabs visible in dev-client (BUG-10) |
 | Theme switching (E2E) | **Working** | extendedWaitUntil for timing (BUG-11), parent redirect handled (BUG-12) |
 
-**What works end-to-end:** Seed test data → sign in → home screen → More tab full verification → Privacy Policy → Terms of Service → theme cycling. All via Maestro automation.
+**What works end-to-end:** Seed test data → sign in → home screen → More tab full verification → Privacy Policy → Terms of Service → theme cycling. All via Maestro automation (hardcoded credentials in the comprehensive flow).
 
 **Known limitations:**
 - Tab bar taps unreliable for "Home" and "Learning Book" (BUG-10, dev-client only)
@@ -1058,3 +1058,77 @@ export TEMP="C:\\tools\\tmp" && export TMP="C:\\tools\\tmp"
 - Parent theme switch redirects to `(parent)/dashboard` (BUG-12, by design)
 - WHPX emulator slow — ANR dialogs during bundle loading (Issue 9)
 - Single emulator = serialized E2E flows (no parallel test execution)
+- Maestro `runScript` env vars broken in sub-flows (Issue 13 — blocks 38 seed-dependent flows)
+
+---
+
+## Issue 13: Maestro `runScript` — `__maestro` Undefined in Sub-Flow Context (2026-03-09)
+
+**What happened:** The reusable `seed-and-sign-in.yaml` setup flow calls `seed.js` via `runScript` with `env` variables. When executed as a sub-flow (via `runFlow` from a parent flow), the script crashes:
+
+```
+TypeError: Cannot read property 'env' of undefined
+  at <js> :program(seed.js:14:428-440)
+```
+
+Line 14: `const scenario = __maestro.env['SCENARIO'] || 'onboarding-complete';`
+
+**What was tried:**
+
+1. **`runScript` with `env` + `outputVariable`:**
+   ```yaml
+   - runScript:
+       file: ../../scripts/seed.js
+       env:
+         API_URL: ${API_URL}
+         SCENARIO: ${SEED_SCENARIO}
+       outputVariable: seedResult
+   ```
+   Result: `Unknown Property: outputVariable` — Maestro 2.2.0 does not recognize `outputVariable` on `runScript`.
+
+2. **`runScript` with `env` only (removed `outputVariable`):**
+   ```yaml
+   - runScript:
+       file: ../../scripts/seed.js
+       env:
+         API_URL: ${API_URL}
+         SCENARIO: ${SEED_SCENARIO}
+   ```
+   Result: `TypeError: Cannot read property 'env' of undefined` — `__maestro` object does not exist in the GraalJS engine context when the script executes inside a `runFlow` sub-flow.
+
+3. **GraalJS TruffleAttach warning:** The engine also prints:
+   ```
+   WARNING: Unable to load the TruffleAttach library.
+   ```
+   This is likely related to the Unicode path issue (Issue 1/4) — GraalVM's native libraries extract to `%TEMP%` which resolves to the Unicode profile path. The `TEMP=C:\tools\tmp` override applies to the Maestro process but may not propagate to GraalVM's internal library extraction.
+
+**What does work:**
+- The seed API endpoint itself works (verified via curl): `POST /v1/__test/seed` returns `{ email, password, accountId, profileId, ids }`.
+- The Clerk find-or-create pattern works — repeated calls with the same email reuse the existing Clerk user.
+- The DB idempotent seeding works — `seedScenario()` deletes existing data before inserting.
+- The comprehensive flow (`post-auth-comprehensive-devclient.yaml`) works with hardcoded credentials (65/65 steps passing).
+
+**Impact:** 38 flows depend on `seed-and-sign-in.yaml` → `seed.js`. All 38 are blocked until the `runScript` env vars are resolved. The 8 standalone auth flows (no seeding) and the 1 comprehensive flow (hardcoded) are unaffected.
+
+**Changes made to the seed infrastructure (working at the API level, blocked at the Maestro level):**
+
+| File | Change | Status |
+|------|--------|--------|
+| `apps/api/src/services/test-seed.ts` | Find-or-create Clerk user (avoids 422 on duplicate email) | Working |
+| `apps/api/src/services/test-seed.ts` | Idempotent DB seeding (deletes existing account before insert) | Working |
+| `apps/api/src/services/test-seed.ts` | PATCH password + `bypass_client_trust` after user creation | Working |
+| `apps/api/src/services/test-seed.ts` | Password changed to `Mentomate2026xK` (non-breached, no special chars) | Working |
+| `apps/mobile/e2e/scripts/seed.js` | Added `output.password` export, fixed default email | Not testable (blocked by `__maestro` issue) |
+| `apps/mobile/e2e/flows/_setup/seed-and-sign-in.yaml` | Dev-client launcher, keyboard dismiss, dynamic password | Not testable (blocked by `__maestro` issue) |
+| `apps/mobile/e2e/flows/_setup/launch-devclient.yaml` | Port 8082, `pressKey: back` for dev tools sheet | Updated |
+| `apps/mobile/e2e/flows/_setup/connect-server.yaml` | Port 8082, `pressKey: back` for dev tools sheet | Updated |
+
+### Flow inventory (50 flows total)
+
+| Category | Count | Status |
+|----------|-------|--------|
+| Comprehensive (hardcoded credentials) | 1 | **Passing** (65/65 steps) |
+| Standalone auth (no seed needed) | 8 | **Not yet run** (should work) |
+| Seed-dependent (via `runFlow: seed-and-sign-in.yaml`) | 38 | **Blocked** by Issue 13 |
+| Consent (special setup) | 2 | **Blocked** (need custom seed + consent state) |
+| Camera/native (ML Kit OCR) | 1 | **Blocked** (emulator has no camera) |

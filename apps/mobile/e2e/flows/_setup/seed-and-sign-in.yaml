@@ -2,55 +2,92 @@
 #
 # Called by other flows via:
 #   - runFlow:
-#       file: _setup/seed-and-sign-in.yaml
+#       file: ../_setup/seed-and-sign-in.yaml
 #       env:
-#         SEED_SCENARIO: with-subject
+#         SEED_SCENARIO: learning-active
 #         API_URL: ${API_URL}
 #
 # Environment variables:
-#   SEED_SCENARIO  — Seed scenario key (e.g., "with-subject", "retention-due")
+#   SEED_SCENARIO  — Seed scenario key (e.g., "onboarding-complete", "retention-due")
 #   API_URL        — Base URL for the API (default: http://10.0.2.2:8787 for Android emulator)
 #
 # After this flow completes, the app is authenticated and on the home screen.
+# Output variables available to subsequent steps:
+#   ${output.email}     — Seeded user email
+#   ${output.password}  — Seeded user password
+#   ${output.accountId} — DB account ID
+#   ${output.profileId} — DB profile ID
+#   (plus scenario-specific IDs like subjectId, topicId, sessionId)
 #
-# NOTE: The seed endpoint currently creates DB rows but does NOT create real
-# Clerk users. Until Clerk Backend API integration is added to the seed service,
-# sign-in will need a real test Clerk account or a deep-link auth bypass.
-# TODO: Implement Clerk test user creation in seed service.
+# The seed endpoint (POST /v1/__test/seed) creates:
+#   - DB rows for the requested scenario (idempotent — deletes existing data first)
+#   - A real Clerk user with bypass_client_trust=true (for CAPTCHA bypass)
 appId: com.mentomate.app
 ---
-# Step 1: Seed test data via API
+# ── Step 1: Seed test data via API ──
+# The script sets output.email, output.password, output.accountId, etc.
 - runScript:
     file: ../../scripts/seed.js
     env:
       API_URL: ${API_URL}
       SCENARIO: ${SEED_SCENARIO}
-    outputVariable: seedResult
 
-# Step 2: Launch app with clean state
+# ── Step 2: Launch app with clean state ──
+# clearState resets auth tokens and AsyncStorage, ensuring we start fresh.
+# On dev-client builds, this also resets the Metro connection — the dev-client
+# launcher will appear first, requiring us to reconnect to Metro.
 - launchApp:
     clearState: true
 
-# Step 3: Wait for auth screen
+# ── Step 3: Connect to Metro via dev-client launcher ──
+# The dev-client launcher shows available Metro servers.
+# Port 8082 = bundle proxy (BUG-7 workaround for OkHttp chunked encoding).
+# For direct Metro connection, change to 8081.
+- extendedWaitUntil:
+    visible: "http://10.0.2.2:8082"
+    timeout: 60000
+
+- tapOn: "http://10.0.2.2:8082"
+
+# ── Step 4: Dismiss dev menu overlay (BUG-2) ──
+# The dev menu "Continue" overlay always appears after bundle load.
+# On WHPX emulator, bundle loading can take several minutes.
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 600000
+
+- tapOn: "Continue"
+
+# A second dev tools sheet may appear — dismiss with BACK.
+# On the sign-in screen (root), BACK is a safe no-op.
+- pressKey: back
+
+# ── Step 5: Wait for sign-in screen ──
 - extendedWaitUntil:
     visible:
       text: "Welcome back"
-    timeout: 15000
+    timeout: 30000
 
-# Step 4: Sign in with seeded credentials
+# ── Step 6: Sign in with seeded credentials ──
 - tapOn:
     id: "sign-in-email"
-- inputText: ${output.seedResult.email}
+- inputText: ${output.email}
+
+# BUG-3: Dismiss keyboard so password field is visible (Android keyboard covers it)
+- hideKeyboard
+
 - tapOn:
     id: "sign-in-password"
-# TODO: Replace with ${output.seedResult.password} once seed service
-# creates Clerk users with a known test password
-- inputText: "TestPass123!"
+- inputText: ${output.password}
+
+# BUG-3: Dismiss keyboard before tapping sign-in button
+- hideKeyboard
+
 - tapOn:
     id: "sign-in-button"
 
-# Step 5: Wait for home screen (auth complete)
+# ── Step 7: Wait for home screen (auth complete) ──
 - extendedWaitUntil:
     visible:
       id: "home-scroll-view"
-    timeout: 15000
+    timeout: 30000

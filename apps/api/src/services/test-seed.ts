@@ -11,7 +11,7 @@
  * can sign in via the app's Clerk-powered login UI. When absent (e.g., unit
  * tests), falls back to generating fake `clerk_seed_*` IDs.
  */
-import { like, inArray, or } from 'drizzle-orm';
+import { eq, like, inArray, or } from 'drizzle-orm';
 import {
   accounts,
   profiles,
@@ -98,7 +98,8 @@ interface ClerkUser {
 }
 
 /**
- * Creates a real Clerk user via the Backend API.
+ * Finds or creates a real Clerk user via the Backend API.
+ * If a user with the given email already exists, reuses it.
  * Returns the Clerk user ID (e.g., `user_2abc...`).
  *
  * If CLERK_SECRET_KEY is not set, generates a fake `clerk_seed_*` ID instead.
@@ -115,34 +116,44 @@ async function createClerkTestUser(
     };
   }
 
-  // Step 1: Create user (password set here may silently fail for special chars)
-  const res = await fetch(`${CLERK_API_BASE}/users`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      email_address: [email],
-      password: SEED_PASSWORD,
-      skip_password_checks: true,
-      // Mark as test user with external_id for cleanup
-      external_id: `${SEED_CLERK_PREFIX}${generateUUIDv7()}`,
-    }),
-  });
+  // Step 1: Check if user already exists (avoids 422 on duplicate email)
+  const existingUser = await findClerkUserByEmail(email, env);
 
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Clerk user creation failed (${res.status}): ${body}`);
+  let userId: string;
+
+  if (existingUser) {
+    userId = existingUser.id;
+  } else {
+    // Step 2: Create user (password set here may silently fail for special chars)
+    const res = await fetch(`${CLERK_API_BASE}/users`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email_address: [email],
+        password: SEED_PASSWORD,
+        skip_password_checks: true,
+        // Mark as test user with external_id for cleanup
+        external_id: `${SEED_CLERK_PREFIX}${generateUUIDv7()}`,
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Clerk user creation failed (${res.status}): ${body}`);
+    }
+
+    const user = (await res.json()) as ClerkUser;
+    userId = user.id;
   }
 
-  const user = (await res.json()) as ClerkUser;
-
-  // Step 2: PATCH to reliably set password + bypass CAPTCHA for E2E testing.
-  // The POST /users endpoint silently corrupts passwords with certain characters.
-  // PATCH /users/:id is reliable. bypass_client_trust disables Turnstile CAPTCHA
-  // so Maestro/automated sign-in works on Android emulators.
-  const patchRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+  // Step 3: PATCH to reliably set password + bypass CAPTCHA for E2E testing.
+  // Always PATCH even for existing users — ensures password and bypass_client_trust
+  // are current. The POST /users endpoint silently corrupts passwords with certain
+  // characters. PATCH /users/:id is reliable.
+  const patchRes = await fetch(`${CLERK_API_BASE}/users/${userId}`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
@@ -160,7 +171,23 @@ async function createClerkTestUser(
     throw new Error(`Clerk user PATCH failed (${patchRes.status}): ${body}`);
   }
 
-  return { clerkUserId: user.id, password: SEED_PASSWORD };
+  return { clerkUserId: userId, password: SEED_PASSWORD };
+}
+
+/** Look up a Clerk user by email address. Returns null if not found. */
+async function findClerkUserByEmail(
+  email: string,
+  env: SeedEnv
+): Promise<ClerkUser | null> {
+  const params = new URLSearchParams({ email_address: email });
+  const res = await fetch(`${CLERK_API_BASE}/users?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+  });
+
+  if (!res.ok) return null;
+
+  const users = (await res.json()) as ClerkUser[];
+  return users.length > 0 ? users[0] : null;
 }
 
 /**
@@ -929,6 +956,12 @@ export async function seedScenario(
   if (!seeder) {
     throw new Error(`Unknown scenario: ${scenario}`);
   }
+
+  // Idempotent: delete any existing account with the same email before seeding.
+  // Child tables (profiles, subjects, sessions, etc.) cascade automatically
+  // via ON DELETE CASCADE foreign keys.
+  await db.delete(accounts).where(eq(accounts.email, email));
+
   return seeder(db, email, env);
 }
 
