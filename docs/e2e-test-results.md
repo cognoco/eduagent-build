@@ -3,7 +3,7 @@
 **Date:** 2026-03-08 (updated 2026-03-09)
 **Environment:** Windows 11 + WHPX emulator (New_Device, API 34, 1080x1920)
 **Build:** Dev-client APK built in WSL2 with expo-dev-client@~6.0.20
-**Metro:** Windows, `unstable_serverRoot: monorepoRoot`
+**Metro:** Windows, `unstable_serverRoot: monorepoRoot`, bundle proxy on port 8082
 **Runtime:** exposdk:54.0.0
 
 ---
@@ -63,17 +63,71 @@ Bundle proxy required because BUG-7 (OkHttp chunked encoding error) became 100% 
 
 **Impact:** 38 flows that depend on `seed-and-sign-in.yaml` remain blocked by Issue 13.
 
+### Session 4 (2026-03-09) — Infrastructure Fixes + Flow Expansion
+
+**Major fixes applied (2 commits: `08abeaa`, `6356e2c`):**
+
+| Fix | What | Files |
+|-----|------|-------|
+| appId unification | `com.zwizzly.eduagent` → `com.mentomate.app` | 5 YAML files |
+| coaching-card-primary testID | Unified `AdaptiveEntryCard` testID so both personas produce `coaching-card-primary` | `AdaptiveEntryCard.tsx` + test |
+| tabBarTestID | Added `tab-home`, `tab-book`, `tab-more` to learner + parent layouts | 2 `_layout.tsx` files |
+| "Ready to learn" removal | Replaced non-existent text with `id: "home-scroll-view"` | 22 YAML files |
+| sign-out.yaml fix | Replaced non-existent `more-settings` with `sign-out-button` + `tab-more` | 1 YAML file |
+| New seed scenarios | Added `trial-expired-child`, `consent-withdrawn`, `parent-solo` | `test-seed.ts` + test |
+
+**13 new Maestro flows added:**
+
+| Team | Flow | Category | Seed Scenario |
+|------|------|----------|---------------|
+| A | `account/more-tab-navigation.yaml` | Account | `onboarding-complete` |
+| A | `account/settings-toggles.yaml` | Account | `onboarding-complete` |
+| A | `onboarding/create-profile-standalone.yaml` | Onboarding | `onboarding-complete` |
+| B | `billing/subscription-details.yaml` | Billing | `trial-active` |
+| B | `billing/child-paywall.yaml` | Billing | `trial-expired-child` |
+| B | `consent/post-approval-landing.yaml` | Consent | `onboarding-complete` (inline) |
+| B | `consent/consent-withdrawn-gate.yaml` | Consent | `consent-withdrawn` (inline) |
+| B | `consent/coppa-flow.yaml` | Consent | None (fresh sign-up) |
+| C | `learning/freeform-session.yaml` | Learning | `learning-active` |
+| C | `homework/homework-from-entry-card.yaml` | Homework | `homework-ready` |
+| C | `parent/parent-learning-book.yaml` | Parent | `parent-with-children` |
+| C | `parent/demo-dashboard.yaml` | Parent | `parent-solo` |
+| C | `edge/empty-first-user.yaml` | Edge | `onboarding-complete` |
+
+**Re-ran all 5 dev-client auth flows — all PASS:**
+
+| # | Flow | Status | Steps | Notes |
+|---|------|--------|-------|-------|
+| 1 | `app-launch-devclient.yaml` | PASS | 8 | Cold launch, dev menu dismiss, sign-in verified |
+| 2 | `auth/sign-in-navigation-devclient.yaml` | PASS | 33 | All 3 auth screens + round-trip nav |
+| 3 | `auth/sign-in-validation-devclient.yaml` | PASS | 22 | Empty submit, password toggle, sign-up link |
+| 4 | `auth/sign-up-screen-devclient.yaml` | PASS | 25 | SSO, form fields, password reqs, Terms/Privacy |
+| 5 | `auth/forgot-password-devclient.yaml` | PASS | 19 | Email entry, submit, back to sign-in |
+
+**Production auth flows — EXPECTED FAIL (dev-client build installed):**
+
+| # | Flow | Status | Notes |
+|---|------|--------|-------|
+| — | `app-launch.yaml` | FAIL | `launchApp` opens DevLauncherActivity, not sign-in screen |
+| — | `auth/sign-in-navigation.yaml` | SKIP | Same — needs production APK |
+| — | `auth/forgot-password.yaml` | SKIP | Same — needs production APK |
+
+These 3 flows are duplicates of the dev-client variants for production builds. They will work once a production APK (`assembleRelease`) is installed.
+
 ### Cumulative Totals
 
 | Category | Flows | Status |
 |----------|-------|--------|
-| Pre-auth (standalone) | 5 | **All PASS** |
+| Pre-auth dev-client (standalone) | 5 | **All PASS** |
 | Post-auth (comprehensive, hardcoded creds) | 1 | **PASS** (65 steps) |
-| Pre-auth (not yet run) | 3 | Should work (standalone, no seed) |
-| Seed-dependent | 38 | **BLOCKED** (Issue 13: Maestro `runScript` env vars) |
-| Consent (special setup) | 2 | **BLOCKED** (need custom seed + consent state) |
+| Pre-auth production (needs prod APK) | 3 | **EXPECTED FAIL** (dev-client installed) |
+| Seed-dependent (seeded flows) | 38 | **BLOCKED** (Issue 13: Maestro `runScript` env vars) |
+| Consent with inline seed (no runScript) | 2 | **BLOCKED** (need API running + Clerk) |
 | Camera/native | 1 | **BLOCKED** (emulator has no camera) |
-| **Total** | **50** | **6 passing, 3 runnable, 41 blocked** |
+| Quick-check / misc | 1 | **PASS** (simple screenshot) |
+| **Total** | **51** | **7 passing, 44 blocked** |
+
+**Flow inventory:** 45 unique test flows + 6 setup helpers + 9 dev-client variants = 59 YAML files total (some overlap between dev-client and production variants testing same journeys).
 
 ---
 
@@ -149,11 +203,11 @@ The `0xd` byte is a carriage return (`\r`). The error occurs in `Http1ExchangeCo
 **Root cause:** React Native's `<Text>` component concatenates `{' '}` spacers into the parent text node's value, which is then exposed to accessibility.
 **Workaround:** Include the trailing space in Maestro assertions: `assertVisible: "Already have an account? "`.
 
-### BUG-6: Stale `appId` in `onboarding/sign-up-flow.yaml`
+### BUG-6: Stale `appId` in multiple flow files — FIXED
 
 **Severity:** Low (test file only)
-**What:** The existing `onboarding/sign-up-flow.yaml` uses `appId: com.zwizzly.eduagent` instead of the correct `appId: com.mentomate.app`. This flow would fail to connect to the app on the emulator.
-**Fix:** Update `appId` to `com.mentomate.app`.
+**What:** Five flow files used `appId: com.zwizzly.eduagent` instead of the correct `appId: com.mentomate.app`: `seed-and-sign-in.yaml`, `sign-out.yaml`, `first-session.yaml`, `core-learning.yaml`, `recall-review.yaml`.
+**Fix:** All updated to `com.mentomate.app` in commit `08abeaa`. Zero occurrences of the old appId remain.
 
 ### BUG-10: Hidden Expo Router tabs render in dev-client tab bar
 
