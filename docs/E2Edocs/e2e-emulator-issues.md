@@ -1450,3 +1450,46 @@ $ADB reverse tcp:8787 tcp:8788
 4. Kill Bluetooth: `$ADB shell am force-stop com.android.bluetooth`
 5. Check for ANR dialogs and dismiss them
 6. Verify all services are up before launching the app
+
+---
+
+## Session 7 Findings (2026-03-10) — `seed-and-run.sh` v4
+
+### `adb reverse` is MANDATORY for Metro
+
+Without `adb reverse tcp:8081 tcp:8081` and `tcp:8082 tcp:8082`, the dev-client cannot reach Metro on the host. The error screen shows:
+
+```
+java.lang.RuntimeException: Unable to load script.
+Make sure you're running Metro or that your bundle 'index...'
+```
+
+`seed-and-run.sh` now sets up `adb reverse` automatically in the pre-flight step. Previously this was manual.
+
+### `seed-and-run.sh` v4 Changes
+
+**Problem:** v3 used `KEYCODE_BACK` to dismiss the "Continue" dev menu overlay. On fast cached bundles (3s load), the overlay appeared and was dismissed, but subsequent Back presses navigated backward from the sign-in screen (navigation root), exiting the app. The script then looped in "Loading..." state for the full timeout (300s in v3) with no useful output.
+
+**Another problem:** When the bundle failed to load (Metro unreachable), the error screen showed "Reload" / "Go To Home". The script matched "Reload" as a dev tools sheet and pressed Back in an infinite loop.
+
+**Fixes applied:**
+
+| Change | v3 | v4 |
+|--------|----|----|
+| Dismiss "Continue" overlay | `KEYCODE_BACK` (exits app!) | **Tap button by bounds** (targeted) |
+| Dev tools "Reload" back-presses | Unlimited loop | **Max 3 attempts**, then FATAL exit |
+| Error screen detection | None | **Instant FATAL** on "problem loading" / "Unable to load script" |
+| Launcher timeout | 120s (hardcoded) | **45s** default, `LAUNCHER_TIMEOUT` env var |
+| Bundle timeout | 300s (hardcoded) | **120s** default, `BUNDLE_TIMEOUT` env var |
+| Fast mode | N/A | `FAST=1` → 20s launcher, 60s bundle |
+| Poll interval | 5s | **3s** |
+| Emulator health check | None | `adb get-state` on every loop iteration |
+| App relaunch attempts | Unlimited | **Max 2**, then FATAL exit |
+| Ctrl+C handling | Script hangs | **Trap INT/TERM** → immediate clean exit |
+| `adb reverse` setup | Manual | **Automatic** (8081 + 8082) |
+| Timeout warning | "continuing anyway" | **FATAL exit** with diagnostic dump |
+| Unknown state logging | "Loading..." (no detail) | Shows first 5 visible text elements |
+
+**Performance comparison (cached bundle on E2E_Device_2):**
+- v3: 120s+ (entered infinite "Loading" loop due to Back key exiting app)
+- v4: **9 seconds** (launcher 3s → Metro tap → Continue tap → dev tools Back → sign-in)
