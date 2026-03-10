@@ -17,8 +17,8 @@
 #   API_URL       — API base URL (default: http://localhost:8787)
 #   EMAIL         — Test user email (default: test-e2e@example.com)
 #   MAESTRO_PATH  — Path to maestro binary (default: /c/tools/maestro/bin/maestro)
-#   METRO_URL     — Metro server URL for dev-client (default: http://10.0.2.2:8081)
-#                   Use http://10.0.2.2:8082 for bundle proxy (BUG-7 workaround)
+#   METRO_URL     — Metro server URL for dev-client (default: http://10.0.2.2:8082)
+#                   Uses bundle proxy by default (BUG-7: OkHttp chunked encoding fails on 8081)
 #
 # Prerequisites:
 #   - API server running at API_URL
@@ -42,7 +42,7 @@ EXTRA_ARGS=("$@")
 API_URL="${API_URL:-http://localhost:8787}"
 EMAIL="${EMAIL:-test-e2e@example.com}"
 MAESTRO="${MAESTRO_PATH:-/c/tools/maestro/bin/maestro}"
-METRO_URL="${METRO_URL:-http://10.0.2.2:8081}"
+METRO_URL="${METRO_URL:-http://10.0.2.2:8082}"
 ADB="${ADB_PATH:-/c/Android/Sdk/platform-tools/adb.exe}"
 APP_ID="com.mentomate.app"
 
@@ -111,20 +111,21 @@ wait_for_text "DEVELOPMENT" 120 || true
 
 # Step B: Dismiss Bluetooth dialog if present (BUG-21 safety net)
 if $ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null | grep -q "Bluetooth"; then
-  echo "[seed-and-run] Dismissing Bluetooth dialog ..."
-  # "Close app" button is roughly at bottom-center of the dialog
-  adb_tap 400 810
+  echo "[seed-and-run] Dismissing Bluetooth dialog via Back key ..."
+  # Use KEYCODE_BACK instead of coordinate tap — resolution-independent
+  $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
   sleep 2
   # Re-wait for launcher after dismissing
   wait_for_text "DEVELOPMENT" 30 || true
 fi
 
-# Step C: Tap Metro 8081 server entry using bounds from uiautomator dump
+# Step C: Tap Metro 8082 server entry (bundle proxy — BUG-7 workaround)
 # The server list order is non-deterministic (mDNS discovery), so we
-# parse the dump to find the 8081 entry's exact bounds.
-echo "[seed-and-run] Finding Metro 8081 entry in UI dump ..."
+# parse the dump to find the 8082 entry's exact bounds.
+# BUG-7: OkHttp chunked encoding fails on 8081; bundle proxy on 8082 fixes it.
+echo "[seed-and-run] Finding Metro 8082 (bundle proxy) entry in UI dump ..."
 METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
-  | grep -oP 'text="http://10.0.2.2:8081"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
+  | grep -oP 'text="http://10.0.2.2:8082"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
   | grep -oP 'bounds="\K[^"]+' || echo "")
 if [ -n "$METRO_BOUNDS" ]; then
   # Parse [x1,y1][x2,y2] and compute center
@@ -134,11 +135,11 @@ if [ -n "$METRO_BOUNDS" ]; then
   Y2=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '4p')
   TAP_X=$(( (X1 + X2) / 2 ))
   TAP_Y=$(( (Y1 + Y2) / 2 ))
-  echo "[seed-and-run] Tapping Metro 8081 at ($TAP_X, $TAP_Y) ..."
+  echo "[seed-and-run] Tapping Metro 8082 at ($TAP_X, $TAP_Y) ..."
   adb_tap $TAP_X $TAP_Y
 else
-  # Fallback: tap the first visible server entry (might be 8082)
-  echo "[seed-and-run] WARNING: Could not find 8081 bounds, tapping first entry ..."
+  # Fallback: try 8081 or first visible server entry
+  echo "[seed-and-run] WARNING: Could not find 8082 bounds, tapping first entry ..."
   FIRST_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
     | grep -oP 'text="http://10.0.2.2:[0-9]+"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
     | head -1 | grep -oP 'bounds="\K[^"]+' || echo "[72,564][1008,720]")
@@ -151,45 +152,96 @@ fi
 sleep 2
 
 # Step D: Wait for bundle to load, then dismiss "Continue" overlay
-# uiautomator dump is UNRELIABLE during the Continue overlay (React Native
-# bottom sheet crashes the dump). Strategy: sleep → press Back → verify.
-# Cached bundle: ~5s. Cold bundle: 1-5 min. We retry with escalating waits.
+# Strategy: poll UI state every 5s. Only press Back when we detect
+# the overlay (or dump fails, suggesting overlay is present).
+# After any Back press, verify app is still in foreground — relaunch if not.
+# Cached bundle: ~5s. Cold bundle: 1-5 min.
 echo "[seed-and-run] Waiting for bundle to load ..."
-for WAIT in 15 30 60 90 120; do
-  echo "[seed-and-run] Sleeping ${WAIT}s for bundle ..."
-  sleep $WAIT
+BUNDLE_ELAPSED=0
+BUNDLE_TIMEOUT=300
+BACK_PRESSED=0
+while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
+  sleep 5
+  BUNDLE_ELAPSED=$((BUNDLE_ELAPSED + 5))
 
-  # Press Back to dismiss Continue overlay (if present)
-  echo "[seed-and-run] Pressing Back to dismiss overlay ..."
-  $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
-  sleep 3
-
-  # Check if we reached the sign-in screen
+  # Try to dump UI hierarchy
+  DUMP_OK=0
+  DUMP=""
   if $ADB $DEVICE_FLAG shell uiautomator dump /sdcard/ui_dump.xml 2>/dev/null; then
     DUMP=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null || echo "")
+    if [ -n "$DUMP" ] && echo "$DUMP" | grep -q "node"; then
+      DUMP_OK=1
+    fi
+  fi
+
+  if [ $DUMP_OK -eq 1 ]; then
+    # Already on sign-in screen?
     if echo "$DUMP" | grep -q "Welcome back"; then
-      echo "[seed-and-run] Sign-in screen reached!"
+      echo "[seed-and-run] Sign-in screen reached after ${BUNDLE_ELAPSED}s!"
       break
     fi
-    # If we see DEVELOPMENT again, the Back went too far (no overlay yet)
-    # or the overlay wasn't showing. Need to re-tap Metro and wait more.
+
+    # Still on dev-client launcher — bundle not loaded yet
     if echo "$DUMP" | grep -q "DEVELOPMENT"; then
-      echo "[seed-and-run] Back to launcher — bundle not ready yet, re-tapping Metro ..."
-      # Re-parse 8081 bounds (may have changed)
-      RETRY_BOUNDS=$(echo "$DUMP" \
-        | grep -oP 'text="http://10.0.2.2:8081"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
-        | grep -oP 'bounds="\K[^"]+' || echo "")
-      if [ -n "$RETRY_BOUNDS" ]; then
-        RX1=$(echo "$RETRY_BOUNDS" | grep -oP '\d+' | sed -n '1p')
-        RY1=$(echo "$RETRY_BOUNDS" | grep -oP '\d+' | sed -n '2p')
-        RX2=$(echo "$RETRY_BOUNDS" | grep -oP '\d+' | sed -n '3p')
-        RY2=$(echo "$RETRY_BOUNDS" | grep -oP '\d+' | sed -n '4p')
-        adb_tap $(( (RX1 + RX2) / 2 )) $(( (RY1 + RY2) / 2 ))
-      fi
+      echo "[seed-and-run] Still on launcher after ${BUNDLE_ELAPSED}s ..."
       continue
+    fi
+
+    # Continue overlay or dev tools sheet detected — press Back
+    if echo "$DUMP" | grep -qi "Continue\|Reload\|dev tools"; then
+      echo "[seed-and-run] Overlay detected after ${BUNDLE_ELAPSED}s, pressing Back ..."
+      $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
+      BACK_PRESSED=1
+      sleep 3
+      continue
+    fi
+
+    # App is in foreground but unknown state (loading screen, blank, etc.)
+    # Check if this is actually the Android home/launcher (app exited)
+    if echo "$DUMP" | grep -q "com.google.android.apps.nexuslauncher\|com.android.launcher"; then
+      echo "[seed-and-run] App exited to home screen! Relaunching ..."
+      $ADB $DEVICE_FLAG shell am start -n "$APP_ID/.MainActivity" 2>/dev/null || true
+      sleep 5
+      continue
+    fi
+
+    # Unknown app state — could be loading. If we haven't tried Back yet
+    # after a reasonable wait (>30s), try once cautiously.
+    if [ $BUNDLE_ELAPSED -ge 30 ] && [ $BACK_PRESSED -eq 0 ]; then
+      echo "[seed-and-run] Unknown state after ${BUNDLE_ELAPSED}s, trying Back ..."
+      $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
+      BACK_PRESSED=1
+      sleep 3
+    else
+      echo "[seed-and-run] Waiting ... (${BUNDLE_ELAPSED}s elapsed)"
+    fi
+  else
+    # UI dump failed — likely during React Native overlay (OOM/crash)
+    # This often means the Continue overlay is showing but crashing uiautomator.
+    # Try pressing Back, but verify app stays in foreground afterward.
+    if [ $BUNDLE_ELAPSED -ge 20 ]; then
+      echo "[seed-and-run] UI dump failed after ${BUNDLE_ELAPSED}s (overlay?), pressing Back ..."
+      $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
+      BACK_PRESSED=1
+      sleep 3
+
+      # Verify app is still in foreground
+      FOREGROUND=$($ADB $DEVICE_FLAG shell "dumpsys activity activities 2>/dev/null | grep mResumedActivity" 2>/dev/null || echo "")
+      if ! echo "$FOREGROUND" | grep -q "$APP_ID"; then
+        echo "[seed-and-run] App left foreground after Back! Relaunching ..."
+        $ADB $DEVICE_FLAG shell am start -n "$APP_ID/.MainActivity" 2>/dev/null || true
+        sleep 5
+        BACK_PRESSED=0
+      fi
+    else
+      echo "[seed-and-run] UI dump failed early (${BUNDLE_ELAPSED}s) — waiting ..."
     fi
   fi
 done
+
+if [ $BUNDLE_ELAPSED -ge $BUNDLE_TIMEOUT ]; then
+  echo "[seed-and-run] WARNING: Bundle did not load within ${BUNDLE_TIMEOUT}s"
+fi
 
 # Step E: Dismiss second dev tools sheet if present (BUG-14)
 if $ADB $DEVICE_FLAG shell uiautomator dump /sdcard/ui_dump.xml 2>/dev/null; then

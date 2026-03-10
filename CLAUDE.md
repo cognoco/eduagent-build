@@ -239,6 +239,8 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
    - `e2e-tech-spec.md` — Technical spec, phase tasks, infrastructure details
    - `e2e-testing-strategy.md` — Overall strategy, architecture, flow inventory
 3. **Keep docs consistent** — if you fix a bug, update both `e2e-test-bugs.md` (status) and `e2e-test-results.md` (session entry). If you add flows, update `e2e-testing-strategy.md` inventory.
+4. **When emulator issues occur -do not reinvent before your read** - `e2e-emulator-issues.md`
+
 
 ## Git Rules
 

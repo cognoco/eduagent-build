@@ -146,23 +146,24 @@ export default function SignUpScreen() {
     return (
       <KeyboardAvoidingView
         className="flex-1 bg-background"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           className="flex-1"
           contentContainerStyle={{
             flexGrow: 1,
-            justifyContent: 'center',
-            paddingTop: insets.top,
-            paddingBottom: insets.bottom,
+            paddingTop: insets.top + 24,
+            paddingBottom: insets.bottom + 24,
             paddingHorizontal: 24,
           }}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         >
-          <Text className="text-h1 font-bold text-text-primary mb-2">
+          <View className="flex-1" style={{ minHeight: 40 }} />
+          <Text className="text-h2 font-bold text-text-primary mb-1">
             Verify your email
           </Text>
-          <Text className="text-body text-text-secondary mb-8">
+          <Text className="text-body-sm text-text-secondary mb-6">
             We sent a verification code to {emailAddress}
           </Text>
 
@@ -226,23 +227,24 @@ export default function SignUpScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
         className="flex-1"
         contentContainerStyle={{
           flexGrow: 1,
-          justifyContent: 'center',
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
+          paddingTop: insets.top + 24,
+          paddingBottom: insets.bottom + 24,
           paddingHorizontal: 24,
         }}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
       >
-        <Text className="text-h1 font-bold text-text-primary mb-2">
+        <View className="flex-1" style={{ minHeight: 40 }} />
+        <Text className="text-h2 font-bold text-text-primary mb-1">
           Create account
         </Text>
-        <Text className="text-body text-text-secondary mb-8">
+        <Text className="text-body-sm text-text-secondary mb-6">
           Start your learning journey
         </Text>
 

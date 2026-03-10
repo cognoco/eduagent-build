@@ -17,6 +17,20 @@ jest.mock('../services/profile', () => ({
     }
     return Promise.resolve(null);
   }),
+  findOwnerProfile: jest.fn().mockImplementation((_db, accountId) => {
+    if (accountId === 'test-account-id') {
+      return Promise.resolve({
+        id: 'owner-profile-id',
+        accountId: 'test-account-id',
+        displayName: 'Owner',
+        personaType: 'LEARNER',
+        birthDate: '2014-06-15',
+        location: 'EU',
+        consentStatus: 'CONSENTED',
+      });
+    }
+    return Promise.resolve(null);
+  }),
 }));
 
 describe('profileScopeMiddleware', () => {
@@ -53,13 +67,18 @@ describe('profileScopeMiddleware', () => {
     });
   });
 
-  it('skips when X-Profile-Id header is absent', async () => {
+  it('auto-resolves owner profile when X-Profile-Id header is absent', async () => {
     const app = createApp();
     const res = await app.request('/test');
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.profileId).toBeNull();
+    expect(body.profileId).toBe('owner-profile-id');
+    expect(body.profileMeta).toEqual({
+      birthDate: '2014-06-15',
+      location: 'EU',
+      consentStatus: 'CONSENTED',
+    });
   });
 
   it('returns 403 when profile does not belong to account', async () => {

@@ -19,7 +19,7 @@ appId: com.mentomate.app
 
 # 3. Tap Parent theme — triggers redirect to parent dashboard
 - tapOn:
-    text: "Parent (Light)"
+    id: "persona-theme-parent"
 
 # 4. Wait for parent dashboard to render
 - extendedWaitUntil:

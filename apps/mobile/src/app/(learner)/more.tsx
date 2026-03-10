@@ -214,6 +214,7 @@ export default function MoreScreen() {
             key={p}
             onPress={() => setPersona(p)}
             className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3.5 mb-2"
+            testID={`persona-theme-${p}`}
             accessibilityLabel={`Select ${personaLabels[p]} theme`}
             accessibilityRole="button"
           >

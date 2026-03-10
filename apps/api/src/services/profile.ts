@@ -63,21 +63,35 @@ export async function listProfiles(
 }
 
 /**
- * Finds the owner profile for an account (or the first profile if no owner flag).
+ * Finds the owner profile for an account.
  * Used by profile-scope middleware to auto-resolve profileId when X-Profile-Id
  * header is absent, preventing the broken `account.id` fallback.
+ *
+ * Uses a targeted `WHERE is_owner = true LIMIT 1` query instead of loading all
+ * profiles into memory. Falls back to the first profile only if no owner flag
+ * is set (defensive — should not happen in normal operation).
  */
 export async function findOwnerProfile(
   db: Database,
   accountId: string
 ): Promise<Profile | null> {
-  const rows = await db.query.profiles.findMany({
+  // Targeted query: owner profile directly
+  const ownerRow = await db.query.profiles.findFirst({
+    where: and(eq(profiles.accountId, accountId), eq(profiles.isOwner, true)),
+  });
+
+  if (ownerRow) {
+    const consentStatus = await getConsentStatus(db, ownerRow.id);
+    return mapProfileRow(ownerRow, consentStatus);
+  }
+
+  // Fallback: no owner flag set — pick first profile (defensive edge case)
+  const fallbackRow = await db.query.profiles.findFirst({
     where: eq(profiles.accountId, accountId),
   });
-  const ownerRow = rows.find((r) => r.isOwner) ?? rows[0];
-  if (!ownerRow) return null;
-  const consentStatus = await getConsentStatus(db, ownerRow.id);
-  return mapProfileRow(ownerRow, consentStatus);
+  if (!fallbackRow) return null;
+  const consentStatus = await getConsentStatus(db, fallbackRow.id);
+  return mapProfileRow(fallbackRow, consentStatus);
 }
 
 /**

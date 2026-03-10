@@ -183,11 +183,14 @@ async function createClerkTestUser(
 }
 
 /** Look up a Clerk user by email address. Returns null if not found.
- * Throws on non-OK responses (rate limits, 5xx) to fail fast. */
+ * Throws on non-OK responses (rate limits, 5xx) to fail fast.
+ * Requires CLERK_SECRET_KEY — returns null without it. */
 async function findClerkUserByEmail(
   email: string,
   env: SeedEnv
 ): Promise<ClerkUser | null> {
+  if (!env.CLERK_SECRET_KEY) return null;
+
   const params = new URLSearchParams({ email_address: email });
   const res = await fetch(`${CLERK_API_BASE}/users?${params.toString()}`, {
     headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
@@ -982,18 +985,12 @@ export async function seedScenario(
     throw new Error(`Unknown scenario: ${scenario}`);
   }
 
-  // Idempotent: delete existing seed accounts with the same email before seeding.
-  // Only deletes accounts whose clerkUserId has the seed prefix — real Clerk users
-  // created by seed are also tagged with clerk_seed_* external_id (set in PATCH step
-  // of createClerkTestUser). Child tables cascade via ON DELETE CASCADE.
-  await db
-    .delete(accounts)
-    .where(
-      and(
-        eq(accounts.email, email),
-        like(accounts.clerkUserId, `${SEED_CLERK_PREFIX}%`)
-      )
-    );
+  // Idempotent: delete existing accounts with the same email before seeding.
+  // Deletes ALL accounts matching the email — both fake clerk_seed_* IDs and real
+  // Clerk user IDs from previous seed runs where CLERK_SECRET_KEY was set.
+  // Safe because this service is ENVIRONMENT-guarded (never runs in production).
+  // Child tables cascade via ON DELETE CASCADE.
+  await db.delete(accounts).where(eq(accounts.email, email));
 
   return seeder(db, email, env);
 }
@@ -1041,13 +1038,18 @@ export interface DebugAccountChain {
   }>;
 }
 
-/** Walks account → profiles → subjects chain for a given email. */
+/** Walks account → profiles → subjects chain for a given email.
+ * Scoped to seed-created accounts (clerk_seed_* prefix) to prevent
+ * exposing arbitrary user data on staging. */
 export async function debugAccountsByEmail(
   db: Database,
   email: string
 ): Promise<DebugAccountChain[]> {
   const accountRows = await db.query.accounts.findMany({
-    where: eq(accounts.email, email),
+    where: and(
+      eq(accounts.email, email),
+      like(accounts.clerkUserId, `${SEED_CLERK_PREFIX}%`)
+    ),
   });
 
   return Promise.all(
@@ -1102,13 +1104,17 @@ export async function debugSubjectsByClerkUserId(
   | { result: DebugSubjectsResult }
   | { error: string; detail: Record<string, string> }
 > {
+  // Scoped to seed accounts to prevent exposing arbitrary user data
   const account = await db.query.accounts.findFirst({
-    where: eq(accounts.clerkUserId, clerkUserId),
+    where: and(
+      eq(accounts.clerkUserId, clerkUserId),
+      like(accounts.clerkUserId, `${SEED_CLERK_PREFIX}%`)
+    ),
   });
 
   if (!account) {
     return {
-      error: 'No account found for clerkUserId',
+      error: 'No account found for clerkUserId (or not a seed account)',
       detail: { clerkUserId },
     };
   }
