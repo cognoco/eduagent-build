@@ -20,76 +20,86 @@ tags:
 # 2. Navigate to sign-up
 - tapOn: "Sign up"
 
-# 4. Sign-up screen visible
+# 3. Sign-up screen visible
 - extendedWaitUntil:
     visible:
       id: "sign-up-email"
     timeout: 5000
 
-# 5. Enter email
+- takeScreenshot: onboarding-01-signup-screen
+
+# 4. Enter email
 - tapOn:
     id: "sign-up-email"
 - inputText: "test-e2e-signup@example.com"
 
-# 6. Enter password
+# 5. Enter password (keyboard visible — visual audit for field coverage)
 - tapOn:
     id: "sign-up-password"
 - inputText: "TestPass123!"
 
-# 7. Submit sign-up
+- takeScreenshot: onboarding-02-signup-credentials-entered
+
+# 6. Submit sign-up
 - tapOn:
     id: "sign-up-button"
 
-# 8. Profile creation screen (or redirect to home)
-# After sign-up, the app should navigate to profile creation
+# 7. Profile creation screen
 - extendedWaitUntil:
     visible:
       id: "profile-name-input"
     timeout: 15000
 
-# 9. Enter profile name
+- takeScreenshot: onboarding-03-profile-creation
+
+# 8. Enter profile name
 - tapOn:
     id: "profile-name-input"
 - inputText: "Test Learner"
 
-# 10. Select learner persona
+# 9. Select learner persona
 - tapOn:
     id: "profile-persona-learner"
 
-# 11. Submit profile
+- takeScreenshot: onboarding-04-profile-filled
+
+# 10. Submit profile
 - tapOn:
     id: "profile-submit"
 
-# 12. Home screen reached
+# 11. Home screen reached — first-time empty state
 - extendedWaitUntil:
     visible:
       id: "home-scroll-view"
     timeout: 15000
 
-# 13. Add first subject
+- takeScreenshot: onboarding-05-home-empty-state
+
+# 12. Add first subject
 - tapOn:
     id: "add-subject-button"
 
-# 14. Subject creation modal visible
+# 13. Subject creation modal visible
 - extendedWaitUntil:
     visible:
       text: "What would you like to learn?"
     timeout: 5000
 
-# 15. Enter subject name
+- takeScreenshot: onboarding-06-create-subject-modal
+
+# 14. Enter subject name
 - tapOn:
     id: "create-subject-name"
 - inputText: "Mathematics"
 
-# 16. Submit subject
+# 15. Submit subject
 - tapOn:
     id: "create-subject-submit"
 
-# 17. Interview screen reached
+# 16. Interview screen reached
 - extendedWaitUntil:
     visible:
       text: "Interview"
     timeout: 10000
 
-# 18. Screenshot
-- takeScreenshot: onboarding-sign-up-complete
+- takeScreenshot: onboarding-07-interview-started

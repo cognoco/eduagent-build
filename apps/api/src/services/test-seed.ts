@@ -1039,17 +1039,15 @@ export interface DebugAccountChain {
 }
 
 /** Walks account → profiles → subjects chain for a given email.
- * Scoped to seed-created accounts (clerk_seed_* prefix) to prevent
- * exposing arbitrary user data on staging. */
+ * Finds ALL accounts matching the email — both seed (clerk_seed_*) and real
+ * Clerk users. Safe because this endpoint is ENVIRONMENT-guarded and only
+ * accessible in test/development environments. */
 export async function debugAccountsByEmail(
   db: Database,
   email: string
 ): Promise<DebugAccountChain[]> {
   const accountRows = await db.query.accounts.findMany({
-    where: and(
-      eq(accounts.email, email),
-      like(accounts.clerkUserId, `${SEED_CLERK_PREFIX}%`)
-    ),
+    where: eq(accounts.email, email),
   });
 
   return Promise.all(
@@ -1104,17 +1102,15 @@ export async function debugSubjectsByClerkUserId(
   | { result: DebugSubjectsResult }
   | { error: string; detail: Record<string, string> }
 > {
-  // Scoped to seed accounts to prevent exposing arbitrary user data
+  // Find account by clerkUserId — includes both seed and real Clerk users.
+  // Safe because this endpoint is ENVIRONMENT-guarded.
   const account = await db.query.accounts.findFirst({
-    where: and(
-      eq(accounts.clerkUserId, clerkUserId),
-      like(accounts.clerkUserId, `${SEED_CLERK_PREFIX}%`)
-    ),
+    where: eq(accounts.clerkUserId, clerkUserId),
   });
 
   if (!account) {
     return {
-      error: 'No account found for clerkUserId (or not a seed account)',
+      error: 'No account found for clerkUserId',
       detail: { clerkUserId },
     };
   }

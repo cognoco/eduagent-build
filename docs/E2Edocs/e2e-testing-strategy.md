@@ -273,16 +273,26 @@ Critical user flows, prioritized by risk and user impact.
 | Tag | Blocking? | When it runs | Purpose |
 |-----|-----------|-------------|---------|
 | `smoke` | Eventually yes (once stabilized) | Every PR + nightly | Core flows work end-to-end |
-| `ui-smoke` | Advisory (always screenshots) | Every PR + nightly | Visual/UX integrity audit — catches keyboard, layout, scroll regressions via screenshots |
 | `nightly` | Advisory | Nightly 3AM UTC + manual | Edge cases, full coverage |
 
-**Graduation plan:** Once smoke flows achieve >95% pass rate across 2 weeks of nightly runs, remove `continue-on-error: true` from the CI job to make them blocking. `ui-smoke` stays advisory permanently — its value is the screenshot audit trail, not pass/fail.
+**Graduation plan:** Once smoke flows achieve >95% pass rate across 2 weeks of nightly runs, remove `continue-on-error: true` from the CI job to make them blocking.
 
-### Tier 0: UI Smoke (screenshot audit — every PR)
+### Embedded Visual Audit (screenshot trail)
 
-| Flow | What it captures | Tags |
-|------|-----------------|------|
-| **Auth Keyboard Visibility** | Screenshots of email/password focus with keyboard open — catches KAV regressions (BUG-24) | `ui-smoke, account` |
+Every functional flow also serves as a visual regression check. Instead of separate "visual test" flows, screenshots are embedded at meaningful screen states within existing flows. This answers two questions from one flow:
+1. **Functional:** Does the flow work? (assertions)
+2. **Visual/UX:** Does the screen look correct at each moment? (screenshots)
+
+CI always uploads screenshots as artifacts (`if: always()`), not just on failure. After a CI run, someone glances at the screenshots and spots anything obviously wrong — no pixel diffing, no new tools.
+
+**Where screenshots are embedded (auth + onboarding priority — 100% of users see these):**
+
+| Flow | Screenshots | What they catch |
+|------|-------------|-----------------|
+| `seed-and-sign-in.yaml` | `signin-01-screen-loaded`, `signin-02-email-keyboard-open`, `signin-03-password-keyboard-open`, `signin-04-home-reached` | KAV regressions (BUG-24), layout shifts, broken auth UI |
+| `sign-in-navigation.yaml` | `auth-nav-sign-in`, `auth-nav-sign-in-keyboard`, `auth-nav-sign-up`, `auth-nav-forgot-password`, `auth-nav-back-to-sign-in` | Auth screen rendering, navigation link visibility, keyboard overlay |
+| `sign-up-flow.yaml` | `onboarding-01` through `onboarding-07` | Each onboarding step: sign-up form, profile creation, empty home, subject creation, interview |
+| `create-subject.yaml` | `subject-01` through `subject-04` | Home with subjects, create modal with keyboard, name entry, interview chat |
 
 ### Tier 1: Smoke (run on every PR)
 
