@@ -200,3 +200,30 @@ Android 13+ (API 33+) requires explicit `POST_NOTIFICATIONS` permission. The app
 **Workaround:** `seed-and-sign-in.yaml` conditionally dismisses the dialog by tapping "Allow" via `dismiss-notifications.yaml` after the home screen loads.
 
 **Applied in:** `seed-and-sign-in.yaml`, `dismiss-notifications.yaml`
+
+---
+
+## BUG-23: Missing `href: null` on `subject` Route Breaks Tab Bar (2026-03-10)
+
+**Status:** Open (app code bug)
+**Severity:** Medium — visual glitch, does not block functionality
+**Affects:** All screens in `(learner)` route group
+
+The bottom tab bar shows ~9 tabs instead of the intended 3 (Home, Learning Book, More). Extra tabs appear with broken icons (missing character rectangle glyphs ▯) and truncated labels like "sub…". The `subject/` directory inside `(learner)/` is auto-discovered by Expo Router as a visible tab because it lacks a `<Tabs.Screen>` declaration with `href: null`.
+
+**Root cause:** Expo Router's file-system routing automatically creates a tab for every file/directory inside a `Tabs` layout group. Routes that should be hidden (navigated to programmatically, not via tab bar) need an explicit `<Tabs.Screen name="..." options={{ href: null }} />`. The `subject/` route is missing this declaration — likely dropped during a previous commit (`08abeaa`, E2E flows/testIDs).
+
+**Broken icons explained:** The `iconMap` in `_layout.tsx` only defines icons for `Home`, `Book`, and `More`. The `TabIcon` component falls back to `'ellipse-outline'` for unknown route names, which renders as a broken glyph when the tab shouldn't exist at all.
+
+**Fix:** Add the missing `Tabs.Screen` entry in `apps/mobile/src/app/(learner)/_layout.tsx`:
+
+```tsx
+<Tabs.Screen
+  name="subject"
+  options={{
+    href: null,
+  }}
+/>
+```
+
+**Verify:** Confirm no other routes are missing — cross-reference all files/directories in `(learner)/` against `Tabs.Screen` declarations. Currently declared with `href: null`: `onboarding`, `session`, `topic`, `subscription`, `homework`. The `subject` directory is the only one missing.
