@@ -11,7 +11,7 @@
  * can sign in via the app's Clerk-powered login UI. When absent (e.g., unit
  * tests), falls back to generating fake `clerk_seed_*` IDs.
  */
-import { eq, like, inArray, or } from 'drizzle-orm';
+import { eq, and, like, inArray, or } from 'drizzle-orm';
 import {
   accounts,
   profiles,
@@ -39,11 +39,12 @@ import {
 /** Prefix used for all seed-created Clerk user IDs */
 export const SEED_CLERK_PREFIX = 'clerk_seed_';
 
-/** Standard test password for all seed-created Clerk users.
+/** Default test password for all seed-created Clerk users.
+ * Read from SEED_PASSWORD env var when available, falling back to a hardcoded default.
  * Must NOT appear in HaveIBeenPwned — Clerk blocks sign-in for breached passwords.
  * Avoid special characters (!, -, etc.) — they may cause encoding issues in Clerk's
  * Backend API user creation endpoint. */
-const SEED_PASSWORD = 'Mentomate2026xK';
+const DEFAULT_SEED_PASSWORD = 'Mentomate2026xK';
 
 /** Clerk REST API base URL */
 const CLERK_API_BASE = 'https://api.clerk.com/v1';
@@ -70,6 +71,8 @@ export type SeedScenario =
 export interface SeedEnv {
   /** Clerk secret key for Backend API calls. Optional — falls back to fake IDs. */
   CLERK_SECRET_KEY?: string;
+  /** Override seed password via env. Falls back to DEFAULT_SEED_PASSWORD. */
+  SEED_PASSWORD?: string;
 }
 
 export interface SeedResult {
@@ -108,11 +111,13 @@ async function createClerkTestUser(
   email: string,
   env: SeedEnv
 ): Promise<{ clerkUserId: string; password: string }> {
+  const password = env.SEED_PASSWORD ?? DEFAULT_SEED_PASSWORD;
+
   if (!env.CLERK_SECRET_KEY) {
     // Fallback for environments without Clerk (unit tests, CI without secrets)
     return {
       clerkUserId: `${SEED_CLERK_PREFIX}${generateUUIDv7()}`,
-      password: SEED_PASSWORD,
+      password,
     };
   }
 
@@ -120,6 +125,7 @@ async function createClerkTestUser(
   const existingUser = await findClerkUserByEmail(email, env);
 
   let userId: string;
+  const seedExternalId = `${SEED_CLERK_PREFIX}${generateUUIDv7()}`;
 
   if (existingUser) {
     userId = existingUser.id;
@@ -133,10 +139,10 @@ async function createClerkTestUser(
       },
       body: JSON.stringify({
         email_address: [email],
-        password: SEED_PASSWORD,
+        password,
         skip_password_checks: true,
         // Mark as test user with external_id for cleanup
-        external_id: `${SEED_CLERK_PREFIX}${generateUUIDv7()}`,
+        external_id: seedExternalId,
       }),
     });
 
@@ -150,9 +156,8 @@ async function createClerkTestUser(
   }
 
   // Step 3: PATCH to reliably set password + bypass CAPTCHA for E2E testing.
-  // Always PATCH even for existing users — ensures password and bypass_client_trust
-  // are current. The POST /users endpoint silently corrupts passwords with certain
-  // characters. PATCH /users/:id is reliable.
+  // Always PATCH even for existing users — ensures password, bypass_client_trust,
+  // and external_id (for cleanup tracking) are current.
   const patchRes = await fetch(`${CLERK_API_BASE}/users/${userId}`, {
     method: 'PATCH',
     headers: {
@@ -160,9 +165,11 @@ async function createClerkTestUser(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      password: SEED_PASSWORD,
+      password,
       skip_password_checks: true,
       bypass_client_trust: true,
+      // Tag reused users with seed external_id so deleteClerkTestUsers can find them
+      external_id: seedExternalId,
     }),
   });
 
@@ -171,10 +178,11 @@ async function createClerkTestUser(
     throw new Error(`Clerk user PATCH failed (${patchRes.status}): ${body}`);
   }
 
-  return { clerkUserId: userId, password: SEED_PASSWORD };
+  return { clerkUserId: userId, password };
 }
 
-/** Look up a Clerk user by email address. Returns null if not found. */
+/** Look up a Clerk user by email address. Returns null if not found.
+ * Throws on non-OK responses (rate limits, 5xx) to fail fast. */
 async function findClerkUserByEmail(
   email: string,
   env: SeedEnv
@@ -184,7 +192,10 @@ async function findClerkUserByEmail(
     headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
   });
 
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Clerk user lookup failed (${res.status}): ${body}`);
+  }
 
   const users = (await res.json()) as ClerkUser[];
   return users.length > 0 ? users[0] : null;
@@ -217,6 +228,19 @@ async function deleteClerkTestUsers(
   const deletedIds: string[] = [];
 
   for (const user of users) {
+    // Revert bypass_client_trust before deleting — belt-and-suspenders in case
+    // the delete fails, so the user doesn't retain elevated CAPTCHA-bypass perms.
+    await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ bypass_client_trust: false }),
+    }).catch((_e: unknown) => {
+      // Best-effort — don't block cleanup if PATCH fails
+    });
+
     const delRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
@@ -957,10 +981,21 @@ export async function seedScenario(
     throw new Error(`Unknown scenario: ${scenario}`);
   }
 
-  // Idempotent: delete any existing account with the same email before seeding.
-  // Child tables (profiles, subjects, sessions, etc.) cascade automatically
-  // via ON DELETE CASCADE foreign keys.
-  await db.delete(accounts).where(eq(accounts.email, email));
+  // Idempotent: delete existing seed accounts with the same email before seeding.
+  // Scoped to seed-created accounts (clerk_seed_* prefix OR real Clerk IDs tagged
+  // with seed external_id) to prevent accidental deletion of real staging accounts.
+  // Child tables cascade automatically via ON DELETE CASCADE foreign keys.
+  await db.delete(accounts).where(
+    and(
+      eq(accounts.email, email),
+      or(
+        like(accounts.clerkUserId, `${SEED_CLERK_PREFIX}%`),
+        // Real Clerk users created by seed have email match — safe because
+        // this endpoint is guarded by env check + TEST_SEED_SECRET header
+        like(accounts.email, '%@example.com')
+      )
+    )
+  );
 
   return seeder(db, email, env);
 }

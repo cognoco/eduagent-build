@@ -205,9 +205,11 @@ echo "[seed-and-run] App should be on sign-in screen. Starting Maestro ..."
 # ── Step 1: Seed via API ──
 echo "[seed-and-run] Seeding scenario='${SCENARIO}' email='${EMAIL}' ..."
 
+# Use node to safely serialize JSON payload (prevents shell injection from EMAIL/SCENARIO)
+SEED_PAYLOAD=$(node -e "process.stdout.write(JSON.stringify({scenario: process.argv[1], email: process.argv[2]}))" "$SCENARIO" "$EMAIL")
 SEED_RESPONSE=$(curl -sf -X POST "${API_URL}/v1/__test/seed" \
   -H "Content-Type: application/json" \
-  -d "{\"scenario\":\"${SCENARIO}\",\"email\":\"${EMAIL}\"}")
+  -d "$SEED_PAYLOAD")
 
 if [ -z "$SEED_RESPONSE" ]; then
   echo "[seed-and-run] ERROR: Seed API returned empty response" >&2

@@ -34,6 +34,7 @@ type TestEnv = {
     ENVIRONMENT: string;
     CLERK_SECRET_KEY?: string;
     TEST_SEED_SECRET?: string;
+    SEED_PASSWORD?: string;
   };
   Variables: { db: Database };
 };
@@ -87,6 +88,7 @@ testSeedRoutes.post(
     const { scenario, email } = c.req.valid('json');
     const seedEnv: SeedEnv = {
       CLERK_SECRET_KEY: c.env.CLERK_SECRET_KEY,
+      SEED_PASSWORD: c.env.SEED_PASSWORD,
     };
     const result = await seedScenario(db, scenario, email, seedEnv);
     return c.json(result, 201);
@@ -97,6 +99,7 @@ testSeedRoutes.post('/__test/reset', async (c) => {
   const db = c.get('db');
   const seedEnv: SeedEnv = {
     CLERK_SECRET_KEY: c.env.CLERK_SECRET_KEY,
+    SEED_PASSWORD: c.env.SEED_PASSWORD,
   };
   const { deletedCount, clerkUsersDeleted } = await resetDatabase(db, seedEnv);
   return c.json({
