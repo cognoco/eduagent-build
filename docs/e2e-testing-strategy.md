@@ -368,46 +368,30 @@ GitHub Actions emulator setup:
 
 Use `@eduagent/factory` for all test data. Never hardcode IDs or values in E2E flows.
 
-For Maestro flows, seed data via the test-only API endpoint. Maestro's `runScript` uses **GraalJS** (not Node.js), so it **cannot** `require()` or `import` npm packages like `@eduagent/factory`. Use Maestro's built-in HTTP module instead:
+For Maestro flows, seed data via the test-only API endpoints:
 
 ```
-POST /v1/__test/seed   # Only available when NODE_ENV=test
-POST /v1/__test/reset   # Truncate all tables
+POST /__test/seed          # Create a pre-configured test scenario
+POST /__test/reset         # Delete seed-created data (clerk_seed_* accounts only)
+GET  /__test/scenarios     # List valid scenario names
+GET  /__test/debug/:email  # Trace account → profiles → subjects chain
+GET  /__test/debug-subjects/:clerkUserId  # Simulate exact subjects query path
 ```
 
-```yaml
-# e2e/flows/_setup/seed-test-user.yaml
-appId: com.eduagent.mobile
----
-- runScript:
-    file: ../scripts/seed.js
-    env:
-      API_URL: ${API_URL}
-```
-
-```javascript
-// e2e/scripts/seed.js — runs in GraalJS (Maestro's embedded JS engine)
-// No require() or import — use Maestro's built-in http module only
-var response = http.post(API_URL + '/v1/__test/seed', {
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    scenario: 'onboarding-complete',
-    email: 'test-e2e@example.com',
-  }),
-});
-output.result = response.body;
-```
-
-Alternatively, run a **Node.js seed script as a CI step before Maestro starts** — this allows full access to `@eduagent/factory` builders:
+> **Note:** The original design used Maestro's GraalJS `runScript` to call the seed API. This was blocked by Issue 13 (`__maestro` undefined in sub-flows). The current approach uses `seed-and-run.sh` — a shell wrapper that seeds via `curl` on the host machine, then passes credentials to Maestro via `-e` CLI env vars.
 
 ```bash
-# In e2e-ci.yml, before the Maestro step:
-- name: Seed test data
-  run: npx tsx apps/mobile/e2e/scripts/seed-ci.ts
-  env:
-    API_URL: http://localhost:8787
-    DATABASE_URL: ${{ env.DATABASE_URL }}
+# Usage: seed-and-run.sh <scenario> <flow-file> [maestro-args...]
+cd apps/mobile/e2e
+./scripts/seed-and-run.sh onboarding-complete flows/account/settings-toggles.yaml
+./scripts/seed-and-run.sh learning-active flows/learning/core-learning.yaml
 ```
+
+The shell wrapper handles the full lifecycle: ADB app clear/launch → dev-client launcher navigation → bundle loading → overlay dismissal → API seeding → Maestro invocation. See Section 7 for the detailed architecture.
+
+### Profile Scope Middleware (BUG-25 — Critical)
+
+The `profileScopeMiddleware` auto-resolves to the owner profile when the `X-Profile-Id` header is absent. This is essential for E2E testing because the mobile client may not send the header during the profile bootstrap sequence after sign-in. Without this fix, all 52 route handlers fell back to `account.id` (which is not a valid profileId), silently returning empty data. Fixed in commit `35ef433`.
 
 ### Isolation Between Parallel CI Runs
 
@@ -431,34 +415,52 @@ Alternatively, run a **Node.js seed script as a CI step before Maestro starts** 
 ```
 apps/
   api/
-    project.json                    # Has test:integration target (DONE)
+    src/
+      routes/test-seed.ts            # POST /__test/seed (10 scenarios), debug endpoints
+      services/test-seed.ts           # Seeding logic + Clerk Backend API integration
+      middleware/profile-scope.ts     # Auto-resolves owner profile when X-Profile-Id absent
+    project.json                      # Has test:integration target (DONE)
   mobile/
     e2e/
       flows/
-        _setup/                     # Seed/teardown flows
-        onboarding/                 # Epic 0 flows
-        learning/                   # Epic 1-2 flows
-        retention/                  # Epic 3 flows
-        parent/                     # Epic 4 flows
-        billing/                    # Epic 5 flows
-      scripts/                      # GraalJS helpers for Maestro runScript (no Node.js APIs)
+        _setup/                       # 10 setup helpers (seed-and-sign-in, dismiss-*, etc.)
+        account/                      # Account management flows
+        billing/                      # Subscription/trial flows
+        consent/                      # GDPR consent flows
+        learning/                     # Session, homework, adaptive flows
+        onboarding/                   # Sign-up, subject creation, consent
+        parent/                       # Parent dashboard, child detail
+        retention/                    # Recall review, failed recall, relearn
+        subjects/                     # Multi-subject management
+        standalone/                   # Pre-auth flows (no seed required)
+      scripts/
+        seed-and-run.sh               # Entry point: ADB automation + seed + Maestro
+        run-all-untested.sh           # Batch runner for all untested flows
+        rerun-failed.sh               # Retry runner for failed flows
+        seed.js                       # (legacy, unused — GraalJS blocked by Issue 13)
       config.yaml
 tests/
-  integration/                      # API integration tests (DONE — 3 suites exist)
-    jest.config.cjs                 # ts-jest, maps @eduagent/* to source paths
-    setup.ts                        # Mock LLM provider, 30s timeout
-    auth-chain.integration.test.ts  # Auth middleware chain validation
-    health-cors.integration.test.ts # Health check + CORS
-    onboarding.integration.test.ts  # Register -> profile -> subject -> session
-    learning.integration.test.ts    # (planned)
-    retention.integration.test.ts   # (planned)
-    billing.integration.test.ts     # (planned)
-    inngest-chains.integration.test.ts  # (planned)
+  integration/                        # API integration tests (15 suites, all passing)
+    jest.config.cjs
+    setup.ts
+    mocks.ts
+    auth-chain.integration.test.ts
+    health-cors.integration.test.ts
+    onboarding.integration.test.ts
+    learning-session.integration.test.ts
+    retention-lifecycle.integration.test.ts
+    session-completed-chain.integration.test.ts
+    stripe-webhook.integration.test.ts
+    account-deletion.integration.test.ts
+    profile-isolation.integration.test.ts
+    test-seed.integration.test.ts
 .github/
   workflows/
-    ci.yml                          # Main CI: lint, typecheck, test, build + integration
-    e2e-ci.yml                      # E2E workflow (DONE — Maestro + Android emulator)
+    ci.yml                            # Main CI: lint, typecheck, test, build + integration
+    e2e-ci.yml                        # E2E workflow (Maestro + Android emulator)
 ```
+
+**Flow inventory:** 53 unique test flows + 10 setup helpers = 63 YAML files total.
 
 This follows the project convention: co-located unit tests in `*.test.ts`, integration/E2E tests in top-level `tests/` directory (per `docs/project_context.md` rule 146). The `jest.config.cjs` maps `@eduagent/*` and `@eduagent/api` to source paths for Hono `app.request()` testing.
 
@@ -476,7 +478,8 @@ Progress as of 2026-03-10:
 4. **CI wiring** — **DONE.** `.github/workflows/e2e-ci.yml` with PostgreSQL service container for both jobs, API server background startup + health check for mobile-maestro job. Advisory mode (`continue-on-error: true`).
 5. **Smoke suite buildout** — **DONE.** All planned smoke and nightly flows written. 16 flows confirmed passing on Android emulator. 35 flows have YAML fixes applied and are ready for validation.
 6. **Seed infrastructure** — **DONE.** `seed-and-run.sh` (shell wrapper: curl + node JSON parsing + ADB automation + Maestro `-e` flags). `test-seed.ts` service with 10 scenarios (onboarding-complete, learning-active, trial-active, trial-expired-child, parent-with-children, parent-solo, retention-due, failed-recall-3x, consent-withdrawn, multi-subject). Bypasses Maestro's broken GraalJS `runScript` (Issue 13).
-7. **Nightly full suite** — IN PROGRESS. All 53 flows written. Batch runner scripts created (`run-all-untested.sh`, `rerun-failed.sh`). Need to complete validation of remaining 35 flows.
+7. **BUG-25 fix: profileScope middleware** — **DONE** (commit `35ef433`). `profileScopeMiddleware` now auto-resolves to owner profile when `X-Profile-Id` header is absent. This was the root cause of seeded subjects/streaks/coaching-cards being invisible on the home screen — blocked ~30 E2E flows.
+8. **Nightly full suite** — IN PROGRESS. All 53 flows written. Batch runner scripts created (`run-all-untested.sh`, `rerun-failed.sh`). 16 flows confirmed passing; 35 ready to validate (BUG-25 fix unblocks ~30).
 
 ### Architecture Evolution (Sessions 1-5)
 
