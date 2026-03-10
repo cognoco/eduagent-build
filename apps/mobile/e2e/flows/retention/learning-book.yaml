@@ -45,8 +45,8 @@ tags:
 # 4. Screenshot of home screen with retention strip
 - takeScreenshot: home-retention-strip
 
-# 5. Navigate to Learning Book via tab (direct navigation)
-- tapOn: "Learning Book"
+# 5. Navigate to Learning Book via tab (BUG-10: use accessibility label, not truncated text)
+- tapOn: "Learning Book Tab"
 
 # 6. Wait for Learning Book screen header
 - extendedWaitUntil:

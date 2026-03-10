@@ -68,7 +68,9 @@ Maestro locates elements via `testID` props (React Native) or accessibility labe
 - All interactive elements (buttons, inputs, toggleable) **must** have a `testID`.
 - Use `accessibilityLabel` when the same string serves both a11y and E2E targeting (preferred for text-bearing elements).
 - Prefer `testID` for non-text elements (containers, loading indicators) where an accessibility label would be meaningless.
-- In Maestro YAML, reference via `id:` (maps to `testID`) or `tapOn:` (matches visible text / `accessibilityLabel`).
+- In Maestro YAML, reference via `id:` (maps to `testID`) or `tapOn:` (matches visible text / `accessibilityLabel` / `contentDescription`).
+- **Tab bar navigation:** Use `tabBarAccessibilityLabel` on `Tabs.Screen` options (maps to Android `contentDescription`). Maestro matches these via `tapOn: "Learning Book Tab"`. This is the ONLY reliable tab navigation method in dev-client builds — point-tap and text matching both break due to BUG-10 (extra hidden tabs). See `e2e-test-bugs.md` BUG-10/BUG-30.
+- **Directory vs file routes:** Expo Router directory routes (`book/index.tsx`) expose raw path segments (`book/index`) in the tab bar, ignoring configured `title` and `tabBarAccessibilityLabel`. Always use file routes (`book.tsx`) for tab screens.
 
 ### Nx Integration
 
@@ -264,7 +266,33 @@ test('continues chain when one step fails (error isolation)', async () => {
 
 ## 3. Smoke Test Matrix
 
-Critical user flows, prioritized by risk and user impact. Tag flows as `smoke` (PR-level) or `full` (nightly).
+Critical user flows, prioritized by risk and user impact.
+
+### Tag Tiers & Graduation Path
+
+| Tag | Blocking? | When it runs | Purpose |
+|-----|-----------|-------------|---------|
+| `smoke` | Eventually yes (once stabilized) | Every PR + nightly | Core flows work end-to-end |
+| `nightly` | Advisory | Nightly 3AM UTC + manual | Edge cases, full coverage |
+
+**Graduation plan:** Once smoke flows achieve >95% pass rate across 2 weeks of nightly runs, remove `continue-on-error: true` from the CI job to make them blocking.
+
+### Embedded Visual Audit (screenshot trail)
+
+Every functional flow also serves as a visual regression check. Instead of separate "visual test" flows, screenshots are embedded at meaningful screen states within existing flows. This answers two questions from one flow:
+1. **Functional:** Does the flow work? (assertions)
+2. **Visual/UX:** Does the screen look correct at each moment? (screenshots)
+
+CI always uploads screenshots as artifacts (`if: always()`), not just on failure. After a CI run, someone glances at the screenshots and spots anything obviously wrong — no pixel diffing, no new tools.
+
+**Where screenshots are embedded (auth + onboarding priority — 100% of users see these):**
+
+| Flow | Screenshots | What they catch |
+|------|-------------|-----------------|
+| `seed-and-sign-in.yaml` | `signin-01-screen-loaded`, `signin-02-email-keyboard-open`, `signin-03-password-keyboard-open`, `signin-04-home-reached` | KAV regressions (BUG-24), layout shifts, broken auth UI |
+| `sign-in-navigation.yaml` | `auth-nav-sign-in`, `auth-nav-sign-in-keyboard`, `auth-nav-sign-up`, `auth-nav-forgot-password`, `auth-nav-back-to-sign-in` | Auth screen rendering, navigation link visibility, keyboard overlay |
+| `sign-up-flow.yaml` | `onboarding-01` through `onboarding-07` | Each onboarding step: sign-up form, profile creation, empty home, subject creation, interview |
+| `create-subject.yaml` | `subject-01` through `subject-04` | Home with subjects, create modal with keyboard, name entry, interview chat |
 
 ### Tier 1: Smoke (run on every PR)
 
@@ -393,6 +421,29 @@ The shell wrapper handles the full lifecycle: ADB app clear/launch → dev-clien
 
 Fixed: `profileScopeMiddleware` auto-resolves to the owner profile when `X-Profile-Id` header is absent. See `e2e-test-bugs.md` BUG-25 for full details.
 
+### TanStack Query Auth Guard (BUG-31 — Critical)
+
+**Rule:** Any TanStack Query hook used inside a provider that mounts before auth (`ProfileProvider` is in root `_layout.tsx`) **MUST** have an `enabled: !!isSignedIn` guard. Without it, the query fires unauthenticated before sign-in, enters TanStack Query error state (401, retries exhausted), and **never recovers** — even after sign-in succeeds. This is because TanStack Query does not auto-retry errored queries when the existing observer re-renders.
+
+**Pattern:**
+```typescript
+import { useAuth } from '@clerk/clerk-expo';
+export function useProfiles() {
+  const { isSignedIn } = useAuth();
+  return useQuery({
+    queryKey: ['profiles'],
+    queryFn: ...,
+    enabled: !!isSignedIn,  // REQUIRED — prevents pre-auth 401 error lock
+  });
+}
+```
+
+See `e2e-test-bugs.md` BUG-31 for full root cause analysis.
+
+### react-native-svg + Fabric Crash (BUG-33 — Known Blocker)
+
+`react-native-svg` 15.12.1 with `newArchEnabled=true` (Fabric) crashes with `ClassCastException` in `RNSVGGroupManagerDelegate` when SVG components (particularly `G`) receive animated props from `react-native-reanimated`. This blocks the Learning Book tab. See `e2e-test-bugs.md` BUG-33.
+
 ### Isolation Between Parallel CI Runs
 
 - **API integration tests:** DELETE cleanup per test or fresh database per CI run (neon-http driver does not support transaction rollback — see Section 2).
@@ -479,7 +530,8 @@ Progress as of 2026-03-10:
 5. **Smoke suite buildout** — **DONE.** All planned smoke and nightly flows written. 16 flows confirmed passing on Android emulator. 35 flows have YAML fixes applied and are ready for validation.
 6. **Seed infrastructure** — **DONE.** `seed-and-run.sh` (shell wrapper: curl + node JSON parsing + ADB automation + Maestro `-e` flags). `test-seed.ts` service with 10 scenarios (onboarding-complete, learning-active, trial-active, trial-expired-child, parent-with-children, parent-solo, retention-due, failed-recall-3x, consent-withdrawn, multi-subject). Bypasses Maestro's broken GraalJS `runScript` (Issue 13).
 7. **BUG-25 fix: profileScope middleware** — **DONE** (commit `35ef433`). `profileScopeMiddleware` now auto-resolves to owner profile when `X-Profile-Id` header is absent. This was the root cause of seeded subjects/streaks/coaching-cards being invisible on the home screen — blocked ~30 E2E flows.
-8. **Nightly full suite** — IN PROGRESS. All 53 flows written. Batch runner scripts created (`run-all-untested.sh`, `rerun-failed.sh`). 16 flows confirmed passing; 35 ready to validate (BUG-25 fix unblocks ~30).
+8. **BUG-10/BUG-30 fix: tab navigation** — **DONE**. Flattened `book/index.tsx` → `book.tsx` (directory routes break tab bar labels in dev-client). Added `tabBarAccessibilityLabel` to all 3 visible tabs in both learner and parent layouts. Updated 7 E2E flow YAML files to use `tapOn: "Learning Book Tab"`. Also fixed BUG-24 (KeyboardAvoidingView), BUG-29 (dashboard loading), BUG-32 (More tab scroll).
+9. **Nightly full suite** — IN PROGRESS. All 53 flows written. Batch runner scripts created (`run-all-untested.sh`, `rerun-failed.sh`). 17 flows confirmed passing; 9 need re-test after BUG-30 fix; 26 ready to validate.
 
 ### Architecture Evolution (Sessions 1-5)
 

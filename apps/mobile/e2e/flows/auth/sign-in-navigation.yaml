@@ -35,6 +35,13 @@ tags:
 
 - takeScreenshot: auth-nav-sign-in
 
+# Visual audit: tap email field to show keyboard state
+- tapOn:
+    id: "sign-in-email"
+- takeScreenshot: auth-nav-sign-in-keyboard
+- tapOn:
+    text: "Welcome back"
+
 # ── Navigate to sign-up ─────────────────────────────────────────────
 
 # 4. Tap sign-up link

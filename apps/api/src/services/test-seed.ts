@@ -11,7 +11,7 @@
  * can sign in via the app's Clerk-powered login UI. When absent (e.g., unit
  * tests), falls back to generating fake `clerk_seed_*` IDs.
  */
-import { eq, and, like, inArray, or } from 'drizzle-orm';
+import { eq, like, inArray, or } from 'drizzle-orm';
 import {
   accounts,
   profiles,
@@ -183,11 +183,14 @@ async function createClerkTestUser(
 }
 
 /** Look up a Clerk user by email address. Returns null if not found.
- * Throws on non-OK responses (rate limits, 5xx) to fail fast. */
+ * Throws on non-OK responses (rate limits, 5xx) to fail fast.
+ * Requires CLERK_SECRET_KEY — returns null without it. */
 async function findClerkUserByEmail(
   email: string,
   env: SeedEnv
 ): Promise<ClerkUser | null> {
+  if (!env.CLERK_SECRET_KEY) return null;
+
   const params = new URLSearchParams({ email_address: email });
   const res = await fetch(`${CLERK_API_BASE}/users?${params.toString()}`, {
     headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
@@ -982,18 +985,24 @@ export async function seedScenario(
     throw new Error(`Unknown scenario: ${scenario}`);
   }
 
-  // Idempotent: delete existing seed accounts with the same email before seeding.
-  // Only deletes accounts whose clerkUserId has the seed prefix — real Clerk users
-  // created by seed are also tagged with clerk_seed_* external_id (set in PATCH step
-  // of createClerkTestUser). Child tables cascade via ON DELETE CASCADE.
-  await db
-    .delete(accounts)
-    .where(
-      and(
-        eq(accounts.email, email),
-        like(accounts.clerkUserId, `${SEED_CLERK_PREFIX}%`)
-      )
-    );
+  // Idempotent: delete existing accounts with the same email before seeding.
+  // Defence-in-depth: look up by email first, then delete by PK only if the
+  // account has a recognizable seed marker (clerk_seed_* prefix) or real Clerk
+  // user ID (user_* prefix from seed runs with CLERK_SECRET_KEY).
+  // This avoids a blind `DELETE WHERE email = ?` which would be dangerous if
+  // the environment guard ever failed (COPPA-regulated platform).
+  // Child tables cascade via ON DELETE CASCADE.
+  const existingAccounts = await db.query.accounts.findMany({
+    where: eq(accounts.email, email),
+  });
+  for (const existing of existingAccounts) {
+    if (
+      existing.clerkUserId.startsWith(SEED_CLERK_PREFIX) ||
+      existing.clerkUserId.startsWith('user_')
+    ) {
+      await db.delete(accounts).where(eq(accounts.id, existing.id));
+    }
+  }
 
   return seeder(db, email, env);
 }
@@ -1041,7 +1050,10 @@ export interface DebugAccountChain {
   }>;
 }
 
-/** Walks account → profiles → subjects chain for a given email. */
+/** Walks account → profiles → subjects chain for a given email.
+ * Finds ALL accounts matching the email — both seed (clerk_seed_*) and real
+ * Clerk users. Safe because this endpoint is ENVIRONMENT-guarded and only
+ * accessible in test/development environments. */
 export async function debugAccountsByEmail(
   db: Database,
   email: string
@@ -1102,6 +1114,8 @@ export async function debugSubjectsByClerkUserId(
   | { result: DebugSubjectsResult }
   | { error: string; detail: Record<string, string> }
 > {
+  // Find account by clerkUserId — includes both seed and real Clerk users.
+  // Safe because this endpoint is ENVIRONMENT-guarded.
   const account = await db.query.accounts.findFirst({
     where: eq(accounts.clerkUserId, clerkUserId),
   });

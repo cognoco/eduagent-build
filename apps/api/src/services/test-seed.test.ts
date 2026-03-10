@@ -27,6 +27,11 @@ function createMockDb(): Database {
     delete: jest.fn().mockReturnValue({
       where: deleteWhere,
     }),
+    query: {
+      accounts: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    },
   } as unknown as Database;
 }
 

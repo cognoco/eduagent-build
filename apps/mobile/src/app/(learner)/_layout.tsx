@@ -616,6 +616,7 @@ export default function LearnerLayout() {
           options={{
             title: 'Home',
             tabBarButtonTestID: 'tab-home',
+            tabBarAccessibilityLabel: 'Home Tab',
             tabBarIcon: ({ focused }) => (
               <TabIcon name="Home" focused={focused} />
             ),
@@ -626,6 +627,7 @@ export default function LearnerLayout() {
           options={{
             title: 'Learning Book',
             tabBarButtonTestID: 'tab-book',
+            tabBarAccessibilityLabel: 'Learning Book Tab',
             tabBarIcon: ({ focused }) => (
               <TabIcon name="Book" focused={focused} />
             ),
@@ -636,6 +638,7 @@ export default function LearnerLayout() {
           options={{
             title: 'More',
             tabBarButtonTestID: 'tab-more',
+            tabBarAccessibilityLabel: 'More Tab',
             tabBarIcon: ({ focused }) => (
               <TabIcon name="More" focused={focused} />
             ),

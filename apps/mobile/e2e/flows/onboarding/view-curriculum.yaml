@@ -1,6 +1,6 @@
 # Flow 3: Home Screen Navigation & Curriculum Review
 # Validates: authenticated home screen elements, tab navigation,
-# tapping a subject navigates to curriculum review.
+# and subjects visible on home screen after seeding.
 # Tags: smoke, onboarding
 #
 # Prerequisites:
@@ -17,42 +17,63 @@ tags:
 # 1. Seed, launch dev-client, sign in.
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
-- assertVisible: "Your coach has a plan"
+
+# 2. Home screen must show subjects section
 - assertVisible: "Your subjects"
 
-# Verify the coaching card area is present (testID: coaching-card)
+# 3. Verify the home scroll view is present
+- assertVisible:
+    id: "home-scroll-view"
+
+# 4. Coaching card should be present on home screen
+# optional: true — coaching card requires precomputed data which
+# may not exist in the learning-active seed scenario
 - assertVisible:
     id: "coaching-card"
     optional: true
 
-# Verify the home scroll view is present
-- assertVisible:
-    id: "home-scroll-view"
+# REMOVED (Rule 3): "Your coach has a plan" assertion dropped — this heading
+# text no longer exists in the home screen implementation. Home screen shows
+# coaching card content directly without this static heading.
 
-# Verify bottom tab bar is visible with expected tabs
-- assertVisible: "Home"
-- assertVisible: "Learning Book"
-- assertVisible: "More"
+# REMOVED (Rule 3): Tab bar text assertions ("Home", "Learning Book", "More")
+# dropped — BUG-10 causes dev-client to show ~9 tabs with truncated labels
+# (e.g. "Ho...", "boo..."). Tab text matching is unreliable in dev-client builds.
+# Tab navigation is validated via accessibility labels instead (steps 6, 9).
 
-# Navigate to Learning Book tab
-- tapOn: "Learning Book"
+# 5. Screenshot: home screen with subjects
+- takeScreenshot: view-curriculum-01-home
 
-# The Learning Book should show filter tabs and topic list
+# 6. Navigate to Learning Book tab (BUG-10: use accessibility label)
+- tapOn: "Learning Book Tab"
+
+# 7. Wait for Learning Book heading
+- extendedWaitUntil:
+    visible:
+      text: "Learning Book"
+    timeout: 10000
+
+# 8. Verify filter tabs are present on Learning Book
+# optional: true — filter tabs only render when multiple subjects exist;
+# learning-active seed may have only one subject
 - assertVisible:
     id: "subject-filter-tabs"
     optional: true
 
-- takeScreenshot: home-navigation
+# 9. Screenshot: Learning Book content
+- takeScreenshot: view-curriculum-02-learning-book
 
-# Navigate back to Home tab
-- tapOn: "Home"
+# 10. Navigate back to Home tab (use accessibility label)
+- tapOn: "Home Tab"
 
-# If subjects exist, tap the first subject to view its curriculum
-# This uses text matching since subject names are dynamic.
-# The curriculum review screen shows "Your Curriculum" or loading state.
+# 11. Verify home screen is visible
 - extendedWaitUntil:
     visible:
-      text: "Your subjects"
-    timeout: 5000
+      id: "home-scroll-view"
+    timeout: 10000
 
-- takeScreenshot: home-subjects-visible
+# 12. Subjects section still visible after round-trip
+- assertVisible: "Your subjects"
+
+# 13. Screenshot
+- takeScreenshot: view-curriculum-03-back-home

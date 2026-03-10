@@ -109,17 +109,22 @@ export default function SignInScreen() {
         className="flex-1"
         contentContainerStyle={{
           flexGrow: 1,
-          justifyContent: 'center',
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
+          paddingTop: insets.top + 24,
+          paddingBottom: insets.bottom + 24,
           paddingHorizontal: 24,
         }}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
       >
-        <Text className="text-h1 font-bold text-text-primary mb-2">
+        {/* Top spacer: pushes form content toward center while keeping ScrollView
+            scrollable when keyboard opens. minHeight prevents full collapse on small
+            screens. Replaces justifyContent:'center' which blocked keyboard scroll
+            (BUG-24). */}
+        <View className="flex-1" style={{ minHeight: 40 }} />
+        <Text className="text-h2 font-bold text-text-primary mb-1">
           Welcome back
         </Text>
-        <Text className="text-body text-text-secondary mb-8">
+        <Text className="text-body-sm text-text-secondary mb-6">
           Sign in to continue learning
         </Text>
 

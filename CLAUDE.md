@@ -239,6 +239,20 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
    - `e2e-tech-spec.md` — Technical spec, phase tasks, infrastructure details
    - `e2e-testing-strategy.md` — Overall strategy, architecture, flow inventory
 3. **Keep docs consistent** — if you fix a bug, update both `e2e-test-bugs.md` (status) and `e2e-test-results.md` (session entry). If you add flows, update `e2e-testing-strategy.md` inventory.
+4. **When emulator issues occur -do not reinvent before your read** - `e2e-emulator-issues.md`
+
+### E2E Flow Integrity Rules (Mandatory)
+
+These rules protect test coverage from silent erosion. Violations are treated as bugs.
+
+1. **Never weaken a test to make it pass.** If an assertion is failing, investigate and report the root cause. Do NOT remove the assertion, add `optional: true`, or rewrite the flow description to match a weaker test. A passing test with no coverage is worse than a failing test.
+
+2. **`optional: true` requires explicit justification.** Only use it when the element is genuinely optional in the UI by design (e.g., a feature flag, a conditional dialog). Never use it because the element is flaky or currently broken. Every `optional: true` must have a comment on the preceding line explaining why.
+
+3. **Removed assertions or navigation steps must be flagged.** If you remove a `tapOn`, `assertVisible`, `scrollUntilVisible`, or any navigation step from an existing flow, you MUST explicitly tell the user what was removed and why. Silent deletion of coverage is not allowed.
+
+4. **The implemented app code is the source of truth.** E2E flows must mirror the real UI as closely as possible (testIDs, text labels, navigation paths, screen structure). If a test fails, the test must be updated to match the app — not the other way around. It is **forbidden** to modify app code to make a test pass (e.g., adding testIDs that don't belong, changing UI behavior to satisfy an assertion, altering navigation to fit a flow). The only exception is when the test caught a genuine bug in the app — then the app code is fixed because it was actually broken, not because a test demanded it.
+
 
 ## Git Rules
 

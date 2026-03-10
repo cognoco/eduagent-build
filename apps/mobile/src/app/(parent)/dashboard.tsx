@@ -92,6 +92,7 @@ export default function DashboardScreen() {
   const {
     data: dashboard,
     isLoading: dashboardLoading,
+    isError,
     refetch,
     isRefetching,
   } = useDashboard();
@@ -134,11 +135,17 @@ export default function DashboardScreen() {
           />
         }
       >
-        {dashboardLoading ? (
+        {dashboardLoading || (!dashboard && !isError) ? (
           <>
             <CardSkeleton />
             <CardSkeleton />
           </>
+        ) : isError ? (
+          <View className="items-center justify-center py-12">
+            <Text className="text-body text-text-secondary">
+              Something went wrong. Pull down to retry.
+            </Text>
+          </View>
         ) : dashboard?.children && dashboard.children.length > 0 ? (
           <>
             {isDemo && <DemoBanner />}

@@ -5,12 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   RetentionSignal,
   type RetentionStatus,
-} from '../../../components/progress';
-import { BookPageFlipAnimation } from '../../../components/common';
-import { useThemeColors } from '../../../lib/theme';
-import { useSubjects } from '../../../hooks/use-subjects';
-import { useOverallProgress } from '../../../hooks/use-progress';
-import { useRetentionTopics } from '../../../hooks/use-retention';
+} from '../../components/progress';
+import { BookPageFlipAnimation } from '../../components/common';
+import { useThemeColors } from '../../lib/theme';
+import { useSubjects } from '../../hooks/use-subjects';
+import { useOverallProgress } from '../../hooks/use-progress';
+import { useRetentionTopics } from '../../hooks/use-retention';
 
 interface EnrichedTopic {
   topicId: string;

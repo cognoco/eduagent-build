@@ -36,6 +36,14 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
     // When X-Profile-Id is absent, auto-resolve to the owner profile.
     // This prevents the broken `?? account.id` fallback in route handlers
     // which silently returns empty results (account.id is not a valid profileId).
+    //
+    // Account-level routes (billing, account settings, profile list) are unaffected —
+    // they read account.id directly and never call c.get('profileId').
+    //
+    // Auto-resolve is try/catch guarded because this middleware runs on ALL routes
+    // including account-level ones. If the DB is down, profile-scoped route handlers
+    // will also fail on their own queries (producing 500). The error log below
+    // ensures the failure is observable in monitoring.
     if (!profileIdHeader) {
       const db = c.get('db');
       const account = c.get('account');
@@ -51,8 +59,7 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
             });
           }
         } catch (err) {
-          // Profile auto-resolve is best-effort; log for observability
-          console.warn(
+          console.error(
             '[profile-scope] Failed to auto-resolve owner profile:',
             err
           );

@@ -21,6 +21,8 @@ tags:
 # The home screen should show the subjects section
 - assertVisible: "Your subjects"
 
+- takeScreenshot: subject-01-home-with-subjects
+
 # Tap "Add subject" button (testID: add-subject-button)
 # There are two instances (with subjects / empty state) but both
 # have the same testID and label text.
@@ -39,6 +41,8 @@ tags:
       id: "create-subject-name"
     timeout: 5000
 
+- takeScreenshot: subject-02-create-modal-keyboard
+
 # Type a subject name into the input (testID: create-subject-name)
 - tapOn:
     id: "create-subject-name"
@@ -53,6 +57,8 @@ tags:
     visible:
       id: "create-subject-submit"
     timeout: 5000
+
+- takeScreenshot: subject-03-name-entered
 
 # Tap the submit button by label text (more reliable after keyboard-induced layout shift)
 - tapOn:
@@ -82,4 +88,4 @@ tags:
 - assertVisible:
     id: "chat-input"
 
-- takeScreenshot: create-subject-interview
+- takeScreenshot: subject-04-interview-started

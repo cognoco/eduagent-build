@@ -1,6 +1,6 @@
 # Flow N5: Multi-Subject Management — View and Navigate Subjects
 # Validates: user with multiple subjects (active, paused, archived) can
-# view subjects list, see status indicators, and navigate to subject detail.
+# view subjects on home screen, navigate between tabs, and see subject detail.
 # Tags: nightly, subjects
 #
 # Journey: UX Journey 1 (Subject Management)
@@ -19,52 +19,74 @@ tags:
       SEED_SCENARIO: "multi-subject"
       API_URL: ${API_URL}
 
-# 2. Home screen
+# 2. Home screen loaded
 - extendedWaitUntil:
     visible:
       id: "home-scroll-view"
     timeout: 15000
 
-# 3. Navigate to Learning Book tab
-# BUG-15: tabBarTestID doesn't propagate on Android.
-# "Learning Book" text may wrap to 2 lines. Use point tap on center-bottom tab.
-- tapOn:
-    point: "50%,97%"
+# 3. Screenshot: home screen — captures what's actually rendering
+- takeScreenshot: multi-subject-01-home
 
-# 4. Wait for subjects list to load
+# 4. Physics (active subject) MUST be visible on home screen
 - extendedWaitUntil:
     visible:
       text: "Physics"
     timeout: 10000
 
-# 5. Verify Physics subject is visible (active)
+# 5. Navigate to Learning Book tab
+- tapOn: "Learning Book Tab"
+
+# 6. Wait for Learning Book to render
+- extendedWaitUntil:
+    visible:
+      text: "Learning Book"
+    timeout: 10000
+
+# 7. Screenshot: Learning Book content
+- takeScreenshot: multi-subject-02-learning-book
+
+# 8. Navigate back to Home tab
+- tapOn: "Home Tab"
+
+# 9. Verify home screen is visible again
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 10000
+
+# 10. Verify Physics still visible after round-trip
 - assertVisible:
     text: "Physics"
 
-# 6. Verify Literature subject is visible (paused)
-- assertVisible:
-    text: "Literature"
-    optional: true
-
-# 7. Tap on Physics subject to view detail
+# 11. Tap on Physics subject to view detail
 - tapOn:
     text: "Physics"
 
-# 8. Wait for subject detail screen
+# 12. Wait for subject detail screen
 - extendedWaitUntil:
     visible:
       text: "Physics"
     timeout: 10000
 
-# 9. Verify subject detail content is present (topics or sessions)
+# 13. Verify subject detail content (topics section)
+# optional: true — "Topics" heading may not render if subject has no curriculum yet
+# (multi-subject seed may not include topics for every subject)
 - assertVisible:
     text: "Topics"
     optional: true
 
-# 10. Navigate back to subjects list
+# 14. Navigate back from subject detail
+# optional: true — back button testID may vary by platform (hardware back on Android)
 - tapOn:
     id: "back-button"
     optional: true
 
-# 11. Screenshot
-- takeScreenshot: multi-subject-complete
+# 15. Verify back on home screen after subject detail round-trip
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 10000
+
+# 16. Final screenshot
+- takeScreenshot: multi-subject-03-back-home

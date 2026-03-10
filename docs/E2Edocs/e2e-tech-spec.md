@@ -219,8 +219,25 @@ exec maestro test -e "EMAIL=${SEED_EMAIL}" -e "PASSWORD=${SEED_PASSWORD}" ... "$
 
 **Priority order:**
 1. `testID` props (most stable): `id: "sign-in-button"`
-2. Accessibility labels: `label: "Sign in"`
-3. Text content (fallback): `text: "Welcome back"`
+2. `tabBarAccessibilityLabel` for tab navigation: `tapOn: "Learning Book Tab"` — maps to Android `contentDescription`, bypasses dev-client tab truncation (BUG-10) and position shifting
+3. Accessibility labels: `label: "Sign in"`
+4. Text content (fallback): `text: "Welcome back"`
+
+**Tab navigation pattern (critical for dev-client):**
+Dev-client builds show hidden Expo Router tabs (BUG-10), causing label truncation and position shifts. **Never use point-tap or text matching for tabs.** Instead:
+```yaml
+# GOOD — matches contentDescription, works regardless of tab count
+- tapOn: "Learning Book Tab"
+- tapOn: "Home Tab"
+- tapOn: "More Tab"
+
+# BAD — breaks when dev-client shows extra tabs
+- tapOn:
+    point: "50%,97%"
+- tapOn:
+    text: "Learning Book"
+```
+These labels are set via `tabBarAccessibilityLabel` in `(learner)/_layout.tsx` and `(parent)/_layout.tsx`.
 
 **Existing testID coverage:** 214 testIDs across 42 component files. Key selectors per screen:
 
@@ -238,7 +255,7 @@ exec maestro test -e "EMAIL=${SEED_EMAIL}" -e "PASSWORD=${SEED_PASSWORD}" ... "$
 | Session Summary | `summary-score`, `summary-topics`, `summary-next`, `summary-close` | `session-summary/[sessionId].tsx` |
 | Coaching Card | `coaching-card-primary`, `coaching-card-secondary` | `BaseCoachingCard.tsx` |
 | Curriculum Review | `curriculum-topic-*`, `curriculum-start-button`, `curriculum-skip` | `onboarding/curriculum-review.tsx` |
-| Learning Book | `book-topic-list`, `book-filter-tabs`, `subject-filter-tabs` | `(learner)/book/index.tsx` |
+| Learning Book | `book-topic-list`, `book-filter-tabs`, `subject-filter-tabs` | `(learner)/book.tsx` (flattened from `book/index.tsx` — directory routes break tab bar labels in dev-client) |
 | Topic Detail | `topic-summary`, `topic-retention`, `topic-review-btn`, `topic-relearn-btn` | `(learner)/topic/[topicId].tsx` |
 | Relearn | `relearn-method-same`, `relearn-method-different`, `relearn-start`, `relearn-explain` | `(learner)/topic/relearn.tsx` |
 | Homework Camera | Multiple camera testIDs (24 total) | `(learner)/homework/camera.tsx` |
@@ -855,8 +872,9 @@ Ordered by dependency chain and value. Status as of 2026-03-10:
 | 5.2 | All Tier 2 flows | **DONE** | 53 flows written |
 | 5.3 | ADB automation (seed-and-run.sh v3) | **DONE** | Full lifecycle via ADB |
 | 5.4 | BUG-25: profileScope middleware fix | **DONE** | Auto-resolve owner profile when X-Profile-Id absent (commit `35ef433`) |
-| 5.5 | Emulator validation | **IN PROGRESS** | 16 passing, 35 ready to validate (BUG-25 fix unblocks ~30) |
-| 5.6 | Nightly scheduled CI workflow | **TODO** | Awaiting flow validation |
+| 5.5 | BUG-10/BUG-30: tab navigation fix | **DONE** | Flattened book route, added `tabBarAccessibilityLabel`, updated 7 flows. Also fixed BUG-24 (KAV), BUG-29 (dashboard), BUG-32 (scroll) |
+| 5.6 | Emulator validation | **IN PROGRESS** | 17 passing, 9 needs re-test (fixes applied), 26 ready to validate |
+| 5.7 | Nightly scheduled CI workflow | **TODO** | Awaiting flow validation |
 
 ---
 
@@ -889,9 +907,19 @@ Ordered by dependency chain and value. Status as of 2026-03-10:
 - [x] All 53 test flows written (8 Tier 2 + 45 additional)
 - [x] 10 setup helper flows created
 - [x] `seed-and-run.sh` v3 with full ADB automation
-- [ ] Remaining 35 flows validated on emulator (16/53 confirmed passing)
+- [x] BUG-31 fixed — `useProfiles()` auth guard enables all data-dependent flows (Session 8)
+- [ ] BUG-33 — react-native-svg + Fabric crash blocks Learning Book tab flows (~5 flows)
+- [ ] Remaining ~33 flows validated on emulator (17/53 confirmed passing, 2 partial)
 - [ ] Nightly scheduled workflow runs in CI
 - [ ] Flake rate <5% over 5 consecutive nightly runs
+
+### Current Blockers (as of Session 8, 2026-03-10)
+| Bug | Severity | Flows Blocked | Fix Status |
+|-----|----------|---------------|------------|
+| BUG-33 (SVG + Fabric crash) | High | ~5 flows (Learning Book tab) | Open — app code fix needed |
+| BUG-27 (consent seed design) | High | 1 flow (consent-withdrawn-gate) | Open — seed restructure needed |
+| BUG-28 (post-approval landing) | Medium | 1 flow (post-approval-landing) | Open — new seed scenario needed |
+| BUG-26 (DB schema drift) | High | 2 flows (billing) | Fixed locally (db:push:dev), need to verify |
 
 ---
 

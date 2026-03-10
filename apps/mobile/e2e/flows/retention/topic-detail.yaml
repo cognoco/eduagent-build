@@ -42,10 +42,9 @@ tags:
     timeout: 15000
 
 # 3. Navigate to Learning Book tab
-# BUG-15: tabBarTestID doesn't propagate on Android.
-# "Learning Book" text may wrap to 2 lines. Use point tap on center-bottom tab.
-- tapOn:
-    point: "50%,97%"
+# BUG-10/BUG-30: Dev-client shows extra tabs, breaking point-tap positions.
+# Use accessibility label (tabBarAccessibilityLabel) for reliable matching.
+- tapOn: "Learning Book Tab"
 
 # 4. Wait for Learning Book to load
 - extendedWaitUntil:

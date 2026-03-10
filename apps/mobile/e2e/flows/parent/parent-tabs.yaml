@@ -32,9 +32,8 @@ tags:
 
 # ---------- Learning Book tab ----------
 
-# 5. Tap "Learning Book" tab
-- tapOn:
-    text: "Learning Book"
+# 5. Tap "Learning Book" tab (BUG-10: use accessibility label, not truncated text)
+- tapOn: "Learning Book Tab"
 
 # 6. Wait for Learning Book to render
 - extendedWaitUntil:

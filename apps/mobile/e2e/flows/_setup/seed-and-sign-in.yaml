@@ -36,10 +36,16 @@ appId: com.mentomate.app
       text: "Welcome back"
     timeout: 120000
 
+# Visual audit: sign-in screen baseline (layout, SSO buttons, form fields)
+- takeScreenshot: signin-01-screen-loaded
+
 # ── Step 2: Sign in with seeded credentials ──
 - tapOn:
     id: "sign-in-email"
 - inputText: ${EMAIL}
+
+# Visual audit: email field with keyboard open (BUG-24 regression guard)
+- takeScreenshot: signin-02-email-keyboard-open
 
 # BUG-3 + BUG-20: Dismiss keyboard so password field is visible.
 # hideKeyboard fails on some Android configs ("custom input" error).
@@ -50,6 +56,9 @@ appId: com.mentomate.app
 - tapOn:
     id: "sign-in-password"
 - inputText: ${PASSWORD}
+
+# Visual audit: password field with keyboard open (BUG-24 regression guard)
+- takeScreenshot: signin-03-password-keyboard-open
 
 # BUG-3 + BUG-20: Dismiss keyboard before tapping sign-in button
 - tapOn:
@@ -69,6 +78,9 @@ appId: com.mentomate.app
     visible:
       id: "home-scroll-view"
     timeout: 30000
+
+# Visual audit: home screen after successful auth
+- takeScreenshot: signin-04-home-reached
 
 # ── Step 4: Dismiss notification permission dialog (BUG-22) ──
 # Android 13+ shows POST_NOTIFICATIONS permission dialog after first sign-in.

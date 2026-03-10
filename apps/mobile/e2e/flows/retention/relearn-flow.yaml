@@ -42,8 +42,8 @@ tags:
       id: "home-scroll-view"
     timeout: 15000
 
-# 3. Navigate to Learning Book tab to find the struggling topic
-- tapOn: "Learning Book"
+# 3. Navigate to Learning Book tab (BUG-10: use accessibility label, not truncated text)
+- tapOn: "Learning Book Tab"
 
 # 4. Wait for Learning Book to load
 - extendedWaitUntil:

@@ -1,9 +1,11 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useAuth } from '@clerk/clerk-expo';
 import { useApiClient } from '../lib/api-client';
 import type { Profile } from '@eduagent/schemas';
 
 export function useProfiles(): UseQueryResult<Profile[]> {
   const client = useApiClient();
+  const { isSignedIn } = useAuth();
 
   return useQuery({
     queryKey: ['profiles'],
@@ -12,5 +14,6 @@ export function useProfiles(): UseQueryResult<Profile[]> {
       const data = await res.json();
       return data.profiles;
     },
+    enabled: !!isSignedIn,
   });
 }

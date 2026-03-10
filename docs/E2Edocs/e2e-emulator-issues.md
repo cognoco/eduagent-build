@@ -1293,3 +1293,263 @@ The seed-and-sign-in pipeline went through 3 major revisions in Sessions 4-5:
 | `dismiss-notifications.yaml` | Tap "Allow" on notification permission dialog |
 | `nav-to-sign-in.yaml` | Navigate to sign-in from launcher |
 | `sign-out.yaml` | Sign out via More → sign-out-button |
+
+---
+
+## ADB Tap Procedure — Correct Method (2026-03-10)
+
+**Critical: Always dump the UI hierarchy BEFORE computing tap coordinates.** An empty or stale dump leads to incorrect coordinates and wasted time. The correct sequence:
+
+### Step-by-step ADB tap procedure
+
+```bash
+export MSYS_NO_PATHCONV=1
+ADB=/c/Android/Sdk/platform-tools/adb.exe
+
+# 1. ALWAYS dump fresh hierarchy first
+$ADB shell uiautomator dump /sdcard/ui_dump.xml 2>/dev/null
+
+# 2. Verify the dump contains expected text (sanity check)
+$ADB exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null | grep -oP 'text="[^"]+"' | sort -u
+
+# 3. Extract bounds for the target element
+BOUNDS=$($ADB exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
+  | grep -oP 'text="TARGET_TEXT"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
+  | head -1 \
+  | grep -oP 'bounds="\K[^"]+')
+
+# 4. ALWAYS verify bounds are non-empty before computing coordinates
+if [ -z "$BOUNDS" ]; then
+  echo "ERROR: Element not found in dump. Do NOT tap."
+  exit 1
+fi
+
+# 5. Parse bounds and compute center
+X1=$(echo "$BOUNDS" | grep -oP '\d+' | sed -n '1p')
+Y1=$(echo "$BOUNDS" | grep -oP '\d+' | sed -n '2p')
+X2=$(echo "$BOUNDS" | grep -oP '\d+' | sed -n '3p')
+Y2=$(echo "$BOUNDS" | grep -oP '\d+' | sed -n '4p')
+TAP_X=$(( (X1 + X2) / 2 ))
+TAP_Y=$(( (Y1 + Y2) / 2 ))
+
+# 6. Tap at computed center
+$ADB shell input tap $TAP_X $TAP_Y
+```
+
+### Common mistakes to avoid
+
+| Mistake | What happens | Fix |
+|---------|-------------|-----|
+| Tap before dump completes | Stale/empty bounds → tap at (0,0) | Always `$ADB shell uiautomator dump` THEN read |
+| Dump during ANR dialog, read after dismiss | Dump XML contains dialog, not launcher UI | Re-dump after dismissing dialog |
+| Empty bounds check skipped | `grep -oP` returns empty → arithmetic on empty → tap at (0,0) | Always `if [ -z "$BOUNDS" ]; then abort` |
+| Dump during React Native overlay | `uiautomator dump` OOM-kills → XML is empty or truncated | Retry dump; if fails 3x, the overlay is blocking |
+| Parse bounds from wrong element | Multiple elements match regex → first match may not be the target | Use `head -1` and verify visually |
+
+### ANR Dialog Coordinates (1080x1920 screen)
+
+ANR dialogs have fixed coordinates on the "New_Device" emulator (1080x1920, 480dpi):
+
+| Dialog | Button | Bounds | Center tap |
+|--------|--------|--------|------------|
+| "System UI isn't responding" | Wait | `[75,1038][1005,1182]` | `(540, 1110)` |
+| "System UI isn't responding" | Close app | `[75,894][1005,1038]` | `(540, 966)` |
+| "App isn't responding" | Wait | `[75,1038][1005,1182]` | `(540, 1110)` |
+| "Bluetooth keeps stopping" | Close app | `[75,894][1005,1038]` | `(540, 966)` |
+
+**Note:** These coordinates are specific to 1080x1920 resolution. If the AVD resolution changes, re-extract from `uiautomator dump`.
+
+### Dev-client Metro server entry tap
+
+The Metro server list in the dev-client launcher has dynamic positions (mDNS discovery order is non-deterministic). **Always parse bounds from the dump — never hardcode coordinates.**
+
+```bash
+# Find 8082 entry (bundle proxy — required for BUG-7 workaround)
+BOUNDS=$($ADB exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
+  | grep -oP 'text="http://10.0.2.2:8082"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
+  | head -1 | grep -oP 'bounds="\K[^"]+')
+```
+
+---
+
+## Issue 13: Maestro gRPC Driver Crash on WHPX After Multiple Test Runs (2026-03-10)
+
+**What happens:** After running 10-16 Maestro steps, the UIAutomator2 gRPC driver crashes with `UNAVAILABLE: io exception` or `Connection reset` on port 7001. The driver process on the device dies, taking the app with it. Subsequent test runs fail with `Maestro Android driver did not start up in time`.
+
+**Trigger pattern:**
+1. Maestro starts test, driver connects on port 7001
+2. 10-16 steps complete successfully (assertions, taps, keyboard input)
+3. During `waitForAppToSettle` (view hierarchy polling), the driver crashes
+4. `io.grpc.StatusRuntimeException: UNAVAILABLE: io exception`
+5. App process dies → Android home screen shown
+6. Next test run: driver can't start (stale instrumentation conflict)
+
+**Root cause:** WHPX emulator resource contention. The UIAutomator2 instrumentation server (runs as a separate process on the device) competes with the React Native app for CPU/memory on the slow WHPX virtualization. During the `waitForAppToSettle` phase, Maestro polls the view hierarchy every ~100ms, creating a burst of gRPC calls that overwhelm the emulator.
+
+**Recovery procedure:**
+```bash
+# 1. Uninstall stuck driver APKs
+$ADB uninstall dev.mobile.maestro
+$ADB uninstall dev.mobile.maestro.test
+
+# 2. Force-stop the app
+$ADB shell am force-stop com.mentomate.app
+
+# 3. Relaunch (Maestro will reinstall driver on next test run)
+$ADB shell am start -n com.mentomate.app/.MainActivity
+
+# If driver still won't start, reboot the emulator:
+$ADB reboot
+# Then re-establish port forwarding after boot:
+$ADB reverse tcp:8081 tcp:8081
+$ADB reverse tcp:8082 tcp:8082
+$ADB reverse tcp:8787 tcp:8788
+```
+
+**Mitigation:** Keep test flows short (< 15 steps). Split long flows into separate files. Give the emulator breathing room between tests (seed-and-run.sh adds 5-10s between steps). Avoid rapid keyboard input/dismiss cycles.
+
+---
+
+## Operational Checklist — Starting an E2E Session (2026-03-10)
+
+Before running any E2E tests, verify ALL services are running:
+
+| # | Service | Verify command | Expected |
+|---|---------|---------------|----------|
+| 1 | Emulator | `$ADB devices` | `emulator-5554  device` |
+| 2 | Metro | `curl http://localhost:8081/status` | `packager-status:running` |
+| 3 | Bundle proxy | `curl http://localhost:8082/status` | `packager-status:running` |
+| 4 | API server | `curl http://localhost:8788/v1/health` | `{"status":"ok",...}` |
+| 5 | ADB reverse | `$ADB reverse --list` | 3 rules: 8081→8081, 8082→8082, 8787→8788 |
+
+**If any service is down, the app will fail to load the bundle or seed data.**
+
+### Service startup commands
+
+```bash
+# Metro (from apps/mobile/)
+cd apps/mobile && npx expo start --port 8081 &
+
+# Bundle proxy (from project root)
+node apps/mobile/e2e/bundle-proxy.js &
+
+# API server (port 8788 — 8787 has zombie workerd processes)
+cd apps/api && npx wrangler dev --port 8788 &
+
+# Port forwarding (must re-do after emulator reboot)
+$ADB reverse tcp:8081 tcp:8081
+$ADB reverse tcp:8082 tcp:8082
+$ADB reverse tcp:8787 tcp:8788
+```
+
+### After emulator reboot
+
+1. Wait for `sys.boot_completed = 1`
+2. Re-establish `adb reverse` port forwarding (rules are lost on reboot)
+3. Pre-grant notification permission: `$ADB shell pm grant com.mentomate.app android.permission.POST_NOTIFICATIONS`
+4. Kill Bluetooth: `$ADB shell am force-stop com.android.bluetooth`
+5. Check for ANR dialogs and dismiss them
+6. Verify all services are up before launching the app
+
+---
+
+## Session 7 Findings (2026-03-10) — `seed-and-run.sh` v4
+
+### `adb reverse` is MANDATORY for Metro
+
+Without `adb reverse tcp:8081 tcp:8081` and `tcp:8082 tcp:8082`, the dev-client cannot reach Metro on the host. The error screen shows:
+
+```
+java.lang.RuntimeException: Unable to load script.
+Make sure you're running Metro or that your bundle 'index...'
+```
+
+`seed-and-run.sh` now sets up `adb reverse` automatically in the pre-flight step. Previously this was manual.
+
+### `seed-and-run.sh` v4 Changes
+
+**Problem:** v3 used `KEYCODE_BACK` to dismiss the "Continue" dev menu overlay. On fast cached bundles (3s load), the overlay appeared and was dismissed, but subsequent Back presses navigated backward from the sign-in screen (navigation root), exiting the app. The script then looped in "Loading..." state for the full timeout (300s in v3) with no useful output.
+
+**Another problem:** When the bundle failed to load (Metro unreachable), the error screen showed "Reload" / "Go To Home". The script matched "Reload" as a dev tools sheet and pressed Back in an infinite loop.
+
+**Fixes applied:**
+
+| Change | v3 | v4 |
+|--------|----|----|
+| Dismiss "Continue" overlay | `KEYCODE_BACK` (exits app!) | **Tap button by bounds** (targeted) |
+| Dev tools "Reload" back-presses | Unlimited loop | **Max 3 attempts**, then FATAL exit |
+| Error screen detection | None | **Instant FATAL** on "problem loading" / "Unable to load script" |
+| Launcher timeout | 120s (hardcoded) | **45s** default, `LAUNCHER_TIMEOUT` env var |
+| Bundle timeout | 300s (hardcoded) | **120s** default, `BUNDLE_TIMEOUT` env var |
+| Fast mode | N/A | `FAST=1` → 20s launcher, 60s bundle |
+| Poll interval | 5s | **3s** |
+| Emulator health check | None | `adb get-state` on every loop iteration |
+| App relaunch attempts | Unlimited | **Max 2**, then FATAL exit |
+| Ctrl+C handling | Script hangs | **Trap INT/TERM** → immediate clean exit |
+| `adb reverse` setup | Manual | **Automatic** (8081 + 8082) |
+| Timeout warning | "continuing anyway" | **FATAL exit** with diagnostic dump |
+| Unknown state logging | "Loading..." (no detail) | Shows first 5 visible text elements |
+
+**Performance comparison (cached bundle on E2E_Device_2):**
+- v3: 120s+ (entered infinite "Loading" loop due to Back key exiting app)
+- v4: **9 seconds** (launcher 3s → Metro tap → Continue tap → dev tools Back → sign-in)
+
+---
+
+## Issue 14: Expo Router Directory Routes Break Tab Bar in Dev-Client (2026-03-10)
+
+**What happened:** The Learning Book tab (`(learner)/book/`) was unreachable via Maestro in dev-client builds. The `tabBarAccessibilityLabel: 'Learning Book Tab'` configured on the `Tabs.Screen` was being ignored — Android UIAutomator showed `content-desc="⏷, book/index"` instead of the configured label.
+
+**Root cause:** Expo Router treats **directory routes** (`book/index.tsx`) differently from **file routes** (`book.tsx`). When a tab screen is a directory route:
+1. The tab bar displays the raw path segment (`book/index`) instead of the configured `title` option
+2. `tabBarAccessibilityLabel` is NOT propagated to the Android `contentDescription`
+3. `tabBarButtonTestID` is also NOT propagated
+
+This is likely because Expo Router internally constructs a different screen name for directory routes (using the directory path) rather than the simple file name.
+
+**Discovery method:** `adb exec-out uiautomator dump /dev/stdout` showed the tab's `content-desc` attribute. The Learning Book tab had `content-desc="⏷, book/index"` while the Home tab (a file route) correctly had `content-desc="Home Tab"`.
+
+**Fix:**
+1. Flatten `book/index.tsx` → `book.tsx` (file route)
+2. Update all import paths (component goes from `../../../hooks/...` to `../../hooks/...`)
+3. Update the `(parent)/book.tsx` re-export path
+4. Update the test file paths similarly
+
+**Lesson for future agents:**
+- **Always use file routes for tab screens** (e.g., `book.tsx`, not `book/index.tsx`). Directory routes break tab bar configuration in dev-client.
+- **Use `tabBarAccessibilityLabel`** (not `tabBarButtonTestID`) for tab navigation in Maestro flows. It maps to Android `contentDescription` which Maestro matches via `tapOn: "label"`.
+- **Verify with UIAutomator:** `adb exec-out uiautomator dump /dev/stdout | grep -o 'content-desc="[^"]*"'` shows what Maestro can actually see.
+- **Never use point-tap (`tapOn: point:`) for tab navigation** — dev-client builds show extra hidden tabs (BUG-10), shifting all tab positions unpredictably.
+
+---
+
+## Issue 15: react-native-svg Crash on Fabric (New Architecture) — ClassCastException (2026-03-10)
+
+**What happens:** Navigating to the Learning Book tab crashes the app with a red error screen:
+
+```
+java.lang.ClassCastException: java.lang.String cannot be cast to...
+  at com.facebook.react.uimanager.BaseViewManagerDelegate
+  at com.facebook.react.viewmanagers.RNSVGGroupManagerDelegate
+  at com.facebook.react.fabric.mounting.SurfaceMountingManager.updateProp
+```
+
+**Environment:**
+- `react-native-svg: 15.12.1`
+- `newArchEnabled=true` (Fabric) in `android/gradle.properties:41`
+- `react-native-reanimated` provides animated SVG transforms
+
+**Affected component:** `BookPageFlipAnimation.tsx` uses `Svg`, `Rect`, `Line`, `G` from react-native-svg. The `G` (Group) component triggers the Fabric `RNSVGGroupManagerDelegate` crash when receiving animated props from reanimated.
+
+**Reproduction:** 100% reproducible — tap "Learning Book Tab" on any seeded flow. The loading state renders `BookPageFlipAnimation` which crashes immediately.
+
+**Why home screen SVG doesn't crash:** `PenWritingAnimation` (also SVG) only renders during `coachingCard.isLoading` on the home screen. In E2E tests, the coaching card API responds fast enough that the loading state is never visible — the SVG never mounts.
+
+**Not an emulator issue:** This is a genuine react-native-svg + Fabric incompatibility. It would crash on real devices with Fabric enabled too.
+
+**Tracked as:** BUG-33 in `e2e-test-bugs.md`
+
+**Lesson for future agents:**
+- **react-native-svg + Fabric + reanimated** is a known fragile combination. If you see `ClassCastException` in `RNSVG*ManagerDelegate`, it's a prop type mismatch in the Fabric bridge.
+- **Don't modify the animation component to fix E2E tests** (CLAUDE.md Rule 4). This is an app bug that needs a proper fix (update react-native-svg, replace with non-SVG animation, or add error boundary).
+- **SVG loading animations may not crash on fast networks** because the loading state resolves before SVG mounts. Test on slow connections or add artificial delays to expose these crashes.
