@@ -907,9 +907,19 @@ Ordered by dependency chain and value. Status as of 2026-03-10:
 - [x] All 53 test flows written (8 Tier 2 + 45 additional)
 - [x] 10 setup helper flows created
 - [x] `seed-and-run.sh` v3 with full ADB automation
-- [ ] Remaining 35 flows validated on emulator (16/53 confirmed passing)
+- [x] BUG-31 fixed — `useProfiles()` auth guard enables all data-dependent flows (Session 8)
+- [ ] BUG-33 — react-native-svg + Fabric crash blocks Learning Book tab flows (~5 flows)
+- [ ] Remaining ~33 flows validated on emulator (17/53 confirmed passing, 2 partial)
 - [ ] Nightly scheduled workflow runs in CI
 - [ ] Flake rate <5% over 5 consecutive nightly runs
+
+### Current Blockers (as of Session 8, 2026-03-10)
+| Bug | Severity | Flows Blocked | Fix Status |
+|-----|----------|---------------|------------|
+| BUG-33 (SVG + Fabric crash) | High | ~5 flows (Learning Book tab) | Open — app code fix needed |
+| BUG-27 (consent seed design) | High | 1 flow (consent-withdrawn-gate) | Open — seed restructure needed |
+| BUG-28 (post-approval landing) | Medium | 1 flow (post-approval-landing) | Open — new seed scenario needed |
+| BUG-26 (DB schema drift) | High | 2 flows (billing) | Fixed locally (db:push:dev), need to verify |
 
 ---
 

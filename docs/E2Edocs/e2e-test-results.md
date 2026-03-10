@@ -254,7 +254,34 @@ During investigation of why ALL seeded data (subjects, streaks, coaching cards) 
 - BUG-29 fix unblocks: `demo-dashboard.yaml` (1 flow, needs re-test)
 - Remaining blockers: BUG-31 (seeded data not visible), BUG-26 (DB schema drift), BUG-27/BUG-28 (consent flow design)
 
-### Cumulative Totals (as of Session 7 follow-up)
+### Session 8 (2026-03-10) — BUG-31 Fix Verification + BUG-33 Discovery
+
+**Key achievement: BUG-31 FIXED** — `useProfiles()` was missing `enabled: !!isSignedIn` guard, causing the query to fire before auth and enter permanent error state. Fix: added the guard in `use-profiles.ts`.
+
+| # | Flow | Status | Notes |
+|---|------|--------|-------|
+| 1 | `subjects/multi-subject.yaml` | PARTIAL PASS | Home screen: `"Physics" is visible... COMPLETED`. Fails at Learning Book tab (BUG-33: SVG crash) |
+| 2 | `onboarding/view-curriculum.yaml` | PARTIAL PASS | Home screen: `"Your subjects" is visible... COMPLETED`. Fails at Learning Book tab (BUG-33: SVG crash) |
+
+**BUG-31 fix confirmed:**
+- `"Physics" is visible... COMPLETED` — seeded subjects now appear on home screen
+- `"Your subjects" is visible... COMPLETED` — home screen data pipeline working end-to-end
+- Both flows pass ALL steps up to Learning Book tab navigation
+
+**BUG-33 discovered:** `react-native-svg` + Fabric (New Architecture) `ClassCastException` in `RNSVGGroupManagerDelegate`. The `BookPageFlipAnimation` component crashes when the Learning Book tab renders its loading state. 100% reproducible. This is a genuine app bug (not a test issue). See `e2e-test-bugs.md` for full details.
+
+**Files changed (BUG-31 fix):**
+- `apps/mobile/src/hooks/use-profiles.ts` — added `enabled: !!isSignedIn`
+- `apps/mobile/src/hooks/use-profiles.test.ts` — added Clerk mock + new test case
+- `apps/mobile/src/lib/profile.test.tsx` — added Clerk mock
+- `apps/api/src/services/test-seed.ts` — debug endpoint fix (removed `clerk_seed_*` filter)
+
+**Impact:**
+- BUG-31 fix unblocks ALL ~30 data-dependent flows (home screen assertions now pass)
+- BUG-33 blocks flows that navigate to Learning Book tab (5+ flows)
+- Flows that only test home screen, account, settings, parent dashboard are now fully testable
+
+### Cumulative Totals (as of Session 8)
 
 | Category | Flows | Status |
 |----------|-------|--------|
@@ -262,16 +289,18 @@ During investigation of why ALL seeded data (subjects, streaks, coaching cards) 
 | Post-auth (comprehensive, hardcoded creds) | 1 | **PASS** (65 steps) |
 | Quick-check / misc | 1 | **PASS** (simple screenshot) |
 | Seed-dependent (confirmed PASS) | 6 | **PASS** (account-lifecycle, delete-account, parent-dashboard, settings-toggles, parent-tabs, create-subject) |
-| Seed-dependent (FAIL — fixed, needs re-test) | 9 | **Needs re-test** — BUG-30 fix unblocks 7, BUG-29/32 fix unblocks 2 |
-| Seed-dependent (not yet tested) | 26 | **Ready to test** — pending BUG-31/BUG-25 verification |
+| Seed-dependent (BUG-31 fixed, partial pass) | 2 | **PARTIAL PASS** — home screen passes, Learning Book blocked by BUG-33 |
+| Seed-dependent (needs re-test with BUG-31 fix) | 7 | **Ready to re-test** — BUG-30 fix + BUG-31 fix should unblock |
+| Seed-dependent (not yet tested) | 26 | **Ready to test** — BUG-31 fix enables data-dependent flows |
+| Blocked by BUG-33 (SVG crash) | ~5 | **Blocked** — any flow navigating to Learning Book tab |
 | Camera/native | 1 | **SKIP** (emulator has no camera) |
 | ExpoGo-only | 1 | **SKIP** (wrong app type — we use dev-client) |
-| **Total** | **53** | **17 passing, 9 needs re-test (fixes applied), 26 ready to test, 2 skipped** |
+| **Total** | **53** | **17 passing, 2 partial pass, 7 needs re-test, ~26 ready to test, 2 skipped** |
 
 ---
 
 ## References
 
-- **Bug details:** See `e2e-test-bugs.md` for all bug entries (BUG-1 through BUG-32) with root causes, fixes, and workarounds.
+- **Bug details:** See `e2e-test-bugs.md` for all bug entries (BUG-1 through BUG-33) with root causes, fixes, and workarounds.
 - **Environment setup:** See `e2e-emulator-issues.md` for emulator configuration, known environment issues, and operational notes.
 - **Infrastructure:** See `e2e-tech-spec.md` for flow specifications, seeding architecture, and CI integration.

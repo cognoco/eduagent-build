@@ -421,6 +421,29 @@ The shell wrapper handles the full lifecycle: ADB app clear/launch → dev-clien
 
 Fixed: `profileScopeMiddleware` auto-resolves to the owner profile when `X-Profile-Id` header is absent. See `e2e-test-bugs.md` BUG-25 for full details.
 
+### TanStack Query Auth Guard (BUG-31 — Critical)
+
+**Rule:** Any TanStack Query hook used inside a provider that mounts before auth (`ProfileProvider` is in root `_layout.tsx`) **MUST** have an `enabled: !!isSignedIn` guard. Without it, the query fires unauthenticated before sign-in, enters TanStack Query error state (401, retries exhausted), and **never recovers** — even after sign-in succeeds. This is because TanStack Query does not auto-retry errored queries when the existing observer re-renders.
+
+**Pattern:**
+```typescript
+import { useAuth } from '@clerk/clerk-expo';
+export function useProfiles() {
+  const { isSignedIn } = useAuth();
+  return useQuery({
+    queryKey: ['profiles'],
+    queryFn: ...,
+    enabled: !!isSignedIn,  // REQUIRED — prevents pre-auth 401 error lock
+  });
+}
+```
+
+See `e2e-test-bugs.md` BUG-31 for full root cause analysis.
+
+### react-native-svg + Fabric Crash (BUG-33 — Known Blocker)
+
+`react-native-svg` 15.12.1 with `newArchEnabled=true` (Fabric) crashes with `ClassCastException` in `RNSVGGroupManagerDelegate` when SVG components (particularly `G`) receive animated props from `react-native-reanimated`. This blocks the Learning Book tab. See `e2e-test-bugs.md` BUG-33.
+
 ### Isolation Between Parallel CI Runs
 
 - **API integration tests:** DELETE cleanup per test or fresh database per CI run (neon-http driver does not support transaction rollback — see Section 2).

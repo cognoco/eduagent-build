@@ -25,8 +25,9 @@ jest.mock('../lib/api-client', () => ({
 
 jest.mock('../lib/profile', () => ({}));
 
+const mockUseAuth = jest.fn(() => ({ isSignedIn: true }));
 jest.mock('@clerk/clerk-expo', () => ({
-  useAuth: () => ({ isSignedIn: true }),
+  useAuth: () => mockUseAuth(),
 }));
 
 let queryClient: QueryClient;
@@ -129,8 +130,7 @@ describe('useProfiles', () => {
   });
 
   it('does not fetch when user is not signed in', async () => {
-    const clerkMock = require('@clerk/clerk-expo') as { useAuth: jest.Mock };
-    clerkMock.useAuth = jest.fn(() => ({ isSignedIn: false }));
+    mockUseAuth.mockReturnValue({ isSignedIn: false });
 
     const { result } = renderHook(() => useProfiles(), {
       wrapper: createWrapper(),
@@ -140,8 +140,5 @@ describe('useProfiles', () => {
     expect(mockFetch).not.toHaveBeenCalled();
     expect(result.current.data).toBeUndefined();
     expect(result.current.fetchStatus).toBe('idle');
-
-    // Restore for other tests
-    clerkMock.useAuth = jest.fn(() => ({ isSignedIn: true }));
   });
 });

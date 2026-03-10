@@ -159,6 +159,7 @@ export default function SignUpScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
         >
+          {/* Top spacer: see sign-in.tsx BUG-24 comment */}
           <View className="flex-1" style={{ minHeight: 40 }} />
           <Text className="text-h2 font-bold text-text-primary mb-1">
             Verify your email
@@ -240,6 +241,7 @@ export default function SignUpScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
+        {/* Top spacer: see sign-in.tsx BUG-24 comment */}
         <View className="flex-1" style={{ minHeight: 40 }} />
         <Text className="text-h2 font-bold text-text-primary mb-1">
           Create account

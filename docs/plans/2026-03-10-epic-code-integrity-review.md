@@ -22,6 +22,10 @@
 | Epic 3 | Assessment, Retention & Extensions | **DONE** | PASS (1 minor schema note) |
 | Epic 4 | Progress & Dashboard | **DONE** | PASS (all clear) |
 | Epic 5 | Billing & Subscription | **DONE** | PASS (all clear) |
+| Epic 6 | Language Learning | **DONE** | NOT IMPLEMENTED (deferred v1.1 — confirmed) |
+| Epic 7 | Concept Map & Prerequisites | **DONE** | NOT IMPLEMENTED (deferred v1.1 — confirmed) |
+| Epic 8 | Full Voice Mode | **DONE** | PARTIAL — foundation only (Epic 3 Cluster G) |
+| Epic 9 | Native In-App Purchases | **DONE** | PASS — FULLY IMPLEMENTED |
 
 ---
 
@@ -192,11 +196,69 @@
 
 ---
 
+## Epic 6: Language Learning (v1.1)
+
+**Status: NOT IMPLEMENTED — Confirmed deferred. No code exists.**
+
+No language selection UI, no language-specific session types, no bilingual dictionary, pronunciation, or fluency drill code. Documentation confirms: "Language Learning (v1.1) — design for but don't build." Architecture docs provide extension points for future implementation. FR146 (Language SPEAK/LISTEN voice) depends on Epic 8.1-8.2.
+
+---
+
+## Epic 7: Concept Map & Prerequisites (v1.1)
+
+**Status: NOT IMPLEMENTED — Confirmed deferred. No code exists.**
+
+No `topic_prerequisites` join table in database schema. No DAG data model, cycle detection, or topological sort services. No concept map screen or component. No prerequisite-aware ordering in Learning Book or coaching cards. Database schema shows flat `sortOrder` on `curriculumTopics` only. Architecture docs provide extension points for future implementation.
+
+---
+
+## Epic 8: Full Voice Mode (v1.1)
+
+**Status: PARTIALLY IMPLEMENTED — Foundation only from Epic 3 Cluster G (TEACH_BACK).**
+
+### What IS implemented (Epic 3 Cluster G — not Epic 8):
+- `VoiceToggle.tsx` — mute/unmute TTS (on by default for TEACH_BACK only)
+- `useTextToSpeech()` hook — wraps `expo-speech` (Option A: wait for complete)
+- `useSpeechRecognition()` hook — on-device STT via `expo-speech-recognition`
+- `VoiceRecordButton.tsx` — recording UI with transcript preview
+- STT/TTS integrated into `ChatShell.tsx` **only for `verificationType === 'teach_back'`**
+
+### What is NOT implemented (Epic 8 specifics):
+- No voice mode toggle at session start for all session types
+- No `input_mode` / `voice_mode` field on sessions table
+- Voice NOT extended to learning/homework/interleaved sessions
+- No voice session controls (pause, replay, speed cycling)
+- No VAD (Voice Activity Detection)
+- No accessibility spike for VoiceOver/TalkBack coexistence (Story 8.4)
+
+**Verdict:** The voice infrastructure is solid and production-ready for TEACH_BACK. Extending it to all session types (Epic 8 proper) is a future task as designed.
+
+---
+
+## Epic 9: Native In-App Purchases (Pre-Launch)
+
+**Status: PASS — FULLY IMPLEMENTED. No regressions detected.**
+
+| Area | Status | Detail |
+|------|--------|--------|
+| Database Schema | PASS | `revenuecatOriginalAppUserId` + `lastRevenuecatEventId` on subscriptions table. `revenuecatTransactionId` on topUpCredits table (`billing.ts:49-50, 93`). |
+| Webhook Route | PASS | `POST /v1/revenuecat/webhook` handles: INITIAL_PURCHASE, RENEWAL, CANCELLATION, EXPIRATION, BILLING_ISSUE, SUBSCRIBER_ALIAS, PRODUCT_CHANGE, UNCANCELLATION, NON_RENEWING_PURCHASE. Idempotency via `isRevenuecatEventProcessed()`. |
+| Product Mapping | PASS | `com.eduagent.plus.monthly`, `.family.yearly`, `.pro.monthly`, etc. (iOS + Android variants). Consumable: `com.eduagent.topup.500`. |
+| Mobile SDK | PASS | `configureRevenueCat()` initializes with platform-specific keys. `useRevenueCatIdentity()` syncs Clerk → `Purchases.logIn(clerkUserId)`. `useOfferings()`, `useCustomerInfo()`, `usePurchase()`, `useRestorePurchases()` hooks — all via TanStack Query. Located in `lib/revenuecat.ts` + `hooks/use-revenuecat.ts`. |
+| Subscription UI | PASS | `subscription.tsx` uses RevenueCat offerings, entitlement detection, platform-specific management links (App Store / Google Play). |
+| KV Cache | PASS | `refreshKvCache()` called after every webhook event. Same KV structure as Stripe path. |
+| Billing Services | PASS | `activateSubscriptionFromRevenuecat()`, `updateSubscriptionFromRevenuecatWebhook()`, `purchaseTopUpCredits()` with idempotency. |
+| Stripe Preserved | PASS | All Stripe code intentionally kept dormant — routes, services, webhooks all present but not active on mobile. |
+| Config | PASS | `REVENUECAT_WEBHOOK_SECRET` optional in config. `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS/ANDROID` for mobile. Graceful no-op on web or when keys not configured. |
+| Tests | PASS | `revenuecat-webhook.test.ts` covers event handlers. |
+
+---
+
 ## Cross-Cutting Concerns
 
 ### Pattern Violations Found
 
-**None.** All 6 agents verified:
+**None.** All agents verified:
 - 0 ORM imports in route files (service separation enforced)
 - 0 `.then()` chains (async/await everywhere)
 - 0 default exports outside Expo Router pages
@@ -227,7 +289,7 @@
 
 ## Summary & Recommendations
 
-### Overall Verdict: PASS — Codebase integrity is solid.
+### Overall Verdict: PASS — Codebase integrity is solid across all 10 epics.
 
 | Epic | Result | Regressions | Concerns |
 |------|--------|-------------|----------|
@@ -237,6 +299,10 @@
 | Epic 3 — Assessment | PASS | None | 1 minor (schema constraint) |
 | Epic 4 — Dashboard | PASS | None | None |
 | Epic 5 — Billing | PASS | None | None |
+| Epic 6 — Language | NOT IMPLEMENTED | N/A | Deferred v1.1 (confirmed, no code) |
+| Epic 7 — Concept Map | NOT IMPLEMENTED | N/A | Deferred v1.1 (confirmed, no code) |
+| Epic 8 — Full Voice | PARTIAL (foundation) | None | Voice only for TEACH_BACK; full extension deferred |
+| Epic 9 — Native IAP | PASS | None | None — fully implemented with RevenueCat |
 
 ### Key Finding
 

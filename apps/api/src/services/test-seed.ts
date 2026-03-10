@@ -986,12 +986,23 @@ export async function seedScenario(
   }
 
   // Idempotent: delete existing accounts with the same email before seeding.
-  // Intentionally broader than clerk_seed_* prefix: also catches seed accounts
-  // created with real Clerk user IDs (when CLERK_SECRET_KEY was set during seed).
-  // Defence-in-depth: this entire service is ENVIRONMENT-guarded (test-seed route
-  // rejects non-test environments) so email-only matching is safe.
+  // Defence-in-depth: look up by email first, then delete by PK only if the
+  // account has a recognizable seed marker (clerk_seed_* prefix) or real Clerk
+  // user ID (user_* prefix from seed runs with CLERK_SECRET_KEY).
+  // This avoids a blind `DELETE WHERE email = ?` which would be dangerous if
+  // the environment guard ever failed (COPPA-regulated platform).
   // Child tables cascade via ON DELETE CASCADE.
-  await db.delete(accounts).where(eq(accounts.email, email));
+  const existingAccounts = await db.query.accounts.findMany({
+    where: eq(accounts.email, email),
+  });
+  for (const existing of existingAccounts) {
+    if (
+      existing.clerkUserId.startsWith(SEED_CLERK_PREFIX) ||
+      existing.clerkUserId.startsWith('user_')
+    ) {
+      await db.delete(accounts).where(eq(accounts.id, existing.id));
+    }
+  }
 
   return seeder(db, email, env);
 }

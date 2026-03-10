@@ -25,32 +25,55 @@ tags:
 - assertVisible:
     id: "home-scroll-view"
 
-# 4. Screenshot: home screen with subjects
+# 4. Coaching card should be present on home screen
+# optional: true — coaching card requires precomputed data which
+# may not exist in the learning-active seed scenario
+- assertVisible:
+    id: "coaching-card"
+    optional: true
+
+# REMOVED (Rule 3): "Your coach has a plan" assertion dropped — this heading
+# text no longer exists in the home screen implementation. Home screen shows
+# coaching card content directly without this static heading.
+
+# REMOVED (Rule 3): Tab bar text assertions ("Home", "Learning Book", "More")
+# dropped — BUG-10 causes dev-client to show ~9 tabs with truncated labels
+# (e.g. "Ho...", "boo..."). Tab text matching is unreliable in dev-client builds.
+# Tab navigation is validated via accessibility labels instead (steps 6, 9).
+
+# 5. Screenshot: home screen with subjects
 - takeScreenshot: view-curriculum-01-home
 
-# 5. Navigate to Learning Book tab (BUG-10: use accessibility label)
+# 6. Navigate to Learning Book tab (BUG-10: use accessibility label)
 - tapOn: "Learning Book Tab"
 
-# 6. Wait for Learning Book heading
+# 7. Wait for Learning Book heading
 - extendedWaitUntil:
     visible:
       text: "Learning Book"
     timeout: 10000
 
-# 7. Screenshot: Learning Book content
+# 8. Verify filter tabs are present on Learning Book
+# optional: true — filter tabs only render when multiple subjects exist;
+# learning-active seed may have only one subject
+- assertVisible:
+    id: "subject-filter-tabs"
+    optional: true
+
+# 9. Screenshot: Learning Book content
 - takeScreenshot: view-curriculum-02-learning-book
 
-# 8. Navigate back to Home tab (use accessibility label)
+# 10. Navigate back to Home tab (use accessibility label)
 - tapOn: "Home Tab"
 
-# 9. Verify home screen is visible
+# 11. Verify home screen is visible
 - extendedWaitUntil:
     visible:
       id: "home-scroll-view"
     timeout: 10000
 
-# 10. Subjects section still visible after round-trip
+# 12. Subjects section still visible after round-trip
 - assertVisible: "Your subjects"
 
-# 11. Screenshot
+# 13. Screenshot
 - takeScreenshot: view-curriculum-03-back-home

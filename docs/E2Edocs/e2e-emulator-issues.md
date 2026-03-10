@@ -1520,3 +1520,36 @@ This is likely because Expo Router internally constructs a different screen name
 - **Use `tabBarAccessibilityLabel`** (not `tabBarButtonTestID`) for tab navigation in Maestro flows. It maps to Android `contentDescription` which Maestro matches via `tapOn: "label"`.
 - **Verify with UIAutomator:** `adb exec-out uiautomator dump /dev/stdout | grep -o 'content-desc="[^"]*"'` shows what Maestro can actually see.
 - **Never use point-tap (`tapOn: point:`) for tab navigation** — dev-client builds show extra hidden tabs (BUG-10), shifting all tab positions unpredictably.
+
+---
+
+## Issue 15: react-native-svg Crash on Fabric (New Architecture) — ClassCastException (2026-03-10)
+
+**What happens:** Navigating to the Learning Book tab crashes the app with a red error screen:
+
+```
+java.lang.ClassCastException: java.lang.String cannot be cast to...
+  at com.facebook.react.uimanager.BaseViewManagerDelegate
+  at com.facebook.react.viewmanagers.RNSVGGroupManagerDelegate
+  at com.facebook.react.fabric.mounting.SurfaceMountingManager.updateProp
+```
+
+**Environment:**
+- `react-native-svg: 15.12.1`
+- `newArchEnabled=true` (Fabric) in `android/gradle.properties:41`
+- `react-native-reanimated` provides animated SVG transforms
+
+**Affected component:** `BookPageFlipAnimation.tsx` uses `Svg`, `Rect`, `Line`, `G` from react-native-svg. The `G` (Group) component triggers the Fabric `RNSVGGroupManagerDelegate` crash when receiving animated props from reanimated.
+
+**Reproduction:** 100% reproducible — tap "Learning Book Tab" on any seeded flow. The loading state renders `BookPageFlipAnimation` which crashes immediately.
+
+**Why home screen SVG doesn't crash:** `PenWritingAnimation` (also SVG) only renders during `coachingCard.isLoading` on the home screen. In E2E tests, the coaching card API responds fast enough that the loading state is never visible — the SVG never mounts.
+
+**Not an emulator issue:** This is a genuine react-native-svg + Fabric incompatibility. It would crash on real devices with Fabric enabled too.
+
+**Tracked as:** BUG-33 in `e2e-test-bugs.md`
+
+**Lesson for future agents:**
+- **react-native-svg + Fabric + reanimated** is a known fragile combination. If you see `ClassCastException` in `RNSVG*ManagerDelegate`, it's a prop type mismatch in the Fabric bridge.
+- **Don't modify the animation component to fix E2E tests** (CLAUDE.md Rule 4). This is an app bug that needs a proper fix (update react-native-svg, replace with non-SVG animation, or add error boundary).
+- **SVG loading animations may not crash on fast networks** because the loading state resolves before SVG mounts. Test on slow connections or add artificial delays to expose these crashes.
