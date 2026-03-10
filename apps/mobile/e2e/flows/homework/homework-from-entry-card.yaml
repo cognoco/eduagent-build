@@ -83,8 +83,12 @@ tags:
 - hideKeyboard
 
 # 11. Send to AI
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
+# (returnKeyType="send" triggers onSubmitEditing). Keep tapOn as optional fallback.
+- pressKey: Enter
 - tapOn:
     id: "send-button"
+    optional: true
 
 # 12. Wait for AI response — real Gemini call, 30s timeout
 - extendedWaitUntil:

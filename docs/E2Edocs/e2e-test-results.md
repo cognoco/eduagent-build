@@ -281,7 +281,38 @@ During investigation of why ALL seeded data (subjects, streaks, coaching cards) 
 - BUG-33 blocks flows that navigate to Learning Book tab (5+ flows)
 - Flows that only test home screen, account, settings, parent dashboard are now fully testable
 
-### Cumulative Totals (as of Session 8)
+### Session 9 (2026-03-10) — BUG-31 Fix Verification + Full Flow Sweep
+
+**Objective:** Verify BUG-31 fix works end-to-end, then run all previously-blocked flows.
+
+**Infrastructure fixes applied this session:**
+1. Fixed `seed-and-run.sh` — dev tools Close button instead of Back key (prevented BUG-14 exit-app)
+2. Fixed `seed-and-run.sh` — `|| true` on grep pipelines to prevent `set -euo pipefail` silent crash
+3. Fixed `seed-and-run.sh` — the full launch sequence now works: clear → launch → DEVELOPMENT → Metro tap → Continue → Close → sign-in
+
+| # | Flow | Scenario | Status | Notes |
+|---|------|----------|--------|-------|
+| 1 | `learning/core-learning.yaml` | learning-active | PARTIAL PASS | Sign-in ✓, home screen ✓, coaching card ✓, session start ✓, chat-input ✓, text entered ✓, **send-button NOT FOUND** (BUG-35) |
+| 2 | `learning/start-session.yaml` | learning-active | PARTIAL PASS | Same as above — all steps pass through text input, fails at send-button (BUG-35) |
+| 3 | `account/more-tab-navigation.yaml` | onboarding-complete | FAIL | Sign-in ✓ (setup passes), but main flow's home-scroll-view check fails — app redirected to /create-subject (BUG-34) |
+
+**BUG-31 fix CONFIRMED WORKING:**
+- Sign-in with `learning-active` → home screen shows subjects ✓
+- `coaching-card-primary` found and tapped ✓ (coaching card renders with real data)
+- Chat session started ✓ (chat-input visible)
+- Text input entered ✓ ("Explain the concept to me")
+- AI responded ✓ (confirmed via manual Enter key press — typing indicator appeared, then AI response rendered)
+
+**New bugs discovered:**
+- **BUG-34:** `onboarding-complete` and other subject-less scenarios auto-redirect from home to /create-subject. Blocks ~10 flows.
+- **BUG-35:** `KeyboardAvoidingView behavior="height"` + `adjustResize` conflict on Android. Keyboard covers ChatShell input bar. Blocks ~15 chat-based flows. Workaround: `pressKey: Enter` (keyboard's send key) works.
+
+**seed-and-run.sh fixes (3 bugs found and fixed):**
+1. Dev tools sheet handler was pressing Back (exits app per BUG-14). Changed to tap Close (X) button.
+2. `set -euo pipefail` caused silent script crash when `grep -oP` found no text matches in UI dump. Added `|| true` to 3 grep pipeline assignments.
+3. Both fixes combined make the script reliably navigate: clear → launch → development → Metro → Continue → Close → sign-in in ~12 seconds.
+
+### Cumulative Totals (as of Session 9)
 
 | Category | Flows | Status |
 |----------|-------|--------|
@@ -289,18 +320,24 @@ During investigation of why ALL seeded data (subjects, streaks, coaching cards) 
 | Post-auth (comprehensive, hardcoded creds) | 1 | **PASS** (65 steps) |
 | Quick-check / misc | 1 | **PASS** (simple screenshot) |
 | Seed-dependent (confirmed PASS) | 6 | **PASS** (account-lifecycle, delete-account, parent-dashboard, settings-toggles, parent-tabs, create-subject) |
-| Seed-dependent (BUG-31 fixed, partial pass) | 2 | **PARTIAL PASS** — home screen passes, Learning Book blocked by BUG-33 |
-| Seed-dependent (needs re-test with BUG-31 fix) | 7 | **Ready to re-test** — BUG-30 fix + BUG-31 fix should unblock |
-| Seed-dependent (not yet tested) | 26 | **Ready to test** — BUG-31 fix enables data-dependent flows |
-| Blocked by BUG-33 (SVG crash) | ~5 | **Blocked** — any flow navigating to Learning Book tab |
+| Seed-dependent (BUG-31 fix verified) | 2 | **PARTIAL PASS** — sign-in → home → coaching → session all pass; blocked at send-button (BUG-35) |
+| Blocked by BUG-33 (SVG crash) | 7 | **Blocked** — any flow navigating to Learning Book tab |
+| Blocked by BUG-34 (no subjects → redirect) | ~10 | **Blocked** — onboarding-complete/trial-active/parent-solo scenarios |
+| Blocked by BUG-35 (keyboard covers send) | ~15 | **Blocked** — all ChatShell flows (learning, homework, retention, recall) |
+| Consent design issues (BUG-27/28) | 5 | **Blocked** — consent flow design mismatch |
 | Camera/native | 1 | **SKIP** (emulator has no camera) |
 | ExpoGo-only | 1 | **SKIP** (wrong app type — we use dev-client) |
-| **Total** | **53** | **17 passing, 2 partial pass, 7 needs re-test, ~26 ready to test, 2 skipped** |
+| **Total** | **53** | **17 confirmed passing, 2 partial pass, ~33 blocked by BUG-33/34/35, 2 skipped** |
+
+**Blocking bug impact analysis:**
+- **BUG-33 (SVG crash):** Fix requires app code change (replace/update react-native-svg). Unblocks 7 flows.
+- **BUG-34 (subject-less redirect):** Fix requires seed infrastructure change (add subjects to more scenarios) OR setup flow change (accept create-subject as valid landing). Unblocks ~10 flows.
+- **BUG-35 (keyboard + send):** Fix requires either app code (KAV behavior) OR flow workaround (pressKey: Enter). Unblocks ~15 flows. **Most impactful fix — single change unblocks the most flows.**
 
 ---
 
 ## References
 
-- **Bug details:** See `e2e-test-bugs.md` for all bug entries (BUG-1 through BUG-33) with root causes, fixes, and workarounds.
+- **Bug details:** See `e2e-test-bugs.md` for all bug entries (BUG-1 through BUG-35) with root causes, fixes, and workarounds.
 - **Environment setup:** See `e2e-emulator-issues.md` for emulator configuration, known environment issues, and operational notes.
 - **Infrastructure:** See `e2e-tech-spec.md` for flow specifications, seeding architecture, and CI integration.

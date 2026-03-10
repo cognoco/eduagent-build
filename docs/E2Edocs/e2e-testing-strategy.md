@@ -417,6 +417,10 @@ cd apps/mobile/e2e
 
 The shell wrapper handles the full lifecycle: ADB app clear/launch → dev-client launcher navigation → bundle loading → overlay dismissal → API seeding → Maestro invocation. See Section 7 for the detailed architecture.
 
+### Shell Script Pitfall: `set -euo pipefail` with grep
+
+**Lesson from Session 9:** `set -euo pipefail` is dangerous in shell scripts that use `grep` in pipelines. When `grep` finds no matches it exits with code 1, and `pipefail` propagates that as a script failure — even when "no matches" is a valid/expected outcome (e.g., checking if a UI element is absent). The fix: use `grep ... || true` for pipelines where zero matches is acceptable, or avoid `set -o pipefail` in favor of explicit error checks on critical commands only.
+
 ### Profile Scope Middleware (BUG-25 — Critical)
 
 Fixed: `profileScopeMiddleware` auto-resolves to the owner profile when `X-Profile-Id` header is absent. See `e2e-test-bugs.md` BUG-25 for full details.
@@ -439,6 +443,10 @@ export function useProfiles() {
 ```
 
 See `e2e-test-bugs.md` BUG-31 for full root cause analysis.
+
+### KeyboardAvoidingView + adjustResize Conflict (BUG-35 — Known Blocker)
+
+On Android with Fabric (New Architecture), combining `KeyboardAvoidingView behavior="height"` with `android:windowSoftInputMode="adjustResize"` causes the keyboard to cover the send button in `ChatShell`. The `adjustResize` already resizes the layout, and `behavior="height"` applies a second offset — but because Fabric reports layout changes differently, the combined effect is insufficient, leaving the input/send area hidden behind the keyboard. This blocks all ~15 flows that require typing in a chat session. See `e2e-test-bugs.md` BUG-35.
 
 ### react-native-svg + Fabric Crash (BUG-33 — Known Blocker)
 
@@ -532,6 +540,7 @@ Progress as of 2026-03-10:
 7. **BUG-25 fix: profileScope middleware** — **DONE** (commit `35ef433`). `profileScopeMiddleware` now auto-resolves to owner profile when `X-Profile-Id` header is absent. This was the root cause of seeded subjects/streaks/coaching-cards being invisible on the home screen — blocked ~30 E2E flows.
 8. **BUG-10/BUG-30 fix: tab navigation** — **DONE**. Flattened `book/index.tsx` → `book.tsx` (directory routes break tab bar labels in dev-client). Added `tabBarAccessibilityLabel` to all 3 visible tabs in both learner and parent layouts. Updated 7 E2E flow YAML files to use `tapOn: "Learning Book Tab"`. Also fixed BUG-24 (KeyboardAvoidingView), BUG-29 (dashboard loading), BUG-32 (More tab scroll).
 9. **Nightly full suite** — IN PROGRESS. All 53 flows written. Batch runner scripts created (`run-all-untested.sh`, `rerun-failed.sh`). 17 flows confirmed passing; 9 need re-test after BUG-30 fix; 26 ready to validate.
+10. **Session 9 findings** — `seed-and-run.sh` fixed (3 bugs: pipefail crash, dev-tools Close button tap, grep pipeline). BUG-31 verified fixed via Maestro. Two new blockers discovered: BUG-34 (onboarding-complete redirect, ~10 flows) and BUG-35 (keyboard covers send button, ~15 flows). Combined with BUG-33 (~5 flows), these three bugs collectively block ~33 of 53 flows.
 
 ### Architecture Evolution (Sessions 1-5)
 

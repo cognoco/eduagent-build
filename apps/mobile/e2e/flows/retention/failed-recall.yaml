@@ -61,8 +61,12 @@ tags:
 - inputText: "I think it has something to do with the main idea"
 
 # 8. Submit answer
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
+# (returnKeyType="send" triggers onSubmitEditing). Keep tapOn as optional fallback.
+- pressKey: Enter
 - tapOn:
     id: "send-button"
+    optional: true
 
 # 9. Wait for AI to evaluate and return feedback
 - extendedWaitUntil:

@@ -377,13 +377,22 @@ async function seedOnboardingComplete(
     respondedAt: new Date(),
   });
 
+  // BUG-34 fix: Add a subject so the home screen stays visible after sign-in.
+  // Without a subject, home.tsx auto-redirects to /create-subject, breaking
+  // flows that expect home-scroll-view to remain visible.
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'General Studies'
+  );
+
   return {
     scenario: 'onboarding-complete',
     accountId,
     profileId,
     email,
     password,
-    ids: {},
+    ids: { subjectId },
   };
 }
 
@@ -657,13 +666,20 @@ async function seedTrialActive(
     cycleResetAt: futureDate(30),
   });
 
+  // BUG-34 fix: Add a subject so the home screen stays visible
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Science'
+  );
+
   return {
     scenario: 'trial-active',
     accountId,
     profileId,
     email,
     password,
-    ids: { subscriptionId },
+    ids: { subscriptionId, subjectId },
   };
 }
 
@@ -698,13 +714,20 @@ async function seedTrialExpired(
     cycleResetAt: futureDate(13),
   });
 
+  // BUG-34 fix: Add a subject so the home screen stays visible
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'History'
+  );
+
   return {
     scenario: 'trial-expired',
     accountId,
     profileId,
     email,
     password,
-    ids: { subscriptionId },
+    ids: { subscriptionId, subjectId },
   };
 }
 

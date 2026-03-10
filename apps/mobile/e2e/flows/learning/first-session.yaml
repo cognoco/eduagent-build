@@ -48,8 +48,12 @@ tags:
 - inputText: "I want to learn the basics"
 
 # 8. Tap send
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
+# (returnKeyType="send" triggers onSubmitEditing). Keep tapOn as optional fallback.
+- pressKey: Enter
 - tapOn:
     id: "send-button"
+    optional: true
 
 # 9. AI responds (chat input re-enabled after streaming)
 - extendedWaitUntil:

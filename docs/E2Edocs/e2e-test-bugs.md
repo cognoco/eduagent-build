@@ -659,3 +659,90 @@ java.lang.ClassCastException: java.lang.String cannot be cast to...
 4. **Disable Fabric for react-native-svg** — use `unstable_enablePackageFabric` to exclude it
 
 **E2E workaround (temporary):** Flows that navigate to Learning Book will fail at the tab switch. Home screen assertions (subjects, retention strip) remain testable. Skip Learning Book tab assertions until BUG-33 is fixed.
+
+---
+
+## BUG-34: `onboarding-complete` Scenario Auto-Redirects Away from Home Screen (2026-03-10)
+
+**Status:** Open (test infrastructure issue)
+**Severity:** High — blocks ~10 E2E flows
+**Affects:** All flows using `onboarding-complete`, `parent-solo`, `trial-active`, or `trial-expired` scenarios that expect `home-scroll-view` to remain visible after sign-in
+
+After signing in with `onboarding-complete` (and other subject-less scenarios), the home screen appears briefly but auto-redirects to `/create-subject` because `subjects.length === 0`. The `seed-and-sign-in.yaml` setup flow's `extendedWaitUntil visible id: home-scroll-view timeout: 30000` sometimes passes (race condition — catches the home screen before redirect) but the main flow's subsequent check fails.
+
+**Root cause:** `home.tsx` lines 41-51 auto-redirect to `/create-subject` when `subjects` is an empty array:
+```tsx
+if (subjects.length === 0) {
+  router.replace('/create-subject');
+}
+```
+
+This is **correct app behavior** — users with no subjects should be guided to create one. The issue is that the seed scenarios and flow expectations don't align:
+
+- `onboarding-complete`: creates account + profile + consent, but NO subjects
+- `parent-solo`: creates parent profile only, NO subjects for learner
+- `trial-active`/`trial-expired`: creates subscription only, NO subjects
+
+**Affected flows (expect home screen but get redirected):**
+- `account/more-tab-navigation.yaml`
+- `account/settings-toggles.yaml`
+- `account/account-lifecycle.yaml`
+- `account/delete-account.yaml`
+- `account/profile-switching.yaml` (parent-with-children — parent is owner, lands on home but no subjects)
+- `assessment/assessment-cycle.yaml`
+- `onboarding/create-profile-standalone.yaml`
+- `billing/subscription.yaml` (trial-active)
+- `billing/subscription-details.yaml` (trial-active)
+
+Additionally, `parent-solo` and `parent-with-children` scenarios create a PARENT as the owner profile. After sign-in, the app routes to `(parent)/dashboard` (not `(learner)/home`), so `home-scroll-view` is never rendered.
+
+**Fix options:**
+1. **Add a subject to `onboarding-complete` seed** — ensures the home screen stays visible. But changes the scenario's semantics (rename to `learner-with-subject`?).
+2. **Create separate scenarios** — `onboarding-no-subject` for flows that test empty state, `onboarding-with-subject` for flows that need the home screen.
+3. **Update the `seed-and-sign-in.yaml` setup flow** — check for either `home-scroll-view` OR the create-subject screen, and handle both.
+4. **For parent scenarios** — `seed-and-sign-in.yaml` needs to accept `dashboard-scroll` as an alternative success condition.
+
+---
+
+## BUG-35: Keyboard Covers Chat Input Bar and Send Button in Session Screen (2026-03-10)
+
+**Status:** Open (app bug — KeyboardAvoidingView + adjustResize conflict)
+**Severity:** Critical — blocks ALL E2E flows that use ChatShell (~15 flows)
+**Affects:** All learning, homework, retention, and recall flows that enter a chat session
+
+When the keyboard opens on the session/chat screen, the app's input bar (TextInput + send button) is completely hidden behind the keyboard. The `KeyboardAvoidingView` does not push the content up.
+
+**Screenshot evidence:** Session screen shows header + AI message + empty space + keyboard. The input bar is not visible. After pressing Enter (keyboard send key), the message sends and the keyboard dismisses, revealing the input bar correctly.
+
+**Root cause:** `ChatShell.tsx` line 228-232:
+```tsx
+<KeyboardAvoidingView
+  className="flex-1 bg-background"
+  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+  keyboardVerticalOffset={0}
+>
+```
+
+`AndroidManifest.xml` already has `android:windowSoftInputMode="adjustResize"`. When `adjustResize` is active, the system resizes the activity's window. Adding `KeyboardAvoidingView behavior="height"` on top of this creates a double-adjustment conflict on Fabric/New Architecture — the view's height calculation interferes with the system's resize, resulting in the input bar being hidden behind the keyboard.
+
+**Note:** BUG-24 changed all `KeyboardAvoidingView` instances from `behavior={undefined}` to `behavior='height'` on Android. The auth screens (ScrollView-based) work correctly with this change because `adjustResize` + ScrollView handle keyboard avoidance. But the `ChatShell` (FlatList-based, no ScrollView wrapper for the input area) behaves differently — `behavior='height'` actively conflicts with `adjustResize`.
+
+**Workaround (confirmed via ADB):** `KEYCODE_ENTER` triggers `onSubmitEditing={handleSend}` (the TextInput has `returnKeyType="send"`). This sends the message and dismisses the keyboard. Maestro's `pressKey: Enter` command can replace `tapOn: send-button` in affected flows.
+
+**Affected flows (all use `tapOn: send-button` in ChatShell):**
+- `learning/core-learning.yaml`
+- `learning/first-session.yaml`
+- `learning/freeform-session.yaml`
+- `learning/session-summary.yaml`
+- `learning/start-session.yaml`
+- `homework/homework-flow.yaml`
+- `homework/homework-from-entry-card.yaml`
+- `homework/camera-ocr.yaml`
+- `retention/recall-review.yaml`
+- `retention/retention-review.yaml`
+- `retention/failed-recall.yaml`
+
+**Fix options:**
+1. **App fix (recommended):** Change `ChatShell.tsx` to `behavior={undefined}` on Android (let `adjustResize` handle everything) or use `behavior='padding'` with an appropriate `keyboardVerticalOffset`.
+2. **E2E workaround:** Replace `tapOn: send-button` with `pressKey: Enter` in all affected flow files. Keep `tapOn: send-button` as an optional fallback assertion.
+3. **Alternative app fix:** Switch `windowSoftInputMode` to `adjustPan` for the session screen (per-activity or via `useEffect` toggle) — but this affects all inputs on the screen.

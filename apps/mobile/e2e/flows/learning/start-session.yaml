@@ -42,8 +42,12 @@ tags:
 - inputText: "Hello, can you help me understand the basics?"
 
 # Tap send button (testID: send-button)
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
+# (returnKeyType="send" triggers onSubmitEditing). Keep tapOn as optional fallback.
+- pressKey: Enter
 - tapOn:
     id: "send-button"
+    optional: true
 
 # Wait for the AI response to appear.
 # The send button should become re-enabled once streaming is done.

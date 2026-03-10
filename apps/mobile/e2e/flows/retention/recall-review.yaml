@@ -70,6 +70,9 @@ tags:
     id: "recall-submit"
     optional: true
 # Fallback: use send-button if recall uses ChatShell
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
+# (returnKeyType="send" triggers onSubmitEditing). Keep tapOn as optional fallback.
+- pressKey: Enter
 - tapOn:
     id: "send-button"
     optional: true

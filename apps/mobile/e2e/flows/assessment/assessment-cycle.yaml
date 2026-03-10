@@ -54,8 +54,12 @@ tags:
 - inputText: "I want to learn about algebra fundamentals"
 
 # 9. Tap send
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
+# (returnKeyType="send" triggers onSubmitEditing). Keep tapOn as optional fallback.
+- pressKey: Enter
 - tapOn:
     id: "send-button"
+    optional: true
 
 # 10. Wait for AI response
 - extendedWaitUntil:

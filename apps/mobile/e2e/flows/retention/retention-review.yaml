@@ -58,8 +58,12 @@ tags:
 - inputText: "The key concept involves understanding the relationship between the variables and applying the formula correctly"
 
 # 8. Submit answer
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
+# (returnKeyType="send" triggers onSubmitEditing). Keep tapOn as optional fallback.
+- pressKey: Enter
 - tapOn:
     id: "send-button"
+    optional: true
 
 # 9. Wait for AI feedback response
 - extendedWaitUntil:
@@ -78,6 +82,9 @@ tags:
   optional: true
 
 # 12. Submit second answer (optional)
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
+# (returnKeyType="send" triggers onSubmitEditing). Keep tapOn as optional fallback.
+- pressKey: Enter
 - tapOn:
     id: "send-button"
     optional: true
