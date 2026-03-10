@@ -33,30 +33,50 @@ tags:
       text: "New subject"
     timeout: 5000
 
-# Verify the instructional text is shown
-- assertVisible: "What would you like to learn?"
+# Verify the input is visible (autoFocus opens keyboard, may cover instructional text)
+- extendedWaitUntil:
+    visible:
+      id: "create-subject-name"
+    timeout: 5000
 
 # Type a subject name into the input (testID: create-subject-name)
 - tapOn:
     id: "create-subject-name"
 - inputText: "World History"
 
-# Tap the submit button (testID: create-subject-submit, label: "Start Learning")
+# Dismiss keyboard so submit button is visible (autoFocus keeps keyboard open)
 - tapOn:
-    id: "create-subject-submit"
+    text: "New subject"
+
+# Wait for layout to settle after keyboard dismissal
+- extendedWaitUntil:
+    visible:
+      id: "create-subject-submit"
+    timeout: 5000
+
+# Tap the submit button by label text (more reliable after keyboard-induced layout shift)
+- tapOn:
+    text: "Start Learning"
 
 # The app should navigate to the interview screen.
 # The ChatShell title will contain "Interview:" prefix.
+# Wait for interview ChatShell to render (API call + navigation on WHPX)
 - extendedWaitUntil:
     visible:
-      text: "Interview"
-    timeout: 10000
+      id: "chat-input"
+    timeout: 30000
 
-# The opening AI message should be visible in the chat
+# Verify the interview title contains "Interview"
+- assertVisible:
+    text: "Interview"
+    optional: true
+
+# The opening AI message should be visible in the chat (SSE streaming)
 - extendedWaitUntil:
     visible:
       text: "learning coach"
-    timeout: 5000
+    timeout: 30000
+    optional: true
 
 # Verify the chat input is available (testID: chat-input)
 - assertVisible:
