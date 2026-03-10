@@ -674,6 +674,12 @@ export default function LearnerLayout() {
             tabBarStyle: { display: 'none' },
           }}
         />
+        <Tabs.Screen
+          name="subject"
+          options={{
+            href: null,
+          }}
+        />
       </Tabs>
     </View>
   );
