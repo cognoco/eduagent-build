@@ -128,3 +128,10 @@ cache/
 
 # Maestro E2E screenshots (land at repo root when run from project root)
 /*.png
+
+# ADB uiautomator dump artifacts
+*uidump*.xml
+*ui_dump*.xml
+
+# Maestro debug flows (local-only, not part of test suite)
+apps/mobile/e2e/flows/_debug/
