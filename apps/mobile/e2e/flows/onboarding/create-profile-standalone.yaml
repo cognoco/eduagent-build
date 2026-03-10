@@ -54,7 +54,12 @@ tags:
 
 - takeScreenshot: profiles-before-create
 
-# 8. Tap Add profile button
+# 8. Scroll to and tap Add profile button (below profile cards)
+- scrollUntilVisible:
+    element:
+      id: "profiles-add-button"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: "profiles-add-button"
 

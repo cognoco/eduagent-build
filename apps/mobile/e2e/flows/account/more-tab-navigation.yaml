@@ -107,12 +107,12 @@ tags:
 
 # ── Destination 3: Help & Support (no-op) ──
 
-# 14. Scroll to Help & Support
+# 14. Scroll to Help & Support (below Subscription — long scroll needed)
 - scrollUntilVisible:
     element:
       text: "Help & Support"
     direction: DOWN
-    timeout: 10000
+    timeout: 30000
 
 # 15. Tap Help & Support (no-op — should stay on More screen)
 - tapOn:
