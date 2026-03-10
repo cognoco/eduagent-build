@@ -1,0 +1,95 @@
+# Flow: UI Keyboard Visibility — Visual audit of keyboard avoidance on auth screens
+#
+# Purpose: Catches regressions where KeyboardAvoidingView is misconfigured and
+# the software keyboard covers input fields or the sign-in button. Maestro's
+# assertVisible checks the accessibility tree (not visual position), so this
+# flow relies on SCREENSHOTS as the primary signal — they are always uploaded
+# to CI artifacts for human review.
+#
+# Tags: ui-smoke (always runs, advisory, screenshot-based)
+#
+# What this catches:
+#   - BUG-24 regression: behavior={undefined} on Android makes KAV a no-op
+#   - Password field hidden behind keyboard
+#   - Sign-in button unreachable when keyboard is open
+#
+# Prerequisite: Seeded user (scenario: onboarding-complete)
+appId: com.mentomate.app
+tags:
+  - ui-smoke
+---
+# 1. Seed & sign in to get a fresh session, then sign out to reach sign-in screen
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-complete"
+      API_URL: ${API_URL}
+
+# 2. Sign out to return to the sign-in screen
+- runFlow:
+    file: ../_setup/sign-out.yaml
+
+# 3. Wait for sign-in screen
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 15000
+
+# ── Baseline: sign-in screen without keyboard ──
+- takeScreenshot: ui-keyboard-01-baseline
+
+# ── Email field focused (keyboard opens) ──
+- tapOn:
+    id: "sign-in-email"
+
+# Small delay for keyboard animation to complete
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-email"
+    timeout: 3000
+
+- takeScreenshot: ui-keyboard-02-email-focused
+
+# Verify email input is still accessible
+- assertVisible:
+    id: "sign-in-email"
+
+# ── Type email, move to password field ──
+- inputText: "test@example.com"
+
+- tapOn:
+    id: "sign-in-password"
+
+# Small delay for keyboard to re-appear on new field
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-password"
+    timeout: 3000
+
+- takeScreenshot: ui-keyboard-03-password-focused
+
+# KEY ASSERTION: With keyboard open on password field, the sign-in button
+# and password input should still be reachable. If KAV is broken, these
+# elements are pushed below the keyboard and the screenshot will show it.
+- assertVisible:
+    id: "sign-in-password"
+
+- assertVisible:
+    id: "sign-in-button"
+    optional: true
+
+# ── Type password, verify button is reachable ──
+- inputText: "Test123!"
+
+- takeScreenshot: ui-keyboard-04-password-filled
+
+# Dismiss keyboard to show final state
+- tapOn:
+    text: "Welcome back"
+
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 5000
+
+- takeScreenshot: ui-keyboard-05-keyboard-dismissed

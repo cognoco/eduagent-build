@@ -266,7 +266,23 @@ test('continues chain when one step fails (error isolation)', async () => {
 
 ## 3. Smoke Test Matrix
 
-Critical user flows, prioritized by risk and user impact. Tag flows as `smoke` (PR-level) or `full` (nightly).
+Critical user flows, prioritized by risk and user impact.
+
+### Tag Tiers & Graduation Path
+
+| Tag | Blocking? | When it runs | Purpose |
+|-----|-----------|-------------|---------|
+| `smoke` | Eventually yes (once stabilized) | Every PR + nightly | Core flows work end-to-end |
+| `ui-smoke` | Advisory (always screenshots) | Every PR + nightly | Visual/UX integrity audit — catches keyboard, layout, scroll regressions via screenshots |
+| `nightly` | Advisory | Nightly 3AM UTC + manual | Edge cases, full coverage |
+
+**Graduation plan:** Once smoke flows achieve >95% pass rate across 2 weeks of nightly runs, remove `continue-on-error: true` from the CI job to make them blocking. `ui-smoke` stays advisory permanently — its value is the screenshot audit trail, not pass/fail.
+
+### Tier 0: UI Smoke (screenshot audit — every PR)
+
+| Flow | What it captures | Tags |
+|------|-----------------|------|
+| **Auth Keyboard Visibility** | Screenshots of email/password focus with keyboard open — catches KAV regressions (BUG-24) | `ui-smoke, account` |
 
 ### Tier 1: Smoke (run on every PR)
 

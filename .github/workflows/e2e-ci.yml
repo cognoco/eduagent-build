@@ -261,7 +261,7 @@ jobs:
             mkdir -p maestro-screenshots
             adb exec-out screencap -p > maestro-screenshots/pre-test-app-state.png || true
 
-            maestro test apps/mobile/e2e/flows/ --include-tags=${{ github.event_name == 'schedule' && 'smoke,nightly' || github.event_name == 'workflow_dispatch' && 'smoke,nightly' || 'smoke' }} --output maestro-screenshots/ || MAESTRO_EXIT=$?
+            maestro test apps/mobile/e2e/flows/ --include-tags=${{ github.event_name == 'schedule' && 'smoke,nightly,ui-smoke' || github.event_name == 'workflow_dispatch' && 'smoke,nightly,ui-smoke' || 'smoke,ui-smoke' }} --output maestro-screenshots/ || MAESTRO_EXIT=$?
 
             # Capture final screen state and logcat on failure.
             # android-emulator-runner splits script lines into separate shell
