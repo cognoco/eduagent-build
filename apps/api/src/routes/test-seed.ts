@@ -14,7 +14,13 @@ import { zValidator } from '@hono/zod-validator';
 // Local z import: this schema is test-infrastructure-only and does not belong in @eduagent/schemas
 import { z } from 'zod';
 import { ERROR_CODES } from '@eduagent/schemas';
-import type { Database } from '@eduagent/database';
+import { eq } from 'drizzle-orm';
+import {
+  type Database,
+  accounts,
+  profiles,
+  subjects,
+} from '@eduagent/database';
 import {
   seedScenario,
   resetDatabase,
@@ -102,4 +108,103 @@ testSeedRoutes.post('/__test/reset', async (c) => {
 
 testSeedRoutes.get('/__test/scenarios', (c) => {
   return c.json({ scenarios: VALID_SCENARIOS });
+});
+
+/**
+ * Debug endpoint: returns account → profiles → subjects chain for a given email.
+ * Used to verify seed data matches what the app sees after Clerk sign-in.
+ */
+testSeedRoutes.get('/__test/debug/:email', async (c) => {
+  const db = c.get('db');
+  const email = c.req.param('email');
+
+  const accountRows = await db.query.accounts.findMany({
+    where: eq(accounts.email, email),
+  });
+
+  const result = await Promise.all(
+    accountRows.map(async (acc) => {
+      const profileRows = await db.query.profiles.findMany({
+        where: eq(profiles.accountId, acc.id),
+      });
+      const profilesWithSubjects = await Promise.all(
+        profileRows.map(async (prof) => {
+          const subjectRows = await db.query.subjects.findMany({
+            where: eq(subjects.profileId, prof.id),
+          });
+          return {
+            id: prof.id,
+            displayName: prof.displayName,
+            personaType: prof.personaType,
+            isOwner: prof.isOwner,
+            subjects: subjectRows.map((s) => ({
+              id: s.id,
+              name: s.name,
+              status: s.status,
+            })),
+          };
+        })
+      );
+      return {
+        id: acc.id,
+        clerkUserId: acc.clerkUserId,
+        email: acc.email,
+        profiles: profilesWithSubjects,
+      };
+    })
+  );
+
+  return c.json({ accounts: result, count: result.length });
+});
+
+/**
+ * Debug endpoint: simulate the exact subjects query path the app uses.
+ * Walks: clerkUserId → account → profile (owner) → subjects.
+ * Also tests listSubjects service directly.
+ */
+testSeedRoutes.get('/__test/debug-subjects/:clerkUserId', async (c) => {
+  const db = c.get('db');
+  const clerkUserId = c.req.param('clerkUserId');
+
+  // Step 1: findOrCreateAccount path
+  const account = await db.query.accounts.findFirst({
+    where: eq(accounts.clerkUserId, clerkUserId),
+  });
+
+  if (!account) {
+    return c.json(
+      { error: 'No account found for clerkUserId', clerkUserId },
+      404
+    );
+  }
+
+  // Step 2: listProfiles path
+  const profileRows = await db.query.profiles.findMany({
+    where: eq(profiles.accountId, account.id),
+  });
+
+  // Step 3: pick owner profile (same logic as mobile app)
+  const ownerProfile = profileRows.find((p) => p.isOwner) ?? profileRows[0];
+  if (!ownerProfile) {
+    return c.json({ error: 'No profiles found', accountId: account.id }, 404);
+  }
+
+  // Step 4: listSubjects using scoped repository (exact same path as GET /v1/subjects)
+  const { listSubjects } = await import('../services/subject');
+  const subjectList = await listSubjects(db, ownerProfile.id);
+
+  return c.json({
+    account: {
+      id: account.id,
+      clerkUserId: account.clerkUserId,
+      email: account.email,
+    },
+    profile: {
+      id: ownerProfile.id,
+      displayName: ownerProfile.displayName,
+      isOwner: ownerProfile.isOwner,
+    },
+    subjects: subjectList,
+    subjectCount: subjectList.length,
+  });
 });

@@ -5,7 +5,7 @@
 
 import { createMiddleware } from 'hono/factory';
 import type { Account } from '../services/account';
-import { getProfile } from '../services/profile';
+import { getProfile, findOwnerProfile } from '../services/profile';
 import type { Database } from '@eduagent/database';
 import { forbidden } from '../errors';
 
@@ -32,17 +32,39 @@ export type ProfileScopeEnv = {
 export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
   async (c, next) => {
     const profileIdHeader = c.req.header('X-Profile-Id');
+
+    // When X-Profile-Id is absent, auto-resolve to the owner profile.
+    // This prevents the broken `?? account.id` fallback in route handlers
+    // which silently returns empty results (account.id is not a valid profileId).
     if (!profileIdHeader) {
+      const db = c.get('db');
+      const account = c.get('account');
+      if (db && account) {
+        try {
+          const owner = await findOwnerProfile(db, account.id);
+          if (owner) {
+            c.set('profileId', owner.id);
+            c.set('profileMeta', {
+              birthDate: owner.birthDate,
+              location: owner.location,
+              consentStatus: owner.consentStatus,
+            });
+          }
+        } catch {
+          // Profile auto-resolve is best-effort; routes still have ?? account.id fallback
+        }
+      }
       await next();
       return;
     }
+
+    // Verify explicitly-provided profile belongs to this account
     const db = c.get('db');
     const account = c.get('account');
     if (!account) {
       await next();
       return;
     }
-    // Verify profile belongs to this account
     const profile = await getProfile(db, profileIdHeader, account.id);
     if (!profile) {
       return forbidden(c, 'Profile does not belong to this account');

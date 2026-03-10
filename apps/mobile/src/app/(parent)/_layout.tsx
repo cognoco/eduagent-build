@@ -67,7 +67,7 @@ export default function ParentLayout() {
           name="dashboard"
           options={{
             title: 'Home',
-            tabBarTestID: 'tab-home',
+            tabBarButtonTestID: 'tab-home',
             tabBarIcon: ({ focused }) => (
               <TabIcon name="Home" focused={focused} />
             ),
@@ -77,7 +77,7 @@ export default function ParentLayout() {
           name="book"
           options={{
             title: 'Learning Book',
-            tabBarTestID: 'tab-book',
+            tabBarButtonTestID: 'tab-book',
             tabBarIcon: ({ focused }) => (
               <TabIcon name="Book" focused={focused} />
             ),
@@ -87,7 +87,7 @@ export default function ParentLayout() {
           name="more"
           options={{
             title: 'More',
-            tabBarTestID: 'tab-more',
+            tabBarButtonTestID: 'tab-more',
             tabBarIcon: ({ focused }) => (
               <TabIcon name="More" focused={focused} />
             ),

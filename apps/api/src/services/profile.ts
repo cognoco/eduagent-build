@@ -63,6 +63,24 @@ export async function listProfiles(
 }
 
 /**
+ * Finds the owner profile for an account (or the first profile if no owner flag).
+ * Used by profile-scope middleware to auto-resolve profileId when X-Profile-Id
+ * header is absent, preventing the broken `account.id` fallback.
+ */
+export async function findOwnerProfile(
+  db: Database,
+  accountId: string
+): Promise<Profile | null> {
+  const rows = await db.query.profiles.findMany({
+    where: eq(profiles.accountId, accountId),
+  });
+  const ownerRow = rows.find((r) => r.isOwner) ?? rows[0];
+  if (!ownerRow) return null;
+  const consentStatus = await getConsentStatus(db, ownerRow.id);
+  return mapProfileRow(ownerRow, consentStatus);
+}
+
+/**
  * Creates a new profile under the given account.
  *
  * The first profile created for an account is automatically marked as the
