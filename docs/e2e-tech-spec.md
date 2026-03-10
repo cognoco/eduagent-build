@@ -39,7 +39,13 @@ This spec covers the implementation of the E2E test suite defined in `e2e-testin
 
 **Solution:** Add a test-only seeding controller guarded by `NODE_ENV=test`.
 
-**Route:** `POST /v1/__test/seed`
+**Routes:**
+- `POST /v1/__test/seed` — Create a pre-configured test scenario
+- `POST /v1/__test/reset` — Delete seed-created data
+- `GET /v1/__test/scenarios` — List valid scenario names
+- `GET /v1/__test/debug/:email` — Trace account → profiles → subjects chain for an email
+- `GET /v1/__test/debug-subjects/:clerkUserId` — Simulate exact subjects query path the app uses
+
 **Location:** `apps/api/src/routes/test-seed.ts`
 
 **Seed Scenarios** (each returns credentials + IDs needed by flows):
@@ -848,8 +854,9 @@ Ordered by dependency chain and value. Status as of 2026-03-10:
 | 5.1 | All seed scenarios | **DONE** | 10 scenarios in `test-seed.ts` |
 | 5.2 | All Tier 2 flows | **DONE** | 53 flows written |
 | 5.3 | ADB automation (seed-and-run.sh v3) | **DONE** | Full lifecycle via ADB |
-| 5.4 | Emulator validation | **IN PROGRESS** | 16 passing, 35 ready to validate |
-| 5.5 | Nightly scheduled CI workflow | **TODO** | Awaiting flow validation |
+| 5.4 | BUG-25: profileScope middleware fix | **DONE** | Auto-resolve owner profile when X-Profile-Id absent (commit `35ef433`) |
+| 5.5 | Emulator validation | **IN PROGRESS** | 16 passing, 35 ready to validate (BUG-25 fix unblocks ~30) |
+| 5.6 | Nightly scheduled CI workflow | **TODO** | Awaiting flow validation |
 
 ---
 

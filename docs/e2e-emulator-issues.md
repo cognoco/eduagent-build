@@ -1329,6 +1329,18 @@ The seed-and-sign-in pipeline went through 3 major revisions in Sessions 4-5:
 - Sign-in worst case: SSO buttons push password field into keyboard zone
 - **Fixed:** Changed to `behavior='height'` on Android across sign-in, sign-up, forgot-password, consent, create-profile, create-subject (8 instances)
 
+**BUG-25: `profileScopeMiddleware` falls back to `account.id` — empty data on home screen** (app code, critical)
+- When `X-Profile-Id` header is absent, `profileScopeMiddleware` skipped without setting `profileId`
+- All 52 route handlers used `c.get('profileId') ?? account.id` fallback
+- `account.id` is NEVER a valid `profile_id` → scoped queries return empty results
+- **Effect:** Seeded subjects, streaks, coaching cards invisible on home screen; ~30 E2E flows blocked
+- **Fixed:** `profileScopeMiddleware` now auto-resolves to owner profile when header absent. New `findOwnerProfile(db, accountId)` service function. Commit `35ef433`.
+
+**tabBarButtonTestID fix** (relates to BUG-15)
+- `tabBarTestID` is the wrong prop name. Expo Router uses `tabBarButtonTestID` for the actual tab bar button.
+- Changed in both `(learner)/_layout.tsx` and `(parent)/_layout.tsx` for all 3 tabs (Home, Learning Book, More).
+- Text-based matching (`tapOn: text: "More"`) still recommended for E2E flows as Expo Router may not propagate testIDs to Android accessibility tree consistently.
+
 ### Setup Helper Inventory (10 files)
 
 | File | Purpose |

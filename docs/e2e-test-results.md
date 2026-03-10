@@ -151,7 +151,26 @@ The 3 production auth flows (`app-launch.yaml`, `sign-in-navigation.yaml`, `forg
 - Keyboard dismissal: tap static heading text (avoids `hideKeyboard` failure)
 - Notification permission: pre-granted via `adb shell pm grant` before app launch
 
-### Cumulative Totals (as of Session 5)
+### Session 6 (2026-03-10) — Critical API Bug Fix (BUG-25)
+
+**Major fix: `profileScopeMiddleware` auto-resolve owner profile**
+
+During investigation of why ALL seeded data (subjects, streaks, coaching cards) appeared empty on the home screen, discovered that `profileScopeMiddleware` was not setting `profileId` when the `X-Profile-Id` header was absent. All 52 route handlers fell back to `account.id` (which is never a valid profileId), causing scoped queries to return empty results.
+
+| Change | What | Files |
+|--------|------|-------|
+| `findOwnerProfile` service | New function: finds owner profile for an account | `services/profile.ts` |
+| Middleware auto-resolve | When `X-Profile-Id` absent, resolve to owner profile | `middleware/profile-scope.ts` |
+| Debug endpoints | `GET /__test/debug/:email`, `GET /__test/debug-subjects/:clerkUserId` | `routes/test-seed.ts` |
+| `tabBarButtonTestID` fix | Correct prop name for Expo Router tab test IDs | `(learner)/_layout.tsx`, `(parent)/_layout.tsx` |
+
+**Tests:** All 326 related API tests pass. TypeScript compilation clean.
+
+**Impact:** Unblocks ~30 E2E flows that depend on seeded subjects/sessions/retention data.
+
+**Needs emulator verification:** The fix is server-side (API middleware). Next step is to restart Metro + API dev server and re-run the seeded flows to confirm subjects appear on the home screen.
+
+### Cumulative Totals (as of Session 6)
 
 | Category | Flows | Status |
 |----------|-------|--------|
@@ -159,7 +178,7 @@ The 3 production auth flows (`app-launch.yaml`, `sign-in-navigation.yaml`, `forg
 | Post-auth (comprehensive, hardcoded creds) | 1 | **PASS** (65 steps) |
 | Quick-check / misc | 1 | **PASS** (simple screenshot) |
 | Seed-dependent (seeded flows, confirmed) | 5 | **PASS** (account-lifecycle, delete-account, parent-dashboard, settings-toggles, parent-tabs) |
-| Seed-dependent (YAML fixed, needs validation) | 35 | **Ready to test** — YAML bugs fixed, seed-and-run.sh v2 working |
+| Seed-dependent (YAML fixed, BUG-25 fixed) | 35 | **Ready to test** — API bug fixed, needs emulator verification |
 | Standalone (consent/onboarding, YAML fixed) | 5 | **Ready to test** — launch-devclient + env var fixes applied |
 | Camera/native | 1 | **SKIP** (emulator has no camera) |
 | ExpoGo-only | 1 | **SKIP** (wrong app type — we use dev-client) |
@@ -167,7 +186,7 @@ The 3 production auth flows (`app-launch.yaml`, `sign-in-navigation.yaml`, `forg
 
 **Flow inventory:** 53 unique test flows + 10 setup helpers = 63 YAML files total.
 
-**Remaining validation plan:** Run 35 flows in batches of 5-6 with Metro restarts between batches (Metro crashes after ~15 consecutive `clearState` + bundle reload cycles).
+**Remaining validation plan:** Run 35 flows in batches of 5-6 with Metro restarts between batches (Metro crashes after ~15 consecutive `clearState` + bundle reload cycles). BUG-25 fix should unblock most of the 35 flows.
 
 ---
 

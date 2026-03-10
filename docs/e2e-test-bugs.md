@@ -75,13 +75,17 @@ When no dev tools sheet is present after the "Continue" overlay, `pressKey: back
 
 ## BUG-15: `tabBarTestID` Not Propagating to Android (2026-03-09)
 
-**Status:** Fixed (workaround)
+**Status:** Partially fixed (prop rename + text workaround)
 **Severity:** High — affects 12+ flows
 **Affects:** All flows that navigate via tab bar
 
-`tabBarTestID: 'tab-more'` set in Expo Router `Tabs.Screen` options does not appear as `resource-id` in the Android UIAutomator hierarchy. The element has `resource-id=""`. This is a React Navigation / Expo Router issue on Android.
+`tabBarTestID: 'tab-more'` set in Expo Router `Tabs.Screen` options does not appear as `resource-id` in the Android UIAutomator hierarchy. The element has `resource-id=""`.
 
-**Workaround:** Use `tapOn: text: "More"` (text-based matching) instead of `tapOn: id: "tab-more"`.
+**Root cause (updated 2026-03-10):** Two issues:
+1. **Wrong prop name:** Expo Router uses `tabBarButtonTestID` (not `tabBarTestID`) for the tab bar button component. Fixed in commit `35ef433` — changed in both `(learner)/_layout.tsx` and `(parent)/_layout.tsx`.
+2. **Android accessibility:** Even with the correct prop, React Navigation may not propagate `testID` to the Android UIAutomator accessibility tree consistently.
+
+**Workaround (still recommended):** Use `tapOn: text: "More"` (text-based matching) instead of `tapOn: id: "tab-more"`.
 
 **Applied in:** 12 flow files across account, billing, onboarding, parent, subjects categories.
 
@@ -282,3 +286,29 @@ Two issues:
 3. Consider changing `justifyContent: 'center'` to `'flex-start'` with a flexible spacer, so content can scroll above the keyboard
 
 **E2E workaround (already applied):** Maestro flows tap the "Welcome back" heading to defocus the input and dismiss the keyboard between email and password entry (BUG-3 + BUG-20).
+
+---
+
+## BUG-25: `profileScopeMiddleware` Falls Back to `account.id` — Empty Data (2026-03-10)
+
+**Status:** Fixed (commit `35ef433`)
+**Severity:** Critical — blocks ~30 E2E flows
+**Affects:** ALL seeded flows using `learning-active`, `retention-due`, `multi-subject`, and other scenarios with subjects
+
+When the mobile app sends API requests without an `X-Profile-Id` header, `profileScopeMiddleware` previously skipped without setting `profileId` in the Hono context. All 52 route handlers used the fallback pattern `const profileId = c.get('profileId') ?? account.id`, where `account.id` is NEVER a valid `profile_id` in any database table. This caused all scoped queries (`createScopedRepository(db, profileId)`) to return empty results.
+
+**Visible symptoms:**
+- Home screen shows "add your first subject" empty state despite subjects existing in DB
+- Streak shows 0 days despite streak data in DB
+- Coaching card shows generic content instead of personalized card
+- Redirects to create-subject modal immediately after sign-in
+
+**Root cause:** The `profileScopeMiddleware` was designed to only set `profileId` when `X-Profile-Id` header is explicitly provided. When absent (e.g., during the initial profile bootstrap sequence, or when the mobile client hasn't yet resolved `activeProfile`), the middleware called `next()` without setting anything. The `?? account.id` fallback in route handlers silently returned empty data instead of failing loudly.
+
+**Fix:** `profileScopeMiddleware` now auto-resolves to the owner profile when `X-Profile-Id` is absent:
+1. New `findOwnerProfile(db, accountId)` function in `services/profile.ts`
+2. Middleware calls it when header is missing, wrapped in try-catch for robustness
+3. If owner profile found, sets both `profileId` and `profileMeta` on the context
+4. If no profiles exist yet (new user), falls through gracefully
+
+**Debug endpoints added:** `GET /__test/debug/:email` and `GET /__test/debug-subjects/:clerkUserId` for tracing the account → profile → subjects chain during seed verification.
