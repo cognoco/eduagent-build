@@ -134,7 +134,7 @@ export default function DashboardScreen() {
           />
         }
       >
-        {dashboardLoading ? (
+        {dashboardLoading || !dashboard ? (
           <>
             <CardSkeleton />
             <CardSkeleton />

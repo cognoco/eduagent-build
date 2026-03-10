@@ -1,1 +1,1 @@
-export { default } from '../(learner)/book/index';
+export { default } from '../(learner)/book';

@@ -34,8 +34,8 @@ tags:
 - assertVisible: "Learning Book"
 - assertVisible: "More"
 
-# Navigate to Learning Book tab
-- tapOn: "Learning Book"
+# Navigate to Learning Book tab (BUG-10: use accessibility label, not truncated text)
+- tapOn: "Learning Book Tab"
 
 # The Learning Book should show filter tabs and topic list
 - assertVisible:

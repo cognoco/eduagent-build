@@ -1493,3 +1493,30 @@ Make sure you're running Metro or that your bundle 'index...'
 **Performance comparison (cached bundle on E2E_Device_2):**
 - v3: 120s+ (entered infinite "Loading" loop due to Back key exiting app)
 - v4: **9 seconds** (launcher 3s → Metro tap → Continue tap → dev tools Back → sign-in)
+
+---
+
+## Issue 14: Expo Router Directory Routes Break Tab Bar in Dev-Client (2026-03-10)
+
+**What happened:** The Learning Book tab (`(learner)/book/`) was unreachable via Maestro in dev-client builds. The `tabBarAccessibilityLabel: 'Learning Book Tab'` configured on the `Tabs.Screen` was being ignored — Android UIAutomator showed `content-desc="⏷, book/index"` instead of the configured label.
+
+**Root cause:** Expo Router treats **directory routes** (`book/index.tsx`) differently from **file routes** (`book.tsx`). When a tab screen is a directory route:
+1. The tab bar displays the raw path segment (`book/index`) instead of the configured `title` option
+2. `tabBarAccessibilityLabel` is NOT propagated to the Android `contentDescription`
+3. `tabBarButtonTestID` is also NOT propagated
+
+This is likely because Expo Router internally constructs a different screen name for directory routes (using the directory path) rather than the simple file name.
+
+**Discovery method:** `adb exec-out uiautomator dump /dev/stdout` showed the tab's `content-desc` attribute. The Learning Book tab had `content-desc="⏷, book/index"` while the Home tab (a file route) correctly had `content-desc="Home Tab"`.
+
+**Fix:**
+1. Flatten `book/index.tsx` → `book.tsx` (file route)
+2. Update all import paths (component goes from `../../../hooks/...` to `../../hooks/...`)
+3. Update the `(parent)/book.tsx` re-export path
+4. Update the test file paths similarly
+
+**Lesson for future agents:**
+- **Always use file routes for tab screens** (e.g., `book.tsx`, not `book/index.tsx`). Directory routes break tab bar configuration in dev-client.
+- **Use `tabBarAccessibilityLabel`** (not `tabBarButtonTestID`) for tab navigation in Maestro flows. It maps to Android `contentDescription` which Maestro matches via `tapOn: "label"`.
+- **Verify with UIAutomator:** `adb exec-out uiautomator dump /dev/stdout | grep -o 'content-desc="[^"]*"'` shows what Maestro can actually see.
+- **Never use point-tap (`tapOn: point:`) for tab navigation** — dev-client builds show extra hidden tabs (BUG-10), shifting all tab positions unpredictably.
