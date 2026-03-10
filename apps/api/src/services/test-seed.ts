@@ -31,6 +31,7 @@ import {
   generateUUIDv7,
   type Database,
 } from '@eduagent/database';
+import { listSubjects } from './subject';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -982,20 +983,17 @@ export async function seedScenario(
   }
 
   // Idempotent: delete existing seed accounts with the same email before seeding.
-  // Scoped to seed-created accounts (clerk_seed_* prefix OR real Clerk IDs tagged
-  // with seed external_id) to prevent accidental deletion of real staging accounts.
-  // Child tables cascade automatically via ON DELETE CASCADE foreign keys.
-  await db.delete(accounts).where(
-    and(
-      eq(accounts.email, email),
-      or(
-        like(accounts.clerkUserId, `${SEED_CLERK_PREFIX}%`),
-        // Real Clerk users created by seed have email match — safe because
-        // this endpoint is guarded by env check + TEST_SEED_SECRET header
-        like(accounts.email, '%@example.com')
+  // Only deletes accounts whose clerkUserId has the seed prefix — real Clerk users
+  // created by seed are also tagged with clerk_seed_* external_id (set in PATCH step
+  // of createClerkTestUser). Child tables cascade via ON DELETE CASCADE.
+  await db
+    .delete(accounts)
+    .where(
+      and(
+        eq(accounts.email, email),
+        like(accounts.clerkUserId, `${SEED_CLERK_PREFIX}%`)
       )
-    )
-  );
+    );
 
   return seeder(db, email, env);
 }
@@ -1024,4 +1022,122 @@ export async function resetDatabase(
     .returning({ id: accounts.id });
 
   return { deletedCount: deleted.length, clerkUsersDeleted };
+}
+
+// ---------------------------------------------------------------------------
+// Debug query functions (extracted from route handlers per CLAUDE.md rules)
+// ---------------------------------------------------------------------------
+
+export interface DebugAccountChain {
+  id: string;
+  clerkUserId: string;
+  email: string;
+  profiles: Array<{
+    id: string;
+    displayName: string;
+    personaType: string;
+    isOwner: boolean;
+    subjects: Array<{ id: string; name: string; status: string }>;
+  }>;
+}
+
+/** Walks account → profiles → subjects chain for a given email. */
+export async function debugAccountsByEmail(
+  db: Database,
+  email: string
+): Promise<DebugAccountChain[]> {
+  const accountRows = await db.query.accounts.findMany({
+    where: eq(accounts.email, email),
+  });
+
+  return Promise.all(
+    accountRows.map(async (acc) => {
+      const profileRows = await db.query.profiles.findMany({
+        where: eq(profiles.accountId, acc.id),
+      });
+      const profilesWithSubjects = await Promise.all(
+        profileRows.map(async (prof) => {
+          const subjectRows = await db.query.subjects.findMany({
+            where: eq(subjects.profileId, prof.id),
+          });
+          return {
+            id: prof.id,
+            displayName: prof.displayName,
+            personaType: prof.personaType,
+            isOwner: prof.isOwner,
+            subjects: subjectRows.map((s) => ({
+              id: s.id,
+              name: s.name,
+              status: s.status,
+            })),
+          };
+        })
+      );
+      return {
+        id: acc.id,
+        clerkUserId: acc.clerkUserId,
+        email: acc.email,
+        profiles: profilesWithSubjects,
+      };
+    })
+  );
+}
+
+export interface DebugSubjectsResult {
+  account: { id: string; clerkUserId: string; email: string };
+  profile: { id: string; displayName: string; isOwner: boolean };
+  subjects: Awaited<ReturnType<typeof listSubjects>>;
+  subjectCount: number;
+}
+
+/**
+ * Simulates the exact subjects query path the app uses.
+ * Walks: clerkUserId → account → profile (owner) → subjects.
+ * Returns null if no account or profile found.
+ */
+export async function debugSubjectsByClerkUserId(
+  db: Database,
+  clerkUserId: string
+): Promise<
+  | { result: DebugSubjectsResult }
+  | { error: string; detail: Record<string, string> }
+> {
+  const account = await db.query.accounts.findFirst({
+    where: eq(accounts.clerkUserId, clerkUserId),
+  });
+
+  if (!account) {
+    return {
+      error: 'No account found for clerkUserId',
+      detail: { clerkUserId },
+    };
+  }
+
+  const profileRows = await db.query.profiles.findMany({
+    where: eq(profiles.accountId, account.id),
+  });
+
+  const ownerProfile = profileRows.find((p) => p.isOwner) ?? profileRows[0];
+  if (!ownerProfile) {
+    return { error: 'No profiles found', detail: { accountId: account.id } };
+  }
+
+  const subjectList = await listSubjects(db, ownerProfile.id);
+
+  return {
+    result: {
+      account: {
+        id: account.id,
+        clerkUserId: account.clerkUserId,
+        email: account.email,
+      },
+      profile: {
+        id: ownerProfile.id,
+        displayName: ownerProfile.displayName,
+        isOwner: ownerProfile.isOwner,
+      },
+      subjects: subjectList,
+      subjectCount: subjectList.length,
+    },
+  };
 }

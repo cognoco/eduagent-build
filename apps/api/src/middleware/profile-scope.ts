@@ -50,8 +50,12 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
               consentStatus: owner.consentStatus,
             });
           }
-        } catch {
-          // Profile auto-resolve is best-effort; routes still have ?? account.id fallback
+        } catch (err) {
+          // Profile auto-resolve is best-effort; log for observability
+          console.warn(
+            '[profile-scope] Failed to auto-resolve owner profile:',
+            err
+          );
         }
       }
       await next();
