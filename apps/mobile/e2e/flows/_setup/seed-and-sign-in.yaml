@@ -1,8 +1,17 @@
-# Reusable setup: Wait for app to load, dismiss overlays, and sign in.
+# Reusable setup: Wait for sign-in screen and sign in.
 #
-# IMPORTANT: Seeding AND app launch are done BEFORE Maestro starts,
-# by seed-and-run.sh. This flow expects the app to be already running
-# (launched via ADB after pm clear).
+# IMPORTANT: seed-and-run.sh handles EVERYTHING before this flow:
+#   1. Seeds test data via API
+#   2. Clears app state via ADB (pm clear)
+#   3. Pre-grants notification permission (BUG-22)
+#   4. Launches app via ADB (am start)
+#   5. Waits for dev-client launcher, taps Metro server entry (via ADB)
+#   6. Waits for bundle to load, taps "Continue" overlay (via ADB)
+#   7. Dismisses system dialogs — Bluetooth (BUG-21), dev tools (BUG-14)
+#
+# By the time Maestro starts this flow, the app should be on the sign-in
+# screen (or very close to it). This avoids Maestro's gRPC driver crashing
+# during the resource-intensive bundle loading phase on WHPX emulators.
 #
 # Called by other flows via:
 #   - runFlow:
@@ -16,78 +25,55 @@
 #   (plus scenario-specific IDs like ${SUBJECT_ID}, ${TOPIC_ID}, etc.)
 #
 # After this flow completes, the app is authenticated and on the home screen.
-#
-# Architecture (Issue 13 + BUG-19 workaround):
-#   seed-and-run.sh calls curl to seed → parses JSON with node →
-#   clears app state via ADB → launches app via ADB →
-#   passes credentials to Maestro via -e flags → Maestro runs the flow.
-#
-# After ADB launch with cleared state, the dev-client either:
-#   a) Shows the launcher (tap Metro URL to connect), OR
-#   b) Auto-discovers Metro and starts loading immediately
-# Both paths end at the "Continue" dev menu overlay after bundle load.
 appId: com.mentomate.app
 ---
-# ── Step 1: Handle ANR dialog if present ──
-# On WHPX emulator, bundle loading is slow. Android may show
-# "MentoMate isn't responding" dialog. Tap "Wait" to dismiss it.
-- runFlow:
-    when:
-      visible: "isn't responding"
-    file: dismiss-anr.yaml
-
-# ── Step 2: Connect to Metro (if dev-client launcher is showing) ──
-# After clearState, the dev-client may show the launcher with server list,
-# or it may auto-discover Metro and skip the launcher entirely.
-# If the launcher is visible, tap the Metro server entry.
-- runFlow:
-    when:
-      visible: "DEVELOPMENT SERVERS"
-    file: tap-metro-server.yaml
-
-# ── Step 3: Dismiss dev menu overlay (BUG-2) ──
-# The dev menu "Continue" overlay always appears after bundle load.
-# On WHPX emulator, bundle loading can take several minutes.
-- extendedWaitUntil:
-    visible: "Continue"
-    timeout: 600000
-
-- tapOn: "Continue"
-
-# A second dev tools sheet may appear (shows "Reload", "Connected to", etc.).
-# Only press BACK if it's actually visible — otherwise BACK exits the app
-# since the sign-in screen is the navigation root (BUG-14).
-- runFlow:
-    when:
-      visible: "Reload"
-    file: dismiss-devtools.yaml
-
-# ── Step 4: Wait for sign-in screen ──
+# ── Step 1: Wait for sign-in screen ──
+# seed-and-run.sh should have already navigated past the dev-client launcher
+# and "Continue" overlay via ADB. Allow extra time in case bundle loading is
+# still finishing or the app needs to settle.
 - extendedWaitUntil:
     visible:
       text: "Welcome back"
-    timeout: 30000
+    timeout: 120000
 
-# ── Step 5: Sign in with seeded credentials ──
+# ── Step 2: Sign in with seeded credentials ──
 - tapOn:
     id: "sign-in-email"
 - inputText: ${EMAIL}
 
-# BUG-3: Dismiss keyboard so password field is visible (Android keyboard covers it)
-- hideKeyboard
+# BUG-3 + BUG-20: Dismiss keyboard so password field is visible.
+# hideKeyboard fails on some Android configs ("custom input" error).
+# Workaround: tap the static "Welcome back" heading to defocus the input.
+- tapOn:
+    text: "Welcome back"
 
 - tapOn:
     id: "sign-in-password"
 - inputText: ${PASSWORD}
 
-# BUG-3: Dismiss keyboard before tapping sign-in button
-- hideKeyboard
+# BUG-3 + BUG-20: Dismiss keyboard before tapping sign-in button
+- tapOn:
+    text: "Welcome back"
+
+# Wait for keyboard to fully dismiss and sign-in button to be visible
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 10000
 
 - tapOn:
     id: "sign-in-button"
 
-# ── Step 6: Wait for home screen (auth complete) ──
+# ── Step 3: Wait for home screen (auth complete) ──
 - extendedWaitUntil:
     visible:
       id: "home-scroll-view"
     timeout: 30000
+
+# ── Step 4: Dismiss notification permission dialog (BUG-22) ──
+# Android 13+ shows POST_NOTIFICATIONS permission dialog after first sign-in.
+# seed-and-run.sh pre-grants via ADB, but this is a safety net.
+- runFlow:
+    when:
+      visible: "send you notifications"
+    file: dismiss-notifications.yaml

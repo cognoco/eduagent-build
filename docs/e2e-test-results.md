@@ -118,19 +118,56 @@ The 3 production auth flows (`app-launch.yaml`, `sign-in-navigation.yaml`, `forg
 
 **Keyboard dismiss pattern discovered:** Instead of `hideKeyboard` (sends BACK key — BUG-5 exits app if keyboard already dismissed), tap a non-input element like the screen heading. This defocuses the `TextInput` and naturally dismisses the keyboard.
 
-### Cumulative Totals
+### Session 5 (2026-03-09 continued, 2026-03-10) — Batch Runs + Infrastructure Hardening
+
+**Major infrastructure changes:**
+
+| Change | What | Why |
+|--------|------|-----|
+| Batch run (42 flows) | First pass of all untested flows | 3 PASS, 36 FAIL, 2 SKIP |
+| Re-run batch (36 flows) | Retry failed flows | 1 PASS (settings-toggles), 35 FAIL (Metro instability) |
+| Manual test | parent-tabs | PASS |
+| `switch-to-parent.yaml` | New helper: More → "Parent (Light)" → dashboard redirect | Parent flows need persona switch after sign-in |
+| 20+ YAML fixes | Fixed consent, standalone, parent, retention, subjects flows | See individual flow sections |
+| `seed-and-sign-in.yaml` v2 | Replaced `launchApp` + conditional `when:` with `extendedWaitUntil` | BUG-19 (launchApp fails on WHPX) |
+| `seed-and-sign-in.yaml` v3 | Simplified to sign-in only; launcher/bundle handled by `seed-and-run.sh` via ADB | Maestro gRPC driver crashes during bundle loading |
+| `seed-and-run.sh` v2 | Full ADB automation: `uiautomator dump` + `input tap` for launcher/Metro/Continue | Bypasses Maestro entirely for resource-intensive phase |
+| BUG-20 fix | `hideKeyboard` → tap "Welcome back" heading | "Custom input" error on some Android configs |
+| BUG-21 fix | Kill Bluetooth via ADB + `dismiss-bluetooth.yaml` safety net | "Bluetooth keeps stopping" dialog on WHPX |
+| BUG-22 fix | Pre-grant notification permission via `adb shell pm grant` | POST_NOTIFICATIONS dialog blocks UI after sign-in |
+| `--reinstall-driver` | Maestro driver reinstall needed after emulator restart | gRPC connection reset after cold boot |
+
+**Newly confirmed PASSING (Session 5):**
+
+| # | Flow | Status | Steps | Notes |
+|---|------|--------|-------|-------|
+| 14 | `account/settings-toggles.yaml` | PASS | 40+ | Full theme/accent/notification/learning-mode cycle, parent redirect + return |
+
+**Infrastructure verification results:**
+- `seed-and-sign-in.yaml` v3 + `seed-and-run.sh` v2 = stable sign-in pipeline
+- Launcher detection: `extendedWaitUntil: "DEVELOPMENT SERVERS"` (120s timeout for cold boot)
+- Bundle loading: ADB `uiautomator dump` polling (5s intervals, up to 600s)
+- "Continue" dismissal: `KEYCODE_BACK` (resolution-independent, more reliable than coordinate tap)
+- Keyboard dismissal: tap static heading text (avoids `hideKeyboard` failure)
+- Notification permission: pre-granted via `adb shell pm grant` before app launch
+
+### Cumulative Totals (as of Session 5)
 
 | Category | Flows | Status |
 |----------|-------|--------|
 | Pre-auth (all variants, standalone) | 8 | **All PASS** |
 | Post-auth (comprehensive, hardcoded creds) | 1 | **PASS** (65 steps) |
 | Quick-check / misc | 1 | **PASS** (simple screenshot) |
-| Seed-dependent (seeded flows) | 38 | **BLOCKED** (Issue 13: Maestro `runScript` env vars) |
-| Consent with inline seed (no runScript) | 2 | **BLOCKED** (need API running + Clerk) |
-| Camera/native | 1 | **BLOCKED** (emulator has no camera) |
-| **Total** | **51** | **10 passing, 41 blocked** |
+| Seed-dependent (seeded flows, confirmed) | 5 | **PASS** (account-lifecycle, delete-account, parent-dashboard, settings-toggles, parent-tabs) |
+| Seed-dependent (YAML fixed, needs validation) | 35 | **Ready to test** — YAML bugs fixed, seed-and-run.sh v2 working |
+| Standalone (consent/onboarding, YAML fixed) | 5 | **Ready to test** — launch-devclient + env var fixes applied |
+| Camera/native | 1 | **SKIP** (emulator has no camera) |
+| ExpoGo-only | 1 | **SKIP** (wrong app type — we use dev-client) |
+| **Total** | **53** | **16 passing, 35 ready to test, 2 skipped** |
 
-**Flow inventory:** 45 unique test flows + 6 setup helpers + 9 dev-client variants = 59 YAML files total.
+**Flow inventory:** 53 unique test flows + 10 setup helpers = 63 YAML files total.
+
+**Remaining validation plan:** Run 35 flows in batches of 5-6 with Metro restarts between batches (Metro crashes after ~15 consecutive `clearState` + bundle reload cycles).
 
 ---
 

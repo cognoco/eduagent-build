@@ -468,14 +468,49 @@ This follows the project convention: co-located unit tests in `*.test.ts`, integ
 
 ## 7. Implementation Sequence
 
-Progress as of 2026-02-26:
+Progress as of 2026-03-10:
 
 1. **API integration test harness** — **DONE.** `tests/integration/` with 10 suites (auth-chain, health-cors, onboarding, account-deletion, profile-isolation, session-completed-chain, stripe-webhook, test-seed, learning-session, retention-lifecycle), `setup.ts`, `mocks.ts`, and `jest.config.cjs`. Uses Hono `app.request()` against PostgreSQL service container.
 2. **Inngest chain integration tests** — **DONE.** `session-completed-chain.integration.test.ts` validates all 6 steps, error isolation, skip logic, and FR92 interleaved topics.
-3. **Maestro setup** — **DONE.** `apps/mobile/e2e/` with `config.yaml`, `scripts/seed.js` (GraalJS), `_setup/seed-and-sign-in.yaml`, `_setup/sign-out.yaml`, Nx `e2e` target with smoke configuration, and 10 total YAML flows (4 existing + 2 setup + 4 Tier 1 smoke).
+3. **Maestro setup** — **DONE.** `apps/mobile/e2e/` with `config.yaml`, `scripts/seed.js` (GraalJS), `_setup/seed-and-sign-in.yaml`, `_setup/sign-out.yaml`, Nx `e2e` target with smoke configuration, and 53 total test flows + 10 setup helpers.
 4. **CI wiring** — **DONE.** `.github/workflows/e2e-ci.yml` with PostgreSQL service container for both jobs, API server background startup + health check for mobile-maestro job. Advisory mode (`continue-on-error: true`).
-5. **Smoke suite buildout** — **DONE.** 4 Tier 1 smoke flows written: `onboarding/sign-up-flow.yaml` (S1), `learning/first-session.yaml` (S2), `learning/core-learning.yaml` (S3), `retention/recall-review.yaml` (S4). Blocker: Clerk test user creation not yet in seed service; recall testIDs (`recall-question`, `recall-answer-input`, `recall-submit`) not yet added to mobile screens.
-6. **Nightly full suite** — TODO. Add scheduled workflow, Tier 2 flows, reporting.
+5. **Smoke suite buildout** — **DONE.** All planned smoke and nightly flows written. 16 flows confirmed passing on Android emulator. 35 flows have YAML fixes applied and are ready for validation.
+6. **Seed infrastructure** — **DONE.** `seed-and-run.sh` (shell wrapper: curl + node JSON parsing + ADB automation + Maestro `-e` flags). `test-seed.ts` service with 10 scenarios (onboarding-complete, learning-active, trial-active, trial-expired-child, parent-with-children, parent-solo, retention-due, failed-recall-3x, consent-withdrawn, multi-subject). Bypasses Maestro's broken GraalJS `runScript` (Issue 13).
+7. **Nightly full suite** — IN PROGRESS. All 53 flows written. Batch runner scripts created (`run-all-untested.sh`, `rerun-failed.sh`). Need to complete validation of remaining 35 flows.
+
+### Architecture Evolution (Sessions 1-5)
+
+The Maestro E2E architecture evolved significantly through practical testing on WHPX:
+
+| Phase | Approach | Status |
+|-------|----------|--------|
+| **Original design** (Section 5) | Maestro `runScript` with GraalJS seed.js | **Blocked** — Issue 13: `__maestro` undefined in sub-flows |
+| **v1** (Session 3-4) | `seed-and-run.sh` + Maestro `launchApp` | **Unstable** — BUG-19: `launchApp` fails on WHPX |
+| **v2** (Session 5) | `seed-and-run.sh` + Maestro `extendedWaitUntil` for launcher | **Unstable** — gRPC driver crashes during bundle loading |
+| **v3** (Session 5, final) | Full ADB automation in `seed-and-run.sh`, Maestro only does sign-in | **Stable** — avoids Maestro during resource-intensive phases |
+
+**v3 data flow:**
+```
+seed-and-run.sh (bash)
+  ├── ADB: pm clear → pm grant → am start
+  ├── ADB: uiautomator dump polling for "DEVELOPMENT" (120s)
+  ├── ADB: input tap Metro server entry
+  ├── ADB: uiautomator dump polling for "Continue" (600s)
+  ├── ADB: KEYCODE_BACK (dismiss Continue + dev tools)
+  ├── API: curl POST /v1/__test/seed → node JSON parse
+  └── exec: maestro test -e EMAIL=... -e PASSWORD=... flow.yaml
+        └── seed-and-sign-in.yaml (Maestro)
+              ├── extendedWaitUntil "Welcome back" (120s)
+              ├── tapOn sign-in-email → inputText
+              ├── tapOn "Welcome back" (dismiss keyboard)
+              ├── tapOn sign-in-password → inputText
+              ├── tapOn "Welcome back" (dismiss keyboard)
+              ├── extendedWaitUntil sign-in-button → tapOn
+              ├── extendedWaitUntil home-scroll-view
+              └── dismiss notification permission (safety net)
+```
+
+**Key insight:** WHPX emulators are too slow/unstable for Maestro to handle the entire app launch lifecycle. Splitting the work between ADB (stable but dumb) and Maestro (smart but fragile under load) gives the best reliability.
 
 ---
 

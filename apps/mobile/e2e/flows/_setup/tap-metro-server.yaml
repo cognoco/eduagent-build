@@ -1,10 +1,9 @@
 # Tap the Metro server entry on the dev-client launcher.
-# Tries both 8081 (direct Metro) and 8082 (bundle proxy).
+# Only taps 8081 (direct Metro, the default). After tapping, the app
+# starts bundle loading which causes heavy UI transitions — querying
+# the view hierarchy during this crashes the gRPC driver.
+# If bundle proxy (8082) is needed, use tap-metro-8082.yaml directly.
 appId: com.mentomate.app
 ---
 - tapOn:
     text: "http://10.0.2.2:8081"
-    optional: true
-- tapOn:
-    text: "http://10.0.2.2:8082"
-    optional: true

@@ -1238,3 +1238,97 @@ The original design had 4 layers. Layer 3 (seed.js) is now bypassed by the shell
 - The More screen is replaced by the parent dashboard, making subsequent theme taps fail.
 - The comprehensive flow handled this by testing Eager Learner ↔ Teen first, then Parent last with explicit redirect handling.
 - Individual flows that test theme switching need the same ordering strategy.
+
+---
+
+## Session 5 Findings (2026-03-10)
+
+### Architecture Evolution: Full ADB Automation
+
+The seed-and-sign-in pipeline went through 3 major revisions in Sessions 4-5:
+
+**v1 (Session 4):** Maestro-native launch
+- `seed-and-run.sh` seeds via API, passes creds to Maestro as env vars
+- `seed-and-sign-in.yaml` uses `launchApp: clearState: true`, conditional `when:` checks for launcher
+- **Problem:** `launchApp` fails intermittently on WHPX (BUG-19), `when:` is a one-time check that misses the launcher
+
+**v2 (Session 5, early):** Hybrid ADB + Maestro
+- `seed-and-run.sh` clears state + launches via ADB (`pm clear` + `am start`)
+- `seed-and-sign-in.yaml` uses `extendedWaitUntil: "DEVELOPMENT SERVERS"` (proper wait, 120s timeout)
+- Maestro handles launcher tap, bundle load wait, "Continue" dismissal
+- **Problem:** Maestro's UIAutomator2 gRPC driver crashes during resource-intensive bundle loading on WHPX
+
+**v3 (Session 5, final):** Full ADB automation
+- `seed-and-run.sh` handles EVERYTHING via ADB before Maestro starts:
+  1. `pm clear` + `am start` (clear state, launch app)
+  2. `am force-stop com.android.bluetooth` (BUG-21: kill Bluetooth service)
+  3. `pm grant POST_NOTIFICATIONS` (BUG-22: pre-grant notification permission)
+  4. `uiautomator dump` + grep for "DEVELOPMENT" (wait for launcher, 120s)
+  5. `input tap 540 642` (tap Metro server entry)
+  6. `uiautomator dump` + grep for "Continue" (wait for bundle, 600s polling)
+  7. `input keyevent KEYCODE_BACK` (dismiss "Continue" overlay — resolution-independent)
+  8. `uiautomator dump` + grep for "Reload" → `KEYCODE_BACK` (dismiss dev tools)
+- `seed-and-sign-in.yaml` simplified to: wait for "Welcome back" → sign in → wait for home
+- Maestro only starts AFTER the app is on the stable sign-in screen
+- **Result:** Avoids Maestro gRPC crashes entirely; much more stable on WHPX
+
+### Key Operational Procedures Discovered
+
+**Emulator restart procedure:**
+1. `adb -s emulator-xxxx emu kill` — kill emulator
+2. Wait 5s
+3. `emulator.exe -avd New_Device -no-snapshot -gpu host -no-audio &` — start fresh
+4. Poll `adb shell getprop sys.boot_completed` until "1" (~30-40s)
+5. Set up ADB reverse: `adb reverse tcp:8081 tcp:8081 && tcp:8082 && tcp:8787`
+6. Run first test with `--reinstall-driver` flag to reinstall Maestro's UIAutomator agent
+
+**Two-emulator pitfalls:**
+- Bare `adb` (without `-s`) fails with "more than one device/emulator"
+- `seed-and-run.sh` has `|| true` on all ADB commands, silently failing with 2 emulators
+- Maestro's `--udid emulator-xxxx` flag can report "not connected" intermittently
+- **Recommendation:** Run with single emulator for reliability
+
+**Metro stability:**
+- Metro + bundle proxy crash after ~15 consecutive `clearState` + bundle reload cycles
+- **Mitigation:** Run batches of 5-6 flows, restart Metro between batches
+- Cold-boot WHPX can take 60-90s before the dev-client launcher appears
+- `uiautomator dump` can OOM during heavy bundle loading; needs retry loop
+
+### New Bugs Discovered
+
+**BUG-18: Persona switch crashes app (~50%)**
+- `setPersona('teen')` from parent dashboard crashes due to navigation race condition
+- Affects: `switch-to-teen` button on parent dashboard
+- Mitigation: Parent theme test placed last in settings-toggles.yaml
+
+**BUG-19: Maestro `launchApp` fails on WHPX**
+- `launchApp` returns "Unable to launch app" intermittently
+- Persistent after app crashes (BUG-18) or concurrent sessions
+- Fix: ADB-based launch (`am force-stop` + `pm clear` + `am start`)
+
+**BUG-20: `hideKeyboard` fails on some Android configs**
+- Maestro's `hideKeyboard` → "Couldn't hide the keyboard. Custom input..."
+- Fix: Tap a static text element (e.g., "Welcome back" heading) to defocus input
+
+**BUG-21: "Bluetooth keeps stopping" dialog on WHPX**
+- System dialog after emulator boot/restart, blocks entire UI
+- Fix: `am force-stop com.android.bluetooth` before app launch + `dismiss-bluetooth.yaml` safety net
+
+**BUG-22: POST_NOTIFICATIONS permission dialog blocks UI**
+- Android 13+ shows dialog after sign-in; `pm clear` resets grant
+- Fix: `pm grant com.mentomate.app android.permission.POST_NOTIFICATIONS` before app launch
+
+### Setup Helper Inventory (10 files)
+
+| File | Purpose |
+|------|---------|
+| `seed-and-sign-in.yaml` | Wait for sign-in screen, enter credentials, wait for home |
+| `launch-devclient.yaml` | Launch app, connect to Metro, dismiss overlays (for standalone flows) |
+| `switch-to-parent.yaml` | More → "Parent (Light)" → wait for `dashboard-scroll` |
+| `tap-metro-server.yaml` | Tap 8081 (optional) + 8082 (optional) Metro entries |
+| `dismiss-anr.yaml` | Tap "Wait" on ANR dialog |
+| `dismiss-bluetooth.yaml` | Tap "Close app" on Bluetooth crash dialog |
+| `dismiss-devtools.yaml` | Press Back to dismiss dev tools sheet |
+| `dismiss-notifications.yaml` | Tap "Allow" on notification permission dialog |
+| `nav-to-sign-in.yaml` | Navigate to sign-in from launcher |
+| `sign-out.yaml` | Sign out via More → sign-out-button |

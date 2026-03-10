@@ -1,0 +1,4 @@
+# Dismiss "Bluetooth keeps stopping" system dialog by tapping "Close app"
+appId: com.mentomate.app
+---
+- tapOn: "Close app"

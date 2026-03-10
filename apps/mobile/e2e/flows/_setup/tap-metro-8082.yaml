@@ -1,0 +1,5 @@
+# Tap the Metro 8082 bundle proxy server entry
+appId: com.mentomate.app
+---
+- tapOn:
+    text: "http://10.0.2.2:8082"

@@ -21,21 +21,37 @@ tags:
   - nightly
   - consent
 ---
-# 1. Launch dev-client, connect to Metro, dismiss dev menu.
-#    clearState: true is in launch-devclient.yaml — resets SecureStore
-#    so postApprovalSeen is fresh.
-- runFlow: ../_setup/launch-devclient.yaml
+# 1. Wait for sign-in screen.
+#    seed-and-run.sh already handled: pm clear (resets SecureStore so
+#    postApprovalSeen is fresh), app launch, dev-client launcher,
+#    bundle loading, and "Continue" overlay dismissal.
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 120000
 
 # 2. Sign in with seeded credentials (from seed-and-run.sh env vars)
 - tapOn:
     id: "sign-in-email"
 - inputText: ${EMAIL}
-- hideKeyboard
+
+# BUG-20: tap heading to dismiss keyboard instead of hideKeyboard
+- tapOn:
+    text: "Welcome back"
 
 - tapOn:
     id: "sign-in-password"
 - inputText: ${PASSWORD}
-- hideKeyboard
+
+# BUG-20: dismiss keyboard
+- tapOn:
+    text: "Welcome back"
+
+# Wait for sign-in button to be visible after keyboard dismissal
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 10000
 
 - tapOn:
     id: "sign-in-button"
