@@ -207,7 +207,7 @@ Android 13+ (API 33+) requires explicit `POST_NOTIFICATIONS` permission. The app
 
 ## BUG-23: Missing `href: null` on `subject` Route Breaks Tab Bar (2026-03-10)
 
-**Status:** Open (app code bug)
+**Status:** Fixed (commit `6536032`)
 **Severity:** Medium — visual glitch, does not block functionality
 **Affects:** All screens in `(learner)` route group
 
@@ -234,7 +234,7 @@ The bottom tab bar shows ~9 tabs instead of the intended 3 (Home, Learning Book,
 
 ## BUG-24: KeyboardAvoidingView Broken on Android — Keyboard Covers Inputs (2026-03-10)
 
-**Status:** Open (app code bug — systemic across 6 screens)
+**Status:** Fixed (commit `6536032`) — needs emulator verification
 **Severity:** High — blocks user input on sign-in/sign-up (first interaction)
 **Affects:** All screens with text inputs in auth and onboarding flows
 

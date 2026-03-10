@@ -1320,6 +1320,15 @@ The seed-and-sign-in pipeline went through 3 major revisions in Sessions 4-5:
 - Android 13+ shows dialog after sign-in; `pm clear` resets grant
 - Fix: `pm grant com.mentomate.app android.permission.POST_NOTIFICATIONS` before app launch
 
+**BUG-23: Missing `href: null` on `subject` route** (app code)
+- Expo Router auto-discovers `subject/` as a visible tab, showing ~9 tabs instead of 3
+- **Fixed:** Added `<Tabs.Screen name="subject" options={{ href: null }} />` to `(learner)/_layout.tsx`
+
+**BUG-24: KeyboardAvoidingView broken on Android** (app code, systemic)
+- `behavior={undefined}` on Android makes KeyboardAvoidingView a no-op across 6 input screens
+- Sign-in worst case: SSO buttons push password field into keyboard zone
+- **Fixed:** Changed to `behavior='height'` on Android across sign-in, sign-up, forgot-password, consent, create-profile, create-subject (8 instances)
+
 ### Setup Helper Inventory (10 files)
 
 | File | Purpose |
