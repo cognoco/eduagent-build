@@ -139,14 +139,15 @@ Additionally, Maestro's UIAutomator2 gRPC driver crashes during resource-intensi
 
 **Final workaround (v3):** `seed-and-run.sh` handles the entire app lifecycle via ADB, including launcher navigation and bundle loading. Maestro only starts after the app is on the stable sign-in screen:
 1. `adb shell am force-stop` + `adb shell pm clear` — kill and wipe
-2. `adb shell pm grant ... POST_NOTIFICATIONS` — pre-grant permissions (BUG-22)
-3. `adb shell am start` — launch app
-4. `uiautomator dump` polling for "DEVELOPMENT" text (launcher screen, 120s)
-5. `adb shell input tap` — tap Metro server entry
-6. `uiautomator dump` polling for "Continue" text (bundle loaded, 600s)
-7. `adb shell input keyevent KEYCODE_BACK` — dismiss "Continue" overlay
-8. Dismiss dev tools sheet if present
-9. **Then** Maestro starts — app is already on sign-in screen
+2. `adb shell am force-stop com.android.bluetooth` — prevent BUG-21
+3. `adb shell pm grant ... POST_NOTIFICATIONS` — pre-grant permissions (BUG-22)
+4. `adb shell am start` — launch app
+5. `uiautomator dump` polling for "DEVELOPMENT" text (launcher screen, 120s)
+6. Parse 8081 entry bounds from dump, `adb shell input tap` at center
+7. Escalating sleep loop (15/30/60/90/120s) + `KEYCODE_BACK` to dismiss Continue overlay + verify via dump (polling for "Continue" text is unreliable — dump OOM-killed during React Native bottom sheet)
+8. If "Welcome back" visible → break; if "DEVELOPMENT" → re-tap Metro
+9. Dismiss dev tools sheet if "Reload" visible
+10. **Then** Maestro starts — app is already on sign-in screen
 
 **Additional operational note:** After emulator cold restart, Maestro's driver must be reinstalled with `--reinstall-driver` flag on the first test run. Without this, all gRPC connections fail with "Connection refused: localhost:7001".
 
@@ -164,7 +165,7 @@ Maestro's `hideKeyboard` command fails with "Couldn't hide the keyboard. This ca
 
 **Workaround:** Replace `hideKeyboard` with tapping a static text element (e.g., `tapOn: text: "Welcome back"`) to defocus the input, which implicitly dismisses the keyboard.
 
-**Applied in:** `seed-and-sign-in.yaml`
+**Applied in:** `seed-and-sign-in.yaml`, `consent-withdrawn-gate.yaml`, `post-approval-landing.yaml`
 
 ---
 
@@ -180,9 +181,9 @@ After emulator boot or cold restart, Android shows a "Bluetooth keeps stopping" 
 
 **Workaround (two layers):**
 1. `seed-and-run.sh` kills Bluetooth via `adb shell am force-stop com.android.bluetooth` before launching the app
-2. `seed-and-sign-in.yaml` has a conditional `dismiss-bluetooth.yaml` flow as a safety net (taps "Close app")
+2. `seed-and-run.sh` checks `uiautomator dump` for "Bluetooth" text and taps dismiss coordinates as a safety net
 
-**Applied in:** `seed-and-run.sh`, `seed-and-sign-in.yaml`, `dismiss-bluetooth.yaml`
+**Applied in:** `seed-and-run.sh`, `dismiss-bluetooth.yaml`
 
 ---
 

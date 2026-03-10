@@ -472,7 +472,7 @@ Progress as of 2026-03-10:
 
 1. **API integration test harness** — **DONE.** `tests/integration/` with 10 suites (auth-chain, health-cors, onboarding, account-deletion, profile-isolation, session-completed-chain, stripe-webhook, test-seed, learning-session, retention-lifecycle), `setup.ts`, `mocks.ts`, and `jest.config.cjs`. Uses Hono `app.request()` against PostgreSQL service container.
 2. **Inngest chain integration tests** — **DONE.** `session-completed-chain.integration.test.ts` validates all 6 steps, error isolation, skip logic, and FR92 interleaved topics.
-3. **Maestro setup** — **DONE.** `apps/mobile/e2e/` with `config.yaml`, `scripts/seed.js` (GraalJS), `_setup/seed-and-sign-in.yaml`, `_setup/sign-out.yaml`, Nx `e2e` target with smoke configuration, and 53 total test flows + 10 setup helpers.
+3. **Maestro setup** — **DONE.** `apps/mobile/e2e/` with `config.yaml`, `scripts/seed-and-run.sh` (ADB automation + seed + Maestro), `_setup/seed-and-sign-in.yaml`, `_setup/sign-out.yaml`, Nx `e2e` target with smoke configuration, and 53 total test flows + 10 setup helpers.
 4. **CI wiring** — **DONE.** `.github/workflows/e2e-ci.yml` with PostgreSQL service container for both jobs, API server background startup + health check for mobile-maestro job. Advisory mode (`continue-on-error: true`).
 5. **Smoke suite buildout** — **DONE.** All planned smoke and nightly flows written. 16 flows confirmed passing on Android emulator. 35 flows have YAML fixes applied and are ready for validation.
 6. **Seed infrastructure** — **DONE.** `seed-and-run.sh` (shell wrapper: curl + node JSON parsing + ADB automation + Maestro `-e` flags). `test-seed.ts` service with 10 scenarios (onboarding-complete, learning-active, trial-active, trial-expired-child, parent-with-children, parent-solo, retention-due, failed-recall-3x, consent-withdrawn, multi-subject). Bypasses Maestro's broken GraalJS `runScript` (Issue 13).
@@ -494,9 +494,11 @@ The Maestro E2E architecture evolved significantly through practical testing on 
 seed-and-run.sh (bash)
   ├── ADB: pm clear → pm grant → am start
   ├── ADB: uiautomator dump polling for "DEVELOPMENT" (120s)
-  ├── ADB: input tap Metro server entry
-  ├── ADB: uiautomator dump polling for "Continue" (600s)
-  ├── ADB: KEYCODE_BACK (dismiss Continue + dev tools)
+  ├── ADB: parse 8081 bounds from dump, input tap at center
+  ├── ADB: escalating sleep (15/30/60/90/120s) + KEYCODE_BACK + verify
+  │         (dump unreliable during Continue overlay — OOM kills it)
+  ├── ADB: if "Welcome back" → break; if "DEVELOPMENT" → re-tap Metro
+  ├── ADB: KEYCODE_BACK if "Reload" visible (dismiss dev tools)
   ├── API: curl POST /v1/__test/seed → node JSON parse
   └── exec: maestro test -e EMAIL=... -e PASSWORD=... flow.yaml
         └── seed-and-sign-in.yaml (Maestro)
