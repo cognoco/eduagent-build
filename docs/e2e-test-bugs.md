@@ -21,13 +21,15 @@ After the JS bundle loads, the Expo dev-client always shows a "Continue" overlay
 
 ## BUG-3: Android Keyboard Covers Password Field (2026-03-08)
 
-**Status:** Workaround in flows (updated for BUG-20)
+**Status:** Workaround in flows (updated for BUG-20). See BUG-24 for the underlying app code root cause.
 **Severity:** Medium
 **Affects:** Sign-in flow
 
 On Android, the software keyboard covers the password field and sign-in button when the email field is focused.
 
-**Workaround:** Tap on static "Welcome back" heading text to defocus the input and dismiss the keyboard. Originally used `hideKeyboard`, but that fails on some Android configs (see BUG-20).
+**Workaround (E2E flows):** Tap on static "Welcome back" heading text to defocus the input and dismiss the keyboard. Originally used `hideKeyboard`, but that fails on some Android configs (see BUG-20).
+
+**Root cause:** See BUG-24 — `KeyboardAvoidingView` has `behavior={undefined}` on Android across all auth screens, so it does nothing. Combined with `justifyContent: 'center'` on the ScrollView, inputs can't scroll into view when the keyboard is open.
 
 ---
 
@@ -227,3 +229,56 @@ The bottom tab bar shows ~9 tabs instead of the intended 3 (Home, Learning Book,
 ```
 
 **Verify:** Confirm no other routes are missing — cross-reference all files/directories in `(learner)/` against `Tabs.Screen` declarations. Currently declared with `href: null`: `onboarding`, `session`, `topic`, `subscription`, `homework`. The `subject` directory is the only one missing.
+
+---
+
+## BUG-24: KeyboardAvoidingView Broken on Android — Keyboard Covers Inputs (2026-03-10)
+
+**Status:** Open (app code bug — systemic across 6 screens)
+**Severity:** High — blocks user input on sign-in/sign-up (first interaction)
+**Affects:** All screens with text inputs in auth and onboarding flows
+
+On Android, the software keyboard covers input fields (especially password) because `KeyboardAvoidingView` is configured with `behavior={undefined}` for Android, making it a no-op. Combined with `justifyContent: 'center'` on the `ScrollView` content container, inputs cannot scroll into view when the keyboard opens.
+
+The sign-in screen is the worst case: Google + Apple SSO buttons (~120px combined) sit above the email/password fields, consuming space that pushes the password field into the keyboard zone.
+
+**Root cause:** All 6 affected screens share the same broken pattern:
+
+```tsx
+<KeyboardAvoidingView
+  className="flex-1 bg-background"
+  behavior={Platform.OS === 'ios' ? 'padding' : undefined}  // ← Android gets undefined
+>
+  <ScrollView
+    contentContainerStyle={{
+      flexGrow: 1,
+      justifyContent: 'center',  // ← Centers content, can't scroll up
+    }}
+  >
+```
+
+Two issues:
+1. `behavior={undefined}` on Android — `KeyboardAvoidingView` does nothing
+2. `justifyContent: 'center'` + `flexGrow: 1` — content is vertically centered; when the keyboard shrinks visible space, the form can't reflow upward
+
+`AndroidManifest.xml` has `android:windowSoftInputMode="adjustResize"` which resizes the window, but without `KeyboardAvoidingView` cooperation, the `ScrollView` doesn't scroll the focused input into view.
+
+**Affected screens (priority order):**
+
+| Screen | File | Above-input content | Severity |
+|--------|------|---------------------|----------|
+| Sign-in | `(auth)/sign-in.tsx` | SSO buttons + heading + subheading (~120px) | **High** |
+| Sign-up | `(auth)/sign-up.tsx` | SSO buttons + heading + subheading (~120px) | **High** |
+| Forgot password | `(auth)/forgot-password.tsx` | Heading + description | Medium |
+| Create profile | `create-profile.tsx` | Heading + description | Medium |
+| Create subject | `create-subject.tsx` | Heading + description | Medium |
+| Consent | `consent.tsx` | Heading + description | Medium |
+
+**Not affected:** `ChatShell.tsx` (input in fixed footer, different layout), `session-summary/[sessionId].tsx` (has `keyboardVerticalOffset={0}`).
+
+**Fix (per screen):**
+1. Change `behavior` to work on both platforms: `behavior={Platform.OS === 'ios' ? 'padding' : 'height'}`
+2. Add `keyboardVerticalOffset` for iOS header compensation
+3. Consider changing `justifyContent: 'center'` to `'flex-start'` with a flexible spacer, so content can scroll above the keyboard
+
+**E2E workaround (already applied):** Maestro flows tap the "Welcome back" heading to defocus the input and dismiss the keyboard between email and password entry (BUG-3 + BUG-20).
