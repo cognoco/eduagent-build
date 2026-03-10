@@ -5,6 +5,20 @@ Each bug has a status, root cause, and fix/workaround.
 
 ---
 
+## BUG-1: App Viewport / Resolution Mismatch (2026-03-08)
+
+**Status:** Open (emulator-specific, likely not user-facing)
+**Severity:** Low
+**Affects:** All screens (visual only)
+
+The app's content appears slightly narrower than the emulator screen in some views. When the emulator window is resized, text on the right edge gets clipped (e.g., "Show" button truncated to "Sh", "Forgot password?" truncated).
+
+**Root cause:** The app may not be handling edge-to-edge / safe area insets correctly on this AVD configuration, or the emulator window scaling doesn't match the virtual display resolution.
+
+**Note:** Does NOT affect Maestro assertions (all testIDs and text elements found correctly). May be emulator-specific and not reproduce on real devices.
+
+---
+
 ## BUG-2: Dev Menu "Continue" Overlay Blocks UI (2026-03-08)
 
 **Status:** Workaround in flows
@@ -33,6 +47,46 @@ On Android, the software keyboard covers the password field and sign-in button w
 
 ---
 
+## BUG-4: Pressable `testID` Not Reliably Exposed to Maestro on Android (2026-03-08)
+
+**Status:** Workaround (use text-based assertions)
+**Severity:** Low (testing infrastructure only)
+**Affects:** `PasswordInput` show/hide toggle
+
+The `PasswordInput` component's show/hide toggle `Pressable` has `testID="sign-in-password-toggle"`, but Maestro cannot find it by ID. The toggle IS visible and functional (verified by asserting the "Show" text), but the `testID` on `Pressable` may not map to an accessibility identifier that Maestro can locate on Android.
+
+**Root cause:** React Native's `Pressable` does not consistently map `testID` to Android's UIAutomator accessibility tree. `TextInput` testIDs work fine; `Pressable` is unreliable.
+
+**Workaround:** Use text-based assertions (`assertVisible: "Show"`) instead of testID for the toggle.
+
+---
+
+## BUG-5: Maestro `hideKeyboard` Exits App When No Keyboard Is Open (2026-03-08)
+
+**Status:** Workaround (never call `hideKeyboard` without preceding text input)
+**Severity:** Low (testing infrastructure only)
+**Affects:** All flows using `hideKeyboard`
+
+On Android, Maestro's `hideKeyboard` command sends a BACK key event. When the keyboard is NOT actually open, this BACK event navigates the app backward — potentially exiting the app entirely to the Android home screen.
+
+**Root cause:** Maestro implements `hideKeyboard` as a BACK key press on Android. Without an open keyboard to dismiss, the BACK event propagates to the navigation stack.
+
+**Workaround:** Never call `hideKeyboard` unless text was just entered. Never call it twice in a row. See also BUG-20 for `hideKeyboard` failure even with keyboard open.
+
+---
+
+## BUG-6: Stale `appId` in Flow Files (2026-03-08)
+
+**Status:** Fixed (commit `08abeaa`)
+**Severity:** Low (test files only)
+**Affects:** 5 flow files
+
+Five flow files used `appId: com.zwizzly.eduagent` instead of the correct `appId: com.mentomate.app`: `seed-and-sign-in.yaml`, `sign-out.yaml`, `first-session.yaml`, `core-learning.yaml`, `recall-review.yaml`.
+
+**Fix:** All updated to `com.mentomate.app`. Zero occurrences of the old appId remain.
+
+---
+
 ## BUG-7: OkHttp Chunked Transfer Encoding (2026-03-08)
 
 **Status:** Partially resolved
@@ -45,6 +99,50 @@ OkHttp's chunked transfer encoding fails on some WHPX configurations when connec
 
 ---
 
+## BUG-8: Dev-Client Launcher Text Not in Maestro Accessibility Tree (2026-03-08)
+
+**Status:** Workaround (use Maestro `launchApp` instead of `adb shell am start`)
+**Severity:** Low (testing infrastructure only)
+**Affects:** Dev-client launcher interaction
+
+When the app is launched manually via `adb shell am start`, Maestro's `hierarchy` command shows no text elements from the dev-client launcher (e.g., "http://10.0.2.2:8081" is not found). However, when launched via Maestro's own `launchApp` command, the same text IS visible and tappable.
+
+**Root cause:** Maestro's `launchApp` performs additional accessibility setup beyond `adb am start`. Without this setup, the dev-client launcher's React Native views don't expose their text to Maestro's accessibility queries.
+
+**Workaround:** Use Maestro's `launchApp` command, not manual `adb shell am start`, when Maestro needs to interact with the launcher. Note: In v3 architecture, `seed-and-run.sh` uses ADB + `uiautomator dump` parsing instead of Maestro for launcher interaction, bypassing this issue entirely.
+
+---
+
+## BUG-9: Trailing Spaces in JSX Text Break Maestro Assertions (2026-03-08)
+
+**Status:** Workaround (include trailing space in assertions)
+**Severity:** Low (testing only)
+**Affects:** Sign-up screen ("Already have an account?" link)
+
+The JSX `Already have an account?{' '}` renders with a trailing space that becomes part of the accessibility text. Maestro's exact text matching fails if the assertion doesn't include the trailing space.
+
+**Root cause:** React Native's `<Text>` component concatenates `{' '}` spacers into the parent text node's value, which is exposed to accessibility.
+
+**Workaround:** Include the trailing space in Maestro assertions: `assertVisible: "Already have an account? "`.
+
+---
+
+## BUG-10: Hidden Expo Router Tabs Render in Dev-Client Tab Bar (2026-03-09)
+
+**Status:** Open (dev-client specific — production builds not affected)
+**Severity:** Medium (E2E testing only)
+**Affects:** All post-auth flows in dev-client builds
+
+Expo Router tabs with `href: null` (hidden from tab bar) still render as visible tabs in dev-client builds. All tab labels truncate: "Home" → "Ho...", "Learning Book" → "boo...", "More" stays readable. Hidden screens like onboarding, session, topic show as "onb...", "ses..." etc.
+
+**Root cause:** Dev-client builds may not apply the same tab filtering as production builds. Extra tabs shift positions and make point-based and text-based tab navigation unreliable.
+
+**Workaround:** Navigate using explicit routes or use "More" tab (short enough to not truncate). Avoid tapping "Home" or "Learning Book" tabs in E2E.
+
+**Note:** Production builds correctly hide tabs with `href: null`.
+
+---
+
 ## BUG-11: Theme Re-render Destabilizes Maestro Text Recognition (2026-03-09)
 
 **Status:** Workaround in flows
@@ -54,6 +152,20 @@ OkHttp's chunked transfer encoding fails on some WHPX configurations when connec
 After tapping a theme button (e.g., "Teen (Dark)"), NativeWind re-renders the entire tree with new CSS variables. During the transition, Maestro briefly can't find text elements.
 
 **Workaround:** `extendedWaitUntil: visible: text: "Appearance"` after each theme tap to wait for re-render to stabilize.
+
+---
+
+## BUG-12: Parent Theme Switch Triggers Persona Routing Redirect (2026-03-09)
+
+**Status:** Expected behavior (documenting for E2E awareness)
+**Severity:** Low (by design, not a bug)
+**Affects:** `settings-toggles.yaml`, any flow involving persona change
+
+Selecting "Parent (Light)" on the More screen triggers `<Redirect href="/(parent)/dashboard" />` in `(learner)/_layout.tsx:575`. The user lands on the parent dashboard, not the More screen.
+
+**Root cause:** Each persona has its own route group (`(learner)/`, `(parent)/`) with a layout guard. Changing persona to `parent` while in the `(learner)` route group triggers the cross-redirect. This is intentional architectural behavior.
+
+**Workaround:** E2E flows must handle the redirect — use `testID="switch-to-teen"` on the parent dashboard's demo link to navigate back. See also BUG-17 for the flow restructuring applied to handle this.
 
 ---
 

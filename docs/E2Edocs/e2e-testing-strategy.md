@@ -391,7 +391,7 @@ The shell wrapper handles the full lifecycle: ADB app clear/launch → dev-clien
 
 ### Profile Scope Middleware (BUG-25 — Critical)
 
-The `profileScopeMiddleware` auto-resolves to the owner profile when the `X-Profile-Id` header is absent. This is essential for E2E testing because the mobile client may not send the header during the profile bootstrap sequence after sign-in. Without this fix, all 52 route handlers fell back to `account.id` (which is not a valid profileId), silently returning empty data. Fixed in commit `35ef433`.
+Fixed: `profileScopeMiddleware` auto-resolves to the owner profile when `X-Profile-Id` header is absent. See `e2e-test-bugs.md` BUG-25 for full details.
 
 ### Isolation Between Parallel CI Runs
 
