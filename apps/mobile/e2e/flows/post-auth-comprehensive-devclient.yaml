@@ -1,0 +1,289 @@
+# Post-Auth Comprehensive E2E — dev-client variant
+# Signs in with seeded test user, then tests all major post-auth screens.
+# Prerequisite: API running at localhost:8787 with learning-active seed data.
+# Prerequisite: App is on the sign-in screen (dev-client already connected).
+# Prerequisite: Seed user must have bypass_client_trust=true in Clerk (CAPTCHA bypass).
+#
+# Seeded user: test-e2e@example.com / Mentomate2026xK
+# Scenario: learning-active (has subject, session, topic)
+appId: com.mentomate.app
+tags:
+  - devclient
+  - post-auth
+  - comprehensive
+---
+# ═══════════════════════════════════════════════════════════════════
+# PHASE 1: Sign In
+# ═══════════════════════════════════════════════════════════════════
+
+# BUG-19: clearState moved to seed-and-run.sh (Maestro clearState unreliable).
+# App state already cleared via ADB before Maestro starts.
+- launchApp
+
+# Dev-client launcher: wait for server entry and tap it
+# METRO_URL is set by seed-and-run.sh (default: http://10.0.2.2:8081).
+- extendedWaitUntil:
+    visible: ${METRO_URL}
+    timeout: 60000
+
+- tapOn: ${METRO_URL}
+
+# Dev menu overlay always appears after bundle load (BUG-2) — dismiss it
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 600000
+
+- tapOn: "Continue"
+
+# A second dev tools sheet may appear (MentoMate, Connected to, Reload, etc.)
+# Only press BACK if the sheet is visible — otherwise BACK exits the app
+# since the sign-in screen is the navigation root (BUG-14).
+- runFlow:
+    when:
+      visible: "Reload"
+    file: _setup/dismiss-devtools.yaml
+
+# Now sign-in screen should be visible
+- extendedWaitUntil:
+    visible: "Welcome back"
+    timeout: 30000
+
+- tapOn:
+    id: "sign-in-email"
+- inputText: "test-e2e@example.com"
+
+# Dismiss keyboard so password field becomes visible (BUG-3)
+- hideKeyboard
+
+- tapOn:
+    id: "sign-in-password"
+- inputText: "Mentomate2026xK"
+
+# BUG-3: Must dismiss keyboard before tapping button (keyboard covers it on Android)
+- hideKeyboard
+
+- tapOn:
+    id: "sign-in-button"
+
+- takeScreenshot: 01-sign-in-tapped
+
+# ═══════════════════════════════════════════════════════════════════
+# PHASE 2: Home Screen Verification
+# ═══════════════════════════════════════════════════════════════════
+
+# Wait for home screen to load (API calls + rendering)
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 30000
+
+- takeScreenshot: 02-home-screen-loaded
+
+# Verify header text (teen persona default)
+- assertVisible:
+    text: "Your subjects"
+
+# The coaching card should be visible (AdaptiveEntryCard for teen persona)
+- assertVisible:
+    text: "Homework help"
+    optional: true
+
+- assertVisible:
+    text: "Just ask something"
+    optional: true
+
+# Verify the "Add subject" button exists
+- assertVisible:
+    id: "add-subject-button"
+
+# Verify retention strip is visible (seeded user has a subject)
+- assertVisible:
+    id: "retention-strip"
+    optional: true
+
+- takeScreenshot: 03-home-subjects-visible
+
+# ═══════════════════════════════════════════════════════════════════
+# PHASE 3: More Tab — Full Screen Test
+# ═══════════════════════════════════════════════════════════════════
+
+# Tap More tab — "More" is not truncated, reliable selector
+- tapOn: "More"
+
+- extendedWaitUntil:
+    visible:
+      text: "Appearance"
+    timeout: 15000
+
+- takeScreenshot: 04-more-screen-top
+
+# ── Appearance section ──
+- assertVisible:
+    text: "Teen (Dark)"
+- assertVisible:
+    text: "Eager Learner (Calm)"
+- assertVisible:
+    text: "Parent (Light)"
+
+# ── Notifications section ──
+- assertVisible:
+    text: "Push notifications"
+- assertVisible:
+    text: "Weekly progress digest"
+
+# ── Learning Mode section (below the fold — scroll first) ──
+- swipe:
+    start: "50%,70%"
+    end: "50%,40%"
+
+- assertVisible:
+    id: "learning-mode-serious"
+- assertVisible:
+    id: "learning-mode-casual"
+
+- takeScreenshot: 05-more-screen-middle
+
+# ── Scroll to Account section ──
+- swipe:
+    start: "50%,70%"
+    end: "50%,30%"
+
+- extendedWaitUntil:
+    visible:
+      text: "Account"
+    timeout: 10000
+
+- takeScreenshot: 06-more-account-section
+
+# ── Test Account section buttons ──
+- assertVisible:
+    text: "Profile"
+- assertVisible:
+    text: "Subscription"
+- assertVisible:
+    text: "Help & Support"
+- assertVisible:
+    text: "Privacy Policy"
+- assertVisible:
+    text: "Terms of Service"
+# Export, Delete, Sign out are at the very bottom — scroll more
+- swipe:
+    start: "50%,70%"
+    end: "50%,30%"
+
+- assertVisible:
+    text: "Export my data"
+
+- assertVisible:
+    text: "Delete account"
+
+- assertVisible:
+    id: "sign-out-button"
+
+- takeScreenshot: 07-more-account-bottom
+
+# ═══════════════════════════════════════════════════════════════════
+# PHASE 4: Navigate into Account sub-screens
+# ═══════════════════════════════════════════════════════════════════
+
+# Scroll back up so Privacy Policy and Terms are visible (not scrolled past)
+- swipe:
+    start: "50%,30%"
+    end: "50%,60%"
+
+# ── Privacy Policy ──
+- tapOn: "Privacy Policy"
+- takeScreenshot: 08-privacy-policy
+- pressKey: back
+
+# Wait for More screen to return
+- extendedWaitUntil:
+    visible:
+      text: "Account"
+    timeout: 10000
+
+# ── Terms of Service ──
+- tapOn: "Terms of Service"
+- takeScreenshot: 09-terms-of-service
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      text: "Account"
+    timeout: 10000
+
+# ═══════════════════════════════════════════════════════════════════
+# PHASE 5: Theme Switching
+# ═══════════════════════════════════════════════════════════════════
+
+# Scroll to top to see Appearance
+- swipe:
+    start: "50%,30%"
+    end: "50%,70%"
+- swipe:
+    start: "50%,30%"
+    end: "50%,70%"
+
+- extendedWaitUntil:
+    visible:
+      text: "Appearance"
+    timeout: 10000
+
+# Switch to Eager Learner theme (stays in learner route group — safe)
+- tapOn: "Eager Learner (Calm)"
+- takeScreenshot: 10-theme-eager-learner
+
+# Switch back to Teen (Dark)
+# BUG-11: After theme switch, the screen re-renders with new CSS variables.
+# Maestro's text recognition can fail during the transition. Wait for the
+# Appearance section header to be visible before tapping.
+- extendedWaitUntil:
+    visible:
+      text: "Appearance"
+    timeout: 10000
+
+- tapOn: "Teen (Dark)"
+- takeScreenshot: 11-theme-teen-restored
+
+# ── Parent theme → redirects to (parent)/dashboard ──
+# BUG-12: Selecting "Parent (Light)" on the More screen triggers a persona
+# routing guard in (learner)/_layout.tsx (line 575):
+#   if (persona === 'parent') return <Redirect href="/(parent)/dashboard" />;
+# This navigates away from the More screen to the Parent dashboard.
+# Verify the redirect works, then switch back via the "Switch to Teen view"
+# link on the parent dashboard.
+- tapOn: "More"
+- extendedWaitUntil:
+    visible:
+      text: "Appearance"
+    timeout: 10000
+
+- tapOn: "Parent (Light)"
+
+- extendedWaitUntil:
+    visible:
+      text: "How your children are doing"
+    timeout: 15000
+
+- takeScreenshot: 12-parent-dashboard-redirect
+
+# The parent dashboard has a "Switch to Teen view (demo)" link
+- tapOn:
+    id: "switch-to-teen"
+
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+- takeScreenshot: 13-back-to-teen-home
+
+# ═══════════════════════════════════════════════════════════════════
+# PHASE 6: Done — all post-auth screens verified
+# ═══════════════════════════════════════════════════════════════════
+# NOTE: Tab navigation to "Home" is unreliable because hidden tabs
+# (href:null) still render in the tab bar, causing text truncation
+# (Ho..., boo...) and making point-based taps imprecise.
+# BUG-10: Hidden tab screens still show in dev-client tab bar.
+
+- takeScreenshot: 14-test-complete

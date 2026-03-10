@@ -22,12 +22,14 @@ tags:
 # 2. Home screen
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
 
-# 3. Navigate to subjects tab
+# 3. Navigate to Learning Book tab
+# BUG-15: tabBarTestID doesn't propagate on Android.
+# "Learning Book" text may wrap to 2 lines. Use point tap on center-bottom tab.
 - tapOn:
-    id: "tab-subjects"
+    point: "50%,97%"
 
 # 4. Wait for subjects list to load
 - extendedWaitUntil:

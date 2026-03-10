@@ -40,7 +40,7 @@ describe('AdaptiveEntryCard', () => {
       />
     );
 
-    fireEvent.press(screen.getByTestId('adaptive-entry-card-primary'));
+    fireEvent.press(screen.getByTestId('coaching-card-primary'));
     expect(onPrimary).toHaveBeenCalledTimes(1);
   });
 

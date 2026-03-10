@@ -2,15 +2,23 @@
 #
 # Navigates to More tab → taps Sign Out → confirms the auth gate appears.
 # Used between flows that need a fresh auth state.
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 ---
 # Navigate to More tab (bottom tab bar)
-- tapOn: "More"
+- tapOn:
+    text: "More"
 
 # Wait for More screen to load
 - extendedWaitUntil:
     visible:
-      id: "more-settings"
+      id: "sign-out-button"
+    timeout: 5000
+
+# Scroll down to sign-out button (may be below fold)
+- scrollUntilVisible:
+    element:
+      id: "sign-out-button"
+    direction: DOWN
     timeout: 5000
 
 # Tap sign out

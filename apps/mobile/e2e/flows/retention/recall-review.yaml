@@ -12,7 +12,7 @@
 # Missing testIDs (from tech spec Section 3.2):
 #   - recall-question, recall-answer-input, recall-submit
 # Until those are added, some assertions use text matching as fallback.
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - smoke
   - retention
@@ -27,7 +27,7 @@ tags:
 # 2. Home screen
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
 
 # 3. Coaching card should indicate recall/review is due.

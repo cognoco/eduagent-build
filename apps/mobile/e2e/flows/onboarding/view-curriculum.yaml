@@ -7,18 +7,16 @@
 #   - User is signed in
 #   - At least one subject exists with a generated curriculum
 #   - API is running and reachable
+# Seeding handled by seed-and-run.sh. Uses learning-active scenario (needs subjects + curriculum).
+# Usage: ./scripts/seed-and-run.sh learning-active flows/onboarding/view-curriculum.yaml
 appId: com.mentomate.app
 tags:
   - smoke
   - onboarding
 ---
-- launchApp
-
-# Assert home screen renders with key elements
-- extendedWaitUntil:
-    visible:
-      text: "Ready to learn"
-    timeout: 15000
+# 1. Seed, launch dev-client, sign in.
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
 - assertVisible: "Your coach has a plan"
 - assertVisible: "Your subjects"
 

@@ -1,0 +1,5 @@
+# Dismiss "Allow MentoMate to send you notifications?" permission dialog.
+# Taps "Allow" to grant the permission (matches production behavior).
+appId: com.mentomate.app
+---
+- tapOn: "Allow"

@@ -19,15 +19,9 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Verify home screen loaded
-- extendedWaitUntil:
-    visible:
-      text: "Ready to learn"
-    timeout: 15000
-
-# 3. Navigate to More tab
+# 2. Navigate to More tab (seed-and-sign-in lands on learner home)
 - tapOn:
-    id: "tab-more"
+    text: "More"
 
 # 4. Wait for More screen to load
 - extendedWaitUntil:
@@ -89,7 +83,7 @@ tags:
 # Wait for the home/More screen to reappear
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
     optional: true
 

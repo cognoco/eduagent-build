@@ -22,7 +22,7 @@ tags:
 # 2. Wait for parent dashboard/home screen
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
 
 # 3. Verify children list is visible — look for child display name

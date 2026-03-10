@@ -1,0 +1,105 @@
+# Flow: Child Paywall — Expired Trial Child-Friendly Paywall
+# Validates: when a child profile's trial has expired, the subscription screen
+# renders the ChildPaywall instead of the normal subscription UI. Verifies
+# heading, notify-parent button, alert, and browse-book navigation.
+# Tags: nightly, billing, consent
+#
+# Journey: UX Journey 5 (Billing & Subscription) + Consent Lifecycle
+# Epics: Epic 5, Epic 9 (RevenueCat IAP), UX Persona Walkthrough
+# Prerequisite: Seeded child user with expired trial (scenario: trial-expired-child)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - billing
+  - consent
+---
+# 1. Seed & sign in as child with expired trial
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "trial-expired-child"
+      API_URL: ${API_URL}
+
+# 2. Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 3. Navigate to More tab (BUG-15: use text, not testID)
+- tapOn:
+    text: "More"
+
+# 4. Wait for More screen
+- extendedWaitUntil:
+    visible:
+      text: "Appearance"
+    timeout: 10000
+
+# 5. Tap Subscription
+- extendedWaitUntil:
+    visible:
+      text: "Subscription"
+    timeout: 10000
+
+- tapOn:
+    text: "Subscription"
+
+# 6. Verify ChildPaywall appears (not normal subscription screen)
+- extendedWaitUntil:
+    visible:
+      id: "child-paywall"
+    timeout: 10000
+
+# 7. Verify child-friendly heading
+- assertVisible:
+    text: "Nice work so far!"
+
+# 8. Verify trial-ended message
+- assertVisible:
+    text: "Your free trial has ended. Ask your parent to continue your learning journey."
+    optional: true
+
+# 9. Screenshot of child paywall
+- takeScreenshot: child-paywall-heading
+
+# 10. Verify notify parent button
+- assertVisible:
+    id: "notify-parent-button"
+
+# 11. Tap notify parent button
+- tapOn:
+    id: "notify-parent-button"
+
+# 12. Wait for alert (optional — depends on API response/network)
+- extendedWaitUntil:
+    visible:
+      text: "Sent!"
+    timeout: 5000
+    optional: true
+
+# 13. Dismiss alert if shown
+- tapOn:
+    text: "OK"
+    optional: true
+
+# 14. Screenshot after notify attempt
+- takeScreenshot: child-paywall-after-notify
+
+# 15. Verify browse book button
+- assertVisible:
+    id: "browse-book-button"
+
+# 16. Tap browse book button
+- tapOn:
+    id: "browse-book-button"
+
+# 17. Verify Learning Book screen loads
+- extendedWaitUntil:
+    visible:
+      text: "Learning Book"
+    timeout: 10000
+    optional: true
+
+# 18. Final screenshot
+- takeScreenshot: child-paywall-learning-book

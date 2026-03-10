@@ -1,0 +1,28 @@
+# Switch persona from learner to parent.
+# Called after seed-and-sign-in.yaml when the test needs parent dashboard.
+#
+# How it works: navigates to More → taps "Parent (Light)" theme →
+# the routing guard in (learner)/_layout.tsx redirects to (parent)/dashboard.
+#
+# After this flow, the app is on the parent dashboard (dashboard-scroll).
+appId: com.mentomate.app
+---
+# 1. Navigate to More tab
+- tapOn:
+    text: "More"
+
+# 2. Wait for Appearance section
+- extendedWaitUntil:
+    visible:
+      text: "Appearance"
+    timeout: 10000
+
+# 3. Tap Parent theme — triggers redirect to parent dashboard
+- tapOn:
+    text: "Parent (Light)"
+
+# 4. Wait for parent dashboard to render
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000

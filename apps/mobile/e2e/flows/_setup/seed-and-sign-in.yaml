@@ -1,56 +1,79 @@
-# Reusable setup: Seed test data via API, then sign in via the app UI.
+# Reusable setup: Wait for sign-in screen and sign in.
+#
+# IMPORTANT: seed-and-run.sh handles EVERYTHING before this flow:
+#   1. Seeds test data via API
+#   2. Clears app state via ADB (pm clear)
+#   3. Pre-grants notification permission (BUG-22)
+#   4. Launches app via ADB (am start)
+#   5. Waits for dev-client launcher, taps Metro server entry (via ADB)
+#   6. Waits for bundle to load, taps "Continue" overlay (via ADB)
+#   7. Dismisses system dialogs — Bluetooth (BUG-21), dev tools (BUG-14)
+#
+# By the time Maestro starts this flow, the app should be on the sign-in
+# screen (or very close to it). This avoids Maestro's gRPC driver crashing
+# during the resource-intensive bundle loading phase on WHPX emulators.
 #
 # Called by other flows via:
 #   - runFlow:
-#       file: _setup/seed-and-sign-in.yaml
-#       env:
-#         SEED_SCENARIO: with-subject
-#         API_URL: ${API_URL}
+#       file: ../_setup/seed-and-sign-in.yaml
 #
-# Environment variables:
-#   SEED_SCENARIO  — Seed scenario key (e.g., "with-subject", "retention-due")
-#   API_URL        — Base URL for the API (default: http://10.0.2.2:8787 for Android emulator)
+# Required Maestro env vars (set by seed-and-run.sh):
+#   ${EMAIL}      — Seeded user email
+#   ${PASSWORD}   — Seeded user password
+#   ${ACCOUNT_ID} — DB account ID
+#   ${PROFILE_ID} — DB profile ID
+#   (plus scenario-specific IDs like ${SUBJECT_ID}, ${TOPIC_ID}, etc.)
 #
 # After this flow completes, the app is authenticated and on the home screen.
-#
-# NOTE: The seed endpoint currently creates DB rows but does NOT create real
-# Clerk users. Until Clerk Backend API integration is added to the seed service,
-# sign-in will need a real test Clerk account or a deep-link auth bypass.
-# TODO: Implement Clerk test user creation in seed service.
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 ---
-# Step 1: Seed test data via API
-- runScript:
-    file: ../../scripts/seed.js
-    env:
-      API_URL: ${API_URL}
-      SCENARIO: ${SEED_SCENARIO}
-    outputVariable: seedResult
-
-# Step 2: Launch app with clean state
-- launchApp:
-    clearState: true
-
-# Step 3: Wait for auth screen
+# ── Step 1: Wait for sign-in screen ──
+# seed-and-run.sh should have already navigated past the dev-client launcher
+# and "Continue" overlay via ADB. Allow extra time in case bundle loading is
+# still finishing or the app needs to settle.
 - extendedWaitUntil:
     visible:
       text: "Welcome back"
-    timeout: 15000
+    timeout: 120000
 
-# Step 4: Sign in with seeded credentials
+# ── Step 2: Sign in with seeded credentials ──
 - tapOn:
     id: "sign-in-email"
-- inputText: ${output.seedResult.email}
+- inputText: ${EMAIL}
+
+# BUG-3 + BUG-20: Dismiss keyboard so password field is visible.
+# hideKeyboard fails on some Android configs ("custom input" error).
+# Workaround: tap the static "Welcome back" heading to defocus the input.
+- tapOn:
+    text: "Welcome back"
+
 - tapOn:
     id: "sign-in-password"
-# TODO: Replace with ${output.seedResult.password} once seed service
-# creates Clerk users with a known test password
-- inputText: "TestPass123!"
+- inputText: ${PASSWORD}
+
+# BUG-3 + BUG-20: Dismiss keyboard before tapping sign-in button
+- tapOn:
+    text: "Welcome back"
+
+# Wait for keyboard to fully dismiss and sign-in button to be visible
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 10000
+
 - tapOn:
     id: "sign-in-button"
 
-# Step 5: Wait for home screen (auth complete)
+# ── Step 3: Wait for home screen (auth complete) ──
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
-    timeout: 15000
+      id: "home-scroll-view"
+    timeout: 30000
+
+# ── Step 4: Dismiss notification permission dialog (BUG-22) ──
+# Android 13+ shows POST_NOTIFICATIONS permission dialog after first sign-in.
+# seed-and-run.sh pre-grants via ADB, but this is a safety net.
+- runFlow:
+    when:
+      visible: "send you notifications"
+    file: dismiss-notifications.yaml

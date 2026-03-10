@@ -1,12 +1,13 @@
 # Tap the Metro server entry on the dev-client launcher.
 # Assumes the launcher is already showing. Does NOT relaunch.
+# METRO_URL is set by seed-and-run.sh (default: http://10.0.2.2:8081).
 appId: com.mentomate.app
 ---
 - extendedWaitUntil:
-    visible: "http://10.0.2.2:8081"
+    visible: ${METRO_URL}
     timeout: 30000
 
-- tapOn: "http://10.0.2.2:8081"
+- tapOn: ${METRO_URL}
 
 # Wait for bundle load + dev menu
 - extendedWaitUntil:
@@ -14,6 +15,12 @@ appId: com.mentomate.app
     timeout: 600000
 
 - tapOn: "Continue"
+
+# Dismiss possible second dev tools sheet (BUG-14: only if visible)
+- runFlow:
+    when:
+      visible: "Reload"
+    file: dismiss-devtools.yaml
 
 # Verify sign-in screen
 - extendedWaitUntil:

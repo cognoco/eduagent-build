@@ -11,7 +11,7 @@
  * can sign in via the app's Clerk-powered login UI. When absent (e.g., unit
  * tests), falls back to generating fake `clerk_seed_*` IDs.
  */
-import { like, inArray, or } from 'drizzle-orm';
+import { eq, and, like, inArray, or } from 'drizzle-orm';
 import {
   accounts,
   profiles,
@@ -31,6 +31,7 @@ import {
   generateUUIDv7,
   type Database,
 } from '@eduagent/database';
+import { listSubjects } from './subject';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -39,8 +40,12 @@ import {
 /** Prefix used for all seed-created Clerk user IDs */
 export const SEED_CLERK_PREFIX = 'clerk_seed_';
 
-/** Standard test password for all seed-created Clerk users */
-const SEED_PASSWORD = 'TestPass123!';
+/** Default test password for all seed-created Clerk users.
+ * Read from SEED_PASSWORD env var when available, falling back to a hardcoded default.
+ * Must NOT appear in HaveIBeenPwned — Clerk blocks sign-in for breached passwords.
+ * Avoid special characters (!, -, etc.) — they may cause encoding issues in Clerk's
+ * Backend API user creation endpoint. */
+const DEFAULT_SEED_PASSWORD = 'Mentomate2026xK';
 
 /** Clerk REST API base URL */
 const CLERK_API_BASE = 'https://api.clerk.com/v1';
@@ -58,12 +63,17 @@ export type SeedScenario =
   | 'trial-active'
   | 'trial-expired'
   | 'multi-subject'
-  | 'homework-ready';
+  | 'homework-ready'
+  | 'trial-expired-child'
+  | 'consent-withdrawn'
+  | 'parent-solo';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
   /** Clerk secret key for Backend API calls. Optional — falls back to fake IDs. */
   CLERK_SECRET_KEY?: string;
+  /** Override seed password via env. Falls back to DEFAULT_SEED_PASSWORD. */
+  SEED_PASSWORD?: string;
 }
 
 export interface SeedResult {
@@ -92,7 +102,8 @@ interface ClerkUser {
 }
 
 /**
- * Creates a real Clerk user via the Backend API.
+ * Finds or creates a real Clerk user via the Backend API.
+ * If a user with the given email already exists, reuses it.
  * Returns the Clerk user ID (e.g., `user_2abc...`).
  *
  * If CLERK_SECRET_KEY is not set, generates a fake `clerk_seed_*` ID instead.
@@ -101,36 +112,94 @@ async function createClerkTestUser(
   email: string,
   env: SeedEnv
 ): Promise<{ clerkUserId: string; password: string }> {
+  const password = env.SEED_PASSWORD ?? DEFAULT_SEED_PASSWORD;
+
   if (!env.CLERK_SECRET_KEY) {
     // Fallback for environments without Clerk (unit tests, CI without secrets)
     return {
       clerkUserId: `${SEED_CLERK_PREFIX}${generateUUIDv7()}`,
-      password: SEED_PASSWORD,
+      password,
     };
   }
 
-  const res = await fetch(`${CLERK_API_BASE}/users`, {
-    method: 'POST',
+  // Step 1: Check if user already exists (avoids 422 on duplicate email)
+  const existingUser = await findClerkUserByEmail(email, env);
+
+  let userId: string;
+  const seedExternalId = `${SEED_CLERK_PREFIX}${generateUUIDv7()}`;
+
+  if (existingUser) {
+    userId = existingUser.id;
+  } else {
+    // Step 2: Create user (password set here may silently fail for special chars)
+    const res = await fetch(`${CLERK_API_BASE}/users`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email_address: [email],
+        password,
+        skip_password_checks: true,
+        // Mark as test user with external_id for cleanup
+        external_id: seedExternalId,
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Clerk user creation failed (${res.status}): ${body}`);
+    }
+
+    const user = (await res.json()) as ClerkUser;
+    userId = user.id;
+  }
+
+  // Step 3: PATCH to reliably set password + bypass CAPTCHA for E2E testing.
+  // Always PATCH even for existing users — ensures password, bypass_client_trust,
+  // and external_id (for cleanup tracking) are current.
+  const patchRes = await fetch(`${CLERK_API_BASE}/users/${userId}`, {
+    method: 'PATCH',
     headers: {
       Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      email_address: [email],
-      password: SEED_PASSWORD,
+      password,
       skip_password_checks: true,
-      // Mark as test user with external_id for cleanup
-      external_id: `${SEED_CLERK_PREFIX}${generateUUIDv7()}`,
+      bypass_client_trust: true,
+      // Tag reused users with seed external_id so deleteClerkTestUsers can find them
+      external_id: seedExternalId,
     }),
+  });
+
+  if (!patchRes.ok) {
+    const body = await patchRes.text();
+    throw new Error(`Clerk user PATCH failed (${patchRes.status}): ${body}`);
+  }
+
+  return { clerkUserId: userId, password };
+}
+
+/** Look up a Clerk user by email address. Returns null if not found.
+ * Throws on non-OK responses (rate limits, 5xx) to fail fast. */
+async function findClerkUserByEmail(
+  email: string,
+  env: SeedEnv
+): Promise<ClerkUser | null> {
+  const params = new URLSearchParams({ email_address: email });
+  const res = await fetch(`${CLERK_API_BASE}/users?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
   });
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Clerk user creation failed (${res.status}): ${body}`);
+    throw new Error(`Clerk user lookup failed (${res.status}): ${body}`);
   }
 
-  const user = (await res.json()) as ClerkUser;
-  return { clerkUserId: user.id, password: SEED_PASSWORD };
+  const users = (await res.json()) as ClerkUser[];
+  return users.length > 0 ? users[0] : null;
 }
 
 /**
@@ -160,6 +229,19 @@ async function deleteClerkTestUsers(
   const deletedIds: string[] = [];
 
   for (const user of users) {
+    // Revert bypass_client_trust before deleting — belt-and-suspenders in case
+    // the delete fails, so the user doesn't retain elevated CAPTCHA-bypass perms.
+    await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ bypass_client_trust: false }),
+    }).catch((_e: unknown) => {
+      // Best-effort — don't block cleanup if PATCH fails
+    });
+
     const delRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
@@ -707,6 +789,167 @@ async function seedHomeworkReady(
   };
 }
 
+async function seedTrialExpiredChild(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  // Expired subscription — child hits the paywall
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'free',
+    status: 'expired',
+    trialEndsAt: pastDate(3),
+    currentPeriodStart: pastDate(17),
+    currentPeriodEnd: pastDate(3),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: 50,
+    usedThisMonth: 50,
+    cycleResetAt: futureDate(13),
+  });
+
+  // Parent profile (account owner)
+  const parentProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Paywall Parent',
+    personaType: 'PARENT',
+    isOwner: true,
+  });
+
+  // Child profile (non-owner teen)
+  const childProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Paywall Teen',
+    personaType: 'TEEN',
+    isOwner: false,
+  });
+
+  // Family link
+  await db.insert(familyLinks).values({
+    id: generateUUIDv7(),
+    parentProfileId,
+    childProfileId,
+  });
+
+  // Consent for child
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: childProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  // Give child a subject with topics so "Browse Learning Book" has content
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    childProfileId,
+    'Science',
+    'active',
+    4
+  );
+
+  return {
+    scenario: 'trial-expired-child',
+    accountId,
+    profileId: childProfileId,
+    email,
+    password,
+    ids: { parentProfileId, childProfileId, subscriptionId, subjectId },
+  };
+}
+
+async function seedConsentWithdrawn(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  // Parent profile (account owner)
+  const parentProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Withdrawn Parent',
+    personaType: 'PARENT',
+    isOwner: true,
+  });
+
+  // Child profile (non-owner teen) with withdrawn consent
+  const childProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Withdrawn Teen',
+    personaType: 'TEEN',
+    isOwner: false,
+  });
+
+  // Family link
+  await db.insert(familyLinks).values({
+    id: generateUUIDv7(),
+    parentProfileId,
+    childProfileId,
+  });
+
+  // Consent state: WITHDRAWN
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: childProfileId,
+    consentType: 'GDPR',
+    status: 'WITHDRAWN',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  return {
+    scenario: 'consent-withdrawn',
+    accountId,
+    profileId: childProfileId,
+    email,
+    password,
+    ids: { parentProfileId, childProfileId },
+  };
+}
+
+async function seedParentSolo(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  // Solo parent profile — no children, no family links
+  const parentProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Solo Parent',
+    personaType: 'PARENT',
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: parentProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  return {
+    scenario: 'parent-solo',
+    accountId,
+    profileId: parentProfileId,
+    email,
+    password,
+    ids: { parentProfileId },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -721,6 +964,9 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'trial-expired': seedTrialExpired,
   'multi-subject': seedMultiSubject,
   'homework-ready': seedHomeworkReady,
+  'trial-expired-child': seedTrialExpiredChild,
+  'consent-withdrawn': seedConsentWithdrawn,
+  'parent-solo': seedParentSolo,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];
@@ -735,6 +981,20 @@ export async function seedScenario(
   if (!seeder) {
     throw new Error(`Unknown scenario: ${scenario}`);
   }
+
+  // Idempotent: delete existing seed accounts with the same email before seeding.
+  // Only deletes accounts whose clerkUserId has the seed prefix — real Clerk users
+  // created by seed are also tagged with clerk_seed_* external_id (set in PATCH step
+  // of createClerkTestUser). Child tables cascade via ON DELETE CASCADE.
+  await db
+    .delete(accounts)
+    .where(
+      and(
+        eq(accounts.email, email),
+        like(accounts.clerkUserId, `${SEED_CLERK_PREFIX}%`)
+      )
+    );
+
   return seeder(db, email, env);
 }
 
@@ -762,4 +1022,122 @@ export async function resetDatabase(
     .returning({ id: accounts.id });
 
   return { deletedCount: deleted.length, clerkUsersDeleted };
+}
+
+// ---------------------------------------------------------------------------
+// Debug query functions (extracted from route handlers per CLAUDE.md rules)
+// ---------------------------------------------------------------------------
+
+export interface DebugAccountChain {
+  id: string;
+  clerkUserId: string;
+  email: string;
+  profiles: Array<{
+    id: string;
+    displayName: string;
+    personaType: string;
+    isOwner: boolean;
+    subjects: Array<{ id: string; name: string; status: string }>;
+  }>;
+}
+
+/** Walks account → profiles → subjects chain for a given email. */
+export async function debugAccountsByEmail(
+  db: Database,
+  email: string
+): Promise<DebugAccountChain[]> {
+  const accountRows = await db.query.accounts.findMany({
+    where: eq(accounts.email, email),
+  });
+
+  return Promise.all(
+    accountRows.map(async (acc) => {
+      const profileRows = await db.query.profiles.findMany({
+        where: eq(profiles.accountId, acc.id),
+      });
+      const profilesWithSubjects = await Promise.all(
+        profileRows.map(async (prof) => {
+          const subjectRows = await db.query.subjects.findMany({
+            where: eq(subjects.profileId, prof.id),
+          });
+          return {
+            id: prof.id,
+            displayName: prof.displayName,
+            personaType: prof.personaType,
+            isOwner: prof.isOwner,
+            subjects: subjectRows.map((s) => ({
+              id: s.id,
+              name: s.name,
+              status: s.status,
+            })),
+          };
+        })
+      );
+      return {
+        id: acc.id,
+        clerkUserId: acc.clerkUserId,
+        email: acc.email,
+        profiles: profilesWithSubjects,
+      };
+    })
+  );
+}
+
+export interface DebugSubjectsResult {
+  account: { id: string; clerkUserId: string; email: string };
+  profile: { id: string; displayName: string; isOwner: boolean };
+  subjects: Awaited<ReturnType<typeof listSubjects>>;
+  subjectCount: number;
+}
+
+/**
+ * Simulates the exact subjects query path the app uses.
+ * Walks: clerkUserId → account → profile (owner) → subjects.
+ * Returns null if no account or profile found.
+ */
+export async function debugSubjectsByClerkUserId(
+  db: Database,
+  clerkUserId: string
+): Promise<
+  | { result: DebugSubjectsResult }
+  | { error: string; detail: Record<string, string> }
+> {
+  const account = await db.query.accounts.findFirst({
+    where: eq(accounts.clerkUserId, clerkUserId),
+  });
+
+  if (!account) {
+    return {
+      error: 'No account found for clerkUserId',
+      detail: { clerkUserId },
+    };
+  }
+
+  const profileRows = await db.query.profiles.findMany({
+    where: eq(profiles.accountId, account.id),
+  });
+
+  const ownerProfile = profileRows.find((p) => p.isOwner) ?? profileRows[0];
+  if (!ownerProfile) {
+    return { error: 'No profiles found', detail: { accountId: account.id } };
+  }
+
+  const subjectList = await listSubjects(db, ownerProfile.id);
+
+  return {
+    result: {
+      account: {
+        id: account.id,
+        clerkUserId: account.clerkUserId,
+        email: account.email,
+      },
+      profile: {
+        id: ownerProfile.id,
+        displayName: ownerProfile.displayName,
+        isOwner: ownerProfile.isOwner,
+      },
+      subjects: subjectList,
+      subjectCount: subjectList.length,
+    },
+  };
 }

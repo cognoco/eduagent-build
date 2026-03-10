@@ -169,6 +169,7 @@ export default function DashboardScreen() {
           <Pressable
             onPress={() => setPersona('teen')}
             className="mt-6 items-center py-3 min-h-[44px] justify-center"
+            testID="switch-to-teen"
           >
             <Text className="text-body-sm text-text-secondary underline">
               Switch to Teen view (demo)

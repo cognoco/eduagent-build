@@ -1,0 +1,146 @@
+# Flow N12: Create Profile — Standalone Profile Creation from More Tab
+# Validates: user can navigate to the profile switcher, open the create
+# profile form, fill in name and birth date, select a region, and submit.
+# Tags: nightly, onboarding, account
+#
+# Journey: UX Journey 1 (Onboarding) + UX Journey 5 (Account Management)
+# Epics: Epic 5 (FR101-FR105)
+# Prerequisite: Seeded user with onboarding complete (scenario: onboarding-complete)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - onboarding
+  - account
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-complete"
+      API_URL: ${API_URL}
+
+# 2. Verify home screen loaded
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 3. Navigate to More tab
+- tapOn:
+    text: "More"
+
+# 4. Wait for More screen to load
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+# 5. Scroll to Profile row
+- scrollUntilVisible:
+    element:
+      text: "Profile"
+    direction: DOWN
+    timeout: 10000
+
+# 6. Tap Profile to open profiles modal
+- tapOn:
+    text: "Profile"
+
+# 7. Wait for profiles screen
+- extendedWaitUntil:
+    visible:
+      id: "profiles-screen"
+    timeout: 10000
+
+- takeScreenshot: profiles-before-create
+
+# 8. Scroll to and tap Add profile button (below profile cards)
+- scrollUntilVisible:
+    element:
+      id: "profiles-add-button"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: "profiles-add-button"
+
+# 9. Wait for "New profile" screen
+- extendedWaitUntil:
+    visible:
+      text: "New profile"
+    timeout: 10000
+
+- takeScreenshot: create-profile-empty
+
+# 10. Tap name field and type "Test Child"
+- tapOn:
+    id: "create-profile-name"
+- inputText: "Test Child"
+- hideKeyboard
+
+- takeScreenshot: create-profile-name-entered
+
+# 11. Tap birth date to open date picker
+- tapOn:
+    id: "create-profile-birthdate"
+
+# 12. Accept default date on Android (OK button dismisses picker)
+# Default date is Jan 1, 2010 — gives age ~16, LEARNER persona
+- tapOn:
+    text: "OK"
+    optional: true
+
+# 13. On iOS, tap Done to dismiss the spinner picker
+- tapOn:
+    id: "date-picker-done"
+    optional: true
+
+- takeScreenshot: create-profile-date-selected
+
+# 14. Wait for persona auto-detection hint (optional — appears after date)
+- extendedWaitUntil:
+    visible:
+      id: "persona-auto-hint"
+    timeout: 5000
+    optional: true
+
+- takeScreenshot: create-profile-persona-hint
+
+# 15. Scroll to Region section
+- scrollUntilVisible:
+    element:
+      text: "Region"
+    direction: DOWN
+    timeout: 10000
+
+# 16. Tap "Other" region (avoids EU/US consent trigger)
+- tapOn:
+    id: "location-other"
+
+- takeScreenshot: create-profile-region-selected
+
+# 17. Scroll to submit button
+- scrollUntilVisible:
+    element:
+      id: "create-profile-submit"
+    direction: DOWN
+    timeout: 10000
+
+# 18. Tap Create profile
+- tapOn:
+    id: "create-profile-submit"
+
+# 19. Wait for navigation back to profiles screen or home screen
+- extendedWaitUntil:
+    visible:
+      id: "profiles-screen"
+    timeout: 15000
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+    optional: true
+
+# 20. Final screenshot — profile created
+- takeScreenshot: create-profile-complete

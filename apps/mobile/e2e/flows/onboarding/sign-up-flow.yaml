@@ -14,17 +14,10 @@ tags:
   - smoke
   - onboarding
 ---
-# 1. Launch app with clean state
-- launchApp:
-    clearState: true
+# 1. Launch dev-client, connect to Metro, dismiss dev menu.
+- runFlow: ../_setup/launch-devclient.yaml
 
-# 2. Auth gate visible
-- extendedWaitUntil:
-    visible:
-      text: "Welcome back"
-    timeout: 15000
-
-# 3. Navigate to sign-up
+# 2. Navigate to sign-up
 - tapOn: "Sign up"
 
 # 4. Sign-up screen visible
@@ -70,7 +63,7 @@ tags:
 # 12. Home screen reached
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
 
 # 13. Add first subject

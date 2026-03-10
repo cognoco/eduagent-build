@@ -1,0 +1,426 @@
+# E2E Test Bugs
+
+Bugs discovered during Maestro E2E testing on Android emulator (WHPX).
+Each bug has a status, root cause, and fix/workaround.
+
+---
+
+## BUG-1: App Viewport / Resolution Mismatch (2026-03-08)
+
+**Status:** Open (emulator-specific, likely not user-facing)
+**Severity:** Low
+**Affects:** All screens (visual only)
+
+The app's content appears slightly narrower than the emulator screen in some views. When the emulator window is resized, text on the right edge gets clipped (e.g., "Show" button truncated to "Sh", "Forgot password?" truncated).
+
+**Root cause:** The app may not be handling edge-to-edge / safe area insets correctly on this AVD configuration, or the emulator window scaling doesn't match the virtual display resolution.
+
+**Note:** Does NOT affect Maestro assertions (all testIDs and text elements found correctly). May be emulator-specific and not reproduce on real devices.
+
+---
+
+## BUG-2: Dev Menu "Continue" Overlay Blocks UI (2026-03-08)
+
+**Status:** Workaround in flows
+**Severity:** High — blocks every test run
+**Affects:** All flows that launch the app
+
+After the JS bundle loads, the Expo dev-client always shows a "Continue" overlay (dev menu). This blocks Maestro from interacting with elements behind it.
+
+**Root cause:** Expo dev-client behavior — the dev menu overlay is always shown on bundle load in development builds.
+
+**Workaround:** Every flow waits for "Continue" to appear (up to 600s on WHPX) and taps it.
+
+---
+
+## BUG-3: Android Keyboard Covers Password Field (2026-03-08)
+
+**Status:** Workaround in flows (updated for BUG-20). See BUG-24 for the underlying app code root cause.
+**Severity:** Medium
+**Affects:** Sign-in flow
+
+On Android, the software keyboard covers the password field and sign-in button when the email field is focused.
+
+**Workaround (E2E flows):** Tap on static "Welcome back" heading text to defocus the input and dismiss the keyboard. Originally used `hideKeyboard`, but that fails on some Android configs (see BUG-20).
+
+**Root cause:** See BUG-24 — `KeyboardAvoidingView` has `behavior={undefined}` on Android across all auth screens, so it does nothing. Combined with `justifyContent: 'center'` on the ScrollView, inputs can't scroll into view when the keyboard is open.
+
+---
+
+## BUG-4: Pressable `testID` Not Reliably Exposed to Maestro on Android (2026-03-08)
+
+**Status:** Workaround (use text-based assertions)
+**Severity:** Low (testing infrastructure only)
+**Affects:** `PasswordInput` show/hide toggle
+
+The `PasswordInput` component's show/hide toggle `Pressable` has `testID="sign-in-password-toggle"`, but Maestro cannot find it by ID. The toggle IS visible and functional (verified by asserting the "Show" text), but the `testID` on `Pressable` may not map to an accessibility identifier that Maestro can locate on Android.
+
+**Root cause:** React Native's `Pressable` does not consistently map `testID` to Android's UIAutomator accessibility tree. `TextInput` testIDs work fine; `Pressable` is unreliable.
+
+**Workaround:** Use text-based assertions (`assertVisible: "Show"`) instead of testID for the toggle.
+
+---
+
+## BUG-5: Maestro `hideKeyboard` Exits App When No Keyboard Is Open (2026-03-08)
+
+**Status:** Workaround (never call `hideKeyboard` without preceding text input)
+**Severity:** Low (testing infrastructure only)
+**Affects:** All flows using `hideKeyboard`
+
+On Android, Maestro's `hideKeyboard` command sends a BACK key event. When the keyboard is NOT actually open, this BACK event navigates the app backward — potentially exiting the app entirely to the Android home screen.
+
+**Root cause:** Maestro implements `hideKeyboard` as a BACK key press on Android. Without an open keyboard to dismiss, the BACK event propagates to the navigation stack.
+
+**Workaround:** Never call `hideKeyboard` unless text was just entered. Never call it twice in a row. See also BUG-20 for `hideKeyboard` failure even with keyboard open.
+
+---
+
+## BUG-6: Stale `appId` in Flow Files (2026-03-08)
+
+**Status:** Fixed (commit `08abeaa`)
+**Severity:** Low (test files only)
+**Affects:** 5 flow files
+
+Five flow files used `appId: com.zwizzly.eduagent` instead of the correct `appId: com.mentomate.app`: `seed-and-sign-in.yaml`, `sign-out.yaml`, `first-session.yaml`, `core-learning.yaml`, `recall-review.yaml`.
+
+**Fix:** All updated to `com.mentomate.app`. Zero occurrences of the old appId remain.
+
+---
+
+## BUG-7: OkHttp Chunked Transfer Encoding (2026-03-08)
+
+**Status:** Partially resolved
+**Severity:** Low (only affects specific emulator configurations)
+**Affects:** Bundle loading on some WHPX emulators
+
+OkHttp's chunked transfer encoding fails on some WHPX configurations when connecting directly to Metro (port 8081).
+
+**Workaround:** Bundle proxy on port 8082 (`e2e/bundle-proxy.js`). Not needed on all emulators — port 8081 works on E2E_Device_2. Flows now use configurable `${METRO_URL}`.
+
+---
+
+## BUG-8: Dev-Client Launcher Text Not in Maestro Accessibility Tree (2026-03-08)
+
+**Status:** Workaround (use Maestro `launchApp` instead of `adb shell am start`)
+**Severity:** Low (testing infrastructure only)
+**Affects:** Dev-client launcher interaction
+
+When the app is launched manually via `adb shell am start`, Maestro's `hierarchy` command shows no text elements from the dev-client launcher (e.g., "http://10.0.2.2:8081" is not found). However, when launched via Maestro's own `launchApp` command, the same text IS visible and tappable.
+
+**Root cause:** Maestro's `launchApp` performs additional accessibility setup beyond `adb am start`. Without this setup, the dev-client launcher's React Native views don't expose their text to Maestro's accessibility queries.
+
+**Workaround:** Use Maestro's `launchApp` command, not manual `adb shell am start`, when Maestro needs to interact with the launcher. Note: In v3 architecture, `seed-and-run.sh` uses ADB + `uiautomator dump` parsing instead of Maestro for launcher interaction, bypassing this issue entirely.
+
+---
+
+## BUG-9: Trailing Spaces in JSX Text Break Maestro Assertions (2026-03-08)
+
+**Status:** Workaround (include trailing space in assertions)
+**Severity:** Low (testing only)
+**Affects:** Sign-up screen ("Already have an account?" link)
+
+The JSX `Already have an account?{' '}` renders with a trailing space that becomes part of the accessibility text. Maestro's exact text matching fails if the assertion doesn't include the trailing space.
+
+**Root cause:** React Native's `<Text>` component concatenates `{' '}` spacers into the parent text node's value, which is exposed to accessibility.
+
+**Workaround:** Include the trailing space in Maestro assertions: `assertVisible: "Already have an account? "`.
+
+---
+
+## BUG-10: Hidden Expo Router Tabs Render in Dev-Client Tab Bar (2026-03-09)
+
+**Status:** Open (dev-client specific — production builds not affected)
+**Severity:** Medium (E2E testing only)
+**Affects:** All post-auth flows in dev-client builds
+
+Expo Router tabs with `href: null` (hidden from tab bar) still render as visible tabs in dev-client builds. All tab labels truncate: "Home" → "Ho...", "Learning Book" → "boo...", "More" stays readable. Hidden screens like onboarding, session, topic show as "onb...", "ses..." etc.
+
+**Root cause:** Dev-client builds may not apply the same tab filtering as production builds. Extra tabs shift positions and make point-based and text-based tab navigation unreliable.
+
+**Workaround:** Navigate using explicit routes or use "More" tab (short enough to not truncate). Avoid tapping "Home" or "Learning Book" tabs in E2E.
+
+**Note:** Production builds correctly hide tabs with `href: null`.
+
+---
+
+## BUG-11: Theme Re-render Destabilizes Maestro Text Recognition (2026-03-09)
+
+**Status:** Workaround in flows
+**Severity:** Medium
+**Affects:** `settings-toggles.yaml`
+
+After tapping a theme button (e.g., "Teen (Dark)"), NativeWind re-renders the entire tree with new CSS variables. During the transition, Maestro briefly can't find text elements.
+
+**Workaround:** `extendedWaitUntil: visible: text: "Appearance"` after each theme tap to wait for re-render to stabilize.
+
+---
+
+## BUG-12: Parent Theme Switch Triggers Persona Routing Redirect (2026-03-09)
+
+**Status:** Expected behavior (documenting for E2E awareness)
+**Severity:** Low (by design, not a bug)
+**Affects:** `settings-toggles.yaml`, any flow involving persona change
+
+Selecting "Parent (Light)" on the More screen triggers `<Redirect href="/(parent)/dashboard" />` in `(learner)/_layout.tsx:575`. The user lands on the parent dashboard, not the More screen.
+
+**Root cause:** Each persona has its own route group (`(learner)/`, `(parent)/`) with a layout guard. Changing persona to `parent` while in the `(learner)` route group triggers the cross-redirect. This is intentional architectural behavior.
+
+**Workaround:** E2E flows must handle the redirect — use `testID="switch-to-teen"` on the parent dashboard's demo link to navigate back. See also BUG-17 for the flow restructuring applied to handle this.
+
+---
+
+## BUG-14: `pressKey: back` Exits App from Navigation Root (2026-03-09)
+
+**Status:** Fixed
+**Severity:** High — crashes test flow
+**Affects:** All setup flows
+
+When no dev tools sheet is present after the "Continue" overlay, `pressKey: back` navigates back from the sign-in screen (the navigation root) to the dev-client launcher, effectively exiting the app. The second dev tools sheet (showing "Reload", "Connected to", etc.) appears non-deterministically.
+
+**Root cause:** Sign-in screen is the navigation root. Back from root = exit app.
+
+**Fix:** Conditional execution: `runFlow: when: visible: "Reload"` + `dismiss-devtools.yaml`. Only presses Back if the sheet is actually detected.
+
+**Applied in:** `seed-and-sign-in.yaml`, `post-auth-comprehensive-devclient.yaml`, `connect-server.yaml`, `launch-devclient.yaml`
+
+---
+
+## BUG-15: `tabBarTestID` Not Propagating to Android (2026-03-09)
+
+**Status:** Partially fixed (prop rename + text workaround)
+**Severity:** High — affects 12+ flows
+**Affects:** All flows that navigate via tab bar
+
+`tabBarTestID: 'tab-more'` set in Expo Router `Tabs.Screen` options does not appear as `resource-id` in the Android UIAutomator hierarchy. The element has `resource-id=""`.
+
+**Root cause (updated 2026-03-10):** Two issues:
+1. **Wrong prop name:** Expo Router uses `tabBarButtonTestID` (not `tabBarTestID`) for the tab bar button component. Fixed in commit `35ef433` — changed in both `(learner)/_layout.tsx` and `(parent)/_layout.tsx`.
+2. **Android accessibility:** Even with the correct prop, React Navigation may not propagate `testID` to the Android UIAutomator accessibility tree consistently.
+
+**Workaround (still recommended):** Use `tapOn: text: "More"` (text-based matching) instead of `tapOn: id: "tab-more"`.
+
+**Applied in:** 12 flow files across account, billing, onboarding, parent, subjects categories.
+
+**Note:** Some flows use `tapOn: point: "50%,97%"` for "Learning Book" tab because the text wraps to 2 lines on some screen sizes, making text matching unreliable.
+
+---
+
+## BUG-17: Parent Theme Switch Redirects Away from More Screen (2026-03-09)
+
+**Status:** Fixed
+**Severity:** Medium
+**Affects:** `settings-toggles.yaml`
+
+Tapping "Parent (Light)" theme button changes persona to `parent`, triggering the layout guard in `(learner)/_layout.tsx:575`: `if (persona === 'parent') return <Redirect href="/(parent)/dashboard" />`. The More screen is replaced by the parent dashboard.
+
+**Root cause:** Persona change is a first-class routing concern — changing it triggers cross-route-group redirects by design.
+
+**Fix:** Restructured `settings-toggles.yaml` — test Eager Learner ↔ Teen first (both stay in learner route group), then Parent last. Parent theme section is at the end of the flow so if it crashes (BUG-18), all other validations are already captured.
+
+---
+
+## BUG-18: Persona Switch Crashes App (~50% of the time) (2026-03-10)
+
+**Status:** Open (app code bug)
+**Severity:** High — crashes app, corrupts emulator state
+**Affects:** `settings-toggles.yaml` (Parent theme section), any flow using persona switch
+
+After tapping "Switch to Teen view (demo)" button on the parent dashboard, the app crashes to the Android home screen approximately 50% of the time. The crash corrupts Maestro's driver connection, requiring an emulator cold restart.
+
+**Root cause:** `setPersona('teen')` in `(parent)/dashboard.tsx:170` triggers a re-render cascade through Expo Router's layout guards. The `(learner)/_layout.tsx` detects persona change and redirects, while simultaneously the `(parent)` layout may also be redirecting. This creates a navigation race condition that crashes the React Navigation tree.
+
+**Reproduction:**
+1. Sign in → navigate to More → tap "Parent (Light)" → lands on parent dashboard
+2. Tap "Switch to Teen view (demo)" → app crashes ~50% of the time
+
+**Mitigation (flow-level):** Parent theme test moved to end of `settings-toggles.yaml` so the crash can't affect earlier validations.
+
+**Proper fix needed:** The `setPersona()` call needs to be coordinated with navigation — e.g., navigate to a neutral route before changing persona, or use `router.replace()` synchronously with the persona change to avoid the layout guard race.
+
+---
+
+## BUG-19: Maestro `launchApp` / `clearState` Unreliable on WHPX (2026-03-10)
+
+**Status:** Fixed (workaround — evolved through 3 iterations)
+**Severity:** Critical — blocks all test execution
+**Affects:** All flows
+
+Maestro's `launchApp` command (with or without `clearState: true`) fails intermittently on WHPX emulators with "Unable to launch app". The failure becomes persistent after certain conditions (app crashes, concurrent Maestro sessions).
+
+Additionally, Maestro's UIAutomator2 gRPC driver crashes during resource-intensive bundle loading on WHPX (`io.grpc.StatusRuntimeException: UNAVAILABLE: io exception`). This makes it unreliable for Maestro to handle the entire launcher → Metro → bundle → Continue flow.
+
+**Root cause:** Multiple factors:
+1. Maestro's `pm clear` + `am start` sequence has timing issues on WHPX
+2. After app crashes (BUG-18), the UIAutomator driver state gets corrupted
+3. Port 7001 is hardcoded — concurrent sessions conflict
+4. gRPC driver drops connection during heavy CPU/memory usage (bundle compilation)
+
+**Final workaround (v3):** `seed-and-run.sh` handles the entire app lifecycle via ADB, including launcher navigation and bundle loading. Maestro only starts after the app is on the stable sign-in screen:
+1. `adb shell am force-stop` + `adb shell pm clear` — kill and wipe
+2. `adb shell am force-stop com.android.bluetooth` — prevent BUG-21
+3. `adb shell pm grant ... POST_NOTIFICATIONS` — pre-grant permissions (BUG-22)
+4. `adb shell am start` — launch app
+5. `uiautomator dump` polling for "DEVELOPMENT" text (launcher screen, 120s)
+6. Parse 8081 entry bounds from dump, `adb shell input tap` at center
+7. Escalating sleep loop (15/30/60/90/120s) + `KEYCODE_BACK` to dismiss Continue overlay + verify via dump (polling for "Continue" text is unreliable — dump OOM-killed during React Native bottom sheet)
+8. If "Welcome back" visible → break; if "DEVELOPMENT" → re-tap Metro
+9. Dismiss dev tools sheet if "Reload" visible
+10. **Then** Maestro starts — app is already on sign-in screen
+
+**Additional operational note:** After emulator cold restart, Maestro's driver must be reinstalled with `--reinstall-driver` flag on the first test run. Without this, all gRPC connections fail with "Connection refused: localhost:7001".
+
+---
+
+## BUG-20: Maestro `hideKeyboard` Fails on Some Android Configs (2026-03-10)
+
+**Status:** Fixed (workaround)
+**Severity:** Medium — blocks sign-in flow
+**Affects:** `seed-and-sign-in.yaml` (and any flow using `hideKeyboard`)
+
+Maestro's `hideKeyboard` command fails with "Couldn't hide the keyboard. This can happen if the app uses a custom input or doesn't expose a standard dismiss action." React Native's `TextInput` doesn't always expose the standard Android `InputMethodManager` dismiss API.
+
+**Root cause:** Maestro calls `InputMethodManager.hideSoftInputFromWindow()` which requires the currently focused view to cooperate. React Native's custom input views don't always implement this correctly.
+
+**Workaround:** Replace `hideKeyboard` with tapping a static text element (e.g., `tapOn: text: "Welcome back"`) to defocus the input, which implicitly dismisses the keyboard.
+
+**Applied in:** `seed-and-sign-in.yaml`, `consent-withdrawn-gate.yaml`, `post-approval-landing.yaml`
+
+---
+
+## BUG-21: "Bluetooth keeps stopping" Dialog Blocks UI on WHPX (2026-03-10)
+
+**Status:** Fixed (workaround)
+**Severity:** High — blocks test execution on fresh/rebooted emulators
+**Affects:** All flows (system-level dialog)
+
+After emulator boot or cold restart, Android shows a "Bluetooth keeps stopping" system dialog. This overlays the entire screen and blocks Maestro from interacting with the app behind it.
+
+**Root cause:** WHPX emulators don't have real Bluetooth hardware. The Bluetooth service crashes on boot and Android's crash reporter shows the dialog.
+
+**Workaround (two layers):**
+1. `seed-and-run.sh` kills Bluetooth via `adb shell am force-stop com.android.bluetooth` before launching the app
+2. `seed-and-run.sh` checks `uiautomator dump` for "Bluetooth" text and taps dismiss coordinates as a safety net
+
+**Applied in:** `seed-and-run.sh`, `dismiss-bluetooth.yaml`
+
+---
+
+## BUG-22: Notification Permission Dialog Blocks UI After Sign-in (2026-03-10)
+
+**Status:** Fixed (workaround)
+**Severity:** High — blocks all flows after sign-in
+**Affects:** All flows (appears on first home screen load after `pm clear`)
+
+Android 13+ (API 33+) requires explicit `POST_NOTIFICATIONS` permission. The app's `usePushTokenRegistration` hook triggers the system permission dialog on the home screen after sign-in. Since `pm clear` wipes previously granted permissions, this dialog appears on every test run.
+
+**Root cause:** Expected Android behavior — `pm clear` resets all runtime permissions. The app correctly requests notification permission on mount.
+
+**Workaround:** `seed-and-sign-in.yaml` conditionally dismisses the dialog by tapping "Allow" via `dismiss-notifications.yaml` after the home screen loads.
+
+**Applied in:** `seed-and-sign-in.yaml`, `dismiss-notifications.yaml`
+
+---
+
+## BUG-23: Missing `href: null` on `subject` Route Breaks Tab Bar (2026-03-10)
+
+**Status:** Fixed (commit `6536032`)
+**Severity:** Medium — visual glitch, does not block functionality
+**Affects:** All screens in `(learner)` route group
+
+The bottom tab bar shows ~9 tabs instead of the intended 3 (Home, Learning Book, More). Extra tabs appear with broken icons (missing character rectangle glyphs ▯) and truncated labels like "sub…". The `subject/` directory inside `(learner)/` is auto-discovered by Expo Router as a visible tab because it lacks a `<Tabs.Screen>` declaration with `href: null`.
+
+**Root cause:** Expo Router's file-system routing automatically creates a tab for every file/directory inside a `Tabs` layout group. Routes that should be hidden (navigated to programmatically, not via tab bar) need an explicit `<Tabs.Screen name="..." options={{ href: null }} />`. The `subject/` route is missing this declaration — likely dropped during a previous commit (`08abeaa`, E2E flows/testIDs).
+
+**Broken icons explained:** The `iconMap` in `_layout.tsx` only defines icons for `Home`, `Book`, and `More`. The `TabIcon` component falls back to `'ellipse-outline'` for unknown route names, which renders as a broken glyph when the tab shouldn't exist at all.
+
+**Fix:** Add the missing `Tabs.Screen` entry in `apps/mobile/src/app/(learner)/_layout.tsx`:
+
+```tsx
+<Tabs.Screen
+  name="subject"
+  options={{
+    href: null,
+  }}
+/>
+```
+
+**Verify:** Confirm no other routes are missing — cross-reference all files/directories in `(learner)/` against `Tabs.Screen` declarations. Currently declared with `href: null`: `onboarding`, `session`, `topic`, `subscription`, `homework`. The `subject` directory is the only one missing.
+
+---
+
+## BUG-24: KeyboardAvoidingView Broken on Android — Keyboard Covers Inputs (2026-03-10)
+
+**Status:** Fixed (commit `6536032`) — needs emulator verification
+**Severity:** High — blocks user input on sign-in/sign-up (first interaction)
+**Affects:** All screens with text inputs in auth and onboarding flows
+
+On Android, the software keyboard covers input fields (especially password) because `KeyboardAvoidingView` is configured with `behavior={undefined}` for Android, making it a no-op. Combined with `justifyContent: 'center'` on the `ScrollView` content container, inputs cannot scroll into view when the keyboard opens.
+
+The sign-in screen is the worst case: Google + Apple SSO buttons (~120px combined) sit above the email/password fields, consuming space that pushes the password field into the keyboard zone.
+
+**Root cause:** All 6 affected screens share the same broken pattern:
+
+```tsx
+<KeyboardAvoidingView
+  className="flex-1 bg-background"
+  behavior={Platform.OS === 'ios' ? 'padding' : undefined}  // ← Android gets undefined
+>
+  <ScrollView
+    contentContainerStyle={{
+      flexGrow: 1,
+      justifyContent: 'center',  // ← Centers content, can't scroll up
+    }}
+  >
+```
+
+Two issues:
+1. `behavior={undefined}` on Android — `KeyboardAvoidingView` does nothing
+2. `justifyContent: 'center'` + `flexGrow: 1` — content is vertically centered; when the keyboard shrinks visible space, the form can't reflow upward
+
+`AndroidManifest.xml` has `android:windowSoftInputMode="adjustResize"` which resizes the window, but without `KeyboardAvoidingView` cooperation, the `ScrollView` doesn't scroll the focused input into view.
+
+**Affected screens (priority order):**
+
+| Screen | File | Above-input content | Severity |
+|--------|------|---------------------|----------|
+| Sign-in | `(auth)/sign-in.tsx` | SSO buttons + heading + subheading (~120px) | **High** |
+| Sign-up | `(auth)/sign-up.tsx` | SSO buttons + heading + subheading (~120px) | **High** |
+| Forgot password | `(auth)/forgot-password.tsx` | Heading + description | Medium |
+| Create profile | `create-profile.tsx` | Heading + description | Medium |
+| Create subject | `create-subject.tsx` | Heading + description | Medium |
+| Consent | `consent.tsx` | Heading + description | Medium |
+
+**Not affected:** `ChatShell.tsx` (input in fixed footer, different layout), `session-summary/[sessionId].tsx` (has `keyboardVerticalOffset={0}`).
+
+**Fix (per screen):**
+1. Change `behavior` to work on both platforms: `behavior={Platform.OS === 'ios' ? 'padding' : 'height'}`
+2. Add `keyboardVerticalOffset` for iOS header compensation
+3. Consider changing `justifyContent: 'center'` to `'flex-start'` with a flexible spacer, so content can scroll above the keyboard
+
+**E2E workaround (already applied):** Maestro flows tap the "Welcome back" heading to defocus the input and dismiss the keyboard between email and password entry (BUG-3 + BUG-20).
+
+---
+
+## BUG-25: `profileScopeMiddleware` Falls Back to `account.id` — Empty Data (2026-03-10)
+
+**Status:** Fixed (commit `35ef433`)
+**Severity:** Critical — blocks ~30 E2E flows
+**Affects:** ALL seeded flows using `learning-active`, `retention-due`, `multi-subject`, and other scenarios with subjects
+
+When the mobile app sends API requests without an `X-Profile-Id` header, `profileScopeMiddleware` previously skipped without setting `profileId` in the Hono context. All 52 route handlers used the fallback pattern `const profileId = c.get('profileId') ?? account.id`, where `account.id` is NEVER a valid `profile_id` in any database table. This caused all scoped queries (`createScopedRepository(db, profileId)`) to return empty results.
+
+**Visible symptoms:**
+- Home screen shows "add your first subject" empty state despite subjects existing in DB
+- Streak shows 0 days despite streak data in DB
+- Coaching card shows generic content instead of personalized card
+- Redirects to create-subject modal immediately after sign-in
+
+**Root cause:** The `profileScopeMiddleware` was designed to only set `profileId` when `X-Profile-Id` header is explicitly provided. When absent (e.g., during the initial profile bootstrap sequence, or when the mobile client hasn't yet resolved `activeProfile`), the middleware called `next()` without setting anything. The `?? account.id` fallback in route handlers silently returned empty data instead of failing loudly.
+
+**Fix:** `profileScopeMiddleware` now auto-resolves to the owner profile when `X-Profile-Id` is absent:
+1. New `findOwnerProfile(db, accountId)` function in `services/profile.ts`
+2. Middleware calls it when header is missing, wrapped in try-catch for robustness
+3. If owner profile found, sets both `profileId` and `profileMeta` on the context
+4. If no profiles exist yet (new user), falls through gracefully
+
+**Debug endpoints added:** `GET /__test/debug/:email` and `GET /__test/debug-subjects/:clerkUserId` for tracing the account → profile → subjects chain during seed verification.

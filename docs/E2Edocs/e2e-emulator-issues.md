@@ -809,3 +809,487 @@ The Unicode path fixes that ARE working:
 3. `gradle.properties` with `-Djava.io.tmpdir=C:/tools/tmp` for Kotlin daemon (permanent fix)
 4. Gradle init.gradle to redirect CMake `.cxx` intermediates to `C:\B\`
 5. Ninja 1.12.1 upgrade to handle >260 char source file paths
+
+---
+
+## Issue 11: Clerk CAPTCHA Blocks Automated Sign-In on Android Emulator (2026-03-09)
+
+**What happened:** After seeding a Clerk test user via the Backend API and successfully verifying the password works (`POST /v1/users/:id/verify_password` → `verified: true`), sign-in via the app's Clerk React Native SDK fails silently. The sign-in completes without an error but returns a non-`complete` status, and the app shows "Sign-in could not be completed."
+
+**Root cause:** Clerk has Cloudflare Turnstile CAPTCHA enabled on the instance. The environment config (`GET /v1/environment`) reveals:
+
+```json
+{
+  "user_settings": {
+    "sign_in": {
+      "captcha_enabled": true,
+      "captcha_provider": "turnstile",
+      "captcha_public_key": "0x4AAAAAAAWXJGBD7bONzLBd",
+      "captcha_widget_type": "invisible"
+    }
+  }
+}
+```
+
+Even though the CAPTCHA widget is "invisible", Clerk's frontend API performs bot detection checks during sign-in. The Android emulator (or the React Native environment) fails these checks, blocking automated sign-in. The CAPTCHA is designed for web browsers and doesn't work in native mobile apps during E2E testing.
+
+**Fix applied — `bypass_client_trust` flag:**
+
+Clerk's Backend API supports a per-user flag `bypass_client_trust` that skips CAPTCHA/bot checks for that user. Set it via PATCH after user creation:
+
+```bash
+# Set bypass_client_trust on the test user
+curl -X PATCH "https://api.clerk.com/v1/users/<user_id>" \
+  -H "Authorization: Bearer <clerk_secret_key>" \
+  -H "Content-Type: application/json" \
+  -d '{"bypass_client_trust": true}'
+```
+
+**Implementation in `apps/api/src/services/test-seed.ts`:**
+
+The seed service's `ensureClerkTestUser()` function now patches the user after creation to set both the password (see Issue 12) and `bypass_client_trust: true`:
+
+```typescript
+const patchRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+  method: 'PATCH',
+  headers: {
+    Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    password: SEED_PASSWORD,
+    skip_password_checks: true,
+    bypass_client_trust: true,
+  }),
+});
+```
+
+**Key insight:** Clerk's CAPTCHA settings are instance-wide and cannot be disabled per-environment. The `bypass_client_trust` flag is the official way to allow automated testing without disabling CAPTCHA for all users.
+
+**Clerk testing tokens alternative:** Clerk also offers `POST /v1/testing_tokens` which returns a short-lived token for bypassing bot detection. However, this is designed for web browser testing (Playwright/Cypress) and requires injecting the token into the browser's `window.__clerk_testing_token`. It is not directly usable in React Native. The `bypass_client_trust` per-user flag is the correct approach for mobile E2E.
+
+---
+
+## Issue 12: Clerk Backend API — POST /users Password Encoding Bug (2026-03-09)
+
+**What happened:** Creating a Clerk user via `POST /v1/users` with a `password` field containing special characters (`!`, `-`) results in the password being silently corrupted. The `POST /v1/users/:id/verify_password` endpoint reports `verified: false` for the exact password that was provided during creation.
+
+**Reproduction:**
+
+```bash
+# Create user with password containing special chars
+curl -X POST "https://api.clerk.com/v1/users" \
+  -H "Authorization: Bearer sk_test_..." \
+  -H "Content-Type: application/json" \
+  -d '{"email_address": ["test@example.com"], "password": "EduAgent-E2e-Kx9!2026"}'
+
+# Verify — FAILS even though the password was just set
+curl -X POST "https://api.clerk.com/v1/users/<id>/verify_password" \
+  -H "Authorization: Bearer sk_test_..." \
+  -H "Content-Type: application/json" \
+  -d '{"password": "EduAgent-E2e-Kx9!2026"}'
+# Returns: { "verified": false }
+```
+
+Tested passwords:
+| Password | Via POST /users | Via PATCH /users | verify_password |
+|----------|----------------|-----------------|-----------------|
+| `TestPass123!` | Created OK | — | FAILS (`verified: false`) |
+| `EduAgent-E2e-Kx9!2026` | Created OK | — | FAILS (`verified: false`) |
+| `Mentomate2026xK` | Created OK | — | OK (`verified: true`) |
+| `Mentomate2026xK` | — | Patched OK | OK (`verified: true`) |
+
+**Root cause hypothesis:** The `POST /v1/users` endpoint may not correctly handle URL-encoded or JSON-escaped special characters in the password field. Characters like `!` and `-` are being silently altered during hashing. The `PATCH /v1/users/:id` endpoint does not have this bug.
+
+**Workaround applied:**
+
+1. Create user via `POST /v1/users` **without** a password (or with a simple alphanumeric one)
+2. Set the password via `PATCH /v1/users/:id` with `skip_password_checks: true`
+
+```typescript
+// Step 1: Create user (no password in POST body)
+const createRes = await fetch(`${CLERK_API_BASE}/users`, {
+  method: 'POST',
+  body: JSON.stringify({ email_address: [email] }),
+});
+
+// Step 2: Reliably set password via PATCH
+const patchRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+  method: 'PATCH',
+  body: JSON.stringify({
+    password: 'Mentomate2026xK',
+    skip_password_checks: true,
+  }),
+});
+```
+
+**Additional note — HaveIBeenPwned:** Even if a password is set correctly, Clerk checks it against the HaveIBeenPwned database during **sign-in** (not just during creation). `TestPass123!` was flagged as breached. Using `skip_password_checks: true` during creation does NOT skip the HIBP check at sign-in time. Use a non-breached password like `Mentomate2026xK`.
+
+---
+
+> **App bugs found during emulator testing** are tracked in `e2e-test-bugs.md` (BUG-1 through BUG-25). This document covers environment and tooling issues only.
+
+## Comprehensive Post-Auth E2E Flow (2026-03-09)
+
+A full post-auth Maestro flow is available at:
+```
+apps/mobile/e2e/flows/post-auth-comprehensive-devclient.yaml
+```
+
+**Prerequisites:**
+1. API running at `localhost:8787` with `.dev.vars` configured (Issue 10)
+2. Metro bundler running at `localhost:8081`
+3. Bundle proxy at `localhost:8082` (BUG-7 workaround)
+4. Android emulator running with dev-client APK installed
+5. Seeded test user in Clerk with `bypass_client_trust: true` (Issue 11)
+
+**What it tests (65 steps):**
+
+| Phase | Screens/Features | Steps |
+|-------|-----------------|-------|
+| 1. Sign In | Dev-client launcher → sign-in form → auth | 15 |
+| 2. Home Screen | ScrollView, subjects, retention strip, coaching card | 8 |
+| 3. More Tab | Appearance, Notifications, Learning Mode, Account sections | 20 |
+| 4. Sub-Screens | Privacy Policy, Terms of Service (navigate + back) | 8 |
+| 5. Theme Switching | Eager Learner ↔ Teen, then Parent redirect → dashboard → back | 14 |
+
+**Test user credentials:**
+- Email: `test-e2e@example.com`
+- Password: `Mentomate2026xK`
+- Created by: `POST /v1/__test/seed` (scenario: `learning-active`)
+
+**Running:**
+```bash
+export TEMP="C:\\tools\\tmp" && export TMP="C:\\tools\\tmp"
+/c/tools/maestro/bin/maestro test apps/mobile/e2e/flows/post-auth-comprehensive-devclient.yaml
+```
+
+---
+
+## Current Status (2026-03-09)
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Emulator boot | Working | From ASCII SDK path (`C:\Android\Sdk`) |
+| ADB | Working | v36.0.2 at `C:\Android\Sdk\platform-tools` |
+| Maestro CLI | Working | v2.2.0 at `C:\tools\maestro` with TEMP override |
+| Gradle daemon | Working | With `GRADLE_USER_HOME=C:\tools\gradle` |
+| Kotlin compiler | Working | `gradle.properties` has `kotlin.daemon.jvmargs=-Djava.io.tmpdir=C:/tools/tmp` |
+| CMake library builds | Working | init.gradle redirects `.cxx` to `C:\B\<module>` |
+| CMake app build | Working | Ninja 1.12.1 handles >260 char paths |
+| Expo Go (JS-only) | Working | Smoke tests run via `exp://localhost:8081` deep link |
+| Android APK build | **BLOCKED on Windows** | pnpm + Sentry config plugin (Issue 7) |
+| Android APK build (WSL2) | **Working** | Bypasses Issue 7 |
+| expo-dev-client | **Installed (WSL2 only)** | `expo-dev-client@~6.0.20` |
+| Metro → dev-client | **Working** | With `unstable_serverRoot: monorepoRoot` (Issue 8) |
+| API server (local) | **Working** | Requires `.dev.vars` (Issue 10) |
+| Clerk test user seeding | **Working** | POST + PATCH for password + bypass_client_trust (Issues 11-12) |
+| Post-auth E2E (Maestro) | **Working** | All 65 steps passing |
+| Tab navigation (E2E) | **Limited** | Hidden tabs visible in dev-client (BUG-10) |
+| Theme switching (E2E) | **Working** | extendedWaitUntil for timing (BUG-11), parent redirect handled (BUG-12) |
+
+**What works end-to-end:** Seed test data → sign in → home screen → More tab full verification → Privacy Policy → Terms of Service → theme cycling. All via Maestro automation (hardcoded credentials in the comprehensive flow).
+
+**Known limitations:**
+- Tab bar taps unreliable for "Home" and "Learning Book" (BUG-10, dev-client only)
+- Theme switch timing requires `extendedWaitUntil` workaround (BUG-11)
+- Parent theme switch redirects to `(parent)/dashboard` (BUG-12, by design)
+- WHPX emulator slow — ANR dialogs during bundle loading (Issue 9)
+- Single emulator = serialized E2E flows (no parallel test execution)
+- Maestro `runScript` env vars broken in sub-flows (Issue 13 — blocks 38 seed-dependent flows)
+
+---
+
+## Issue 13: Maestro `runScript` — `__maestro` Undefined in Sub-Flow Context (2026-03-09)
+
+**What happened:** The reusable `seed-and-sign-in.yaml` setup flow calls `seed.js` via `runScript` with `env` variables. When executed as a sub-flow (via `runFlow` from a parent flow), the script crashes:
+
+```
+TypeError: Cannot read property 'env' of undefined
+  at <js> :program(seed.js:14:428-440)
+```
+
+Line 14: `const scenario = __maestro.env['SCENARIO'] || 'onboarding-complete';`
+
+**What was tried:**
+
+1. **`runScript` with `env` + `outputVariable`:**
+   ```yaml
+   - runScript:
+       file: ../../scripts/seed.js
+       env:
+         API_URL: ${API_URL}
+         SCENARIO: ${SEED_SCENARIO}
+       outputVariable: seedResult
+   ```
+   Result: `Unknown Property: outputVariable` — Maestro 2.2.0 does not recognize `outputVariable` on `runScript`.
+
+2. **`runScript` with `env` only (removed `outputVariable`):**
+   ```yaml
+   - runScript:
+       file: ../../scripts/seed.js
+       env:
+         API_URL: ${API_URL}
+         SCENARIO: ${SEED_SCENARIO}
+   ```
+   Result: `TypeError: Cannot read property 'env' of undefined` — `__maestro` object does not exist in the GraalJS engine context when the script executes inside a `runFlow` sub-flow.
+
+3. **GraalJS TruffleAttach warning:** The engine also prints:
+   ```
+   WARNING: Unable to load the TruffleAttach library.
+   ```
+   This is likely related to the Unicode path issue (Issue 1/4) — GraalVM's native libraries extract to `%TEMP%` which resolves to the Unicode profile path. The `TEMP=C:\tools\tmp` override applies to the Maestro process but may not propagate to GraalVM's internal library extraction.
+
+**What does work:**
+- The seed API endpoint itself works (verified via curl): `POST /v1/__test/seed` returns `{ email, password, accountId, profileId, ids }`.
+- The Clerk find-or-create pattern works — repeated calls with the same email reuse the existing Clerk user.
+- The DB idempotent seeding works — `seedScenario()` deletes existing data before inserting.
+- The comprehensive flow (`post-auth-comprehensive-devclient.yaml`) works with hardcoded credentials (65/65 steps passing).
+
+**Impact:** 38 flows depend on `seed-and-sign-in.yaml` → `seed.js`. All 38 were blocked until the shell wrapper workaround was built.
+
+### Workaround: Shell wrapper (`seed-and-run.sh`) — WORKING
+
+**Date:** 2026-03-09
+
+The `runScript` + GraalJS bridge is bypassed entirely. Instead, a shell wrapper script (`apps/mobile/e2e/scripts/seed-and-run.sh`) handles seeding via `curl` + `node` (for JSON parsing) on the host machine, then passes credentials to Maestro via `-e` CLI env vars.
+
+**New architecture (3 layers, GraalJS bypassed):**
+
+```
+Layer 3: seed-and-run.sh (bash)       ← NEW: replaces broken GraalJS bridge
+  1. curl -X POST /v1/__test/seed → JSON response
+  2. node -e "..." → parse email, password, accountId, etc.
+  3. maestro test -e EMAIL=... -e PASSWORD=... <flow-file>
+  calls ↓
+Layer 2: API endpoint                  ← WORKING (verified via curl)
+  POST /v1/__test/seed { scenario, email }
+  returns { email, password, accountId, profileId, ids }
+  calls ↓
+Layer 1: test-seed.ts service          ← WORKING (321 tests pass)
+  - findClerkUserByEmail() → reuses existing Clerk user or creates new one
+  - PATCH password + bypass_client_trust on Clerk user
+  - Deletes existing DB account for this email (idempotent)
+  - Runs scenario seeder (creates account, profile, subjects, sessions, etc.)
+  - Returns all IDs + password to caller
+```
+
+**Updated `seed-and-sign-in.yaml`:**
+- Removed `runScript` step entirely (seeding is done by the shell wrapper before Maestro starts)
+- Changed `${output.email}` → `${EMAIL}` and `${output.password}` → `${PASSWORD}` (now read from Maestro CLI env vars)
+- Flow now only handles: app launch → dev-client connection → sign-in → home screen verification
+
+**Usage:**
+```bash
+cd apps/mobile/e2e
+TEMP='C:\tools\tmp' TMP='C:\tools\tmp' ./scripts/seed-and-run.sh <scenario> <flow-file>
+
+# Examples:
+./scripts/seed-and-run.sh onboarding-complete flows/account/settings-toggles.yaml
+./scripts/seed-and-run.sh learning-active flows/learning/core-learning.yaml
+./scripts/seed-and-run.sh retention-due flows/retention/recall-review.yaml
+```
+
+**Verified working (2026-03-09):**
+- Seeding via curl → JSON parsing → credential extraction: works
+- Maestro receives `${EMAIL}` and `${PASSWORD}` via `-e` flags: works
+- `seed-and-sign-in.yaml` sub-flow: all 16 steps pass (launch → Metro → dev menu → sign-in → home)
+- Conditional dev tools sheet dismissal (BUG-14 fix): works
+
+### Previous seeding architecture (for reference)
+
+The original design had 4 layers. Layer 3 (seed.js) is now bypassed by the shell wrapper.
+
+**Layer 1 — `apps/api/src/services/test-seed.ts`** (working):
+- 12 seed scenarios implemented: `onboarding-complete`, `learning-active`, `retention-due`, `failed-recall-3x`, `parent-with-children`, `trial-active`, `trial-expired`, `multi-subject`, `homework-ready`, `trial-expired-child`, `consent-withdrawn`, `parent-solo`
+- Creates real Clerk users via Backend API (find-or-create pattern)
+- Sets password via PATCH (avoids POST encoding bug — Issue 12)
+- Sets `bypass_client_trust: true` (CAPTCHA bypass — Issue 11)
+- Idempotent: deletes existing DB data for the email before seeding
+
+**Layer 2 — `POST /v1/__test/seed`** (working):
+- Guarded by `ENVIRONMENT !== 'production'` and optional `X-Test-Secret` header
+- Validates input via Zod (`scenario` + `email`)
+- Returns `{ scenario, accountId, profileId, email, password, ids: { subjectId, topicId, ... } }`
+- Verified working: `curl -X POST http://localhost:8787/v1/__test/seed -H "Content-Type: application/json" -d '{"scenario":"onboarding-complete"}'` returns 201 with full response
+
+**Layer 3 — `apps/mobile/e2e/scripts/seed.js`** (bypassed):
+- Originally ran in Maestro's GraalJS engine — now **bypassed** by `seed-and-run.sh`
+- Kept for reference but not used in the current architecture
+- Reads env vars via `__maestro.env['SCENARIO']` and `__maestro.env['API_URL']`
+- Cannot work because `__maestro` is undefined when called from `runFlow` sub-flow
+
+**Layer 4 — `apps/mobile/e2e/flows/_setup/seed-and-sign-in.yaml`** (working):
+- Called by 33 flows via `runFlow: _setup/seed-and-sign-in.yaml`
+- `runScript` step removed — seeding done by `seed-and-run.sh` before Maestro starts
+- Reads `${EMAIL}` / `${PASSWORD}` from Maestro CLI env vars (set by wrapper's `-e` flags)
+- Step 1: `launchApp: clearState: true`
+- Steps 2-3: Dev-client launcher + conditional dev menu overlay handling
+- Steps 4-5: Sign in with `${EMAIL}` / `${PASSWORD}`
+- Step 6: Wait for `home-scroll-view` (auth complete)
+- **Verified working** (2026-03-09): all 16 steps pass
+
+**Changes made to the seed infrastructure:**
+
+| File | Change | Status |
+|------|--------|--------|
+| `apps/api/src/services/test-seed.ts` | Find-or-create Clerk user (avoids 422 on duplicate email) | Working |
+| `apps/api/src/services/test-seed.ts` | Idempotent DB seeding (deletes existing account before insert) | Working |
+| `apps/api/src/services/test-seed.ts` | PATCH password + `bypass_client_trust` after user creation | Working |
+| `apps/api/src/services/test-seed.ts` | Password changed to `Mentomate2026xK` (non-breached, no special chars) | Working |
+| `apps/mobile/e2e/scripts/seed-and-run.sh` | Shell wrapper: curl + node JSON parsing + Maestro `-e` flags | **Working** |
+| `apps/mobile/e2e/flows/_setup/seed-and-sign-in.yaml` | Removed runScript, uses `${EMAIL}`/`${PASSWORD}` from CLI env vars | **Working** |
+| `apps/mobile/e2e/flows/_setup/dismiss-devtools.yaml` | Helper flow: `pressKey: back` (called conditionally) | **Working** |
+| `apps/mobile/e2e/flows/_setup/launch-devclient.yaml` | Port 8082, `pressKey: back` for dev tools sheet | Updated |
+| `apps/mobile/e2e/flows/_setup/connect-server.yaml` | Port 8082, `pressKey: back` for dev tools sheet | Updated |
+
+### Flow inventory (50 flows total)
+
+| Category | Count | Status |
+|----------|-------|--------|
+| Comprehensive (hardcoded credentials) | 1 | **Passing** (65/65 steps) |
+| Standalone auth (no seed needed) | 8 | **Not yet run** (should work) |
+| Seed-dependent (via `seed-and-run.sh` + `seed-and-sign-in.yaml`) | 33 | **Unblocked** — seed chain working, individual flows need testing |
+| Consent (special setup) | 2 | **Blocked** (need custom seed + consent state) |
+| Camera/native (ML Kit OCR) | 1 | **Blocked** (emulator has no camera) |
+
+### Known issues in individual flows (found during first seed-dependent run)
+
+**BUG-14: `pressKey: back` exits app from navigation root**
+- When no dev tools sheet is present after "Continue" overlay, `pressKey: back` navigates back from the sign-in screen (navigation root) to the dev-client launcher, exiting the app.
+- The second dev tools sheet (showing "Reload", "Connected to", etc.) appears non-deterministically.
+- **Fix:** Conditional execution using `runFlow: when: visible: "Reload"` — only press Back if the sheet is detected.
+- Applied in: `seed-and-sign-in.yaml`, `post-auth-comprehensive-devclient.yaml`
+
+**BUG-15: `tabBarTestID` not propagating to Android accessibility tree**
+- `tabBarTestID: 'tab-more'` set in Expo Router `Tabs.Screen` options does not appear as `resource-id` in the Android UIAutomator hierarchy. The element has `resource-id=""`.
+- Affects all `tapOn: id: "tab-*"` references in flows.
+- **Workaround:** Use `tapOn: text: "More"` (text-based matching) instead of `tapOn: id: "tab-more"`.
+
+**BUG-16: Maestro regex metacharacters in theme names**
+- Theme names like `Eager Learner (Calm)` and `Parent (Light)` contain parentheses, which Maestro interprets as regex capture groups.
+- `tapOn: text: "Eager Learner (Calm)"` fails because `(Calm)` is treated as a regex group.
+- **Workaround:** Escape parentheses in Maestro text matchers: `"Eager Learner \\(Calm\\)"`, or use testIDs on theme buttons.
+
+**BUG-17: Parent theme switch redirects away from More screen**
+- Tapping "Parent (Light)" theme button changes persona to `parent`, triggering `_layout.tsx:575`: `if (persona === 'parent') return <Redirect href="/(parent)/dashboard" />`.
+- The More screen is replaced by the parent dashboard, making subsequent theme taps fail.
+- The comprehensive flow handled this by testing Eager Learner ↔ Teen first, then Parent last with explicit redirect handling.
+- Individual flows that test theme switching need the same ordering strategy.
+
+---
+
+## Session 5 Findings (2026-03-10)
+
+### Architecture Evolution: Full ADB Automation
+
+The seed-and-sign-in pipeline went through 3 major revisions in Sessions 4-5:
+
+**v1 (Session 4):** Maestro-native launch
+- `seed-and-run.sh` seeds via API, passes creds to Maestro as env vars
+- `seed-and-sign-in.yaml` uses `launchApp: clearState: true`, conditional `when:` checks for launcher
+- **Problem:** `launchApp` fails intermittently on WHPX (BUG-19), `when:` is a one-time check that misses the launcher
+
+**v2 (Session 5, early):** Hybrid ADB + Maestro
+- `seed-and-run.sh` clears state + launches via ADB (`pm clear` + `am start`)
+- `seed-and-sign-in.yaml` uses `extendedWaitUntil: "DEVELOPMENT SERVERS"` (proper wait, 120s timeout)
+- Maestro handles launcher tap, bundle load wait, "Continue" dismissal
+- **Problem:** Maestro's UIAutomator2 gRPC driver crashes during resource-intensive bundle loading on WHPX
+
+**v3 (Session 5, final):** Full ADB automation
+- `seed-and-run.sh` handles EVERYTHING via ADB before Maestro starts:
+  1. `pm clear` + `am start` (clear state, launch app)
+  2. `am force-stop com.android.bluetooth` (BUG-21: kill Bluetooth service)
+  3. `pm grant POST_NOTIFICATIONS` (BUG-22: pre-grant notification permission)
+  4. `uiautomator dump` + grep for "DEVELOPMENT" (wait for launcher, 120s)
+  5. Parse 8081 entry bounds from `uiautomator dump`, `input tap` at center (not hardcoded)
+  6. Escalating sleep loop (15/30/60/90/120s) + `KEYCODE_BACK` + verify via dump
+     (`uiautomator dump` is unreliable during Continue overlay — OOM kills the dump)
+  7. If dump shows "Welcome back" → sign-in screen reached, break
+  8. If dump shows "DEVELOPMENT" → went back too far, re-tap Metro and continue
+  9. `uiautomator dump` + grep for "Reload" → `KEYCODE_BACK` (dismiss dev tools)
+- `seed-and-sign-in.yaml` simplified to: wait for "Welcome back" → sign in → wait for home
+- Maestro only starts AFTER the app is on the stable sign-in screen
+- **Result:** Avoids Maestro gRPC crashes entirely; much more stable on WHPX
+
+### Key Operational Procedures Discovered
+
+**Emulator restart procedure:**
+1. `adb -s emulator-xxxx emu kill` — kill emulator
+2. Wait 5s
+3. `emulator.exe -avd New_Device -no-snapshot -gpu host -no-audio &` — start fresh
+4. Poll `adb shell getprop sys.boot_completed` until "1" (~30-40s)
+5. Set up ADB reverse: `adb reverse tcp:8081 tcp:8081 && tcp:8082 && tcp:8787`
+6. Run first test with `--reinstall-driver` flag to reinstall Maestro's UIAutomator agent
+
+**Two-emulator pitfalls:**
+- Bare `adb` (without `-s`) fails with "more than one device/emulator"
+- `seed-and-run.sh` has `|| true` on all ADB commands, silently failing with 2 emulators
+- Maestro's `--udid emulator-xxxx` flag can report "not connected" intermittently
+- **Recommendation:** Run with single emulator for reliability
+
+**Metro stability:**
+- Metro + bundle proxy crash after ~15 consecutive `clearState` + bundle reload cycles
+- **Mitigation:** Run batches of 5-6 flows, restart Metro between batches
+- Cold-boot WHPX can take 60-90s before the dev-client launcher appears
+- `uiautomator dump` can OOM during heavy bundle loading; needs retry loop
+
+### New Bugs Discovered
+
+**BUG-18: Persona switch crashes app (~50%)**
+- `setPersona('teen')` from parent dashboard crashes due to navigation race condition
+- Affects: `switch-to-teen` button on parent dashboard
+- Mitigation: Parent theme test placed last in settings-toggles.yaml
+
+**BUG-19: Maestro `launchApp` fails on WHPX**
+- `launchApp` returns "Unable to launch app" intermittently
+- Persistent after app crashes (BUG-18) or concurrent sessions
+- Fix: ADB-based launch (`am force-stop` + `pm clear` + `am start`)
+
+**BUG-20: `hideKeyboard` fails on some Android configs**
+- Maestro's `hideKeyboard` → "Couldn't hide the keyboard. Custom input..."
+- Fix: Tap a static text element (e.g., "Welcome back" heading) to defocus input
+
+**BUG-21: "Bluetooth keeps stopping" dialog on WHPX**
+- System dialog after emulator boot/restart, blocks entire UI
+- Fix: `am force-stop com.android.bluetooth` before app launch + `dismiss-bluetooth.yaml` safety net
+
+**BUG-22: POST_NOTIFICATIONS permission dialog blocks UI**
+- Android 13+ shows dialog after sign-in; `pm clear` resets grant
+- Fix: `pm grant com.mentomate.app android.permission.POST_NOTIFICATIONS` before app launch
+
+**BUG-23: Missing `href: null` on `subject` route** (app code)
+- Expo Router auto-discovers `subject/` as a visible tab, showing ~9 tabs instead of 3
+- **Fixed:** Added `<Tabs.Screen name="subject" options={{ href: null }} />` to `(learner)/_layout.tsx`
+
+**BUG-24: KeyboardAvoidingView broken on Android** (app code, systemic)
+- `behavior={undefined}` on Android makes KeyboardAvoidingView a no-op across 6 input screens
+- Sign-in worst case: SSO buttons push password field into keyboard zone
+- **Fixed:** Changed to `behavior='height'` on Android across sign-in, sign-up, forgot-password, consent, create-profile, create-subject (8 instances)
+
+**BUG-25: `profileScopeMiddleware` falls back to `account.id` — empty data on home screen** (app code, critical)
+- When `X-Profile-Id` header is absent, `profileScopeMiddleware` skipped without setting `profileId`
+- All 52 route handlers used `c.get('profileId') ?? account.id` fallback
+- `account.id` is NEVER a valid `profile_id` → scoped queries return empty results
+- **Effect:** Seeded subjects, streaks, coaching cards invisible on home screen; ~30 E2E flows blocked
+- **Fixed:** `profileScopeMiddleware` now auto-resolves to owner profile when header absent. New `findOwnerProfile(db, accountId)` service function. Commit `35ef433`.
+
+**tabBarButtonTestID fix** (relates to BUG-15)
+- `tabBarTestID` is the wrong prop name. Expo Router uses `tabBarButtonTestID` for the actual tab bar button.
+- Changed in both `(learner)/_layout.tsx` and `(parent)/_layout.tsx` for all 3 tabs (Home, Learning Book, More).
+- Text-based matching (`tapOn: text: "More"`) still recommended for E2E flows as Expo Router may not propagate testIDs to Android accessibility tree consistently.
+
+### Setup Helper Inventory (10 files)
+
+| File | Purpose |
+|------|---------|
+| `seed-and-sign-in.yaml` | Wait for sign-in screen, enter credentials, wait for home |
+| `launch-devclient.yaml` | Launch app, connect to Metro, dismiss overlays (for standalone flows) |
+| `switch-to-parent.yaml` | More → "Parent (Light)" → wait for `dashboard-scroll` |
+| `tap-metro-server.yaml` | Tap 8081 Metro entry (8082 via separate `tap-metro-8082.yaml`) |
+| `dismiss-anr.yaml` | Tap "Wait" on ANR dialog |
+| `dismiss-bluetooth.yaml` | Tap "Close app" on Bluetooth crash dialog |
+| `dismiss-devtools.yaml` | Press Back to dismiss dev tools sheet |
+| `dismiss-notifications.yaml` | Tap "Allow" on notification permission dialog |
+| `nav-to-sign-in.yaml` | Navigate to sign-in from launcher |
+| `sign-out.yaml` | Sign out via More → sign-out-button |

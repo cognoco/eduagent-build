@@ -35,7 +35,7 @@ function createMockDb(): Database {
 // ---------------------------------------------------------------------------
 
 describe('VALID_SCENARIOS', () => {
-  it('contains all 9 expected scenarios', () => {
+  it('contains all 12 expected scenarios', () => {
     expect(VALID_SCENARIOS).toEqual([
       'onboarding-complete',
       'learning-active',
@@ -46,6 +46,9 @@ describe('VALID_SCENARIOS', () => {
       'trial-expired',
       'multi-subject',
       'homework-ready',
+      'trial-expired-child',
+      'consent-withdrawn',
+      'parent-solo',
     ]);
   });
 

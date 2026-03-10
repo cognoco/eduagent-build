@@ -227,6 +227,19 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 
 - **Always test your own work before concluding a task.** Run the relevant tests for any code you write or modify. Do not declare a task complete until tests pass.
 
+## E2E Testing Documentation (Mandatory)
+
+**When working on anything related to E2E tests** (writing flows, fixing bugs, updating seed data, modifying test infrastructure, running test sessions), you MUST:
+
+1. **Read all docs in `docs/E2Edocs/`** at the start of your task to understand current state.
+2. **Update the relevant docs** before concluding your task. The folder contains:
+   - `e2e-test-results.md` — Session-by-session results, cumulative pass/fail counts
+   - `e2e-test-bugs.md` — Bug tracker (BUG-XX entries) with status and root causes
+   - `e2e-emulator-issues.md` — Emulator/environment issues and session findings
+   - `e2e-tech-spec.md` — Technical spec, phase tasks, infrastructure details
+   - `e2e-testing-strategy.md` — Overall strategy, architecture, flow inventory
+3. **Keep docs consistent** — if you fix a bug, update both `e2e-test-bugs.md` (status) and `e2e-test-results.md` (session entry). If you add flows, update `e2e-testing-strategy.md` inventory.
+
 ## Git Rules
 
 - **Never commit unless explicitly asked.**

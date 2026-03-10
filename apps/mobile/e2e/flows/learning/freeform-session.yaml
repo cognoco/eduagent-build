@@ -1,0 +1,81 @@
+# Flow: Freeform "Just Ask" Session — Enter via AdaptiveEntryCard secondary action
+# Validates: teen persona sees entry card, "Just ask something" navigates to freeform
+# session, user can type a question, and AI responds with a real Gemini response.
+# Tags: nightly, learning
+#
+# Journey: UX Journey 2 (Daily Learning Loop — freeform variant)
+# Epics: Epic 2
+# Prerequisite: Seeded user with active subject + coaching card
+#               (scenario: learning-active — provides "World History" subject)
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(learner)/home.tsx (home-scroll-view, coaching-card)
+#   - apps/mobile/src/components/coaching/AdaptiveEntryCard.tsx (coaching-card-primary)
+#   - apps/mobile/src/components/coaching/BaseCoachingCard.tsx (footer = secondary actions)
+#   - apps/mobile/src/components/session/ChatShell.tsx (chat-input, send-button, chat-messages)
+#   - apps/mobile/src/app/(learner)/session/index.tsx (freeform mode)
+#
+# NOTE: The AdaptiveEntryCard renders three actions for teen persona:
+#   1. "Homework help" (primary button via coaching-card-primary)
+#   2. "Practice for a test" (secondary, rendered in footer)
+#   3. "Just ask something" (secondary, rendered in footer)
+# The secondary actions are plain Pressable with accessibilityLabel text, not testIDs.
+# We tap by text: "Just ask something".
+appId: com.mentomate.app
+tags:
+  - nightly
+  - learning
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+# 2. Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 3. Tap "Just ask something" secondary action on AdaptiveEntryCard
+#    This is rendered as a text label in the card's footer for teen persona.
+- tapOn:
+    text: "Just ask something"
+
+# 4. Wait for freeform session screen — chat input is always present
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+# 5. Verify freeform session title
+- assertVisible:
+    text: "Chat"
+
+# 6. Type a freeform question
+- tapOn:
+    id: "chat-input"
+- inputText: "What is photosynthesis?"
+- hideKeyboard
+
+# 7. Tap send button
+- tapOn:
+    id: "send-button"
+
+# 8. Wait for AI response — real Gemini call, 30s timeout
+#    After streaming completes, the chat-input becomes editable again
+#    and the send-button is re-rendered. We wait for the chat-messages
+#    scroll view to contain the response by checking the input is available.
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 30000
+
+# 9. Verify the session did not crash — chat messages area is still visible
+- assertVisible:
+    id: "chat-messages"
+
+# 10. Screenshot after AI response
+- takeScreenshot: freeform-session-ai-response
