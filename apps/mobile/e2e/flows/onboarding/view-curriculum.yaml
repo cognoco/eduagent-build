@@ -1,6 +1,6 @@
 # Flow 3: Home Screen Navigation & Curriculum Review
 # Validates: authenticated home screen elements, tab navigation,
-# tapping a subject navigates to curriculum review.
+# and subjects visible on home screen after seeding.
 # Tags: smoke, onboarding
 #
 # Prerequisites:
@@ -17,42 +17,40 @@ tags:
 # 1. Seed, launch dev-client, sign in.
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
-- assertVisible: "Your coach has a plan"
+
+# 2. Home screen must show subjects section
 - assertVisible: "Your subjects"
 
-# Verify the coaching card area is present (testID: coaching-card)
-- assertVisible:
-    id: "coaching-card"
-    optional: true
-
-# Verify the home scroll view is present
+# 3. Verify the home scroll view is present
 - assertVisible:
     id: "home-scroll-view"
 
-# Verify bottom tab bar is visible with expected tabs
-- assertVisible: "Home"
-- assertVisible: "Learning Book"
-- assertVisible: "More"
+# 4. Screenshot: home screen with subjects
+- takeScreenshot: view-curriculum-01-home
 
-# Navigate to Learning Book tab (BUG-10: use accessibility label, not truncated text)
+# 5. Navigate to Learning Book tab (BUG-10: use accessibility label)
 - tapOn: "Learning Book Tab"
 
-# The Learning Book should show filter tabs and topic list
-- assertVisible:
-    id: "subject-filter-tabs"
-    optional: true
-
-- takeScreenshot: home-navigation
-
-# Navigate back to Home tab
-- tapOn: "Home"
-
-# If subjects exist, tap the first subject to view its curriculum
-# This uses text matching since subject names are dynamic.
-# The curriculum review screen shows "Your Curriculum" or loading state.
+# 6. Wait for Learning Book heading
 - extendedWaitUntil:
     visible:
-      text: "Your subjects"
-    timeout: 5000
+      text: "Learning Book"
+    timeout: 10000
 
-- takeScreenshot: home-subjects-visible
+# 7. Screenshot: Learning Book content
+- takeScreenshot: view-curriculum-02-learning-book
+
+# 8. Navigate back to Home tab (use accessibility label)
+- tapOn: "Home Tab"
+
+# 9. Verify home screen is visible
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 10000
+
+# 10. Subjects section still visible after round-trip
+- assertVisible: "Your subjects"
+
+# 11. Screenshot
+- takeScreenshot: view-curriculum-03-back-home

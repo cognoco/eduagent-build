@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and } from 'drizzle-orm';
+import { eq, and, asc } from 'drizzle-orm';
 import { profiles, type Database } from '@eduagent/database';
 import type {
   ProfileCreateInput,
@@ -85,9 +85,14 @@ export async function findOwnerProfile(
     return mapProfileRow(ownerRow, consentStatus);
   }
 
-  // Fallback: no owner flag set — pick first profile (defensive edge case)
+  // Fallback: no owner flag set — pick first profile (defensive edge case).
+  // Should not happen in normal operation — log for observability.
+  console.warn(
+    `[findOwnerProfile] No owner profile for account ${accountId}, falling back to oldest profile`
+  );
   const fallbackRow = await db.query.profiles.findFirst({
     where: eq(profiles.accountId, accountId),
+    orderBy: [asc(profiles.createdAt)],
   });
   if (!fallbackRow) return null;
   const consentStatus = await getConsentStatus(db, fallbackRow.id);

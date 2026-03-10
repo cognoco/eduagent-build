@@ -4,6 +4,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
 import { ProfileProvider, useProfile, type Profile } from './profile';
 
+jest.mock('@clerk/clerk-expo', () => ({
+  useAuth: () => ({ isSignedIn: true }),
+}));
+
 const mockFetch = jest.fn();
 jest.mock('./api-client', () => ({
   useApiClient: () => {

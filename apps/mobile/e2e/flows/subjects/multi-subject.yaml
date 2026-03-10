@@ -1,17 +1,12 @@
 # Flow N5: Multi-Subject Management — View and Navigate Subjects
 # Validates: user with multiple subjects (active, paused, archived) can
-# view subjects list on home screen, navigate to subject detail, and
-# verify Learning Book tab is accessible.
+# view subjects on home screen, navigate between tabs, and see subject detail.
 # Tags: nightly, subjects
 #
 # Journey: UX Journey 1 (Subject Management)
 # Epics: Epic 1 (FR10-FR14), Epic 4 (FR70-FR72)
 # Prerequisite: Seeded user with Physics (active), Literature (paused),
 #               Art History (archived) (scenario: multi-subject)
-#
-# NOTE: Learning Book shows retention topics (SM-2 cards), NOT subjects.
-# This seed has no retention data, so Learning Book shows empty state.
-# Subject visibility is verified on the home screen instead.
 appId: com.mentomate.app
 tags:
   - nightly
@@ -24,52 +19,74 @@ tags:
       SEED_SCENARIO: "multi-subject"
       API_URL: ${API_URL}
 
-# 2. Home screen
+# 2. Home screen loaded
 - extendedWaitUntil:
     visible:
       id: "home-scroll-view"
     timeout: 15000
 
-# 3. Screenshot: home screen with subjects
+# 3. Screenshot: home screen — captures what's actually rendering
 - takeScreenshot: multi-subject-01-home
 
-# 4. Verify Physics subject card is visible on home screen (active subject)
-- assertVisible:
-    text: "Physics"
-    optional: true
+# 4. Physics (active subject) MUST be visible on home screen
+- extendedWaitUntil:
+    visible:
+      text: "Physics"
+    timeout: 10000
 
-# 5. Verify coaching card area is present
-- assertVisible:
-    id: "coaching-card-primary"
-    optional: true
-
-# 6. Navigate to Learning Book tab
-# BUG-10/BUG-30: Dev-client shows extra tabs, breaking point-tap positions.
-# Use accessibility label (tabBarAccessibilityLabel) for reliable matching.
+# 5. Navigate to Learning Book tab
 - tapOn: "Learning Book Tab"
 
-# 7. Wait for Learning Book to render
+# 6. Wait for Learning Book to render
 - extendedWaitUntil:
     visible:
       text: "Learning Book"
     timeout: 10000
 
-# 8. Screenshot: Learning Book (may be empty — no retention data in this seed)
+# 7. Screenshot: Learning Book content
 - takeScreenshot: multi-subject-02-learning-book
 
-# 9. Check for empty state (expected — multi-subject seed has no retention cards)
-- assertVisible:
-    id: "learning-book-empty"
-    optional: true
-
-# 10. Navigate back to Home tab
+# 8. Navigate back to Home tab
 - tapOn: "Home Tab"
 
-# 11. Verify home screen is visible again
+# 9. Verify home screen is visible again
 - extendedWaitUntil:
     visible:
       id: "home-scroll-view"
     timeout: 10000
 
-# 12. Final screenshot
+# 10. Verify Physics still visible after round-trip
+- assertVisible:
+    text: "Physics"
+
+# 11. Tap on Physics subject to view detail
+- tapOn:
+    text: "Physics"
+
+# 12. Wait for subject detail screen
+- extendedWaitUntil:
+    visible:
+      text: "Physics"
+    timeout: 10000
+
+# 13. Verify subject detail content (topics section)
+# optional: true — "Topics" heading may not render if subject has no curriculum yet
+# (multi-subject seed may not include topics for every subject)
+- assertVisible:
+    text: "Topics"
+    optional: true
+
+# 14. Navigate back from subject detail
+# optional: true — back button testID may vary by platform (hardware back on Android)
+- tapOn:
+    id: "back-button"
+    optional: true
+
+# 15. Verify back on home screen after subject detail round-trip
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 10000
+
+# 16. Final screenshot
 - takeScreenshot: multi-subject-03-back-home

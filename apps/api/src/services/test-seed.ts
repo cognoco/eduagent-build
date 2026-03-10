@@ -11,7 +11,7 @@
  * can sign in via the app's Clerk-powered login UI. When absent (e.g., unit
  * tests), falls back to generating fake `clerk_seed_*` IDs.
  */
-import { eq, and, like, inArray, or } from 'drizzle-orm';
+import { eq, like, inArray, or } from 'drizzle-orm';
 import {
   accounts,
   profiles,
@@ -986,9 +986,10 @@ export async function seedScenario(
   }
 
   // Idempotent: delete existing accounts with the same email before seeding.
-  // Deletes ALL accounts matching the email — both fake clerk_seed_* IDs and real
-  // Clerk user IDs from previous seed runs where CLERK_SECRET_KEY was set.
-  // Safe because this service is ENVIRONMENT-guarded (never runs in production).
+  // Intentionally broader than clerk_seed_* prefix: also catches seed accounts
+  // created with real Clerk user IDs (when CLERK_SECRET_KEY was set during seed).
+  // Defence-in-depth: this entire service is ENVIRONMENT-guarded (test-seed route
+  // rejects non-test environments) so email-only matching is safe.
   // Child tables cascade via ON DELETE CASCADE.
   await db.delete(accounts).where(eq(accounts.email, email));
 
