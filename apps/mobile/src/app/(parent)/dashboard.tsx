@@ -174,7 +174,10 @@ export default function DashboardScreen() {
 
         {__DEV__ && (
           <Pressable
-            onPress={() => setPersona('teen')}
+            onPress={() => {
+              router.replace('/(learner)/home' as never);
+              setTimeout(() => setPersona('teen'), 50);
+            }}
             className="mt-6 items-center py-3 min-h-[44px] justify-center"
             testID="switch-to-teen"
           >

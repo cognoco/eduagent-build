@@ -227,7 +227,7 @@ export function ChatShell({
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
       {/* Header */}

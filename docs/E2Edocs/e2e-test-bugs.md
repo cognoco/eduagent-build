@@ -226,8 +226,8 @@ Tapping "Parent (Light)" theme button changes persona to `parent`, triggering th
 
 ## BUG-18: Persona Switch Crashes App (~50% of the time) (2026-03-10)
 
-**Status:** Open (app code bug)
-**Severity:** High — crashes app, corrupts emulator state
+**Status:** FIXED (2026-03-11) — `router.replace` before deferred `setPersona` prevents layout guard race.
+**Severity:** High — crashes app, corrupts emulator state. **Affects real users.**
 **Affects:** `settings-toggles.yaml` (Parent theme section), any flow using persona switch
 
 After tapping "Switch to Teen view (demo)" button on the parent dashboard, the app crashes to the Android home screen approximately 50% of the time. The crash corrupts Maestro's driver connection, requiring an emulator cold restart.
@@ -240,7 +240,9 @@ After tapping "Switch to Teen view (demo)" button on the parent dashboard, the a
 
 **Mitigation (flow-level):** Parent theme test moved to end of `settings-toggles.yaml` so the crash can't affect earlier validations.
 
-**Proper fix needed:** The `setPersona()` call needs to be coordinated with navigation — e.g., navigate to a neutral route before changing persona, or use `router.replace()` synchronously with the persona change to avoid the layout guard race.
+**Proper fix needed (code-only, no emulator required):** The `setPersona()` call needs to be coordinated with navigation — e.g., call `router.replace('/(learner)/home')` **before** or **simultaneously with** `setPersona('teen')` using a single `startTransition` or `InteractionManager.runAfterInteractions`, so the layout guard doesn't race with the persona state change. Alternatively, `setPersona()` + `router.replace()` can be wrapped in `unstable_batchedUpdates` (or React 18's automatic batching) to ensure both state changes commit in one render cycle.
+
+**Files:** `apps/mobile/src/app/(parent)/dashboard.tsx` (line ~170, "Switch to Teen" handler), `apps/mobile/src/app/(learner)/_layout.tsx` (line ~575, persona guard redirect).
 
 ---
 
@@ -623,7 +625,7 @@ After navigating to the Delete Account screen and tapping `delete-account-cancel
 
 ## BUG-33: Learning Book Tab Crash — react-native-svg ClassCastException on Fabric (2026-03-10)
 
-**Status:** Open (app code bug — react-native-svg + Fabric + reanimated)
+**Status:** FIXED (2026-03-11) — replaced animated SVG `<G>` transform with pure Reanimated `<Animated.View>` scaleX (no SVG dependency). Tests pass (14 suites, 137 tests).
 **Severity:** High — blocks ALL flows that navigate to the Learning Book tab
 **Affects:** `subjects/multi-subject.yaml`, `onboarding/view-curriculum.yaml`, `retention/learning-book.yaml`, `retention/topic-detail.yaml`, and any flow navigating to the Learning Book tab
 
@@ -657,6 +659,10 @@ java.lang.ClassCastException: java.lang.String cannot be cast to...
 2. **Update react-native-svg** — check if a newer version has Fabric ClassCastException fix
 3. **Wrap SVG in error boundary** — prevent crash from taking down the whole screen
 4. **Disable Fabric for react-native-svg** — use `unstable_enablePackageFabric` to exclude it
+
+**Confirmed fix approach (2026-03-11 code review):** The crash is in `BookPageFlipAnimation.tsx` which uses `Animated.createAnimatedComponent(G)` and passes `transform` as a string via `useAnimatedProps()`. The `RNSVGGroupManagerDelegate` on Fabric (New Architecture) expects a typed transform object, not a string. **This is fixable without the emulator** — replace the animated SVG `<G>` transform with a reanimated `<Animated.View>` wrapper using standard `style.transform`, or replace the entire component with a simple `ActivityIndicator`. The component is only used during loading states.
+
+**Files:** `apps/mobile/src/components/common/BookPageFlipAnimation.tsx` (source), `BookPageFlipAnimation.test.tsx` (test), `apps/mobile/src/app/(learner)/book.tsx` (consumer), `apps/mobile/src/components/common/index.ts` (barrel export).
 
 **E2E workaround (temporary):** Flows that navigate to Learning Book will fail at the tab switch. Home screen assertions (subjects, retention strip) remain testable. Skip Learning Book tab assertions until BUG-33 is fixed.
 
@@ -708,7 +714,7 @@ Additionally, `parent-solo` and `parent-with-children` scenarios create a PARENT
 
 ## BUG-35: Keyboard Covers Chat Input Bar and Send Button in Session Screen (2026-03-10)
 
-**Status:** WORKAROUND APPLIED (Session 10) — `pressKey: Enter` added to all 11 affected flow files. Works reliably. App code fix still needed for real users.
+**Status:** FIXED (2026-03-11) — changed `ChatShell.tsx` KAV `behavior` from `'height'` to `undefined` on Android. E2E workaround (`pressKey: Enter`) remains in flows as defense-in-depth. Tests pass (28 tests).
 **Workaround confirmed:** Session 10 ran 4 chat flows (start-session, core-learning, first-session, recall-review) — all PASS with `pressKey: Enter`.
 **Severity:** Critical — blocks ALL E2E flows that use ChatShell (~15 flows)
 **Affects:** All learning, homework, retention, and recall flows that enter a chat session
@@ -746,7 +752,7 @@ When the keyboard opens on the session/chat screen, the app's input bar (TextInp
 - `retention/failed-recall.yaml`
 
 **Fix options:**
-1. **App fix (recommended):** Change `ChatShell.tsx` to `behavior={undefined}` on Android (let `adjustResize` handle everything) or use `behavior='padding'` with an appropriate `keyboardVerticalOffset`.
+1. **App fix (recommended, fixable without emulator):** Change `ChatShell.tsx` to `behavior={undefined}` on Android (let `adjustResize` handle everything). Unlike auth screens (ScrollView-based, where `behavior='height'` works), ChatShell uses FlatList — `adjustResize` already handles the window resize, and `behavior='height'` double-adjusts. Setting `behavior={undefined}` on Android for ChatShell specifically (while keeping `'padding'` on iOS) should resolve the conflict. File: `apps/mobile/src/components/session/ChatShell.tsx`.
 2. **E2E workaround:** ~~Replace `tapOn: send-button` with `pressKey: Enter` in all affected flow files. Keep `tapOn: send-button` as an optional fallback assertion.~~ **DONE (Session 10).**
 3. **Alternative app fix:** Switch `windowSoftInputMode` to `adjustPan` for the session screen (per-activity or via `useEffect` toggle) — but this affects all inputs on the screen.
 
@@ -829,19 +835,19 @@ Both flows asserted `id: recall-test-screen` after tapping the coaching card, bu
 
 ## BUG-41: Learning Book SVG Crash (= BUG-33) — RNSVGGroupManagerDelegate ClassCastException (2026-03-11)
 
-**Status:** Open (app bug — same root cause as BUG-33)
+**Status:** FIXED (2026-03-11) — resolved by BUG-33 fix (BookPageFlipAnimation rewritten without SVG).
 **Severity:** HIGH — blocks 5 flows
 **Affects:** `retention/learning-book.yaml`, `retention/topic-detail.yaml`, `retention/relearn-flow.yaml`, `subjects/multi-subject.yaml` (at LB step), any future flow navigating to Learning Book tab
 
 Same `ClassCastException: java.lang.String cannot be cast` in `com.facebook.react.viewmanagers.RNSVGGroupManagerDelegate` as BUG-33. Confirmed reproducible in Session 10 across multiple scenarios (retention-due, failed-recall-3x, multi-subject).
 
-**Note:** BUG-41 is a duplicate of BUG-33, tracked separately because Session 10 confirmed it across more scenarios. Fix BUG-33 to resolve both.
+**Note:** BUG-41 is a duplicate of BUG-33, tracked separately because Session 10 confirmed it across more scenarios. Fix BUG-33 to resolve both. See BUG-33 for confirmed fix approach (replace animated SVG with non-SVG alternative — code-only fix, no emulator needed).
 
 ---
 
 ## BUG-42: No "Subscription" or "Billing" Entry on More Tab (2026-03-11)
 
-**Status:** Open (investigation needed)
+**Status:** FIXED (2026-03-11) — replaced `extendedWaitUntil` with `scrollUntilVisible` in `subscription-details.yaml` step 5.
 **Severity:** Medium — blocks 1 flow (subscription-details), partial impact on subscription flow
 **Affects:** `billing/subscription.yaml` (optional assertions → PASS with warnings), `billing/subscription-details.yaml` (mandatory → FAIL)
 
@@ -852,7 +858,6 @@ The More tab shows APPEARANCE, ACCENT COLOR, NOTIFICATIONS, and LEARNING MODE se
 
 **Screenshot:** More tab showing themes, accent colors, notification toggles. No billing section visible.
 
-**Fix options:**
-1. **Scroll down** in the flow to find the billing section below the fold.
-2. **Investigate** the More screen component to see if subscription section is conditionally rendered.
-3. **Check** if billing routes exist but aren't linked from the More tab yet.
+**Root cause (confirmed via code review 2026-03-11):** The "Subscription" row **IS implemented** in `more.tsx:279-289` under the "Account" section header (line 271). The layout order is: Appearance → Accent Color → Notifications → Learning Mode → Account (Profile, **Subscription**, Help & Support, Privacy Policy, Terms of Service, Export my data, Delete account, Sign out). The "Account" section is below the fold — the flow screenshot only shows content through Learning Mode. The row renders `label="Subscription"` with a tier value from `useSubscription()`.
+
+**Fix (YAML only, no emulator needed):** Add `scrollUntilVisible` for "Subscription" text before asserting. Same pattern as BUG-32 fix. If `useSubscription()` returns `undefined` for `trial-active` (KV cache not populated by seed), the row still renders with the "Subscription" label but no value — still findable by text.

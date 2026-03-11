@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
+import { View } from 'react-native';
 import Animated, {
   useSharedValue,
-  useAnimatedProps,
+  useAnimatedStyle,
   useReducedMotion,
   withRepeat,
   withTiming,
@@ -10,9 +11,6 @@ import Animated, {
   withDelay,
   Easing,
 } from 'react-native-reanimated';
-import Svg, { Rect, Line, G } from 'react-native-svg';
-
-const AnimatedG = Animated.createAnimatedComponent(G);
 
 interface BookPageFlipAnimationProps {
   /** Overall size in pixels (default: 120) */
@@ -22,34 +20,20 @@ interface BookPageFlipAnimationProps {
   testID?: string;
 }
 
-// ViewBox 0 0 120 120
-const BOOK_Y = 25;
-const BOOK_H = 70;
-const SPINE_X = 60;
-const LEFT_X = 12;
-const LEFT_W = 44;
-const RIGHT_X = 64;
-const RIGHT_W = 44;
-const PAGE_INSET = 4;
-const PAGE_Y = BOOK_Y + PAGE_INSET;
-const PAGE_H = BOOK_H - PAGE_INSET * 2;
-const PAGE_X = SPINE_X + PAGE_INSET;
-const PAGE_W = RIGHT_W - PAGE_INSET * 2;
-
-const COVER_OPACITY = 0.25;
-const PAGE_OPACITY = 0.6;
-const SPINE_OPACITY = 0.5;
-
 // Timing
 const PAGE_FLIP_MS = 500;
 const STAGGER_MS = 300;
 const PAUSE_MS = 400;
 const RESET_MS = 300;
 
+const COVER_OPACITY = 0.25;
+const PAGE_OPACITY = 0.6;
+const SPINE_OPACITY = 0.5;
+
 /**
  * Looping book page-flip animation. Three pages stagger-flip from right
- * to left (simulated via scaleX), then reset simultaneously.
- * Built with react-native-reanimated + react-native-svg.
+ * to left (simulated via scaleX on Views), then reset simultaneously.
+ * Built with react-native-reanimated Views (no SVG — avoids Fabric crash).
  */
 export function BookPageFlipAnimation({
   size = 120,
@@ -76,14 +60,11 @@ export function BookPageFlipAnimation({
             staggerDelay,
             withTiming(-1, { duration: PAGE_FLIP_MS, easing })
           ),
-          // Hold until all pages flipped + pause
           withDelay(
             2 * STAGGER_MS - staggerDelay + PAUSE_MS,
             withTiming(-1, { duration: 0 })
           ),
-          // Reset all pages together
           withTiming(1, { duration: RESET_MS }),
-          // Brief pause before next cycle
           withDelay(PAUSE_MS, withTiming(1, { duration: 0 }))
         ),
         -1,
@@ -96,101 +77,131 @@ export function BookPageFlipAnimation({
     page3.value = buildFlipSequence(STAGGER_MS * 2) as number;
   }, [reduceMotion, page1, page2, page3]);
 
-  const page1Props = useAnimatedProps(() => ({
-    transform: `translate(${PAGE_X}, 0) scale(${
-      page1.value
-    }, 1) translate(${-PAGE_X}, 0)`,
+  const page1Style = useAnimatedStyle(() => ({
+    transform: [{ scaleX: page1.value }],
   }));
 
-  const page2Props = useAnimatedProps(() => ({
-    transform: `translate(${PAGE_X}, 0) scale(${
-      page2.value
-    }, 1) translate(${-PAGE_X}, 0)`,
+  const page2Style = useAnimatedStyle(() => ({
+    transform: [{ scaleX: page2.value }],
   }));
 
-  const page3Props = useAnimatedProps(() => ({
-    transform: `translate(${PAGE_X}, 0) scale(${
-      page3.value
-    }, 1) translate(${-PAGE_X}, 0)`,
+  const page3Style = useAnimatedStyle(() => ({
+    transform: [{ scaleX: page3.value }],
   }));
+
+  // Proportional layout — all values relative to the logical 120×120 viewbox
+  const scale = size / 120;
+  const bookY = 25 * scale;
+  const bookH = 70 * scale;
+  const spineX = 60 * scale;
+  const leftX = 12 * scale;
+  const leftW = 44 * scale;
+  const rightX = 64 * scale;
+  const rightW = 44 * scale;
+  const pageInset = 4 * scale;
+  const pageX = spineX + pageInset;
+  const pageY = bookY + pageInset;
+  const pageW = rightW - pageInset * 2;
+  const pageH = bookH - pageInset * 2;
 
   return (
-    <Animated.View
+    <View
       testID={testID}
       accessibilityLabel="Loading content"
       accessibilityRole="image"
+      style={{ width: size, height: size }}
     >
-      <Svg width={size} height={size} viewBox="0 0 120 120">
-        {/* Left cover */}
-        <Rect
-          x={LEFT_X}
-          y={BOOK_Y}
-          width={LEFT_W}
-          height={BOOK_H}
-          rx={3}
-          fill={color}
-          opacity={COVER_OPACITY}
-        />
+      {/* Left cover */}
+      <View
+        style={{
+          position: 'absolute',
+          left: leftX,
+          top: bookY,
+          width: leftW,
+          height: bookH,
+          borderRadius: 3 * scale,
+          backgroundColor: color,
+          opacity: COVER_OPACITY,
+        }}
+      />
 
-        {/* Right cover */}
-        <Rect
-          x={RIGHT_X}
-          y={BOOK_Y}
-          width={RIGHT_W}
-          height={BOOK_H}
-          rx={3}
-          fill={color}
-          opacity={COVER_OPACITY}
-        />
+      {/* Right cover */}
+      <View
+        style={{
+          position: 'absolute',
+          left: rightX,
+          top: bookY,
+          width: rightW,
+          height: bookH,
+          borderRadius: 3 * scale,
+          backgroundColor: color,
+          opacity: COVER_OPACITY,
+        }}
+      />
 
-        {/* Pages */}
-        <AnimatedG animatedProps={page1Props}>
-          <Rect
-            x={PAGE_X}
-            y={PAGE_Y}
-            width={PAGE_W}
-            height={PAGE_H}
-            fill={color}
-            opacity={PAGE_OPACITY}
-            rx={1}
-          />
-        </AnimatedG>
+      {/* Page 1 — scaleX flips around its center (transformOrigin defaults to center) */}
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            left: pageX,
+            top: pageY,
+            width: pageW,
+            height: pageH,
+            borderRadius: 1 * scale,
+            backgroundColor: color,
+            opacity: PAGE_OPACITY,
+          },
+          page1Style,
+        ]}
+      />
 
-        <AnimatedG animatedProps={page2Props}>
-          <Rect
-            x={PAGE_X + 2}
-            y={PAGE_Y}
-            width={PAGE_W - 2}
-            height={PAGE_H}
-            fill={color}
-            opacity={PAGE_OPACITY * 0.8}
-            rx={1}
-          />
-        </AnimatedG>
+      {/* Page 2 */}
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            left: pageX + 2 * scale,
+            top: pageY,
+            width: pageW - 2 * scale,
+            height: pageH,
+            borderRadius: 1 * scale,
+            backgroundColor: color,
+            opacity: PAGE_OPACITY * 0.8,
+          },
+          page2Style,
+        ]}
+      />
 
-        <AnimatedG animatedProps={page3Props}>
-          <Rect
-            x={PAGE_X + 4}
-            y={PAGE_Y}
-            width={PAGE_W - 4}
-            height={PAGE_H}
-            fill={color}
-            opacity={PAGE_OPACITY * 0.6}
-            rx={1}
-          />
-        </AnimatedG>
+      {/* Page 3 */}
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            left: pageX + 4 * scale,
+            top: pageY,
+            width: pageW - 4 * scale,
+            height: pageH,
+            borderRadius: 1 * scale,
+            backgroundColor: color,
+            opacity: PAGE_OPACITY * 0.6,
+          },
+          page3Style,
+        ]}
+      />
 
-        {/* Spine line */}
-        <Line
-          x1={SPINE_X}
-          y1={BOOK_Y}
-          x2={SPINE_X}
-          y2={BOOK_Y + BOOK_H}
-          stroke={color}
-          strokeWidth={2}
-          opacity={SPINE_OPACITY}
-        />
-      </Svg>
-    </Animated.View>
+      {/* Spine line */}
+      <View
+        style={{
+          position: 'absolute',
+          left: spineX - 1 * scale,
+          top: bookY,
+          width: 2 * scale,
+          height: bookH,
+          backgroundColor: color,
+          opacity: SPINE_OPACITY,
+        }}
+      />
+    </View>
   );
 }
