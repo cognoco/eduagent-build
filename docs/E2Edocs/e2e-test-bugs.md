@@ -660,6 +660,8 @@ java.lang.ClassCastException: java.lang.String cannot be cast to...
 
 **E2E workaround (temporary):** Flows that navigate to Learning Book will fail at the tab switch. Home screen assertions (subjects, retention strip) remain testable. Skip Learning Book tab assertions until BUG-33 is fixed.
 
+**Parent routing fix (commit `93e5646`):** BUG-33 also manifested as a parent routing mismatch — parent scenarios create a PARENT owner profile, so the app routes to `(parent)/dashboard` (testID: `dashboard-scroll`), not `(learner)/home` (testID: `home-scroll-view`). Fixed in `seed-and-sign-in.yaml` (accepts both landing screens) and 6 parent flow YAMLs (replaced `switch-to-parent.yaml` with direct `dashboard-scroll` wait). The SVG crash on Learning Book tab remains open.
+
 ---
 
 ## BUG-34: `onboarding-complete` Scenario Auto-Redirects Away from Home Screen (2026-03-10)
@@ -785,53 +787,43 @@ After 3 exchanges, the flow expects `end-session-button` to appear. The session 
 
 ## BUG-38: `onboarding-complete` Scenario Triggers PostApprovalLanding Screen (2026-03-11)
 
-**Status:** Open (test infrastructure issue)
-**Severity:** HIGH — blocks 9 flows
+**Status:** FIXED (commit `93e5646`)
+**Severity:** HIGH — blocked 9 flows
 **Affects:** All flows using `onboarding-complete` scenario: `more-tab-navigation`, `settings-toggles`, `delete-account`, `account-lifecycle`, `create-profile-standalone`, `empty-first-user`, `analogy-preference-flow`, `assessment-cycle`, `curriculum-review-flow`
 
 After sign-in, the "You're approved!" PostApprovalLanding screen appears instead of the home screen. This screen has a "Let's Go" button that navigates to subject creation.
 
-**Root cause:** The `onboarding-complete` scenario seeds a user with approved consent. The `PostApprovalLanding` screen checks SecureStore for whether this interstitial has been shown (`hasSeenPostApproval` or similar key). Since `pm clear` wipes SecureStore before each test run, the app thinks this is a fresh consent approval and shows the landing screen.
-
-The setup flow's `home-scroll-view` assertion sometimes passes (race condition — home briefly renders before the PostApprovalLanding redirect), but the main flow's subsequent assertion catches the redirect.
+**Root cause:** The `onboarding-complete` scenario seeds a user with approved consent. The `PostApprovalLanding` screen checks SecureStore for whether this interstitial has been shown (`postApprovalSeen_${profileId}`). Since `pm clear` wipes SecureStore before each test run, the app thinks this is a fresh consent approval and shows the landing screen.
 
 **Screenshot:** Shows party emoji 🎉, "You're approved!", "Your parent said yes — time to start learning. Let's set up your first subject.", "Let's Go" button.
 
-**Fix options:**
-1. **Setup flow fix (recommended):** Add a step after sign-in to check for and dismiss PostApprovalLanding: `tapOn text: "Let's Go" optional: true` followed by a wait.
-2. **Seed fix:** Have the seed set the SecureStore flag via an API endpoint (complex — SecureStore is client-side).
-3. **App fix:** Skip PostApprovalLanding when consent was seeded (not user-initiated approval). Could check a flag on the consent record.
+**Fix applied:** Setup flow fix in `seed-and-sign-in.yaml` — added `tapOn text: "Let's Go" optional: true` after sign-in, followed by a wait for `home-scroll-view`. The dismiss callback sets `setShouldShow(false)` → layout re-renders normal tabs → home screen appears.
 
 ---
 
 ## BUG-39: Homework Flows Need Camera Permission Handling (2026-03-11)
 
-**Status:** Open (flow design issue)
-**Severity:** Medium — blocks 3 flows
+**Status:** FIXED (commit `93e5646`)
+**Severity:** Medium — blocked 3 flows
 **Affects:** `homework/homework-flow.yaml`, `homework/homework-from-entry-card.yaml`, `homework/camera-ocr.yaml`
 
 After navigating to the homework screen, the "Camera Access Needed" screen appears with an "Allow Camera" button. Tapping it triggers the Android system permission dialog ("Allow MentoMate to take pictures and record video?") with three options: "While using the app", "Only this time", "Don't allow". The flow doesn't handle this system dialog.
 
 **Screenshots:** Camera Access Needed screen → Android permission dialog
 
-**Fix options:**
-1. **Pre-grant permission via ADB** in `seed-and-run.sh`: `adb shell pm grant com.mentomate.app android.permission.CAMERA`
-2. **Flow fix:** Add Maestro `allowPermission` command or tap "While using the app" text after the grant button.
-3. **Both:** Pre-grant in script (reliable) + flow handles the case where permission was already granted.
+**Fix applied:** Pre-grant CAMERA permission via ADB in `seed-and-run.sh`: `$ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.CAMERA 2>/dev/null || true`. Same pattern as BUG-22 notification permission fix.
 
 ---
 
 ## BUG-40: `retention-review` and `failed-recall` Flows Expect Non-Existent `recall-test-screen` testID (2026-03-11)
 
-**Status:** Open (flow design issue)
-**Severity:** Medium — blocks 2 flows
+**Status:** FIXED (commit `93e5646`)
+**Severity:** Medium — blocked 2 flows
 **Affects:** `retention/retention-review.yaml`, `retention/failed-recall.yaml`
 
-Both flows assert `id: recall-test-screen` after tapping the coaching card, but the app renders a standard `ChatShell` session screen (with `chat-input`, `send-button`, etc.). The `recall-test-screen` testID doesn't exist in the app — retention reviews go through the same ChatShell as learning sessions.
+Both flows asserted `id: recall-test-screen` after tapping the coaching card, but the app renders a standard `ChatShell` session screen (with `chat-input`, `send-button`, etc.). The `recall-test-screen` testID doesn't exist in the app — retention reviews go through the same ChatShell as learning sessions.
 
-**Note:** The smoke-tier `recall-review.yaml` handles this correctly with `optional: true` on all recall-specific assertions and falls back to `chat-input`. These nightly-tier flows should follow the same pattern.
-
-**Fix:** Change `recall-test-screen` assertion to `optional: true` or replace with `chat-input` assertion (same pattern as `recall-review.yaml`).
+**Fix applied:** Replaced `recall-test-screen` with `chat-input` in both flows, matching the pattern used by the smoke-tier `recall-review.yaml`.
 
 ---
 
