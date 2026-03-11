@@ -144,6 +144,8 @@ $ADB $DEVICE_FLAG shell pm clear "$APP_ID" 2>/dev/null || true
 $ADB $DEVICE_FLAG shell am force-stop com.android.bluetooth 2>/dev/null || true
 # BUG-22: Pre-grant notification permission so the dialog doesn't block UI
 $ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.POST_NOTIFICATIONS 2>/dev/null || true
+# BUG-39: Pre-grant camera permission so homework flows don't hit system dialog
+$ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.CAMERA 2>/dev/null || true
 sleep 1
 $ADB $DEVICE_FLAG shell am start -n "$APP_ID/.MainActivity" 2>/dev/null || true
 

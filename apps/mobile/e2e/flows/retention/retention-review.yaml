@@ -41,10 +41,12 @@ tags:
 - tapOn:
     id: "coaching-card-primary"
 
-# 5. Wait for recall/review screen
+# 5. Wait for session screen (ChatShell)
+# BUG-40 fix: The app uses ChatShell for retention reviews, not a dedicated
+# recall-test-screen. Wait for chat-input which is always present in ChatShell.
 - extendedWaitUntil:
     visible:
-      id: "recall-test-screen"
+      id: "chat-input"
     timeout: 10000
 
 # 6. Verify the recall prompt is shown
