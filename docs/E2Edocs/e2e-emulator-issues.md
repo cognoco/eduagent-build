@@ -1624,3 +1624,22 @@ The auth screens (sign-in, sign-up) work fine with the same `behavior="height"` 
 **Note:** On Windows with unicode username path (`ZuzanaKopečná`), some tools can't read these paths directly. Use `cp` to a simple path like `/c/tools/tmp/` before viewing.
 
 **Also includes:** `commands-(flow-name.yaml).json` (step-by-step results), `ai-(flow-name).json`, `ai-report-(flow-name).html`, and optionally `maestro.log`.
+
+## Issue 20: Maestro `inputText` DEADLINE_EXCEEDED — Systematic gRPC Timeout (2026-03-11)
+
+**Symptom:** Every Maestro `inputText` command fails with `DEADLINE_EXCEEDED: deadline exceeded after 119.99s` on the gRPC call to `MaestroDriverGrpc.inputText`. `tapOn` and `assertVisible` commands work normally.
+
+**Root cause:** Maestro's Android driver installs a custom IME (input method editor) to handle text input. After extended emulator usage (multiple test sessions without cold boot), the driver's IME becomes corrupted/unresponsive. The `pm list packages | grep maestro` returns empty, and `ime list -s` shows only Google Keyboard — Maestro's IME is not installed.
+
+**Fix:** Cold-boot the emulator with `-no-snapshot-load`:
+```bash
+C:/Android/Sdk/emulator/emulator.exe -avd E2E_Device_2 -no-snapshot-load -gpu host -no-audio -no-boot-anim
+```
+After cold boot:
+1. Wait for "System UI isn't responding" dialog → tap "Wait"
+2. Wait 10s for system to stabilize
+3. Reinstall the dev-client APK: `adb install -r /c/tools/tmp/app-debug.apk`
+4. Re-establish port forwarding: `adb reverse tcp:8787/8081/8082`
+5. Disable animations: `adb shell settings put global window_animation_scale 0` (etc.)
+
+**Prevention:** If running many flows in a session, consider cold-booting every ~20 runs.

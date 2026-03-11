@@ -861,3 +861,43 @@ The More tab shows APPEARANCE, ACCENT COLOR, NOTIFICATIONS, and LEARNING MODE se
 **Root cause (confirmed via code review 2026-03-11):** The "Subscription" row **IS implemented** in `more.tsx:279-289` under the "Account" section header (line 271). The layout order is: Appearance → Accent Color → Notifications → Learning Mode → Account (Profile, **Subscription**, Help & Support, Privacy Policy, Terms of Service, Export my data, Delete account, Sign out). The "Account" section is below the fold — the flow screenshot only shows content through Learning Mode. The row renders `label="Subscription"` with a tier value from `useSubscription()`.
 
 **Fix (YAML only, no emulator needed):** Add `scrollUntilVisible` for "Subscription" text before asserting. Same pattern as BUG-32 fix. If `useSubscription()` returns `undefined` for `trial-active` (KV cache not populated by seed), the row still renders with the "Subscription" label but no value — still findable by text.
+
+---
+
+## BUG-43: Coaching Card Auto-Navigation After PostApprovalLanding Dismissal (2026-03-11)
+
+**Status:** Open (setup flow + scenario interaction issue)
+**Severity:** HIGH — blocks 4+ flows
+**Affects:** `homework/homework-flow.yaml`, `homework/camera-ocr.yaml`, `retention/retention-review.yaml`, `retention/failed-recall.yaml`, and any flow using a scenario with active sessions/retention cards + CONSENTED status
+
+After sign-in, the PostApprovalLanding screen appears (BUG-38 behavior — SecureStore wiped by `pm clear`). The BUG-38 fix in `seed-and-sign-in.yaml` taps "Let's Go" to dismiss it. However, for scenarios that seed active sessions or due retention cards (`homework-ready`, `retention-due`, `failed-recall-3x`), the coaching card on the home screen immediately auto-navigates the user into a "Practice Session" (ChatShell). The flow's subsequent `home-scroll-view` assertion fails because the user is on the session screen.
+
+**Screenshots:** "Practice Session" / "Test your knowledge" screen with "Your answer..." input and timer.
+
+**Why it doesn't affect `onboarding-complete`:** That scenario has no active session or due retention card — the coaching card doesn't auto-navigate.
+
+**Why it doesn't affect parent scenarios:** Parent profiles route to `(parent)/dashboard` which doesn't have the coaching card auto-navigation behavior.
+
+**Root cause:** The BUG-38 fix (tapping "Let's Go") works correctly — PostApprovalLanding is dismissed and the home screen renders. But the coaching card's auto-navigation fires immediately on home render for scenarios with active content, taking the user away from home before the flow can assert `home-scroll-view`.
+
+**Fix options:**
+1. **Add `pressKey: Back` after PostApproval dismiss** in `seed-and-sign-in.yaml` — if the coaching card navigated, Back returns to home. If it didn't navigate, Back is harmless (optional).
+2. **Individual flow fix:** Each affected flow adds `pressKey: Back` or `tapOn: back-button optional: true` before its `home-scroll-view` assertion.
+3. **Seed fix:** Don't set CONSENTED status for scenarios that have active sessions — use a different consent status that doesn't trigger PostApprovalLanding. Complex because consent is required for the session to function.
+
+---
+
+## BUG-44: `add-subject-button` TestID Not Found on Home Screen (2026-03-11)
+
+**Status:** Open (testID or scrolling issue)
+**Severity:** Medium — blocks 3 flows
+**Affects:** `onboarding/analogy-preference-flow.yaml`, `assessment/assessment-cycle.yaml`, `onboarding/curriculum-review-flow.yaml`
+
+After successful sign-in with `onboarding-complete` scenario (BUG-38 PostApprovalLanding dismissed, home screen reached), the flow taps `id: add-subject-button` but it's not found. The home screen is visible (`home-scroll-view` assertion passes) but the button is not in the viewport.
+
+**Possible causes:**
+1. **Below the fold** — the button may be at the bottom of the home ScrollView, requiring scroll
+2. **TestID mismatch** — the button may have a different testID in the current app code
+3. **Conditional render** — the button may only show when there are 0 subjects (but `onboarding-complete` now has "General Studies" from BUG-34 fix)
+
+**Fix:** Check `apps/mobile/src/app/(learner)/home.tsx` for the `add-subject-button` testID. If it only renders with 0 subjects, these flows need a different navigation path to create a subject. If it's below the fold, add `scrollUntilVisible` before the tap.

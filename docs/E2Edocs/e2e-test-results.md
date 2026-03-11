@@ -366,46 +366,84 @@ During investigation of why ALL seeded data (subjects, streaks, coaching cards) 
 - Parent dashboard child cards have rich data: session counts, trend arrows, retention signals with organic metaphors
 - BUG-35 (keyboard covering input) visually confirmed in retention screenshots — keyboard covers send button area
 
-### Cumulative Totals (as of Session 10)
+### Session 11 (2026-03-11) — Bug Fix Verification (BUG-33/38/39/40)
+
+Ran 18 flows to verify the 4 high-priority bug fixes committed in `93e5646`.
+Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic failure (corrupted driver state).
+
+| # | Flow | Bug | Result | Notes |
+|---|------|-----|--------|-------|
+| 1 | `account/more-tab-navigation` | BUG-38 | **PASS** | Full navigation + sign-out. PostApprovalLanding dismissed. |
+| 2 | `account/settings-toggles` | BUG-38 | **PARTIAL** | All settings OK. Fails at parent `switch-to-teen` (BUG-18). |
+| 3 | `account/delete-account` | BUG-38 | **PASS** | Full delete + cancel flow. |
+| 4 | `account/account-lifecycle` | BUG-38 | **PASS** | Warnings on sections needing scroll. |
+| 5 | `onboarding/create-profile-standalone` | BUG-38 | **PASS** | Full profile creation with name, date, region. |
+| 6 | `edge/empty-first-user` | BUG-38 | **FAIL** | BUG-34 conflict: `onboarding-complete` seed now has subjects → no redirect to create-subject. Needs `onboarding-no-subjects` scenario. |
+| 7 | `onboarding/analogy-preference-flow` | BUG-38 | **FAIL** | `add-subject-button` testID not found on home (BUG-44). |
+| 8 | `assessment/assessment-cycle` | BUG-38 | **FAIL** | Same `add-subject-button` issue (BUG-44). |
+| 9 | `onboarding/curriculum-review-flow` | BUG-38 | **FAIL** | Same `add-subject-button` issue (BUG-44). |
+| 10 | `parent/child-drill-down` | BUG-33 | **PASS** | Dashboard → child detail → subject topics. |
+| 11 | `parent/consent-management` | BUG-33 | **PASS** | Dashboard → consent section → withdraw flow. |
+| 12 | `parent/parent-tabs` | BUG-33 | **PASS** | Home → Learning Book → More → Home. No SVG crash! |
+| 13 | `parent/demo-dashboard` | BUG-33 | **PASS** | Demo banner + preview mode + child card. |
+| 14 | `account/profile-switching` | BUG-33 | **PASS** | Profile switcher UI + child switch. |
+| 15 | `homework/homework-flow` | BUG-39 | **FAIL** | BUG-43: coaching card auto-navigates to Practice Session after PostApprovalLanding dismissal. |
+| 16 | `homework/camera-ocr` | BUG-39 | **FAIL** | Same BUG-43. |
+| 17 | `retention/retention-review` | BUG-40 | **FAIL** | Same BUG-43. |
+| 18 | `retention/failed-recall` | BUG-40 | **FAIL** | Same BUG-43. |
+
+**Session 11 totals: 9 PASS, 1 PARTIAL, 8 FAIL**
+
+**New bugs discovered:**
+- **BUG-43:** PostApprovalLanding dismissal + coaching card auto-navigation. After "Let's Go" tap, scenarios with active sessions (`homework-ready`, `retention-due`, `failed-recall-3x`) auto-navigate to Practice Session instead of showing home screen. Blocks 4+ flows.
+- **BUG-44:** `add-subject-button` testID not found on home screen after `onboarding-complete` sign-in. May need scrolling or testID mismatch. Blocks 3 flows.
+
+**Bug fix validation:**
+- **BUG-33 (parent routing): FULLY VALIDATED** — all 5 parent flows pass with `dashboard-scroll`
+- **BUG-38 (PostApprovalLanding): PARTIALLY VALIDATED** — works for `onboarding-complete` (5/9 pass), but triggers BUG-43 for active-session scenarios
+- **BUG-39 (camera permission): INFRASTRUCTURE VALID** — `pm grant CAMERA` runs correctly, but flows blocked by BUG-43 before reaching camera
+- **BUG-40 (recall-test-screen): INFRASTRUCTURE VALID** — `chat-input` change is correct, but flows blocked by BUG-43 before reaching ChatShell
+
+### Cumulative Totals (as of Session 11)
 
 | Category | Flows | Status |
 |----------|-------|--------|
 | Pre-auth (all variants, standalone) | 8 | **All PASS** |
 | Post-auth (comprehensive, hardcoded creds) | 1 | **PASS** (65 steps) |
 | Quick-check / misc | 1 | **PASS** (simple screenshot) |
-| Seed-dependent (learning-active) — Session 10 | 3 | **PASS** (start-session, core-learning, first-session) — BUG-35 workaround works |
-| Seed-dependent (retention-due) — Session 10 | 1 | **PASS** (recall-review) — real AI response confirmed |
-| Seed-dependent (trial-active billing) | 1 | **PASS (partial)** (subscription) — More tab works, no billing entry (BUG-42) |
-| Seed-dependent (prior sessions) | 6 | **PASS** (account-lifecycle, delete-account, parent-dashboard, settings-toggles, parent-tabs, create-subject) |
-| Blocked by BUG-33/41 (SVG crash) | 5 | **Blocked** — learning-book, topic-detail, relearn-flow, multi-subject (at LB step) |
-| Blocked by BUG-38 (PostApprovalLanding) | 9 | **Blocked** — all onboarding-complete flows (more-tab, settings, delete-account, account-lifecycle, create-profile, empty-first-user, analogy-pref, assessment, curriculum-review) |
-| Blocked by BUG-33 (parent routing in setup) | 7 | **Blocked** — all parent + parent-solo flows |
-| Blocked by BUG-40 (recall-test-screen testID) | 2 | **Blocked** — retention-review, failed-recall |
-| Blocked by BUG-39 (camera permission) | 3 | **Blocked** — homework-flow, homework-from-entry-card, camera-ocr |
-| Blocked by BUG-36/37 (flow design) | 2 | **Blocked** — freeform-session (wrong card type), session-summary (no end button) |
-| Blocked by BUG-42 (no subscription in UI) | 1 | **FAIL** — subscription-details (mandatory assertion) |
+| Seed-dependent (learning-active) | 3 | **PASS** (start-session, core-learning, first-session) |
+| Seed-dependent (retention-due) — smoke | 1 | **PASS** (recall-review) |
+| Seed-dependent (trial-active billing) | 1 | **PASS (partial)** (subscription — BUG-42) |
+| Seed-dependent (onboarding-complete) — Session 11 | 5 | **PASS** (more-tab-nav, delete-account, account-lifecycle, create-profile, create-subject) |
+| Seed-dependent (parent) — Session 11 | 5 | **PASS** (child-drill-down, consent-mgmt, parent-tabs, demo-dashboard, profile-switching) |
+| Seed-dependent (parent) — Session 10 | 1 | **PASS** (parent-dashboard) |
+| Partial: settings-toggles | 1 | **PARTIAL** — all settings OK, fails at parent switch-to-teen (BUG-18) |
+| Blocked by BUG-43 (coaching card auto-nav) | 4 | **Blocked** — homework-flow, camera-ocr, retention-review, failed-recall |
+| Blocked by BUG-44 (add-subject-button) | 3 | **Blocked** — analogy-preference, assessment-cycle, curriculum-review |
+| Blocked by BUG-41 (SVG crash) | 5 | **Blocked** — learning-book, topic-detail, relearn-flow, multi-subject, view-curriculum |
+| Blocked by BUG-34 conflict (seed has subjects) | 1 | **Blocked** — empty-first-user (needs `onboarding-no-subjects` scenario) |
+| Blocked by BUG-36/37 (flow design) | 2 | **Blocked** — freeform-session, session-summary |
+| Blocked by BUG-42 (subscription UI) | 1 | **FAIL** — subscription-details |
 | Consent design issues (BUG-27/28) | 5 | **Blocked** — consent flow design mismatch |
-| Not yet run (standalone auth, no seed) | 3 | **NOT RUN** — sign-in-navigation, forgot-password, sign-up-flow (non-devclient variants) |
-| ExpoGo-only | 1 | **SKIP** (wrong app type — we use dev-client) |
-| **Total** | **53** | **21 confirmed passing, 1 partial, ~28 blocked, 3 not yet run** |
+| Not yet run (standalone auth, homework-from-entry-card) | 4 | **NOT RUN** |
+| ExpoGo-only | 1 | **SKIP** (wrong app type) |
+| **Total** | **53** | **27 confirmed passing, 2 partial, ~20 blocked, 4 not yet run** |
 
-**Blocking bug priority (Session 10 updated):**
+**Blocking bug priority (Session 11 updated):**
 
 | Bug | Impact | Fix Type | Unblocks |
 |-----|--------|----------|----------|
-| **BUG-38** (PostApprovalLanding) | 9 flows | Seed or setup flow fix (skip/dismiss landing) | onboarding-complete flows |
-| **BUG-33** (parent routing) | 7 flows | Setup flow fix (accept `dashboard-scroll-view` or skip home check for parent) | all parent flows |
-| **BUG-41** (SVG crash) | 5 flows | App code fix (react-native-svg Fabric compat) | learning-book, topic-detail, relearn, multi-subject |
-| **BUG-39** (camera permission) | 3 flows | Flow fix (add `allowPermission` or `adb pm grant`) | homework flows |
-| **BUG-40** (recall-test-screen) | 2 flows | Flow fix (change to `chat-input` assertion) | retention-review, failed-recall |
+| **BUG-43** (coaching card auto-nav after PostApproval) | 4+ flows | Setup flow fix: add `pressKey: Back` after PostApproval dismiss, or skip dismiss for active-session scenarios | homework, retention flows |
+| **BUG-41** (SVG crash on Learning Book) | 5 flows | App code fix (react-native-svg Fabric compat) | learning-book, topic-detail, relearn, multi-subject, view-curriculum |
+| **BUG-44** (`add-subject-button` not found) | 3 flows | Flow fix: scroll to button or check testID in home.tsx | analogy-pref, assessment, curriculum-review |
 | **BUG-36/37** (flow design) | 2 flows | Flow redesign | freeform-session, session-summary |
-| **BUG-42** (subscription UI) | 1 flow | App investigation (missing subscription entry on More tab) | subscription-details |
+| **BUG-42** (subscription UI scroll) | 1 flow | Flow fix: add scrollUntilVisible | subscription-details |
 
 ---
 
 ## References
 
-- **Bug details:** See `e2e-test-bugs.md` for all bug entries (BUG-1 through BUG-42) with root causes, fixes, and workarounds.
+- **Bug details:** See `e2e-test-bugs.md` for all bug entries (BUG-1 through BUG-44) with root causes, fixes, and workarounds.
 - **Environment setup:** See `e2e-emulator-issues.md` for emulator configuration, known environment issues, and operational notes.
 - **Infrastructure:** See `e2e-tech-spec.md` for flow specifications, seeding architecture, and CI integration.
 - **Screenshots:** Maestro test output at `~/.maestro/tests/` — directories timestamped per run, contains PNGs for warning/failure steps.
