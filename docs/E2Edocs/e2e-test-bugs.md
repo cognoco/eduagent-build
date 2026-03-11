@@ -664,8 +664,8 @@ java.lang.ClassCastException: java.lang.String cannot be cast to...
 
 ## BUG-34: `onboarding-complete` Scenario Auto-Redirects Away from Home Screen (2026-03-10)
 
-**Status:** Open (test infrastructure issue)
-**Severity:** High — blocks ~10 E2E flows
+**Status:** PARTIALLY FIXED (Session 10) — subjects added to `onboarding-complete`, `trial-active`, `trial-expired` seeds. BUT `onboarding-complete` flows now blocked by BUG-38 (PostApprovalLanding screen). Parent scenarios still blocked by BUG-33.
+**Severity:** High — blocks ~10 E2E flows (reduced, some now blocked by different bugs)
 **Affects:** All flows using `onboarding-complete`, `parent-solo`, `trial-active`, or `trial-expired` scenarios that expect `home-scroll-view` to remain visible after sign-in
 
 After signing in with `onboarding-complete` (and other subject-less scenarios), the home screen appears briefly but auto-redirects to `/create-subject` because `subjects.length === 0`. The `seed-and-sign-in.yaml` setup flow's `extendedWaitUntil visible id: home-scroll-view timeout: 30000` sometimes passes (race condition — catches the home screen before redirect) but the main flow's subsequent check fails.
@@ -706,7 +706,8 @@ Additionally, `parent-solo` and `parent-with-children` scenarios create a PARENT
 
 ## BUG-35: Keyboard Covers Chat Input Bar and Send Button in Session Screen (2026-03-10)
 
-**Status:** Open (app bug — KeyboardAvoidingView + adjustResize conflict)
+**Status:** WORKAROUND APPLIED (Session 10) — `pressKey: Enter` added to all 11 affected flow files. Works reliably. App code fix still needed for real users.
+**Workaround confirmed:** Session 10 ran 4 chat flows (start-session, core-learning, first-session, recall-review) — all PASS with `pressKey: Enter`.
 **Severity:** Critical — blocks ALL E2E flows that use ChatShell (~15 flows)
 **Affects:** All learning, homework, retention, and recall flows that enter a chat session
 
@@ -744,5 +745,122 @@ When the keyboard opens on the session/chat screen, the app's input bar (TextInp
 
 **Fix options:**
 1. **App fix (recommended):** Change `ChatShell.tsx` to `behavior={undefined}` on Android (let `adjustResize` handle everything) or use `behavior='padding'` with an appropriate `keyboardVerticalOffset`.
-2. **E2E workaround:** Replace `tapOn: send-button` with `pressKey: Enter` in all affected flow files. Keep `tapOn: send-button` as an optional fallback assertion.
+2. **E2E workaround:** ~~Replace `tapOn: send-button` with `pressKey: Enter` in all affected flow files. Keep `tapOn: send-button` as an optional fallback assertion.~~ **DONE (Session 10).**
 3. **Alternative app fix:** Switch `windowSoftInputMode` to `adjustPan` for the session screen (per-activity or via `useEffect` toggle) — but this affects all inputs on the screen.
+
+---
+
+## BUG-36: `freeform-session` Flow Expects Wrong Coaching Card Layout (2026-03-11)
+
+**Status:** Open (flow design issue)
+**Severity:** Low — 1 flow affected
+**Affects:** `learning/freeform-session.yaml`
+
+The flow taps `"Just ask something"` text, expecting the AdaptiveEntryCard's teen three-action layout (primary: "Homework help", secondary: "Practice for a test" / "Just ask something"). But with `learning-active` scenario, the coaching card renders as a "Continue: World History" card with "Let's go" and "I have something else in mind" — no "Just ask something" text.
+
+**Root cause:** The coaching card type depends on the precomputed card result. `learning-active` creates a continue-learning card because there's an active session/topic. The three-action teen entry card only appears when there's no active learning context.
+
+**Fix options:**
+1. Create a `learning-fresh` scenario that has subjects but no active sessions — this would render the three-action entry card.
+2. Change the flow to use the existing card layout and navigate to freeform via a different path (e.g., session mode selector).
+
+---
+
+## BUG-37: `session-summary` Flow Can't Find `end-session-button` (2026-03-11)
+
+**Status:** Open (flow design + possible app issue)
+**Severity:** Low — 1 flow affected
+**Affects:** `learning/session-summary.yaml`
+
+After 3 exchanges, the flow expects `end-session-button` to appear. The session timer is at 11:42 but no end/close button is visible. The session is still active (not auto-closed).
+
+**Root cause:** The session's exchange cap may be set higher than 3 in the seeded data, so auto-close doesn't trigger. The `end-session-button` testID may not exist in the app, or it may only appear after a certain condition (timer expiry, exchange cap reached, manual back navigation).
+
+**Fix options:**
+1. Investigate what testID the close/end session UI uses in `ChatShell.tsx` and update the flow.
+2. Configure the seed to set a lower exchange cap so auto-close triggers after 3 exchanges.
+3. Use back navigation to exit the session instead.
+
+---
+
+## BUG-38: `onboarding-complete` Scenario Triggers PostApprovalLanding Screen (2026-03-11)
+
+**Status:** Open (test infrastructure issue)
+**Severity:** HIGH — blocks 9 flows
+**Affects:** All flows using `onboarding-complete` scenario: `more-tab-navigation`, `settings-toggles`, `delete-account`, `account-lifecycle`, `create-profile-standalone`, `empty-first-user`, `analogy-preference-flow`, `assessment-cycle`, `curriculum-review-flow`
+
+After sign-in, the "You're approved!" PostApprovalLanding screen appears instead of the home screen. This screen has a "Let's Go" button that navigates to subject creation.
+
+**Root cause:** The `onboarding-complete` scenario seeds a user with approved consent. The `PostApprovalLanding` screen checks SecureStore for whether this interstitial has been shown (`hasSeenPostApproval` or similar key). Since `pm clear` wipes SecureStore before each test run, the app thinks this is a fresh consent approval and shows the landing screen.
+
+The setup flow's `home-scroll-view` assertion sometimes passes (race condition — home briefly renders before the PostApprovalLanding redirect), but the main flow's subsequent assertion catches the redirect.
+
+**Screenshot:** Shows party emoji 🎉, "You're approved!", "Your parent said yes — time to start learning. Let's set up your first subject.", "Let's Go" button.
+
+**Fix options:**
+1. **Setup flow fix (recommended):** Add a step after sign-in to check for and dismiss PostApprovalLanding: `tapOn text: "Let's Go" optional: true` followed by a wait.
+2. **Seed fix:** Have the seed set the SecureStore flag via an API endpoint (complex — SecureStore is client-side).
+3. **App fix:** Skip PostApprovalLanding when consent was seeded (not user-initiated approval). Could check a flag on the consent record.
+
+---
+
+## BUG-39: Homework Flows Need Camera Permission Handling (2026-03-11)
+
+**Status:** Open (flow design issue)
+**Severity:** Medium — blocks 3 flows
+**Affects:** `homework/homework-flow.yaml`, `homework/homework-from-entry-card.yaml`, `homework/camera-ocr.yaml`
+
+After navigating to the homework screen, the "Camera Access Needed" screen appears with an "Allow Camera" button. Tapping it triggers the Android system permission dialog ("Allow MentoMate to take pictures and record video?") with three options: "While using the app", "Only this time", "Don't allow". The flow doesn't handle this system dialog.
+
+**Screenshots:** Camera Access Needed screen → Android permission dialog
+
+**Fix options:**
+1. **Pre-grant permission via ADB** in `seed-and-run.sh`: `adb shell pm grant com.mentomate.app android.permission.CAMERA`
+2. **Flow fix:** Add Maestro `allowPermission` command or tap "While using the app" text after the grant button.
+3. **Both:** Pre-grant in script (reliable) + flow handles the case where permission was already granted.
+
+---
+
+## BUG-40: `retention-review` and `failed-recall` Flows Expect Non-Existent `recall-test-screen` testID (2026-03-11)
+
+**Status:** Open (flow design issue)
+**Severity:** Medium — blocks 2 flows
+**Affects:** `retention/retention-review.yaml`, `retention/failed-recall.yaml`
+
+Both flows assert `id: recall-test-screen` after tapping the coaching card, but the app renders a standard `ChatShell` session screen (with `chat-input`, `send-button`, etc.). The `recall-test-screen` testID doesn't exist in the app — retention reviews go through the same ChatShell as learning sessions.
+
+**Note:** The smoke-tier `recall-review.yaml` handles this correctly with `optional: true` on all recall-specific assertions and falls back to `chat-input`. These nightly-tier flows should follow the same pattern.
+
+**Fix:** Change `recall-test-screen` assertion to `optional: true` or replace with `chat-input` assertion (same pattern as `recall-review.yaml`).
+
+---
+
+## BUG-41: Learning Book SVG Crash (= BUG-33) — RNSVGGroupManagerDelegate ClassCastException (2026-03-11)
+
+**Status:** Open (app bug — same root cause as BUG-33)
+**Severity:** HIGH — blocks 5 flows
+**Affects:** `retention/learning-book.yaml`, `retention/topic-detail.yaml`, `retention/relearn-flow.yaml`, `subjects/multi-subject.yaml` (at LB step), any future flow navigating to Learning Book tab
+
+Same `ClassCastException: java.lang.String cannot be cast` in `com.facebook.react.viewmanagers.RNSVGGroupManagerDelegate` as BUG-33. Confirmed reproducible in Session 10 across multiple scenarios (retention-due, failed-recall-3x, multi-subject).
+
+**Note:** BUG-41 is a duplicate of BUG-33, tracked separately because Session 10 confirmed it across more scenarios. Fix BUG-33 to resolve both.
+
+---
+
+## BUG-42: No "Subscription" or "Billing" Entry on More Tab (2026-03-11)
+
+**Status:** Open (investigation needed)
+**Severity:** Medium — blocks 1 flow (subscription-details), partial impact on subscription flow
+**Affects:** `billing/subscription.yaml` (optional assertions → PASS with warnings), `billing/subscription-details.yaml` (mandatory → FAIL)
+
+The More tab shows APPEARANCE, ACCENT COLOR, NOTIFICATIONS, and LEARNING MODE sections, but no "Subscription", "Billing", "Trial", or "Upgrade" entry. This may be:
+1. Below the fold (needs scroll) — the More tab content extends beyond viewport
+2. Not rendered for the `trial-active` scenario / learner persona
+3. A missing feature (subscription UI not yet wired to More tab)
+
+**Screenshot:** More tab showing themes, accent colors, notification toggles. No billing section visible.
+
+**Fix options:**
+1. **Scroll down** in the flow to find the billing section below the fold.
+2. **Investigate** the More screen component to see if subscription section is conditionally rendered.
+3. **Check** if billing routes exist but aren't linked from the More tab yet.

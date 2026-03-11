@@ -1597,3 +1597,30 @@ The auth screens (sign-in, sign-up) work fine with the same `behavior="height"` 
 **Not an emulator issue:** This is an app code issue that would affect real Android devices with Fabric enabled.
 
 **Tracked as:** BUG-35 in `e2e-test-bugs.md`
+
+---
+
+## Issue 18: LLM (Gemini) API Intermittent Connection Failures (2026-03-11)
+
+**What happened:** During Session 10, some Maestro flows got real AI responses ("Welcome to your first practice session! Let's see what you know. Ready?") while others got the fallback error message ("I'm having trouble connecting right now. Please try again."). The `learning-active` flows consistently got error responses; `retention-due` flows got real AI responses.
+
+**Impact on testing:** Maestro tests check UI element presence (e.g., `chat-input` is visible after send), not response content. So LLM failures don't cause test failures. However, this means tests can report PASS when the AI isn't actually working. **Screenshots are the ground truth** — always check them for actual AI response content.
+
+**Not an emulator issue.** This is an API/LLM configuration issue (API key validity, rate limiting, or Gemini service availability). The API health endpoint returns `{"status":"ok","llm":{"providers":["gemini"]}}`.
+
+**Recommendation:** Add at least one content assertion to a smoke flow (e.g., assert that the AI response does NOT contain "trouble connecting") to catch LLM failures in automated runs.
+
+---
+
+## Issue 19: Maestro Screenshot Storage Location (2026-03-11)
+
+**Location:** `~/.maestro/tests/<timestamp>/` on the host machine.
+
+**File naming convention:**
+- `screenshot-✅-<millis>-(flow-name.yaml).png` — test step passed
+- `screenshot-⚠️-<millis>-(flow-name.yaml).png` — optional step warned
+- `screenshot-❌-<millis>-(flow-name.yaml).png` — test step failed
+
+**Note:** On Windows with unicode username path (`ZuzanaKopečná`), some tools can't read these paths directly. Use `cp` to a simple path like `/c/tools/tmp/` before viewing.
+
+**Also includes:** `commands-(flow-name.yaml).json` (step-by-step results), `ai-(flow-name).json`, `ai-report-(flow-name).html`, and optionally `maestro.log`.

@@ -79,7 +79,6 @@ tags:
     id: "chat-input"
     optional: true
 - inputText: "The second concept relates to how these principles are applied in practice"
-  optional: true
 
 # 12. Submit second answer (optional)
 # BUG-35: keyboard covers send button on Android. Use keyboard Enter key
