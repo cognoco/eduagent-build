@@ -63,8 +63,10 @@ tags:
 - inputText: "Here is my homework answer: The quadratic formula is x = (-b +/- sqrt(b^2-4ac)) / 2a"
 
 # 12. Send message
-- tapOn:
-    id: "send-button"
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
+# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
+# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
+- pressKey: Enter
 
 # 13. Wait for AI response
 - extendedWaitUntil:

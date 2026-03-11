@@ -5,6 +5,7 @@ import {
   ScrollView,
   Alert,
   RefreshControl,
+  InteractionManager,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -174,7 +175,10 @@ export default function DashboardScreen() {
 
         {__DEV__ && (
           <Pressable
-            onPress={() => setPersona('teen')}
+            onPress={() => {
+              router.replace('/(learner)/home' as never);
+              InteractionManager.runAfterInteractions(() => setPersona('teen'));
+            }}
             className="mt-6 items-center py-3 min-h-[44px] justify-center"
             testID="switch-to-teen"
           >

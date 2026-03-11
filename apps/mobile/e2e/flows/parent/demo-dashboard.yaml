@@ -33,8 +33,13 @@ tags:
       SEED_SCENARIO: "parent-solo"
       API_URL: ${API_URL}
 
-# 2. Switch to parent persona (seed-and-sign-in lands on learner home)
-- runFlow: ../_setup/switch-to-parent.yaml
+# 2. Wait for parent dashboard
+# BUG-33 fix: parent-solo creates a PARENT owner profile. After sign-in, the app
+# routes directly to (parent)/dashboard — no need for switch-to-parent.yaml.
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
 
 # 3. Verify "Home" heading on parent dashboard
 - assertVisible:

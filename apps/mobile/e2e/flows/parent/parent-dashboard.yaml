@@ -19,10 +19,12 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Wait for parent dashboard/home screen
+# 2. Wait for parent dashboard
+# BUG-33 fix: parent persona routes to (parent)/dashboard with id: dashboard-scroll,
+# NOT (learner)/home with id: home-scroll-view.
 - extendedWaitUntil:
     visible:
-      id: "home-scroll-view"
+      id: "dashboard-scroll"
     timeout: 15000
 
 # 3. Verify children list is visible — look for child display name

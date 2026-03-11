@@ -1553,3 +1553,93 @@ java.lang.ClassCastException: java.lang.String cannot be cast to...
 - **react-native-svg + Fabric + reanimated** is a known fragile combination. If you see `ClassCastException` in `RNSVG*ManagerDelegate`, it's a prop type mismatch in the Fabric bridge.
 - **Don't modify the animation component to fix E2E tests** (CLAUDE.md Rule 4). This is an app bug that needs a proper fix (update react-native-svg, replace with non-SVG animation, or add error boundary).
 - **SVG loading animations may not crash on fast networks** because the loading state resolves before SVG mounts. Test on slow connections or add artificial delays to expose these crashes.
+
+---
+
+## Issue 16: `seed-and-run.sh` Silent Crash with `set -euo pipefail` (2026-03-10)
+
+**What happened:** The `seed-and-run.sh` script would silently exit with code 1 during the bundle loading loop, after successfully dumping the UI hierarchy. No error message, no stack trace — just silence.
+
+**Root cause:** Three interacting issues:
+
+1. **`set -euo pipefail` + grep pipeline in command substitution:** The "Unknown state" handler at the end of the bundle loop had:
+   ```bash
+   VISIBLE_TEXTS=$(echo "$DUMP" | grep -oP 'text="\K[^"]+' | head -5 | tr '\n' ', ')
+   ```
+   When the UI dump had nodes but NO text values (common during React Native loading transitions), `grep` returned exit code 1 (no match). With `pipefail`, this propagated through the pipeline. Since this was a command substitution in a variable assignment, `set -e` triggered and killed the script immediately — before any echo could print a diagnostic message.
+
+2. **Dev tools Close button vs Back key:** The script's "Reload" handler pressed `KEYCODE_BACK` to dismiss the dev tools sheet. But after tapping "Continue" on the dev-client welcome overlay, the full dev tools menu opens (not a dismissable sheet). Back key from this state exits the app entirely (BUG-14). Fixed by finding and tapping the "Close" (X) button via `content-desc="Close"` instead.
+
+3. **Same grep pattern bug in two more places:** The `ERROR_TEXT` and `FINAL_TEXTS` variables had identical grep pipelines without `|| true`.
+
+**Fix:** Added `|| true` to all 3 grep pipeline assignments. Changed dev tools handler to tap Close button. The script now reliably navigates: clear → launch → DEVELOPMENT → Metro → Continue → Close → sign-in (~12 seconds).
+
+**Lesson for future agents:**
+- **`set -euo pipefail` is dangerous with grep in command substitutions.** Always append `|| true` or `|| echo ""` when grep might return 1 (no matches). This is especially treacherous because the error is SILENT — no message, just immediate exit.
+- **Debug `set -e` failures by redirecting output to a file** (`> /tmp/log.txt 2>&1`) since the Bash tool output may truncate.
+- **Dev-client "Continue" button ≠ dismiss overlay.** It opens the full dev tools menu. Must tap "Close" (X) button after.
+
+---
+
+## Issue 17: KeyboardAvoidingView `behavior="height"` + `adjustResize` Conflict on Fabric (2026-03-10)
+
+**What happened:** On the session/chat screen (`ChatShell.tsx`), when the keyboard opens after entering text, the app's input bar (TextInput + send button) is completely hidden behind the keyboard. The `KeyboardAvoidingView` does not push the content up.
+
+**Root cause:** `AndroidManifest.xml` has `android:windowSoftInputMode="adjustResize"` (correct for general use). `ChatShell.tsx` also has `KeyboardAvoidingView behavior="height"`. On Fabric/New Architecture, these create a double-adjustment conflict:
+- `adjustResize` shrinks the window above the keyboard
+- `behavior="height"` tries to adjust the KAV's height
+- The combined effect results in the input bar ending up behind the keyboard
+
+The auth screens (sign-in, sign-up) work fine with the same `behavior="height"` because they use `ScrollView` which can scroll focused inputs into view. `ChatShell` uses `FlatList` for messages with the input bar as a separate sibling — no scroll wrapper for the input bar itself.
+
+**Workaround for E2E:** `KEYCODE_ENTER` (via ADB or Maestro's `pressKey: Enter`) triggers `onSubmitEditing={handleSend}` because the TextInput has `returnKeyType="send"`. The message sends, keyboard dismisses, and input bar becomes visible.
+
+**Not an emulator issue:** This is an app code issue that would affect real Android devices with Fabric enabled.
+
+**Tracked as:** BUG-35 in `e2e-test-bugs.md`
+
+---
+
+## Issue 18: LLM (Gemini) API Intermittent Connection Failures (2026-03-11)
+
+**What happened:** During Session 10, some Maestro flows got real AI responses ("Welcome to your first practice session! Let's see what you know. Ready?") while others got the fallback error message ("I'm having trouble connecting right now. Please try again."). The `learning-active` flows consistently got error responses; `retention-due` flows got real AI responses.
+
+**Impact on testing:** Maestro tests check UI element presence (e.g., `chat-input` is visible after send), not response content. So LLM failures don't cause test failures. However, this means tests can report PASS when the AI isn't actually working. **Screenshots are the ground truth** — always check them for actual AI response content.
+
+**Not an emulator issue.** This is an API/LLM configuration issue (API key validity, rate limiting, or Gemini service availability). The API health endpoint returns `{"status":"ok","llm":{"providers":["gemini"]}}`.
+
+**Recommendation:** Add at least one content assertion to a smoke flow (e.g., assert that the AI response does NOT contain "trouble connecting") to catch LLM failures in automated runs.
+
+---
+
+## Issue 19: Maestro Screenshot Storage Location (2026-03-11)
+
+**Location:** `~/.maestro/tests/<timestamp>/` on the host machine.
+
+**File naming convention:**
+- `screenshot-✅-<millis>-(flow-name.yaml).png` — test step passed
+- `screenshot-⚠️-<millis>-(flow-name.yaml).png` — optional step warned
+- `screenshot-❌-<millis>-(flow-name.yaml).png` — test step failed
+
+**Note:** On Windows with unicode username path (`ZuzanaKopečná`), some tools can't read these paths directly. Use `cp` to a simple path like `/c/tools/tmp/` before viewing.
+
+**Also includes:** `commands-(flow-name.yaml).json` (step-by-step results), `ai-(flow-name).json`, `ai-report-(flow-name).html`, and optionally `maestro.log`.
+
+## Issue 20: Maestro `inputText` DEADLINE_EXCEEDED — Systematic gRPC Timeout (2026-03-11)
+
+**Symptom:** Every Maestro `inputText` command fails with `DEADLINE_EXCEEDED: deadline exceeded after 119.99s` on the gRPC call to `MaestroDriverGrpc.inputText`. `tapOn` and `assertVisible` commands work normally.
+
+**Root cause:** Maestro's Android driver installs a custom IME (input method editor) to handle text input. After extended emulator usage (multiple test sessions without cold boot), the driver's IME becomes corrupted/unresponsive. The `pm list packages | grep maestro` returns empty, and `ime list -s` shows only Google Keyboard — Maestro's IME is not installed.
+
+**Fix:** Cold-boot the emulator with `-no-snapshot-load`:
+```bash
+C:/Android/Sdk/emulator/emulator.exe -avd E2E_Device_2 -no-snapshot-load -gpu host -no-audio -no-boot-anim
+```
+After cold boot:
+1. Wait for "System UI isn't responding" dialog → tap "Wait"
+2. Wait 10s for system to stabilize
+3. Reinstall the dev-client APK: `adb install -r /c/tools/tmp/app-debug.apk`
+4. Re-establish port forwarding: `adb reverse tcp:8787/8081/8082`
+5. Disable animations: `adb shell settings put global window_animation_scale 0` (etc.)
+
+**Prevention:** If running many flows in a session, consider cold-booting every ~20 runs.

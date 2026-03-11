@@ -226,8 +226,8 @@ Tapping "Parent (Light)" theme button changes persona to `parent`, triggering th
 
 ## BUG-18: Persona Switch Crashes App (~50% of the time) (2026-03-10)
 
-**Status:** Open (app code bug)
-**Severity:** High — crashes app, corrupts emulator state
+**Status:** FIXED (2026-03-11) — `router.replace` before deferred `setPersona` prevents layout guard race.
+**Severity:** High — crashes app, corrupts emulator state. **Affects real users.**
 **Affects:** `settings-toggles.yaml` (Parent theme section), any flow using persona switch
 
 After tapping "Switch to Teen view (demo)" button on the parent dashboard, the app crashes to the Android home screen approximately 50% of the time. The crash corrupts Maestro's driver connection, requiring an emulator cold restart.
@@ -240,7 +240,9 @@ After tapping "Switch to Teen view (demo)" button on the parent dashboard, the a
 
 **Mitigation (flow-level):** Parent theme test moved to end of `settings-toggles.yaml` so the crash can't affect earlier validations.
 
-**Proper fix needed:** The `setPersona()` call needs to be coordinated with navigation — e.g., navigate to a neutral route before changing persona, or use `router.replace()` synchronously with the persona change to avoid the layout guard race.
+**Proper fix needed (code-only, no emulator required):** The `setPersona()` call needs to be coordinated with navigation — e.g., call `router.replace('/(learner)/home')` **before** or **simultaneously with** `setPersona('teen')` using a single `startTransition` or `InteractionManager.runAfterInteractions`, so the layout guard doesn't race with the persona state change. Alternatively, `setPersona()` + `router.replace()` can be wrapped in `unstable_batchedUpdates` (or React 18's automatic batching) to ensure both state changes commit in one render cycle.
+
+**Files:** `apps/mobile/src/app/(parent)/dashboard.tsx` (line ~170, "Switch to Teen" handler), `apps/mobile/src/app/(learner)/_layout.tsx` (line ~575, persona guard redirect).
 
 ---
 
@@ -623,7 +625,7 @@ After navigating to the Delete Account screen and tapping `delete-account-cancel
 
 ## BUG-33: Learning Book Tab Crash — react-native-svg ClassCastException on Fabric (2026-03-10)
 
-**Status:** Open (app code bug — react-native-svg + Fabric + reanimated)
+**Status:** FIXED (2026-03-11) — replaced animated SVG `<G>` transform with pure Reanimated `<Animated.View>` scaleX (no SVG dependency). Tests pass (14 suites, 137 tests).
 **Severity:** High — blocks ALL flows that navigate to the Learning Book tab
 **Affects:** `subjects/multi-subject.yaml`, `onboarding/view-curriculum.yaml`, `retention/learning-book.yaml`, `retention/topic-detail.yaml`, and any flow navigating to the Learning Book tab
 
@@ -658,4 +660,244 @@ java.lang.ClassCastException: java.lang.String cannot be cast to...
 3. **Wrap SVG in error boundary** — prevent crash from taking down the whole screen
 4. **Disable Fabric for react-native-svg** — use `unstable_enablePackageFabric` to exclude it
 
+**Confirmed fix approach (2026-03-11 code review):** The crash is in `BookPageFlipAnimation.tsx` which uses `Animated.createAnimatedComponent(G)` and passes `transform` as a string via `useAnimatedProps()`. The `RNSVGGroupManagerDelegate` on Fabric (New Architecture) expects a typed transform object, not a string. **This is fixable without the emulator** — replace the animated SVG `<G>` transform with a reanimated `<Animated.View>` wrapper using standard `style.transform`, or replace the entire component with a simple `ActivityIndicator`. The component is only used during loading states.
+
+**Files:** `apps/mobile/src/components/common/BookPageFlipAnimation.tsx` (source), `BookPageFlipAnimation.test.tsx` (test), `apps/mobile/src/app/(learner)/book.tsx` (consumer), `apps/mobile/src/components/common/index.ts` (barrel export).
+
 **E2E workaround (temporary):** Flows that navigate to Learning Book will fail at the tab switch. Home screen assertions (subjects, retention strip) remain testable. Skip Learning Book tab assertions until BUG-33 is fixed.
+
+**Parent routing fix (commit `93e5646`):** BUG-33 also manifested as a parent routing mismatch — parent scenarios create a PARENT owner profile, so the app routes to `(parent)/dashboard` (testID: `dashboard-scroll`), not `(learner)/home` (testID: `home-scroll-view`). Fixed in `seed-and-sign-in.yaml` (accepts both landing screens) and 6 parent flow YAMLs (replaced `switch-to-parent.yaml` with direct `dashboard-scroll` wait). The SVG crash on Learning Book tab remains open.
+
+---
+
+## BUG-34: `onboarding-complete` Scenario Auto-Redirects Away from Home Screen (2026-03-10)
+
+**Status:** PARTIALLY FIXED — subjects added to `onboarding-complete`, `trial-active`, `trial-expired` seeds + `topicId` now exposed in all three. Remaining: `parent-solo` and `parent-with-children` still have no subjects (parent owner profiles route to `(parent)/dashboard` anyway, so this is expected behavior, not a bug). BUG-33 (SVG crash) is now fixed separately.
+**Severity:** Medium (reduced from High) — remaining parent scenarios are handled by dashboard-scroll fallback in seed-and-sign-in.yaml
+**Affects:** Parent scenarios (`parent-solo`, `parent-with-children`) — these land on dashboard, not home, by design
+
+After signing in with `onboarding-complete` (and other subject-less scenarios), the home screen appears briefly but auto-redirects to `/create-subject` because `subjects.length === 0`. The `seed-and-sign-in.yaml` setup flow's `extendedWaitUntil visible id: home-scroll-view timeout: 30000` sometimes passes (race condition — catches the home screen before redirect) but the main flow's subsequent check fails.
+
+**Root cause:** `home.tsx` lines 41-51 auto-redirect to `/create-subject` when `subjects` is an empty array:
+```tsx
+if (subjects.length === 0) {
+  router.replace('/create-subject');
+}
+```
+
+This is **correct app behavior** — users with no subjects should be guided to create one. The issue is that the seed scenarios and flow expectations don't align:
+
+- `onboarding-complete`: creates account + profile + consent, but NO subjects
+- `parent-solo`: creates parent profile only, NO subjects for learner
+- `trial-active`/`trial-expired`: creates subscription only, NO subjects
+
+**Affected flows (expect home screen but get redirected):**
+- `account/more-tab-navigation.yaml`
+- `account/settings-toggles.yaml`
+- `account/account-lifecycle.yaml`
+- `account/delete-account.yaml`
+- `account/profile-switching.yaml` (parent-with-children — parent is owner, lands on home but no subjects)
+- `assessment/assessment-cycle.yaml`
+- `onboarding/create-profile-standalone.yaml`
+- `billing/subscription.yaml` (trial-active)
+- `billing/subscription-details.yaml` (trial-active)
+
+Additionally, `parent-solo` and `parent-with-children` scenarios create a PARENT as the owner profile. After sign-in, the app routes to `(parent)/dashboard` (not `(learner)/home`), so `home-scroll-view` is never rendered.
+
+**Fix applied (Option 1):** Subject added to `onboarding-complete`, `trial-active`, `trial-expired` seeds. `topicId` now exposed in return `ids` for all three.
+
+**Semantic drift note:** `onboarding-complete` no longer represents "just finished onboarding, no subjects." To test the empty-state `/create-subject` redirect, a new `onboarding-no-subject` scenario would be needed (Option 2). This is tracked but deferred — no current flow tests the empty-state path.
+
+**For parent scenarios (Option 4):** Already handled — `seed-and-sign-in.yaml` accepts `dashboard-scroll` as an alternative landing screen.
+
+---
+
+## BUG-35: Keyboard Covers Chat Input Bar and Send Button in Session Screen (2026-03-10)
+
+**Status:** FIXED (2026-03-11) — changed `ChatShell.tsx` KAV `behavior` from `'height'` to `undefined` on Android. E2E workaround (`pressKey: Enter`) remains in flows as defense-in-depth. Tests pass (28 tests).
+**Workaround confirmed:** Session 10 ran 4 chat flows (start-session, core-learning, first-session, recall-review) — all PASS with `pressKey: Enter`.
+**Severity:** Critical — blocks ALL E2E flows that use ChatShell (~15 flows)
+**Affects:** All learning, homework, retention, and recall flows that enter a chat session
+
+When the keyboard opens on the session/chat screen, the app's input bar (TextInput + send button) is completely hidden behind the keyboard. The `KeyboardAvoidingView` does not push the content up.
+
+**Screenshot evidence:** Session screen shows header + AI message + empty space + keyboard. The input bar is not visible. After pressing Enter (keyboard send key), the message sends and the keyboard dismisses, revealing the input bar correctly.
+
+**Root cause:** `ChatShell.tsx` line 228-232:
+```tsx
+<KeyboardAvoidingView
+  className="flex-1 bg-background"
+  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+  keyboardVerticalOffset={0}
+>
+```
+
+`AndroidManifest.xml` already has `android:windowSoftInputMode="adjustResize"`. When `adjustResize` is active, the system resizes the activity's window. Adding `KeyboardAvoidingView behavior="height"` on top of this creates a double-adjustment conflict on Fabric/New Architecture — the view's height calculation interferes with the system's resize, resulting in the input bar being hidden behind the keyboard.
+
+**Note:** BUG-24 changed all `KeyboardAvoidingView` instances from `behavior={undefined}` to `behavior='height'` on Android. The auth screens (ScrollView-based) work correctly with this change because `adjustResize` + ScrollView handle keyboard avoidance. But the `ChatShell` (FlatList-based, no ScrollView wrapper for the input area) behaves differently — `behavior='height'` actively conflicts with `adjustResize`.
+
+**Workaround (confirmed via ADB):** `KEYCODE_ENTER` triggers `onSubmitEditing={handleSend}` (the TextInput has `returnKeyType="send"`). This sends the message and dismisses the keyboard. Maestro's `pressKey: Enter` command can replace `tapOn: send-button` in affected flows.
+
+**Affected flows (all use `tapOn: send-button` in ChatShell):**
+- `learning/core-learning.yaml`
+- `learning/first-session.yaml`
+- `learning/freeform-session.yaml`
+- `learning/session-summary.yaml`
+- `learning/start-session.yaml`
+- `homework/homework-flow.yaml`
+- `homework/homework-from-entry-card.yaml`
+- `homework/camera-ocr.yaml`
+- `retention/recall-review.yaml`
+- `retention/retention-review.yaml`
+- `retention/failed-recall.yaml`
+
+**Fix options:**
+1. **App fix (recommended, fixable without emulator):** Change `ChatShell.tsx` to `behavior={undefined}` on Android (let `adjustResize` handle everything). Unlike auth screens (ScrollView-based, where `behavior='height'` works), ChatShell uses FlatList — `adjustResize` already handles the window resize, and `behavior='height'` double-adjusts. Setting `behavior={undefined}` on Android for ChatShell specifically (while keeping `'padding'` on iOS) should resolve the conflict. File: `apps/mobile/src/components/session/ChatShell.tsx`.
+2. **E2E workaround:** ~~Replace `tapOn: send-button` with `pressKey: Enter` in all affected flow files. Keep `tapOn: send-button` as an optional fallback assertion.~~ **DONE (Session 10).**
+3. **Alternative app fix:** Switch `windowSoftInputMode` to `adjustPan` for the session screen (per-activity or via `useEffect` toggle) — but this affects all inputs on the screen.
+
+---
+
+## BUG-36: `freeform-session` Flow Expects Wrong Coaching Card Layout (2026-03-11)
+
+**Status:** Open (flow design issue)
+**Severity:** Low — 1 flow affected
+**Affects:** `learning/freeform-session.yaml`
+
+The flow taps `"Just ask something"` text, expecting the AdaptiveEntryCard's teen three-action layout (primary: "Homework help", secondary: "Practice for a test" / "Just ask something"). But with `learning-active` scenario, the coaching card renders as a "Continue: World History" card with "Let's go" and "I have something else in mind" — no "Just ask something" text.
+
+**Root cause:** The coaching card type depends on the precomputed card result. `learning-active` creates a continue-learning card because there's an active session/topic. The three-action teen entry card only appears when there's no active learning context.
+
+**Fix options:**
+1. Create a `learning-fresh` scenario that has subjects but no active sessions — this would render the three-action entry card.
+2. Change the flow to use the existing card layout and navigate to freeform via a different path (e.g., session mode selector).
+
+---
+
+## BUG-37: `session-summary` Flow Can't Find `end-session-button` (2026-03-11)
+
+**Status:** Open (flow design + possible app issue)
+**Severity:** Low — 1 flow affected
+**Affects:** `learning/session-summary.yaml`
+
+After 3 exchanges, the flow expects `end-session-button` to appear. The session timer is at 11:42 but no end/close button is visible. The session is still active (not auto-closed).
+
+**Root cause:** The session's exchange cap may be set higher than 3 in the seeded data, so auto-close doesn't trigger. The `end-session-button` testID may not exist in the app, or it may only appear after a certain condition (timer expiry, exchange cap reached, manual back navigation).
+
+**Fix options:**
+1. Investigate what testID the close/end session UI uses in `ChatShell.tsx` and update the flow.
+2. Configure the seed to set a lower exchange cap so auto-close triggers after 3 exchanges.
+3. Use back navigation to exit the session instead.
+
+---
+
+## BUG-38: `onboarding-complete` Scenario Triggers PostApprovalLanding Screen (2026-03-11)
+
+**Status:** FIXED (commit `93e5646`)
+**Severity:** HIGH — blocked 9 flows
+**Affects:** All flows using `onboarding-complete` scenario: `more-tab-navigation`, `settings-toggles`, `delete-account`, `account-lifecycle`, `create-profile-standalone`, `empty-first-user`, `analogy-preference-flow`, `assessment-cycle`, `curriculum-review-flow`
+
+After sign-in, the "You're approved!" PostApprovalLanding screen appears instead of the home screen. This screen has a "Let's Go" button that navigates to subject creation.
+
+**Root cause:** The `onboarding-complete` scenario seeds a user with approved consent. The `PostApprovalLanding` screen checks SecureStore for whether this interstitial has been shown (`postApprovalSeen_${profileId}`). Since `pm clear` wipes SecureStore before each test run, the app thinks this is a fresh consent approval and shows the landing screen.
+
+**Screenshot:** Shows party emoji 🎉, "You're approved!", "Your parent said yes — time to start learning. Let's set up your first subject.", "Let's Go" button.
+
+**Fix applied:** Setup flow fix in `seed-and-sign-in.yaml` — added `tapOn text: "Let's Go" optional: true` after sign-in, followed by a wait for `home-scroll-view`. The dismiss callback sets `setShouldShow(false)` → layout re-renders normal tabs → home screen appears.
+
+---
+
+## BUG-39: Homework Flows Need Camera Permission Handling (2026-03-11)
+
+**Status:** FIXED (commit `93e5646`)
+**Severity:** Medium — blocked 3 flows
+**Affects:** `homework/homework-flow.yaml`, `homework/homework-from-entry-card.yaml`, `homework/camera-ocr.yaml`
+
+After navigating to the homework screen, the "Camera Access Needed" screen appears with an "Allow Camera" button. Tapping it triggers the Android system permission dialog ("Allow MentoMate to take pictures and record video?") with three options: "While using the app", "Only this time", "Don't allow". The flow doesn't handle this system dialog.
+
+**Screenshots:** Camera Access Needed screen → Android permission dialog
+
+**Fix applied:** Pre-grant CAMERA permission via ADB in `seed-and-run.sh`: `$ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.CAMERA 2>/dev/null || true`. Same pattern as BUG-22 notification permission fix.
+
+---
+
+## BUG-40: `retention-review` and `failed-recall` Flows Expect Non-Existent `recall-test-screen` testID (2026-03-11)
+
+**Status:** FIXED (commit `93e5646`)
+**Severity:** Medium — blocked 2 flows
+**Affects:** `retention/retention-review.yaml`, `retention/failed-recall.yaml`
+
+Both flows asserted `id: recall-test-screen` after tapping the coaching card, but the app renders a standard `ChatShell` session screen (with `chat-input`, `send-button`, etc.). The `recall-test-screen` testID doesn't exist in the app — retention reviews go through the same ChatShell as learning sessions.
+
+**Fix applied:** Replaced `recall-test-screen` with `chat-input` in both flows, matching the pattern used by the smoke-tier `recall-review.yaml`.
+
+---
+
+## BUG-41: Learning Book SVG Crash (= BUG-33) — RNSVGGroupManagerDelegate ClassCastException (2026-03-11)
+
+**Status:** FIXED (2026-03-11) — resolved by BUG-33 fix (BookPageFlipAnimation rewritten without SVG).
+**Severity:** HIGH — blocks 5 flows
+**Affects:** `retention/learning-book.yaml`, `retention/topic-detail.yaml`, `retention/relearn-flow.yaml`, `subjects/multi-subject.yaml` (at LB step), any future flow navigating to Learning Book tab
+
+Same `ClassCastException: java.lang.String cannot be cast` in `com.facebook.react.viewmanagers.RNSVGGroupManagerDelegate` as BUG-33. Confirmed reproducible in Session 10 across multiple scenarios (retention-due, failed-recall-3x, multi-subject).
+
+**Note:** BUG-41 is a duplicate of BUG-33, tracked separately because Session 10 confirmed it across more scenarios. Fix BUG-33 to resolve both. See BUG-33 for confirmed fix approach (replace animated SVG with non-SVG alternative — code-only fix, no emulator needed).
+
+---
+
+## BUG-42: No "Subscription" or "Billing" Entry on More Tab (2026-03-11)
+
+**Status:** FIXED (2026-03-11) — replaced `extendedWaitUntil` with `scrollUntilVisible` in `subscription-details.yaml` step 5.
+**Severity:** Medium — blocks 1 flow (subscription-details), partial impact on subscription flow
+**Affects:** `billing/subscription.yaml` (optional assertions → PASS with warnings), `billing/subscription-details.yaml` (mandatory → FAIL)
+
+The More tab shows APPEARANCE, ACCENT COLOR, NOTIFICATIONS, and LEARNING MODE sections, but no "Subscription", "Billing", "Trial", or "Upgrade" entry. This may be:
+1. Below the fold (needs scroll) — the More tab content extends beyond viewport
+2. Not rendered for the `trial-active` scenario / learner persona
+3. A missing feature (subscription UI not yet wired to More tab)
+
+**Screenshot:** More tab showing themes, accent colors, notification toggles. No billing section visible.
+
+**Root cause (confirmed via code review 2026-03-11):** The "Subscription" row **IS implemented** in `more.tsx:279-289` under the "Account" section header (line 271). The layout order is: Appearance → Accent Color → Notifications → Learning Mode → Account (Profile, **Subscription**, Help & Support, Privacy Policy, Terms of Service, Export my data, Delete account, Sign out). The "Account" section is below the fold — the flow screenshot only shows content through Learning Mode. The row renders `label="Subscription"` with a tier value from `useSubscription()`.
+
+**Fix (YAML only, no emulator needed):** Add `scrollUntilVisible` for "Subscription" text before asserting. Same pattern as BUG-32 fix. If `useSubscription()` returns `undefined` for `trial-active` (KV cache not populated by seed), the row still renders with the "Subscription" label but no value — still findable by text.
+
+---
+
+## BUG-43: Coaching Card Auto-Navigation After PostApprovalLanding Dismissal (2026-03-11)
+
+**Status:** Open (setup flow + scenario interaction issue)
+**Severity:** HIGH — blocks 4+ flows
+**Affects:** `homework/homework-flow.yaml`, `homework/camera-ocr.yaml`, `retention/retention-review.yaml`, `retention/failed-recall.yaml`, and any flow using a scenario with active sessions/retention cards + CONSENTED status
+
+After sign-in, the PostApprovalLanding screen appears (BUG-38 behavior — SecureStore wiped by `pm clear`). The BUG-38 fix in `seed-and-sign-in.yaml` taps "Let's Go" to dismiss it. However, for scenarios that seed active sessions or due retention cards (`homework-ready`, `retention-due`, `failed-recall-3x`), the coaching card on the home screen immediately auto-navigates the user into a "Practice Session" (ChatShell). The flow's subsequent `home-scroll-view` assertion fails because the user is on the session screen.
+
+**Screenshots:** "Practice Session" / "Test your knowledge" screen with "Your answer..." input and timer.
+
+**Why it doesn't affect `onboarding-complete`:** That scenario has no active session or due retention card — the coaching card doesn't auto-navigate.
+
+**Why it doesn't affect parent scenarios:** Parent profiles route to `(parent)/dashboard` which doesn't have the coaching card auto-navigation behavior.
+
+**Root cause:** The BUG-38 fix (tapping "Let's Go") works correctly — PostApprovalLanding is dismissed and the home screen renders. But the coaching card's auto-navigation fires immediately on home render for scenarios with active content, taking the user away from home before the flow can assert `home-scroll-view`.
+
+**Fix options:**
+1. **Add `pressKey: Back` after PostApproval dismiss** in `seed-and-sign-in.yaml` — if the coaching card navigated, Back returns to home. If it didn't navigate, Back is harmless (optional).
+2. **Individual flow fix:** Each affected flow adds `pressKey: Back` or `tapOn: back-button optional: true` before its `home-scroll-view` assertion.
+3. **Seed fix:** Don't set CONSENTED status for scenarios that have active sessions — use a different consent status that doesn't trigger PostApprovalLanding. Complex because consent is required for the session to function.
+
+---
+
+## BUG-44: `add-subject-button` TestID Not Found on Home Screen (2026-03-11)
+
+**Status:** Open (testID or scrolling issue)
+**Severity:** Medium — blocks 3 flows
+**Affects:** `onboarding/analogy-preference-flow.yaml`, `assessment/assessment-cycle.yaml`, `onboarding/curriculum-review-flow.yaml`
+
+After successful sign-in with `onboarding-complete` scenario (BUG-38 PostApprovalLanding dismissed, home screen reached), the flow taps `id: add-subject-button` but it's not found. The home screen is visible (`home-scroll-view` assertion passes) but the button is not in the viewport.
+
+**Possible causes:**
+1. **Below the fold** — the button may be at the bottom of the home ScrollView, requiring scroll
+2. **TestID mismatch** — the button may have a different testID in the current app code
+3. **Conditional render** — the button may only show when there are 0 subjects (but `onboarding-complete` now has "General Studies" from BUG-34 fix)
+
+**Fix:** Check `apps/mobile/src/app/(learner)/home.tsx` for the `add-subject-button` testID. If it only renders with 0 subjects, these flows need a different navigation path to create a subject. If it's below the fold, add `scrollUntilVisible` before the tap.

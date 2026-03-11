@@ -873,8 +873,11 @@ Ordered by dependency chain and value. Status as of 2026-03-10:
 | 5.3 | ADB automation (seed-and-run.sh v3) | **DONE** | Full lifecycle via ADB |
 | 5.4 | BUG-25: profileScope middleware fix | **DONE** | Auto-resolve owner profile when X-Profile-Id absent (commit `35ef433`) |
 | 5.5 | BUG-10/BUG-30: tab navigation fix | **DONE** | Flattened book route, added `tabBarAccessibilityLabel`, updated 7 flows. Also fixed BUG-24 (KAV), BUG-29 (dashboard), BUG-32 (scroll) |
-| 5.6 | Emulator validation | **IN PROGRESS** | 17 passing, 9 needs re-test (fixes applied), 26 ready to validate |
-| 5.7 | Nightly scheduled CI workflow | **TODO** | Awaiting flow validation |
+| 5.6 | seed-and-run.sh v3 bugfixes | **DONE** | Session 9: fixed 3 bugs — `set -euo pipefail` crash on grep pipeline, dev-tools Close button (added `input tap` fallback), grep pipeline `set -e` interaction |
+| 5.7 | BUG-31 verification | **DONE** | Session 9: `useProfiles()` auth guard fix verified working via Maestro sign-in flow |
+| 5.8 | BUG-34/BUG-35 discovered | **OPEN** | Session 9: onboarding-complete redirect (~10 flows) + keyboard covers send button (~15 flows) |
+| 5.9 | Emulator validation | **IN PROGRESS** | 17 passing, 9 needs re-test (fixes applied), 26 ready to validate. BUG-34/35 block ~25 additional flows |
+| 5.10 | Nightly scheduled CI workflow | **TODO** | Awaiting flow validation + BUG-34/35 fixes |
 
 ---
 
@@ -907,16 +910,22 @@ Ordered by dependency chain and value. Status as of 2026-03-10:
 - [x] All 53 test flows written (8 Tier 2 + 45 additional)
 - [x] 10 setup helper flows created
 - [x] `seed-and-run.sh` v3 with full ADB automation
-- [x] BUG-31 fixed — `useProfiles()` auth guard enables all data-dependent flows (Session 8)
+- [x] BUG-31 fixed — `useProfiles()` auth guard enables all data-dependent flows (Session 8, verified Session 9)
+- [x] seed-and-run.sh v3 bugfixes — pipefail crash, dev-tools Close button, grep pipeline (Session 9)
+- [ ] BUG-34 — onboarding-complete scenario redirects from home, blocks ~10 flows
+- [ ] BUG-35 — keyboard covers send button in ChatShell, blocks ~15 flows
 - [ ] BUG-33 — react-native-svg + Fabric crash blocks Learning Book tab flows (~5 flows)
-- [ ] Remaining ~33 flows validated on emulator (17/53 confirmed passing, 2 partial)
+- [ ] Remaining flows validated on emulator (17/53 confirmed passing, BUG-33/34/35 collectively block ~33 of 53 flows)
 - [ ] Nightly scheduled workflow runs in CI
 - [ ] Flake rate <5% over 5 consecutive nightly runs
 
-### Current Blockers (as of Session 8, 2026-03-10)
+### Current Blockers (as of Session 9, 2026-03-10)
 | Bug | Severity | Flows Blocked | Fix Status |
 |-----|----------|---------------|------------|
+| BUG-34 (onboarding-complete redirect) | High | ~10 flows (all using onboarding-complete scenario) | Open — home screen redirects back to auth after seed sign-in |
+| BUG-35 (keyboard covers send button) | High | ~15 flows (all ChatShell interactions) | Open — `KeyboardAvoidingView behavior="height"` + `adjustResize` conflict on Android/Fabric |
 | BUG-33 (SVG + Fabric crash) | High | ~5 flows (Learning Book tab) | Open — app code fix needed |
+| BUG-31 (useProfiles auth guard) | High | ~30 flows | **FIXED** — verified in Session 9 via Maestro |
 | BUG-27 (consent seed design) | High | 1 flow (consent-withdrawn-gate) | Open — seed restructure needed |
 | BUG-28 (post-approval landing) | Medium | 1 flow (post-approval-landing) | Open — new seed scenario needed |
 | BUG-26 (DB schema drift) | High | 2 flows (billing) | Fixed locally (db:push:dev), need to verify |

@@ -25,6 +25,14 @@
 #   (plus scenario-specific IDs like ${SUBJECT_ID}, ${TOPIC_ID}, etc.)
 #
 # After this flow completes, the app is authenticated and on the home screen.
+#
+# AUTH VERIFICATION NOTE: All post-auth waits below are optional because
+# three mutually exclusive landing screens are possible (learner home,
+# parent dashboard, PostApprovalLanding). Maestro YAML has no OR/assertAny
+# construct. Auth success is verified by EACH CALLING FLOW, which must
+# include a mandatory wait for its expected landing screen (e.g.,
+# home-scroll-view or dashboard-scroll). If auth fails silently here,
+# the calling flow's mandatory assertion will catch it with a clear error.
 appId: com.mentomate.app
 ---
 # ── Step 1: Wait for sign-in screen ──
@@ -73,13 +81,51 @@ appId: com.mentomate.app
 - tapOn:
     id: "sign-in-button"
 
-# ── Step 3: Wait for home screen (auth complete) ──
+# ── Step 3: Wait for post-auth screen ──
+# After sign-in, the app may land on one of three screens depending on persona/state:
+#   a) Learner home (id: home-scroll-view) — most common
+#   b) Parent dashboard (id: dashboard-scroll) — parent persona scenarios (BUG-33)
+#   c) PostApprovalLanding ("You're approved!") — onboarding-complete scenario (BUG-38)
+# We check for home-scroll-view first (30s timeout covers most cases).
+# If it's not found, the flow continues — individual flows handle their landing screen.
 - extendedWaitUntil:
     visible:
       id: "home-scroll-view"
     timeout: 30000
+    optional: true
 
-# Visual audit: home screen after successful auth
+# BUG-33: Parent scenarios route to (parent)/dashboard, not (learner)/home.
+# Accept dashboard-scroll as a valid post-auth landing.
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 5000
+    optional: true
+
+# BUG-38: PostApprovalLanding intercepts onboarding-complete users.
+# SecureStore is wiped by pm clear, so the app shows "You're approved!" screen.
+# Dismiss it by tapping "Let's Go" if visible.
+- tapOn:
+    text: "Let's Go"
+    optional: true
+
+# BUG-43: After PostApproval dismiss, the coaching card may auto-navigate to
+# a Practice Session (for scenarios with active sessions like retention-due,
+# homework-ready, failed-recall-3x). Tap the Home tab to return to home.
+# Safe no-op if already on home. Skipped for parent scenarios (no match).
+- tapOn:
+    text: "Home"
+    optional: true
+
+# After dismissing PostApprovalLanding (and returning from any auto-nav),
+# wait for home screen to appear
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 10000
+    optional: true
+
+# Visual audit: post-auth screen (home, dashboard, or post-landing)
 - takeScreenshot: signin-04-home-reached
 
 # ── Step 4: Dismiss notification permission dialog (BUG-22) ──

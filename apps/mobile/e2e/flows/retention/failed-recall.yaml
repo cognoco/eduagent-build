@@ -49,10 +49,12 @@ tags:
     text: "Review"
     optional: true
 
-# 6. Wait for recall test screen
+# 6. Wait for session screen (ChatShell)
+# BUG-40 fix: The app uses ChatShell for retention/recall reviews, not a dedicated
+# recall-test-screen. Wait for chat-input which is always present in ChatShell.
 - extendedWaitUntil:
     visible:
-      id: "recall-test-screen"
+      id: "chat-input"
     timeout: 10000
 
 # 7. Enter an answer in recall test
@@ -61,8 +63,10 @@ tags:
 - inputText: "I think it has something to do with the main idea"
 
 # 8. Submit answer
-- tapOn:
-    id: "send-button"
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
+# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
+# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
+- pressKey: Enter
 
 # 9. Wait for AI to evaluate and return feedback
 - extendedWaitUntil:

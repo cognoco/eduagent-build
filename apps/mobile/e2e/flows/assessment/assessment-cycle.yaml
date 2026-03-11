@@ -24,6 +24,12 @@ tags:
     timeout: 15000
 
 # 3. Create a new subject — tap add button
+# BUG-44 fix: add-subject-button is below the fold in home ScrollView
+- scrollUntilVisible:
+    element:
+      id: "add-subject-button"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: "add-subject-button"
 
@@ -54,8 +60,10 @@ tags:
 - inputText: "I want to learn about algebra fundamentals"
 
 # 9. Tap send
-- tapOn:
-    id: "send-button"
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
+# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
+# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
+- pressKey: Enter
 
 # 10. Wait for AI response
 - extendedWaitUntil:

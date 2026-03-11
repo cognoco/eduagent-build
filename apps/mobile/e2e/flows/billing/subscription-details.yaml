@@ -35,10 +35,11 @@ tags:
       text: "Appearance"
     timeout: 10000
 
-# 5. Tap Subscription menu item
-- extendedWaitUntil:
-    visible:
+# 5. Scroll to & tap Subscription menu item (below the fold on More screen)
+- scrollUntilVisible:
+    element:
       text: "Subscription"
+    direction: DOWN
     timeout: 10000
 
 - tapOn:

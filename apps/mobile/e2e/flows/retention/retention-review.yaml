@@ -41,10 +41,12 @@ tags:
 - tapOn:
     id: "coaching-card-primary"
 
-# 5. Wait for recall/review screen
+# 5. Wait for session screen (ChatShell)
+# BUG-40 fix: The app uses ChatShell for retention reviews, not a dedicated
+# recall-test-screen. Wait for chat-input which is always present in ChatShell.
 - extendedWaitUntil:
     visible:
-      id: "recall-test-screen"
+      id: "chat-input"
     timeout: 10000
 
 # 6. Verify the recall prompt is shown
@@ -58,8 +60,10 @@ tags:
 - inputText: "The key concept involves understanding the relationship between the variables and applying the formula correctly"
 
 # 8. Submit answer
-- tapOn:
-    id: "send-button"
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
+# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
+# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
+- pressKey: Enter
 
 # 9. Wait for AI feedback response
 - extendedWaitUntil:
@@ -70,17 +74,21 @@ tags:
 # 10. Take screenshot of feedback
 - takeScreenshot: retention-review-feedback
 
+# TODO: Steps 11-12 assume a second card is due. If chat-input isn't found
+# (optional), inputText and pressKey: Enter fire on whatever is focused.
+# Maestro has no conditional execution — accept this limitation for now.
+
 # 11. Enter a second recall answer (if multiple cards due)
 - tapOn:
     id: "chat-input"
     optional: true
 - inputText: "The second concept relates to how these principles are applied in practice"
-  optional: true
 
 # 12. Submit second answer (optional)
-- tapOn:
-    id: "send-button"
-    optional: true
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
+# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
+# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
+- pressKey: Enter
 
 # 13. Wait for second feedback
 - extendedWaitUntil:

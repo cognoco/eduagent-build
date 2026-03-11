@@ -144,6 +144,8 @@ $ADB $DEVICE_FLAG shell pm clear "$APP_ID" 2>/dev/null || true
 $ADB $DEVICE_FLAG shell am force-stop com.android.bluetooth 2>/dev/null || true
 # BUG-22: Pre-grant notification permission so the dialog doesn't block UI
 $ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.POST_NOTIFICATIONS 2>/dev/null || true
+# BUG-39: Pre-grant camera permission so homework flows don't hit system dialog
+$ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.CAMERA 2>/dev/null || true
 sleep 1
 $ADB $DEVICE_FLAG shell am start -n "$APP_ID/.MainActivity" 2>/dev/null || true
 
@@ -184,6 +186,7 @@ if [ -n "$METRO_BOUNDS" ]; then
   Y1=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '2p')
   X2=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '3p')
   Y2=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '4p')
+  X1=${X1:-0}; Y1=${Y1:-0}; X2=${X2:-0}; Y2=${Y2:-0}
   TAP_X=$(( (X1 + X2) / 2 ))
   TAP_Y=$(( (Y1 + Y2) / 2 ))
   echo "[seed-and-run] Tapping Metro at ($TAP_X, $TAP_Y) ..."
@@ -239,7 +242,7 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
     # HARD FAIL: Error screen detected (Metro can't load bundle)
     if echo "$DUMP" | grep -q "problem loading\|Unable to load script\|Could not connect to development server"; then
       echo "[seed-and-run] FATAL: Bundle load error detected!" >&2
-      ERROR_TEXT=$(echo "$DUMP" | grep -oP 'text="\K[^"]+' | head -5 | tr '\n' ' ')
+      ERROR_TEXT=$(echo "$DUMP" | grep -oP 'text="\K[^"]+' | head -5 | tr '\n' ' ' || true)
       echo "[seed-and-run] Error: ${ERROR_TEXT}" >&2
       echo "[seed-and-run] Check: Metro running? adb reverse set? Bundle proxy on 8082?" >&2
       exit 1
@@ -253,6 +256,7 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
       CY1=$(echo "$CONTINUE_BOUNDS" | grep -oP '\d+' | sed -n '2p')
       CX2=$(echo "$CONTINUE_BOUNDS" | grep -oP '\d+' | sed -n '3p')
       CY2=$(echo "$CONTINUE_BOUNDS" | grep -oP '\d+' | sed -n '4p')
+      CX1=${CX1:-0}; CY1=${CY1:-0}; CX2=${CX2:-0}; CY2=${CY2:-0}
       CTX=$(( (CX1 + CX2) / 2 ))
       CTY=$(( (CY1 + CY2) / 2 ))
       echo "[seed-and-run] Tapping 'Continue' at ($CTX, $CTY) ..."
@@ -262,17 +266,66 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
       continue
     fi
 
-    # Dev tools sheet ("Reload" visible) — dismiss with Back (max 3 times)
+    # Dev tools sheet ("Reload" visible) — tap Close button (not Back! BUG-14)
+    # After tapping "Continue", the dev-client expands to show the full dev tools
+    # menu (Reload, Go home, Performance monitor, etc.). The Close button (X) at
+    # top-right dismisses the entire dev-client UI. Back key would exit the app.
     if echo "$DUMP" | grep -q '"Reload"'; then
-      DEVTOOLS_BACK=${DEVTOOLS_BACK:-0}
-      DEVTOOLS_BACK=$((DEVTOOLS_BACK + 1))
-      if [ $DEVTOOLS_BACK -gt 3 ]; then
-        echo "[seed-and-run] FATAL: Dev tools sheet won't dismiss after 3 Back presses." >&2
+      DEVTOOLS_CLOSE=${DEVTOOLS_CLOSE:-0}
+      DEVTOOLS_CLOSE=$((DEVTOOLS_CLOSE + 1))
+      if [ $DEVTOOLS_CLOSE -gt 3 ]; then
+        echo "[seed-and-run] FATAL: Dev tools sheet won't dismiss after 3 Close taps." >&2
         exit 1
       fi
-      echo "[seed-and-run] Dev tools sheet detected, pressing Back (${DEVTOOLS_BACK}/3) ..."
-      $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
+      CLOSE_BOUNDS=$(echo "$DUMP" | grep -oP 'content-desc="Close"[^/]*bounds="\K[^"]+' || echo "")
+      if [ -n "$CLOSE_BOUNDS" ]; then
+        CLX1=$(echo "$CLOSE_BOUNDS" | grep -oP '\d+' | sed -n '1p')
+        CLY1=$(echo "$CLOSE_BOUNDS" | grep -oP '\d+' | sed -n '2p')
+        CLX2=$(echo "$CLOSE_BOUNDS" | grep -oP '\d+' | sed -n '3p')
+        CLY2=$(echo "$CLOSE_BOUNDS" | grep -oP '\d+' | sed -n '4p')
+        CLX1=${CLX1:-0}; CLY1=${CLY1:-0}; CLX2=${CLX2:-0}; CLY2=${CLY2:-0}
+        if [ "$CLX1" -gt 0 ] && [ "$CLY1" -gt 0 ]; then
+          CLTX=$(( (CLX1 + CLX2) / 2 ))
+          CLTY=$(( (CLY1 + CLY2) / 2 ))
+          echo "[seed-and-run] Dev tools sheet detected, tapping Close at ($CLTX, $CLTY) (${DEVTOOLS_CLOSE}/3) ..."
+          adb_tap $CLTX $CLTY
+        else
+          echo "[seed-and-run] Dev tools Close button bounds malformed ('$CLOSE_BOUNDS'), pressing Back ..."
+          $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
+        fi
+      else
+        echo "[seed-and-run] Dev tools sheet detected but Close button not found, pressing Back ..."
+        $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
+      fi
       sleep 1
+      continue
+    fi
+
+    # ANR dialog ("isn't responding") — tap "Wait" to dismiss and keep waiting
+    # WHPX emulators trigger ANR during React Native JS engine cold start after pm clear.
+    if echo "$DUMP" | grep -q "isn't responding"; then
+      ANR_WAIT_COUNT=${ANR_WAIT_COUNT:-0}
+      ANR_WAIT_COUNT=$((ANR_WAIT_COUNT + 1))
+      if [ $ANR_WAIT_COUNT -gt 5 ]; then
+        echo "[seed-and-run] FATAL: ANR dialog appeared 5 times. App is stuck." >&2
+        exit 1
+      fi
+      WAIT_BOUNDS=$(echo "$DUMP" | grep -oP '"Wait"[^>]*bounds="\K[^"]+' || echo "")
+      if [ -n "$WAIT_BOUNDS" ]; then
+        WX1=$(echo "$WAIT_BOUNDS" | grep -oP '\d+' | sed -n '1p')
+        WY1=$(echo "$WAIT_BOUNDS" | grep -oP '\d+' | sed -n '2p')
+        WX2=$(echo "$WAIT_BOUNDS" | grep -oP '\d+' | sed -n '3p')
+        WY2=$(echo "$WAIT_BOUNDS" | grep -oP '\d+' | sed -n '4p')
+        WX1=${WX1:-0}; WY1=${WY1:-0}; WX2=${WX2:-0}; WY2=${WY2:-0}
+        WTX=$(( (WX1 + WX2) / 2 ))
+        WTY=$(( (WY1 + WY2) / 2 ))
+        echo "[seed-and-run] ANR dialog detected (${ANR_WAIT_COUNT}/5), tapping 'Wait' at ($WTX, $WTY) ..."
+        adb_tap $WTX $WTY
+      else
+        echo "[seed-and-run] ANR dialog detected but 'Wait' button not found, pressing Back ..."
+        $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
+      fi
+      sleep 3
       continue
     fi
 
@@ -290,7 +343,9 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
     fi
 
     # Unknown state — log what's visible for diagnosis
-    VISIBLE_TEXTS=$(echo "$DUMP" | grep -oP 'text="\K[^"]+' | head -5 | tr '\n' ', ')
+    # NOTE: || true prevents set -euo pipefail from killing the script when grep
+    # returns 1 (no text values in the dump, e.g., during React Native loading).
+    VISIBLE_TEXTS=$(echo "$DUMP" | grep -oP 'text="\K[^"]+' | head -5 | tr '\n' ', ' || true)
     echo "[seed-and-run] Loading (${BUNDLE_ELAPSED}s) visible=[${VISIBLE_TEXTS:-empty}]"
   else
     # UI dump failed — likely overlay blocking uiautomator (OOM)
@@ -302,7 +357,7 @@ if [ $BUNDLE_ELAPSED -ge $BUNDLE_TIMEOUT ]; then
   echo "[seed-and-run] FATAL: Bundle did not load within ${BUNDLE_TIMEOUT}s" >&2
   # Dump final state for diagnosis
   MSYS_NO_PATHCONV=1 $ADB $DEVICE_FLAG shell uiautomator dump /sdcard/ui_dump.xml 2>/dev/null || true
-  FINAL_TEXTS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null | grep -oP 'text="\K[^"]+' | head -10 | tr '\n' ', ')
+  FINAL_TEXTS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null | grep -oP 'text="\K[^"]+' | head -10 | tr '\n' ', ' || true)
   echo "[seed-and-run] Final screen: [${FINAL_TEXTS:-empty/no text}]" >&2
   exit 1
 fi
