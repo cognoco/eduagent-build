@@ -77,16 +77,21 @@ export function BookPageFlipAnimation({
     page3.value = buildFlipSequence(STAGGER_MS * 2) as number;
   }, [reduceMotion, page1, page2, page3]);
 
+  // transformOrigin 'left center' pivots the scaleX around the left (spine) edge,
+  // matching the original SVG translate-scale-translate trick.
   const page1Style = useAnimatedStyle(() => ({
     transform: [{ scaleX: page1.value }],
+    transformOrigin: 'left center',
   }));
 
   const page2Style = useAnimatedStyle(() => ({
     transform: [{ scaleX: page2.value }],
+    transformOrigin: 'left center',
   }));
 
   const page3Style = useAnimatedStyle(() => ({
     transform: [{ scaleX: page3.value }],
+    transformOrigin: 'left center',
   }));
 
   // Proportional layout — all values relative to the logical 120×120 viewbox
@@ -139,7 +144,7 @@ export function BookPageFlipAnimation({
         }}
       />
 
-      {/* Page 1 — scaleX flips around its center (transformOrigin defaults to center) */}
+      {/* Page 1 — scaleX flips around the left (spine) edge via transformOrigin */}
       <Animated.View
         style={[
           {

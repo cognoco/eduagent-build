@@ -672,9 +672,9 @@ java.lang.ClassCastException: java.lang.String cannot be cast to...
 
 ## BUG-34: `onboarding-complete` Scenario Auto-Redirects Away from Home Screen (2026-03-10)
 
-**Status:** PARTIALLY FIXED (Session 10) — subjects added to `onboarding-complete`, `trial-active`, `trial-expired` seeds. BUT `onboarding-complete` flows now blocked by BUG-38 (PostApprovalLanding screen). Parent scenarios still blocked by BUG-33.
-**Severity:** High — blocks ~10 E2E flows (reduced, some now blocked by different bugs)
-**Affects:** All flows using `onboarding-complete`, `parent-solo`, `trial-active`, or `trial-expired` scenarios that expect `home-scroll-view` to remain visible after sign-in
+**Status:** PARTIALLY FIXED — subjects added to `onboarding-complete`, `trial-active`, `trial-expired` seeds + `topicId` now exposed in all three. Remaining: `parent-solo` and `parent-with-children` still have no subjects (parent owner profiles route to `(parent)/dashboard` anyway, so this is expected behavior, not a bug). BUG-33 (SVG crash) is now fixed separately.
+**Severity:** Medium (reduced from High) — remaining parent scenarios are handled by dashboard-scroll fallback in seed-and-sign-in.yaml
+**Affects:** Parent scenarios (`parent-solo`, `parent-with-children`) — these land on dashboard, not home, by design
 
 After signing in with `onboarding-complete` (and other subject-less scenarios), the home screen appears briefly but auto-redirects to `/create-subject` because `subjects.length === 0`. The `seed-and-sign-in.yaml` setup flow's `extendedWaitUntil visible id: home-scroll-view timeout: 30000` sometimes passes (race condition — catches the home screen before redirect) but the main flow's subsequent check fails.
 
@@ -704,11 +704,11 @@ This is **correct app behavior** — users with no subjects should be guided to 
 
 Additionally, `parent-solo` and `parent-with-children` scenarios create a PARENT as the owner profile. After sign-in, the app routes to `(parent)/dashboard` (not `(learner)/home`), so `home-scroll-view` is never rendered.
 
-**Fix options:**
-1. **Add a subject to `onboarding-complete` seed** — ensures the home screen stays visible. But changes the scenario's semantics (rename to `learner-with-subject`?).
-2. **Create separate scenarios** — `onboarding-no-subject` for flows that test empty state, `onboarding-with-subject` for flows that need the home screen.
-3. **Update the `seed-and-sign-in.yaml` setup flow** — check for either `home-scroll-view` OR the create-subject screen, and handle both.
-4. **For parent scenarios** — `seed-and-sign-in.yaml` needs to accept `dashboard-scroll` as an alternative success condition.
+**Fix applied (Option 1):** Subject added to `onboarding-complete`, `trial-active`, `trial-expired` seeds. `topicId` now exposed in return `ids` for all three.
+
+**Semantic drift note:** `onboarding-complete` no longer represents "just finished onboarding, no subjects." To test the empty-state `/create-subject` redirect, a new `onboarding-no-subject` scenario would be needed (Option 2). This is tracked but deferred — no current flow tests the empty-state path.
+
+**For parent scenarios (Option 4):** Already handled — `seed-and-sign-in.yaml` accepts `dashboard-scroll` as an alternative landing screen.
 
 ---
 

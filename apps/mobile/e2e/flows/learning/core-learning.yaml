@@ -38,11 +38,9 @@ tags:
     id: "chat-input"
 - inputText: "Explain the concept to me"
 # BUG-35: keyboard covers send button on Android. Use keyboard Enter key
-# (returnKeyType="send" triggers onSubmitEditing). Keep tapOn as optional fallback.
+# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
+# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
 - pressKey: Enter
-- tapOn:
-    id: "send-button"
-    optional: true
 
 # 6. Wait for AI response
 - extendedWaitUntil:
@@ -55,11 +53,9 @@ tags:
     id: "chat-input"
 - inputText: "Can you give me an example?"
 # BUG-35: keyboard covers send button on Android. Use keyboard Enter key
-# (returnKeyType="send" triggers onSubmitEditing). Keep tapOn as optional fallback.
+# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
+# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
 - pressKey: Enter
-- tapOn:
-    id: "send-button"
-    optional: true
 
 # 8. Wait for response
 - extendedWaitUntil:
@@ -72,11 +68,9 @@ tags:
     id: "chat-input"
 - inputText: "I think I understand, let me try to explain it back"
 # BUG-35: keyboard covers send button on Android. Use keyboard Enter key
-# (returnKeyType="send" triggers onSubmitEditing). Keep tapOn as optional fallback.
+# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
+# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
 - pressKey: Enter
-- tapOn:
-    id: "send-button"
-    optional: true
 
 # 10. Wait for response
 - extendedWaitUntil:

@@ -186,6 +186,7 @@ if [ -n "$METRO_BOUNDS" ]; then
   Y1=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '2p')
   X2=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '3p')
   Y2=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '4p')
+  X1=${X1:-0}; Y1=${Y1:-0}; X2=${X2:-0}; Y2=${Y2:-0}
   TAP_X=$(( (X1 + X2) / 2 ))
   TAP_Y=$(( (Y1 + Y2) / 2 ))
   echo "[seed-and-run] Tapping Metro at ($TAP_X, $TAP_Y) ..."
@@ -255,6 +256,7 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
       CY1=$(echo "$CONTINUE_BOUNDS" | grep -oP '\d+' | sed -n '2p')
       CX2=$(echo "$CONTINUE_BOUNDS" | grep -oP '\d+' | sed -n '3p')
       CY2=$(echo "$CONTINUE_BOUNDS" | grep -oP '\d+' | sed -n '4p')
+      CX1=${CX1:-0}; CY1=${CY1:-0}; CX2=${CX2:-0}; CY2=${CY2:-0}
       CTX=$(( (CX1 + CX2) / 2 ))
       CTY=$(( (CY1 + CY2) / 2 ))
       echo "[seed-and-run] Tapping 'Continue' at ($CTX, $CTY) ..."
@@ -281,15 +283,49 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
         CLY1=$(echo "$CLOSE_BOUNDS" | grep -oP '\d+' | sed -n '2p')
         CLX2=$(echo "$CLOSE_BOUNDS" | grep -oP '\d+' | sed -n '3p')
         CLY2=$(echo "$CLOSE_BOUNDS" | grep -oP '\d+' | sed -n '4p')
-        CLTX=$(( (CLX1 + CLX2) / 2 ))
-        CLTY=$(( (CLY1 + CLY2) / 2 ))
-        echo "[seed-and-run] Dev tools sheet detected, tapping Close at ($CLTX, $CLTY) (${DEVTOOLS_CLOSE}/3) ..."
-        adb_tap $CLTX $CLTY
+        CLX1=${CLX1:-0}; CLY1=${CLY1:-0}; CLX2=${CLX2:-0}; CLY2=${CLY2:-0}
+        if [ "$CLX1" -gt 0 ] && [ "$CLY1" -gt 0 ]; then
+          CLTX=$(( (CLX1 + CLX2) / 2 ))
+          CLTY=$(( (CLY1 + CLY2) / 2 ))
+          echo "[seed-and-run] Dev tools sheet detected, tapping Close at ($CLTX, $CLTY) (${DEVTOOLS_CLOSE}/3) ..."
+          adb_tap $CLTX $CLTY
+        else
+          echo "[seed-and-run] Dev tools Close button bounds malformed ('$CLOSE_BOUNDS'), pressing Back ..."
+          $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
+        fi
       else
         echo "[seed-and-run] Dev tools sheet detected but Close button not found, pressing Back ..."
         $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
       fi
       sleep 1
+      continue
+    fi
+
+    # ANR dialog ("isn't responding") — tap "Wait" to dismiss and keep waiting
+    # WHPX emulators trigger ANR during React Native JS engine cold start after pm clear.
+    if echo "$DUMP" | grep -q "isn't responding"; then
+      ANR_WAIT_COUNT=${ANR_WAIT_COUNT:-0}
+      ANR_WAIT_COUNT=$((ANR_WAIT_COUNT + 1))
+      if [ $ANR_WAIT_COUNT -gt 5 ]; then
+        echo "[seed-and-run] FATAL: ANR dialog appeared 5 times. App is stuck." >&2
+        exit 1
+      fi
+      WAIT_BOUNDS=$(echo "$DUMP" | grep -oP '"Wait"[^>]*bounds="\K[^"]+' || echo "")
+      if [ -n "$WAIT_BOUNDS" ]; then
+        WX1=$(echo "$WAIT_BOUNDS" | grep -oP '\d+' | sed -n '1p')
+        WY1=$(echo "$WAIT_BOUNDS" | grep -oP '\d+' | sed -n '2p')
+        WX2=$(echo "$WAIT_BOUNDS" | grep -oP '\d+' | sed -n '3p')
+        WY2=$(echo "$WAIT_BOUNDS" | grep -oP '\d+' | sed -n '4p')
+        WX1=${WX1:-0}; WY1=${WY1:-0}; WX2=${WX2:-0}; WY2=${WY2:-0}
+        WTX=$(( (WX1 + WX2) / 2 ))
+        WTY=$(( (WY1 + WY2) / 2 ))
+        echo "[seed-and-run] ANR dialog detected (${ANR_WAIT_COUNT}/5), tapping 'Wait' at ($WTX, $WTY) ..."
+        adb_tap $WTX $WTY
+      else
+        echo "[seed-and-run] ANR dialog detected but 'Wait' button not found, pressing Back ..."
+        $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
+      fi
+      sleep 3
       continue
     fi
 

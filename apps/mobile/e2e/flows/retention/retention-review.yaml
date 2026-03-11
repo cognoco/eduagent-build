@@ -61,11 +61,9 @@ tags:
 
 # 8. Submit answer
 # BUG-35: keyboard covers send button on Android. Use keyboard Enter key
-# (returnKeyType="send" triggers onSubmitEditing). Keep tapOn as optional fallback.
+# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
+# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
 - pressKey: Enter
-- tapOn:
-    id: "send-button"
-    optional: true
 
 # 9. Wait for AI feedback response
 - extendedWaitUntil:
@@ -76,6 +74,10 @@ tags:
 # 10. Take screenshot of feedback
 - takeScreenshot: retention-review-feedback
 
+# TODO: Steps 11-12 assume a second card is due. If chat-input isn't found
+# (optional), inputText and pressKey: Enter fire on whatever is focused.
+# Maestro has no conditional execution — accept this limitation for now.
+
 # 11. Enter a second recall answer (if multiple cards due)
 - tapOn:
     id: "chat-input"
@@ -84,11 +86,9 @@ tags:
 
 # 12. Submit second answer (optional)
 # BUG-35: keyboard covers send button on Android. Use keyboard Enter key
-# (returnKeyType="send" triggers onSubmitEditing). Keep tapOn as optional fallback.
+# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
+# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
 - pressKey: Enter
-- tapOn:
-    id: "send-button"
-    optional: true
 
 # 13. Wait for second feedback
 - extendedWaitUntil:
