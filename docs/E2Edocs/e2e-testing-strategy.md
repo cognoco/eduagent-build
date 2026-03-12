@@ -443,6 +443,7 @@ See `e2e-test-bugs.md` BUG-49 and `e2e-emulator-issues.md` Issue 21 for full det
 |------|-------------|
 | `seed-and-sign-in.yaml` | Standard flows — signs in and waits for `home-scroll-view` or `dashboard-scroll-view` |
 | `sign-in-only.yaml` | Edge-case flows where post-auth screen is NOT home/dashboard (e.g., 0-subjects redirect to create-subject, consent-withdrawn gate). Does NOT attempt post-auth navigation recovery. |
+| `switch-to-child.yaml` | Multi-profile flows where the seed creates a parent-owned account but the test needs the child's perspective. Navigates More → Profile → taps child by name → waits for learner home. Accepts `${CHILD_NAME}` env var. |
 
 See `e2e-test-bugs.md` BUG-51 for why `sign-in-only.yaml` was needed.
 
@@ -503,7 +504,7 @@ apps/
   mobile/
     e2e/
       flows/
-        _setup/                       # 18 setup helpers (seed-and-sign-in, sign-in-only, dismiss-*, etc.)
+        _setup/                       # 19 setup helpers (seed-and-sign-in, sign-in-only, dismiss-*, etc.)
         account/                      # Account management flows
         billing/                      # Subscription/trial flows
         consent/                      # GDPR consent flows
@@ -540,7 +541,7 @@ tests/
     e2e-ci.yml                        # E2E workflow (Maestro + Android emulator)
 ```
 
-**Flow inventory:** 54 unique test flows + 18 setup helpers = 72 YAML files total.
+**Flow inventory:** 54 unique test flows + 19 setup helpers = 72 YAML files total.
 
 This follows the project convention: co-located unit tests in `*.test.ts`, integration/E2E tests in top-level `tests/` directory (per `docs/project_context.md` rule 146). The `jest.config.cjs` maps `@eduagent/*` and `@eduagent/api` to source paths for Hono `app.request()` testing.
 
@@ -554,7 +555,7 @@ Progress as of 2026-03-12:
 
 1. **API integration test harness** — **DONE.** `tests/integration/` with 10 suites (auth-chain, health-cors, onboarding, account-deletion, profile-isolation, session-completed-chain, stripe-webhook, test-seed, learning-session, retention-lifecycle), `setup.ts`, `mocks.ts`, and `jest.config.cjs`. Uses Hono `app.request()` against PostgreSQL service container.
 2. **Inngest chain integration tests** — **DONE.** `session-completed-chain.integration.test.ts` validates all 6 steps, error isolation, skip logic, and FR92 interleaved topics.
-3. **Maestro setup** — **DONE.** `apps/mobile/e2e/` with `config.yaml`, `scripts/seed-and-run.sh` (ADB automation + seed + Maestro), `_setup/seed-and-sign-in.yaml`, `_setup/sign-in-only.yaml` (edge-case flows), `_setup/sign-out.yaml`, Nx `e2e` target with smoke configuration, and 54 total test flows + 18 setup helpers.
+3. **Maestro setup** — **DONE.** `apps/mobile/e2e/` with `config.yaml`, `scripts/seed-and-run.sh` (ADB automation + seed + Maestro), `_setup/seed-and-sign-in.yaml`, `_setup/sign-in-only.yaml` (edge-case flows), `_setup/sign-out.yaml`, Nx `e2e` target with smoke configuration, and 54 total test flows + 19 setup helpers.
 4. **CI wiring** — **DONE.** `.github/workflows/e2e-ci.yml` with PostgreSQL service container for both jobs, API server background startup + health check for mobile-maestro job. Advisory mode (`continue-on-error: true`).
 5. **Smoke suite buildout** — **DONE.** All planned smoke and nightly flows written. 43 flows confirmed passing on Android emulator (as of Session 15). 3 flows fail due to LLM connectivity, 1 needs custom sign-in mechanism, 4 not yet runnable (need `launch-devclient.yaml`).
 6. **Seed infrastructure** — **DONE.** `seed-and-run.sh` (shell wrapper: curl + node JSON parsing + ADB automation + Maestro `-e` flags). `test-seed.ts` service with 14 scenarios (onboarding-complete, onboarding-no-subject, learning-active, retention-due, failed-recall-3x, parent-with-children, trial-active, trial-expired, multi-subject, homework-ready, trial-expired-child, consent-withdrawn, consent-withdrawn-solo, parent-solo). Bypasses Maestro's broken GraalJS `runScript` (Issue 13).

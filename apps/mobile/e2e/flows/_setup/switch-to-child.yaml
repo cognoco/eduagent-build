@@ -1,0 +1,60 @@
+# Switch from parent (or any owner) to a child profile via Profiles screen.
+#
+# Called after seed-and-sign-in.yaml when the active profile is the parent
+# but the test needs the child's perspective (e.g., ChildPaywall).
+#
+# Works from both parent dashboard and learner home — both layouts have
+# a "More" tab with a "Profile" row that pushes to /profiles.
+#
+# Required env var:
+#   ${CHILD_NAME} — Display name of the child profile to switch to
+#
+# After this flow, the app is on the learner home (home-scroll-view).
+appId: com.mentomate.app
+---
+# 1. Navigate to More tab (works from both parent dashboard and learner home)
+- tapOn:
+    text: "More"
+
+# 2. Wait for More screen to load
+- extendedWaitUntil:
+    visible:
+      text: "Appearance"
+    timeout: 10000
+
+# 3. Scroll to find Profile row and tap it
+- scrollUntilVisible:
+    element:
+      text: "Profile"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    text: "Profile"
+
+# 4. Wait for profiles screen
+- extendedWaitUntil:
+    visible:
+      id: "profiles-screen"
+    timeout: 10000
+
+# 5. Tap the child profile by name
+- tapOn:
+    text: ${CHILD_NAME}
+
+# 6. After switching, persona changes from PARENT → TEEN/LEARNER.
+# profiles.tsx calls router.back() → returns to More tab → layout guard
+# re-evaluates → TEEN persona redirects to (learner)/home.
+
+# 7. BUG-38 safety: PostApprovalLanding may appear after switching to a
+# TEEN profile with CONSENTED status when SecureStore was wiped (pm clear).
+- runFlow:
+    when:
+      visible: "You're approved!"
+    file: dismiss-post-approval.yaml
+
+# 8. Wait for learner home screen
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000

@@ -307,6 +307,15 @@ export async function routeAndStream(
   // --- Try primary provider ---
   if (canAttempt(config.provider)) {
     const fallbackConfig = getFallbackConfig(config, rung);
+    console.info(
+      `[llm] routeAndStream: primary=${config.provider}/${
+        config.model
+      }, fallback=${
+        fallbackConfig
+          ? `${fallbackConfig.provider}/${fallbackConfig.model}`
+          : 'none'
+      }`
+    );
     // NOTE: recordSuccess/recordFailure fire during iteration, not here,
     // because chatStream() returns a lazy AsyncIterable — the actual HTTP
     // request and data flow happen in the caller's for-await loop.

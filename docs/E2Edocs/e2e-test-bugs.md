@@ -1029,3 +1029,26 @@ Additionally, the PostApprovalLanding ("You're approved!") intercepts after `pm 
 **Files changed:**
 - `e2e/flows/_setup/sign-in-only.yaml` (new)
 - `e2e/flows/edge/empty-first-user.yaml` — rewritten setup sequence
+
+---
+
+## BUG-52: child-paywall Flow Signs In as Parent, Not Child (2026-03-12)
+
+**Status:** FIXED (2026-03-12) — new `switch-to-child.yaml` setup flow
+**Severity:** HIGH — flow fails at step 2 (never reaches ChildPaywall)
+**Affects:** `billing/child-paywall.yaml`
+
+The `trial-expired-child` seed creates a parent-owned account with a parent profile (owner) and child profile (non-owner). Sign-in authenticates as the parent, landing on the parent dashboard (`dashboard-scroll`). The flow then waits for `home-scroll-view` (step 2), which never appears → timeout failure.
+
+Even if step 2 were fixed, the ChildPaywall would not render because the active profile is the parent (owner). The ChildPaywall component gates on `!activeProfile.isOwner && subscription.status === 'expired'` — it requires the non-owner child profile to be active.
+
+**Same class of issue as BUG-50** (consent-withdrawn multi-profile seed). BUG-50 was solved by creating a solo seed variant. That approach doesn't work here because the ChildPaywall *requires* a non-owner profile — you can't make a solo profile that is both owner and non-owner.
+
+**Fix:**
+1. Created `switch-to-child.yaml` — reusable setup flow that navigates More → Profile → taps child by name → waits for learner home after persona redirect
+2. Updated `child-paywall.yaml` to run `switch-to-child.yaml` after `seed-and-sign-in.yaml`
+3. Includes PostApprovalLanding dismiss (BUG-38 safety) since `pm clear` wipes SecureStore
+
+**Files changed:**
+- `e2e/flows/_setup/switch-to-child.yaml` (new)
+- `e2e/flows/billing/child-paywall.yaml` — added profile switch step

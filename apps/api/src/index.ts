@@ -54,6 +54,7 @@ type Bindings = {
   CLERK_JWKS_URL?: string;
   CLERK_AUDIENCE?: string;
   GEMINI_API_KEY?: string;
+  OPENAI_API_KEY?: string;
   LOG_LEVEL?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;

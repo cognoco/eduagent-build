@@ -470,7 +470,7 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 | 19 | `account/settings-toggles` | **PARTIAL** | All settings features work; fails only on BUG-18 persona switch at end |
 | 20 | `onboarding/curriculum-review-flow` | **FAIL** | `view-curriculum-button` not found (LLM dependency — button only appears after AI generates structured curriculum response) |
 | 21 | `billing/subscription-details` | **FAIL** | "Bring your own key (coming soon)" text not found; may have been removed or renamed |
-| 22 | `billing/child-paywall` | **FAIL** | ChildPaywall screen intercepts instead of home; flow design needs own sign-in like post-approval-landing |
+| 22 | `billing/child-paywall` | **FAIL** | BUG-52: sign-in as parent lands on dashboard, active profile is parent not child. Fixed: added switch-to-child.yaml setup step. Needs re-test. |
 | 23 | `homework/homework-flow` | **FAIL** | Navigation to homework session via HW tab broke; `chat-input` not found after optional steps |
 | 24 | `learning/session-summary` | **FAIL** | `end-session-button` not visible after 3 LLM exchanges (BUG-37: exchangeCount may not increment from streaming) |
 | 25 | `retention/topic-detail` | **FAIL** | `retention-card` testID not found in Learning Book |
@@ -493,7 +493,7 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 | Category | Count | Flows |
 |----------|-------|-------|
 | LLM-dependent (need specific AI response) | 3 | curriculum-review, analogy-preference, session-summary |
-| Flow design (wrong scenario, navigation path, or text mismatch) | 4 | child-paywall, homework-flow, empty-first-user, subscription-details |
+| Flow design (wrong scenario, navigation path, or text mismatch) | 4 | child-paywall (BUG-52 fixed), homework-flow, empty-first-user, subscription-details |
 | TestID mismatch (testID not found in current UI) | 2 | topic-detail (`retention-card`), consent-withdrawn-gate |
 | Text mismatch (expected text not in current UI) | 1 | relearn-flow |
 | App logic (unexpected navigation behavior) | 1 | multi-subject |
@@ -552,7 +552,7 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 
 **Key findings:**
 
-1. **7 of 8 non-LLM failures fixed.** All flow-design, testID mismatch, text mismatch, and app-logic failures from Session 14 are now resolved. Only child-paywall remains (needs custom sign-in mechanism).
+1. **7 of 8 non-LLM failures fixed.** All flow-design, testID mismatch, text mismatch, and app-logic failures from Session 14 are now resolved. child-paywall fixed post-session (BUG-52: switch-to-child.yaml — needs re-test).
 
 2. **Maestro text matching quirks documented.** Three distinct patterns where Maestro fails to match text on Android: (a) text inside nested `<Text>` children of `<Pressable>` with testID, (b) long wrapping text in single `<Text>` node, (c) text with regex special chars (parentheses). Fix: use testIDs or escape regex.
 
@@ -581,7 +581,7 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 | Seed-dependent (edge) | 1 | **PASS** (empty-first-user) |
 | Partial: settings-toggles | 1 | **PARTIAL** — all settings OK, fails at parent switch-to-teen (BUG-18) |
 | LLM-dependent (need structured AI response) | 3 | **FAIL** — curriculum-review, analogy-preference, session-summary |
-| Flow design issues | 1 | **FAIL** — child-paywall (needs custom sign-in mechanism) |
+| Flow design issues | 1 | **FIXED** — child-paywall (BUG-52: added switch-to-child.yaml, needs re-test) |
 | Not yet run (need launch-devclient mechanism) | 4 | **NOT RUN** — coppa-flow, profile-creation-consent, consent-pending-gate, sign-up-flow |
 | ExpoGo-only | 1 | **SKIP** (wrong app type) |
 | **Total** | **53** | **43 confirmed passing, 1 partial, 4 failing, 4 not yet run, 1 skipped** |
@@ -591,14 +591,14 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 | Priority | Category | Flows | Fix Type |
 |----------|----------|-------|----------|
 | P1 | LLM-dependent | 3 | Mock LLM mode, wait-and-retry flow design, or fix LLM API keys |
-| P2 | Flow design | 1 | child-paywall needs custom sign-in (like consent-withdrawn-gate) |
+| P2 | Flow design | 1 | child-paywall — FIXED (BUG-52: switch-to-child.yaml), awaiting re-test on emulator |
 | P3 | Not yet run | 4 | Need `launch-devclient.yaml` mechanism for standalone flows |
 
 ---
 
 ## References
 
-- **Bug details:** See `e2e-test-bugs.md` for all bug entries (BUG-1 through BUG-48) with root causes, fixes, and workarounds.
+- **Bug details:** See `e2e-test-bugs.md` for all bug entries (BUG-1 through BUG-52) with root causes, fixes, and workarounds.
 - **Environment setup:** See `e2e-emulator-issues.md` for emulator configuration, known environment issues, and operational notes.
 - **Infrastructure:** See `e2e-tech-spec.md` for flow specifications, seeding architecture, and CI integration.
 - **Screenshots:** Maestro test output at `~/.maestro/tests/` — directories timestamped per run, contains PNGs for warning/failure steps.

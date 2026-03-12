@@ -6,25 +6,33 @@
 #
 # Journey: UX Journey 5 (Billing & Subscription) + Consent Lifecycle
 # Epics: Epic 5, Epic 9 (RevenueCat IAP), UX Persona Walkthrough
-# Prerequisite: Seeded child user with expired trial (scenario: trial-expired-child)
+# Prerequisite: Seeded parent+child account with expired trial
+#               (scenario: trial-expired-child)
+#
+# BUG-52: The trial-expired-child seed creates a parent-owned account.
+# Sign-in authenticates as the parent (account owner), landing on the parent
+# dashboard. The ChildPaywall only renders for non-owner profiles with an
+# expired trial. Fix: switch to the child profile before navigating to
+# the Subscription screen.
 appId: com.mentomate.app
 tags:
   - nightly
   - billing
   - consent
 ---
-# 1. Seed & sign in as child with expired trial
+# 1. Seed & sign in — lands on parent dashboard (owner is PARENT persona)
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
       SEED_SCENARIO: "trial-expired-child"
       API_URL: ${API_URL}
 
-# 2. Wait for home screen
-- extendedWaitUntil:
-    visible:
-      id: "home-scroll-view"
-    timeout: 15000
+# 2. Switch to child profile (BUG-52 fix)
+# Navigates: parent dashboard → More → Profile → tap "Paywall Teen" → learner home
+- runFlow:
+    file: ../_setup/switch-to-child.yaml
+    env:
+      CHILD_NAME: "Paywall Teen"
 
 # 3. Navigate to More tab (BUG-15: use text, not testID)
 - tapOn:
