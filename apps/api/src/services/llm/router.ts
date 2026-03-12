@@ -247,7 +247,8 @@ async function* wrapStreamWithCircuitBreaker(
   source: AsyncIterable<string>,
   providerId: string,
   fallbackConfig: ModelConfig | null,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  onFallback?: () => void
 ): AsyncIterable<string> {
   let chunksYielded = 0;
   try {
@@ -268,6 +269,7 @@ async function* wrapStreamWithCircuitBreaker(
             fallbackConfig.provider
           }: ${err instanceof Error ? err.message : String(err)}`
         );
+        onFallback?.();
         yield* wrapStreamWithCircuitBreaker(
           fallbackProvider.chatStream(messages, fallbackConfig),
           fallbackConfig.provider,
@@ -308,16 +310,23 @@ export async function routeAndStream(
     // NOTE: recordSuccess/recordFailure fire during iteration, not here,
     // because chatStream() returns a lazy AsyncIterable — the actual HTTP
     // request and data flow happen in the caller's for-await loop.
+    let fallbackFired = false;
     const stream = wrapStreamWithCircuitBreaker(
       provider.chatStream(messages, config),
       config.provider,
       fallbackConfig,
-      messages
+      messages,
+      () => {
+        fallbackFired = true;
+      }
     );
     return {
       stream,
       provider: config.provider,
       model: config.model,
+      get fallbackUsed() {
+        return fallbackFired;
+      },
     };
   }
 

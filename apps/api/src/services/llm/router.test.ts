@@ -4,8 +4,28 @@ import {
   registerProvider,
   getRegisteredProviders,
   _clearProviders,
+  _resetCircuits,
 } from './router';
 import { createMockProvider } from './providers/mock';
+import type { LLMProvider } from './types';
+
+/** Mock provider whose chatStream always throws (for testing stream fallback). */
+function createFailingStreamProvider(id: string): LLMProvider {
+  return {
+    ...createMockProvider(id),
+    chatStream(): AsyncIterable<string> {
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            async next(): Promise<IteratorResult<string>> {
+              throw new Error('Stream connection lost');
+            },
+          };
+        },
+      };
+    },
+  };
+}
 
 // Register mock as 'gemini' so getModelConfig routing works
 beforeAll(() => {
@@ -102,6 +122,50 @@ describe('LLM Router', () => {
       );
 
       expect(result.model).toBe('gemini-2.5-pro');
+    });
+  });
+
+  describe('streaming fallback (pre-first-byte failure)', () => {
+    beforeAll(() => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createFailingStreamProvider('gemini'));
+      registerProvider(createMockProvider('openai'));
+    });
+
+    afterAll(() => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    it('falls back to openai and sets fallbackUsed on stream failure', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const result = await routeAndStream(
+        [{ role: 'user', content: 'test' }],
+        1
+      );
+
+      // Provider metadata reflects initial selection (gemini)
+      expect(result.provider).toBe('gemini');
+      expect(result.fallbackUsed).toBe(false);
+
+      // Consume stream — triggers fallback internally
+      const chunks: string[] = [];
+      for await (const chunk of result.stream) {
+        chunks.push(chunk);
+      }
+
+      // Data came from the openai fallback mock
+      expect(chunks.length).toBeGreaterThan(0);
+      expect(chunks.join('')).toContain('Mock streamed');
+      // fallbackUsed is set after stream consumption
+      expect(result.fallbackUsed).toBe(true);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('failed before first byte, trying fallback')
+      );
+      warnSpy.mockRestore();
     });
   });
 

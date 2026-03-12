@@ -64,7 +64,7 @@ describe('OpenAI Provider', () => {
       const body = JSON.parse(opts.body);
       expect(body.model).toBe('gpt-4o-mini');
       expect(body.messages).toHaveLength(2);
-      expect(body.max_tokens).toBe(4096);
+      expect(body.max_completion_tokens).toBe(4096);
     });
 
     it('throws on non-2xx response', async () => {
@@ -103,6 +103,14 @@ describe('OpenAI Provider', () => {
       await expect(provider.chat(TEST_MESSAGES, TEST_CONFIG)).rejects.toThrow(
         'OpenAI returned empty response'
       );
+    });
+
+    it('passes AbortSignal with 25s timeout to fetch', async () => {
+      mockFetch.mockResolvedValueOnce(createOkResponse('test'));
+      await provider.chat(TEST_MESSAGES, TEST_CONFIG);
+
+      const opts = mockFetch.mock.calls[0][1];
+      expect(opts.signal).toBeInstanceOf(AbortSignal);
     });
 
     it('throws when choices[0].message.content is undefined', async () => {

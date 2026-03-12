@@ -7,6 +7,10 @@ import type { LLMProvider, ChatMessage, ModelConfig } from '../types';
 
 const OPENAI_BASE_URL = 'https://api.openai.com/v1/chat/completions';
 
+// 25s timeout — CF Workers have a 30s subrequest wall; this gives 5s buffer
+// and ensures the circuit breaker gets timely failure signals on hangs.
+const OPENAI_TIMEOUT_MS = 25_000;
+
 // ---------------------------------------------------------------------------
 // Message conversion
 // ---------------------------------------------------------------------------
@@ -19,7 +23,7 @@ interface OpenAIMessage {
 interface OpenAIRequest {
   model: string;
   messages: OpenAIMessage[];
-  max_tokens: number;
+  max_completion_tokens: number;
   stream?: boolean;
 }
 
@@ -75,7 +79,7 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
       const body: OpenAIRequest = {
         model: mapModel(config),
         messages: toOpenAIMessages(messages),
-        max_tokens: config.maxTokens,
+        max_completion_tokens: config.maxTokens,
       };
 
       const res = await fetch(OPENAI_BASE_URL, {
@@ -85,6 +89,7 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
       });
 
       if (!res.ok) {
@@ -114,7 +119,7 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
       const body: OpenAIRequest = {
         model: mapModel(config),
         messages: toOpenAIMessages(messages),
-        max_tokens: config.maxTokens,
+        max_completion_tokens: config.maxTokens,
         stream: true,
       };
 
@@ -125,6 +130,7 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
       });
 
       if (!res.ok) {

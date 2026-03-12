@@ -56,7 +56,14 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
   await next();
 });
 
-/** Reset initialization state — only for testing */
+/**
+ * Reset initialization state — only for testing.
+ *
+ * NOTE: This only resets the `initialized` flag so the middleware re-runs
+ * provider registration on the next request. It does NOT clear the provider
+ * registry in router.ts. For full test isolation, also call `_clearProviders()`
+ * from `@eduagent/services/llm` to remove previously registered providers.
+ */
 export function resetLlmMiddleware(): void {
   initialized = false;
 }
