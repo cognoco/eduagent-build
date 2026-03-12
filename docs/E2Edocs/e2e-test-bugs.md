@@ -969,3 +969,63 @@ After sign-in with a parent scenario, the app briefly shows `home-scroll-view` (
 **Files changed:**
 - `e2e/flows/_setup/return-to-home-safe.yaml` (new)
 - `e2e/flows/_setup/seed-and-sign-in.yaml` (updated to reference safe variant)
+
+---
+
+## BUG-49: Maestro Text Matching Failures on Android (2026-03-12)
+
+**Status:** DOCUMENTED — workarounds applied in Session 15 flows
+**Severity:** MEDIUM — affects any flow using `text:` selectors for taps/assertions
+**Affects:** `topic-detail`, `relearn-flow`, `subscription-details`, and any flow matching text inside nested elements
+
+Three distinct patterns where Maestro fails to match visible text on Android:
+
+1. **Nested `<Text>` inside `<Pressable>` with testID:** Text like "2 sessions" rendered in a `<Text>` child inside a `<Pressable testID="topic-row-{id}">` is invisible to Maestro's `text:` selector. Root cause: Maestro may treat the `<Pressable>` as a single accessible element and not traverse children.
+
+2. **Long wrapping text in single `<Text>` node:** Text like "Every topic needs its own approach. Let's find what clicks for you!" wraps across 2+ lines. Maestro's regex matcher fails to find even substrings like "Every topic needs its own approach". Root cause: possible line-break injection in accessibility text.
+
+3. **Regex special characters:** Text containing literal parentheses, e.g. "Bring your own key (coming soon)", fails because Maestro treats `text:` as regex. Unescaped `(` `)` create malformed regex groups.
+
+**Workarounds:**
+- Pattern 1 & 2: Use `testID` selectors or tap specific known text (e.g., topic names from seed)
+- Pattern 3: Escape regex chars with `\\(` `\\)`
+
+---
+
+## BUG-50: consent-withdrawn Seed Creates Parent+Child (Wrong Profile Selected) (2026-03-12)
+
+**Status:** FIXED (2026-03-12) — new `consent-withdrawn-solo` seed scenario
+**Severity:** HIGH — consent-withdrawn-gate flow could never pass
+**Affects:** `consent/consent-withdrawn-gate.yaml`
+
+The `consent-withdrawn` seed scenario creates a parent profile (isOwner: true) and a child profile (TEEN, WITHDRAWN consent) under one account. After sign-in, the app's profile selection logic picks the parent (owner) profile, showing the parent dashboard instead of the child's consent-withdrawn-gate.
+
+**Root cause:** The app picks the first/owner profile on sign-in. The child profile with WITHDRAWN consent is never selected, so the consent-withdrawn-gate component never renders.
+
+**Fix:** Created `consent-withdrawn-solo` seed scenario with a single LEARNER profile that has WITHDRAWN consent. No parent profile, no profile switching needed. Updated `consent-withdrawn-gate.yaml` to use the new scenario.
+
+**Files changed:**
+- `apps/api/src/services/test-seed.ts` — added `seedConsentWithdrawnSolo()` + type + map entry
+- `e2e/flows/consent/consent-withdrawn-gate.yaml` — use `consent-withdrawn-solo` scenario
+
+---
+
+## BUG-51: empty-first-user Breaks seed-and-sign-in Return-to-Home Logic (2026-03-12)
+
+**Status:** FIXED (2026-03-12) — new `sign-in-only.yaml` setup flow
+**Severity:** MEDIUM — only affects flows where post-auth screen is not home/dashboard
+**Affects:** `edge/empty-first-user.yaml`
+
+With `onboarding-no-subject` seed (0 subjects), `home.tsx` immediately redirects to `/create-subject`. The `seed-and-sign-in.yaml` recovery logic detects `home-scroll-view` is gone and fires `return-to-home-safe.yaml`, which presses Back — but there's no home to return to (it keeps redirecting). This creates a fatal loop.
+
+Additionally, the PostApprovalLanding ("You're approved!") intercepts after `pm clear` wipes SecureStore. The sign-in-only flow needs explicit handling for this screen.
+
+**Fix:**
+1. Created `sign-in-only.yaml` — minimal sign-in without any post-auth recovery
+2. Flow uses `sign-in-only.yaml` instead of `seed-and-sign-in.yaml`
+3. Added explicit PostApproval wait + dismiss before checking for create-subject
+4. Changed "learning coach" text assertion to "Your coach is here" header text (chat bubble text invisible to Maestro)
+
+**Files changed:**
+- `e2e/flows/_setup/sign-in-only.yaml` (new)
+- `e2e/flows/edge/empty-first-user.yaml` — rewritten setup sequence

@@ -59,22 +59,18 @@ tags:
 - assertVisible:
     text: "Physics"
 
-# 11. Tap on Physics subject/coaching card on home screen.
-#     Tapping a subject on home navigates to /(learner)/onboarding/curriculum-review
-#     which shows "Your Curriculum" as the title (not the subject name).
+# 11. Tap the Physics subject card via testID (more reliable than text: "Physics"
+#     which can match multiple elements on screen — coaching card, subject card, etc.)
+#     seed-and-run.sh provides ACTIVE_SUBJECT_ID for the Physics subject.
 - tapOn:
-    text: "Physics"
+    id: "home-subject-${ACTIVE_SUBJECT_ID}"
 
-# 12. Wait for curriculum review screen (navigated from home tap)
+# 12. Wait for curriculum review screen (navigated from home tap).
+#     home.tsx navigates to /(learner)/onboarding/curriculum-review.
 - extendedWaitUntil:
     visible:
-      text: "Your Curriculum"
+      id: "curriculum-back"
     timeout: 10000
-
-# 13. Verify curriculum content is visible (topics list or chat input)
-- assertVisible:
-    id: "chat-input"
-    optional: true
 
 # 14. Navigate back to home screen (Android hardware Back key)
 - pressKey: Back

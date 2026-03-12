@@ -6,7 +6,7 @@
 #
 # Journey: Consent Lifecycle (withdrawal / GDPR deletion)
 # Epics: Epic 5 (COPPA/GDPR consent gating), UX Persona Walkthrough
-# Prerequisite: Seeded user with WITHDRAWN consent status (scenario: consent-withdrawn)
+# Prerequisite: Seeded user with WITHDRAWN consent status (scenario: consent-withdrawn-solo)
 #
 # NOTE: This flow does NOT use runFlow seed-and-sign-in because that flow
 # waits for home-scroll-view — but the consent-withdrawn gate appears
@@ -14,7 +14,7 @@
 #
 # Seeding is handled by seed-and-run.sh BEFORE Maestro starts.
 # Credentials arrive as ${EMAIL} and ${PASSWORD} env vars.
-# Usage: ./scripts/seed-and-run.sh consent-withdrawn flows/consent/consent-withdrawn-gate.yaml
+# Usage: ./scripts/seed-and-run.sh consent-withdrawn-solo flows/consent/consent-withdrawn-gate.yaml
 appId: com.mentomate.app
 tags:
   - nightly

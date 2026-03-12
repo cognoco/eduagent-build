@@ -1,6 +1,6 @@
 # E2E Test Results — Dev-Client on Android Emulator
 
-**Date:** 2026-03-08 (updated 2026-03-12)
+**Date:** 2026-03-08 (updated 2026-03-12, Session 15)
 **Environment:** Windows 11 + WHPX emulator (New_Device, API 34, 1080x1920)
 **Build:** Dev-client APK built in WSL2 with expo-dev-client@~6.0.20
 **Metro:** Windows, `unstable_serverRoot: monorepoRoot`, bundle proxy on port 8082
@@ -510,7 +510,57 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 
 5. **Remaining FAIL flows are mostly flow-design or testID issues** — not app bugs. The 11 failures break down as: 3 LLM-dependent (environment), 4 flow-design (test authoring), 2 testID mismatch (need investigation), 1 text mismatch (need investigation), 1 app logic (need investigation).
 
-### Cumulative Totals (as of Session 14)
+### Session 15 (2026-03-12) — Fix & Verify 10 Failing Flows
+
+**Objective:** Fix and re-run all 10 flows that failed in Session 14 (excluding child-paywall which needs a custom sign-in mechanism and the 4 not-yet-runnable flows).
+
+**Environment:** Same as Session 14. FAST=1 mode. Bluetooth fix applied.
+
+**Fixes applied:**
+
+| Flow | Root Cause | Fix |
+|------|-----------|-----|
+| topic-detail | Maestro can't find text inside nested `<Text>` in `<Pressable>` | Tap "Biology Topic 1" (seed's topic name) instead of "sessions"/"World History" |
+| relearn-flow | Same nested text issue + long wrapping text not matched | Tap "Chemistry Topic 1", replace text assertions with testID waits |
+| multi-subject | `tapOn: text: "Physics"` hit wrong element | Use `tapOn: id: "home-subject-${ACTIVE_SUBJECT_ID}"` testID |
+| subscription-details | Unescaped regex parens in "Bring your own key (coming soon)" + flaky "More" tab tap | Escaped `\(` `\)` in regex, use "More Tab" accessibility label |
+| homework-flow | Already fixed in Session 14 (coaching-card-primary) | Verified working |
+| consent-withdrawn-gate | `consent-withdrawn` seed creates parent+child; app picks parent profile | New `consent-withdrawn-solo` seed scenario (single learner profile with WITHDRAWN consent) |
+| empty-first-user | seed-and-sign-in return-to-home fails (0 subjects → create-subject redirect) | New `sign-in-only.yaml` setup flow + explicit PostApproval dismiss + header text check ("Your coach is here" instead of chat bubble "learning coach") |
+| session-summary | LLM returning "I'm having trouble connecting" errors | Not fixable from flow — LLM infra issue |
+| analogy-preference-flow | Same LLM connectivity issue | Not fixable from flow |
+| curriculum-review-flow | Same LLM connectivity issue | Not run (same blocker) |
+
+**New infrastructure created:**
+- `e2e/flows/_setup/sign-in-only.yaml` — Minimal sign-in without post-auth recovery (for edge cases)
+- `apps/api/src/services/test-seed.ts` — Added `onboarding-no-subject` and `consent-withdrawn-solo` seed scenarios
+
+| # | Flow | Status | Notes |
+|---|------|--------|-------|
+| 1 | `retention/topic-detail` | **PASS** | Tap "Biology Topic 1" — all retention metrics verified |
+| 2 | `retention/relearn-flow` | **PASS** | Tap "Chemistry Topic 1", choice + method picker + session start |
+| 3 | `subjects/multi-subject` | **PASS** | TestID tap → curriculum-review → Back → home |
+| 4 | `billing/subscription-details` | **PASS** | Trial banner, usage, restore-purchases, BYOK section |
+| 5 | `homework/homework-flow` | **PASS** | coaching-card-primary → chat |
+| 6 | `consent/consent-withdrawn-gate` | **PASS** | Gate blocks access, sign-out returns to auth |
+| 7 | `edge/empty-first-user` | **PASS** | PostApproval → create-subject → interview screen |
+| 8 | `learning/session-summary` | **FAIL** | LLM errors: "I'm having trouble connecting" — exchangeCount never increments |
+| 9 | `onboarding/analogy-preference-flow` | **FAIL** | LLM errors: view-curriculum-button never appears |
+| 10 | `onboarding/curriculum-review-flow` | **SKIP** | Same LLM dependency — not run |
+
+**Session 15 totals: 9 flows run — 7 PASS, 2 FAIL (LLM infra), 1 SKIP**
+
+**Key findings:**
+
+1. **7 of 8 non-LLM failures fixed.** All flow-design, testID mismatch, text mismatch, and app-logic failures from Session 14 are now resolved. Only child-paywall remains (needs custom sign-in mechanism).
+
+2. **Maestro text matching quirks documented.** Three distinct patterns where Maestro fails to match text on Android: (a) text inside nested `<Text>` children of `<Pressable>` with testID, (b) long wrapping text in single `<Text>` node, (c) text with regex special chars (parentheses). Fix: use testIDs or escape regex.
+
+3. **LLM connectivity is the sole remaining blocker.** 3 flows depend on working LLM responses. The API health endpoint reports providers available but actual SSE streams return errors. This is a rate-limiting or API key issue.
+
+4. **New seed scenarios work correctly.** `onboarding-no-subject` (empty state) and `consent-withdrawn-solo` (single profile with WITHDRAWN consent) both produce correct test conditions.
+
+### Cumulative Totals (as of Session 15)
 
 | Category | Flows | Status |
 |----------|-------|--------|
@@ -518,33 +568,31 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 | Post-auth (comprehensive, hardcoded creds) | 1 | **PASS** (65 steps) |
 | Quick-check / misc | 1 | **PASS** (simple screenshot) |
 | Seed-dependent (learning) | 5 | **PASS** (start-session, core-learning, first-session, freeform-session, homework-from-entry-card) |
-| Seed-dependent (retention) | 4 | **PASS** (recall-review, learning-book, retention-review, failed-recall) |
-| Seed-dependent (billing) | 1 | **PASS** (subscription) |
+| Seed-dependent (retention) | 6 | **PASS** (recall-review, learning-book, retention-review, failed-recall, topic-detail, relearn-flow) |
+| Seed-dependent (billing) | 2 | **PASS** (subscription, subscription-details) |
 | Seed-dependent (onboarding) | 3 | **PASS** (create-subject, create-profile, view-curriculum) |
 | Seed-dependent (account) | 3 | **PASS** (more-tab-nav, delete-account, account-lifecycle) |
-| Seed-dependent (consent) | 1 | **PASS** (post-approval-landing) |
+| Seed-dependent (consent) | 2 | **PASS** (post-approval-landing, consent-withdrawn-gate) |
 | Seed-dependent (assessment) | 1 | **PASS** (assessment-cycle) |
-| Seed-dependent (homework) | 1 | **PASS** (camera-ocr) |
+| Seed-dependent (homework) | 2 | **PASS** (camera-ocr, homework-flow) |
 | Seed-dependent (parent) | 6 | **PASS** (parent-dashboard, parent-learning-book, child-drill-down, parent-tabs, consent-management, demo-dashboard) |
 | Seed-dependent (parent) — profile switching | 1 | **PASS** (profile-switching) |
+| Seed-dependent (subjects) | 1 | **PASS** (multi-subject) |
+| Seed-dependent (edge) | 1 | **PASS** (empty-first-user) |
 | Partial: settings-toggles | 1 | **PARTIAL** — all settings OK, fails at parent switch-to-teen (BUG-18) |
 | LLM-dependent (need structured AI response) | 3 | **FAIL** — curriculum-review, analogy-preference, session-summary |
-| Flow design issues | 4 | **FAIL** — child-paywall, homework-flow, empty-first-user, subscription-details |
-| TestID/text mismatch (need investigation) | 3 | **FAIL** — topic-detail, consent-withdrawn-gate, relearn-flow |
-| App logic (need investigation) | 1 | **FAIL** — multi-subject |
+| Flow design issues | 1 | **FAIL** — child-paywall (needs custom sign-in mechanism) |
 | Not yet run (need launch-devclient mechanism) | 4 | **NOT RUN** — coppa-flow, profile-creation-consent, consent-pending-gate, sign-up-flow |
 | ExpoGo-only | 1 | **SKIP** (wrong app type) |
-| **Total** | **53** | **36 confirmed passing, 1 partial, 11 failing, 4 not yet run, 1 skipped** |
+| **Total** | **53** | **43 confirmed passing, 1 partial, 4 failing, 4 not yet run, 1 skipped** |
 
-**Remaining work (Session 14 updated):**
+**Remaining work (Session 15 updated):**
 
 | Priority | Category | Flows | Fix Type |
 |----------|----------|-------|----------|
-| P1 | LLM-dependent | 3 | Mock LLM mode or wait-and-retry flow design |
-| P2 | Flow design | 4 | Test authoring fixes (custom sign-in, correct scenario, text update) |
-| P3 | TestID/text mismatch | 3 | Investigate current UI, update flow assertions |
-| P4 | App logic | 1 | Investigate multi-subject navigation |
-| P5 | Not yet run | 4 | Need `launch-devclient.yaml` mechanism for standalone flows |
+| P1 | LLM-dependent | 3 | Mock LLM mode, wait-and-retry flow design, or fix LLM API keys |
+| P2 | Flow design | 1 | child-paywall needs custom sign-in (like consent-withdrawn-gate) |
+| P3 | Not yet run | 4 | Need `launch-devclient.yaml` mechanism for standalone flows |
 
 ---
 

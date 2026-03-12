@@ -1,0 +1,50 @@
+# Minimal sign-in flow — no post-auth navigation recovery.
+#
+# Use this for edge-case flows where the post-auth screen is NOT the standard
+# home-scroll-view or dashboard-scroll (e.g., 0-subjects redirect to
+# create-subject, consent-withdrawn gate, etc.).
+#
+# seed-and-run.sh handles everything before Maestro: seed, app launch,
+# dev-client, bundle loading. By the time this flow runs, the app is on
+# the sign-in screen.
+appId: com.mentomate.app
+---
+# 1. Wait for sign-in screen
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 120000
+
+# 2. Enter email
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${EMAIL}
+
+# BUG-20: dismiss keyboard by tapping heading
+- tapOn:
+    text: "Welcome back"
+
+# 3. Enter password
+- tapOn:
+    id: "sign-in-password"
+- inputText: ${PASSWORD}
+
+# BUG-20: dismiss keyboard
+- tapOn:
+    text: "Welcome back"
+
+# 4. Wait for sign-in button and tap it
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 10000
+
+- tapOn:
+    id: "sign-in-button"
+
+# 5. Brief pause for auth to process — calling flow handles specific landing screen
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 3000
+    optional: true

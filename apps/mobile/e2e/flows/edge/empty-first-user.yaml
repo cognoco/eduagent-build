@@ -30,16 +30,29 @@ tags:
   - edge
   - onboarding
 ---
-# 1. Seed & sign in — onboarding-no-subject creates a user with 0 subjects
+# 1. Sign in only — no post-auth recovery (home redirects to create-subject
+#    with 0 subjects, which breaks seed-and-sign-in's return-to-home logic).
 - runFlow:
-    file: ../_setup/seed-and-sign-in.yaml
+    file: ../_setup/sign-in-only.yaml
     env:
       SEED_SCENARIO: "onboarding-no-subject"
       API_URL: ${API_URL}
 
+# 1b. BUG-38: PostApprovalLanding appears after pm clear wipes SecureStore.
+#     Wait for it explicitly, then dismiss. The conditional `when:` check
+#     fires too early (before auth completes), so we wait with timeout.
+- extendedWaitUntil:
+    visible:
+      text: "You're approved!"
+    timeout: 15000
+    optional: true
+
+- tapOn:
+    text: "Let's Go"
+    optional: true
+
 # 2. Wait for create-subject screen — home.tsx redirects here when subjects=0.
-#    The setup flow may have timed out waiting for home-scroll-view, but auth
-#    is complete. We use a generous timeout for the redirect to settle.
+#    After sign-in → PostApproval → home → redirect to create-subject.
 - extendedWaitUntil:
     visible:
       id: "create-subject-name"
@@ -83,10 +96,12 @@ tags:
     text: "Biology"
     optional: true
 
-# 11. Verify AI opening message is visible — the interview screen always
-#     starts with "Hi! I'm your learning coach..." greeting.
+# 11. Verify interview screen is showing coach context.
+#     NOTE: "learning coach" text is inside a chat bubble FlatList — Maestro
+#     can't find text inside React Native chat bubbles on Android.
+#     Use the header subtitle "Your coach is here" instead.
 - assertVisible:
-    text: "learning coach"
+    text: "Your coach is here"
 
 # 12. Screenshot: interview screen with AI greeting
 - takeScreenshot: empty-first-user-02-interview
