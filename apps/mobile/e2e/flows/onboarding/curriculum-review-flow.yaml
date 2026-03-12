@@ -60,19 +60,30 @@ tags:
 # NOTE: Skipped "learning coach" text check — Maestro can't reliably find text
 # inside React Native chat bubbles on Android. chat-input presence is sufficient.
 
-# Respond to the interview
+# Respond to the interview with a detailed message to help the LLM complete faster.
 - tapOn:
     id: "chat-input"
-- inputText: "I want to learn about world wars and ancient civilizations for my exam"
+- inputText: "I want to learn about World War I, World War II, and ancient civilizations (Rome, Greece, Egypt) for my history exam in 3 weeks. I'm aiming for a B+ or better. I know WWII basics but need to learn WWI causes, the interwar period, and ancient governance. I prefer timelines and stories."
 # BUG-35: keyboard covers send button on Android. Use Enter key instead.
-# send-button tapOn removed per E2E integrity rules — optional: true on a
-# mandatory UI element is prohibited.
 - pressKey: Enter
 
-# Wait for interview to complete — the footer button appears when the LLM
-# generates a structured curriculum response that sets interviewComplete=true.
-# This requires the AI to process the interview message, generate a curriculum,
-# and stream the result back. Allow 90s for WHPX emulators with LLM latency.
+# Wait for interview completion after first exchange (may need follow-up)
+- extendedWaitUntil:
+    visible:
+      id: "view-curriculum-button"
+    timeout: 45000
+    optional: true
+
+# If interview didn't complete, send a follow-up with more context
+- runFlow:
+    when:
+      notVisible:
+        id: "view-curriculum-button"
+    file: ../_setup/interview-followup.yaml
+    env:
+      FOLLOWUP_MESSAGE: "I have 3 weeks to study, about 1 hour per day. I want to understand causes and effects, not just memorize dates. Please create my study curriculum."
+
+# Wait for interview completion after second exchange (90s for LLM + streaming)
 - extendedWaitUntil:
     visible:
       id: "view-curriculum-button"
@@ -100,11 +111,12 @@ tags:
 - takeScreenshot: curriculum-review-screen
 
 # ── Verify curriculum loaded with topics ──────────────────────────────
-# The curriculum shows "Version X — N topics" subtitle when loaded.
-# If the curriculum is still generating, a loading spinner appears first.
+# Wait for action buttons (only render when curriculum data is loaded).
+# NOTE: "Version X — N topics" subtitle text unreliable with Maestro
+# (em dash U+2014 causes matching issues). Use button testIDs instead.
 - extendedWaitUntil:
     visible:
-      text: "topics"
+      id: "start-learning-button"
     timeout: 15000
 
 # ── Verify header elements ────────────────────────────────────────────
@@ -146,6 +158,12 @@ tags:
 - tapOn:
     id: "challenge-feedback"
 - inputText: "I already know the basics, skip intro topics"
+
+# Dismiss keyboard before interacting with modal buttons
+# pressKey: Back dismisses the Android keyboard (first press = keyboard dismiss,
+# not navigation back). This is safer than hideKeyboard (BUG-20) and doesn't
+# require a visible tap target (modal title pushed off-screen by keyboard).
+- pressKey: Back
 
 - takeScreenshot: curriculum-review-challenge-modal
 

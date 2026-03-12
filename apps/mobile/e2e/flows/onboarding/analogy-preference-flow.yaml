@@ -55,22 +55,32 @@ tags:
       id: "chat-input"
     timeout: 20000
 
-# Respond to the interview to move it toward completion.
-# The interview requires at least one exchange before it can complete.
+# Respond to the interview with a detailed message to help the LLM complete faster.
 # NOTE: Skipped "learning coach" text check — Maestro can't reliably find text
 # inside React Native chat bubbles on Android. chat-input presence is sufficient.
 - tapOn:
     id: "chat-input"
-- inputText: "I want to learn about cells and genetics for my school exam"
+- inputText: "I want to learn about cells and genetics for my school biology exam next month. I'm aiming for an A grade. I already know basic cell structure but need to learn DNA replication, gene expression, mitosis, meiosis, and heredity. I prefer visual explanations."
 # BUG-35: keyboard covers send button on Android. Use Enter key instead.
 - pressKey: Enter
 
-# Wait for AI response — interview may complete in 1-3 exchanges.
-# The interview-complete footer shows "Interview complete!" text
-# and a "View Curriculum" button once the AI decides enough info is gathered.
-# This requires the LLM to: (1) process the message, (2) generate a curriculum,
-# (3) stream the response back, (4) trigger interviewComplete=true.
-# Allow 90s for WHPX emulators with LLM latency.
+# Wait for interview completion after first exchange (may need follow-up)
+- extendedWaitUntil:
+    visible:
+      id: "view-curriculum-button"
+    timeout: 45000
+    optional: true
+
+# If interview didn't complete, send a follow-up with more context
+- runFlow:
+    when:
+      notVisible:
+        id: "view-curriculum-button"
+    file: ../_setup/interview-followup.yaml
+    env:
+      FOLLOWUP_MESSAGE: "I have about 4 weeks to prepare. My goal is to understand each topic deeply, not just memorize. I learn best with step-by-step breakdowns. Please create my curriculum."
+
+# Wait for interview completion after second exchange (90s for LLM + streaming)
 - extendedWaitUntil:
     visible:
       id: "view-curriculum-button"
@@ -91,8 +101,9 @@ tags:
 - assertVisible:
     text: "How do you like things explained?"
 
-- assertVisible:
-    text: "Pick an analogy style"
+# NOTE: Subtitle "Pick an analogy style (optional)..." removed — BUG-49 pattern #2
+# (long wrapping text) + unescaped parentheses in regex. Screen already verified
+# via analogy-preference-title testID and heading text above.
 
 - takeScreenshot: analogy-preference-screen
 

@@ -616,7 +616,7 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 | Partial: settings-toggles | 1 | **PARTIAL** — all settings OK, fails at parent switch-to-teen (BUG-18) |
 | LLM-dependent (need structured AI response) | 2 | **FAIL** — curriculum-review, analogy-preference (session-summary now PASS via Session 16 streaming fix) |
 | Seed-dependent (billing) — child paywall | 1 | **PASS** — child-paywall (BUG-52 fixed: switch-to-child.yaml) |
-| Not yet run (need launch-devclient mechanism) | 4 | **NOT RUN** — coppa-flow, profile-creation-consent, consent-pending-gate, sign-up-flow |
+| Pre-auth (need run-without-seed.sh) | 4 | **READY** — coppa-flow, profile-creation-consent, consent-pending-gate, sign-up-flow (updated to use run-without-seed.sh, awaiting emulator test) |
 | ExpoGo-only | 1 | **SKIP** (wrong app type) |
 | **Total** | **53** | **45 confirmed passing, 1 partial, 2 failing, 4 not yet run, 1 skipped** |
 
@@ -626,7 +626,7 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 |----------|----------|-------|----------|
 | P1 | LLM-dependent (structured response) | 2 | curriculum-review, analogy-preference — need LLM to return structured curriculum/preferences. May now pass with SSE streaming fix; needs re-test. |
 | ~P2~ | ~Flow design~ | ~1~ | ~child-paywall — FIXED and VERIFIED (BUG-52: switch-to-child.yaml). All steps COMPLETED.~ |
-| P3 | Not yet run | 4 | Need `launch-devclient.yaml` mechanism for standalone flows |
+| P3 | Pre-auth flows | 4 | `run-without-seed.sh` created. Flows updated. Needs emulator test — Clerk sign-up may need test-mode config. |
 | P4 | Visual | 1 | BUG-53: tab bar icons missing (Ionicons font not loading). No E2E impact. |
 
 ---

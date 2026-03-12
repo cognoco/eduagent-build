@@ -40,14 +40,37 @@ tags:
     id: "sign-up-email"
 - inputText: "test-e2e-consent-${Date.now()}@example.com"
 
+# Dismiss keyboard so password field becomes visible
+- tapOn:
+    text: "Create account"
+
 # 6. Enter password
 - tapOn:
     id: "sign-up-password"
 - inputText: "TestPass123!"
 
+# Dismiss keyboard before tapping sign-up button
+- tapOn:
+    text: "Create account"
+
 # 7. Submit sign-up
 - tapOn:
     id: "sign-up-button"
+
+# 7b. Clerk email verification screen
+- extendedWaitUntil:
+    visible:
+      id: "sign-up-code"
+    timeout: 15000
+
+- takeScreenshot: consent-01-verification-screen
+
+# 7c. Enter verification code (Clerk dev mode test code)
+- tapOn:
+    id: "sign-up-code"
+- inputText: "424242"
+- tapOn:
+    id: "sign-up-verify-button"
 
 # 8. Wait for profile creation screen
 - extendedWaitUntil:
