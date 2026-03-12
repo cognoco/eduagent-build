@@ -12,10 +12,21 @@ import type {
 // ---------------------------------------------------------------------------
 
 function getModelConfig(rung: EscalationRung): ModelConfig {
+  // Gemini is the preferred (cheaper) provider. If it isn't registered
+  // (no GEMINI_API_KEY), route to OpenAI as primary instead.
+  const useGemini = providers.has('gemini');
+
   if (rung <= 2) {
-    return { provider: 'gemini', model: 'gemini-2.0-flash', maxTokens: 4096 };
+    if (useGemini) {
+      return { provider: 'gemini', model: 'gemini-2.0-flash', maxTokens: 4096 };
+    }
+    return { provider: 'openai', model: 'gpt-4o-mini', maxTokens: 4096 };
   }
-  return { provider: 'gemini', model: 'gemini-2.5-pro', maxTokens: 8192 };
+
+  if (useGemini) {
+    return { provider: 'gemini', model: 'gemini-2.5-pro', maxTokens: 8192 };
+  }
+  return { provider: 'openai', model: 'gpt-4o', maxTokens: 8192 };
 }
 
 /** Fallback config when primary provider fails. Returns null if no fallback. */
@@ -116,6 +127,11 @@ function canAttempt(providerId: string): boolean {
 /** Exported for testing only */
 export function _resetCircuits(): void {
   circuits.clear();
+}
+
+/** Exported for testing only */
+export function _clearProviders(): void {
+  providers.clear();
 }
 
 export class CircuitOpenError extends Error {
@@ -267,6 +283,15 @@ async function* wrapStreamWithCircuitBreaker(
   }
 }
 
+/**
+ * Streaming variant of routeAndCall.
+ *
+ * NOTE: The `provider` and `model` fields in the returned StreamResult
+ * reflect the initially selected provider. If wrapStreamWithCircuitBreaker
+ * transparently falls back (pre-first-byte failure), these fields still
+ * report the original provider. Callers using these fields for cost
+ * attribution or observability should be aware of this limitation.
+ */
 export async function routeAndStream(
   messages: ChatMessage[],
   rung: EscalationRung = 1

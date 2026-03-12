@@ -3,6 +3,7 @@ import {
   routeAndStream,
   registerProvider,
   getRegisteredProviders,
+  _clearProviders,
 } from './router';
 import { createMockProvider } from './providers/mock';
 
@@ -101,6 +102,45 @@ describe('LLM Router', () => {
       );
 
       expect(result.model).toBe('gemini-2.5-pro');
+    });
+  });
+
+  describe('OpenAI-only deployment (no Gemini key)', () => {
+    beforeAll(() => {
+      _clearProviders();
+      registerProvider(createMockProvider('openai'));
+    });
+
+    afterAll(() => {
+      _clearProviders();
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    it('routes to openai as primary for low rung', async () => {
+      const result = await routeAndCall([{ role: 'user', content: 'test' }], 1);
+      expect(result.provider).toBe('openai');
+      expect(result.model).toBe('gpt-4o-mini');
+    });
+
+    it('routes to gpt-4o for high rung', async () => {
+      const result = await routeAndCall([{ role: 'user', content: 'test' }], 3);
+      expect(result.provider).toBe('openai');
+      expect(result.model).toBe('gpt-4o');
+    });
+
+    it('streams via openai when gemini is not registered', async () => {
+      const result = await routeAndStream(
+        [{ role: 'user', content: 'test' }],
+        1
+      );
+      expect(result.provider).toBe('openai');
+      expect(result.model).toBe('gpt-4o-mini');
+
+      const chunks: string[] = [];
+      for await (const chunk of result.stream) {
+        chunks.push(chunk);
+      }
+      expect(chunks.length).toBeGreaterThan(0);
     });
   });
 });

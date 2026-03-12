@@ -5,6 +5,7 @@ export {
   getRegisteredProviders,
   CircuitOpenError,
   _resetCircuits,
+  _clearProviders,
 } from './router';
 export { mockProvider, createMockProvider } from './providers/mock';
 export { createGeminiProvider } from './providers/gemini';

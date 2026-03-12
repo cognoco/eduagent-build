@@ -950,6 +950,7 @@ During Session 12 (and previously in Sessions 10-11), the Gemini LLM API (`gemin
 1. Add LLM health probe to `/v1/health` (actual Gemini ping, not just config check)
 2. Add retry logic in interview service for transient LLM failures
 3. For E2E: consider a mock/stub LLM mode that returns canned interview responses
+4. For E2E: run interview flows in a retry loop (re-seed + re-run on LLM failure)
 
 ---
 
@@ -968,4 +969,3 @@ After sign-in with a parent scenario, the app briefly shows `home-scroll-view` (
 **Files changed:**
 - `e2e/flows/_setup/return-to-home-safe.yaml` (new)
 - `e2e/flows/_setup/seed-and-sign-in.yaml` (updated to reference safe variant)
-4. For E2E: run interview flows in a retry loop (re-seed + re-run on LLM failure)
