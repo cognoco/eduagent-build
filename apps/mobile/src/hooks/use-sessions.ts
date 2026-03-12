@@ -183,8 +183,9 @@ export function useStreamMessage(sessionId: string): {
         setIsStreaming(false);
       }
     },
-    // Empty deps: all mutable values accessed via refs (sessionIdRef,
-    // getTokenRef, profileIdRef, abortRef) to avoid stale closures.
+
+    // all mutable values accessed via refs (sessionIdRef, getTokenRef,
+    // profileIdRef, abortRef) to avoid stale closures.
     []
   );
 

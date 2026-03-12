@@ -127,6 +127,11 @@ function parseSSEBuffer(
  * streaming without the Web Streams API.
  *
  * Returns an async generator of StreamEvents and an abort handle.
+ *
+ * @remarks Callers MUST call `abort()` when they stop consuming `events`
+ * (e.g. on component unmount or early exit from `for await`). The XHR runs
+ * independently of the generator — abandoning the generator without aborting
+ * leaves the connection open until the 30s timeout fires.
  */
 export function streamSSEViaXHR(
   url: string,

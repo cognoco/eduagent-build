@@ -10,7 +10,7 @@ export interface ErrorContext {
   profileId?: string;
   requestPath?: string;
   /** Arbitrary metadata attached as Sentry extras (e.g. sessionId, subjectId). */
-  extra?: Record<string, string>;
+  extra?: Record<string, unknown>;
 }
 
 /**
