@@ -13,6 +13,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import { streamSSE } from 'hono/streaming';
+import { captureException } from '../services/sentry';
 import {
   startSession,
   SubjectInactiveError,
@@ -199,6 +200,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           },
         });
       } catch (err) {
+        captureException(err, { sessionId: result.sessionId, profileId });
         console.warn(
           `[sessions] Failed to dispatch session.completed event for ${
             result.sessionId

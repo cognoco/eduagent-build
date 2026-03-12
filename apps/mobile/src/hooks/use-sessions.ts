@@ -117,6 +117,7 @@ export function useStreamMessage(sessionId: string): {
   const { activeProfile } = useProfile();
   const [isStreaming, setIsStreaming] = useState(false);
   const isStreamingRef = useRef(false);
+  const abortRef = useRef<(() => void) | null>(null);
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
 
@@ -155,11 +156,12 @@ export function useStreamMessage(sessionId: string): {
           headers['X-Profile-Id'] = profileIdRef.current;
 
         const url = `${getApiUrl()}/v1/sessions/${effectiveSessionId}/stream`;
-        const { events } = streamSSEViaXHR(url, {
+        const { events, abort } = streamSSEViaXHR(url, {
           method: 'POST',
           headers,
           body: JSON.stringify({ message }),
         });
+        abortRef.current = abort;
 
         let accumulated = '';
         for await (const event of events) {
@@ -174,6 +176,8 @@ export function useStreamMessage(sessionId: string): {
           }
         }
       } finally {
+        abortRef.current?.();
+        abortRef.current = null;
         isStreamingRef.current = false;
         setIsStreaming(false);
       }

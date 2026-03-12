@@ -65,8 +65,14 @@ export async function* parseSSEStream(
         if (data === '[DONE]') return;
 
         try {
-          const event = JSON.parse(data) as StreamEvent;
-          yield event;
+          const parsed: unknown = JSON.parse(data);
+          if (
+            typeof parsed === 'object' &&
+            parsed !== null &&
+            'type' in parsed
+          ) {
+            yield parsed as StreamEvent;
+          }
         } catch {
           // Skip malformed events
         }
@@ -101,8 +107,10 @@ function parseSSEBuffer(
     }
 
     try {
-      const event = JSON.parse(data) as StreamEvent;
-      queue.push(event);
+      const parsed: unknown = JSON.parse(data);
+      if (typeof parsed === 'object' && parsed !== null && 'type' in parsed) {
+        queue.push(parsed as StreamEvent);
+      }
     } catch {
       // Skip malformed events
     }
@@ -145,7 +153,7 @@ export function streamSSEViaXHR(
 
   // Detect HTTP errors early (before streaming begins)
   xhr.onreadystatechange = () => {
-    if (xhr.readyState >= 2 && xhr.status >= 400) {
+    if (xhr.readyState === 2 && xhr.status >= 400) {
       streamError = new Error(`API error ${xhr.status}: ${xhr.statusText}`);
       done = true;
       resolve?.();
@@ -203,7 +211,7 @@ export function streamSSEViaXHR(
       }
       await new Promise<void>((r) => {
         resolve = r;
-      }); // eslint-disable-line no-loop-func
+      });
     }
   }
 
