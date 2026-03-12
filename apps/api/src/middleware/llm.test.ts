@@ -23,6 +23,11 @@ function createMockContext(env: Record<string, string | undefined>) {
 
 const originalNodeEnv = process.env['NODE_ENV'];
 
+// NOTE: resetLlmMiddleware() only clears the middleware's `initialized` flag.
+// Router state (registered providers, circuit breakers) lives in router.ts and
+// requires separate _clearProviders() / _resetCircuits() calls. In this file
+// we mock the entire llm barrel so router state is irrelevant; but integration
+// tests must call both to get a clean slate. See router.test.ts for examples.
 beforeEach(() => {
   jest.clearAllMocks();
   resetLlmMiddleware();

@@ -29,14 +29,22 @@ function getModelConfig(rung: EscalationRung): ModelConfig {
   return { provider: 'openai', model: 'gpt-4o', maxTokens: 8192 };
 }
 
-/** Fallback config when primary provider fails. Returns null if no fallback. */
+/**
+ * Fallback config when primary provider fails. Returns null if no fallback.
+ *
+ * Intentionally one-directional for MVP: Gemini → OpenAI only.
+ * Gemini is our primary (cheaper, safety-settings-native) provider. OpenAI is
+ * the paid fallback. The reverse (OpenAI → Gemini) is not wired because in an
+ * OpenAI-only deployment Gemini keys are absent, and in a dual-provider
+ * deployment Gemini is already the primary. Extend when adding more providers.
+ */
 function getFallbackConfig(
   primary: ModelConfig,
   rung: EscalationRung
 ): ModelConfig | null {
   // Only fall back if the fallback provider is actually registered
   if (!providers.has('openai')) return null;
-  // Don't fall back to the same provider
+  // Don't fall back to the same provider (OpenAI-only deployment)
   if (primary.provider === 'openai') return null;
 
   if (rung <= 2) {
@@ -269,13 +277,22 @@ async function* wrapStreamWithCircuitBreaker(
             fallbackConfig.provider
           }: ${err instanceof Error ? err.message : String(err)}`
         );
-        onFallback?.();
-        yield* wrapStreamWithCircuitBreaker(
+        // Manually iterate so onFallback fires after first successful chunk,
+        // confirming the fallback provider actually works.
+        const fallbackStream = wrapStreamWithCircuitBreaker(
           fallbackProvider.chatStream(messages, fallbackConfig),
           fallbackConfig.provider,
           null, // no further fallback
           messages
         );
+        let signalled = false;
+        for await (const chunk of fallbackStream) {
+          if (!signalled) {
+            onFallback?.();
+            signalled = true;
+          }
+          yield chunk;
+        }
         return;
       }
     }
@@ -307,15 +324,6 @@ export async function routeAndStream(
   // --- Try primary provider ---
   if (canAttempt(config.provider)) {
     const fallbackConfig = getFallbackConfig(config, rung);
-    console.info(
-      `[llm] routeAndStream: primary=${config.provider}/${
-        config.model
-      }, fallback=${
-        fallbackConfig
-          ? `${fallbackConfig.provider}/${fallbackConfig.model}`
-          : 'none'
-      }`
-    );
     // NOTE: recordSuccess/recordFailure fire during iteration, not here,
     // because chatStream() returns a lazy AsyncIterable — the actual HTTP
     // request and data flow happen in the caller's for-await loop.
