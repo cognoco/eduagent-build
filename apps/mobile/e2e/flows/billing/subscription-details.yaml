@@ -25,9 +25,8 @@ tags:
       id: "home-scroll-view"
     timeout: 15000
 
-# 3. Navigate to More tab (BUG-15: use text, not testID)
-- tapOn:
-    text: "More"
+# 3. Navigate to More tab (use accessibility label for reliable targeting)
+- tapOn: "More Tab"
 
 # 4. Wait for More screen
 - extendedWaitUntil:
@@ -80,15 +79,17 @@ tags:
 - assertVisible:
     id: "restore-purchases-button"
 
-# 14. Verify BYOK section text
+# 14. Verify BYOK section text. NOTE: escaped parentheses — Maestro text:
+#     is a regex, so literal parens must be backslash-escaped.
 - scrollUntilVisible:
     element:
-      text: "Bring your own key (coming soon)"
+      text: "Bring your own key \\(coming soon\\)"
     direction: DOWN
-    timeout: 10000
+    timeout: 15000
+    speed: 30
 
 - assertVisible:
-    text: "Bring your own key (coming soon)"
+    text: "Bring your own key \\(coming soon\\)"
 
 # 15. Screenshot of restore + BYOK section
 - takeScreenshot: subscription-details-restore-byok

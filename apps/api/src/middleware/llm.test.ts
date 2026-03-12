@@ -6,8 +6,13 @@ jest.mock('../services/llm/providers/gemini', () => ({
   createGeminiProvider: jest.fn().mockReturnValue({ id: 'gemini' }),
 }));
 
+jest.mock('../services/llm/providers/openai', () => ({
+  createOpenAIProvider: jest.fn().mockReturnValue({ id: 'openai' }),
+}));
+
 import { registerProvider } from '../services/llm';
 import { createGeminiProvider } from '../services/llm/providers/gemini';
+import { createOpenAIProvider } from '../services/llm/providers/openai';
 import { llmMiddleware, resetLlmMiddleware } from './llm';
 
 function createMockContext(env: Record<string, string | undefined>) {
@@ -18,6 +23,11 @@ function createMockContext(env: Record<string, string | undefined>) {
 
 const originalNodeEnv = process.env['NODE_ENV'];
 
+// NOTE: resetLlmMiddleware() only clears the middleware's `initialized` flag.
+// Router state (registered providers, circuit breakers) lives in router.ts and
+// requires separate _clearProviders() / _resetCircuits() calls. In this file
+// we mock the entire llm barrel so router state is irrelevant; but integration
+// tests must call both to get a clean slate. See router.test.ts for examples.
 beforeEach(() => {
   jest.clearAllMocks();
   resetLlmMiddleware();
@@ -40,36 +50,62 @@ describe('llmMiddleware', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('throws in production when GEMINI_API_KEY is missing', async () => {
+  it('registers OpenAI provider when key is present', async () => {
+    const c = createMockContext({ OPENAI_API_KEY: 'oai-key-456' });
+    const next = jest.fn().mockResolvedValue(undefined);
+
+    await llmMiddleware(c, next);
+
+    expect(createOpenAIProvider).toHaveBeenCalledWith('oai-key-456');
+    expect(registerProvider).toHaveBeenCalled();
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('registers both providers when both keys are present', async () => {
+    const c = createMockContext({
+      GEMINI_API_KEY: 'gem-key',
+      OPENAI_API_KEY: 'oai-key',
+    });
+    const next = jest.fn().mockResolvedValue(undefined);
+
+    await llmMiddleware(c, next);
+
+    expect(createGeminiProvider).toHaveBeenCalledWith('gem-key');
+    expect(createOpenAIProvider).toHaveBeenCalledWith('oai-key');
+    expect(registerProvider).toHaveBeenCalledTimes(2);
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('throws in production when no LLM keys are set', async () => {
     process.env['NODE_ENV'] = 'development';
     const c = createMockContext({ ENVIRONMENT: 'production' });
     const next = jest.fn();
 
     await expect(llmMiddleware(c, next)).rejects.toThrow(
-      'GEMINI_API_KEY is required (environment: production)'
+      'At least one LLM API key is required'
     );
     expect(registerProvider).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('throws in staging when GEMINI_API_KEY is missing', async () => {
+  it('throws in staging when no LLM keys are set', async () => {
     process.env['NODE_ENV'] = 'development';
     const c = createMockContext({ ENVIRONMENT: 'staging' });
     const next = jest.fn();
 
     await expect(llmMiddleware(c, next)).rejects.toThrow(
-      'GEMINI_API_KEY is required (environment: staging)'
+      'At least one LLM API key is required'
     );
     expect(registerProvider).not.toHaveBeenCalled();
   });
 
-  it('throws in development when key missing', async () => {
+  it('throws in development when no keys set', async () => {
     process.env['NODE_ENV'] = 'development';
     const c = createMockContext({ ENVIRONMENT: 'development' });
     const next = jest.fn();
 
     await expect(llmMiddleware(c, next)).rejects.toThrow(
-      'GEMINI_API_KEY is required (environment: development)'
+      'At least one LLM API key is required'
     );
     expect(registerProvider).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
@@ -81,13 +117,13 @@ describe('llmMiddleware', () => {
     const next = jest.fn();
 
     await expect(llmMiddleware(c, next)).rejects.toThrow(
-      'GEMINI_API_KEY is required (environment: development)'
+      'At least one LLM API key is required'
     );
     expect(registerProvider).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('warns in test environment when key missing (no throw) — process.env fallback', async () => {
+  it('warns in test environment when no keys set (no throw) — process.env fallback', async () => {
     process.env['NODE_ENV'] = 'test';
     const c = createMockContext({});
     const next = jest.fn().mockResolvedValue(undefined);
@@ -97,14 +133,14 @@ describe('llmMiddleware', () => {
 
     expect(registerProvider).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('GEMINI_API_KEY not set')
+      expect.stringContaining('No LLM API keys set')
     );
     expect(next).toHaveBeenCalled();
 
     warnSpy.mockRestore();
   });
 
-  it('warns in test environment when key missing (no throw) — c.env.ENVIRONMENT', async () => {
+  it('warns in test environment when no keys set (no throw) — c.env.ENVIRONMENT', async () => {
     process.env['NODE_ENV'] = 'development';
     const c = createMockContext({ ENVIRONMENT: 'test' });
     const next = jest.fn().mockResolvedValue(undefined);
@@ -114,7 +150,7 @@ describe('llmMiddleware', () => {
 
     expect(registerProvider).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('GEMINI_API_KEY not set')
+      expect.stringContaining('No LLM API keys set')
     );
     expect(next).toHaveBeenCalled();
 

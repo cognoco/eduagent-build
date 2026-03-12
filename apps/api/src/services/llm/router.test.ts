@@ -3,8 +3,29 @@ import {
   routeAndStream,
   registerProvider,
   getRegisteredProviders,
+  _clearProviders,
+  _resetCircuits,
 } from './router';
 import { createMockProvider } from './providers/mock';
+import type { LLMProvider } from './types';
+
+/** Mock provider whose chatStream always throws (for testing stream fallback). */
+function createFailingStreamProvider(id: string): LLMProvider {
+  return {
+    ...createMockProvider(id),
+    chatStream(): AsyncIterable<string> {
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            async next(): Promise<IteratorResult<string>> {
+              throw new Error('Stream connection lost');
+            },
+          };
+        },
+      };
+    },
+  };
+}
 
 // Register mock as 'gemini' so getModelConfig routing works
 beforeAll(() => {
@@ -101,6 +122,89 @@ describe('LLM Router', () => {
       );
 
       expect(result.model).toBe('gemini-2.5-pro');
+    });
+  });
+
+  describe('streaming fallback (pre-first-byte failure)', () => {
+    beforeAll(() => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createFailingStreamProvider('gemini'));
+      registerProvider(createMockProvider('openai'));
+    });
+
+    afterAll(() => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    it('falls back to openai and sets fallbackUsed on stream failure', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const result = await routeAndStream(
+        [{ role: 'user', content: 'test' }],
+        1
+      );
+
+      // Provider metadata reflects initial selection (gemini)
+      expect(result.provider).toBe('gemini');
+      expect(result.fallbackUsed).toBe(false);
+
+      // Consume stream — triggers fallback internally
+      const chunks: string[] = [];
+      for await (const chunk of result.stream) {
+        chunks.push(chunk);
+      }
+
+      // Data came from the openai fallback mock
+      expect(chunks.length).toBeGreaterThan(0);
+      expect(chunks.join('')).toContain('Mock streamed');
+      // fallbackUsed is set after stream consumption
+      expect(result.fallbackUsed).toBe(true);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('failed before first byte, trying fallback')
+      );
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe('OpenAI-only deployment (no Gemini key)', () => {
+    beforeAll(() => {
+      _clearProviders();
+      registerProvider(createMockProvider('openai'));
+    });
+
+    afterAll(() => {
+      _clearProviders();
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    it('routes to openai as primary for low rung', async () => {
+      const result = await routeAndCall([{ role: 'user', content: 'test' }], 1);
+      expect(result.provider).toBe('openai');
+      expect(result.model).toBe('gpt-4o-mini');
+    });
+
+    it('routes to gpt-4o for high rung', async () => {
+      const result = await routeAndCall([{ role: 'user', content: 'test' }], 3);
+      expect(result.provider).toBe('openai');
+      expect(result.model).toBe('gpt-4o');
+    });
+
+    it('streams via openai when gemini is not registered', async () => {
+      const result = await routeAndStream(
+        [{ role: 'user', content: 'test' }],
+        1
+      );
+      expect(result.provider).toBe('openai');
+      expect(result.model).toBe('gpt-4o-mini');
+
+      const chunks: string[] = [];
+      for await (const chunk of result.stream) {
+        chunks.push(chunk);
+      }
+      expect(chunks.length).toBeGreaterThan(0);
     });
   });
 });

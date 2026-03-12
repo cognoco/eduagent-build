@@ -59,30 +59,23 @@ tags:
 - assertVisible:
     text: "Physics"
 
-# 11. Tap on Physics subject to view detail
+# 11. Tap the Physics subject card via testID (more reliable than text: "Physics"
+#     which can match multiple elements on screen — coaching card, subject card, etc.)
+#     seed-and-run.sh provides ACTIVE_SUBJECT_ID for the Physics subject.
 - tapOn:
-    text: "Physics"
+    id: "home-subject-${ACTIVE_SUBJECT_ID}"
 
-# 12. Wait for subject detail screen
+# 12. Wait for curriculum review screen (navigated from home tap).
+#     home.tsx navigates to /(learner)/onboarding/curriculum-review.
 - extendedWaitUntil:
     visible:
-      text: "Physics"
+      id: "curriculum-back"
     timeout: 10000
 
-# 13. Verify subject detail content (topics section)
-# optional: true — "Topics" heading may not render if subject has no curriculum yet
-# (multi-subject seed may not include topics for every subject)
-- assertVisible:
-    text: "Topics"
-    optional: true
+# 14. Navigate back to home screen (Android hardware Back key)
+- pressKey: Back
 
-# 14. Navigate back from subject detail
-# optional: true — back button testID may vary by platform (hardware back on Android)
-- tapOn:
-    id: "back-button"
-    optional: true
-
-# 15. Verify back on home screen after subject detail round-trip
+# 15. Verify back on home screen after curriculum round-trip
 - extendedWaitUntil:
     visible:
       id: "home-scroll-view"

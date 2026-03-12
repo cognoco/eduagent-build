@@ -425,6 +425,28 @@ The shell wrapper handles the full lifecycle: ADB app clear/launch → dev-clien
 
 Fixed: `profileScopeMiddleware` auto-resolves to the owner profile when `X-Profile-Id` header is absent. See `e2e-test-bugs.md` BUG-25 for full details.
 
+### Maestro Text Matching on Android (BUG-49 — Critical Pattern)
+
+Maestro's `text:` selector has three known failure patterns on Android (discovered Session 15):
+
+1. **Nested `<Text>` in `<Pressable testID>`** — inner text invisible to `text:` selector. Fix: use testID or tap by unique text content.
+2. **Long wrapping text** — single `<Text>` with wrapped content not matched. Fix: use testID-based assertions instead.
+3. **Unescaped regex characters** — `text:` values are regex; `(`, `)`, etc. must be escaped with `\\`. Fix: escape all special chars.
+
+**Rule of thumb:** Prefer `id:` selectors over `text:` selectors wherever possible. Fall back to `text:` only for elements without testIDs and with short, non-special-character content.
+
+See `e2e-test-bugs.md` BUG-49 and `e2e-emulator-issues.md` Issue 21 for full details.
+
+### Sign-In Setup Flow Variants
+
+| Flow | When to Use |
+|------|-------------|
+| `seed-and-sign-in.yaml` | Standard flows — signs in and waits for `home-scroll-view` or `dashboard-scroll-view` |
+| `sign-in-only.yaml` | Edge-case flows where post-auth screen is NOT home/dashboard (e.g., 0-subjects redirect to create-subject, consent-withdrawn gate). Does NOT attempt post-auth navigation recovery. |
+| `switch-to-child.yaml` | Multi-profile flows where the seed creates a parent-owned account but the test needs the child's perspective. Navigates More → Profile → taps child by name → waits for learner home. Accepts `${CHILD_NAME}` env var. |
+
+See `e2e-test-bugs.md` BUG-51 for why `sign-in-only.yaml` was needed.
+
 ### TanStack Query Auth Guard (BUG-31 — Critical)
 
 **Rule:** Any TanStack Query hook used inside a provider that mounts before auth (`ProfileProvider` is in root `_layout.tsx`) **MUST** have an `enabled: !!isSignedIn` guard. Without it, the query fires unauthenticated before sign-in, enters TanStack Query error state (401, retries exhausted), and **never recovers** — even after sign-in succeeds. This is because TanStack Query does not auto-retry errored queries when the existing observer re-renders.
@@ -475,14 +497,14 @@ On Android with Fabric (New Architecture), combining `KeyboardAvoidingView behav
 apps/
   api/
     src/
-      routes/test-seed.ts            # POST /__test/seed (10 scenarios), debug endpoints
+      routes/test-seed.ts            # POST /__test/seed (14 scenarios), debug endpoints
       services/test-seed.ts           # Seeding logic + Clerk Backend API integration
       middleware/profile-scope.ts     # Auto-resolves owner profile when X-Profile-Id absent
     project.json                      # Has test:integration target (DONE)
   mobile/
     e2e/
       flows/
-        _setup/                       # 10 setup helpers (seed-and-sign-in, dismiss-*, etc.)
+        _setup/                       # 19 setup helpers (seed-and-sign-in, sign-in-only, dismiss-*, etc.)
         account/                      # Account management flows
         billing/                      # Subscription/trial flows
         consent/                      # GDPR consent flows
@@ -519,7 +541,7 @@ tests/
     e2e-ci.yml                        # E2E workflow (Maestro + Android emulator)
 ```
 
-**Flow inventory:** 53 unique test flows + 10 setup helpers = 63 YAML files total.
+**Flow inventory:** 54 unique test flows + 19 setup helpers = 72 YAML files total.
 
 This follows the project convention: co-located unit tests in `*.test.ts`, integration/E2E tests in top-level `tests/` directory (per `docs/project_context.md` rule 146). The `jest.config.cjs` maps `@eduagent/*` and `@eduagent/api` to source paths for Hono `app.request()` testing.
 
@@ -529,18 +551,20 @@ This follows the project convention: co-located unit tests in `*.test.ts`, integ
 
 ## 7. Implementation Sequence
 
-Progress as of 2026-03-10:
+Progress as of 2026-03-12:
 
 1. **API integration test harness** — **DONE.** `tests/integration/` with 10 suites (auth-chain, health-cors, onboarding, account-deletion, profile-isolation, session-completed-chain, stripe-webhook, test-seed, learning-session, retention-lifecycle), `setup.ts`, `mocks.ts`, and `jest.config.cjs`. Uses Hono `app.request()` against PostgreSQL service container.
 2. **Inngest chain integration tests** — **DONE.** `session-completed-chain.integration.test.ts` validates all 6 steps, error isolation, skip logic, and FR92 interleaved topics.
-3. **Maestro setup** — **DONE.** `apps/mobile/e2e/` with `config.yaml`, `scripts/seed-and-run.sh` (ADB automation + seed + Maestro), `_setup/seed-and-sign-in.yaml`, `_setup/sign-out.yaml`, Nx `e2e` target with smoke configuration, and 53 total test flows + 10 setup helpers.
+3. **Maestro setup** — **DONE.** `apps/mobile/e2e/` with `config.yaml`, `scripts/seed-and-run.sh` (ADB automation + seed + Maestro), `_setup/seed-and-sign-in.yaml`, `_setup/sign-in-only.yaml` (edge-case flows), `_setup/sign-out.yaml`, Nx `e2e` target with smoke configuration, and 54 total test flows + 19 setup helpers.
 4. **CI wiring** — **DONE.** `.github/workflows/e2e-ci.yml` with PostgreSQL service container for both jobs, API server background startup + health check for mobile-maestro job. Advisory mode (`continue-on-error: true`).
-5. **Smoke suite buildout** — **DONE.** All planned smoke and nightly flows written. 16 flows confirmed passing on Android emulator. 35 flows have YAML fixes applied and are ready for validation.
-6. **Seed infrastructure** — **DONE.** `seed-and-run.sh` (shell wrapper: curl + node JSON parsing + ADB automation + Maestro `-e` flags). `test-seed.ts` service with 10 scenarios (onboarding-complete, learning-active, trial-active, trial-expired-child, parent-with-children, parent-solo, retention-due, failed-recall-3x, consent-withdrawn, multi-subject). Bypasses Maestro's broken GraalJS `runScript` (Issue 13).
+5. **Smoke suite buildout** — **DONE.** All planned smoke and nightly flows written. 43 flows confirmed passing on Android emulator (as of Session 15). 3 flows fail due to LLM connectivity, 1 needs custom sign-in mechanism, 4 not yet runnable (need `launch-devclient.yaml`).
+6. **Seed infrastructure** — **DONE.** `seed-and-run.sh` (shell wrapper: curl + node JSON parsing + ADB automation + Maestro `-e` flags). `test-seed.ts` service with 14 scenarios (onboarding-complete, onboarding-no-subject, learning-active, retention-due, failed-recall-3x, parent-with-children, trial-active, trial-expired, multi-subject, homework-ready, trial-expired-child, consent-withdrawn, consent-withdrawn-solo, parent-solo). Bypasses Maestro's broken GraalJS `runScript` (Issue 13).
 7. **BUG-25 fix: profileScope middleware** — **DONE** (commit `35ef433`). `profileScopeMiddleware` now auto-resolves to owner profile when `X-Profile-Id` header is absent. This was the root cause of seeded subjects/streaks/coaching-cards being invisible on the home screen — blocked ~30 E2E flows.
 8. **BUG-10/BUG-30 fix: tab navigation** — **DONE**. Flattened `book/index.tsx` → `book.tsx` (directory routes break tab bar labels in dev-client). Added `tabBarAccessibilityLabel` to all 3 visible tabs in both learner and parent layouts. Updated 7 E2E flow YAML files to use `tapOn: "Learning Book Tab"`. Also fixed BUG-24 (KeyboardAvoidingView), BUG-29 (dashboard loading), BUG-32 (More tab scroll).
-9. **Nightly full suite** — IN PROGRESS. All 53 flows written. Batch runner scripts created (`run-all-untested.sh`, `rerun-failed.sh`). 17 flows confirmed passing; 9 need re-test after BUG-30 fix; 26 ready to validate.
-10. **Session 9 findings** — `seed-and-run.sh` fixed (3 bugs: pipefail crash, dev-tools Close button tap, grep pipeline). BUG-31 verified fixed via Maestro. Two new blockers discovered: BUG-34 (onboarding-complete redirect, ~10 flows) and BUG-35 (keyboard covers send button, ~15 flows). Combined with BUG-33 (~5 flows), these three bugs collectively block ~33 of 53 flows.
+9. **Nightly full suite** — NEAR COMPLETE. All 54 flows written. 43 flows confirmed passing (Session 15). 3 flows fail (LLM connectivity — session-summary, analogy-preference-flow, curriculum-review-flow). 1 flow needs custom sign-in (child-paywall). 4 flows not yet runnable (coppa-flow, profile-creation-consent, consent-pending-gate, sign-up-flow — need `launch-devclient.yaml` mechanism). 1 flow partial (settings-toggles, BUG-18). 1 skipped (ExpoGo-only). 1 deferred (recall-review, needs coaching-card precompute).
+10. **Session 9 findings** — `seed-and-run.sh` fixed (3 bugs: pipefail crash, dev-tools Close button tap, grep pipeline). BUG-31 verified fixed via Maestro. BUG-34 fixed (PR #72: subjects added to `onboarding-complete`, `trial-active`, `trial-expired` seed scenarios). BUG-35 workaround applied (PR #72: all ChatShell flows use `pressKey: Enter` instead of tapping obscured `send-button`). BUG-33 fixed (Session 11). BUG-48 fixed (Session 14: parent-redirect timing race).
+11. **Session 14 sweep (2026-03-12)** — 26 flows run: 18 PASS, 1 PARTIAL, 11 FAIL. BUG-48 discovered and fixed (parent-redirect timing in `seed-and-sign-in.yaml`). All parent flows now stable.
+12. **Session 15 fix sweep (2026-03-12)** — All 10 failing flows from Session 14 re-run after fixes. 7 PASS, 2 FAIL (LLM), 1 SKIP (emulator). Fixes: BUG-49 (Maestro text matching — 3 patterns: nested `<Text>`, long wrapping text, unescaped regex), BUG-50 (consent-withdrawn multi-profile → new `consent-withdrawn-solo` seed), BUG-51 (empty-first-user → new `sign-in-only.yaml` setup flow). New seed scenarios: `onboarding-no-subject`, `consent-withdrawn-solo`. Cumulative: **43/53 flows passing (81%)**. See `e2e-test-results.md` for full breakdown.
 
 ### Architecture Evolution (Sessions 1-5)
 

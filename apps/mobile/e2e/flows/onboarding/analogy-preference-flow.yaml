@@ -63,17 +63,18 @@ tags:
     id: "chat-input"
 - inputText: "I want to learn about cells and genetics for my school exam"
 # BUG-35: keyboard covers send button on Android. Use Enter key instead.
-# send-button tapOn removed per E2E integrity rules — optional: true on a
-# mandatory UI element is prohibited.
 - pressKey: Enter
 
 # Wait for AI response — interview may complete in 1-3 exchanges.
 # The interview-complete footer shows "Interview complete!" text
 # and a "View Curriculum" button once the AI decides enough info is gathered.
+# This requires the LLM to: (1) process the message, (2) generate a curriculum,
+# (3) stream the response back, (4) trigger interviewComplete=true.
+# Allow 90s for WHPX emulators with LLM latency.
 - extendedWaitUntil:
     visible:
       id: "view-curriculum-button"
-    timeout: 30000
+    timeout: 90000
 
 - takeScreenshot: analogy-pref-interview-complete
 

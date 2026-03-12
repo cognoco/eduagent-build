@@ -15,7 +15,7 @@ This spec covers the implementation of the E2E test suite defined in `e2e-testin
 
 | Area | Details |
 |------|---------|
-| **Maestro flows** | 53 test flows + 10 setup helpers (63 YAML files total) |
+| **Maestro flows** | 54 test flows + 18 setup helpers (72 YAML files total) |
 | **Test data seeding** | API seeding endpoint + `seed-and-run.sh` shell wrapper |
 | **Authentication** | ADB-automated app lifecycle + Maestro sign-in |
 | **API integration tests** | 15 integration suites covering all critical chains |
@@ -53,15 +53,19 @@ This spec covers the implementation of the E2E test suite defined in `e2e-testin
 | Scenario Key | Creates | Used By Flows |
 |-------------|---------|---------------|
 | `onboarding-complete` | User with completed onboarding, 1 subject + curriculum | Account, settings, profile flows |
+| `onboarding-no-subject` | User with completed onboarding, 0 subjects | Empty-first-user edge case flow |
 | `learning-active` | User + subject + active learning sessions | Learning, session flows |
 | `trial-active` | User on active trial period | Subscription, billing flows |
+| `trial-expired` | User with expired trial | Trial expiry flows |
 | `trial-expired-child` | Child profile with expired trial | Paywall, subscription flows |
 | `parent-with-children` | Parent profile + linked child profiles + sessions | Parent dashboard, child detail flows |
 | `parent-solo` | Parent profile without linked children | Parent onboarding flows |
 | `retention-due` | User + subject + topics with due retention cards | Retention, recall review flows |
 | `failed-recall-3x` | User + topic with 3+ failed recall tests | Failed recall remediation flows |
-| `consent-withdrawn` | User with withdrawn GDPR consent | Consent gate, consent management flows |
+| `consent-withdrawn` | Parent+child with withdrawn GDPR consent | Consent management flows (multi-profile) |
+| `consent-withdrawn-solo` | Single learner profile with withdrawn consent | Consent-withdrawn-gate flow (single-profile) |
 | `multi-subject` | User + 3 subjects (various states) | Multi-subject management flows |
+| `homework-ready` | User + subject configured for homework | Homework help flows |
 
 **Request shape:**
 
@@ -121,11 +125,12 @@ seed-and-run.sh (bash)
 ./seed-and-run.sh retention-due flows/retention/recall-review.yaml --debug-output
 ```
 
-**Setup flows in `_setup/`:**
+**Setup flows in `_setup/` (18 helpers):**
 
 ```
 apps/mobile/e2e/flows/_setup/
   seed-and-sign-in.yaml      # Wait for sign-in screen, enter creds, wait for home
+  sign-in-only.yaml          # Minimal sign-in — no post-auth navigation (edge cases: 0-subjects, consent-withdrawn)
   sign-out.yaml              # Sign out via More tab
   launch-devclient.yaml      # Launch app + connect to Metro (standalone flows)
   switch-to-parent.yaml      # More → "Parent (Light)" → parent dashboard
@@ -133,7 +138,14 @@ apps/mobile/e2e/flows/_setup/
   dismiss-bluetooth.yaml     # Tap "Close app" on Bluetooth crash dialog (BUG-21)
   dismiss-devtools.yaml      # Press Back to dismiss dev tools sheet (BUG-14)
   dismiss-notifications.yaml # Tap "Allow" on notification permission dialog (BUG-22)
+  dismiss-post-approval.yaml # Dismiss PostApprovalLanding screen
+  return-to-home.yaml        # Navigate back to home screen
+  return-to-home-safe.yaml   # Navigate back to home (with safety checks)
+  connect-server.yaml        # Connect to Metro dev server
+  nav-to-sign-in.yaml        # Navigate to sign-in screen
+  launch-expogo.yaml         # Launch via Expo Go (pre-dev-client)
   tap-metro-server.yaml      # Tap 8081 Metro entry
+  tap-metro-8081.yaml        # Tap 8081 Metro entry (alternate)
   tap-metro-8082.yaml        # Tap 8082 bundle proxy entry (BUG-7 workaround)
 ```
 
@@ -775,7 +787,7 @@ apps/
   api/
     src/
       routes/
-        test-seed.ts              # POST /v1/__test/seed (10 scenarios)
+        test-seed.ts              # POST /v1/__test/seed (14 scenarios)
       services/
         test-seed.ts              # Seeding logic with @eduagent/factory
   mobile/
@@ -787,7 +799,7 @@ apps/
         run-all-untested.sh       # Batch runner for all untested flows
         rerun-failed.sh           # Retry runner for failed flows
       flows/
-        _setup/                   # 10 setup helpers
+        _setup/                   # 18 setup helpers
           seed-and-sign-in.yaml   # Wait for sign-in screen, enter creds, wait for home
           sign-out.yaml           # Sign out via More tab
           launch-devclient.yaml   # Launch app + connect Metro (standalone flows)
@@ -824,7 +836,7 @@ tests/
     mocks.ts
 ```
 
-**Flow inventory:** 53 unique test flows + 10 setup helpers = 63 YAML files total.
+**Flow inventory:** 54 unique test flows + 18 setup helpers = 72 YAML files total.
 
 ---
 
@@ -864,20 +876,21 @@ Ordered by dependency chain and value. Status as of 2026-03-10:
 |---|------|--------|-------|
 | 4.1-4.3 | All integration tests | **DONE** | 15 suites, all passing |
 
-### Phase 5: Tier 2 Nightly Flows — **IN PROGRESS**
+### Phase 5: Tier 2 Nightly Flows — **NEAR COMPLETE**
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 5.1 | All seed scenarios | **DONE** | 10 scenarios in `test-seed.ts` |
-| 5.2 | All Tier 2 flows | **DONE** | 53 flows written |
+| 5.1 | All seed scenarios | **DONE** | 14 scenarios in `test-seed.ts` |
+| 5.2 | All Tier 2 flows | **DONE** | 54 flows written |
 | 5.3 | ADB automation (seed-and-run.sh v3) | **DONE** | Full lifecycle via ADB |
 | 5.4 | BUG-25: profileScope middleware fix | **DONE** | Auto-resolve owner profile when X-Profile-Id absent (commit `35ef433`) |
 | 5.5 | BUG-10/BUG-30: tab navigation fix | **DONE** | Flattened book route, added `tabBarAccessibilityLabel`, updated 7 flows. Also fixed BUG-24 (KAV), BUG-29 (dashboard), BUG-32 (scroll) |
 | 5.6 | seed-and-run.sh v3 bugfixes | **DONE** | Session 9: fixed 3 bugs — `set -euo pipefail` crash on grep pipeline, dev-tools Close button (added `input tap` fallback), grep pipeline `set -e` interaction |
 | 5.7 | BUG-31 verification | **DONE** | Session 9: `useProfiles()` auth guard fix verified working via Maestro sign-in flow |
-| 5.8 | BUG-34/BUG-35 discovered | **OPEN** | Session 9: onboarding-complete redirect (~10 flows) + keyboard covers send button (~15 flows) |
-| 5.9 | Emulator validation | **IN PROGRESS** | 17 passing, 9 needs re-test (fixes applied), 26 ready to validate. BUG-34/35 block ~25 additional flows |
-| 5.10 | Nightly scheduled CI workflow | **TODO** | Awaiting flow validation + BUG-34/35 fixes |
+| 5.8 | BUG-34/BUG-35 fixes | **DONE** | BUG-34 fixed (PR #72: subjects added to seed). BUG-35 workaround (pressKey: Enter). BUG-33 fixed (Session 11). |
+| 5.9 | BUG-49/50/51 fixes (Session 15) | **DONE** | Maestro text matching patterns (testID selectors), consent-withdrawn-solo seed, sign-in-only.yaml |
+| 5.10 | Emulator validation | **NEAR COMPLETE** | 43/53 passing (81%). 3 LLM-dependent, 1 needs custom sign-in, 4 need launch-devclient, 1 partial, 1 deferred |
+| 5.11 | Nightly scheduled CI workflow | **TODO** | Awaiting LLM mock mode for deterministic CI runs |
 
 ---
 
@@ -906,29 +919,32 @@ Ordered by dependency chain and value. Status as of 2026-03-10:
 - [x] 15 API integration test suites passing
 - [x] `pnpm exec nx run api:test:integration` runs all integration tests
 
-### Phase 5 Complete When: **IN PROGRESS**
-- [x] All 53 test flows written (8 Tier 2 + 45 additional)
-- [x] 10 setup helper flows created
+### Phase 5 Complete When: **NEAR COMPLETE**
+- [x] All 54 test flows written (8 Tier 2 + 46 additional)
+- [x] 18 setup helper flows created
 - [x] `seed-and-run.sh` v3 with full ADB automation
-- [x] BUG-31 fixed — `useProfiles()` auth guard enables all data-dependent flows (Session 8, verified Session 9)
-- [x] seed-and-run.sh v3 bugfixes — pipefail crash, dev-tools Close button, grep pipeline (Session 9)
-- [ ] BUG-34 — onboarding-complete scenario redirects from home, blocks ~10 flows
-- [ ] BUG-35 — keyboard covers send button in ChatShell, blocks ~15 flows
-- [ ] BUG-33 — react-native-svg + Fabric crash blocks Learning Book tab flows (~5 flows)
-- [ ] Remaining flows validated on emulator (17/53 confirmed passing, BUG-33/34/35 collectively block ~33 of 53 flows)
+- [x] 14 seed scenarios in `test-seed.ts`
+- [x] BUG-31 fixed — `useProfiles()` auth guard (Session 8, verified Session 9)
+- [x] BUG-33 fixed — SVG + Fabric crash (Session 11)
+- [x] BUG-34 fixed — onboarding-complete seed (PR #72)
+- [x] BUG-35 workaround — `pressKey: Enter` for ChatShell (PR #72)
+- [x] BUG-49 fixed — Maestro text matching patterns (Session 15: testID selectors)
+- [x] BUG-50 fixed — consent-withdrawn multi-profile (Session 15: `consent-withdrawn-solo` seed)
+- [x] BUG-51 fixed — empty-first-user (Session 15: `sign-in-only.yaml`)
+- [x] 43/53 flows validated on emulator (81% pass rate)
+- [ ] 3 LLM-dependent flows need working LLM or mock mode (session-summary, analogy-preference-flow, curriculum-review-flow)
+- [ ] 1 flow needs custom sign-in mechanism (child-paywall)
+- [ ] 4 flows need `launch-devclient.yaml` mechanism (coppa-flow, profile-creation-consent, consent-pending-gate, sign-up-flow)
 - [ ] Nightly scheduled workflow runs in CI
 - [ ] Flake rate <5% over 5 consecutive nightly runs
 
-### Current Blockers (as of Session 9, 2026-03-10)
+### Current Blockers (as of Session 15, 2026-03-12)
 | Bug | Severity | Flows Blocked | Fix Status |
 |-----|----------|---------------|------------|
-| BUG-34 (onboarding-complete redirect) | High | ~10 flows (all using onboarding-complete scenario) | Open — home screen redirects back to auth after seed sign-in |
-| BUG-35 (keyboard covers send button) | High | ~15 flows (all ChatShell interactions) | Open — `KeyboardAvoidingView behavior="height"` + `adjustResize` conflict on Android/Fabric |
-| BUG-33 (SVG + Fabric crash) | High | ~5 flows (Learning Book tab) | Open — app code fix needed |
-| BUG-31 (useProfiles auth guard) | High | ~30 flows | **FIXED** — verified in Session 9 via Maestro |
-| BUG-27 (consent seed design) | High | 1 flow (consent-withdrawn-gate) | Open — seed restructure needed |
-| BUG-28 (post-approval landing) | Medium | 1 flow (post-approval-landing) | Open — new seed scenario needed |
-| BUG-26 (DB schema drift) | High | 2 flows (billing) | Fixed locally (db:push:dev), need to verify |
+| LLM connectivity | High | 3 flows (session-summary, analogy-preference-flow, curriculum-review-flow) | Open — API health reports providers OK but SSE streams return error messages. Likely rate limiting or API key issue. |
+| child-paywall sign-in | Medium | 1 flow | Open — needs custom sign-in for child profile (parent owns account). May need `sign-in-only.yaml` variant or post-seed profile switch. |
+| launch-devclient.yaml | Medium | 4 flows (pre-auth flows) | Open — these flows need app launch without prior seed (sign-up, COPPA, consent-pending). Need ADB-only launch mechanism without seed. |
+| BUG-18 (settings-toggles partial) | Low | 1 flow partial | Known — camera/storage permissions toggle requires native permission dialog handling |
 
 ---
 

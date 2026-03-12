@@ -38,9 +38,17 @@ export interface RouteResult {
   latencyMs: number;
 }
 
-/** Stream result */
+/**
+ * Stream result.
+ *
+ * `provider` and `model` reflect the initially selected provider. If the
+ * stream wrapper transparently falls back (pre-first-byte failure),
+ * `fallbackUsed` is set to `true` after the stream is consumed — callers
+ * should check this field for accurate cost attribution / observability.
+ */
 export interface StreamResult {
   stream: AsyncIterable<string>;
   provider: string;
   model: string;
+  fallbackUsed?: boolean;
 }

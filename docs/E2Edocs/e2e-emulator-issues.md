@@ -1643,3 +1643,111 @@ After cold boot:
 5. Disable animations: `adb shell settings put global window_animation_scale 0` (etc.)
 
 **Prevention:** If running many flows in a session, consider cold-booting every ~20 runs.
+
+---
+
+## Issue 21: Maestro Text Matching Failures on Android — Three Patterns (2026-03-12)
+
+**Discovery:** Session 15 revealed three distinct patterns where Maestro's `text:` selector fails to find visible text on Android. These caused failures across 6 flows (topic-detail, relearn-flow, multi-subject, subscription-details, consent-withdrawn-gate, empty-first-user).
+
+### Pattern A: Nested `<Text>` inside `<Pressable>` with testID
+
+When a `<Pressable testID="foo">` wraps `<Text>` children, Maestro's `text:` selector cannot find the inner text content. The testID on the outer `Pressable` makes it the accessibility target, and the inner text nodes become invisible to Maestro's accessibility tree scan.
+
+**Example (topic row in Learning Book):**
+```tsx
+<Pressable testID={`book-topic-${topic.id}`} onPress={...}>
+  <Text>{topic.name}</Text>          {/* invisible to text: selector */}
+  <Text>{topic.sessionCount} sessions</Text>  {/* invisible */}
+</Pressable>
+```
+
+**Fix:** Tap the element by its known text content directly (if the text is unique) or use the parent testID. For topic rows, tap the deterministic topic name: `tapOn: text: "Biology Topic 1"`.
+
+### Pattern B: Long Wrapping Text in Single `<Text>` Node
+
+When a single `<Text>` element contains long text that wraps across multiple lines, Maestro fails to match the full string on Android. The text is visually present but the accessibility tree may truncate or split it across multiple accessibility nodes.
+
+**Example (relearn screen):**
+```tsx
+<Text>Every topic needs its own approach. Let's find what works best for you.</Text>
+```
+Maestro `assertVisible: text: "Every topic needs its own approach"` → NOT FOUND.
+
+**Fix:** Replace text-based assertions with testID-based waits. Add a `testID` to the container and use `id:` selector instead.
+
+### Pattern C: Unescaped Regex Special Characters in `text:`
+
+Maestro treats `text:` values as **regex patterns**, not literal strings. Characters like `(`, `)`, `+`, `*`, `?`, `[`, `]` have special meaning and must be escaped with `\\`.
+
+**Example (subscription screen):**
+```yaml
+# FAILS — Maestro interprets parentheses as regex group
+- assertVisible:
+    text: "Bring your own key (coming soon)"
+
+# WORKS — escaped parentheses
+- assertVisible:
+    text: "Bring your own key \\(coming soon\\)"
+```
+
+**Fix:** Escape all regex special characters in `text:` selectors. Common characters needing escape: `\\(`, `\\)`, `\\+`, `\\*`, `\\?`, `\\[`, `\\]`, `\\.`.
+
+### Summary of Workarounds
+
+| Pattern | Symptom | Fix |
+|---------|---------|-----|
+| Nested `<Text>` in `<Pressable testID>` | `text:` can't find inner text | Use testID or tap by known unique text |
+| Long wrapping text | Full string not matched | Use testID-based wait instead of text assertion |
+| Unescaped regex chars | Pattern matching fails | Escape `(`, `)`, etc. with `\\` |
+
+**See also:** `e2e-test-bugs.md` BUG-49 for the full bug report with affected flows.
+
+---
+
+## Session 15 Findings (2026-03-12)
+
+**Scope:** Re-ran all 10 failing flows from Session 14 after applying fixes. Results: 7 PASS, 2 FAIL (LLM), 1 SKIP (emulator cold boot needed).
+
+### New Infrastructure
+
+| Component | Details |
+|-----------|---------|
+| `sign-in-only.yaml` | Minimal sign-in setup flow — no post-auth navigation recovery. For edge-case flows where post-auth screen is not `home-scroll-view` or `dashboard-scroll` (e.g., 0-subjects redirect, consent-withdrawn gate). |
+| `consent-withdrawn-solo` seed | Single-profile learner with withdrawn consent. The original `consent-withdrawn` scenario creates parent+child, and the app picks the parent profile (account owner), bypassing the consent gate. |
+| `onboarding-no-subject` seed | Learner with completed onboarding but 0 subjects. For testing the empty-state redirect from home to create-subject. |
+
+### Fixes Applied
+
+| Flow | Issue | Fix |
+|------|-------|-----|
+| topic-detail | "sessions" text not found (Pattern A) | Tap "Biology Topic 1" directly |
+| relearn-flow | Long wrapping text not found (Pattern B) | Use `id: "relearn-different-method"` and `id: "relearn-method-visual_diagrams"` |
+| multi-subject | Tapping "Physics" navigated wrong | Use `id: "home-subject-${ACTIVE_SUBJECT_ID}"` |
+| subscription-details | Unescaped regex parens (Pattern C) | Escape `\\(coming soon\\)` |
+| subscription-details | "More" tab tap hit wrong element | Use `tapOn: "More Tab"` (accessibility label) |
+| consent-withdrawn-gate | Parent profile shown instead of gate | New `consent-withdrawn-solo` seed scenario |
+| empty-first-user | seed-and-sign-in return-to-home fails | New `sign-in-only.yaml` setup flow |
+| empty-first-user | PostApprovalLanding blocks create-subject | Explicit wait + dismiss |
+| empty-first-user | "learning coach" text in chat bubble | Use header text "Your coach is here" instead |
+
+### LLM Connectivity Issue
+
+Two flows failed because the LLM (Gemini) returns "I'm having trouble connecting" instead of actual AI responses:
+- `session-summary` — end-session-button never appears (exchangeCount never reaches minimum)
+- `analogy-preference-flow` — view-curriculum-button never appears (interview never completes)
+
+The API health endpoint reports providers are available, but actual SSE streams fail. This is an API configuration issue (rate limiting, API key, or Gemini service availability), not a flow or emulator problem.
+
+### Cumulative Status After Session 15
+
+| Category | Count | Details |
+|----------|-------|---------|
+| **Passing** | 43 | Verified on Android emulator |
+| **Failing (LLM)** | 3 | session-summary, analogy-preference-flow, curriculum-review-flow |
+| **Failing (design)** | 1 | child-paywall (needs custom sign-in for child profile) |
+| **Not yet runnable** | 4 | coppa-flow, profile-creation-consent, consent-pending-gate, sign-up-flow |
+| **Partial** | 1 | settings-toggles (BUG-18) |
+| **Deferred** | 1 | recall-review (needs coaching-card precompute) |
+| **Skipped** | 1 | app-launch-expogo (ExpoGo-only, not relevant for dev-client) |
+| **Total** | 54 | |

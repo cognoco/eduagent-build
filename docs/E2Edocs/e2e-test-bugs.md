@@ -889,15 +889,166 @@ After sign-in, the PostApprovalLanding screen appears (BUG-38 behavior — Secur
 
 ## BUG-44: `add-subject-button` TestID Not Found on Home Screen (2026-03-11)
 
-**Status:** Open (testID or scrolling issue)
+**Status:** Fixed in flows (Session 12)
 **Severity:** Medium — blocks 3 flows
 **Affects:** `onboarding/analogy-preference-flow.yaml`, `assessment/assessment-cycle.yaml`, `onboarding/curriculum-review-flow.yaml`
 
 After successful sign-in with `onboarding-complete` scenario (BUG-38 PostApprovalLanding dismissed, home screen reached), the flow taps `id: add-subject-button` but it's not found. The home screen is visible (`home-scroll-view` assertion passes) but the button is not in the viewport.
 
-**Possible causes:**
-1. **Below the fold** — the button may be at the bottom of the home ScrollView, requiring scroll
-2. **TestID mismatch** — the button may have a different testID in the current app code
-3. **Conditional render** — the button may only show when there are 0 subjects (but `onboarding-complete` now has "General Studies" from BUG-34 fix)
+**Root cause:** Button is below the fold. With the `onboarding-complete` seed (which creates a "General Studies" subject), the home screen has enough content to push the "Add Subject" button below the visible viewport.
 
-**Fix:** Check `apps/mobile/src/app/(learner)/home.tsx` for the `add-subject-button` testID. If it only renders with 0 subjects, these flows need a different navigation path to create a subject. If it's below the fold, add `scrollUntilVisible` before the tap.
+**Fix:** Added `scrollUntilVisible` before `tapOn: add-subject-button` in all affected flows. Verified working in Session 12 — Maestro successfully scrolls down and finds the button.
+
+---
+
+## BUG-45: Maestro Can't Find Text in ChatShell Header on Android (2026-03-11)
+
+**Status:** Workaround in flows (Session 12)
+**Severity:** Medium — blocks interview-dependent flows
+**Affects:** `onboarding/analogy-preference-flow.yaml`, `onboarding/curriculum-review-flow.yaml`
+
+Maestro `assertVisible: text: "Interview"` fails on the ChatShell header. The header text "Interview: Biology" is rendered as a React Native `<Text>` inside a complex view hierarchy but is not exposed to Android's accessibility tree in a way Maestro's text matcher can discover.
+
+**Root cause:** React Native `<Text>` components inside certain view hierarchies (custom headers with back buttons, status bar insets) may not be discoverable by Maestro's `text:` selector. The text IS visually rendered but not in the Android accessibility tree.
+
+**Workaround:** Replaced `text: "Interview"` with `id: "chat-input"` — the TextInput's testID is reliably exposed. The presence of `chat-input` confirms the interview/chat screen has loaded.
+
+---
+
+## BUG-46: Maestro Can't Find Text Inside Chat Message Bubbles (2026-03-11)
+
+**Status:** Workaround in flows (Session 12)
+**Severity:** Low — cosmetic assertion, not blocking
+**Affects:** `onboarding/analogy-preference-flow.yaml`, `onboarding/curriculum-review-flow.yaml`
+
+Maestro `assertVisible: text: "learning coach"` fails even when the AI opening message ("Hi! I'm your learning coach...") is visually rendered in a `MessageBubble`. Same root cause as BUG-45 — text inside React Native chat bubble components isn't reliably exposed to Maestro's text matcher on Android.
+
+**Workaround:** Removed the `text: "learning coach"` assertion. The `id: "chat-input"` check (BUG-45 fix) is sufficient to confirm the chat screen loaded. The opening message in the interview screen is a hardcoded constant, not an LLM call, so its presence is guaranteed by the component mounting.
+
+---
+
+## BUG-47: Gemini LLM Intermittently Fails/Hangs During E2E Runs (2026-03-11)
+
+**Status:** Open — environment issue, not an app bug
+**Severity:** High — blocks all interview-dependent flows
+**Affects:** `onboarding/analogy-preference-flow.yaml`, `onboarding/curriculum-review-flow.yaml`, any flow requiring LLM responses
+
+During Session 12 (and previously in Sessions 10-11), the Gemini LLM API (`gemini-2.0-flash`) intermittently fails or hangs when called from the interview service. The interview requires at least one AI response exchange before showing the "View Curriculum" button.
+
+**Observed behaviors (5 consecutive runs, Session 12):**
+1. AI opening message appeared (hardcoded, not LLM). User message sent. AI responded with error: "I'm having trouble connecting right now. Please try again." (LLM call failed, catch handler fired)
+2. Same as #1
+3. AI opening message appeared. User message appeared. No AI response — LLM call hung (no success or error callback)
+4. Disk full error (cleaned 38GB from `/c/tools/tmp/`)
+5. Empty chat area — even the hardcoded opening message not rendering (possible rendering glitch after disk pressure, or component mount issue)
+
+**Root cause:** Gemini API intermittency. The `/v1/health` endpoint reports `"llm":{"providers":["gemini"]}` (config check, not live call), so health checks pass even when the LLM is unresponsive. The interview's `sendInterview.mutateAsync()` either times out or returns an error.
+
+**Impact:** The `view-curriculum-button` never appears → analogy preference and curriculum review flows can't proceed past the interview screen. All flow logic before the LLM call is validated and working.
+
+**Possible mitigations:**
+1. Add LLM health probe to `/v1/health` (actual Gemini ping, not just config check)
+2. Add retry logic in interview service for transient LLM failures
+3. For E2E: consider a mock/stub LLM mode that returns canned interview responses
+4. For E2E: run interview flows in a retry loop (re-seed + re-run on LLM failure)
+
+---
+
+## BUG-48: Parent-Redirect Timing Race in seed-and-sign-in.yaml (2026-03-12)
+
+**Status:** FIXED (2026-03-12) — created `return-to-home-safe.yaml` with dual-guard logic
+**Severity:** HIGH — blocks all parent flows that use `seed-and-sign-in.yaml`
+**Affects:** `parent/parent-dashboard.yaml`, `parent/parent-learning-book.yaml`, and any parent scenario using `seed-and-sign-in.yaml` with `return-to-home.yaml`
+
+After sign-in with a parent scenario, the app briefly shows `home-scroll-view` (learner layout) then redirects to `dashboard-scroll` (parent layout). The existing `return-to-home.yaml` conditional (`when: notVisible: id: home-scroll-view`) evaluates **after** the redirect has occurred, so `home-scroll-view` is indeed not visible (because the parent dashboard is showing). This causes it to incorrectly press Back, navigating away from the dashboard.
+
+**Root cause:** Maestro's `when: notVisible` evaluates at check time, not at the moment of sign-in. The brief learner layout appearance followed by parent redirect creates a race condition. By the time the conditional runs, the parent dashboard has loaded, `home-scroll-view` is gone, so the `notVisible` condition is true — and the Back press fires, leaving the dashboard.
+
+**Fix:** Created `return-to-home-safe.yaml` which adds a second guard: if `dashboard-scroll` IS visible, skip the Back press entirely (the parent is already where they should be). Updated `seed-and-sign-in.yaml` to use `return-to-home-safe.yaml` instead of `return-to-home.yaml`.
+
+**Files changed:**
+- `e2e/flows/_setup/return-to-home-safe.yaml` (new)
+- `e2e/flows/_setup/seed-and-sign-in.yaml` (updated to reference safe variant)
+
+---
+
+## BUG-49: Maestro Text Matching Failures on Android (2026-03-12)
+
+**Status:** DOCUMENTED — workarounds applied in Session 15 flows
+**Severity:** MEDIUM — affects any flow using `text:` selectors for taps/assertions
+**Affects:** `topic-detail`, `relearn-flow`, `subscription-details`, and any flow matching text inside nested elements
+
+Three distinct patterns where Maestro fails to match visible text on Android:
+
+1. **Nested `<Text>` inside `<Pressable>` with testID:** Text like "2 sessions" rendered in a `<Text>` child inside a `<Pressable testID="topic-row-{id}">` is invisible to Maestro's `text:` selector. Root cause: Maestro may treat the `<Pressable>` as a single accessible element and not traverse children.
+
+2. **Long wrapping text in single `<Text>` node:** Text like "Every topic needs its own approach. Let's find what clicks for you!" wraps across 2+ lines. Maestro's regex matcher fails to find even substrings like "Every topic needs its own approach". Root cause: possible line-break injection in accessibility text.
+
+3. **Regex special characters:** Text containing literal parentheses, e.g. "Bring your own key (coming soon)", fails because Maestro treats `text:` as regex. Unescaped `(` `)` create malformed regex groups.
+
+**Workarounds:**
+- Pattern 1 & 2: Use `testID` selectors or tap specific known text (e.g., topic names from seed)
+- Pattern 3: Escape regex chars with `\\(` `\\)`
+
+---
+
+## BUG-50: consent-withdrawn Seed Creates Parent+Child (Wrong Profile Selected) (2026-03-12)
+
+**Status:** FIXED (2026-03-12) — new `consent-withdrawn-solo` seed scenario
+**Severity:** HIGH — consent-withdrawn-gate flow could never pass
+**Affects:** `consent/consent-withdrawn-gate.yaml`
+
+The `consent-withdrawn` seed scenario creates a parent profile (isOwner: true) and a child profile (TEEN, WITHDRAWN consent) under one account. After sign-in, the app's profile selection logic picks the parent (owner) profile, showing the parent dashboard instead of the child's consent-withdrawn-gate.
+
+**Root cause:** The app picks the first/owner profile on sign-in. The child profile with WITHDRAWN consent is never selected, so the consent-withdrawn-gate component never renders.
+
+**Fix:** Created `consent-withdrawn-solo` seed scenario with a single LEARNER profile that has WITHDRAWN consent. No parent profile, no profile switching needed. Updated `consent-withdrawn-gate.yaml` to use the new scenario.
+
+**Files changed:**
+- `apps/api/src/services/test-seed.ts` — added `seedConsentWithdrawnSolo()` + type + map entry
+- `e2e/flows/consent/consent-withdrawn-gate.yaml` — use `consent-withdrawn-solo` scenario
+
+---
+
+## BUG-51: empty-first-user Breaks seed-and-sign-in Return-to-Home Logic (2026-03-12)
+
+**Status:** FIXED (2026-03-12) — new `sign-in-only.yaml` setup flow
+**Severity:** MEDIUM — only affects flows where post-auth screen is not home/dashboard
+**Affects:** `edge/empty-first-user.yaml`
+
+With `onboarding-no-subject` seed (0 subjects), `home.tsx` immediately redirects to `/create-subject`. The `seed-and-sign-in.yaml` recovery logic detects `home-scroll-view` is gone and fires `return-to-home-safe.yaml`, which presses Back — but there's no home to return to (it keeps redirecting). This creates a fatal loop.
+
+Additionally, the PostApprovalLanding ("You're approved!") intercepts after `pm clear` wipes SecureStore. The sign-in-only flow needs explicit handling for this screen.
+
+**Fix:**
+1. Created `sign-in-only.yaml` — minimal sign-in without any post-auth recovery
+2. Flow uses `sign-in-only.yaml` instead of `seed-and-sign-in.yaml`
+3. Added explicit PostApproval wait + dismiss before checking for create-subject
+4. Changed "learning coach" text assertion to "Your coach is here" header text (chat bubble text invisible to Maestro)
+
+**Files changed:**
+- `e2e/flows/_setup/sign-in-only.yaml` (new)
+- `e2e/flows/edge/empty-first-user.yaml` — rewritten setup sequence
+
+---
+
+## BUG-52: child-paywall Flow Signs In as Parent, Not Child (2026-03-12)
+
+**Status:** FIXED (2026-03-12) — new `switch-to-child.yaml` setup flow
+**Severity:** HIGH — flow fails at step 2 (never reaches ChildPaywall)
+**Affects:** `billing/child-paywall.yaml`
+
+The `trial-expired-child` seed creates a parent-owned account with a parent profile (owner) and child profile (non-owner). Sign-in authenticates as the parent, landing on the parent dashboard (`dashboard-scroll`). The flow then waits for `home-scroll-view` (step 2), which never appears → timeout failure.
+
+Even if step 2 were fixed, the ChildPaywall would not render because the active profile is the parent (owner). The ChildPaywall component gates on `!activeProfile.isOwner && subscription.status === 'expired'` — it requires the non-owner child profile to be active.
+
+**Same class of issue as BUG-50** (consent-withdrawn multi-profile seed). BUG-50 was solved by creating a solo seed variant. That approach doesn't work here because the ChildPaywall *requires* a non-owner profile — you can't make a solo profile that is both owner and non-owner.
+
+**Fix:**
+1. Created `switch-to-child.yaml` — reusable setup flow that navigates More → Profile → taps child by name → waits for learner home after persona redirect
+2. Updated `child-paywall.yaml` to run `switch-to-child.yaml` after `seed-and-sign-in.yaml`
+3. Includes PostApprovalLanding dismiss (BUG-38 safety) since `pm clear` wipes SecureStore
+
+**Files changed:**
+- `e2e/flows/_setup/switch-to-child.yaml` (new)
+- `e2e/flows/billing/child-paywall.yaml` — added profile switch step

@@ -42,99 +42,103 @@ tags:
 - tapOn:
     id: "chat-input"
 - inputText: "Explain the concept to me"
-# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
-# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
-# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key.
 - pressKey: Enter
 
-# 6. Wait for AI response
+# 6. Wait for AI response (60s — LLM can be slow, BUG-47)
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 60000
 
 # 7. Exchange 2: follow-up
 - tapOn:
     id: "chat-input"
 - inputText: "Can you give me an example of how this works?"
-# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
-# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
-# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
 - pressKey: Enter
 
 # 8. Wait for AI response
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 60000
 
 # 9. Exchange 3: confirm understanding
 - tapOn:
     id: "chat-input"
 - inputText: "That makes sense, thank you"
-# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
-# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
-# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
 - pressKey: Enter
 
-# 10. Wait for AI response — end-session button appears after first exchange
+# 10. Wait for AI response — end-session button appears after exchangeCount > 0
+#     BUG-37: exchangeCount is set from LLM streaming result. If LLM fails,
+#     the count stays at 0 and end-session-button never renders. Increased
+#     timeout to 60s to give LLM time to respond.
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 60000
 
-# 11. Tap end-session button (testID: end-session-button)
+# 11. Wait for end-session-button to appear (rendered in header when exchangeCount > 0)
+#     BUG-37: The button only appears after a successful LLM streaming response
+#     increments exchangeCount. The count updates asynchronously from the SSE stream.
+#     On WHPX emulators, the LLM response parsing can be slow — allow 30s.
+- extendedWaitUntil:
+    visible:
+      id: "end-session-button"
+    timeout: 30000
+
+# 12. Tap end-session button
 - tapOn:
     id: "end-session-button"
 
-# 12. Confirm the end session alert — tap "End Session" button in the Alert dialog
+# 13. Confirm the end session alert — tap "End Session" button in the Alert dialog
 - tapOn:
     text: "End Session"
 
-# 13. Wait for session summary screen to load
+# 14. Wait for session summary screen to load
 - extendedWaitUntil:
     visible:
       id: "summary-title"
     timeout: 20000
 
-# 14. Screenshot: summary screen before writing
+# 15. Screenshot: summary screen before writing
 - takeScreenshot: session-summary-screen
 
-# 15. Verify session takeaways are visible
+# 16. Verify session takeaways are visible
 - assertVisible:
     id: "session-takeaways"
 
-# 16. Tap summary input and write a summary
+# 17. Tap summary input and write a summary
 - tapOn:
     id: "summary-input"
 - inputText: "I learned about the key concepts and how they apply in practice"
 
-# 17. Tap submit summary button
+# 18. Tap submit summary button
 - tapOn:
     id: "submit-summary-button"
 
-# 18. Wait for AI feedback (the mutation submits and returns feedback)
+# 19. Wait for AI feedback (the mutation submits and returns feedback)
 - extendedWaitUntil:
     visible:
       id: "ai-feedback"
     timeout: 20000
 
-# 19. Verify summary-submitted state is showing
+# 20. Verify summary-submitted state is showing
 - assertVisible:
     id: "summary-submitted"
 
-# 20. Screenshot: summary with AI feedback
+# 21. Screenshot: summary with AI feedback
 - takeScreenshot: session-summary-feedback
 
-# 21. Tap continue button to return home
+# 22. Tap continue button to return home
 - tapOn:
     id: "continue-button"
 
-# 22. Verify we returned to home screen
+# 23. Verify we returned to home screen
 - extendedWaitUntil:
     visible:
       id: "home-scroll-view"
     timeout: 10000
 
-# 23. Final screenshot
+# 24. Final screenshot
 - takeScreenshot: session-summary-complete

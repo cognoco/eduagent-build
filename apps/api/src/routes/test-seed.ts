@@ -26,6 +26,11 @@ import {
   type SeedScenario,
   type SeedEnv,
 } from '../services/test-seed';
+import {
+  routeAndCall,
+  routeAndStream,
+  getRegisteredProviders,
+} from '../services/llm';
 
 type TestEnv = {
   Bindings: {
@@ -148,4 +153,58 @@ testSeedRoutes.get('/__test/debug-subjects/:clerkUserId', async (c) => {
     return c.json(outcome, 404);
   }
   return c.json(outcome.result);
+});
+
+/**
+ * LLM diagnostic endpoint — test-only.
+ * GET /__test/llm-ping — calls routeAndCall with a simple prompt.
+ * GET /__test/llm-ping?stream=1 — tests streaming via routeAndStream.
+ */
+testSeedRoutes.get('/__test/llm-ping', async (c) => {
+  const providers = getRegisteredProviders();
+  const useStream = c.req.query('stream') === '1';
+
+  const messages = [
+    { role: 'system' as const, content: 'Reply with exactly one word.' },
+    { role: 'user' as const, content: 'Say hello.' },
+  ];
+
+  try {
+    if (useStream) {
+      const result = await routeAndStream(messages, 1);
+      let fullText = '';
+      for await (const chunk of result.stream) {
+        fullText += chunk;
+      }
+      return c.json({
+        ok: true,
+        mode: 'stream',
+        provider: result.provider,
+        model: result.model,
+        fallbackUsed: result.fallbackUsed ?? false,
+        response: fullText.trim(),
+        registeredProviders: providers,
+      });
+    }
+
+    const result = await routeAndCall(messages, 1);
+    return c.json({
+      ok: true,
+      mode: 'call',
+      provider: result.provider,
+      model: result.model,
+      latencyMs: result.latencyMs,
+      response: result.response.trim(),
+      registeredProviders: providers,
+    });
+  } catch (err) {
+    return c.json(
+      {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+        registeredProviders: providers,
+      },
+      500
+    );
+  }
 });

@@ -69,11 +69,14 @@ tags:
 # mandatory UI element is prohibited.
 - pressKey: Enter
 
-# Wait for interview to complete — the footer button appears when done
+# Wait for interview to complete — the footer button appears when the LLM
+# generates a structured curriculum response that sets interviewComplete=true.
+# This requires the AI to process the interview message, generate a curriculum,
+# and stream the result back. Allow 90s for WHPX emulators with LLM latency.
 - extendedWaitUntil:
     visible:
       id: "view-curriculum-button"
-    timeout: 30000
+    timeout: 90000
 
 # ── Navigate through analogy preference (skip it) ─────────────────────
 - tapOn:

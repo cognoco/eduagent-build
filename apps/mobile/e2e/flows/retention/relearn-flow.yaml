@@ -63,15 +63,12 @@ tags:
     text: "Needs attention"
     optional: true
 
-# 7. Tap the topic that needs attention
+# 7. Tap the first topic row. The failed-recall-3x seed creates topics under
+#    "Chemistry" subject named "Chemistry Topic 1/2/3". The first topic has
+#    failureCount=3, which shows "Needs attention" label. Tap by topic name
+#    since Maestro can't reliably find text inside nested <Text> nodes.
 - tapOn:
-    text: "Needs attention"
-    optional: true
-
-# 7b. Fallback: tap a topic row by its content
-- tapOn:
-    text: "session"
-    optional: true
+    text: "Chemistry Topic 1"
 
 # 8. Wait for topic detail screen
 - extendedWaitUntil:
@@ -93,9 +90,14 @@ tags:
       text: "Relearn Topic"
     timeout: 10000
 
-# 12. Verify the choice phase prompt text
-- assertVisible:
-    text: "Every topic needs its own approach"
+# 12. Wait for choice phase to render — verify both options are present.
+#     NOTE: text assertion "Every topic needs its own approach" removed —
+#     Maestro can't match long wrapping text in single <Text> on Android.
+#     The testID checks provide equivalent coverage.
+- extendedWaitUntil:
+    visible:
+      id: "relearn-different-method"
+    timeout: 10000
 
 # 13. Verify both choice options are present
 - assertVisible:
@@ -110,10 +112,12 @@ tags:
 - tapOn:
     id: "relearn-different-method"
 
-# 16. Verify method picker phase loads
+# 16. Verify method picker phase loads — wait for first method option.
+#     NOTE: text "Pick a teaching style that works best for you:" is a long
+#     wrapping <Text> that Maestro can't match on Android. Use testID instead.
 - extendedWaitUntil:
     visible:
-      text: "Pick a teaching style"
+      id: "relearn-method-visual_diagrams"
     timeout: 5000
 
 # 17. Verify all 4 method options are present

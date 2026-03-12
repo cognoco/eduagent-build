@@ -56,6 +56,7 @@ const CLERK_API_BASE = 'https://api.clerk.com/v1';
 
 export type SeedScenario =
   | 'onboarding-complete'
+  | 'onboarding-no-subject'
   | 'learning-active'
   | 'retention-due'
   | 'failed-recall-3x'
@@ -66,6 +67,7 @@ export type SeedScenario =
   | 'homework-ready'
   | 'trial-expired-child'
   | 'consent-withdrawn'
+  | 'consent-withdrawn-solo'
   | 'parent-solo';
 
 /** Environment bindings needed by the seed service */
@@ -355,6 +357,41 @@ type SeederFn = (
   email: string,
   env: SeedEnv
 ) => Promise<SeedResult>;
+
+/** Onboarding complete but with 0 subjects — for testing the empty-state
+ *  /create-subject redirect that home.tsx triggers when subjects.length === 0.
+ *  This is the original semantics of onboarding-complete before BUG-34 added
+ *  a default subject. */
+async function seedOnboardingNoSubject(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Test Learner',
+    personaType: 'LEARNER',
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  return {
+    scenario: 'onboarding-no-subject',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: {},
+  };
+}
 
 async function seedOnboardingComplete(
   db: Database,
@@ -945,6 +982,40 @@ async function seedConsentWithdrawn(
   };
 }
 
+async function seedConsentWithdrawnSolo(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  // Single learner profile — no parent, no profile switch needed
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Withdrawn Learner',
+    personaType: 'LEARNER',
+  });
+
+  // Consent state: WITHDRAWN
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'WITHDRAWN',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  return {
+    scenario: 'consent-withdrawn-solo',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: {},
+  };
+}
+
 async function seedParentSolo(
   db: Database,
   email: string,
@@ -985,6 +1056,7 @@ async function seedParentSolo(
 
 const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'onboarding-complete': seedOnboardingComplete,
+  'onboarding-no-subject': seedOnboardingNoSubject,
   'learning-active': seedLearningActive,
   'retention-due': seedRetentionDue,
   'failed-recall-3x': seedFailedRecall3x,
@@ -995,6 +1067,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'homework-ready': seedHomeworkReady,
   'trial-expired-child': seedTrialExpiredChild,
   'consent-withdrawn': seedConsentWithdrawn,
+  'consent-withdrawn-solo': seedConsentWithdrawnSolo,
   'parent-solo': seedParentSolo,
 };
 
