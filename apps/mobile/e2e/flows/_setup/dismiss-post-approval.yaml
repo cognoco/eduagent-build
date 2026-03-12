@@ -10,4 +10,5 @@ appId: com.mentomate.app
     visible:
       id: "home-scroll-view"
     timeout: 15000
+    # Parent scenarios land on dashboard-scroll, not home-scroll-view
     optional: true

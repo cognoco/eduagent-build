@@ -64,19 +64,17 @@ tags:
 - inputText: "I want to learn about cells and genetics for my school exam"
 # BUG-35: keyboard covers send button on Android. Use Enter key instead.
 - pressKey: Enter
-# Fallback: tap send-button in case Enter didn't trigger onSubmitEditing
-- tapOn:
-    id: "send-button"
-    optional: true  # BUG-35: keyboard may cover this
 
 # Wait for AI response — interview may complete in 1-3 exchanges.
 # The interview-complete footer shows "Interview complete!" text
 # and a "View Curriculum" button once the AI decides enough info is gathered.
-# LLM response + interview completion can take up to 60s with slow Gemini
+# This requires the LLM to: (1) process the message, (2) generate a curriculum,
+# (3) stream the response back, (4) trigger interviewComplete=true.
+# Allow 90s for WHPX emulators with LLM latency.
 - extendedWaitUntil:
     visible:
       id: "view-curriculum-button"
-    timeout: 60000
+    timeout: 90000
 
 - takeScreenshot: analogy-pref-interview-complete
 

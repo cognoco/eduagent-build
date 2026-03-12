@@ -214,6 +214,59 @@ async function attemptProvider(
 // Streaming variant for SSE
 // ---------------------------------------------------------------------------
 
+/**
+ * Wraps an async iterable stream with circuit breaker tracking.
+ *
+ * chatStream() returns a lazy AsyncIterable — the actual HTTP request and
+ * data flow happen during for-await iteration, not at creation time. This
+ * wrapper defers recordSuccess/recordFailure to iteration so the circuit
+ * breaker accurately reflects real streaming outcomes.
+ *
+ * - On successful completion → recordSuccess
+ * - On iteration error → recordFailure
+ * - Pre-first-byte failure with available fallback → transparent retry
+ * - Mid-stream failure → re-throw (cannot switch providers after data flows)
+ */
+async function* wrapStreamWithCircuitBreaker(
+  source: AsyncIterable<string>,
+  providerId: string,
+  fallbackConfig: ModelConfig | null,
+  messages: ChatMessage[]
+): AsyncIterable<string> {
+  let chunksYielded = 0;
+  try {
+    for await (const chunk of source) {
+      chunksYielded++;
+      yield chunk;
+    }
+    recordSuccess(providerId);
+  } catch (err) {
+    recordFailure(providerId);
+
+    // Pre-first-byte failure with available fallback → try fallback stream
+    if (chunksYielded === 0 && fallbackConfig) {
+      const fallbackProvider = providers.get(fallbackConfig.provider);
+      if (fallbackProvider && canAttempt(fallbackConfig.provider)) {
+        console.warn(
+          `[llm] Primary stream ${providerId} failed before first byte, trying fallback ${
+            fallbackConfig.provider
+          }: ${err instanceof Error ? err.message : String(err)}`
+        );
+        yield* wrapStreamWithCircuitBreaker(
+          fallbackProvider.chatStream(messages, fallbackConfig),
+          fallbackConfig.provider,
+          null, // no further fallback
+          messages
+        );
+        return;
+      }
+    }
+
+    // Mid-stream failure or no fallback available — re-throw
+    throw err;
+  }
+}
+
 export async function routeAndStream(
   messages: ChatMessage[],
   rung: EscalationRung = 1
@@ -226,26 +279,21 @@ export async function routeAndStream(
 
   // --- Try primary provider ---
   if (canAttempt(config.provider)) {
-    try {
-      const stream = provider.chatStream(messages, config);
-      recordSuccess(config.provider);
-      return {
-        stream,
-        provider: config.provider,
-        model: config.model,
-      };
-    } catch (err) {
-      recordFailure(config.provider);
-      const fallbackConfig = getFallbackConfig(config, rung);
-      if (!fallbackConfig) throw err;
-
-      console.warn(
-        `[llm] Primary stream ${config.provider} failed, trying fallback ${
-          fallbackConfig.provider
-        }: ${err instanceof Error ? err.message : String(err)}`
-      );
-      return attemptStreamProvider(fallbackConfig, messages);
-    }
+    const fallbackConfig = getFallbackConfig(config, rung);
+    // NOTE: recordSuccess/recordFailure fire during iteration, not here,
+    // because chatStream() returns a lazy AsyncIterable — the actual HTTP
+    // request and data flow happen in the caller's for-await loop.
+    const stream = wrapStreamWithCircuitBreaker(
+      provider.chatStream(messages, config),
+      config.provider,
+      fallbackConfig,
+      messages
+    );
+    return {
+      stream,
+      provider: config.provider,
+      model: config.model,
+    };
   }
 
   // Primary circuit is open — try fallback directly
@@ -260,7 +308,7 @@ export async function routeAndStream(
   throw new CircuitOpenError(config.provider);
 }
 
-/** Attempt a single provider stream (used by fallback path). */
+/** Attempt a single provider stream (used for direct fallback when primary circuit is open). */
 async function attemptStreamProvider(
   config: ModelConfig,
   messages: ChatMessage[]
@@ -273,16 +321,18 @@ async function attemptStreamProvider(
     throw new CircuitOpenError(config.provider);
   }
 
-  try {
-    const stream = provider.chatStream(messages, config);
-    recordSuccess(config.provider);
-    return {
-      stream,
-      provider: config.provider,
-      model: config.model,
-    };
-  } catch (err) {
-    recordFailure(config.provider);
-    throw err;
-  }
+  // NOTE: recordSuccess/recordFailure fire during iteration, not here,
+  // because chatStream() returns a lazy AsyncIterable — the actual HTTP
+  // request and data flow happen in the caller's for-await loop.
+  const stream = wrapStreamWithCircuitBreaker(
+    provider.chatStream(messages, config),
+    config.provider,
+    null, // no further fallback
+    messages
+  );
+  return {
+    stream,
+    provider: config.provider,
+    model: config.model,
+  };
 }
