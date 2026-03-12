@@ -129,6 +129,9 @@ cache/
 # Maestro E2E screenshots (land at repo root when run from project root)
 /*.png
 
+# JVM crash logs (Android emulator, Gradle)
+hs_err_pid*.log
+
 # ADB uiautomator dump artifacts
 *uidump*.xml
 *ui_dump*.xml

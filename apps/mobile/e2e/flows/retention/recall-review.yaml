@@ -66,15 +66,15 @@ tags:
 - inputText: "I remember the key concept is about how this works in practice"
 
 # 7. Submit answer
+# Two UI paths exist: recall-submit (dedicated button) or ChatShell Enter key.
+# recall-submit is optional (may not exist if using ChatShell for recall).
+# KNOWN LIMITATION: If recall-submit succeeds, pressKey: Enter also fires
+# (Maestro has no conditional execution). This may send an empty follow-up
+# message. The LLM handles empty/duplicate messages gracefully in practice.
+# BUG-35: pressKey: Enter is the ChatShell path (keyboard covers send-button).
 - tapOn:
     id: "recall-submit"
     optional: true
-# Note: If recall-submit succeeds, pressKey: Enter may fire on the chat
-# input causing a duplicate submission. This is a known Maestro limitation
-# (no conditional execution). In practice the LLM handles empty messages gracefully.
-# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
-# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
-# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
 - pressKey: Enter
 
 # 8. Wait for score/feedback

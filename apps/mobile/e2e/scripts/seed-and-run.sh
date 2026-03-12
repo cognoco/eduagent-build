@@ -284,18 +284,24 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
         CLX2=$(echo "$CLOSE_BOUNDS" | grep -oP '\d+' | sed -n '3p')
         CLY2=$(echo "$CLOSE_BOUNDS" | grep -oP '\d+' | sed -n '4p')
         CLX1=${CLX1:-0}; CLY1=${CLY1:-0}; CLX2=${CLX2:-0}; CLY2=${CLY2:-0}
-        if [ "$CLX1" -gt 0 ] && [ "$CLY1" -gt 0 ]; then
+        if [ "$CLX2" -gt 0 ] && [ "$CLY2" -gt 0 ]; then
           CLTX=$(( (CLX1 + CLX2) / 2 ))
           CLTY=$(( (CLY1 + CLY2) / 2 ))
           echo "[seed-and-run] Dev tools sheet detected, tapping Close at ($CLTX, $CLTY) (${DEVTOOLS_CLOSE}/3) ..."
           adb_tap $CLTX $CLTY
         else
-          echo "[seed-and-run] Dev tools Close button bounds malformed ('$CLOSE_BOUNDS'), pressing Back ..."
-          $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
+          # BUG-14: Do NOT press Back — it exits the app from navigation root.
+          # Retry the UI dump instead; the Close button may render on next poll.
+          echo "[seed-and-run] Dev tools Close button bounds malformed ('$CLOSE_BOUNDS'), retrying dump ..." >&2
+          sleep 1
+          continue
         fi
       else
-        echo "[seed-and-run] Dev tools sheet detected but Close button not found, pressing Back ..."
-        $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
+        # BUG-14: Do NOT press Back — it exits the app from navigation root.
+        # Retry the UI dump; the Close button may appear on next poll cycle.
+        echo "[seed-and-run] Dev tools sheet detected but Close button not found, retrying dump ..." >&2
+        sleep 1
+        continue
       fi
       sleep 1
       continue

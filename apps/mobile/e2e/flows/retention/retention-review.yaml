@@ -74,20 +74,18 @@ tags:
 # 10. Take screenshot of feedback
 - takeScreenshot: retention-review-feedback
 
-# TODO: Steps 11-12 assume a second card is due. If chat-input isn't found
-# (optional), inputText and pressKey: Enter fire on whatever is focused.
-# Maestro has no conditional execution — accept this limitation for now.
-
-# 11. Enter a second recall answer (if multiple cards due)
+# 11-12. Second recall answer (if multiple cards due).
+# KNOWN LIMITATION: Maestro has no conditional execution. If the second card
+# doesn't exist, chat-input won't be found (optional, no failure), but
+# inputText and pressKey still fire on whatever is focused. In practice this
+# is harmless — the chat input from the first answer is still focused, and
+# the LLM handles the extra message gracefully.
 - tapOn:
     id: "chat-input"
     optional: true
 - inputText: "The second concept relates to how these principles are applied in practice"
 
-# 12. Submit second answer (optional)
-# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
-# (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
-# per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key.
 - pressKey: Enter
 
 # 13. Wait for second feedback
