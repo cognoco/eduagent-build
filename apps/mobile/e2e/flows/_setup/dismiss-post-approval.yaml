@@ -1,0 +1,13 @@
+# BUG-38 fix: Dismiss PostApprovalLanding screen by tapping "Let's Go".
+# Only called conditionally when "You're approved!" text is visible.
+appId: com.mentomate.app
+---
+- tapOn:
+    text: "Let's Go"
+
+# Wait for the dismiss to take effect (setShouldShow(false) → re-render)
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+    optional: true

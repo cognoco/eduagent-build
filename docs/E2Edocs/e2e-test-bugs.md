@@ -950,4 +950,22 @@ During Session 12 (and previously in Sessions 10-11), the Gemini LLM API (`gemin
 1. Add LLM health probe to `/v1/health` (actual Gemini ping, not just config check)
 2. Add retry logic in interview service for transient LLM failures
 3. For E2E: consider a mock/stub LLM mode that returns canned interview responses
+
+---
+
+## BUG-48: Parent-Redirect Timing Race in seed-and-sign-in.yaml (2026-03-12)
+
+**Status:** FIXED (2026-03-12) — created `return-to-home-safe.yaml` with dual-guard logic
+**Severity:** HIGH — blocks all parent flows that use `seed-and-sign-in.yaml`
+**Affects:** `parent/parent-dashboard.yaml`, `parent/parent-learning-book.yaml`, and any parent scenario using `seed-and-sign-in.yaml` with `return-to-home.yaml`
+
+After sign-in with a parent scenario, the app briefly shows `home-scroll-view` (learner layout) then redirects to `dashboard-scroll` (parent layout). The existing `return-to-home.yaml` conditional (`when: notVisible: id: home-scroll-view`) evaluates **after** the redirect has occurred, so `home-scroll-view` is indeed not visible (because the parent dashboard is showing). This causes it to incorrectly press Back, navigating away from the dashboard.
+
+**Root cause:** Maestro's `when: notVisible` evaluates at check time, not at the moment of sign-in. The brief learner layout appearance followed by parent redirect creates a race condition. By the time the conditional runs, the parent dashboard has loaded, `home-scroll-view` is gone, so the `notVisible` condition is true — and the Back press fires, leaving the dashboard.
+
+**Fix:** Created `return-to-home-safe.yaml` which adds a second guard: if `dashboard-scroll` IS visible, skip the Back press entirely (the parent is already where they should be). Updated `seed-and-sign-in.yaml` to use `return-to-home-safe.yaml` instead of `return-to-home.yaml`.
+
+**Files changed:**
+- `e2e/flows/_setup/return-to-home-safe.yaml` (new)
+- `e2e/flows/_setup/seed-and-sign-in.yaml` (updated to reference safe variant)
 4. For E2E: run interview flows in a retry loop (re-seed + re-run on LLM failure)

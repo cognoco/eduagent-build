@@ -239,7 +239,7 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
    - `e2e-tech-spec.md` — Technical spec, phase tasks, infrastructure details
    - `e2e-testing-strategy.md` — Overall strategy, architecture, flow inventory
 3. **Keep docs consistent** — if you fix a bug, update both `e2e-test-bugs.md` (status) and `e2e-test-results.md` (session entry). If you add flows, update `e2e-testing-strategy.md` inventory.
-4. **When emulator issues occur -do not reinvent before your read** - `e2e-emulator-issues.md`
+4. **When emulator or app issues occur — ALWAYS read `docs/E2Edocs/e2e-emulator-issues.md` FIRST.** Every time you encounter a problem with the Android emulator (crashes, dialogs, boot issues, ADB failures, Bluetooth, ANR) or the app (launch failures, bundle loading, Metro connectivity, dev-client issues), you MUST read the emulator issues doc before attempting any fix. The doc contains tested solutions for all known issues. Do NOT guess or try ad-hoc solutions — the documented procedures exist because they were discovered through painful trial and error.
 
 ### E2E Flow Integrity Rules (Mandatory)
 
