@@ -55,11 +55,14 @@ tags:
 - tapOn:
     id: "sign-in-button"
 
-# 5. Wait for consent-withdrawn gate (NOT home screen — gate blocks access)
+# 5. Wait for consent-withdrawn gate (NOT home screen — gate blocks access).
+#    After sign-in, the app fetches profiles from API, checks consentStatus,
+#    and renders the gate. This requires network round-trips, so allow 30s
+#    on WHPX emulators where API calls can be slow.
 - extendedWaitUntil:
     visible:
       id: "consent-withdrawn-gate"
-    timeout: 15000
+    timeout: 30000
 
 # 6. Verify gate heading
 - assertVisible:

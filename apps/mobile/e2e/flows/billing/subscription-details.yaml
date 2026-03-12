@@ -80,12 +80,14 @@ tags:
 - assertVisible:
     id: "restore-purchases-button"
 
-# 14. Verify BYOK section text
+# 14. Verify BYOK section text (may be far below restore-purchases,
+#     increase timeout and use slower scroll speed for reliability)
 - scrollUntilVisible:
     element:
       text: "Bring your own key (coming soon)"
     direction: DOWN
-    timeout: 10000
+    timeout: 15000
+    speed: 30
 
 - assertVisible:
     text: "Bring your own key (coming soon)"

@@ -21,17 +21,20 @@
 # /create-subject. The setup flow's last wait may timeout — that's expected.
 # Auth is still completed by that point. We add our own extended wait for
 # the create-subject screen.
+#
+# BUG-34: onboarding-complete now includes a subject (to keep home-scroll-view
+# visible for other flows). Use onboarding-no-subject for the empty-state test.
 appId: com.mentomate.app
 tags:
   - nightly
   - edge
   - onboarding
 ---
-# 1. Seed & sign in — onboarding-complete creates a user with 0 subjects
+# 1. Seed & sign in — onboarding-no-subject creates a user with 0 subjects
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "onboarding-complete"
+      SEED_SCENARIO: "onboarding-no-subject"
       API_URL: ${API_URL}
 
 # 2. Wait for create-subject screen — home.tsx redirects here when subjects=0.

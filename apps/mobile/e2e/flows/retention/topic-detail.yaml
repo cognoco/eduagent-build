@@ -64,21 +64,21 @@ tags:
     id: "learning-book-empty"
     optional: true
 
-# 7. Tap the first visible topic row (text-based fallback since topicId is dynamic)
+# 7. Tap the first visible topic row. Topic rows in book.tsx show:
+#    - topic.name (e.g., "Biology Topic 1")
+#    - subjectName + "{N} sessions" (separate <Text> nodes)
+#    The retention-due seed creates 3 topics under "Biology" subject.
+#    Tap the first topic by name — "Biology Topic 1" is always present.
+#    NOTE: tapOn text: "sessions" fails — Maestro can't find text inside
+#    nested <Text> children of a <Pressable> with testID.
 - tapOn:
-    text: "session"
-    optional: true
+    text: "Biology Topic 1"
 
-# 7b. Alternative: tap any visible topic row content
-- tapOn:
-    text: "Last practiced"
-    optional: true
-
-# 8. Wait for topic detail screen to load
+# 8. Wait for topic detail screen to load (navigation from book to topic/[topicId])
 - extendedWaitUntil:
     visible:
       id: "retention-card"
-    timeout: 10000
+    timeout: 15000
 
 # 9. Verify retention card shows memory strength label
 - assertVisible:

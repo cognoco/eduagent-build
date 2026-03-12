@@ -80,11 +80,12 @@ tags:
 
 # 11. Wait for end-session-button to appear (rendered in header when exchangeCount > 0)
 #     BUG-37: The button only appears after a successful LLM streaming response
-#     increments exchangeCount. Use extendedWaitUntil to tolerate latency.
+#     increments exchangeCount. The count updates asynchronously from the SSE stream.
+#     On WHPX emulators, the LLM response parsing can be slow — allow 30s.
 - extendedWaitUntil:
     visible:
       id: "end-session-button"
-    timeout: 15000
+    timeout: 30000
 
 # 12. Tap end-session button
 - tapOn:
