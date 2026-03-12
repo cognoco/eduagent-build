@@ -18,6 +18,22 @@ function getModelConfig(rung: EscalationRung): ModelConfig {
   return { provider: 'gemini', model: 'gemini-2.5-pro', maxTokens: 8192 };
 }
 
+/** Fallback config when primary provider fails. Returns null if no fallback. */
+function getFallbackConfig(
+  primary: ModelConfig,
+  rung: EscalationRung
+): ModelConfig | null {
+  // Only fall back if the fallback provider is actually registered
+  if (!providers.has('openai')) return null;
+  // Don't fall back to the same provider
+  if (primary.provider === 'openai') return null;
+
+  if (rung <= 2) {
+    return { provider: 'openai', model: 'gpt-4o-mini', maxTokens: 4096 };
+  }
+  return { provider: 'openai', model: 'gpt-4o', maxTokens: 8192 };
+}
+
 // ---------------------------------------------------------------------------
 // Provider registry
 // ---------------------------------------------------------------------------
@@ -126,6 +142,54 @@ export async function routeAndCall(
     throw new Error(`No provider registered for: ${config.provider}`);
   }
 
+  // --- Try primary provider ---
+  if (canAttempt(config.provider)) {
+    const start = Date.now();
+    try {
+      const response = await provider.chat(messages, config);
+      recordSuccess(config.provider);
+      return {
+        response,
+        provider: config.provider,
+        model: config.model,
+        latencyMs: Date.now() - start,
+      };
+    } catch (err) {
+      recordFailure(config.provider);
+      // Fall through to fallback
+      const fallbackConfig = getFallbackConfig(config, rung);
+      if (!fallbackConfig) throw err;
+
+      console.warn(
+        `[llm] Primary provider ${config.provider} failed, trying fallback ${
+          fallbackConfig.provider
+        }: ${err instanceof Error ? err.message : String(err)}`
+      );
+      return attemptProvider(fallbackConfig, messages);
+    }
+  }
+
+  // Primary circuit is open — try fallback directly
+  const fallbackConfig = getFallbackConfig(config, rung);
+  if (fallbackConfig) {
+    console.warn(
+      `[llm] Primary provider ${config.provider} circuit open, using fallback ${fallbackConfig.provider}`
+    );
+    return attemptProvider(fallbackConfig, messages);
+  }
+
+  throw new CircuitOpenError(config.provider);
+}
+
+/** Attempt a single provider call (used by fallback path). */
+async function attemptProvider(
+  config: ModelConfig,
+  messages: ChatMessage[]
+): Promise<RouteResult> {
+  const provider = providers.get(config.provider);
+  if (!provider) {
+    throw new Error(`No provider registered for: ${config.provider}`);
+  }
   if (!canAttempt(config.provider)) {
     throw new CircuitOpenError(config.provider);
   }
@@ -160,15 +224,55 @@ export async function routeAndStream(
     throw new Error(`No provider registered for: ${config.provider}`);
   }
 
+  // --- Try primary provider ---
+  if (canAttempt(config.provider)) {
+    try {
+      const stream = provider.chatStream(messages, config);
+      recordSuccess(config.provider);
+      return {
+        stream,
+        provider: config.provider,
+        model: config.model,
+      };
+    } catch (err) {
+      recordFailure(config.provider);
+      const fallbackConfig = getFallbackConfig(config, rung);
+      if (!fallbackConfig) throw err;
+
+      console.warn(
+        `[llm] Primary stream ${config.provider} failed, trying fallback ${
+          fallbackConfig.provider
+        }: ${err instanceof Error ? err.message : String(err)}`
+      );
+      return attemptStreamProvider(fallbackConfig, messages);
+    }
+  }
+
+  // Primary circuit is open — try fallback directly
+  const fallbackConfig = getFallbackConfig(config, rung);
+  if (fallbackConfig) {
+    console.warn(
+      `[llm] Primary stream ${config.provider} circuit open, using fallback ${fallbackConfig.provider}`
+    );
+    return attemptStreamProvider(fallbackConfig, messages);
+  }
+
+  throw new CircuitOpenError(config.provider);
+}
+
+/** Attempt a single provider stream (used by fallback path). */
+async function attemptStreamProvider(
+  config: ModelConfig,
+  messages: ChatMessage[]
+): Promise<StreamResult> {
+  const provider = providers.get(config.provider);
+  if (!provider) {
+    throw new Error(`No provider registered for: ${config.provider}`);
+  }
   if (!canAttempt(config.provider)) {
     throw new CircuitOpenError(config.provider);
   }
 
-  // NOTE: recordSuccess fires when chatStream() returns the lazy iterable,
-  // before any data flows. A provider that fails on the first next() call
-  // is silently credited as healthy. This is a known limitation — wrapping
-  // the iterable to record on first chunk would be more accurate but adds
-  // complexity. The caller's try/catch around iteration handles the failure.
   try {
     const stream = provider.chatStream(messages, config);
     recordSuccess(config.provider);
