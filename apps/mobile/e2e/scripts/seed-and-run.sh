@@ -7,10 +7,16 @@
 #
 # Usage:
 #   ./seed-and-run.sh <scenario> <flow-file> [maestro-args...]
+#   ./seed-and-run.sh --no-seed <flow-file> [maestro-args...]
+#
+# The --no-seed flag skips the seed API call and launches the app with a clean
+# state (pm clear). Use this for pre-auth flows that need to sign up a new user
+# (e.g., coppa-flow, profile-creation-consent, sign-up-flow).
 #
 # Examples:
 #   ./seed-and-run.sh onboarding-complete flows/account/settings-toggles.yaml
 #   ./seed-and-run.sh learning-active flows/learning/core-learning.yaml
+#   ./seed-and-run.sh --no-seed flows/onboarding/sign-up-flow.yaml
 #   ./seed-and-run.sh retention-due flows/retention/recall-review.yaml --debug-output
 #
 # Environment variables (optional):
@@ -24,7 +30,7 @@
 #   FAST             — Set to 1 for aggressive timeouts (20s launcher, 60s bundle)
 #
 # Prerequisites:
-#   - API server running at API_URL
+#   - API server running at API_URL (not needed for --no-seed if flow doesn't call API)
 #   - Android emulator running with dev-client APK
 #   - Metro bundler + bundle proxy running
 #   - TEMP/TMP set to ASCII paths (Windows Unicode workaround)
@@ -44,9 +50,18 @@ trap cleanup INT TERM
 export MSYS_NO_PATHCONV=1
 
 # ── Args ──
-SCENARIO="${1:?Usage: seed-and-run.sh <scenario> <flow-file> [maestro-args...]}"
-FLOW_FILE="${2:?Usage: seed-and-run.sh <scenario> <flow-file> [maestro-args...]}"
-shift 2
+NO_SEED=0
+if [ "${1:-}" = "--no-seed" ]; then
+  NO_SEED=1
+  shift
+  SCENARIO="(none)"
+  FLOW_FILE="${1:?Usage: seed-and-run.sh --no-seed <flow-file> [maestro-args...]}"
+  shift
+else
+  SCENARIO="${1:?Usage: seed-and-run.sh <scenario> <flow-file> [maestro-args...]}"
+  FLOW_FILE="${2:?Usage: seed-and-run.sh <scenario> <flow-file> [maestro-args...]}"
+  shift 2
+fi
 EXTRA_ARGS=("$@")
 
 # ── Config ──
@@ -368,7 +383,19 @@ if [ $BUNDLE_ELAPSED -ge $BUNDLE_TIMEOUT ]; then
   exit 1
 fi
 
-echo "[seed-and-run] App on sign-in screen. Seeding + Maestro ..."
+echo "[seed-and-run] App on sign-in screen."
+
+if [ $NO_SEED -eq 1 ]; then
+  # ── No-seed mode: skip API seeding, run Maestro with minimal env vars ──
+  echo "[seed-and-run] --no-seed mode: skipping seed API call."
+  MAESTRO_ENV_ARGS=(
+    -e "API_URL=${API_URL}"
+    -e "METRO_URL=${METRO_URL}"
+  )
+
+  echo "[seed-and-run] Running: ${MAESTRO} test ${MAESTRO_ENV_ARGS[*]} ${FLOW_FILE} ${EXTRA_ARGS[*]:-}"
+  exec "${MAESTRO}" test "${MAESTRO_ENV_ARGS[@]}" "${EXTRA_ARGS[@]:+${EXTRA_ARGS[@]}}" "${FLOW_FILE}"
+fi
 
 # ── Step 1: Seed via API ──
 echo "[seed-and-run] Seeding scenario='${SCENARIO}' email='${EMAIL}' ..."

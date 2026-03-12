@@ -931,20 +931,24 @@ Ordered by dependency chain and value. Status as of 2026-03-10:
 - [x] BUG-49 fixed — Maestro text matching patterns (Session 15: testID selectors)
 - [x] BUG-50 fixed — consent-withdrawn multi-profile (Session 15: `consent-withdrawn-solo` seed)
 - [x] BUG-51 fixed — empty-first-user (Session 15: `sign-in-only.yaml`)
-- [x] 43/53 flows validated on emulator (81% pass rate)
-- [ ] 3 LLM-dependent flows need working LLM or mock mode (session-summary, analogy-preference-flow, curriculum-review-flow)
-- [ ] 1 flow needs custom sign-in mechanism (child-paywall)
+- [x] 43/53 flows validated on emulator (81% pass rate, Session 15)
+- [x] SSE streaming fixed — `streamSSEViaXHR()` replaces `parseSSEStream()` for React Native (Session 16)
+- [x] session-summary flow passes end-to-end (Session 16)
+- [x] 44/53 flows validated on emulator (83% pass rate, Session 16)
+- [ ] 2 LLM-dependent flows need re-test (analogy-preference-flow, curriculum-review-flow — may now pass with streaming fix)
+- [ ] 1 flow needs custom sign-in mechanism (child-paywall — BUG-52 fix ready, awaiting re-test)
 - [ ] 4 flows need `launch-devclient.yaml` mechanism (coppa-flow, profile-creation-consent, consent-pending-gate, sign-up-flow)
 - [ ] Nightly scheduled workflow runs in CI
 - [ ] Flake rate <5% over 5 consecutive nightly runs
 
-### Current Blockers (as of Session 15, 2026-03-12)
+### Current Blockers (as of Session 16, 2026-03-12)
 | Bug | Severity | Flows Blocked | Fix Status |
 |-----|----------|---------------|------------|
-| LLM connectivity | High | 3 flows (session-summary, analogy-preference-flow, curriculum-review-flow) | Open — API health reports providers OK but SSE streams return error messages. Likely rate limiting or API key issue. |
-| child-paywall sign-in | Medium | 1 flow | Open — needs custom sign-in for child profile (parent owns account). May need `sign-in-only.yaml` variant or post-seed profile switch. |
+| ~~LLM connectivity~~ | ~~High~~ | ~~3 flows~~ | **FIXED (Session 16)** — Root cause: React Native Hermes `fetch` returns `response.body = null` (no ReadableStream). Fix: `streamSSEViaXHR()` using XMLHttpRequest `onprogress`. session-summary passes; analogy-preference and curriculum-review need re-test. |
+| child-paywall sign-in | Medium | 1 flow | Fixed (BUG-52: `switch-to-child.yaml`), awaiting re-test on emulator. |
 | launch-devclient.yaml | Medium | 4 flows (pre-auth flows) | Open — these flows need app launch without prior seed (sign-up, COPPA, consent-pending). Need ADB-only launch mechanism without seed. |
 | BUG-18 (settings-toggles partial) | Low | 1 flow partial | Known — camera/storage permissions toggle requires native permission dialog handling |
+| BUG-53 (missing icons) | Low | 0 flows | Open — Ionicons font not loading on emulator. Visual only, no E2E impact. |
 
 ---
 

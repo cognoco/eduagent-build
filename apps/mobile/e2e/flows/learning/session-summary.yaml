@@ -113,32 +113,46 @@ tags:
     id: "summary-input"
 - inputText: "I learned about the key concepts and how they apply in practice"
 
-# 18. Tap submit summary button
+# 18. Dismiss keyboard — BUG-35 class: keyboard covers submit button on Android.
+#     pressKey: back dismisses keyboard first on Android (only navigates if already dismissed).
+- pressKey: back
+
+# 19. Scroll to and tap submit summary button (may be below fold after keyboard dismiss)
+- scrollUntilVisible:
+    element:
+      id: "submit-summary-button"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: "submit-summary-button"
 
-# 19. Wait for AI feedback (the mutation submits and returns feedback)
+# 20. Wait for AI feedback (the mutation submits and returns feedback)
 - extendedWaitUntil:
     visible:
       id: "ai-feedback"
     timeout: 20000
 
-# 20. Verify summary-submitted state is showing
+# 21. Verify summary-submitted state is showing
 - assertVisible:
     id: "summary-submitted"
 
-# 21. Screenshot: summary with AI feedback
+# 22. Screenshot: summary with AI feedback
 - takeScreenshot: session-summary-feedback
 
-# 22. Tap continue button to return home
+# 23. Scroll to continue button (may be below fold after AI feedback text) and tap
+- scrollUntilVisible:
+    element:
+      id: "continue-button"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: "continue-button"
 
-# 23. Verify we returned to home screen
+# 24. Verify we returned to home screen
 - extendedWaitUntil:
     visible:
       id: "home-scroll-view"
     timeout: 10000
 
-# 24. Final screenshot
+# 25. Final screenshot
 - takeScreenshot: session-summary-complete

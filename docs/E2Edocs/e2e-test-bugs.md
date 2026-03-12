@@ -1052,3 +1052,37 @@ Even if step 2 were fixed, the ChildPaywall would not render because the active 
 **Files changed:**
 - `e2e/flows/_setup/switch-to-child.yaml` (new)
 - `e2e/flows/billing/child-paywall.yaml` — added profile switch step
+
+## BUG-53: Tab Bar Icons Missing — Ionicons Font Not Loading (2026-03-12)
+
+**Severity:** Medium (visual only — navigation labels still visible)
+**Status:** OPEN
+
+Tab bar icons render as empty squares with X marks (broken font glyphs) instead of Ionicons. Affects all tabs: Home, Learning Book, More, and the hidden dev-only route tabs (session, topic, homework, subject). The text labels ("Ho...", "Lea...", "More") are visible and truncated but functional.
+
+**Root cause hypothesis:** Ionicons vector font not loaded in the dev-client APK. Expo's `@expo/vector-icons` bundles Ionicons as a font asset. On debug builds served by Metro, the font may not be pre-loaded before the tab bar renders. Alternatively, the font asset path may be broken on the WHPX emulator.
+
+**Why tests pass:** Jest doesn't render actual fonts — it only checks the component tree. The `Ionicons` component renders a `<Text>` node with a font glyph codepoint, which Jest sees as present regardless of whether the font file loads.
+
+**Impact on E2E:** No direct impact — Maestro navigates via `testID` not icon recognition. Visual-only bug.
+
+**Investigation needed:**
+1. Check if `expo-font` `useFonts()` reports Ionicons as loaded
+2. Check if the font file is bundled in the Metro-served bundle
+3. May need `Font.loadAsync()` in root layout before rendering tabs
+
+## BUG-54: Session Close Fails — `inngest.send()` Throws Without Inngest Dev Server (2026-03-12)
+
+**Severity:** High (blocks session-summary and all session close flows in E2E)
+**Status:** FIXED (2026-03-12) — wrapped `inngest.send()` in try-catch in `routes/sessions.ts`
+
+After streaming works and 3 exchanges complete, tapping "End Session" → confirm shows error dialog: "Failed to close session. Please try again." The `POST /v1/sessions/:sessionId/close` handler calls `inngest.send()` (line 183 of `routes/sessions.ts`) to dispatch the `app/session.completed` background event. Without the Inngest dev server running (port 8288), this throws a network error that crashes the entire endpoint.
+
+**Root cause:** `inngest.send()` is not wrapped in a try-catch. In local dev without Inngest running, the network error propagates to the Hono error handler, returning a 500 to the client. The mobile `useCloseSession` hook catches this and shows the "Failed to close" alert.
+
+**Fix options:**
+1. **Start Inngest dev server** for E2E sessions: `npx inngest-cli@latest dev` (port 8288). Add to the E2E operational checklist.
+2. **Wrap `inngest.send()` in try-catch** in the close handler — log warning but don't fail the response. The background job is important but shouldn't block the synchronous session close. This would also improve production resilience if Inngest is temporarily unavailable.
+3. Both — fix the code AND add Inngest to the E2E checklist.
+
+**Affects:** `session-summary.yaml`, `core-learning.yaml`, `first-session.yaml`, `freeform-session.yaml`, `homework-flow.yaml` — any flow that closes a session.

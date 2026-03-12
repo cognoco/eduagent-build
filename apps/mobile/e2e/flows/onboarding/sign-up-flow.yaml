@@ -14,8 +14,13 @@ tags:
   - smoke
   - onboarding
 ---
-# 1. Launch dev-client, connect to Metro, dismiss dev menu.
-- runFlow: ../_setup/launch-devclient.yaml
+# 1. Wait for sign-in screen (app launched by run-without-seed.sh via ADB)
+# NOTE: This flow must be run via run-without-seed.sh (not seed-and-run.sh)
+# because it signs up a NEW user via Clerk — no pre-seeded account needed.
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 120000
 
 # 2. Navigate to sign-up
 - tapOn: "Sign up"

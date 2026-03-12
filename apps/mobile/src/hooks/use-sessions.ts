@@ -6,10 +6,12 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
+import { useAuth } from '@clerk/clerk-expo';
 import type { LearningSession, SessionSummary } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
-import { parseSSEStream } from '../lib/sse';
+import { getApiUrl } from '../lib/api';
+import { streamSSEViaXHR } from '../lib/sse';
 
 // API-route-specific response wrappers (not in schemas)
 interface SessionStartResult {
@@ -111,11 +113,18 @@ export function useStreamMessage(sessionId: string): {
   ) => Promise<void>;
   isStreaming: boolean;
 } {
-  const client = useApiClient();
+  const { getToken } = useAuth();
+  const { activeProfile } = useProfile();
   const [isStreaming, setIsStreaming] = useState(false);
   const isStreamingRef = useRef(false);
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
+
+  // Refs for auth values — avoid stale closures in the callback
+  const getTokenRef = useRef(getToken);
+  const profileIdRef = useRef(activeProfile?.id);
+  getTokenRef.current = getToken;
+  profileIdRef.current = activeProfile?.id;
 
   const stream = useCallback(
     async (
@@ -133,13 +142,27 @@ export function useStreamMessage(sessionId: string): {
       setIsStreaming(true);
 
       try {
-        const res = await client.sessions[':sessionId'].stream.$post({
-          param: { sessionId: effectiveSessionId },
-          json: { message },
+        // Build URL and auth headers manually — React Native's fetch does NOT
+        // support ReadableStream on response.body (Hermes returns null), so we
+        // bypass the Hono RPC client and use XHR-based streaming instead.
+        const token = await getTokenRef.current();
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        if (profileIdRef.current)
+          headers['X-Profile-Id'] = profileIdRef.current;
+
+        const url = `${getApiUrl()}/v1/sessions/${effectiveSessionId}/stream`;
+        const { events } = streamSSEViaXHR(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ message }),
         });
 
         let accumulated = '';
-        for await (const event of parseSSEStream(res as unknown as Response)) {
+        for await (const event of events) {
           if (event.type === 'chunk') {
             accumulated += event.content;
             onChunk(accumulated);
@@ -155,7 +178,7 @@ export function useStreamMessage(sessionId: string): {
         setIsStreaming(false);
       }
     },
-    [client]
+    []
   );
 
   return { stream, isStreaming };

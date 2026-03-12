@@ -447,6 +447,15 @@ See `e2e-test-bugs.md` BUG-49 and `e2e-emulator-issues.md` Issue 21 for full det
 
 See `e2e-test-bugs.md` BUG-51 for why `sign-in-only.yaml` was needed.
 
+### Pre-Auth Flow Launcher
+
+| Script | When to Use |
+|--------|-------------|
+| `seed-and-run.sh <scenario> <flow>` | Standard flows — seeds test data, then runs Maestro with credentials as env vars |
+| `run-without-seed.sh <flow>` | Pre-auth flows that sign up a new user (no seed needed). Wrapper for `seed-and-run.sh --no-seed`. |
+
+Pre-auth flows (coppa-flow, profile-creation-consent, consent-pending-gate, sign-up-flow) need a fresh app state with no existing user. They use `run-without-seed.sh` which does the full ADB automation (pm clear → launch → Metro → bundle → dismiss overlays) but skips the seed API call. The Maestro flow starts from the sign-in screen and taps "Sign up" to begin the registration flow.
+
 ### TanStack Query Auth Guard (BUG-31 — Critical)
 
 **Rule:** Any TanStack Query hook used inside a provider that mounts before auth (`ProfileProvider` is in root `_layout.tsx`) **MUST** have an `enabled: !!isSignedIn` guard. Without it, the query fires unauthenticated before sign-in, enters TanStack Query error state (401, retries exhausted), and **never recovers** — even after sign-in succeeds. This is because TanStack Query does not auto-retry errored queries when the existing observer re-renders.
@@ -515,7 +524,8 @@ apps/
         subjects/                     # Multi-subject management
         standalone/                   # Pre-auth flows (no seed required)
       scripts/
-        seed-and-run.sh               # Entry point: ADB automation + seed + Maestro
+        seed-and-run.sh               # Entry point: ADB automation + seed + Maestro (supports --no-seed)
+        run-without-seed.sh           # Wrapper: ADB automation without seeding (pre-auth flows)
         run-all-untested.sh           # Batch runner for all untested flows
         rerun-failed.sh               # Retry runner for failed flows
         seed.js                       # (legacy, unused — GraalJS blocked by Issue 13)
@@ -557,14 +567,15 @@ Progress as of 2026-03-12:
 2. **Inngest chain integration tests** — **DONE.** `session-completed-chain.integration.test.ts` validates all 6 steps, error isolation, skip logic, and FR92 interleaved topics.
 3. **Maestro setup** — **DONE.** `apps/mobile/e2e/` with `config.yaml`, `scripts/seed-and-run.sh` (ADB automation + seed + Maestro), `_setup/seed-and-sign-in.yaml`, `_setup/sign-in-only.yaml` (edge-case flows), `_setup/sign-out.yaml`, Nx `e2e` target with smoke configuration, and 54 total test flows + 19 setup helpers.
 4. **CI wiring** — **DONE.** `.github/workflows/e2e-ci.yml` with PostgreSQL service container for both jobs, API server background startup + health check for mobile-maestro job. Advisory mode (`continue-on-error: true`).
-5. **Smoke suite buildout** — **DONE.** All planned smoke and nightly flows written. 43 flows confirmed passing on Android emulator (as of Session 15). 3 flows fail due to LLM connectivity, 1 needs custom sign-in mechanism, 4 not yet runnable (need `launch-devclient.yaml`).
+5. **Smoke suite buildout** — **DONE.** All planned smoke and nightly flows written. 44 flows confirmed passing on Android emulator (as of Session 16). 2 flows need re-test (LLM connectivity — may now pass with SSE streaming fix), 1 needs custom sign-in mechanism, 4 not yet runnable (need `launch-devclient.yaml`).
 6. **Seed infrastructure** — **DONE.** `seed-and-run.sh` (shell wrapper: curl + node JSON parsing + ADB automation + Maestro `-e` flags). `test-seed.ts` service with 14 scenarios (onboarding-complete, onboarding-no-subject, learning-active, retention-due, failed-recall-3x, parent-with-children, trial-active, trial-expired, multi-subject, homework-ready, trial-expired-child, consent-withdrawn, consent-withdrawn-solo, parent-solo). Bypasses Maestro's broken GraalJS `runScript` (Issue 13).
 7. **BUG-25 fix: profileScope middleware** — **DONE** (commit `35ef433`). `profileScopeMiddleware` now auto-resolves to owner profile when `X-Profile-Id` header is absent. This was the root cause of seeded subjects/streaks/coaching-cards being invisible on the home screen — blocked ~30 E2E flows.
 8. **BUG-10/BUG-30 fix: tab navigation** — **DONE**. Flattened `book/index.tsx` → `book.tsx` (directory routes break tab bar labels in dev-client). Added `tabBarAccessibilityLabel` to all 3 visible tabs in both learner and parent layouts. Updated 7 E2E flow YAML files to use `tapOn: "Learning Book Tab"`. Also fixed BUG-24 (KeyboardAvoidingView), BUG-29 (dashboard loading), BUG-32 (More tab scroll).
-9. **Nightly full suite** — NEAR COMPLETE. All 54 flows written. 43 flows confirmed passing (Session 15). 3 flows fail (LLM connectivity — session-summary, analogy-preference-flow, curriculum-review-flow). 1 flow needs custom sign-in (child-paywall). 4 flows not yet runnable (coppa-flow, profile-creation-consent, consent-pending-gate, sign-up-flow — need `launch-devclient.yaml` mechanism). 1 flow partial (settings-toggles, BUG-18). 1 skipped (ExpoGo-only). 1 deferred (recall-review, needs coaching-card precompute).
+9. **Nightly full suite** — NEAR COMPLETE. All 54 flows written. 44 flows confirmed passing (Session 16). 2 flows need re-test (LLM connectivity — analogy-preference-flow, curriculum-review-flow; session-summary now passes after SSE streaming fix). 1 flow needs custom sign-in (child-paywall). 4 flows not yet runnable (coppa-flow, profile-creation-consent, consent-pending-gate, sign-up-flow — need `launch-devclient.yaml` mechanism). 1 flow partial (settings-toggles, BUG-18). 1 skipped (ExpoGo-only). 1 deferred (recall-review, needs coaching-card precompute).
 10. **Session 9 findings** — `seed-and-run.sh` fixed (3 bugs: pipefail crash, dev-tools Close button tap, grep pipeline). BUG-31 verified fixed via Maestro. BUG-34 fixed (PR #72: subjects added to `onboarding-complete`, `trial-active`, `trial-expired` seed scenarios). BUG-35 workaround applied (PR #72: all ChatShell flows use `pressKey: Enter` instead of tapping obscured `send-button`). BUG-33 fixed (Session 11). BUG-48 fixed (Session 14: parent-redirect timing race).
 11. **Session 14 sweep (2026-03-12)** — 26 flows run: 18 PASS, 1 PARTIAL, 11 FAIL. BUG-48 discovered and fixed (parent-redirect timing in `seed-and-sign-in.yaml`). All parent flows now stable.
 12. **Session 15 fix sweep (2026-03-12)** — All 10 failing flows from Session 14 re-run after fixes. 7 PASS, 2 FAIL (LLM), 1 SKIP (emulator). Fixes: BUG-49 (Maestro text matching — 3 patterns: nested `<Text>`, long wrapping text, unescaped regex), BUG-50 (consent-withdrawn multi-profile → new `consent-withdrawn-solo` seed), BUG-51 (empty-first-user → new `sign-in-only.yaml` setup flow). New seed scenarios: `onboarding-no-subject`, `consent-withdrawn-solo`. Cumulative: **43/53 flows passing (81%)**. See `e2e-test-results.md` for full breakdown.
+13. **Session 16 — SSE streaming fix (2026-03-12)** — Root cause of ALL LLM-dependent E2E failures identified and fixed: React Native Hermes `fetch` returns `response.body = null` (no `ReadableStream` support). Fix: new `streamSSEViaXHR()` in `apps/mobile/src/lib/sse.ts` uses `XMLHttpRequest.onprogress` for true streaming. `useStreamMessage` hook updated to use XHR instead of Hono RPC client. Session-summary flow now passes all 25 steps end-to-end. BUG-53 discovered (tab bar icons missing — Ionicons font not loading on emulator, visual only). BUG-54 fixed (Inngest `send()` crash on session close — wrapped in try-catch). Cumulative: **44/53 flows passing (83%)**.
 
 ### Architecture Evolution (Sessions 1-5)
 
