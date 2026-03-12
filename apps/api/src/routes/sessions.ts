@@ -200,7 +200,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           },
         });
       } catch (err) {
-        captureException(err, { profileId });
+        captureException(err, {
+          profileId,
+          extra: { sessionId: result.sessionId },
+        });
         console.warn(
           `[sessions] Failed to dispatch session.completed event for ${
             result.sessionId

@@ -9,6 +9,8 @@ export interface ErrorContext {
   userId?: string;
   profileId?: string;
   requestPath?: string;
+  /** Arbitrary metadata attached as Sentry extras (e.g. sessionId, subjectId). */
+  extra?: Record<string, string>;
 }
 
 /**
@@ -27,6 +29,11 @@ export function captureException(err: unknown, context?: ErrorContext): void {
     }
     if (context?.requestPath) {
       scope.setTag('requestPath', context.requestPath);
+    }
+    if (context?.extra) {
+      for (const [key, value] of Object.entries(context.extra)) {
+        scope.setExtra(key, value);
+      }
     }
     Sentry.captureException(err);
   });

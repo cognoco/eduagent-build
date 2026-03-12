@@ -54,7 +54,8 @@ export async function* parseSSEStream(
       buffer += decoder.decode(value, { stream: true });
 
       // Parse SSE events from buffer
-      const lines = buffer.split('\n');
+      // SSE spec allows \r\n, \r, and \n as line terminators
+      const lines = buffer.split(/\r\n|\r|\n/);
       buffer = lines.pop() ?? ''; // Keep incomplete line in buffer
 
       for (const line of lines) {
@@ -93,7 +94,8 @@ function parseSSEBuffer(
   queue: StreamEvent[],
   onDone: () => void
 ): string {
-  const lines = buffer.split('\n');
+  // SSE spec allows \r\n, \r, and \n as line terminators
+  const lines = buffer.split(/\r\n|\r|\n/);
   const remainder = lines.pop() ?? '';
 
   for (const line of lines) {
@@ -156,7 +158,9 @@ export function streamSSEViaXHR(
     if (xhr.readyState === 2 && xhr.status >= 400) {
       streamError = new Error(`API error ${xhr.status}: ${xhr.statusText}`);
       done = true;
-      resolve?.();
+      const r = resolve;
+      resolve = null;
+      r?.();
     }
   };
 
@@ -172,7 +176,9 @@ export function streamSSEViaXHR(
       done = true;
     });
 
-    resolve?.();
+    const r = resolve;
+    resolve = null;
+    r?.();
   };
 
   xhr.onerror = () => {
@@ -180,10 +186,20 @@ export function streamSSEViaXHR(
       `SSE connection failed: ${xhr.statusText || 'network error'}`
     );
     done = true;
-    resolve?.();
+    const r = resolve;
+    resolve = null;
+    r?.();
   };
 
   xhr.onloadend = () => {
+    // Skip if already errored — avoid parsing error response bodies as SSE
+    if (streamError) {
+      done = true;
+      const r = resolve;
+      resolve = null;
+      r?.();
+      return;
+    }
     // Parse any remaining buffer data
     if (buffer) {
       parseSSEBuffer(buffer + '\n', eventQueue, () => {
@@ -192,11 +208,22 @@ export function streamSSEViaXHR(
       buffer = '';
     }
     done = true;
-    resolve?.();
+    const r = resolve;
+    resolve = null;
+    r?.();
   };
 
   // Text mode — required for incremental responseText access
   xhr.responseType = '';
+  // 30s timeout — prevents indefinite hangs if server stalls mid-stream
+  xhr.timeout = 30_000;
+  xhr.ontimeout = () => {
+    streamError = new Error('SSE stream timed out after 30s');
+    done = true;
+    const r = resolve;
+    resolve = null;
+    r?.();
+  };
   xhr.send(options.body ?? null);
 
   async function* generateEvents(): AsyncGenerator<StreamEvent> {

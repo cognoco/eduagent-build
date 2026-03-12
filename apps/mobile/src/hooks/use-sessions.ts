@@ -176,12 +176,15 @@ export function useStreamMessage(sessionId: string): {
           }
         }
       } finally {
+        // Abort any in-flight XHR — safe to call even after normal completion
         abortRef.current?.();
         abortRef.current = null;
         isStreamingRef.current = false;
         setIsStreaming(false);
       }
     },
+    // Empty deps: all mutable values accessed via refs (sessionIdRef,
+    // getTokenRef, profileIdRef, abortRef) to avoid stale closures.
     []
   );
 
