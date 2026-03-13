@@ -8,8 +8,8 @@ E2E_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$E2E_DIR"
 
 SEED_SCRIPT="./scripts/seed-and-run.sh"
-export TEMP="${TEMP:-C:\\tools\\tmp}"
-export TMP="${TMP:-C:\\tools\\tmp}"
+export TEMP="${TEMP:-/tmp}"
+export TMP="${TMP:-/tmp}"
 
 RESULTS_FILE="$E2E_DIR/scripts/regression-batch3-$(date +%Y%m%d-%H%M%S).txt"
 PASS=0 FAIL=0 TOTAL=0
@@ -17,22 +17,22 @@ PASS=0 FAIL=0 TOTAL=0
 log() {
   local s="$1" f="$2" n="${3:-}"
   echo "[$s] $f $n" | tee -a "$RESULTS_FILE"
-  [ "$s" = "PASS" ] && ((PASS++))
-  [ "$s" = "FAIL" ] && ((FAIL++))
-  ((TOTAL++))
+  [ "$s" = "PASS" ] && PASS=$((PASS + 1))
+  [ "$s" = "FAIL" ] && FAIL=$((FAIL + 1))
+  TOTAL=$((TOTAL + 1))
 }
 
 run_s() {
   local sc="$1" fl="$2" fast="${3:-1}"
   echo -e "\n=== [$((TOTAL+1))] $sc → $fl (FAST=$fast) ==="
-  if FAST=$fast $SEED_SCRIPT "$sc" "$fl"; then log "PASS" "$fl"
+  if FAST=$fast "$SEED_SCRIPT" "$sc" "$fl"; then log "PASS" "$fl"
   else log "FAIL" "$fl" "(scenario: $sc)"; fi
 }
 
 run_ns() {
   local fl="$1" fast="${2:-1}"
   echo -e "\n=== [$((TOTAL+1))] NO-SEED: $fl (FAST=$fast) ==="
-  if FAST=$fast $SEED_SCRIPT --no-seed "$fl"; then log "PASS" "$fl"
+  if FAST=$fast "$SEED_SCRIPT" --no-seed "$fl"; then log "PASS" "$fl"
   else log "FAIL" "$fl" "(no-seed)"; fi
 }
 

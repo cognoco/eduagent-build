@@ -17,11 +17,9 @@ E2E_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$E2E_DIR"
 
 SEED_SCRIPT="./scripts/seed-and-run.sh"
-NOSEED_SCRIPT="./scripts/run-without-seed.sh"
-MAESTRO="${MAESTRO_PATH:-/c/tools/maestro/bin/maestro}"
 
-export TEMP="${TEMP:-C:\\tools\\tmp}"
-export TMP="${TMP:-C:\\tools\\tmp}"
+export TEMP="${TEMP:-/tmp}"
+export TMP="${TMP:-/tmp}"
 
 RESULTS_FILE="$E2E_DIR/scripts/regression-results-$(date +%Y%m%d-%H%M%S).txt"
 PASS_COUNT=0
@@ -36,12 +34,12 @@ log_result() {
   local note="${3:-}"
   echo "[$status] $flow $note" | tee -a "$RESULTS_FILE"
   case "$status" in
-    PASS) ((PASS_COUNT++)) ;;
-    FAIL) ((FAIL_COUNT++)) ;;
-    SKIP) ((SKIP_COUNT++)) ;;
-    PARTIAL) ((PARTIAL_COUNT++)) ;;
+    PASS) PASS_COUNT=$((PASS_COUNT + 1)) ;;
+    FAIL) FAIL_COUNT=$((FAIL_COUNT + 1)) ;;
+    SKIP) SKIP_COUNT=$((SKIP_COUNT + 1)) ;;
+    PARTIAL) PARTIAL_COUNT=$((PARTIAL_COUNT + 1)) ;;
   esac
-  ((TOTAL++))
+  TOTAL=$((TOTAL + 1))
 }
 
 run_seeded() {
@@ -51,7 +49,7 @@ run_seeded() {
   echo "=========================================="
   echo "[$((TOTAL+1))] SEEDED: $scenario → $flow"
   echo "=========================================="
-  if FAST=1 $SEED_SCRIPT "$scenario" "$flow"; then
+  if FAST=1 "$SEED_SCRIPT" "$scenario" "$flow"; then
     log_result "PASS" "$flow"
   else
     log_result "FAIL" "$flow" "(scenario: $scenario)"
@@ -64,7 +62,7 @@ run_noseed() {
   echo "=========================================="
   echo "[$((TOTAL+1))] NO-SEED: $flow"
   echo "=========================================="
-  if FAST=1 $SEED_SCRIPT --no-seed "$flow"; then
+  if FAST=1 "$SEED_SCRIPT" --no-seed "$flow"; then
     log_result "PASS" "$flow"
   else
     log_result "FAIL" "$flow" "(no-seed)"
