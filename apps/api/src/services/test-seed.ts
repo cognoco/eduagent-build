@@ -68,7 +68,9 @@ export type SeedScenario =
   | 'trial-expired-child'
   | 'consent-withdrawn'
   | 'consent-withdrawn-solo'
-  | 'parent-solo';
+  | 'parent-solo'
+  | 'pre-profile'
+  | 'consent-pending';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -1050,6 +1052,64 @@ async function seedParentSolo(
   };
 }
 
+/** Pre-profile: Clerk user + DB account, but NO profile.
+ *  For E2E flows that test profile creation (consent triggers, onboarding).
+ *  After sign-in, the app renders tabs but activeProfile is null.
+ *  Navigate via More → Profiles → "Create your first profile" to reach
+ *  the create-profile screen. */
+async function seedPreProfile(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  return {
+    scenario: 'pre-profile',
+    accountId,
+    profileId: '',
+    email,
+    password,
+    ids: {},
+  };
+}
+
+/** Consent-pending: Clerk user + account + learner profile with
+ *  PARENTAL_CONSENT_REQUESTED status. The learner layout renders
+ *  ConsentPendingGate instead of tabs. For testing the gate UI
+ *  (check-again, preview modes, sign-out) without needing to traverse
+ *  the full sign-up → profile creation → consent request flow. */
+async function seedConsentPending(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Pending Learner',
+    personaType: 'TEEN',
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'PARENTAL_CONSENT_REQUESTED',
+    parentEmail: 'parent-e2e-test@example.com',
+  });
+
+  return {
+    scenario: 'consent-pending',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: {},
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -1069,6 +1129,8 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'consent-withdrawn': seedConsentWithdrawn,
   'consent-withdrawn-solo': seedConsentWithdrawnSolo,
   'parent-solo': seedParentSolo,
+  'pre-profile': seedPreProfile,
+  'consent-pending': seedConsentPending,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];

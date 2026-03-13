@@ -224,25 +224,21 @@ Tapping "Parent (Light)" theme button changes persona to `parent`, triggering th
 
 ---
 
-## BUG-18: Persona Switch Crashes App (~50% of the time) (2026-03-10)
+## BUG-18: Persona Switch — `switch-to-teen` Button Below Fold (2026-03-10, updated 2026-03-12)
 
-**Status:** FIXED (2026-03-11) — `router.replace` before deferred `setPersona` prevents layout guard race.
-**Severity:** High — crashes app, corrupts emulator state. **Affects real users.**
-**Affects:** `settings-toggles.yaml` (Parent theme section), any flow using persona switch
+**Status:** FIXED (2026-03-12, Session 17) — `scrollUntilVisible` added before `switch-to-teen` tap.
+**Severity:** Medium — E2E test failure, not a crash. No real user impact.
+**Affects:** `settings-toggles.yaml` (Parent theme section)
 
-After tapping "Switch to Teen view (demo)" button on the parent dashboard, the app crashes to the Android home screen approximately 50% of the time. The crash corrupts Maestro's driver connection, requiring an emulator cold restart.
+Originally reported as a ~50% crash on persona switch. Crash was fixed in Session 11 (`router.replace` before deferred `setPersona`). Residual failure in Session 14 was actually a **scroll issue**: the `switch-to-teen` dev button on the parent dashboard was below the visible fold. Maestro's `tapOn` couldn't find it without scrolling first.
 
-**Root cause:** `setPersona('teen')` in `(parent)/dashboard.tsx:170` triggers a re-render cascade through Expo Router's layout guards. The `(learner)/_layout.tsx` detects persona change and redirects, while simultaneously the `(parent)` layout may also be redirecting. This creates a navigation race condition that crashes the React Navigation tree.
+**Root cause (original crash):** `setPersona('teen')` in `(parent)/dashboard.tsx:170` triggered a re-render cascade through Expo Router's layout guards. Fixed by coordinating `router.replace` with `setPersona`.
 
-**Reproduction:**
-1. Sign in → navigate to More → tap "Parent (Light)" → lands on parent dashboard
-2. Tap "Switch to Teen view (demo)" → app crashes ~50% of the time
+**Root cause (Session 14 residual failure):** The `switch-to-teen` button is rendered near the bottom of the parent dashboard `ScrollView`. On the 1080x1920 emulator, it's below the fold. Maestro's `tapOn` only searches the visible viewport.
 
-**Mitigation (flow-level):** Parent theme test moved to end of `settings-toggles.yaml` so the crash can't affect earlier validations.
+**Fix:** Added `scrollUntilVisible` before the `tapOn: id: "switch-to-teen"` step in `settings-toggles.yaml`.
 
-**Proper fix needed (code-only, no emulator required):** The `setPersona()` call needs to be coordinated with navigation — e.g., call `router.replace('/(learner)/home')` **before** or **simultaneously with** `setPersona('teen')` using a single `startTransition` or `InteractionManager.runAfterInteractions`, so the layout guard doesn't race with the persona state change. Alternatively, `setPersona()` + `router.replace()` can be wrapped in `unstable_batchedUpdates` (or React 18's automatic batching) to ensure both state changes commit in one render cycle.
-
-**Files:** `apps/mobile/src/app/(parent)/dashboard.tsx` (line ~170, "Switch to Teen" handler), `apps/mobile/src/app/(learner)/_layout.tsx` (line ~575, persona guard redirect).
+**Files:** `apps/mobile/e2e/flows/account/settings-toggles.yaml` (step 21).
 
 ---
 
@@ -1086,3 +1082,24 @@ After streaming works and 3 exchanges complete, tapping "End Session" → confir
 3. Both — fix the code AND add Inngest to the E2E checklist.
 
 **Affects:** `session-summary.yaml`, `core-learning.yaml`, `first-session.yaml`, `freeform-session.yaml`, `homework-flow.yaml` — any flow that closes a session.
+
+---
+
+## BUG-55: Clerk Email Verification Blocks Pre-Auth E2E Flows (2026-03-12)
+
+**Status:** FIXED (2026-03-12) — bypassed via `pre-profile` and `consent-pending` seed scenarios
+**Severity:** High — was blocking 4 flows from achieving full PASS
+**Affects:** `coppa-flow.yaml`, `profile-creation-consent.yaml`, `consent-pending-gate.yaml` (FIXED). `sign-up-flow.yaml` remains PARTIAL (intentionally — tests sign-up UI itself).
+
+After submitting the sign-up form with valid email + password, Clerk sends a 6-digit verification code to the email address. The verification screen (`sign-up-code` testID) renders correctly. However, entering the test code "424242" and tapping "Verify" results in "Incorrect code" — Clerk dev mode does NOT auto-verify or accept a fixed test code.
+
+**Root cause:** Clerk's email verification is a server-side check against a real code sent via email. Development mode provides no bypass mechanism for automated testing. The emails are sent to `*@example.com` addresses (which don't have real inboxes), so the codes cannot be retrieved.
+
+**Fix implemented (solution 2):** Two new seed scenarios added to `test-seed.ts`:
+
+- **`pre-profile`** — Creates Clerk user + DB account, but NO profile. Flows sign in (bypassing sign-up + verification), then navigate to create-profile via More → Profiles → "Create first profile". Used by `coppa-flow.yaml` and `profile-creation-consent.yaml`.
+- **`consent-pending`** — Creates Clerk user + account + TEEN profile with `PARENTAL_CONSENT_REQUESTED` consent status. The learner layout renders `ConsentPendingGate` directly. Used by `consent-pending-gate.yaml`.
+
+Both scenarios call `createClerkTestUser()` which uses Clerk's Backend API to create pre-verified users server-side — no email verification needed.
+
+**Remaining limitation:** `sign-up-flow.yaml` stays PARTIAL because it intentionally tests the sign-up form UI (email, password, "Create account" button, verification screen). Post-verification steps remain `optional: true`. This is acceptable — the sign-up UI coverage is still valuable.

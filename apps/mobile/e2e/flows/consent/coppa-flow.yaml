@@ -1,11 +1,14 @@
 # Flow: COPPA Consent Path — US Under-13 Consent Trigger
-# Validates: signing up, creating a profile with US location, and verifying
-# the COPPA consent flow triggers correctly. Tests the full path from sign-up
-# through profile creation to consent request.
+# Validates: profile creation with US location selection. Tests the full path
+# from sign-in (pre-seeded account, no profile) through More → Profiles →
+# "Create first profile" → profile form → US location.
 # Tags: nightly, consent, coppa
 #
 # Journey: UX Journey 1 (Onboarding) + Consent Lifecycle (COPPA)
 # Epics: Epic 0 (FR1-FR9), Epic 5 (COPPA/GDPR consent gating)
+#
+# Prerequisite: Seeded user with pre-profile scenario (Clerk user + account, no profile).
+# Usage: ./scripts/seed-and-run.sh pre-profile flows/consent/coppa-flow.yaml
 #
 # NOTE: The date picker defaults to 2010-01-01 (~16 years old) which does NOT
 # trigger COPPA (requires under 13). Interacting with the native date picker
@@ -18,95 +21,104 @@ tags:
   - consent
   - coppa
 ---
-# 1. Wait for sign-in screen (app launched by run-without-seed.sh via ADB)
-# NOTE: This flow must be run via run-without-seed.sh (not seed-and-run.sh)
-# because it signs up a NEW user via Clerk — no pre-seeded account needed.
+# ============================================================
+# SIGN IN with seeded pre-profile credentials
+# ============================================================
+
+# 1. Wait for sign-in screen (seed-and-run.sh handles app launch + dev-client)
 - extendedWaitUntil:
     visible:
       text: "Welcome back"
     timeout: 120000
 
-# 2. Navigate to sign-up
-- tapOn: "Sign up"
+# 2. Sign in with seeded credentials (from seed-and-run.sh env vars)
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${EMAIL}
 
-# 4. Wait for sign-up form
+# BUG-20: tap heading to dismiss keyboard instead of hideKeyboard
+- tapOn:
+    text: "Welcome back"
+
+- tapOn:
+    id: "sign-in-password"
+- inputText: ${PASSWORD}
+
+# BUG-20: dismiss keyboard
+- tapOn:
+    text: "Welcome back"
+
 - extendedWaitUntil:
     visible:
-      id: "sign-up-email"
-    timeout: 5000
+      id: "sign-in-button"
+    timeout: 10000
 
-# 5. Enter email
 - tapOn:
-    id: "sign-up-email"
-- inputText: "test-e2e-coppa-${Date.now()}@example.com"
+    id: "sign-in-button"
 
-# Dismiss keyboard so password field becomes visible
-- tapOn:
-    text: "Create account"
+# ============================================================
+# NAVIGATE TO CREATE PROFILE
+# ============================================================
+# With no profile, the home screen renders but subjects query is disabled
+# (no activeProfile), so the tab bar is visible. Navigate via More tab.
 
-# 6. Enter password
-- tapOn:
-    id: "sign-up-password"
-- inputText: "E2eTest_2026xK!"
-
-# Dismiss keyboard before tapping sign-up button
-- tapOn:
-    text: "Create account"
-
-# 7. Submit sign-up
-- tapOn:
-    id: "sign-up-button"
-
-# 7b. Clerk email verification screen
+# 3. Wait for home screen or tabs to render (no redirect since no subjects query)
 - extendedWaitUntil:
     visible:
-      id: "sign-up-code"
-    timeout: 15000
+      id: "tab-more"
+    timeout: 30000
 
-- takeScreenshot: coppa-01-verification-screen
-
-# 7c. Enter verification code (Clerk dev mode test code)
+# 4. Tap More tab
 - tapOn:
-    id: "sign-up-code"
-- inputText: "424242"
-- pressKey: Back
+    id: "tab-more"
+
+# 5. Wait for More screen to render, then tap Profile row
+- extendedWaitUntil:
+    visible:
+      text: "Profile"
+    timeout: 10000
+
 - tapOn:
-    id: "sign-up-verify-button"
+    text: "Profile"
 
-# ════════════════════════════════════════════════════════════════════════
-# VERIFICATION BOUNDARY: Steps below require a valid Clerk verification code.
-# Clerk dev mode does NOT auto-verify or accept a fixed test code.
-# To unblock: add POST /__test/verify-email endpoint (Clerk Backend API)
-# or create a "pre-profile" seed scenario that bypasses sign-up entirely.
-# Until then, verification and subsequent steps are marked optional.
-# ════════════════════════════════════════════════════════════════════════
+# 6. Wait for Profiles screen — should show "No profiles yet"
+- extendedWaitUntil:
+    visible:
+      text: "No profiles yet"
+    timeout: 10000
 
-# 8. Wait for profile creation screen (only reachable if verification succeeded)
+# 7. Tap "Create profile" button
+- tapOn:
+    id: "profiles-create-first"
+
+# ============================================================
+# PROFILE CREATION — US Location (COPPA path)
+# ============================================================
+
+# 8. Wait for profile creation screen
 - extendedWaitUntil:
     visible:
       id: "create-profile-name"
     timeout: 15000
-    optional: true
 
-# 9. Enter display name (optional — unreachable without verification)
+# 9. Enter display name
 - tapOn:
     id: "create-profile-name"
-    optional: true
 - inputText: "COPPA Test Child"
 
 # Dismiss keyboard (BUG-20: hideKeyboard fails on Android)
 - pressKey: Back
 
-# 10. Open birth date picker (optional — unreachable without verification)
+# 10. Open birth date picker
 - tapOn:
     id: "create-profile-birthdate"
-    optional: true
 
 # 11. Wait for date picker
 - extendedWaitUntil:
     visible:
       id: "date-picker"
     timeout: 5000
+    # Optional: Android auto-dismisses immediately on some configs
     optional: true
 
 # 12. Dismiss date picker (iOS "Done" button; Android auto-dismisses)
@@ -116,6 +128,7 @@ tags:
 #     triggered (under-13 detection) use optional: true below.
 - tapOn:
     id: "date-picker-done"
+    # Optional: may not appear on Android (auto-dismiss)
     optional: true
 
 # 13. Verify persona auto-detection
@@ -129,36 +142,37 @@ tags:
 - takeScreenshot: coppa-flow-date-selected
 
 # 15. Wait for region selector (appears after birthdate is set)
-#     (optional — unreachable without verification)
 - extendedWaitUntil:
     visible:
       id: "location-us"
     timeout: 5000
-    optional: true
 
 # 16. Select US location — key differentiator from GDPR flow
 - tapOn:
     id: "location-us"
-    optional: true
 
 # 17. Screenshot with US location selected
 - takeScreenshot: coppa-flow-us-selected
 
-# 18. Submit profile creation (optional — unreachable without verification)
+# 18. Submit profile creation
 - tapOn:
     id: "create-profile-submit"
-    optional: true
 
-# 19. Check if consent screen appears (optional — only triggers for under-13)
-#     With default date (~16 years), COPPA does not trigger.
-#     If a younger date was selected, COPPA consent screen would appear.
+# ============================================================
+# POST-SUBMISSION — consent trigger depends on age
+# ============================================================
+# With default date (~16 years), COPPA does NOT trigger (requires under 13).
+# If somehow a younger date was set, consent screen would appear. These steps
+# are optional because the date picker limitation makes consent unreliable.
+
+# 19. Check if consent screen appears (only triggers for under-13)
 - extendedWaitUntil:
     visible:
       text: "Parental consent required"
     timeout: 15000
     optional: true
 
-# 20. Verify COPPA-specific regulation text (optional — only if consent triggered)
+# 20. Verify COPPA-specific regulation text (only if consent triggered)
 - assertVisible:
     text: "Under US COPPA regulations"
     optional: true
@@ -166,14 +180,12 @@ tags:
 # 21. Screenshot of consent screen (if it appeared)
 - takeScreenshot: coppa-flow-consent-screen
 
-# 22. Verify consent email input is visible (optional — only if consent triggered)
+# 22. Verify consent email input is visible (only if consent triggered)
 - assertVisible:
     id: "consent-email"
     optional: true
 
-# 23. Enter parent email (optional — only if consent screen is showing)
-#     If consent screen did not appear, these taps/inputs are harmless
-#     because the consent-email field won't exist to receive focus.
+# 23. Enter parent email (only if consent screen is showing)
 - tapOn:
     id: "consent-email"
     optional: true
@@ -181,7 +193,7 @@ tags:
 # 24. Screenshot — captures consent form or post-profile state
 - takeScreenshot: coppa-flow-consent-form
 
-# 25. Submit consent request (optional — only if consent email was entered)
+# 25. Submit consent request (only if consent email was entered)
 - tapOn:
     id: "consent-submit"
     optional: true
@@ -198,7 +210,7 @@ tags:
     id: "consent-done"
     optional: true
 
-# 28. Verify consent pending gate appears (optional — only if consent was triggered)
+# 28. Verify consent pending gate appears (only if consent was triggered)
 - extendedWaitUntil:
     visible:
       id: "consent-pending-gate"
