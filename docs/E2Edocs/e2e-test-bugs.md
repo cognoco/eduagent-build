@@ -435,7 +435,7 @@ When the mobile app sends API requests without an `X-Profile-Id` header, `profil
 
 ## BUG-26: `trial-active` Seed Scenario Fails — DB Schema Drift (2026-03-10)
 
-**Status:** Open (seed infrastructure bug)
+**Status:** Fix available — runtime only (`pnpm run db:push:dev`)
 **Severity:** High — blocks 2 billing E2E flows
 **Affects:** `billing/subscription-details.yaml`, `billing/child-paywall.yaml`
 
@@ -455,7 +455,7 @@ column "revenuecat_original_app_user_id" of relation "subscriptions" does not ex
 
 ## BUG-27: Consent-Withdrawn Gate Not Rendered After Sign-In (2026-03-10)
 
-**Status:** Open (profile resolution mismatch — root cause confirmed)
+**Status:** FIXED (Session 15 — flow updated to use `consent-withdrawn-solo` scenario)
 **Severity:** High — blocks consent E2E flows
 **Affects:** `consent/consent-withdrawn-gate.yaml`
 
@@ -480,7 +480,7 @@ The flow returns `profileId: childProfileId` from the seed, but the mobile clien
 
 ## BUG-28: Post-Approval Landing Not Rendered After Sign-In (2026-03-10)
 
-**Status:** Open (flow design issue or app logic gap)
+**Status:** FIXED (BUG-38 confirmed PostApprovalLanding renders for `onboarding-complete`; no `isOwner` check)
 **Severity:** Medium — blocks 1 consent E2E flow
 **Affects:** `consent/post-approval-landing.yaml`
 
@@ -756,7 +756,7 @@ When the keyboard opens on the session/chat screen, the app's input bar (TextInp
 
 ## BUG-36: `freeform-session` Flow Expects Wrong Coaching Card Layout (2026-03-11)
 
-**Status:** Open (flow design issue)
+**Status:** FIXED (flow updated to use `coaching-card-primary` testID instead of text tap)
 **Severity:** Low — 1 flow affected
 **Affects:** `learning/freeform-session.yaml`
 
@@ -772,7 +772,7 @@ The flow taps `"Just ask something"` text, expecting the AdaptiveEntryCard's tee
 
 ## BUG-37: `session-summary` Flow Can't Find `end-session-button` (2026-03-11)
 
-**Status:** Open (flow design + possible app issue)
+**Status:** Dependent on BUG-47 — flow is correct, LLM reliability blocks it
 **Severity:** Low — 1 flow affected
 **Affects:** `learning/session-summary.yaml`
 
@@ -862,7 +862,7 @@ The More tab shows APPEARANCE, ACCENT COLOR, NOTIFICATIONS, and LEARNING MODE se
 
 ## BUG-43: Coaching Card Auto-Navigation After PostApprovalLanding Dismissal (2026-03-11)
 
-**Status:** Open (setup flow + scenario interaction issue)
+**Status:** Workaround applied (Back press guard in seed-and-sign-in.yaml); auto-navigation not reproducible in code review — coaching card components are purely presentational with no useEffect-based auto-nav
 **Severity:** HIGH — blocks 4+ flows
 **Affects:** `homework/homework-flow.yaml`, `homework/camera-ocr.yaml`, `retention/retention-review.yaml`, `retention/failed-recall.yaml`, and any flow using a scenario with active sessions/retention cards + CONSENTED status
 
@@ -925,7 +925,7 @@ Maestro `assertVisible: text: "learning coach"` fails even when the AI opening m
 
 ## BUG-47: Gemini LLM Intermittently Fails/Hangs During E2E Runs (2026-03-11)
 
-**Status:** Open — environment issue, not an app bug
+**Status:** Partially mitigated — retry logic added to `routeAndCall()` (non-streaming). Streaming paths rely on circuit breaker + fallback. Environment issue persists for Gemini-only deployments without OpenAI fallback.
 **Severity:** High — blocks all interview-dependent flows
 **Affects:** `onboarding/analogy-preference-flow.yaml`, `onboarding/curriculum-review-flow.yaml`, any flow requiring LLM responses
 
@@ -942,9 +942,13 @@ During Session 12 (and previously in Sessions 10-11), the Gemini LLM API (`gemin
 
 **Impact:** The `view-curriculum-button` never appears → analogy preference and curriculum review flows can't proceed past the interview screen. All flow logic before the LLM call is validated and working.
 
-**Possible mitigations:**
+**Mitigations applied (Session 19):**
+- **Retry logic added to `routeAndCall()`** — up to 3 attempts with exponential backoff (1s, 2s delays) before recording circuit breaker failure. Helps non-streaming LLM calls (coaching card precompute, session-completed chain).
+- **Retry also added to fallback provider path** (`attemptProvider`) — fallback calls also retry before giving up.
+
+**Remaining mitigations (not yet applied):**
 1. Add LLM health probe to `/v1/health` (actual Gemini ping, not just config check)
-2. Add retry logic in interview service for transient LLM failures
+2. For E2E streaming: configure OpenAI as fallback provider (`OPENAI_API_KEY` env var) — eliminates Gemini single point of failure
 3. For E2E: consider a mock/stub LLM mode that returns canned interview responses
 4. For E2E: run interview flows in a retry loop (re-seed + re-run on LLM failure)
 
@@ -1052,7 +1056,7 @@ Even if step 2 were fixed, the ChildPaywall would not render because the active 
 ## BUG-53: Tab Bar Icons Missing — Ionicons Font Not Loading (2026-03-12)
 
 **Severity:** Medium (visual only — navigation labels still visible)
-**Status:** OPEN
+**Status:** FIXED (Session 19 — added `...Ionicons.font` to `useFonts()` in root `_layout.tsx`)
 
 Tab bar icons render as empty squares with X marks (broken font glyphs) instead of Ionicons. Affects all tabs: Home, Learning Book, More, and the hidden dev-only route tabs (session, topic, homework, subject). The text labels ("Ho...", "Lea...", "More") are visible and truncated but functional.
 
@@ -1062,10 +1066,7 @@ Tab bar icons render as empty squares with X marks (broken font glyphs) instead 
 
 **Impact on E2E:** No direct impact — Maestro navigates via `testID` not icon recognition. Visual-only bug.
 
-**Investigation needed:**
-1. Check if `expo-font` `useFonts()` reports Ionicons as loaded
-2. Check if the font file is bundled in the Metro-served bundle
-3. May need `Font.loadAsync()` in root layout before rendering tabs
+**Fix applied (Session 19):** Added `import Ionicons from '@expo/vector-icons/Ionicons'` and `...Ionicons.font` to the `useFonts()` call in `apps/mobile/src/app/_layout.tsx`. This ensures the Ionicons font is explicitly loaded alongside the Atkinson Hyperlegible custom fonts before the splash screen is dismissed. The root layout's existing font gate (`if (!fontsLoaded) return null`) ensures no tabs render before Ionicons is available.
 
 ## BUG-54: Session Close Fails — `inngest.send()` Throws Without Inngest Dev Server (2026-03-12)
 

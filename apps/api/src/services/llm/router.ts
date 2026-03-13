@@ -152,6 +152,40 @@ export class CircuitOpenError extends Error {
 }
 
 // ---------------------------------------------------------------------------
+// Retry helper for transient failures
+// ---------------------------------------------------------------------------
+
+const MAX_RETRIES = 2; // Up to 3 total attempts
+const INITIAL_RETRY_DELAY_MS = 1_000;
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  label: string,
+  maxRetries: number = MAX_RETRIES
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        const delay = INITIAL_RETRY_DELAY_MS * 2 ** attempt;
+        console.warn(
+          `[llm] ${label} attempt ${
+            attempt + 1
+          } failed, retrying in ${delay}ms: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
+}
+
+// ---------------------------------------------------------------------------
 // Core orchestrator — all LLM calls go through here (ARCH-8)
 // ---------------------------------------------------------------------------
 
@@ -166,11 +200,14 @@ export async function routeAndCall(
     throw new Error(`No provider registered for: ${config.provider}`);
   }
 
-  // --- Try primary provider ---
+  // --- Try primary provider with retry ---
   if (canAttempt(config.provider)) {
     const start = Date.now();
     try {
-      const response = await provider.chat(messages, config);
+      const response = await withRetry(
+        () => provider.chat(messages, config),
+        config.provider
+      );
       recordSuccess(config.provider);
       return {
         response,
@@ -185,9 +222,11 @@ export async function routeAndCall(
       if (!fallbackConfig) throw err;
 
       console.warn(
-        `[llm] Primary provider ${config.provider} failed, trying fallback ${
-          fallbackConfig.provider
-        }: ${err instanceof Error ? err.message : String(err)}`
+        `[llm] Primary provider ${
+          config.provider
+        } failed after retries, trying fallback ${fallbackConfig.provider}: ${
+          err instanceof Error ? err.message : String(err)
+        }`
       );
       return attemptProvider(fallbackConfig, messages);
     }
@@ -205,7 +244,7 @@ export async function routeAndCall(
   throw new CircuitOpenError(config.provider);
 }
 
-/** Attempt a single provider call (used by fallback path). */
+/** Attempt a single provider call with retry (used by fallback path). */
 async function attemptProvider(
   config: ModelConfig,
   messages: ChatMessage[]
@@ -220,7 +259,10 @@ async function attemptProvider(
 
   const start = Date.now();
   try {
-    const response = await provider.chat(messages, config);
+    const response = await withRetry(
+      () => provider.chat(messages, config),
+      `${config.provider} (fallback)`
+    );
     recordSuccess(config.provider);
     return {
       response,
