@@ -1,4 +1,4 @@
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnalogyDomainPicker } from '../../../components/common';
@@ -73,14 +73,18 @@ export default function AnalogyPreferenceScreen() {
         </Text>
       </View>
 
-      {/* Picker */}
-      <View className="flex-1 px-5">
+      {/* Picker — ScrollView needed: 7 options at ~72dp each overflow on ≤640dp screens */}
+      <ScrollView
+        className="flex-1 px-5"
+        contentContainerStyle={{ paddingBottom: 8 }}
+        showsVerticalScrollIndicator={false}
+      >
         <AnalogyDomainPicker
           value={selectedDomain}
           onSelect={setSelectedDomain}
           disabled={isPending}
         />
-      </View>
+      </ScrollView>
 
       {/* Actions */}
       <View

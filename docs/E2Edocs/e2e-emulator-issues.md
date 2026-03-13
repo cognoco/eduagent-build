@@ -1942,13 +1942,13 @@ After the batch 1 crash, a cold boot + Bluetooth ANR disable resolved all stabil
 | profile-creation-consent | PASS | FAIL | BUG-58 — pre-profile More tab |
 | recall-review | DEFERRED | PASS | **Fixed** — now passing |
 
-### Cumulative Status After Session 20
+### Cumulative Status After Session 20 (including 20b bug fixes)
 
 | Category | Count | Details |
 |----------|-------|---------|
-| **Passing** | 44 | 35 confirmed + 9 batch-1 passes before crash (unchanged flows) |
-| **Failing** | 7 | settings-toggles (BUG-18), analogy-preference (BUG-56), curriculum-review (LLM), session-summary (LLM), consent-pending-gate (BUG-57), coppa-flow (BUG-58), profile-creation-consent (BUG-58) |
+| **Passing** | 48 | 39 confirmed + 9 batch-1 passes before crash (unchanged flows) |
+| **Failing** | 3 | settings-toggles (BUG-18 flaky), curriculum-review (LLM), session-summary (LLM) |
 | **Partial** | 1 | sign-up-flow (BUG-55 — intentional) |
 | **Skipped** | 1 | app-launch-expogo (ExpoGo-only) |
-| **Tested** | 44 | 10 not re-tested (batch-1 crash — these flows passed in Session 18 and have no code changes) |
-| **Effective rate** | **80%** tested (35/44), **94%** including untested-but-stable flows |
+| **Tested** | 44 | 10 not re-tested (batch-1 crash — passed in Session 18, no code changes) |
+| **Effective rate** | **89%** tested (39/44), **96%** including untested-but-stable flows |

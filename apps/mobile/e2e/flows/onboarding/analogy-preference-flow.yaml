@@ -107,10 +107,13 @@ tags:
 
 - takeScreenshot: analogy-preference-screen
 
-# ── Verify all domain options are visible ──────────────────────────────
+# ── Verify all domain options exist (scroll as needed) ────────────────
+# On 360x640dp screens, only ~4 of 7 options fit above the fold.
+# BUG-56 fix: container now has ScrollView, so scrollUntilVisible works.
 - assertVisible:
     id: "analogy-domain-picker"
 
+# First 4 options are always above the fold
 - assertVisible:
     id: "analogy-domain-none"
 
@@ -123,18 +126,24 @@ tags:
 - assertVisible:
     id: "analogy-domain-building"
 
-- assertVisible:
-    id: "analogy-domain-music"
+# Options 5-7 may be below fold — scroll to each
+- scrollUntilVisible:
+    element:
+      id: "analogy-domain-music"
+    direction: DOWN
+    timeout: 5000
 
-- assertVisible:
-    id: "analogy-domain-nature"
+- scrollUntilVisible:
+    element:
+      id: "analogy-domain-nature"
+    direction: DOWN
+    timeout: 5000
 
-# Gaming is the 7th option — may be below fold on 1080x1920 emulator
 - scrollUntilVisible:
     element:
       id: "analogy-domain-gaming"
     direction: DOWN
-    timeout: 10000
+    timeout: 5000
 
 # ── Verify action buttons are visible ──────────────────────────────────
 - scrollUntilVisible:
@@ -146,7 +155,13 @@ tags:
 - assertVisible:
     id: "analogy-skip-button"
 
-# ── Select a domain (cooking) ─────────────────────────────────────────
+# ── Select a domain (cooking) — scroll back up first ─────────────────
+- scrollUntilVisible:
+    element:
+      id: "analogy-domain-cooking"
+    direction: UP
+    timeout: 5000
+
 - tapOn:
     id: "analogy-domain-cooking"
 

@@ -782,6 +782,24 @@ Full regression run to verify nothing broke from previously passing tests. Ran i
 
 **Updated cumulative: 35/44 passing (80%). 2 LLM-dependent, 1 known flaky, 1 UI bug, 3 consent regressions to investigate. 1 PARTIAL (sign-up), 1 SKIP (ExpoGo).**
 
+### Session 20b — Bug Fix Verification (2026-03-13)
+
+Fixed and re-verified 4 flows:
+
+| Flow | Bug | Fix Applied | Result |
+|------|-----|-------------|--------|
+| `consent/consent-pending-gate` | BUG-57 | Full text match (not substring) + `scrollUntilVisible` for footer disclaimer in `PreviewSampleCoaching` | **PASS** |
+| `consent/coppa-flow` | BUG-58 | `scrollUntilVisible` for "Profile" on More tab + Android date picker "OK" tap | **PASS** |
+| `consent/profile-creation-consent` | BUG-58 | Same as coppa-flow | **PASS** |
+| `onboarding/analogy-preference-flow` | BUG-56 | App fix: `ScrollView` in `analogy-preference.tsx`. Flow fix: `scrollUntilVisible` for options 5-7 | **PASS** |
+
+**Root causes identified:**
+- **BUG-56**: Genuine UI bug — 7 options at ~78dp each overflow ~346dp available space. Fixed by wrapping picker in `ScrollView`.
+- **BUG-57**: Maestro uses full-text matching on Android for `assertVisible: text:`. Substring of a multi-sentence `<Text>` node fails. Fixed by matching the complete text. Also, `PreviewSampleCoaching` footer was below fold in ScrollView — added `scrollUntilVisible`.
+- **BUG-58**: Two issues — (1) "Profile" row is at ~716dp on More screen, 164dp below fold on 360x640dp viewport. Fixed with `scrollUntilVisible`. (2) Android `DatePickerDialog` requires "OK" tap to dismiss — was missing in flows. Added `tapOn: text: "OK"` (optional, Android-only).
+
+**Updated cumulative: 39/44 passing (89%). Remaining: 2 LLM-dependent, 1 known flaky (BUG-18). 1 PARTIAL (sign-up), 1 SKIP (ExpoGo).**
+
 ---
 
 ## References

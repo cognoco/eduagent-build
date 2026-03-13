@@ -1109,7 +1109,7 @@ Both scenarios call `createClerkTestUser()` which uses Clerk's Backend API to cr
 
 ## BUG-56: AnalogyDomainPicker Not Scrollable — Gaming Option Clipped (2026-03-13)
 
-**Status:** Open (genuine UI bug)
+**Status:** FIXED (2026-03-13) — ScrollView added to analogy-preference.tsx
 **Severity:** Medium — 7th option not reachable on smaller screens
 **Affects:** `analogy-preference-flow.yaml` (FAIL), `analogy-preference.tsx` screen
 
@@ -1132,7 +1132,7 @@ The `AnalogyDomainPicker` component renders 7 domain options (none, cooking, spo
 
 ## BUG-57: consent-pending-gate Text Assertion Failure — PreviewSubjectBrowser (2026-03-13)
 
-**Status:** Open (needs investigation — regression from Session 18)
+**Status:** FIXED (2026-03-13) — full text match + scrollUntilVisible for footer
 **Severity:** Medium — flow was PASSING in Session 18
 **Affects:** `consent-pending-gate.yaml` (FAIL at step 14)
 
@@ -1161,7 +1161,7 @@ The full text is a single `<Text>` node containing both sentences. The assertion
 
 ## BUG-58: Pre-Profile Accounts — "Profile" Not Visible on More Tab (2026-03-13)
 
-**Status:** Open (needs investigation — regression from Session 18)
+**Status:** FIXED (2026-03-13) — scrollUntilVisible + Android date picker OK tap
 **Severity:** Medium — 2 flows affected, both PASSING in Session 18
 **Affects:** `coppa-flow.yaml` (FAIL at step 5), `profile-creation-consent.yaml` (FAIL at step 5)
 

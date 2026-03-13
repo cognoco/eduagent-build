@@ -27,6 +27,20 @@ tags:
       id: "dashboard-scroll"
     timeout: 15000
 
+# ── Visual integrity: parent tab bar ───────────────────────────────────
+- assertVisible:
+    id: "tab-home"
+- assertVisible:
+    id: "tab-book"
+- assertVisible:
+    id: "tab-more"
+
+# ── Visual integrity: dashboard heading ────────────────────────────────
+# Parent dashboard must show "Your Children" or similar heading with real data.
+- assertVisible:
+    text: "Your Children"
+    optional: true
+
 # 3. Verify children list is visible — look for child display name
 - extendedWaitUntil:
     visible:

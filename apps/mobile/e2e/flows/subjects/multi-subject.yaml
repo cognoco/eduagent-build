@@ -25,6 +25,21 @@ tags:
       id: "home-scroll-view"
     timeout: 15000
 
+# ── Visual integrity: tab bar ──────────────────────────────────────────
+# All 3 tabs must render with correct testIDs. Catches missing icons (BUG-53),
+# hidden tabs (BUG-10), and tab bar rendering failures.
+- assertVisible:
+    id: "tab-home"
+- assertVisible:
+    id: "tab-book"
+- assertVisible:
+    id: "tab-more"
+
+# ── Visual integrity: coaching card ────────────────────────────────────
+# With active subjects, the coaching card must render (not loading spinner forever).
+- assertVisible:
+    id: "coaching-card"
+
 # 3. Screenshot: home screen — captures what's actually rendering
 - takeScreenshot: multi-subject-01-home
 
@@ -33,6 +48,23 @@ tags:
     visible:
       text: "Physics"
     timeout: 10000
+
+# ── Visual integrity: subject list section ─────────────────────────────
+# "Your subjects" heading must appear when subjects exist.
+# Catches empty-state rendering when data should be present (BUG-31 pattern).
+- scrollUntilVisible:
+    element:
+      text: "Your subjects"
+    direction: DOWN
+    timeout: 5000
+
+# ── Negative assertions: empty-state must NOT appear with real data ───
+# If seeded with subjects, the empty-state placeholder must not render.
+# Catches counter mismatch bugs where data loads but empty UI shows.
+- assertNotVisible:
+    text: "Start learning"
+- assertNotVisible:
+    text: "Add your first subject"
 
 # 5. Navigate to Learning Book tab
 - tapOn: "Learning Book Tab"

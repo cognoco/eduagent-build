@@ -124,8 +124,10 @@ tags:
     text: "Science"
 
 # 14. Verify the preview disclaimer
+# BUG-57: Maestro can't reliably match substrings inside React Native <Text> on Android.
+# Match the full text content of the disclaimer node (JSX whitespace collapses to single spaces).
 - assertVisible:
-    text: "Here's a preview of what you can learn."
+    text: "Here's a preview of what you can learn. You'll unlock these once your parent approves."
 
 # 15. Screenshot of subject browser preview
 - takeScreenshot: consent-preview-subject-browser
@@ -168,9 +170,12 @@ tags:
 - assertVisible:
     text: "How your coach helps"
 
-# 22. Verify the preview footer disclaimer
-- assertVisible:
-    text: "This is a preview. Full access unlocks after parent approval."
+# 22. Verify the preview footer disclaimer (at bottom of ScrollView — scroll to it)
+- scrollUntilVisible:
+    element:
+      text: "This is a preview. Full access unlocks after parent approval."
+    direction: DOWN
+    timeout: 5000
 
 # 23. Screenshot of coaching preview
 - takeScreenshot: consent-preview-sample-coaching
