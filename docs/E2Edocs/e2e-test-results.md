@@ -1,6 +1,6 @@
 # E2E Test Results — Dev-Client on Android Emulator
 
-**Date:** 2026-03-08 (updated 2026-03-12, Session 18)
+**Date:** 2026-03-08 (updated 2026-03-13, Session 19)
 **Environment:** Windows 11 + WHPX emulator (New_Device, API 34, 1080x1920)
 **Build:** Dev-client APK built in WSL2 with expo-dev-client@~6.0.20
 **Metro:** Windows, `unstable_serverRoot: monorepoRoot`, bundle proxy on port 8082
@@ -680,6 +680,31 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 | P1 | Pre-auth sign-up flow | 1 | `sign-up-flow.yaml` — PARTIAL by design (Clerk verification). Could be promoted to PASS by adding `POST /__test/verify-email` endpoint. Low priority. |
 | P2 | Visual | 1 | BUG-53: tab bar icons missing (Ionicons font not loading). No E2E impact. |
 | P3 | Deferred | 1 | recall-review — needs coaching-card precompute service running. |
+
+### Session 19 (2026-03-13) — Bug Resolution Sweep
+
+**Objective:** Resolve all open E2E bugs. Code fixes, doc updates, and status reclassification.
+
+**Code changes:**
+
+1. **BUG-53 fix:** Added `import Ionicons from '@expo/vector-icons/Ionicons'` and `...Ionicons.font` to `useFonts()` in `apps/mobile/src/app/_layout.tsx`. Tab bar icons will now load explicitly alongside custom fonts before splash screen dismissal.
+
+2. **BUG-47 mitigation:** Added retry logic with exponential backoff (up to 3 attempts: 1s, 2s delays) to `routeAndCall()` in `apps/api/src/services/llm/router.ts`. Also added retry to fallback provider path (`attemptProvider`). 4 new tests in `router.test.ts` (all passing).
+
+**Bug status reclassifications (no code change needed):**
+
+| Bug | Old Status | New Status | Reason |
+|-----|-----------|------------|--------|
+| BUG-26 | Open | Fix available (runtime) | Needs `pnpm run db:push:dev` — no code change |
+| BUG-27 | Open | **FIXED** | Flow already uses `consent-withdrawn-solo` scenario (Session 15) |
+| BUG-28 | Open | **FIXED** | BUG-38 confirmed PostApprovalLanding renders for `onboarding-complete`; no `isOwner` check |
+| BUG-36 | Open | **FIXED** | Flow already updated to use `coaching-card-primary` testID |
+| BUG-37 | Open | Dependent on BUG-47 | Flow is correct; `end-session-button` testID confirmed; LLM reliability blocks it |
+| BUG-43 | Open | Workaround applied | Back press guard in seed-and-sign-in.yaml; auto-nav not reproducible in code review |
+| BUG-47 | Open | Partially mitigated | Retry added for non-streaming; streaming relies on circuit breaker + fallback |
+| BUG-53 | Open | **FIXED** | Ionicons font explicitly loaded in root layout |
+
+**Updated cumulative: 51/54 passing (94%). Remaining: 1 partial (sign-up-flow), 1 deferred (recall-review), 1 skipped (ExpoGo). No open bugs blocking test coverage — only BUG-26 (runtime fix) and BUG-47 (environment/Gemini) remain open.**
 
 ---
 
