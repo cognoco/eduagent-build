@@ -710,7 +710,8 @@ Additionally, `parent-solo` and `parent-with-children` scenarios create a PARENT
 
 ## BUG-35: Keyboard Covers Chat Input Bar and Send Button in Session Screen (2026-03-10)
 
-**Status:** FIXED (2026-03-11) — changed `ChatShell.tsx` KAV `behavior` from `'height'` to `undefined` on Android. E2E workaround (`pressKey: Enter`) remains in flows as defense-in-depth. Tests pass (28 tests).
+**Status:** RE-OPENED (2026-03-13) — `undefined` was never a real fix (KAV does nothing, keyboard still covers input). Reverted to `behavior='height'` on Android (2026-03-13). Needs verification after rebuild — BUG-35 originally reported `'height'` conflicting with `adjustResize` on FlatList-based ChatShell, but `undefined` leaves keyboard coverage unresolved. If `'height'` still conflicts, next approach: remove `adjustResize` from AndroidManifest for ChatShell screens or switch to `behavior='padding'`.
+**E2E workaround:** `pressKey: Enter` remains in all flows as defense-in-depth.
 **Workaround confirmed:** Session 10 ran 4 chat flows (start-session, core-learning, first-session, recall-review) — all PASS with `pressKey: Enter`.
 **Severity:** Critical — blocks ALL E2E flows that use ChatShell (~15 flows)
 **Affects:** All learning, homework, retention, and recall flows that enter a chat session
@@ -1187,3 +1188,61 @@ The failure occurs at:
 3. **Tab navigation timing** — After `tapOn: id: tab-more`, the More screen may not be fully rendered within 10s on WHPX emulator
 
 **Investigation needed:** Re-run one of the flows with increased timeout and screenshots before/after `tab-more` tap. Check if the More screen renders at all, or if a gate/redirect is intercepting.
+
+---
+
+## BUG-59: Tab Bar Overflow — Hidden Routes Render as Visible Tabs (2026-03-13)
+
+**Status:** FIXED (2026-03-13) — added `tabBarItemStyle: { display: 'none' }` to all hidden tabs
+**Severity:** High — visual defect on EVERY screen in the app (learner + parent layouts)
+**Affects:** All flows — the tab bar is visible on every screen except fullscreen (session, homework, onboarding)
+
+**Observed behavior:** The bottom tab bar shows 9 tabs instead of 3. The 6 hidden routes (`onboarding`, `session`, `topic`, `subscription`, `homework`, `subject`) render as visible tab buttons with truncated labels ("ses...", "topi...", "ho...", "sub...") and placeholder rectangle icons (no `tabBarIcon` defined for hidden routes). The 3 real tabs (Home, Learning Book, More) are squeezed to accommodate the extra buttons.
+
+**Screenshot evidence:** Learning Book screen shows tab bar with: `Ho... Lea... More ses... topi... ho... topi... sub... topi...`
+
+**Root cause:** In Expo Router's `<Tabs>`, `href: null` prevents a tab from being a **navigation target** (no deep linking, no programmatic navigation from tab bar), but does NOT remove the tab **button** from the visual layout. The underlying `@react-navigation/bottom-tabs` still allocates space and renders the button.
+
+- `tabBarStyle: { display: 'none' }` (already on `onboarding`, `session`, `homework`) hides the **entire tab bar** when that screen is active — it does NOT hide the tab button when another screen is active
+- `tabBarItemStyle: { display: 'none' }` hides the tab **button** from the bar regardless of which screen is active — this is the correct property
+
+**Fix applied:**
+
+`apps/mobile/src/app/(learner)/_layout.tsx` — Added `tabBarItemStyle: { display: 'none' }` to all 6 hidden `Tabs.Screen` entries:
+- `onboarding` (line 649)
+- `session` (line 656)
+- `topic` (line 663)
+- `subscription` (line 669)
+- `homework` (line 675)
+- `subject` (line 681)
+
+`apps/mobile/src/app/(parent)/_layout.tsx` — Added `tabBarItemStyle: { display: 'none' }` to the hidden `child` tab (line 101).
+
+**Verification:** No direct unit tests for layout files. Fix is purely additive CSS. Needs visual verification after rebuild — tab bar should show exactly 3 tabs (Home, Learning Book, More) with correct icons and full labels.
+
+---
+
+## BUG-60: ChatShell Keyboard Avoidance — Unresolved on Android (2026-03-13)
+
+**Status:** IN PROGRESS — reverted to `behavior='height'`, needs rebuild + visual verification
+**Severity:** High — keyboard covers chat input and send button during active typing
+**Affects:** All learning, homework, retention, and recall flows that use ChatShell (~15 flows)
+**Related:** BUG-24 (original KAV fix for auth screens), BUG-35 (ChatShell-specific revert)
+
+**History:**
+1. **BUG-24 (2026-03-10):** All screens had `behavior={undefined}`. Fixed to `behavior='height'` on Android for all 10 instances.
+2. **BUG-35 (2026-03-11):** ChatShell specifically had issues with `'height'` — reported double-adjustment conflict with `adjustResize` in AndroidManifest. Reverted ChatShell to `behavior={undefined}`. Used `pressKey: Enter` workaround in E2E.
+3. **Session 20c (2026-03-13):** User confirmed keyboard still covers input with `undefined`. Audit confirmed ChatShell is the ONLY remaining screen with `undefined`. Reverted to `behavior='height'`.
+
+**Current state of ChatShell.tsx line 230:**
+```tsx
+behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+```
+
+**If `'height'` still conflicts with `adjustResize`**, next approaches to try:
+1. `behavior='padding'` on Android (adds padding instead of resizing height)
+2. Remove `android:windowSoftInputMode="adjustResize"` from AndroidManifest (let KAV handle it alone)
+3. Replace `KeyboardAvoidingView` with `react-native-keyboard-aware-scroll-view` for the input area
+4. Use `useAnimatedKeyboard` from `react-native-reanimated` for manual offset
+
+**E2E flows are unaffected** — all chat flows use `pressKey: Enter` workaround (BUG-35) which bypasses the need to tap the send button behind the keyboard.

@@ -1952,3 +1952,25 @@ After the batch 1 crash, a cold boot + Bluetooth ANR disable resolved all stabil
 | **Skipped** | 1 | app-launch-expogo (ExpoGo-only) |
 | **Tested** | 44 | 10 not re-tested (batch-1 crash — passed in Session 18, no code changes) |
 | **Effective rate** | **89%** tested (39/44), **96%** including untested-but-stable flows |
+
+---
+
+## Session 20c — Visual Bug Fixes (2026-03-13)
+
+### Visual issues identified from emulator screenshots
+
+Two visual bugs found during manual screenshot review that affect ALL screens:
+
+1. **Tab bar overflow (BUG-59):** 9 tabs visible instead of 3. Hidden routes (`onboarding`, `session`, `topic`, `subscription`, `homework`, `subject`) render as visible tab buttons with truncated labels and placeholder rectangle icons. Caused by Expo Router's `href: null` not hiding tab buttons visually — only prevents navigation. Fixed with `tabBarItemStyle: { display: 'none' }` on all hidden `Tabs.Screen` entries in both learner and parent layouts.
+
+2. **ChatShell keyboard coverage (BUG-60):** Keyboard covers chat input field and send button on Android. `KeyboardAvoidingView` with `behavior={undefined}` means KAV does nothing. Changed to `behavior='height'`. Note: BUG-35 originally reported `'height'` conflicting with `adjustResize` — needs verification after rebuild.
+
+### App code changes
+
+| File | Change | Bug |
+|------|--------|-----|
+| `(learner)/_layout.tsx` | Added `tabBarItemStyle: { display: 'none' }` to 6 hidden tabs | BUG-59 |
+| `(parent)/_layout.tsx` | Added `tabBarItemStyle: { display: 'none' }` to 1 hidden tab | BUG-59 |
+| `ChatShell.tsx` line 230 | `behavior={undefined}` → `behavior='height'` on Android | BUG-60 |
+
+**Both fixes require APK rebuild or Metro bundle refresh to verify on emulator.**

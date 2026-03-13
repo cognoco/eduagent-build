@@ -800,11 +800,31 @@ Fixed and re-verified 4 flows:
 
 **Updated cumulative: 39/44 passing (89%). Remaining: 2 LLM-dependent, 1 known flaky (BUG-18). 1 PARTIAL (sign-up), 1 SKIP (ExpoGo).**
 
+### Session 20c — Visual Bug Fixes (2026-03-13)
+
+Two visual bugs identified from emulator screenshot review and fixed in app code:
+
+| Bug | Description | Fix Applied | Status |
+|-----|-------------|-------------|--------|
+| BUG-59 | Tab bar shows 9 tabs (6 hidden routes render as visible buttons with placeholder icons) | Added `tabBarItemStyle: { display: 'none' }` to all hidden `Tabs.Screen` in learner + parent layouts | FIXED — needs rebuild to verify |
+| BUG-60 | ChatShell keyboard covers input field on Android (`behavior={undefined}` = KAV does nothing) | Changed `ChatShell.tsx` line 230 to `behavior='height'` on Android | IN PROGRESS — needs rebuild to verify (BUG-35 history: `'height'` may conflict with `adjustResize`) |
+
+**Files changed:**
+- `apps/mobile/src/app/(learner)/_layout.tsx` — 6 hidden tabs get `tabBarItemStyle: { display: 'none' }`
+- `apps/mobile/src/app/(parent)/_layout.tsx` — 1 hidden tab gets `tabBarItemStyle: { display: 'none' }`
+- `apps/mobile/src/components/session/ChatShell.tsx` — KAV `behavior` changed from `undefined` to `'height'` on Android
+
+**Tests:** ChatShell.tsx — 28/28 pass. Layout files have no direct unit tests (integration-level only).
+
+**Note:** Both fixes require an APK rebuild or Metro bundle refresh to take effect on the emulator. E2E flow pass/fail counts are unchanged — the tab bar overflow didn't block any assertions (Maestro targets by testID, not visual position), and keyboard avoidance is already worked around via `pressKey: Enter` (BUG-35).
+
+**Updated cumulative: 39/44 passing (89%). 2 visual bugs fixed pending rebuild verification.**
+
 ---
 
 ## References
 
-- **Bug details:** See `e2e-test-bugs.md` for all bug entries (BUG-1 through BUG-55) with root causes, fixes, and workarounds.
+- **Bug details:** See `e2e-test-bugs.md` for all bug entries (BUG-1 through BUG-60) with root causes, fixes, and workarounds.
 - **Environment setup:** See `e2e-emulator-issues.md` for emulator configuration, known environment issues, and operational notes.
 - **Infrastructure:** See `e2e-tech-spec.md` for flow specifications, seeding architecture, and CI integration.
 - **Screenshots:** Maestro test output at `~/.maestro/tests/` — directories timestamped per run, contains PNGs for warning/failure steps.

@@ -100,6 +100,7 @@ export default function ParentLayout() {
           name="child"
           options={{
             href: null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
       </Tabs>

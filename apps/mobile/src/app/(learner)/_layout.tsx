@@ -648,6 +648,7 @@ export default function LearnerLayout() {
           name="onboarding"
           options={{
             href: null,
+            tabBarItemStyle: { display: 'none' },
             tabBarStyle: { display: 'none' },
           }}
         />
@@ -655,6 +656,7 @@ export default function LearnerLayout() {
           name="session"
           options={{
             href: null,
+            tabBarItemStyle: { display: 'none' },
             tabBarStyle: { display: 'none' },
           }}
         />
@@ -662,18 +664,21 @@ export default function LearnerLayout() {
           name="topic"
           options={{
             href: null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen
           name="subscription"
           options={{
             href: null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen
           name="homework"
           options={{
             href: null,
+            tabBarItemStyle: { display: 'none' },
             tabBarStyle: { display: 'none' },
           }}
         />
@@ -681,6 +686,7 @@ export default function LearnerLayout() {
           name="subject"
           options={{
             href: null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
       </Tabs>
