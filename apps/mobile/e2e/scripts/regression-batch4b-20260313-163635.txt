@@ -1,0 +1,23 @@
+E2E Regression Batch 4b — Fri, Mar 13, 2026  4:36:35 PM
+==========================================
+[PASS] flows/retention/failed-recall.yaml 
+[PASS] flows/retention/relearn-flow.yaml 
+[PASS] flows/parent/parent-tabs.yaml 
+[PASS] flows/parent/parent-dashboard.yaml 
+[PASS] flows/parent/parent-learning-book.yaml 
+[PASS] flows/parent/child-drill-down.yaml 
+[PASS] flows/parent/consent-management.yaml 
+[PASS] flows/parent/demo-dashboard.yaml 
+[PASS] flows/homework/homework-flow.yaml 
+[PASS] flows/homework/homework-from-entry-card.yaml 
+[PASS] flows/homework/camera-ocr.yaml 
+[PASS] flows/subjects/multi-subject.yaml 
+[PASS] flows/edge/empty-first-user.yaml 
+[PASS] flows/consent/consent-withdrawn-gate.yaml 
+[PASS] flows/consent/post-approval-landing.yaml 
+[FAIL] flows/consent/consent-pending-gate.yaml (scenario: consent-pending)
+[FAIL] flows/consent/coppa-flow.yaml (scenario: pre-profile)
+[FAIL] flows/consent/profile-creation-consent.yaml (scenario: pre-profile)
+[PASS] flows/onboarding/sign-up-flow.yaml 
+BATCH 4b COMPLETE — Fri, Mar 13, 2026  5:17:53 PM
+  PASS: 16 / FAIL: 3 / TOTAL: 19

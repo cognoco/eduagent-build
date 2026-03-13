@@ -129,12 +129,19 @@ tags:
 - assertVisible:
     id: "analogy-domain-nature"
 
-- assertVisible:
-    id: "analogy-domain-gaming"
+# Gaming is the 7th option — may be below fold on 1080x1920 emulator
+- scrollUntilVisible:
+    element:
+      id: "analogy-domain-gaming"
+    direction: DOWN
+    timeout: 10000
 
 # ── Verify action buttons are visible ──────────────────────────────────
-- assertVisible:
-    id: "analogy-continue-button"
+- scrollUntilVisible:
+    element:
+      id: "analogy-continue-button"
+    direction: DOWN
+    timeout: 10000
 
 - assertVisible:
     id: "analogy-skip-button"

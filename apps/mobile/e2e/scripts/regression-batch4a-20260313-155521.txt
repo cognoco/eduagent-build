@@ -1,0 +1,16 @@
+E2E Regression Batch 4a — Fri, Mar 13, 2026  3:55:21 PM
+==========================================
+[PASS] flows/account/more-tab-navigation.yaml 
+[FAIL] flows/account/settings-toggles.yaml (scenario: onboarding-complete)
+[PASS] flows/account/profile-switching.yaml 
+[PASS] flows/onboarding/create-subject.yaml 
+[FAIL] flows/onboarding/analogy-preference-flow.yaml (scenario: onboarding-complete)
+[FAIL] flows/onboarding/curriculum-review-flow.yaml (scenario: onboarding-complete)
+[PASS] flows/billing/child-paywall.yaml 
+[FAIL] flows/learning/session-summary.yaml (scenario: learning-active)
+[PASS] flows/retention/topic-detail.yaml 
+[PASS] flows/retention/learning-book.yaml 
+[PASS] flows/retention/retention-review.yaml 
+[PASS] flows/retention/recall-review.yaml 
+BATCH 4a COMPLETE — Fri, Mar 13, 2026  4:33:37 PM
+  PASS: 8 / FAIL: 4 / TOTAL: 12

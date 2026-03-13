@@ -1104,3 +1104,86 @@ After submitting the sign-up form with valid email + password, Clerk sends a 6-d
 Both scenarios call `createClerkTestUser()` which uses Clerk's Backend API to create pre-verified users server-side — no email verification needed.
 
 **Remaining limitation:** `sign-up-flow.yaml` stays PARTIAL because it intentionally tests the sign-up form UI (email, password, "Create account" button, verification screen). Post-verification steps remain `optional: true`. This is acceptable — the sign-up UI coverage is still valuable.
+
+---
+
+## BUG-56: AnalogyDomainPicker Not Scrollable — Gaming Option Clipped (2026-03-13)
+
+**Status:** Open (genuine UI bug)
+**Severity:** Medium — 7th option not reachable on smaller screens
+**Affects:** `analogy-preference-flow.yaml` (FAIL), `analogy-preference.tsx` screen
+
+The `AnalogyDomainPicker` component renders 7 domain options (none, cooking, sports, building, music, nature, gaming) in a plain `View` container — not a `ScrollView`. On 360x640dp screens (emulator default), the gaming option (7th, index 6) is clipped below the fold.
+
+**Layout math:** Header (~124dp) + Actions (~120dp) = ~244dp overhead. Remaining ~396dp for picker. 7 options × ~72dp each = 504dp needed. Gap: ~108dp.
+
+**Root cause:** `analogy-preference.tsx` wraps the picker in `<View className="flex-1 px-5">` (no scroll). The `AnalogyDomainPicker` component itself uses `<View>` for its container, not `<ScrollView>`.
+
+**E2E impact:** `scrollUntilVisible` cannot scroll a non-scrollable container — Maestro correctly fails.
+
+**Fix needed:** Wrap `AnalogyDomainPicker` or its container in `analogy-preference.tsx` with a `ScrollView`. The picker already handles selection state correctly — only the container needs to scroll.
+
+**Files:**
+- `apps/mobile/src/components/common/AnalogyDomainPicker.tsx` — 7 options in `<View>`
+- `apps/mobile/src/app/(learner)/onboarding/analogy-preference.tsx` — picker container `<View className="flex-1 px-5">`
+- `apps/mobile/e2e/flows/onboarding/analogy-preference-flow.yaml` — `scrollUntilVisible` for gaming fails
+
+---
+
+## BUG-57: consent-pending-gate Text Assertion Failure — PreviewSubjectBrowser (2026-03-13)
+
+**Status:** Open (needs investigation — regression from Session 18)
+**Severity:** Medium — flow was PASSING in Session 18
+**Affects:** `consent-pending-gate.yaml` (FAIL at step 14)
+
+The flow fails at:
+```yaml
+- assertVisible:
+    text: "Here's a preview of what you can learn."
+```
+
+The `PreviewSubjectBrowser` component (`_layout.tsx:172-174`) renders:
+```
+Here's a preview of what you can learn. You'll unlock these once your parent approves.
+```
+
+The full text is a single `<Text>` node containing both sentences. The assertion matches only the first sentence. This passed in Session 18 with identical code — no changes to `_layout.tsx` between sessions.
+
+**Possible causes:**
+1. **Maestro text matching inconsistency** — substring matching may have failed due to emulator rendering timing or accessibility tree state. Related to BUG-49 pattern.
+2. **Screen not fully rendered** — the `PreviewSubjectBrowser` may not have completed rendering when the assertion fired.
+
+**Investigation needed:** Re-run the single flow with screenshots to capture the actual screen state at the assertion point. If text matching is the issue, consider using `id`-based assertion instead.
+
+**Note:** No code changes to `_layout.tsx` between Session 18 and Session 20 (`git log --since="2026-03-12" -- "apps/mobile/src/app/(learner)/_layout.tsx"` returns empty).
+
+---
+
+## BUG-58: Pre-Profile Accounts — "Profile" Not Visible on More Tab (2026-03-13)
+
+**Status:** Open (needs investigation — regression from Session 18)
+**Severity:** Medium — 2 flows affected, both PASSING in Session 18
+**Affects:** `coppa-flow.yaml` (FAIL at step 5), `profile-creation-consent.yaml` (FAIL at step 5)
+
+Both flows use the `pre-profile` seed scenario (Clerk user + account, no profile). After sign-in, they navigate: `tab-more` → wait for `text: "Profile"` → tap "Profile" → "No profiles yet" → "Create profile".
+
+The failure occurs at:
+```yaml
+- extendedWaitUntil:
+    visible:
+      text: "Profile"
+    timeout: 10000
+```
+
+**Code analysis:**
+- `more.tsx:274-278` — The "Profile" `SettingsRow` is rendered **unconditionally** (no `activeProfile` guard)
+- `_layout.tsx:640` — `tab-more` testID exists and is rendered for all authenticated users
+- `_layout.tsx:573-596` — None of the consent gates trigger for `null` activeProfile (all check `activeProfile?.consentStatus`)
+- No code changes to `more.tsx` or `(learner)/_layout.tsx` between sessions
+
+**Possible causes:**
+1. **Race condition** — Profile loading state (`isProfileLoading`) returns `null` layout briefly, then the More tab renders but Maestro's assertion window may have expired
+2. **Maestro text matching** — "Profile" appears as `SettingsRow` label; if the row renders with Clerk display name alongside, Maestro may not isolate the "Profile" text node (BUG-49 pattern)
+3. **Tab navigation timing** — After `tapOn: id: tab-more`, the More screen may not be fully rendered within 10s on WHPX emulator
+
+**Investigation needed:** Re-run one of the flows with increased timeout and screenshots before/after `tab-more` tap. Check if the More screen renders at all, or if a gate/redirect is intercepting.
