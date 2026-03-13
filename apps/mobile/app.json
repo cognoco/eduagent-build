@@ -75,8 +75,7 @@
         {
           "microphonePermission": "MentoMate needs microphone access for voice-based learning."
         }
-      ],
-      "react-native-purchases"
+      ]
     ],
     "extra": {
       "eas": {
