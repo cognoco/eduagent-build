@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { useSubmitSummary } from '../../hooks/use-sessions';
@@ -94,6 +95,15 @@ export default function SessionSummaryScreen() {
         style={{ paddingTop: insets.top + 8 }}
       >
         <View className="flex-row items-center">
+          <Pressable
+            onPress={handleContinue}
+            className="me-2 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
+            accessibilityLabel="Close and go home"
+            accessibilityRole="button"
+            testID="summary-close-button"
+          >
+            <Ionicons name="close" size={24} color={colors.textPrimary} />
+          </Pressable>
           <CelebrationAnimation
             size={36}
             color={colors.success}
