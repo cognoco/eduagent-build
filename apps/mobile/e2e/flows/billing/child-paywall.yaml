@@ -44,10 +44,11 @@ tags:
       text: "Appearance"
     timeout: 10000
 
-# 5. Tap Subscription
-- extendedWaitUntil:
-    visible:
+# 5. Scroll to Subscription (may be below fold after switch-to-child scrolled to Profile)
+- scrollUntilVisible:
+    element:
       text: "Subscription"
+    direction: DOWN
     timeout: 10000
 
 - tapOn:

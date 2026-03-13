@@ -220,6 +220,16 @@ export default function SignUpScreen() {
               testID="sign-up-back-from-verify"
             />
           </View>
+
+          <View className="flex-row justify-center mt-2">
+            <Button
+              variant="tertiary"
+              size="small"
+              label="Back to sign in"
+              onPress={() => router.push('/(auth)/sign-in')}
+              testID="verify-back-to-sign-in"
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     );

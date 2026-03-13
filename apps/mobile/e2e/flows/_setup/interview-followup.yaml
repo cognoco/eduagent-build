@@ -1,0 +1,9 @@
+# Helper: Send a follow-up response during an interview
+# Used when the LLM asks for more details before completing the interview.
+# Accepts ${FOLLOWUP_MESSAGE} env var with the response text.
+appId: com.mentomate.app
+---
+- tapOn:
+    id: "chat-input"
+- inputText: ${FOLLOWUP_MESSAGE}
+- pressKey: Enter

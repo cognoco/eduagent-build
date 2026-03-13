@@ -196,6 +196,16 @@ export default function ForgotPasswordScreen() {
               testID="reset-back-from-code"
             />
           </View>
+
+          <View className="flex-row justify-center mt-2">
+            <Button
+              variant="tertiary"
+              size="small"
+              label="Back to sign in"
+              onPress={() => router.push('/(auth)/sign-in')}
+              testID="reset-back-to-sign-in"
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     );

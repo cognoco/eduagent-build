@@ -175,6 +175,12 @@ tags:
 - takeScreenshot: settings-theme-parent-redirect
 
 # 21. Switch back to Teen via dev-only button on parent dashboard
+# The button is below the fold on parent dashboard — scroll to it first
+- scrollUntilVisible:
+    element:
+      id: "switch-to-teen"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: "switch-to-teen"
 

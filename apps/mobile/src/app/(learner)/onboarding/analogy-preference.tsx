@@ -52,6 +52,15 @@ export default function AnalogyPreferenceScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       {/* Header */}
       <View className="px-5 pt-4 pb-3">
+        <Pressable
+          onPress={() => router.back()}
+          className="mb-3 min-w-[44px] min-h-[44px] justify-center self-start"
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+          testID="analogy-back-button"
+        >
+          <Text className="text-primary text-body font-semibold">Back</Text>
+        </Pressable>
         <Text
           className="text-h2 font-bold text-text-primary"
           testID="analogy-preference-title"

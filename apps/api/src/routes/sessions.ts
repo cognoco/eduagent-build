@@ -13,6 +13,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import { streamSSE } from 'hono/streaming';
+import { captureException } from '../services/sentry';
 import {
   startSession,
   SubjectInactiveError,
@@ -179,21 +180,36 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         body
       );
 
-      // Dispatch background job for retention, streaks, coaching
-      await inngest.send({
-        name: 'app/session.completed',
-        data: {
+      // Dispatch background job for retention, streaks, coaching.
+      // Wrapped in try-catch so the synchronous close response succeeds even
+      // if Inngest is temporarily unavailable (local dev without dev server,
+      // or transient network failure in production).
+      try {
+        await inngest.send({
+          name: 'app/session.completed',
+          data: {
+            profileId,
+            sessionId: result.sessionId,
+            topicId: result.topicId,
+            subjectId: result.subjectId,
+            sessionType: result.sessionType,
+            verificationType: result.verificationType,
+            interleavedTopicIds: result.interleavedTopicIds,
+            summaryStatus: body.summaryStatus,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      } catch (err) {
+        captureException(err, {
           profileId,
-          sessionId: result.sessionId,
-          topicId: result.topicId,
-          subjectId: result.subjectId,
-          sessionType: result.sessionType,
-          verificationType: result.verificationType,
-          interleavedTopicIds: result.interleavedTopicIds,
-          summaryStatus: body.summaryStatus,
-          timestamp: new Date().toISOString(),
-        },
-      });
+          extra: { sessionId: result.sessionId },
+        });
+        console.warn(
+          `[sessions] Failed to dispatch session.completed event for ${
+            result.sessionId
+          }: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
 
       // Check if we should prompt the learner to switch to Casual Explorer
       const promptCasualSwitch = await shouldPromptCasualSwitch(db, profileId);

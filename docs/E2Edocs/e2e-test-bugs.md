@@ -224,25 +224,21 @@ Tapping "Parent (Light)" theme button changes persona to `parent`, triggering th
 
 ---
 
-## BUG-18: Persona Switch Crashes App (~50% of the time) (2026-03-10)
+## BUG-18: Persona Switch — `switch-to-teen` Button Below Fold (2026-03-10, updated 2026-03-12)
 
-**Status:** FIXED (2026-03-11) — `router.replace` before deferred `setPersona` prevents layout guard race.
-**Severity:** High — crashes app, corrupts emulator state. **Affects real users.**
-**Affects:** `settings-toggles.yaml` (Parent theme section), any flow using persona switch
+**Status:** FIXED (2026-03-12, Session 17) — `scrollUntilVisible` added before `switch-to-teen` tap.
+**Severity:** Medium — E2E test failure, not a crash. No real user impact.
+**Affects:** `settings-toggles.yaml` (Parent theme section)
 
-After tapping "Switch to Teen view (demo)" button on the parent dashboard, the app crashes to the Android home screen approximately 50% of the time. The crash corrupts Maestro's driver connection, requiring an emulator cold restart.
+Originally reported as a ~50% crash on persona switch. Crash was fixed in Session 11 (`router.replace` before deferred `setPersona`). Residual failure in Session 14 was actually a **scroll issue**: the `switch-to-teen` dev button on the parent dashboard was below the visible fold. Maestro's `tapOn` couldn't find it without scrolling first.
 
-**Root cause:** `setPersona('teen')` in `(parent)/dashboard.tsx:170` triggers a re-render cascade through Expo Router's layout guards. The `(learner)/_layout.tsx` detects persona change and redirects, while simultaneously the `(parent)` layout may also be redirecting. This creates a navigation race condition that crashes the React Navigation tree.
+**Root cause (original crash):** `setPersona('teen')` in `(parent)/dashboard.tsx:170` triggered a re-render cascade through Expo Router's layout guards. Fixed by coordinating `router.replace` with `setPersona`.
 
-**Reproduction:**
-1. Sign in → navigate to More → tap "Parent (Light)" → lands on parent dashboard
-2. Tap "Switch to Teen view (demo)" → app crashes ~50% of the time
+**Root cause (Session 14 residual failure):** The `switch-to-teen` button is rendered near the bottom of the parent dashboard `ScrollView`. On the 1080x1920 emulator, it's below the fold. Maestro's `tapOn` only searches the visible viewport.
 
-**Mitigation (flow-level):** Parent theme test moved to end of `settings-toggles.yaml` so the crash can't affect earlier validations.
+**Fix:** Added `scrollUntilVisible` before the `tapOn: id: "switch-to-teen"` step in `settings-toggles.yaml`.
 
-**Proper fix needed (code-only, no emulator required):** The `setPersona()` call needs to be coordinated with navigation — e.g., call `router.replace('/(learner)/home')` **before** or **simultaneously with** `setPersona('teen')` using a single `startTransition` or `InteractionManager.runAfterInteractions`, so the layout guard doesn't race with the persona state change. Alternatively, `setPersona()` + `router.replace()` can be wrapped in `unstable_batchedUpdates` (or React 18's automatic batching) to ensure both state changes commit in one render cycle.
-
-**Files:** `apps/mobile/src/app/(parent)/dashboard.tsx` (line ~170, "Switch to Teen" handler), `apps/mobile/src/app/(learner)/_layout.tsx` (line ~575, persona guard redirect).
+**Files:** `apps/mobile/e2e/flows/account/settings-toggles.yaml` (step 21).
 
 ---
 
@@ -439,7 +435,7 @@ When the mobile app sends API requests without an `X-Profile-Id` header, `profil
 
 ## BUG-26: `trial-active` Seed Scenario Fails — DB Schema Drift (2026-03-10)
 
-**Status:** Open (seed infrastructure bug)
+**Status:** Fix available — runtime only (`pnpm run db:push:dev`)
 **Severity:** High — blocks 2 billing E2E flows
 **Affects:** `billing/subscription-details.yaml`, `billing/child-paywall.yaml`
 
@@ -459,7 +455,7 @@ column "revenuecat_original_app_user_id" of relation "subscriptions" does not ex
 
 ## BUG-27: Consent-Withdrawn Gate Not Rendered After Sign-In (2026-03-10)
 
-**Status:** Open (profile resolution mismatch — root cause confirmed)
+**Status:** FIXED (Session 15 — flow updated to use `consent-withdrawn-solo` scenario)
 **Severity:** High — blocks consent E2E flows
 **Affects:** `consent/consent-withdrawn-gate.yaml`
 
@@ -484,7 +480,7 @@ The flow returns `profileId: childProfileId` from the seed, but the mobile clien
 
 ## BUG-28: Post-Approval Landing Not Rendered After Sign-In (2026-03-10)
 
-**Status:** Open (flow design issue or app logic gap)
+**Status:** FIXED (BUG-38 confirmed PostApprovalLanding renders for `onboarding-complete`; no `isOwner` check)
 **Severity:** Medium — blocks 1 consent E2E flow
 **Affects:** `consent/post-approval-landing.yaml`
 
@@ -760,7 +756,7 @@ When the keyboard opens on the session/chat screen, the app's input bar (TextInp
 
 ## BUG-36: `freeform-session` Flow Expects Wrong Coaching Card Layout (2026-03-11)
 
-**Status:** Open (flow design issue)
+**Status:** FIXED (flow updated to use `coaching-card-primary` testID instead of text tap)
 **Severity:** Low — 1 flow affected
 **Affects:** `learning/freeform-session.yaml`
 
@@ -776,7 +772,7 @@ The flow taps `"Just ask something"` text, expecting the AdaptiveEntryCard's tee
 
 ## BUG-37: `session-summary` Flow Can't Find `end-session-button` (2026-03-11)
 
-**Status:** Open (flow design + possible app issue)
+**Status:** Dependent on BUG-47 — flow is correct, LLM reliability blocks it
 **Severity:** Low — 1 flow affected
 **Affects:** `learning/session-summary.yaml`
 
@@ -866,7 +862,7 @@ The More tab shows APPEARANCE, ACCENT COLOR, NOTIFICATIONS, and LEARNING MODE se
 
 ## BUG-43: Coaching Card Auto-Navigation After PostApprovalLanding Dismissal (2026-03-11)
 
-**Status:** Open (setup flow + scenario interaction issue)
+**Status:** Workaround applied (Back press guard in seed-and-sign-in.yaml); auto-navigation not reproducible in code review — coaching card components are purely presentational with no useEffect-based auto-nav
 **Severity:** HIGH — blocks 4+ flows
 **Affects:** `homework/homework-flow.yaml`, `homework/camera-ocr.yaml`, `retention/retention-review.yaml`, `retention/failed-recall.yaml`, and any flow using a scenario with active sessions/retention cards + CONSENTED status
 
@@ -929,7 +925,7 @@ Maestro `assertVisible: text: "learning coach"` fails even when the AI opening m
 
 ## BUG-47: Gemini LLM Intermittently Fails/Hangs During E2E Runs (2026-03-11)
 
-**Status:** Open — environment issue, not an app bug
+**Status:** Partially mitigated — retry logic added to `routeAndCall()` (non-streaming). Streaming paths rely on circuit breaker + fallback. Environment issue persists for Gemini-only deployments without OpenAI fallback.
 **Severity:** High — blocks all interview-dependent flows
 **Affects:** `onboarding/analogy-preference-flow.yaml`, `onboarding/curriculum-review-flow.yaml`, any flow requiring LLM responses
 
@@ -946,9 +942,13 @@ During Session 12 (and previously in Sessions 10-11), the Gemini LLM API (`gemin
 
 **Impact:** The `view-curriculum-button` never appears → analogy preference and curriculum review flows can't proceed past the interview screen. All flow logic before the LLM call is validated and working.
 
-**Possible mitigations:**
+**Mitigations applied (Session 19):**
+- **Retry logic added to `routeAndCall()`** — up to 3 attempts with exponential backoff (1s, 2s delays) before recording circuit breaker failure. Helps non-streaming LLM calls (coaching card precompute, session-completed chain).
+- **Retry also added to fallback provider path** (`attemptProvider`) — fallback calls also retry before giving up.
+
+**Remaining mitigations (not yet applied):**
 1. Add LLM health probe to `/v1/health` (actual Gemini ping, not just config check)
-2. Add retry logic in interview service for transient LLM failures
+2. For E2E streaming: configure OpenAI as fallback provider (`OPENAI_API_KEY` env var) — eliminates Gemini single point of failure
 3. For E2E: consider a mock/stub LLM mode that returns canned interview responses
 4. For E2E: run interview flows in a retry loop (re-seed + re-run on LLM failure)
 
@@ -1052,3 +1052,55 @@ Even if step 2 were fixed, the ChildPaywall would not render because the active 
 **Files changed:**
 - `e2e/flows/_setup/switch-to-child.yaml` (new)
 - `e2e/flows/billing/child-paywall.yaml` — added profile switch step
+
+## BUG-53: Tab Bar Icons Missing — Ionicons Font Not Loading (2026-03-12)
+
+**Severity:** Medium (visual only — navigation labels still visible)
+**Status:** FIXED (Session 19 — added `...Ionicons.font` to `useFonts()` in root `_layout.tsx`)
+
+Tab bar icons render as empty squares with X marks (broken font glyphs) instead of Ionicons. Affects all tabs: Home, Learning Book, More, and the hidden dev-only route tabs (session, topic, homework, subject). The text labels ("Ho...", "Lea...", "More") are visible and truncated but functional.
+
+**Root cause hypothesis:** Ionicons vector font not loaded in the dev-client APK. Expo's `@expo/vector-icons` bundles Ionicons as a font asset. On debug builds served by Metro, the font may not be pre-loaded before the tab bar renders. Alternatively, the font asset path may be broken on the WHPX emulator.
+
+**Why tests pass:** Jest doesn't render actual fonts — it only checks the component tree. The `Ionicons` component renders a `<Text>` node with a font glyph codepoint, which Jest sees as present regardless of whether the font file loads.
+
+**Impact on E2E:** No direct impact — Maestro navigates via `testID` not icon recognition. Visual-only bug.
+
+**Fix applied (Session 19):** Added `import Ionicons from '@expo/vector-icons/Ionicons'` and `...Ionicons.font` to the `useFonts()` call in `apps/mobile/src/app/_layout.tsx`. This ensures the Ionicons font is explicitly loaded alongside the Atkinson Hyperlegible custom fonts before the splash screen is dismissed. The root layout's existing font gate (`if (!fontsLoaded) return null`) ensures no tabs render before Ionicons is available.
+
+## BUG-54: Session Close Fails — `inngest.send()` Throws Without Inngest Dev Server (2026-03-12)
+
+**Severity:** High (blocks session-summary and all session close flows in E2E)
+**Status:** FIXED (2026-03-12) — wrapped `inngest.send()` in try-catch in `routes/sessions.ts`
+
+After streaming works and 3 exchanges complete, tapping "End Session" → confirm shows error dialog: "Failed to close session. Please try again." The `POST /v1/sessions/:sessionId/close` handler calls `inngest.send()` (line 183 of `routes/sessions.ts`) to dispatch the `app/session.completed` background event. Without the Inngest dev server running (port 8288), this throws a network error that crashes the entire endpoint.
+
+**Root cause:** `inngest.send()` is not wrapped in a try-catch. In local dev without Inngest running, the network error propagates to the Hono error handler, returning a 500 to the client. The mobile `useCloseSession` hook catches this and shows the "Failed to close" alert.
+
+**Fix options:**
+1. **Start Inngest dev server** for E2E sessions: `npx inngest-cli@latest dev` (port 8288). Add to the E2E operational checklist.
+2. **Wrap `inngest.send()` in try-catch** in the close handler — log warning but don't fail the response. The background job is important but shouldn't block the synchronous session close. This would also improve production resilience if Inngest is temporarily unavailable.
+3. Both — fix the code AND add Inngest to the E2E checklist.
+
+**Affects:** `session-summary.yaml`, `core-learning.yaml`, `first-session.yaml`, `freeform-session.yaml`, `homework-flow.yaml` — any flow that closes a session.
+
+---
+
+## BUG-55: Clerk Email Verification Blocks Pre-Auth E2E Flows (2026-03-12)
+
+**Status:** FIXED (2026-03-12) — bypassed via `pre-profile` and `consent-pending` seed scenarios
+**Severity:** High — was blocking 4 flows from achieving full PASS
+**Affects:** `coppa-flow.yaml`, `profile-creation-consent.yaml`, `consent-pending-gate.yaml` (FIXED). `sign-up-flow.yaml` remains PARTIAL (intentionally — tests sign-up UI itself).
+
+After submitting the sign-up form with valid email + password, Clerk sends a 6-digit verification code to the email address. The verification screen (`sign-up-code` testID) renders correctly. However, entering the test code "424242" and tapping "Verify" results in "Incorrect code" — Clerk dev mode does NOT auto-verify or accept a fixed test code.
+
+**Root cause:** Clerk's email verification is a server-side check against a real code sent via email. Development mode provides no bypass mechanism for automated testing. The emails are sent to `*@example.com` addresses (which don't have real inboxes), so the codes cannot be retrieved.
+
+**Fix implemented (solution 2):** Two new seed scenarios added to `test-seed.ts`:
+
+- **`pre-profile`** — Creates Clerk user + DB account, but NO profile. Flows sign in (bypassing sign-up + verification), then navigate to create-profile via More → Profiles → "Create first profile". Used by `coppa-flow.yaml` and `profile-creation-consent.yaml`.
+- **`consent-pending`** — Creates Clerk user + account + TEEN profile with `PARENTAL_CONSENT_REQUESTED` consent status. The learner layout renders `ConsentPendingGate` directly. Used by `consent-pending-gate.yaml`.
+
+Both scenarios call `createClerkTestUser()` which uses Clerk's Backend API to create pre-verified users server-side — no email verification needed.
+
+**Remaining limitation:** `sign-up-flow.yaml` stays PARTIAL because it intentionally tests the sign-up form UI (email, password, "Create account" button, verification screen). Post-verification steps remain `optional: true`. This is acceptable — the sign-up UI coverage is still valuable.

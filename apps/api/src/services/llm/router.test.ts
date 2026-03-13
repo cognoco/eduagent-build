@@ -27,6 +27,28 @@ function createFailingStreamProvider(id: string): LLMProvider {
   };
 }
 
+/** Mock provider whose chat() fails N times then succeeds. */
+function createTransientFailProvider(
+  id: string,
+  failCount: number
+): LLMProvider & { callCount: number } {
+  const base = createMockProvider(id);
+  let calls = 0;
+  return {
+    ...base,
+    get callCount() {
+      return calls;
+    },
+    async chat(...args: Parameters<LLMProvider['chat']>): Promise<string> {
+      calls++;
+      if (calls <= failCount) {
+        throw new Error(`Transient failure #${calls}`);
+      }
+      return base.chat(...args);
+    },
+  };
+}
+
 // Register mock as 'gemini' so getModelConfig routing works
 beforeAll(() => {
   registerProvider(createMockProvider('gemini'));
@@ -165,6 +187,82 @@ describe('LLM Router', () => {
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('failed before first byte, trying fallback')
       );
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe('routeAndCall retry on transient failure', () => {
+    afterEach(() => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    it('retries and succeeds after transient failure', async () => {
+      const flaky = createTransientFailProvider('gemini', 1);
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(flaky);
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const result = await routeAndCall([{ role: 'user', content: 'test' }], 1);
+
+      expect(result.response).toContain('Mock response');
+      expect(result.provider).toBe('gemini');
+      // First call fails, second succeeds → 2 total calls
+      expect(flaky.callCount).toBe(2);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('attempt 1 failed, retrying')
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('retries twice then succeeds on third attempt', async () => {
+      const flaky = createTransientFailProvider('gemini', 2);
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(flaky);
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const result = await routeAndCall([{ role: 'user', content: 'test' }], 1);
+
+      expect(result.response).toContain('Mock response');
+      expect(flaky.callCount).toBe(3);
+      warnSpy.mockRestore();
+    });
+
+    it('exhausts retries then falls back to secondary provider', async () => {
+      const flaky = createTransientFailProvider('gemini', 5); // always fails
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(flaky);
+      registerProvider(createMockProvider('openai'));
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const result = await routeAndCall([{ role: 'user', content: 'test' }], 1);
+
+      // Falls back to openai after gemini retries exhausted
+      expect(result.provider).toBe('openai');
+      // 3 total gemini attempts (1 + 2 retries)
+      expect(flaky.callCount).toBe(3);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('failed after retries, trying fallback')
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('exhausts retries and throws when no fallback available', async () => {
+      const flaky = createTransientFailProvider('gemini', 5);
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(flaky);
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      await expect(
+        routeAndCall([{ role: 'user', content: 'test' }], 1)
+      ).rejects.toThrow('Transient failure');
+
+      expect(flaky.callCount).toBe(3);
       warnSpy.mockRestore();
     });
   });

@@ -40,7 +40,7 @@ function createMockDb(): Database {
 // ---------------------------------------------------------------------------
 
 describe('VALID_SCENARIOS', () => {
-  it('contains all 14 expected scenarios', () => {
+  it('contains all 16 expected scenarios', () => {
     expect(VALID_SCENARIOS).toEqual([
       'onboarding-complete',
       'onboarding-no-subject',
@@ -56,6 +56,8 @@ describe('VALID_SCENARIOS', () => {
       'consent-withdrawn',
       'consent-withdrawn-solo',
       'parent-solo',
+      'pre-profile',
+      'consent-pending',
     ]);
   });
 

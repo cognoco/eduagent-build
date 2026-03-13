@@ -41,7 +41,7 @@ jest.mock('../lib/api', () => ({
 
 jest.mock('../lib/sse', () => ({
   parseSSEStream: jest.fn(),
-  streamSSE: jest.fn(),
+  streamSSEViaXHR: jest.fn(),
 }));
 
 jest.mock('../lib/profile', () => ({
@@ -370,20 +370,18 @@ describe('useStreamMessage', () => {
   });
 
   it('uses overrideSessionId when provided, ignoring hook sessionId', async () => {
-    const { parseSSEStream } = require('../lib/sse') as {
-      parseSSEStream: jest.Mock;
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
     };
 
-    // Mock fetch to return OK response
-    mockFetch.mockResolvedValueOnce(new Response('stream', { status: 200 }));
-
-    // Mock parseSSEStream to yield chunk + done events
-    parseSSEStream.mockReturnValueOnce(
-      (async function* () {
+    // Mock streamSSEViaXHR to return events async generator + abort handle
+    streamSSEViaXHR.mockReturnValueOnce({
+      events: (async function* () {
         yield { type: 'chunk', content: 'Hello' };
         yield { type: 'done', exchangeCount: 1, escalationRung: 1 };
-      })()
-    );
+      })(),
+      abort: jest.fn(),
+    });
 
     // Hook initialized with empty string (simulating no session yet)
     const { result } = renderHook(() => useStreamMessage(''), {
@@ -398,10 +396,9 @@ describe('useStreamMessage', () => {
       await result.current.stream('Hello', onChunk, onDone, 'real-session-id');
     });
 
-    // Should have called API (wouldn't be called if sessionId was '')
-    expect(mockFetch).toHaveBeenCalled();
-    // Verify the URL contains the override session ID
-    const [url] = mockFetch.mock.calls[0] as [string, ...unknown[]];
+    // Should have called streamSSEViaXHR with URL containing the override session ID
+    expect(streamSSEViaXHR).toHaveBeenCalled();
+    const [url] = streamSSEViaXHR.mock.calls[0] as [string, ...unknown[]];
     expect(url).toContain('real-session-id');
     expect(onDone).toHaveBeenCalledWith({
       exchangeCount: 1,

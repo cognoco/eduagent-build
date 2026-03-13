@@ -1,3 +1,12 @@
+# DEPRECATED: Use run-without-seed.sh instead for pre-auth flows.
+# This flow uses Maestro's launchApp which is unreliable on WHPX (BUG-19).
+# run-without-seed.sh handles ADB launch + Metro + bundle + overlays, then
+# Maestro starts from the sign-in screen. All flows that previously used
+# this file now wait for "Welcome back" text directly.
+#
+# Kept for non-WHPX environments (real devices, KVM emulators).
+#
+# Original description:
 # Launch dev-client and connect to Metro
 # BUG-19: clearState moved to seed-and-run.sh (Maestro clearState unreliable).
 # Assumes app state was already cleared via ADB by the caller script.
