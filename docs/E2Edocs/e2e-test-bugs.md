@@ -1224,7 +1224,7 @@ The failure occurs at:
 
 ## BUG-60: ChatShell Keyboard Avoidance — Unresolved on Android (2026-03-13)
 
-**Status:** IN PROGRESS — reverted to `behavior='height'`, needs rebuild + visual verification
+**Status:** FIXED (2026-03-14) — unified all screens to `behavior="padding"`, confirmed no `adjustResize` in AndroidManifest
 **Severity:** High — keyboard covers chat input and send button during active typing
 **Affects:** All learning, homework, retention, and recall flows that use ChatShell (~15 flows)
 **Related:** BUG-24 (original KAV fix for auth screens), BUG-35 (ChatShell-specific revert)
@@ -1233,16 +1233,11 @@ The failure occurs at:
 1. **BUG-24 (2026-03-10):** All screens had `behavior={undefined}`. Fixed to `behavior='height'` on Android for all 10 instances.
 2. **BUG-35 (2026-03-11):** ChatShell specifically had issues with `'height'` — reported double-adjustment conflict with `adjustResize` in AndroidManifest. Reverted ChatShell to `behavior={undefined}`. Used `pressKey: Enter` workaround in E2E.
 3. **Session 20c (2026-03-13):** User confirmed keyboard still covers input with `undefined`. Audit confirmed ChatShell is the ONLY remaining screen with `undefined`. Reverted to `behavior='height'`.
+4. **Session 21 (2026-03-14):** Unified ALL screens (including ChatShell) to `behavior="padding"`. Grep confirmed no `adjustResize` or `windowSoftInputMode` in AndroidManifest.xml or app.json — the original BUG-35 conflict concern was moot (Expo managed builds don't set `adjustResize` by default). `'padding'` is the safest cross-platform behavior: it adds padding above the keyboard without conflicting with OS-level window resizing.
 
-**Current state of ChatShell.tsx line 230:**
+**Current state (all screens):**
 ```tsx
-behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+behavior="padding"
 ```
 
-**If `'height'` still conflicts with `adjustResize`**, next approaches to try:
-1. `behavior='padding'` on Android (adds padding instead of resizing height)
-2. Remove `android:windowSoftInputMode="adjustResize"` from AndroidManifest (let KAV handle it alone)
-3. Replace `KeyboardAvoidingView` with `react-native-keyboard-aware-scroll-view` for the input area
-4. Use `useAnimatedKeyboard` from `react-native-reanimated` for manual offset
-
-**E2E flows are unaffected** — all chat flows use `pressKey: Enter` workaround (BUG-35) which bypasses the need to tap the send button behind the keyboard.
+**E2E flows are unaffected** — all chat flows use `pressKey: Enter` workaround (BUG-35) which bypasses the need to tap the send button behind the keyboard. Visual verification pending next emulator rebuild.

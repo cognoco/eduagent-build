@@ -36,8 +36,10 @@ tags:
     id: "coaching-card"
 
 # ── Negative assertions: empty state must not appear ───────────────────
+# Full text match required — Maestro on Android can't reliably match substrings
+# inside React Native <Text> nodes (BUG-57 pattern).
 - assertNotVisible:
-    text: "Start learning"
+    text: "Start learning — add your first subject"
 
 # 3. Start session via coaching card
 - tapOn:

@@ -36,10 +36,11 @@ tags:
     id: "tab-more"
 
 # ── Visual integrity: dashboard heading ────────────────────────────────
-# Parent dashboard must show "Your Children" or similar heading with real data.
+# Parent dashboard shows "Home" heading + "How your children are doing" subtitle.
 - assertVisible:
-    text: "Your Children"
-    optional: true
+    text: "Home"
+- assertVisible:
+    text: "How your children are doing"
 
 # 3. Verify children list is visible — look for child display name
 - extendedWaitUntil:

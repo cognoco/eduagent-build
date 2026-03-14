@@ -61,10 +61,10 @@ tags:
 # ── Negative assertions: empty-state must NOT appear with real data ───
 # If seeded with subjects, the empty-state placeholder must not render.
 # Catches counter mismatch bugs where data loads but empty UI shows.
+# Full text match required — Maestro on Android can't reliably match substrings
+# inside React Native <Text> nodes (BUG-57 pattern).
 - assertNotVisible:
-    text: "Start learning"
-- assertNotVisible:
-    text: "Add your first subject"
+    text: "Start learning — add your first subject"
 
 # 5. Navigate to Learning Book tab
 - tapOn: "Learning Book Tab"
