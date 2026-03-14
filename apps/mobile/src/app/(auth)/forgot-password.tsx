@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { useSignIn } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
@@ -14,6 +15,8 @@ import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
+
+const SCREEN_HEIGHT = Dimensions.get('screen').height;
 
 export default function ForgotPasswordScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -112,7 +115,7 @@ export default function ForgotPasswordScreen() {
         <ScrollView
           className="flex-1"
           contentContainerStyle={{
-            flexGrow: 1,
+            minHeight: SCREEN_HEIGHT,
             paddingTop: insets.top + 24,
             paddingBottom: insets.bottom + 24,
             paddingHorizontal: 24,
@@ -219,7 +222,7 @@ export default function ForgotPasswordScreen() {
       <ScrollView
         className="flex-1"
         contentContainerStyle={{
-          flexGrow: 1,
+          minHeight: SCREEN_HEIGHT,
           paddingTop: insets.top + 24,
           paddingBottom: insets.bottom + 24,
           paddingHorizontal: 24,

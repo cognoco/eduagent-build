@@ -8,6 +8,7 @@ import {
   Platform,
   ScrollView,
   Modal,
+  Dimensions,
 } from 'react-native';
 import DateTimePicker, {
   type DateTimePickerEvent,
@@ -20,6 +21,8 @@ import { useProfile, type Profile } from '../lib/profile';
 import { checkConsentRequirement } from '../hooks/use-consent';
 import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
+
+const SCREEN_HEIGHT = Dimensions.get('screen').height;
 
 type PersonaType = 'TEEN' | 'LEARNER' | 'PARENT';
 
@@ -185,7 +188,7 @@ export default function CreateProfileScreen() {
       <ScrollView
         className="flex-1"
         contentContainerStyle={{
-          flexGrow: 1,
+          minHeight: SCREEN_HEIGHT,
           paddingTop: insets.top + 16,
           paddingBottom: insets.bottom + 24,
           paddingHorizontal: 24,

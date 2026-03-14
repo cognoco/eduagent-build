@@ -6,12 +6,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCreateSubject } from '../hooks/use-subjects';
 import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
+
+const SCREEN_HEIGHT = Dimensions.get('screen').height;
 
 export default function CreateSubjectScreen() {
   const insets = useSafeAreaInsets();
@@ -49,7 +52,7 @@ export default function CreateSubjectScreen() {
       <ScrollView
         className="flex-1"
         contentContainerStyle={{
-          flexGrow: 1,
+          minHeight: SCREEN_HEIGHT,
           paddingTop: insets.top + 16,
           paddingBottom: insets.bottom + 24,
           paddingHorizontal: 24,

@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
@@ -16,6 +17,11 @@ import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
+
+// Use physical screen height (not window) so the content container always
+// overflows the ScrollView after adjustResize shrinks it for the keyboard.
+// This makes the ScrollView scrollable, letting users reach covered inputs.
+const SCREEN_HEIGHT = Dimensions.get('screen').height;
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -108,7 +114,7 @@ export default function SignInScreen() {
       <ScrollView
         className="flex-1"
         contentContainerStyle={{
-          flexGrow: 1,
+          minHeight: SCREEN_HEIGHT,
           paddingTop: insets.top + 24,
           paddingBottom: insets.bottom + 24,
           paddingHorizontal: 24,
@@ -116,10 +122,9 @@ export default function SignInScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
-        {/* Top spacer: pushes form content toward center while keeping ScrollView
-            scrollable when keyboard opens. minHeight prevents full collapse on small
-            screens. Replaces justifyContent:'center' which blocked keyboard scroll
-            (BUG-24). */}
+        {/* Top spacer: pushes form content toward center. minHeight: SCREEN_HEIGHT
+            on the contentContainer ensures the content always overflows the ScrollView
+            after adjustResize shrinks it for the keyboard → scrollable (BUG-24/60). */}
         <View className="flex-1" style={{ minHeight: 40 }} />
         <Text className="text-h2 font-bold text-text-primary mb-1">
           Welcome back
