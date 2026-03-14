@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { useSignUp, useSSO } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
@@ -16,6 +17,10 @@ import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
+import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
+
+// Captured at module load — safe because these screens are portrait-locked.
+const SCREEN_HEIGHT = Dimensions.get('screen').height;
 
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -31,6 +36,12 @@ export default function SignUpScreen() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+  const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
+  const {
+    scrollRef: verifyScrollRef,
+    onFieldLayout: onVerifyFieldLayout,
+    onFieldFocus: onVerifyFieldFocus,
+  } = useKeyboardScroll();
 
   const { startSSOFlow: startGoogleSSO } = useSSO();
   const { startSSOFlow: startAppleSSO } = useSSO();
@@ -144,14 +155,12 @@ export default function SignUpScreen() {
 
   if (pendingVerification) {
     return (
-      <KeyboardAvoidingView
-        className="flex-1 bg-background"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <KeyboardAvoidingView className="flex-1 bg-background" behavior="padding">
         <ScrollView
+          ref={verifyScrollRef}
           className="flex-1"
           contentContainerStyle={{
-            flexGrow: 1,
+            minHeight: SCREEN_HEIGHT,
             paddingTop: insets.top + 24,
             paddingBottom: insets.bottom + 24,
             paddingHorizontal: 24,
@@ -177,19 +186,22 @@ export default function SignUpScreen() {
             </View>
           )}
 
-          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-            Verification code
-          </Text>
-          <TextInput
-            className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
-            placeholder="Enter 6-digit code"
-            placeholderTextColor={colors.muted}
-            keyboardType="number-pad"
-            value={code}
-            onChangeText={setCode}
-            editable={!loading}
-            testID="sign-up-code"
-          />
+          <View onLayout={onVerifyFieldLayout('code')}>
+            <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+              Verification code
+            </Text>
+            <TextInput
+              className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
+              placeholder="Enter 6-digit code"
+              placeholderTextColor={colors.muted}
+              keyboardType="number-pad"
+              value={code}
+              onChangeText={setCode}
+              editable={!loading}
+              testID="sign-up-code"
+              onFocus={onVerifyFieldFocus('code')}
+            />
+          </View>
 
           <Button
             variant="primary"
@@ -236,14 +248,12 @@ export default function SignUpScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-background"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <KeyboardAvoidingView className="flex-1 bg-background" behavior="padding">
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerStyle={{
-          flexGrow: 1,
+          minHeight: SCREEN_HEIGHT,
           paddingTop: insets.top + 24,
           paddingBottom: insets.bottom + 24,
           paddingHorizontal: 24,
@@ -301,35 +311,41 @@ export default function SignUpScreen() {
           <View className="flex-1 h-px bg-border" />
         </View>
 
-        <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-          Email
-        </Text>
-        <TextInput
-          className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
-          autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-          placeholder="you@example.com"
-          placeholderTextColor={colors.muted}
-          value={emailAddress}
-          onChangeText={setEmailAddress}
-          editable={!loading}
-          testID="sign-up-email"
-        />
-
-        <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-          Password
-        </Text>
-        <View className="mb-6">
-          <PasswordInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Create a password"
+        <View onLayout={onFieldLayout('email')}>
+          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+            Email
+          </Text>
+          <TextInput
+            className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+            placeholder="you@example.com"
+            placeholderTextColor={colors.muted}
+            value={emailAddress}
+            onChangeText={setEmailAddress}
             editable={!loading}
-            testID="sign-up-password"
-            showRequirements
-            onSubmitEditing={onSignUpPress}
+            testID="sign-up-email"
+            onFocus={onFieldFocus('email')}
           />
+        </View>
+
+        <View onLayout={onFieldLayout('password')}>
+          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+            Password
+          </Text>
+          <View className="mb-6">
+            <PasswordInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Create a password"
+              editable={!loading}
+              testID="sign-up-password"
+              showRequirements
+              onSubmitEditing={onSignUpPress}
+              onFocus={onFieldFocus('password')}
+            />
+          </View>
         </View>
 
         <Button

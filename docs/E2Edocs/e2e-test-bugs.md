@@ -710,7 +710,8 @@ Additionally, `parent-solo` and `parent-with-children` scenarios create a PARENT
 
 ## BUG-35: Keyboard Covers Chat Input Bar and Send Button in Session Screen (2026-03-10)
 
-**Status:** FIXED (2026-03-11) — changed `ChatShell.tsx` KAV `behavior` from `'height'` to `undefined` on Android. E2E workaround (`pressKey: Enter`) remains in flows as defense-in-depth. Tests pass (28 tests).
+**Status:** RE-OPENED (2026-03-13) — `undefined` was never a real fix (KAV does nothing, keyboard still covers input). Reverted to `behavior='height'` on Android (2026-03-13). Needs verification after rebuild — BUG-35 originally reported `'height'` conflicting with `adjustResize` on FlatList-based ChatShell, but `undefined` leaves keyboard coverage unresolved. If `'height'` still conflicts, next approach: remove `adjustResize` from AndroidManifest for ChatShell screens or switch to `behavior='padding'`.
+**E2E workaround:** `pressKey: Enter` remains in all flows as defense-in-depth.
 **Workaround confirmed:** Session 10 ran 4 chat flows (start-session, core-learning, first-session, recall-review) — all PASS with `pressKey: Enter`.
 **Severity:** Critical — blocks ALL E2E flows that use ChatShell (~15 flows)
 **Affects:** All learning, homework, retention, and recall flows that enter a chat session
@@ -1104,3 +1105,139 @@ After submitting the sign-up form with valid email + password, Clerk sends a 6-d
 Both scenarios call `createClerkTestUser()` which uses Clerk's Backend API to create pre-verified users server-side — no email verification needed.
 
 **Remaining limitation:** `sign-up-flow.yaml` stays PARTIAL because it intentionally tests the sign-up form UI (email, password, "Create account" button, verification screen). Post-verification steps remain `optional: true`. This is acceptable — the sign-up UI coverage is still valuable.
+
+---
+
+## BUG-56: AnalogyDomainPicker Not Scrollable — Gaming Option Clipped (2026-03-13)
+
+**Status:** FIXED (2026-03-13) — ScrollView added to analogy-preference.tsx
+**Severity:** Medium — 7th option not reachable on smaller screens
+**Affects:** `analogy-preference-flow.yaml` (FAIL), `analogy-preference.tsx` screen
+
+The `AnalogyDomainPicker` component renders 7 domain options (none, cooking, sports, building, music, nature, gaming) in a plain `View` container — not a `ScrollView`. On 360x640dp screens (emulator default), the gaming option (7th, index 6) is clipped below the fold.
+
+**Layout math:** Header (~124dp) + Actions (~120dp) = ~244dp overhead. Remaining ~396dp for picker. 7 options × ~72dp each = 504dp needed. Gap: ~108dp.
+
+**Root cause:** `analogy-preference.tsx` wraps the picker in `<View className="flex-1 px-5">` (no scroll). The `AnalogyDomainPicker` component itself uses `<View>` for its container, not `<ScrollView>`.
+
+**E2E impact:** `scrollUntilVisible` cannot scroll a non-scrollable container — Maestro correctly fails.
+
+**Fix needed:** Wrap `AnalogyDomainPicker` or its container in `analogy-preference.tsx` with a `ScrollView`. The picker already handles selection state correctly — only the container needs to scroll.
+
+**Files:**
+- `apps/mobile/src/components/common/AnalogyDomainPicker.tsx` — 7 options in `<View>`
+- `apps/mobile/src/app/(learner)/onboarding/analogy-preference.tsx` — picker container `<View className="flex-1 px-5">`
+- `apps/mobile/e2e/flows/onboarding/analogy-preference-flow.yaml` — `scrollUntilVisible` for gaming fails
+
+---
+
+## BUG-57: consent-pending-gate Text Assertion Failure — PreviewSubjectBrowser (2026-03-13)
+
+**Status:** FIXED (2026-03-13) — full text match + scrollUntilVisible for footer
+**Severity:** Medium — flow was PASSING in Session 18
+**Affects:** `consent-pending-gate.yaml` (FAIL at step 14)
+
+The flow fails at:
+```yaml
+- assertVisible:
+    text: "Here's a preview of what you can learn."
+```
+
+The `PreviewSubjectBrowser` component (`_layout.tsx:172-174`) renders:
+```
+Here's a preview of what you can learn. You'll unlock these once your parent approves.
+```
+
+The full text is a single `<Text>` node containing both sentences. The assertion matches only the first sentence. This passed in Session 18 with identical code — no changes to `_layout.tsx` between sessions.
+
+**Possible causes:**
+1. **Maestro text matching inconsistency** — substring matching may have failed due to emulator rendering timing or accessibility tree state. Related to BUG-49 pattern.
+2. **Screen not fully rendered** — the `PreviewSubjectBrowser` may not have completed rendering when the assertion fired.
+
+**Investigation needed:** Re-run the single flow with screenshots to capture the actual screen state at the assertion point. If text matching is the issue, consider using `id`-based assertion instead.
+
+**Note:** No code changes to `_layout.tsx` between Session 18 and Session 20 (`git log --since="2026-03-12" -- "apps/mobile/src/app/(learner)/_layout.tsx"` returns empty).
+
+---
+
+## BUG-58: Pre-Profile Accounts — "Profile" Not Visible on More Tab (2026-03-13)
+
+**Status:** FIXED (2026-03-13) — scrollUntilVisible + Android date picker OK tap
+**Severity:** Medium — 2 flows affected, both PASSING in Session 18
+**Affects:** `coppa-flow.yaml` (FAIL at step 5), `profile-creation-consent.yaml` (FAIL at step 5)
+
+Both flows use the `pre-profile` seed scenario (Clerk user + account, no profile). After sign-in, they navigate: `tab-more` → wait for `text: "Profile"` → tap "Profile" → "No profiles yet" → "Create profile".
+
+The failure occurs at:
+```yaml
+- extendedWaitUntil:
+    visible:
+      text: "Profile"
+    timeout: 10000
+```
+
+**Code analysis:**
+- `more.tsx:274-278` — The "Profile" `SettingsRow` is rendered **unconditionally** (no `activeProfile` guard)
+- `_layout.tsx:640` — `tab-more` testID exists and is rendered for all authenticated users
+- `_layout.tsx:573-596` — None of the consent gates trigger for `null` activeProfile (all check `activeProfile?.consentStatus`)
+- No code changes to `more.tsx` or `(learner)/_layout.tsx` between sessions
+
+**Possible causes:**
+1. **Race condition** — Profile loading state (`isProfileLoading`) returns `null` layout briefly, then the More tab renders but Maestro's assertion window may have expired
+2. **Maestro text matching** — "Profile" appears as `SettingsRow` label; if the row renders with Clerk display name alongside, Maestro may not isolate the "Profile" text node (BUG-49 pattern)
+3. **Tab navigation timing** — After `tapOn: id: tab-more`, the More screen may not be fully rendered within 10s on WHPX emulator
+
+**Investigation needed:** Re-run one of the flows with increased timeout and screenshots before/after `tab-more` tap. Check if the More screen renders at all, or if a gate/redirect is intercepting.
+
+---
+
+## BUG-59: Tab Bar Overflow — Hidden Routes Render as Visible Tabs (2026-03-13)
+
+**Status:** FIXED (2026-03-13) — added `tabBarItemStyle: { display: 'none' }` to all hidden tabs
+**Severity:** High — visual defect on EVERY screen in the app (learner + parent layouts)
+**Affects:** All flows — the tab bar is visible on every screen except fullscreen (session, homework, onboarding)
+
+**Observed behavior:** The bottom tab bar shows 9 tabs instead of 3. The 6 hidden routes (`onboarding`, `session`, `topic`, `subscription`, `homework`, `subject`) render as visible tab buttons with truncated labels ("ses...", "topi...", "ho...", "sub...") and placeholder rectangle icons (no `tabBarIcon` defined for hidden routes). The 3 real tabs (Home, Learning Book, More) are squeezed to accommodate the extra buttons.
+
+**Screenshot evidence:** Learning Book screen shows tab bar with: `Ho... Lea... More ses... topi... ho... topi... sub... topi...`
+
+**Root cause:** In Expo Router's `<Tabs>`, `href: null` prevents a tab from being a **navigation target** (no deep linking, no programmatic navigation from tab bar), but does NOT remove the tab **button** from the visual layout. The underlying `@react-navigation/bottom-tabs` still allocates space and renders the button.
+
+- `tabBarStyle: { display: 'none' }` (already on `onboarding`, `session`, `homework`) hides the **entire tab bar** when that screen is active — it does NOT hide the tab button when another screen is active
+- `tabBarItemStyle: { display: 'none' }` hides the tab **button** from the bar regardless of which screen is active — this is the correct property
+
+**Fix applied:**
+
+`apps/mobile/src/app/(learner)/_layout.tsx` — Added `tabBarItemStyle: { display: 'none' }` to all 6 hidden `Tabs.Screen` entries:
+- `onboarding` (line 649)
+- `session` (line 656)
+- `topic` (line 663)
+- `subscription` (line 669)
+- `homework` (line 675)
+- `subject` (line 681)
+
+`apps/mobile/src/app/(parent)/_layout.tsx` — Added `tabBarItemStyle: { display: 'none' }` to the hidden `child` tab (line 101).
+
+**Verification:** No direct unit tests for layout files. Fix is purely additive CSS. Needs visual verification after rebuild — tab bar should show exactly 3 tabs (Home, Learning Book, More) with correct icons and full labels.
+
+---
+
+## BUG-60: ChatShell Keyboard Avoidance — Unresolved on Android (2026-03-13)
+
+**Status:** FIXED (2026-03-14) — unified all screens to `behavior="padding"`, confirmed no `adjustResize` in AndroidManifest
+**Severity:** High — keyboard covers chat input and send button during active typing
+**Affects:** All learning, homework, retention, and recall flows that use ChatShell (~15 flows)
+**Related:** BUG-24 (original KAV fix for auth screens), BUG-35 (ChatShell-specific revert)
+
+**History:**
+1. **BUG-24 (2026-03-10):** All screens had `behavior={undefined}`. Fixed to `behavior='height'` on Android for all 10 instances.
+2. **BUG-35 (2026-03-11):** ChatShell specifically had issues with `'height'` — reported double-adjustment conflict with `adjustResize` in AndroidManifest. Reverted ChatShell to `behavior={undefined}`. Used `pressKey: Enter` workaround in E2E.
+3. **Session 20c (2026-03-13):** User confirmed keyboard still covers input with `undefined`. Audit confirmed ChatShell is the ONLY remaining screen with `undefined`. Reverted to `behavior='height'`.
+4. **Session 21 (2026-03-14):** Unified ALL screens (including ChatShell) to `behavior="padding"`. Grep confirmed no `adjustResize` or `windowSoftInputMode` in AndroidManifest.xml or app.json — the original BUG-35 conflict concern was moot (Expo managed builds don't set `adjustResize` by default). `'padding'` is the safest cross-platform behavior: it adds padding above the keyboard without conflicting with OS-level window resizing.
+
+**Current state (all screens):**
+```tsx
+behavior="padding"
+```
+
+**E2E flows are unaffected** — all chat flows use `pressKey: Enter` workaround (BUG-35) which bypasses the need to tap the send button behind the keyboard. Visual verification pending next emulator rebuild.

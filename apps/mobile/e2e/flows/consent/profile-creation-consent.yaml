@@ -72,10 +72,19 @@ tags:
 - tapOn:
     id: "tab-more"
 
-# 5. Wait for More screen, then tap Profile row
+# 5. Wait for More screen heading to render
 - extendedWaitUntil:
     visible:
+      text: "More"
+    timeout: 10000
+
+# BUG-58: "Profile" row is in the Account section, below Appearance + Notifications +
+# Learning Mode — sits at ~716dp on 360x640dp screens (164dp below fold).
+# Must scroll to bring it into view.
+- scrollUntilVisible:
+    element:
       text: "Profile"
+    direction: DOWN
     timeout: 10000
 
 - tapOn:
@@ -113,21 +122,26 @@ tags:
 - tapOn:
     id: "create-profile-birthdate"
 
-# 11. Wait for date picker to appear
+# 11. Wait for date picker dialog
 - extendedWaitUntil:
     visible:
       id: "date-picker"
     timeout: 5000
-    # Optional: Android auto-dismisses on some configs
+    # Optional: Android native dialog may not expose testID to accessibility tree
     optional: true
 
-# 12. Dismiss the date picker (iOS modal "Done" button).
-#     On Android the picker auto-dismisses on date selection.
-#     The default picker value (2010-01-01) gives ~16 years old.
-#     GDPR consent triggers for age < 16 with EU location. At 16, it does not.
+# 12a. iOS: Dismiss date picker via "Done" button
 - tapOn:
     id: "date-picker-done"
-    # Optional: may not appear on Android
+    # Optional: iOS-only — not rendered on Android
+    optional: true
+
+# 12b. Android: Dismiss native DatePickerDialog by tapping "OK" button.
+#      Default date (2010-01-01, ~16 years old). GDPR triggers for age < 16
+#      with EU location — at 16, it does NOT trigger.
+- tapOn:
+    text: "OK"
+    # Optional: only present on Android native date picker dialog
     optional: true
 
 # 13. Verify persona auto-detection hint appears

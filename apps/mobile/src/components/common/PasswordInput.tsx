@@ -12,6 +12,8 @@ interface PasswordInputProps {
   showRequirements?: boolean;
   /** Called when Enter/Return is pressed (e.g. to submit the form) */
   onSubmitEditing?: () => void;
+  /** Called when the inner TextInput receives focus (e.g. for scroll-to-field) */
+  onFocus?: () => void;
 }
 
 export function PasswordInput({
@@ -22,6 +24,7 @@ export function PasswordInput({
   testID,
   showRequirements = false,
   onSubmitEditing,
+  onFocus,
 }: PasswordInputProps) {
   const colors = useThemeColors();
   const [visible, setVisible] = useState(false);
@@ -44,6 +47,7 @@ export function PasswordInput({
           returnKeyType={onSubmitEditing ? 'go' : 'default'}
           onSubmitEditing={onSubmitEditing}
           testID={testID}
+          onFocus={onFocus}
         />
         <Pressable
           onPress={() => setVisible((v) => !v)}

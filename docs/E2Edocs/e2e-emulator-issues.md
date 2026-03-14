@@ -1890,3 +1890,87 @@ None — infrastructure change only.
 | **Deferred** | 1 | recall-review (needs coaching-card precompute) |
 | **Skipped** | 1 | app-launch-expogo (ExpoGo-only) |
 | **Total** | 54 | **94% passing**, 1.9% partial, 1.9% deferred, 1.9% skipped |
+
+---
+
+## Session 20 — Full Regression Run (2026-03-13)
+
+### Context
+
+Full regression run of all 54 E2E flows to verify nothing was broken from the Session 18 baseline (51/54 passing). Ran across three batches:
+- **Batch 1** (`run-all-regression.sh`): 31 flows — emulator crashed after flow 12 (11 PASS, 20 FAIL from crash cascade). Triggered Bluetooth ANR fix.
+- **Batch 4a** (`regression-batch4a.sh`): 12 flows — targeted batch 1 failures + emulator crash victims. 8 PASS, 4 FAIL.
+- **Batch 4b** (`regression-batch4b.sh`): 19 remaining untested flows. 16 PASS, 3 FAIL.
+
+### Emulator Stability Findings
+
+**Major validation: 31 consecutive flows without degradation (~82 minutes).**
+
+After the batch 1 crash, a cold boot + Bluetooth ANR disable resolved all stability issues. The emulator ran batches 4a + 4b (31 flows total) without a single crash, freeze, or degradation. This confirms the operational procedure:
+
+1. **Cold boot** (`emulator @e2e_pixel -no-snapshot-load`) for any suspected emulator instability
+2. **Bluetooth disable** (`adb shell pm disable-user com.android.bluetooth`) — persistent across reboots, eliminates the primary ANR source
+3. **ADB reverse port forwarding** — must be re-established after every cold boot:
+   ```bash
+   adb reverse tcp:8081 tcp:8081  # Metro
+   adb reverse tcp:8082 tcp:8082  # Bundle proxy
+   adb reverse tcp:8787 tcp:8787  # API server
+   ```
+4. **FAST=1 mode viable** — 20s launcher / 60s bundle timeouts sufficient for warmed-up emulator
+
+### Operational Notes
+
+| Item | Finding |
+|------|---------|
+| Bluetooth ANR disable | Confirmed persistent — survived cold boot, no "Bluetooth keeps stopping" dialogs in 82 minutes of testing |
+| ADB reverse after cold boot | `adb reverse --list` was empty after cold boot — must re-run all three `adb reverse tcp:PORT tcp:PORT` commands |
+| FAST mode reliability | All 31 post-fix flows used FAST=1 successfully — no launcher or bundle timeouts |
+| Emulator memory | No degradation over 82 minutes continuous use — WHPX stable with Bluetooth disabled |
+
+### New Bugs
+
+- **BUG-56**: `AnalogyDomainPicker` not scrollable — `scrollUntilVisible` can't reach gaming option on 360x640dp screen (genuine UI bug, needs `ScrollView`)
+- **BUG-57**: consent-pending-gate text assertion failure — `"Here's a preview of what you can learn."` not matched in `PreviewSubjectBrowser` (needs investigation)
+- **BUG-58**: coppa-flow / profile-creation-consent — `"Profile"` not visible on More tab for pre-profile accounts (needs investigation)
+
+### Regressions from Session 18
+
+| Flow | Session 18 | Session 20 | Category |
+|------|-----------|-----------|----------|
+| consent-pending-gate | PASS | FAIL | BUG-57 — text matching |
+| coppa-flow | PASS | FAIL | BUG-58 — pre-profile More tab |
+| profile-creation-consent | PASS | FAIL | BUG-58 — pre-profile More tab |
+| recall-review | DEFERRED | PASS | **Fixed** — now passing |
+
+### Cumulative Status After Session 20 (including 20b bug fixes)
+
+| Category | Count | Details |
+|----------|-------|---------|
+| **Passing** | 50 | 39 confirmed in Session 20/20b + 11 untested (passed in Session 18, no code changes) |
+| **Failing** | 3 | settings-toggles (BUG-18 flaky), curriculum-review (LLM), session-summary (LLM) |
+| **Partial** | 1 | sign-up-flow (BUG-55 — intentional) |
+| **Skipped** | 1 | app-launch-expogo (ExpoGo-only) |
+| **Total** | 55 | 54 flows + 1 SKIP (note: 43 tested in Session 20, 11 carried from Session 18) |
+| **Effective rate** | **91%** tested (39/43), **93%** including untested-but-stable flows (50/54) |
+
+---
+
+## Session 20c — Visual Bug Fixes (2026-03-13)
+
+### Visual issues identified from emulator screenshots
+
+Two visual bugs found during manual screenshot review that affect ALL screens:
+
+1. **Tab bar overflow (BUG-59):** 9 tabs visible instead of 3. Hidden routes (`onboarding`, `session`, `topic`, `subscription`, `homework`, `subject`) render as visible tab buttons with truncated labels and placeholder rectangle icons. Caused by Expo Router's `href: null` not hiding tab buttons visually — only prevents navigation. Fixed with `tabBarItemStyle: { display: 'none' }` on all hidden `Tabs.Screen` entries in both learner and parent layouts.
+
+2. **ChatShell keyboard coverage (BUG-60):** Keyboard covers chat input field and send button on Android. `KeyboardAvoidingView` with `behavior={undefined}` means KAV does nothing. Changed to `behavior='padding'` across ALL screens (Session 21 unified approach). Grep confirmed no `adjustResize` or `windowSoftInputMode` in AndroidManifest.xml or app.json — the original BUG-35 conflict concern was moot (Expo managed builds don't set `adjustResize` by default).
+
+### App code changes
+
+| File | Change | Bug |
+|------|--------|-----|
+| `(learner)/_layout.tsx` | Added `tabBarItemStyle: { display: 'none' }` to 6 hidden tabs | BUG-59 |
+| `(parent)/_layout.tsx` | Added `tabBarItemStyle: { display: 'none' }` to 1 hidden tab | BUG-59 |
+| All 10 KAV screens | Unified to `behavior="padding"` (no platform branching) | BUG-60 |
+
+**Both fixes require APK rebuild or Metro bundle refresh to verify on emulator.**

@@ -72,10 +72,19 @@ tags:
 - tapOn:
     id: "tab-more"
 
-# 5. Wait for More screen to render, then tap Profile row
+# 5. Wait for More screen heading to render
 - extendedWaitUntil:
     visible:
+      text: "More"
+    timeout: 10000
+
+# BUG-58: "Profile" row is in the Account section, below Appearance + Notifications +
+# Learning Mode — sits at ~716dp on 360x640dp screens (164dp below fold).
+# Must scroll to bring it into view.
+- scrollUntilVisible:
+    element:
       text: "Profile"
+    direction: DOWN
     timeout: 10000
 
 - tapOn:
@@ -113,22 +122,26 @@ tags:
 - tapOn:
     id: "create-profile-birthdate"
 
-# 11. Wait for date picker
+# 11. Wait for date picker dialog
 - extendedWaitUntil:
     visible:
       id: "date-picker"
     timeout: 5000
-    # Optional: Android auto-dismisses immediately on some configs
+    # Optional: Android native dialog may not expose testID to accessibility tree
     optional: true
 
-# 12. Dismiss date picker (iOS "Done" button; Android auto-dismisses)
-#     Default date is 2010-01-01 (~16 years old). For COPPA trigger we
-#     would need under 13, but Maestro cannot reliably scroll the native
-#     date picker to a specific year. Steps that depend on COPPA being
-#     triggered (under-13 detection) use optional: true below.
+# 12a. iOS: Dismiss date picker via "Done" button
 - tapOn:
     id: "date-picker-done"
-    # Optional: may not appear on Android (auto-dismiss)
+    # Optional: iOS-only — not rendered on Android
+    optional: true
+
+# 12b. Android: Dismiss native DatePickerDialog by tapping "OK" button.
+#      The dialog shows with default date (2010-01-01, ~16 years old).
+#      Must tap OK to accept and close — dialog does NOT auto-dismiss.
+- tapOn:
+    text: "OK"
+    # Optional: only present on Android native date picker dialog
     optional: true
 
 # 13. Verify persona auto-detection

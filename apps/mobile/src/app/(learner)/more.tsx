@@ -268,6 +268,21 @@ export default function MoreScreen() {
           />
         ))}
 
+        <Pressable
+          onPress={() => router.push('/(learner)/homework/camera')}
+          className="bg-surface rounded-card px-4 py-3.5 mb-2 mt-2"
+          accessibilityLabel="Start homework help session"
+          accessibilityRole="button"
+          testID="homework-help-link"
+        >
+          <Text className="text-body font-semibold text-text-primary">
+            Homework Help
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            Snap a photo and get guided through it step by step
+          </Text>
+        </Pressable>
+
         <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
           Account
         </Text>

@@ -24,8 +24,12 @@ tags:
 - takeScreenshot: subject-01-home-with-subjects
 
 # Tap "Add subject" button (testID: add-subject-button)
-# There are two instances (with subjects / empty state) but both
-# have the same testID and label text.
+# BUG-44 fix: button is below subject cards in home ScrollView
+- scrollUntilVisible:
+    element:
+      id: "add-subject-button"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: "add-subject-button"
 

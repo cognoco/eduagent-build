@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
@@ -16,6 +17,12 @@ import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
+import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
+
+// Use physical screen height (not window) so the content container always
+// overflows the ScrollView after adjustResize shrinks it for the keyboard.
+// This makes the ScrollView scrollable, letting users reach covered inputs.
+const SCREEN_HEIGHT = Dimensions.get('screen').height;
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -28,6 +35,7 @@ export default function SignInScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+  const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
   const { startSSOFlow: startGoogleSSO } = useSSO();
   const { startSSOFlow: startAppleSSO } = useSSO();
@@ -101,14 +109,12 @@ export default function SignInScreen() {
   }, [isLoaded, canSubmit, signIn, setActive, router, emailAddress, password]);
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-background"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <KeyboardAvoidingView className="flex-1 bg-background" behavior="padding">
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerStyle={{
-          flexGrow: 1,
+          minHeight: SCREEN_HEIGHT,
           paddingTop: insets.top + 24,
           paddingBottom: insets.bottom + 24,
           paddingHorizontal: 24,
@@ -116,10 +122,9 @@ export default function SignInScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
-        {/* Top spacer: pushes form content toward center while keeping ScrollView
-            scrollable when keyboard opens. minHeight prevents full collapse on small
-            screens. Replaces justifyContent:'center' which blocked keyboard scroll
-            (BUG-24). */}
+        {/* Top spacer: pushes form content toward center. minHeight: SCREEN_HEIGHT
+            on the contentContainer ensures the content always overflows the ScrollView
+            after adjustResize shrinks it for the keyboard → scrollable (BUG-24/60). */}
         <View className="flex-1" style={{ minHeight: 40 }} />
         <Text className="text-h2 font-bold text-text-primary mb-1">
           Welcome back
@@ -165,34 +170,40 @@ export default function SignInScreen() {
           <View className="flex-1 h-px bg-border" />
         </View>
 
-        <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-          Email
-        </Text>
-        <TextInput
-          className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
-          autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-          placeholder="you@example.com"
-          placeholderTextColor={colors.muted}
-          value={emailAddress}
-          onChangeText={setEmailAddress}
-          editable={!loading}
-          testID="sign-in-email"
-        />
-
-        <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-          Password
-        </Text>
-        <View className="mb-2">
-          <PasswordInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Enter your password"
+        <View onLayout={onFieldLayout('email')}>
+          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+            Email
+          </Text>
+          <TextInput
+            className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+            placeholder="you@example.com"
+            placeholderTextColor={colors.muted}
+            value={emailAddress}
+            onChangeText={setEmailAddress}
             editable={!loading}
-            testID="sign-in-password"
-            onSubmitEditing={onSignInPress}
+            testID="sign-in-email"
+            onFocus={onFieldFocus('email')}
           />
+        </View>
+
+        <View onLayout={onFieldLayout('password')}>
+          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+            Password
+          </Text>
+          <View className="mb-2">
+            <PasswordInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Enter your password"
+              editable={!loading}
+              testID="sign-in-password"
+              onSubmitEditing={onSignInPress}
+              onFocus={onFieldFocus('password')}
+            />
+          </View>
         </View>
 
         <View className="items-end mb-4">
