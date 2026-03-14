@@ -14,8 +14,11 @@ OUTPUT="${1:-$SCRIPT_DIR/screenshot-review-$TIMESTAMP.md}"
 
 cd "$E2E_DIR"
 
-# Collect all PNG screenshots (compatible with Git Bash — no -printf)
-mapfile -t SCREENSHOTS < <(ls -1 *.png 2>/dev/null | sort)
+# Collect all PNG screenshots (compatible with Git Bash / MSYS2 — no mapfile)
+SCREENSHOTS=()
+while IFS= read -r f; do
+  SCREENSHOTS+=("$f")
+done < <(ls -1 *.png 2>/dev/null | sort)
 
 if [ ${#SCREENSHOTS[@]} -eq 0 ]; then
   echo "No screenshots found in $E2E_DIR"

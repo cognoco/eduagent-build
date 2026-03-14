@@ -23,6 +23,7 @@ import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 
+// Captured at module load — safe because these screens are portrait-locked.
 const SCREEN_HEIGHT = Dimensions.get('screen').height;
 
 type PersonaType = 'TEEN' | 'LEARNER' | 'PARENT';

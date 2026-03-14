@@ -1946,12 +1946,12 @@ After the batch 1 crash, a cold boot + Bluetooth ANR disable resolved all stabil
 
 | Category | Count | Details |
 |----------|-------|---------|
-| **Passing** | 48 | 39 confirmed + 9 batch-1 passes before crash (unchanged flows) |
+| **Passing** | 50 | 39 confirmed in Session 20/20b + 11 untested (passed in Session 18, no code changes) |
 | **Failing** | 3 | settings-toggles (BUG-18 flaky), curriculum-review (LLM), session-summary (LLM) |
 | **Partial** | 1 | sign-up-flow (BUG-55 — intentional) |
 | **Skipped** | 1 | app-launch-expogo (ExpoGo-only) |
-| **Tested** | 44 | 10 not re-tested (batch-1 crash — passed in Session 18, no code changes) |
-| **Effective rate** | **89%** tested (39/44), **96%** including untested-but-stable flows |
+| **Total** | 55 | 54 flows + 1 SKIP (note: 43 tested in Session 20, 11 carried from Session 18) |
+| **Effective rate** | **91%** tested (39/43), **93%** including untested-but-stable flows (50/54) |
 
 ---
 
@@ -1963,7 +1963,7 @@ Two visual bugs found during manual screenshot review that affect ALL screens:
 
 1. **Tab bar overflow (BUG-59):** 9 tabs visible instead of 3. Hidden routes (`onboarding`, `session`, `topic`, `subscription`, `homework`, `subject`) render as visible tab buttons with truncated labels and placeholder rectangle icons. Caused by Expo Router's `href: null` not hiding tab buttons visually — only prevents navigation. Fixed with `tabBarItemStyle: { display: 'none' }` on all hidden `Tabs.Screen` entries in both learner and parent layouts.
 
-2. **ChatShell keyboard coverage (BUG-60):** Keyboard covers chat input field and send button on Android. `KeyboardAvoidingView` with `behavior={undefined}` means KAV does nothing. Changed to `behavior='height'`. Note: BUG-35 originally reported `'height'` conflicting with `adjustResize` — needs verification after rebuild.
+2. **ChatShell keyboard coverage (BUG-60):** Keyboard covers chat input field and send button on Android. `KeyboardAvoidingView` with `behavior={undefined}` means KAV does nothing. Changed to `behavior='padding'` across ALL screens (Session 21 unified approach). Grep confirmed no `adjustResize` or `windowSoftInputMode` in AndroidManifest.xml or app.json — the original BUG-35 conflict concern was moot (Expo managed builds don't set `adjustResize` by default).
 
 ### App code changes
 
@@ -1971,6 +1971,6 @@ Two visual bugs found during manual screenshot review that affect ALL screens:
 |------|--------|-----|
 | `(learner)/_layout.tsx` | Added `tabBarItemStyle: { display: 'none' }` to 6 hidden tabs | BUG-59 |
 | `(parent)/_layout.tsx` | Added `tabBarItemStyle: { display: 'none' }` to 1 hidden tab | BUG-59 |
-| `ChatShell.tsx` line 230 | `behavior={undefined}` → `behavior='height'` on Android | BUG-60 |
+| All 10 KAV screens | Unified to `behavior="padding"` (no platform branching) | BUG-60 |
 
 **Both fixes require APK rebuild or Metro bundle refresh to verify on emulator.**

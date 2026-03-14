@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Run ALL E2E flows for regression testing.
-# Updated 2026-03-13 to reflect current seed scenario mappings from Sessions 15-18.
+# Updated 2026-03-14 to use shared e2e-lib.sh and configurable FAST mode.
 #
 # Usage: cd apps/mobile/e2e && ./scripts/run-all-regression.sh
+#        FAST=0 ./scripts/run-all-regression.sh   # disable FAST for cold emulator
 #
 # Prerequisites:
 #   - API server running at localhost:8787
@@ -12,66 +13,15 @@
 
 set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-E2E_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-cd "$E2E_DIR"
-
-SEED_SCRIPT="./scripts/seed-and-run.sh"
-
-export TEMP="${TEMP:-/tmp}"
-export TMP="${TMP:-/tmp}"
+# shellcheck source=e2e-lib.sh
+source "$(dirname "$0")/e2e-lib.sh"
 
 RESULTS_FILE="$E2E_DIR/scripts/regression-results-$(date +%Y%m%d-%H%M%S).txt"
-PASS_COUNT=0
-FAIL_COUNT=0
-SKIP_COUNT=0
-PARTIAL_COUNT=0
-TOTAL=0
-
-log_result() {
-  local status="$1"
-  local flow="$2"
-  local note="${3:-}"
-  echo "[$status] $flow $note" | tee -a "$RESULTS_FILE"
-  case "$status" in
-    PASS) PASS_COUNT=$((PASS_COUNT + 1)) ;;
-    FAIL) FAIL_COUNT=$((FAIL_COUNT + 1)) ;;
-    SKIP) SKIP_COUNT=$((SKIP_COUNT + 1)) ;;
-    PARTIAL) PARTIAL_COUNT=$((PARTIAL_COUNT + 1)) ;;
-  esac
-  TOTAL=$((TOTAL + 1))
-}
-
-run_seeded() {
-  local scenario="$1"
-  local flow="$2"
-  echo ""
-  echo "=========================================="
-  echo "[$((TOTAL+1))] SEEDED: $scenario → $flow"
-  echo "=========================================="
-  if FAST=1 "$SEED_SCRIPT" "$scenario" "$flow"; then
-    log_result "PASS" "$flow"
-  else
-    log_result "FAIL" "$flow" "(scenario: $scenario)"
-  fi
-}
-
-run_noseed() {
-  local flow="$1"
-  echo ""
-  echo "=========================================="
-  echo "[$((TOTAL+1))] NO-SEED: $flow"
-  echo "=========================================="
-  if FAST=1 "$SEED_SCRIPT" --no-seed "$flow"; then
-    log_result "PASS" "$flow"
-  else
-    log_result "FAIL" "$flow" "(no-seed)"
-  fi
-}
 
 echo "E2E Full Regression Run — $(date)" | tee "$RESULTS_FILE"
 echo "Branch: $(git branch --show-current 2>/dev/null || echo 'unknown')" | tee -a "$RESULTS_FILE"
 echo "Commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')" | tee -a "$RESULTS_FILE"
+echo "FAST=$FAST" | tee -a "$RESULTS_FILE"
 echo "==========================================" | tee -a "$RESULTS_FILE"
 echo "" | tee -a "$RESULTS_FILE"
 
@@ -155,3 +105,7 @@ echo "  SKIP:    $SKIP_COUNT" | tee -a "$RESULTS_FILE"
 echo "  TOTAL:   $TOTAL" | tee -a "$RESULTS_FILE"
 echo "==========================================" | tee -a "$RESULTS_FILE"
 echo "Results saved to: $RESULTS_FILE"
+
+if [ "$FAIL_COUNT" -gt 0 ]; then
+  exit 1
+fi

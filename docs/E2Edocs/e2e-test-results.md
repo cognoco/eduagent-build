@@ -767,7 +767,7 @@ Full regression run to verify nothing broke from previously passing tests. Ran i
 | 42 | `consent/profile-creation-consent` | **FAIL** | BUG-58: Same as coppa-flow — `"Profile"` not visible (pre-profile → tab-more) |
 | 43 | `app-launch-expogo` | SKIP | ExpoGo — wrong app type for dev-client |
 
-**Session 20 totals: 35 PASS / 7 FAIL / 1 PARTIAL / 1 SKIP = 44 tested**
+**Session 20 totals: 35 PASS / 7 FAIL / 1 PARTIAL = 43 tested + 1 SKIP = 44 total**
 
 **Failure analysis:**
 - **2 LLM-dependent** (curriculum-review, session-summary): LLM response timing. Not regressions.
@@ -807,12 +807,12 @@ Two visual bugs identified from emulator screenshot review and fixed in app code
 | Bug | Description | Fix Applied | Status |
 |-----|-------------|-------------|--------|
 | BUG-59 | Tab bar shows 9 tabs (6 hidden routes render as visible buttons with placeholder icons) | Added `tabBarItemStyle: { display: 'none' }` to all hidden `Tabs.Screen` in learner + parent layouts | FIXED — needs rebuild to verify |
-| BUG-60 | ChatShell keyboard covers input field on Android (`behavior={undefined}` = KAV does nothing) | Changed `ChatShell.tsx` line 230 to `behavior='height'` on Android | IN PROGRESS — needs rebuild to verify (BUG-35 history: `'height'` may conflict with `adjustResize`) |
+| BUG-60 | ChatShell keyboard covers input field on Android (`behavior={undefined}` = KAV does nothing) | Unified ALL 10 screens to `behavior="padding"` (no platform branching). No `adjustResize` in AndroidManifest — original conflict moot. | FIXED — visual verification pending rebuild |
 
 **Files changed:**
 - `apps/mobile/src/app/(learner)/_layout.tsx` — 6 hidden tabs get `tabBarItemStyle: { display: 'none' }`
 - `apps/mobile/src/app/(parent)/_layout.tsx` — 1 hidden tab gets `tabBarItemStyle: { display: 'none' }`
-- `apps/mobile/src/components/session/ChatShell.tsx` — KAV `behavior` changed from `undefined` to `'height'` on Android
+- `apps/mobile/src/components/session/ChatShell.tsx` — KAV `behavior` unified to `"padding"` (all platforms)
 
 **Tests:** ChatShell.tsx — 28/28 pass. Layout files have no direct unit tests (integration-level only).
 

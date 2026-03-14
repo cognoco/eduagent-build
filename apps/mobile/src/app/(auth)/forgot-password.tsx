@@ -16,6 +16,7 @@ import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
 import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
 
+// Captured at module load — safe because these screens are portrait-locked.
 const SCREEN_HEIGHT = Dimensions.get('screen').height;
 
 export default function ForgotPasswordScreen() {
