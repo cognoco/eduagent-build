@@ -21,6 +21,7 @@ import { useProfile, type Profile } from '../lib/profile';
 import { checkConsentRequirement } from '../hooks/use-consent';
 import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
+import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 
 const SCREEN_HEIGHT = Dimensions.get('screen').height;
 
@@ -93,6 +94,7 @@ export default function CreateProfileScreen() {
   const [location, setLocation] = useState<'EU' | 'US' | 'OTHER' | ''>('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
   const birthDateString = birthDate ? formatDateForApi(birthDate) : null;
 
@@ -186,6 +188,7 @@ export default function CreateProfileScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerStyle={{
           minHeight: SCREEN_HEIGHT,
@@ -222,19 +225,22 @@ export default function CreateProfileScreen() {
           </View>
         )}
 
-        <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-          Display name
-        </Text>
-        <TextInput
-          className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
-          placeholder="Enter name"
-          placeholderTextColor={colors.muted}
-          value={displayName}
-          onChangeText={setDisplayName}
-          maxLength={50}
-          editable={!loading}
-          testID="create-profile-name"
-        />
+        <View onLayout={onFieldLayout('name')}>
+          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+            Display name
+          </Text>
+          <TextInput
+            className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
+            placeholder="Enter name"
+            placeholderTextColor={colors.muted}
+            value={displayName}
+            onChangeText={setDisplayName}
+            maxLength={50}
+            editable={!loading}
+            testID="create-profile-name"
+            onFocus={onFieldFocus('name')}
+          />
+        </View>
 
         <Text className="text-body-sm font-semibold text-text-secondary mb-1">
           Birth date

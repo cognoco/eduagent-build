@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRequestConsent } from '../hooks/use-consent';
 import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
+import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 
 const SCREEN_HEIGHT = Dimensions.get('screen').height;
 
@@ -31,6 +32,7 @@ export default function ConsentScreen() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [resending, setResending] = useState(false);
+  const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail);
   const canSubmit = isValidEmail && !isPending && !success;
@@ -81,6 +83,7 @@ export default function ConsentScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerStyle={{
           minHeight: SCREEN_HEIGHT,
@@ -143,21 +146,24 @@ export default function ConsentScreen() {
               </View>
             )}
 
-            <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-              Parent's email address
-            </Text>
-            <TextInput
-              className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
-              placeholder="parent@example.com"
-              placeholderTextColor={colors.muted}
-              value={parentEmail}
-              onChangeText={setParentEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              editable={!isPending}
-              testID="consent-email"
-            />
+            <View onLayout={onFieldLayout('email')}>
+              <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+                Parent's email address
+              </Text>
+              <TextInput
+                className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
+                placeholder="parent@example.com"
+                placeholderTextColor={colors.muted}
+                value={parentEmail}
+                onChangeText={setParentEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                editable={!isPending}
+                testID="consent-email"
+                onFocus={onFieldFocus('email')}
+              />
+            </View>
 
             <Button
               variant="primary"

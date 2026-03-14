@@ -15,6 +15,7 @@ import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
+import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
 
 const SCREEN_HEIGHT = Dimensions.get('screen').height;
 
@@ -31,6 +32,12 @@ export default function ForgotPasswordScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
+  const {
+    scrollRef: resetScrollRef,
+    onFieldLayout: onResetFieldLayout,
+    onFieldFocus: onResetFieldFocus,
+  } = useKeyboardScroll();
 
   const canSubmitEmail = emailAddress.trim() !== '' && !loading;
   const canSubmitReset =
@@ -113,6 +120,7 @@ export default function ForgotPasswordScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
+          ref={resetScrollRef}
           className="flex-1"
           contentContainerStyle={{
             minHeight: SCREEN_HEIGHT,
@@ -141,33 +149,39 @@ export default function ForgotPasswordScreen() {
             </View>
           )}
 
-          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-            Reset code
-          </Text>
-          <TextInput
-            className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
-            placeholder="Enter 6-digit code"
-            placeholderTextColor={colors.muted}
-            keyboardType="number-pad"
-            value={code}
-            onChangeText={setCode}
-            editable={!loading}
-            testID="reset-code"
-          />
-
-          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-            New password
-          </Text>
-          <View className="mb-6">
-            <PasswordInput
-              value={newPassword}
-              onChangeText={setNewPassword}
-              placeholder="Enter new password"
+          <View onLayout={onResetFieldLayout('code')}>
+            <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+              Reset code
+            </Text>
+            <TextInput
+              className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
+              placeholder="Enter 6-digit code"
+              placeholderTextColor={colors.muted}
+              keyboardType="number-pad"
+              value={code}
+              onChangeText={setCode}
               editable={!loading}
-              testID="reset-new-password"
-              showRequirements
-              onSubmitEditing={onResetPress}
+              testID="reset-code"
+              onFocus={onResetFieldFocus('code')}
             />
+          </View>
+
+          <View onLayout={onResetFieldLayout('password')}>
+            <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+              New password
+            </Text>
+            <View className="mb-6">
+              <PasswordInput
+                value={newPassword}
+                onChangeText={setNewPassword}
+                placeholder="Enter new password"
+                editable={!loading}
+                testID="reset-new-password"
+                showRequirements
+                onSubmitEditing={onResetPress}
+                onFocus={onResetFieldFocus('password')}
+              />
+            </View>
           </View>
 
           <Button
@@ -220,6 +234,7 @@ export default function ForgotPasswordScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerStyle={{
           minHeight: SCREEN_HEIGHT,
@@ -248,21 +263,24 @@ export default function ForgotPasswordScreen() {
           </View>
         )}
 
-        <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-          Email
-        </Text>
-        <TextInput
-          className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
-          autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-          placeholder="you@example.com"
-          placeholderTextColor={colors.muted}
-          value={emailAddress}
-          onChangeText={setEmailAddress}
-          editable={!loading}
-          testID="forgot-password-email"
-        />
+        <View onLayout={onFieldLayout('email')}>
+          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+            Email
+          </Text>
+          <TextInput
+            className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+            placeholder="you@example.com"
+            placeholderTextColor={colors.muted}
+            value={emailAddress}
+            onChangeText={setEmailAddress}
+            editable={!loading}
+            testID="forgot-password-email"
+            onFocus={onFieldFocus('email')}
+          />
+        </View>
 
         <Button
           variant="primary"

@@ -17,6 +17,7 @@ import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
+import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
 
 // Use physical screen height (not window) so the content container always
 // overflows the ScrollView after adjustResize shrinks it for the keyboard.
@@ -34,6 +35,7 @@ export default function SignInScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+  const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
   const { startSSOFlow: startGoogleSSO } = useSSO();
   const { startSSOFlow: startAppleSSO } = useSSO();
@@ -112,6 +114,7 @@ export default function SignInScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerStyle={{
           minHeight: SCREEN_HEIGHT,
@@ -170,34 +173,40 @@ export default function SignInScreen() {
           <View className="flex-1 h-px bg-border" />
         </View>
 
-        <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-          Email
-        </Text>
-        <TextInput
-          className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
-          autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-          placeholder="you@example.com"
-          placeholderTextColor={colors.muted}
-          value={emailAddress}
-          onChangeText={setEmailAddress}
-          editable={!loading}
-          testID="sign-in-email"
-        />
-
-        <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-          Password
-        </Text>
-        <View className="mb-2">
-          <PasswordInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Enter your password"
+        <View onLayout={onFieldLayout('email')}>
+          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+            Email
+          </Text>
+          <TextInput
+            className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+            placeholder="you@example.com"
+            placeholderTextColor={colors.muted}
+            value={emailAddress}
+            onChangeText={setEmailAddress}
             editable={!loading}
-            testID="sign-in-password"
-            onSubmitEditing={onSignInPress}
+            testID="sign-in-email"
+            onFocus={onFieldFocus('email')}
           />
+        </View>
+
+        <View onLayout={onFieldLayout('password')}>
+          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+            Password
+          </Text>
+          <View className="mb-2">
+            <PasswordInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Enter your password"
+              editable={!loading}
+              testID="sign-in-password"
+              onSubmitEditing={onSignInPress}
+              onFocus={onFieldFocus('password')}
+            />
+          </View>
         </View>
 
         <View className="items-end mb-4">
