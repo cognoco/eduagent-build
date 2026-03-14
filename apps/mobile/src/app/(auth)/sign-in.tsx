@@ -109,10 +109,7 @@ export default function SignInScreen() {
   }, [isLoaded, canSubmit, signIn, setActive, router, emailAddress, password]);
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-background"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <KeyboardAvoidingView className="flex-1 bg-background" behavior="padding">
       <ScrollView
         ref={scrollRef}
         className="flex-1"

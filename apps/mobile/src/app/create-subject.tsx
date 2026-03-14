@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
   Dimensions,
 } from 'react-native';
@@ -47,10 +46,7 @@ export default function CreateSubjectScreen() {
   }, [canSubmit, name, createSubject, router]);
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-background"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <KeyboardAvoidingView className="flex-1 bg-background" behavior="padding">
       <ScrollView
         ref={scrollRef}
         className="flex-1"
