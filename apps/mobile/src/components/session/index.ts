@@ -15,3 +15,7 @@ export { SessionTimer } from './SessionTimer';
 export { QuestionCounter } from './QuestionCounter';
 export { VoiceRecordButton, VoiceTranscriptPreview } from './VoiceRecordButton';
 export { VoiceToggle } from './VoiceToggle';
+export {
+  VoicePlaybackBar,
+  type VoicePlaybackBarProps,
+} from './VoicePlaybackBar';
