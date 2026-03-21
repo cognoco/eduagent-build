@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageBubble, type VerificationBadge } from './MessageBubble';
 import { VoiceRecordButton, VoiceTranscriptPreview } from './VoiceRecordButton';
 import { VoiceToggle } from './VoiceToggle';
+import { VoicePlaybackBar } from './VoicePlaybackBar';
 import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
 import { useTextToSpeech } from '../../hooks/use-text-to-speech';
 import { useThemeColors } from '../../lib/theme';
@@ -26,9 +27,6 @@ export interface ChatMessage {
   verificationBadge?: VerificationBadge;
 }
 
-/** Verification types that enable voice input/output in the session. */
-export type VoiceVerificationType = 'teach_back';
-
 interface ChatShellProps {
   title: string;
   subtitle?: string;
@@ -39,8 +37,8 @@ interface ChatShellProps {
   rightAction?: React.ReactNode;
   footer?: React.ReactNode;
   placeholder?: string;
-  /** When set to 'teach_back', enables voice input (STT) and output (TTS). */
-  verificationType?: VoiceVerificationType | string;
+  /** When set to 'teach_back', voice defaults ON. Otherwise voice defaults OFF but toggle is always visible. */
+  verificationType?: string;
   /** Optional testID for the message scroll area (used by E2E flows). */
   messagesTestID?: string;
 }
@@ -106,11 +104,10 @@ export function ChatShell({
   const scrollRef = useRef<ScrollView>(null);
   const [input, setInput] = useState('');
 
-  // Voice is enabled only for teach_back verification type
-  const isVoiceSession = verificationType === 'teach_back';
-
-  // Voice toggle — defaults ON for teach_back, session-scoped
-  const [isVoiceEnabled, setIsVoiceEnabled] = useState(isVoiceSession);
+  // Voice toggle — defaults ON for teach_back, OFF for all others. Session-scoped.
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(
+    verificationType === 'teach_back'
+  );
 
   // STT hook
   const {
@@ -122,7 +119,14 @@ export function ChatShell({
   } = useSpeechRecognition();
 
   // TTS hook
-  const { speak, stop: stopSpeaking } = useTextToSpeech();
+  const {
+    speak,
+    stop: stopSpeaking,
+    replay,
+    isSpeaking: ttsPlaying,
+    rate,
+    setRate,
+  } = useTextToSpeech();
 
   // Track whether we have a transcript ready for preview
   const [pendingTranscript, setPendingTranscript] = useState('');
@@ -136,7 +140,7 @@ export function ChatShell({
 
   // Auto-TTS: speak new AI messages when voice is enabled (Option A — complete only)
   useEffect(() => {
-    if (!isVoiceSession || !isVoiceEnabled) return;
+    if (!isVoiceEnabled) return;
 
     // Find the last AI message that is NOT streaming
     const lastAiMessage = [...messages]
@@ -149,16 +153,16 @@ export function ChatShell({
 
     lastSpokenIdRef.current = lastAiMessage.id;
     speak(lastAiMessage.content);
-  }, [messages, isVoiceSession, isVoiceEnabled, speak]);
+  }, [messages, isVoiceEnabled, speak]);
 
   const handleSend = useCallback(() => {
     if (!input.trim() || isStreaming) return;
     const text = input.trim();
     setInput('');
     // Stop TTS when user sends a message
-    if (isVoiceSession) stopSpeaking();
+    if (isVoiceEnabled) stopSpeaking();
     onSend(text);
-  }, [input, isStreaming, onSend, isVoiceSession, stopSpeaking]);
+  }, [input, isStreaming, onSend, isVoiceEnabled, stopSpeaking]);
 
   // Voice record button toggle
   const handleVoicePress = useCallback(async () => {
@@ -203,15 +207,28 @@ export function ChatShell({
     await startListening();
   }, [clearTranscript, startListening, stopSpeaking]);
 
-  const handleVoiceToggle = useCallback(() => {
-    setIsVoiceEnabled((prev) => {
-      if (prev) stopSpeaking(); // muting stops current speech
-      return !prev;
-    });
-  }, [stopSpeaking]);
+  const handleVoiceToggle = useCallback(async () => {
+    if (isVoiceEnabled) {
+      stopSpeaking();
+      if (isListening) {
+        await stopListening();
+      }
+      setPendingTranscript('');
+      clearTranscript();
+      setIsVoiceEnabled(false);
+      return;
+    }
+    setIsVoiceEnabled(true);
+  }, [
+    isVoiceEnabled,
+    stopSpeaking,
+    isListening,
+    stopListening,
+    clearTranscript,
+  ]);
 
-  // Combine rightAction with VoiceToggle for teach_back sessions
-  const headerRightContent = isVoiceSession ? (
+  // Always show VoiceToggle in header (all session types)
+  const headerRightContent = (
     <View className="flex-row items-center">
       <VoiceToggle
         isVoiceEnabled={isVoiceEnabled}
@@ -219,8 +236,6 @@ export function ChatShell({
       />
       {rightAction}
     </View>
-  ) : (
-    rightAction
   );
 
   return (
@@ -274,8 +289,19 @@ export function ChatShell({
         {footer}
       </ScrollView>
 
-      {/* Voice transcript preview (above input, only for teach_back) */}
-      {isVoiceSession && pendingTranscript && !isListening && (
+      {/* VoicePlaybackBar — shown when voice is ON and input is active */}
+      {isVoiceEnabled && !inputDisabled && (
+        <VoicePlaybackBar
+          isSpeaking={ttsPlaying}
+          rate={rate}
+          onStop={stopSpeaking}
+          onReplay={replay}
+          onRateChange={setRate}
+        />
+      )}
+
+      {/* Voice transcript preview (above input, when voice enabled) */}
+      {isVoiceEnabled && pendingTranscript && !isListening && (
         <VoiceTranscriptPreview
           transcript={pendingTranscript}
           onSend={handleVoiceSend}
@@ -304,7 +330,7 @@ export function ChatShell({
             testID="chat-input"
             accessibilityLabel="Message input"
           />
-          {isVoiceSession && (
+          {isVoiceEnabled && (
             <View className="me-2">
               <VoiceRecordButton
                 isListening={isListening}

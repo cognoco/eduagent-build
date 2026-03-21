@@ -1,9 +1,4 @@
-export {
-  ChatShell,
-  animateResponse,
-  type ChatMessage,
-  type VoiceVerificationType,
-} from './ChatShell';
+export { ChatShell, animateResponse, type ChatMessage } from './ChatShell';
 export { MessageBubble, type VerificationBadge } from './MessageBubble';
 export {
   type SessionModeConfig,
@@ -15,3 +10,7 @@ export { SessionTimer } from './SessionTimer';
 export { QuestionCounter } from './QuestionCounter';
 export { VoiceRecordButton, VoiceTranscriptPreview } from './VoiceRecordButton';
 export { VoiceToggle } from './VoiceToggle';
+export {
+  VoicePlaybackBar,
+  type VoicePlaybackBarProps,
+} from './VoicePlaybackBar';
