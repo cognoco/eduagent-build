@@ -58,12 +58,17 @@ jest.mock('../../hooks/use-speech-recognition', () => ({
 // TTS mock
 const mockSpeak = jest.fn();
 const mockStopSpeaking = jest.fn();
+const mockReplay = jest.fn();
+const mockSetRate = jest.fn();
 
 jest.mock('../../hooks/use-text-to-speech', () => ({
   useTextToSpeech: () => ({
     isSpeaking: false,
+    rate: 1.0,
     speak: mockSpeak,
     stop: mockStopSpeaking,
+    replay: mockReplay,
+    setRate: mockSetRate,
   }),
 }));
 
@@ -137,34 +142,66 @@ describe('ChatShell', () => {
   // -----------------------------------------------------------------------
 
   describe('voice UI visibility', () => {
-    it('does NOT show voice record button for standard sessions', () => {
+    it('always shows voice toggle regardless of session type', () => {
+      renderChatShell({ verificationType: undefined });
+
+      expect(screen.getByTestId('voice-toggle')).toBeTruthy();
+    });
+
+    it('voice toggle defaults OFF for standard sessions', () => {
+      renderChatShell({ verificationType: undefined });
+
+      const toggle = screen.getByTestId('voice-toggle');
+      expect(toggle.props.accessibilityState.checked).toBe(false);
+    });
+
+    it('voice toggle defaults ON for teach_back sessions', () => {
+      renderChatShell({ verificationType: 'teach_back' });
+
+      const toggle = screen.getByTestId('voice-toggle');
+      expect(toggle.props.accessibilityState.checked).toBe(true);
+    });
+
+    it('does NOT show voice record button when voice is OFF (standard session)', () => {
       renderChatShell({ verificationType: undefined });
 
       expect(screen.queryByTestId('voice-record-button')).toBeNull();
     });
 
-    it('does NOT show voice record button for evaluate sessions', () => {
-      renderChatShell({ verificationType: 'evaluate' });
-
-      expect(screen.queryByTestId('voice-record-button')).toBeNull();
-    });
-
-    it('shows voice record button for teach_back sessions', () => {
+    it('shows voice record button when voice is ON (teach_back)', () => {
       renderChatShell({ verificationType: 'teach_back' });
 
       expect(screen.getByTestId('voice-record-button')).toBeTruthy();
     });
 
-    it('does NOT show voice toggle for standard sessions', () => {
+    it('shows mic button after toggling voice ON in standard session', () => {
       renderChatShell({ verificationType: undefined });
 
-      expect(screen.queryByTestId('voice-toggle')).toBeNull();
+      // Voice is OFF by default — no mic button
+      expect(screen.queryByTestId('voice-record-button')).toBeNull();
+
+      // Toggle voice ON
+      fireEvent.press(screen.getByTestId('voice-toggle'));
+
+      expect(screen.getByTestId('voice-record-button')).toBeTruthy();
     });
 
-    it('shows voice toggle for teach_back sessions', () => {
+    it('shows playback bar when voice is enabled', () => {
       renderChatShell({ verificationType: 'teach_back' });
 
-      expect(screen.getByTestId('voice-toggle')).toBeTruthy();
+      expect(screen.getByTestId('voice-playback-bar')).toBeTruthy();
+    });
+
+    it('hides playback bar when voice is OFF', () => {
+      renderChatShell({ verificationType: undefined });
+
+      expect(screen.queryByTestId('voice-playback-bar')).toBeNull();
+    });
+
+    it('hides playback bar when input is disabled', () => {
+      renderChatShell({ verificationType: 'teach_back', inputDisabled: true });
+
+      expect(screen.queryByTestId('voice-playback-bar')).toBeNull();
     });
   });
 
@@ -365,7 +402,7 @@ describe('ChatShell', () => {
       ).toBe(false);
     });
 
-    it('does NOT speak for non-teach_back sessions', () => {
+    it('does NOT speak when voice defaults OFF (standard session)', () => {
       renderChatShell({
         verificationType: undefined,
         messages: [{ id: 'ai-1', role: 'ai', content: 'Hello' }],
@@ -405,24 +442,13 @@ describe('ChatShell', () => {
   // Header right action composition
   // -----------------------------------------------------------------------
 
-  it('renders rightAction alongside voice toggle for teach_back', () => {
+  it('renders rightAction alongside voice toggle for all sessions', () => {
     const { Text } = require('react-native');
     renderChatShell({
-      verificationType: 'teach_back',
       rightAction: <Text testID="custom-action">Done</Text>,
     });
 
     expect(screen.getByTestId('voice-toggle')).toBeTruthy();
-    expect(screen.getByTestId('custom-action')).toBeTruthy();
-  });
-
-  it('renders rightAction alone for non-teach_back', () => {
-    const { Text } = require('react-native');
-    renderChatShell({
-      rightAction: <Text testID="custom-action">Done</Text>,
-    });
-
-    expect(screen.queryByTestId('voice-toggle')).toBeNull();
     expect(screen.getByTestId('custom-action')).toBeTruthy();
   });
 });
