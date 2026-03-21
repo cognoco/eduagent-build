@@ -8,8 +8,11 @@ import * as Speech from 'expo-speech';
 
 export interface UseTextToSpeechResult {
   isSpeaking: boolean;
+  rate: number;
   speak: (text: string) => void;
   stop: () => void;
+  replay: () => void;
+  setRate: (rate: number) => void;
 }
 
 /**
@@ -19,7 +22,10 @@ export interface UseTextToSpeechResult {
  */
 export function useTextToSpeech(): UseTextToSpeechResult {
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [rate, setRateState] = useState(1.0);
   const mountedRef = useRef(true);
+  const rateRef = useRef(1.0);
+  const lastTextRef = useRef<string | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -33,7 +39,10 @@ export function useTextToSpeech(): UseTextToSpeechResult {
     // Stop any ongoing speech first
     Speech.stop();
 
+    lastTextRef.current = text;
+
     Speech.speak(text, {
+      rate: rateRef.current,
       onStart: () => {
         if (mountedRef.current) setIsSpeaking(true);
       },
@@ -54,5 +63,16 @@ export function useTextToSpeech(): UseTextToSpeechResult {
     setIsSpeaking(false);
   }, []);
 
-  return { isSpeaking, speak, stop };
+  const replay = useCallback(() => {
+    if (lastTextRef.current) {
+      speak(lastTextRef.current);
+    }
+  }, [speak]);
+
+  const setRate = useCallback((newRate: number) => {
+    rateRef.current = newRate;
+    setRateState(newRate);
+  }, []);
+
+  return { isSpeaking, rate, speak, stop, replay, setRate };
 }

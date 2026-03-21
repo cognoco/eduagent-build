@@ -20,6 +20,11 @@ describe('useTextToSpeech', () => {
     expect(result.current.isSpeaking).toBe(false);
   });
 
+  it('initializes rate at 1.0', () => {
+    const { result } = renderHook(() => useTextToSpeech());
+    expect(result.current.rate).toBe(1.0);
+  });
+
   it('calls Speech.speak when speak() is invoked', () => {
     const { result } = renderHook(() => useTextToSpeech());
 
@@ -30,11 +35,30 @@ describe('useTextToSpeech', () => {
     expect(mockSpeak).toHaveBeenCalledWith(
       'Hello world',
       expect.objectContaining({
+        rate: 1.0,
         onStart: expect.any(Function),
         onDone: expect.any(Function),
         onStopped: expect.any(Function),
         onError: expect.any(Function),
       })
+    );
+  });
+
+  it('passes current rate to Speech.speak', () => {
+    const { result } = renderHook(() => useTextToSpeech());
+
+    act(() => {
+      result.current.setRate(1.25);
+    });
+    expect(result.current.rate).toBe(1.25);
+
+    act(() => {
+      result.current.speak('Fast speech');
+    });
+
+    expect(mockSpeak).toHaveBeenCalledWith(
+      'Fast speech',
+      expect.objectContaining({ rate: 1.25 })
     );
   });
 
@@ -93,6 +117,45 @@ describe('useTextToSpeech', () => {
       callArgs.onDone();
     });
     expect(result.current.isSpeaking).toBe(false);
+  });
+
+  it('replay re-speaks last text', () => {
+    const { result } = renderHook(() => useTextToSpeech());
+
+    act(() => {
+      result.current.speak('Original text');
+    });
+    mockSpeak.mockClear();
+    mockStop.mockClear();
+
+    act(() => {
+      result.current.replay();
+    });
+
+    expect(mockSpeak).toHaveBeenCalledWith(
+      'Original text',
+      expect.objectContaining({ rate: 1.0 })
+    );
+  });
+
+  it('replay no-ops when nothing has been spoken', () => {
+    const { result } = renderHook(() => useTextToSpeech());
+
+    act(() => {
+      result.current.replay();
+    });
+
+    expect(mockSpeak).not.toHaveBeenCalled();
+  });
+
+  it('setRate updates state', () => {
+    const { result } = renderHook(() => useTextToSpeech());
+
+    act(() => {
+      result.current.setRate(0.75);
+    });
+
+    expect(result.current.rate).toBe(0.75);
   });
 
   it('cleans up on unmount', () => {
