@@ -208,12 +208,25 @@ export function ChatShell({
     await startListening();
   }, [clearTranscript, startListening, stopSpeaking]);
 
-  const handleVoiceToggle = useCallback(() => {
-    setIsVoiceEnabled((prev) => {
-      if (prev) stopSpeaking(); // muting stops current speech
-      return !prev;
-    });
-  }, [stopSpeaking]);
+  const handleVoiceToggle = useCallback(async () => {
+    if (isVoiceEnabled) {
+      stopSpeaking();
+      if (isListening) {
+        await stopListening();
+      }
+      setPendingTranscript('');
+      clearTranscript();
+      setIsVoiceEnabled(false);
+      return;
+    }
+    setIsVoiceEnabled(true);
+  }, [
+    isVoiceEnabled,
+    stopSpeaking,
+    isListening,
+    stopListening,
+    clearTranscript,
+  ]);
 
   // Always show VoiceToggle in header (all session types)
   const headerRightContent = (

@@ -19,7 +19,8 @@ export interface VoicePlaybackBarProps {
 
 function nextRate(current: number): number {
   const idx = RATE_CYCLE.indexOf(current);
-  return RATE_CYCLE[(idx + 1) % RATE_CYCLE.length];
+  const safeIdx = idx === -1 ? 0 : idx;
+  return RATE_CYCLE[(safeIdx + 1) % RATE_CYCLE.length];
 }
 
 export function VoicePlaybackBar({
@@ -40,6 +41,7 @@ export function VoicePlaybackBar({
       <Pressable
         onPress={onReplay}
         disabled={isSpeaking}
+        accessibilityState={{ disabled: isSpeaking }}
         className="min-h-[44px] min-w-[44px] items-center justify-center"
         accessibilityLabel="Replay last AI message"
         accessibilityRole="button"
