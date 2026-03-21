@@ -7,7 +7,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 E2E_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-cd "$E2E_DIR"
+cd "$E2E_DIR" || { echo "[e2e-lib] Failed to cd into $E2E_DIR" >&2; exit 1; }
 
 SEED_SCRIPT="./scripts/seed-and-run.sh"
 FAST="${FAST:-1}"

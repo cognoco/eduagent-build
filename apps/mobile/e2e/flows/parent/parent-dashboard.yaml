@@ -43,6 +43,7 @@ tags:
     text: "How your children are doing"
 
 # 3. Verify children list is visible — look for child display name
+# optional: seed data may not yet be fetched from API when assertion runs
 - extendedWaitUntil:
     visible:
       text: "Test Teen"
@@ -50,21 +51,25 @@ tags:
     optional: true
 
 # 4. Look for child card element
+# optional: child-card testID only renders after familyLinks API returns data
 - assertVisible:
     id: "child-card"
     optional: true
 
 # 5. Tap on child card to view detail
+# optional: depends on child-card rendering (step 4); if absent, step 6 is the fallback
 - tapOn:
     id: "child-card"
     optional: true
 
 # 6. Fallback: tap on child name text
+# optional: fallback for step 5 — one of the two tap targets should succeed
 - tapOn:
     text: "Test Teen"
     optional: true
 
 # 7. Wait for child detail view
+# optional: only reachable if step 5 or 6 succeeded (tap landed on a child card)
 - extendedWaitUntil:
     visible:
       text: "Sessions"
@@ -72,11 +77,13 @@ tags:
     optional: true
 
 # 8. Verify session count or time information is visible
+# optional: only reachable if child detail screen loaded (step 7)
 - assertVisible:
     text: "sessions"
     optional: true
 
 # 9. Navigate back to dashboard
+# optional: back button only present if we navigated into child detail (step 7)
 - tapOn:
     id: "back-button"
     optional: true
