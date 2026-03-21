@@ -66,8 +66,8 @@
       [
         "@sentry/react-native/expo",
         {
-          "organization": "SENTRY_ORG_PLACEHOLDER",
-          "project": "SENTRY_PROJECT_PLACEHOLDER"
+          "organization": "zwizzly",
+          "project": "mentomate-mobile"
         }
       ],
       [

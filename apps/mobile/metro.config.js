@@ -3,7 +3,9 @@ const { getDefaultConfig } = require('@expo/metro-config');
 const { mergeConfig } = require('metro-config');
 const { withNativeWind } = require('nativewind/metro');
 
-const defaultConfig = getDefaultConfig(__dirname);
+const { getSentryExpoConfig } = require('@sentry/react-native/metro');
+
+const defaultConfig = getSentryExpoConfig(__dirname);
 const { assetExts, sourceExts } = defaultConfig.resolver;
 
 const monorepoRoot = path.resolve(__dirname, '../..');

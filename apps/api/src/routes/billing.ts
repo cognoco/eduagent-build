@@ -220,9 +220,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       { cancel_at_period_end: true }
     );
 
-    const currentPeriodEnd = new Date(
-      (updated as any).current_period_end * 1000
-    ).toISOString();
+    const periodEndTs = updated.items?.data?.[0]?.current_period_end;
+    const currentPeriodEnd =
+      typeof periodEndTs === 'number'
+        ? new Date(periodEndTs * 1000).toISOString()
+        : new Date().toISOString();
 
     // Mark local DB row so cancelAtPeriodEnd is reflected immediately
     await markSubscriptionCancelled(db, subscription.id);

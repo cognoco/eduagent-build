@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { View, Text } from 'react-native';
+import { useEffect, useMemo } from 'react';
+import { View, Text, type TextStyle } from 'react-native';
 import Animated, {
   FadeIn,
   FadeInUp,
@@ -10,9 +10,10 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import Markdown from 'react-native-markdown-display';
 import { Ionicons } from '@expo/vector-icons';
 import { formatMathContent } from '../../lib/math-format';
-import { useThemeColors } from '../../lib/theme';
+import { useThemeColors, type ThemeColors } from '../../lib/theme';
 
 export type VerificationBadge = 'evaluate' | 'teach_back';
 
@@ -162,6 +163,64 @@ const ESCALATION_STYLES: Partial<
   },
 };
 
+// ---------------------------------------------------------------------------
+// Markdown styles — themed to match chat bubble text
+// ---------------------------------------------------------------------------
+
+function buildMarkdownStyles(
+  colors: ThemeColors
+): Record<string, TextStyle | { backgroundColor?: string }> {
+  const base: TextStyle = {
+    color: colors.textPrimary,
+    fontSize: 15,
+    lineHeight: 22,
+  };
+  return {
+    body: base,
+    paragraph: { ...base, marginTop: 0, marginBottom: 4 },
+    strong: { ...base, fontWeight: '700' },
+    em: { ...base, fontStyle: 'italic' },
+    bullet_list: { ...base, marginBottom: 4 },
+    ordered_list: { ...base, marginBottom: 4 },
+    list_item: { ...base, marginBottom: 2 },
+    code_inline: {
+      ...base,
+      fontFamily: 'monospace',
+      backgroundColor: `${colors.muted}22`,
+      paddingHorizontal: 4,
+      borderRadius: 4,
+    },
+    fence: {
+      ...base,
+      fontFamily: 'monospace',
+      backgroundColor: `${colors.muted}22`,
+      padding: 8,
+      borderRadius: 8,
+      marginBottom: 4,
+    },
+    code_block: {
+      ...base,
+      fontFamily: 'monospace',
+      backgroundColor: `${colors.muted}22`,
+      padding: 8,
+      borderRadius: 8,
+      marginBottom: 4,
+    },
+    heading1: { ...base, fontSize: 18, fontWeight: '700', marginBottom: 4 },
+    heading2: { ...base, fontSize: 17, fontWeight: '700', marginBottom: 4 },
+    heading3: { ...base, fontSize: 16, fontWeight: '600', marginBottom: 4 },
+    link: { ...base, color: colors.primary },
+    blockquote: {
+      ...base,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.primary,
+      paddingLeft: 8,
+      marginBottom: 4,
+    },
+    hr: { backgroundColor: colors.muted, height: 1, marginVertical: 8 },
+  };
+}
+
 const VERIFICATION_BADGE_CONFIG: Record<
   VerificationBadge,
   { label: string; bgClass: string; textClass: string }
@@ -195,6 +254,8 @@ export function MessageBubble({
       ? VERIFICATION_BADGE_CONFIG[verificationBadge]
       : undefined;
   const isThinking = streaming && !content;
+
+  const mdStyles = useMemo(() => buildMarkdownStyles(colors), [colors]);
 
   const bubbleBg = escalation
     ? `${escalation.bg} ${escalation.border}`
@@ -240,14 +301,14 @@ export function MessageBubble({
         )}
         {isThinking ? (
           <ThinkingIndicator />
-        ) : (
-          <Text
-            className={`text-body leading-relaxed ${
-              isAI ? 'text-text-primary' : 'text-text-inverse'
-            }`}
-          >
-            {displayContent}
+        ) : isAI ? (
+          <View>
+            <Markdown style={mdStyles}>{displayContent}</Markdown>
             {streaming && <BlinkingCursor />}
+          </View>
+        ) : (
+          <Text className="text-body leading-relaxed text-text-inverse">
+            {displayContent}
           </Text>
         )}
       </View>

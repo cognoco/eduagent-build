@@ -330,7 +330,9 @@ describe('Integration: Stripe Webhook — event handling', () => {
   it('invoice.payment_failed → sets past_due and emits Inngest event', async () => {
     const event = buildStripeEvent('invoice.payment_failed', {
       id: 'in_failed_123',
-      subscription: MOCK_SUB_ID,
+      parent: {
+        subscription_details: { subscription: MOCK_SUB_ID },
+      },
       attempt_count: 2,
     });
 
@@ -381,7 +383,9 @@ describe('Integration: Stripe Webhook — event handling', () => {
   it('invoice.payment_succeeded → sets active', async () => {
     const event = buildStripeEvent('invoice.payment_succeeded', {
       id: 'in_success_123',
-      subscription: MOCK_SUB_ID,
+      parent: {
+        subscription_details: { subscription: MOCK_SUB_ID },
+      },
     });
 
     mockVerifyWebhookSignature.mockResolvedValue(event);

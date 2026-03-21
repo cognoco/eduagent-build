@@ -4,14 +4,18 @@ import {
   Text,
   TextInput,
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCreateSubject } from '../hooks/use-subjects';
 import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
+import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
+
+// Captured at module load — safe because these screens are portrait-locked.
+const SCREEN_HEIGHT = Dimensions.get('screen').height;
 
 export default function CreateSubjectScreen() {
   const insets = useSafeAreaInsets();
@@ -20,6 +24,7 @@ export default function CreateSubjectScreen() {
   const createSubject = useCreateSubject();
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
   const canSubmit = name.trim().length >= 1 && !createSubject.isPending;
 
@@ -42,14 +47,12 @@ export default function CreateSubjectScreen() {
   }, [canSubmit, name, createSubject, router]);
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-background"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <KeyboardAvoidingView className="flex-1 bg-background" behavior="padding">
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerStyle={{
-          flexGrow: 1,
+          minHeight: SCREEN_HEIGHT,
           paddingTop: insets.top + 16,
           paddingBottom: insets.bottom + 24,
           paddingHorizontal: 24,
@@ -88,20 +91,23 @@ export default function CreateSubjectScreen() {
           personalized curriculum just for you.
         </Text>
 
-        <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-          Subject name
-        </Text>
-        <TextInput
-          className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
-          placeholder="e.g. Calculus, World History, Python..."
-          placeholderTextColor={colors.muted}
-          value={name}
-          onChangeText={setName}
-          maxLength={200}
-          editable={!createSubject.isPending}
-          testID="create-subject-name"
-          autoFocus
-        />
+        <View onLayout={onFieldLayout('name')}>
+          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+            Subject name
+          </Text>
+          <TextInput
+            className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
+            placeholder="e.g. Calculus, World History, Python..."
+            placeholderTextColor={colors.muted}
+            value={name}
+            onChangeText={setName}
+            maxLength={200}
+            editable={!createSubject.isPending}
+            testID="create-subject-name"
+            autoFocus
+            onFocus={onFieldFocus('name')}
+          />
+        </View>
 
         <Button
           variant="primary"

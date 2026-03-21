@@ -188,7 +188,7 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 
 **Not yet integrated:** OCR provider (server-side fallback; ML Kit primary on device).
 
-**Epic 9 (pre-launch): Native In-App Purchases** — Adds Apple StoreKit 2 / Google Play Billing via RevenueCat SDK for mobile. Both app stores **require** native IAP for digital services (AI tutoring). Existing Stripe code is **kept intact** (dormant) for future web client and B2B/school licensing — do not remove it. Business logic (quota metering, subscription tiers, KV caching) is payment-agnostic and unchanged. See `docs/epics.md` Epic 9 for full stories.
+**Epic 9 (COMPLETE): Native In-App Purchases** — Apple StoreKit 2 / Google Play Billing via RevenueCat SDK integrated. Existing Stripe code **kept intact** (dormant) for future web client and B2B/school licensing. Business logic (quota metering, subscription tiers, KV caching) is payment-agnostic and unchanged.
 
 **Epic 3 extensions — now implemented:**
 - **EVALUATE verification type (Devil's Advocate, FR128-FR133)** — 8th verification type. AI presents flawed reasoning for student to critique (Bloom's Level 5-6). Strong-retention gating (`shouldTriggerEvaluate`), modified SM-2 quality floor (2-3 for failure), `evaluateDifficultyRung` 1-4 on retention card, three-strike escalation, `evaluate-data.ts` DB service, eligibility route (`GET /v1/topics/:topicId/evaluate-eligibility`), wired into session-completed Step 1c.
@@ -204,10 +204,10 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 
 **Pre-launch configuration (not code):**
 - [ ] Clerk: configure custom email domain (SPF/DKIM/DMARC) so verification/consent emails don't land in spam
-- [ ] Sentry: create projects + set `SENTRY_DSN` secrets for API and mobile
+- [x] Sentry: mobile project created (`zwizzly/mentomate-mobile`), DSN set in local env — still need auth token in EAS Secrets for source map uploads
 - [ ] Resend: set `RESEND_API_KEY` secret, verify sending domain
 - [ ] Apple Developer Program enrollment ($99/year) — required for App Store + IAP
-- [ ] Google Play Developer account ($25 one-time) — required for Play Store + IAP
+- [x] Google Play Developer account ($25 one-time) — done 2026-03-21
 - [ ] RevenueCat project setup — connect both stores, configure entitlements & offerings (see Epic 9)
 
 ## Required Reading (before any implementation work)

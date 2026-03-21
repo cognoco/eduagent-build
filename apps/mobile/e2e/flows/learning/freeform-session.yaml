@@ -53,6 +53,13 @@ tags:
 # BUG-35: keyboard covers send button on Android. Use keyboard Enter key.
 - pressKey: Enter
 
+# Visual integrity: verify user message rendered in chat
+- scrollUntilVisible:
+    element:
+      text: "What is photosynthesis?"
+    direction: DOWN
+    timeout: 10000
+
 # 7. Wait for AI response — real LLM call, 60s timeout
 - extendedWaitUntil:
     visible:

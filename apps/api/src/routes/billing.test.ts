@@ -373,7 +373,10 @@ describe('billing routes', () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
       mockSubscriptionsUpdate.mockResolvedValue({
         cancel_at_period_end: true,
-        current_period_end: 1739577600, // 2025-02-15T00:00:00Z
+        // Stripe SDK v20: period fields on SubscriptionItem
+        items: {
+          data: [{ current_period_end: 1739577600 }], // 2025-02-15T00:00:00Z
+        },
       });
 
       const res = await app.request(

@@ -47,6 +47,13 @@ tags:
 # per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
 - pressKey: Enter
 
+# Visual integrity: verify user message rendered in chat
+- scrollUntilVisible:
+    element:
+      text: "Hello, can you help me understand the basics?"
+    direction: DOWN
+    timeout: 10000
+
 # Wait for the AI response to appear.
 # The send button should become re-enabled once streaming is done.
 # We verify the chat input is still present (session didn't crash).

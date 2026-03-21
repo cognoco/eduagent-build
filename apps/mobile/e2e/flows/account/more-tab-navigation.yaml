@@ -42,6 +42,37 @@ tags:
       text: "Appearance"
     timeout: 10000
 
+# ── Visual integrity: all section headings scrollable ──────────────────
+# More screen has 4 sections: Appearance, Notifications, Learning Mode, Account.
+# Each must be reachable by scrolling. Catches layout overflow issues.
+- assertVisible:
+    text: "Appearance"
+
+- scrollUntilVisible:
+    element:
+      text: "Notifications"
+    direction: DOWN
+    timeout: 5000
+
+- scrollUntilVisible:
+    element:
+      text: "Learning Mode"
+    direction: DOWN
+    timeout: 5000
+
+- scrollUntilVisible:
+    element:
+      text: "Account"
+    direction: DOWN
+    timeout: 5000
+
+# Scroll back to top for screenshot
+- scrollUntilVisible:
+    element:
+      text: "Appearance"
+    direction: UP
+    timeout: 5000
+
 - takeScreenshot: more-tab-loaded
 
 # ── Destination 1: Profile (modal — close returns to More) ──

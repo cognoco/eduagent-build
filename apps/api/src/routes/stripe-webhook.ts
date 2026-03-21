@@ -25,6 +25,39 @@ import type { CachedSubscriptionStatus } from '../services/kv';
 import type { WebhookSubscriptionUpdate } from '../services/billing';
 
 // ---------------------------------------------------------------------------
+// Stripe SDK v20 type helpers
+// ---------------------------------------------------------------------------
+// In Stripe SDK v20, `current_period_start` and `current_period_end` moved
+// from `Subscription` to `SubscriptionItem`. Webhook payloads still include
+// them at the subscription level, but the TypeScript types don't expose them.
+// These helpers safely extract period timestamps from subscription items.
+
+function extractPeriodStart(sub: Stripe.Subscription): number | undefined {
+  const ts = sub.items?.data?.[0]?.current_period_start;
+  return typeof ts === 'number' ? ts : undefined;
+}
+
+function extractPeriodEnd(sub: Stripe.Subscription): number | undefined {
+  const ts = sub.items?.data?.[0]?.current_period_end;
+  return typeof ts === 'number' ? ts : undefined;
+}
+
+/**
+ * Extracts the subscription ID from an Invoice.
+ * In Stripe SDK v20, `subscription` moved to `parent.subscription_details`.
+ */
+function extractSubscriptionIdFromInvoice(
+  invoice: Stripe.Invoice
+): string | undefined {
+  const parentSub = invoice.parent?.subscription_details?.subscription;
+  if (typeof parentSub === 'string') return parentSub;
+  if (parentSub && typeof parentSub === 'object' && 'id' in parentSub) {
+    return parentSub.id;
+  }
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -112,15 +145,13 @@ async function handleSubscriptionEvent(
     updates.tier = tier;
   }
 
-  if ((stripeSubscription as any).current_period_start) {
-    updates.currentPeriodStart = new Date(
-      (stripeSubscription as any).current_period_start * 1000
-    ).toISOString();
+  const periodStart = extractPeriodStart(stripeSubscription);
+  if (periodStart) {
+    updates.currentPeriodStart = new Date(periodStart * 1000).toISOString();
   }
-  if ((stripeSubscription as any).current_period_end) {
-    updates.currentPeriodEnd = new Date(
-      (stripeSubscription as any).current_period_end * 1000
-    ).toISOString();
+  const periodEnd = extractPeriodEnd(stripeSubscription);
+  if (periodEnd) {
+    updates.currentPeriodEnd = new Date(periodEnd * 1000).toISOString();
   }
   if (stripeSubscription.canceled_at) {
     updates.cancelledAt = new Date(
@@ -205,10 +236,7 @@ async function handlePaymentFailed(
   invoice: Stripe.Invoice,
   eventTimestamp: string
 ): Promise<void> {
-  const stripeSubscriptionId =
-    typeof (invoice as any).subscription === 'string'
-      ? (invoice as any).subscription
-      : (invoice as any).subscription?.id;
+  const stripeSubscriptionId = extractSubscriptionIdFromInvoice(invoice);
 
   if (!stripeSubscriptionId) return;
 
@@ -245,10 +273,7 @@ async function handlePaymentSucceeded(
   invoice: Stripe.Invoice,
   eventTimestamp: string
 ): Promise<void> {
-  const stripeSubscriptionId =
-    typeof (invoice as any).subscription === 'string'
-      ? (invoice as any).subscription
-      : (invoice as any).subscription?.id;
+  const stripeSubscriptionId = extractSubscriptionIdFromInvoice(invoice);
 
   if (!stripeSubscriptionId) return;
 

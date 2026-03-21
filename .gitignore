@@ -57,6 +57,11 @@ test-output
 # TestSprite MCP generated tests (ephemeral, not committed)
 testsprite_tests/
 
+# Sentry auth token (local builds — never commit)
+# Note: android/ is gitignored (Expo managed), so sentry.properties
+# won't reach EAS builds. Use SENTRY_AUTH_TOKEN, SENTRY_ORG,
+# SENTRY_PROJECT env vars in EAS Secrets instead.
+
 # Environment variables
 # IMPORTANT: .env.example IS tracked (template for developers)
 # All other .env files contain secrets and MUST NOT be committed
@@ -141,3 +146,4 @@ apps/mobile/e2e/flows/_debug/
 
 # E2E test run result artifacts (timestamped, local-only)
 apps/mobile/e2e/scripts/*-results-*.txt
+apps/mobile/e2e/scripts/regression-batch*.txt

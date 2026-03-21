@@ -23,6 +23,24 @@ tags:
       id: "home-scroll-view"
     timeout: 15000
 
+# ── Visual integrity: tab bar completeness ─────────────────────────────
+- assertVisible:
+    id: "tab-home"
+- assertVisible:
+    id: "tab-book"
+- assertVisible:
+    id: "tab-more"
+
+# ── Visual integrity: coaching card present with data ──────────────────
+- assertVisible:
+    id: "coaching-card"
+
+# ── Negative assertions: empty state must not appear ───────────────────
+# Full text match required — Maestro on Android can't reliably match substrings
+# inside React Native <Text> nodes (BUG-57 pattern).
+- assertNotVisible:
+    text: "Start learning — add your first subject"
+
 # 3. Start session via coaching card
 - tapOn:
     id: "coaching-card-primary"
@@ -41,6 +59,15 @@ tags:
 # (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
 # per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
 - pressKey: Enter
+
+# ── Visual integrity: verify user message rendered in chat ─────────────
+# After sending, the user's message must appear in the message list.
+# Catches rendering bugs where input is accepted but not displayed.
+- scrollUntilVisible:
+    element:
+      text: "Explain the concept to me"
+    direction: DOWN
+    timeout: 10000
 
 # 6. Wait for AI response
 - extendedWaitUntil:
