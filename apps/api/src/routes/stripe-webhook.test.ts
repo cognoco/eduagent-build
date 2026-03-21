@@ -92,8 +92,15 @@ function makeSubscription(
   return {
     id: 'sub_stripe_123',
     status: 'active',
-    current_period_start: 1700000000,
-    current_period_end: 1702592000,
+    // Stripe SDK v20: period fields live on SubscriptionItem
+    items: {
+      data: [
+        {
+          current_period_start: 1700000000,
+          current_period_end: 1702592000,
+        },
+      ],
+    },
     canceled_at: null,
     ...overrides,
   };
@@ -104,7 +111,12 @@ function makeInvoice(
 ): Record<string, unknown> {
   return {
     id: 'in_123',
-    subscription: 'sub_stripe_123',
+    // Stripe SDK v20: subscription moved to parent.subscription_details
+    parent: {
+      subscription_details: {
+        subscription: 'sub_stripe_123',
+      },
+    },
     attempt_count: 1,
     ...overrides,
   };

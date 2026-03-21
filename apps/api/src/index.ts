@@ -194,14 +194,17 @@ app.route('/', routes);
 
 // Global error handler — catches unhandled exceptions and returns ApiErrorSchema envelope
 app.onError((err, c) => {
-  console.error('[unhandled]', err);
-
-  // Report to Sentry with user/request context
+  // Report to Sentry with user/request context (primary observability channel)
   captureException(err, {
     userId: c.get('user')?.userId,
     profileId: c.get('profileId'),
     requestPath: c.req.path,
   });
+
+  // Only log to console in non-production (avoid leaking stack traces / internal paths)
+  if (c.env.ENVIRONMENT !== 'production') {
+    console.error('[unhandled]', err);
+  }
 
   return c.json(
     {
