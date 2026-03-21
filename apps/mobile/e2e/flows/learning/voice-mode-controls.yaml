@@ -1,0 +1,135 @@
+# Flow N12: Voice Mode Controls — Toggle, Playback Bar, Speed Cycling
+# Validates: Epic 8 ungating — voice toggle visible on all sessions,
+# mic button + playback bar appear when toggled ON, speed badge cycles.
+# Tags: nightly, learning, voice
+#
+# Epics: Epic 8 (FR144-FR145)
+# Prerequisite: Seeded user with active subject (scenario: learning-active)
+appId: com.zwizzly.eduagent
+tags:
+  - nightly
+  - learning
+  - voice
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+# 2. Home screen visible
+- extendedWaitUntil:
+    visible:
+      text: "Ready to learn"
+    timeout: 15000
+
+# 3. Start a learning session via coaching card
+- tapOn:
+    id: "coaching-card-primary"
+
+# 4. Session screen loads
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 10000
+
+# ---------------------------------------------------------------
+# Voice toggle is always visible (Epic 8 ungating)
+# ---------------------------------------------------------------
+
+# 5. Voice toggle visible in header
+- assertVisible:
+    id: "voice-toggle"
+
+# 6. Voice defaults OFF for learning session — no mic button
+- assertNotVisible:
+    id: "voice-record-button"
+
+# 7. No playback bar when voice is OFF
+- assertNotVisible:
+    id: "voice-playback-bar"
+
+# 8. Screenshot: session with voice OFF (baseline)
+- takeScreenshot: voice-mode-01-voice-off
+
+# ---------------------------------------------------------------
+# Toggle voice ON
+# ---------------------------------------------------------------
+
+# 9. Tap voice toggle → enable voice
+- tapOn:
+    id: "voice-toggle"
+
+# 10. Mic button now visible
+- extendedWaitUntil:
+    visible:
+      id: "voice-record-button"
+    timeout: 3000
+
+# 11. Playback bar now visible
+- assertVisible:
+    id: "voice-playback-bar"
+
+# 12. Replay button visible
+- assertVisible:
+    id: "voice-replay-button"
+
+# 13. Speed badge visible, showing 1x
+- assertVisible:
+    id: "voice-rate-button"
+- assertVisible:
+    text: "1x"
+
+# 14. Screenshot: session with voice ON
+- takeScreenshot: voice-mode-02-voice-on
+
+# ---------------------------------------------------------------
+# Speed cycling: 1x → 1.25x → 0.75x → 1x
+# ---------------------------------------------------------------
+
+# 15. Tap speed badge → 1.25x
+- tapOn:
+    id: "voice-rate-button"
+- assertVisible:
+    text: "1.25x"
+
+# 16. Tap speed badge → 0.75x
+- tapOn:
+    id: "voice-rate-button"
+- assertVisible:
+    text: "0.75x"
+
+# 17. Tap speed badge → back to 1x
+- tapOn:
+    id: "voice-rate-button"
+- assertVisible:
+    text: "1x"
+
+# 18. Screenshot: speed cycling complete
+- takeScreenshot: voice-mode-03-speed-cycled
+
+# ---------------------------------------------------------------
+# Toggle voice OFF — controls disappear
+# ---------------------------------------------------------------
+
+# 19. Tap voice toggle → disable voice
+- tapOn:
+    id: "voice-toggle"
+
+# 20. Mic button gone
+- extendedWaitUntil:
+    notVisible:
+      id: "voice-record-button"
+    timeout: 3000
+
+# 21. Playback bar gone
+- assertNotVisible:
+    id: "voice-playback-bar"
+
+# 22. Voice toggle still visible (always present)
+- assertVisible:
+    id: "voice-toggle"
+
+# 23. Screenshot: voice OFF again (round-trip verified)
+- takeScreenshot: voice-mode-04-voice-off-again
