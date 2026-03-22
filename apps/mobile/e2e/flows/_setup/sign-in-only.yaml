@@ -20,18 +20,16 @@ appId: com.mentomate.app
     id: "sign-in-email"
 - inputText: ${EMAIL}
 
-# BUG-20: dismiss keyboard by tapping heading
-- tapOn:
-    text: "Welcome back"
+# Dismiss keyboard (pressKey: back is reliable when keyboard IS open — see BUG-5 notes)
+- pressKey: back
 
 # 3. Enter password
 - tapOn:
     id: "sign-in-password"
 - inputText: ${PASSWORD}
 
-# BUG-20: dismiss keyboard
-- tapOn:
-    text: "Welcome back"
+# Dismiss keyboard
+- pressKey: back
 
 # 4. Wait for sign-in button and tap it
 - extendedWaitUntil:

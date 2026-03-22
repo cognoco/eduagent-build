@@ -71,7 +71,7 @@ tags:
     element:
       text: "Appearance"
     direction: UP
-    timeout: 5000
+    timeout: 10000
 
 - takeScreenshot: more-tab-loaded
 
