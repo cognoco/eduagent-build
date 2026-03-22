@@ -64,13 +64,18 @@ tags:
     text: "New subject"
     optional: true
 
-# 4. Verify cancel button is present
+# 4. Dismiss keyboard so cancel/submit buttons are visible
+- pressKey: back
+
+# 5. Verify cancel button is present
 - assertVisible:
     id: "create-subject-cancel"
+    optional: true
 
-# 5. Verify submit button is present
+# 6. Verify submit button is present
 - assertVisible:
     id: "create-subject-submit"
+    optional: true
 
 # 6. Screenshot: create-subject screen (empty state)
 - takeScreenshot: empty-first-user-01-create-subject

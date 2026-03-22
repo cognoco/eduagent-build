@@ -81,9 +81,7 @@ tags:
 - takeScreenshot: multi-child-03-emma-detail
 
 # Navigate back to dashboard
-- tapOn:
-    id: "back-button"
-    optional: true
+# Use pressKey:back only — tapOn back-button + pressKey = double-back exits dashboard
 - pressKey: back
 
 # Wait for dashboard to reload
@@ -114,9 +112,7 @@ tags:
 - takeScreenshot: multi-child-04-lucas-detail
 
 # Navigate back
-- tapOn:
-    id: "back-button"
-    optional: true
+# Use pressKey:back only — tapOn back-button + pressKey = double-back exits dashboard
 - pressKey: back
 
 - extendedWaitUntil:
@@ -146,9 +142,7 @@ tags:
 - takeScreenshot: multi-child-05-sofia-detail
 
 # Navigate back
-- tapOn:
-    id: "back-button"
-    optional: true
+# Use pressKey:back only — tapOn back-button + pressKey = double-back exits dashboard
 - pressKey: back
 
 - extendedWaitUntil:

@@ -21,7 +21,7 @@ tags:
 # 2. Home screen visible
 - extendedWaitUntil:
     visible:
-      text: "Ready to learn"
+      id: "home-scroll-view"
     timeout: 15000
 
 # 3. Start a learning session via coaching card
