@@ -178,12 +178,33 @@ function buildMarkdownStyles(
   return {
     body: base,
     text: base,
-    paragraph: { ...base, marginTop: 0, marginBottom: 4 },
+    // The library renders `inline` and `textgroup` as <Text> wrappers around
+    // content.  Without an explicit color they default to black on Android,
+    // making dark-mode text invisible.
+    textgroup: base,
+    inline: base,
+    // Paragraph renders as a View (via _VIEW_SAFE_paragraph, which strips text
+    // props). Keep the library's default layout props so text wraps correctly.
+    paragraph: {
+      ...base,
+      marginTop: 0,
+      marginBottom: 4,
+      flexWrap: 'wrap' as const,
+      flexDirection: 'row' as const,
+      alignItems: 'flex-start' as const,
+      justifyContent: 'flex-start' as const,
+      width: '100%',
+    },
     strong: { ...base, fontWeight: '700' },
     em: { ...base, fontStyle: 'italic' },
+    s: { ...base, textDecorationLine: 'line-through' as const },
     bullet_list: { ...base, marginBottom: 4 },
     ordered_list: { ...base, marginBottom: 4 },
     list_item: { ...base, marginBottom: 2 },
+    bullet_list_icon: { ...base, marginLeft: 10, marginRight: 10 },
+    ordered_list_icon: { ...base, marginLeft: 10, marginRight: 10 },
+    bullet_list_content: { flex: 1 },
+    ordered_list_content: { flex: 1 },
     code_inline: {
       ...base,
       fontFamily: 'monospace',
@@ -213,11 +234,14 @@ function buildMarkdownStyles(
     link: { ...base, color: colors.primary },
     blockquote: {
       ...base,
+      backgroundColor: `${colors.muted}11`,
       borderLeftWidth: 3,
       borderLeftColor: colors.primary,
       paddingLeft: 8,
       marginBottom: 4,
     },
+    softbreak: base,
+    hardbreak: { ...base, width: '100%', height: 1 },
     hr: { backgroundColor: colors.muted, height: 1, marginVertical: 8 },
   };
 }
