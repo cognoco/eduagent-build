@@ -177,6 +177,7 @@ function buildMarkdownStyles(
   };
   return {
     body: base,
+    text: base,
     paragraph: { ...base, marginTop: 0, marginBottom: 4 },
     strong: { ...base, fontWeight: '700' },
     em: { ...base, fontStyle: 'italic' },
