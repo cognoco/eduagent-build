@@ -36,7 +36,7 @@ tags:
 # 4. Wait for create-subject modal
 - extendedWaitUntil:
     visible:
-      text: "New subject"
+      id: "create-subject-name"
     timeout: 10000
 
 # 5. Enter subject name

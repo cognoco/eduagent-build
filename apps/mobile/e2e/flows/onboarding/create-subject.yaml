@@ -55,8 +55,8 @@ tags:
 - inputText: "World History"
 
 # Dismiss keyboard so submit button is visible (autoFocus keeps keyboard open)
-- tapOn:
-    text: "New subject"
+# pressKey: back reliably dismisses keyboard when it IS open (BUG-5 safe here)
+- pressKey: back
 
 # Wait for layout to settle after keyboard dismissal
 - extendedWaitUntil:
