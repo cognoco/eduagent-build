@@ -304,7 +304,9 @@ export function MessageBubble({
           <ThinkingIndicator />
         ) : isAI ? (
           <View>
-            <Markdown style={mdStyles}>{displayContent}</Markdown>
+            <Markdown mergeStyle={false} style={mdStyles}>
+              {displayContent}
+            </Markdown>
             {streaming && <BlinkingCursor />}
           </View>
         ) : (
