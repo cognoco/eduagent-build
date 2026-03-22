@@ -91,13 +91,19 @@ export default function HomeScreen() {
             </View>
           )}
           {streak && streak.currentStreak > 0 ? (
-            <View className="bg-surface-elevated rounded-full px-3 py-2 items-center justify-center">
+            <View
+              testID="streak-badge"
+              className="bg-surface-elevated rounded-full px-3 py-2 items-center justify-center"
+            >
               <Text className="text-text-primary text-body-sm font-semibold">
                 {streak.currentStreak}d
               </Text>
             </View>
           ) : (
-            <View className="bg-surface-elevated rounded-full w-11 h-11 items-center justify-center">
+            <View
+              testID="streak-badge"
+              className="bg-surface-elevated rounded-full w-11 h-11 items-center justify-center"
+            >
               <Text className="text-text-secondary text-body-sm">0d</Text>
             </View>
           )}

@@ -83,6 +83,7 @@ run_seeded "multi-subject" "flows/subjects/multi-subject.yaml"
 
 # ─── GROUP 10: Edge case flows ───
 run_seeded "onboarding-no-subject" "flows/edge/empty-first-user.yaml"
+run_seeded "learning-active"       "flows/edge/streak-display.yaml"
 
 # ─── GROUP 11: Consent flows (updated per Sessions 15-18) ───
 run_seeded "consent-withdrawn-solo" "flows/consent/consent-withdrawn-gate.yaml"
