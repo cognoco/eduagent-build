@@ -820,6 +820,96 @@ Two visual bugs identified from emulator screenshot review and fixed in app code
 
 **Updated cumulative: 39/44 passing (89%). 2 visual bugs fixed pending rebuild verification.**
 
+### Session 21 (2026-03-22) — Full Regression + Bug Fixes + New Flows
+
+**Environment:** Windows 11 + WHPX emulator (New_Device, API 34, 1080x1920)
+**Build:** Same dev-client APK from Session 20 (no native changes since March 13)
+**Metro:** Windows, `unstable_serverRoot: monorepoRoot`, bundle proxy on port 8082
+**Branch:** `e2e/session-21-fixes` (6 commits)
+**Commit:** `5fc6989` (final)
+
+**Infrastructure issues resolved this session:**
+- Bluetooth "keeps stopping" dialog: `pm uninstall -k --user 0 com.android.bluetooth` (survives app restarts, lost on cold reboot)
+- Maestro gRPC driver crash after cold boot: manual APK extraction from `maestro-client.jar` + install via ADB
+- Full emulator cold reboot required to stabilize driver
+
+#### Main Regression Run (44 flows)
+
+| # | Flow | Status | Notes |
+|---|------|--------|-------|
+| 1 | `account/more-tab-navigation` | FAIL → **PASS** | Scroll timeout 5s→10s |
+| 2 | `account/settings-toggles` | **PASS** | |
+| 3 | `account/account-lifecycle` | **PASS** | |
+| 4 | `account/delete-account` | **PASS** | |
+| 5 | `account/profile-switching` | **PASS** | |
+| 6 | `onboarding/create-profile-standalone` | **PASS** | |
+| 7 | `onboarding/analogy-preference-flow` | FAIL → **PASS** | "New subject"→testID fix (BUG-61) |
+| 8 | `onboarding/curriculum-review-flow` | FAIL → **PASS** | Same fix + LLM responded |
+| 9 | `onboarding/create-subject` | FAIL → **PASS** | Same fix (BUG-61) |
+| 10 | `onboarding/view-curriculum` | **PASS** | |
+| 11 | `billing/subscription` | **PASS** | |
+| 12 | `billing/subscription-details` | **PASS** | |
+| 13 | `billing/child-paywall` | **PASS** | |
+| 14 | `learning/core-learning` | FAIL → **PASS** | Exchange timeout 15s→30s |
+| 15 | `learning/first-session` | **PASS** | |
+| 16 | `learning/freeform-session` | **PASS** | |
+| 17 | `learning/session-summary` | **PASS** | |
+| 18 | `learning/start-session` | **PASS** | |
+| 19 | `assessment/assessment-cycle` | FAIL → **PASS** | "New subject"→testID + timeout fix |
+| 20 | `retention/topic-detail` | **PASS** | |
+| 21 | `retention/learning-book` | **PASS** | |
+| 22 | `retention/retention-review` | **PASS** | |
+| 23 | `retention/recall-review` | **PASS** | |
+| 24 | `retention/failed-recall` | **PASS** | |
+| 25 | `retention/relearn-flow` | **PASS** | |
+| 26 | `parent/parent-tabs` | **PASS** | |
+| 27 | `parent/parent-dashboard` | **PASS** | |
+| 28 | `parent/parent-learning-book` | **PASS** | |
+| 29 | `parent/child-drill-down` | **PASS** | |
+| 30 | `parent/consent-management` | **PASS** | |
+| 31 | `parent/demo-dashboard` | **PASS** | |
+| 32 | `homework/homework-flow` | **PASS** | |
+| 33 | `homework/homework-from-entry-card` | **PASS** | |
+| 34 | `homework/camera-ocr` | **PASS** | |
+| 35 | `subjects/multi-subject` | **PASS** | |
+| 36 | `edge/empty-first-user` | FAIL → **pending** | sign-in-only.yaml keyboard fix applied |
+| 37 | `consent/consent-withdrawn-gate` | FAIL → **pending** | BUG-62 fix applied |
+| 38 | `consent/post-approval-landing` | FAIL → **pending** | BUG-62 fix applied |
+| 39 | `consent/consent-pending-gate` | FAIL → **pending** | BUG-62 fix applied |
+| 40 | `consent/coppa-flow` | FAIL → **pending** | BUG-62 fix applied |
+| 41 | `consent/profile-creation-consent` | FAIL → **pending** | BUG-62 fix applied |
+| 42 | `onboarding/sign-up-flow` | PARTIAL | By design — Clerk verification |
+| 43 | `app-launch-expogo` | SKIP | ExpoGo — wrong app type |
+
+#### New Flows Added This Session
+
+| # | Flow | Seed Scenario | Status | Notes |
+|---|------|---------------|--------|-------|
+| 44 | `parent/multi-child-dashboard` | `parent-multi-child` | FAIL → **pending** | New seed (3 children), needs debugging |
+| 45 | `parent/add-child-profile` | `parent-with-children` | **PASS** | New flow — parent creates child via profiles screen |
+| 46 | `learning/voice-mode-controls` | `learning-active` | FAIL → **pending** | Fixed appId typo, added to regression |
+| 47 | `edge/streak-display` | `learning-active` | **PASS** | New flow — streak badge testID added |
+
+#### Bug Fixes Applied This Session
+
+| Bug | What | Fix | Flows Affected |
+|-----|------|-----|----------------|
+| BUG-59 | `child/[profileId]` tab visible in parent layout | Added `tabBarItemStyle: { display: 'none' }` | Visual only |
+| BUG-61 | "New subject" heading pushed off screen by autoFocus keyboard (BUG-60 side effect) | Assert on `create-subject-name` testID instead of heading text | 5 flows |
+| BUG-62 | Consent flows use `tapOn "Welcome back"` for keyboard dismiss — heading covered by keyboard | Replace with `pressKey: back` (matches seed-and-sign-in.yaml pattern) | 5 consent + sign-in-only |
+| BUG-63 | Coach bubble text invisible in dark mode — `react-native-markdown-display` missing `text` style key | Add `text: base` to Markdown styles in MessageBubble.tsx | All chat sessions |
+| — | LLM exchange timeouts too short (15s) on WHPX | Bumped to 30s in core-learning + assessment-cycle | 2 flows |
+| — | voice-mode-controls.yaml wrong appId (`com.zwizzly.eduagent`) | Fixed to `com.mentomate.app` | 1 flow |
+
+#### New Infrastructure
+
+- **`parent-multi-child` seed scenario:** Parent + 3 children (Emma/Mathematics, Lucas/Science, Sofia/History) with varying session progress
+- **`streak-badge` testID** added to home.tsx streak View
+- **`voice-mode-controls`** added to regression script
+- **Test count:** 17 seed scenarios (was 16), 48 flows in regression (was 44)
+
+**Session 21 verified totals: 35/44 core flows PASS (80%). With fixes applied to remaining 8 (pending re-run #4), expected: 41-43/48 (85-90%).**
+
 ---
 
 ## References
