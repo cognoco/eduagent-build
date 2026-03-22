@@ -1277,6 +1277,8 @@ behavior="padding"
 
 **Fix:** Replace `tapOn: text: "Welcome back"` with `pressKey: back` in all 5 consent flows. This matches the pattern used in `seed-and-sign-in.yaml` and `sign-in-only.yaml` (already fixed). `pressKey: back` reliably dismisses the keyboard when it's open.
 
+**Re-run #4 results:** 4/5 consent flows now PASS (consent-withdrawn-gate, post-approval-landing, consent-pending-gate, profile-creation-consent). `coppa-flow` still fails — different issue (not keyboard-related).
+
 **Lesson learned:** When fixing a keyboard dismiss pattern in a shared flow, grep for ALL copies of that pattern across the entire `flows/` directory. Consent flows had their own sign-in code that wasn't updated.
 
 ---

@@ -908,7 +908,39 @@ Two visual bugs identified from emulator screenshot review and fixed in app code
 - **`voice-mode-controls`** added to regression script
 - **Test count:** 17 seed scenarios (was 16), 48 flows in regression (was 44)
 
-**Session 21 verified totals: 35/44 core flows PASS (80%). With fixes applied to remaining 8 (pending re-run #4), expected: 41-43/48 (85-90%).**
+#### Re-run #4 Results (Consent Fix Verification)
+
+| # | Flow | Status | Notes |
+|---|------|--------|-------|
+| 37 | `consent/consent-withdrawn-gate` | **PASS** | BUG-62 fix verified |
+| 38 | `consent/post-approval-landing` | **PASS** | BUG-62 fix verified |
+| 39 | `consent/consent-pending-gate` | **PASS** | BUG-62 fix verified |
+| 40 | `consent/coppa-flow` | FAIL | Different issue — needs investigation |
+| 41 | `consent/profile-creation-consent` | **PASS** | BUG-62 fix verified |
+| 36 | `edge/empty-first-user` | FAIL | Persistent — sign-in-only needs deeper fix |
+| 44 | `parent/multi-child-dashboard` | FAIL | New flow — needs debugging |
+| 46 | `learning/voice-mode-controls` | FAIL | New flow — needs debugging |
+
+### Session 21 Final Totals
+
+| Category | Count | Details |
+|----------|-------|---------|
+| **PASS** | **41** | 29 from main run + 6 fixed + 4 consent fixed + 2 new flows |
+| **FAIL** | **4** | coppa-flow, empty-first-user, multi-child-dashboard, voice-mode-controls |
+| **PARTIAL** | **1** | sign-up (Clerk verification — by design) |
+| **SKIP** | **1** | ExpoGo (wrong app type) |
+| **NOT RUN** | **1** | sign-up-flow in re-run (expected partial) |
+| **TOTAL** | **48** | 44 original + 4 new flows |
+
+**Pass rate: 41/48 = 85% (up from 29/43 = 67% at session start)**
+
+**Comparison to Session 20 (March 13): 39/44 (89%) → 41/48 (85%).** Pass rate dipped slightly due to 4 new flows (2 passing, 2 need debugging), but absolute pass count increased from 39 to 41. All 6 previously-failing flows from Session 20 are now fixed.
+
+**Remaining failures (4):**
+- `coppa-flow` — 4/5 consent flows pass, this one has a flow-specific issue (not keyboard-related)
+- `empty-first-user` — `sign-in-only.yaml` keyboard fix applied but flow still fails (needs deeper investigation)
+- `multi-child-dashboard` — new flow, first run, needs debugging
+- `voice-mode-controls` — new flow, appId fixed but flow logic needs verification on emulator
 
 ---
 
