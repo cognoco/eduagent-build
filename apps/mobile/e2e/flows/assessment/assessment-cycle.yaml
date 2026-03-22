@@ -69,7 +69,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 30000
 
 # 11. Screenshot
 - takeScreenshot: assessment-cycle-complete

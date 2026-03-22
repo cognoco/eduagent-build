@@ -5,7 +5,7 @@
 #
 # Epics: Epic 8 (FR144-FR145)
 # Prerequisite: Seeded user with active subject (scenario: learning-active)
-appId: com.zwizzly.eduagent
+appId: com.mentomate.app
 tags:
   - nightly
   - learning

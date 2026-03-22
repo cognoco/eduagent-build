@@ -1,0 +1,159 @@
+# Flow: Parent Multi-Child Dashboard — View and Navigate Multiple Children
+# Validates: parent with 3 children sees all children listed, can tap into each,
+# and verify per-child data (subjects, sessions). Tests scroll behavior when
+# children list extends beyond the fold.
+# Tags: nightly, parent
+#
+# Journey: UX Journey 4 (Parent Oversight)
+# Epics: Epic 5 (FR85-FR90)
+# Prerequisite: Seeded parent user with 3 linked children
+#               (scenario: parent-multi-child — creates Emma, Lucas, Sofia)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+---
+# 1. Seed & sign in as parent
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-multi-child"
+      API_URL: ${API_URL}
+
+# 2. Wait for parent dashboard
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+# ── Visual integrity: dashboard heading ────────────────────────────────
+- assertVisible:
+    text: "Home"
+- assertVisible:
+    text: "How your children are doing"
+
+- takeScreenshot: multi-child-01-dashboard
+
+# ── Verify all 3 children are listed ──────────────────────────────────
+# Child 1: Emma (teen, Mathematics, 10 exchanges completed)
+- extendedWaitUntil:
+    visible:
+      text: "Emma"
+    timeout: 10000
+
+# Child 2: Lucas (learner, Science, 5 exchanges completed)
+- scrollUntilVisible:
+    element:
+      text: "Lucas"
+    direction: DOWN
+    timeout: 10000
+
+# Child 3: Sofia (teen, History, no sessions yet)
+- scrollUntilVisible:
+    element:
+      text: "Sofia"
+    direction: DOWN
+    timeout: 10000
+
+- takeScreenshot: multi-child-02-all-children-visible
+
+# ── Drill into Child 1 (Emma) ─────────────────────────────────────────
+- scrollUntilVisible:
+    element:
+      text: "Emma"
+    direction: UP
+    timeout: 10000
+
+- tapOn:
+    text: "Emma"
+
+# Wait for child detail screen
+- extendedWaitUntil:
+    visible:
+      text: "Emma"
+    timeout: 10000
+
+# Verify subject and session info
+- assertVisible:
+    text: "Mathematics"
+    optional: true
+
+- takeScreenshot: multi-child-03-emma-detail
+
+# Navigate back to dashboard
+- tapOn:
+    id: "back-button"
+    optional: true
+- pressKey: back
+
+# Wait for dashboard to reload
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 10000
+
+# ── Drill into Child 2 (Lucas) ────────────────────────────────────────
+- scrollUntilVisible:
+    element:
+      text: "Lucas"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    text: "Lucas"
+
+- extendedWaitUntil:
+    visible:
+      text: "Lucas"
+    timeout: 10000
+
+- assertVisible:
+    text: "Science"
+    optional: true
+
+- takeScreenshot: multi-child-04-lucas-detail
+
+# Navigate back
+- tapOn:
+    id: "back-button"
+    optional: true
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 10000
+
+# ── Drill into Child 3 (Sofia — no sessions) ─────────────────────────
+- scrollUntilVisible:
+    element:
+      text: "Sofia"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    text: "Sofia"
+
+- extendedWaitUntil:
+    visible:
+      text: "Sofia"
+    timeout: 10000
+
+- assertVisible:
+    text: "History"
+    optional: true
+
+- takeScreenshot: multi-child-05-sofia-detail
+
+# Navigate back
+- tapOn:
+    id: "back-button"
+    optional: true
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 10000
+
+- takeScreenshot: multi-child-06-complete

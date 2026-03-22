@@ -70,7 +70,8 @@ export type SeedScenario =
   | 'consent-withdrawn-solo'
   | 'parent-solo'
   | 'pre-profile'
-  | 'consent-pending';
+  | 'consent-pending'
+  | 'parent-multi-child';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -677,6 +678,147 @@ async function seedParentWithChildren(
   };
 }
 
+async function seedParentMultiChild(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  // Parent profile
+  const parentProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Test Parent',
+    personaType: 'PARENT',
+    isOwner: true,
+  });
+
+  // Child 1 — teen with active learning
+  const child1ProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Emma',
+    personaType: 'TEEN',
+    isOwner: false,
+  });
+
+  await db.insert(familyLinks).values({
+    id: generateUUIDv7(),
+    parentProfileId,
+    childProfileId: child1ProfileId,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: child1ProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const { subjectId: subject1Id } = await createSubjectWithCurriculum(
+    db,
+    child1ProfileId,
+    'Mathematics'
+  );
+
+  const session1Id = generateUUIDv7();
+  await db.insert(learningSessions).values({
+    id: session1Id,
+    profileId: child1ProfileId,
+    subjectId: subject1Id,
+    sessionType: 'learning',
+    status: 'completed',
+    exchangeCount: 10,
+    endedAt: pastDate(1),
+  });
+
+  // Child 2 — learner with different subject
+  const child2ProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Lucas',
+    personaType: 'LEARNER',
+    isOwner: false,
+  });
+
+  await db.insert(familyLinks).values({
+    id: generateUUIDv7(),
+    parentProfileId,
+    childProfileId: child2ProfileId,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: child2ProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const { subjectId: subject2Id } = await createSubjectWithCurriculum(
+    db,
+    child2ProfileId,
+    'Science'
+  );
+
+  const session2Id = generateUUIDv7();
+  await db.insert(learningSessions).values({
+    id: session2Id,
+    profileId: child2ProfileId,
+    subjectId: subject2Id,
+    sessionType: 'learning',
+    status: 'completed',
+    exchangeCount: 5,
+    endedAt: pastDate(2),
+  });
+
+  // Child 3 — teen with no sessions yet (fresh onboarding)
+  const child3ProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Sofia',
+    personaType: 'TEEN',
+    isOwner: false,
+  });
+
+  await db.insert(familyLinks).values({
+    id: generateUUIDv7(),
+    parentProfileId,
+    childProfileId: child3ProfileId,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: child3ProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const { subjectId: subject3Id } = await createSubjectWithCurriculum(
+    db,
+    child3ProfileId,
+    'History'
+  );
+
+  return {
+    scenario: 'parent-multi-child',
+    accountId,
+    profileId: parentProfileId,
+    email,
+    password,
+    ids: {
+      parentProfileId,
+      child1ProfileId,
+      child2ProfileId,
+      child3ProfileId,
+      subject1Id,
+      subject2Id,
+      subject3Id,
+      session1Id,
+      session2Id,
+    },
+  };
+}
+
 async function seedTrialActive(
   db: Database,
   email: string,
@@ -1131,6 +1273,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'parent-solo': seedParentSolo,
   'pre-profile': seedPreProfile,
   'consent-pending': seedConsentPending,
+  'parent-multi-child': seedParentMultiChild,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];

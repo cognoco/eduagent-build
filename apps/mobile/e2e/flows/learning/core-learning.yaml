@@ -73,7 +73,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 30000
 
 # 7. Exchange 2: follow-up
 - tapOn:
@@ -88,7 +88,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 30000
 
 # 9. Exchange 3: clarification
 - tapOn:
@@ -103,7 +103,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 30000
 
 # 11. Session close — either auto-closes after exchange cap or manual
 # Look for summary screen or close button

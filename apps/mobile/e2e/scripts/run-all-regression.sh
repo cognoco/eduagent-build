@@ -50,6 +50,7 @@ run_seeded "learning-active" "flows/learning/first-session.yaml"
 run_seeded "learning-active" "flows/learning/freeform-session.yaml"
 run_seeded "learning-active" "flows/learning/session-summary.yaml"
 run_seeded "learning-active" "flows/learning/start-session.yaml"
+run_seeded "learning-active" "flows/learning/voice-mode-controls.yaml"
 
 # ─── GROUP 5: Assessment ───
 run_seeded "onboarding-complete" "flows/assessment/assessment-cycle.yaml"
@@ -69,6 +70,8 @@ run_seeded "parent-with-children" "flows/parent/parent-learning-book.yaml"
 run_seeded "parent-with-children" "flows/parent/child-drill-down.yaml"
 run_seeded "parent-with-children" "flows/parent/consent-management.yaml"
 run_seeded "parent-solo"          "flows/parent/demo-dashboard.yaml"
+run_seeded "parent-multi-child"  "flows/parent/multi-child-dashboard.yaml"
+run_seeded "parent-with-children" "flows/parent/add-child-profile.yaml"
 
 # ─── GROUP 8: Homework flows ───
 run_seeded "homework-ready"   "flows/homework/homework-flow.yaml"
