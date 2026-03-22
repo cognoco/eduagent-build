@@ -75,7 +75,8 @@
         {
           "microphonePermission": "MentoMate needs microphone access for voice-based learning."
         }
-      ]
+      ],
+      "./plugins/withForceDarkDisabled"
     ],
     "extra": {
       "eas": {

@@ -55,11 +55,12 @@ appId: com.mentomate.app
 # Visual audit: email field with keyboard open (BUG-24 regression guard)
 - takeScreenshot: signin-02-email-keyboard-open
 
-# BUG-3 + BUG-20: Dismiss keyboard so password field is visible.
-# hideKeyboard fails on some Android configs ("custom input" error).
-# Workaround: tap the static "Welcome back" heading to defocus the input.
-- tapOn:
-    text: "Welcome back"
+# BUG-3 + BUG-20 + BUG-24: Dismiss keyboard so password field is visible.
+# On E2E_Device_2, keyboard covers entire form including heading text.
+# pressKey: back safely dismisses keyboard (guaranteed open after inputText).
+# Note: BUG-5 warns about back-key exiting app when keyboard is NOT open,
+# but here the keyboard IS open (immediately after inputText), so this is safe.
+- pressKey: back
 
 - tapOn:
     id: "sign-in-password"
@@ -68,9 +69,8 @@ appId: com.mentomate.app
 # Visual audit: password field with keyboard open (BUG-24 regression guard)
 - takeScreenshot: signin-03-password-keyboard-open
 
-# BUG-3 + BUG-20: Dismiss keyboard before tapping sign-in button
-- tapOn:
-    text: "Welcome back"
+# Dismiss keyboard before tapping sign-in button (same pattern as above)
+- pressKey: back
 
 # Wait for keyboard to fully dismiss and sign-in button to be visible
 - extendedWaitUntil:

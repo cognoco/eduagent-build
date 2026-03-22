@@ -328,7 +328,35 @@ export function MessageBubble({
           <ThinkingIndicator />
         ) : isAI ? (
           <View>
-            <Markdown mergeStyle={false} style={mdStyles}>
+            <Markdown
+              mergeStyle={false}
+              style={mdStyles}
+              rules={{
+                // Force NativeWind-resolved text color on wrapper nodes.
+                // The Markdown lib's StyleSheet.create() styles can be
+                // overridden by Android force-dark; NativeWind classes
+                // bypass that because they resolve via CSS variables.
+                inline: (node: { key: string }, children: React.ReactNode) => (
+                  <Text
+                    key={node.key}
+                    className="text-text-primary text-body leading-relaxed"
+                  >
+                    {children}
+                  </Text>
+                ),
+                textgroup: (
+                  node: { key: string },
+                  children: React.ReactNode
+                ) => (
+                  <Text
+                    key={node.key}
+                    className="text-text-primary text-body leading-relaxed"
+                  >
+                    {children}
+                  </Text>
+                ),
+              }}
+            >
               {displayContent}
             </Markdown>
             {streaming && <BlinkingCursor />}
