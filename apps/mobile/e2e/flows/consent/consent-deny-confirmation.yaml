@@ -1,0 +1,46 @@
+# Flow: Story 10.11 — Consent Deny Confirmation Dialog
+# Validates: the consent web page's Deny button has a JS confirm() dialog
+# Tags: nightly, consent, epic-10
+#
+# Journey: Consent Lifecycle (Parent Web Flow)
+# Epics: Epic 10 (Story 10.11)
+#
+# NOTE: Story 10.11 modifies the server-rendered HTML consent page
+# (`consent-web.ts`), NOT the mobile app. The confirm() dialog is a
+# browser-native JavaScript feature. Maestro cannot test browser pages.
+#
+# This flow is a PLACEHOLDER documenting why E2E coverage for 10.11
+# is handled by API unit tests (consent-web.test.ts) rather than Maestro.
+# The two new tests verify:
+#   1. Deny link HTML contains onclick="return confirm(...)"
+#   2. Approve link does NOT contain onclick confirm
+#
+# The actual confirmation behavior (browser confirm() dialog) can only
+# be tested via a browser automation tool (Playwright/Cypress) against
+# the consent-web HTML endpoint. This is out of scope for Maestro.
+#
+# If browser E2E is added later, test this:
+#   1. Navigate to /v1/consent-page?token=X
+#   2. Click "Deny"
+#   3. Verify confirm dialog appears with child name + deletion warning
+#   4. Click "Cancel" → verify still on consent page
+#   5. Click "Deny" again → click "OK" → verify denial landing page
+appId: com.mentomate.app
+tags:
+  - nightly
+  - consent
+  - epic-10
+  - placeholder
+---
+# This is a documentation-only placeholder flow.
+# Story 10.11 is a server-rendered HTML page change tested by API unit tests.
+# See apps/api/src/routes/consent-web.test.ts for the two tests covering
+# the onclick confirm() attribute on the Deny link.
+
+# Verify the app launches (minimal smoke to keep the flow valid YAML)
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 120000
+
+- takeScreenshot: consent-deny-confirmation-placeholder

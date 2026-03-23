@@ -3108,18 +3108,18 @@ The original architecture (docs/architecture.md) specified "Payments | Stripe" w
 
 **Goal:** Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion before first public release. Focused on copy clarity, confirmation dialogs, and persona-appropriate language for the DACH market (ages 11-15).
 **Stories:** 13 | **Priority:** Must-ship (10.1–10.7, 10.10–10.13), fast-follow (10.8–10.9)
-**Status:** Partially built. Stories 10.10–10.13 implemented with unit tests passing (505+ tests). E2E validation pending — Maestro flows not yet written or run for these stories. Stories 10.1–10.9 not yet started. DB migration generated (`0002_light_puff_adder.sql`) but not applied.
+**Status:** Partially built. Stories 10.10–10.13 implemented with unit tests passing (505+ tests). Maestro E2E flows written but not yet run (requires emulator + API stack). Stories 10.1–10.9 not yet started. DB migration generated (`0002_light_puff_adder.sql`) but not applied.
 **FRs:** FR18 (topic skip — undo gap), FR20 (relevance labels), FR19 (challenge naming), FR56 (relearn method descriptions), plus new NFR for actionable errors and child-friendly GDPR copy.
 **Dependencies:** Epics 0-5 complete (all screens and services exist). No new infrastructure needed.
 **Persona scope:** Items marked UNIVERSAL apply to all personas. Items marked LEARNER-ONLY apply only when persona is `learner` (ages ~10-12). See persona-conditional notes per story.
 
 **Story status (10.10–10.13):**
-| Story | Unit tests | E2E tests | Status |
-|-------|-----------|-----------|--------|
-| 10.10 — Hand-to-parent consent | 12 pass + 26 no regression | Not written | Built, not E2E tested |
-| 10.11 — Consent deny confirmation | 12 pass (2 new) | Not written | Built, not E2E tested |
-| 10.12 — Subject raw input audit trail | 455 API + 33 schema + 5 hooks pass | Not written | Built, not E2E tested |
-| 10.13 — Guided label tooltip | 7 pass (all new) | Not written | Built, not E2E tested |
+| Story | Unit tests | E2E flow | Status |
+|-------|-----------|----------|--------|
+| 10.10 — Hand-to-parent consent | 12 pass + 26 no regression | `consent/hand-to-parent-consent.yaml` | Built, E2E written (not run) |
+| 10.11 — Consent deny confirmation | 12 pass (2 new) | `consent/consent-deny-confirmation.yaml` (placeholder — server HTML, not mobile) | Built, unit tested |
+| 10.12 — Subject raw input audit trail | 455 API + 33 schema + 5 hooks pass | `parent/subject-raw-input-audit.yaml` | Built, E2E written (not run) |
+| 10.13 — Guided label tooltip | 7 pass (all new) | `parent/guided-label-tooltip.yaml` | Built, E2E written (not run) |
 
 ---
 

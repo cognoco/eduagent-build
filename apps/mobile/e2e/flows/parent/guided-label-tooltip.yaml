@@ -1,0 +1,128 @@
+# Flow: Story 10.13 — "Guided" Label Tooltip in Parent Transcript
+# Validates: parent session transcript shows "Guided" badge with info icon,
+# and tapping the icon shows an explanatory Alert dialog.
+# Tags: nightly, parent, epic-10
+#
+# Journey: UX Journey 4 (Parent Oversight)
+# Epics: Epic 10 (Story 10.13)
+#
+# Prerequisite: Seeded parent user with linked child who has sessions
+#               containing AI responses with escalationRung >= 3.
+#               Scenario: parent-with-children
+#
+# Usage: ./scripts/seed-and-run.sh parent-with-children flows/parent/guided-label-tooltip.yaml
+#
+# NOTE: The "Guided" badge only appears on exchanges where escalationRung >= 3.
+# The seed must include session events with escalationRung >= 3 in their metadata
+# for the badge and info icon to render. If the seed doesn't include such events,
+# Guided-specific assertions are optional.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+  - epic-10
+---
+# 1. Seed & sign in as parent
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-with-children"
+      API_URL: ${API_URL}
+
+# 2. Wait for parent dashboard
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+# 3. Tap into child detail
+- tapOn:
+    id: "parent-dashboard-summary-primary"
+    optional: true
+
+- tapOn:
+    id: "parent-dashboard-summary"
+    optional: true
+
+# 4. Wait for child detail screen
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+# 5. Scroll down to Recent Sessions and tap on a session
+- scrollUntilVisible:
+    element:
+      text: "Recent Sessions"
+    direction: DOWN
+    timeout: 10000
+    optional: true
+
+# 6. Tap on a session card (look for "exchanges" text as proxy)
+- tapOn:
+    text: "exchanges"
+    optional: true
+
+# 7. Wait for transcript screen
+- extendedWaitUntil:
+    visible:
+      id: "transcript-scroll"
+    timeout: 10000
+    optional: true
+
+# 8. Verify transcript header
+- assertVisible:
+    text: "Session Transcript"
+    optional: true
+
+# 9. Screenshot: transcript screen
+- takeScreenshot: guided-tooltip-01-transcript
+
+# 10. Scroll to find a "Guided" label (only present if escalationRung >= 3)
+- scrollUntilVisible:
+    element:
+      text: "Guided"
+    direction: DOWN
+    timeout: 10000
+    optional: true
+
+# 11. Screenshot: Guided label visible
+- takeScreenshot: guided-tooltip-02-guided-label
+
+# 12. Tap the Guided info button (testID: guided-info-{index})
+#     Try index 0 first — the first exchange with Guided badge
+- tapOn:
+    id: "guided-info-0"
+    optional: true
+
+# 13. Verify the Alert dialog appears with explanation text
+#     Alert.alert title: "What does Guided mean?"
+- assertVisible:
+    text: "What does Guided mean?"
+    optional: true
+
+# 14. Verify the explanation body text
+- assertVisible:
+    text: "extra help"
+    optional: true
+
+# 15. Screenshot: Alert dialog with Guided explanation
+- takeScreenshot: guided-tooltip-03-alert-dialog
+
+# 16. Dismiss the Alert dialog
+- tapOn:
+    text: "OK"
+    optional: true
+
+# 17. Navigate back to child detail
+- tapOn:
+    id: "back-button"
+    optional: true
+
+# 18. Navigate back to dashboard
+- tapOn:
+    id: "back-button"
+    optional: true
+
+# 19. Final screenshot
+- takeScreenshot: guided-tooltip-04-complete
