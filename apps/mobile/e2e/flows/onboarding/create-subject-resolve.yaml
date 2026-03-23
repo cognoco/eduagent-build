@@ -1,0 +1,69 @@
+# Flow: Subject Name Resolution (typo correction)
+# Validates: LLM-powered subject name resolution suggests corrections
+# before creating the subject. Tests the corrected/resolved path.
+# Tags: smoke, onboarding
+#
+# Journey: UX Journey 1 (Onboarding)
+# Prerequisite: Seeded user with no subjects (scenario: onboarding-no-subject)
+appId: com.mentomate.app
+tags:
+  - smoke
+  - onboarding
+---
+# 1. Seed & sign in (user with no subjects)
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-no-subject"
+      API_URL: ${API_URL}
+
+# 2. Home screen — should show empty state with "add subject" prompt
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 3. Navigate to create-subject screen
+- tapOn:
+    id: "add-subject-button"
+
+# 4. Wait for create-subject screen
+- extendedWaitUntil:
+    visible:
+      id: "create-subject-name"
+    timeout: 10000
+
+# 5. Screenshot: empty create-subject screen
+- takeScreenshot: resolve-01-create-subject-empty
+
+# 6. Type a misspelled subject name
+- tapOn:
+    id: "create-subject-name"
+- inputText: "Phsics"
+- pressKey: back
+
+# 7. Tap Start Learning — triggers resolve
+- tapOn:
+    id: "create-subject-submit"
+
+# 8. Wait for suggestion card (LLM resolve)
+- extendedWaitUntil:
+    visible:
+      id: "subject-suggestion-card"
+    timeout: 15000
+
+# 9. Screenshot: suggestion card visible with correction
+- takeScreenshot: resolve-02-suggestion-card
+
+# 10. Accept the suggestion
+- tapOn:
+    id: "subject-suggestion-accept"
+
+# 11. Wait for interview screen (subject created + navigated)
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+# 12. Screenshot: interview screen reached
+- takeScreenshot: resolve-03-interview-reached
