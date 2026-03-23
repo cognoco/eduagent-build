@@ -551,7 +551,7 @@ tests/
     e2e-ci.yml                        # E2E workflow (Maestro + Android emulator)
 ```
 
-**Flow inventory:** 58 unique test flows + 20 setup helpers = 78 YAML files total (updated Session 21: +4 flows, +1 seed scenario).
+**Flow inventory:** 64 unique test flows + 20 setup helpers = 84 YAML files total (updated Session 22: +6 flows — 3 consent age-gated, 1 consent placeholder, 2 parent audit).
 
 This follows the project convention: co-located unit tests in `*.test.ts`, integration/E2E tests in top-level `tests/` directory (per `docs/project_context.md` rule 146). The `jest.config.cjs` maps `@eduagent/*` and `@eduagent/api` to source paths for Hono `app.request()` testing.
 

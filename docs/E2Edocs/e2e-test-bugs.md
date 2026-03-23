@@ -1305,3 +1305,21 @@ return {
 
 **Files changed:** `apps/mobile/src/components/session/MessageBubble.tsx`
 **Tests:** 31/31 ChatShell tests pass.
+
+---
+
+## BUG-64: Consent Request API Crashes Without Inngest Dev Server (2026-03-23)
+
+**Status:** FIXED
+**Severity:** High — blocks consent email sending in E2E (and prod without Inngest)
+**Affects:** consent-coppa-under13, consent-gdpr-under16, hand-to-parent-consent, any flow that submits consent request
+**Type:** App bug (same pattern as BUG-54)
+
+**Root cause:** `apps/api/src/routes/consent.ts` line 82: `await inngest.send({ name: 'app/consent.requested', ... })` was NOT wrapped in try-catch. When the Inngest dev server is not running (normal for local E2E testing), the network error propagates up, crashing the entire consent request endpoint. The DB consent state is already saved at this point, so the crash loses the success response.
+
+Same pattern as BUG-54 (session close endpoint), which was fixed in Session 16.
+
+**Fix:** Wrap `inngest.send()` in try-catch with `console.warn()`. The Inngest event dispatches the consent reminder workflow — a best-effort enhancement, not a critical path. Consent works correctly without reminders.
+
+**Files changed:** `apps/api/src/routes/consent.ts`
+**Tests:** 311/311 consent route tests pass (22 suites).
