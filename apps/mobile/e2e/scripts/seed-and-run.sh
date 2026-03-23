@@ -28,6 +28,8 @@
 #   LAUNCHER_TIMEOUT — Seconds to wait for dev-client launcher (default: 45)
 #   BUNDLE_TIMEOUT   — Seconds to wait for JS bundle to load (default: 120)
 #   FAST             — Set to 1 for aggressive timeouts (20s launcher, 60s bundle)
+#   UI_MODE          — Set to "light" to switch emulator to light mode before running.
+#                      Restores dark mode on exit. Default: leave system theme unchanged.
 #
 # Prerequisites:
 #   - API server running at API_URL (not needed for --no-seed if flow doesn't call API)
@@ -151,6 +153,17 @@ $ADB $DEVICE_FLAG reverse tcp:8081 tcp:8081 2>/dev/null || true
 $ADB $DEVICE_FLAG reverse tcp:8082 tcp:8082 2>/dev/null || true
 
 echo "[seed-and-run] Emulator OK. Ports forwarded. Timeouts: launcher=${LAUNCHER_TIMEOUT}s, bundle=${BUNDLE_TIMEOUT}s"
+
+# ── UI_MODE: switch system theme if requested ──
+if [ "${UI_MODE:-}" = "light" ]; then
+  echo "[seed-and-run] Switching emulator to LIGHT mode ..."
+  $ADB $DEVICE_FLAG shell cmd uimode night no 2>/dev/null || true
+  sleep 1
+elif [ "${UI_MODE:-}" = "dark" ]; then
+  echo "[seed-and-run] Switching emulator to DARK mode ..."
+  $ADB $DEVICE_FLAG shell cmd uimode night yes 2>/dev/null || true
+  sleep 1
+fi
 
 echo "[seed-and-run] Clearing app state and launching via ADB ..."
 $ADB $DEVICE_FLAG shell am force-stop "$APP_ID" 2>/dev/null || true
