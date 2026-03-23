@@ -243,11 +243,10 @@ export function formatConsentRequestEmail(
   consentType: ConsentType,
   tokenUrl: string
 ): EmailPayload {
-  const regulation = consentType === 'GDPR' ? 'GDPR (EU)' : 'COPPA (US)';
   return {
     to: parentEmail,
     subject: `Parental consent required for ${childName}'s MentoMate account`,
-    body: `Your child ${childName} wants to use MentoMate. Under ${regulation}, we need your consent. Please click the link to approve or deny: ${tokenUrl}`,
+    body: `Your child ${childName} wants to use MentoMate. Under applicable data protection regulations, we need your consent before processing their personal data. Please click the link to approve or deny: ${tokenUrl}`,
     type: 'consent_request',
   };
 }

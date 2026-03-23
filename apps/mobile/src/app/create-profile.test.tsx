@@ -115,14 +115,14 @@ describe('CreateProfileScreen', () => {
     expect(screen.getByTestId('date-picker')).toBeTruthy();
   });
 
-  it('calls POST and navigates back on successful submit', async () => {
+  it('calls POST and navigates back on successful submit (adult, no consent needed)', async () => {
     const newProfile = {
       id: 'new-id',
       accountId: 'a1',
       displayName: 'Sam',
       avatarUrl: null,
-      birthDate: '2010-06-15',
-      personaType: 'TEEN',
+      birthDate: '2000-06-15',
+      personaType: 'PARENT',
       isOwner: false,
       createdAt: '2026-02-16T00:00:00Z',
       updatedAt: '2026-02-16T00:00:00Z',
@@ -136,10 +136,10 @@ describe('CreateProfileScreen', () => {
 
     fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
 
-    // Open date picker and select a date
+    // Open date picker and select a date (26-year-old → no consent)
     fireEvent.press(screen.getByTestId('create-profile-birthdate'));
     await act(() => {
-      datePickerOnChange?.({ type: 'set' }, new Date(2010, 5, 15));
+      datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
     });
 
     fireEvent.press(screen.getByTestId('create-profile-submit'));
@@ -154,6 +154,47 @@ describe('CreateProfileScreen', () => {
 
     await waitFor(() => {
       expect(mockBack).toHaveBeenCalled();
+    });
+  });
+
+  it('redirects to consent screen for child under 16', async () => {
+    const newProfile = {
+      id: 'child-id',
+      accountId: 'a1',
+      displayName: 'Kid',
+      avatarUrl: null,
+      birthDate: '2014-06-15',
+      personaType: 'TEEN',
+      isOwner: false,
+      createdAt: '2026-02-16T00:00:00Z',
+      updatedAt: '2026-02-16T00:00:00Z',
+    };
+
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profile: newProfile }), { status: 200 })
+    );
+
+    render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Kid');
+
+    // Open date picker and select a date (12-year-old → consent required)
+    fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+    await act(() => {
+      datePickerOnChange?.({ type: 'set' }, new Date(2014, 5, 15));
+    });
+
+    fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/consent',
+        params: { profileId: 'child-id' },
+      });
     });
   });
 

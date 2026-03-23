@@ -63,9 +63,9 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       }
 
       const appUrl = c.env.APP_URL ?? 'https://app.mentomate.com';
-      let consentState;
+      let result;
       try {
-        consentState = await requestConsent(db, input, appUrl, {
+        result = await requestConsent(db, input, appUrl, {
           resendApiKey: c.env.RESEND_API_KEY,
           emailFrom: c.env.EMAIL_FROM,
         });
@@ -85,8 +85,8 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         await inngest.send({
           name: 'app/consent.requested',
           data: {
-            profileId: consentState.profileId,
-            consentType: consentState.consentType,
+            profileId: result.consentState.profileId,
+            consentType: result.consentState.consentType,
             timestamp: new Date().toISOString(),
           },
         });
@@ -100,6 +100,8 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         {
           message: 'Consent request sent to parent',
           consentType: input.consentType,
+          emailStatus: result.emailDelivered ? 'sent' : 'failed',
+          emailFailureReason: result.emailFailureReason,
         },
         201
       );

@@ -17,6 +17,7 @@ import {
   getConsentHandOffCopy,
   getConsentRequestCopy,
 } from '../lib/consent-copy';
+import { useNetworkStatus } from '../hooks/use-network-status';
 import { formatApiError } from '../lib/format-api-error';
 
 // Captured at module load — safe because these screens are portrait-locked.
@@ -28,12 +29,13 @@ export default function ConsentScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
-  const { profileId, consentType } = useLocalSearchParams<{
+  const { profileId } = useLocalSearchParams<{
     profileId: string;
-    consentType: 'GDPR' | 'COPPA';
   }>();
+  const consentType = 'GDPR' as const;
 
   const { mutateAsync, isPending } = useRequestConsent();
+  const { isOffline } = useNetworkStatus();
 
   const [phase, setPhase] = useState<Phase>('child');
   const [parentEmail, setParentEmail] = useState('');
@@ -46,13 +48,11 @@ export default function ConsentScreen() {
 
   // Regulation text uses the default (non-learner) variant since the PARENT reads it.
   const regulationCopy = getConsentRequestCopy('parent');
-  const regulationText =
-    consentType === 'GDPR'
-      ? regulationCopy.gdprRegulation
-      : regulationCopy.coppaRegulation;
+  const regulationText = regulationCopy.regulation;
 
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail);
-  const canSubmit = isValidEmail && !isPending && phase === 'parent';
+  const canSubmit =
+    isValidEmail && !isPending && phase === 'parent' && !isOffline;
 
   const onSubmit = useCallback(async () => {
     if (!canSubmit || !profileId || !consentType) return;

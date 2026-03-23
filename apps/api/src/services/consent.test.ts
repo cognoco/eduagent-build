@@ -85,54 +85,55 @@ function createMockDb({
 // ---------------------------------------------------------------------------
 
 describe('checkConsentRequired', () => {
-  it('requires GDPR consent for EU child under 16', () => {
-    // 10-year-old in the EU
-    const result = checkConsentRequired('2016-06-15', 'EU');
+  it('requires GDPR consent for child under 16', () => {
+    // 10-year-old
+    const result = checkConsentRequired('2016-06-15');
 
     expect(result.required).toBe(true);
     expect(result.consentType).toBe('GDPR');
   });
 
-  it('requires COPPA consent for US child under 13', () => {
-    // 10-year-old in the US
-    const result = checkConsentRequired('2016-06-15', 'US');
+  it('requires GDPR consent for 15-year-old (boundary)', () => {
+    const fifteenYearsAgo = new Date();
+    fifteenYearsAgo.setFullYear(fifteenYearsAgo.getFullYear() - 15);
+    const birthDate = fifteenYearsAgo.toISOString().split('T')[0];
+
+    const result = checkConsentRequired(birthDate);
 
     expect(result.required).toBe(true);
-    expect(result.consentType).toBe('COPPA');
+    expect(result.consentType).toBe('GDPR');
   });
 
-  it('does not require consent for EU user 16 or older', () => {
-    // 18-year-old in the EU
-    const result = checkConsentRequired('2008-01-01', 'EU');
+  it('does not require consent for 16-year-old (boundary)', () => {
+    const sixteenYearsAgo = new Date();
+    sixteenYearsAgo.setFullYear(sixteenYearsAgo.getFullYear() - 16);
+    // Subtract an extra day to ensure they're fully 16
+    sixteenYearsAgo.setDate(sixteenYearsAgo.getDate() - 1);
+    const birthDate = sixteenYearsAgo.toISOString().split('T')[0];
+
+    const result = checkConsentRequired(birthDate);
 
     expect(result.required).toBe(false);
     expect(result.consentType).toBeNull();
   });
 
-  it('does not require consent for US user 13 or older', () => {
-    // 14-year-old in the US
-    const result = checkConsentRequired('2012-01-01', 'US');
+  it('does not require consent for adult', () => {
+    const result = checkConsentRequired('1990-01-01');
 
     expect(result.required).toBe(false);
     expect(result.consentType).toBeNull();
   });
 
-  it('does not require consent for OTHER location regardless of age', () => {
-    // 10-year-old in OTHER location
-    const result = checkConsentRequired('2016-06-15', 'OTHER');
+  it('flags belowMinimumAge for child under 11', () => {
+    const nineYearsAgo = new Date();
+    nineYearsAgo.setFullYear(nineYearsAgo.getFullYear() - 9);
+    const birthDate = nineYearsAgo.toISOString().split('T')[0];
 
-    expect(result.required).toBe(false);
-    expect(result.consentType).toBeNull();
-  });
+    const result = checkConsentRequired(birthDate);
 
-  it('does not require consent for adult in any location', () => {
-    const eu = checkConsentRequired('1990-01-01', 'EU');
-    const us = checkConsentRequired('1990-01-01', 'US');
-    const other = checkConsentRequired('1990-01-01', 'OTHER');
-
-    expect(eu.required).toBe(false);
-    expect(us.required).toBe(false);
-    expect(other.required).toBe(false);
+    expect(result.required).toBe(true);
+    expect(result.consentType).toBe('GDPR');
+    expect(result.belowMinimumAge).toBe(true);
   });
 });
 
@@ -154,13 +155,16 @@ describe('requestConsent', () => {
       'https://test.example.com'
     );
 
-    expect(result.status).toBe('PARENTAL_CONSENT_REQUESTED');
-    expect(result.profileId).toBe('550e8400-e29b-41d4-a716-446655440000');
-    expect(result.consentType).toBe('GDPR');
-    expect(result.parentEmail).toBe('parent@example.com');
-    expect(result.respondedAt).toBeNull();
-    expect(result.id).toBeDefined();
-    expect(result.requestedAt).toBeDefined();
+    expect(result.consentState.status).toBe('PARENTAL_CONSENT_REQUESTED');
+    expect(result.consentState.profileId).toBe(
+      '550e8400-e29b-41d4-a716-446655440000'
+    );
+    expect(result.consentState.consentType).toBe('GDPR');
+    expect(result.consentState.parentEmail).toBe('parent@example.com');
+    expect(result.consentState.respondedAt).toBeNull();
+    expect(result.consentState.id).toBeDefined();
+    expect(result.consentState.requestedAt).toBeDefined();
+    expect(result.emailDelivered).toBe(true);
   });
 
   it('persists the consent token in the insert values', async () => {
@@ -184,7 +188,7 @@ describe('requestConsent', () => {
     expect(insertedValues.consentToken.length).toBeGreaterThan(0);
   });
 
-  it('returns consent state with correct consent type for COPPA', async () => {
+  it('returns consent state with correct consent type for COPPA (backward compat)', async () => {
     const row = mockConsentRow({ consentType: 'COPPA' });
     const db = createMockDb({ insertReturning: [row] });
     const result = await requestConsent(
@@ -197,7 +201,7 @@ describe('requestConsent', () => {
       'https://test.example.com'
     );
 
-    expect(result.consentType).toBe('COPPA');
+    expect(result.consentState.consentType).toBe('COPPA');
   });
 });
 

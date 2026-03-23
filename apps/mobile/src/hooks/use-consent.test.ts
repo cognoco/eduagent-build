@@ -34,76 +34,48 @@ function createWrapper() {
 
 describe('checkConsentRequirement', () => {
   it('returns not required when birthDate is null', () => {
-    const { result } = renderHook(() => checkConsentRequirement(null, 'EU'));
+    const { result } = renderHook(() => checkConsentRequirement(null));
     expect(result.current.required).toBe(false);
     expect(result.current.consentType).toBeNull();
   });
 
-  it('returns not required when location is null', () => {
-    const { result } = renderHook(() =>
-      checkConsentRequirement('2015-01-01', null)
-    );
-    expect(result.current.required).toBe(false);
-    expect(result.current.consentType).toBeNull();
-  });
-
-  it('returns GDPR required for EU child under 16', () => {
-    // A child born 10 years ago
+  it('returns GDPR required for child under 16', () => {
     const tenYearsAgo = new Date();
     tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
     const birthDate = tenYearsAgo.toISOString().split('T')[0];
 
-    const { result } = renderHook(() =>
-      checkConsentRequirement(birthDate, 'EU')
-    );
+    const { result } = renderHook(() => checkConsentRequirement(birthDate));
     expect(result.current.required).toBe(true);
     expect(result.current.consentType).toBe('GDPR');
   });
 
-  it('returns not required for EU adult', () => {
+  it('returns GDPR required for 15-year-old (boundary)', () => {
+    const fifteenYearsAgo = new Date();
+    fifteenYearsAgo.setFullYear(fifteenYearsAgo.getFullYear() - 15);
+    const birthDate = fifteenYearsAgo.toISOString().split('T')[0];
+
+    const { result } = renderHook(() => checkConsentRequirement(birthDate));
+    expect(result.current.required).toBe(true);
+    expect(result.current.consentType).toBe('GDPR');
+  });
+
+  it('returns not required for 16-year-old (boundary)', () => {
+    const sixteenYearsAgo = new Date();
+    sixteenYearsAgo.setFullYear(sixteenYearsAgo.getFullYear() - 16);
+    sixteenYearsAgo.setDate(sixteenYearsAgo.getDate() - 1);
+    const birthDate = sixteenYearsAgo.toISOString().split('T')[0];
+
+    const { result } = renderHook(() => checkConsentRequirement(birthDate));
+    expect(result.current.required).toBe(false);
+    expect(result.current.consentType).toBeNull();
+  });
+
+  it('returns not required for adult', () => {
     const twentyYearsAgo = new Date();
     twentyYearsAgo.setFullYear(twentyYearsAgo.getFullYear() - 20);
     const birthDate = twentyYearsAgo.toISOString().split('T')[0];
 
-    const { result } = renderHook(() =>
-      checkConsentRequirement(birthDate, 'EU')
-    );
-    expect(result.current.required).toBe(false);
-    expect(result.current.consentType).toBeNull();
-  });
-
-  it('returns COPPA required for US child under 13', () => {
-    const tenYearsAgo = new Date();
-    tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
-    const birthDate = tenYearsAgo.toISOString().split('T')[0];
-
-    const { result } = renderHook(() =>
-      checkConsentRequirement(birthDate, 'US')
-    );
-    expect(result.current.required).toBe(true);
-    expect(result.current.consentType).toBe('COPPA');
-  });
-
-  it('returns not required for US child 13 or older', () => {
-    const fourteenYearsAgo = new Date();
-    fourteenYearsAgo.setFullYear(fourteenYearsAgo.getFullYear() - 14);
-    const birthDate = fourteenYearsAgo.toISOString().split('T')[0];
-
-    const { result } = renderHook(() =>
-      checkConsentRequirement(birthDate, 'US')
-    );
-    expect(result.current.required).toBe(false);
-    expect(result.current.consentType).toBeNull();
-  });
-
-  it('returns not required for OTHER location regardless of age', () => {
-    const tenYearsAgo = new Date();
-    tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
-    const birthDate = tenYearsAgo.toISOString().split('T')[0];
-
-    const { result } = renderHook(() =>
-      checkConsentRequirement(birthDate, 'OTHER')
-    );
+    const { result } = renderHook(() => checkConsentRequirement(birthDate));
     expect(result.current.required).toBe(false);
     expect(result.current.consentType).toBeNull();
   });
