@@ -36,6 +36,28 @@ export const subjectSchema = z.object({
 });
 export type Subject = z.infer<typeof subjectSchema>;
 
+// Subject name resolution — validate/resolve user input before creating subject
+
+export const subjectResolveInputSchema = z.object({
+  rawInput: z.string().min(1).max(200),
+});
+export type SubjectResolveInput = z.infer<typeof subjectResolveInputSchema>;
+
+export const subjectResolveStatusSchema = z.enum([
+  'direct_match',
+  'corrected',
+  'resolved',
+  'no_match',
+]);
+export type SubjectResolveStatus = z.infer<typeof subjectResolveStatusSchema>;
+
+export const subjectResolveResultSchema = z.object({
+  status: subjectResolveStatusSchema,
+  resolvedName: z.string().nullable(),
+  displayMessage: z.string(),
+});
+export type SubjectResolveResult = z.infer<typeof subjectResolveResultSchema>;
+
 // Curriculum schemas
 
 export const curriculumTopicSchema = z.object({
