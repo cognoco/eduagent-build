@@ -33,11 +33,13 @@ tags:
 - tapOn:
     id: "add-subject-button"
 
-# The create-subject modal should appear
+# The create-subject screen should appear (autoFocus opens keyboard,
+# pushing "New subject" heading above fold on small screens — BUG-60 side effect).
+# Assert on the input testID instead of the heading text.
 - extendedWaitUntil:
     visible:
-      text: "New subject"
-    timeout: 5000
+      id: "create-subject-name"
+    timeout: 10000
 
 # Verify the input is visible (autoFocus opens keyboard, may cover instructional text)
 - extendedWaitUntil:
@@ -53,8 +55,8 @@ tags:
 - inputText: "World History"
 
 # Dismiss keyboard so submit button is visible (autoFocus keeps keyboard open)
-- tapOn:
-    text: "New subject"
+# pressKey: back reliably dismisses keyboard when it IS open (BUG-5 safe here)
+- pressKey: back
 
 # Wait for layout to settle after keyboard dismissal
 - extendedWaitUntil:

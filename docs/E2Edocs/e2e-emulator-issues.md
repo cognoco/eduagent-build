@@ -1974,3 +1974,64 @@ Two visual bugs found during manual screenshot review that affect ALL screens:
 | All 10 KAV screens | Unified to `behavior="padding"` (no platform branching) | BUG-60 |
 
 **Both fixes require APK rebuild or Metro bundle refresh to verify on emulator.**
+
+---
+
+## Session 22 Findings (2026-03-23)
+
+### Maestro gRPC Driver Corruption — AppsFilter BLOCKED
+
+**What happened:** After 16 rapid `pm clear` + app launch cycles (from a failed regression where all seeds returned `INTERNAL_ERROR` due to DB schema drift), the Maestro gRPC driver on `New_Device` AVD became permanently broken:
+
+```
+AppsFilter: interaction: PackageSetting{com.mentomate.app/10192} -> PackageSetting{dev.mobile.maestro/10193} BLOCKED
+Crash of app dev.mobile.maestro running instrumentation ComponentInfo{dev.mobile.maestro.test/...}
+```
+
+**Recovery attempts that FAILED:**
+- Uninstall + reinstall Maestro driver APKs
+- ADB reboot
+- Cold boot with `-no-snapshot-load` (no wipe)
+
+**Recovery that WORKED:**
+- Switch to `E2E_Device_2` AVD with `-wipe-data` cold boot
+- Reinstall app APK: `adb install "C:\tools\tmp\app-debug.apk"`
+- Re-establish all ADB reverse ports, permissions, Bluetooth disable, animations
+
+**Lesson:** When `AppsFilter: BLOCKED` appears in logcat for Maestro packages, the emulator's package manager state is corrupted beyond reboot repair. The only fix is a full data wipe or a different AVD.
+
+### Maestro IME Degradation After 55 Flows
+
+After the full 55-flow regression, `inputText` commands hit `DEADLINE_EXCEEDED` on every call. The Maestro custom IME becomes unresponsive after extended use. Fixed by cold boot with `-no-snapshot-load -wipe-data`.
+
+**Prevention:** For sessions with 50+ flows, expect to need a cold boot + wipe afterward before running additional tests.
+
+### seed-and-run.sh Metro URL Discovery
+
+After cold boot **without** `-wipe-data`, the dev-client launcher's mDNS only discovers Metro as `http://localhost:8081` (not `http://10.0.2.2:8082`). `localhost` doesn't work from inside the emulator. Added fallback grep for `localhost:*` URLs in `seed-and-run.sh`, but the reliable fix is always using `-wipe-data` for fresh emulator state.
+
+### Android Date Picker Manipulation (New Technique)
+
+Successfully manipulated the Android native `DatePickerDialog` via Maestro to set specific years for consent age testing:
+
+1. `tapOn: id: "create-profile-birthdate"` — open picker
+2. `tapOn: id: "android:id/date_picker_header_year"` — switch to year list mode
+3. `scrollUntilVisible: element: text: "2014"` — scroll year list
+4. `tapOn: text: "2014"` — select year
+5. `tapOn: text: "OK"` — confirm
+
+**Key:** Use `scrollUntilVisible` (not bare `scroll`) to avoid overshooting the target year. The year list view resource-ids are `android:id/date_picker_header_year` (header) and individual year entries are `android:id/text1` with text content.
+
+### Consent API — Inngest Resilience (BUG-64)
+
+The consent request route (`POST /v1/consent/request`) crashed when Inngest dev server was not running — same pattern as BUG-54 (session close). Fixed by wrapping `inngest.send()` in try-catch.
+
+### Operational Notes
+
+| Item | Finding |
+|------|---------|
+| `New_Device` AVD | Corrupted — avoid until wiped or recreated |
+| `E2E_Device_2` AVD | Working — use for all E2E testing |
+| Post-regression Maestro state | Degraded after 55 flows — cold boot before next session |
+| DB schema push | MUST run `pnpm run db:push:dev` before E2E sessions if schema changed |
+| Bluetooth disable | Persistent across reboots on `E2E_Device_2` after `pm disable-user` |

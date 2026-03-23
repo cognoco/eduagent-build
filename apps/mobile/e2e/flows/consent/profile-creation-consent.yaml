@@ -36,17 +36,15 @@ tags:
     id: "sign-in-email"
 - inputText: ${EMAIL}
 
-# BUG-20: tap heading to dismiss keyboard instead of hideKeyboard
-- tapOn:
-    text: "Welcome back"
+# Dismiss keyboard (pressKey: back — keyboard is open after inputText)
+- pressKey: back
 
 - tapOn:
     id: "sign-in-password"
 - inputText: ${PASSWORD}
 
-# BUG-20: dismiss keyboard
-- tapOn:
-    text: "Welcome back"
+# Dismiss keyboard (pressKey: back — keyboard is open after inputText)
+- pressKey: back
 
 - extendedWaitUntil:
     visible:
@@ -179,10 +177,10 @@ tags:
 
 # 18. Wait for consent request screen to appear.
 #     After profile creation with a minor + EU location, the app navigates
-#     to /consent with GDPR consent type.
+#     to /consent with GDPR consent type. consent.tsx uses child-friendly copy.
 - extendedWaitUntil:
     visible:
-      text: "Parental consent required"
+      text: "Almost there! We need a grown-up's help"
     timeout: 15000
     optional: true
 

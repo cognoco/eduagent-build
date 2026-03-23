@@ -173,9 +173,19 @@ export default function ChildDetailScreen() {
                 accessibilityRole="button"
                 testID={`subject-card-${subject.name}`}
               >
-                <Text className="text-body font-medium text-text-primary">
-                  {subject.name}
-                </Text>
+                <View className="flex-1 me-3">
+                  <Text className="text-body font-medium text-text-primary">
+                    {subject.name}
+                  </Text>
+                  {subject.rawInput && subject.rawInput !== subject.name && (
+                    <Text
+                      className="text-caption text-text-secondary mt-0.5"
+                      testID={`subject-raw-input-${subject.name}`}
+                    >
+                      Your child searched for &ldquo;{subject.rawInput}&rdquo;
+                    </Text>
+                  )}
+                </View>
                 <RetentionSignal
                   status={subject.retentionStatus as RetentionStatus}
                 />

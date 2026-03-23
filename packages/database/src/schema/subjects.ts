@@ -34,6 +34,7 @@ export const subjects = pgTable(
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
+    rawInput: text('raw_input'),
     status: subjectStatusEnum('status').notNull().default('active'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()

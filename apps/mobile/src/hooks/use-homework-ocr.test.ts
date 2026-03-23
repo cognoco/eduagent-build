@@ -121,7 +121,9 @@ describe('useHomeworkOcr', () => {
     });
 
     expect(result.current.status).toBe('error');
-    expect(result.current.error).toBe('Something went wrong reading that');
+    expect(result.current.error).toBe(
+      "We couldn't read that clearly. Try taking the photo again with better lighting."
+    );
     expect(result.current.failCount).toBe(1);
   });
 

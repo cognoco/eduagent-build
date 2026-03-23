@@ -1,6 +1,7 @@
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useChildSessionTranscript } from '../../../../../hooks/use-dashboard';
 
 function MessageSkeleton(): React.ReactNode {
@@ -114,9 +115,28 @@ export default function SessionTranscriptScreen() {
                   {exchange.escalationRung !== undefined &&
                     exchange.escalationRung !== null &&
                     exchange.escalationRung >= 3 && (
-                      <Text className="text-caption text-text-secondary ms-2">
-                        Guided
-                      </Text>
+                      <Pressable
+                        testID={`guided-info-${i}`}
+                        className="flex-row items-center ms-2"
+                        accessibilityLabel="Guided — tap for more info"
+                        accessibilityRole="button"
+                        onPress={() =>
+                          Alert.alert(
+                            'What does Guided mean?',
+                            'Your child needed extra help here, so their learning mate provided more direct guidance. This is normal — it means a tricky concept is being worked through together.',
+                            [{ text: 'OK' }]
+                          )
+                        }
+                      >
+                        <Text className="text-caption text-text-secondary">
+                          Guided
+                        </Text>
+                        <Ionicons
+                          name="information-circle-outline"
+                          size={14}
+                          className="text-text-secondary ms-0.5"
+                        />
+                      </Pressable>
                     )}
                 </View>
               </View>

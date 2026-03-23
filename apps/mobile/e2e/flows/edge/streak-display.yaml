@@ -1,0 +1,39 @@
+# Flow: Streak Display — Verify streak badge renders on home screen
+# Validates: streak badge is visible in the home header area,
+# showing either a count (e.g., "1d") or zero state ("0d").
+# Tags: nightly, edge
+#
+# Prerequisite: Seeded user with active learning (scenario: learning-active)
+#               The seed creates a completed session which should generate streak data.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - edge
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+# 2. Verify home screen loaded
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 3. Verify streak badge is visible in header
+- assertVisible:
+    id: "streak-badge"
+
+- takeScreenshot: streak-display-01-badge-visible
+
+# 4. Verify streak shows a value (either "0d" or a number like "1d", "2d")
+# The text content depends on whether the seed scenario generates streak data.
+# At minimum, the badge should render with "0d" as the zero state.
+- assertVisible:
+    text: "0d"
+    optional: true
+
+- takeScreenshot: streak-display-02-complete

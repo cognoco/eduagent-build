@@ -36,12 +36,21 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
+jest.mock('../services/subject-resolve', () => ({
+  resolveSubjectName: jest.fn().mockResolvedValue({
+    status: 'corrected',
+    resolvedName: 'Physics',
+    displayMessage: 'Did you mean **Physics**?',
+  }),
+}));
+
 jest.mock('../services/subject', () => ({
   listSubjects: jest.fn().mockResolvedValue([]),
   createSubject: jest.fn().mockImplementation((_db, profileId, input) => ({
     id: 'test-subject-id',
     profileId,
     name: input.name,
+    rawInput: input.rawInput ?? null,
     status: 'active',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -50,6 +59,7 @@ jest.mock('../services/subject', () => ({
     id: 'test-subject-id',
     profileId: 'test-account-id',
     name: 'Mathematics',
+    rawInput: null,
     status: 'active',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -58,6 +68,7 @@ jest.mock('../services/subject', () => ({
     id: 'test-subject-id',
     profileId: 'test-account-id',
     name: 'Updated Subject',
+    rawInput: null,
     status: 'active',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -76,6 +87,59 @@ const AUTH_HEADERS = {
 };
 
 describe('subject routes', () => {
+  // -------------------------------------------------------------------------
+  // POST /v1/subjects/resolve
+  // -------------------------------------------------------------------------
+
+  describe('POST /v1/subjects/resolve', () => {
+    it('returns 200 with resolve result', async () => {
+      const res = await app.request(
+        '/v1/subjects/resolve',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ rawInput: 'Phsics' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body).toHaveProperty('status', 'corrected');
+      expect(body).toHaveProperty('resolvedName', 'Physics');
+      expect(body).toHaveProperty('displayMessage');
+    });
+
+    it('returns 400 when rawInput is empty', async () => {
+      const res = await app.request(
+        '/v1/subjects/resolve',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ rawInput: '' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        '/v1/subjects/resolve',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rawInput: 'Physics' }),
+          headers: { 'Content-Type': 'application/json' },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
   // -------------------------------------------------------------------------
   // GET /v1/subjects
   // -------------------------------------------------------------------------
@@ -140,6 +204,28 @@ describe('subject routes', () => {
       );
 
       expect(res.status).toBe(400);
+    });
+
+    it('returns 201 with rawInput when provided', async () => {
+      const res = await app.request(
+        '/v1/subjects',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            name: 'Biology — Entomology',
+            rawInput: 'ants',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(201);
+
+      const body = await res.json();
+      expect(body.subject).toBeDefined();
+      expect(body.subject.name).toBe('Biology — Entomology');
+      expect(body.subject.rawInput).toBe('ants');
     });
 
     it('returns 401 without auth header', async () => {

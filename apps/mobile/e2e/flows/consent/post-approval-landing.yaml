@@ -35,17 +35,15 @@ tags:
     id: "sign-in-email"
 - inputText: ${EMAIL}
 
-# BUG-20: tap heading to dismiss keyboard instead of hideKeyboard
-- tapOn:
-    text: "Welcome back"
+# Dismiss keyboard (pressKey: back — keyboard is open after inputText)
+- pressKey: back
 
 - tapOn:
     id: "sign-in-password"
 - inputText: ${PASSWORD}
 
-# BUG-20: dismiss keyboard
-- tapOn:
-    text: "Welcome back"
+# Dismiss keyboard (pressKey: back — keyboard is open after inputText)
+- pressKey: back
 
 # Wait for sign-in button to be visible after keyboard dismissal
 - extendedWaitUntil:

@@ -1,0 +1,83 @@
+# Flow: Subject Name Resolution (typo correction + ambiguous)
+# Validates: LLM-powered subject name resolution suggests corrections
+# before creating the subject. Tests the corrected/resolved path.
+# Tags: smoke, onboarding
+#
+# Journey: UX Journey 1 (Onboarding)
+# Prerequisite: Seeded user with onboarding-complete (has existing subject)
+# Usage: ./scripts/seed-and-run.sh onboarding-complete flows/onboarding/create-subject-resolve.yaml
+appId: com.mentomate.app
+tags:
+  - smoke
+  - onboarding
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-complete"
+      API_URL: ${API_URL}
+
+# 2. Home screen — wait for subjects section
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 3. Navigate to create-subject via add-subject button
+- scrollUntilVisible:
+    element:
+      id: "add-subject-button"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: "add-subject-button"
+
+# 4. Wait for create-subject screen
+- extendedWaitUntil:
+    visible:
+      id: "create-subject-name"
+    timeout: 10000
+
+# 5. Screenshot: empty create-subject screen
+- takeScreenshot: resolve-01-create-subject-empty
+
+# 6. Type a misspelled subject name
+- tapOn:
+    id: "create-subject-name"
+- inputText: "Phsics"
+
+# 7. Dismiss keyboard so button is visible
+- pressKey: back
+
+# 8. Wait for submit button to be visible
+- extendedWaitUntil:
+    visible:
+      id: "create-subject-submit"
+    timeout: 5000
+
+# 9. Tap Start Learning — triggers resolve
+- tapOn:
+    id: "create-subject-submit"
+
+# 10. Wait for suggestion card (LLM resolve — may take a few seconds)
+- extendedWaitUntil:
+    visible:
+      id: "subject-suggestion-card"
+    timeout: 15000
+
+# 11. Screenshot: suggestion card visible with correction
+- takeScreenshot: resolve-02-suggestion-card
+
+# 12. Accept the suggestion
+- tapOn:
+    id: "subject-suggestion-accept"
+
+# 13. Wait for interview screen (subject created + navigated)
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 30000
+
+# 14. Screenshot: interview screen reached
+- takeScreenshot: resolve-03-interview-reached

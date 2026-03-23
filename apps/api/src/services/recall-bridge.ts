@@ -87,7 +87,7 @@ function buildRecallBridgePrompt(
   topicDescription: string
 ): string {
   return (
-    'You are MentoMate, a personalised learning coach.\n\n' +
+    'You are MentoMate, a personalised learning mate.\n\n' +
     'The learner just successfully solved a homework problem. ' +
     'Generate exactly 2 brief recall questions about the underlying concept.\n\n' +
     'Rules:\n' +

@@ -57,13 +57,13 @@ export function getModeConfig(mode: string): SessionModeConfig {
 
 const FIRST_SESSION: Record<string, string> = {
   homework:
-    "Welcome! I'm your learning coach. Let's tackle this homework together. What are you working on?",
+    "Welcome! I'm your learning mate. Let's tackle this homework together. What are you working on?",
   learning:
     "Hey there! I'm excited to learn with you. What topic would you like to explore?",
   practice:
     "Welcome to your first practice session! Let's see what you know. Ready?",
   freeform:
-    "Hi! I'm your learning coach. Feel free to ask me anything — I'm here to help.",
+    "Hi! I'm your learning mate. Feel free to ask me anything — I'm here to help.",
 };
 
 const EARLY_SESSIONS: Record<string, string> = {

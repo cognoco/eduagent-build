@@ -1,0 +1,78 @@
+# Flow: Coach Bubble Visibility (Light Mode)
+# Validates: AI/coach message text is visible in light mode chat bubbles.
+# Regression guard for invisible-ink bug — verifies the fix doesn't break light mode.
+# Tags: smoke, learning, visual
+#
+# Journey: UX Journey 2 (Daily Learning Loop)
+# Prerequisite: Seeded user with subject + coaching card (scenario: learning-active)
+# System theme: light — run with UI_MODE=light:
+#   UI_MODE=light ./e2e/scripts/seed-and-run.sh learning-active flows/learning/coach-bubble-light.yaml
+appId: com.mentomate.app
+tags:
+  - smoke
+  - learning
+  - visual
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+# 2. Home screen
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 3. Start session via coaching card
+- tapOn:
+    id: "coaching-card-primary"
+
+# 4. Session active — chat input present
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 10000
+
+# 5. Screenshot BEFORE exchange — capture initial AI greeting if present
+- takeScreenshot: coach-bubble-light-01-session-start
+
+# 6. Send user message
+- tapOn:
+    id: "chat-input"
+- inputText: "Hello, can you help me understand the basics?"
+- pressKey: Enter
+
+# 7. Verify user message rendered
+- scrollUntilVisible:
+    element:
+      text: "Hello, can you help me understand the basics?"
+    direction: DOWN
+    timeout: 10000
+
+# 8. Wait for AI response (coach bubble)
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 30000
+
+# 9. Screenshot AFTER AI response — this is the key visual check.
+# The coach bubble text MUST be readable in light mode (dark text on light background).
+- takeScreenshot: coach-bubble-light-02-ai-response
+
+# 10. Send follow-up to get a second AI response
+- tapOn:
+    id: "chat-input"
+- inputText: "Can you explain that differently?"
+- pressKey: Enter
+
+# 11. Wait for second AI response
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 30000
+
+# 12. Final screenshot — multiple coach bubbles visible
+- takeScreenshot: coach-bubble-light-03-multi-exchange

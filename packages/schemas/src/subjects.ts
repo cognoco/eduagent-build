@@ -17,6 +17,7 @@ export type TopicRelevance = z.infer<typeof topicRelevanceSchema>;
 
 export const subjectCreateSchema = z.object({
   name: z.string().min(1).max(200),
+  rawInput: z.string().min(1).max(200).optional(),
 });
 export type SubjectCreateInput = z.infer<typeof subjectCreateSchema>;
 
@@ -30,11 +31,42 @@ export const subjectSchema = z.object({
   id: z.string().uuid(),
   profileId: z.string().uuid(),
   name: z.string(),
+  rawInput: z.string().nullable().optional(),
   status: subjectStatusSchema,
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
 export type Subject = z.infer<typeof subjectSchema>;
+
+// Subject name resolution — validate/resolve user input before creating subject
+
+export const subjectResolveInputSchema = z.object({
+  rawInput: z.string().min(1).max(200),
+});
+export type SubjectResolveInput = z.infer<typeof subjectResolveInputSchema>;
+
+export const subjectResolveStatusSchema = z.enum([
+  'direct_match',
+  'corrected',
+  'resolved',
+  'ambiguous',
+  'no_match',
+]);
+export type SubjectResolveStatus = z.infer<typeof subjectResolveStatusSchema>;
+
+export const subjectSuggestionSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+});
+export type SubjectSuggestion = z.infer<typeof subjectSuggestionSchema>;
+
+export const subjectResolveResultSchema = z.object({
+  status: subjectResolveStatusSchema,
+  resolvedName: z.string().nullable(),
+  suggestions: z.array(subjectSuggestionSchema),
+  displayMessage: z.string(),
+});
+export type SubjectResolveResult = z.infer<typeof subjectResolveResultSchema>;
 
 // Curriculum schemas
 
@@ -84,6 +116,11 @@ export const topicSkipSchema = z.object({
   topicId: z.string().uuid(),
 });
 export type TopicSkipInput = z.infer<typeof topicSkipSchema>;
+
+export const topicUnskipSchema = z.object({
+  topicId: z.string().uuid(),
+});
+export type TopicUnskipInput = z.infer<typeof topicUnskipSchema>;
 
 export const curriculumChallengeSchema = z.object({
   feedback: z.string().min(1).max(2000),

@@ -1,0 +1,168 @@
+# Flow: Above Consent Threshold — No Consent Required
+# Validates: creating a profile for a 17-year-old does NOT trigger consent,
+# regardless of location (US or EU). Profile creation goes straight to
+# the home/subject-creation flow — no consent screen appears.
+# Tags: nightly, consent
+#
+# Journey: UX Journey 1 (Onboarding) — happy path without consent
+# Epics: Epic 0, Epic 5
+#
+# Prerequisite: Seeded user with pre-profile scenario (Clerk user + account, no profile).
+# Usage: ./scripts/seed-and-run.sh pre-profile flows/consent/consent-above-threshold.yaml
+#
+# Date picker: Android DatePickerDialog opens with default 2010-01-01.
+# Tap year header → tap 2009 (already visible, age = 17) → OK.
+# Select EU location (strictest threshold: 16). 17 > 16 → no consent.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - consent
+---
+# ============================================================
+# SIGN IN (pre-profile: Clerk user + account, no profile)
+# ============================================================
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 120000
+
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${EMAIL}
+- pressKey: back
+
+- tapOn:
+    id: "sign-in-password"
+- inputText: ${PASSWORD}
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 10000
+- tapOn:
+    id: "sign-in-button"
+
+# ============================================================
+# NAVIGATE TO CREATE PROFILE (More → Profile → Create)
+# ============================================================
+- extendedWaitUntil:
+    visible:
+      id: "tab-more"
+    timeout: 30000
+- tapOn:
+    id: "tab-more"
+
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      text: "Profile"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    text: "Profile"
+
+- extendedWaitUntil:
+    visible:
+      text: "No profiles yet"
+    timeout: 10000
+- tapOn:
+    id: "profiles-create-first"
+
+# ============================================================
+# PROFILE FORM — set age to 17 (born 2009), select EU
+# ============================================================
+- extendedWaitUntil:
+    visible:
+      id: "create-profile-name"
+    timeout: 15000
+
+# Enter display name
+- tapOn:
+    id: "create-profile-name"
+- inputText: "Above Threshold Teen"
+- pressKey: back
+
+# Open date picker
+- tapOn:
+    id: "create-profile-birthdate"
+
+# Wait for date picker dialog
+- extendedWaitUntil:
+    visible:
+      text: "OK"
+    timeout: 5000
+
+# Tap the year header "2010" to switch to year selection mode
+- tapOn:
+    id: "android:id/date_picker_header_year"
+
+# 2009 should be visible in the initial year list, scrollUntilVisible as safety
+- scrollUntilVisible:
+    element:
+      text: "2009"
+    direction: UP
+    timeout: 5000
+
+# Tap year 2009 (age = 17 in 2026 → above both COPPA 13 and GDPR 16)
+- tapOn:
+    text: "2009"
+
+# Confirm date selection
+- tapOn:
+    text: "OK"
+
+# Verify date was set
+- assertVisible:
+    text: "January 1, 2009"
+
+- takeScreenshot: above-threshold-01-date-set
+
+# Location options should now be visible
+- extendedWaitUntil:
+    visible:
+      id: "location-eu"
+    timeout: 5000
+
+# Select EU location (strictest threshold: 16). Age 17 > 16 → no consent.
+- tapOn:
+    id: "location-eu"
+
+- takeScreenshot: above-threshold-02-eu-selected
+
+# Submit profile creation
+- tapOn:
+    id: "create-profile-submit"
+
+# ============================================================
+# VERIFY: NO CONSENT SCREEN — profile creation goes to home
+# ============================================================
+# After profile creation for age 17+, the app should NOT show the consent
+# screen. Instead, it navigates to the home screen or subject creation.
+
+# MANDATORY: Consent screen must NOT appear.
+# After profile creation for age 17+, the app redirects to subject creation
+# (new profile has 0 subjects → create-subject screen).
+- extendedWaitUntil:
+    visible:
+      id: "create-subject-name"
+    timeout: 30000
+
+# Double-check: consent screen is NOT visible
+- assertNotVisible:
+    id: "consent-child-view"
+
+- assertNotVisible:
+    text: "One more step!"
+
+- takeScreenshot: above-threshold-03-no-consent-create-subject
+
+# Verify we landed on subject creation (profile was created successfully, no consent)
+- assertVisible:
+    text: "Start Learning"
+
+- takeScreenshot: above-threshold-04-complete

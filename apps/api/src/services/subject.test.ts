@@ -24,6 +24,7 @@ function mockSubjectRow(
     id: string;
     profileId: string;
     name: string;
+    rawInput: string | null;
     status: 'active' | 'paused' | 'archived';
   }>
 ) {
@@ -31,6 +32,7 @@ function mockSubjectRow(
     id: overrides?.id ?? 'subject-1',
     profileId: overrides?.profileId ?? profileId,
     name: overrides?.name ?? 'Mathematics',
+    rawInput: overrides?.rawInput ?? null,
     status: overrides?.status ?? 'active',
     createdAt: NOW,
     updatedAt: NOW,
@@ -145,6 +147,29 @@ describe('createSubject', () => {
     const db = createMockDb({ insertReturning: [row] });
     const result = await createSubject(db, profileId, { name: 'History' });
     expect(result.id).toBe('new-id');
+  });
+
+  it('persists rawInput when provided', async () => {
+    const row = mockSubjectRow({
+      name: 'Biology — Entomology',
+      rawInput: 'ants',
+    });
+    const db = createMockDb({ insertReturning: [row] });
+    const result = await createSubject(db, profileId, {
+      name: 'Biology — Entomology',
+      rawInput: 'ants',
+    });
+
+    expect(result.rawInput).toBe('ants');
+    expect(result.name).toBe('Biology — Entomology');
+  });
+
+  it('returns null rawInput when not provided', async () => {
+    const row = mockSubjectRow({ name: 'Mathematics' });
+    const db = createMockDb({ insertReturning: [row] });
+    const result = await createSubject(db, profileId, { name: 'Mathematics' });
+
+    expect(result.rawInput).toBeNull();
   });
 });
 

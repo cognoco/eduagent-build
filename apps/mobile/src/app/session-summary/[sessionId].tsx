@@ -143,7 +143,7 @@ export default function SessionSummaryScreen() {
             </View>
           ))}
           <Text className="text-caption text-text-secondary mt-3">
-            Your coach will check in soon
+            Your mate will check in soon
           </Text>
         </View>
 
@@ -154,7 +154,7 @@ export default function SessionSummaryScreen() {
           </Text>
           <Text className="text-body-sm text-text-secondary mb-3">
             Write a short summary of what you learned. This helps you remember
-            and helps your coach plan next time.
+            and helps your mate plan next time.
           </Text>
 
           {!submitted ? (
@@ -181,7 +181,8 @@ export default function SessionSummaryScreen() {
                   className="text-body-sm text-danger mt-2"
                   testID="summary-error"
                 >
-                  Failed to submit summary. Please try again.
+                  Couldn't save your summary. Check your connection and try
+                  again — your work won't be lost.
                 </Text>
               )}
 
@@ -227,7 +228,7 @@ export default function SessionSummaryScreen() {
               </Text>
               <View className="h-px bg-surface-elevated my-3" />
               <Text className="text-body-sm font-semibold text-text-primary mb-1">
-                Coach feedback
+                Mate feedback
               </Text>
               <Text
                 className="text-body-sm text-text-secondary"

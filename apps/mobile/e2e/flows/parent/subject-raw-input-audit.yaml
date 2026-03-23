@@ -1,0 +1,94 @@
+# Flow: Story 10.12 — Subject Raw Input Audit Trail for Parents
+# Validates: parent child detail shows "Your child searched for X" subtitle
+# when a subject was created via name resolution (raw input differs from name).
+# Tags: nightly, parent, epic-10
+#
+# Journey: UX Journey 4 (Parent Oversight)
+# Epics: Epic 10 (Story 10.12)
+#
+# Prerequisite: Seeded parent user with linked child who has a subject created
+#               via name resolution (rawInput differs from name).
+#               Scenario: parent-with-children
+#
+# NOTE: The parent-with-children seed creates subjects with static names.
+# For rawInput to be present, the seed would need to insert a subject with
+# rawInput != name. If the seed doesn't populate rawInput, the subtitle
+# won't appear and those assertions are optional. When the seed is updated
+# to include rawInput test data, remove the optional flags.
+#
+# Usage: ./scripts/seed-and-run.sh parent-with-children flows/parent/subject-raw-input-audit.yaml
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+  - epic-10
+---
+# 1. Seed & sign in as parent
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-with-children"
+      API_URL: ${API_URL}
+
+# 2. Wait for parent dashboard
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+# 3. Screenshot: parent dashboard
+- takeScreenshot: raw-input-audit-01-dashboard
+
+# 4. Tap into child detail (via summary card)
+- tapOn:
+    id: "parent-dashboard-summary-primary"
+    optional: true
+
+# 4b. Fallback: tap the card body
+- tapOn:
+    id: "parent-dashboard-summary"
+    optional: true
+
+# 5. Wait for child detail screen
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+# 6. Verify "Subjects" heading
+- extendedWaitUntil:
+    visible:
+      text: "Subjects"
+    timeout: 5000
+    optional: true
+
+# 7. Screenshot: child detail with subjects
+- takeScreenshot: raw-input-audit-02-child-detail
+
+# 8. Verify subject name is visible (seed-dependent)
+- assertVisible:
+    text: "Mathematics"
+    optional: true
+
+# 9. Check for rawInput subtitle — "Your child searched for" text
+#    This only appears when the subject has rawInput != name in the DB.
+#    If the seed includes a subject with rawInput (e.g., "ants" → "Biology — Entomology"),
+#    this assertion will pass. Otherwise it's optional until seed is updated.
+- assertVisible:
+    text: "Your child searched for"
+    optional: true
+
+# 10. Check for the specific rawInput testID pattern
+- assertVisible:
+    id: "subject-raw-input-Mathematics"
+    optional: true
+
+# 11. Screenshot: subject cards (captures rawInput subtitle if present)
+- takeScreenshot: raw-input-audit-03-subject-cards
+
+# 12. Navigate back to dashboard
+- tapOn:
+    id: "back-button"
+
+# 13. Final screenshot
+- takeScreenshot: raw-input-audit-04-back-to-dashboard

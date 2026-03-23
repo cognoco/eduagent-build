@@ -1,0 +1,1 @@
+ALTER TABLE "subjects" ADD COLUMN "raw_input" text;

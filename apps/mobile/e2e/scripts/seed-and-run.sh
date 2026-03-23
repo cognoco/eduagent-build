@@ -28,6 +28,8 @@
 #   LAUNCHER_TIMEOUT — Seconds to wait for dev-client launcher (default: 45)
 #   BUNDLE_TIMEOUT   — Seconds to wait for JS bundle to load (default: 120)
 #   FAST             — Set to 1 for aggressive timeouts (20s launcher, 60s bundle)
+#   UI_MODE          — Set to "light" to switch emulator to light mode before running.
+#                      Restores dark mode on exit. Default: leave system theme unchanged.
 #
 # Prerequisites:
 #   - API server running at API_URL (not needed for --no-seed if flow doesn't call API)
@@ -152,11 +154,32 @@ $ADB $DEVICE_FLAG reverse tcp:8082 tcp:8082 2>/dev/null || true
 
 echo "[seed-and-run] Emulator OK. Ports forwarded. Timeouts: launcher=${LAUNCHER_TIMEOUT}s, bundle=${BUNDLE_TIMEOUT}s"
 
+# ── UI_MODE: switch system theme if requested ──
+if [ "${UI_MODE:-}" = "light" ]; then
+  echo "[seed-and-run] Switching emulator to LIGHT mode ..."
+  $ADB $DEVICE_FLAG shell cmd uimode night no 2>/dev/null || true
+  sleep 1
+elif [ "${UI_MODE:-}" = "dark" ]; then
+  echo "[seed-and-run] Switching emulator to DARK mode ..."
+  $ADB $DEVICE_FLAG shell cmd uimode night yes 2>/dev/null || true
+  sleep 1
+fi
+
 echo "[seed-and-run] Clearing app state and launching via ADB ..."
 $ADB $DEVICE_FLAG shell am force-stop "$APP_ID" 2>/dev/null || true
 $ADB $DEVICE_FLAG shell pm clear "$APP_ID" 2>/dev/null || true
 # BUG-21: Kill Bluetooth to prevent "Bluetooth keeps stopping" dialog on WHPX
 $ADB $DEVICE_FLAG shell am force-stop com.android.bluetooth 2>/dev/null || true
+# Stop Maestro driver to release UIAutomator service.
+# The Maestro instrumentation runner takes exclusive control of UIAutomator.
+# If a previous Maestro run left the driver running, it blocks uiautomator dump.
+# force-stop kills the process; the driver APK stays installed so Maestro can
+# reuse it without a slow reinstall (~120s on WHPX).
+$ADB $DEVICE_FLAG shell am force-stop dev.mobile.maestro 2>/dev/null || true
+$ADB $DEVICE_FLAG shell am force-stop dev.mobile.maestro.test 2>/dev/null || true
+# Kill any lingering instrumentation runner (belt-and-suspenders)
+$ADB $DEVICE_FLAG shell am kill dev.mobile.maestro 2>/dev/null || true
+$ADB $DEVICE_FLAG shell am kill dev.mobile.maestro.test 2>/dev/null || true
 # BUG-22: Pre-grant notification permission so the dialog doesn't block UI
 $ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.POST_NOTIFICATIONS 2>/dev/null || true
 # BUG-39: Pre-grant camera permission so homework flows don't hit system dialog
@@ -169,49 +192,74 @@ $ADB $DEVICE_FLAG shell am start -n "$APP_ID/.MainActivity" 2>/dev/null || true
 # resource contention. We handle launcher → Metro tap → bundle load → Continue
 # entirely via ADB, so Maestro starts with a stable, loaded app.
 
-# Step A: Wait for dev-client launcher (fail fast if emulator is dead)
+# Step A: Wait for dev-client launcher OR auto-connected state
+# On some AVDs (E2E_Device_2), the dev-client auto-discovers Metro and skips
+# the launcher entirely, going straight to the dev tools sheet or sign-in screen.
+SKIP_TO_BUNDLE=0
 if ! wait_for_text "DEVELOPMENT" "$LAUNCHER_TIMEOUT"; then
-  echo "[seed-and-run] FATAL: Dev-client launcher never appeared. Is the APK installed?" >&2
-  exit 1
+  # Take a FRESH dump — the last dump from wait_for_text may be stale
+  # (captured during loading, before the app settled on its final screen)
+  sleep 2
+  $ADB $DEVICE_FLAG shell uiautomator dump /sdcard/ui_dump.xml 2>/dev/null || true
+  LAST_DUMP=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null || echo "")
+  if echo "$LAST_DUMP" | grep -q "Reload\|Welcome back\|Connected to"; then
+    echo "[seed-and-run] App auto-connected to Metro (skipped launcher). Proceeding to bundle phase."
+    SKIP_TO_BUNDLE=1
+  else
+    echo "[seed-and-run] FATAL: Dev-client launcher never appeared. Is the APK installed?" >&2
+    echo "[seed-and-run] Dump contents: $(echo "$LAST_DUMP" | grep -oP 'text="\K[^"]+' | head -10 | tr '\n' ', ')" >&2
+    exit 1
+  fi
 fi
 
-# Step B: Dismiss Bluetooth dialog if present (BUG-21 safety net)
-if $ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null | grep -q "Bluetooth"; then
-  echo "[seed-and-run] Dismissing Bluetooth dialog via Back key ..."
-  $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
-  sleep 1
-  # Re-wait for launcher after dismissing
-  wait_for_text "DEVELOPMENT" 15 || true
-fi
+# Steps B and C only needed when launcher was shown (not auto-connected)
+if [ $SKIP_TO_BUNDLE -eq 0 ]; then
 
-# Step C: Tap Metro server entry in launcher
-# Parse the dump to find the server entry's exact bounds.
-echo "[seed-and-run] Finding Metro server entry in UI dump ..."
-# Try 8082 first (bundle proxy — BUG-7 workaround), fall back to 8081
-METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
-  | grep -oP 'text="http://10.0.2.2:8082"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
-  | grep -oP 'bounds="\K[^"]+' || echo "")
-if [ -z "$METRO_BOUNDS" ]; then
+  # Step B: Dismiss Bluetooth dialog if present (BUG-21 safety net)
+  if $ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null | grep -q "Bluetooth"; then
+    echo "[seed-and-run] Dismissing Bluetooth dialog via Back key ..."
+    $ADB $DEVICE_FLAG shell input keyevent KEYCODE_BACK
+    sleep 1
+    # Re-wait for launcher after dismissing
+    wait_for_text "DEVELOPMENT" 15 || true
+  fi
+
+  # Step C: Tap Metro server entry in launcher
+  # Parse the dump to find the server entry's exact bounds.
+  echo "[seed-and-run] Finding Metro server entry in UI dump ..."
+  # Try 8082 first (bundle proxy — BUG-7 workaround), then 10.0.2.2:any, then localhost:any
   METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
-    | grep -oP 'text="http://10.0.2.2:[0-9]+"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
-    | head -1 | grep -oP 'bounds="\K[^"]+' || echo "")
-fi
-if [ -n "$METRO_BOUNDS" ]; then
-  X1=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '1p')
-  Y1=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '2p')
-  X2=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '3p')
-  Y2=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '4p')
-  X1=${X1:-0}; Y1=${Y1:-0}; X2=${X2:-0}; Y2=${Y2:-0}
-  TAP_X=$(( (X1 + X2) / 2 ))
-  TAP_Y=$(( (Y1 + Y2) / 2 ))
-  echo "[seed-and-run] Tapping Metro at ($TAP_X, $TAP_Y) ..."
-  adb_tap $TAP_X $TAP_Y
-else
-  echo "[seed-and-run] FATAL: No Metro server entry found in launcher!" >&2
-  echo "[seed-and-run] Is Metro running? Check: curl http://localhost:8081/status" >&2
-  exit 1
-fi
-sleep 1
+    | grep -oP 'text="http://10.0.2.2:8082"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
+    | grep -oP 'bounds="\K[^"]+' || echo "")
+  if [ -z "$METRO_BOUNDS" ]; then
+    METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
+      | grep -oP 'text="http://10.0.2.2:[0-9]+"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
+      | head -1 | grep -oP 'bounds="\K[^"]+' || echo "")
+  fi
+  # Fallback: after cold boot (no wipe), mDNS may resolve Metro as localhost
+  if [ -z "$METRO_BOUNDS" ]; then
+    METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
+      | grep -oP 'text="http://localhost:[0-9]+"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
+      | head -1 | grep -oP 'bounds="\K[^"]+' || echo "")
+  fi
+  if [ -n "$METRO_BOUNDS" ]; then
+    X1=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '1p')
+    Y1=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '2p')
+    X2=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '3p')
+    Y2=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '4p')
+    X1=${X1:-0}; Y1=${Y1:-0}; X2=${X2:-0}; Y2=${Y2:-0}
+    TAP_X=$(( (X1 + X2) / 2 ))
+    TAP_Y=$(( (Y1 + Y2) / 2 ))
+    echo "[seed-and-run] Tapping Metro at ($TAP_X, $TAP_Y) ..."
+    adb_tap $TAP_X $TAP_Y
+  else
+    echo "[seed-and-run] FATAL: No Metro server entry found in launcher!" >&2
+    echo "[seed-and-run] Is Metro running? Check: curl http://localhost:8081/status" >&2
+    exit 1
+  fi
+  sleep 1
+
+fi  # end SKIP_TO_BUNDLE check
 
 # Step D: Wait for bundle to load, then dismiss "Continue" overlay
 # Cached bundle: ~5s. Cold bundle: up to 2 min.

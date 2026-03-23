@@ -35,9 +35,10 @@ tags:
 - tapOn:
     id: "add-subject-button"
 
+# autoFocus opens keyboard, pushing "New subject" heading above fold (BUG-60 side effect)
 - extendedWaitUntil:
     visible:
-      text: "New subject"
+      id: "create-subject-name"
     timeout: 10000
 
 - tapOn:

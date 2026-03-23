@@ -174,7 +174,7 @@ describe('useCoachingCard', () => {
     expect(result.current.headline).toBe(
       "I'm still getting to know you. What are you working on today?"
     );
-    expect(result.current.subtext).toContain('Your coach is ready');
+    expect(result.current.subtext).toContain('Your mate is ready');
   });
 
   it('includes subjectId in freeform routes when defaultSubjectId is provided', async () => {

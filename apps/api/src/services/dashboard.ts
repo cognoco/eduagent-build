@@ -9,6 +9,7 @@ import {
   profiles,
   learningSessions,
   sessionEvents,
+  subjects,
   curricula,
   curriculumTopics,
   type Database,
@@ -187,6 +188,21 @@ export async function getChildrenForParent(
   });
   if (links.length === 0) return [];
 
+  // Pre-fetch all subjects for all child profiles in a single query (avoids N+1)
+  const childProfileIds = links.map((l) => l.childProfileId);
+  const allChildSubjects = await db.query.subjects.findMany({
+    where: inArray(subjects.profileId, childProfileIds),
+  });
+  const subjectsByProfile = new Map<string, Map<string, string | null>>();
+  for (const s of allChildSubjects) {
+    let profileMap = subjectsByProfile.get(s.profileId);
+    if (!profileMap) {
+      profileMap = new Map();
+      subjectsByProfile.set(s.profileId, profileMap);
+    }
+    profileMap.set(s.id, s.rawInput ?? null);
+  }
+
   const children: DashboardChild[] = [];
 
   for (const link of links) {
@@ -238,7 +254,10 @@ export async function getChildrenForParent(
       startOfLastWeek
     );
 
-    // 7. Build DashboardInput for summary generation
+    // 7. Look up rawInput from pre-fetched subjects (keyed by subjectId)
+    const rawInputMap = subjectsByProfile.get(childProfileId) ?? new Map();
+
+    // 8. Build DashboardInput for summary generation
     const subjectRetentionData = progress.subjects.map((s) => ({
       name: s.name,
       status: s.retentionStatus,
@@ -269,9 +288,10 @@ export async function getChildrenForParent(
       totalTimeThisWeek: dashboardInput.totalTimeThisWeekMinutes,
       totalTimeLastWeek: dashboardInput.totalTimeLastWeekMinutes,
       trend,
-      subjects: subjectRetentionData.map((s) => ({
+      subjects: progress.subjects.map((s) => ({
         name: s.name,
-        retentionStatus: s.status,
+        retentionStatus: s.retentionStatus,
+        rawInput: rawInputMap.get(s.subjectId) ?? null,
       })),
       guidedVsImmediateRatio: calculateGuidedRatio(
         guidedMetrics.guidedCount,

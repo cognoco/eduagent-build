@@ -4,7 +4,7 @@ import {
   Text,
   Pressable,
   ScrollView,
-  TextInput,
+  // TextInput — commented out with BYOK waitlist section
   Alert,
   ActivityIndicator,
   Linking,
@@ -29,7 +29,7 @@ import { UsageMeter } from '../../components/common';
 import {
   useSubscription,
   useUsage,
-  useJoinByokWaitlist,
+  // useJoinByokWaitlist, — commented out with BYOK waitlist section
   type SubscriptionTier,
 } from '../../hooks/use-subscription';
 import {
@@ -406,7 +406,8 @@ export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
-  const [byokEmail, setByokEmail] = useState('');
+  // BYOK waitlist state — commented out with BYOK waitlist section
+  // const [byokEmail, setByokEmail] = useState('');
   const { activeProfile } = useProfile();
 
   const queryClient = useQueryClient();
@@ -414,7 +415,7 @@ export default function SubscriptionScreen() {
   // API hooks for usage display and subscription state
   const { data: subscription, isLoading: subLoading } = useSubscription();
   const { data: usage, isLoading: usageLoading } = useUsage();
-  const byokWaitlist = useJoinByokWaitlist();
+  // const byokWaitlist = useJoinByokWaitlist();
 
   // Top-up IAP state
   const [topUpPurchasing, setTopUpPurchasing] = useState(false);
@@ -456,7 +457,7 @@ export default function SubscriptionScreen() {
         }
         Alert.alert(
           'Purchase failed',
-          'Something went wrong. Please try again.'
+          'Something unexpected happened with your purchase. Please try again.'
         );
       }
     },
@@ -529,7 +530,10 @@ export default function SubscriptionScreen() {
         );
         return;
       }
-      Alert.alert('Purchase failed', 'Something went wrong. Please try again.');
+      Alert.alert(
+        'Purchase failed',
+        'Something unexpected happened with your purchase. Please try again.'
+      );
       return;
     }
 
@@ -569,19 +573,19 @@ export default function SubscriptionScreen() {
   }, [offerings, usage, queryClient, activeProfile?.id]);
 
   // ---------------------------------------------------------------------------
-  // BYOK waitlist handler (kept from existing Stripe logic)
+  // BYOK waitlist handler — commented out with BYOK waitlist section
   // ---------------------------------------------------------------------------
 
-  const handleByokSubmit = useCallback(async () => {
-    if (!byokEmail.trim()) return;
-    try {
-      await byokWaitlist.mutateAsync({ email: byokEmail.trim() });
-      Alert.alert('Waitlist', 'You have been added to the BYOK waitlist.');
-      setByokEmail('');
-    } catch {
-      Alert.alert('Error', 'Could not join waitlist. Try again.');
-    }
-  }, [byokWaitlist, byokEmail]);
+  // const handleByokSubmit = useCallback(async () => {
+  //   if (!byokEmail.trim()) return;
+  //   try {
+  //     await byokWaitlist.mutateAsync({ email: byokEmail.trim() });
+  //     Alert.alert('Waitlist', 'You have been added to the BYOK waitlist.');
+  //     setByokEmail('');
+  //   } catch {
+  //     Alert.alert('Error', 'Could not join waitlist. Try again.');
+  //   }
+  // }, [byokWaitlist, byokEmail]);
 
   // ---------------------------------------------------------------------------
   // Child profile gate — child sees the child-friendly paywall
@@ -866,7 +870,7 @@ export default function SubscriptionScreen() {
             </View>
           )}
 
-          {/* BYOK waitlist */}
+          {/* BYOK waitlist — hidden until feature is ready
           <View className="mt-6">
             <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2">
               Bring your own key (coming soon)
@@ -901,6 +905,7 @@ export default function SubscriptionScreen() {
               </View>
             </View>
           </View>
+          */}
         </ScrollView>
       )}
     </View>

@@ -34,17 +34,15 @@ tags:
     id: "sign-in-email"
 - inputText: ${EMAIL}
 
-# BUG-20: tap heading to dismiss keyboard instead of hideKeyboard
-- tapOn:
-    text: "Welcome back"
+# Dismiss keyboard (pressKey: back — keyboard is open after inputText)
+- pressKey: back
 
 - tapOn:
     id: "sign-in-password"
 - inputText: ${PASSWORD}
 
-# BUG-20: dismiss keyboard
-- tapOn:
-    text: "Welcome back"
+# Dismiss keyboard (pressKey: back — keyboard is open after inputText)
+- pressKey: back
 
 # Wait for sign-in button to be visible after keyboard dismissal
 - extendedWaitUntil:
@@ -64,18 +62,18 @@ tags:
       id: "consent-withdrawn-gate"
     timeout: 30000
 
-# 6. Verify gate heading
+# 6. Verify gate heading (child-friendly copy for LEARNER persona)
 - assertVisible:
-    text: "Account deletion pending"
+    text: "Your account is being closed"
 
-# 7. Verify withdrawal explanation
+# 7. Verify withdrawal explanation (child-friendly copy for LEARNER persona)
 - assertVisible:
-    text: "Your parent has withdrawn consent for your account."
+    text: "Your parent or guardian has decided to close your account."
     optional: true
 
-# 8. Verify deletion timeline message
+# 8. Verify deletion timeline message (child-friendly copy for LEARNER persona)
 - assertVisible:
-    text: "Your data will be permanently deleted within 7 days."
+    text: "Your learning data will be removed in 7 days."
     optional: true
 
 # 9. Screenshot of consent-withdrawn gate

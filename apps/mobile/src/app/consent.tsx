@@ -13,9 +13,16 @@ import { useRequestConsent } from '../hooks/use-consent';
 import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
+import {
+  getConsentHandOffCopy,
+  getConsentRequestCopy,
+} from '../lib/consent-copy';
+import { formatApiError } from '../lib/format-api-error';
 
 // Captured at module load — safe because these screens are portrait-locked.
 const SCREEN_HEIGHT = Dimensions.get('screen').height;
+
+type Phase = 'child' | 'parent' | 'success';
 
 export default function ConsentScreen() {
   const insets = useSafeAreaInsets();
@@ -28,19 +35,24 @@ export default function ConsentScreen() {
 
   const { mutateAsync, isPending } = useRequestConsent();
 
+  const [phase, setPhase] = useState<Phase>('child');
   const [parentEmail, setParentEmail] = useState('');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
   const [resending, setResending] = useState(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
-  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail);
-  const canSubmit = isValidEmail && !isPending && !success;
+  // Hand-off copy uses learner variant (consent screen is always shown to children).
+  const copy = getConsentHandOffCopy('learner');
 
+  // Regulation text uses the default (non-learner) variant since the PARENT reads it.
+  const regulationCopy = getConsentRequestCopy('parent');
   const regulationText =
     consentType === 'GDPR'
-      ? 'Under EU GDPR regulations, users under 16 need parental consent to use this service.'
-      : 'Under US COPPA regulations, users under 13 need parental consent to use this service.';
+      ? regulationCopy.gdprRegulation
+      : regulationCopy.coppaRegulation;
+
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail);
+  const canSubmit = isValidEmail && !isPending && phase === 'parent';
 
   const onSubmit = useCallback(async () => {
     if (!canSubmit || !profileId || !consentType) return;
@@ -52,11 +64,9 @@ export default function ConsentScreen() {
         parentEmail: parentEmail.trim(),
         consentType,
       });
-      setSuccess(true);
+      setPhase('success');
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Something went wrong.';
-      setError(message);
+      setError(formatApiError(err));
     }
   }, [canSubmit, profileId, consentType, parentEmail, mutateAsync]);
 
@@ -90,41 +100,29 @@ export default function ConsentScreen() {
         }}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-h1 font-bold text-text-primary">
-            Parental consent required
-          </Text>
-        </View>
-
-        {success ? (
-          <View testID="consent-success">
-            <Text className="text-body text-text-primary mb-4">
-              We sent an email to{' '}
-              <Text className="font-semibold">{parentEmail}</Text>.
+        {phase === 'child' && (
+          <View testID="consent-child-view">
+            <Text className="text-h1 font-bold text-text-primary mb-4">
+              {copy.childTitle}
             </Text>
             <Text className="text-body text-text-secondary mb-8">
-              They'll need to approve before you can start learning. You can
-              close this screen.
+              {copy.childMessage}
             </Text>
             <Button
               variant="primary"
-              label="Done"
-              onPress={() => router.back()}
-              testID="consent-done"
+              label={copy.handOffButton}
+              onPress={() => setPhase('parent')}
+              testID="consent-handoff-button"
             />
-            <View className="flex-row justify-center mt-4">
-              <Button
-                variant="tertiary"
-                size="small"
-                label="Resend email"
-                onPress={onResendEmail}
-                loading={resending}
-                testID="consent-resend-email"
-              />
-            </View>
           </View>
-        ) : (
-          <>
+        )}
+
+        {phase === 'parent' && (
+          <View testID="consent-parent-view">
+            <Text className="text-h1 font-bold text-text-primary mb-4">
+              {copy.parentTitle}
+            </Text>
+
             <Text className="text-body text-text-secondary mb-6">
               {regulationText}
             </Text>
@@ -145,11 +143,11 @@ export default function ConsentScreen() {
 
             <View onLayout={onFieldLayout('email')}>
               <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-                Parent's email address
+                {copy.parentEmailLabel}
               </Text>
               <TextInput
-                className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
-                placeholder="parent@example.com"
+                className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-2"
+                placeholder={copy.parentEmailPlaceholder}
                 placeholderTextColor={colors.muted}
                 value={parentEmail}
                 onChangeText={setParentEmail}
@@ -160,17 +158,51 @@ export default function ConsentScreen() {
                 testID="consent-email"
                 onFocus={onFieldFocus('email')}
               />
+              <Text className="text-body-sm text-text-secondary mb-6">
+                {copy.spamWarning}
+              </Text>
             </View>
 
             <Button
               variant="primary"
-              label="Send consent request"
+              label={copy.parentSubmitButton}
               onPress={onSubmit}
               disabled={!canSubmit}
               loading={isPending}
               testID="consent-submit"
             />
-          </>
+          </View>
+        )}
+
+        {phase === 'success' && (
+          <View testID="consent-success">
+            <Text className="text-h1 font-bold text-text-primary mb-4">
+              {copy.successMessage}
+            </Text>
+            <Text className="text-body text-text-primary mb-2">
+              We sent a consent link to{' '}
+              <Text className="font-semibold">{parentEmail}</Text>.
+            </Text>
+            <Text className="text-body text-text-secondary mb-8">
+              {copy.successSpamHint}
+            </Text>
+            <Button
+              variant="primary"
+              label={copy.handBackButton}
+              onPress={() => router.back()}
+              testID="consent-done"
+            />
+            <View className="flex-row justify-center mt-4">
+              <Button
+                variant="tertiary"
+                size="small"
+                label="Resend email"
+                onPress={onResendEmail}
+                loading={resending}
+                testID="consent-resend-email"
+              />
+            </View>
+          </View>
         )}
       </ScrollView>
     </KeyboardAvoidingView>

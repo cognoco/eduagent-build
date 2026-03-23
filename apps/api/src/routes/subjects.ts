@@ -1,6 +1,11 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { subjectCreateSchema, subjectUpdateSchema } from '@eduagent/schemas';
+import {
+  subjectCreateSchema,
+  subjectUpdateSchema,
+  subjectResolveInputSchema,
+  ERROR_CODES,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
@@ -10,7 +15,8 @@ import {
   getSubject,
   updateSubject,
 } from '../services/subject';
-import { notFound } from '../errors';
+import { resolveSubjectName } from '../services/subject-resolve';
+import { notFound, apiError } from '../errors';
 
 type SubjectRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -23,6 +29,24 @@ type SubjectRouteEnv = {
 };
 
 export const subjectRoutes = new Hono<SubjectRouteEnv>()
+  .post(
+    '/subjects/resolve',
+    zValidator('json', subjectResolveInputSchema),
+    async (c) => {
+      const { rawInput } = c.req.valid('json');
+      try {
+        const result = await resolveSubjectName(rawInput);
+        return c.json(result);
+      } catch {
+        return apiError(
+          c,
+          502,
+          ERROR_CODES.INTERNAL_ERROR,
+          'Subject name resolution failed — please try again'
+        );
+      }
+    }
+  )
   .get('/subjects', async (c) => {
     const db = c.get('db');
     const account = c.get('account');

@@ -1,16 +1,22 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { topicSkipSchema, curriculumChallengeSchema } from '@eduagent/schemas';
+import {
+  topicSkipSchema,
+  topicUnskipSchema,
+  curriculumChallengeSchema,
+  ERROR_CODES,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import {
   getCurriculum,
   skipTopic,
+  unskipTopic,
   challengeCurriculum,
   explainTopicOrdering,
 } from '../services/curriculum';
-import { notFound, unauthorized } from '../errors';
+import { notFound, unauthorized, apiError } from '../errors';
 
 type CurriculumRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -54,8 +60,50 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         await skipTopic(db, profileId, subjectId, topicId);
         return c.json({ message: 'Topic skipped', topicId });
       } catch (error) {
-        if (error instanceof Error && error.message === 'Subject not found') {
-          return notFound(c, 'Subject not found');
+        if (error instanceof Error) {
+          if (error.message === 'Subject not found')
+            return notFound(c, 'Subject not found');
+          if (error.message === 'Curriculum not found')
+            return notFound(c, 'Curriculum not found');
+          if (error.message === 'Topic not found in curriculum')
+            return notFound(c, 'Topic not found in curriculum');
+        }
+        throw error;
+      }
+    }
+  )
+  // Unskip (restore) a topic
+  .post(
+    '/subjects/:subjectId/curriculum/unskip',
+    zValidator('json', topicUnskipSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = c.get('profileId');
+      if (!profileId)
+        return unauthorized(
+          c,
+          'Profile selection required (X-Profile-Id header)'
+        );
+      const subjectId = c.req.param('subjectId');
+      const { topicId } = c.req.valid('json');
+      try {
+        await unskipTopic(db, profileId, subjectId, topicId);
+        return c.json({ message: 'Topic restored', topicId });
+      } catch (error) {
+        if (error instanceof Error) {
+          if (error.message === 'Subject not found')
+            return notFound(c, 'Subject not found');
+          if (error.message === 'Curriculum not found')
+            return notFound(c, 'Curriculum not found');
+          if (error.message === 'Topic not found in curriculum')
+            return notFound(c, 'Topic not found in curriculum');
+          if (error.message === 'Topic is not skipped')
+            return apiError(
+              c,
+              422,
+              ERROR_CODES.VALIDATION_ERROR,
+              'Topic is not skipped'
+            );
         }
         throw error;
       }

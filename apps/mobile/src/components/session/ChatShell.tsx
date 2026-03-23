@@ -87,7 +87,7 @@ export function animateResponse(
 
 export function ChatShell({
   title,
-  subtitle = 'Your coach is here',
+  subtitle = 'Your mate is here',
   messages,
   onSend,
   isStreaming,

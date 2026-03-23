@@ -1,0 +1,229 @@
+# Flow: COPPA Consent — US Under-13 (Full 3-Phase Consent Form)
+# Validates: creating a profile for a 12-year-old in US triggers COPPA consent,
+# then walks through all 3 phases: child hand-off → parent email → success.
+# Tags: nightly, consent, coppa
+#
+# Journey: UX Journey 1 (Onboarding) + Consent Lifecycle (COPPA)
+# Epics: Epic 0, Epic 5, Epic 10 (Story 10.10)
+#
+# Prerequisite: Seeded user with pre-profile scenario (Clerk user + account, no profile).
+# Usage: ./scripts/seed-and-run.sh pre-profile flows/consent/consent-coppa-under13.yaml
+#
+# Date picker technique: Android native DatePickerDialog opens with default 2010-01-01.
+# Tap year header → switch to year list → scroll down → tap 2014 → OK.
+# Result: age = 12, US location → COPPA consent required.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - consent
+  - coppa
+---
+# ============================================================
+# SIGN IN (pre-profile: Clerk user + account, no profile)
+# ============================================================
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 120000
+
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${EMAIL}
+- pressKey: back
+
+- tapOn:
+    id: "sign-in-password"
+- inputText: ${PASSWORD}
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 10000
+- tapOn:
+    id: "sign-in-button"
+
+# ============================================================
+# NAVIGATE TO CREATE PROFILE (More → Profile → Create)
+# ============================================================
+- extendedWaitUntil:
+    visible:
+      id: "tab-more"
+    timeout: 30000
+- tapOn:
+    id: "tab-more"
+
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      text: "Profile"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    text: "Profile"
+
+- extendedWaitUntil:
+    visible:
+      text: "No profiles yet"
+    timeout: 10000
+- tapOn:
+    id: "profiles-create-first"
+
+# ============================================================
+# PROFILE FORM — set age to 10 (born 2014), select US
+# ============================================================
+- extendedWaitUntil:
+    visible:
+      id: "create-profile-name"
+    timeout: 15000
+
+# Enter display name
+- tapOn:
+    id: "create-profile-name"
+- inputText: "COPPA Test Child"
+- pressKey: back
+
+# Open date picker
+- tapOn:
+    id: "create-profile-birthdate"
+
+# Wait for date picker dialog (shows January 2010 calendar)
+- extendedWaitUntil:
+    visible:
+      text: "OK"
+    timeout: 5000
+
+# Tap the year header "2010" to switch to year selection mode
+- tapOn:
+    id: "android:id/date_picker_header_year"
+
+# Scroll down until 2014 is visible (initial list shows 2008-2015, scroll may overshoot)
+- scrollUntilVisible:
+    element:
+      text: "2014"
+    direction: DOWN
+    timeout: 5000
+
+# Tap year 2014 (age = 12 in 2026 → triggers COPPA)
+- tapOn:
+    text: "2014"
+
+# Confirm date selection
+- tapOn:
+    text: "OK"
+
+# Verify date was set
+- assertVisible:
+    text: "January 1, 2014"
+
+- takeScreenshot: coppa-under13-01-date-set
+
+# Location options should now be visible
+- extendedWaitUntil:
+    visible:
+      id: "location-us"
+    timeout: 5000
+
+# Select US location (COPPA = under 13 in US)
+- tapOn:
+    id: "location-us"
+
+- takeScreenshot: coppa-under13-02-us-selected
+
+# Submit profile creation
+- tapOn:
+    id: "create-profile-submit"
+
+# ============================================================
+# PHASE 1: CHILD VIEW — "One more step!" hand-off screen
+# ============================================================
+# MANDATORY: Consent MUST appear for a 10yo in the US
+- extendedWaitUntil:
+    visible:
+      id: "consent-child-view"
+    timeout: 15000
+
+- assertVisible:
+    text: "One more step!"
+
+- takeScreenshot: coppa-under13-03-child-handoff
+
+# Tap the hand-off button to transition to parent form
+- tapOn:
+    id: "consent-handoff-button"
+
+# ============================================================
+# PHASE 2: PARENT VIEW — email form with COPPA regulation text
+# ============================================================
+- extendedWaitUntil:
+    visible:
+      id: "consent-parent-view"
+    timeout: 10000
+
+- assertVisible:
+    text: "Parental Consent Required"
+
+# Verify COPPA-specific regulation text (parent reads this)
+# NOTE: Full text wraps on screen — Maestro Pattern B limitation (Issue 21).
+# Use partial match. The parent-view testID already confirms correct phase.
+- assertVisible:
+    text: "COPPA"
+    optional: true
+    # Justification: long wrapping text unreliable on Android (Issue 21 Pattern B)
+
+- takeScreenshot: coppa-under13-04-parent-form
+
+# Enter parent email
+- tapOn:
+    id: "consent-email"
+- inputText: "parent-coppa-e2e@example.com"
+- pressKey: back
+
+# Submit consent request
+- extendedWaitUntil:
+    visible:
+      id: "consent-submit"
+    timeout: 5000
+- tapOn:
+    id: "consent-submit"
+
+# ============================================================
+# PHASE 3: SUCCESS VIEW
+# ============================================================
+- extendedWaitUntil:
+    visible:
+      id: "consent-success"
+    timeout: 15000
+
+# Note: "Consent link sent!" visible in UI dump but Maestro text matcher fails (Issue 21).
+# consent-success testID is sufficient verification.
+- assertVisible:
+    text: "Hand back to your child"
+
+# Verify resend button exists
+- assertVisible:
+    id: "consent-resend-email"
+
+# Verify done button exists
+- assertVisible:
+    id: "consent-done"
+
+- takeScreenshot: coppa-under13-05-success
+
+# Tap done to return
+- tapOn:
+    id: "consent-done"
+
+# After done, should land on consent pending gate
+- extendedWaitUntil:
+    visible:
+      text: "Hang tight!"
+    timeout: 15000
+    # Optional: navigation after consent done varies by app state
+    optional: true
+
+- takeScreenshot: coppa-under13-06-complete

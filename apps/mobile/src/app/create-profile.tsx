@@ -22,6 +22,7 @@ import { checkConsentRequirement } from '../hooks/use-consent';
 import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
+import { formatApiError } from '../lib/format-api-error';
 
 // Captured at module load — safe because these screens are portrait-locked.
 const SCREEN_HEIGHT = Dimensions.get('screen').height;
@@ -163,9 +164,7 @@ export default function CreateProfileScreen() {
         router.back();
       }
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Something went wrong.';
-      setError(message);
+      setError(formatApiError(err));
     } finally {
       setLoading(false);
     }

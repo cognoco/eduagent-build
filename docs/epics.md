@@ -414,7 +414,7 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 
 ## Epic List
 
-**10 epics total: 6 MVP (Epics 0-5), 1 pre-launch (Epic 9), 3 deferred (Epics 6, 7, 8).**
+**11 epics total: 6 MVP (Epics 0-5), 2 pre-launch (Epics 9, 10), 3 deferred (Epics 6, 7, 8).**
 
 ### Epic 0: Project Foundation & User Registration
 
@@ -622,6 +622,25 @@ Add native Apple/Google in-app purchases for mobile billing via RevenueCat. The 
 
 ---
 
+### Epic 10: Pre-Launch UX Polish (PRE-LAUNCH — before public release)
+
+Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion. Focused on copy clarity, confirmation dialogs, and persona-appropriate language for the DACH market (ages 11-15). Identified from user testing / UX gap analysis.
+
+**Items addressed:** Topic skip undo (#4), GDPR child-friendly text (#9), profile removal alert (#15), actionable error messages (#10), curriculum label jargon (#2, #3), relearn method descriptions (#8).
+
+**FRs covered:** FR18 (topic skip undo gap), FR19/FR20 (curriculum label clarity), FR56 (relearn descriptions)
+**Stories:** 6 (3 must-ship, 3 should-ship)
+
+**Implementation notes:**
+- All stories are independent (touch different screens/files). Can be parallelized.
+- 4 stories are pure string/copy changes. 1 adds a small API endpoint (unskip). 1 adds a shared error utility.
+- Persona-conditional copy for learner-only stories (10.2, 10.6); universal copy for the rest.
+
+**Dependencies:** Epics 0-5 (all screens, services, and infrastructure exist)
+**Enables:** Confident public launch — eliminates highest-risk UX gaps.
+
+---
+
 ### Epic Dependency Graph
 
 ```
@@ -630,6 +649,8 @@ Epic 0 ──→ Epic 1 ──→ Epic 2 ──→ Epic 3 ──→ Epic 4
   └──→ Epic 5 (parallel) ┘           │           │
          │                           │           │
          └──→ Epic 9 (pre-launch) ←──┘ (adds native IAP for mobile, Stripe kept for web)
+                                     │
+         Epic 10 (pre-launch) ← Epics 0-5 (UX polish, all stories independent)
                                      │
                               Epic 3 Cluster G (Feynman Stage, MVP)
                                      │
@@ -867,7 +888,7 @@ So that I can exercise my privacy rights under GDPR.
 ## Epic 1: Onboarding & Curriculum Generation — Stories
 
 **Goal:** Users can specify subjects, complete an AI-powered conversational assessment interview, receive a personalized curriculum, and begin their learning journey.
-**FRs:** FR13-FR22 (10 FRs) | **Stories:** 5
+**FRs:** FR13-FR22 (10 FRs) | **Stories:** 6
 **Deferred from this epic:** UX-9 (parent simulated dashboard → Epic 4 as demo-mode toggle on real dashboard), UX-8 (cold-start three-button fallback → Epic 2 where it's actually used)
 
 ### Story 1.1: Subject Selection & Onboarding Entry
@@ -1017,6 +1038,49 @@ So that my learning path reflects what I actually need to work on.
 **⚠️ Fully testable with real performance data only after Epic 3** (assessments + retention scoring). Unit tests use mock performance payloads. Integration test deferred to Epic 3 story dependency.
 
 **FRs:** FR21
+
+---
+
+### Story 1.6: Subject Name Resolution (LLM-powered input validation)
+
+As a young learner who might misspell a subject or not know its formal name,
+I want the app to understand what I mean and suggest the right subject,
+So that I don't get stuck or end up with a misspelled subject name forever.
+
+**Acceptance Criteria:**
+
+**Given** user on subject input screen
+**When** user types a well-formed subject name (e.g., "Physics")
+**Then** subject is accepted immediately with no suggestion step (direct_match) (FR13 refinement)
+
+**Given** user on subject input screen
+**When** user types a misspelled subject (e.g., "Phsics")
+**Then** LLM detects the typo and shows inline suggestion: "Did you mean **Physics**?" with Accept/Edit buttons (corrected)
+**And** tapping Accept creates the subject with the corrected name
+**And** tapping Edit pre-fills the corrected name in the input for manual adjustment
+
+**Given** user on subject input screen
+**When** user types a broad or ambiguous topic (e.g., "ants", "space", "water")
+**Then** LLM returns 2-4 suggestions with different learning angles (ambiguous)
+**And** each suggestion shows a name and short child-friendly description (e.g., "Biology — Entomology: Ant bodies, life cycle and species")
+**And** suggestions render as tappable cards — tapping one creates the subject with that name
+
+**Given** user on subject input screen
+**When** user types natural language describing what they want to learn (e.g., "I want to learn how computers work")
+**Then** LLM resolves to a formal subject name ("Computer Science") and shows suggestion with Accept/Edit (resolved)
+
+**Given** user on subject input screen
+**When** user types nonsense or gibberish (e.g., "jjjjj")
+**Then** LLM returns no_match with a friendly message asking the user to try again
+**And** the subject is NOT created
+
+**Given** the resolve API is unavailable (network error, API down)
+**When** user taps "Start Learning"
+**Then** app falls through gracefully and creates the subject with the raw input (same as pre-feature behaviour)
+
+**Implementation:** `POST /v1/subjects/resolve` endpoint using `routeAndCall()` at rung 1 (fast/cheap classification). Response schema: `{ status, resolvedName, suggestions[], displayMessage }`. No database changes — pure LLM classification.
+
+**FRs:** FR13 (refinement — input validation before subject creation)
 
 ---
 
@@ -3037,3 +3101,684 @@ FR108-FR117 business requirements preserved from Epic 5. Only the payment mechan
 ### Why This Epic Exists
 
 The original architecture (docs/architecture.md) specified "Payments | Stripe" without accounting for Apple App Store and Google Play Store policies. Both stores **require** native in-app purchases for digital services. AI-powered tutoring qualifies as a digital service. An app using Stripe web checkout for digital content subscriptions will be rejected during App Store review (Apple Review Guidelines §3.1.1, Google Play Billing Policy). This epic was added to close that gap before the first store submission.
+
+---
+
+## Epic 10: Pre-Launch UX Polish (PRE-LAUNCH) — Stories
+
+**Goal:** Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion before first public release. Focused on copy clarity, confirmation dialogs, and persona-appropriate language for the DACH market (ages 11-15).
+**Stories:** 13 | **Priority:** Must-ship (10.1–10.7, 10.10–10.13), fast-follow (10.8–10.9)
+**Status:** Partially built. Stories 10.10–10.13 implemented with unit tests passing (505+ tests). Maestro E2E flows written but not yet run (requires emulator + API stack). Stories 10.1–10.9 not yet started. DB migration generated (`0002_light_puff_adder.sql`) but not applied.
+**FRs:** FR18 (topic skip — undo gap), FR20 (relevance labels), FR19 (challenge naming), FR56 (relearn method descriptions), plus new NFR for actionable errors and child-friendly GDPR copy.
+**Dependencies:** Epics 0-5 complete (all screens and services exist). No new infrastructure needed.
+**Persona scope:** Items marked UNIVERSAL apply to all personas. Items marked LEARNER-ONLY apply only when persona is `learner` (ages ~10-12). See persona-conditional notes per story.
+
+**Story status (10.10–10.13):**
+| Story | Unit tests | E2E flow | Status |
+|-------|-----------|----------|--------|
+| 10.10 — Hand-to-parent consent | 12 pass + 26 no regression | `consent/hand-to-parent-consent.yaml` | Built, E2E written (not run) |
+| 10.11 — Consent deny confirmation | 12 pass (2 new) | `consent/consent-deny-confirmation.yaml` (placeholder — server HTML, not mobile) | Built, unit tested |
+| 10.12 — Subject raw input audit trail | 455 API + 33 schema + 5 hooks pass | `parent/subject-raw-input-audit.yaml` | Built, E2E written (not run) |
+| 10.13 — Guided label tooltip | 7 pass (all new) | `parent/guided-label-tooltip.yaml` | Built, E2E written (not run) |
+
+---
+
+### Story 10.1: Topic Skip Confirmation & Undo
+
+_Priority: Must-ship. Scope: UNIVERSAL._
+
+As a learner reviewing my curriculum,
+I want a confirmation before skipping a topic and the ability to undo a skip,
+So that accidental taps don't permanently remove topics from my learning path.
+
+**Background:** Story 1.4 acceptance criteria already states "skipped topics can be un-skipped later" but this was never implemented. The skip action currently fires immediately with no confirmation and no reversal path. This story closes that gap.
+
+**Acceptance Criteria:**
+
+**Given** user is on the curriculum review screen (`curriculum-review.tsx`)
+**When** user taps the "Skip" button on a topic
+**Then** a confirmation dialog appears: title "Skip this topic?", body "You can always bring it back later.", buttons "Cancel" (default) and "Skip" (destructive style)
+**And** the skip API call is only made if user confirms
+
+**Given** a topic has been skipped (shows at reduced opacity)
+**When** user taps on the skipped topic row
+**Then** an "Undo skip" / "Restore" button is visible
+**And** tapping it calls a new `POST /v1/subjects/:subjectId/curriculum/unskip` endpoint
+
+**Given** the unskip endpoint is called
+**When** the topic exists and is currently skipped
+**Then** `curriculumTopics.skipped` is set to `false`
+**And** an audit record is inserted into `curriculumAdaptations` with `skipReason: 'User restored'`
+**And** the curriculum query cache is invalidated on success
+
+**Given** the unskip endpoint is called
+**When** the topic is not currently skipped
+**Then** the endpoint returns 400 "Topic is not skipped"
+
+**Implementation notes:**
+- New API endpoint: `POST /v1/subjects/:subjectId/curriculum/unskip` with `{ topicId }` body (mirrors skip endpoint)
+- New service function `unskipTopic()` in `services/curriculum.ts` — inverse of `skipTopic()`
+- New schema `topicUnskipSchema` in `@eduagent/schemas` (identical to `topicSkipSchema`)
+- New hook `useUnskipTopic()` in `use-curriculum.ts`
+- UI: `Alert.alert()` confirmation before skip. Skipped topic row gets a "Restore" pressable. Both use existing testID naming convention.
+- Tests: service unit tests (unskip happy path, already-not-skipped, ownership), route tests (200, 400, 401), hook test, mobile component test for confirmation dialog.
+
+**FRs:** FR18 (closes un-skip gap from Story 1.4)
+
+---
+
+### Story 10.2: Child-Friendly GDPR/COPPA Consent Text
+
+_Priority: Must-ship. Scope: LEARNER-ONLY (ages ~10-12). Teen/parent text unchanged._
+
+As a young learner (age 10-12) seeing the consent screen for the first time,
+I want the consent explanation in language I can understand,
+So that I'm not confused or scared by legal jargon during onboarding.
+
+**Background:** The current consent screen (`consent.tsx`) shows regulatory text like "Under EU GDPR regulations, users under 16 need parental consent to use this service." A 10-year-old in the DACH market (already dealing with English as a second language) will not understand "GDPR regulations" or "parental consent to use this service." The consent-withdrawn gate text ("Account deletion pending", "Your data will be permanently deleted within 7 days") is similarly clinical.
+
+**Acceptance Criteria:**
+
+**Given** a learner-persona user lands on the consent request screen (`consent.tsx`)
+**When** the screen renders
+**Then** the regulation text is child-friendly:
+  - GDPR: "Because you're under 16, we need your parent or guardian to say it's OK for you to use this app. It's a rule in Europe to keep you safe online!"
+  - COPPA: "Because you're under 13, we need a grown-up to say it's OK for you to use this app. It's a rule to keep kids safe online!"
+**And** the title changes from "Parental consent required" to "Almost there! We need a grown-up's help"
+**And** the "Parent's email address" label changes to "Your parent's or guardian's email"
+**And** the success message changes from "They'll need to approve before you can start learning" to "Once they say yes, you're all set to start learning!"
+
+**Given** a learner-persona user is on the consent-pending gate (`ConsentPendingGate`)
+**When** the gate renders
+**Then** title changes from "Waiting for approval" to "Hang tight!"
+**And** description includes "We've asked your parent or guardian — they just need to check their email."
+**And** "Once they approve, you'll have full access" → "Once they say yes, you can start exploring!"
+
+**Given** a learner-persona user is on the consent-withdrawn gate (`ConsentWithdrawnGate`)
+**When** the gate renders
+**Then** title changes from "Account deletion pending" to "Your account is being closed"
+**And** message changes from "Your parent has withdrawn consent for your account" to "Your parent or guardian has decided to close your account."
+**And** "Your data will be permanently deleted within 7 days" → "Your learning data will be removed in 7 days."
+**And** help text changes from "If this was a mistake, ask your parent to restore consent from their dashboard" to "If this wasn't meant to happen, ask your parent to fix it from their app."
+
+**Given** persona is `teen` or `parent`
+**When** any consent screen renders
+**Then** text remains unchanged (current regulatory language is appropriate for teens and parents)
+
+**Implementation notes:**
+- Persona is available via `useTheme()` → `persona` in the learner layout. The consent screen is rendered within `(learner)/_layout.tsx` which has persona context.
+- Create a `consent-copy.ts` utility with persona-keyed string maps. Screens import and select by persona.
+- No API changes — this is purely mobile string changes.
+- Tests: component tests verifying correct text per persona. E2E: consent flow should verify the child-friendly strings appear.
+
+**FRs:** (GDPR/COPPA UX — no new FR, improves FR7/FR8 user experience)
+
+---
+
+### Story 10.3: Reassuring Profile Removal Alert
+
+_Priority: Must-ship. Scope: UNIVERSAL._
+
+As any user whose profile was removed server-side (consent denied / auto-deleted),
+I want a reassuring explanation instead of a scary alert,
+So that I understand what happened without panicking.
+
+**Background:** Current alert text: "Profile Removed — One of your profiles has been removed because parental consent was not received in time. You have been switched to your main profile." This is clinical and alarming, especially for a child.
+
+**Acceptance Criteria:**
+
+**Given** `profileWasRemoved` is true in the learner layout
+**When** the alert fires
+**Then** the alert title is "Profile switched"
+**And** the message is: "One of your profiles is no longer available, so we've switched you to your main profile. Everything else is just as you left it."
+**And** the button text remains "OK"
+
+**Given** the same scenario in any persona context
+**When** the alert fires
+**Then** the same reassuring text is used (universal, not persona-specific)
+
+**Implementation notes:**
+- Single string change in `apps/mobile/src/app/(learner)/_layout.tsx` lines 559-561.
+- Avoids words "removed", "deleted", "consent" in the alert — these are implementation details that alarm users.
+- Tests: component test verifying the new alert text. Snapshot/text assertion in layout test if one exists.
+
+**FRs:** (UX improvement — no direct FR)
+
+---
+
+### Story 10.4: Actionable Error Messages
+
+_Priority: Should-ship. Scope: UNIVERSAL._
+
+As any user encountering an error,
+I want to understand what went wrong and what I can do about it,
+So that I can recover without support or guesswork.
+
+**Background:** The app uses "Something went wrong. Please try again." as a fallback in 8+ locations. Users don't know whether it's a network issue, a server problem, or something they did wrong. Parents will generate support emails; kids will just leave.
+
+**Acceptance Criteria:**
+
+**Given** any API call fails with a network error (fetch throws, no response)
+**When** the error is displayed to the user
+**Then** the message includes a network hint: "Looks like you're offline or our servers can't be reached. Check your internet connection and try again."
+
+**Given** any API call fails with a 5xx status
+**When** the error is displayed
+**Then** the message includes: "Something went wrong on our end. Please try again in a moment."
+
+**Given** any API call fails with a 4xx status that includes an error body
+**When** the error is displayed
+**Then** the API's error message is shown (it's already user-facing from `apiErrorSchema`)
+
+**Given** any API call fails with a 4xx status with no meaningful body
+**When** the error is displayed
+**Then** the message includes: "That didn't work. Please check your input and try again."
+
+**Given** OCR capture fails (`camera.tsx`)
+**When** the error is displayed
+**Then** the primary action is "Retake photo" (not "type it out")
+**And** the message says: "We couldn't read that clearly. Try taking the photo again with better lighting."
+
+**Given** session streaming fails
+**When** the error is displayed
+**Then** the message says: "Lost connection to your session. Tap to reconnect." (not "I'm having trouble connecting")
+
+**Implementation notes:**
+- Create `apps/mobile/src/lib/format-api-error.ts` — centralized error formatter that inspects the error type:
+  - `TypeError` / fetch failure → network message
+  - Response with `status >= 500` → server message
+  - Response with `status >= 400` and body → extract body message
+  - Response with `status >= 400` no body → input message
+  - Default fallback → "Something unexpected happened. Please try again."
+- Replace the 8+ inline "Something went wrong" strings to use `formatApiError(err)`.
+- Camera OCR: update `camera.tsx` to show "Retake photo" as primary action, "Type it instead" as secondary.
+- Session streaming: update `session/index.tsx` error messages.
+- Do NOT change Clerk-specific errors (already handled by `extractClerkError`).
+- Do NOT change RevenueCat-specific errors (already have their own discriminator).
+- Tests: unit tests for `formatApiError` (network, 5xx, 4xx with body, 4xx without body, unknown). Component tests for camera and session screens verifying new strings.
+
+**FRs:** (new NFR — actionable error UX)
+
+---
+
+### Story 10.5: Plain-Language Curriculum Labels
+
+_Priority: Should-ship. Scope: UNIVERSAL._
+
+As any user viewing my curriculum,
+I want labels that make sense without domain knowledge,
+So that I understand what each topic category and action means.
+
+**Background:** Two issues:
+1. Topic relevance labels use curriculum jargon: "Contemporary" and "Emerging" mean nothing to a 12-year-old (or most parents). These are LLM-generated classification terms, not user-facing labels.
+2. "Challenge your curriculum" is unclear. Users don't know what "challenge" means in this context — it could mean "make it harder." The actual intent is "change my topics."
+
+**Acceptance Criteria:**
+
+**Given** user views curriculum review screen
+**When** topic relevance badges render
+**Then** display labels are mapped from internal values to plain language:
+  - `core` → "Essential"
+  - `recommended` → "Recommended" (already clear — keep)
+  - `contemporary` → "Current"
+  - `emerging` → "Cutting-edge"
+**And** badge colors remain unchanged (primary/accent/warning/success)
+**And** the internal enum values (`core`, `recommended`, `contemporary`, `emerging`) are unchanged in schema/database — only the display text changes
+
+**Given** user views curriculum review screen
+**When** the "Challenge" button renders
+**Then** button label is "Change my topics" (not "Challenge")
+**And** modal title is "Change your topics" (not "Challenge your curriculum")
+**And** modal subtitle remains: "Tell us what you'd change and we'll regenerate your learning path."
+
+**Implementation notes:**
+- Add a `RELEVANCE_LABEL` display map in `curriculum-review.tsx` alongside existing `RELEVANCE_BG` and `RELEVANCE_TEXT` maps.
+- Update button text and modal title — string-only changes.
+- No schema, database, or API changes. Internal enum stays as-is.
+- Tests: component test verifying display labels. E2E: curriculum review flow should see "Essential" / "Current" / "Cutting-edge" badges.
+
+**FRs:** FR20 (clearer relevance labels), FR19 (clearer challenge action)
+
+---
+
+### Story 10.6: Child-Friendly Relearn Method Descriptions
+
+_Priority: Should-ship. Scope: LEARNER-ONLY (ages ~10-12). Teen descriptions unchanged._
+
+As a young learner who failed recall and needs to relearn a topic,
+I want method descriptions that are concrete and relatable,
+So that I can pick a learning style without needing to understand metacognitive terms.
+
+**Background:** Current descriptions assume metacognition: "Learn through charts, diagrams, and visual representations", "Connect concepts to practical, everyday situations." A 10-year-old doesn't know what "visual representations" means. Teens handle abstract descriptions fine — this change is learner-only.
+
+**Acceptance Criteria:**
+
+**Given** a learner-persona user is on the relearn method selection screen (`relearn.tsx`)
+**When** the method options render
+**Then** descriptions use concrete, child-friendly language:
+  - Visual Diagrams: "Show me pictures" / "Learn with pictures, charts, and drawings"
+  - Step-by-Step: "Walk me through it" / "Break it down into small, easy steps"
+  - Real-World Examples: "Show me how it works in real life" / "Learn with fun, everyday examples"
+  - Practice Problems: "Let me try it" / "Learn by solving problems with help"
+**And** the phase-1 choice text changes:
+  - "Different Method" description: "Let's try learning this a different way!" (not "Choose a new teaching style that might work better for you")
+  - "Same Method" description: "Let's go over it again the same way" (not "Review the topic again using your current learning approach")
+  - Intro text: "Let's find what works best for you!" (not "Every topic needs its own approach. Let's find what clicks for you!")
+
+**Given** persona is `teen` or `parent`
+**When** the relearn screen renders
+**Then** descriptions remain unchanged (current text is appropriate)
+
+**Implementation notes:**
+- Persona is available in the learner layout context. `relearn.tsx` can access it via `useTheme()`.
+- Create persona-keyed variants of the `TEACHING_METHODS` array and intro strings.
+- No API or schema changes — purely mobile display text.
+- Tests: component test verifying correct descriptions per persona.
+
+**FRs:** FR56 (improves relearn method UX for younger learners)
+
+---
+
+### Story 10.7: Living Book — Progress Celebration Animations
+
+_Priority: Should-ship. Scope: ALL KIDS (ages 8-15, both Learner and Teen). Parents unaffected._
+
+As a young learner answering questions in an interview or learning session,
+I want to see a book visually filling up with pages each time I contribute,
+So that I feel a sense of progress and accomplishment instead of wondering "when does this end?"
+
+**Background:** The interview has no progress indicator. Its length is LLM-decided (2-8 exchanges), so a progress bar is impossible without lying. A "3 of 5" bar that actually goes to 7 destroys trust. The insight: flip the framing from "how much is left" (unknowable) to "look what you've built" (always known). The app already has a "Learning Book" concept — extend that metaphor into a visible, growing animation.
+
+The book metaphor works as a **unified celebration system** across multiple screens, not just the interview.
+
+**Acceptance Criteria:**
+
+_Phase 1 — Interview screen:_
+
+**Given** user is on the interview screen (`interview.tsx`)
+**When** the screen loads
+**Then** a small book icon appears in the header area, visually empty (0 pages)
+
+**Given** user sends an answer in the interview
+**When** the AI acknowledges the answer (exchange count increments)
+**Then** the book icon plays a page-writing micro-animation (pen stroke + page flip)
+**And** a subtle page counter increments (e.g., "1 page", "2 pages", "3 pages")
+**And** the book visually grows (thickens or fills) proportionally
+
+**Given** the interview completes (`isComplete: true`)
+**When** the completion card renders
+**Then** the book plays a "completion flourish" animation (glow, sparkle, or gentle bounce)
+**And** a message ties the metaphor together: "Your book is ready!" (replacing or augmenting "Your personalized curriculum is ready.")
+
+_Phase 2 — Learning session (stretch):_
+
+**Given** user is in a learning session (`ChatShell.tsx` or `session/index.tsx`)
+**When** user sends a message and receives an AI response (exchange count increments)
+**Then** a small book icon in the header plays the same page-writing animation
+**And** the page counter increments
+
+_Phase 3 — Session summary (stretch):_
+
+**Given** user is on the session summary screen and writes a summary
+**When** the summary is submitted
+**Then** the book plays a special "author" animation: "You wrote your own page today!"
+
+_Persona adaptation:_
+
+**Given** persona is `learner` (ages ~8-12)
+**When** any book animation plays
+**Then** the animation is expressive: larger icon, visible sparkle/confetti, audible-optional page-turn sound
+
+**Given** persona is `teen` (ages ~13-15)
+**When** any book animation plays
+**Then** the animation is subtle: smaller icon, quiet page-turn, counter only — no sparkles
+
+**Given** persona is `parent`
+**When** any of the above screens render
+**Then** no book animation is shown (parents don't do learning sessions)
+
+_Edge cases:_
+
+**Given** the exchange count is 1
+**When** the animation plays
+**Then** it looks natural (single page written, book still thin — no awkwardness)
+
+**Given** the exchange count exceeds 10 (long interview or session)
+**When** the animation plays
+**Then** the book continues growing without visual overflow (max visual size caps at ~8-10 pages, counter keeps incrementing)
+
+**Implementation notes:**
+- **Animation approach:** Lottie (preferred for quality/perf) or Reanimated 3 layout animations. The book is a `~40x40` icon in the header, not a full-screen element.
+- **Data source:** `exchangeCount` is already tracked in interview state and session state. No new API data needed.
+- **Component:** New `<LivingBook exchangeCount={n} isComplete={boolean} persona={persona} />` component in `apps/mobile/src/components/common/`.
+- **Phase 1 only for initial ship.** Phases 2-3 are stretch goals — the component is reusable, so extending to other screens is incremental.
+- **Persona detection:** Available via `useTheme()` → `persona` in learner layout context.
+- **Assets:** One Lottie JSON file (~5-15 KB) for the book animation, or pure Reanimated if avoiding asset overhead. Design tokens: use existing `--color-primary` for the pen stroke, `--color-accent` for sparkles.
+- **Performance:** Animation runs on UI thread (Lottie/Reanimated). No layout shifts — book is absolutely positioned in header. No re-renders beyond the exchange count change.
+- Tests: component test verifying animation triggers on exchangeCount change, persona-conditional rendering (sparkles for learner, subtle for teen, hidden for parent), completion flourish on `isComplete`.
+
+**FRs:** (new UX engagement feature — no direct FR; supports interview flow from FR13/FR14 and session engagement from FR35/FR36)
+
+**Dependencies:** None. Interview and session screens exist. Exchange count is already tracked.
+
+---
+
+### Story 10.8: Session Summary — Structured Prompts & Emoji Reactions
+
+_Priority: Fast-follow (ship → measure → build). Scope: ALL KIDS (ages 8-15). Persona-adaptive._
+
+As a learner who just finished a session,
+I want a low-effort way to capture what I learned,
+So that I don't skip the summary every time because a blank text field feels like more homework.
+
+**Background:** The session summary screen asks kids to write free-form text: "In my own words, I learned that..." with a 10-character minimum. The "Skip for now" button is always available. Hypothesis: the skip rate will be very high (>80%) because writing open-ended reflections is cognitively expensive after a learning session. However, the current implementation works — it just may not get used. **Ship as-is, instrument the skip rate, then build structured prompts if data confirms the hypothesis.**
+
+**Acceptance Criteria:**
+
+_Phase 0 — Instrumentation (ship first):_
+
+**Given** user is on the session summary screen
+**When** user taps "Skip for now"
+**Then** a `summary_skipped` event is logged (Inngest or analytics) with `{ sessionId, persona, exchangeCount }`
+
+**Given** user submits a summary
+**When** the summary is saved
+**Then** a `summary_submitted` event is logged with `{ sessionId, persona, exchangeCount, charCount }`
+
+**And** the decision gate for Phase 1 is: **skip rate > 50% after 50+ summary opportunities** (not calendar time). With fewer than 50 data points, any percentage is anecdote, not signal. The gate is sample-size-based because early post-launch user counts may be too small for a calendar-based threshold to be meaningful.
+
+_Phase 1 — Structured prompts (build only if data warrants):_
+
+**Given** persona is `learner` (ages ~8-12)
+**When** the session summary screen renders
+**Then** instead of a blank text field, show 3 tappable prompt cards:
+  - "The coolest thing I learned was ___"
+  - "I was surprised that ___"
+  - "I still don't get ___"
+**And** tapping a card pre-fills the text field with the prompt stem
+**And** an emoji-only quick reaction row appears above the prompts: 🤯 (Mind-blown), 😊 (Got it), 🤔 (Still confused), 😴 (Too easy)
+**And** tapping an emoji counts as a valid summary (no text required)
+
+**Given** persona is `teen` (ages ~13-15)
+**When** the session summary screen renders
+**Then** keep the existing open text field
+**But** make "Skip" equally prominent (same visual weight as "Submit", not secondary text link)
+**And** add the emoji quick-reaction row above the text field (optional, lower-key)
+
+_Phase 1 fallback:_
+
+**Given** skip rate ≤ 50% after 50+ summary opportunities
+**When** reviewing the data
+**Then** the current implementation is sufficient — close this story as "not needed"
+
+**Implementation notes:**
+- Phase 0 is trivial: add two analytics calls in `session-summary/[sessionId].tsx` (the skip handler and submit handler).
+- Phase 1 (if triggered): new `SummaryPromptCards` component in `apps/mobile/src/components/session/`. Emoji reactions stored as a new optional `reaction` field on the session summary (requires schema + migration).
+- The decision gate (>50% skip rate after 50+ opportunities) prevents over-engineering. If kids actually write summaries, this story self-closes. The 50-opportunity minimum ensures statistical relevance — with 15 early users doing 3 sessions each, you'd hit 45 opportunities and still need to wait for more data rather than reacting to noise.
+- Tests: Phase 0 — verify events fire. Phase 1 — component tests for prompt cards, emoji selection, persona branching.
+
+**FRs:** (improves session summary engagement — no direct FR; supports FR35/FR36 session completion)
+
+**Dependencies:** None. Session summary screen exists.
+
+---
+
+### Story 10.9: Softer Recall Remediation Copy
+
+_Priority: Fast-follow. Scope: ALL KIDS (ages 8-15). Persona-adaptive._
+
+As a learner who failed a recall test multiple times,
+I want encouraging, non-clinical language in the remediation card,
+So that I feel motivated to try again instead of feeling like I failed a test.
+
+**Background:** After 3 failed recall attempts, the child sees a "remediation card" with:
+- "Practice round {N}" label — clinical, implies repeated failure
+- Cooldown timer: "Available in 2h 15m" — feels like punishment
+- Two buttons: "Review and Re-test" vs "Relearn Topic" — unclear difference
+
+The tone is encouraging ("Don't worry — that's completely normal!") but the structure communicates failure tracking. This is a second-session experience at earliest — no one churns on day one because of this. Ship current copy, fix in a fast follow after launch.
+
+**Acceptance Criteria:**
+
+**Given** persona is `learner` (ages ~8-12) and recall failure count ≥ 3
+**When** the remediation card renders on `recall-test.tsx`
+**Then** "Practice round {N}" label is replaced with "Let's try something new!"
+**And** cooldown timer uses honest, kid-friendly time framing:
+  - If remaining ≤ 1 hour: "You can try again in {N} minutes — go do something fun!"
+  - If remaining ≤ 4 hours: "You can try again in about {N} hours — your brain needs a real break!"
+  - If remaining > 4 hours: "Come back tomorrow and try fresh!"
+**And** the actual remaining time is always truthful — never "soon" when the cooldown is hours away
+**And** the two-button choice is simplified to a single primary CTA: "Try a different way" (routes to relearn)
+**And** a secondary text link "Or try again later" replaces the disabled "Review and Re-test" button
+
+**Given** persona is `teen` (ages ~13-15) and recall failure count ≥ 3
+**When** the remediation card renders
+**Then** "Practice round {N}" label changes to "Attempt {N}"
+**And** cooldown timer shows actual remaining time in natural language: "Your brain needs a break — try again in {time}"
+**And** both buttons remain (teens understand the choice) but labels soften:
+  - "Review and Re-test" → "Review and try again"
+  - "Relearn Topic" → "Try a different approach"
+
+**Given** cooldown is active (for both personas)
+**When** the primary action is disabled
+**Then** the screen still offers something to do: "While you wait, check out your Learning Book" (link to book screen)
+
+**Implementation notes:**
+- All changes in `apps/mobile/src/app/(learner)/topic/recall-test.tsx` — string changes + minor layout adjustment (single button vs two for learner persona).
+- Persona available via `useTheme()` → `persona`.
+- No API or schema changes. The cooldown logic stays identical — only the display text changes.
+- **Trust principle:** Never use vague optimism ("come back soon!") when the actual wait is hours. A kid who returns in 30 minutes and finds a locked button feels lied to. Honest framing ("come back tomorrow") sets correct expectations and preserves trust even when the news isn't great.
+- The "Learning Book" link during cooldown is a new `router.push` — trivial addition.
+- Tests: component tests verifying correct copy per persona, cooldown state rendering.
+
+**FRs:** FR56 (improves recall remediation UX)
+
+**Dependencies:** None. Recall test screen exists.
+
+---
+
+### Story 10.10: "Hand to Your Parent" Consent Interstitial
+
+_Priority: Must-ship (launch blocker). Scope: LEARNER screen + PARENT interaction._
+
+As a young learner who needs parental consent,
+I want to hand my phone to my parent instead of typing their email,
+So that consent isn't blocked by a typo or my not knowing their email address.
+
+**Background:** The consent flow currently asks children under 13/16 to type their parent's email address. Children this age often don't know the exact address, and typos silently send consent emails to wrong addresses. The child gets only 3 resend attempts before being locked out (429). Combined with the risk of the consent email landing in spam, this creates the single biggest onboarding funnel leak: a child who can't complete consent never uses the app.
+
+The fix is an interstitial: instead of making the child type, the screen shows a child-friendly message ("Hand this to your parent") and a button. When tapped, the screen switches to a parent-facing form with professional tone, clear instructions, and the email field — filled in by the parent themselves while holding the child's device. The parent also sees a note: "Check your inbox (and spam folder) for the consent email."
+
+**Acceptance Criteria:**
+
+**Given** user lands on the consent screen (`consent.tsx`)
+**When** the screen renders
+**Then** the first view shows a child-friendly message: title "One more step!", body "We need a grown-up to say it's OK. Hand your phone to your parent or guardian.", and a primary button "I'm the parent / guardian"
+
+**Given** user taps "I'm the parent / guardian"
+**When** the screen transitions
+**Then** a parent-facing form appears with: title "Parental Consent Required", brief explanation of GDPR/COPPA (current regulatory text, professional tone), email label "Your email address" (not "Your parent's email"), placeholder "you@example.com", note beneath the input: "We'll send a one-time consent link. Check your spam folder if you don't see it within a few minutes.", and a "Send consent link" button
+
+**Given** parent submits their email successfully
+**When** the success state renders
+**Then** it shows: "Consent link sent to [email]", "Check your inbox (and spam folder). The link expires in 7 days.", a "Resend" button, and a "Hand back to your child" button that returns to the child-facing view with a "Hang tight!" waiting message
+
+**Given** the consent screen is shown for COPPA (under 13)
+**When** the regulatory text renders
+**Then** the parent-facing form shows the COPPA regulation text (not the child-friendly version)
+
+**Given** the consent screen is shown for GDPR (under 16 in EU)
+**When** the regulatory text renders
+**Then** the parent-facing form shows the GDPR regulation text
+
+**Implementation notes:**
+- Refactor `consent.tsx` to have two phases: `childView` (hand-off prompt) and `parentView` (email form + regulatory text).
+- The parent-facing email label changes from "Your parent's or guardian's email" to "Your email address" — the parent is the one typing now.
+- Add spam folder warning to both the form and the success state.
+- Update `consent-copy.ts` to add parent-facing copy variants alongside existing learner copy.
+- Existing API (`useRequestConsent`) is unchanged — only the mobile UI changes.
+- Tests: component tests for both phases, transition between them, correct copy per consentType.
+
+**FRs:** (UX improvement — fixes onboarding funnel leak)
+
+**Dependencies:** None. Consent screen exists. No API changes needed.
+
+---
+
+### Story 10.11: Consent Deny Confirmation on Web
+
+_Priority: Must-ship (data loss risk). Scope: PARENT (consent web page)._
+
+As a parent viewing the consent decision page in my browser,
+I want a confirmation step before denying consent,
+So that an accidental tap doesn't irreversibly delete my child's profile and all their learning data.
+
+**Background:** The consent web page (`consent-web.ts`) renders "Approve" and "Deny" as plain `<a href>` links. Clicking "Deny" immediately navigates to the confirm endpoint, which cascade-deletes the child's profile. There is no confirmation dialog, no "Are you sure?", no undo. One accidental tap = total data loss. This is indefensible for a children's education app.
+
+**Acceptance Criteria:**
+
+**Given** parent is on the consent decision page (`/consent-page?token=X`)
+**When** parent clicks the "Deny" button
+**Then** a JavaScript confirmation dialog appears: "Are you sure you want to deny consent? [Child name]'s account and all learning data will be permanently deleted. This cannot be undone."
+**And** the browser's native `confirm()` dialog shows "OK" and "Cancel" buttons
+
+**Given** parent clicks "OK" on the confirmation dialog
+**When** the confirmation is accepted
+**Then** the deny link navigates to `/consent-page/confirm?token=X&approved=false` as before
+
+**Given** parent clicks "Cancel" on the confirmation dialog
+**When** the confirmation is rejected
+**Then** nothing happens — parent stays on the consent decision page
+
+**Given** JavaScript is disabled in the parent's browser
+**When** parent clicks the "Deny" link
+**Then** the link still works (progressive enhancement — `confirm()` is a guard, not a gate)
+
+**Implementation notes:**
+- Change the "Deny" `<a>` tag to include an `onclick="return confirm('...')"` attribute.
+- The confirmation text must include the child's name (already available as `childName` in the template).
+- No API changes. No new endpoints. Pure HTML/JS change in `consent-web.ts`.
+- Tests: update `consent-web.test.ts` to verify the `onclick` attribute is present on the deny link and contains `confirm(`. Existing deny-flow tests remain unchanged (they test the confirm endpoint directly, not the HTML page).
+
+**FRs:** (UX improvement — prevents accidental data loss)
+
+**Dependencies:** None. Consent web route exists.
+
+---
+
+### Story 10.12: Subject Raw Input Audit Trail for Parents
+
+_Priority: Should-ship. Scope: LEARNER (creates subject) + PARENT (views mapping)._
+
+As a parent viewing my child's subjects on the dashboard,
+I want to see what my child originally typed alongside the resolved subject name,
+So that I understand why my child is studying "Biology — Entomology" when they asked to learn about "ants".
+
+**Background:** Subject name resolution (`subject-resolve.ts`) maps child input like "ants" to formal names like "Biology — Entomology". But the raw input is discarded after subject creation — `doCreate()` only sends the resolved `name` to the API. The parent dashboard shows "Biology — Entomology" with no context. This erodes parent trust: "Where did this come from? My kid wanted to learn about bugs."
+
+**Acceptance Criteria:**
+
+**Given** the subjects database table
+**When** schema is examined
+**Then** a nullable `raw_input` text column exists on the `subjects` table
+
+**Given** a child creates a subject via the create-subject screen
+**When** subject resolution produces a different name than the raw input (corrected, resolved, or ambiguous→picked)
+**Then** the API stores both `name` (resolved) and `rawInput` (what the child typed) on the subject row
+
+**Given** a child creates a subject that is a direct match (e.g., "Physics")
+**When** the subject is created
+**Then** `rawInput` is null (no mapping needed — the names are the same)
+
+**Given** a parent views a child's subject list on the child detail screen
+**When** a subject has a non-null `rawInput` that differs from `name`
+**Then** the parent sees: subject name "Biology — Entomology" with a subtitle 'Your child searched for "ants"' (in secondary text color)
+
+**Given** a parent views a subject where `rawInput` is null or matches `name`
+**When** the subject renders
+**Then** no subtitle is shown (no mapping to display)
+
+**Implementation notes:**
+- **Schema:** Add `rawInput: text('raw_input')` (nullable) to `subjects` table in `packages/database/src/schema/subjects.ts`. Run `pnpm run db:generate` for migration.
+- **Schemas package:** Add optional `rawInput` field to `subjectCreateSchema` in `@eduagent/schemas`. Add `rawInput` to subject response schema.
+- **API route:** `POST /v1/subjects` accepts optional `rawInput` field. Subject service passes it to insert.
+- **Mobile create-subject:** Pass `rawInput` to `createSubject.mutateAsync()` when the resolved name differs from the original input. For direct matches, omit it.
+- **Parent dashboard:** In child detail screen (`/(parent)/child/[profileId].tsx`), render subtitle beneath subject name when `rawInput` is present and differs from `name`.
+- Tests: API unit tests for rawInput persistence and retrieval. Mobile component tests for subtitle rendering. Parent detail screen tests.
+
+**FRs:** (UX improvement — parent trust, subject creation transparency)
+
+**Dependencies:** Story 1.6 (subject resolve) must be complete (it is).
+
+---
+
+### Story 10.13: "Guided" Label Explanation in Parent Transcript
+
+_Priority: Should-ship. Scope: PARENT._
+
+As a parent reading my child's session transcript,
+I want to understand what the "Guided" label means,
+So that I know the AI is coaching my child through difficulty, not just giving away answers.
+
+**Background:** The parent session transcript view shows a "Guided" badge on messages where the AI's escalation rung was ≥ 3 (meaning the AI had to demonstrate or directly teach rather than coach Socratically). Without context, "Guided" could mean the AI was doing the child's work for them. In reality, it means the child needed extra help and the AI responded appropriately. A brief explanation builds parent trust in the tutoring methodology.
+
+**Acceptance Criteria:**
+
+**Given** parent is viewing a session transcript (`/(parent)/child/[profileId]/session/[sessionId]`)
+**When** a message has the "Guided" label
+**Then** an info icon (ℹ️ or Ionicons `information-circle-outline`) appears next to the label
+
+**Given** parent taps the info icon
+**When** the tooltip/popover renders
+**Then** it shows: "Your child needed extra help here, so the coach provided more direct guidance. This is normal — it means a tricky concept is being worked through together."
+
+**Given** no messages have the "Guided" label
+**When** the transcript renders
+**Then** no info icon appears anywhere (nothing to explain)
+
+**Implementation notes:**
+- Find the "Guided" badge rendering in the parent transcript screen component.
+- Add a Pressable info icon next to the badge that toggles a small tooltip/popover or shows an Alert.
+- The tooltip text is static (no per-message variation needed).
+- Tests: component test verifying info icon renders next to "Guided" badge, tooltip text on press.
+
+**FRs:** (UX improvement — parent trust)
+
+**Dependencies:** None. Parent transcript screen exists.
+
+---
+
+### Epic 10 Execution Order
+
+```
+10.3 (profile removal alert — 1 string change, <5 min)
+  → 10.5 (curriculum labels — string map + button text, ~30 min)
+  → 10.1 (topic skip confirmation + undo — new endpoint + UI, ~2 hours)
+
+10.2 (consent copy — persona-keyed strings, ~1 hour) — parallel with above
+10.6 (relearn descriptions — persona-keyed, ~30 min) — parallel with above
+10.4 (error formatter + replacements, ~2 hours) — parallel with above
+10.7 (Living Book animation — new component + interview integration, ~3-4 hours) — parallel with above, Phase 1 only
+
+Parent-perspective audit additions (must-ship before launch):
+10.11 (consent deny confirmation — JS confirm() on web page, ~15 min) — parallel, API-only
+10.13 (Guided label tooltip — info icon in parent transcript, ~30 min) — parallel, parent mobile only
+10.10 (hand-to-parent consent interstitial — consent.tsx refactor, ~2 hours) — parallel, learner mobile only
+10.12 (subject raw input audit trail — schema + API + parent UI, ~3 hours) — last, cross-cutting
+
+Fast-follow (post-launch):
+10.8 Phase 0 (summary skip-rate instrumentation, ~15 min) — ship with Epic 10
+10.8 Phase 1 (structured prompts — only if skip rate > 70%, ~2-3 hours) — post-launch, data-driven
+10.9 (recall remediation copy softening, ~1 hour) — post-launch, not day-one critical
+```
+
+All thirteen stories are independent (touch different files). Stories 10.3, 10.5, and 10.6 are pure string changes. Story 10.1 adds a new API endpoint. Story 10.4 adds a shared utility. Story 10.2 adds persona-conditional copy. Story 10.7 adds a new animation component. Story 10.8 Phase 0 adds two analytics calls. Story 10.9 is persona-conditional string + minor layout changes. Story 10.10 refactors the consent screen into two phases (child/parent). Story 10.11 adds a JS `confirm()` to the consent-web deny link. Story 10.12 adds a DB column + API field + parent UI subtitle. Story 10.13 adds an info tooltip to the parent transcript. No story blocks another.
+
+### Epic 10 Scope Boundaries
+
+**In scope:** Copy changes, confirmation dialogs (topic skip + consent deny), one new API endpoint (unskip), one shared error formatter, one animation component (Living Book), summary skip-rate instrumentation, recall remediation copy softening, consent screen hand-to-parent interstitial, subject raw input audit trail (schema + API + parent dashboard), Guided label explanation tooltip.
+**Out of scope:** Items 6 (analogy examples — requires LLM prompt changes), 11 (retention tooltips — needs first-time-user detection), 12 ("Done" button timing — requires exchange counting logic), 13 (OCR fallback — "retake photo" as primary is already addressed by copy tweak in 10.4), 14 (onboarding playfulness — partially addressed by Living Book Phase 1 animations), profile switch PIN/biometric (deferred to Phase 2), parental controls/session limits (OS-level screen time exists, roadmap item).
+
+### Why This Epic Exists
+
+User testing identified 15 UX gaps across the app. The first nine (10.1–10.9) were identified by a child-focused UX audit. A subsequent parent-perspective audit identified four additional gaps (10.10–10.13) that represent actual launch blockers: the consent flow is the single biggest onboarding funnel leak (10.10), accidental consent denial causes irreversible data loss (10.11), parents can't see why their child is studying a subject (10.12), and "Guided" labels in transcripts erode parent trust without context (10.13). The must-ship items (10.1–10.7, 10.10–10.13) fix issues that risk user abandonment, data loss, or trust erosion. The fast-follow items (10.8–10.9) address second-session experiences. Story 10.8 is deliberately data-gated. The cost of not shipping the must-ship items is disproportionately high; the fast-follows are scheduled by measured impact, not guesswork.

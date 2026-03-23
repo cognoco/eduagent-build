@@ -27,13 +27,13 @@ export function useSubjects(): UseQueryResult<Subject[]> {
 export function useCreateSubject(): UseMutationResult<
   { subject: Subject },
   Error,
-  { name: string }
+  { name: string; rawInput?: string }
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { name: string }) => {
+    mutationFn: async (input: { name: string; rawInput?: string }) => {
       const res = await client.subjects.$post({ json: input });
       return (await res.json()) as { subject: Subject };
     },

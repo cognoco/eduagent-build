@@ -62,7 +62,9 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
       setStatus('done');
     } catch {
       setFailCount((prev) => prev + 1);
-      setError('Something went wrong reading that');
+      setError(
+        "We couldn't read that clearly. Try taking the photo again with better lighting."
+      );
       setStatus('error');
     }
   }, []);

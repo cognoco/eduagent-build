@@ -88,7 +88,7 @@ function ThinkingIndicator(): React.ReactElement {
     <View
       className="flex-row gap-1.5 py-2 px-1 items-center"
       testID="thinking-indicator"
-      accessibilityLabel="Your coach is thinking"
+      accessibilityLabel="Your mate is thinking"
     >
       <PencilTapIcon />
       {[0, 1, 2].map((i) => (
@@ -168,32 +168,55 @@ const ESCALATION_STYLES: Partial<
 // ---------------------------------------------------------------------------
 
 function buildMarkdownStyles(
-  colors: ThemeColors
+  _colors: ThemeColors
 ): Record<string, TextStyle | { backgroundColor?: string }> {
+  // Text color is intentionally OMITTED from all styles.
+  // Color comes from NativeWind className="text-text-primary" on the
+  // custom inline/textgroup render rules (see `rules` prop below).
+  // NativeWind resolves via CSS variables which are always in sync with
+  // background colors. Using useThemeColors() here caused a split-state
+  // bug: theme context returned light-mode colors (dark text) while
+  // NativeWind backgrounds stayed dark → invisible text.
   const base: TextStyle = {
-    color: colors.textPrimary,
     fontSize: 15,
     lineHeight: 22,
   };
   return {
     body: base,
-    paragraph: { ...base, marginTop: 0, marginBottom: 4 },
+    text: base,
+    textgroup: base,
+    inline: base,
+    // Paragraph renders as a View (via _VIEW_SAFE_paragraph, which strips text
+    // props). Keep the library's default layout props so text wraps correctly.
+    paragraph: {
+      ...base,
+      marginTop: 0,
+      marginBottom: 4,
+      flexWrap: 'wrap' as const,
+      flexDirection: 'row' as const,
+      alignItems: 'flex-start' as const,
+      justifyContent: 'flex-start' as const,
+      width: '100%',
+    },
     strong: { ...base, fontWeight: '700' },
     em: { ...base, fontStyle: 'italic' },
+    s: { ...base, textDecorationLine: 'line-through' as const },
     bullet_list: { ...base, marginBottom: 4 },
     ordered_list: { ...base, marginBottom: 4 },
     list_item: { ...base, marginBottom: 2 },
+    bullet_list_icon: { ...base, marginLeft: 10, marginRight: 10 },
+    ordered_list_icon: { ...base, marginLeft: 10, marginRight: 10 },
+    bullet_list_content: { flex: 1 },
+    ordered_list_content: { flex: 1 },
     code_inline: {
       ...base,
       fontFamily: 'monospace',
-      backgroundColor: `${colors.muted}22`,
       paddingHorizontal: 4,
       borderRadius: 4,
     },
     fence: {
       ...base,
       fontFamily: 'monospace',
-      backgroundColor: `${colors.muted}22`,
       padding: 8,
       borderRadius: 8,
       marginBottom: 4,
@@ -201,7 +224,6 @@ function buildMarkdownStyles(
     code_block: {
       ...base,
       fontFamily: 'monospace',
-      backgroundColor: `${colors.muted}22`,
       padding: 8,
       borderRadius: 8,
       marginBottom: 4,
@@ -209,15 +231,15 @@ function buildMarkdownStyles(
     heading1: { ...base, fontSize: 18, fontWeight: '700', marginBottom: 4 },
     heading2: { ...base, fontSize: 17, fontWeight: '700', marginBottom: 4 },
     heading3: { ...base, fontSize: 16, fontWeight: '600', marginBottom: 4 },
-    link: { ...base, color: colors.primary },
+    link: { ...base, textDecorationLine: 'underline' as const },
     blockquote: {
       ...base,
-      borderLeftWidth: 3,
-      borderLeftColor: colors.primary,
       paddingLeft: 8,
       marginBottom: 4,
     },
-    hr: { backgroundColor: colors.muted, height: 1, marginVertical: 8 },
+    softbreak: base,
+    hardbreak: { ...base, width: '100%', height: 1 },
+    hr: { height: 1, marginVertical: 8 },
   };
 }
 
@@ -303,7 +325,37 @@ export function MessageBubble({
           <ThinkingIndicator />
         ) : isAI ? (
           <View>
-            <Markdown style={mdStyles}>{displayContent}</Markdown>
+            <Markdown
+              mergeStyle={false}
+              style={mdStyles}
+              rules={{
+                // Force NativeWind-resolved text color on wrapper nodes.
+                // The Markdown lib's StyleSheet.create() styles can be
+                // overridden by Android force-dark; NativeWind classes
+                // bypass that because they resolve via CSS variables.
+                inline: (node: { key: string }, children: React.ReactNode) => (
+                  <Text
+                    key={node.key}
+                    className="text-text-primary text-body leading-relaxed"
+                  >
+                    {children}
+                  </Text>
+                ),
+                textgroup: (
+                  node: { key: string },
+                  children: React.ReactNode
+                ) => (
+                  <Text
+                    key={node.key}
+                    className="text-text-primary text-body leading-relaxed"
+                  >
+                    {children}
+                  </Text>
+                ),
+              }}
+            >
+              {displayContent}
+            </Markdown>
             {streaming && <BlinkingCursor />}
           </View>
         ) : (

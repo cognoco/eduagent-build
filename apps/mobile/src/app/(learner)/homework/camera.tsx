@@ -443,7 +443,8 @@ export default function CameraScreen(): React.ReactNode {
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
             {showManualFallback
               ? "Hmm, I'm having trouble reading that"
-              : state.errorMessage ?? 'Something went wrong'}
+              : state.errorMessage ??
+                "We couldn't read that clearly. Try taking the photo again with better lighting."}
           </Text>
 
           {showManualFallback ? (

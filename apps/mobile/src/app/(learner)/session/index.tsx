@@ -16,6 +16,7 @@ import {
   useCloseSession,
 } from '../../../hooks/use-sessions';
 import { useStreaks } from '../../../hooks/use-streaks';
+import { formatApiError } from '../../../lib/format-api-error';
 
 export default function SessionScreen() {
   const {
@@ -104,7 +105,7 @@ export default function SessionScreen() {
         const sid = await ensureSession();
         if (!sid) {
           const errorMessage = subjectId
-            ? "I'm having trouble starting a session. Please try again."
+            ? "Couldn't start your session. Check your connection and try again."
             : 'Please select a subject first so I can help you learn.';
           animationCleanupRef.current = animateResponse(
             errorMessage,
@@ -148,9 +149,9 @@ export default function SessionScreen() {
           },
           sid
         );
-      } catch {
+      } catch (err: unknown) {
         animationCleanupRef.current = animateResponse(
-          "I'm having trouble connecting right now. Please try again.",
+          formatApiError(err),
           setMessages,
           setIsStreaming
         );
@@ -194,12 +195,9 @@ export default function SessionScreen() {
                   escalationRung: String(escalationRung),
                 },
               } as never);
-            } catch {
+            } catch (err: unknown) {
               setIsClosing(false);
-              Alert.alert(
-                'Error',
-                'Failed to close session. Please try again.'
-              );
+              Alert.alert('Error', formatApiError(err));
             }
           },
         },

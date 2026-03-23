@@ -25,6 +25,7 @@ function mapSubjectRow(row: typeof subjects.$inferSelect): Subject {
     id: row.id,
     profileId: row.profileId,
     name: row.name,
+    rawInput: row.rawInput ?? null,
     status: row.status,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -58,6 +59,7 @@ export async function createSubject(
     .values({
       profileId,
       name: input.name,
+      rawInput: input.rawInput ?? null,
       status: 'active',
     })
     .returning();

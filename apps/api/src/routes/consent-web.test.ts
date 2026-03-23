@@ -164,6 +164,90 @@ describe('consent-web routes', () => {
       expect(html).toContain('Consent required for Emma');
       expect(html).toContain('Emma wants to use MentoMate');
     });
+
+    it('deny link points to deny-confirm endpoint (no inline JS)', async () => {
+      const res = await app.request(
+        '/v1/consent-page?token=valid-token',
+        {},
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      // No inline JS — deny goes to server-side confirmation page
+      expect(html).not.toContain('onclick');
+      expect(html).toContain('/consent-page/deny-confirm?token=valid-token');
+    });
+
+    it('approve link does NOT include onclick confirm dialog', async () => {
+      const res = await app.request(
+        '/v1/consent-page?token=valid-token',
+        {},
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      // The approve button should not have an onclick handler
+      const approveMatch = html.match(/<a[^>]*approved=true[^>]*>/);
+      expect(approveMatch).not.toBeNull();
+      expect(approveMatch![0]).not.toContain('onclick');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /v1/consent-page/deny-confirm
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/consent-page/deny-confirm', () => {
+    it('returns 400 when token is missing', async () => {
+      const res = await app.request(
+        '/v1/consent-page/deny-confirm',
+        {},
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+      const html = await res.text();
+      expect(html).toContain('Invalid link');
+    });
+
+    it('returns 404 when token is invalid', async () => {
+      const { getChildNameByToken } = jest.requireMock(
+        '../services/consent'
+      ) as { getChildNameByToken: jest.Mock };
+      getChildNameByToken.mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        '/v1/consent-page/deny-confirm?token=bad-token',
+        {},
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+      const html = await res.text();
+      expect(html).toContain('Link expired or invalid');
+    });
+
+    it('renders "Are you sure?" confirmation page with child name', async () => {
+      const res = await app.request(
+        '/v1/consent-page/deny-confirm?token=valid-token',
+        {},
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      expect(html).toContain('Are you sure?');
+      expect(html).toContain('permanently deleted');
+      expect(html).toContain("Emma's account");
+      // Confirm deny links to the actual confirm endpoint
+      expect(html).toContain(
+        '/consent-page/confirm?token=valid-token&approved=false'
+      );
+      // Go back links to the consent page
+      expect(html).toContain('/consent-page?token=valid-token');
+    });
   });
 
   // -------------------------------------------------------------------------

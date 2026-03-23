@@ -9,6 +9,7 @@ import {
   generateCurriculum,
   getCurriculum,
   skipTopic,
+  unskipTopic,
   challengeCurriculum,
   explainTopicOrdering,
 } from './curriculum';
@@ -332,6 +333,64 @@ describe('skipTopic', () => {
     });
 
     await skipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID);
+
+    expect(db.update).toHaveBeenCalled();
+    expect(db.insert).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// unskipTopic tests
+// ---------------------------------------------------------------------------
+
+describe('unskipTopic', () => {
+  it('throws when subject does not belong to profile', async () => {
+    const db = createMockDb({ subjectFindFirst: undefined });
+    await expect(
+      unskipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
+    ).rejects.toThrow('Subject not found');
+  });
+
+  it('throws when no curriculum exists for subject', async () => {
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: undefined,
+    });
+    await expect(
+      unskipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
+    ).rejects.toThrow('Curriculum not found');
+  });
+
+  it('throws when topic does not belong to curriculum', async () => {
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
+      topicFindFirst: undefined,
+    });
+    await expect(
+      unskipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
+    ).rejects.toThrow('Topic not found in curriculum');
+  });
+
+  it('throws when topic is not currently skipped', async () => {
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
+      topicFindFirst: mockTopicRow({ skipped: false }),
+    });
+    await expect(
+      unskipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
+    ).rejects.toThrow('Topic is not skipped');
+  });
+
+  it('restores a skipped topic and inserts audit record', async () => {
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
+      topicFindFirst: mockTopicRow({ skipped: true }),
+    });
+
+    await unskipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID);
 
     expect(db.update).toHaveBeenCalled();
     expect(db.insert).toHaveBeenCalled();
