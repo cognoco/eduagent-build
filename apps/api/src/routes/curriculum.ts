@@ -4,6 +4,7 @@ import {
   topicSkipSchema,
   topicUnskipSchema,
   curriculumChallengeSchema,
+  ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -15,7 +16,7 @@ import {
   challengeCurriculum,
   explainTopicOrdering,
 } from '../services/curriculum';
-import { notFound, unauthorized } from '../errors';
+import { notFound, unauthorized, apiError } from '../errors';
 
 type CurriculumRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -59,8 +60,13 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         await skipTopic(db, profileId, subjectId, topicId);
         return c.json({ message: 'Topic skipped', topicId });
       } catch (error) {
-        if (error instanceof Error && error.message === 'Subject not found') {
-          return notFound(c, 'Subject not found');
+        if (error instanceof Error) {
+          if (error.message === 'Subject not found')
+            return notFound(c, 'Subject not found');
+          if (error.message === 'Curriculum not found')
+            return notFound(c, 'Curriculum not found');
+          if (error.message === 'Topic not found in curriculum')
+            return notFound(c, 'Topic not found in curriculum');
         }
         throw error;
       }
@@ -84,8 +90,20 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         await unskipTopic(db, profileId, subjectId, topicId);
         return c.json({ message: 'Topic restored', topicId });
       } catch (error) {
-        if (error instanceof Error && error.message === 'Subject not found') {
-          return notFound(c, 'Subject not found');
+        if (error instanceof Error) {
+          if (error.message === 'Subject not found')
+            return notFound(c, 'Subject not found');
+          if (error.message === 'Curriculum not found')
+            return notFound(c, 'Curriculum not found');
+          if (error.message === 'Topic not found in curriculum')
+            return notFound(c, 'Topic not found in curriculum');
+          if (error.message === 'Topic is not skipped')
+            return apiError(
+              c,
+              422,
+              ERROR_CODES.VALIDATION_ERROR,
+              'Topic is not skipped'
+            );
         }
         throw error;
       }

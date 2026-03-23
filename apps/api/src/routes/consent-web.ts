@@ -31,17 +31,6 @@ function escapeHtml(unsafe: string): string {
     .replace(/'/g, '&#039;');
 }
 
-/**
- * Escape a string for safe use inside a single-quoted JS string literal
- * that is embedded in an HTML attribute. First escapes JS special chars
- * (backslash, single quote), then HTML-escapes the result so the browser's
- * HTML decoder produces a valid JS string.
- */
-function escapeJsStringInHtmlAttr(unsafe: string): string {
-  const jsEscaped = unsafe.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  return escapeHtml(jsEscaped);
-}
-
 // ---------------------------------------------------------------------------
 // Shared HTML layout
 // ---------------------------------------------------------------------------
@@ -124,7 +113,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
     c.header('X-Content-Type-Options', 'nosniff');
     c.header(
       'Content-Security-Policy',
-      "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"
+      "default-src 'self'; style-src 'unsafe-inline'; script-src 'none'"
     );
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
   })
@@ -181,14 +170,71 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         )}&approved=true" class="btn btn-primary">
            Approve
          </a>
-         <a href="${confirmUrl}?token=${encodeURIComponent(
+         <a href="${basePath}/consent-page/deny-confirm?token=${encodeURIComponent(
           token
-        )}&approved=false" class="btn btn-danger" onclick="return confirm('Are you sure you want to deny consent? ${escapeJsStringInHtmlAttr(
-          childName
-        )}&#039;s account and all learning data will be permanently deleted. This cannot be undone.')">
+        )}" class="btn btn-danger">
            Deny
          </a>
          <p class="info">You can withdraw consent at any time from the parent dashboard in the app.</p>`
+      )
+    );
+  })
+
+  /**
+   * GET /consent-page/deny-confirm?token=X
+   *
+   * Server-side two-step confirmation for consent denial.
+   * Renders an "Are you sure?" page with confirm / go back buttons.
+   */
+  .get('/consent-page/deny-confirm', async (c) => {
+    const token = c.req.query('token');
+    if (!token) {
+      return c.html(
+        pageLayout(
+          'Invalid Link',
+          `<h1 class="error">Invalid link</h1>
+           <p>This consent link is missing required information. Please check your email for the correct link.</p>`
+        ),
+        400
+      );
+    }
+
+    const db = c.get('db');
+    const childName = await getChildNameByToken(db, token);
+
+    if (!childName) {
+      return c.html(
+        pageLayout(
+          'Link Expired',
+          `<h1 class="error">Link expired or invalid</h1>
+           <p>This consent link has expired or is no longer valid.</p>
+           <p>Ask your child to resend the consent request from the app.</p>`
+        ),
+        404
+      );
+    }
+
+    const basePath = c.req.path.replace('/consent-page/deny-confirm', '');
+    const confirmDenyUrl = `${basePath}/consent-page/confirm?token=${encodeURIComponent(
+      token
+    )}&approved=false`;
+    const backUrl = `${basePath}/consent-page?token=${encodeURIComponent(
+      token
+    )}`;
+
+    return c.html(
+      pageLayout(
+        'Confirm Denial',
+        `<h1>Are you sure?</h1>
+         <p>${escapeHtml(
+           childName
+         )}'s account and all learning data will be permanently deleted. This cannot be undone.</p>
+         <a href="${confirmDenyUrl}" class="btn btn-danger">
+           Yes, deny consent
+         </a>
+         <a href="${backUrl}" class="btn btn-secondary">
+           Go back
+         </a>`
       )
     );
   })

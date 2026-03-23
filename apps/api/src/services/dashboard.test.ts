@@ -295,8 +295,12 @@ describe('getChildrenForParent', () => {
 
     mockGetOverallProgress.mockResolvedValue({
       subjects: [
-        { name: 'Math', retentionStatus: 'strong' },
-        { name: 'Science', retentionStatus: 'fading' },
+        { subjectId: 'subj-math', name: 'Math', retentionStatus: 'strong' },
+        {
+          subjectId: 'subj-science',
+          name: 'Science',
+          retentionStatus: 'fading',
+        },
       ],
       totalTopicsCompleted: 5,
       totalTopicsVerified: 2,
@@ -321,8 +325,13 @@ describe('getChildrenForParent', () => {
     ]);
 
     mockSubjectsFindMany.mockResolvedValue([
-      { name: 'Math', rawInput: null },
-      { name: 'Science', rawInput: 'bugs and stuff' },
+      { id: 'subj-math', profileId: CHILD_ID, name: 'Math', rawInput: null },
+      {
+        id: 'subj-science',
+        profileId: CHILD_ID,
+        name: 'Science',
+        rawInput: 'bugs and stuff',
+      },
     ]);
 
     const result = await getChildrenForParent(db as never, PARENT_ID);
