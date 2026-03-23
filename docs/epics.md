@@ -867,7 +867,7 @@ So that I can exercise my privacy rights under GDPR.
 ## Epic 1: Onboarding & Curriculum Generation — Stories
 
 **Goal:** Users can specify subjects, complete an AI-powered conversational assessment interview, receive a personalized curriculum, and begin their learning journey.
-**FRs:** FR13-FR22 (10 FRs) | **Stories:** 5
+**FRs:** FR13-FR22 (10 FRs) | **Stories:** 6
 **Deferred from this epic:** UX-9 (parent simulated dashboard → Epic 4 as demo-mode toggle on real dashboard), UX-8 (cold-start three-button fallback → Epic 2 where it's actually used)
 
 ### Story 1.1: Subject Selection & Onboarding Entry
@@ -1017,6 +1017,49 @@ So that my learning path reflects what I actually need to work on.
 **⚠️ Fully testable with real performance data only after Epic 3** (assessments + retention scoring). Unit tests use mock performance payloads. Integration test deferred to Epic 3 story dependency.
 
 **FRs:** FR21
+
+---
+
+### Story 1.6: Subject Name Resolution (LLM-powered input validation)
+
+As a young learner who might misspell a subject or not know its formal name,
+I want the app to understand what I mean and suggest the right subject,
+So that I don't get stuck or end up with a misspelled subject name forever.
+
+**Acceptance Criteria:**
+
+**Given** user on subject input screen
+**When** user types a well-formed subject name (e.g., "Physics")
+**Then** subject is accepted immediately with no suggestion step (direct_match) (FR13 refinement)
+
+**Given** user on subject input screen
+**When** user types a misspelled subject (e.g., "Phsics")
+**Then** LLM detects the typo and shows inline suggestion: "Did you mean **Physics**?" with Accept/Edit buttons (corrected)
+**And** tapping Accept creates the subject with the corrected name
+**And** tapping Edit pre-fills the corrected name in the input for manual adjustment
+
+**Given** user on subject input screen
+**When** user types a broad or ambiguous topic (e.g., "ants", "space", "water")
+**Then** LLM returns 2-4 suggestions with different learning angles (ambiguous)
+**And** each suggestion shows a name and short child-friendly description (e.g., "Biology — Entomology: Ant bodies, life cycle and species")
+**And** suggestions render as tappable cards — tapping one creates the subject with that name
+
+**Given** user on subject input screen
+**When** user types natural language describing what they want to learn (e.g., "I want to learn how computers work")
+**Then** LLM resolves to a formal subject name ("Computer Science") and shows suggestion with Accept/Edit (resolved)
+
+**Given** user on subject input screen
+**When** user types nonsense or gibberish (e.g., "jjjjj")
+**Then** LLM returns no_match with a friendly message asking the user to try again
+**And** the subject is NOT created
+
+**Given** the resolve API is unavailable (network error, API down)
+**When** user taps "Start Learning"
+**Then** app falls through gracefully and creates the subject with the raw input (same as pre-feature behaviour)
+
+**Implementation:** `POST /v1/subjects/resolve` endpoint using `routeAndCall()` at rung 1 (fast/cheap classification). Response schema: `{ status, resolvedName, suggestions[], displayMessage }`. No database changes — pure LLM classification.
+
+**FRs:** FR13 (refinement — input validation before subject creation)
 
 ---
 
