@@ -45,10 +45,7 @@ export function LivingBook({
   const sparkleOpacity = useSharedValue(0);
   const completionGlow = useSharedValue(0);
 
-  // Book thickness grows proportionally (capped visually)
   const visualPages = Math.min(exchangeCount, MAX_VISUAL_PAGES);
-  const thickness = 20 + visualPages * 2; // 20px base + 2px per page
-
   const isExpressive = persona === 'learner';
 
   // Page-flip animation on each new exchange

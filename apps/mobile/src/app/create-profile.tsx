@@ -91,7 +91,7 @@ export default function CreateProfileScreen() {
 
   const birthDateString = birthDate ? formatDateForApi(birthDate) : null;
 
-  const { required: consentRequired, consentType } =
+  const { required: consentRequired } =
     checkConsentRequirement(birthDateString);
 
   const onDateChange = useCallback(
