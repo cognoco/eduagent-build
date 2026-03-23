@@ -85,12 +85,20 @@ run_seeded "multi-subject" "flows/subjects/multi-subject.yaml"
 run_seeded "onboarding-no-subject" "flows/edge/empty-first-user.yaml"
 run_seeded "learning-active"       "flows/edge/streak-display.yaml"
 
-# ─── GROUP 11: Consent flows (updated per Sessions 15-18) ───
+# ─── GROUP 11: Consent flows (updated per Sessions 15-18, 22) ───
 run_seeded "consent-withdrawn-solo" "flows/consent/consent-withdrawn-gate.yaml"
 run_seeded "onboarding-complete"    "flows/consent/post-approval-landing.yaml"
 run_seeded "consent-pending"        "flows/consent/consent-pending-gate.yaml"
 run_seeded "pre-profile"            "flows/consent/coppa-flow.yaml"
 run_seeded "pre-profile"            "flows/consent/profile-creation-consent.yaml"
+run_seeded "pre-profile"            "flows/consent/consent-coppa-under13.yaml"
+run_seeded "pre-profile"            "flows/consent/consent-gdpr-under16.yaml"
+run_seeded "pre-profile"            "flows/consent/consent-above-threshold.yaml"
+run_seeded "pre-profile"            "flows/consent/hand-to-parent-consent.yaml"
+
+# ─── GROUP 14: Parent audit flows (Epic 10) ───
+run_seeded "parent-with-children" "flows/parent/subject-raw-input-audit.yaml"
+run_seeded "parent-with-children" "flows/parent/guided-label-tooltip.yaml"
 
 # ─── GROUP 12: Sign-up flow (PARTIAL by design — Clerk verification) ───
 run_noseed "flows/onboarding/sign-up-flow.yaml"

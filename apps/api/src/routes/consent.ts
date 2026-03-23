@@ -79,14 +79,22 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       // Dispatch Inngest event for reminder workflow
       // NOTE: parentEmail is intentionally omitted — PII must not be in event payloads.
       // The consent-reminders function looks up parentEmail from the DB.
-      await inngest.send({
-        name: 'app/consent.requested',
-        data: {
-          profileId: consentState.profileId,
-          consentType: consentState.consentType,
-          timestamp: new Date().toISOString(),
-        },
-      });
+      // Wrapped in try-catch: consent request must succeed even if Inngest is unreachable
+      // (same pattern as session close — BUG-54).
+      try {
+        await inngest.send({
+          name: 'app/consent.requested',
+          data: {
+            profileId: consentState.profileId,
+            consentType: consentState.consentType,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      } catch {
+        console.warn(
+          '[consent] Failed to dispatch Inngest event — reminder workflow skipped'
+        );
+      }
 
       return c.json(
         {

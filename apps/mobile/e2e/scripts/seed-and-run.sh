@@ -227,13 +227,19 @@ if [ $SKIP_TO_BUNDLE -eq 0 ]; then
   # Step C: Tap Metro server entry in launcher
   # Parse the dump to find the server entry's exact bounds.
   echo "[seed-and-run] Finding Metro server entry in UI dump ..."
-  # Try 8082 first (bundle proxy — BUG-7 workaround), fall back to 8081
+  # Try 8082 first (bundle proxy — BUG-7 workaround), then 10.0.2.2:any, then localhost:any
   METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
     | grep -oP 'text="http://10.0.2.2:8082"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
     | grep -oP 'bounds="\K[^"]+' || echo "")
   if [ -z "$METRO_BOUNDS" ]; then
     METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
       | grep -oP 'text="http://10.0.2.2:[0-9]+"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
+      | head -1 | grep -oP 'bounds="\K[^"]+' || echo "")
+  fi
+  # Fallback: after cold boot (no wipe), mDNS may resolve Metro as localhost
+  if [ -z "$METRO_BOUNDS" ]; then
+    METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
+      | grep -oP 'text="http://localhost:[0-9]+"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
       | head -1 | grep -oP 'bounds="\K[^"]+' || echo "")
   fi
   if [ -n "$METRO_BOUNDS" ]; then

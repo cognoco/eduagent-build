@@ -1,0 +1,226 @@
+# Flow: GDPR Consent — EU Under-16 (Full 3-Phase Consent Form)
+# Validates: creating a profile for a 14-year-old in EU triggers GDPR consent,
+# then walks through all 3 phases: child hand-off → parent email → success.
+# Tags: nightly, consent, gdpr
+#
+# Journey: UX Journey 1 (Onboarding) + Consent Lifecycle (GDPR)
+# Epics: Epic 0, Epic 5, Epic 10 (Story 10.10)
+#
+# Prerequisite: Seeded user with pre-profile scenario (Clerk user + account, no profile).
+# Usage: ./scripts/seed-and-run.sh pre-profile flows/consent/consent-gdpr-under16.yaml
+#
+# Date picker technique: Android native DatePickerDialog opens with default 2010-01-01.
+# Tap year header → switch to year list → tap 2012 (already visible) → OK.
+# Result: age = 14, EU location → GDPR consent required (under 16).
+appId: com.mentomate.app
+tags:
+  - nightly
+  - consent
+  - gdpr
+---
+# ============================================================
+# SIGN IN (pre-profile: Clerk user + account, no profile)
+# ============================================================
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 120000
+
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${EMAIL}
+- pressKey: back
+
+- tapOn:
+    id: "sign-in-password"
+- inputText: ${PASSWORD}
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 10000
+- tapOn:
+    id: "sign-in-button"
+
+# ============================================================
+# NAVIGATE TO CREATE PROFILE (More → Profile → Create)
+# ============================================================
+- extendedWaitUntil:
+    visible:
+      id: "tab-more"
+    timeout: 30000
+- tapOn:
+    id: "tab-more"
+
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      text: "Profile"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    text: "Profile"
+
+- extendedWaitUntil:
+    visible:
+      text: "No profiles yet"
+    timeout: 10000
+- tapOn:
+    id: "profiles-create-first"
+
+# ============================================================
+# PROFILE FORM — set age to 14 (born 2012), select EU
+# ============================================================
+- extendedWaitUntil:
+    visible:
+      id: "create-profile-name"
+    timeout: 15000
+
+# Enter display name
+- tapOn:
+    id: "create-profile-name"
+- inputText: "GDPR Test Child"
+- pressKey: back
+
+# Open date picker
+- tapOn:
+    id: "create-profile-birthdate"
+
+# Wait for date picker dialog
+- extendedWaitUntil:
+    visible:
+      text: "OK"
+    timeout: 5000
+
+# Tap the year header "2010" to switch to year selection mode
+- tapOn:
+    id: "android:id/date_picker_header_year"
+
+# 2012 should be visible in the initial year list, scrollUntilVisible as safety
+- scrollUntilVisible:
+    element:
+      text: "2012"
+    direction: DOWN
+    timeout: 5000
+
+# Tap year 2012 (age = 14 in 2026 → under 16, triggers GDPR in EU)
+- tapOn:
+    text: "2012"
+
+# Confirm date selection
+- tapOn:
+    text: "OK"
+
+# Verify date was set
+- assertVisible:
+    text: "January 1, 2012"
+
+- takeScreenshot: gdpr-under16-01-date-set
+
+# Location options should now be visible
+- extendedWaitUntil:
+    visible:
+      id: "location-eu"
+    timeout: 5000
+
+# Select EU location (GDPR = under 16 in EU)
+- tapOn:
+    id: "location-eu"
+
+- takeScreenshot: gdpr-under16-02-eu-selected
+
+# Submit profile creation
+- tapOn:
+    id: "create-profile-submit"
+
+# ============================================================
+# PHASE 1: CHILD VIEW — "One more step!" hand-off screen
+# ============================================================
+# MANDATORY: Consent MUST appear for a 14yo in the EU
+- extendedWaitUntil:
+    visible:
+      id: "consent-child-view"
+    timeout: 15000
+
+- assertVisible:
+    text: "One more step!"
+
+- takeScreenshot: gdpr-under16-03-child-handoff
+
+# Tap the hand-off button to transition to parent form
+- tapOn:
+    id: "consent-handoff-button"
+
+# ============================================================
+# PHASE 2: PARENT VIEW — email form with GDPR regulation text
+# ============================================================
+- extendedWaitUntil:
+    visible:
+      id: "consent-parent-view"
+    timeout: 10000
+
+- assertVisible:
+    text: "Parental Consent Required"
+
+# Verify GDPR-specific regulation text (parent reads this)
+# NOTE: Full text wraps on screen — Maestro Pattern B limitation (Issue 21).
+- assertVisible:
+    text: "GDPR"
+    optional: true
+    # Justification: long wrapping text unreliable on Android (Issue 21 Pattern B)
+
+- takeScreenshot: gdpr-under16-04-parent-form
+
+# Enter parent email
+- tapOn:
+    id: "consent-email"
+- inputText: "parent-gdpr-e2e@example.com"
+- pressKey: back
+
+# Submit consent request
+- extendedWaitUntil:
+    visible:
+      id: "consent-submit"
+    timeout: 5000
+- tapOn:
+    id: "consent-submit"
+
+# ============================================================
+# PHASE 3: SUCCESS VIEW
+# ============================================================
+- extendedWaitUntil:
+    visible:
+      id: "consent-success"
+    timeout: 15000
+
+- assertVisible:
+    text: "Hand back to your child"
+
+# Verify resend button exists
+- assertVisible:
+    id: "consent-resend-email"
+
+# Verify done button exists
+- assertVisible:
+    id: "consent-done"
+
+- takeScreenshot: gdpr-under16-05-success
+
+# Tap done to return
+- tapOn:
+    id: "consent-done"
+
+# After done, should land on consent pending gate
+- extendedWaitUntil:
+    visible:
+      text: "Hang tight!"
+    timeout: 15000
+    # Optional: navigation after consent done varies by app state
+    optional: true
+
+- takeScreenshot: gdpr-under16-06-complete
