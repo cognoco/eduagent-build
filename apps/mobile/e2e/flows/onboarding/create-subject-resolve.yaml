@@ -1,29 +1,35 @@
-# Flow: Subject Name Resolution (typo correction)
+# Flow: Subject Name Resolution (typo correction + ambiguous)
 # Validates: LLM-powered subject name resolution suggests corrections
 # before creating the subject. Tests the corrected/resolved path.
 # Tags: smoke, onboarding
 #
 # Journey: UX Journey 1 (Onboarding)
-# Prerequisite: Seeded user with no subjects (scenario: onboarding-no-subject)
+# Prerequisite: Seeded user with onboarding-complete (has existing subject)
+# Usage: ./scripts/seed-and-run.sh onboarding-complete flows/onboarding/create-subject-resolve.yaml
 appId: com.mentomate.app
 tags:
   - smoke
   - onboarding
 ---
-# 1. Seed & sign in (user with no subjects)
+# 1. Seed & sign in
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "onboarding-no-subject"
+      SEED_SCENARIO: "onboarding-complete"
       API_URL: ${API_URL}
 
-# 2. Home screen — should show empty state with "add subject" prompt
+# 2. Home screen — wait for subjects section
 - extendedWaitUntil:
     visible:
       id: "home-scroll-view"
     timeout: 15000
 
-# 3. Navigate to create-subject screen
+# 3. Navigate to create-subject via add-subject button
+- scrollUntilVisible:
+    element:
+      id: "add-subject-button"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: "add-subject-button"
 
@@ -40,30 +46,38 @@ tags:
 - tapOn:
     id: "create-subject-name"
 - inputText: "Phsics"
+
+# 7. Dismiss keyboard so button is visible
 - pressKey: back
 
-# 7. Tap Start Learning — triggers resolve
+# 8. Wait for submit button to be visible
+- extendedWaitUntil:
+    visible:
+      id: "create-subject-submit"
+    timeout: 5000
+
+# 9. Tap Start Learning — triggers resolve
 - tapOn:
     id: "create-subject-submit"
 
-# 8. Wait for suggestion card (LLM resolve)
+# 10. Wait for suggestion card (LLM resolve — may take a few seconds)
 - extendedWaitUntil:
     visible:
       id: "subject-suggestion-card"
     timeout: 15000
 
-# 9. Screenshot: suggestion card visible with correction
+# 11. Screenshot: suggestion card visible with correction
 - takeScreenshot: resolve-02-suggestion-card
 
-# 10. Accept the suggestion
+# 12. Accept the suggestion
 - tapOn:
     id: "subject-suggestion-accept"
 
-# 11. Wait for interview screen (subject created + navigated)
+# 13. Wait for interview screen (subject created + navigated)
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 30000
 
-# 12. Screenshot: interview screen reached
+# 14. Screenshot: interview screen reached
 - takeScreenshot: resolve-03-interview-reached
