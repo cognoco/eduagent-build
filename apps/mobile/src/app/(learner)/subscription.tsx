@@ -456,7 +456,7 @@ export default function SubscriptionScreen() {
         }
         Alert.alert(
           'Purchase failed',
-          'Something went wrong. Please try again.'
+          'Something unexpected happened with your purchase. Please try again.'
         );
       }
     },
@@ -529,7 +529,10 @@ export default function SubscriptionScreen() {
         );
         return;
       }
-      Alert.alert('Purchase failed', 'Something went wrong. Please try again.');
+      Alert.alert(
+        'Purchase failed',
+        'Something unexpected happened with your purchase. Please try again.'
+      );
       return;
     }
 
@@ -866,7 +869,7 @@ export default function SubscriptionScreen() {
             </View>
           )}
 
-          {/* BYOK waitlist */}
+          {/* BYOK waitlist — hidden until feature is ready
           <View className="mt-6">
             <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2">
               Bring your own key (coming soon)
@@ -901,6 +904,7 @@ export default function SubscriptionScreen() {
               </View>
             </View>
           </View>
+          */}
         </ScrollView>
       )}
     </View>

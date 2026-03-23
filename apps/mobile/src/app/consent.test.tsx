@@ -51,22 +51,71 @@ describe('ConsentScreen', () => {
     queryClient.clear();
   });
 
-  it('renders consent form', () => {
+  // ── Phase 1: Child view ──────────────────────────────────────────
+
+  it('renders child view by default with hand-off message and button', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByText('Parental consent required')).toBeTruthy();
+    expect(screen.getByTestId('consent-child-view')).toBeTruthy();
+    expect(screen.getByText('One more step!')).toBeTruthy();
+    expect(
+      screen.getByText(
+        "We need a grown-up to say it's OK. Hand your phone to your parent or guardian."
+      )
+    ).toBeTruthy();
+    expect(screen.getByTestId('consent-handoff-button')).toBeTruthy();
+  });
+
+  it('does not show email input or submit button in child view', () => {
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    expect(screen.queryByTestId('consent-email')).toBeNull();
+    expect(screen.queryByTestId('consent-submit')).toBeNull();
+  });
+
+  // ── Phase 2: Parent view ─────────────────────────────────────────
+
+  it('transitions to parent view when hand-off button is pressed', () => {
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.press(screen.getByTestId('consent-handoff-button'));
+
+    expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
+    expect(screen.queryByTestId('consent-child-view')).toBeNull();
+  });
+
+  it('parent view shows email input, regulation text, spam warning, and submit button', () => {
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.press(screen.getByTestId('consent-handoff-button'));
+
     expect(screen.getByTestId('consent-email')).toBeTruthy();
     expect(screen.getByTestId('consent-submit')).toBeTruthy();
+    // GDPR regulation text (default/parent variant)
+    expect(screen.getByText(/under 16/i)).toBeTruthy();
+    // Spam warning
+    expect(screen.getByText(/check your spam folder/i)).toBeTruthy();
+    // Email label
+    expect(screen.getByText('Your email address')).toBeTruthy();
   });
 
-  it('shows GDPR regulation text', () => {
+  it('shows professional (non-learner) regulation text for the parent', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByText(/EU GDPR/)).toBeTruthy();
+    fireEvent.press(screen.getByTestId('consent-handoff-button'));
+
+    // Default variant says "parental consent" not "grown-up"
+    expect(
+      screen.getByText(/parental consent to use this service/i)
+    ).toBeTruthy();
   });
 
-  it('disables submit with invalid email', () => {
+  // ── Email validation ─────────────────────────────────────────────
+
+  it('disables submit button when email is empty', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.press(screen.getByTestId('consent-handoff-button'));
 
     const button = screen.getByTestId('consent-submit');
     expect(
@@ -74,7 +123,36 @@ describe('ConsentScreen', () => {
     ).toBeTruthy();
   });
 
-  it('submits consent request and shows success', async () => {
+  it('disables submit button for invalid email', () => {
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.press(screen.getByTestId('consent-handoff-button'));
+    fireEvent.changeText(screen.getByTestId('consent-email'), 'not-an-email');
+
+    const button = screen.getByTestId('consent-submit');
+    expect(
+      button.props.accessibilityState?.disabled ?? button.props.disabled
+    ).toBeTruthy();
+  });
+
+  it('enables submit button for valid email', () => {
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.press(screen.getByTestId('consent-handoff-button'));
+    fireEvent.changeText(
+      screen.getByTestId('consent-email'),
+      'parent@example.com'
+    );
+
+    const button = screen.getByTestId('consent-submit');
+    expect(
+      button.props.accessibilityState?.disabled ?? button.props.disabled
+    ).toBeFalsy();
+  });
+
+  // ── Phase 3: Success view ────────────────────────────────────────
+
+  it('shows success view after successful submit', async () => {
     mockMutateAsync.mockResolvedValue({
       message: 'Consent request sent',
       consentType: 'GDPR',
@@ -82,6 +160,10 @@ describe('ConsentScreen', () => {
 
     render(<ConsentScreen />, { wrapper: Wrapper });
 
+    // Go to parent view
+    fireEvent.press(screen.getByTestId('consent-handoff-button'));
+
+    // Fill email and submit
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
       'parent@example.com'
@@ -99,13 +181,20 @@ describe('ConsentScreen', () => {
     await waitFor(() => {
       expect(screen.getByTestId('consent-success')).toBeTruthy();
     });
+
+    expect(screen.getByText('Consent link sent!')).toBeTruthy();
+    expect(screen.getByText(/parent@example\.com/)).toBeTruthy();
   });
 
-  it('displays error on failure', async () => {
-    mockMutateAsync.mockRejectedValue(new Error('API error: 500'));
+  it('success view shows spam hint and resend button', async () => {
+    mockMutateAsync.mockResolvedValue({
+      message: 'Consent request sent',
+      consentType: 'GDPR',
+    });
 
     render(<ConsentScreen />, { wrapper: Wrapper });
 
+    fireEvent.press(screen.getByTestId('consent-handoff-button'));
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
       'parent@example.com'
@@ -113,16 +202,24 @@ describe('ConsentScreen', () => {
     fireEvent.press(screen.getByTestId('consent-submit'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('consent-error')).toBeTruthy();
-      expect(screen.getByText('API error: 500')).toBeTruthy();
+      expect(screen.getByTestId('consent-success')).toBeTruthy();
     });
+
+    expect(
+      screen.getByText(/check your inbox.*the link expires in 7 days/i)
+    ).toBeTruthy();
+    expect(screen.getByTestId('consent-resend-email')).toBeTruthy();
   });
 
-  it('navigates back on Done button', async () => {
-    mockMutateAsync.mockResolvedValue({ message: 'sent', consentType: 'GDPR' });
+  it('hand-back button calls router.back()', async () => {
+    mockMutateAsync.mockResolvedValue({
+      message: 'Consent request sent',
+      consentType: 'GDPR',
+    });
 
     render(<ConsentScreen />, { wrapper: Wrapper });
 
+    fireEvent.press(screen.getByTestId('consent-handoff-button'));
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
       'parent@example.com'
@@ -135,5 +232,28 @@ describe('ConsentScreen', () => {
 
     fireEvent.press(screen.getByTestId('consent-done'));
     expect(mockBack).toHaveBeenCalled();
+  });
+
+  // ── Error handling ───────────────────────────────────────────────
+
+  it('displays error on submission failure', async () => {
+    mockMutateAsync.mockRejectedValue(new Error('API error: 500'));
+
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.press(screen.getByTestId('consent-handoff-button'));
+    fireEvent.changeText(
+      screen.getByTestId('consent-email'),
+      'parent@example.com'
+    );
+    fireEvent.press(screen.getByTestId('consent-submit'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('consent-error')).toBeTruthy();
+      expect(screen.getByText('API error: 500')).toBeTruthy();
+    });
+
+    // Should remain on parent view, not transition to success
+    expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
   });
 });

@@ -11,6 +11,7 @@ import {
   type RetentionStatus,
 } from '../../../components/progress';
 import { useSubmitRecallTest } from '../../../hooks/use-retention';
+import { formatApiError } from '../../../lib/format-api-error';
 
 const OPENING_MESSAGE: ChatMessage = {
   id: 'ai-opening',
@@ -98,9 +99,9 @@ export default function RecallTestScreen() {
               );
             }
           },
-          onError: () => {
+          onError: (err: Error) => {
             cleanupRef.current = animateResponse(
-              'Something went wrong while checking your recall. Please try again.',
+              formatApiError(err),
               setMessages,
               setIsStreaming
             );

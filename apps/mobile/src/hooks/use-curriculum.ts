@@ -50,6 +50,28 @@ export function useSkipTopic(
   });
 }
 
+export function useUnskipTopic(
+  subjectId: string
+): UseMutationResult<{ message: string }, Error, string> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (topicId: string): Promise<{ message: string }> => {
+      const res = await client.subjects[':subjectId'].curriculum.unskip.$post({
+        param: { subjectId },
+        json: { topicId },
+      });
+      return (await res.json()) as { message: string };
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['curriculum', subjectId],
+      });
+    },
+  });
+}
+
 export function useChallengeCurriculum(
   subjectId: string
 ): UseMutationResult<{ curriculum: Curriculum }, Error, string> {

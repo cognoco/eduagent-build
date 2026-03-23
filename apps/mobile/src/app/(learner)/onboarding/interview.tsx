@@ -7,9 +7,10 @@ import {
   type ChatMessage,
 } from '../../../components/session';
 import { useSendInterviewMessage } from '../../../hooks/use-interview';
+import { formatApiError } from '../../../lib/format-api-error';
 
 const OPENING_MESSAGE =
-  "Hi! I'm your learning coach. I'd like to get to know you a bit before we start. What made you interested in learning this subject?";
+  "Hi! I'm your learning mate. I'd like to get to know you a bit before we start. What made you interested in learning this subject?";
 
 export default function InterviewScreen() {
   const { subjectId, subjectName } = useLocalSearchParams<{
@@ -54,9 +55,9 @@ export default function InterviewScreen() {
             }
           }
         );
-      } catch {
+      } catch (err: unknown) {
         animationCleanupRef.current = animateResponse(
-          "I'm having trouble connecting right now. Please try again.",
+          formatApiError(err),
           setMessages,
           setIsStreaming
         );

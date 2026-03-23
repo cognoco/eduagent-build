@@ -144,7 +144,8 @@ export default function DashboardScreen() {
         ) : isError ? (
           <View className="items-center justify-center py-12">
             <Text className="text-body text-text-secondary">
-              Something went wrong. Pull down to retry.
+              Couldn't load your dashboard. Pull down to refresh, or check your
+              internet connection.
             </Text>
           </View>
         ) : dashboard?.children && dashboard.children.length > 0 ? (

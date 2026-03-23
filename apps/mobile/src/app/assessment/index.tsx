@@ -9,6 +9,7 @@ import {
   useCreateAssessment,
   useSubmitAnswer,
 } from '../../hooks/use-assessments';
+import { formatApiError } from '../../lib/format-api-error';
 
 const OPENING_MESSAGE =
   "Let's see what you've picked up so far. I'll ask a few questions \u2014 just do your best, and I'll help fill in any gaps.";
@@ -64,12 +65,8 @@ export default function AssessmentScreen() {
             ]);
           }
         });
-      } catch {
-        animateResponse(
-          "I'm having trouble connecting right now. Please try again.",
-          setMessages,
-          setIsStreaming
-        );
+      } catch (err: unknown) {
+        animateResponse(formatApiError(err), setMessages, setIsStreaming);
       }
     },
     [

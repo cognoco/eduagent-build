@@ -17,6 +17,7 @@ export type TopicRelevance = z.infer<typeof topicRelevanceSchema>;
 
 export const subjectCreateSchema = z.object({
   name: z.string().min(1).max(200),
+  rawInput: z.string().min(1).max(200).optional(),
 });
 export type SubjectCreateInput = z.infer<typeof subjectCreateSchema>;
 
@@ -30,6 +31,7 @@ export const subjectSchema = z.object({
   id: z.string().uuid(),
   profileId: z.string().uuid(),
   name: z.string(),
+  rawInput: z.string().nullable().optional(),
   status: subjectStatusSchema,
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -114,6 +116,11 @@ export const topicSkipSchema = z.object({
   topicId: z.string().uuid(),
 });
 export type TopicSkipInput = z.infer<typeof topicSkipSchema>;
+
+export const topicUnskipSchema = z.object({
+  topicId: z.string().uuid(),
+});
+export type TopicUnskipInput = z.infer<typeof topicUnskipSchema>;
 
 export const curriculumChallengeSchema = z.object({
   feedback: z.string().min(1).max(2000),

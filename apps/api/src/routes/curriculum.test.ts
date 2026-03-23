@@ -60,6 +60,7 @@ jest.mock('../services/curriculum', () => ({
   generateCurriculum: jest.fn().mockResolvedValue([]),
   getCurriculum: jest.fn().mockResolvedValue(null),
   skipTopic: jest.fn().mockResolvedValue(undefined),
+  unskipTopic: jest.fn().mockResolvedValue(undefined),
   challengeCurriculum: jest.fn().mockResolvedValue({
     id: 'curr-1',
     subjectId: '550e8400-e29b-41d4-a716-446655440000',
@@ -158,6 +159,58 @@ describe('curriculum routes', () => {
     it('returns 401 without auth header', async () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/curriculum/skip`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ topicId: TOPIC_ID }),
+          headers: { 'Content-Type': 'application/json' },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /v1/subjects/:subjectId/curriculum/unskip
+  // -------------------------------------------------------------------------
+
+  describe('POST /v1/subjects/:subjectId/curriculum/unskip', () => {
+    it('returns 200 with valid topicId', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/curriculum/unskip`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ topicId: TOPIC_ID }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.message).toBe('Topic restored');
+      expect(body.topicId).toBe(TOPIC_ID);
+    });
+
+    it('returns 400 with invalid UUID', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/curriculum/unskip`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ topicId: 'not-a-uuid' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/curriculum/unskip`,
         {
           method: 'POST',
           body: JSON.stringify({ topicId: TOPIC_ID }),

@@ -9,6 +9,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStartRelearn } from '../../../hooks/use-retention';
+// Persona-conditional copy — documented exception, same pattern as (learner)/home.tsx
+import { useTheme } from '../../../lib/theme';
 
 const TEACHING_METHODS = [
   {
@@ -33,6 +35,50 @@ const TEACHING_METHODS = [
   },
 ];
 
+const TEACHING_METHODS_LEARNER = [
+  {
+    id: 'visual_diagrams' as const,
+    label: 'Show Me Pictures',
+    description: 'Learn with pictures, charts, and drawings',
+  },
+  {
+    id: 'step_by_step' as const,
+    label: 'Walk Me Through It',
+    description: 'Break it down into small, easy steps',
+  },
+  {
+    id: 'real_world_examples' as const,
+    label: 'Show Me How It Works',
+    description: 'Learn with fun, everyday examples',
+  },
+  {
+    id: 'practice_problems' as const,
+    label: 'Let Me Try It',
+    description: 'Learn by solving problems with help',
+  },
+];
+
+/** Copy strings that vary by persona. */
+const COPY_DEFAULT = {
+  phase1Intro:
+    "Every topic needs its own approach. Let's find what clicks for you!",
+  differentMethodLabel: 'Different Method',
+  differentMethodDesc:
+    'Choose a new teaching style that might work better for you',
+  sameMethodLabel: 'Same Method',
+  sameMethodDesc: 'Review the topic again using your current learning approach',
+  phase2Intro: 'Pick a teaching style that works best for you:',
+} as const;
+
+const COPY_LEARNER = {
+  phase1Intro: "Let's find what works best for you!",
+  differentMethodLabel: 'Try Something New',
+  differentMethodDesc: "Let's try learning this a different way!",
+  sameMethodLabel: 'Same Method',
+  sameMethodDesc: "Let's go over it again the same way",
+  phase2Intro: 'How would you like to learn this time?',
+} as const;
+
 export default function RelearnScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -42,6 +88,11 @@ export default function RelearnScreen() {
   }>();
 
   const startRelearn = useStartRelearn();
+  const { persona } = useTheme();
+
+  const isLearner = persona === 'learner';
+  const methods = isLearner ? TEACHING_METHODS_LEARNER : TEACHING_METHODS;
+  const copy = isLearner ? COPY_LEARNER : COPY_DEFAULT;
 
   const [phase, setPhase] = useState<'choice' | 'method'>('choice');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -137,7 +188,7 @@ export default function RelearnScreen() {
           contentContainerStyle={{ paddingBottom: 40 }}
         >
           <Text className="text-body text-text-secondary mb-6">
-            Every topic needs its own approach. Let's find what clicks for you!
+            {copy.phase1Intro}
           </Text>
 
           <Pressable
@@ -148,10 +199,10 @@ export default function RelearnScreen() {
             accessibilityRole="button"
           >
             <Text className="text-body font-semibold text-text-inverse mb-1">
-              Different Method
+              {copy.differentMethodLabel}
             </Text>
             <Text className="text-body-sm text-text-inverse opacity-80">
-              Choose a new teaching style that might work better for you
+              {copy.differentMethodDesc}
             </Text>
           </Pressable>
 
@@ -163,10 +214,10 @@ export default function RelearnScreen() {
             accessibilityRole="button"
           >
             <Text className="text-body font-semibold text-text-primary mb-1">
-              Same Method
+              {copy.sameMethodLabel}
             </Text>
             <Text className="text-body-sm text-text-secondary">
-              Review the topic again using your current learning approach
+              {copy.sameMethodDesc}
             </Text>
           </Pressable>
         </ScrollView>
@@ -176,10 +227,10 @@ export default function RelearnScreen() {
           contentContainerStyle={{ paddingBottom: 40 }}
         >
           <Text className="text-body text-text-secondary mb-6">
-            Pick a teaching style that works best for you:
+            {copy.phase2Intro}
           </Text>
 
-          {TEACHING_METHODS.map((method) => (
+          {methods.map((method) => (
             <Pressable
               key={method.id}
               onPress={() => handleSelectMethod(method.id)}

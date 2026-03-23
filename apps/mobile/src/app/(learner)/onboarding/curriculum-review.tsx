@@ -15,8 +15,10 @@ import { useThemeColors } from '../../../lib/theme';
 import {
   useCurriculum,
   useSkipTopic,
+  useUnskipTopic,
   useChallengeCurriculum,
 } from '../../../hooks/use-curriculum';
+import { formatApiError } from '../../../lib/format-api-error';
 
 const RELEVANCE_BG: Record<string, string> = {
   core: 'bg-primary/20',
@@ -32,6 +34,13 @@ const RELEVANCE_TEXT: Record<string, string> = {
   emerging: 'text-success',
 };
 
+const RELEVANCE_LABEL: Record<string, string> = {
+  core: 'Essential',
+  recommended: 'Recommended',
+  contemporary: 'Current',
+  emerging: 'Cutting-edge',
+};
+
 export default function CurriculumScreen() {
   const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
   const router = useRouter();
@@ -39,6 +48,7 @@ export default function CurriculumScreen() {
   const colors = useThemeColors();
   const { data: curriculum, isLoading } = useCurriculum(subjectId ?? '');
   const skipTopic = useSkipTopic(subjectId ?? '');
+  const unskipTopic = useUnskipTopic(subjectId ?? '');
   const challengeCurriculum = useChallengeCurriculum(subjectId ?? '');
   const [showChallengeModal, setShowChallengeModal] = useState(false);
   const [challengeFeedback, setChallengeFeedback] = useState('');
@@ -57,11 +67,8 @@ export default function CurriculumScreen() {
       await challengeCurriculum.mutateAsync(challengeFeedback.trim());
       setChallengeFeedback('');
       setShowChallengeModal(false);
-    } catch {
-      Alert.alert(
-        'Something went wrong',
-        'We couldn\u2019t regenerate your curriculum. Please try again.'
-      );
+    } catch (err: unknown) {
+      Alert.alert('Curriculum update failed', formatApiError(err));
     }
   };
 
@@ -87,7 +94,7 @@ export default function CurriculumScreen() {
           testID="challenge-button"
         >
           <Text className="text-body-sm text-primary font-semibold">
-            Challenge
+            Change my topics
           </Text>
         </Pressable>
       </View>
@@ -148,7 +155,7 @@ export default function CurriculumScreen() {
                           'text-text-secondary'
                         }`}
                       >
-                        {topic.relevance}
+                        {RELEVANCE_LABEL[topic.relevance] ?? topic.relevance}
                       </Text>
                     </View>
                     <Text className="text-caption text-text-secondary">
@@ -156,14 +163,39 @@ export default function CurriculumScreen() {
                     </Text>
                   </View>
                 </View>
-                {!topic.skipped && (
+                {!topic.skipped ? (
                   <Pressable
-                    onPress={() => skipTopic.mutate(topic.id)}
+                    onPress={() =>
+                      Alert.alert(
+                        'Skip this topic?',
+                        'You can always bring it back later.',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Skip',
+                            style: 'destructive',
+                            onPress: () => skipTopic.mutate(topic.id),
+                          },
+                        ]
+                      )
+                    }
                     className="bg-surface-elevated rounded-button px-3 py-1 min-h-[44px] min-w-[44px] items-center justify-center"
                     testID={`skip-${topic.id}`}
                   >
                     <Text className="text-caption text-text-secondary">
                       Skip
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={() => unskipTopic.mutate(topic.id)}
+                    className="bg-surface-elevated rounded-button px-3 py-1"
+                    testID={`restore-${topic.id}`}
+                    accessibilityLabel={`Restore ${topic.title}`}
+                    accessibilityRole="button"
+                  >
+                    <Text className="text-caption font-medium text-primary">
+                      Restore
                     </Text>
                   </Pressable>
                 )}
@@ -219,7 +251,7 @@ export default function CurriculumScreen() {
             style={{ paddingBottom: Math.max(insets.bottom, 24) }}
           >
             <Text className="text-h3 font-bold text-text-primary mb-3">
-              Challenge your curriculum
+              Change your topics
             </Text>
             <Text className="text-body-sm text-text-secondary mb-4">
               Tell us what you'd change and we'll regenerate your learning path.

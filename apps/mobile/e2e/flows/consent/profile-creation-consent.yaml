@@ -177,10 +177,10 @@ tags:
 
 # 18. Wait for consent request screen to appear.
 #     After profile creation with a minor + EU location, the app navigates
-#     to /consent with GDPR consent type.
+#     to /consent with GDPR consent type. consent.tsx uses child-friendly copy.
 - extendedWaitUntil:
     visible:
-      text: "Parental consent required"
+      text: "Almost there! We need a grown-up's help"
     timeout: 15000
     optional: true
 

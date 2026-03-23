@@ -25,7 +25,7 @@ describe('getOpeningMessage', () => {
 
     it('returns freeform fallback for unknown mode', () => {
       const msg = getOpeningMessage('unknown', 0);
-      expect(msg).toContain("I'm your learning coach");
+      expect(msg).toContain("I'm your learning mate");
     });
   });
 

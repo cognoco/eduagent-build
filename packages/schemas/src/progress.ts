@@ -85,6 +85,7 @@ export const dashboardChildSchema = z.object({
     z.object({
       name: z.string(),
       retentionStatus: z.enum(['strong', 'fading', 'weak']),
+      rawInput: z.string().nullable().optional(),
     })
   ),
   guidedVsImmediateRatio: z.number().min(0).max(1),

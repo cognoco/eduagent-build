@@ -126,6 +126,10 @@ tags:
 - assertVisible:
     id: "challenge-button"
 
+# ── Story 10.5: Verify "Change my topics" label (was "Challenge") ─────
+- assertVisible:
+    text: "Change my topics"
+
 # ── Verify action buttons at bottom ───────────────────────────────────
 - assertVisible:
     id: "start-learning-button"
@@ -139,10 +143,10 @@ tags:
 - tapOn:
     id: "challenge-button"
 
-# Challenge modal should appear with title and input
+# Story 10.5: modal title changed from "Challenge your curriculum" to "Change your topics"
 - extendedWaitUntil:
     visible:
-      text: "Challenge your curriculum"
+      text: "Change your topics"
     timeout: 5000
 
 - assertVisible:
@@ -176,6 +180,38 @@ tags:
     visible:
       text: "Your Curriculum"
     timeout: 5000
+
+# ── Story 10.5: Verify plain-language relevance labels ────────────────
+# LLM generates topics with relevance values. At least "Essential" (core)
+# should appear since the LLM always includes core topics.
+- assertVisible:
+    text: "Essential"
+
+# optional: true — LLM may or may not generate "Recommended" relevance topics
+- assertVisible:
+    text: "Recommended"
+    optional: true
+
+# optional: true — LLM may or may not generate "Current" relevance topics
+- assertVisible:
+    text: "Current"
+    optional: true
+
+# optional: true — LLM may or may not generate "Cutting-edge" relevance topics
+- assertVisible:
+    text: "Cutting-edge"
+    optional: true
+
+- takeScreenshot: curriculum-review-relevance-labels
+
+# ── Story 10.1: Verify skip confirmation dialog ──────────────────────
+# NOTE: We cannot reliably test the Alert.alert() confirmation dialog
+# in Maestro because the skip button testIDs are dynamic (skip-<uuid>)
+# and we don't know the topic UUIDs from LLM-generated data.
+# The confirmation dialog is tested via unit tests instead.
+# We verify the Skip button text is visible on at least one topic.
+- assertVisible:
+    text: "Skip"
 
 # ── Test "Explore first" (go-home) button ─────────────────────────────
 # Verify the "Explore first" link is present

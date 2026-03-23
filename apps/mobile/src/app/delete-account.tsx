@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDeleteAccount, useCancelDeletion } from '../hooks/use-account';
 import { useThemeColors } from '../lib/theme';
+import { formatApiError } from '../lib/format-api-error';
 
 export default function DeleteAccountScreen() {
   const insets = useSafeAreaInsets();
@@ -27,9 +28,7 @@ export default function DeleteAccountScreen() {
       const result = await deleteAccount.mutateAsync();
       setGracePeriodEnds(result.gracePeriodEnds);
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Something went wrong.';
-      setError(message);
+      setError(formatApiError(err));
     }
   }, [deleteAccount]);
 
@@ -39,9 +38,7 @@ export default function DeleteAccountScreen() {
       await cancelDeletion.mutateAsync();
       router.back();
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Something went wrong.';
-      setError(message);
+      setError(formatApiError(err));
     }
   }, [cancelDeletion, router]);
 

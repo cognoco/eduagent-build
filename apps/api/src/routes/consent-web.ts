@@ -31,6 +31,17 @@ function escapeHtml(unsafe: string): string {
     .replace(/'/g, '&#039;');
 }
 
+/**
+ * Escape a string for safe use inside a single-quoted JS string literal
+ * that is embedded in an HTML attribute. First escapes JS special chars
+ * (backslash, single quote), then HTML-escapes the result so the browser's
+ * HTML decoder produces a valid JS string.
+ */
+function escapeJsStringInHtmlAttr(unsafe: string): string {
+  const jsEscaped = unsafe.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return escapeHtml(jsEscaped);
+}
+
 // ---------------------------------------------------------------------------
 // Shared HTML layout
 // ---------------------------------------------------------------------------
@@ -113,7 +124,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
     c.header('X-Content-Type-Options', 'nosniff');
     c.header(
       'Content-Security-Policy',
-      "default-src 'self'; style-src 'unsafe-inline'; script-src 'none'"
+      "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"
     );
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
   })
@@ -172,7 +183,9 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
          </a>
          <a href="${confirmUrl}?token=${encodeURIComponent(
           token
-        )}&approved=false" class="btn btn-danger">
+        )}&approved=false" class="btn btn-danger" onclick="return confirm('Are you sure you want to deny consent? ${escapeJsStringInHtmlAttr(
+          childName
+        )}&#039;s account and all learning data will be permanently deleted. This cannot be undone.')">
            Deny
          </a>
          <p class="info">You can withdraw consent at any time from the parent dashboard in the app.</p>`

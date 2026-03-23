@@ -1,0 +1,119 @@
+# Flow N10b: Relearn Child-Friendly Copy — Learner Persona Labels
+# Validates: when signed in as a learner persona (child), the relearn screen
+# shows child-friendly labels ("Try Something New", "Show Me Pictures", etc.)
+# instead of the default labels ("Different Method", "Visual Diagrams", etc.).
+# Tags: nightly, retention
+#
+# Journey: UX Journey 2 (Recall failure path — remediation)
+# Epics: Epic 10 (Story 10.6 — child-friendly relearn descriptions)
+# Prerequisite: Seeded user with 3 failed recalls + needs-deepening topic
+#               (scenario: failed-recall-3x). The learner persona is the default
+#               persona for a child profile.
+#
+# testID mapping (topic/relearn.tsx):
+#   - relearn-back                -> back button
+#   - relearn-different-method    -> choice: try different method
+#   - relearn-same-method         -> choice: continue same method
+#   - relearn-method-visual_diagrams    -> method picker option
+#   - relearn-method-step_by_step      -> method picker option
+#   - relearn-method-real_world_examples -> method picker option
+#   - relearn-method-practice_problems  -> method picker option
+#   - relearn-back-to-choice     -> back from method picker to choice phase
+appId: com.mentomate.app
+tags:
+  - nightly
+  - retention
+---
+# 1. Seed & sign in with failed-recall scenario (3+ failures)
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "failed-recall-3x"
+      API_URL: ${API_URL}
+
+# 2. Home screen
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 3. Navigate to Learning Book tab
+- tapOn: "Learning Book Tab"
+
+# 4. Wait for Learning Book to load
+- extendedWaitUntil:
+    visible:
+      text: "Learning Book"
+    timeout: 10000
+
+# 5. Wait for topics to load
+- extendedWaitUntil:
+    notVisible:
+      id: "learning-book-loading"
+    timeout: 10000
+    # Spinner may already be gone by the time we check
+    optional: true
+
+# 6. Tap the first topic row (seeded with 3 failed recalls)
+- tapOn:
+    text: "Chemistry Topic 1"
+
+# 7. Wait for topic detail screen
+- extendedWaitUntil:
+    visible:
+      id: "retention-card"
+    timeout: 10000
+
+# 8. Tap relearn button
+- tapOn:
+    id: "relearn-button"
+
+# 9. Verify relearn screen loads
+- extendedWaitUntil:
+    visible:
+      text: "Relearn Topic"
+    timeout: 10000
+
+# 10. Verify child-friendly phase 1 copy (learner persona).
+#     "Try Something New" replaces "Different Method" for learner.
+- extendedWaitUntil:
+    visible:
+      id: "relearn-different-method"
+    timeout: 5000
+
+- assertVisible:
+    text: "Try Something New"
+- assertVisible:
+    text: "Same Method"
+
+# 11. Screenshot of child-friendly choice phase
+- takeScreenshot: relearn-child-friendly-choice
+
+# 12. Tap "Try Something New" to enter method picker
+- tapOn:
+    id: "relearn-different-method"
+
+# 13. Verify child-friendly method labels are visible
+- extendedWaitUntil:
+    visible:
+      id: "relearn-method-visual_diagrams"
+    timeout: 5000
+
+- assertVisible:
+    text: "Show Me Pictures"
+- assertVisible:
+    text: "Walk Me Through It"
+- assertVisible:
+    text: "Show Me How It Works"
+- assertVisible:
+    text: "Let Me Try It"
+
+# 14. Screenshot of child-friendly method picker
+- takeScreenshot: relearn-child-friendly-methods
+
+# 15. Go back to choice phase and verify labels persist
+- tapOn:
+    id: "relearn-back-to-choice"
+
+- assertVisible:
+    text: "Try Something New"

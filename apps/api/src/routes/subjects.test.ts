@@ -50,6 +50,7 @@ jest.mock('../services/subject', () => ({
     id: 'test-subject-id',
     profileId,
     name: input.name,
+    rawInput: input.rawInput ?? null,
     status: 'active',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -58,6 +59,7 @@ jest.mock('../services/subject', () => ({
     id: 'test-subject-id',
     profileId: 'test-account-id',
     name: 'Mathematics',
+    rawInput: null,
     status: 'active',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -66,6 +68,7 @@ jest.mock('../services/subject', () => ({
     id: 'test-subject-id',
     profileId: 'test-account-id',
     name: 'Updated Subject',
+    rawInput: null,
     status: 'active',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -201,6 +204,28 @@ describe('subject routes', () => {
       );
 
       expect(res.status).toBe(400);
+    });
+
+    it('returns 201 with rawInput when provided', async () => {
+      const res = await app.request(
+        '/v1/subjects',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            name: 'Biology — Entomology',
+            rawInput: 'ants',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(201);
+
+      const body = await res.json();
+      expect(body.subject).toBeDefined();
+      expect(body.subject.name).toBe('Biology — Entomology');
+      expect(body.subject.rawInput).toBe('ants');
     });
 
     it('returns 401 without auth header', async () => {

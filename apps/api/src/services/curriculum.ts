@@ -150,6 +150,61 @@ export async function skipTopic(
 }
 
 // ---------------------------------------------------------------------------
+// Unskip (restore) a topic (with ownership verification)
+// ---------------------------------------------------------------------------
+
+export async function unskipTopic(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  topicId: string
+): Promise<void> {
+  // Verify ownership through scoped repository
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
+  if (!subject) throw new Error('Subject not found');
+
+  // Verify topic belongs to this subject's curriculum
+  const curriculum = await db.query.curricula.findFirst({
+    where: eq(curricula.subjectId, subjectId),
+    orderBy: desc(curricula.version),
+  });
+  if (!curriculum) throw new Error('Curriculum not found');
+
+  const topic = await db.query.curriculumTopics.findFirst({
+    where: and(
+      eq(curriculumTopics.id, topicId),
+      eq(curriculumTopics.curriculumId, curriculum.id)
+    ),
+  });
+  if (!topic) throw new Error('Topic not found in curriculum');
+
+  if (!topic.skipped) throw new Error('Topic is not skipped');
+
+  await db
+    .update(curriculumTopics)
+    .set({
+      skipped: false,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(curriculumTopics.id, topicId),
+        eq(curriculumTopics.curriculumId, curriculum.id)
+      )
+    );
+
+  // Record the adaptation
+  await db.insert(curriculumAdaptations).values({
+    profileId,
+    subjectId,
+    topicId,
+    sortOrder: 0,
+    skipReason: 'User restored',
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Challenge and regenerate a curriculum
 // ---------------------------------------------------------------------------
 

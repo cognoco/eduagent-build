@@ -177,15 +177,16 @@ tags:
 # are optional because the date picker limitation makes consent unreliable.
 
 # 19. Check if consent screen appears (only triggers for under-13)
+#     consent.tsx always uses child-friendly (learner) copy
 - extendedWaitUntil:
     visible:
-      text: "Parental consent required"
+      text: "Almost there! We need a grown-up's help"
     timeout: 15000
     optional: true
 
-# 20. Verify COPPA-specific regulation text (only if consent triggered)
+# 20. Verify COPPA-specific regulation text — child-friendly (only if consent triggered)
 - assertVisible:
-    text: "Under US COPPA regulations"
+    text: "Because you're under 13"
     optional: true
 
 # 21. Screenshot of consent screen (if it appeared)

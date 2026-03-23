@@ -9,6 +9,7 @@ import {
   profiles,
   learningSessions,
   sessionEvents,
+  subjects,
   curricula,
   curriculumTopics,
   type Database,
@@ -238,7 +239,15 @@ export async function getChildrenForParent(
       startOfLastWeek
     );
 
-    // 7. Build DashboardInput for summary generation
+    // 7. Fetch rawInput from subjects table
+    const childSubjects = await db.query.subjects.findMany({
+      where: eq(subjects.profileId, childProfileId),
+    });
+    const rawInputMap = new Map(
+      childSubjects.map((s) => [s.name, s.rawInput ?? null])
+    );
+
+    // 8. Build DashboardInput for summary generation
     const subjectRetentionData = progress.subjects.map((s) => ({
       name: s.name,
       status: s.retentionStatus,
@@ -272,6 +281,7 @@ export async function getChildrenForParent(
       subjects: subjectRetentionData.map((s) => ({
         name: s.name,
         retentionStatus: s.status,
+        rawInput: rawInputMap.get(s.name) ?? null,
       })),
       guidedVsImmediateRatio: calculateGuidedRatio(
         guidedMetrics.guidedCount,

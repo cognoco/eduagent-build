@@ -88,7 +88,7 @@ export default function PrivacyPolicyScreen() {
         <Section title="3. How We Use Your Data">
           <Paragraph>
             To provide personalised AI tutoring using Socratic dialogue and
-            spaced repetition. To generate curricula, coaching insights, and
+            spaced repetition. To generate curricula, learning insights, and
             progress reports. To send review reminders and notifications you
             have opted into. To improve our service through anonymised,
             aggregated analytics.

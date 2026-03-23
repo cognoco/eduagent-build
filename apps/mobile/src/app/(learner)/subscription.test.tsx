@@ -493,7 +493,7 @@ describe('SubscriptionScreen', () => {
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Purchase failed',
-        'Something went wrong. Please try again.'
+        'Something unexpected happened with your purchase. Please try again.'
       );
     });
   });

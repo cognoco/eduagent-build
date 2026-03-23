@@ -18,6 +18,10 @@ import { useTheme, useThemeColors } from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
 import { useRevenueCatIdentity } from '../../hooks/use-revenuecat';
+import {
+  getConsentPendingCopy,
+  getConsentWithdrawnCopy,
+} from '../../lib/consent-copy';
 
 const iconMap: Record<
   string,
@@ -298,9 +302,8 @@ function ConsentWithdrawnGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const { signOut } = useClerk();
   const { profiles, activeProfile, switchProfile } = useProfile();
-
-  // Estimate deletion date: 7 days from when status changed to WITHDRAWN.
-  // We don't have revokedAt on the client — approximate with "within 7 days".
+  const { persona } = useTheme();
+  const copy = getConsentWithdrawnCopy(persona);
 
   return (
     <View
@@ -312,17 +315,16 @@ function ConsentWithdrawnGate(): React.ReactElement {
         className="text-h1 font-bold text-text-primary mb-4 text-center"
         accessibilityRole="header"
       >
-        Account deletion pending
+        {copy.title}
       </Text>
       <Text className="text-body text-text-secondary mb-2 text-center">
-        Your parent has withdrawn consent for your account.
+        {copy.message}
       </Text>
       <Text className="text-body text-text-secondary mb-2 text-center">
-        Your data will be permanently deleted within 7 days.
+        {copy.details}
       </Text>
       <Text className="text-body-sm text-text-muted mb-8 text-center">
-        If this was a mistake, ask your parent to restore consent from their
-        dashboard.
+        {copy.help}
       </Text>
 
       {profiles.length > 1 && activeProfile && (
@@ -363,6 +365,8 @@ function ConsentPendingGate(): React.ReactElement {
   const { profiles, activeProfile, switchProfile } = useProfile();
   const { data: consentData } = useConsentStatus();
   const resendMutation = useRequestConsent();
+  const { persona } = useTheme();
+  const copy = getConsentPendingCopy(persona);
   const [checking, setChecking] = React.useState(false);
   const [previewMode, setPreviewMode] = React.useState<
     'subjects' | 'coaching' | null
@@ -411,15 +415,15 @@ function ConsentPendingGate(): React.ReactElement {
       testID="consent-pending-gate"
     >
       <Text className="text-h1 font-bold text-text-primary mb-4 text-center">
-        Waiting for approval
+        {copy.title}
       </Text>
       <Text className="text-body text-text-secondary mb-2 text-center">
         {parentEmail
-          ? `We sent an email to ${parentEmail}.`
-          : 'We sent an email to your parent or guardian.'}
+          ? copy.descriptionWithEmail(parentEmail)
+          : copy.descriptionWithoutEmail}
       </Text>
       <Text className="text-body text-text-secondary mb-8 text-center">
-        Once they approve, you'll have full access.
+        {copy.subtext}
       </Text>
 
       <Pressable
@@ -557,8 +561,8 @@ export default function LearnerLayout() {
   React.useEffect(() => {
     if (profileWasRemoved) {
       Alert.alert(
-        'Profile Removed',
-        'One of your profiles has been removed because parental consent was not received in time. You have been switched to your main profile.',
+        'Profile switched',
+        "One of your profiles is no longer available, so we've switched you to your main profile. Everything else is just as you left it.",
         [{ text: 'OK', onPress: acknowledgeProfileRemoval }]
       );
     }

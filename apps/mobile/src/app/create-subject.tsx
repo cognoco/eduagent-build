@@ -17,6 +17,7 @@ import { useResolveSubject } from '../hooks/use-resolve-subject';
 import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
+import { formatApiError } from '../lib/format-api-error';
 import type { SubjectResolveResult } from '@eduagent/schemas';
 
 // Captured at module load — safe because these screens are portrait-locked.
@@ -35,6 +36,7 @@ export default function CreateSubjectScreen() {
   const createSubject = useCreateSubject();
   const resolveSubject = useResolveSubject();
   const [name, setName] = useState('');
+  const [originalInput, setOriginalInput] = useState('');
   const [error, setError] = useState('');
   const [resolveState, setResolveState] = useState<ResolveState>({
     phase: 'idle',
@@ -51,8 +53,13 @@ export default function CreateSubjectScreen() {
       setResolveState({ phase: 'creating' });
       setError('');
       try {
+        const rawInput =
+          originalInput && originalInput !== subjectName
+            ? originalInput
+            : undefined;
         const result = await createSubject.mutateAsync({
           name: subjectName,
+          ...(rawInput ? { rawInput } : {}),
         });
         router.replace({
           pathname: '/(learner)/onboarding/interview',
@@ -62,16 +69,17 @@ export default function CreateSubjectScreen() {
           },
         } as never);
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Something went wrong.');
+        setError(formatApiError(err));
         setResolveState({ phase: 'idle' });
       }
     },
-    [createSubject, router]
+    [createSubject, router, originalInput]
   );
 
   const onSubmit = useCallback(async () => {
     if (!canSubmit) return;
     setError('');
+    setOriginalInput(name.trim());
     setResolveState({ phase: 'resolving' });
 
     try {

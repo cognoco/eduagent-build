@@ -75,9 +75,7 @@ export default function HomeScreen() {
               : "Let's explore together!"}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            {persona === 'teen'
-              ? 'Your coach has ideas'
-              : 'Your coach is ready'}
+            {persona === 'teen' ? 'Your mate has ideas' : 'Your mate is ready'}
           </Text>
         </View>
         <View className="flex-row items-center" style={{ zIndex: 50 }}>

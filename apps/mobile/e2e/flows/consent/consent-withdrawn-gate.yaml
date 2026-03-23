@@ -62,18 +62,18 @@ tags:
       id: "consent-withdrawn-gate"
     timeout: 30000
 
-# 6. Verify gate heading
+# 6. Verify gate heading (child-friendly copy for LEARNER persona)
 - assertVisible:
-    text: "Account deletion pending"
+    text: "Your account is being closed"
 
-# 7. Verify withdrawal explanation
+# 7. Verify withdrawal explanation (child-friendly copy for LEARNER persona)
 - assertVisible:
-    text: "Your parent has withdrawn consent for your account."
+    text: "Your parent or guardian has decided to close your account."
     optional: true
 
-# 8. Verify deletion timeline message
+# 8. Verify deletion timeline message (child-friendly copy for LEARNER persona)
 - assertVisible:
-    text: "Your data will be permanently deleted within 7 days."
+    text: "Your learning data will be removed in 7 days."
     optional: true
 
 # 9. Screenshot of consent-withdrawn gate

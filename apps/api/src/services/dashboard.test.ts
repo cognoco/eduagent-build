@@ -8,6 +8,7 @@ const mockProfilesFindFirst = jest.fn();
 const mockSessionsFindMany = jest.fn();
 const mockSessionsFindFirst = jest.fn();
 const mockSessionEventsFindMany = jest.fn();
+const mockSubjectsFindMany = jest.fn();
 const mockCurriculaFindFirst = jest.fn();
 const mockCurriculumTopicsFindMany = jest.fn();
 
@@ -27,6 +28,9 @@ jest.mock('@eduagent/database', () => ({
     eventType: 'event_type',
     sessionId: 'session_id',
     createdAt: 'created_at',
+  },
+  subjects: {
+    profileId: 'profile_id',
   },
   curricula: { subjectId: 'subject_id' },
   curriculumTopics: { curriculumId: 'curriculum_id' },
@@ -235,6 +239,9 @@ function createMockDb() {
       sessionEvents: {
         findMany: mockSessionEventsFindMany,
       },
+      subjects: {
+        findMany: mockSubjectsFindMany,
+      },
       curricula: {
         findFirst: mockCurriculaFindFirst,
       },
@@ -313,6 +320,11 @@ describe('getChildrenForParent', () => {
       { metadata: { escalationRung: 4 } },
     ]);
 
+    mockSubjectsFindMany.mockResolvedValue([
+      { name: 'Math', rawInput: null },
+      { name: 'Science', rawInput: 'bugs and stuff' },
+    ]);
+
     const result = await getChildrenForParent(db as never, PARENT_ID);
 
     expect(result).toHaveLength(1);
@@ -323,7 +335,9 @@ describe('getChildrenForParent', () => {
     expect(result[0].trend).toBe('up');
     expect(result[0].subjects).toHaveLength(2);
     expect(result[0].subjects[0].name).toBe('Math');
+    expect(result[0].subjects[0].rawInput).toBeNull();
     expect(result[0].subjects[1].retentionStatus).toBe('fading');
+    expect(result[0].subjects[1].rawInput).toBe('bugs and stuff');
     expect(result[0].guidedVsImmediateRatio).toBeCloseTo(2 / 3);
   });
 
@@ -427,6 +441,7 @@ describe('getChildDetail', () => {
     });
     mockSessionsFindMany.mockResolvedValue([]);
     mockSessionEventsFindMany.mockResolvedValue([]);
+    mockSubjectsFindMany.mockResolvedValue([]);
 
     const result = await getChildDetail(db as never, PARENT_ID, CHILD_ID);
 

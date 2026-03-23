@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   useCurriculum,
   useSkipTopic,
+  useUnskipTopic,
   useChallengeCurriculum,
   useExplainTopic,
 } from './use-curriculum';
@@ -164,6 +165,39 @@ describe('useSkipTopic', () => {
     );
 
     const { result } = renderHook(() => useSkipTopic('subject-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate('topic-1');
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+  });
+});
+
+describe('useUnskipTopic', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('calls POST to unskip (restore) a topic', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: 'Topic restored' }), {
+        status: 200,
+      })
+    );
+
+    const { result } = renderHook(() => useUnskipTopic('subject-1'), {
       wrapper: createWrapper(),
     });
 

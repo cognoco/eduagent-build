@@ -164,6 +164,37 @@ describe('consent-web routes', () => {
       expect(html).toContain('Consent required for Emma');
       expect(html).toContain('Emma wants to use MentoMate');
     });
+
+    it('deny link includes onclick confirm dialog with child name', async () => {
+      const res = await app.request(
+        '/v1/consent-page?token=valid-token',
+        {},
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      expect(html).toContain('onclick="return confirm(');
+      expect(html).toContain('Are you sure you want to deny consent?');
+      expect(html).toContain('permanently deleted');
+      // Child name appears in the confirmation message
+      expect(html).toMatch(/confirm\(.*Emma/);
+    });
+
+    it('approve link does NOT include onclick confirm dialog', async () => {
+      const res = await app.request(
+        '/v1/consent-page?token=valid-token',
+        {},
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      // The approve button should not have an onclick handler
+      const approveMatch = html.match(/<a[^>]*approved=true[^>]*>/);
+      expect(approveMatch).not.toBeNull();
+      expect(approveMatch![0]).not.toContain('onclick');
+    });
   });
 
   // -------------------------------------------------------------------------

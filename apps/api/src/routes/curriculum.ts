@@ -1,12 +1,17 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { topicSkipSchema, curriculumChallengeSchema } from '@eduagent/schemas';
+import {
+  topicSkipSchema,
+  topicUnskipSchema,
+  curriculumChallengeSchema,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import {
   getCurriculum,
   skipTopic,
+  unskipTopic,
   challengeCurriculum,
   explainTopicOrdering,
 } from '../services/curriculum';
@@ -53,6 +58,31 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
       try {
         await skipTopic(db, profileId, subjectId, topicId);
         return c.json({ message: 'Topic skipped', topicId });
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Subject not found') {
+          return notFound(c, 'Subject not found');
+        }
+        throw error;
+      }
+    }
+  )
+  // Unskip (restore) a topic
+  .post(
+    '/subjects/:subjectId/curriculum/unskip',
+    zValidator('json', topicUnskipSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = c.get('profileId');
+      if (!profileId)
+        return unauthorized(
+          c,
+          'Profile selection required (X-Profile-Id header)'
+        );
+      const subjectId = c.req.param('subjectId');
+      const { topicId } = c.req.valid('json');
+      try {
+        await unskipTopic(db, profileId, subjectId, topicId);
+        return c.json({ message: 'Topic restored', topicId });
       } catch (error) {
         if (error instanceof Error && error.message === 'Subject not found') {
           return notFound(c, 'Subject not found');
