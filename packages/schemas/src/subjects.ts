@@ -47,13 +47,21 @@ export const subjectResolveStatusSchema = z.enum([
   'direct_match',
   'corrected',
   'resolved',
+  'ambiguous',
   'no_match',
 ]);
 export type SubjectResolveStatus = z.infer<typeof subjectResolveStatusSchema>;
 
+export const subjectSuggestionSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+});
+export type SubjectSuggestion = z.infer<typeof subjectSuggestionSchema>;
+
 export const subjectResolveResultSchema = z.object({
   status: subjectResolveStatusSchema,
   resolvedName: z.string().nullable(),
+  suggestions: z.array(subjectSuggestionSchema),
   displayMessage: z.string(),
 });
 export type SubjectResolveResult = z.infer<typeof subjectResolveResultSchema>;

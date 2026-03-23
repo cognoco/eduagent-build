@@ -25,65 +25,93 @@ describe('resolveSubjectName', () => {
     llmResponse({
       status: 'direct_match',
       resolvedName: 'Physics',
+      suggestions: [
+        { name: 'Physics', description: 'Forces, motion and energy' },
+      ],
       displayMessage: '',
     });
 
     const result = await resolveSubjectName('Physics');
 
-    expect(result).toEqual({
-      status: 'direct_match',
-      resolvedName: 'Physics',
-      displayMessage: '',
-    });
+    expect(result.status).toBe('direct_match');
+    expect(result.resolvedName).toBe('Physics');
+    expect(result.suggestions).toHaveLength(1);
+    expect(result.displayMessage).toBe('');
   });
 
   it('returns corrected for a misspelled subject', async () => {
     llmResponse({
       status: 'corrected',
       resolvedName: 'Physics',
+      suggestions: [
+        { name: 'Physics', description: 'Forces, motion and energy' },
+      ],
       displayMessage: 'Did you mean **Physics**?',
     });
 
     const result = await resolveSubjectName('Phsics');
 
-    expect(result).toEqual({
-      status: 'corrected',
-      resolvedName: 'Physics',
-      displayMessage: 'Did you mean **Physics**?',
+    expect(result.status).toBe('corrected');
+    expect(result.resolvedName).toBe('Physics');
+    expect(result.suggestions[0].name).toBe('Physics');
+  });
+
+  it('returns ambiguous with multiple suggestions for a broad topic', async () => {
+    llmResponse({
+      status: 'ambiguous',
+      resolvedName: null,
+      suggestions: [
+        {
+          name: 'Biology — Entomology',
+          description: 'Ant bodies, life cycle and species',
+        },
+        { name: 'Ecology', description: 'How ants interact with ecosystems' },
+      ],
+      displayMessage:
+        '**Ants** can be studied from different angles — which interests you?',
     });
+
+    const result = await resolveSubjectName('ants');
+
+    expect(result.status).toBe('ambiguous');
+    expect(result.resolvedName).toBeNull();
+    expect(result.suggestions).toHaveLength(2);
+    expect(result.suggestions[0].name).toBe('Biology — Entomology');
+    expect(result.suggestions[1].name).toBe('Ecology');
   });
 
   it('returns resolved for natural language input', async () => {
     llmResponse({
       status: 'resolved',
-      resolvedName: 'Biology — Entomology',
+      resolvedName: 'Computer Science',
+      suggestions: [
+        { name: 'Computer Science', description: 'How computers work' },
+      ],
       displayMessage:
-        'This sounds like **Biology — Entomology** — shall we go with that?',
+        'This sounds like **Computer Science** — shall we go with that?',
     });
 
-    const result = await resolveSubjectName('I want to learn about ants');
+    const result = await resolveSubjectName(
+      'I want to learn how computers work'
+    );
 
-    expect(result).toEqual({
-      status: 'resolved',
-      resolvedName: 'Biology — Entomology',
-      displayMessage:
-        'This sounds like **Biology — Entomology** — shall we go with that?',
-    });
+    expect(result.status).toBe('resolved');
+    expect(result.resolvedName).toBe('Computer Science');
   });
 
   it('returns no_match with null resolvedName for nonsense input', async () => {
     llmResponse({
       status: 'no_match',
       resolvedName: null,
-      displayMessage:
-        "I couldn't find a matching subject. Try entering a subject name like 'Physics' or 'History', or describe what you'd like to learn.",
+      suggestions: [],
+      displayMessage: "I couldn't find a matching subject.",
     });
 
     const result = await resolveSubjectName('jjjjj');
 
     expect(result.status).toBe('no_match');
     expect(result.resolvedName).toBeNull();
-    expect(result.displayMessage).toBeTruthy();
+    expect(result.suggestions).toHaveLength(0);
   });
 
   it('falls back to direct_match when LLM returns unparseable response', async () => {
@@ -96,18 +124,17 @@ describe('resolveSubjectName', () => {
 
     const result = await resolveSubjectName('History');
 
-    expect(result).toEqual({
-      status: 'direct_match',
-      resolvedName: 'History',
-      displayMessage: '',
-    });
+    expect(result.status).toBe('direct_match');
+    expect(result.resolvedName).toBe('History');
+    expect(result.suggestions).toHaveLength(1);
   });
 
   it('falls back to direct_match when LLM returns unknown status', async () => {
     llmResponse({
       status: 'something_unknown',
       resolvedName: 'Whatever',
-      displayMessage: 'Weird message',
+      suggestions: [],
+      displayMessage: '',
     });
 
     const result = await resolveSubjectName('History');
@@ -119,6 +146,7 @@ describe('resolveSubjectName', () => {
     llmResponse({
       status: 'direct_match',
       resolvedName: 'Math',
+      suggestions: [{ name: 'Math', description: '' }],
       displayMessage: '',
     });
 
@@ -131,5 +159,20 @@ describe('resolveSubjectName', () => {
       ]),
       1
     );
+  });
+
+  it('handles missing suggestions array gracefully', async () => {
+    llmResponse({
+      status: 'corrected',
+      resolvedName: 'Physics',
+      displayMessage: 'Did you mean **Physics**?',
+      // no suggestions field
+    });
+
+    const result = await resolveSubjectName('Phsics');
+
+    expect(result.status).toBe('corrected');
+    expect(result.resolvedName).toBe('Physics');
+    expect(result.suggestions).toEqual([]);
   });
 });

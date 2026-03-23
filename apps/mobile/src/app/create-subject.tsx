@@ -44,6 +44,7 @@ export default function CreateSubjectScreen() {
   const isBusy =
     resolveState.phase === 'resolving' || resolveState.phase === 'creating';
   const canSubmit = name.trim().length >= 1 && !isBusy;
+  const showSuggestion = resolveState.phase === 'suggestion';
 
   const doCreate = useCallback(
     async (subjectName: string) => {
@@ -92,13 +93,21 @@ export default function CreateSubjectScreen() {
         return;
       }
 
-      // corrected or resolved — show suggestion card
+      // corrected, resolved, or ambiguous — show suggestion card(s)
       setResolveState({ phase: 'suggestion', result });
     } catch {
       // Resolve failed — fall through to create with raw name
       await doCreate(name.trim());
     }
   }, [canSubmit, name, resolveSubject, doCreate]);
+
+  const onPickSuggestion = useCallback(
+    async (suggestionName: string) => {
+      setName(suggestionName);
+      await doCreate(suggestionName);
+    },
+    [doCreate]
+  );
 
   const onAcceptSuggestion = useCallback(async () => {
     if (resolveState.phase !== 'suggestion') return;
@@ -109,7 +118,6 @@ export default function CreateSubjectScreen() {
 
   const onEditSuggestion = useCallback(() => {
     if (resolveState.phase !== 'suggestion') return;
-    // Pre-fill the input with the suggested name so the user can tweak it
     if (resolveState.result.resolvedName) {
       setName(resolveState.result.resolvedName);
     }
@@ -119,13 +127,15 @@ export default function CreateSubjectScreen() {
   const onNameChange = useCallback(
     (text: string) => {
       setName(text);
-      // Reset suggestion if user edits the input
       if (resolveState.phase === 'suggestion') {
         setResolveState({ phase: 'idle' });
       }
     },
     [resolveState.phase]
   );
+
+  const isAmbiguous =
+    showSuggestion && resolveState.result.status === 'ambiguous';
 
   return (
     <KeyboardAvoidingView className="flex-1 bg-background" behavior="padding">
@@ -207,18 +217,15 @@ export default function CreateSubjectScreen() {
           </View>
         )}
 
-        {/* Suggestion card */}
-        {resolveState.phase === 'suggestion' && (
-          <View
-            className="bg-primary-soft rounded-card px-4 py-4 mb-4"
-            testID="subject-suggestion-card"
-          >
-            <View className="flex-row items-start mb-3">
+        {/* Ambiguous: multiple tappable suggestion cards */}
+        {isAmbiguous && resolveState.phase === 'suggestion' && (
+          <View className="mb-4" testID="subject-suggestion-card">
+            <View className="flex-row items-center mb-3">
               <Ionicons
                 name="sparkles"
                 size={18}
                 color={colors.primary}
-                style={{ marginRight: 8, marginTop: 2 }}
+                style={{ marginRight: 8 }}
               />
               <Text
                 className="text-body text-text-primary flex-1"
@@ -227,41 +234,95 @@ export default function CreateSubjectScreen() {
                 {resolveState.result.displayMessage}
               </Text>
             </View>
-            <View className="flex-row gap-3">
+            {resolveState.result.suggestions.map((suggestion, index) => (
               <Pressable
-                onPress={onAcceptSuggestion}
-                className="flex-1 bg-primary rounded-button py-3 items-center min-h-[44px] justify-center"
-                testID="subject-suggestion-accept"
+                key={suggestion.name}
+                onPress={() => onPickSuggestion(suggestion.name)}
+                className="bg-primary-soft rounded-card px-4 py-3 mb-2 flex-row items-center min-h-[52px]"
+                testID={`subject-suggestion-option-${index}`}
                 accessibilityRole="button"
-                accessibilityLabel="Accept suggestion"
+                accessibilityLabel={`Choose ${suggestion.name}`}
               >
-                <Text className="text-text-inverse font-semibold text-body-sm">
-                  Accept
-                </Text>
+                <View className="flex-1">
+                  <Text className="text-body font-semibold text-text-primary">
+                    {suggestion.name}
+                  </Text>
+                  {suggestion.description !== '' && (
+                    <Text className="text-body-sm text-text-secondary mt-0.5">
+                      {suggestion.description}
+                    </Text>
+                  )}
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={colors.muted}
+                />
               </Pressable>
-              <Pressable
-                onPress={onEditSuggestion}
-                className="flex-1 bg-surface rounded-button py-3 items-center min-h-[44px] justify-center border border-border"
-                testID="subject-suggestion-edit"
-                accessibilityRole="button"
-                accessibilityLabel="Edit suggestion"
-              >
-                <Text className="text-text-primary font-semibold text-body-sm">
-                  Edit
-                </Text>
-              </Pressable>
-            </View>
+            ))}
           </View>
         )}
 
-        <Button
-          variant="primary"
-          label="Start Learning"
-          onPress={onSubmit}
-          disabled={!canSubmit}
-          loading={isBusy}
-          testID="create-subject-submit"
-        />
+        {/* Single suggestion: corrected or resolved */}
+        {showSuggestion &&
+          !isAmbiguous &&
+          resolveState.phase === 'suggestion' && (
+            <View
+              className="bg-primary-soft rounded-card px-4 py-4 mb-4"
+              testID="subject-suggestion-card"
+            >
+              <View className="flex-row items-start mb-3">
+                <Ionicons
+                  name="sparkles"
+                  size={18}
+                  color={colors.primary}
+                  style={{ marginRight: 8, marginTop: 2 }}
+                />
+                <Text
+                  className="text-body text-text-primary flex-1"
+                  testID="subject-suggestion-message"
+                >
+                  {resolveState.result.displayMessage}
+                </Text>
+              </View>
+              <View className="flex-row gap-3">
+                <Pressable
+                  onPress={onAcceptSuggestion}
+                  className="flex-1 bg-primary rounded-button py-3 items-center min-h-[44px] justify-center"
+                  testID="subject-suggestion-accept"
+                  accessibilityRole="button"
+                  accessibilityLabel="Accept suggestion"
+                >
+                  <Text className="text-text-inverse font-semibold text-body-sm">
+                    Accept
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={onEditSuggestion}
+                  className="flex-1 bg-surface rounded-button py-3 items-center min-h-[44px] justify-center border border-border"
+                  testID="subject-suggestion-edit"
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit suggestion"
+                >
+                  <Text className="text-text-primary font-semibold text-body-sm">
+                    Edit
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+        {/* Only show Start Learning when not showing suggestions */}
+        {!showSuggestion && (
+          <Button
+            variant="primary"
+            label="Start Learning"
+            onPress={onSubmit}
+            disabled={!canSubmit}
+            loading={isBusy}
+            testID="create-subject-submit"
+          />
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
