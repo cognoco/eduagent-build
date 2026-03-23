@@ -168,19 +168,22 @@ const ESCALATION_STYLES: Partial<
 // ---------------------------------------------------------------------------
 
 function buildMarkdownStyles(
-  colors: ThemeColors
+  _colors: ThemeColors
 ): Record<string, TextStyle | { backgroundColor?: string }> {
+  // Text color is intentionally OMITTED from all styles.
+  // Color comes from NativeWind className="text-text-primary" on the
+  // custom inline/textgroup render rules (see `rules` prop below).
+  // NativeWind resolves via CSS variables which are always in sync with
+  // background colors. Using useThemeColors() here caused a split-state
+  // bug: theme context returned light-mode colors (dark text) while
+  // NativeWind backgrounds stayed dark → invisible text.
   const base: TextStyle = {
-    color: colors.textPrimary,
     fontSize: 15,
     lineHeight: 22,
   };
   return {
     body: base,
     text: base,
-    // The library renders `inline` and `textgroup` as <Text> wrappers around
-    // content.  Without an explicit color they default to black on Android,
-    // making dark-mode text invisible.
     textgroup: base,
     inline: base,
     // Paragraph renders as a View (via _VIEW_SAFE_paragraph, which strips text
@@ -208,14 +211,12 @@ function buildMarkdownStyles(
     code_inline: {
       ...base,
       fontFamily: 'monospace',
-      backgroundColor: `${colors.muted}22`,
       paddingHorizontal: 4,
       borderRadius: 4,
     },
     fence: {
       ...base,
       fontFamily: 'monospace',
-      backgroundColor: `${colors.muted}22`,
       padding: 8,
       borderRadius: 8,
       marginBottom: 4,
@@ -223,7 +224,6 @@ function buildMarkdownStyles(
     code_block: {
       ...base,
       fontFamily: 'monospace',
-      backgroundColor: `${colors.muted}22`,
       padding: 8,
       borderRadius: 8,
       marginBottom: 4,
@@ -231,18 +231,15 @@ function buildMarkdownStyles(
     heading1: { ...base, fontSize: 18, fontWeight: '700', marginBottom: 4 },
     heading2: { ...base, fontSize: 17, fontWeight: '700', marginBottom: 4 },
     heading3: { ...base, fontSize: 16, fontWeight: '600', marginBottom: 4 },
-    link: { ...base, color: colors.primary },
+    link: { ...base, textDecorationLine: 'underline' as const },
     blockquote: {
       ...base,
-      backgroundColor: `${colors.muted}11`,
-      borderLeftWidth: 3,
-      borderLeftColor: colors.primary,
       paddingLeft: 8,
       marginBottom: 4,
     },
     softbreak: base,
     hardbreak: { ...base, width: '100%', height: 1 },
-    hr: { backgroundColor: colors.muted, height: 1, marginVertical: 8 },
+    hr: { height: 1, marginVertical: 8 },
   };
 }
 
