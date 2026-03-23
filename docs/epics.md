@@ -624,9 +624,9 @@ Add native Apple/Google in-app purchases for mobile billing via RevenueCat. The 
 
 ### Epic 10: Pre-Launch UX Polish (PRE-LAUNCH — before public release)
 
-Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion. Focused on copy clarity, confirmation dialogs, and persona-appropriate language for the DACH market (ages 11-15). Identified from user testing / UX gap analysis.
+Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion. Focused on copy clarity, confirmation dialogs, consent unification (GDPR-everywhere), App Store compliance, and persona-appropriate language for English-speaking markets (US/UK/AU, ages 11-15). Identified from user testing / UX gap analysis + market strategy pivot (2026-03-23).
 
-**Items addressed:** Topic skip undo (#4), GDPR child-friendly text (#9), profile removal alert (#15), actionable error messages (#10), curriculum label jargon (#2, #3), relearn method descriptions (#8).
+**Items addressed:** Topic skip undo (#4), child-friendly consent text (#9), profile removal alert (#15), actionable error messages (#10), curriculum label jargon (#2, #3), relearn method descriptions (#8), consent unification (GDPR-everywhere), App Store compliance audit, age-gated Sentry, offline action gating, parent email delivery feedback, App Store rating prompt, curriculum completion celebration.
 
 **FRs covered:** FR18 (topic skip undo gap), FR19/FR20 (curriculum label clarity), FR56 (relearn descriptions)
 **Stories:** 6 (3 must-ship, 3 should-ship)
@@ -3106,12 +3106,14 @@ The original architecture (docs/architecture.md) specified "Payments | Stripe" w
 
 ## Epic 10: Pre-Launch UX Polish (PRE-LAUNCH) — Stories
 
-**Goal:** Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion before first public release. Focused on copy clarity, confirmation dialogs, and persona-appropriate language for the DACH market (ages 11-15).
-**Stories:** 13 | **Priority:** Must-ship (10.1–10.7, 10.10–10.13), fast-follow (10.8–10.9)
-**Status:** Partially built. Stories 10.10–10.13 implemented with unit tests passing (505+ tests). Maestro E2E flows written but not yet run (requires emulator + API stack). Stories 10.1–10.9 not yet started. DB migration generated (`0002_light_puff_adder.sql`) but not applied.
-**FRs:** FR18 (topic skip — undo gap), FR20 (relevance labels), FR19 (challenge naming), FR56 (relearn method descriptions), plus new NFR for actionable errors and child-friendly GDPR copy.
+**Goal:** Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion before first public release. Focused on copy clarity, confirmation dialogs, persona-appropriate language, consent unification, and App Store compliance for English-speaking markets (US, UK, Australia) targeting ages 11-15.
+**Stories:** 19 | **Priority:** Must-ship (10.1–10.7, 10.10–10.14, 10.16, 10.19), should-ship (10.15, 10.17, 10.18), fast-follow (10.8–10.9)
+**Status:** Partially built. Stories 10.10–10.13 implemented with unit tests passing (505+ tests). Maestro E2E flows written but not yet run (requires emulator + API stack). Stories 10.1–10.9, 10.14–10.19 not yet started. DB migration generated (`0002_light_puff_adder.sql`) but not applied.
+**FRs:** FR7, FR8 (consent unification), FR18 (topic skip — undo gap), FR20 (relevance labels), FR19 (challenge naming), FR56 (relearn method descriptions), plus new NFR for actionable errors and child-friendly consent copy.
 **Dependencies:** Epics 0-5 complete (all screens and services exist). No new infrastructure needed.
 **Persona scope:** Items marked UNIVERSAL apply to all personas. Items marked LEARNER-ONLY apply only when persona is `learner` (ages ~10-12). See persona-conditional notes per story.
+
+**Market context (decided 2026-03-23):** Launch is English-only, targeting US/UK/AU. GDPR's under-16 parental consent threshold is applied globally ("GDPR-everywhere" strategy). This is the strictest standard and automatically satisfies US COPPA (under 13), UK GDPR + AADC (under 13 consent + under-18 design obligations), and Australia's Privacy Act. The location picker is removed — birth date alone drives consent. See Story 10.19 for consent unification.
 
 **Story status (10.10–10.13):**
 | Story | Unit tests | E2E flow | Status |
@@ -3167,23 +3169,22 @@ So that accidental taps don't permanently remove topics from my learning path.
 
 ---
 
-### Story 10.2: Child-Friendly GDPR/COPPA Consent Text
+### Story 10.2: Child-Friendly Consent Text
 
 _Priority: Must-ship. Scope: LEARNER-ONLY (ages ~10-12). Teen/parent text unchanged._
+_Dependency: Story 10.19 (consent unification) should land first — it removes the GDPR/COPPA branching that this story's copy replaces._
 
 As a young learner (age 10-12) seeing the consent screen for the first time,
 I want the consent explanation in language I can understand,
 So that I'm not confused or scared by legal jargon during onboarding.
 
-**Background:** The current consent screen (`consent.tsx`) shows regulatory text like "Under EU GDPR regulations, users under 16 need parental consent to use this service." A 10-year-old in the DACH market (already dealing with English as a second language) will not understand "GDPR regulations" or "parental consent to use this service." The consent-withdrawn gate text ("Account deletion pending", "Your data will be permanently deleted within 7 days") is similarly clinical.
+**Background:** The current consent screen (`consent.tsx`) shows regulatory text like "Under EU GDPR regulations, users under 16 need parental consent to use this service." An 11-year-old will not understand "GDPR regulations" or "parental consent to use this service." The consent-withdrawn gate text ("Account deletion pending", "Your data will be permanently deleted within 7 days") is similarly clinical. After Story 10.19 (consent unification), there is a single consent regulation string instead of GDPR/COPPA branches — this story provides the child-friendly version.
 
 **Acceptance Criteria:**
 
 **Given** a learner-persona user lands on the consent request screen (`consent.tsx`)
 **When** the screen renders
-**Then** the regulation text is child-friendly:
-  - GDPR: "Because you're under 16, we need your parent or guardian to say it's OK for you to use this app. It's a rule in Europe to keep you safe online!"
-  - COPPA: "Because you're under 13, we need a grown-up to say it's OK for you to use this app. It's a rule to keep kids safe online!"
+**Then** the regulation text is child-friendly: "Because you're under 16, we need your parent or guardian to say it's OK for you to use this app. It's a rule to keep you safe online!"
 **And** the title changes from "Parental consent required" to "Almost there! We need a grown-up's help"
 **And** the "Parent's email address" label changes to "Your parent's or guardian's email"
 **And** the success message changes from "They'll need to approve before you can start learning" to "Once they say yes, you're all set to start learning!"
@@ -3207,11 +3208,11 @@ So that I'm not confused or scared by legal jargon during onboarding.
 
 **Implementation notes:**
 - Persona is available via `useTheme()` → `persona` in the learner layout. The consent screen is rendered within `(learner)/_layout.tsx` which has persona context.
-- Create a `consent-copy.ts` utility with persona-keyed string maps. Screens import and select by persona.
+- `consent-copy.ts` already exists with persona-keyed string maps — update the learner copy to use the unified jurisdiction-neutral regulation string (from 10.19). Remove the `gdprRegulation` / `coppaRegulation` split in `ConsentRequestCopy` — replace with a single `regulation` field.
 - No API changes — this is purely mobile string changes.
-- Tests: component tests verifying correct text per persona. E2E: consent flow should verify the child-friendly strings appear.
+- Tests: update existing component tests to verify correct text per persona. E2E: consent flow should verify the child-friendly strings appear.
 
-**FRs:** (GDPR/COPPA UX — no new FR, improves FR7/FR8 user experience)
+**FRs:** (Consent UX — no new FR, improves FR7/FR8 user experience)
 
 ---
 
@@ -3580,12 +3581,13 @@ The tone is encouraging ("Don't worry — that's completely normal!") but the st
 ### Story 10.10: "Hand to Your Parent" Consent Interstitial
 
 _Priority: Must-ship (launch blocker). Scope: LEARNER screen + PARENT interaction._
+_Dependency: Story 10.19 (consent unification) should land first — it removes the GDPR/COPPA branching that this story's parent-view references._
 
 As a young learner who needs parental consent,
 I want to hand my phone to my parent instead of typing their email,
 So that consent isn't blocked by a typo or my not knowing their email address.
 
-**Background:** The consent flow currently asks children under 13/16 to type their parent's email address. Children this age often don't know the exact address, and typos silently send consent emails to wrong addresses. The child gets only 3 resend attempts before being locked out (429). Combined with the risk of the consent email landing in spam, this creates the single biggest onboarding funnel leak: a child who can't complete consent never uses the app.
+**Background:** The consent flow currently asks children under 16 to type their parent's email address. Children this age often don't know the exact address, and typos silently send consent emails to wrong addresses. The child gets only 3 resend attempts before being locked out (429). Combined with the risk of the consent email landing in spam, this creates the single biggest onboarding funnel leak: a child who can't complete consent never uses the app.
 
 The fix is an interstitial: instead of making the child type, the screen shows a child-friendly message ("Hand this to your parent") and a button. When tapped, the screen switches to a parent-facing form with professional tone, clear instructions, and the email field — filled in by the parent themselves while holding the child's device. The parent also sees a note: "Check your inbox (and spam folder) for the consent email."
 
@@ -3597,31 +3599,23 @@ The fix is an interstitial: instead of making the child type, the screen shows a
 
 **Given** user taps "I'm the parent / guardian"
 **When** the screen transitions
-**Then** a parent-facing form appears with: title "Parental Consent Required", brief explanation of GDPR/COPPA (current regulatory text, professional tone), email label "Your email address" (not "Your parent's email"), placeholder "you@example.com", note beneath the input: "We'll send a one-time consent link. Check your spam folder if you don't see it within a few minutes.", and a "Send consent link" button
+**Then** a parent-facing form appears with: title "Parental Consent Required", brief explanation of the consent requirement (unified regulation text from 10.19, professional tone — e.g., "Users under 16 require parental consent before using this service. We collect learning data only after consent is granted."), email label "Your email address" (not "Your parent's email"), placeholder "you@example.com", note beneath the input: "We'll send a one-time consent link. Check your spam folder if you don't see it within a few minutes.", and a "Send consent link" button
 
 **Given** parent submits their email successfully
 **When** the success state renders
 **Then** it shows: "Consent link sent to [email]", "Check your inbox (and spam folder). The link expires in 7 days.", a "Resend" button, and a "Hand back to your child" button that returns to the child-facing view with a "Hang tight!" waiting message
 
-**Given** the consent screen is shown for COPPA (under 13)
-**When** the regulatory text renders
-**Then** the parent-facing form shows the COPPA regulation text (not the child-friendly version)
-
-**Given** the consent screen is shown for GDPR (under 16 in EU)
-**When** the regulatory text renders
-**Then** the parent-facing form shows the GDPR regulation text
-
 **Implementation notes:**
 - Refactor `consent.tsx` to have two phases: `childView` (hand-off prompt) and `parentView` (email form + regulatory text).
 - The parent-facing email label changes from "Your parent's or guardian's email" to "Your email address" — the parent is the one typing now.
 - Add spam folder warning to both the form and the success state.
-- Update `consent-copy.ts` to add parent-facing copy variants alongside existing learner copy.
+- After 10.19, `consent-copy.ts` has a single `regulation` field instead of `gdprRegulation`/`coppaRegulation` — the parent-view uses the default (professional) copy, the child-view uses the learner (friendly) copy.
 - Existing API (`useRequestConsent`) is unchanged — only the mobile UI changes.
-- Tests: component tests for both phases, transition between them, correct copy per consentType.
+- Tests: component tests for both phases, transition between them. No need to test per-consentType copy (unified after 10.19).
 
 **FRs:** (UX improvement — fixes onboarding funnel leak)
 
-**Dependencies:** None. Consent screen exists. No API changes needed.
+**Dependencies:** Story 10.19 (consent unification). Consent screen exists. No API changes needed.
 
 ---
 
@@ -3748,37 +3742,340 @@ So that I know the AI is coaching my child through difficulty, not just giving a
 
 ---
 
+### Story 10.14: App Store Compliance Audit & Category Decision
+
+**Priority:** Must-ship (launch blocker — cannot submit without this decision)
+**Scope:** OPERATIONAL (documentation + configuration + SDK audit) + SENTRY RUNTIME CODE (age-gated init)
+
+**What:**
+Determine whether MentoMate submits under Apple's **Kids Category** or **Education** category, execute the compliance checklist, and implement age-gated Sentry initialization.
+
+**Context:** The app targets ages 11-17+ across US/UK/AU. Under-16 users require parental consent (GDPR-everywhere, see Story 10.19). Apple's Kids Category imposes strict rules: no third-party analytics/tracking, no behavioral profiling, no ads, restricted data collection, and a parental gate on purchases. The Education category is less restrictive but still subject to COPPA for under-13 users.
+
+**Recommendation:** **Education category** for v1. Kids Category readiness documented for v2 (when Age 6-10 mode ships). Rationale: Kids Category prohibits all third-party analytics — Sentry would need full conditional disable. Education category permits analytics when parental consent is obtained, which the app already requires for under-16.
+
+**Key decision factors:**
+- Kids Category: stricter, signals trust but requires disabling Sentry entirely for under-13, Apple-enforced parental purchase gate, no OAuth
+- Education: less restrictive, Sentry OK with consent, parent persona owns billing (documented)
+- Hybrid: submit Education now, document Kids Category readiness for v2
+
+**Age-gated Sentry initialization (runtime code):**
+
+Apple's enforcement line is **under 13**, not under 16. Even under Education category, Sentry for under-13 is scrutinized. The app must gate Sentry by age:
+
+| Age Group | Sentry Behavior | Rationale |
+|-----------|----------------|-----------|
+| **Under 13** | **Disabled until consent is CONSENTED** | Apple COPPA enforcement. `initSentry()` called only after consent state machine resolves to CONSENTED. If consent revoked, Sentry disabled. |
+| **13-15** | Enabled (consent covers it) | Parental consent obtained. Privacy policy discloses error tracking. |
+| **16+** | Enabled (no consent needed) | Adult user. Standard analytics. |
+
+Implementation: `initSentry()` in root `_layout.tsx` currently runs unconditionally. Refactor to: (1) read active profile's birth date + consent status, (2) if under-13 and consent !== CONSENTED, skip init, (3) re-evaluate on profile switch.
+
+**Checklist (regardless of category):**
+1. Document the category decision with rationale in `docs/architecture.md`
+2. Implement age-gated Sentry init (see table above) — `lib/sentry.ts` + root `_layout.tsx`
+3. Audit RevenueCat — no parental purchase gate exists in `lib/revenuecat.ts`. Apple enforces at store level for Kids Category; for Education, document that parent manages subscription (parent persona owns billing).
+4. Update privacy policy (`app/privacy.tsx`): Section 4 updated by Story 10.19 (consent unification). Add RevenueCat explicitly to data sharing section (currently says "payment processors" generically). Add Sentry age-gating disclosure.
+5. Set correct content rating in App Store Connect (likely 9+ for Education with AI tutoring content)
+6. Verify iOS Privacy Manifest (`app.json` privacyManifests) is complete — audit `@sentry/react-native` and RevenueCat SDK privacy manifest requirements, merge into `app.json`
+7. Add `privacyPolicyUrl` to `app.json` expo config (currently missing)
+8. Google Play: complete Families Policy declaration (target age: "Under 13" + "13-17"), ensure privacy policy meets Families Policy requirements
+
+**Deliverables:** Architecture decision record in docs, age-gated Sentry implementation + tests, updated privacy policy, updated `app.json`, compliance checklist signed off.
+
+**FRs:** (Operational — App Store submission requirement)
+
+**Dependencies:** Story 10.19 (consent unification) for privacy policy Section 4 update. Sentry gating can proceed independently.
+
+---
+
+### Story 10.15: Curriculum Completion Celebration & Next Steps
+
+**Priority:** Should-ship (retention risk — child finishes everything and hits dead end)
+**Scope:** LEARNER + TEEN (all kids)
+
+**What:**
+When a learner has completed all topics in a subject's curriculum, show a celebration and prompt to continue learning instead of the current broken empty state.
+
+**Current state:** Learning Book shows "No topics yet — add a subject to get started" even when topics exist but are all completed. Coaching card service falls back to generic "challenge" card. No celebration, no "add new subject" prompt. `CelebrationAnimation` component exists (used on session summary) but is not wired to curriculum completion.
+
+**Changes:**
+
+1. **Learning Book empty state fix** (`book.tsx`): When `filteredTopics.length === 0` but subjects exist, distinguish between "no curriculum yet" vs "all topics completed/verified":
+   - No curriculum: current message ("No topics yet — add a subject to get started")
+   - All completed: "You've covered everything! 🎉" + "Add another subject" button + "Keep reviewing" link (routes to Learning Book's review-due filter)
+
+2. **Coaching card — new `curriculum_complete` type** (`services/coaching-cards.ts`): When all topics for the profile's active subjects have retention status `verified` or `stable`:
+   - Card type: `curriculum_complete`
+   - Title: "You've mastered your subjects!"
+   - Subtitle: "Ready for something new?"
+   - CTA: Routes to subject creation flow
+   - Priority: 5 (below review_due, above insight)
+
+3. **Home screen rendering** (`home.tsx`): Handle `curriculum_complete` card type — show celebration animation (reuse existing `CelebrationAnimation`) + "Add a new subject" CTA.
+
+**Persona adaptation:**
+- Learner (under 13): Expressive — "Amazing job! You've learned SO much! 🌟"
+- Teen (13+): Subtle — "All topics covered. Want to explore something new?"
+
+**FRs:** (UX improvement — retention, completion state)
+
+**Dependencies:** None. Coaching card service and Learning Book exist.
+
+---
+
+### Story 10.16: Offline Action Gating (NFR45/NFR47)
+
+**Priority:** Must-ship (NFR requirement — kids on tablets with spotty Wi-Fi)
+**Scope:** UNIVERSAL
+
+**What:**
+When the device is offline, disable server-dependent actions and show cached data where available, fulfilling NFR45 (read-only cached data offline) and NFR47 (disable server-dependent actions when disconnected).
+
+**Current state:** `useNetworkStatus` hook detects offline. `OfflineBanner` shows "No internet connection." But all buttons remain active — tapping "Start session" while offline produces a confusing error in the chat. TanStack Query has no `networkMode` set (defaults to `always`, fires requests that immediately fail).
+
+**Changes:**
+
+1. **TanStack Query `networkMode`** (`_layout.tsx`): Set `queries.networkMode: 'online'` in `defaultOptions` — queries pause instead of failing when offline. Mutations keep `networkMode: 'always'` (fail immediately with user-visible error, which is better than silent queue for learning sessions).
+
+2. **Disable session-start when offline** (`session/index.tsx`, `home.tsx`): Read `useNetworkStatus()`. When `isOffline`:
+   - "Start session" / "Continue" buttons: disabled + opacity 50%
+   - Show helper text below: "You'll need internet for learning sessions"
+   - Coaching card CTA: disabled
+
+3. **Disable send button when offline** (`session/index.tsx`): The message input send button should be disabled during offline. SSE streaming already has a 30s timeout, but preventing the attempt is better UX.
+
+4. **Consent flow offline guard** (`consent.tsx`): Disable "Submit" button when offline — consent request requires API call.
+
+5. **Cached coaching card** (stretch): TanStack Query already caches the last successful coaching card response for `staleTime: 5min`. Extend to show the cached card (read-only) when offline, with a subtle "(offline — last updated X min ago)" badge. No new API work needed.
+
+**What this does NOT do (by design per NFR46):** No offline writes, no offline sessions, no message queuing. Those are post-MVP.
+
+**FRs:** NFR45, NFR47
+
+**Dependencies:** `useNetworkStatus` hook exists. TanStack Query configured.
+
+---
+
+### Story 10.17: Parent Email Delivery Feedback
+
+**Priority:** Should-ship (onboarding funnel + GDPR regulatory risk)
+**Scope:** LEARNER consent flow + API
+
+**What:**
+Detect when the parent consent email fails to deliver and show actionable feedback instead of the current false-success screen.
+
+**Current state:** `services/notifications.ts` sends consent email via Resend API. If Resend returns an error (invalid address, bounce), it's silently logged. The mobile consent success screen always shows "Consent link sent to [email]" regardless of delivery outcome. A child who enters a typo'd or nonexistent email is stuck in `PARENTAL_CONSENT_REQUESTED` status indefinitely with no indication anything went wrong.
+
+**GDPR risk (applies globally under GDPR-everywhere strategy):** If a child enters a valid but wrong email (e.g., a stranger's address), that stranger receives a consent request containing the child's first name. Under GDPR Article 5(1)(f), this is an unauthorized disclosure of a minor's personal data. This risk exists in all target markets (US, UK, AU) since we apply GDPR standards universally.
+
+**Changes:**
+
+1. **API: Return delivery status from consent request** (`routes/consent.ts`, `services/consent.ts`):
+   - Call Resend API and check response for errors
+   - Return `{ status: 'sent' | 'failed', failureReason?: string }` in the response
+   - On failure: still create the consent record (parent can retry), but return `status: 'failed'`
+
+2. **Mobile: Handle delivery failure** (`consent.tsx`):
+   - On `status: 'failed'`: Show warning — "We couldn't deliver the email. Please double-check the address." with the email input pre-filled for correction
+   - On `status: 'sent'`: Current success screen (unchanged)
+
+3. **API: Resend webhook for bounce/complaint** (stretch):
+   - Register Resend webhook endpoint (`POST /v1/webhooks/resend`)
+   - On bounce: update `consentStates.deliveryStatus = 'bounced'`
+   - Mobile: when checking consent status (`GET /v1/consent/my-status`), if `deliveryStatus === 'bounced'`, show "The email couldn't be delivered — please update the address"
+
+**Privacy mitigation:** The consent email currently includes the child's display name. Consider showing only first initial + "your child" for the email subject to reduce PII exposure if sent to wrong address.
+
+**FRs:** (Onboarding funnel improvement, GDPR data minimization)
+
+**Dependencies:** Resend API integration exists. Consent flow exists.
+
+---
+
+### Story 10.18: App Store Rating Prompt After Successful Recall
+
+**Priority:** Should-ship (App Store ranking — zero implementation exists)
+**Scope:** UNIVERSAL
+
+**What:**
+Prompt for App Store rating at the psychologically optimal moment — immediately after a successful recall test when the child feels accomplished.
+
+**Current state:** No `expo-store-review` dependency, no rating prompt logic anywhere in the codebase.
+
+**Changes:**
+
+1. **Install `expo-store-review`** (`apps/mobile/package.json`).
+
+2. **Rating trigger logic** (`hooks/use-rating-prompt.ts`):
+   - Track successful recall count in SecureStore (`rating-recall-success-count:{profileId}`)
+   - Trigger conditions (ALL must be true):
+     - At least 5 successful recall tests completed (child has genuine experience)
+     - At least 7 days since profile creation (not a brand-new user)
+     - Not prompted in the last 90 days (Apple limits to 3/year anyway)
+     - Session just ended with a successful recall (quality ≥ 3 in SM-2 terms)
+   - On trigger: call `StoreReview.requestReview()` — Apple decides whether to actually show the dialog
+
+3. **Integration point** (`session-summary/[sessionId].tsx`):
+   - After the session summary "Done" button is tapped (not during the summary — let the child finish their reflection)
+   - Check `useRatingPrompt()` hook — if conditions met, call `requestReview()` before navigating home
+   - No custom UI — Apple's native dialog handles everything
+
+4. **Parent profiles excluded** — only prompt on learner/teen personas (parents don't have learning sessions).
+
+**Why after recall specifically:** The child just proved they remember something. They feel competent. The app just delivered its core value proposition. This is the peak of positive sentiment — any other moment (onboarding, mid-session, after a failed test) is worse.
+
+**FRs:** (App Store optimization)
+
+**Dependencies:** Session summary screen exists. SM-2 quality scores available from session-completed chain.
+
+---
+
+### Story 10.19: Consent Unification — GDPR-Everywhere
+
+_Priority: Must-ship (launch blocker — prerequisite for 10.2, 10.10, 10.14 privacy policy update). Scope: UNIVERSAL._
+
+As a user in any country,
+I want a single, consistent consent experience based on my age,
+So that the app doesn't ask me to pick my region or show different rules depending on where I live.
+
+**Background:** The app was originally designed for a DACH-first launch with separate GDPR (EU, under 16) and COPPA (US, under 13) consent paths. The market strategy has pivoted to English-only (US/UK/AU) with GDPR's under-16 threshold applied globally. This means:
+- The location picker during profile creation is unnecessary — birth date alone determines consent
+- The `consentType` enum (`GDPR | COPPA`) no longer needs branching — all consent is `GDPR`-type
+- Consent copy referencing "in Europe" or "in the US" should be jurisdiction-neutral
+- The privacy policy should explain a single, universal consent rule
+
+**Current state (what needs changing):**
+- `create-profile.tsx`: Location picker (EU/US/Other) with `LOCATION_OPTIONS` array
+- `use-consent.ts`: `checkConsentRequirement()` takes `location` param, branches on EU vs US
+- `services/consent.ts`: `checkConsentRequired()` takes `location: 'EU' | 'US' | 'OTHER'`, branches on EU (<16) vs US (<13)
+- `middleware/consent.ts`: calls `checkConsentRequired()` with profile's stored location
+- `packages/schemas/src/consent.ts`: `consentTypeSchema = z.enum(['GDPR', 'COPPA'])`
+- `packages/database/src/schema/profiles.ts`: `locationTypeEnum`, `consentTypeEnum` with both values, `profiles.location` column
+- `consent-copy.ts`: separate `gdprRegulation` and `coppaRegulation` fields on `ConsentRequestCopy`
+- `consent.tsx`: reads `consentType` param, selects GDPR vs COPPA copy
+- `privacy.tsx`: Section 4 says "For users under 16 (EU/GDPR) or under 13 (US/COPPA)"
+- `consent-web.ts`: parent-facing HTML (already uses generic "applicable privacy regulations" — minimal change)
+- `consent-copy.test.ts`: tests GDPR vs COPPA copy selection
+- `use-consent.test.ts`: tests EU/US location-based consent requirement
+
+**Age groups (unchanged — UX differentiation stays):**
+
+| Age | Consent Required | Persona UX | Parent Transcript | Sentry (see 10.14) |
+|-----|-----------------|------------|-------------------|---------------------|
+| Under 11 | Blocked at registration | N/A | N/A | N/A |
+| 11-12 | Yes (under 16) | Learner — child-friendly copy | Full transcripts | Off until consent |
+| 13-15 | Yes (under 16) | Teen — matter-of-fact copy | Summaries only | Enabled with consent |
+| 16-17 | No | Teen/Learner — standard | No parent dashboard | Always enabled |
+| 18+ | No | Learner — academic | N/A | Always enabled |
+
+**Acceptance Criteria:**
+
+**Given** a user creates a new profile
+**When** they enter their birth date
+**Then** no location picker is shown (removed)
+**And** consent is determined by age alone: age < 16 → consent required; age ≥ 16 → no consent
+**And** the API receives no `location` field (or ignores it if sent by older clients)
+
+**Given** consent is required (user under 16)
+**When** the consent flow triggers
+**Then** the `consentType` is always `'GDPR'` (regardless of user's actual location)
+**And** copy is jurisdiction-neutral: "Users under 16 require parental consent before using this service."
+**And** the learner-persona version is: "Because you're under 16, we need your parent or guardian to say it's OK for you to use this app. It's a rule to keep you safe online!"
+
+**Given** consent is denied by parent
+**When** the denial message renders
+**Then** it says "register again when you're 16" (not jurisdiction-dependent)
+
+**Given** a user views the privacy policy
+**When** Section 4 renders
+**Then** it says: "For users under 16, we require verifiable parental consent before processing personal data." (no EU/US split)
+
+**Changes (by layer):**
+
+1. **Mobile — `create-profile.tsx`:** Remove `LOCATION_OPTIONS`, `locationTypeEnum` picker, and `location` state. Remove `location` from the API request body. Profile creation sends only `birthDate`, `displayName`, `personaType`.
+
+2. **Mobile — `use-consent.ts`:** Simplify `checkConsentRequirement(birthDate, location)` → `checkConsentRequirement(birthDate)`. Logic: `age < 16 → { required: true, consentType: 'GDPR' }`. Remove location parameter.
+
+3. **Mobile — `consent-copy.ts`:** Replace `gdprRegulation` / `coppaRegulation` fields with a single `regulation` field on `ConsentRequestCopy`. Update both default and learner variants. Update `ConsentHandOffCopy` if it references consent type.
+
+4. **Mobile — `consent.tsx`:** Remove `consentType` from route params (or ignore it). Always use `'GDPR'`. Select copy using the single `regulation` field.
+
+5. **Mobile — `privacy.tsx`:** Update Section 4 to jurisdiction-neutral text.
+
+6. **API — `services/consent.ts`:** Simplify `checkConsentRequired(birthDate, location)` → `checkConsentRequired(birthDate)`. Always return `consentType: 'GDPR'` when `age < 16`. The function still checks `MINIMUM_AGE` (11) for blocking.
+
+7. **API — `middleware/consent.ts`:** Update `checkConsentRequired()` call to drop location param. Read age from profile's `birthDate`.
+
+8. **API — `services/profile.ts`:** Make `location` optional in profile creation. If sent (backward compat), ignore for consent logic.
+
+9. **Schemas — `packages/schemas/src/consent.ts`:** Keep `consentTypeSchema` as `z.enum(['GDPR', 'COPPA'])` for backward compatibility with existing DB records. No schema migration needed — new records always use `'GDPR'`.
+
+10. **Database — `packages/database/src/schema/profiles.ts`:** Keep `locationTypeEnum` and `profiles.location` column (nullable, already optional). No DB migration needed. Column becomes vestigial — not written by new code, existing data preserved.
+
+11. **Tests:** Update `use-consent.test.ts` (remove location-based tests, add age-only tests), `consent-copy.test.ts` (single regulation field), `consent.test.tsx` (no consentType param), `services/consent.test.ts` (age-only logic), `middleware/consent.ts` tests, `services/profile.test.ts` (location optional).
+
+**What does NOT change:**
+- Consent state machine (PENDING → CONSENTED → WITHDRAWN) — untouched
+- Consent email mechanics (Resend, tokens, expiry) — untouched
+- Inngest consent reminder/auto-delete jobs — untouched
+- Parent consent web page (`consent-web.ts`) — already uses generic "applicable privacy regulations"
+- `consentStates` DB table structure — no migration needed
+- Age-group UX differentiation (persona-aware copy, transcript access, Sentry gating) — those remain driven by birth date, not consent type
+
+**FRs:** FR7, FR8 (unifies consent flow across jurisdictions)
+
+**Dependencies:** None. This is a prerequisite for Stories 10.2, 10.10, and 10.14 (privacy policy update). Should be implemented first.
+
+---
+
 ### Epic 10 Execution Order
 
 ```
-10.3 (profile removal alert — 1 string change, <5 min)
-  → 10.5 (curriculum labels — string map + button text, ~30 min)
-  → 10.1 (topic skip confirmation + undo — new endpoint + UI, ~2 hours)
+PHASE 1 — Consent unification (must land first — Stories 10.2, 10.10, 10.14 depend on it):
+10.19 (consent unification — GDPR-everywhere: remove location picker, simplify age-only logic,
+       unify copy, update privacy policy, ~4-5 hours) — FIRST, unblocks consent-related stories
 
-10.2 (consent copy — persona-keyed strings, ~1 hour) — parallel with above
-10.6 (relearn descriptions — persona-keyed, ~30 min) — parallel with above
-10.4 (error formatter + replacements, ~2 hours) — parallel with above
-10.7 (Living Book animation — new component + interview integration, ~3-4 hours) — parallel with above, Phase 1 only
+PHASE 2 — Parallel work (all independent, run concurrently):
 
-Parent-perspective audit additions (must-ship before launch):
-10.11 (consent deny confirmation — JS confirm() on web page, ~15 min) — parallel, API-only
-10.13 (Guided label tooltip — info icon in parent transcript, ~30 min) — parallel, parent mobile only
-10.10 (hand-to-parent consent interstitial — consent.tsx refactor, ~2 hours) — parallel, learner mobile only
-10.12 (subject raw input audit trail — schema + API + parent UI, ~3 hours) — last, cross-cutting
+  String/copy changes:
+  10.3 (profile removal alert — 1 string change, <5 min)
+    → 10.5 (curriculum labels — string map + button text, ~30 min)
+    → 10.1 (topic skip confirmation + undo — new endpoint + UI, ~2 hours)
 
-Fast-follow (post-launch):
+  10.2 (consent copy — persona-keyed strings using unified regulation field, ~1 hour) — after 10.19
+  10.6 (relearn descriptions — persona-keyed, ~30 min) — parallel
+  10.4 (error formatter + replacements, ~2 hours) — parallel
+  10.7 (Living Book animation — new component + interview integration, ~3-4 hours) — parallel, Phase 1 only
+
+  Parent-perspective audit additions (must-ship before launch):
+  10.11 (consent deny confirmation — JS confirm() on web page, ~15 min) — parallel, API-only
+  10.13 (Guided label tooltip — info icon in parent transcript, ~30 min) — parallel, parent mobile only
+  10.10 (hand-to-parent consent interstitial — consent.tsx refactor, ~2 hours) — after 10.19
+  10.12 (subject raw input audit trail — schema + API + parent UI, ~3 hours) — cross-cutting
+
+  Pre-launch compliance & resilience:
+  10.14 (App Store compliance audit + age-gated Sentry — docs + runtime, ~3-4 hours) — after 10.19 (for privacy policy)
+  10.16 (offline action gating — TanStack networkMode + button disabling, ~2-3 hours) — parallel
+  10.17 (parent email delivery feedback — API response + mobile warning, ~2-3 hours) — parallel
+
+  Should-ship (retention & App Store ranking):
+  10.15 (curriculum completion celebration — coaching card + empty state + animation, ~3-4 hours) — parallel
+  10.18 (App Store rating prompt after successful recall — expo-store-review + hook, ~2 hours) — parallel
+
+PHASE 3 — Fast-follow (post-launch):
 10.8 Phase 0 (summary skip-rate instrumentation, ~15 min) — ship with Epic 10
 10.8 Phase 1 (structured prompts — only if skip rate > 70%, ~2-3 hours) — post-launch, data-driven
 10.9 (recall remediation copy softening, ~1 hour) — post-launch, not day-one critical
 ```
 
-All thirteen stories are independent (touch different files). Stories 10.3, 10.5, and 10.6 are pure string changes. Story 10.1 adds a new API endpoint. Story 10.4 adds a shared utility. Story 10.2 adds persona-conditional copy. Story 10.7 adds a new animation component. Story 10.8 Phase 0 adds two analytics calls. Story 10.9 is persona-conditional string + minor layout changes. Story 10.10 refactors the consent screen into two phases (child/parent). Story 10.11 adds a JS `confirm()` to the consent-web deny link. Story 10.12 adds a DB column + API field + parent UI subtitle. Story 10.13 adds an info tooltip to the parent transcript. No story blocks another.
+Story 10.19 is the only sequencing dependency — it changes the consent data model and copy structure that Stories 10.2, 10.10, and 10.14 build upon. All other stories remain fully independent. Stories 10.3, 10.5, and 10.6 are pure string changes. Story 10.1 adds a new API endpoint. Story 10.4 adds a shared utility. Story 10.2 updates persona-conditional consent copy (post-10.19). Story 10.7 adds a new animation component. Story 10.8 Phase 0 adds two analytics calls. Story 10.9 is persona-conditional string + minor layout changes. Story 10.10 refactors the consent screen into two phases (post-10.19). Story 10.11 adds a JS `confirm()` to the consent-web deny link. Story 10.12 adds a DB column + API field + parent UI subtitle. Story 10.13 adds an info tooltip to the parent transcript. Story 10.14 adds age-gated Sentry + docs + config. Story 10.15 adds a coaching card type + empty state fix + celebration. Story 10.16 adds offline action gating via TanStack Query networkMode + button disabling. Story 10.17 adds email delivery status feedback to consent flow. Story 10.18 adds expo-store-review with recall-triggered rating prompt. Story 10.19 unifies consent to age-only GDPR-everywhere.
 
 ### Epic 10 Scope Boundaries
 
-**In scope:** Copy changes, confirmation dialogs (topic skip + consent deny), one new API endpoint (unskip), one shared error formatter, one animation component (Living Book), summary skip-rate instrumentation, recall remediation copy softening, consent screen hand-to-parent interstitial, subject raw input audit trail (schema + API + parent dashboard), Guided label explanation tooltip.
-**Out of scope:** Items 6 (analogy examples — requires LLM prompt changes), 11 (retention tooltips — needs first-time-user detection), 12 ("Done" button timing — requires exchange counting logic), 13 (OCR fallback — "retake photo" as primary is already addressed by copy tweak in 10.4), 14 (onboarding playfulness — partially addressed by Living Book Phase 1 animations), profile switch PIN/biometric (deferred to Phase 2), parental controls/session limits (OS-level screen time exists, roadmap item).
+**In scope:** Consent unification (GDPR-everywhere, location picker removal, age-only consent logic), copy changes, confirmation dialogs (topic skip + consent deny), one new API endpoint (unskip), one shared error formatter, one animation component (Living Book), summary skip-rate instrumentation, recall remediation copy softening, consent screen hand-to-parent interstitial, subject raw input audit trail (schema + API + parent dashboard), Guided label explanation tooltip, App Store compliance audit & category decision + age-gated Sentry, curriculum completion celebration & next-steps coaching card, offline action gating (NFR45/47), parent email delivery feedback, App Store rating prompt.
+**Out of scope:** Items 6 (analogy examples — requires LLM prompt changes), 11 (retention tooltips — needs first-time-user detection), 12 ("Done" button timing — requires exchange counting logic), 13 (OCR fallback — "retake photo" as primary is already addressed by copy tweak in 10.4), 14 (onboarding playfulness — partially addressed by Living Book Phase 1 animations), profile switch PIN/biometric (deferred to Phase 2), parental controls/session limits (OS-level screen time exists, roadmap item), full German localization (deferred — English-only launch, NFR36 deferred to post-MVP), DB migration to remove `location` column or rename `consentTypeEnum` (vestigial, no harm).
 
 ### Why This Epic Exists
 
-User testing identified 15 UX gaps across the app. The first nine (10.1–10.9) were identified by a child-focused UX audit. A subsequent parent-perspective audit identified four additional gaps (10.10–10.13) that represent actual launch blockers: the consent flow is the single biggest onboarding funnel leak (10.10), accidental consent denial causes irreversible data loss (10.11), parents can't see why their child is studying a subject (10.12), and "Guided" labels in transcripts erode parent trust without context (10.13). The must-ship items (10.1–10.7, 10.10–10.13) fix issues that risk user abandonment, data loss, or trust erosion. The fast-follow items (10.8–10.9) address second-session experiences. Story 10.8 is deliberately data-gated. The cost of not shipping the must-ship items is disproportionately high; the fast-follows are scheduled by measured impact, not guesswork.
+User testing identified 15 UX gaps across the app. The first nine (10.1–10.9) were identified by a child-focused UX audit. A subsequent parent-perspective audit identified four additional gaps (10.10–10.13) that represent actual launch blockers: the consent flow is the single biggest onboarding funnel leak (10.10), accidental consent denial causes irreversible data loss (10.11), parents can't see why their child is studying a subject (10.12), and "Guided" labels in transcripts erode parent trust without context (10.13). An external strategic review then identified five more gaps (10.14–10.18) spanning App Store compliance, curriculum completion dead-ends, offline resilience, parent email delivery validation, and App Store rating optimization. A market strategy pivot (2026-03-23) to English-only launch (US/UK/AU) with GDPR-everywhere consent added Story 10.19 (consent unification) as a prerequisite for consent-related stories. The must-ship items (10.1–10.7, 10.10–10.14, 10.16, 10.19) fix issues that risk user abandonment, data loss, regulatory rejection, or trust erosion. The should-ship items (10.15, 10.17, 10.18) address retention cliffs and onboarding funnel leaks. The fast-follow items (10.8–10.9) address second-session experiences. Story 10.8 is deliberately data-gated. German localization (NFR36) deferred — English-only launch means it's no longer a v1 requirement. The cost of not shipping the must-ship items is disproportionately high; the rest are scheduled by measured impact, not guesswork.
