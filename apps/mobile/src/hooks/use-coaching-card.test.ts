@@ -177,7 +177,7 @@ describe('useCoachingCard', () => {
     expect(result.current.subtext).toContain('Your mate is ready');
   });
 
-  it('includes subjectId in freeform routes when defaultSubjectId is provided', async () => {
+  it('shows curriculum_complete card when defaultSubjectId provided but no suggestion', async () => {
     mockFetch.mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
       if (url.includes('/progress/continue')) {
@@ -213,10 +213,11 @@ describe('useCoachingCard', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    // Freeform routes must include subjectId so the API can create a session
-    expect(result.current.primaryRoute).toContain('subjectId=subject-abc');
-    expect(result.current.secondaryRoute).toContain('subjectId=subject-abc');
-    expect(result.current.primaryRoute).toContain('mode=freeform');
+    // Story 10.15: curriculum complete card when subjects exist but no next topic
+    expect(result.current.isCurriculumComplete).toBe(true);
+    expect(result.current.headline).toContain('mastered');
+    expect(result.current.primaryRoute).toBe('/create-subject');
+    expect(result.current.secondaryRoute).toBe('/(learner)/book');
   });
 
   it('omits subjectId from freeform routes when no defaultSubjectId', async () => {

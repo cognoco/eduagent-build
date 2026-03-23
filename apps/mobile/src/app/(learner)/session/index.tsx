@@ -16,6 +16,7 @@ import {
   useCloseSession,
 } from '../../../hooks/use-sessions';
 import { useStreaks } from '../../../hooks/use-streaks';
+import { useNetworkStatus } from '../../../hooks/use-network-status';
 import { formatApiError } from '../../../lib/format-api-error';
 
 export default function SessionScreen() {
@@ -45,6 +46,8 @@ export default function SessionScreen() {
     sessionExperience,
     problemText
   );
+
+  const { isOffline } = useNetworkStatus();
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'opening', role: 'ai', content: openingContent },
@@ -251,6 +254,7 @@ export default function SessionScreen() {
       messages={messages}
       onSend={handleSend}
       isStreaming={isStreaming}
+      inputDisabled={isOffline}
       rightAction={headerRight}
       footer={
         modeConfig.showQuestionCount ? (

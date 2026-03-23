@@ -1,12 +1,14 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ChatShell,
   animateResponse,
+  LivingBook,
   type ChatMessage,
 } from '../../../components/session';
 import { useSendInterviewMessage } from '../../../hooks/use-interview';
+import { useTheme } from '../../../lib/theme';
 import { formatApiError } from '../../../lib/format-api-error';
 
 const OPENING_MESSAGE =
@@ -19,12 +21,19 @@ export default function InterviewScreen() {
   }>();
   const router = useRouter();
   const sendInterview = useSendInterviewMessage(subjectId ?? '');
+  const { persona } = useTheme();
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'opening', role: 'ai', content: OPENING_MESSAGE },
   ]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [interviewComplete, setInterviewComplete] = useState(false);
+
+  // Count user messages for the Living Book page counter
+  const exchangeCount = useMemo(
+    () => messages.filter((m) => m.role === 'user').length,
+    [messages]
+  );
 
   const animationCleanupRef = useRef<(() => void) | null>(null);
 
@@ -73,11 +82,20 @@ export default function InterviewScreen() {
       onSend={handleSend}
       isStreaming={isStreaming}
       inputDisabled={interviewComplete}
+      rightAction={
+        persona !== 'parent' ? (
+          <LivingBook
+            exchangeCount={exchangeCount}
+            isComplete={interviewComplete}
+            persona={persona}
+          />
+        ) : undefined
+      }
       footer={
         interviewComplete ? (
           <View className="bg-coaching-card rounded-card p-4 mt-2 mb-4">
             <Text className="text-body font-semibold text-text-primary mb-2">
-              Interview complete!
+              Your book is ready!
             </Text>
             <Text className="text-body-sm text-text-secondary mb-3">
               Your personalized curriculum is ready.

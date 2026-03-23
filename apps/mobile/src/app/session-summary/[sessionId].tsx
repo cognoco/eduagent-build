@@ -11,8 +11,9 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useThemeColors } from '../../lib/theme';
+import { useTheme, useThemeColors } from '../../lib/theme';
 import { useSubmitSummary } from '../../hooks/use-sessions';
+import { Sentry } from '../../lib/sentry';
 import {
   CheckmarkPopAnimation,
   CelebrationAnimation,
@@ -35,6 +36,7 @@ export default function SessionSummaryScreen() {
   const [submitted, setSubmitted] = useState(false);
 
   const submitSummary = useSubmitSummary(sessionId ?? '');
+  const { persona } = useTheme();
 
   const exchanges = parseInt(exchangeCount ?? '0', 10);
   const rung = parseInt(escalationRung ?? '1', 10);
@@ -58,12 +60,34 @@ export default function SessionSummaryScreen() {
       });
       setAiFeedback(result.summary.aiFeedback);
       setSubmitted(true);
+
+      // Story 10.8 Phase 0: summary_submitted event
+      Sentry.addBreadcrumb({
+        category: 'summary',
+        message: 'summary_submitted',
+        data: {
+          sessionId,
+          persona,
+          exchangeCount: exchanges,
+          charCount: summaryText.trim().length,
+        },
+        level: 'info',
+      });
     } catch {
       // Error state handled by mutation
     }
   };
 
   const handleContinue = (): void => {
+    // Story 10.8 Phase 0: summary_skipped event (only when not yet submitted)
+    if (!submitted) {
+      Sentry.addBreadcrumb({
+        category: 'summary',
+        message: 'summary_skipped',
+        data: { sessionId, persona, exchangeCount: exchanges },
+        level: 'info',
+      });
+    }
     router.replace('/(learner)/home');
   };
 

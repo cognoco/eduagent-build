@@ -35,8 +35,9 @@ const COLD_START_SESSION_THRESHOLD = 5;
  * card using this priority order:
  *   1. review_due  (priority 7-10, scales with overdue count)
  *   2. streak      (priority 6, learner on grace period)
- *   3. insight     (priority 4, verified topics exist)
- *   4. challenge   (priority 3, fallback)
+ *   3. curriculum_complete (priority 5, all topics verified/stable)
+ *   4. insight     (priority 4, verified topics exist)
+ *   5. challenge   (priority 3, fallback)
  */
 export async function precomputeCoachingCard(
   db: Database,
@@ -118,7 +119,29 @@ export async function precomputeCoachingCard(
     }
   }
 
-  // --- Priority 3: insight (verified topics) ---
+  // --- Priority 3: curriculum_complete (all topics verified/stable) ---
+  // If there are multiple retention cards and ALL of them are verified or stable,
+  // the learner has completed their curriculum. Require >= 3 to distinguish from
+  // "just started and verified one topic" vs "completed entire curriculum."
+  if (allCards.length >= 3) {
+    const allComplete = allCards.every(
+      (c) => c.xpStatus === 'verified' || c.xpStatus === 'stable'
+    );
+    if (allComplete) {
+      return {
+        id,
+        profileId,
+        type: 'curriculum_complete' as const,
+        title: "You've mastered your subjects!",
+        body: 'Ready for something new?',
+        priority: 5,
+        expiresAt,
+        createdAt,
+      };
+    }
+  }
+
+  // --- Priority 4: insight (verified topics) ---
   const verifiedCards = allCards.filter((c) => c.xpStatus === 'verified');
   if (verifiedCards.length > 0) {
     const firstVerified = verifiedCards[0];

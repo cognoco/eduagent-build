@@ -110,6 +110,7 @@ export const coachingCardTypeSchema = z.enum([
   'insight',
   'review_due',
   'challenge',
+  'curriculum_complete',
 ]);
 export type CoachingCardType = z.infer<typeof coachingCardTypeSchema>;
 
@@ -158,10 +159,19 @@ export const challengeCardSchema = z.object({
 });
 export type ChallengeCard = z.infer<typeof challengeCardSchema>;
 
+export const curriculumCompleteCardSchema = z.object({
+  ...baseCoachingCardFields,
+  type: z.literal('curriculum_complete'),
+});
+export type CurriculumCompleteCard = z.infer<
+  typeof curriculumCompleteCardSchema
+>;
+
 export const coachingCardSchema = z.discriminatedUnion('type', [
   streakCardSchema,
   insightCardSchema,
   reviewDueCardSchema,
   challengeCardSchema,
+  curriculumCompleteCardSchema,
 ]);
 export type CoachingCard = z.infer<typeof coachingCardSchema>;
