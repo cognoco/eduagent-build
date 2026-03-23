@@ -4,7 +4,7 @@ import {
   Text,
   Pressable,
   ScrollView,
-  TextInput,
+  // TextInput — commented out with BYOK waitlist section
   Alert,
   ActivityIndicator,
   Linking,
@@ -572,19 +572,19 @@ export default function SubscriptionScreen() {
   }, [offerings, usage, queryClient, activeProfile?.id]);
 
   // ---------------------------------------------------------------------------
-  // BYOK waitlist handler (kept from existing Stripe logic)
+  // BYOK waitlist handler — commented out with BYOK waitlist section
   // ---------------------------------------------------------------------------
 
-  const handleByokSubmit = useCallback(async () => {
-    if (!byokEmail.trim()) return;
-    try {
-      await byokWaitlist.mutateAsync({ email: byokEmail.trim() });
-      Alert.alert('Waitlist', 'You have been added to the BYOK waitlist.');
-      setByokEmail('');
-    } catch {
-      Alert.alert('Error', 'Could not join waitlist. Try again.');
-    }
-  }, [byokWaitlist, byokEmail]);
+  // const handleByokSubmit = useCallback(async () => {
+  //   if (!byokEmail.trim()) return;
+  //   try {
+  //     await byokWaitlist.mutateAsync({ email: byokEmail.trim() });
+  //     Alert.alert('Waitlist', 'You have been added to the BYOK waitlist.');
+  //     setByokEmail('');
+  //   } catch {
+  //     Alert.alert('Error', 'Could not join waitlist. Try again.');
+  //   }
+  // }, [byokWaitlist, byokEmail]);
 
   // ---------------------------------------------------------------------------
   // Child profile gate — child sees the child-friendly paywall

@@ -1,5 +1,4 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
-import React from 'react';
 import { Alert } from 'react-native';
 
 const mockBack = jest.fn();
