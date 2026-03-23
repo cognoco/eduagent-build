@@ -29,7 +29,7 @@ import { UsageMeter } from '../../components/common';
 import {
   useSubscription,
   useUsage,
-  useJoinByokWaitlist,
+  // useJoinByokWaitlist, — commented out with BYOK waitlist section
   type SubscriptionTier,
 } from '../../hooks/use-subscription';
 import {
@@ -406,7 +406,8 @@ export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
-  const [byokEmail, setByokEmail] = useState('');
+  // BYOK waitlist state — commented out with BYOK waitlist section
+  // const [byokEmail, setByokEmail] = useState('');
   const { activeProfile } = useProfile();
 
   const queryClient = useQueryClient();
@@ -414,7 +415,7 @@ export default function SubscriptionScreen() {
   // API hooks for usage display and subscription state
   const { data: subscription, isLoading: subLoading } = useSubscription();
   const { data: usage, isLoading: usageLoading } = useUsage();
-  const byokWaitlist = useJoinByokWaitlist();
+  // const byokWaitlist = useJoinByokWaitlist();
 
   // Top-up IAP state
   const [topUpPurchasing, setTopUpPurchasing] = useState(false);

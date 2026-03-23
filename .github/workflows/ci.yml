@@ -65,6 +65,15 @@ jobs:
       - name: Apply database schema
         run: pnpm --filter @eduagent/database db:push
 
+      # Clean stale build artifacts — composite mode (tsconfig.base.json) uses dist/*.d.ts
+      # to verify source-output consistency. Nx remote cache can restore stale dist/ and
+      # .tsbuildinfo from a previous build, causing TS6305 false positives when source files
+      # change. Removing these forces tsc --build to regenerate declarations from scratch.
+      - name: Clean stale TypeScript build artifacts
+        run: |
+          find . -name '*.tsbuildinfo' -not -path '*/node_modules/*' -delete
+          rm -rf apps/mobile/dist apps/api/dist
+
       # Prepend any command with "nx-cloud record --" to record its logs to Nx Cloud
       # - run: pnpm exec nx-cloud record -- echo Hello World
       # When you enable task distribution, run the e2e-ci task instead of e2e
