@@ -119,14 +119,12 @@ export async function precomputeCoachingCard(
     }
   }
 
-  // --- Priority 3: curriculum_complete (all topics verified/stable) ---
-  // If there are multiple retention cards and ALL of them are verified or stable,
+  // --- Priority 3: curriculum_complete (all topics verified) ---
+  // If there are multiple retention cards and ALL of them are verified,
   // the learner has completed their curriculum. Require >= 3 to distinguish from
   // "just started and verified one topic" vs "completed entire curriculum."
   if (allCards.length >= 3) {
-    const allComplete = allCards.every(
-      (c) => c.xpStatus === 'verified' || c.xpStatus === 'stable'
-    );
+    const allComplete = allCards.every((c) => c.xpStatus === 'verified');
     if (allComplete) {
       return {
         id,
