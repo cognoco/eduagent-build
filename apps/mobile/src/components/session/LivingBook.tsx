@@ -21,9 +21,6 @@ interface LivingBookProps {
   persona: Persona;
 }
 
-/** Max visual thickness — counter keeps incrementing beyond this. */
-const MAX_VISUAL_PAGES = 8;
-
 /**
  * A small book icon in the chat header that visually fills up as the user
  * contributes answers. Plays a micro-animation on each new exchange and a
@@ -45,7 +42,6 @@ export function LivingBook({
   const sparkleOpacity = useSharedValue(0);
   const completionGlow = useSharedValue(0);
 
-  const visualPages = Math.min(exchangeCount, MAX_VISUAL_PAGES);
   const isExpressive = persona === 'learner';
 
   // Page-flip animation on each new exchange
