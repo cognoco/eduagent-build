@@ -224,21 +224,24 @@ Tapping "Parent (Light)" theme button changes persona to `parent`, triggering th
 
 ---
 
-## BUG-18: Persona Switch — `switch-to-teen` Button Below Fold (2026-03-10, updated 2026-03-12)
+## BUG-18: Persona Switch — Navigation Race Condition (2026-03-10, updated 2026-03-24)
 
-**Status:** FIXED (2026-03-12, Session 17) — `scrollUntilVisible` added before `switch-to-teen` tap.
-**Severity:** Medium — E2E test failure, not a crash. No real user impact.
-**Affects:** `settings-toggles.yaml` (Parent theme section)
+**Status:** FIXED (2026-03-24) — coordinated `router.replace` + deferred `setPersona` in both More screens.
+**Severity:** Medium — ~50% crash on persona switch between learner↔parent.
+**Affects:** `settings-toggles.yaml` (Parent theme section), any persona switch via More screen.
 
-Originally reported as a ~50% crash on persona switch. Crash was fixed in Session 11 (`router.replace` before deferred `setPersona`). Residual failure in Session 14 was actually a **scroll issue**: the `switch-to-teen` dev button on the parent dashboard was below the visible fold. Maestro's `tapOn` couldn't find it without scrolling first.
+Originally reported as a ~50% crash on persona switch. The `switch-to-teen` button on `(parent)/dashboard.tsx` was fixed in Session 11 with `router.replace` before deferred `setPersona`. Residual scroll issue fixed in Session 17 with `scrollUntilVisible`.
 
-**Root cause (original crash):** `setPersona('teen')` in `(parent)/dashboard.tsx:170` triggered a re-render cascade through Expo Router's layout guards. Fixed by coordinating `router.replace` with `setPersona`.
+**Root cause (persistent):** Both `(learner)/more.tsx` and `(parent)/more.tsx` called `setPersona(p)` directly. This triggered the layout guard's declarative `<Redirect>`, creating a navigation race condition — the target layout could render before persona context propagated, causing a redirect bounce-back.
 
-**Root cause (Session 14 residual failure):** The `switch-to-teen` button is rendered near the bottom of the parent dashboard `ScrollView`. On the 1080x1920 emulator, it's below the fold. Maestro's `tapOn` only searches the visible viewport.
+**Fix (2026-03-24):** Applied the same coordinated pattern from `switch-to-teen` to both More screens:
+- `(learner)/more.tsx`: when switching to parent, calls `router.replace('/(parent)/dashboard')` first, then `InteractionManager.runAfterInteractions(() => setPersona('parent'))`
+- `(parent)/more.tsx`: when switching to teen/learner, calls `router.replace('/(learner)/home')` first, then deferred `setPersona`
+- Non-cross-group switches (e.g., teen↔learner) still use `setPersona(p)` directly since they stay in the same layout group.
 
-**Fix:** Added `scrollUntilVisible` before the `tapOn: id: "switch-to-teen"` step in `settings-toggles.yaml`.
-
-**Files:** `apps/mobile/e2e/flows/account/settings-toggles.yaml` (step 21).
+**Files changed:**
+- `apps/mobile/src/app/(learner)/more.tsx` — coordinated persona switch handler
+- `apps/mobile/src/app/(parent)/more.tsx` — coordinated persona switch handler
 
 ---
 
@@ -702,7 +705,7 @@ Additionally, `parent-solo` and `parent-with-children` scenarios create a PARENT
 
 **Fix applied (Option 1):** Subject added to `onboarding-complete`, `trial-active`, `trial-expired` seeds. `topicId` now exposed in return `ids` for all three.
 
-**Semantic drift note:** `onboarding-complete` no longer represents "just finished onboarding, no subjects." To test the empty-state `/create-subject` redirect, a new `onboarding-no-subject` scenario would be needed (Option 2). This is tracked but deferred — no current flow tests the empty-state path.
+**Semantic drift note:** `onboarding-complete` no longer represents "just finished onboarding, no subjects." The `onboarding-no-subject` scenario was created for the empty-state test (`empty-first-user.yaml`). As of 2026-03-24, all batch runner scripts (`rerun-failed.sh`, `run-all-untested.sh`, `run-all-regression.sh`, `regression-batch*.sh`) now correctly pass `onboarding-no-subject` for this flow.
 
 **For parent scenarios (Option 4):** Already handled — `seed-and-sign-in.yaml` accepts `dashboard-scroll` as an alternative landing screen.
 
@@ -1037,26 +1040,24 @@ Additionally, the PostApprovalLanding ("You're approved!") intercepts after `pm 
 
 ---
 
-## BUG-52: child-paywall Flow Signs In as Parent, Not Child (2026-03-12)
+## BUG-52: child-paywall Flow Signs In as Parent, Not Child (2026-03-12, updated 2026-03-24)
 
-**Status:** FIXED (2026-03-12) — new `switch-to-child.yaml` setup flow
-**Severity:** HIGH — flow fails at step 2 (never reaches ChildPaywall)
+**Status:** FIXED (2026-03-24) — switched to `sign-in-only.yaml` to avoid post-auth recovery interference.
+**Severity:** HIGH — flow fails before reaching ChildPaywall
 **Affects:** `billing/child-paywall.yaml`
 
-The `trial-expired-child` seed creates a parent-owned account with a parent profile (owner) and child profile (non-owner). Sign-in authenticates as the parent, landing on the parent dashboard (`dashboard-scroll`). The flow then waits for `home-scroll-view` (step 2), which never appears → timeout failure.
+The `trial-expired-child` seed creates a parent-owned account with a parent profile (owner) and child profile (non-owner). Sign-in authenticates as the parent, landing on the parent dashboard (`dashboard-scroll`).
 
-Even if step 2 were fixed, the ChildPaywall would not render because the active profile is the parent (owner). The ChildPaywall component gates on `!activeProfile.isOwner && subscription.status === 'expired'` — it requires the non-owner child profile to be active.
+**Root cause (persistent):** `seed-and-sign-in.yaml` has 40s+ of optional waits and post-auth recovery logic (home-scroll-view 30s, return-to-home-safe, etc.) that are wasted for parent-landing scenarios. This caused intermittent flow timeouts and interfered with the subsequent `switch-to-child.yaml` step.
 
-**Same class of issue as BUG-50** (consent-withdrawn multi-profile seed). BUG-50 was solved by creating a solo seed variant. That approach doesn't work here because the ChildPaywall *requires* a non-owner profile — you can't make a solo profile that is both owner and non-owner.
-
-**Fix:**
-1. Created `switch-to-child.yaml` — reusable setup flow that navigates More → Profile → taps child by name → waits for learner home after persona redirect
-2. Updated `child-paywall.yaml` to run `switch-to-child.yaml` after `seed-and-sign-in.yaml`
-3. Includes PostApprovalLanding dismiss (BUG-38 safety) since `pm clear` wipes SecureStore
+**Fix (2026-03-24):** Replaced `seed-and-sign-in.yaml` with `sign-in-only.yaml` in `child-paywall.yaml`:
+1. `sign-in-only.yaml` — minimal sign-in, no post-auth recovery
+2. Explicit `dashboard-scroll` wait (30s) — confirms parent dashboard landed
+3. Optional PostApproval dismiss (BUG-38 safety)
+4. `switch-to-child.yaml` — navigates to child profile via More → Profile
 
 **Files changed:**
-- `e2e/flows/_setup/switch-to-child.yaml` (new)
-- `e2e/flows/billing/child-paywall.yaml` — added profile switch step
+- `e2e/flows/billing/child-paywall.yaml` — replaced seed-and-sign-in with sign-in-only + explicit dashboard wait
 
 ## BUG-53: Tab Bar Icons Missing — Ionicons Font Not Loading (2026-03-12)
 

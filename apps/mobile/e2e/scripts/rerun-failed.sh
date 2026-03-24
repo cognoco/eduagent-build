@@ -86,10 +86,10 @@ run_s "parent-solo"          "flows/parent/demo-dashboard.yaml"
 run_s "multi-subject" "flows/subjects/multi-subject.yaml"
 
 # Edge
-run_s "onboarding-complete" "flows/edge/empty-first-user.yaml"
+run_s "onboarding-no-subject" "flows/edge/empty-first-user.yaml"
 
 # Consent
-run_s "consent-withdrawn"   "flows/consent/consent-withdrawn-gate.yaml"
+run_s "consent-withdrawn-solo" "flows/consent/consent-withdrawn-gate.yaml"
 run_s "onboarding-complete" "flows/consent/post-approval-landing.yaml"
 
 # Standalone

@@ -1,4 +1,12 @@
-import { View, Text, Pressable, ScrollView, Switch, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  Switch,
+  Alert,
+  InteractionManager,
+} from 'react-native';
 import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -147,7 +155,16 @@ export default function ParentMoreScreen() {
         {personas.map((p) => (
           <Pressable
             key={p}
-            onPress={() => setPersona(p)}
+            onPress={() => {
+              if (p !== 'parent') {
+                // Navigate first, then update persona after interactions settle
+                // to avoid layout guard redirect race condition (BUG-18)
+                router.replace('/(learner)/home' as never);
+                InteractionManager.runAfterInteractions(() => setPersona(p));
+              } else {
+                setPersona(p);
+              }
+            }}
             className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3.5 mb-2"
             accessibilityLabel={`Select ${personaLabels[p]} theme`}
             accessibilityRole="button"

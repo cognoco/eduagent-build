@@ -17,40 +17,52 @@ function getSentryDsn(): string | undefined {
   return process.env.EXPO_PUBLIC_SENTRY_DSN;
 }
 
-let sentryInitialized = false;
+/** Whether Sentry.init() has ever been called (call at most once). */
+let sentryEverInitialized = false;
+/** Whether Sentry is currently active (events are sent). */
+let sentryActive = false;
 
 /**
- * Initializes Sentry unconditionally. Call for profiles that are 13+ or
- * under-13 with CONSENTED status.
+ * Enables Sentry. On the first call this initializes the SDK; subsequent
+ * calls re-enable the existing client via `beforeSend` gate.
+ *
+ * Sentry.init() is NOT idempotent — calling it twice registers duplicate
+ * native crash handlers and transport instances. We guard against this with
+ * `sentryEverInitialized` and use `beforeSend` to gate event delivery.
  */
 export function enableSentry(): void {
-  if (!getSentryDsn() || sentryInitialized) return;
+  if (!getSentryDsn() || sentryActive) return;
 
-  Sentry.init({
-    dsn: getSentryDsn(),
-    tracesSampleRate: __DEV__ ? 1.0 : 0.1,
-    debug: __DEV__,
-  });
-  sentryInitialized = true;
+  if (!sentryEverInitialized) {
+    Sentry.init({
+      dsn: getSentryDsn(),
+      tracesSampleRate: __DEV__ ? 1.0 : 0.1,
+      debug: __DEV__,
+      beforeSend(event) {
+        return sentryActive ? event : null;
+      },
+      beforeSendTransaction(event) {
+        return sentryActive ? event : null;
+      },
+    });
+    sentryEverInitialized = true;
+  }
+  sentryActive = true;
 }
 
 /**
- * Disables Sentry by closing the client. Used when switching to an under-13
- * profile without consent.
+ * Disables Sentry by gating `beforeSend`. The SDK stays initialized (no
+ * `client.close()`) so re-enabling is safe without a second `init()`.
  */
 export function disableSentry(): void {
-  if (!sentryInitialized) return;
-
-  const client = Sentry.getClient();
-  if (client) {
-    void client.close();
-  }
-  sentryInitialized = false;
+  if (!sentryActive) return;
+  sentryActive = false;
+  Sentry.setUser(null);
 }
 
-/** Returns whether Sentry is currently initialized. */
+/** Returns whether Sentry is currently active. */
 export function isSentryEnabled(): boolean {
-  return sentryInitialized;
+  return sentryActive;
 }
 
 /**
@@ -104,6 +116,12 @@ export function evaluateSentryForProfile(
     // 13–15 with active consent, or 16+: enable
     enableSentry();
   }
+}
+
+/** @internal Test-only: resets module state so each test gets a clean slate. */
+export function _resetSentryState(): void {
+  sentryEverInitialized = false;
+  sentryActive = false;
 }
 
 export { Sentry };

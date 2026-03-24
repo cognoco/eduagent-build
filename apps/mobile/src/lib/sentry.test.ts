@@ -4,15 +4,14 @@ import {
   disableSentry,
   isSentryEnabled,
   evaluateSentryForProfile,
+  _resetSentryState,
 } from './sentry';
 
-jest.mock('@sentry/react-native', () => {
-  const mockClient = { close: jest.fn() };
-  return {
-    init: jest.fn(),
-    getClient: jest.fn(() => mockClient),
-  };
-});
+jest.mock('@sentry/react-native', () => ({
+  init: jest.fn(),
+  getClient: jest.fn(),
+  setUser: jest.fn(),
+}));
 
 // Helper: set EXPO_PUBLIC_SENTRY_DSN so the module doesn't no-op
 beforeAll(() => {
@@ -21,8 +20,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
-  // Reset internal state by disabling
-  disableSentry();
+  _resetSentryState();
   jest.clearAllMocks();
 });
 
@@ -39,11 +37,20 @@ describe('enableSentry / disableSentry', () => {
     expect(Sentry.init).toHaveBeenCalledTimes(1);
   });
 
-  it('disables Sentry by closing client', () => {
+  it('disables Sentry and clears user', () => {
     enableSentry();
     disableSentry();
-    expect(Sentry.getClient).toHaveBeenCalled();
+    expect(Sentry.setUser).toHaveBeenCalledWith(null);
     expect(isSentryEnabled()).toBe(false);
+  });
+
+  it('does not call init() twice after disable → re-enable', () => {
+    enableSentry();
+    disableSentry();
+    enableSentry();
+    // init() called once total — re-enable uses beforeSend gate
+    expect(Sentry.init).toHaveBeenCalledTimes(1);
+    expect(isSentryEnabled()).toBe(true);
   });
 });
 
