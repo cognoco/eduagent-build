@@ -2035,3 +2035,69 @@ The consent request route (`POST /v1/consent/request`) crashed when Inngest dev 
 | Post-regression Maestro state | Degraded after 55 flows — cold boot before next session |
 | DB schema push | MUST run `pnpm run db:push:dev` before E2E sessions if schema changed |
 | Bluetooth disable | Persistent across reboots on `E2E_Device_2` after `pm disable-user` |
+| Bluetooth disable after `-wipe-data` | NOT persistent — must re-run `pm disable-user --user 0 com.android.bluetooth` after wipe |
+
+---
+
+## Session 24 Findings (2026-03-24) — Bug Fix Verification Attempt
+
+### Pre-session State
+
+Branch `e2e/session-23-visual-review` has 12 bug fixes applied (FIX-01 through FIX-12 from `e2e-bug-fix-plan.md`). All fixes verified in source code by code review. Unit tests all pass:
+- **API:** 95 suites, 1,622 tests PASS
+- **Mobile:** 67 suites, 623 tests PASS
+- **DB schema:** In sync (`pnpm run db:push:dev` → "No changes detected")
+- **API health:** Both LLM providers confirmed (`{"llm":{"providers":["gemini","openai"]}}`)
+
+### Emulator Issues
+
+1. **Initial attempt:** Emulator was running `E2E_Device_2` from Session 23 (61 flows). Bundle loading hung indefinitely (2+ hours) at "Loading from 10.0.2.2:8081..." — confirmed via logcat that OkHttp downloaded the bundle but Hermes never finished parsing. Root cause: post-Session-23 degraded state (documented: "Maestro IME degrades after 55 flows") combined with BUG-7 (OkHttp chunked encoding on port 8081 — should have used 8082 bundle proxy).
+
+2. **Cold boot with `-wipe-data`:** Emulator booted successfully (75s). But `-wipe-data` also wiped the Bluetooth disable state, causing "Bluetooth keeps stopping" dialog on first app launch. `seed-and-run.sh` detected the dialog but couldn't proceed.
+
+3. **Second cold boot (no wipe):** Emulator booted (55s), all setup completed. But emulator crashed during bundle loading with GPU error:
+   ```
+   Failed to import external memory object with error: 1285
+   Failed to import memory to ColorBufferGl:192
+   ```
+   The emulator process died, ADB showed no devices.
+
+4. **Hypothesis:** Launching emulator as a background process from Claude's Bash tool may cause the process to be terminated when the shell session ends. The emulator should be launched from a persistent terminal (user's own terminal window).
+
+### Key Lesson — Bluetooth Disable After `-wipe-data`
+
+`pm disable-user com.android.bluetooth` is persistent across regular reboots and `-no-snapshot-load` cold boots, but is **wiped** by `-wipe-data`. Must re-disable after any wipe.
+
+### Operational Note for Next Session
+
+The emulator needs to be launched from the user's own terminal (not from Claude's Bash tool) to ensure the process persists. After the emulator is running:
+1. `adb reverse tcp:8081 tcp:8081 && tcp:8082 tcp:8082 && tcp:8787 tcp:8787`
+2. `adb shell pm disable-user --user 0 com.android.bluetooth`
+3. `adb install C:\tools\tmp\app-debug.apk` (if wiped)
+4. `adb shell pm grant com.mentomate.app android.permission.POST_NOTIFICATIONS`
+5. `adb shell pm grant com.mentomate.app android.permission.CAMERA`
+6. `adb shell settings put global window_animation_scale 0` (+ transition + animator)
+7. Run flows via `seed-and-run.sh` with `LAUNCHER_TIMEOUT=90 BUNDLE_TIMEOUT=600`
+
+### E2E Results (6 flows run)
+
+| Flow | Fix | Result | Notes |
+|------|-----|--------|-------|
+| `subscription-details` | FIX-04 | **PASS** | BYOK assertions correctly WARNED |
+| `more-tab-navigation` | FIX-10 | **PASS** | Subscription screen loads, no spinner |
+| `assessment-cycle` | FIX-06 | **PASS** | add-subject-button found (no curriculum_complete card) |
+| `settings-toggles` | FIX-11/12 | **FAIL** | BUG-18 parent persona switch crash (~50%) — pre-existing |
+| `child-paywall` | FIX-05 | **FAIL** | BUG-52 parent seed navigation — pre-existing |
+| `empty-first-user` | FIX-08 | **FAIL** | Wrong seed (onboarding-complete has subjects, needs onboarding-no-subject) — pre-existing |
+
+### Critical Finding: Metro Was Dead
+
+The root cause of ALL initial bundle loading failures was that **Metro (8081) and the bundle proxy (8082) were not running**. The API (8787) was fine. The emulator was fine. Two hours were wasted debugging emulator issues when the real problem was simply that Metro had crashed.
+
+**ALWAYS check all 4 services before running E2E tests:**
+```bash
+curl http://localhost:8081/status   # Metro
+curl http://localhost:8082/status   # Bundle proxy
+curl http://localhost:8787/v1/health  # API
+adb devices                         # Emulator
+```
