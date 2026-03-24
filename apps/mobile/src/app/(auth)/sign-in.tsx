@@ -127,8 +127,8 @@ export default function SignInScreen() {
             on the contentContainer ensures the content always overflows the ScrollView
             after adjustResize shrinks it for the keyboard → scrollable (BUG-24/60). */}
         <View className="flex-1" style={{ minHeight: 40 }} />
-        <View className="items-center mb-6">
-          <MentomateLogo variant="stacked" size="md" />
+        <View className="items-center mb-3">
+          <MentomateLogo variant="stacked" size="sm" />
         </View>
         <Text className="text-h2 font-bold text-text-primary mb-1">
           Welcome back

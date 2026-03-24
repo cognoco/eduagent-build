@@ -37,7 +37,7 @@
       "package": "com.mentomate.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#0f0f0f"
+        "backgroundColor": "#1e1b4b"
       },
       "edgeToEdgeEnabled": true
     },

@@ -264,8 +264,8 @@ export default function SignUpScreen() {
       >
         {/* Top spacer: see sign-in.tsx BUG-24 comment */}
         <View className="flex-1" style={{ minHeight: 40 }} />
-        <View className="items-center mb-6">
-          <MentomateLogo variant="stacked" size="md" />
+        <View className="items-center mb-3">
+          <MentomateLogo variant="stacked" size="sm" />
         </View>
         <Text className="text-h2 font-bold text-text-primary mb-1">
           Create account
