@@ -44,7 +44,8 @@ export function useRatingPrompt(): {
     // Increment successful recall count
     const countKey = RECALL_COUNT_KEY(profileId);
     const stored = await SecureStore.getItemAsync(countKey);
-    const currentCount = stored ? parseInt(stored, 10) : 0;
+    const parsed = stored ? parseInt(stored, 10) : 0;
+    const currentCount = Number.isNaN(parsed) ? 0 : parsed;
     const newCount = currentCount + 1;
     await SecureStore.setItemAsync(countKey, String(newCount));
 

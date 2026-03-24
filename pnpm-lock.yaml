@@ -391,8 +391,8 @@ importers:
         specifier: ~3.0.9
         version: 3.0.9(react-native@0.81.5(@babel/core@7.28.5)(@react-native-community/cli@18.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))(react@19.1.0)
       expo-store-review:
-        specifier: ^55.0.9
-        version: 55.0.9(expo@54.0.29)(react-native@0.81.5(@babel/core@7.28.5)(@react-native-community/cli@18.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))
+        specifier: ^9.0.9
+        version: 9.0.9(expo@54.0.29)(react-native@0.81.5(@babel/core@7.28.5)(@react-native-community/cli@18.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))
       expo-system-ui:
         specifier: ~6.0.9
         version: 6.0.9(expo@54.0.29)(react-native-web@0.21.2(encoding@0.1.13)(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.28.5)(@react-native-community/cli@18.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))
@@ -7917,8 +7917,8 @@ packages:
       react: 19.1.0
       react-native: '*'
 
-  expo-store-review@55.0.9:
-    resolution: {integrity: sha512-24l1XNcdVWlcfL3n36WWPnT7XeSI+Imf5YiAwGY0dc+NwJkVZ42krTOZc/o9JmlSW/MMz6nArTckzmpicVJKxA==}
+  expo-store-review@9.0.9:
+    resolution: {integrity: sha512-99vS7edXlKzPcdjrzVlMQWc4zOyq4khQfFjhNqJgpGP+AgRn4U0LaZkHIrVjmzolryD3rcHJSiUQH9Vi0sD0MQ==}
     peerDependencies:
       expo: '*'
       react-native: '*'
@@ -22193,7 +22193,7 @@ snapshots:
       react-native: 0.81.5(@babel/core@7.28.5)(@react-native-community/cli@18.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10)
       react-native-is-edge-to-edge: 1.2.1(react-native@0.81.5(@babel/core@7.28.5)(@react-native-community/cli@18.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))(react@19.1.0)
 
-  expo-store-review@55.0.9(expo@54.0.29)(react-native@0.81.5(@babel/core@7.28.5)(@react-native-community/cli@18.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10)):
+  expo-store-review@9.0.9(expo@54.0.29)(react-native@0.81.5(@babel/core@7.28.5)(@react-native-community/cli@18.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10)):
     dependencies:
       expo: 54.0.29(@babel/core@7.28.5)(@expo/metro-runtime@6.1.2)(bufferutil@4.1.0)(expo-router@6.0.23)(react-native@0.81.5(@babel/core@7.28.5)(@react-native-community/cli@18.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10))(react@19.1.0)(utf-8-validate@5.0.10)
       react-native: 0.81.5(@babel/core@7.28.5)(@react-native-community/cli@18.0.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@types/react@19.1.0)(bufferutil@4.1.0)(react@19.1.0)(utf-8-validate@5.0.10)

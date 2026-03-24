@@ -4,7 +4,7 @@
 // Apple scrutinizes Sentry for under-13 users even under Education category.
 // Age groups:
 //   Under 13 → disabled until consent status is CONSENTED
-//   13–15    → enabled (parental consent covers it)
+//   13–15    → disabled if consent is WITHDRAWN or PENDING
 //   16+      → enabled (no consent needed)
 //
 // No-ops gracefully when EXPO_PUBLIC_SENTRY_DSN is not set.
@@ -43,7 +43,7 @@ export function disableSentry(): void {
 
   const client = Sentry.getClient();
   if (client) {
-    client.close();
+    void client.close();
   }
   sentryInitialized = false;
 }
@@ -94,8 +94,14 @@ export function evaluateSentryForProfile(
     } else {
       disableSentry();
     }
+  } else if (
+    age < 16 &&
+    (consentStatus === 'WITHDRAWN' || consentStatus === 'PENDING')
+  ) {
+    // 13–15 with withdrawn/pending consent: disable — parent opted out of data processing
+    disableSentry();
   } else {
-    // 13+: always enable
+    // 13–15 with active consent, or 16+: enable
     enableSentry();
   }
 }

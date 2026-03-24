@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
 import { RetentionSignal, type RetentionStatus } from './RetentionSignal';
-import { useTheme } from '../../lib/theme';
 
 interface RemediationCardProps {
   retentionStatus: RetentionStatus;
@@ -10,6 +8,10 @@ interface RemediationCardProps {
   cooldownEndsAt?: string;
   onReviewRetest: () => void;
   onRelearnTopic: () => void;
+  /** Persona-aware — caller passes this from layout/route context. */
+  isLearner: boolean;
+  /** Navigation callback for Learning Book link during cooldown. */
+  onBookPress?: () => void;
 }
 
 function formatCountdown(ms: number): string {
@@ -48,11 +50,9 @@ export function RemediationCard({
   cooldownEndsAt,
   onReviewRetest,
   onRelearnTopic,
+  isLearner,
+  onBookPress,
 }: RemediationCardProps) {
-  const { persona } = useTheme();
-  const router = useRouter();
-  const isLearner = persona === 'learner';
-
   const [remainingMs, setRemainingMs] = useState(() => {
     if (!cooldownEndsAt) return 0;
     return Math.max(0, new Date(cooldownEndsAt).getTime() - Date.now());
@@ -185,9 +185,9 @@ export function RemediationCard({
       )}
 
       {/* During cooldown, offer something to do */}
-      {cooldownActive && (
+      {cooldownActive && onBookPress && (
         <Pressable
-          onPress={() => router.push('/(learner)/book' as never)}
+          onPress={onBookPress}
           className="mt-2 py-2 items-center"
           testID="remediation-book-link"
           accessibilityLabel="Check out your Learning Book"

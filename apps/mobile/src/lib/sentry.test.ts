@@ -102,6 +102,36 @@ describe('evaluateSentryForProfile', () => {
     expect(isSentryEnabled()).toBe(false);
   });
 
+  it('disables Sentry for 14-year-old with PENDING consent', () => {
+    const fourteenYearsAgo = new Date();
+    fourteenYearsAgo.setFullYear(fourteenYearsAgo.getFullYear() - 14);
+    const birthDate = fourteenYearsAgo.toISOString().split('T')[0];
+
+    evaluateSentryForProfile(birthDate, 'PENDING');
+    expect(isSentryEnabled()).toBe(false);
+  });
+
+  it('disables Sentry for 14-year-old with WITHDRAWN consent', () => {
+    enableSentry();
+    expect(isSentryEnabled()).toBe(true);
+
+    const fourteenYearsAgo = new Date();
+    fourteenYearsAgo.setFullYear(fourteenYearsAgo.getFullYear() - 14);
+    const birthDate = fourteenYearsAgo.toISOString().split('T')[0];
+
+    evaluateSentryForProfile(birthDate, 'WITHDRAWN');
+    expect(isSentryEnabled()).toBe(false);
+  });
+
+  it('enables Sentry for 14-year-old with CONSENTED status', () => {
+    const fourteenYearsAgo = new Date();
+    fourteenYearsAgo.setFullYear(fourteenYearsAgo.getFullYear() - 14);
+    const birthDate = fourteenYearsAgo.toISOString().split('T')[0];
+
+    evaluateSentryForProfile(birthDate, 'CONSENTED');
+    expect(isSentryEnabled()).toBe(true);
+  });
+
   it('enables Sentry for 16+ regardless of consent', () => {
     const twentyYearsAgo = new Date();
     twentyYearsAgo.setFullYear(twentyYearsAgo.getFullYear() - 20);

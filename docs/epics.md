@@ -4031,7 +4031,7 @@ So that the app doesn't ask me to pick my region or show different rules dependi
 
 ### Epic 10 Execution Order
 
-```
+```text
 PHASE 1 — Consent unification (must land first — Stories 10.2, 10.10, 10.14 depend on it):
 10.19 (consent unification — GDPR-everywhere: remove location picker, simplify age-only logic,
        unify copy, update privacy policy, ~4-5 hours) — FIRST, unblocks consent-related stories

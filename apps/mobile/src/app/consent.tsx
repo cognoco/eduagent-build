@@ -55,7 +55,7 @@ export default function ConsentScreen() {
     isValidEmail && !isPending && phase === 'parent' && !isOffline;
 
   const onSubmit = useCallback(async () => {
-    if (!canSubmit || !profileId || !consentType) return;
+    if (!canSubmit || !profileId) return;
 
     setError('');
     try {
@@ -71,7 +71,7 @@ export default function ConsentScreen() {
   }, [canSubmit, profileId, consentType, parentEmail, mutateAsync]);
 
   const onResendEmail = useCallback(async () => {
-    if (!profileId || !consentType || resending) return;
+    if (!profileId || resending) return;
 
     setResending(true);
     try {

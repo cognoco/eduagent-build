@@ -46,6 +46,11 @@ export function LivingBook({
 
   // Page-flip animation on each new exchange
   useEffect(() => {
+    if (exchangeCount < prevCount.current) {
+      // Session reset — sync the high-water mark so future increments animate
+      prevCount.current = exchangeCount;
+      return;
+    }
     if (exchangeCount > prevCount.current) {
       prevCount.current = exchangeCount;
 
