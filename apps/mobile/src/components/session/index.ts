@@ -14,3 +14,4 @@ export {
   VoicePlaybackBar,
   type VoicePlaybackBarProps,
 } from './VoicePlaybackBar';
+export { LivingBook } from './LivingBook';

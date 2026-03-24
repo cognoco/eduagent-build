@@ -222,54 +222,23 @@ describe('createProfile', () => {
     expect(result.accountId).toBe('acct-1');
   });
 
-  it('creates PENDING consent state for EU child under 16', async () => {
+  it('creates PENDING consent state for child under 16', async () => {
     (checkConsentRequired as jest.Mock).mockReturnValueOnce({
       required: true,
       consentType: 'GDPR',
     });
-    const row = mockProfileRow({ location: 'EU' });
+    const row = mockProfileRow();
     const db = createMockDb({ insertReturning: [row] });
 
     const result = await createProfile(
       db,
       'account-123',
       { displayName: 'Child', birthDate: '2016-06-15' },
-      false,
-      'EU'
+      false
     );
 
-    expect(checkConsentRequired).toHaveBeenCalledWith('2016-06-15', 'EU');
+    expect(checkConsentRequired).toHaveBeenCalledWith('2016-06-15');
     expect(createPendingConsentState).toHaveBeenCalledWith(db, row.id, 'GDPR');
-    expect(result.consentStatus).toBe('PENDING');
-  });
-
-  it('creates PENDING consent state for US child under 13', async () => {
-    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
-      required: true,
-      consentType: 'COPPA',
-    });
-    (createPendingConsentState as jest.Mock).mockResolvedValueOnce({
-      id: 'consent-2',
-      profileId: 'profile-1',
-      consentType: 'COPPA',
-      status: 'PENDING',
-      parentEmail: null,
-      requestedAt: '2025-01-15T10:00:00.000Z',
-      respondedAt: null,
-    });
-    const row = mockProfileRow({ location: 'US' });
-    const db = createMockDb({ insertReturning: [row] });
-
-    const result = await createProfile(
-      db,
-      'account-123',
-      { displayName: 'Child', birthDate: '2016-06-15' },
-      false,
-      'US'
-    );
-
-    expect(checkConsentRequired).toHaveBeenCalledWith('2016-06-15', 'US');
-    expect(createPendingConsentState).toHaveBeenCalledWith(db, row.id, 'COPPA');
     expect(result.consentStatus).toBe('PENDING');
   });
 
@@ -285,8 +254,7 @@ describe('createProfile', () => {
       db,
       'account-123',
       { displayName: 'Adult', birthDate: '1990-01-15' },
-      false,
-      'EU'
+      false
     );
 
     expect(createPendingConsentState).not.toHaveBeenCalled();
@@ -301,51 +269,12 @@ describe('createProfile', () => {
       db,
       'account-123',
       { displayName: 'No BD' },
-      false,
-      'EU'
+      false
     );
 
     expect(checkConsentRequired).not.toHaveBeenCalled();
     expect(createPendingConsentState).not.toHaveBeenCalled();
     expect(result.consentStatus).toBeNull();
-  });
-
-  it('server location overrides client location', async () => {
-    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
-      required: true,
-      consentType: 'GDPR',
-    });
-    const row = mockProfileRow({ location: 'EU' });
-    const db = createMockDb({ insertReturning: [row] });
-
-    await createProfile(
-      db,
-      'account-123',
-      { displayName: 'Child', birthDate: '2016-06-15', location: 'OTHER' },
-      false,
-      'EU'
-    );
-
-    // serverLocation 'EU' should override client 'OTHER'
-    expect(checkConsentRequired).toHaveBeenCalledWith('2016-06-15', 'EU');
-  });
-
-  it('falls back to client location when no server location', async () => {
-    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
-      required: true,
-      consentType: 'GDPR',
-    });
-    const row = mockProfileRow({ location: 'EU' });
-    const db = createMockDb({ insertReturning: [row] });
-
-    await createProfile(
-      db,
-      'account-123',
-      { displayName: 'Child', birthDate: '2016-06-15', location: 'EU' },
-      false
-    );
-
-    expect(checkConsentRequired).toHaveBeenCalledWith('2016-06-15', 'EU');
   });
 });
 

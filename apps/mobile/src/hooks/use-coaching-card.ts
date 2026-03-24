@@ -10,6 +10,8 @@ interface CoachingCardState {
   primaryRoute: string;
   secondaryRoute: string;
   isLoading: boolean;
+  /** When true, show celebration animation + "Add a new subject" CTA (Story 10.15). */
+  isCurriculumComplete?: boolean;
 }
 
 /**
@@ -67,6 +69,20 @@ export function useCoachingCard(defaultSubjectId?: string): CoachingCardState {
         primaryRoute: `/session?mode=practice&subjectId=${suggestion.subjectId}&topicId=${suggestion.topicId}`,
         secondaryRoute: freeformRoute,
         isLoading: false,
+      };
+    }
+
+    // Curriculum complete: user has subjects but no next topic to study
+    if (defaultSubjectId && !suggestion) {
+      return {
+        headline: "You've mastered your subjects!",
+        subtext: 'Ready for something new?',
+        primaryLabel: 'Add a new subject',
+        secondaryLabel: 'Keep reviewing',
+        primaryRoute: '/create-subject',
+        secondaryRoute: '/(learner)/book',
+        isLoading: false,
+        isCurriculumComplete: true,
       };
     }
 

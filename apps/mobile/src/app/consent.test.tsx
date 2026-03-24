@@ -13,7 +13,6 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack }),
   useLocalSearchParams: () => ({
     profileId: '550e8400-e29b-41d4-a716-446655440000',
-    consentType: 'GDPR',
   }),
 }));
 
@@ -28,6 +27,10 @@ jest.mock('../hooks/use-consent', () => ({
     mutateAsync: mockMutateAsync,
     isPending: false,
   }),
+}));
+
+jest.mock('../hooks/use-network-status', () => ({
+  useNetworkStatus: () => ({ isOffline: false, isReady: true }),
 }));
 
 const queryClient = new QueryClient({
@@ -91,7 +94,7 @@ describe('ConsentScreen', () => {
 
     expect(screen.getByTestId('consent-email')).toBeTruthy();
     expect(screen.getByTestId('consent-submit')).toBeTruthy();
-    // GDPR regulation text (default/parent variant)
+    // Jurisdiction-neutral regulation text (default/parent variant)
     expect(screen.getByText(/under 16/i)).toBeTruthy();
     // Spam warning
     expect(screen.getByText(/check your spam folder/i)).toBeTruthy();

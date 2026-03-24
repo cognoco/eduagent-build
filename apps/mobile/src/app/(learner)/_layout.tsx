@@ -22,6 +22,7 @@ import {
   getConsentPendingCopy,
   getConsentWithdrawnCopy,
 } from '../../lib/consent-copy';
+import { evaluateSentryForProfile } from '../../lib/sentry';
 
 const iconMap: Record<
   string,
@@ -556,6 +557,18 @@ export default function LearnerLayout() {
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();
+
+  // Age-gated Sentry: re-evaluate on profile switch (Story 10.14)
+  React.useEffect(() => {
+    evaluateSentryForProfile(
+      activeProfile?.birthDate ?? null,
+      activeProfile?.consentStatus ?? null
+    );
+  }, [
+    activeProfile?.id,
+    activeProfile?.birthDate,
+    activeProfile?.consentStatus,
+  ]);
 
   // Show alert when a profile was removed server-side (consent denied / auto-deleted)
   React.useEffect(() => {

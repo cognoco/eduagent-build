@@ -34,33 +34,33 @@ function createApp(options: {
   return app;
 }
 
-const EU_CHILD_META: ProfileMeta = {
-  birthDate: '2014-06-15', // ~11 years old → EU child under 16
-  location: 'EU',
+const CHILD_PENDING_META: ProfileMeta = {
+  birthDate: '2014-06-15', // ~11 years old → under 16, consent required
+  location: null,
   consentStatus: 'PENDING',
 };
 
-const US_CHILD_META: ProfileMeta = {
-  birthDate: '2016-03-10', // ~9 years old → US child under 13
-  location: 'US',
+const CHILD_REQUESTED_META: ProfileMeta = {
+  birthDate: '2016-03-10', // ~9 years old → under 16, consent required
+  location: null,
   consentStatus: 'PARENTAL_CONSENT_REQUESTED',
 };
 
 const WITHDRAWN_CHILD_META: ProfileMeta = {
   birthDate: '2014-06-15',
-  location: 'EU',
+  location: null,
   consentStatus: 'WITHDRAWN',
 };
 
 const CONSENTED_CHILD_META: ProfileMeta = {
   birthDate: '2014-06-15',
-  location: 'EU',
+  location: null,
   consentStatus: 'CONSENTED',
 };
 
 const ADULT_META: ProfileMeta = {
   birthDate: '1990-01-01',
-  location: 'EU',
+  location: null,
   consentStatus: null,
 };
 
@@ -84,7 +84,7 @@ describe('consentMiddleware', () => {
   it('passes through for exempt path /v1/health', async () => {
     const app = createApp({
       profileId: 'p-1',
-      profileMeta: EU_CHILD_META,
+      profileMeta: CHILD_PENDING_META,
       routePath: '/v1/health',
     });
     const res = await app.request('/v1/health');
@@ -94,7 +94,7 @@ describe('consentMiddleware', () => {
   it('passes through for exempt path /v1/consent/', async () => {
     const app = createApp({
       profileId: 'p-1',
-      profileMeta: EU_CHILD_META,
+      profileMeta: CHILD_PENDING_META,
     });
     const res = await app.request('/v1/consent/my-status');
     expect(res.status).toBe(200);
@@ -103,7 +103,7 @@ describe('consentMiddleware', () => {
   it('passes through for exempt path /v1/profiles', async () => {
     const app = createApp({
       profileId: 'p-1',
-      profileMeta: EU_CHILD_META,
+      profileMeta: CHILD_PENDING_META,
     });
     const res = await app.request('/v1/profiles');
     expect(res.status).toBe(200);
@@ -112,13 +112,13 @@ describe('consentMiddleware', () => {
   it('passes through for exempt path /v1/billing/', async () => {
     const app = createApp({
       profileId: 'p-1',
-      profileMeta: EU_CHILD_META,
+      profileMeta: CHILD_PENDING_META,
     });
     const res = await app.request('/v1/billing/status');
     expect(res.status).toBe(200);
   });
 
-  it('passes through when birthDate or location is missing', async () => {
+  it('passes through when birthDate is missing', async () => {
     const app = createApp({
       profileId: 'p-1',
       profileMeta: { birthDate: null, location: null, consentStatus: null },
@@ -145,10 +145,10 @@ describe('consentMiddleware', () => {
     expect(res.status).toBe(200);
   });
 
-  it('returns 403 for EU child with PENDING consent', async () => {
+  it('returns 403 for child with PENDING consent', async () => {
     const app = createApp({
       profileId: 'p-1',
-      profileMeta: EU_CHILD_META,
+      profileMeta: CHILD_PENDING_META,
     });
     const res = await app.request('/v1/subjects');
 
@@ -159,20 +159,20 @@ describe('consentMiddleware', () => {
     expect(body.details.consentType).toBe('GDPR');
   });
 
-  it('returns 403 for US child with PARENTAL_CONSENT_REQUESTED', async () => {
+  it('returns 403 for child with PARENTAL_CONSENT_REQUESTED', async () => {
     const app = createApp({
       profileId: 'p-1',
-      profileMeta: US_CHILD_META,
+      profileMeta: CHILD_REQUESTED_META,
     });
     const res = await app.request('/v1/subjects');
 
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.code).toBe('CONSENT_REQUIRED');
-    expect(body.details.consentType).toBe('COPPA');
+    expect(body.details.consentType).toBe('GDPR');
   });
 
-  it('returns 403 for EU child with WITHDRAWN consent', async () => {
+  it('returns 403 for child with WITHDRAWN consent', async () => {
     const app = createApp({
       profileId: 'p-1',
       profileMeta: WITHDRAWN_CHILD_META,
@@ -189,7 +189,7 @@ describe('consentMiddleware', () => {
   it('allows /v1/__test/ paths even with pending consent', async () => {
     const app = createApp({
       profileId: 'p-1',
-      profileMeta: EU_CHILD_META,
+      profileMeta: CHILD_PENDING_META,
     });
     const res = await app.request('/v1/__test/seed');
     expect(res.status).toBe(200);

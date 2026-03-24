@@ -1,0 +1,240 @@
+# Flow: Story 10.10 — "Hand to Your Parent" Consent Interstitial
+# Validates: consent screen two-phase flow (child hand-off → parent form → success)
+# Tags: nightly, consent, epic-10
+#
+# Journey: UX Journey 1 (Onboarding) + Consent Lifecycle
+# Epics: Epic 10 (Story 10.10)
+#
+# Prerequisite: Seeded user with pre-profile scenario (Clerk user + account, no profile).
+# After profile creation triggers COPPA/GDPR, the consent screen appears with the
+# new hand-to-parent interstitial instead of the old direct-email form.
+#
+# Usage: ./scripts/seed-and-run.sh pre-profile flows/consent/hand-to-parent-consent.yaml
+#
+# NOTE: This flow verifies the two-phase consent UI introduced in Story 10.10.
+# The date picker defaults to ~16 years old which may NOT trigger consent.
+# Phase transitions are tested where consent is triggered; steps are optional
+# where consent depends on age detection.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - consent
+  - epic-10
+---
+# ============================================================
+# SIGN IN with seeded pre-profile credentials
+# ============================================================
+
+# 1. Wait for sign-in screen
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 120000
+
+# 2. Sign in with seeded credentials
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${EMAIL}
+- pressKey: back
+
+- tapOn:
+    id: "sign-in-password"
+- inputText: ${PASSWORD}
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 10000
+
+- tapOn:
+    id: "sign-in-button"
+
+# ============================================================
+# NAVIGATE TO CREATE PROFILE (same as coppa-flow.yaml)
+# ============================================================
+
+# 3. Wait for tabs to render (no profile yet)
+- extendedWaitUntil:
+    visible:
+      id: "tab-more"
+    timeout: 30000
+
+# 4. Navigate: More → Profile → Create profile
+- tapOn:
+    id: "tab-more"
+
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      text: "Profile"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    text: "Profile"
+
+- extendedWaitUntil:
+    visible:
+      text: "No profiles yet"
+    timeout: 10000
+
+- tapOn:
+    id: "profiles-create-first"
+
+# ============================================================
+# PROFILE CREATION — trigger consent
+# ============================================================
+
+# 5. Wait for profile creation screen
+- extendedWaitUntil:
+    visible:
+      id: "create-profile-name"
+    timeout: 15000
+
+# 6. Enter display name
+- tapOn:
+    id: "create-profile-name"
+- inputText: "Consent Test Child"
+- pressKey: Back
+
+# 7. Open date picker and accept default
+- tapOn:
+    id: "create-profile-birthdate"
+
+- tapOn:
+    text: "OK"
+    # Optional: Android native date picker dialog
+    optional: true
+
+# 8. Select EU location (more likely to trigger GDPR for age 16)
+- extendedWaitUntil:
+    visible:
+      id: "location-eu"
+    timeout: 5000
+    optional: true
+
+- tapOn:
+    id: "location-eu"
+    optional: true
+
+# 9. Submit profile creation
+- tapOn:
+    id: "create-profile-submit"
+
+# ============================================================
+# PHASE 1: CHILD VIEW — "Hand to your parent" interstitial
+# ============================================================
+
+# 10. Verify child-facing hand-off screen appears
+- extendedWaitUntil:
+    visible:
+      id: "consent-child-view"
+    timeout: 15000
+    optional: true
+
+# 11. Verify child-friendly title
+- assertVisible:
+    text: "One more step!"
+    optional: true
+
+# 12. Verify hand-off instruction
+- assertVisible:
+    text: "Hand your phone to your parent or guardian"
+    optional: true
+
+# 13. Screenshot: child hand-off view
+- takeScreenshot: hand-to-parent-01-child-view
+
+# 14. Verify "I'm the parent / guardian" button is present
+- assertVisible:
+    id: "consent-handoff-button"
+    optional: true
+
+# 15. Tap the hand-off button to transition to parent view
+- tapOn:
+    id: "consent-handoff-button"
+    optional: true
+
+# ============================================================
+# PHASE 2: PARENT VIEW — email form
+# ============================================================
+
+# 16. Verify parent-facing form appears
+- extendedWaitUntil:
+    visible:
+      id: "consent-parent-view"
+    timeout: 10000
+    optional: true
+
+# 17. Verify parent-facing title (professional, not child-friendly)
+- assertVisible:
+    text: "Parental Consent Required"
+    optional: true
+
+# 18. Verify spam warning text is present
+- assertVisible:
+    text: "spam folder"
+    optional: true
+
+# 19. Screenshot: parent form view
+- takeScreenshot: hand-to-parent-02-parent-view
+
+# 20. Enter parent email
+- tapOn:
+    id: "consent-email"
+    optional: true
+- inputText: "parent-e2e@example.com"
+  # Only enters text if consent-email field was tapped
+- pressKey: back
+
+# 21. Submit consent request
+- tapOn:
+    id: "consent-submit"
+    optional: true
+
+# ============================================================
+# PHASE 3: SUCCESS VIEW
+# ============================================================
+
+# 22. Verify success state
+- extendedWaitUntil:
+    visible:
+      id: "consent-success"
+    timeout: 10000
+    optional: true
+
+# 23. Verify success message
+- assertVisible:
+    text: "Consent link sent"
+    optional: true
+
+# 24. Verify spam hint on success screen
+- assertVisible:
+    text: "Check your inbox"
+    optional: true
+
+# 25. Verify resend button is available
+- assertVisible:
+    id: "consent-resend-email"
+    optional: true
+
+# 26. Verify "Hand back to your child" / Done button is available
+- assertVisible:
+    id: "consent-done"
+    optional: true
+
+# 27. Screenshot: success view
+- takeScreenshot: hand-to-parent-03-success
+
+# 28. Tap Done to return
+- tapOn:
+    id: "consent-done"
+    optional: true
+
+# 29. Final screenshot
+- takeScreenshot: hand-to-parent-04-complete

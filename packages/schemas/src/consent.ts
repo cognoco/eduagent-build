@@ -14,7 +14,7 @@ export type ConsentStatus = z.infer<typeof consentStatusSchema>;
 export const consentRequestSchema = z.object({
   childProfileId: z.string().uuid(),
   parentEmail: z.string().email(),
-  consentType: consentTypeSchema,
+  consentType: consentTypeSchema.default('GDPR'),
 });
 
 export type ConsentRequest = z.infer<typeof consentRequestSchema>;

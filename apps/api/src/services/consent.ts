@@ -107,35 +107,25 @@ function calculateAge(birthDate: string): number {
 export const MINIMUM_AGE = 11;
 
 /**
- * Determines whether parental consent is required based on age and location.
+ * Determines whether parental consent is required based on age alone.
  *
+ * GDPR-everywhere model (Story 10.19): location is no longer a factor.
  * - Users under 11 are rejected entirely (PRD line 386)
- * - EU children under 16 require GDPR consent
- * - US children under 13 require COPPA consent
- * - All others do not require consent
+ * - Users under 16 require GDPR consent
+ * - Users 16+ do not require consent
  */
-export function checkConsentRequired(
-  birthDate: string,
-  location: 'EU' | 'US' | 'OTHER'
-): {
+export function checkConsentRequired(birthDate: string): {
   required: boolean;
   consentType: ConsentType | null;
   belowMinimumAge?: boolean;
 } {
   const age = calculateAge(birthDate);
   if (age < MINIMUM_AGE) {
-    // Under 11 → blocked at profile creation. For EU/US, also consent-gate
-    // existing profiles so middleware blocks access.
-    if (location === 'EU')
-      return { required: true, consentType: 'GDPR', belowMinimumAge: true };
-    if (location === 'US')
-      return { required: true, consentType: 'COPPA', belowMinimumAge: true };
-    return { required: false, consentType: null, belowMinimumAge: true };
+    return { required: true, consentType: 'GDPR', belowMinimumAge: true };
   }
-  if (location === 'EU' && age < 16)
+  if (age < 16) {
     return { required: true, consentType: 'GDPR' };
-  if (location === 'US' && age < 13)
-    return { required: true, consentType: 'COPPA' };
+  }
   return { required: false, consentType: null };
 }
 
@@ -176,12 +166,20 @@ const MAX_CONSENT_RESENDS = 3;
 /**
  * Creates a consent request and sends a notification email to the parent.
  */
+export interface ConsentRequestResult {
+  consentState: ConsentState;
+  /** Whether the consent email was successfully delivered. */
+  emailDelivered: boolean;
+  /** Reason for email delivery failure, if any. */
+  emailFailureReason?: string;
+}
+
 export async function requestConsent(
   db: Database,
   input: ConsentRequest,
   appUrl: string,
   emailOptions?: EmailOptions
-): Promise<ConsentState> {
+): Promise<ConsentRequestResult> {
   const token = crypto.randomUUID();
 
   // Token expires in 7 days (PRD line 414)
@@ -232,7 +230,7 @@ export async function requestConsent(
 
   const tokenUrl = `${appUrl}/consent?token=${token}`;
 
-  await sendEmail(
+  const emailResult = await sendEmail(
     formatConsentRequestEmail(
       input.parentEmail,
       childName,
@@ -242,7 +240,11 @@ export async function requestConsent(
     emailOptions
   );
 
-  return mapConsentRow(row);
+  return {
+    consentState: mapConsentRow(row),
+    emailDelivered: emailResult.sent,
+    emailFailureReason: emailResult.reason,
+  };
 }
 
 /**

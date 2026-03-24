@@ -55,24 +55,20 @@ export function useConsentStatus(): UseQueryResult<ConsentStatusData> {
 
 /**
  * Pure client-side age check for consent requirements.
- * EU: age < 16 requires GDPR consent
- * US: age < 13 requires COPPA consent
+ * GDPR-everywhere: age < 16 requires consent (Story 10.19).
  */
-export function checkConsentRequirement(
-  birthDate: string | null,
-  location: string | null
-): { required: boolean; consentType: 'GDPR' | 'COPPA' | null } {
-  if (!birthDate || !location) {
+export function checkConsentRequirement(birthDate: string | null): {
+  required: boolean;
+  consentType: 'GDPR' | null;
+} {
+  if (!birthDate) {
     return { required: false, consentType: null };
   }
 
   const age = calculateAge(birthDate);
 
-  if (location === 'EU' && age < 16) {
+  if (age < 16) {
     return { required: true, consentType: 'GDPR' };
-  }
-  if (location === 'US' && age < 13) {
-    return { required: true, consentType: 'COPPA' };
   }
 
   return { required: false, consentType: null };

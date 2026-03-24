@@ -60,17 +60,14 @@ export const consentMiddleware = createMiddleware<ConsentEnv>(
       return;
     }
 
-    // If we don't have birthDate or location, we can't determine consent → allow
-    if (!meta.birthDate || !meta.location) {
+    // If we don't have birthDate, we can't determine consent → allow
+    if (!meta.birthDate) {
       await next();
       return;
     }
 
-    // Check if consent is required for this profile's age + location
-    const { required, consentType } = checkConsentRequired(
-      meta.birthDate,
-      meta.location
-    );
+    // Check if consent is required for this profile's age (GDPR-everywhere)
+    const { required, consentType } = checkConsentRequired(meta.birthDate);
 
     if (!required) {
       await next();

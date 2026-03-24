@@ -95,12 +95,12 @@ export default function PrivacyPolicyScreen() {
           </Paragraph>
         </Section>
 
-        <Section title="4. Parental Consent (GDPR &amp; COPPA)">
+        <Section title="4. Parental Consent">
           <Paragraph>
-            For users under 16 (EU/GDPR) or under 13 (US/COPPA), we require
-            verifiable parental consent before processing personal data. A
-            parent or guardian must approve the child&apos;s account via email
-            before any learning data is collected.
+            For users under 16, we require verifiable parental consent before
+            processing personal data. A parent or guardian must approve the
+            child&apos;s account via email before any learning data is
+            collected.
           </Paragraph>
           <Paragraph>
             Parents can withdraw consent at any time from the parent dashboard.
@@ -124,7 +124,14 @@ export default function PrivacyPolicyScreen() {
             We do not sell your data. We share data only with: authentication
             provider (Clerk) for sign-in; AI providers for learning sessions;
             email provider (Resend) for notifications; error tracking (Sentry)
-            for app stability; payment processors for subscription management.
+            for app stability; in-app purchase management (RevenueCat) for
+            subscription processing; payment processors for subscription
+            management.
+          </Paragraph>
+          <Paragraph>
+            For users under 13, error tracking (Sentry) is disabled until
+            parental consent is granted. It is re-disabled if consent is
+            withdrawn.
           </Paragraph>
         </Section>
 

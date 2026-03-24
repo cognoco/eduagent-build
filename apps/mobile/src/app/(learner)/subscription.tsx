@@ -413,8 +413,16 @@ export default function SubscriptionScreen() {
   const queryClient = useQueryClient();
 
   // API hooks for usage display and subscription state
-  const { data: subscription, isLoading: subLoading } = useSubscription();
-  const { data: usage, isLoading: usageLoading } = useUsage();
+  const {
+    data: subscription,
+    isLoading: subLoading,
+    isError: subError,
+  } = useSubscription();
+  const {
+    data: usage,
+    isLoading: usageLoading,
+    isError: usageError,
+  } = useUsage();
   // const byokWaitlist = useJoinByokWaitlist();
 
   // Top-up IAP state
@@ -638,6 +646,15 @@ export default function SubscriptionScreen() {
           testID="subscription-loading"
         >
           <ActivityIndicator />
+        </View>
+      ) : subError || usageError ? (
+        <View
+          className="flex-1 items-center justify-center px-5"
+          testID="subscription-error"
+        >
+          <Text className="text-body text-text-secondary text-center">
+            Unable to load subscription details. Please try again.
+          </Text>
         </View>
       ) : (
         <ScrollView

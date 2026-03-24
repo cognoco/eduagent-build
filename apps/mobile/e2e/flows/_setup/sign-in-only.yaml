@@ -40,9 +40,27 @@ appId: com.mentomate.app
 - tapOn:
     id: "sign-in-button"
 
-# 5. Brief pause for auth to process — calling flow handles specific landing screen
+# 5. Verify auth completed — wait for any post-auth screen.
+#    The calling flow handles specific landing logic, but we must confirm
+#    sign-in actually succeeded before returning control.
+#    Possible post-auth screens: learner home, create-subject (0 subjects),
+#    PostApprovalLanding ("You're approved!"), or parent dashboard.
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "home-scroll-view"
+    timeout: 20000
+    # Post-auth screen varies by scenario — home may not appear if redirected
+    # to create-subject, PostApprovalLanding, or consent gate
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "create-subject-name"
     timeout: 3000
+    # Only appears for 0-subject users (onboarding-no-subject scenario)
+    optional: true
+- extendedWaitUntil:
+    visible:
+      text: "You're approved!"
+    timeout: 3000
+    # PostApprovalLanding — appears after pm clear wipes SecureStore (BUG-38)
     optional: true

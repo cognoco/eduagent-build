@@ -58,18 +58,15 @@ export function getConsentHandOffCopy(persona: Persona): ConsentHandOffCopy {
 
 export interface ConsentRequestCopy {
   title: string;
-  gdprRegulation: string;
-  coppaRegulation: string;
+  regulation: string;
   emailLabel: string;
   successMessage: string;
 }
 
 const defaultConsentRequest: ConsentRequestCopy = {
   title: 'Parental consent required',
-  gdprRegulation:
-    'Under EU GDPR regulations, users under 16 need parental consent to use this service.',
-  coppaRegulation:
-    'Under US COPPA regulations, users under 13 need parental consent to use this service.',
+  regulation:
+    'Under data protection regulations, users under 16 need parental consent to use this service.',
   emailLabel: "Parent's email address",
   successMessage:
     "They'll need to approve before you can start learning. You can close this screen.",
@@ -77,10 +74,8 @@ const defaultConsentRequest: ConsentRequestCopy = {
 
 const learnerConsentRequest: ConsentRequestCopy = {
   title: "Almost there! We need a grown-up's help",
-  gdprRegulation:
-    "Because you're under 16, we need your parent or guardian to say it's OK for you to use this app. It's a rule in Europe to keep you safe online!",
-  coppaRegulation:
-    "Because you're under 13, we need a grown-up to say it's OK for you to use this app. It's a rule to keep kids safe online!",
+  regulation:
+    "Because you're under 16, we need your parent or guardian to say it's OK for you to use this app. It's a rule to keep you safe online!",
   emailLabel: "Your parent's or guardian's email",
   successMessage:
     "Once they say yes, you're all set to start learning! You can close this screen.",

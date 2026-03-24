@@ -41,43 +41,49 @@ tags:
 # 1b. BUG-38: PostApprovalLanding appears after pm clear wipes SecureStore.
 #     Wait for it explicitly, then dismiss. The conditional `when:` check
 #     fires too early (before auth completes), so we wait with timeout.
+# PostApprovalLanding is genuinely optional — only appears when SecureStore
+# was wiped (pm clear) and profile has CONSENTED status
 - extendedWaitUntil:
     visible:
       text: "You're approved!"
     timeout: 15000
+    # PostApprovalLanding only appears after SecureStore wipe — genuinely optional
     optional: true
 
+# Dismiss PostApprovalLanding if it appeared
 - tapOn:
     text: "Let's Go"
+    # Only present if PostApprovalLanding appeared (see step above)
     optional: true
 
 # 2. Wait for create-subject screen — home.tsx redirects here when subjects=0.
 #    After sign-in → PostApproval → home → redirect to create-subject.
+#    Increased from 20s to 30s: auth + PostApproval dismiss + home redirect
+#    chain takes ~15-20s on WHPX emulator.
 - extendedWaitUntil:
     visible:
       id: "create-subject-name"
-    timeout: 20000
+    timeout: 30000
 
-# 3. Verify "New subject" heading is visible (optional — keyboard autoFocus
-# pushes heading above fold on small screens, BUG-60 side effect)
+# 3. Verify "New subject" heading is visible
+# Keyboard autoFocus may push heading above fold on small screens (BUG-60)
 - assertVisible:
     text: "New subject"
+    # autoFocus keyboard pushes heading off-screen on small emulator viewports
     optional: true
 
 # 4. Dismiss keyboard so cancel/submit buttons are visible
 - pressKey: back
 
-# 5. Verify cancel button is present
+# 5. Verify cancel button is present (mandatory — core UI element)
 - assertVisible:
     id: "create-subject-cancel"
-    optional: true
 
-# 6. Verify submit button is present
+# 6. Verify submit button is present (mandatory — core UI element)
 - assertVisible:
     id: "create-subject-submit"
-    optional: true
 
-# 6. Screenshot: create-subject screen (empty state)
+# 6b. Screenshot: create-subject screen (empty state)
 - takeScreenshot: empty-first-user-01-create-subject
 
 # 7. Type a subject name
@@ -101,6 +107,7 @@ tags:
 # 10. Verify the interview title contains the subject name
 - assertVisible:
     text: "Biology"
+    # Header title may show generic "Onboarding" before subject name loads via query
     optional: true
 
 # 11. Verify interview screen is showing coach context.

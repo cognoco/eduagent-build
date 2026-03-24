@@ -35,14 +35,6 @@ const PERSONA_OPTIONS: { value: PersonaType; label: string }[] = [
   { value: 'PARENT', label: 'Parent' },
 ];
 
-type LocationValue = 'EU' | 'US' | 'OTHER';
-
-const LOCATION_OPTIONS: { value: LocationValue; label: string }[] = [
-  { value: 'EU', label: 'EU' },
-  { value: 'US', label: 'US' },
-  { value: 'OTHER', label: 'Other' },
-];
-
 function formatDateForDisplay(date: Date): string {
   return date.toLocaleDateString(undefined, {
     year: 'numeric',
@@ -93,17 +85,14 @@ export default function CreateProfileScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [personaType, setPersonaType] = useState<PersonaType>('LEARNER');
   const [personaAutoDetected, setPersonaAutoDetected] = useState(false);
-  const [location, setLocation] = useState<'EU' | 'US' | 'OTHER' | ''>('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
   const birthDateString = birthDate ? formatDateForApi(birthDate) : null;
 
-  const { required: consentRequired, consentType } = checkConsentRequirement(
-    birthDateString,
-    location || null
-  );
+  const { required: consentRequired } =
+    checkConsentRequirement(birthDateString);
 
   const onDateChange = useCallback(
     (_event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -136,29 +125,21 @@ export default function CreateProfileScreen() {
     setLoading(true);
 
     try {
-      const body: {
-        displayName: string;
-        personaType?: PersonaType;
-        birthDate?: string;
-        location?: 'EU' | 'US' | 'OTHER';
-      } = {
+      const body = {
         displayName: trimmedName,
         personaType,
         birthDate: formatDateForApi(birthDate),
       };
-      if (location) {
-        body.location = location;
-      }
 
       const res = await client.profiles.$post({ json: body });
       const result = (await res.json()) as { profile: Profile };
       await queryClient.invalidateQueries({ queryKey: ['profiles'] });
       await switchProfile(result.profile.id);
 
-      if (consentRequired && consentType) {
+      if (consentRequired) {
         router.replace({
           pathname: '/consent',
-          params: { profileId: result.profile.id, consentType },
+          params: { profileId: result.profile.id },
         });
       } else {
         router.back();
@@ -173,9 +154,7 @@ export default function CreateProfileScreen() {
     displayName,
     birthDate,
     personaType,
-    location,
     consentRequired,
-    consentType,
     client,
     queryClient,
     switchProfile,
@@ -363,38 +342,6 @@ export default function CreateProfileScreen() {
             );
           })}
         </View>
-
-        {birthDate !== null && (
-          <>
-            <Text className="text-body-sm font-semibold text-text-secondary mb-2">
-              Region
-            </Text>
-            <View className="flex-row mb-8">
-              {LOCATION_OPTIONS.map((option) => {
-                const isSelected = location === option.value;
-                return (
-                  <Pressable
-                    key={option.value}
-                    onPress={() => setLocation(option.value)}
-                    className={`flex-1 py-3 items-center rounded-button me-2 last:me-0 ${
-                      isSelected ? 'bg-primary' : 'bg-surface'
-                    }`}
-                    disabled={loading}
-                    testID={`location-${option.value.toLowerCase()}`}
-                  >
-                    <Text
-                      className={`text-body-sm font-semibold ${
-                        isSelected ? 'text-text-inverse' : 'text-text-primary'
-                      }`}
-                    >
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </>
-        )}
 
         <Button
           variant="primary"

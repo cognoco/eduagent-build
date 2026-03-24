@@ -429,6 +429,30 @@ async function seedOnboardingComplete(
     'General Studies'
   );
 
+  // FIX-06: Create retention cards with mixed xpStatus so the curriculum_complete
+  // coaching card does NOT trigger. The server-side check
+  // (coaching-cards.ts Priority 3) fires when allCards.length >= 3 AND every
+  // card has xpStatus === 'verified'. The client-side useCoachingCard hook
+  // shows "You've mastered your subjects!" when there's a subject but no
+  // continue-suggestion (all topics verified). Keeping one topic at 'pending'
+  // prevents both paths.
+  const now = new Date();
+  const retentionCardValues = topicIds.map((topicId, i) => ({
+    id: generateUUIDv7(),
+    profileId,
+    topicId,
+    easeFactor: '2.50',
+    intervalDays: i < 2 ? 7 : 1,
+    repetitions: i < 2 ? 3 : 0,
+    failureCount: 0,
+    consecutiveSuccesses: i < 2 ? 3 : 0,
+    // First two topics verified, third topic pending — prevents curriculum_complete
+    xpStatus: (i < 2 ? 'verified' : 'pending') as 'verified' | 'pending',
+    nextReviewAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), // 7 days from now (not overdue)
+    lastReviewedAt: now,
+  }));
+  await db.insert(retentionCards).values(retentionCardValues);
+
   return {
     scenario: 'onboarding-complete',
     accountId,

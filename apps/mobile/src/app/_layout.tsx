@@ -32,11 +32,8 @@ import type { ColorScheme } from '../lib/design-tokens';
 import { ProfileProvider, useProfile } from '../lib/profile';
 import { ErrorBoundary, OfflineBanner } from '../components/common';
 import { useNetworkStatus } from '../hooks/use-network-status';
-import { initSentry, Sentry } from '../lib/sentry';
+import { Sentry } from '../lib/sentry';
 import { configureRevenueCat } from '../lib/revenuecat';
-
-// Initialize Sentry at module level — runs before any component renders
-initSentry();
 
 // Initialize RevenueCat at module level — runs before any component renders.
 // No-ops gracefully when API keys are not set (dev/web).
@@ -59,6 +56,10 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 5 * 60_000,
       retry: 2,
+      // Story 10.16: queries pause when offline instead of failing immediately.
+      // Mutations keep networkMode 'always' (default) so they fail immediately
+      // with a user-visible error rather than silently queuing.
+      networkMode: 'online',
     },
   },
 });

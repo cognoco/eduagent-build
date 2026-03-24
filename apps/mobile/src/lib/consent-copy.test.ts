@@ -11,10 +11,8 @@ describe('getConsentRequestCopy', () => {
   it('returns child-friendly text for learner persona', () => {
     const copy = getConsentRequestCopy('learner');
     expect(copy.title).toBe("Almost there! We need a grown-up's help");
-    expect(copy.gdprRegulation).toContain("you're under 16");
-    expect(copy.gdprRegulation).toContain('keep you safe online');
-    expect(copy.coppaRegulation).toContain("you're under 13");
-    expect(copy.coppaRegulation).toContain('keep kids safe online');
+    expect(copy.regulation).toContain("you're under 16");
+    expect(copy.regulation).toContain('keep you safe online');
     expect(copy.emailLabel).toBe("Your parent's or guardian's email");
     expect(copy.successMessage).toContain('Once they say yes');
   });
@@ -24,8 +22,8 @@ describe('getConsentRequestCopy', () => {
     (persona) => {
       const copy = getConsentRequestCopy(persona);
       expect(copy.title).toBe('Parental consent required');
-      expect(copy.gdprRegulation).toContain('EU GDPR regulations');
-      expect(copy.coppaRegulation).toContain('US COPPA regulations');
+      expect(copy.regulation).toContain('data protection regulations');
+      expect(copy.regulation).toContain('under 16');
       expect(copy.emailLabel).toBe("Parent's email address");
       expect(copy.successMessage).toContain("They'll need to approve");
     }

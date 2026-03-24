@@ -105,24 +105,19 @@ export async function findOwnerProfile(
  * The first profile created for an account is automatically marked as the
  * owner profile (isOwner = true). Subsequent profiles are non-owner.
  *
- * When `serverLocation` is provided (derived from cf.country by the route),
- * the server determines consent requirements based on birthDate + location.
+ * Consent is determined by age alone (GDPR-everywhere, Story 10.19).
  * If consent is required, a PENDING consent state row is created automatically.
  */
 export async function createProfile(
   db: Database,
   accountId: string,
   input: ProfileCreateInput,
-  isOwner?: boolean,
-  serverLocation?: 'EU' | 'US' | 'OTHER'
+  isOwner?: boolean
 ): Promise<Profile> {
-  const effectiveLocation = serverLocation ?? input.location ?? null;
-
   // Pre-compute consent check (single call — used for both age gate and consent state)
-  const consentCheck =
-    input.birthDate && effectiveLocation
-      ? checkConsentRequired(input.birthDate, effectiveLocation)
-      : null;
+  const consentCheck = input.birthDate
+    ? checkConsentRequired(input.birthDate)
+    : null;
 
   // Enforce minimum age (PRD line 386: ages 6-10 out of scope)
   if (consentCheck?.belowMinimumAge) {
@@ -137,7 +132,7 @@ export async function createProfile(
       avatarUrl: input.avatarUrl ?? null,
       birthDate: input.birthDate ? new Date(input.birthDate) : null,
       personaType: input.personaType ?? 'LEARNER',
-      location: effectiveLocation,
+      location: input.location ?? null,
       isOwner: isOwner ?? false,
     })
     .returning();

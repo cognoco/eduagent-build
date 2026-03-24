@@ -166,7 +166,7 @@ describe('consent routes', () => {
       expect(body.consentType).toBe('GDPR');
     });
 
-    it('returns 201 with COPPA consent type', async () => {
+    it('returns 201 with COPPA consent type (backward compat)', async () => {
       const res = await app.request(
         '/v1/consent/request',
         {

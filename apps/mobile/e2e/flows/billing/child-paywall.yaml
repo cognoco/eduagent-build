@@ -34,17 +34,24 @@ tags:
     env:
       CHILD_NAME: "Paywall Teen"
 
-# 3. Navigate to More tab (BUG-15: use text, not testID)
+# 3. Wait for learner home after profile switch — switch-to-child.yaml
+#    may complete before layout guard fully settles on WHPX emulator
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 10000
+
+# 4. Navigate to More tab (BUG-15: use text, not testID)
 - tapOn:
     text: "More"
 
-# 4. Wait for More screen
+# 5. Wait for More screen
 - extendedWaitUntil:
     visible:
       text: "Appearance"
-    timeout: 10000
+    timeout: 15000
 
-# 5. Scroll to Subscription (may be below fold after switch-to-child scrolled to Profile)
+# 6. Scroll to Subscription (may be below fold after switch-to-child scrolled to Profile)
 - scrollUntilVisible:
     element:
       text: "Subscription"
@@ -54,61 +61,66 @@ tags:
 - tapOn:
     text: "Subscription"
 
-# 6. Verify ChildPaywall appears (not normal subscription screen)
+# 7. Verify ChildPaywall appears (not normal subscription screen)
 - extendedWaitUntil:
     visible:
       id: "child-paywall"
     timeout: 10000
 
-# 7. Verify child-friendly heading
+# 8. Verify child-friendly heading
 - assertVisible:
     text: "Nice work so far!"
 
-# 8. Verify trial-ended message
+# 9. Verify trial-ended message
+# Long text may wrap differently on small screens — optional by design
 - assertVisible:
     text: "Your free trial has ended. Ask your parent to continue your learning journey."
     optional: true
 
-# 9. Screenshot of child paywall
+# 10. Screenshot of child paywall
 - takeScreenshot: child-paywall-heading
 
-# 10. Verify notify parent button
+# 11. Verify notify parent button
 - assertVisible:
     id: "notify-parent-button"
 
-# 11. Tap notify parent button
+# 12. Tap notify parent button
 - tapOn:
     id: "notify-parent-button"
 
-# 12. Wait for alert (optional — depends on API response/network)
+# 13. Wait for alert (optional — depends on API response/network in emulator)
 - extendedWaitUntil:
     visible:
       text: "Sent!"
     timeout: 5000
+    # Alert depends on API response — may not appear if API unreachable in emulator
     optional: true
 
-# 13. Dismiss alert if shown
+# 14. Dismiss alert if shown
+# Alert may not have appeared (see step 13)
 - tapOn:
     text: "OK"
     optional: true
 
-# 14. Screenshot after notify attempt
+# 15. Screenshot after notify attempt
 - takeScreenshot: child-paywall-after-notify
 
-# 15. Verify browse book button
+# 16. Verify browse book button
 - assertVisible:
     id: "browse-book-button"
 
-# 16. Tap browse book button
+# 17. Tap browse book button
 - tapOn:
     id: "browse-book-button"
 
-# 17. Verify Learning Book screen loads
+# 18. Verify Learning Book screen loads
+# Navigation to Learning Book may be slow on emulator with expired trial state
 - extendedWaitUntil:
     visible:
       text: "Learning Book"
-    timeout: 10000
+    timeout: 15000
+    # Learning Book screen may not load if subscription gate blocks navigation
     optional: true
 
-# 18. Final screenshot
+# 19. Final screenshot
 - takeScreenshot: child-paywall-learning-book

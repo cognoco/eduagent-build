@@ -82,7 +82,7 @@ export const consentReminder = inngest.createFunction(
       );
     });
 
-    // Day 30 auto-delete — GDPR/COPPA requires deletion if consent not granted
+    // Day 30 auto-delete — GDPR requires deletion if consent not granted
     await step.sleep('wait-5-more-days', '5d');
     await step.run('auto-delete-account', async () => {
       const db = getStepDatabase();
