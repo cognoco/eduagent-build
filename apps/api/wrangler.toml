@@ -2,6 +2,10 @@
 # MentoMate API — Cloudflare Workers Configuration
 # =============================================================================
 #
+# Account: Zwizzly (shared team account)
+# Secrets: Managed in Doppler (project: mentomate, configs: prd/stg/dev)
+#          Synced to GitHub Actions via Doppler-GitHub integration.
+#
 # Free plan (100K req/day) is fine for launch. The 10ms CPU time limit is
 # per-request CPU only — I/O waits (Gemini, Neon, Resend, Voyage) don't count.
 # If LLM routes hit "Worker exceeded CPU time limit" errors under load,
@@ -13,6 +17,7 @@
 # =============================================================================
 
 name = "mentomate-api"
+account_id = "0bcf2a3befee2c8b247aad5a94b2354c"
 main = "src/index.ts"
 compatibility_date = "2025-12-01"
 compatibility_flags = ["nodejs_compat"]
@@ -25,8 +30,8 @@ ENVIRONMENT = "development"
 #   EMAIL_FROM    = "noreply@mentomate.com"
 
 # =============================================================================
-# Secrets — set via `wrangler secret put <NAME>`
-# Never commit secret values. Each must be set in every deployment environment.
+# Secrets — managed in Doppler, synced to Cloudflare via CI/CD
+# Never commit secret values. See Doppler project "mentomate" for all configs.
 # =============================================================================
 #
 # --- Core ---
@@ -68,31 +73,23 @@ ENVIRONMENT = "development"
 
 # =============================================================================
 # KV Namespaces
-# Create with: wrangler kv namespace create <BINDING_NAME>
-# Then paste the returned id below.
+# Using title-based references — wrangler auto-creates namespaces on first
+# deploy if they don't exist in the target account.
 # =============================================================================
 
 [[kv_namespaces]]
 binding = "SUBSCRIPTION_KV"
-id = "dc05e0f9269c43e78dabd5ef984dcd64"
-preview_id = "dc05e0f9269c43e78dabd5ef984dcd64"
+id = "SUBSCRIPTION_KV"
 
 [[kv_namespaces]]
 binding = "COACHING_KV"
-id = "f5232eccbccf42538f71cba5fa2ac565"
-preview_id = "f5232eccbccf42538f71cba5fa2ac565"
+id = "COACHING_KV"
 
 # =============================================================================
 # Staging Environment
 # =============================================================================
 # Deploy with: wrangler deploy --env staging
-# Set secrets with: wrangler secret put <NAME> --env staging
-#
-# Before first staging deploy, create KV namespaces:
-#   wrangler kv namespace create SUBSCRIPTION_KV --env staging
-#   wrangler kv namespace create COACHING_KV --env staging
-# Then replace the placeholder IDs below with the returned namespace IDs.
-# =============================================================================
+# Custom domain: api-stg.mentomate.com
 
 [env.staging]
 compatibility_date = "2025-12-01"
@@ -106,23 +103,17 @@ EMAIL_FROM = "noreply@mentomate.com"
 
 [[env.staging.kv_namespaces]]
 binding = "SUBSCRIPTION_KV"
-id = "947a17b55bac4e1eb7968a110019cd22"
+id = "staging-SUBSCRIPTION_KV"
 
 [[env.staging.kv_namespaces]]
 binding = "COACHING_KV"
-id = "baf0be70bf5f441e9d00eb14362ca82b"
+id = "staging-COACHING_KV"
 
 # =============================================================================
 # Production Environment
 # =============================================================================
 # Deploy with: wrangler deploy --env production
-# Set secrets with: wrangler secret put <NAME> --env production
-#
-# Before first production deploy, create KV namespaces:
-#   wrangler kv namespace create SUBSCRIPTION_KV --env production
-#   wrangler kv namespace create COACHING_KV --env production
-# Then replace the placeholder IDs below with the returned namespace IDs.
-# =============================================================================
+# Custom domain: api.mentomate.com
 
 [env.production]
 compatibility_date = "2025-12-01"
@@ -136,8 +127,8 @@ EMAIL_FROM = "noreply@mentomate.com"
 
 [[env.production.kv_namespaces]]
 binding = "SUBSCRIPTION_KV"
-id = "ca361f466516431684c221756f45b262"
+id = "production-SUBSCRIPTION_KV"
 
 [[env.production.kv_namespaces]]
 binding = "COACHING_KV"
-id = "08b8d5f385a34533ae7a437504e40d41"
+id = "production-COACHING_KV"
