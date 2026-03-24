@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, useColorScheme } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import Svg, {
   Path,
   Circle,
@@ -6,37 +6,22 @@ import Svg, {
   LinearGradient,
   Stop,
 } from 'react-native-svg';
-import { useTheme } from '../lib/theme';
+import { useTheme, useThemeColors } from '../lib/theme';
 
-// ── Brand colors ──────────────────────────────────────────────
-const light = {
+// ── Brand colors (fixed, not theme-dependent) ────────────────
+const brand = {
   violet: '#8b5cf6',
   teal: '#0d9488',
+  tealBright: '#14b8a6',
   pink: '#f472b6',
   ltViolet: '#a78bfa',
   mint: '#5eead4',
   lavender: '#f3e8ff',
   ltMint: '#ccfbf1',
-  gradStart: '#a78bfa',
-  gradEnd: '#14b8a6',
-  textDark: '#1c1917',
-  textTeal: '#0d9488',
-  circleO: '#8b5cf6',
-} as const;
-
-const dark = {
-  violet: '#8b5cf6',
-  teal: '#14b8a6',
-  pink: '#f9a8d4',
-  ltViolet: '#c4b5fd',
-  mint: '#99f6e4',
-  lavender: '#f3e8ff',
-  ltMint: '#ccfbf1',
-  gradStart: '#c4b5fd',
-  gradEnd: '#5eead4',
-  textDark: '#f1f5f9',
-  textTeal: '#5eead4',
-  circleO: '#a78bfa',
+  gradStartLight: '#a78bfa',
+  gradEndLight: '#14b8a6',
+  gradStartDark: '#c4b5fd',
+  gradEndDark: '#5eead4',
 } as const;
 
 // ── Size presets ──────────────────────────────────────────────
@@ -52,30 +37,31 @@ type Size = 'sm' | 'md' | 'lg';
 type MentomateLogoProps = {
   variant?: Variant;
   size?: Size;
-  /** Override automatic light/dark detection */
-  colorScheme?: 'light' | 'dark';
 };
 
 /** Static Mentomate brand logo — icon only, horizontal lockup, or stacked lockup. */
 export function MentomateLogo({
   variant = 'stacked',
   size = 'md',
-  colorScheme: colorSchemeProp,
 }: MentomateLogoProps) {
-  const { colorScheme: appScheme } = useTheme();
-  const systemScheme = useColorScheme();
-  // Prefer explicit prop → app theme context → system scheme → light fallback
-  const scheme = colorSchemeProp ?? appScheme ?? systemScheme ?? 'light';
-  const c = scheme === 'dark' ? dark : light;
+  const { colorScheme } = useTheme();
+  const themeColors = useThemeColors();
+  const isDark = colorScheme === 'dark';
   const s = sizes[size];
   const gradId = `logo-grad-${size}`;
+  // Text colors from the app's resolved theme — guaranteed correct for light/dark
+  const textMent = themeColors.textPrimary;
+  const textMate = isDark ? brand.mint : brand.teal;
+  const circleOColor = isDark ? brand.ltViolet : brand.violet;
+  const gradStart = isDark ? brand.gradStartDark : brand.gradStartLight;
+  const gradEnd = isDark ? brand.gradEndDark : brand.gradEndLight;
 
   const icon = (
     <Svg width={s.icon} height={s.icon} viewBox="-5 -15 130 130">
       <Defs>
         <LinearGradient id={gradId} x1="0" y1="1" x2="1" y2="0">
-          <Stop offset="0%" stopColor={c.gradStart} />
-          <Stop offset="100%" stopColor={c.gradEnd} />
+          <Stop offset="0%" stopColor={gradStart} />
+          <Stop offset="100%" stopColor={gradEnd} />
         </LinearGradient>
       </Defs>
 
@@ -89,13 +75,13 @@ export function MentomateLogo({
       />
 
       {/* Stepping stones */}
-      <Circle cx={33} cy={73} r={4} fill={c.pink} opacity={0.55} />
-      <Circle cx={60} cy={55} r={5} fill={c.ltViolet} opacity={0.6} />
-      <Circle cx={88} cy={37} r={6} fill={c.mint} opacity={0.7} />
+      <Circle cx={33} cy={73} r={4} fill={brand.pink} opacity={0.55} />
+      <Circle cx={60} cy={55} r={5} fill={brand.ltViolet} opacity={0.6} />
+      <Circle cx={88} cy={37} r={6} fill={brand.mint} opacity={0.7} />
 
       {/* Student node */}
-      <Circle cx={20} cy={100} r={15} fill={c.violet} />
-      <Circle cx={20} cy={100} r={6.5} fill={c.lavender} />
+      <Circle cx={20} cy={100} r={15} fill={brand.violet} />
+      <Circle cx={20} cy={100} r={6.5} fill={brand.lavender} />
 
       {/* Achievement ring */}
       <Circle
@@ -103,14 +89,14 @@ export function MentomateLogo({
         cy={10}
         r={22}
         fill="none"
-        stroke={c.teal}
+        stroke={brand.tealBright}
         strokeWidth={1.5}
         opacity={0.18}
       />
 
       {/* Mentor node */}
-      <Circle cx={100} cy={10} r={17} fill={c.teal} />
-      <Circle cx={100} cy={10} r={7} fill={c.ltMint} />
+      <Circle cx={100} cy={10} r={17} fill={brand.teal} />
+      <Circle cx={100} cy={10} r={7} fill={brand.ltMint} />
     </Svg>
   );
 
@@ -118,7 +104,7 @@ export function MentomateLogo({
 
   const wordmark = (
     <View style={styles.wordmark}>
-      <Text style={[styles.text, { fontSize: s.font, color: c.textDark }]}>
+      <Text style={[styles.text, { fontSize: s.font, color: textMent }]}>
         ment
       </Text>
       <View
@@ -129,7 +115,7 @@ export function MentomateLogo({
             height: s.circleR * 2,
             borderRadius: s.circleR,
             borderWidth: s.circleStroke,
-            borderColor: c.circleO,
+            borderColor: circleOColor,
             marginHorizontal: s.gap * 0.15,
             marginBottom: s.font * 0.06,
           },
@@ -142,12 +128,12 @@ export function MentomateLogo({
               width: s.dotR * 2,
               height: s.dotR * 2,
               borderRadius: s.dotR,
-              backgroundColor: c.circleO,
+              backgroundColor: circleOColor,
             },
           ]}
         />
       </View>
-      <Text style={[styles.text, { fontSize: s.font, color: c.textTeal }]}>
+      <Text style={[styles.text, { fontSize: s.font, color: textMate }]}>
         mate
       </Text>
     </View>
