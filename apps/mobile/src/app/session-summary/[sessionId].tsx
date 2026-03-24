@@ -16,7 +16,7 @@ import { useSubmitSummary } from '../../hooks/use-sessions';
 import { Sentry } from '../../lib/sentry';
 import {
   CheckmarkPopAnimation,
-  CelebrationAnimation,
+  BrandCelebration,
 } from '../../components/common';
 
 export default function SessionSummaryScreen() {
@@ -127,11 +127,7 @@ export default function SessionSummaryScreen() {
           >
             <Ionicons name="close" size={24} color={colors.textPrimary} />
           </Pressable>
-          <CelebrationAnimation
-            size={36}
-            color={colors.success}
-            accentColor={colors.accent}
-          />
+          <BrandCelebration size={36} />
           <Text
             className="text-h3 font-semibold text-text-primary ms-2"
             testID="summary-title"
