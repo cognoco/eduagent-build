@@ -81,15 +81,21 @@ tags:
 
 # 14. Verify BYOK section text. NOTE: escaped parentheses — Maestro text:
 #     is a regex, so literal parens must be backslash-escaped.
+# BYOK section commented out in app code (Epic 10) — feature not yet ready
+# Tracking: re-enable when BYOK feature is implemented
 - scrollUntilVisible:
     element:
       text: "Bring your own key \\(coming soon\\)"
     direction: DOWN
     timeout: 15000
     speed: 30
+    # BYOK UI commented out in subscription.tsx (Epic 10) — element not rendered
+    optional: true
 
+# BYOK UI commented out in subscription.tsx (Epic 10) — element not rendered
 - assertVisible:
     text: "Bring your own key \\(coming soon\\)"
+    optional: true
 
 # 15. Screenshot of restore + BYOK section
 - takeScreenshot: subscription-details-restore-byok

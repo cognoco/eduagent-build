@@ -100,7 +100,10 @@ export default function ParentLayout() {
           name="child"
           options={{
             href: null,
+            // Triple approach: href:null + display:none + tabBarButton:null
+            // dev-client builds don't always honor href:null alone (BUG-10)
             tabBarItemStyle: { display: 'none' },
+            tabBarButton: () => null,
           }}
         />
       </Tabs>

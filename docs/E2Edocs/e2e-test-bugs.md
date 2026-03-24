@@ -947,11 +947,15 @@ During Session 12 (and previously in Sessions 10-11), the Gemini LLM API (`gemin
 - **Retry logic added to `routeAndCall()`** — up to 3 attempts with exponential backoff (1s, 2s delays) before recording circuit breaker failure. Helps non-streaming LLM calls (coaching card precompute, session-completed chain).
 - **Retry also added to fallback provider path** (`attemptProvider`) — fallback calls also retry before giving up.
 
+**Additional mitigations applied (2026-03-24, FIX-01/02/03):**
+1. **FIX-01:** `AbortSignal.timeout(20_000)` added to both Gemini `fetch()` calls — prevents indefinite hangs, circuit breaker now sees failures
+2. **FIX-02:** `OPENAI_API_KEY` added to `PRODUCTION_REQUIRED_KEYS` — OpenAI fallback guaranteed in staging/production
+3. **FIX-03:** Retry jitter added (0-500ms random), MAX_RETRIES increased to 3 (4 total), initial delay reduced to 500ms — prevents thundering herd
+
 **Remaining mitigations (not yet applied):**
 1. Add LLM health probe to `/v1/health` (actual Gemini ping, not just config check)
-2. For E2E streaming: configure OpenAI as fallback provider (`OPENAI_API_KEY` env var) — eliminates Gemini single point of failure
-3. For E2E: consider a mock/stub LLM mode that returns canned interview responses
-4. For E2E: run interview flows in a retry loop (re-seed + re-run on LLM failure)
+2. For E2E: consider a mock/stub LLM mode that returns canned interview responses
+3. For E2E: run interview flows in a retry loop (re-seed + re-run on LLM failure)
 
 ---
 
@@ -1323,3 +1327,75 @@ Same pattern as BUG-54 (session close endpoint), which was fixed in Session 16.
 
 **Files changed:** `apps/api/src/routes/consent.ts`
 **Tests:** 311/311 consent route tests pass (22 suites).
+
+---
+
+## BUG-65: Subscription Screen — Perpetual Loading Spinner (2026-03-23)
+
+**Status:** FIXED (2026-03-24) — error state + testID added to subscription.tsx (FIX-10)
+**Severity:** High — user sees blank screen
+**Affects:** Subscription detail screen (navigated from More → Subscription)
+**Type:** App bug (visual — Maestro passes but screen is blank)
+**Found by:** Session 23 visual review (V-004)
+
+**What happens:** When navigating to the Subscription screen from the More tab, only the heading "Subscription" + "Back" button + a teal loading spinner are shown. No subscription content (plan name, trial status, usage, restore purchases, BYOK) ever loads. Screen remains in infinite loading state.
+
+**Why Maestro passed:** The flow asserts `id: subscription-screen` which matches the screen container — present even when content fails to load.
+
+**Likely cause:** (1) RevenueCat SDK initialization fails in emulator (no Play Store → no StoreKit), OR (2) the `onboarding-complete` seed doesn't create subscription data, and the screen lacks an empty/error state fallback. Note: the More tab inline text shows "Subscription: Free" correctly — the issue is specific to the full detail page.
+
+**Recommended fix:** Add an empty/error state to the subscription screen (e.g., "No active subscription" or timeout handler). Verify with `trial-active` seed scenario.
+
+---
+
+## BUG-66: Parent Dashboard — Empty Child Cards (2026-03-23)
+
+**Status:** FIXED (2026-03-24) — improved empty state message + testID added to dashboard.tsx (FIX-11)
+**Severity:** Medium — cosmetic when no children linked
+**Affects:** Parent dashboard (reached via persona switch to Parent Light)
+**Type:** App bug (visual — Maestro passes)
+**Found by:** Session 23 visual review (V-005)
+
+**What happens:** Parent dashboard shows "How your children are doing" heading with two large empty gray card placeholders — no child names, no session data, no content rendered inside the cards.
+
+**Why Maestro passed:** The flow asserts the heading text "How your children are doing" and the `switch-to-teen` link, both of which are present regardless of card content.
+
+**Root cause:** The `onboarding-complete` seed creates a learner profile, not a parent with children. When switching to parent persona, the dashboard renders card skeletons but has no child data to populate them. No empty state message is shown.
+
+**Recommended fix:** When dashboard has no linked children, show "No children linked yet" message instead of empty cards. Or hide the cards entirely and show an onboarding prompt.
+
+---
+
+## BUG-67: Parent Tab Bar — 4th Tab Leak (`child/[profileId]`) (2026-03-23)
+
+**Status:** FIXED (2026-03-24) — triple approach applied: href:null + display:none + tabBarButton:null in (parent)/_layout.tsx (FIX-12)
+**Severity:** Medium — visual clutter
+**Affects:** Parent layout tab bar
+**Type:** App bug (visual)
+**Found by:** Session 23 visual review (V-006)
+
+**What happens:** The `child/[profileId]` dynamic route renders as a 4th visible tab in the parent tab bar with a broken icon (box with X) and truncated label "child/[profileI...". This should be hidden.
+
+**Why Maestro passed:** Maestro navigates by accessibility labels ("Home Tab", "Learning Book Tab", "More Tab"), bypassing visual tab position and count.
+
+**Relation to BUG-59:** BUG-59 fixed hidden tabs in the learner layout using `tabBarItemStyle: { display: 'none' }`. The same fix was applied to `(parent)/_layout.tsx` but appears to not cover the `child/[profileId]` route. Either the fix was incomplete or the dynamic route bypasses the style.
+
+**Recommended fix:** Add `tabBarItemStyle: { display: 'none' }` to the `child/[profileId]` `Tabs.Screen` in `(parent)/_layout.tsx`. Verify with emulator screenshot.
+
+---
+
+## BUG-68: Parent Learning Book Tab Routes to Wrong Screen (2026-03-23)
+
+**Status:** Open
+**Severity:** High — parent cannot access curriculum overview
+**Affects:** Parent layout, Learning Book tab
+**Type:** App bug (routing — Maestro may pass but shows wrong content)
+**Found by:** Session 23 visual review (V-008)
+
+**What happens:** When a parent taps the "Learning Book Tab", the screen shows the learner's "New subject" creation form (with keyboard open and subject name input) instead of the parent's curriculum overview. Screenshot `parent-tabs-02-learning-book` clearly shows the wrong screen.
+
+**Why Maestro partially passed:** The flow took the screenshot after tapping Learning Book Tab, but failed at the next step (tapping "More") because the unexpected screen broke navigation flow.
+
+**Likely cause:** The parent layout's Learning Book tab route may be pointing to the learner's create-subject component instead of the parent's book component. Or a navigation state leak from a previous flow left the app on the create-subject screen.
+
+**Recommended fix:** Verify parent `(parent)/_layout.tsx` Learning Book tab's `href` points to `(parent)/book` not `(learner)/create-subject`. If it's a state leak, investigate whether `pm clear` fully resets navigation stack for the parent route group.

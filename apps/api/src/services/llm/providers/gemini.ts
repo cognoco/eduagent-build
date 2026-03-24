@@ -127,6 +127,7 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20_000),
       });
 
       if (!res.ok) {
@@ -151,6 +152,7 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20_000),
       });
 
       if (!res.ok) {

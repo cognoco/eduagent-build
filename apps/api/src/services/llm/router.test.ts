@@ -243,8 +243,8 @@ describe('LLM Router', () => {
 
       // Falls back to openai after gemini retries exhausted
       expect(result.provider).toBe('openai');
-      // 3 total gemini attempts (1 + 2 retries)
-      expect(flaky.callCount).toBe(3);
+      // 4 total gemini attempts (1 + 3 retries)
+      expect(flaky.callCount).toBe(4);
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('failed after retries, trying fallback')
       );
@@ -262,7 +262,7 @@ describe('LLM Router', () => {
         routeAndCall([{ role: 'user', content: 'test' }], 1)
       ).rejects.toThrow('Transient failure');
 
-      expect(flaky.callCount).toBe(3);
+      expect(flaky.callCount).toBe(4);
       warnSpy.mockRestore();
     });
   });

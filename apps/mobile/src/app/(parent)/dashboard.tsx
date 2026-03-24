@@ -167,9 +167,10 @@ export default function DashboardScreen() {
             )}
           </>
         ) : (
-          <View className="py-8 items-center">
-            <Text className="text-body text-text-secondary">
-              No children linked yet
+          <View className="py-8 items-center" testID="dashboard-empty">
+            <Text className="text-body text-text-secondary text-center">
+              No children linked yet. Add a child profile to see their progress
+              here.
             </Text>
           </View>
         )}

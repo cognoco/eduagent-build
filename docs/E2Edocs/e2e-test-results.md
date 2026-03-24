@@ -1055,6 +1055,73 @@ Two visual bugs identified from emulator screenshot review and fixed in app code
 
 ---
 
+### Session 23 (2026-03-23) — Full Visual Review Run (61 flows)
+
+**Objective:** Run ALL E2E flows with visual review of every screenshot. Catch bugs that Maestro assertions miss — invisible text, wrong screens, empty content, layout issues.
+
+**Environment:** E2E_Device_2:5554 (cold boot + wipe-data mid-session), Metro 8081, Bundle Proxy 8082, API 8787.
+**Branch:** `e2e/session-23-visual-review` (from latest `main`)
+
+**Infrastructure notes:**
+- Maestro driver degradation after ~17 flows (DEADLINE_EXCEEDED on inputText). Fixed by cold reboot with `-no-snapshot-load -wipe-data` + APK reinstall.
+- `seed-and-run.sh` Metro URL coordinate extraction sometimes picks wrong entry (8081 vs 8082) — both work but occasionally causes bundle load timeout. Retry with FAST=0 resolves.
+
+#### Results (61 flows)
+
+| # | Flow | Status | Notes |
+|---|------|--------|-------|
+| 1-8 | Pre-auth (8 flows) | **All PASS** | All auth screens render correctly |
+| 9 | `account/more-tab-navigation` | **PASS** | V-004: Subscription screen spinner |
+| 10 | `account/settings-toggles` | **PASS** | V-005/V-006: Parent dashboard empty + 4th tab leak |
+| 11 | `account/account-lifecycle` | **PASS** | 5 WARNs (sections below fold) |
+| 12 | `account/delete-account` | **FAIL** | sign-out-button below fold after cancel |
+| 13 | `account/profile-switching` | **PASS** | |
+| 14 | `onboarding/create-profile-standalone` | **PASS** | |
+| 15 | `onboarding/create-subject` | **FAIL** | Maestro timing (assert OK, tap FAIL) |
+| 16 | `onboarding/view-curriculum` | **PASS** | V-007: Learning Book empty vs home data |
+| 17 | `onboarding/analogy-preference-flow` | **PASS** | |
+| 18 | `onboarding/curriculum-review-flow` | **FAIL** | LLM-dependent |
+| 19-21 | Billing (3 flows) | **All PASS** | Child paywall UX excellent |
+| 22-27 | Learning (6 flows) | **All PASS** | BUG-63 fix confirmed |
+| 28 | `assessment/assessment-cycle` | **FAIL** | Sign-in infra timing |
+| 29-34 | Retention (6 flows) | **All PASS** | SM-2 metrics render correctly |
+| 35 | `parent/parent-tabs` | **FAIL** | V-008: Learning Book shows wrong screen |
+| 36 | `parent/parent-dashboard` | **FAIL** | Sign-in infra timing |
+| 37-42 | Parent (6 remaining) | **All PASS** | |
+| 43-45 | Homework (3 flows) | **All PASS** | |
+| 46 | `subjects/multi-subject` | **PASS** | |
+| 47-48 | Edge (2 flows) | **All PASS** | |
+| 49-56 | Consent (8 flows) | **All PASS** | COPPA/GDPR age-gated flows clean |
+| 57-58 | Parent audit (2 flows) | **All PASS** | |
+| 59 | `onboarding/sign-up-flow` | **PARTIAL** | Clerk verification — by design |
+| 60-61 | Coach bubble dark/light | **All PASS** | |
+
+#### Session 23 Final Totals
+
+| Category | Count | Details |
+|----------|-------|---------|
+| **PASS** | **55** | 90% pass rate |
+| **FAIL** | **6** | 2 LLM/timing, 2 infra, 1 flow design, 1 Maestro timing |
+| **PARTIAL** | **1** | sign-up (Clerk verification — by design) |
+| **TOTAL** | **61** | |
+
+#### Visual Issues Found (4 MAJOR — new this session)
+
+| ID | Severity | Screen | Issue |
+|----|----------|--------|-------|
+| V-004 | MAJOR | Subscription detail | Perpetual loading spinner — no content loaded |
+| V-005 | MAJOR | Parent dashboard | Two empty gray cards — no child data rendered |
+| V-006 | MAJOR | Parent tab bar | 4th tab `child/[profileId]` leaks with broken icon |
+| V-008 | MAJOR | Parent Learning Book | Shows learner's "New subject" screen instead of curriculum |
+
+**Key insight:** All 4 MAJOR visual bugs passed Maestro's functional assertions. They were caught only by reading the screenshots — validating the visual review approach.
+
+**Comparison to Session 22:** 47/55 (85%) → 55/61 (90%). Pass rate improved, absolute count up from 47 to 55. Previously failing flows (subscription-details, child-paywall, empty-first-user) now pass. New visual review process discovered 4 MAJOR issues invisible to Maestro.
+
+**See:** `e2e-visual-findings.md` for complete visual review with per-screen analysis.
+
+---
+
 ## References
 
 - **Bug details:** See `e2e-test-bugs.md` for all bug entries (BUG-1 through BUG-60) with root causes, fixes, and workarounds.

@@ -155,8 +155,8 @@ export class CircuitOpenError extends Error {
 // Retry helper for transient failures
 // ---------------------------------------------------------------------------
 
-const MAX_RETRIES = 2; // Up to 3 total attempts
-const INITIAL_RETRY_DELAY_MS = 1_000;
+const MAX_RETRIES = 3; // Up to 4 total attempts
+const INITIAL_RETRY_DELAY_MS = 500;
 
 async function withRetry<T>(
   fn: () => Promise<T>,
@@ -170,7 +170,8 @@ async function withRetry<T>(
     } catch (err) {
       lastError = err;
       if (attempt < maxRetries) {
-        const delay = INITIAL_RETRY_DELAY_MS * 2 ** attempt;
+        const jitter = Math.random() * 500;
+        const delay = INITIAL_RETRY_DELAY_MS * 2 ** attempt + jitter;
         console.warn(
           `[llm] ${label} attempt ${
             attempt + 1
