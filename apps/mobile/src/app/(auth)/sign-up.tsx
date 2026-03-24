@@ -18,6 +18,7 @@ import { extractClerkError } from '../../lib/clerk-error';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
 import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
+import { MentomateLogo } from '../../components/MentomateLogo';
 
 // Captured at module load — safe because these screens are portrait-locked.
 const SCREEN_HEIGHT = Dimensions.get('screen').height;
@@ -263,6 +264,9 @@ export default function SignUpScreen() {
       >
         {/* Top spacer: see sign-in.tsx BUG-24 comment */}
         <View className="flex-1" style={{ minHeight: 40 }} />
+        <View className="items-center mb-6">
+          <MentomateLogo variant="stacked" size="md" />
+        </View>
         <Text className="text-h2 font-bold text-text-primary mb-1">
           Create account
         </Text>

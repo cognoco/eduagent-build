@@ -52,7 +52,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0f0f0f"
+          "backgroundColor": "#1e1b4b"
         }
       ],
       ["expo-router", { "root": "./src/app" }],

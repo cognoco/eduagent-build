@@ -34,6 +34,7 @@ import { ErrorBoundary, OfflineBanner } from '../components/common';
 import { useNetworkStatus } from '../hooks/use-network-status';
 import { Sentry } from '../lib/sentry';
 import { configureRevenueCat } from '../lib/revenuecat';
+import { AnimatedSplash } from '../components/AnimatedSplash';
 
 // Initialize RevenueCat at module level — runs before any component renders.
 // No-ops gracefully when API keys are not set (dev/web).
@@ -253,9 +254,11 @@ export default function RootLayout() {
     AtkinsonHyperlegible_700Bold,
     ...Ionicons.font,
   });
+  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
     if (fontsLoaded) {
+      // Hide native splash — the AnimatedSplash component takes over
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
@@ -280,6 +283,7 @@ export default function RootLayout() {
           </ClerkLoaded>
         </ClerkProvider>
       </SafeAreaProvider>
+      {showSplash && <AnimatedSplash onComplete={() => setShowSplash(false)} />}
     </GestureHandlerRootView>
   );
 }

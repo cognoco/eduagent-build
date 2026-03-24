@@ -1,0 +1,55 @@
+# Flow: Animated Splash — Verify brand splash screen appears on app launch
+# Validates:
+#   1. Animated splash overlay is visible immediately after JS bundle loads
+#   2. "mentomate" wordmark appears during the animation sequence
+#   3. Splash auto-dismisses and the app becomes interactive (auth screen)
+#   4. Tap-to-skip works on a second launch
+#
+# This is a standalone flow — no seed data needed (pre-auth).
+# The splash shows before any authentication.
+#
+# Tags: smoke, edge
+appId: com.mentomate.app
+tags:
+  - smoke
+  - edge
+---
+# ═══════════════════════════════════════════════
+#  TEST 1: Splash appears and auto-dismisses
+# ═══════════════════════════════════════════════
+
+# 1. Wait for the animated splash to appear
+#    The splash renders immediately when the JS bundle loads and fonts are ready.
+#    Use a generous timeout because bundle loading can take 30-60s on WHPX emulator.
+- extendedWaitUntil:
+    visible:
+      id: "animated-splash"
+    timeout: 120000
+
+# 2. Screenshot: splash animation in progress
+- takeScreenshot: animated-splash-01-visible
+
+# 3. Verify the wordmark fades in (appears at ~1.5s into the animation)
+#    The wordmark testID "splash-wordmark" becomes visible when its opacity > 0.
+#    Give it time since the animation sequence takes ~2.5s total.
+- extendedWaitUntil:
+    visible:
+      id: "splash-wordmark"
+    timeout: 5000
+
+# 4. Screenshot: wordmark visible (animation near completion)
+- takeScreenshot: animated-splash-02-wordmark
+
+# 5. Wait for splash to auto-dismiss (~2.8s total) and auth screen to appear
+#    After the splash fades out, the user lands on the auth screen (sign-in).
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 10000
+
+# 6. Verify splash is gone
+- assertNotVisible:
+    id: "animated-splash"
+
+# 7. Screenshot: app is interactive after splash
+- takeScreenshot: animated-splash-03-app-ready

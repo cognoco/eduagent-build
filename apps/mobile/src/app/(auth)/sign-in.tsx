@@ -18,6 +18,7 @@ import { extractClerkError } from '../../lib/clerk-error';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
 import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
+import { MentomateLogo } from '../../components/MentomateLogo';
 
 // Use physical screen height (not window) so the content container always
 // overflows the ScrollView after adjustResize shrinks it for the keyboard.
@@ -126,6 +127,9 @@ export default function SignInScreen() {
             on the contentContainer ensures the content always overflows the ScrollView
             after adjustResize shrinks it for the keyboard → scrollable (BUG-24/60). */}
         <View className="flex-1" style={{ minHeight: 40 }} />
+        <View className="items-center mb-6">
+          <MentomateLogo variant="stacked" size="md" />
+        </View>
         <Text className="text-h2 font-bold text-text-primary mb-1">
           Welcome back
         </Text>
