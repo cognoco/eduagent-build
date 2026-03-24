@@ -100,10 +100,9 @@ export default function ParentLayout() {
           name="child"
           options={{
             href: null,
-            // Triple approach: href:null + display:none + tabBarButton:null
-            // dev-client builds don't always honor href:null alone (BUG-10)
+            // href:null + display:none hides tab; tabBarButton:() => null
+            // cannot be combined with href (Expo Router throws render error)
             tabBarItemStyle: { display: 'none' },
-            tabBarButton: () => null,
           }}
         />
       </Tabs>

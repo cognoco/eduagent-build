@@ -113,9 +113,9 @@ tags:
 # 11. Verify interview screen is showing coach context.
 #     NOTE: "learning coach" text is inside a chat bubble FlatList — Maestro
 #     can't find text inside React Native chat bubbles on Android.
-#     Use the header subtitle "Your coach is here" instead.
+#     Use the header subtitle "Your mate is here" instead.
 - assertVisible:
-    text: "Your coach is here"
+    text: "Your mate is here"
 
 # 12. Screenshot: interview screen with AI greeting
 - takeScreenshot: empty-first-user-02-interview
