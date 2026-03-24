@@ -7,7 +7,7 @@
 # Journey: UX Journey 1 (First-time User Onboarding)
 # Epics: Epic 1
 # Prerequisite: Seeded user with completed onboarding but no subjects
-#               (scenario: onboarding-complete — creates learner profile,
+#               (scenario: onboarding-no-subject — creates learner profile,
 #                consent granted, but 0 subjects)
 #
 # testIDs verified against:

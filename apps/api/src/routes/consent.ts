@@ -96,13 +96,6 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         );
       }
 
-      if (result.emailFailureReason) {
-        console.warn(
-          '[consent] Email delivery failed:',
-          result.emailFailureReason
-        );
-      }
-
       return c.json(
         {
           message: 'Consent request sent to parent',

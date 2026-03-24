@@ -122,7 +122,7 @@ run_seeded "parent-solo"          "flows/parent/demo-dashboard.yaml"
 run_seeded "multi-subject" "flows/subjects/multi-subject.yaml"
 
 # Edge case flows
-run_seeded "onboarding-complete" "flows/edge/empty-first-user.yaml"
+run_seeded "onboarding-no-subject" "flows/edge/empty-first-user.yaml"
 
 # Consent flows (seeded, but DON'T use seed-and-sign-in.yaml — custom sign-in)
 run_seeded "consent-withdrawn"   "flows/consent/consent-withdrawn-gate.yaml"

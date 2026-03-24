@@ -20,12 +20,30 @@ tags:
   - billing
   - consent
 ---
-# 1. Seed & sign in — lands on parent dashboard (owner is PARENT persona)
+# 1. Sign in only — no post-auth recovery (BUG-52 fix).
+# The trial-expired-child seed creates a parent-owned account. Sign-in lands
+# on the parent dashboard, NOT learner home. Using sign-in-only avoids the
+# 40s+ of optional home-scroll-view waits in seed-and-sign-in that are wasted
+# for parent scenarios and risk flow timeout.
 - runFlow:
-    file: ../_setup/seed-and-sign-in.yaml
+    file: ../_setup/sign-in-only.yaml
     env:
       SEED_SCENARIO: "trial-expired-child"
       API_URL: ${API_URL}
+
+# 1b. Wait for parent dashboard — confirms sign-in succeeded and we're
+# on the expected landing screen before proceeding to profile switch.
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 30000
+
+# 1c. BUG-38 safety: PostApprovalLanding may appear after pm clear wipes
+# SecureStore. Dismiss if present before switching profiles.
+- tapOn:
+    text: "Let's Go"
+    # PostApprovalLanding only appears after SecureStore wipe — genuinely optional
+    optional: true
 
 # 2. Switch to child profile (BUG-52 fix)
 # Navigates: parent dashboard → More → Profile → tap "Paywall Teen" → learner home
@@ -39,7 +57,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "home-scroll-view"
-    timeout: 10000
+    timeout: 15000
 
 # 4. Navigate to More tab (BUG-15: use text, not testID)
 - tapOn:

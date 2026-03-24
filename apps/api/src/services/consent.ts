@@ -170,8 +170,6 @@ export interface ConsentRequestResult {
   consentState: ConsentState;
   /** Whether the consent email was successfully delivered. */
   emailDelivered: boolean;
-  /** Reason for email delivery failure, if any. */
-  emailFailureReason?: string;
 }
 
 export async function requestConsent(
@@ -240,10 +238,13 @@ export async function requestConsent(
     emailOptions
   );
 
+  if (!emailResult.sent) {
+    console.warn('[consent] Email delivery failed:', emailResult.reason);
+  }
+
   return {
     consentState: mapConsentRow(row),
     emailDelivered: emailResult.sent,
-    emailFailureReason: emailResult.reason,
   };
 }
 

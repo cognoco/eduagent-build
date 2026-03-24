@@ -111,18 +111,7 @@ tags:
     # Optional: Android native date picker dialog
     optional: true
 
-# 8. Select EU location (more likely to trigger GDPR for age 16)
-- extendedWaitUntil:
-    visible:
-      id: "location-eu"
-    timeout: 5000
-    optional: true
-
-- tapOn:
-    id: "location-eu"
-    optional: true
-
-# 9. Submit profile creation
+# 8. Submit profile creation (location picker removed — consent is purely age-gated)
 - tapOn:
     id: "create-profile-submit"
 

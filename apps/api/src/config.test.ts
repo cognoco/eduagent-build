@@ -32,14 +32,15 @@ describe('validateProductionKeys', () => {
     expect(missing).toContain('CLERK_SECRET_KEY');
     expect(missing).toContain('CLERK_JWKS_URL');
     expect(missing).toContain('GEMINI_API_KEY');
-    expect(missing).toContain('OPENAI_API_KEY');
     expect(missing).toContain('VOYAGE_API_KEY');
     expect(missing).toContain('RESEND_API_KEY');
-    expect(missing).toContain('REVENUECAT_WEBHOOK_SECRET');
     // Stripe secrets are optional — dormant until web client added
     expect(missing).not.toContain('STRIPE_SECRET_KEY');
     expect(missing).not.toContain('STRIPE_WEBHOOK_SECRET');
-    expect(missing).toHaveLength(7);
+    // OPENAI_API_KEY and REVENUECAT_WEBHOOK_SECRET are no longer required
+    expect(missing).not.toContain('OPENAI_API_KEY');
+    expect(missing).not.toContain('REVENUECAT_WEBHOOK_SECRET');
+    expect(missing).toHaveLength(5);
   });
 
   it('returns empty array for production with all required secrets present', () => {
@@ -49,10 +50,8 @@ describe('validateProductionKeys', () => {
       CLERK_SECRET_KEY: 'sk_live_xxx',
       CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
       GEMINI_API_KEY: 'gemini-key',
-      OPENAI_API_KEY: 'openai-key',
       VOYAGE_API_KEY: 'voyage-key',
       RESEND_API_KEY: 're_xxx',
-      REVENUECAT_WEBHOOK_SECRET: 'rc_webhook_secret',
       // Stripe secrets omitted — optional (dormant until web client)
     });
 
@@ -66,16 +65,11 @@ describe('validateProductionKeys', () => {
       CLERK_SECRET_KEY: 'sk_live_xxx',
       CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
       GEMINI_API_KEY: 'gemini-key',
-      OPENAI_API_KEY: 'openai-key',
-      // Missing: VOYAGE_API_KEY, RESEND_API_KEY, REVENUECAT_WEBHOOK_SECRET
+      // Missing: VOYAGE_API_KEY, RESEND_API_KEY
       // Stripe keys are optional — not in production required list
     });
 
-    expect(missing).toEqual([
-      'VOYAGE_API_KEY',
-      'RESEND_API_KEY',
-      'REVENUECAT_WEBHOOK_SECRET',
-    ]);
+    expect(missing).toEqual(['VOYAGE_API_KEY', 'RESEND_API_KEY']);
   });
 });
 
