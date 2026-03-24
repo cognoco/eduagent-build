@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, useColorScheme } from 'react-native';
 import Svg, {
   Path,
   Circle,
@@ -63,7 +63,9 @@ export function MentomateLogo({
   colorScheme: colorSchemeProp,
 }: MentomateLogoProps) {
   const { colorScheme: appScheme } = useTheme();
-  const scheme = colorSchemeProp ?? appScheme ?? 'light';
+  const systemScheme = useColorScheme();
+  // Prefer explicit prop → app theme context → system scheme → light fallback
+  const scheme = colorSchemeProp ?? appScheme ?? systemScheme ?? 'light';
   const c = scheme === 'dark' ? dark : light;
   const s = sizes[size];
   const gradId = `logo-grad-${size}`;

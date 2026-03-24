@@ -123,13 +123,14 @@ export default function SignInScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
-        {/* Top spacer: pushes form content toward center. minHeight: SCREEN_HEIGHT
-            on the contentContainer ensures the content always overflows the ScrollView
-            after adjustResize shrinks it for the keyboard → scrollable (BUG-24/60). */}
-        <View className="flex-1" style={{ minHeight: 40 }} />
-        <View className="items-center mb-3">
+        {/* Brand logo at top of screen */}
+        <View className="items-center mt-4 mb-4">
           <MentomateLogo variant="stacked" size="sm" />
         </View>
+        {/* Spacer: pushes form content toward center. minHeight: SCREEN_HEIGHT
+            on the contentContainer ensures the content always overflows the ScrollView
+            after adjustResize shrinks it for the keyboard → scrollable (BUG-24/60). */}
+        <View className="flex-1" style={{ minHeight: 20 }} />
         <Text className="text-h2 font-bold text-text-primary mb-1">
           Welcome back
         </Text>
