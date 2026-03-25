@@ -2,6 +2,13 @@
 # MentoMate API — Cloudflare Workers Configuration
 # =============================================================================
 #
+# Account: Zwizzly (shared team account)
+# Account ID is provided via CLOUDFLARE_ACCOUNT_ID env var (managed in Doppler).
+#
+# Secrets: Managed in Doppler (project: mentomate, configs: prd/stg/dev)
+#          Synced to GitHub Actions via Doppler-GitHub integration.
+#          For local dev: run `pnpm env:sync` to pull secrets from Doppler.
+#
 # Free plan (100K req/day) is fine for launch. The 10ms CPU time limit is
 # per-request CPU only — I/O waits (Gemini, Neon, Resend, Voyage) don't count.
 # If LLM routes hit "Worker exceeded CPU time limit" errors under load,
@@ -25,8 +32,8 @@ ENVIRONMENT = "development"
 #   EMAIL_FROM    = "noreply@mentomate.com"
 
 # =============================================================================
-# Secrets — set via `wrangler secret put <NAME>`
-# Never commit secret values. Each must be set in every deployment environment.
+# Secrets — managed in Doppler, synced via Doppler-GitHub integration
+# Never commit secret values. See Doppler project "mentomate" for all configs.
 # =============================================================================
 #
 # --- Core ---
@@ -67,32 +74,26 @@ ENVIRONMENT = "development"
 #   SENTRY_DSN                Sentry error tracking DSN
 
 # =============================================================================
-# KV Namespaces
-# Create with: wrangler kv namespace create <BINDING_NAME>
-# Then paste the returned id below.
+# KV Namespaces (Zwizzly account)
+# These are edge caches for subscription and coaching data.
+# Namespace IDs are from the Zwizzly Cloudflare account.
 # =============================================================================
 
 [[kv_namespaces]]
 binding = "SUBSCRIPTION_KV"
-id = "dc05e0f9269c43e78dabd5ef984dcd64"
-preview_id = "dc05e0f9269c43e78dabd5ef984dcd64"
+id = "3510a1174e454e66a169a519c9c996f7"
+preview_id = "3510a1174e454e66a169a519c9c996f7"
 
 [[kv_namespaces]]
 binding = "COACHING_KV"
-id = "f5232eccbccf42538f71cba5fa2ac565"
-preview_id = "f5232eccbccf42538f71cba5fa2ac565"
+id = "db6f91e2639e44ce931f63f858593f3c"
+preview_id = "db6f91e2639e44ce931f63f858593f3c"
 
 # =============================================================================
 # Staging Environment
 # =============================================================================
 # Deploy with: wrangler deploy --env staging
-# Set secrets with: wrangler secret put <NAME> --env staging
-#
-# Before first staging deploy, create KV namespaces:
-#   wrangler kv namespace create SUBSCRIPTION_KV --env staging
-#   wrangler kv namespace create COACHING_KV --env staging
-# Then replace the placeholder IDs below with the returned namespace IDs.
-# =============================================================================
+# Custom domain: api-stg.mentomate.com
 
 [env.staging]
 compatibility_date = "2025-12-01"
@@ -106,23 +107,17 @@ EMAIL_FROM = "noreply@mentomate.com"
 
 [[env.staging.kv_namespaces]]
 binding = "SUBSCRIPTION_KV"
-id = "947a17b55bac4e1eb7968a110019cd22"
+id = "8cbb6e486dc64f80acb0214b7fc84e25"
 
 [[env.staging.kv_namespaces]]
 binding = "COACHING_KV"
-id = "baf0be70bf5f441e9d00eb14362ca82b"
+id = "cbed5036c909416487c3b9362da521d0"
 
 # =============================================================================
 # Production Environment
 # =============================================================================
 # Deploy with: wrangler deploy --env production
-# Set secrets with: wrangler secret put <NAME> --env production
-#
-# Before first production deploy, create KV namespaces:
-#   wrangler kv namespace create SUBSCRIPTION_KV --env production
-#   wrangler kv namespace create COACHING_KV --env production
-# Then replace the placeholder IDs below with the returned namespace IDs.
-# =============================================================================
+# Custom domain: api.mentomate.com
 
 [env.production]
 compatibility_date = "2025-12-01"
@@ -136,8 +131,8 @@ EMAIL_FROM = "noreply@mentomate.com"
 
 [[env.production.kv_namespaces]]
 binding = "SUBSCRIPTION_KV"
-id = "ca361f466516431684c221756f45b262"
+id = "cde9f81f19a34022b6dc6951928a0511"
 
 [[env.production.kv_namespaces]]
 binding = "COACHING_KV"
-id = "08b8d5f385a34533ae7a437504e40d41"
+id = "76b36f4748fe4d77b27387a5bebf4be6"
