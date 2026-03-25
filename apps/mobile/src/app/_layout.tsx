@@ -259,14 +259,14 @@ class SplashErrorBoundary extends React.Component<
   { children: React.ReactNode; onError: () => void },
   { hasError: boolean }
 > {
-  state = { hasError: false };
+  override state = { hasError: false };
   static getDerivedStateFromError() {
     return { hasError: true };
   }
-  componentDidCatch() {
+  override componentDidCatch() {
     this.props.onError();
   }
-  render() {
+  override render() {
     return this.state.hasError ? null : this.props.children;
   }
 }
