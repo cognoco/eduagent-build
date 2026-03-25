@@ -1,5 +1,5 @@
 <svg viewBox="-5 -15 130 130" xmlns="http://www.w3.org/2000/svg">
-  <!-- Icon mark only — transparent background, for light surfaces -->
+  <!-- Icon mark — transparent background -->
   <defs>
     <linearGradient id="a" x1="0" y1="1" x2="1" y2="0">
       <stop offset="0%" stop-color="#a78bfa"/>

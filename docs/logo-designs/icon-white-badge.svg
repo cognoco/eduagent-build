@@ -7,7 +7,7 @@
     </linearGradient>
   </defs>
   <rect width="140" height="140" rx="30" fill="#fff" stroke="#e5e5e5" stroke-width=".5"/>
-  <g transform="translate(18,16)">
+  <g transform="translate(10,18)">
     <path d="M20,100 C20,55 100,55 100,10" fill="none" stroke="url(#a)" stroke-width="4" stroke-linecap="round"/>
     <circle cx="33" cy="73" r="4" fill="#f472b6" opacity=".55"/>
     <circle cx="60" cy="55" r="5" fill="#a78bfa" opacity=".6"/>
