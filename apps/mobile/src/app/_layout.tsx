@@ -1,5 +1,11 @@
 import '../../global.css';
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import { View, useColorScheme } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { Stack } from 'expo-router';
@@ -248,6 +254,23 @@ function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
   );
 }
 
+/** Thin error boundary so AnimatedSplash crashes don't block the app. */
+class SplashErrorBoundary extends React.Component<
+  { children: React.ReactNode; onError: () => void },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch() {
+    this.props.onError();
+  }
+  render() {
+    return this.state.hasError ? null : this.props.children;
+  }
+}
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     AtkinsonHyperlegible_400Regular,
@@ -283,7 +306,11 @@ export default function RootLayout() {
           </ClerkLoaded>
         </ClerkProvider>
       </SafeAreaProvider>
-      {showSplash && <AnimatedSplash onComplete={() => setShowSplash(false)} />}
+      {showSplash && (
+        <SplashErrorBoundary onError={() => setShowSplash(false)}>
+          <AnimatedSplash onComplete={() => setShowSplash(false)} />
+        </SplashErrorBoundary>
+      )}
     </GestureHandlerRootView>
   );
 }

@@ -89,7 +89,8 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
     const spring = { damping: 8, stiffness: 180 };
     const pop = { damping: 5, stiffness: 150 }; // bouncy overshoot = star burst feel
     const ease = Easing.bezier(0.25, 0.1, 0.25, 1);
-    const sparkEase = Easing.out(Easing.cubic);
+    // Easing.out(Easing.cubic) equivalent — Easing.out may not be available
+    const sparkEase = Easing.bezier(0.33, 1, 0.68, 1);
 
     // 200ms — student node
     studentR.value = withDelay(200, withSpring(15, spring));
