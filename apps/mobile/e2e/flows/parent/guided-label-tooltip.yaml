@@ -35,14 +35,9 @@ tags:
       id: "dashboard-scroll"
     timeout: 15000
 
-# 3. Tap into child detail
+# 3. Tap "View details" on child card (single tap — double-tap causes double navigation)
 - tapOn:
     id: "parent-dashboard-summary-primary"
-    optional: true
-
-- tapOn:
-    id: "parent-dashboard-summary"
-    optional: true
 
 # 4. Wait for child detail screen
 - extendedWaitUntil:

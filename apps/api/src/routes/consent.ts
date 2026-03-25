@@ -192,14 +192,22 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       const state = await revokeConsent(db, childProfileId, parentProfileId);
 
       // Schedule 7-day grace period deletion via Inngest
-      await inngest.send({
-        name: 'app/consent.revoked',
-        data: {
-          childProfileId,
-          parentProfileId,
-          timestamp: new Date().toISOString(),
-        },
-      });
+      // Wrapped in try-catch: revocation must succeed even if Inngest is unreachable
+      // (same pattern as consent request — BUG-64, session close — BUG-54).
+      try {
+        await inngest.send({
+          name: 'app/consent.revoked',
+          data: {
+            childProfileId,
+            parentProfileId,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      } catch {
+        console.warn(
+          '[consent] Failed to dispatch Inngest revocation event — grace period job skipped'
+        );
+      }
 
       return c.json({
         message:

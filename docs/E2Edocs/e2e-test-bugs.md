@@ -1369,7 +1369,7 @@ Same pattern as BUG-54 (session close endpoint), which was fixed in Session 16.
 
 ## BUG-67: Parent Tab Bar — 4th Tab Leak (`child/[profileId]`) (2026-03-23)
 
-**Status:** FIXED (2026-03-24) — triple approach applied: href:null + display:none + tabBarButton:null in (parent)/_layout.tsx (FIX-12)
+**Status:** FIXED (2026-03-25) — corrected route name from `child` to `child/[profileId]` to match Expo Router auto-discovery
 **Severity:** Medium — visual clutter
 **Affects:** Parent layout tab bar
 **Type:** App bug (visual)
@@ -1379,9 +1379,11 @@ Same pattern as BUG-54 (session close endpoint), which was fixed in Session 16.
 
 **Why Maestro passed:** Maestro navigates by accessibility labels ("Home Tab", "Learning Book Tab", "More Tab"), bypassing visual tab position and count.
 
-**Relation to BUG-59:** BUG-59 fixed hidden tabs in the learner layout using `tabBarItemStyle: { display: 'none' }`. The same fix was applied to `(parent)/_layout.tsx` but appears to not cover the `child/[profileId]` route. Either the fix was incomplete or the dynamic route bypasses the style.
+**Root cause (confirmed 2026-03-25):** The `Tabs.Screen` declaration used `name="child"` but Expo Router auto-discovers the route as `child/[profileId]` (because the directory structure is `child/[profileId]/_layout.tsx`). Since `name="child"` didn't match the auto-discovered route `child/[profileId]`, Expo Router ignored the declaration and created an additional visible tab for the unmatched route with default options (raw path as label, no icon).
 
-**Recommended fix:** Add `tabBarItemStyle: { display: 'none' }` to the `child/[profileId]` `Tabs.Screen` in `(parent)/_layout.tsx`. Verify with emulator screenshot.
+**Fix (2026-03-25):** Changed `name="child"` to `name="child/[profileId]"` in `(parent)/_layout.tsx`. The `href: null` + `tabBarItemStyle: { display: 'none' }` properties now correctly apply to the matching route. Note: `tabBarButton: () => null` cannot be combined with `href: null` (Expo Router throws render error) — the dual-approach is the correct pattern.
+
+**Verified:** E2E consent-management test (Session 25) shows 3 tabs in parent layout (no leaked 4th tab).
 
 ---
 
@@ -1400,3 +1402,55 @@ Same pattern as BUG-54 (session close endpoint), which was fixed in Session 16.
 **Likely cause:** The parent layout's Learning Book tab route may be pointing to the learner's create-subject component instead of the parent's book component. Or a navigation state leak from a previous flow left the app on the create-subject screen.
 
 **Recommended fix:** Verify parent `(parent)/_layout.tsx` Learning Book tab's `href` points to `(parent)/book` not `(learner)/create-subject`. If it's a state leak, investigate whether `pm clear` fully resets navigation stack for the parent route group.
+
+**Code review (2026-03-25):** `(parent)/book.tsx` correctly re-exports from `(learner)/book` — the routing config is correct. This is most likely a navigation state leak from a previous learner flow, not a routing path issue. Needs live emulator reproduction.
+
+---
+
+## BUG-69: Animated Splash Untestable in Dev-Client Builds (2026-03-25)
+
+**Status:** DOCUMENTED — test requires production APK
+**Severity:** Low (testing infrastructure only — splash works in production)
+**Affects:** `edge/animated-splash.yaml`
+**Type:** Infrastructure limitation
+
+**What happens:** The `AnimatedSplash` component mounts and starts its 2.8s animation timer when fonts load (via `useEffect` on mount). In dev-client builds, the Expo dev-client "Continue" overlay renders at the native level, on top of the entire React component tree. The splash animation plays and completes behind this overlay before the user (or Maestro) can tap "Continue". By the time Continue is dismissed, `onComplete()` has already fired and `showSplash` is `false`.
+
+**Timeline:**
+1. Bundle loads → React tree mounts → fonts start loading (~0-1s)
+2. Continue overlay shown by dev-client (native level, covers screen)
+3. Fonts loaded → `AnimatedSplash` mounts → animation starts (0s)
+4. Animation completes at ~2.8s → `onComplete()` → splash fades out
+5. User/Maestro taps Continue at ~5-10s → overlay dismissed → sign-in screen visible, splash already gone
+
+**Positive finding:** The `SplashErrorBoundary` did NOT trigger, confirming `AnimatedCircle` and `AnimatedPath` from `react-native-svg` work correctly on Fabric/New Architecture. This is significant because BUG-33 showed that animated `G` (Group) components crash with ClassCastException — `Circle` and `Path` are safe.
+
+**Approaches tested (all failed):**
+1. `seed-and-run.sh --no-seed` → Maestro starts after sign-in screen (splash gone)
+2. Metro reload via ADB dev menu → splash completes during Maestro startup (~4s)
+3. `launchApp clearState: true` within Maestro → splash completes behind Continue overlay
+
+**Resolution:** This test can only pass on production builds (no dev-client overlay). For dev-client testing, the animated splash is verified indirectly: SVG rendering works (sign-in logo confirms), SplashErrorBoundary doesn't fire (component doesn't crash), and the sign-in screen appears normally (splash auto-dismissed correctly).
+
+---
+
+## BUG-70: Consent Revocation `inngest.send()` Not Wrapped in Try-Catch (2026-03-25)
+
+**Status:** FIXED (2026-03-25)
+**Severity:** High — consent revocation fails when Inngest dev server is not running
+**Affects:** `parent/consent-management.yaml`, any parent withdrawing consent in E2E or local dev
+**Type:** App bug (same pattern as BUG-54 and BUG-64)
+
+**What happens:** The `PUT /v1/consent/:childProfileId/revoke` endpoint calls `inngest.send({ name: 'app/consent.revoked', ... })` to schedule the 7-day grace period deletion job. Without the Inngest dev server running (normal for local dev and E2E testing), the network error propagates through the outer catch block (which only handles "Not authorized" and "No consent record") and re-throws as a 500 error. The mobile app shows "Error: Could not withdraw consent. Please try again."
+
+**Root cause:** The `inngest.send()` call in the revoke endpoint was not wrapped in its own try-catch. The DB state was already saved by `revokeConsent()` before the Inngest call, so the consent was technically revoked but the success response was lost.
+
+**Fix:** Wrapped `inngest.send()` in try-catch with `console.warn()`, matching the pattern from BUG-64 (consent request) and BUG-54 (session close). Tests: 314/314 consent route tests pass.
+
+**Files changed:** `apps/api/src/routes/consent.ts` (revoke endpoint)
+
+**Pattern audit (completeness check):**
+- `app/consent.requested` → try-catch ✓ (BUG-64)
+- `app/consent.revoked` → try-catch ✓ (BUG-70, this fix)
+- `app/session.completed` → try-catch ✓ (BUG-54)
+- Restore endpoint → no Inngest call ✓ (no fix needed)
