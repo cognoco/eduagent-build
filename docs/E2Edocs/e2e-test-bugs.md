@@ -1389,7 +1389,7 @@ Same pattern as BUG-54 (session close endpoint), which was fixed in Session 16.
 
 ## BUG-68: Parent Learning Book Tab Routes to Wrong Screen (2026-03-23)
 
-**Status:** Open
+**Status:** RESOLVED (2026-03-25) — not reproducible. Resolved as side-effect of BUG-34 (subjects added to seeds).
 **Severity:** High — parent cannot access curriculum overview
 **Affects:** Parent layout, Learning Book tab
 **Type:** App bug (routing — Maestro may pass but shows wrong content)
@@ -1399,11 +1399,11 @@ Same pattern as BUG-54 (session close endpoint), which was fixed in Session 16.
 
 **Why Maestro partially passed:** The flow took the screenshot after tapping Learning Book Tab, but failed at the next step (tapping "More") because the unexpected screen broke navigation flow.
 
-**Likely cause:** The parent layout's Learning Book tab route may be pointing to the learner's create-subject component instead of the parent's book component. Or a navigation state leak from a previous flow left the app on the create-subject screen.
+**Root cause (confirmed 2026-03-25):** Navigation state leak from the learner route group. The original Session 23 test used `onboarding-complete` seed (which at the time had NO subjects), causing `home.tsx` to auto-redirect to `/create-subject`. When switching to parent persona, the stale create-subject screen in the learner group's navigation stack leaked into the parent's book tab (which re-exports the learner book component via `(parent)/book.tsx`).
 
-**Recommended fix:** Verify parent `(parent)/_layout.tsx` Learning Book tab's `href` points to `(parent)/book` not `(learner)/create-subject`. If it's a state leak, investigate whether `pm clear` fully resets navigation stack for the parent route group.
+**Resolution:** BUG-34 added subjects to the `onboarding-complete` seed, eliminating the `home.tsx` → `/create-subject` auto-redirect. Without the redirect, no stale navigation state exists to leak.
 
-**Code review (2026-03-25):** `(parent)/book.tsx` correctly re-exports from `(learner)/book` — the routing config is correct. This is most likely a navigation state leak from a previous learner flow, not a routing path issue. Needs live emulator reproduction.
+**Verification (Session 25):** Ran `parent-tabs.yaml` and `parent-learning-book.yaml` with `parent-with-children` seed — Learning Book tab correctly shows empty state ("No topics yet — add a subject to get started"). Both flows PASS. `(parent)/book.tsx` re-export is correct.
 
 ---
 

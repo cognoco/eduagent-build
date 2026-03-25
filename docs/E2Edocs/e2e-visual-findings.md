@@ -279,11 +279,11 @@ parent-learning-book, child-drill-down, consent-management, demo-dashboard, mult
 - **Impact:** Low — may confuse users who see a subject on home but empty Learning Book
 - **Likely cause:** `learning-active` seed creates subject + retention data but no curriculum topics
 
-### V-008: Parent Learning Book shows wrong screen (MAJOR)
+### V-008: Parent Learning Book shows wrong screen (MAJOR) — RESOLVED
 - **Screen:** Parent Learning Book tab
 - **What:** Tapping "Learning Book Tab" in parent layout shows the learner's "New subject" creation screen with keyboard, instead of the parent's curriculum overview
 - **Impact:** HIGH — parents cannot access curriculum overview via tab navigation
-- **Likely cause:** Parent layout's Learning Book tab routes to the learner's create-subject screen instead of the parent book component
+- **Status:** RESOLVED (2026-03-25, BUG-68) — navigation state leak from learner group. Resolved as side-effect of BUG-34 (subjects added to seeds eliminated the create-subject auto-redirect). Verified in Session 25: Learning Book shows correct empty state.
 
 ### V-009: Consent-withdrawn low contrast text (INFO)
 - **Screen:** Consent-withdrawn gate
