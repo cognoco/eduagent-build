@@ -2195,3 +2195,102 @@ Unchanged from Session 22 baseline (51/54 passing) except:
 - **Wrong seed fixed** — empty-first-user now PASS (was FAIL)
 - **hand-to-parent-consent upgraded** — date picker technique makes assertions mandatory (was all optional/weak)
 - **consent-withdrawn-gate seed fixed** — batch scripts now use correct `consent-withdrawn-solo`
+
+---
+
+## Screenshot_Device AVD — High-Res for App Store (2026-03-25)
+
+### Purpose
+
+Created a high-resolution AVD matching iPhone 15 Pro Max physical resolution for App Store / Google Play screenshots. Screenshots taken via `adb shell screencap` are at native 1290x2796 resolution — directly usable for both stores.
+
+### AVD Configuration
+
+| Setting | Value |
+|---------|-------|
+| Name | `Screenshot_Device` |
+| Resolution | 1290 x 2796 |
+| DPI | 480 (3x retina, matching iPhone 15 Pro Max) |
+| RAM | 4096 MB |
+| System image | android-34/google_apis/x86_64 |
+| Config path | `C:\AndroidHome\.android\avd\Screenshot_Device.avd\config.ini` |
+
+### Key Finding: System Dark Mode Must Be Enabled Explicitly
+
+The app's NativeWind theme (via `ThemeContext`) can render dark backgrounds even when the Android system is in light mode. But components using `useColorScheme()` from React Native read the **system** setting, not the app's internal theme state. This causes a mismatch:
+
+- **NativeWind CSS variables:** Dark (set by ThemeContext persona defaults)
+- **`useColorScheme()`:** Light (reads Android system setting)
+- **Result:** Dark background + dark text = invisible text (e.g., "ment" in logo)
+
+**Fix:** Always enable dark mode on the emulator before taking screenshots:
+```bash
+adb shell cmd uimode night yes
+```
+
+Check current mode:
+```bash
+adb shell cmd uimode night
+# "Night mode: yes" = dark, "Night mode: no" = light
+```
+
+This is persistent across app restarts but **NOT across cold boots with `-wipe-data`**.
+
+### Setup Procedure
+
+```bash
+ADB=C:/Android/Sdk/platform-tools/adb.exe
+
+# 1. Boot (from Windows)
+C:/Android/Sdk/emulator/emulator.exe -avd Screenshot_Device -no-snapshot-load -gpu host -no-audio -no-boot-anim &
+
+# 2. Wait for boot
+# Poll: $ADB shell getprop sys.boot_completed → "1"
+
+# 3. Setup
+$ADB reverse tcp:8081 tcp:8081
+$ADB reverse tcp:8082 tcp:8082
+$ADB reverse tcp:8787 tcp:8787
+$ADB shell pm disable-user --user 0 com.android.bluetooth
+$ADB shell settings put global window_animation_scale 0
+$ADB shell settings put global transition_animation_scale 0
+$ADB shell settings put global animator_duration_scale 0
+$ADB shell cmd uimode night yes
+$ADB install -r C:/tools/tmp/app-debug.apk
+$ADB shell pm grant com.mentomate.app android.permission.POST_NOTIFICATIONS
+$ADB shell pm grant com.mentomate.app android.permission.CAMERA
+$ADB shell am start -n com.mentomate.app/.MainActivity
+```
+
+### Taking Screenshots
+
+```bash
+# Capture
+$ADB shell screencap -p /sdcard/screenshot.png
+$ADB pull /sdcard/screenshot.png <local-path>.png
+
+# Verify resolution
+file <local-path>.png
+# Expected: PNG image data, 1290 x 2796, 8-bit/color RGBA
+```
+
+### Performance Notes
+
+- **Boot time:** ~35 seconds (7 polls at 5s intervals)
+- **Bundle loading:** ~10-15 seconds (much faster than E2E_Device_2 — 4GB RAM vs 2GB)
+- **Bundle proxy (8082) required:** `localhost:8081` in dev-client launcher doesn't work through `adb reverse`. Must use `10.0.2.2:8082` entry.
+- **mDNS discovery:** After cold boot without `-wipe-data`, launcher shows both `10.0.2.2:8081` and `10.0.2.2:8082`. After `-wipe-data`, may show only `localhost:8081` — need bundle proxy.
+
+### Dev-Client Launch Sequence (from ADB)
+
+```bash
+# 1. Launch app
+$ADB shell am start -n com.mentomate.app/.MainActivity
+
+# 2. Wait for launcher, tap 8082
+# uiautomator dump → grep "8082" → parse bounds → input tap
+
+# 3. Wait for "Continue" overlay → tap it
+# 4. Dev tools menu appears → press KEYCODE_BACK to dismiss
+# 5. Sign-in screen reached
+```

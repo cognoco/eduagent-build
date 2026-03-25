@@ -55,8 +55,8 @@ export const tokens: Record<Persona, Record<ColorScheme, ThemeTokens>> = {
         textPrimary: '#1a1a1a',
         textSecondary: '#525252',
         textInverse: '#fafafa',
-        primary: '#7c3aed',
-        primarySoft: 'rgba(124, 58, 237, 0.10)',
+        primary: '#6d28d9',
+        primarySoft: 'rgba(109, 40, 217, 0.10)',
         secondary: '#8b5cf6',
         accent: '#a855f7',
         success: '#15803d',
@@ -250,10 +250,10 @@ export const accentPresets: Record<Persona, AccentPreset[]> = {
     {
       id: 'violet',
       label: 'Violet',
-      swatch: '#7c3aed',
+      swatch: '#6d28d9',
       light: {
-        primary: '#7c3aed',
-        primarySoft: 'rgba(124, 58, 237, 0.10)',
+        primary: '#6d28d9',
+        primarySoft: 'rgba(109, 40, 217, 0.10)',
         secondary: '#8b5cf6',
         accent: '#a855f7',
         coachBubble: 'rgba(139, 92, 246, 0.08)',
@@ -423,10 +423,10 @@ export const accentPresets: Record<Persona, AccentPreset[]> = {
     {
       id: 'purple',
       label: 'Purple',
-      swatch: '#7c3aed',
+      swatch: '#6d28d9',
       light: {
-        primary: '#7c3aed',
-        primarySoft: 'rgba(124, 58, 237, 0.10)',
+        primary: '#6d28d9',
+        primarySoft: 'rgba(109, 40, 217, 0.10)',
         secondary: '#8b5cf6',
         accent: '#a78bfa',
         coachBubble: 'rgba(124, 58, 237, 0.06)',

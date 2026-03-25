@@ -277,7 +277,7 @@ export default function SignUpScreen() {
       >
         {/* Brand logo at top of screen */}
         <View className="items-center mt-4 mb-4">
-          <MentomateLogo variant="stacked" size="sm" />
+          <MentomateLogo size="md" />
         </View>
         {/* Spacer: see sign-in.tsx BUG-24 comment */}
         <View className="flex-1" style={{ minHeight: 20 }} />

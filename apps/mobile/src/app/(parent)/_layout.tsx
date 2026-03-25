@@ -97,7 +97,7 @@ export default function ParentLayout() {
           }}
         />
         <Tabs.Screen
-          name="child"
+          name="child/[profileId]"
           options={{
             href: null,
             // href:null + display:none hides tab; tabBarButton:() => null

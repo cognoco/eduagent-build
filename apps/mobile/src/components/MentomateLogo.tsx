@@ -1,169 +1,76 @@
-import { View, Text, StyleSheet } from 'react-native';
-import Svg, {
-  Path,
-  Circle,
-  Defs,
-  LinearGradient,
-  Stop,
-} from 'react-native-svg';
-import { useTheme, useThemeColors } from '../lib/theme';
-
-// ── Brand colors (fixed, not theme-dependent) ────────────────
-const brand = {
-  violet: '#8b5cf6',
-  teal: '#0d9488',
-  tealBright: '#14b8a6',
-  pink: '#f472b6',
-  ltViolet: '#a78bfa',
-  mint: '#5eead4',
-  lavender: '#f3e8ff',
-  ltMint: '#ccfbf1',
-  gradStartLight: '#a78bfa',
-  gradEndLight: '#14b8a6',
-  gradStartDark: '#c4b5fd',
-  gradEndDark: '#5eead4',
-} as const;
+import { View, Text, StyleSheet, useColorScheme } from 'react-native';
+import IconLight from '../../assets/images/logo-icon-light.svg';
+import IconDark from '../../assets/images/logo-icon-dark.svg';
 
 // ── Size presets ──────────────────────────────────────────────
 const sizes = {
-  sm: { icon: 32, font: 14, circleR: 3.5, circleStroke: 1.2, dotR: 1, gap: 6 },
-  md: { icon: 56, font: 20, circleR: 5, circleStroke: 1.6, dotR: 1.5, gap: 10 },
-  lg: { icon: 80, font: 28, circleR: 7, circleStroke: 1.8, dotR: 2, gap: 14 },
+  sm: { icon: 48, font: 16, gap: 6 },
+  md: { icon: 72, font: 22, gap: 8 },
+  lg: { icon: 96, font: 28, gap: 10 },
 } as const;
 
-type Variant = 'icon' | 'horizontal' | 'stacked';
 type Size = 'sm' | 'md' | 'lg';
 
 type MentomateLogoProps = {
-  variant?: Variant;
   size?: Size;
 };
 
-/** Static Mentomate brand logo — icon only, horizontal lockup, or stacked lockup. */
-export function MentomateLogo({
-  variant = 'stacked',
-  size = 'md',
-}: MentomateLogoProps) {
-  const { colorScheme } = useTheme();
-  const themeColors = useThemeColors();
+/**
+ * Mentomate brand logo — SVG icon + native Text wordmark.
+ * Automatically picks light/dark variant based on system color scheme.
+ * Uses native Text for the wordmark to guarantee correct color rendering
+ * on all screens (including pre-auth where ThemeContext is not available).
+ */
+export function MentomateLogo({ size = 'md' }: MentomateLogoProps) {
+  const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const s = sizes[size];
-  const gradId = `logo-grad-${size}`;
-  // Text colors from the app's resolved theme — guaranteed correct for light/dark
-  const textMent = themeColors.textPrimary;
-  const textMate = isDark ? brand.mint : brand.teal;
-  const circleOColor = isDark ? brand.ltViolet : brand.violet;
-  const gradStart = isDark ? brand.gradStartDark : brand.gradStartLight;
-  const gradEnd = isDark ? brand.gradEndDark : brand.gradEndLight;
+  const Icon = isDark ? IconDark : IconLight;
 
-  const icon = (
-    <Svg width={s.icon} height={s.icon} viewBox="-5 -15 130 130">
-      <Defs>
-        <LinearGradient id={gradId} x1="0" y1="1" x2="1" y2="0">
-          <Stop offset="0%" stopColor={gradStart} />
-          <Stop offset="100%" stopColor={gradEnd} />
-        </LinearGradient>
-      </Defs>
+  const mentColor = isDark ? '#f1f5f9' : '#1a1a1a';
+  const mateColor = isDark ? '#5eead4' : '#0d9488';
+  const circleColor = isDark ? '#a78bfa' : '#8b5cf6';
 
-      {/* Growth arc */}
-      <Path
-        d="M20,100 C20,55 100,55 100,10"
-        fill="none"
-        stroke={`url(#${gradId})`}
-        strokeWidth={4}
-        strokeLinecap="round"
-      />
-
-      {/* Stepping stones */}
-      <Circle cx={33} cy={73} r={4} fill={brand.pink} opacity={0.55} />
-      <Circle cx={60} cy={55} r={5} fill={brand.ltViolet} opacity={0.6} />
-      <Circle cx={88} cy={37} r={6} fill={brand.mint} opacity={0.7} />
-
-      {/* Student node */}
-      <Circle cx={20} cy={100} r={15} fill={brand.violet} />
-      <Circle cx={20} cy={100} r={6.5} fill={brand.lavender} />
-
-      {/* Achievement ring */}
-      <Circle
-        cx={100}
-        cy={10}
-        r={22}
-        fill="none"
-        stroke={brand.tealBright}
-        strokeWidth={1.5}
-        opacity={0.18}
-      />
-
-      {/* Mentor node */}
-      <Circle cx={100} cy={10} r={17} fill={brand.teal} />
-      <Circle cx={100} cy={10} r={7} fill={brand.ltMint} />
-    </Svg>
-  );
-
-  if (variant === 'icon') return icon;
-
-  const wordmark = (
-    <View style={styles.wordmark}>
-      <Text style={[styles.text, { fontSize: s.font, color: textMent }]}>
-        ment
-      </Text>
-      <View
-        style={[
-          styles.circleO,
-          {
-            width: s.circleR * 2,
-            height: s.circleR * 2,
-            borderRadius: s.circleR,
-            borderWidth: s.circleStroke,
-            borderColor: circleOColor,
-            marginHorizontal: s.gap * 0.15,
-            marginBottom: s.font * 0.06,
-          },
-        ]}
-      >
+  return (
+    <View style={styles.container}>
+      <Icon width={s.icon} height={s.icon} />
+      <View style={[styles.wordmark, { marginTop: s.gap }]}>
+        <Text style={[styles.text, { fontSize: s.font, color: mentColor }]}>
+          ment
+        </Text>
         <View
           style={[
-            styles.circleODot,
+            styles.circleO,
             {
-              width: s.dotR * 2,
-              height: s.dotR * 2,
-              borderRadius: s.dotR,
-              backgroundColor: circleOColor,
+              width: s.font * 0.5,
+              height: s.font * 0.5,
+              borderRadius: s.font * 0.25,
+              borderWidth: s.font * 0.08,
+              borderColor: circleColor,
+              marginHorizontal: s.font * 0.02,
+              marginBottom: s.font * 0.04,
             },
           ]}
-        />
+        >
+          <View
+            style={{
+              width: s.font * 0.18,
+              height: s.font * 0.18,
+              borderRadius: s.font * 0.09,
+              backgroundColor: circleColor,
+            }}
+          />
+        </View>
+        <Text style={[styles.text, { fontSize: s.font, color: mateColor }]}>
+          mate
+        </Text>
       </View>
-      <Text style={[styles.text, { fontSize: s.font, color: textMate }]}>
-        mate
-      </Text>
-    </View>
-  );
-
-  if (variant === 'horizontal') {
-    return (
-      <View style={[styles.horizontal, { gap: s.gap }]}>
-        {icon}
-        {wordmark}
-      </View>
-    );
-  }
-
-  // stacked (default)
-  return (
-    <View style={styles.stacked}>
-      {icon}
-      <View style={{ height: s.gap * 0.8 }} />
-      {wordmark}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  horizontal: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  stacked: {
+  container: {
     alignItems: 'center',
   },
   wordmark: {
@@ -178,5 +85,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  circleODot: {},
 });

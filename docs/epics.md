@@ -661,6 +661,25 @@ Epic 0 ──→ Epic 1 ──→ Epic 2 ──→ Epic 3 ──→ Epic 4
                               Epic 7 (v1.1) ← depends on Epic 1 + Epic 3
 ```
 
+### Epic 11: Brand Color Refresh (Post-Launch)
+
+**Scope:** Post-launch polish
+**Stories:** 11.1–11.5
+**Depends on:** None (independent of all other epics)
+
+**Why:** The current violet primary (`#7c3aed`/`#8b5cf6`) is strongly associated with AI-generated designs ("AI slop"). Replace teen default with brand blue (`#378ADD`) from the approved brand palette. Keep violet as a selectable accent. Also fix dark mode elevation contrast (cards invisible against background).
+
+**Stories:**
+- 11.1: Update teen persona default colors in `design-tokens.ts`
+- 11.2: Regenerate all logo SVGs with brand blue + teal
+- 11.3: Improve dark mode elevation contrast (background/surface/elevated steps)
+- 11.4: Update learner accent presets (replace purple option)
+- 11.5: Hardcoded violet color audit across codebase
+
+**Detailed plan:** `docs/plans/2026-03-25-brand-color-refresh.md`
+
+---
+
 **Parallelization opportunities:**
 - Epic 5 can start after Epic 0, running in parallel with Epics 1-4
 - Epic 4's feature clusters (Learning Book, Multi-Subject, Engagement, Parent Dashboard) can be staffed in parallel
