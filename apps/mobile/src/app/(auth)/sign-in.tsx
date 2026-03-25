@@ -23,7 +23,11 @@ import { MentomateLogo } from '../../components/MentomateLogo';
 // Use physical screen height (not window) so the content container always
 // overflows the ScrollView after adjustResize shrinks it for the keyboard.
 // This makes the ScrollView scrollable, letting users reach covered inputs.
-const SCREEN_HEIGHT = Dimensions.get('screen').height;
+// On web, cap at a mobile-like height to avoid massive whitespace.
+const SCREEN_HEIGHT =
+  Platform.OS === 'web'
+    ? Math.min(Dimensions.get('screen').height, 812)
+    : Dimensions.get('screen').height;
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -110,10 +114,16 @@ export default function SignInScreen() {
   }, [isLoaded, canSubmit, signIn, setActive, router, emailAddress, password]);
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-background" behavior="padding">
+    <KeyboardAvoidingView
+      className="flex-1 bg-background items-center"
+      behavior="padding"
+    >
       <ScrollView
         ref={scrollRef}
         className="flex-1"
+        style={
+          Platform.OS === 'web' ? { maxWidth: 480, width: '100%' } : undefined
+        }
         contentContainerStyle={{
           minHeight: SCREEN_HEIGHT,
           paddingTop: insets.top + 24,
@@ -125,7 +135,10 @@ export default function SignInScreen() {
       >
         {/* Brand logo at top of screen */}
         <View className="items-center mt-4 mb-4">
-          <MentomateLogo variant="stacked" size="sm" />
+          <MentomateLogo
+            variant="stacked"
+            size={Platform.OS === 'web' ? 'lg' : 'sm'}
+          />
         </View>
         {/* Spacer: pushes form content toward center. minHeight: SCREEN_HEIGHT
             on the contentContainer ensures the content always overflows the ScrollView

@@ -12,9 +12,8 @@
 # Usage: ./scripts/seed-and-run.sh pre-profile flows/consent/hand-to-parent-consent.yaml
 #
 # NOTE: This flow verifies the two-phase consent UI introduced in Story 10.10.
-# The date picker defaults to ~16 years old which may NOT trigger consent.
-# Phase transitions are tested where consent is triggered; steps are optional
-# where consent depends on age detection.
+# Uses the Session 22 date picker technique to select birth year 2014 (~12 years old),
+# which triggers COPPA consent. All consent assertions are mandatory.
 appId: com.mentomate.app
 tags:
   - nightly
@@ -102,16 +101,31 @@ tags:
 - inputText: "Consent Test Child"
 - pressKey: Back
 
-# 7. Open date picker and accept default
+# 7. Open date picker and select child birth year (2014 = ~12 years old → triggers COPPA)
+#    Session 22 technique: year header → year list → scroll → select → OK
 - tapOn:
     id: "create-profile-birthdate"
 
+# 7a. Switch to year list mode
+- tapOn:
+    id: "android:id/date_picker_header_year"
+
+# 7b. Scroll to year 2014 in the year list
+- scrollUntilVisible:
+    element:
+      text: "2014"
+    direction: DOWN
+    timeout: 10000
+
+# 7c. Select year 2014
+- tapOn:
+    text: "2014"
+
+# 7d. Confirm date selection
 - tapOn:
     text: "OK"
-    # Optional: Android native date picker dialog
-    optional: true
 
-# 8. Submit profile creation (location picker removed — consent is purely age-gated)
+# 8. Submit profile creation
 - tapOn:
     id: "create-profile-submit"
 
@@ -124,17 +138,15 @@ tags:
     visible:
       id: "consent-child-view"
     timeout: 15000
-    optional: true
 
 # 11. Verify child-friendly title
 - assertVisible:
     text: "One more step!"
-    optional: true
 
 # 12. Verify hand-off instruction
-- assertVisible:
-    text: "Hand your phone to your parent or guardian"
-    optional: true
+#     Full text: "We need a grown-up to say it's OK. Hand your phone to your parent or guardian."
+#     Maestro cannot match ANY substring of long wrapping text on Android (Issue 21, Pattern B).
+#     Screen identity already verified by consent-child-view testID + "One more step!" heading.
 
 # 13. Screenshot: child hand-off view
 - takeScreenshot: hand-to-parent-01-child-view
@@ -142,12 +154,10 @@ tags:
 # 14. Verify "I'm the parent / guardian" button is present
 - assertVisible:
     id: "consent-handoff-button"
-    optional: true
 
 # 15. Tap the hand-off button to transition to parent view
 - tapOn:
     id: "consent-handoff-button"
-    optional: true
 
 # ============================================================
 # PHASE 2: PARENT VIEW — email form
@@ -158,17 +168,14 @@ tags:
     visible:
       id: "consent-parent-view"
     timeout: 10000
-    optional: true
 
 # 17. Verify parent-facing title (professional, not child-friendly)
 - assertVisible:
     text: "Parental Consent Required"
-    optional: true
 
 # 18. Verify spam warning text is present
-- assertVisible:
-    text: "spam folder"
-    optional: true
+#     Full text: "We'll send a one-time consent link. Check your spam folder if you don't see it within a few minutes."
+#     Long wrapping text — Maestro Pattern B. Screen verified by consent-parent-view + title.
 
 # 19. Screenshot: parent form view
 - takeScreenshot: hand-to-parent-02-parent-view
@@ -176,15 +183,12 @@ tags:
 # 20. Enter parent email
 - tapOn:
     id: "consent-email"
-    optional: true
 - inputText: "parent-e2e@example.com"
-  # Only enters text if consent-email field was tapped
 - pressKey: back
 
 # 21. Submit consent request
 - tapOn:
     id: "consent-submit"
-    optional: true
 
 # ============================================================
 # PHASE 3: SUCCESS VIEW
@@ -194,28 +198,23 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "consent-success"
-    timeout: 10000
-    optional: true
+    timeout: 15000
 
 # 23. Verify success message
-- assertVisible:
-    text: "Consent link sent"
-    optional: true
+#     "Consent link sent!" wraps on small viewports — Pattern B.
+#     Success screen verified by consent-success testID.
 
 # 24. Verify spam hint on success screen
-- assertVisible:
-    text: "Check your inbox"
-    optional: true
+#     Full text: "Check your inbox (and spam folder). The link expires in 7 days."
+#     Long wrapping text — Maestro Pattern B. Success verified by consent-success + title.
 
 # 25. Verify resend button is available
 - assertVisible:
     id: "consent-resend-email"
-    optional: true
 
 # 26. Verify "Hand back to your child" / Done button is available
 - assertVisible:
     id: "consent-done"
-    optional: true
 
 # 27. Screenshot: success view
 - takeScreenshot: hand-to-parent-03-success
@@ -223,7 +222,6 @@ tags:
 # 28. Tap Done to return
 - tapOn:
     id: "consent-done"
-    optional: true
 
 # 29. Final screenshot
 - takeScreenshot: hand-to-parent-04-complete
