@@ -9,8 +9,12 @@
  * - Doppler is not configured for this project
  *
  * Generates:
+ * - .env.development.local  (root — used by db scripts via dotenv-cli)
  * - apps/api/.dev.vars      (Wrangler local secrets)
  * - apps/mobile/.env.local  (Expo local env)
+ *
+ * All files receive the full Doppler config. Consumers read only the
+ * keys they need; extra keys are harmless and ignored.
  *
  * Developers can also run manually: pnpm env:sync
  */
@@ -23,6 +27,10 @@ const DOPPLER_CONFIG = 'dev';
 const STALENESS_DAYS = 7;
 
 const OUTPUT_FILES = [
+  {
+    path: path.join(__dirname, '..', '.env.development.local'),
+    description: 'Root env (.env.development.local)',
+  },
   {
     path: path.join(__dirname, '..', 'apps', 'api', '.dev.vars'),
     description: 'Wrangler local secrets (apps/api/.dev.vars)',
