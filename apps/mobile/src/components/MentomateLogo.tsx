@@ -35,7 +35,11 @@ export function MentomateLogo({
   const circleColor = isDark ? '#a78bfa' : '#8b5cf6';
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      accessibilityLabel="Mentomate"
+      accessibilityRole="image"
+    >
       <Icon width={s.icon} height={s.icon} />
       <View style={[styles.wordmark, { marginTop: s.gap }]}>
         <Text style={[styles.text, { fontSize: s.font, color: mentColor }]}>

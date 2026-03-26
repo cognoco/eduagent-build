@@ -286,7 +286,7 @@ export const accentPresets: Record<Persona, AccentPreset[]> = {
       },
     },
     {
-      id: 'pink',
+      id: 'hotpink',
       label: 'Pink',
       swatch: '#f472b6',
       light: {
