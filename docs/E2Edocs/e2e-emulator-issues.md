@@ -2101,3 +2101,196 @@ curl http://localhost:8082/status   # Bundle proxy
 curl http://localhost:8787/v1/health  # API
 adb devices                         # Emulator
 ```
+
+---
+
+## Session 25 Findings (2026-03-24) — Bug Fix Verification + Consent Testing
+
+### Emulator Setup
+
+- Cold-booted `E2E_Device_2` from Claude's Bash tool — **works**, contrary to Session 24 hypothesis that the process would die. Used `emulator.exe ... & disown`.
+- After cold boot: Bluetooth must be re-disabled (`pm disable-user --user 0 com.android.bluetooth`). Persistent across `adb reboot` but NOT across cold boot.
+
+### Maestro IME Degradation — Confirmed Trigger
+
+The Maestro custom IME degrades not just after 55+ flows, but also after an **aborted batch run**. Stopping `run-all-untested.sh` mid-flow (after it had started the first Maestro test) corrupted the IME state. Symptoms:
+- `ime list -s` showed only Google Keyboard — Maestro's IME missing
+- `inputText` appeared to COMPLETE but keyboard never visually opened
+- `pressKey: back` (intended to dismiss keyboard) navigated backward, exiting the app
+- Screenshot showed Gmail welcome screen or Android home — app had been Back-keyed out
+
+**Fix:** Cold boot with `-no-snapshot-load`. Regular `adb reboot` did NOT fix it.
+
+**Prevention:** Never stop `run-all-untested.sh` while a Maestro test is actively running. If you must abort, cold-boot the emulator afterward before running more tests.
+
+### New Bug Found: Parent Layout Render Crash
+
+**Root cause:** `(parent)/_layout.tsx` had `href: null` + `tabBarButton: () => null` on the `child` tab screen. Expo Router throws: `"Cannot use 'href' and 'tabBarButton' together."` This crashed the entire parent layout on render — any persona switch to Parent would show a red error screen.
+
+**Fix:** Removed `tabBarButton: () => null`, keeping `href: null` + `tabBarItemStyle: { display: 'none' }`.
+
+**Impact:** This was the REAL cause of BUG-18 failures in Sessions 22-24. The `InteractionManager.runAfterInteractions` persona switch fix (from this branch) was correct, but couldn't be verified because the parent layout crashed before the persona value even mattered.
+
+### Stale Text in E2E Flows
+
+- `empty-first-user.yaml`: asserted `"Your coach is here"` but app shows `"Your mate is here"`. Updated.
+- `hand-to-parent-consent.yaml`: asserted `"Hand your phone to your parent or guardian"` but full text is `"We need a grown-up to say it's OK. Hand your phone to your parent or guardian."` — long wrapping text (Issue 21, Pattern B). Changed to short match: `"grown-up to say"`.
+
+### Dual-Source-of-Truth Seed Bugs (4th Instance)
+
+`run-all-untested.sh` and `rerun-failed.sh` both used `consent-withdrawn` for `consent-withdrawn-gate.yaml`, but the flow expects `consent-withdrawn-solo` (single-profile learner). The `consent-withdrawn` scenario creates parent+child, and the app loads the parent profile (account owner), bypassing the consent gate entirely. Fixed both scripts.
+
+**Pattern:** This is the same class of bug as the empty-first-user seed mismatch. The YAML flow header documents the correct scenario, but the batch scripts that call `seed-and-run.sh` were never updated to match. Always check that `run-all-untested.sh` and `rerun-failed.sh` pass the same scenario that the flow's header comment specifies.
+
+### Bundle Proxy Degradation — `/status` Lies
+
+After ~10 `pm clear` + bundle reload cycles, the bundle proxy entered a state where:
+- `curl http://localhost:8082/status` → `packager-status:running` ✓
+- `curl http://localhost:8082/apps/mobile/index.bundle?platform=android&dev=true` → HTTP 200, 8.8MB ✓
+- Dev-client connected to 8082 (green dot in launcher) ✓
+- **But the dev-client showed "Error loading app — timeout"** ✗
+
+The `/status` endpoint and even full bundle `curl` from the host worked, but the emulator's OkHttp client couldn't complete the transfer. This is a more subtle degradation than Session 24's "Metro was dead" — the proxy APPEARS healthy but silently fails under the emulator's HTTP client.
+
+**Fix:** Restart Metro + bundle proxy. No amount of `adb reboot`, `adb reverse` reset, or `pm clear` fixes this.
+
+**Diagnostic:** If you see "Error loading app — timeout" with a green dot on the 8082 entry (meaning the dev-client connected), don't waste time on the emulator — restart Metro and the proxy.
+
+### Date Picker Technique — Verified Working for Consent Flows
+
+Session 22's date picker technique works reliably for triggering COPPA consent:
+```yaml
+- tapOn:
+    id: "create-profile-birthdate"
+- tapOn:
+    id: "android:id/date_picker_header_year"
+- scrollUntilVisible:
+    element:
+      text: "2014"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    text: "2014"
+- tapOn:
+    text: "OK"
+```
+Verified: `consent-child-view` and `"One more step!"` appeared correctly after profile creation with birth year 2014 (~12 years old).
+
+### E2E Results (Session 25)
+
+| Flow | Bug/Area | Result | Notes |
+|------|----------|--------|-------|
+| `settings-toggles` | BUG-18 (persona switch) | **PASS** (96/96) | After parent layout `tabBarButton` fix |
+| `child-paywall` | BUG-52 (sign-in flow) | **PASS** (83/83) | `sign-in-only.yaml` works |
+| `empty-first-user` | Wrong seed | **PASS** (68/68) | `onboarding-no-subject` correct |
+| `consent-withdrawn-gate` | Consent service | **PASS** (54/54) | With `consent-withdrawn-solo` seed |
+| `post-approval-landing` | Consent service | **PASS** (53/53) | |
+| `hand-to-parent-consent` | Consent service | **PARTIAL** | Date picker + child view verified; bundle proxy degraded before Phase 2/3 |
+
+### Cumulative Status After Session 25
+
+Unchanged from Session 22 baseline (51/54 passing) except:
+- **BUG-18 fixed** — settings-toggles now PASS (was FAIL)
+- **BUG-52 fixed** — child-paywall now PASS (was FAIL)
+- **Wrong seed fixed** — empty-first-user now PASS (was FAIL)
+- **hand-to-parent-consent upgraded** — date picker technique makes assertions mandatory (was all optional/weak)
+- **consent-withdrawn-gate seed fixed** — batch scripts now use correct `consent-withdrawn-solo`
+
+---
+
+## Screenshot_Device AVD — High-Res for App Store (2026-03-25)
+
+### Purpose
+
+Created a high-resolution AVD matching iPhone 15 Pro Max physical resolution for App Store / Google Play screenshots. Screenshots taken via `adb shell screencap` are at native 1290x2796 resolution — directly usable for both stores.
+
+### AVD Configuration
+
+| Setting | Value |
+|---------|-------|
+| Name | `Screenshot_Device` |
+| Resolution | 1290 x 2796 |
+| DPI | 480 (3x retina, matching iPhone 15 Pro Max) |
+| RAM | 4096 MB |
+| System image | android-34/google_apis/x86_64 |
+| Config path | `C:\AndroidHome\.android\avd\Screenshot_Device.avd\config.ini` |
+
+### Key Finding: System Dark Mode Must Be Enabled Explicitly
+
+The app's NativeWind theme (via `ThemeContext`) can render dark backgrounds even when the Android system is in light mode. But components using `useColorScheme()` from React Native read the **system** setting, not the app's internal theme state. This causes a mismatch:
+
+- **NativeWind CSS variables:** Dark (set by ThemeContext persona defaults)
+- **`useColorScheme()`:** Light (reads Android system setting)
+- **Result:** Dark background + dark text = invisible text (e.g., "ment" in logo)
+
+**Fix:** Always enable dark mode on the emulator before taking screenshots:
+```bash
+adb shell cmd uimode night yes
+```
+
+Check current mode:
+```bash
+adb shell cmd uimode night
+# "Night mode: yes" = dark, "Night mode: no" = light
+```
+
+This is persistent across app restarts but **NOT across cold boots with `-wipe-data`**.
+
+### Setup Procedure
+
+```bash
+ADB=C:/Android/Sdk/platform-tools/adb.exe
+
+# 1. Boot (from Windows)
+C:/Android/Sdk/emulator/emulator.exe -avd Screenshot_Device -no-snapshot-load -gpu host -no-audio -no-boot-anim &
+
+# 2. Wait for boot
+# Poll: $ADB shell getprop sys.boot_completed → "1"
+
+# 3. Setup
+$ADB reverse tcp:8081 tcp:8081
+$ADB reverse tcp:8082 tcp:8082
+$ADB reverse tcp:8787 tcp:8787
+$ADB shell pm disable-user --user 0 com.android.bluetooth
+$ADB shell settings put global window_animation_scale 0
+$ADB shell settings put global transition_animation_scale 0
+$ADB shell settings put global animator_duration_scale 0
+$ADB shell cmd uimode night yes
+$ADB install -r C:/tools/tmp/app-debug.apk
+$ADB shell pm grant com.mentomate.app android.permission.POST_NOTIFICATIONS
+$ADB shell pm grant com.mentomate.app android.permission.CAMERA
+$ADB shell am start -n com.mentomate.app/.MainActivity
+```
+
+### Taking Screenshots
+
+```bash
+# Capture
+$ADB shell screencap -p /sdcard/screenshot.png
+$ADB pull /sdcard/screenshot.png <local-path>.png
+
+# Verify resolution
+file <local-path>.png
+# Expected: PNG image data, 1290 x 2796, 8-bit/color RGBA
+```
+
+### Performance Notes
+
+- **Boot time:** ~35 seconds (7 polls at 5s intervals)
+- **Bundle loading:** ~10-15 seconds (much faster than E2E_Device_2 — 4GB RAM vs 2GB)
+- **Bundle proxy (8082) required:** `localhost:8081` in dev-client launcher doesn't work through `adb reverse`. Must use `10.0.2.2:8082` entry.
+- **mDNS discovery:** After cold boot without `-wipe-data`, launcher shows both `10.0.2.2:8081` and `10.0.2.2:8082`. After `-wipe-data`, may show only `localhost:8081` — need bundle proxy.
+
+### Dev-Client Launch Sequence (from ADB)
+
+```bash
+# 1. Launch app
+$ADB shell am start -n com.mentomate.app/.MainActivity
+
+# 2. Wait for launcher, tap 8082
+# uiautomator dump → grep "8082" → parse bounds → input tap
+
+# 3. Wait for "Continue" overlay → tap it
+# 4. Dev tools menu appears → press KEYCODE_BACK to dismiss
+# 5. Sign-in screen reached
+```

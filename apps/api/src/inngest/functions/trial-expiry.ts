@@ -70,7 +70,12 @@ export const trialExpiry = inngest.createFunction(
         const freeTier = getTierConfig('free');
 
         for (const trial of extendedTrials) {
-          await downgradeQuotaPool(db, trial.id, freeTier.monthlyQuota);
+          await downgradeQuotaPool(
+            db,
+            trial.id,
+            freeTier.monthlyQuota,
+            freeTier.dailyLimit
+          );
           count++;
         }
 

@@ -26,6 +26,8 @@ const sampleStatus: CachedSubscriptionStatus = {
   status: 'active',
   monthlyLimit: 500,
   usedThisMonth: 42,
+  dailyLimit: null,
+  usedToday: 0,
 };
 
 describe('writeSubscriptionStatus', () => {
@@ -73,5 +75,42 @@ describe('readSubscriptionStatus', () => {
     expect(result!.status).toBe('active');
     expect(typeof result!.monthlyLimit).toBe('number');
     expect(typeof result!.usedThisMonth).toBe('number');
+    expect(result!.dailyLimit).toBeNull();
+    expect(result!.usedToday).toBe(0);
+  });
+
+  it('handles legacy cache entries without daily fields', async () => {
+    // Old cache entries won't have dailyLimit/usedToday
+    const legacyEntry = {
+      subscriptionId: 'sub-123',
+      tier: 'plus',
+      status: 'active',
+      monthlyLimit: 500,
+      usedThisMonth: 42,
+    };
+    const kv = createMockKV({ getResult: JSON.stringify(legacyEntry) });
+    const result = await readSubscriptionStatus(kv, 'acc-123');
+
+    // Should default dailyLimit to null and usedToday to 0
+    expect(result).not.toBeNull();
+    expect(result!.dailyLimit).toBeNull();
+    expect(result!.usedToday).toBe(0);
+  });
+
+  it('handles free tier with daily limit', async () => {
+    const freeStatus: CachedSubscriptionStatus = {
+      subscriptionId: 'sub-free',
+      tier: 'free',
+      status: 'active',
+      monthlyLimit: 100,
+      usedThisMonth: 30,
+      dailyLimit: 10,
+      usedToday: 5,
+    };
+    const kv = createMockKV({ getResult: JSON.stringify(freeStatus) });
+    const result = await readSubscriptionStatus(kv, 'acc-free');
+
+    expect(result!.dailyLimit).toBe(10);
+    expect(result!.usedToday).toBe(5);
   });
 });

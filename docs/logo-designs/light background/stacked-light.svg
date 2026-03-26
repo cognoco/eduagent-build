@@ -1,0 +1,27 @@
+<svg viewBox="0 0 180 130" xmlns="http://www.w3.org/2000/svg">
+  <!-- Stacked lockup — icon above wordmark, for light backgrounds -->
+  <rect width="180" height="130" fill="#fff"/>
+  <defs>
+    <linearGradient id="a" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </linearGradient>
+  </defs>
+  <!-- Icon centered -->
+  <g transform="translate(52,2) scale(0.7)">
+    <path d="M20,100 C20,55 100,55 100,10" fill="none" stroke="url(#a)" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="33" cy="73" r="5" fill="#f472b6" opacity=".55"/>
+    <circle cx="60" cy="55" r="6" fill="#a78bfa" opacity=".6"/>
+    <circle cx="88" cy="37" r="7" fill="#5eead4" opacity=".7"/>
+    <circle cx="20" cy="100" r="17" fill="#8b5cf6"/>
+    <circle cx="20" cy="100" r="7.5" fill="#f3e8ff"/>
+    <circle cx="100" cy="10" r="25" fill="none" stroke="#14b8a6" stroke-width="2" opacity=".18"/>
+    <circle cx="100" cy="10" r="20" fill="#0d9488"/>
+    <circle cx="100" cy="10" r="8.5" fill="#ccfbf1"/>
+  </g>
+  <!-- Wordmark centered below -->
+  <text x="82" y="112" text-anchor="end" font-family="'Inter',system-ui,sans-serif" font-size="22" font-weight="600" letter-spacing="-.5" fill="#1c1917">ment</text>
+  <circle cx="90" cy="106" r="5.5" fill="none" stroke="#8b5cf6" stroke-width="1.8"/>
+  <circle cx="90" cy="106" r="2" fill="#8b5cf6"/>
+  <text x="98" y="112" font-family="'Inter',system-ui,sans-serif" font-size="22" font-weight="600" letter-spacing="-.5" fill="#0d9488">mate</text>
+</svg>

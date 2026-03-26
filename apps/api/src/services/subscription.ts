@@ -12,6 +12,7 @@ export interface SubscriptionState {
 
 export interface TierConfig {
   monthlyQuota: number;
+  dailyLimit: number | null;
   maxProfiles: number;
   priceMonthly: number;
   priceYearly: number;
@@ -25,7 +26,8 @@ export interface TierConfig {
 
 const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
   free: {
-    monthlyQuota: 50,
+    monthlyQuota: 100,
+    dailyLimit: 10,
     maxProfiles: 1,
     priceMonthly: 0,
     priceYearly: 0,
@@ -34,6 +36,7 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
   },
   plus: {
     monthlyQuota: 500,
+    dailyLimit: null,
     maxProfiles: 1,
     priceMonthly: 18.99,
     priceYearly: 168,
@@ -42,6 +45,7 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
   },
   family: {
     monthlyQuota: 1500,
+    dailyLimit: null,
     maxProfiles: 4,
     priceMonthly: 28.99,
     priceYearly: 252,
@@ -50,6 +54,7 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
   },
   pro: {
     monthlyQuota: 3000,
+    dailyLimit: null,
     maxProfiles: 6,
     priceMonthly: 48.99,
     priceYearly: 432,

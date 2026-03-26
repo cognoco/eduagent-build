@@ -39,15 +39,10 @@ tags:
 # 3. Screenshot: parent dashboard
 - takeScreenshot: raw-input-audit-01-dashboard
 
-# 4. Tap into child detail (via summary card)
+# 4. Tap "View details" on child card (single tap only — double-tap causes
+#    double router.push past child detail, see consent-management fix)
 - tapOn:
     id: "parent-dashboard-summary-primary"
-    optional: true
-
-# 4b. Fallback: tap the card body
-- tapOn:
-    id: "parent-dashboard-summary"
-    optional: true
 
 # 5. Wait for child detail screen
 - extendedWaitUntil:

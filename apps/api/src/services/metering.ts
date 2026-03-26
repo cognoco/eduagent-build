@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Quota Metering — Story 5.6
+// Quota Metering — Story 5.6 + Dual-Cap (daily + monthly)
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
@@ -7,12 +7,16 @@ export interface MeteringState {
   monthlyLimit: number;
   usedThisMonth: number;
   topUpCreditsRemaining: number;
+  dailyLimit: number | null;
+  usedToday: number;
 }
 
 export interface MeteringResult {
   allowed: boolean;
   remaining: number;
   warningLevel: 'none' | 'soft' | 'hard' | 'exceeded';
+  dailyRemaining: number | null;
+  dailyWarningLevel: 'none' | 'soft' | 'hard' | 'exceeded' | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -44,7 +48,7 @@ export function getWarningLevel(
 }
 
 /**
- * Calculates the total remaining questions available.
+ * Calculates the total remaining questions available (monthly + top-ups).
  * Combines remaining monthly quota with top-up credits.
  */
 export function calculateRemainingQuestions(state: MeteringState): number {
@@ -56,19 +60,43 @@ export function calculateRemainingQuestions(state: MeteringState): number {
 }
 
 /**
+ * Calculates remaining daily questions.
+ * Returns null when there is no daily limit (paid tiers).
+ */
+export function calculateRemainingDaily(state: MeteringState): number | null {
+  if (state.dailyLimit === null) {
+    return null;
+  }
+  return Math.max(0, state.dailyLimit - state.usedToday);
+}
+
+/**
  * Checks quota and returns whether the user is allowed to ask a question.
  *
- * When the monthly quota is exhausted, draws from top-up credits.
- * Warning levels are based on the monthly limit usage ratio.
+ * Enforces both daily and monthly caps:
+ * - Daily cap: if set, user cannot exceed dailyLimit per day
+ * - Monthly cap: user cannot exceed monthlyLimit per month (+ top-ups)
+ * Both must pass for the question to be allowed.
  */
 export function checkQuota(state: MeteringState): MeteringResult {
   const remaining = calculateRemainingQuestions(state);
   const warningLevel = getWarningLevel(state.usedThisMonth, state.monthlyLimit);
+  const dailyRemaining = calculateRemainingDaily(state);
+  const dailyWarningLevel =
+    state.dailyLimit !== null
+      ? getWarningLevel(state.usedToday, state.dailyLimit)
+      : null;
+
+  // Both caps must pass
+  const dailyAllowed = dailyRemaining === null || dailyRemaining > 0;
+  const monthlyAllowed = remaining > 0;
 
   return {
-    allowed: remaining > 0,
+    allowed: dailyAllowed && monthlyAllowed,
     remaining,
     warningLevel,
+    dailyRemaining,
+    dailyWarningLevel,
   };
 }
 

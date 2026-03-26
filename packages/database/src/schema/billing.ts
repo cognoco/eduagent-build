@@ -64,8 +64,10 @@ export const quotaPools = pgTable('quota_pools', {
     .notNull()
     .unique()
     .references(() => subscriptions.id, { onDelete: 'cascade' }),
-  monthlyLimit: integer('monthly_limit').notNull().default(50),
+  monthlyLimit: integer('monthly_limit').notNull().default(100),
   usedThisMonth: integer('used_this_month').notNull().default(0),
+  dailyLimit: integer('daily_limit'),
+  usedToday: integer('used_today').notNull().default(0),
   cycleResetAt: timestamp('cycle_reset_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()

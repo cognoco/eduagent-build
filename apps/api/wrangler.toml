@@ -103,7 +103,7 @@ compatibility_flags = ["nodejs_compat"]
 ENVIRONMENT = "staging"
 APP_URL = "https://staging.mentomate.com"
 LOG_LEVEL = "debug"
-EMAIL_FROM = "noreply@mentomate.com"
+EMAIL_FROM = "staging-noreply@mentomate.com"
 
 [[env.staging.kv_namespaces]]
 binding = "SUBSCRIPTION_KV"

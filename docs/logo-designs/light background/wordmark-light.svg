@@ -1,0 +1,8 @@
+<svg viewBox="0 0 260 40" xmlns="http://www.w3.org/2000/svg">
+  <!-- Wordmark only (no icon) — for tight spaces, footers, captions. Light bg -->
+  <rect width="260" height="40" fill="#fff"/>
+  <text x="108" y="30" text-anchor="end" font-family="'Inter',system-ui,sans-serif" font-size="30" font-weight="600" letter-spacing="-.5" fill="#1c1917">ment</text>
+  <circle cx="118" cy="22.5" r="7.5" fill="none" stroke="#8b5cf6" stroke-width="1.8"/>
+  <circle cx="118" cy="22.5" r="2.5" fill="#8b5cf6"/>
+  <text x="128" y="30" font-family="'Inter',system-ui,sans-serif" font-size="30" font-weight="600" letter-spacing="-.5" fill="#0d9488">mate</text>
+</svg>

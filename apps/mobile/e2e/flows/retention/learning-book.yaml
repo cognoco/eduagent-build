@@ -92,9 +92,9 @@ tags:
 # 14. Screenshot after filtering
 - takeScreenshot: learning-book-filtered
 
-# 15. Return to home screen
+# 15. Return to home screen (use accessibility label to avoid matching heading)
 - tapOn:
-    text: "Home"
+    text: "Home Tab"
     optional: true
 
 # 16. Navigate to Learning Book via retention strip chip

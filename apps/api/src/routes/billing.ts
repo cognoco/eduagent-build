@@ -84,18 +84,25 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           trialEndsAt: null,
           currentPeriodEnd: null,
           cancelAtPeriodEnd: false,
-          monthlyLimit: 50,
+          monthlyLimit: 100,
           usedThisMonth: 0,
-          remainingQuestions: 50,
+          remainingQuestions: 100,
+          dailyLimit: 10,
+          usedToday: 0,
+          dailyRemainingQuestions: 10,
         },
       });
     }
 
     // Fetch quota pool for enriched response
     const quota = await getQuotaPool(db, subscription.id);
-    const monthlyLimit = quota?.monthlyLimit ?? 50;
+    const monthlyLimit = quota?.monthlyLimit ?? 100;
     const usedThisMonth = quota?.usedThisMonth ?? 0;
     const remaining = Math.max(0, monthlyLimit - usedThisMonth);
+    const dailyLimit = quota?.dailyLimit ?? null;
+    const usedToday = quota?.usedToday ?? 0;
+    const dailyRemainingQuestions =
+      dailyLimit !== null ? Math.max(0, dailyLimit - usedToday) : null;
 
     // cancelAtPeriodEnd: subscription has a cancellation date but status is still active
     const cancelAtPeriodEnd =
@@ -111,6 +118,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         monthlyLimit,
         usedThisMonth,
         remainingQuestions: remaining,
+        dailyLimit,
+        usedToday,
+        dailyRemainingQuestions,
       },
     });
   })
@@ -318,19 +328,24 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     if (!subscription) {
       return c.json({
         usage: {
-          monthlyLimit: 50,
+          monthlyLimit: 100,
           usedThisMonth: 0,
-          remainingQuestions: 50,
+          remainingQuestions: 100,
           topUpCreditsRemaining: 0,
           warningLevel: 'none' as const,
           cycleResetAt: new Date().toISOString(),
+          dailyLimit: 10,
+          usedToday: 0,
+          dailyRemainingQuestions: 10,
         },
       });
     }
 
     const quota = await getQuotaPool(db, subscription.id);
-    const monthlyLimit = quota?.monthlyLimit ?? 50;
+    const monthlyLimit = quota?.monthlyLimit ?? 100;
     const usedThisMonth = quota?.usedThisMonth ?? 0;
+    const dailyLimit = quota?.dailyLimit ?? null;
+    const usedToday = quota?.usedToday ?? 0;
     const topUpCreditsRemaining = await getTopUpCreditsRemaining(
       db,
       subscription.id
@@ -339,8 +354,12 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       monthlyLimit,
       usedThisMonth,
       topUpCreditsRemaining,
+      dailyLimit,
+      usedToday,
     });
     const warningLevel = getWarningLevel(usedThisMonth, monthlyLimit);
+    const dailyRemainingQuestions =
+      dailyLimit !== null ? Math.max(0, dailyLimit - usedToday) : null;
 
     return c.json({
       usage: {
@@ -350,6 +369,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         topUpCreditsRemaining,
         warningLevel,
         cycleResetAt: quota?.cycleResetAt ?? new Date().toISOString(),
+        dailyLimit,
+        usedToday,
+        dailyRemainingQuestions,
       },
     });
   })
@@ -403,6 +425,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
             status: cached.status,
             monthlyLimit: cached.monthlyLimit,
             usedThisMonth: cached.usedThisMonth,
+            dailyLimit: cached.dailyLimit,
+            usedToday: cached.usedToday,
           },
         });
       }
@@ -415,8 +439,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         status: {
           tier: 'free' as const,
           status: 'trial' as const,
-          monthlyLimit: 50,
+          monthlyLimit: 100,
           usedThisMonth: 0,
+          dailyLimit: 10,
+          usedToday: 0,
         },
       });
     }
@@ -427,8 +453,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       status: {
         tier: subscription.tier,
         status: subscription.status,
-        monthlyLimit: quota?.monthlyLimit ?? 50,
+        monthlyLimit: quota?.monthlyLimit ?? 100,
         usedThisMonth: quota?.usedThisMonth ?? 0,
+        dailyLimit: quota?.dailyLimit ?? null,
+        usedToday: quota?.usedToday ?? 0,
       },
     });
   })

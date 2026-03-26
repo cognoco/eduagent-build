@@ -81,9 +81,8 @@ tags:
 # 11. Screenshot: Learning Book content
 - takeScreenshot: parent-learning-book-02-content
 
-# 12. Navigate back to Home tab (BUG-15: use text, not testID)
-- tapOn:
-    text: "Home"
+# 12. Navigate back to Home tab (use accessibility label to avoid matching heading)
+- tapOn: "Home Tab"
 
 # 13. Verify dashboard is visible again
 - extendedWaitUntil:

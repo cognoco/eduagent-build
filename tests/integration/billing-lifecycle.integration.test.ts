@@ -34,13 +34,12 @@ jest.mock('../../apps/api/src/services/billing', () => ({
   markSubscriptionCancelled: mockMarkSubscriptionCancelled,
   getTopUpCreditsRemaining: mockGetTopUpCreditsRemaining,
   getTopUpPriceCents: mockGetTopUpPriceCents,
-  decrementQuota: jest
-    .fn()
-    .mockResolvedValue({
-      success: true,
-      remainingMonthly: 49,
-      remainingTopUp: 0,
-    }),
+  decrementQuota: jest.fn().mockResolvedValue({
+    success: true,
+    remainingMonthly: 49,
+    remainingTopUp: 0,
+    remainingDaily: null,
+  }),
 }));
 
 jest.mock('../../apps/api/src/services/stripe', () => ({
@@ -81,9 +80,13 @@ jest.mock('../../apps/api/src/services/kv', () => ({
   readSubscriptionStatus: jest.fn().mockResolvedValue(null),
 }));
 
+const mockGetWarningLevel = jest.fn().mockReturnValue('none');
+const mockCalculateRemainingQuestions = jest.fn().mockReturnValue(50);
+
 jest.mock('../../apps/api/src/services/metering', () => ({
-  getWarningLevel: jest.fn().mockReturnValue('none'),
-  calculateRemainingQuestions: jest.fn().mockReturnValue(50),
+  getWarningLevel: (...args: unknown[]) => mockGetWarningLevel(...args),
+  calculateRemainingQuestions: (...args: unknown[]) =>
+    mockCalculateRemainingQuestions(...args),
 }));
 
 // --- Base mocks (middleware chain requires these) ---
@@ -152,11 +155,15 @@ describe('Integration: GET /v1/subscription', () => {
     const body = await res.json();
     expect(body.subscription.tier).toBe('free');
     expect(body.subscription.status).toBe('trial');
-    expect(body.subscription.monthlyLimit).toBe(50);
-    expect(body.subscription.remainingQuestions).toBe(50);
+    expect(body.subscription.monthlyLimit).toBe(100);
+    expect(body.subscription.remainingQuestions).toBe(100);
+    // Dual-cap: free tier defaults include daily limit
+    expect(body.subscription.dailyLimit).toBe(10);
+    expect(body.subscription.usedToday).toBe(0);
+    expect(body.subscription.dailyRemainingQuestions).toBe(10);
   });
 
-  it('returns 200 with existing subscription details', async () => {
+  it('returns 200 with existing subscription details (paid tier, no daily limit)', async () => {
     mockGetSubscriptionByAccountId.mockResolvedValue({
       id: SUBSCRIPTION_ID,
       accountId: ACCOUNT_ID,
@@ -173,6 +180,8 @@ describe('Integration: GET /v1/subscription', () => {
       subscriptionId: SUBSCRIPTION_ID,
       monthlyLimit: 500,
       usedThisMonth: 42,
+      dailyLimit: null,
+      usedToday: 15,
     });
 
     const res = await app.request(
@@ -189,6 +198,46 @@ describe('Integration: GET /v1/subscription', () => {
     expect(body.subscription.usedThisMonth).toBe(42);
     expect(body.subscription.remainingQuestions).toBe(458);
     expect(body.subscription.cancelAtPeriodEnd).toBe(false);
+    // Paid tier: no daily limit
+    expect(body.subscription.dailyLimit).toBeNull();
+    expect(body.subscription.usedToday).toBe(15);
+    expect(body.subscription.dailyRemainingQuestions).toBeNull();
+  });
+
+  it('returns daily remaining for free tier subscription', async () => {
+    mockGetSubscriptionByAccountId.mockResolvedValue({
+      id: SUBSCRIPTION_ID,
+      accountId: ACCOUNT_ID,
+      tier: 'free',
+      status: 'active',
+      trialEndsAt: null,
+      currentPeriodEnd: '2025-02-15T00:00:00.000Z',
+      cancelledAt: null,
+      stripeSubscriptionId: null,
+      stripeCustomerId: null,
+    });
+    mockGetQuotaPool.mockResolvedValue({
+      id: 'quota-1',
+      subscriptionId: SUBSCRIPTION_ID,
+      monthlyLimit: 100,
+      usedThisMonth: 30,
+      dailyLimit: 10,
+      usedToday: 7,
+    });
+
+    const res = await app.request(
+      '/v1/subscription',
+      { method: 'GET', headers: AUTH_HEADERS },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.subscription.tier).toBe('free');
+    expect(body.subscription.dailyLimit).toBe(10);
+    expect(body.subscription.usedToday).toBe(7);
+    expect(body.subscription.dailyRemainingQuestions).toBe(3);
+    expect(body.subscription.remainingQuestions).toBe(70);
   });
 
   it('returns 401 without auth', async () => {
@@ -302,7 +351,7 @@ describe('Integration: GET /v1/usage', () => {
     configureValidJWT(jwt);
   });
 
-  it('returns 200 with usage data', async () => {
+  it('returns 200 with usage data (paid tier, no daily limit)', async () => {
     mockGetSubscriptionByAccountId.mockResolvedValue({
       id: SUBSCRIPTION_ID,
       accountId: ACCOUNT_ID,
@@ -314,9 +363,12 @@ describe('Integration: GET /v1/usage', () => {
       subscriptionId: SUBSCRIPTION_ID,
       monthlyLimit: 500,
       usedThisMonth: 120,
+      dailyLimit: null,
+      usedToday: 8,
       cycleResetAt: '2025-02-01T00:00:00.000Z',
     });
     mockGetTopUpCreditsRemaining.mockResolvedValue(0);
+    mockCalculateRemainingQuestions.mockReturnValue(380);
 
     const res = await app.request(
       '/v1/usage',
@@ -330,6 +382,64 @@ describe('Integration: GET /v1/usage', () => {
     expect(body.usage.monthlyLimit).toBe(500);
     expect(body.usage.usedThisMonth).toBe(120);
     expect(body.usage.warningLevel).toBe('none');
+    expect(body.usage.remainingQuestions).toBe(380);
+    // Paid tier: no daily limit
+    expect(body.usage.dailyLimit).toBeNull();
+    expect(body.usage.usedToday).toBe(8);
+    expect(body.usage.dailyRemainingQuestions).toBeNull();
+  });
+
+  it('returns 200 with daily cap fields for free tier', async () => {
+    mockGetSubscriptionByAccountId.mockResolvedValue({
+      id: SUBSCRIPTION_ID,
+      accountId: ACCOUNT_ID,
+      tier: 'free',
+      status: 'active',
+    });
+    mockGetQuotaPool.mockResolvedValue({
+      id: 'quota-1',
+      subscriptionId: SUBSCRIPTION_ID,
+      monthlyLimit: 100,
+      usedThisMonth: 45,
+      dailyLimit: 10,
+      usedToday: 9,
+      cycleResetAt: '2025-02-01T00:00:00.000Z',
+    });
+    mockGetTopUpCreditsRemaining.mockResolvedValue(0);
+    mockCalculateRemainingQuestions.mockReturnValue(55);
+
+    const res = await app.request(
+      '/v1/usage',
+      { method: 'GET', headers: AUTH_HEADERS },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.usage.monthlyLimit).toBe(100);
+    expect(body.usage.usedThisMonth).toBe(45);
+    expect(body.usage.dailyLimit).toBe(10);
+    expect(body.usage.usedToday).toBe(9);
+    expect(body.usage.dailyRemainingQuestions).toBe(1);
+    expect(body.usage.remainingQuestions).toBe(55);
+  });
+
+  it('returns free defaults with daily fields when no subscription', async () => {
+    mockGetSubscriptionByAccountId.mockResolvedValue(null);
+
+    const res = await app.request(
+      '/v1/usage',
+      { method: 'GET', headers: AUTH_HEADERS },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.usage.monthlyLimit).toBe(100);
+    expect(body.usage.usedThisMonth).toBe(0);
+    expect(body.usage.dailyLimit).toBe(10);
+    expect(body.usage.usedToday).toBe(0);
+    expect(body.usage.dailyRemainingQuestions).toBe(10);
   });
 });
 

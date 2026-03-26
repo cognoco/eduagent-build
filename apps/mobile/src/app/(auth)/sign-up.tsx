@@ -18,9 +18,14 @@ import { extractClerkError } from '../../lib/clerk-error';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
 import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
+import { MentomateLogo } from '../../components/MentomateLogo';
 
 // Captured at module load — safe because these screens are portrait-locked.
-const SCREEN_HEIGHT = Dimensions.get('screen').height;
+// On web, cap at a mobile-like height to avoid massive whitespace.
+const SCREEN_HEIGHT =
+  Platform.OS === 'web'
+    ? Math.min(Dimensions.get('screen').height, 812)
+    : Dimensions.get('screen').height;
 
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -155,7 +160,10 @@ export default function SignUpScreen() {
 
   if (pendingVerification) {
     return (
-      <KeyboardAvoidingView className="flex-1 bg-background" behavior="padding">
+      <KeyboardAvoidingView
+        className="flex-1 bg-background items-center"
+        behavior="padding"
+      >
         <ScrollView
           ref={verifyScrollRef}
           className="flex-1"
@@ -248,10 +256,16 @@ export default function SignUpScreen() {
   }
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-background" behavior="padding">
+    <KeyboardAvoidingView
+      className="flex-1 bg-background items-center"
+      behavior="padding"
+    >
       <ScrollView
         ref={scrollRef}
         className="flex-1"
+        style={
+          Platform.OS === 'web' ? { maxWidth: 480, width: '100%' } : undefined
+        }
         contentContainerStyle={{
           minHeight: SCREEN_HEIGHT,
           paddingTop: insets.top + 24,
@@ -261,8 +275,12 @@ export default function SignUpScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
-        {/* Top spacer: see sign-in.tsx BUG-24 comment */}
-        <View className="flex-1" style={{ minHeight: 40 }} />
+        {/* Brand logo at top of screen */}
+        <View className="items-center mt-4 mb-4">
+          <MentomateLogo size="md" />
+        </View>
+        {/* Spacer: see sign-in.tsx BUG-24 comment */}
+        <View className="flex-1" style={{ minHeight: 20 }} />
         <Text className="text-h2 font-bold text-text-primary mb-1">
           Create account
         </Text>

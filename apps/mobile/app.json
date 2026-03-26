@@ -37,7 +37,7 @@
       "package": "com.mentomate.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#0f0f0f"
+        "backgroundColor": "#1e1b4b"
       },
       "edgeToEdgeEnabled": true
     },
@@ -52,7 +52,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0f0f0f"
+          "backgroundColor": "#1e1b4b"
         }
       ],
       ["expo-router", { "root": "./src/app" }],

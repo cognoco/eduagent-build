@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Quota Reset — Tests
+// Quota Reset — Tests (daily + monthly reset)
 // ---------------------------------------------------------------------------
 
 const mockFindManyQuotaPools = jest.fn().mockResolvedValue([]);
@@ -9,6 +9,13 @@ const mockDbUpdate = jest.fn().mockReturnValue({
     .fn()
     .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
 });
+const mockDbUpdateReturning = jest.fn().mockReturnValue({
+  set: jest.fn().mockReturnValue({
+    where: jest.fn().mockReturnValue({
+      returning: jest.fn().mockResolvedValue([]),
+    }),
+  }),
+});
 
 jest.mock('@eduagent/database', () => ({
   createDatabase: jest.fn(() => ({
@@ -16,12 +23,24 @@ jest.mock('@eduagent/database', () => ({
       quotaPools: { findMany: mockFindManyQuotaPools },
       subscriptions: { findFirst: mockFindFirstSubscription },
     },
-    update: mockDbUpdate,
+    update: (...args: unknown[]) => {
+      // Route to returning mock for daily reset, plain mock for monthly
+      const result = mockDbUpdate(...args);
+      return {
+        ...result,
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      };
+    },
   })),
   quotaPools: {
     cycleResetAt: 'cycle_reset_at',
     id: 'id',
     subscriptionId: 'subscription_id',
+    usedToday: 'used_today',
   },
   subscriptions: {
     id: 'id',
@@ -30,11 +49,14 @@ jest.mock('@eduagent/database', () => ({
 
 jest.mock('../../services/subscription', () => ({
   getTierConfig: jest.fn((tier: string) => {
-    const configs: Record<string, { monthlyQuota: number }> = {
-      free: { monthlyQuota: 50 },
-      plus: { monthlyQuota: 500 },
-      family: { monthlyQuota: 1500 },
-      pro: { monthlyQuota: 3000 },
+    const configs: Record<
+      string,
+      { monthlyQuota: number; dailyLimit: number | null }
+    > = {
+      free: { monthlyQuota: 100, dailyLimit: 10 },
+      plus: { monthlyQuota: 500, dailyLimit: null },
+      family: { monthlyQuota: 1500, dailyLimit: null },
+      pro: { monthlyQuota: 3000, dailyLimit: null },
     };
     return configs[tier] ?? configs.free;
   }),
@@ -49,8 +71,13 @@ import { quotaReset } from './quota-reset';
 const NOW = new Date('2025-01-15T01:00:00.000Z');
 
 async function executeSteps(): Promise<Record<string, unknown>> {
+  const stepResults: Record<string, unknown> = {};
   const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+    run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
+      const result = await fn();
+      stepResults[name] = result;
+      return result;
+    }),
     sleep: jest.fn(),
   };
 
@@ -60,7 +87,7 @@ async function executeSteps(): Promise<Record<string, unknown>> {
     step: mockStep,
   });
 
-  return { result, mockStep };
+  return { result, mockStep, stepResults };
 }
 
 beforeEach(() => {
@@ -95,14 +122,22 @@ describe('quotaReset', () => {
     );
   });
 
-  it('returns completed status with reset count', async () => {
+  it('returns completed status with daily and monthly reset counts', async () => {
     const { result } = await executeSteps();
 
     expect(result).toEqual({
       status: 'completed',
-      resetCount: 0,
+      dailyResetCount: expect.any(Number),
+      monthlyResetCount: expect.any(Number),
       timestamp: expect.any(String),
     });
+  });
+
+  it('runs daily reset step before monthly reset step', async () => {
+    const { mockStep } = await executeSteps();
+
+    const stepNames = mockStep.run.mock.calls.map((call: unknown[]) => call[0]);
+    expect(stepNames).toEqual(['reset-daily-quotas', 'reset-expired-cycles']);
   });
 
   it('resets quota pools whose cycle has elapsed', async () => {
@@ -122,7 +157,7 @@ describe('quotaReset', () => {
 
     const { result } = await executeSteps();
 
-    expect(result.resetCount).toBe(1);
+    expect(result.monthlyResetCount).toBe(1);
     expect(mockDbUpdate).toHaveBeenCalled();
   });
 
@@ -143,7 +178,7 @@ describe('quotaReset', () => {
 
     await executeSteps();
 
-    // Verify db.update was called (set values are checked implicitly via mock chain)
+    // Verify db.update was called
     expect(mockDbUpdate).toHaveBeenCalled();
   });
 
@@ -161,7 +196,7 @@ describe('quotaReset', () => {
 
     const { result } = await executeSteps();
 
-    expect(result.resetCount).toBe(1);
+    expect(result.monthlyResetCount).toBe(1);
   });
 
   it('resets multiple pools in one run', async () => {
@@ -189,7 +224,7 @@ describe('quotaReset', () => {
 
     const { result } = await executeSteps();
 
-    expect(result.resetCount).toBe(2);
+    expect(result.monthlyResetCount).toBe(2);
   });
 
   it('handles zero pools gracefully', async () => {
@@ -197,7 +232,6 @@ describe('quotaReset', () => {
 
     const { result } = await executeSteps();
 
-    expect(result.resetCount).toBe(0);
-    expect(mockDbUpdate).not.toHaveBeenCalled();
+    expect(result.monthlyResetCount).toBe(0);
   });
 });

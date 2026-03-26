@@ -18,11 +18,16 @@ import { extractClerkError } from '../../lib/clerk-error';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
 import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
+import { MentomateLogo } from '../../components/MentomateLogo';
 
 // Use physical screen height (not window) so the content container always
 // overflows the ScrollView after adjustResize shrinks it for the keyboard.
 // This makes the ScrollView scrollable, letting users reach covered inputs.
-const SCREEN_HEIGHT = Dimensions.get('screen').height;
+// On web, cap at a mobile-like height to avoid massive whitespace.
+const SCREEN_HEIGHT =
+  Platform.OS === 'web'
+    ? Math.min(Dimensions.get('screen').height, 812)
+    : Dimensions.get('screen').height;
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -109,10 +114,16 @@ export default function SignInScreen() {
   }, [isLoaded, canSubmit, signIn, setActive, router, emailAddress, password]);
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-background" behavior="padding">
+    <KeyboardAvoidingView
+      className="flex-1 bg-background items-center"
+      behavior="padding"
+    >
       <ScrollView
         ref={scrollRef}
         className="flex-1"
+        style={
+          Platform.OS === 'web' ? { maxWidth: 480, width: '100%' } : undefined
+        }
         contentContainerStyle={{
           minHeight: SCREEN_HEIGHT,
           paddingTop: insets.top + 24,
@@ -122,14 +133,17 @@ export default function SignInScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
-        {/* Top spacer: pushes form content toward center. minHeight: SCREEN_HEIGHT
-            on the contentContainer ensures the content always overflows the ScrollView
-            after adjustResize shrinks it for the keyboard → scrollable (BUG-24/60). */}
-        <View className="flex-1" style={{ minHeight: 40 }} />
-        <Text className="text-h2 font-bold text-text-primary mb-1">
+        {/* Brand logo at top of screen */}
+        <View className="items-center mt-8 mb-8">
+          <MentomateLogo size="md" />
+        </View>
+        {/* Spacer: pushes form content toward center. maxHeight caps the gap
+            on tall screens so the logo and form stay visually connected. */}
+        <View className="flex-1" style={{ minHeight: 16, maxHeight: 32 }} />
+        <Text className="text-h2 font-bold text-text-primary mb-1 text-center">
           Welcome back
         </Text>
-        <Text className="text-body-sm text-text-secondary mb-6">
+        <Text className="text-body-sm text-text-secondary mb-6 text-center">
           Sign in to continue learning
         </Text>
 

@@ -52,9 +52,8 @@ tags:
 
 # ---------- More tab ----------
 
-# 8. Tap "More" tab
-- tapOn:
-    text: "More"
+# 8. Tap "More" tab (use accessibility label to avoid matching heading)
+- tapOn: "More Tab"
 
 # 9. Wait for More screen heading
 - extendedWaitUntil:
@@ -90,8 +89,8 @@ tags:
 # ---------- Back to Home tab ----------
 
 # 15. Tap "Home" tab to return to dashboard
-- tapOn:
-    text: "Home"
+#     Use accessibility label (not text) to avoid matching "Home" heading
+- tapOn: "Home Tab"
 
 # 16. Verify dashboard is visible again
 - extendedWaitUntil:

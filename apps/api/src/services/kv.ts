@@ -12,6 +12,8 @@ export interface CachedSubscriptionStatus {
   status: SubscriptionStatus;
   monthlyLimit: number;
   usedThisMonth: number;
+  dailyLimit: number | null;
+  usedToday: number;
 }
 
 const cachedSubscriptionStatusSchema = z.object({
@@ -20,6 +22,8 @@ const cachedSubscriptionStatusSchema = z.object({
   status: z.string(),
   monthlyLimit: z.number(),
   usedThisMonth: z.number(),
+  dailyLimit: z.number().nullable().optional(),
+  usedToday: z.number().optional(),
 });
 
 /** 24 hours in seconds */
@@ -59,7 +63,11 @@ export async function readSubscriptionStatus(
 
   try {
     const parsed = cachedSubscriptionStatusSchema.parse(JSON.parse(raw));
-    return parsed as CachedSubscriptionStatus;
+    return {
+      ...parsed,
+      dailyLimit: parsed.dailyLimit ?? null,
+      usedToday: parsed.usedToday ?? 0,
+    } as CachedSubscriptionStatus;
   } catch {
     // Cache corruption — treat as miss
     return null;

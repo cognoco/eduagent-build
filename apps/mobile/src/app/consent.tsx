@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Dimensions,
 } from 'react-native';
@@ -21,7 +22,11 @@ import { useNetworkStatus } from '../hooks/use-network-status';
 import { formatApiError } from '../lib/format-api-error';
 
 // Captured at module load — safe because these screens are portrait-locked.
-const SCREEN_HEIGHT = Dimensions.get('screen').height;
+// On web, cap at a mobile-like height to avoid massive whitespace.
+const SCREEN_HEIGHT =
+  Platform.OS === 'web'
+    ? Math.min(Dimensions.get('screen').height, 812)
+    : Dimensions.get('screen').height;
 
 type Phase = 'child' | 'parent' | 'success';
 
@@ -88,10 +93,16 @@ export default function ConsentScreen() {
   }, [profileId, consentType, parentEmail, mutateAsync, resending]);
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-background" behavior="padding">
+    <KeyboardAvoidingView
+      className="flex-1 bg-background items-center"
+      behavior="padding"
+    >
       <ScrollView
         ref={scrollRef}
         className="flex-1"
+        style={
+          Platform.OS === 'web' ? { maxWidth: 480, width: '100%' } : undefined
+        }
         contentContainerStyle={{
           minHeight: SCREEN_HEIGHT,
           paddingTop: insets.top + 16,

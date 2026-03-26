@@ -70,7 +70,9 @@ jest.mock('../../apps/api/src/services/notifications', () => ({
 // --- Subscription config mock ---
 
 jest.mock('../../apps/api/src/services/subscription', () => ({
-  getTierConfig: jest.fn().mockReturnValue({ monthlyQuota: 50 }),
+  getTierConfig: jest
+    .fn()
+    .mockReturnValue({ monthlyQuota: 100, dailyLimit: 10 }),
 }));
 
 // --- Trial constants mock ---
@@ -165,7 +167,8 @@ describe('Integration: Inngest trial-expiry function', () => {
     expect(mockDowngradeQuotaPool).toHaveBeenCalledWith(
       expect.anything(),
       'sub-2',
-      50 // free tier monthlyQuota
+      100, // free tier monthlyQuota (dual-cap)
+      10 // free tier dailyLimit
     );
     expect(result.extendedExpiredCount).toBe(1);
   });

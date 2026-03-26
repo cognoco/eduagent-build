@@ -128,6 +128,16 @@ run_seeded "onboarding-no-subject" "flows/edge/empty-first-user.yaml"
 run_seeded "consent-withdrawn-solo" "flows/consent/consent-withdrawn-gate.yaml"
 run_seeded "onboarding-complete" "flows/consent/post-approval-landing.yaml"
 
+# ─── GROUP 1.5: No-seed flows (need fresh app launch but no seed data) ───
+
+# Animated splash — tests the brand animation on app startup.
+# Must run via seed-and-run.sh --no-seed for a clean app launch.
+if $SEED_SCRIPT --no-seed "flows/edge/animated-splash.yaml"; then
+  log_result "PASS" "flows/edge/animated-splash.yaml"
+else
+  log_result "FAIL" "flows/edge/animated-splash.yaml" "(no-seed)"
+fi
+
 # ─── GROUP 2: Standalone flows (no seed, fresh sign-up via Clerk) ───
 # These do fresh sign-ups — they need a working Clerk instance
 

@@ -15,6 +15,7 @@ import { useThemeColors } from '../../../lib/theme';
 import { cameraReducer, initialCameraState } from './camera-reducer';
 import { useHomeworkOcr } from '../../../hooks/use-homework-ocr';
 import { useSubjects } from '../../../hooks/use-subjects';
+import { CelebrationAnimation } from '../../../components/common';
 
 type FlashMode = 'off' | 'on' | 'auto';
 
@@ -36,6 +37,7 @@ export default function CameraScreen(): React.ReactNode {
   const [editedText, setEditedText] = useState('');
   const [manualText, setManualText] = useState('');
   const [flash, setFlash] = useState<FlashMode>('off');
+  const [showCelebration, setShowCelebration] = useState(true);
 
   // Sync permission state into reducer
   useEffect(() => {
@@ -345,6 +347,18 @@ export default function CameraScreen(): React.ReactNode {
         >
           <Text className="text-body font-medium text-primary">← Back</Text>
         </Pressable>
+
+        {showCelebration && (
+          <View className="items-center mt-2">
+            <CelebrationAnimation
+              size={80}
+              color={colors.success}
+              accentColor={colors.accent}
+              onComplete={() => setShowCelebration(false)}
+              testID="homework-celebration"
+            />
+          </View>
+        )}
 
         <Text className="text-body text-text-secondary mt-4 mb-3">
           Here&apos;s what I see:

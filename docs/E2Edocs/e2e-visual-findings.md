@@ -164,7 +164,7 @@
 | # | Screen | Finding | Severity |
 |---|--------|---------|----------|
 | V-005 | Parent dashboard (after theme switch) | Two large EMPTY gray cards — no child names, no data, no content. Parent dashboard shows "How your children are doing" + two blank card placeholders. `onboarding-complete` seed has no children, but empty cards with no content/message is poor UX. | MAJOR |
-| V-006 | Parent dashboard tab bar | 4th tab "child/[profileI..." leaks in tab bar with broken icon (box with X). BUG-59 regression — `tabBarItemStyle: { display: 'none' }` not working for `child/[profileId]` route in parent layout. | MAJOR |
+| V-006 | Parent dashboard tab bar | ~~4th tab "child/[profileI..." leaks in tab bar with broken icon.~~ **FIXED** (2026-03-25, BUG-67) — route name corrected to `child/[profileId]`. | ~~MAJOR~~ FIXED |
 
 **Positive findings:** Theme switching works perfectly. Accent color palette changes per persona (Indigo/Teal/Rose → Violet/Electric Blue/Hot Pink). Notification toggles visible and functional.
 
@@ -267,11 +267,11 @@ parent-learning-book, child-drill-down, consent-management, demo-dashboard, mult
 - **Likely cause:** `onboarding-complete` seed has no children. Cards render but with no data to populate.
 - **Recommendation:** Show "No children linked" message or hide cards when empty
 
-### V-006: 4th tab leaks in parent layout (MAJOR)
+### V-006: 4th tab leaks in parent layout (MAJOR) — FIXED
 - **Screen:** Parent dashboard tab bar
 - **What:** `child/[profileId]` route renders as visible 4th tab with broken icon (box with X) and truncated label "child/[profileI..."
 - **Impact:** Visual clutter in parent tab bar. Could confuse users.
-- **Status:** BUG-59 regression — `tabBarItemStyle: { display: 'none' }` not effective for this route in parent layout
+- **Status:** FIXED (2026-03-25, BUG-67) — root cause was `Tabs.Screen name="child"` not matching the auto-discovered route `child/[profileId]`. Changed to `name="child/[profileId]"`. Verified in Session 25 E2E run (consent-management test shows 3 tabs).
 
 ### V-007: Learning Book empty state inconsistent with home (INFO)
 - **Screen:** Learning Book (after `learning-active` seed)
@@ -279,11 +279,11 @@ parent-learning-book, child-drill-down, consent-management, demo-dashboard, mult
 - **Impact:** Low — may confuse users who see a subject on home but empty Learning Book
 - **Likely cause:** `learning-active` seed creates subject + retention data but no curriculum topics
 
-### V-008: Parent Learning Book shows wrong screen (MAJOR)
+### V-008: Parent Learning Book shows wrong screen (MAJOR) — RESOLVED
 - **Screen:** Parent Learning Book tab
 - **What:** Tapping "Learning Book Tab" in parent layout shows the learner's "New subject" creation screen with keyboard, instead of the parent's curriculum overview
 - **Impact:** HIGH — parents cannot access curriculum overview via tab navigation
-- **Likely cause:** Parent layout's Learning Book tab routes to the learner's create-subject screen instead of the parent book component
+- **Status:** RESOLVED (2026-03-25, BUG-68) — navigation state leak from learner group. Resolved as side-effect of BUG-34 (subjects added to seeds eliminated the create-subject auto-redirect). Verified in Session 25: Learning Book shows correct empty state.
 
 ### V-009: Consent-withdrawn low contrast text (INFO)
 - **Screen:** Consent-withdrawn gate

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Metering Middleware — Sprint 9 Phase 4 + Pre-Feature Hardening
+// Metering Middleware — Sprint 9 Phase 4 + Pre-Feature Hardening + Dual-Cap
 // Enforces quota on LLM-consuming routes (session messages + streaming).
 // Reads from KV cache first, falls back to DB, backfills KV on miss.
 //
@@ -9,6 +9,9 @@
 //   I4  — KV operations wrapped in try/catch
 //   I6  — Trailing slash tolerated in route matching
 //   I7  — KV cache updated after decrement
+//
+// Dual-cap: free tier enforces 10 questions/day AND 100 questions/month.
+// Paid tiers: monthly limit only (dailyLimit = null).
 // ---------------------------------------------------------------------------
 
 import { createMiddleware } from 'hono/factory';
@@ -137,6 +140,8 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     let tier: SubscriptionTier;
     let monthlyLimit: number;
     let usedThisMonth: number;
+    let dailyLimit: number | null;
+    let usedToday: number;
     let subscriptionId: string;
     let subscriptionStatus: SubscriptionStatus;
 
@@ -146,6 +151,8 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       tier = cached.tier;
       monthlyLimit = cached.monthlyLimit;
       usedThisMonth = cached.usedThisMonth;
+      dailyLimit = cached.dailyLimit;
+      usedToday = cached.usedToday;
       subscriptionStatus = cached.status;
     } else {
       // KV miss — fall back to DB
@@ -156,8 +163,10 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       subscriptionStatus = subscription.status;
 
       const quota = await getQuotaPool(db, subscriptionId);
-      monthlyLimit = quota?.monthlyLimit ?? 50;
+      monthlyLimit = quota?.monthlyLimit ?? 100;
       usedThisMonth = quota?.usedThisMonth ?? 0;
+      dailyLimit = quota?.dailyLimit ?? null;
+      usedToday = quota?.usedToday ?? 0;
 
       // Backfill KV cache on miss (I4: wrapped in try/catch)
       if (kv) {
@@ -167,30 +176,39 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
           status: subscriptionStatus,
           monthlyLimit,
           usedThisMonth,
+          dailyLimit,
+          usedToday,
         });
       }
     }
 
-    // 2. Check quota using pure business logic
+    // 2. Check quota using pure business logic (checks both daily + monthly)
     const result = checkQuota({
       monthlyLimit,
       usedThisMonth,
       topUpCreditsRemaining: 0, // will be checked by decrementQuota FIFO fallback
+      dailyLimit,
+      usedToday,
     });
 
-    // 3. Attempt to decrement quota (atomic, handles top-up FIFO fallback)
+    // 3. Attempt to decrement quota (atomic, handles top-up FIFO fallback + daily guard)
     const decrement = await decrementQuota(db, subscriptionId);
 
     if (!decrement.success) {
+      const isDailyExceeded = decrement.source === 'daily_exceeded';
       return c.json(
         {
           code: ERROR_CODES.QUOTA_EXCEEDED,
-          message:
-            'Monthly quota exceeded. Upgrade your plan or purchase top-up credits.',
+          message: isDailyExceeded
+            ? "You've reached your daily question limit. Come back tomorrow for more!"
+            : 'Monthly quota exceeded. Upgrade your plan or purchase top-up credits.',
           details: {
             tier,
+            reason: isDailyExceeded ? ('daily' as const) : ('monthly' as const),
             monthlyLimit,
             usedThisMonth,
+            dailyLimit,
+            usedToday,
             topUpCreditsRemaining: 0,
             upgradeOptions: buildUpgradeOptions(tier),
           },
@@ -210,6 +228,8 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
         status: subscriptionStatus,
         monthlyLimit,
         usedThisMonth: usedThisMonth + 1,
+        dailyLimit,
+        usedToday: usedToday + 1,
       });
     }
 
@@ -217,6 +237,9 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     const remaining = decrement.remainingMonthly + decrement.remainingTopUp;
     c.header('X-Quota-Remaining', String(remaining));
     c.header('X-Quota-Warning-Level', result.warningLevel);
+    if (decrement.remainingDaily !== null) {
+      c.header('X-Daily-Remaining', String(decrement.remainingDaily));
+    }
 
     await next();
     return;

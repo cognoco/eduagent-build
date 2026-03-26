@@ -119,6 +119,8 @@ function mockQuota(overrides?: Record<string, unknown>) {
     subscriptionId: 'sub-1',
     monthlyLimit: 500,
     usedThisMonth: 100,
+    dailyLimit: null as number | null,
+    usedToday: 0,
     cycleResetAt: '2025-02-15T00:00:00.000Z',
     createdAt: '2025-01-15T00:00:00.000Z',
     updatedAt: '2025-01-15T00:00:00.000Z',
@@ -136,6 +138,7 @@ beforeEach(() => {
     source: 'monthly',
     remainingMonthly: 399,
     remainingTopUp: 0,
+    remainingDaily: null,
   });
   mockReadSubscriptionStatus.mockResolvedValue(null);
   mockWriteSubscriptionStatus.mockResolvedValue(undefined);
@@ -182,6 +185,7 @@ describe('metering middleware', () => {
         source: 'monthly',
         remainingMonthly: 399,
         remainingTopUp: 0,
+        remainingDaily: null,
       });
 
       const res = await app.request(
@@ -209,6 +213,7 @@ describe('metering middleware', () => {
         source: 'monthly',
         remainingMonthly: 399,
         remainingTopUp: 0,
+        remainingDaily: null,
       });
 
       const res = await app.request(
@@ -234,6 +239,7 @@ describe('metering middleware', () => {
         source: 'monthly',
         remainingMonthly: 49,
         remainingTopUp: 0,
+        remainingDaily: null,
       });
 
       const res = await app.request(
@@ -249,6 +255,64 @@ describe('metering middleware', () => {
       // 450/500 = 90% => soft warning
       expect(res.headers.get('X-Quota-Warning-Level')).toBe('soft');
     });
+
+    it('sets X-Daily-Remaining header for free tier', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(
+        mockSubscription({ tier: 'free' })
+      );
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({
+          monthlyLimit: 100,
+          usedThisMonth: 10,
+          dailyLimit: 10,
+          usedToday: 3,
+        })
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 89,
+        remainingTopUp: 0,
+        remainingDaily: 6,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('X-Daily-Remaining')).toBe('6');
+    });
+
+    it('does not set X-Daily-Remaining header for paid tiers', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 399,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.headers.get('X-Daily-Remaining')).toBeNull();
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -261,13 +325,19 @@ describe('metering middleware', () => {
         mockSubscription({ tier: 'free' })
       );
       mockGetQuotaPool.mockResolvedValue(
-        mockQuota({ usedThisMonth: 50, monthlyLimit: 50 })
+        mockQuota({
+          usedThisMonth: 100,
+          monthlyLimit: 100,
+          dailyLimit: 10,
+          usedToday: 5,
+        })
       );
       mockDecrementQuota.mockResolvedValue({
         success: false,
         source: 'none',
         remainingMonthly: 0,
         remainingTopUp: 0,
+        remainingDaily: 5,
       });
 
       const res = await app.request(
@@ -285,8 +355,49 @@ describe('metering middleware', () => {
       const body = await res.json();
       expect(body.code).toBe('QUOTA_EXCEEDED');
       expect(body.details.tier).toBe('free');
+      expect(body.details.reason).toBe('monthly');
       expect(body.details.upgradeOptions).toBeDefined();
       expect(body.details.upgradeOptions.length).toBeGreaterThan(0);
+    });
+
+    it('returns 402 with daily reason when daily limit hit', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(
+        mockSubscription({ tier: 'free' })
+      );
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({
+          usedThisMonth: 30,
+          monthlyLimit: 100,
+          dailyLimit: 10,
+          usedToday: 10,
+        })
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: false,
+        source: 'daily_exceeded',
+        remainingMonthly: 70,
+        remainingTopUp: 0,
+        remainingDaily: 0,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(402);
+
+      const body = await res.json();
+      expect(body.code).toBe('QUOTA_EXCEEDED');
+      expect(body.details.reason).toBe('daily');
+      expect(body.details.dailyLimit).toBe(10);
+      expect(body.details.usedToday).toBe(10);
+      expect(body.message).toContain('daily');
     });
 
     it('includes upgrade options in 402 response', async () => {
@@ -294,13 +405,19 @@ describe('metering middleware', () => {
         mockSubscription({ tier: 'free' })
       );
       mockGetQuotaPool.mockResolvedValue(
-        mockQuota({ usedThisMonth: 50, monthlyLimit: 50 })
+        mockQuota({
+          usedThisMonth: 100,
+          monthlyLimit: 100,
+          dailyLimit: 10,
+          usedToday: 5,
+        })
       );
       mockDecrementQuota.mockResolvedValue({
         success: false,
         source: 'none',
         remainingMonthly: 0,
         remainingTopUp: 0,
+        remainingDaily: 5,
       });
 
       const res = await app.request(
@@ -331,14 +448,17 @@ describe('metering middleware', () => {
         mockQuota({
           subscriptionId: 'sub-free',
           usedThisMonth: 0,
-          monthlyLimit: 50,
+          monthlyLimit: 100,
+          dailyLimit: 10,
+          usedToday: 0,
         })
       );
       mockDecrementQuota.mockResolvedValue({
         success: true,
         source: 'monthly',
-        remainingMonthly: 49,
+        remainingMonthly: 99,
         remainingTopUp: 0,
+        remainingDaily: 9,
       });
 
       const res = await app.request(
@@ -377,12 +497,15 @@ describe('metering middleware', () => {
         status: 'active',
         monthlyLimit: 500,
         usedThisMonth: 100,
+        dailyLimit: null,
+        usedToday: 0,
       });
       mockDecrementQuota.mockResolvedValue({
         success: true,
         source: 'monthly',
         remainingMonthly: 399,
         remainingTopUp: 0,
+        remainingDaily: null,
       });
 
       const res = await app.request(
@@ -401,7 +524,7 @@ describe('metering middleware', () => {
       expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
     });
 
-    it('backfills KV on cache miss (includes subscriptionId)', async () => {
+    it('backfills KV on cache miss (includes subscriptionId + daily fields)', async () => {
       mockReadSubscriptionStatus.mockResolvedValue(null);
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota());
@@ -410,6 +533,7 @@ describe('metering middleware', () => {
         source: 'monthly',
         remainingMonthly: 399,
         remainingTopUp: 0,
+        remainingDaily: null,
       });
 
       await app.request(
@@ -431,6 +555,7 @@ describe('metering middleware', () => {
           tier: 'plus',
           status: 'active',
           monthlyLimit: 500,
+          dailyLimit: null,
         })
       );
     });
@@ -444,6 +569,7 @@ describe('metering middleware', () => {
         source: 'monthly',
         remainingMonthly: 399,
         remainingTopUp: 0,
+        remainingDaily: null,
       });
 
       const res = await app.request(
@@ -472,6 +598,7 @@ describe('metering middleware', () => {
         source: 'monthly',
         remainingMonthly: 399,
         remainingTopUp: 0,
+        remainingDaily: null,
       });
 
       const res = await app.request(
@@ -504,6 +631,7 @@ describe('metering middleware', () => {
         source: 'top_up',
         remainingMonthly: 0,
         remainingTopUp: 499,
+        remainingDaily: null,
       });
 
       const res = await app.request(
@@ -531,13 +659,19 @@ describe('metering middleware', () => {
         mockSubscription({ tier: 'free' })
       );
       mockGetQuotaPool.mockResolvedValue(
-        mockQuota({ usedThisMonth: 50, monthlyLimit: 50 })
+        mockQuota({
+          usedThisMonth: 100,
+          monthlyLimit: 100,
+          dailyLimit: 10,
+          usedToday: 5,
+        })
       );
       mockDecrementQuota.mockResolvedValue({
         success: false,
         source: 'none',
         remainingMonthly: 0,
         remainingTopUp: 0,
+        remainingDaily: 5,
       });
 
       const res = await app.request(
@@ -563,6 +697,7 @@ describe('metering middleware', () => {
         source: 'none',
         remainingMonthly: 0,
         remainingTopUp: 0,
+        remainingDaily: null,
       });
 
       const res = await app.request(

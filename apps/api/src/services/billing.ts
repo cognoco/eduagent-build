@@ -41,6 +41,8 @@ export interface QuotaPoolRow {
   subscriptionId: string;
   monthlyLimit: number;
   usedThisMonth: number;
+  dailyLimit: number | null;
+  usedToday: number;
   cycleResetAt: string;
   createdAt: string;
   updatedAt: string;
@@ -86,6 +88,8 @@ function mapQuotaPoolRow(row: typeof quotaPools.$inferSelect): QuotaPoolRow {
     subscriptionId: row.subscriptionId,
     monthlyLimit: row.monthlyLimit,
     usedThisMonth: row.usedThisMonth,
+    dailyLimit: row.dailyLimit,
+    usedToday: row.usedToday,
     cycleResetAt: row.cycleResetAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -143,10 +147,13 @@ export async function createSubscription(
   const cycleResetAt = new Date(now);
   cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
 
+  const tierConfig = getTierConfig(tier);
   await db.insert(quotaPools).values({
     subscriptionId: subRow.id,
     monthlyLimit,
     usedThisMonth: 0,
+    dailyLimit: tierConfig.dailyLimit,
+    usedToday: 0,
     cycleResetAt,
   });
 
@@ -280,6 +287,7 @@ export async function resetMonthlyQuota(
     .set({
       monthlyLimit: newLimit,
       usedThisMonth: 0,
+      usedToday: 0,
       cycleResetAt: nextReset,
       updatedAt: now,
     })
@@ -432,16 +440,39 @@ export async function expireTrialSubscription(
 export async function downgradeQuotaPool(
   db: Database,
   subscriptionId: string,
-  monthlyLimit: number
+  monthlyLimit: number,
+  dailyLimit: number | null = null
 ): Promise<void> {
   await db
     .update(quotaPools)
     .set({
       monthlyLimit,
       usedThisMonth: 0,
+      dailyLimit,
+      usedToday: 0,
       updatedAt: new Date(),
     })
     .where(eq(quotaPools.subscriptionId, subscriptionId));
+}
+
+/**
+ * Resets the daily question counter for ALL quota pools.
+ * Called by the daily Inngest cron at 01:00 UTC.
+ */
+export async function resetDailyQuotas(
+  db: Database,
+  now: Date
+): Promise<number> {
+  const result = await db
+    .update(quotaPools)
+    .set({
+      usedToday: 0,
+      updatedAt: now,
+    })
+    .where(sql`${quotaPools.usedToday} > 0`)
+    .returning();
+
+  return result.length;
 }
 
 // ---------------------------------------------------------------------------
@@ -450,9 +481,10 @@ export async function downgradeQuotaPool(
 
 export interface DecrementResult {
   success: boolean;
-  source: 'monthly' | 'top_up' | 'none';
+  source: 'monthly' | 'top_up' | 'none' | 'daily_exceeded';
   remainingMonthly: number;
   remainingTopUp: number;
+  remainingDaily: number | null;
 }
 
 /**
@@ -460,8 +492,10 @@ export interface DecrementResult {
  *
  * Strategy:
  * 1. Try monthly quota first (atomic WHERE guard prevents TOCTOU race)
- * 2. If monthly exhausted, consume from oldest unexpired top-up credit (FIFO)
- * 3. If both exhausted, return { success: false }
+ *    — also enforces daily limit when set (free tier: 10/day)
+ * 2. If monthly exhausted but daily OK, consume from oldest unexpired top-up (FIFO)
+ * 3. If daily limit hit, return { source: 'daily_exceeded' } immediately
+ * 4. If both exhausted, return { success: false }
  *
  * All UPDATEs use SQL WHERE guards so concurrent requests cannot over-decrement.
  */
@@ -469,17 +503,19 @@ export async function decrementQuota(
   db: Database,
   subscriptionId: string
 ): Promise<DecrementResult> {
-  // 1. Try monthly quota — atomic: only succeeds if usedThisMonth < monthlyLimit
+  // 1. Try monthly quota — atomic: succeeds only if monthly AND daily limits allow
   const [monthlyUpdated] = await db
     .update(quotaPools)
     .set({
       usedThisMonth: sql`${quotaPools.usedThisMonth} + 1`,
+      usedToday: sql`${quotaPools.usedToday} + 1`,
       updatedAt: new Date(),
     })
     .where(
       and(
         eq(quotaPools.subscriptionId, subscriptionId),
-        sql`${quotaPools.usedThisMonth} < ${quotaPools.monthlyLimit}`
+        sql`${quotaPools.usedThisMonth} < ${quotaPools.monthlyLimit}`,
+        sql`(${quotaPools.dailyLimit} IS NULL OR ${quotaPools.usedToday} < ${quotaPools.dailyLimit})`
       )
     )
     .returning();
@@ -491,10 +527,40 @@ export async function decrementQuota(
       remainingMonthly:
         monthlyUpdated.monthlyLimit - monthlyUpdated.usedThisMonth,
       remainingTopUp: 0,
+      remainingDaily:
+        monthlyUpdated.dailyLimit !== null
+          ? monthlyUpdated.dailyLimit - monthlyUpdated.usedToday
+          : null,
     };
   }
 
-  // 2. Fall back to top-up credits (FIFO by purchasedAt, unexpired)
+  // Atomic update failed — determine why (daily vs monthly)
+  const pool = await db.query.quotaPools.findFirst({
+    where: eq(quotaPools.subscriptionId, subscriptionId),
+  });
+
+  if (!pool) {
+    return {
+      success: false,
+      source: 'none',
+      remainingMonthly: 0,
+      remainingTopUp: 0,
+      remainingDaily: null,
+    };
+  }
+
+  // Daily limit hit — hard stop, cannot use even top-ups
+  if (pool.dailyLimit !== null && pool.usedToday >= pool.dailyLimit) {
+    return {
+      success: false,
+      source: 'daily_exceeded',
+      remainingMonthly: Math.max(0, pool.monthlyLimit - pool.usedThisMonth),
+      remainingTopUp: 0,
+      remainingDaily: 0,
+    };
+  }
+
+  // 2. Monthly exhausted, daily OK — fall back to top-up credits (FIFO)
   const now = new Date();
   const topUp = await db.query.topUpCredits.findFirst({
     where: sql`${topUpCredits.subscriptionId} = ${subscriptionId}
@@ -516,21 +582,38 @@ export async function decrementQuota(
       .returning();
 
     if (updatedTopUp) {
+      // Also increment usedToday since we consumed a question
+      await db
+        .update(quotaPools)
+        .set({
+          usedToday: sql`${quotaPools.usedToday} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(quotaPools.subscriptionId, subscriptionId));
+
       return {
         success: true,
         source: 'top_up',
         remainingMonthly: 0,
         remainingTopUp: updatedTopUp.remaining,
+        remainingDaily:
+          pool.dailyLimit !== null
+            ? pool.dailyLimit - pool.usedToday - 1
+            : null,
       };
     }
   }
 
-  // 3. Both exhausted or no quota pool exists
+  // 3. Both exhausted or no top-ups available
   return {
     success: false,
     source: 'none',
     remainingMonthly: 0,
     remainingTopUp: 0,
+    remainingDaily:
+      pool.dailyLimit !== null
+        ? Math.max(0, pool.dailyLimit - pool.usedToday)
+        : null,
   };
 }
 
@@ -539,6 +622,7 @@ export async function decrementQuota(
  * Used when an LLM call fails after decrement — avoids charging for failed work.
  *
  * Refunds always go to the monthly pool (simpler, avoids FIFO complications).
+ * Also refunds the daily counter to keep both in sync.
  */
 export async function incrementQuota(
   db: Database,
@@ -548,6 +632,7 @@ export async function incrementQuota(
     .update(quotaPools)
     .set({
       usedThisMonth: sql`GREATEST(${quotaPools.usedThisMonth} - 1, 0)`,
+      usedToday: sql`GREATEST(${quotaPools.usedToday} - 1, 0)`,
       updatedAt: new Date(),
     })
     .where(eq(quotaPools.subscriptionId, subscriptionId));
@@ -677,7 +762,9 @@ export async function resetExpiredQuotaCycles(
       .update(quotaPools)
       .set({
         usedThisMonth: 0,
+        usedToday: 0,
         monthlyLimit: tierConfig.monthlyQuota,
+        dailyLimit: tierConfig.dailyLimit,
         cycleResetAt: nextReset,
         updatedAt: now,
       })
@@ -753,11 +840,14 @@ export async function transitionToExtendedTrial(
     })
     .where(eq(subscriptions.id, subscriptionId));
 
+  const freeTierConfig = getTierConfig('free');
   await db
     .update(quotaPools)
     .set({
       monthlyLimit: extendedMonthlyQuota,
       usedThisMonth: 0,
+      dailyLimit: freeTierConfig.dailyLimit,
+      usedToday: 0,
       updatedAt: new Date(),
     })
     .where(eq(quotaPools.subscriptionId, subscriptionId));

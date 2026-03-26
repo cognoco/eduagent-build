@@ -150,13 +150,16 @@ export function billingMock(accountId?: string): Record<string, jest.Mock> {
     getQuotaPool: jest.fn().mockResolvedValue({
       id: '00000000-0000-4000-8000-000000000006',
       subscriptionId: '00000000-0000-4000-8000-000000000005',
-      monthlyLimit: 50,
+      monthlyLimit: 100,
       usedThisMonth: 0,
+      dailyLimit: 10,
+      usedToday: 0,
     }),
     decrementQuota: jest.fn().mockResolvedValue({
       success: true,
-      remainingMonthly: 49,
+      remainingMonthly: 99,
       remainingTopUp: 0,
+      remainingDaily: 9,
     }),
   };
 }

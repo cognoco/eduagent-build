@@ -41,14 +41,10 @@ tags:
 - takeScreenshot: parent-drill-down-01-dashboard
 
 # 5. Tap "View details" on the child card to drill into child detail
+#    NOTE: Do NOT also tap the card body — double-tap causes double
+#    router.push, navigating past child detail (BUG-70 consent-management fix).
 - tapOn:
     id: "parent-dashboard-summary-primary"
-    optional: true
-
-# 5b. Fallback: tap the card body itself
-- tapOn:
-    id: "parent-dashboard-summary"
-    optional: true
 
 # 6. Wait for child detail screen
 - extendedWaitUntil:

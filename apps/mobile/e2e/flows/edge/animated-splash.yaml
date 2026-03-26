@@ -1,0 +1,111 @@
+# Flow: Animated Splash — Verify brand splash screen appears on app launch
+# Validates:
+#   1. Animated splash overlay is visible immediately after JS bundle loads
+#   2. "mentomate" wordmark appears during the animation sequence
+#   3. Splash auto-dismisses and the app becomes interactive (auth screen)
+#
+# STATUS: BLOCKED — Cannot run in dev-client builds (see BUG-69).
+#   The AnimatedSplash mounts and starts its 2.8s timer when fonts load,
+#   which happens WHILE the Expo dev-client "Continue" overlay is still
+#   covering the screen. The splash animation completes behind the overlay
+#   before "Continue" is ever tapped. By the time Maestro can see the app,
+#   the splash has already faded out and onComplete() has fired.
+#   This test requires a PRODUCTION APK (no dev-client overlay).
+#
+# POSITIVE FINDING (Session 25): The SplashErrorBoundary did NOT trigger,
+#   confirming the AnimatedSplash's react-native-svg rendering (AnimatedCircle,
+#   AnimatedPath) does not crash on Fabric/New Architecture. This is significant
+#   because BUG-33 showed that animated SVG G components DO crash — Circle and
+#   Path are safe.
+#
+# This is a standalone flow — no seed data needed (pre-auth).
+# The splash shows before any authentication.
+#
+# Usage (production builds only):
+#   maestro test flows/edge/animated-splash.yaml
+#
+# Tags: smoke, edge
+appId: com.mentomate.app
+tags:
+  - smoke
+  - edge
+---
+# ═══════════════════════════════════════════════
+#  STEP 0: Restart the app via Maestro launchApp
+# ═══════════════════════════════════════════════
+# launchApp force-stops and relaunches the app. On dev-client builds,
+# the Expo dev-client launcher appears. The bundle is cached by Metro
+# so reload should be fast (~5-10s vs 60-120s cold start).
+- launchApp:
+    clearState: true
+
+# Wait for dev-client launcher (shows "Development Build" subtitle)
+- extendedWaitUntil:
+    visible: "Development Build"
+    timeout: 30000
+
+# Tap the Metro server entry (port 8082 = bundle proxy).
+# Both 8081 and 8082 are shown; tap 8082 first (bundle proxy), fallback to 8081.
+- tapOn:
+    text: "http://10.0.2.2:8082"
+    optional: true
+
+# Fallback: tap port 8081 if 8082 not found
+- tapOn:
+    text: "http://10.0.2.2:8081"
+    optional: true
+
+# Wait for JS bundle to load and "Continue" overlay to appear.
+# Bundle is cached by Metro, so this should be fast (5-15s).
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 120000
+
+# Tap "Continue" to dismiss the dev-client overlay.
+# NOTE: The animated splash has ALREADY played and completed behind
+# this overlay by this point. See BUG-69 for details.
+- tapOn: "Continue"
+
+# Dismiss dev tools sheet if it appears (BUG-14 safety)
+- runFlow:
+    when:
+      visible: "Reload"
+    file: ../_setup/dismiss-devtools.yaml
+
+# ═══════════════════════════════════════════════
+#  TEST 1: Splash appears and auto-dismisses
+# ═══════════════════════════════════════════════
+# BUG-69: In dev-client builds, this assertion will FAIL because the splash
+# has already completed behind the Continue overlay. On production builds
+# (no Continue overlay), the splash should be visible here.
+
+# 1. Wait for the animated splash to appear
+- extendedWaitUntil:
+    visible:
+      id: "animated-splash"
+    timeout: 15000
+
+# 2. Screenshot: splash animation in progress
+- takeScreenshot: animated-splash-01-visible
+
+# 3. Verify the wordmark fades in (appears at ~1.5s into the animation)
+- extendedWaitUntil:
+    visible:
+      id: "splash-wordmark"
+    timeout: 5000
+
+# 4. Screenshot: wordmark visible (animation near completion)
+- takeScreenshot: animated-splash-02-wordmark
+
+# 5. Wait for splash to auto-dismiss (~2.8s total) and auth screen to appear
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 10000
+
+# 6. Verify splash is gone
+- assertNotVisible:
+    id: "animated-splash"
+
+# 7. Screenshot: app is interactive after splash
+- takeScreenshot: animated-splash-03-app-ready

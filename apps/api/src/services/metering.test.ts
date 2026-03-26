@@ -1,6 +1,7 @@
 import {
   checkQuota,
   calculateRemainingQuestions,
+  calculateRemainingDaily,
   getWarningLevel,
   calculateMidCycleUpgrade,
   calculateMidCycleDowngrade,
@@ -18,6 +19,8 @@ function createTestState(
     monthlyLimit: 500,
     usedThisMonth: 0,
     topUpCreditsRemaining: 0,
+    dailyLimit: null,
+    usedToday: 0,
     ...overrides,
   };
 }
@@ -94,17 +97,50 @@ describe('calculateRemainingQuestions', () => {
 });
 
 // ---------------------------------------------------------------------------
+// calculateRemainingDaily
+// ---------------------------------------------------------------------------
+
+describe('calculateRemainingDaily', () => {
+  it('returns null when dailyLimit is null (paid tiers)', () => {
+    const state = createTestState({ dailyLimit: null, usedToday: 5 });
+    expect(calculateRemainingDaily(state)).toBeNull();
+  });
+
+  it('returns full daily limit when nothing used today', () => {
+    const state = createTestState({ dailyLimit: 10, usedToday: 0 });
+    expect(calculateRemainingDaily(state)).toBe(10);
+  });
+
+  it('subtracts usedToday from dailyLimit', () => {
+    const state = createTestState({ dailyLimit: 10, usedToday: 7 });
+    expect(calculateRemainingDaily(state)).toBe(3);
+  });
+
+  it('returns 0 when daily limit reached', () => {
+    const state = createTestState({ dailyLimit: 10, usedToday: 10 });
+    expect(calculateRemainingDaily(state)).toBe(0);
+  });
+
+  it('never returns negative', () => {
+    const state = createTestState({ dailyLimit: 10, usedToday: 15 });
+    expect(calculateRemainingDaily(state)).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // checkQuota
 // ---------------------------------------------------------------------------
 
 describe('checkQuota', () => {
-  it('allows when quota is available', () => {
+  it('allows when quota is available (no daily limit)', () => {
     const state = createTestState({ usedThisMonth: 100 });
     const result = checkQuota(state);
 
     expect(result.allowed).toBe(true);
     expect(result.remaining).toBe(400);
     expect(result.warningLevel).toBe('none');
+    expect(result.dailyRemaining).toBeNull();
+    expect(result.dailyWarningLevel).toBeNull();
   });
 
   it('shows soft warning at 80% usage', () => {
@@ -145,6 +181,79 @@ describe('checkQuota', () => {
     expect(result.allowed).toBe(true);
     expect(result.remaining).toBe(200);
     expect(result.warningLevel).toBe('exceeded');
+  });
+
+  // Daily limit tests
+  it('allows when both daily and monthly have room', () => {
+    const state = createTestState({
+      monthlyLimit: 100,
+      usedThisMonth: 30,
+      dailyLimit: 10,
+      usedToday: 3,
+    });
+    const result = checkQuota(state);
+
+    expect(result.allowed).toBe(true);
+    expect(result.dailyRemaining).toBe(7);
+    expect(result.dailyWarningLevel).toBe('none');
+  });
+
+  it('blocks when daily limit exceeded even if monthly has room', () => {
+    const state = createTestState({
+      monthlyLimit: 100,
+      usedThisMonth: 30,
+      dailyLimit: 10,
+      usedToday: 10,
+    });
+    const result = checkQuota(state);
+
+    expect(result.allowed).toBe(false);
+    expect(result.dailyRemaining).toBe(0);
+    expect(result.dailyWarningLevel).toBe('exceeded');
+    // Monthly still has room
+    expect(result.remaining).toBe(70);
+    expect(result.warningLevel).toBe('none');
+  });
+
+  it('blocks when monthly exhausted even if daily has room', () => {
+    const state = createTestState({
+      monthlyLimit: 100,
+      usedThisMonth: 100,
+      dailyLimit: 10,
+      usedToday: 3,
+    });
+    const result = checkQuota(state);
+
+    expect(result.allowed).toBe(false);
+    expect(result.remaining).toBe(0);
+    expect(result.dailyRemaining).toBe(7);
+  });
+
+  it('shows daily soft warning at 80% daily usage', () => {
+    const state = createTestState({
+      monthlyLimit: 100,
+      usedThisMonth: 10,
+      dailyLimit: 10,
+      usedToday: 8,
+    });
+    const result = checkQuota(state);
+
+    expect(result.allowed).toBe(true);
+    expect(result.dailyWarningLevel).toBe('soft');
+  });
+
+  it('returns null daily fields when dailyLimit is null (paid tiers)', () => {
+    const state = createTestState({
+      monthlyLimit: 500,
+      usedThisMonth: 100,
+      dailyLimit: null,
+      usedToday: 100,
+    });
+    const result = checkQuota(state);
+
+    expect(result.allowed).toBe(true);
+    expect(result.dailyRemaining).toBeNull();
+    expect(result.dailyWarningLevel).toBeNull();
   });
 });
 

@@ -1,5 +1,11 @@
 import '../../global.css';
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import { View, useColorScheme } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { Stack } from 'expo-router';
@@ -34,6 +40,7 @@ import { ErrorBoundary, OfflineBanner } from '../components/common';
 import { useNetworkStatus } from '../hooks/use-network-status';
 import { Sentry } from '../lib/sentry';
 import { configureRevenueCat } from '../lib/revenuecat';
+import { AnimatedSplash } from '../components/AnimatedSplash';
 
 // Initialize RevenueCat at module level — runs before any component renders.
 // No-ops gracefully when API keys are not set (dev/web).
@@ -247,15 +254,34 @@ function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
   );
 }
 
+/** Thin error boundary so AnimatedSplash crashes don't block the app. */
+class SplashErrorBoundary extends React.Component<
+  { children: React.ReactNode; onError: () => void },
+  { hasError: boolean }
+> {
+  override state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  override componentDidCatch() {
+    this.props.onError();
+  }
+  override render() {
+    return this.state.hasError ? null : this.props.children;
+  }
+}
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     AtkinsonHyperlegible_400Regular,
     AtkinsonHyperlegible_700Bold,
     ...Ionicons.font,
   });
+  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
     if (fontsLoaded) {
+      // Hide native splash — the AnimatedSplash component takes over
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
@@ -280,6 +306,11 @@ export default function RootLayout() {
           </ClerkLoaded>
         </ClerkProvider>
       </SafeAreaProvider>
+      {showSplash && (
+        <SplashErrorBoundary onError={() => setShowSplash(false)}>
+          <AnimatedSplash onComplete={() => setShowSplash(false)} />
+        </SplashErrorBoundary>
+      )}
     </GestureHandlerRootView>
   );
 }
