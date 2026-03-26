@@ -520,7 +520,14 @@ describe('decrementQuota', () => {
     const db = {
       query: {
         subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        quotaPools: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        quotaPools: {
+          findFirst: jest.fn().mockResolvedValue({
+            monthlyLimit: 100,
+            usedThisMonth: 100,
+            dailyLimit: null,
+            usedToday: 0,
+          }),
+        },
         topUpCredits: { findFirst: jest.fn().mockResolvedValue(topUp) },
         profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
       },

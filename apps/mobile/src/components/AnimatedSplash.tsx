@@ -17,6 +17,7 @@ import Animated, {
   withSequence,
   Easing,
   runOnJS,
+  useReducedMotion,
 } from 'react-native-reanimated';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -59,6 +60,8 @@ type AnimatedSplashProps = {
  * Tap anywhere to skip.
  */
 export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
+  const reduceMotion = useReducedMotion();
+
   // --- Shared values ---
   const pathDraw = useSharedValue(0);
   const studentR = useSharedValue(0);
@@ -86,6 +89,14 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
 
   // --- Choreography ---
   useEffect(() => {
+    // Accessibility: skip animation for users who prefer reduced motion
+    if (reduceMotion) {
+      fade.value = withTiming(0, { duration: 200 }, (finished) => {
+        if (finished) runOnJS(done)();
+      });
+      return;
+    }
+
     const spring = { damping: 8, stiffness: 180 };
     const pop = { damping: 5, stiffness: 150 }; // bouncy overshoot = star burst feel
     const ease = Easing.bezier(0.25, 0.1, 0.25, 1);
@@ -146,7 +157,7 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
         if (finished) runOnJS(done)();
       })
     );
-  }, []);
+  }, [done, reduceMotion]);
 
   // --- Animated props for SVG elements ---
   const pathProps = useAnimatedProps(() => ({

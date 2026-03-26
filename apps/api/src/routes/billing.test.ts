@@ -163,6 +163,8 @@ function mockQuotaPool(overrides?: Record<string, unknown>) {
     subscriptionId: 'sub-1',
     monthlyLimit: 500,
     usedThisMonth: 42,
+    dailyLimit: null as number | null,
+    usedToday: 0,
     cycleResetAt: '2025-02-15T00:00:00.000Z',
     createdAt: '2025-01-15T00:00:00.000Z',
     updatedAt: '2025-01-15T00:00:00.000Z',
@@ -203,9 +205,12 @@ describe('billing routes', () => {
       expect(body.subscription.tier).toBe('free');
       expect(body.subscription.status).toBe('trial');
       expect(body.subscription.cancelAtPeriodEnd).toBe(false);
-      expect(body.subscription.monthlyLimit).toBe(50);
+      expect(body.subscription.monthlyLimit).toBe(100);
       expect(body.subscription.usedThisMonth).toBe(0);
-      expect(body.subscription.remainingQuestions).toBe(50);
+      expect(body.subscription.remainingQuestions).toBe(100);
+      expect(body.subscription.dailyLimit).toBe(10);
+      expect(body.subscription.usedToday).toBe(0);
+      expect(body.subscription.dailyRemainingQuestions).toBe(10);
     });
 
     it('returns real subscription data when subscription exists', async () => {
@@ -521,12 +526,15 @@ describe('billing routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.usage.monthlyLimit).toBe(50);
+      expect(body.usage.monthlyLimit).toBe(100);
       expect(body.usage.usedThisMonth).toBe(0);
-      expect(body.usage.remainingQuestions).toBe(50);
+      expect(body.usage.remainingQuestions).toBe(100);
       expect(body.usage.topUpCreditsRemaining).toBe(0);
       expect(body.usage.warningLevel).toBe('none');
       expect(body.usage.cycleResetAt).toBeDefined();
+      expect(body.usage.dailyLimit).toBe(10);
+      expect(body.usage.usedToday).toBe(0);
+      expect(body.usage.dailyRemainingQuestions).toBe(10);
     });
 
     it('returns real usage data when subscription exists', async () => {
@@ -629,8 +637,10 @@ describe('billing routes', () => {
       const body = await res.json();
       expect(body.status.tier).toBe('free');
       expect(body.status.status).toBe('trial');
-      expect(body.status.monthlyLimit).toBe(50);
+      expect(body.status.monthlyLimit).toBe(100);
       expect(body.status.usedThisMonth).toBe(0);
+      expect(body.status.dailyLimit).toBe(10);
+      expect(body.status.usedToday).toBe(0);
     });
 
     it('returns DB-backed status when no KV namespace', async () => {

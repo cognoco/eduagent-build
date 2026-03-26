@@ -52,7 +52,9 @@ jest.mock('../../apps/api/src/services/billing', () => ({
 
 // --- Subscription service mock ---
 jest.mock('../../apps/api/src/services/subscription', () => ({
-  getTierConfig: jest.fn().mockReturnValue({ monthlyQuota: 500 }),
+  getTierConfig: jest
+    .fn()
+    .mockReturnValue({ monthlyQuota: 500, dailyLimit: null }),
 }));
 
 // --- KV service mock ---

@@ -40,6 +40,7 @@ jest.mock('../services/account', () => ({
 jest.mock('../services/subscription', () => ({
   getTierConfig: jest.fn().mockReturnValue({
     monthlyQuota: 500,
+    dailyLimit: null,
     maxProfiles: 1,
     priceMonthly: 18.99,
     priceYearly: 168,

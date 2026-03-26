@@ -11,9 +11,12 @@ export function buildSubscription(
     trialEndsAt: null,
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,
-    monthlyLimit: 50,
+    monthlyLimit: 100,
     usedThisMonth: 0,
-    remainingQuestions: 50,
+    remainingQuestions: 100,
+    dailyLimit: 10,
+    usedToday: 0,
+    dailyRemainingQuestions: 10,
     ...overrides,
   };
 }
@@ -25,6 +28,8 @@ export function buildQuotaPool(
     subscriptionId: string;
     monthlyLimit: number;
     usedThisMonth: number;
+    dailyLimit: number | null;
+    usedToday: number;
     cycleResetAt: string;
     createdAt: string;
     updatedAt: string;
@@ -34,8 +39,10 @@ export function buildQuotaPool(
   return {
     id: uuidv7(),
     subscriptionId: uuidv7(),
-    monthlyLimit: 50,
+    monthlyLimit: 100,
     usedThisMonth: 0,
+    dailyLimit: 10 as number | null,
+    usedToday: 0,
     cycleResetAt: now,
     createdAt: now,
     updatedAt: now,

@@ -165,7 +165,7 @@ export function BrandCelebration({
         if (finished) runOnJS(done)();
       })
     );
-  }, []);
+  }, [done, reduceMotion]);
 
   // --- Animated props ---
   const pathProps = useAnimatedProps(() => ({

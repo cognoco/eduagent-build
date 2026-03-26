@@ -1,3 +1,4 @@
+import type React from 'react';
 import { View, Text, StyleSheet, useColorScheme } from 'react-native';
 import IconLight from '../../assets/images/logo-icon-light.svg';
 import IconDark from '../../assets/images/logo-icon-dark.svg';
@@ -21,7 +22,9 @@ type MentomateLogoProps = {
  * Uses native Text for the wordmark to guarantee correct color rendering
  * on all screens (including pre-auth where ThemeContext is not available).
  */
-export function MentomateLogo({ size = 'md' }: MentomateLogoProps) {
+export function MentomateLogo({
+  size = 'md',
+}: MentomateLogoProps): React.JSX.Element {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const s = sizes[size];

@@ -21,6 +21,9 @@ export const subscriptionSchema = z.object({
   monthlyLimit: z.number().int(),
   usedThisMonth: z.number().int(),
   remainingQuestions: z.number().int(),
+  dailyLimit: z.number().int().nullable(),
+  usedToday: z.number().int(),
+  dailyRemainingQuestions: z.number().int().nullable(),
 });
 export type Subscription = z.infer<typeof subscriptionSchema>;
 
@@ -47,6 +50,9 @@ export const usageSchema = z.object({
   topUpCreditsRemaining: z.number().int(),
   warningLevel: z.enum(['none', 'soft', 'hard', 'exceeded']),
   cycleResetAt: z.string().datetime(),
+  dailyLimit: z.number().int().nullable(),
+  usedToday: z.number().int(),
+  dailyRemainingQuestions: z.number().int().nullable(),
 });
 export type Usage = z.infer<typeof usageSchema>;
 
@@ -85,8 +91,11 @@ export const quotaExceededSchema = z.object({
   message: z.string(),
   details: z.object({
     tier: subscriptionTierSchema,
+    reason: z.enum(['monthly', 'daily']),
     monthlyLimit: z.number().int(),
     usedThisMonth: z.number().int(),
+    dailyLimit: z.number().int().nullable(),
+    usedToday: z.number().int(),
     topUpCreditsRemaining: z.number().int(),
     upgradeOptions: z.array(
       z.object({

@@ -8,7 +8,8 @@ jest.mock('@eduagent/database', () => ({
 
 jest.mock('../../services/subscription', () => ({
   getTierConfig: jest.fn().mockReturnValue({
-    monthlyQuota: 50,
+    monthlyQuota: 100,
+    dailyLimit: 10,
     maxProfiles: 1,
   }),
 }));
@@ -159,7 +160,8 @@ describe('trialExpiry', () => {
     expect(mockDowngradeQuotaPool).toHaveBeenCalledWith(
       expect.anything(),
       'sub-2',
-      50
+      100,
+      10
     );
   });
 
@@ -303,7 +305,8 @@ describe('trialExpiry', () => {
     expect(mockDowngradeQuotaPool).toHaveBeenCalledWith(
       expect.anything(),
       'sub-6',
-      50
+      100,
+      10
     );
   });
 });

@@ -70,7 +70,9 @@ jest.mock('../../apps/api/src/services/notifications', () => ({
 // --- Subscription config mock ---
 
 jest.mock('../../apps/api/src/services/subscription', () => ({
-  getTierConfig: jest.fn().mockReturnValue({ monthlyQuota: 50 }),
+  getTierConfig: jest
+    .fn()
+    .mockReturnValue({ monthlyQuota: 100, dailyLimit: 10 }),
 }));
 
 // --- Trial constants mock ---

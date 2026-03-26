@@ -917,8 +917,10 @@ async function seedTrialExpired(
   await db.insert(quotaPools).values({
     id: generateUUIDv7(),
     subscriptionId,
-    monthlyLimit: 50, // Free tier limit
+    monthlyLimit: 100, // Free tier limit
     usedThisMonth: 12,
+    dailyLimit: 10,
+    usedToday: 2,
     cycleResetAt: futureDate(13),
   });
 
@@ -1046,8 +1048,10 @@ async function seedTrialExpiredChild(
   await db.insert(quotaPools).values({
     id: generateUUIDv7(),
     subscriptionId,
-    monthlyLimit: 50,
-    usedThisMonth: 50,
+    monthlyLimit: 100,
+    usedThisMonth: 100,
+    dailyLimit: 10,
+    usedToday: 10,
     cycleResetAt: futureDate(13),
   });
 
