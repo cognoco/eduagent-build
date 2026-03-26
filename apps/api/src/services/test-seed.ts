@@ -71,7 +71,8 @@ export type SeedScenario =
   | 'parent-solo'
   | 'pre-profile'
   | 'consent-pending'
-  | 'parent-multi-child';
+  | 'parent-multi-child'
+  | 'daily-limit-reached';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -1281,6 +1282,88 @@ async function seedConsentPending(
 }
 
 // ---------------------------------------------------------------------------
+// Scenario: daily-limit-reached
+// Free-tier user who has hit the daily question cap (10/10) but still has
+// monthly quota remaining. Next LLM request should trigger 402 QUOTA_EXCEEDED
+// with reason: 'daily'.
+// ---------------------------------------------------------------------------
+
+async function seedDailyLimitReached(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Daily Cap User',
+    personaType: 'LEARNER',
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'free',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: 100,
+    usedThisMonth: 10,
+    dailyLimit: 10,
+    usedToday: 10, // Daily cap fully used
+    cycleResetAt: futureDate(30),
+  });
+
+  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Mathematics'
+  );
+
+  // Create an active session so the user can attempt to send a message
+  const sessionId = generateUUIDv7();
+  await db.insert(learningSessions).values({
+    id: sessionId,
+    profileId,
+    subjectId,
+    topicId: topicIds[0],
+    sessionType: 'learning',
+    status: 'active',
+    exchangeCount: 3,
+  });
+
+  await db.insert(sessionEvents).values(
+    Array.from({ length: 3 }, (_, i) => ({
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      subjectId,
+      eventType:
+        i % 2 === 0 ? ('user_message' as const) : ('ai_response' as const),
+      content:
+        i % 2 === 0
+          ? 'What is algebra?'
+          : 'Algebra is a branch of mathematics...',
+    }))
+  );
+
+  return {
+    scenario: 'daily-limit-reached',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subscriptionId, subjectId, sessionId, topicId: topicIds[0] },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -1302,6 +1385,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'pre-profile': seedPreProfile,
   'consent-pending': seedConsentPending,
   'parent-multi-child': seedParentMultiChild,
+  'daily-limit-reached': seedDailyLimitReached,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];

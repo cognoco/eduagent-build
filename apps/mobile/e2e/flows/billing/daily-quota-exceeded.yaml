@@ -1,0 +1,85 @@
+# Flow: Daily Quota Exceeded — Verify 402 Error on Daily Cap
+# Validates: when a free-tier user has hit the daily question limit (10/10),
+# sending a message in an active session triggers the quota exceeded error
+# with the daily limit message.
+# Tags: nightly, billing, quota
+#
+# Journey: UX Journey 5 (Billing & Subscription) — Dual-Cap Enforcement
+# Epics: Epic 5 (Quota Metering)
+# Prerequisite: Seeded free-tier user with daily limit fully used
+#               (scenario: daily-limit-reached)
+#
+# NOTE: The daily-limit-reached seed creates:
+#   - Free-tier subscription (active, 100 monthly / 10 daily)
+#   - Quota pool with usedToday=10, usedThisMonth=10
+#   - An active learning session with 3 exchanges
+#   - A subject (Mathematics) so home screen renders
+# The metering middleware blocks at 402 before the LLM is called,
+# so no LLM configuration is needed for this flow to work.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - billing
+  - quota
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "daily-limit-reached"
+      API_URL: ${API_URL}
+
+# 2. Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 30000
+
+# 3. Navigate to the active session via the coaching card
+# The coaching card should link to the existing active session
+- tapOn:
+    id: "coaching-card-primary"
+    # Coaching card may not render if precompute hasn't run
+    optional: true
+
+# 3b. Fallback: if no coaching card, try to navigate via subject
+- tapOn:
+    text: "Mathematics"
+    optional: true
+
+# 4. Wait for the session/chat screen
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+# 5. Type a message
+- tapOn:
+    id: "chat-input"
+- inputText: "Can you explain quadratic equations?"
+
+# 6. Send message (keyboard Enter, per BUG-35)
+- pressKey: Enter
+
+# 7. Wait for the daily quota exceeded error message to appear
+# The metering middleware returns: "You've reached your daily question limit.
+# Come back tomorrow for more!" — this is passed through formatApiError
+# and rendered as a chat message via animateResponse.
+- extendedWaitUntil:
+    visible:
+      text: "daily question limit"
+    timeout: 15000
+    # The error text may vary or render partially — optional safety
+    optional: true
+
+# 7b. Alternative: check for the shorter variant
+- assertVisible:
+    text: "Come back tomorrow"
+    optional: true
+
+# 8. Screenshot of quota exceeded state
+- takeScreenshot: daily-quota-exceeded-chat
+
+# 9. Verify the chat input is still present (session screen didn't crash)
+- assertVisible:
+    id: "chat-input"

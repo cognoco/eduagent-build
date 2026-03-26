@@ -162,6 +162,8 @@ async function refreshKvCache(
     status: sub.status,
     monthlyLimit: quota?.monthlyLimit ?? 0,
     usedThisMonth: quota?.usedThisMonth ?? 0,
+    dailyLimit: quota?.dailyLimit ?? null,
+    usedToday: quota?.usedToday ?? 0,
   };
 
   await writeSubscriptionStatus(kv, accountId, cached);
