@@ -352,12 +352,14 @@ export async function markSubscriptionCancelled(
 export async function updateQuotaPoolLimit(
   db: Database,
   subscriptionId: string,
-  newLimit: number
+  newLimit: number,
+  dailyLimit: number | null
 ): Promise<void> {
   await db
     .update(quotaPools)
     .set({
       monthlyLimit: newLimit,
+      dailyLimit,
       updatedAt: new Date(),
     })
     .where(eq(quotaPools.subscriptionId, subscriptionId));
@@ -408,7 +410,12 @@ export async function activateSubscriptionFromCheckout(
     .returning();
 
   // Update quota pool limit to match the new tier
-  await updateQuotaPoolLimit(db, existing.id, tierConfig.monthlyQuota);
+  await updateQuotaPoolLimit(
+    db,
+    existing.id,
+    tierConfig.monthlyQuota,
+    tierConfig.dailyLimit
+  );
 
   return mapSubscriptionRow(updated);
 }
@@ -1578,6 +1585,8 @@ export async function activateSubscriptionFromRevenuecat(
       subscriptionId: subRow.id,
       monthlyLimit: tierConfig.monthlyQuota,
       usedThisMonth: 0,
+      dailyLimit: tierConfig.dailyLimit,
+      usedToday: 0,
       cycleResetAt,
     });
 
@@ -1612,7 +1621,12 @@ export async function activateSubscriptionFromRevenuecat(
     .returning();
 
   // Update quota pool limit to match the new tier
-  await updateQuotaPoolLimit(db, existing.id, tierConfig.monthlyQuota);
+  await updateQuotaPoolLimit(
+    db,
+    existing.id,
+    tierConfig.monthlyQuota,
+    tierConfig.dailyLimit
+  );
 
   return mapSubscriptionRow(updated);
 }

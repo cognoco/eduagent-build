@@ -1,6 +1,7 @@
-# Flow: GDPR Consent — EU Under-16 (Full 3-Phase Consent Form)
-# Validates: creating a profile for a 14-year-old in EU triggers GDPR consent,
-# then walks through all 3 phases: child hand-off → parent email → success.
+# Flow: GDPR Consent — Under-16 (Full 3-Phase Consent Form)
+# Validates: creating a profile for a 14-year-old triggers GDPR consent
+# (GDPR-everywhere: age < 16 globally), then walks through all 3 phases:
+# child hand-off → parent email → success.
 # Tags: nightly, consent, gdpr
 #
 # Journey: UX Journey 1 (Onboarding) + Consent Lifecycle (GDPR)
@@ -11,7 +12,7 @@
 #
 # Date picker technique: Android native DatePickerDialog opens with default 2010-01-01.
 # Tap year header → switch to year list → tap 2012 (already visible) → OK.
-# Result: age = 14, EU location → GDPR consent required (under 16).
+# Result: age = 14 → under 16, GDPR consent required.
 appId: com.mentomate.app
 tags:
   - nightly
@@ -74,7 +75,7 @@ tags:
     id: "profiles-create-first"
 
 # ============================================================
-# PROFILE FORM — set age to 14 (born 2012), select EU
+# PROFILE FORM — set age to 14 (born 2012), no location needed
 # ============================================================
 - extendedWaitUntil:
     visible:
@@ -122,19 +123,11 @@ tags:
 
 - takeScreenshot: gdpr-under16-01-date-set
 
-# Location options should now be visible
-- extendedWaitUntil:
-    visible:
-      id: "location-eu"
-    timeout: 5000
+# Verify persona auto-detected (14yo → LEARNER)
+- assertVisible:
+    id: "persona-auto-hint"
 
-# Select EU location (GDPR = under 16 in EU)
-- tapOn:
-    id: "location-eu"
-
-- takeScreenshot: gdpr-under16-02-eu-selected
-
-# Submit profile creation
+# Submit profile creation (GDPR-everywhere: age 14 < 16 → consent required)
 - tapOn:
     id: "create-profile-submit"
 

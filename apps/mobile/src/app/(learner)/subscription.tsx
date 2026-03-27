@@ -53,10 +53,10 @@ const TIER_LABELS: Record<SubscriptionTier, string> = {
 };
 
 const TIER_LIMITS: Record<SubscriptionTier, string> = {
-  free: '50 questions/month',
+  free: '100 questions/month',
   plus: '500 questions/month',
-  family: '1,000 questions/month (shared)',
-  pro: '2,000 questions/month',
+  family: '1,500 questions/month (shared)',
+  pro: '3,000 questions/month',
 };
 
 /** Map RevenueCat PACKAGE_TYPE to human-readable period labels. */

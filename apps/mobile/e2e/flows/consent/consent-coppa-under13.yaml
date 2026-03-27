@@ -1,9 +1,10 @@
-# Flow: COPPA Consent — US Under-13 (Full 3-Phase Consent Form)
-# Validates: creating a profile for a 12-year-old in US triggers COPPA consent,
-# then walks through all 3 phases: child hand-off → parent email → success.
+# Flow: COPPA-Age Consent — Under-13 (Full 3-Phase Consent Form)
+# Validates: creating a profile for a 12-year-old triggers consent
+# (GDPR-everywhere: age < 16 globally), then walks through all 3 phases:
+# child hand-off → parent email → success.
 # Tags: nightly, consent, coppa
 #
-# Journey: UX Journey 1 (Onboarding) + Consent Lifecycle (COPPA)
+# Journey: UX Journey 1 (Onboarding) + Consent Lifecycle
 # Epics: Epic 0, Epic 5, Epic 10 (Story 10.10)
 #
 # Prerequisite: Seeded user with pre-profile scenario (Clerk user + account, no profile).
@@ -11,7 +12,7 @@
 #
 # Date picker technique: Android native DatePickerDialog opens with default 2010-01-01.
 # Tap year header → switch to year list → scroll down → tap 2014 → OK.
-# Result: age = 12, US location → COPPA consent required.
+# Result: age = 12 → under 16, consent required.
 appId: com.mentomate.app
 tags:
   - nightly
@@ -74,7 +75,7 @@ tags:
     id: "profiles-create-first"
 
 # ============================================================
-# PROFILE FORM — set age to 10 (born 2014), select US
+# PROFILE FORM — set age to 12 (born 2014), no location needed
 # ============================================================
 - extendedWaitUntil:
     visible:
@@ -122,19 +123,11 @@ tags:
 
 - takeScreenshot: coppa-under13-01-date-set
 
-# Location options should now be visible
-- extendedWaitUntil:
-    visible:
-      id: "location-us"
-    timeout: 5000
+# Verify persona auto-detected (12yo → TEEN)
+- assertVisible:
+    id: "persona-auto-hint"
 
-# Select US location (COPPA = under 13 in US)
-- tapOn:
-    id: "location-us"
-
-- takeScreenshot: coppa-under13-02-us-selected
-
-# Submit profile creation
+# Submit profile creation (GDPR-everywhere: age 12 < 16 → consent required)
 - tapOn:
     id: "create-profile-submit"
 

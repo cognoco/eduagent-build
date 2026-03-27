@@ -1,7 +1,7 @@
 # Flow: Above Consent Threshold — No Consent Required
-# Validates: creating a profile for a 17-year-old does NOT trigger consent,
-# regardless of location (US or EU). Profile creation goes straight to
-# the home/subject-creation flow — no consent screen appears.
+# Validates: creating a profile for a 17-year-old does NOT trigger consent.
+# GDPR-everywhere: age >= 16 means no consent required (no location selector).
+# Profile creation goes straight to the home/subject-creation flow.
 # Tags: nightly, consent
 #
 # Journey: UX Journey 1 (Onboarding) — happy path without consent
@@ -11,8 +11,7 @@
 # Usage: ./scripts/seed-and-run.sh pre-profile flows/consent/consent-above-threshold.yaml
 #
 # Date picker: Android DatePickerDialog opens with default 2010-01-01.
-# Tap year header → tap 2009 (already visible, age = 17) → OK.
-# Select EU location (strictest threshold: 16). 17 > 16 → no consent.
+# Tap year header → tap 2009 (age = 17, above threshold) → OK.
 appId: com.mentomate.app
 tags:
   - nightly
@@ -74,7 +73,7 @@ tags:
     id: "profiles-create-first"
 
 # ============================================================
-# PROFILE FORM — set age to 17 (born 2009), select EU
+# PROFILE FORM — set age to 17 (born 2009), no location needed
 # ============================================================
 - extendedWaitUntil:
     visible:
@@ -122,19 +121,11 @@ tags:
 
 - takeScreenshot: above-threshold-01-date-set
 
-# Location options should now be visible
-- extendedWaitUntil:
-    visible:
-      id: "location-eu"
-    timeout: 5000
+# Verify persona auto-detected (17yo → LEARNER)
+- assertVisible:
+    id: "persona-auto-hint"
 
-# Select EU location (strictest threshold: 16). Age 17 > 16 → no consent.
-- tapOn:
-    id: "location-eu"
-
-- takeScreenshot: above-threshold-02-eu-selected
-
-# Submit profile creation
+# Submit profile creation (GDPR-everywhere: age 17 >= 16 → no consent)
 - tapOn:
     id: "create-profile-submit"
 
@@ -159,10 +150,10 @@ tags:
 - assertNotVisible:
     text: "One more step!"
 
-- takeScreenshot: above-threshold-03-no-consent-create-subject
+- takeScreenshot: above-threshold-02-no-consent-create-subject
 
 # Verify we landed on subject creation (profile was created successfully, no consent)
 - assertVisible:
-    text: "Start Learning"
+    id: "create-subject-name"
 
-- takeScreenshot: above-threshold-04-complete
+- takeScreenshot: above-threshold-03-complete
