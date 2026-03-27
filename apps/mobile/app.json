@@ -67,7 +67,8 @@
         "@sentry/react-native/expo",
         {
           "organization": "zwizzly",
-          "project": "mentomate-mobile"
+          "project": "mentomate-mobile",
+          "uploadSourceMaps": false
         }
       ],
       [
