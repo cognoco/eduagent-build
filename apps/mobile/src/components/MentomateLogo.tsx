@@ -30,7 +30,7 @@ export function MentomateLogo({
   const s = sizes[size];
   const Icon = isDark ? IconDark : IconLight;
 
-  const mentColor = isDark ? '#f1f5f9' : '#1a1a1a';
+  const mentColor = isDark ? '#8b5cf6' : '#8b5cf6';
   const mateColor = isDark ? '#5eead4' : '#0d9488';
   const circleColor = isDark ? '#a78bfa' : '#8b5cf6';
 

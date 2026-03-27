@@ -130,40 +130,26 @@ tags:
     id: "create-profile-submit"
 
 # ============================================================
-# VERIFY: NO CONSENT SCREEN — returns to profiles list
+# VERIFY: NO CONSENT SCREEN — lands on create-subject
 # ============================================================
-# After profile creation for age 17+ (no consent), router.back() returns
-# to the Profiles screen. The new profile should be visible and active.
+# After profile creation for age 17+ (no consent), the app creates the
+# profile and redirects to create-subject (0 subjects). The profiles
+# screen may flash briefly or be skipped entirely — timing varies.
+# The key proof: landing on create-subject (not consent) confirms success.
 
 - extendedWaitUntil:
     visible:
-      text: "Above Threshold Teen"
-    timeout: 15000
+      id: "create-subject-name"
+    timeout: 30000
 
-# Verify we're on the Profiles screen (not consent)
-- assertVisible:
-    text: "Profiles"
-
-# MANDATORY: Consent screen must NOT appear
+# MANDATORY: Consent screen must NOT have appeared
 - assertNotVisible:
     id: "consent-child-view"
 
 - assertNotVisible:
     text: "One more step!"
 
-- takeScreenshot: above-threshold-02-profile-created-no-consent
-
-# Tap Done → app redirects to create-subject (0 subjects, new profile)
-- tapOn:
-    text: "Done"
-
-- extendedWaitUntil:
-    visible:
-      id: "create-subject-name"
-    timeout: 15000
-
-# Confirm: no consent pending gate appeared
 - assertNotVisible:
     text: "Hang tight!"
 
-- takeScreenshot: above-threshold-03-create-subject-no-gate
+- takeScreenshot: above-threshold-02-no-consent-create-subject

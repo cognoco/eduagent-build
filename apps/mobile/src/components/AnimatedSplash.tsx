@@ -40,7 +40,7 @@ const C = {
   sparkPink: '#fce7f3',
   sparkViolet: '#ede9fe',
   sparkMint: '#d1fae5',
-  text: '#f1f5f9',
+  text: '#8b5cf6',
   textViolet: '#a78bfa',
   textTeal: '#5eead4',
 } as const;
