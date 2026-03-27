@@ -1088,7 +1088,12 @@ export async function handleTierChange(
   const remainingQuestions = Math.max(0, newMonthlyLimit - usedThisCycle);
 
   // Update quota pool limit (preserves usedThisMonth)
-  await updateQuotaPoolLimit(db, subscriptionId, newMonthlyLimit);
+  await updateQuotaPoolLimit(
+    db,
+    subscriptionId,
+    newMonthlyLimit,
+    newConfig.dailyLimit
+  );
 
   return {
     previousTier: sub.tier,
@@ -1399,7 +1404,12 @@ export async function downgradeAllFamilyProfiles(
     })
     .where(eq(subscriptions.id, subscriptionId));
 
-  await updateQuotaPoolLimit(db, subscriptionId, freeTier.monthlyQuota);
+  await updateQuotaPoolLimit(
+    db,
+    subscriptionId,
+    freeTier.monthlyQuota,
+    freeTier.dailyLimit
+  );
 
   return downgraded;
 }

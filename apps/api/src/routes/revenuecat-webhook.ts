@@ -254,7 +254,12 @@ async function handleRenewal(
 
   if (updated && tier) {
     const tierConfig = getTierConfig(tier);
-    await updateQuotaPoolLimit(db, updated.id, tierConfig.monthlyQuota);
+    await updateQuotaPoolLimit(
+      db,
+      updated.id,
+      tierConfig.monthlyQuota,
+      tierConfig.dailyLimit
+    );
   }
 
   if (updated) {
@@ -328,7 +333,12 @@ async function handleExpiration(
 
   if (updated) {
     const freeConfig = getTierConfig('free');
-    await updateQuotaPoolLimit(db, updated.id, freeConfig.monthlyQuota);
+    await updateQuotaPoolLimit(
+      db,
+      updated.id,
+      freeConfig.monthlyQuota,
+      freeConfig.dailyLimit
+    );
     await refreshKvCache(kv, db, updated.accountId);
   }
 }
@@ -395,7 +405,12 @@ async function handleProductChange(
 
   if (updated) {
     const tierConfig = getTierConfig(newTier);
-    await updateQuotaPoolLimit(db, updated.id, tierConfig.monthlyQuota);
+    await updateQuotaPoolLimit(
+      db,
+      updated.id,
+      tierConfig.monthlyQuota,
+      tierConfig.dailyLimit
+    );
     await refreshKvCache(kv, db, updated.accountId);
   }
 }

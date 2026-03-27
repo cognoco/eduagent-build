@@ -173,7 +173,12 @@ async function handleSubscriptionEvent(
     // If tier metadata present, sync quota pool limit to new tier
     if (tier) {
       const tierConfig = getTierConfig(tier);
-      await updateQuotaPoolLimit(db, updated.id, tierConfig.monthlyQuota);
+      await updateQuotaPoolLimit(
+        db,
+        updated.id,
+        tierConfig.monthlyQuota,
+        tierConfig.dailyLimit
+      );
     }
     await refreshKvCache(kv, db, updated.accountId);
   }

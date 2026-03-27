@@ -731,7 +731,7 @@ describe('updateQuotaPoolLimit', () => {
   it('updates monthlyLimit on quota pool', async () => {
     const db = createMockDb();
 
-    await updateQuotaPoolLimit(db, subscriptionId, 1500);
+    await updateQuotaPoolLimit(db, subscriptionId, 1500, null);
 
     expect(db.update).toHaveBeenCalled();
   });

@@ -768,7 +768,8 @@ describe('tier metadata in subscription events', () => {
     expect(updateQuotaPoolLimit).toHaveBeenCalledWith(
       mockDb,
       'sub-internal-1',
-      expect.any(Number)
+      expect.any(Number),
+      null
     );
   });
 
