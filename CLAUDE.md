@@ -226,6 +226,17 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 ## Quality Rules
 
 - **Always test your own work before concluding a task.** Run the relevant tests for any code you write or modify. Do not declare a task complete until tests pass.
+- **Always run E2E tests after implementing or fixing features.** Never skip E2E tests or declare work done without running them. If E2E infrastructure is down, explicitly report that rather than silently skipping.
+- **Run `pnpm exec tsc --noEmit` before every commit** to catch type errors locally. Also run `pnpm exec nx lint <project>` for any modified project. Do not push until both pass cleanly. This avoids multi-round CI fix-push cycles.
+- **Batch PR review fixes in one pass.** When addressing PR review findings, apply ALL fixes first, then run the full test suite and type checker locally. Only commit and push once everything passes. Do not push partial fixes.
+- **Do not add mocks to test files** unless explicitly asked. Prefer fixture-based test data. Only update test fixtures (input data), never add new mock variables.
+- **Do not delete UI code** — comment it out instead, unless the user explicitly says to delete it.
+- **When the user says "just talk to me" or "do not change yet"**, stop and discuss before making any code changes. Wait for explicit approval before implementing. Design decisions require discussion first.
+
+## CI & PR Readiness
+
+- **After pushing changes, wait for ALL CI checks to actually pass** before declaring a PR ready or asking to merge. Monitor CI to completion using `gh pr checks <number>`.
+- **Never declare a PR "ready to merge" based on local tests alone.** CI is the source of truth.
 
 ## E2E Testing Documentation (Mandatory)
 
@@ -240,6 +251,11 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
    - `e2e-testing-strategy.md` — Overall strategy, architecture, flow inventory
 3. **Keep docs consistent** — if you fix a bug, update both `e2e-test-bugs.md` (status) and `e2e-test-results.md` (session entry). If you add flows, update `e2e-testing-strategy.md` inventory.
 4. **When emulator or app issues occur — ALWAYS read `docs/E2Edocs/e2e-emulator-issues.md` FIRST.** Every time you encounter a problem with the Android emulator (crashes, dialogs, boot issues, ADB failures, Bluetooth, ANR) or the app (launch failures, bundle loading, Metro connectivity, dev-client issues), you MUST read the emulator issues doc before attempting any fix. The doc contains tested solutions for all known issues. Do NOT guess or try ad-hoc solutions — the documented procedures exist because they were discovered through painful trial and error.
+
+### E2E Infrastructure Debugging
+
+- **Before debugging test/emulator infrastructure issues for more than 15 minutes**, check the basics first: Is Metro running? Is the dev server up? Is the emulator connected (`adb devices`)? Read `docs/E2Edocs/e2e-emulator-issues.md` before attempting any fix.
+- **If infrastructure isn't working after 15 minutes of debugging, STOP and report the issue clearly** to the user. Do not spiral into multi-hour debugging sessions.
 
 ### E2E Flow Integrity Rules (Mandatory)
 
