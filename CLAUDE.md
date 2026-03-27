@@ -210,6 +210,19 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 - [x] Google Play Developer account ($25 one-time) — done 2026-03-21
 - [ ] RevenueCat project setup — connect both stores, configure entitlements & offerings (see Epic 9)
 
+## Planning & Specification (before any new feature/epic)
+
+Every new feature or epic **MUST have these documents before implementation begins:**
+
+1. **PRD section** — Requirements with numbered FRs, acceptance criteria, and edge cases
+2. **Architecture decisions** — Technical design, data model changes, API contracts, integration points
+3. **Epic/story breakdown** — Stories with clear scope, acceptance criteria, and dependencies
+4. **UX spec** (if UI work) — Screens, flows, component behavior, accessibility
+
+Use the BMAD commands (`/bmad-bmm-create-prd`, `/bmad-bmm-create-architecture`, `/bmad-bmm-create-epics-and-stories`, `/bmad-bmm-create-ux-design`) to generate these — they enforce completeness and multi-perspective review. Do not skip the spec phase and jump straight to coding.
+
+**Do not implement features based on verbal descriptions alone.** If the user says "build X" and no spec exists, ask whether to create the spec first or point to an existing one.
+
 ## Required Reading (before any implementation work)
 
 **You MUST read these before writing code:**
