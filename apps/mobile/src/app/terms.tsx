@@ -41,9 +41,10 @@ export default function TermsOfServiceScreen() {
           onPress={() => router.back()}
           accessibilityLabel="Go back"
           accessibilityRole="button"
-          className="mr-3"
+          className="mr-3 w-10 h-10 items-center justify-center rounded-full bg-surface"
+          testID="back-button"
         >
-          <Ionicons name="close" size={24} color={colors.textPrimary} />
+          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text className="text-h2 font-bold text-text-primary">
           Terms of Service
@@ -113,9 +114,9 @@ export default function TermsOfServiceScreen() {
 
         <Section title="7. Intellectual Property">
           <Paragraph>
-            All MentoMate content, design, and technology are owned by Cognoco
-            s.r.o. Your learning data (session exchanges, notes, summaries)
-            belongs to you. We license it only to provide the service.
+            All MentoMate content, design, and technology are owned by Zwizzly.
+            Your learning data (session exchanges, notes, summaries) belongs to
+            you. We license it only to provide the service.
           </Paragraph>
         </Section>
 
@@ -147,8 +148,10 @@ export default function TermsOfServiceScreen() {
 
         <Section title="11. Governing Law">
           <Paragraph>
-            These terms are governed by the laws of the Czech Republic. Disputes
-            will be resolved in the courts of Prague, Czech Republic.
+            These terms are governed by the applicable laws of the European
+            Union, including the General Data Protection Regulation (GDPR). Any
+            disputes will be resolved in accordance with applicable EU consumer
+            protection and data privacy regulations.
           </Paragraph>
         </Section>
 

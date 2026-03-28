@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable, Alert } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import {
   ChatShell,
   animateResponse,
@@ -61,6 +61,19 @@ export default function SessionScreen() {
   );
 
   const animationCleanupRef = useRef<(() => void) | null>(null);
+
+  // Reset state when screen regains focus (prevents stale state loop)
+  useFocusEffect(
+    useCallback(() => {
+      animationCleanupRef.current?.();
+      setMessages([{ id: 'opening', role: 'ai', content: openingContent }]);
+      setIsStreaming(false);
+      setExchangeCount(0);
+      setEscalationRung(1);
+      setIsClosing(false);
+      setActiveSessionId(routeSessionId ?? null);
+    }, [openingContent, routeSessionId])
+  );
 
   useEffect(() => {
     return () => {

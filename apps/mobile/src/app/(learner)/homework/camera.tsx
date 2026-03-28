@@ -8,9 +8,10 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../../lib/theme';
 import { cameraReducer, initialCameraState } from './camera-reducer';
 import { useHomeworkOcr } from '../../../hooks/use-homework-ocr';
@@ -38,6 +39,17 @@ export default function CameraScreen(): React.ReactNode {
   const [manualText, setManualText] = useState('');
   const [flash, setFlash] = useState<FlashMode>('off');
   const [showCelebration, setShowCelebration] = useState(true);
+
+  // Reset state when screen regains focus (prevents stale state loop)
+  useFocusEffect(
+    useCallback(() => {
+      dispatch({ type: 'RESET', hasPermission: permission?.granted ?? false });
+      setEditedText('');
+      setManualText('');
+      setShowCelebration(true);
+      setFlash('off');
+    }, [permission?.granted])
+  );
 
   // Sync permission state into reducer
   useEffect(() => {
@@ -213,12 +225,12 @@ export default function CameraScreen(): React.ReactNode {
           <Pressable
             testID="close-button"
             onPress={handleClose}
-            className="absolute top-0 left-4 w-12 h-12 items-center justify-center rounded-full bg-black/40"
+            className="absolute top-0 left-4 w-14 h-14 items-center justify-center rounded-full bg-black/60 border border-white/30"
             style={{ marginTop: insets.top + 8 }}
             accessibilityLabel="Close camera"
             accessibilityRole="button"
           >
-            <Text className="text-white text-h3 font-bold">X</Text>
+            <Ionicons name="close" size={28} color="white" />
           </Pressable>
 
           {/* Capture guide overlay */}

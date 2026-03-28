@@ -14,7 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { useProfile } from '../../lib/profile';
-import { useTheme, useThemeColors } from '../../lib/theme';
+import { useTheme, useThemeColors, useTokenVars } from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
 import { useRevenueCatIdentity } from '../../hooks/use-revenuecat';
@@ -545,6 +545,7 @@ export default function LearnerLayout() {
   const { isLoaded, isSignedIn } = useAuth();
   const { persona } = useTheme();
   const colors = useThemeColors();
+  const tokenVars = useTokenVars();
   const {
     activeProfile,
     isLoading: isProfileLoading,
@@ -613,7 +614,7 @@ export default function LearnerLayout() {
   }
 
   return (
-    <View className="flex-1">
+    <View style={[{ flex: 1 }, tokenVars]}>
       <Tabs
         screenOptions={{
           headerShown: false,

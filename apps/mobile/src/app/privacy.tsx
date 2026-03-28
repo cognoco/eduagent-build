@@ -41,9 +41,10 @@ export default function PrivacyPolicyScreen() {
           onPress={() => router.back()}
           accessibilityLabel="Go back"
           accessibilityRole="button"
-          className="mr-3"
+          className="mr-3 w-10 h-10 items-center justify-center rounded-full bg-surface"
+          testID="back-button"
         >
-          <Ionicons name="close" size={24} color={colors.textPrimary} />
+          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text className="text-h2 font-bold text-text-primary">
           Privacy Policy
@@ -59,10 +60,11 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="1. Who We Are">
           <Paragraph>
-            MentoMate is an AI-powered tutoring platform operated by Cognoco
-            s.r.o. (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;). We are
-            committed to protecting the privacy of all our users, especially
-            children aged 11-15.
+            MentoMate is an AI-powered tutoring platform operated by Zwizzly
+            (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;). We are committed
+            to protecting the privacy of all our users, especially children aged
+            11-15. We process personal data in accordance with the EU General
+            Data Protection Regulation (GDPR).
           </Paragraph>
         </Section>
 

@@ -2,7 +2,7 @@ import { Tabs, Redirect } from 'expo-router';
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@clerk/clerk-expo';
-import { useTheme, useThemeColors } from '../../lib/theme';
+import { useTheme, useThemeColors, useTokenVars } from '../../lib/theme';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
 import { useRevenueCatIdentity } from '../../hooks/use-revenuecat';
 
@@ -36,6 +36,7 @@ export default function ParentLayout() {
   const { isLoaded, isSignedIn } = useAuth();
   const { persona } = useTheme();
   const colors = useThemeColors();
+  const tokenVars = useTokenVars();
 
   // Register push token on app launch (runs once, guarded internally)
   usePushTokenRegistration();
@@ -48,7 +49,7 @@ export default function ParentLayout() {
   if (persona !== 'parent') return <Redirect href="/(learner)/home" />;
 
   return (
-    <View className="flex-1">
+    <View style={[{ flex: 1 }, tokenVars]}>
       <Tabs
         screenOptions={{
           headerShown: false,

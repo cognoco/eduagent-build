@@ -21,7 +21,8 @@ export type CameraAction =
   | { type: 'RETAKE' }
   | { type: 'OCR_SUCCESS'; text: string }
   | { type: 'OCR_ERROR'; message: string }
-  | { type: 'RETRY_OCR' };
+  | { type: 'RETRY_OCR' }
+  | { type: 'RESET'; hasPermission: boolean };
 
 export const initialCameraState: CameraState = {
   phase: 'permission',
@@ -64,6 +65,12 @@ export function cameraReducer(
 
     case 'RETRY_OCR':
       return { ...state, phase: 'processing', errorMessage: null };
+
+    case 'RESET':
+      return {
+        ...initialCameraState,
+        phase: action.hasPermission ? 'viewfinder' : 'permission',
+      };
 
     default:
       return state;

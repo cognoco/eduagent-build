@@ -6,6 +6,10 @@ import CameraScreen from './camera';
 jest.mock('expo-router', () => ({
   useRouter: jest.fn(),
   useLocalSearchParams: jest.fn(),
+  useFocusEffect: (cb: () => void) => {
+    const { useEffect } = require('react');
+    useEffect(() => cb(), []);
+  },
 }));
 
 // Mock expo-camera — CameraView as a simple View for testing
@@ -32,6 +36,20 @@ jest.mock('expo-camera', () => {
       );
     }),
     useCameraPermissions: jest.fn(),
+  };
+});
+
+// Mock @expo/vector-icons
+jest.mock('@expo/vector-icons', () => {
+  const { Text } = require('react-native');
+  return {
+    Ionicons: ({
+      name,
+      ...props
+    }: {
+      name: string;
+      [key: string]: unknown;
+    }) => <Text {...props}>{name}</Text>,
   };
 });
 
