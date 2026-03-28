@@ -2344,6 +2344,114 @@ So that I can verify the app is working without switching into child profiles.
 
 ---
 
+### Cluster E: Learning Book Cross-Navigation
+
+### Story 4.12: Post-Session Learning Book Navigation
+
+_Priority: Should-ship. Scope: LEARNER-ONLY._
+
+As a learner who has just finished a session,
+I want to navigate directly to the Learning Book from the session summary,
+So that I can see my learning progress and historical summaries without having to discover the tab on my own.
+
+**Acceptance Criteria:**
+
+**Given** a learner is on the session summary screen after submitting a summary (or skipping)
+**When** the "Continue" / "Skip for now" actions are visible
+**Then** a secondary action link "See your Learning Book" is displayed below the primary continue button
+
+**Given** the learner taps "See your Learning Book"
+**When** the session included a specific `topicId`
+**Then** the learner navigates to the topic detail screen with the correct `subjectId` and `topicId` params
+
+**Given** the learner taps "See your Learning Book"
+**When** the session did NOT have a specific `topicId` (freeform)
+**Then** the learner navigates to the Learning Book tab
+
+**Given** the navigation occurs
+**Then** the session summary screen is replaced (not pushed) to avoid back-stack accumulation
+**And** a `testID="go-to-learning-book"` is present on the link
+
+**Implementation notes:**
+- Modify `session-summary/[sessionId].tsx` — add `subjectId` and `topicId` to `useLocalSearchParams`, add "See your Learning Book" Pressable
+- Modify `session/index.tsx` — pass `subjectId` and `topicId` as params in the `router.replace` call to session-summary (currently only passes `subjectName`, `exchangeCount`, `escalationRung`)
+- No new API needed — all data already available via route params
+
+**FRs:** FR67, FR68
+
+---
+
+### Story 4.13: In-Session Learning Book Link
+
+_Priority: Should-ship. Scope: LEARNER-ONLY._
+
+As a learner in an active chat session,
+I want to see a non-intrusive link to my Learning Book,
+So that I can review previous lessons while learning.
+
+**Acceptance Criteria:**
+
+**Given** a learner has at least 1 completed topic in any subject
+**When** the session screen loads and the opening message renders
+**Then** a subtle footer element shows: "Want to see your previous lessons? Go to the Learning Book" as a tappable link
+
+**Given** the learner taps the Learning Book link
+**Then** the learner navigates to the Learning Book tab
+
+**Given** the learner has zero completed topics
+**When** the session loads
+**Then** no Learning Book link is shown
+
+**And** the link does NOT appear in homework mode (homework is task-focused, avoid distraction)
+**And** a `testID="session-learning-book-link"` is present
+**And** the link uses text-secondary color, caption size — visually subtle, not competing with chat
+
+**Implementation notes:**
+- `ChatShell` already accepts a `footer` prop — compose with existing `QuestionCounter` if both need to render
+- Use existing `useOverallProgress` hook to check if learner has topics (already cached from home screen)
+- New component: `LearningBookPrompt.tsx` — small, non-intrusive link
+
+**FRs:** FR67
+
+---
+
+### Story 4.14: Topic Detail — Continue Learning Button
+
+_Priority: Should-ship. Scope: LEARNER-ONLY._
+
+As a learner viewing a topic in the Learning Book,
+I want to see a summary of what I learned and have a "Continue Learning" button,
+So that I can review my knowledge and resume learning on that topic seamlessly.
+
+**Acceptance Criteria:**
+
+**Given** a topic with `completionStatus` of `in_progress`
+**When** the topic detail renders
+**Then** the primary button reads "Continue Learning" and navigates to session with `mode: 'freeform'`, `subjectId`, and `topicId`
+**And** a secondary "Start Review Session" button is also available
+
+**Given** a topic with `completionStatus` of `completed`, `verified`, or `stable`
+**When** the topic detail renders
+**Then** the primary button reads "Start Review Session" (existing behavior)
+**And** a secondary "Continue Learning" button is also available
+
+**Given** a topic with `completionStatus` of `not_started`
+**When** the topic detail renders
+**Then** the primary button reads "Start Learning" (replaces "Start Review Session")
+**And** no secondary "Continue Learning" button is shown
+
+**And** a `testID="continue-learning-button"` is present on the new button
+**And** the existing "Your summary" card (already implemented with `summaryExcerpt`) continues to display when present
+
+**Implementation notes:**
+- Modify `topic/[topicId].tsx` action buttons section — add adaptive labeling based on `completionStatus`
+- No new API needed — `summaryExcerpt` and `completionStatus` already in `TopicProgress` schema
+- Navigate to session with `mode: 'freeform'` for continued learning
+
+**FRs:** FR67, FR68, FR73
+
+---
+
 ### Epic 4 Execution Order
 
 ```
@@ -2351,6 +2459,7 @@ Cluster A: 4.1 → 4.2 (topic detail drills from topic list)
 Cluster B: 4.3 → 4.4 (lifecycle needs home screen first)
 Cluster C: 4.5, 4.6, 4.7 (can parallel) → 4.8 (notifications need content to notify about)
 Cluster D: 4.9 (theming) → 4.10 (coaching cards use theme tokens) → 4.11 (dashboard uses coaching card variant)
+Cluster E: 4.12, 4.13, 4.14 (all independent — can parallel, no API changes needed)
 
 Clusters A-D are independent and can run in parallel.
 ```
@@ -4048,6 +4157,170 @@ So that the app doesn't ask me to pick my region or show different rules dependi
 
 ---
 
+### Cluster B: Subject Auto-Inference
+
+### Story 10.20: Subject Classification Service (API)
+
+_Priority: Must-ship (prerequisite for 10.21, 10.22). Scope: UNIVERSAL._
+
+As the system,
+I want to classify problem text or conversation content against a learner's enrolled subjects,
+So that the correct subject can be inferred without manual selection.
+
+**Background:** The UX spec (Journey 4) states "AI auto-detects the subject from the input — no subject selection required" and targets a <3s camera pipeline (OCR + classification + first AI token). This was deferred during Epic 2 implementation. Multiple entry points (Homework help, Just ask something, Practice for a test) navigate to sessions without a `subjectId`, causing dead-ends ("Please select a subject first") or empty subject pickers.
+
+**Acceptance Criteria:**
+
+**Given** OCR text or user-typed problem text and the learner's list of active subjects
+**When** the classification endpoint `POST /v1/subjects/classify` is called
+**Then** it returns candidates ranked by confidence (0–1), a `needsConfirmation` boolean, and an optional `suggestedSubjectName` for unmatched subjects
+
+**Given** a clear problem (e.g., "Solve 2x + 5 = 15") and the learner has "Algebra" enrolled
+**When** classification runs
+**Then** it returns a single candidate with confidence ≥ 0.8 and `needsConfirmation: false`
+
+**Given** ambiguous text matching multiple enrolled subjects
+**When** classification runs
+**Then** it returns multiple candidates ranked by confidence with `needsConfirmation: true`
+
+**Given** text that doesn't match any enrolled subject
+**When** classification runs
+**Then** it returns empty candidates with `needsConfirmation: true` and a `suggestedSubjectName`
+
+**Given** the LLM call fails or times out
+**When** the fallback executes
+**Then** it returns `{ candidates: [], needsConfirmation: true }` — never blocks the user
+
+**Implementation notes:**
+- New endpoint: `POST /v1/subjects/classify` in `subjectRoutes`
+- New service: `services/subject-classify.ts` — follows `subject-resolve.ts` pattern
+- Uses `routeAndCall()` at rung 1 (Gemini Flash — fast/cheap classification)
+- Input: `{ text: string }` — profile's subjects fetched server-side
+- New schemas in `packages/schemas/src/subjects.ts`: `SubjectClassifyInput`, `SubjectClassifyResult`
+- Performance target: <500ms classification (within the <3s camera pipeline budget)
+
+**FRs:** UX Journey 4 ("AI auto-detects from input"), NFR7 (<3s camera pipeline)
+
+---
+
+### Story 10.21: Camera/Homework Flow — LLM Subject Auto-Detection
+
+_Priority: Must-ship. Scope: LEARNER-ONLY._
+
+As a child tapping "Homework help" from the coaching card,
+I want the AI to figure out which subject my homework is from,
+So that I don't get stuck picking a subject before I can get help.
+
+**Acceptance Criteria:**
+
+**Given** learner taps "Homework help" on AdaptiveEntryCard (no `subjectId` in route params)
+**When** OCR extracts text from the photo
+**Then** the camera screen calls `POST /v1/subjects/classify` with the OCR text
+**And** if confidence ≥ 0.8 and exactly one candidate: auto-selects that subject, shows inline confirmation "Looks like **[Subject]**" with a small "Change" link
+**And** proceeds to session without interruption
+
+**Given** classification returns multiple candidates or low confidence
+**When** result screen renders
+**Then** shows a compact subject picker with candidates pre-sorted by confidence, top candidate highlighted
+
+**Given** classification finds no match (subject not enrolled)
+**When** result screen renders
+**Then** shows the standard subject picker with all enrolled subjects plus a secondary "Add new subject" action
+
+**Given** learner navigates to camera via per-subject HW button (already has `subjectId`)
+**When** the flow starts
+**Then** existing behavior is unchanged — `subjectId` is used directly, no classification
+
+**Given** learner uses manual text input fallback (OCR failed twice)
+**When** learner taps "Continue"
+**Then** classification runs against typed text before navigating to session
+
+**Given** the classification API call fails
+**When** the fallback triggers
+**Then** the existing subject picker displays as today — graceful degradation
+
+**Files:** `camera.tsx` (replace `Alert.alert('No subject selected')` dead-end), new hook `use-classify-subject.ts`
+
+**FRs:** UX Journey 4
+
+**Dependencies:** Story 10.20
+
+---
+
+### Story 10.22: Chat/Session Flow — Subject Inference from Conversation
+
+_Priority: Must-ship. Scope: LEARNER-ONLY._
+
+As a learner who tapped "Just ask something" without a specific subject context,
+I want the AI to figure out what subject I'm asking about from my first message,
+So that my session gets connected to the right subject and shows up in my Learning Book.
+
+**Acceptance Criteria:**
+
+**Given** learner navigates to session screen without `subjectId`
+**When** the learner sends their first message
+**Then** the system calls `POST /v1/subjects/classify` with the message text
+**And** if high-confidence single match: session starts with that subject, AI acknowledges naturally ("Got it, this is about [Subject].")
+
+**Given** classification returns multiple candidates
+**When** the first message is sent
+**Then** the AI response includes a natural confirmation: "This sounds like it could be **Math** or **Physics**. Which one are we working on?"
+**And** the learner's response resolves the subject
+
+**Given** learner starts a session with `subjectId` already provided
+**When** the session starts
+**Then** existing behavior is unchanged — no classification needed
+
+**Given** classification cannot match any enrolled subject
+**When** fallback activates
+**Then** session continues without a subject (freeform) with a non-intrusive prompt after 2-3 exchanges: "Want me to connect this to one of your subjects?"
+
+**Implementation notes:**
+- Modify `ensureSession()` in `session/index.tsx` — when `subjectId` is null, classify before calling `startSession`
+- Add `pendingClassification` state with brief loading indicator ("Figuring out what this is about...")
+- Alternative: inject subject-routing instruction into the streaming LLM system prompt for a more natural feel
+
+**FRs:** UX Journey 4
+
+**Dependencies:** Story 10.20
+
+---
+
+### Story 10.23: "Practice for a Test" Flow — Subject Pre-Selection
+
+_Priority: Should-ship. Scope: LEARNER-ONLY._
+
+As a learner tapping "Practice for a test",
+I want to quickly confirm which subject I'm practicing for,
+So that the AI pulls up the right topics to test me on.
+
+**Acceptance Criteria:**
+
+**Given** learner taps "Practice for a test" and the coaching card has a `primaryRoute` with `subjectId`
+**When** the route navigates
+**Then** the session starts with that subject (existing behavior)
+
+**Given** learner taps "Practice for a test" and the coaching card has no subject-specific suggestion
+**When** the button is tapped
+**Then** a bottom-sheet subject picker appears with all active subjects
+**And** each subject shows its retention status using RetentionSignal
+**And** tapping a subject immediately starts the practice session
+
+**Given** learner has exactly one active subject
+**When** "Practice for a test" is tapped with no coaching card suggestion
+**Then** auto-selects the single subject with no picker shown
+
+**Implementation notes:**
+- Pure client-side — no new API needed
+- Modify `home.tsx` "Practice for a test" `onPress` handler — add fallback when `primaryRoute` is null
+- Reuse existing `subjects` data already loaded on home screen
+
+**FRs:** UX Journey 4
+
+**Dependencies:** None (independent of 10.20)
+
+---
+
 ### Epic 10 Execution Order
 
 ```text
@@ -4082,7 +4355,13 @@ PHASE 2 — Parallel work (all independent, run concurrently):
   10.15 (curriculum completion celebration — coaching card + empty state + animation, ~3-4 hours) — parallel
   10.18 (App Store rating prompt after successful recall — expo-store-review + hook, ~2 hours) — parallel
 
-PHASE 3 — Fast-follow (post-launch):
+PHASE 3 — Subject auto-inference (Cluster B):
+10.23 (Practice for a test subject picker — pure client-side, no API, ~2 hours) — can start immediately
+10.20 (Subject classification API service — new endpoint + LLM classify, ~3-4 hours) — can parallel with 10.23
+10.21 (Camera/homework auto-detect — client integration, ~3-4 hours) — after 10.20
+10.22 (Chat/session inference — client integration, ~3-4 hours) — after 10.20, can parallel with 10.21
+
+PHASE 4 — Fast-follow (post-launch):
 10.8 Phase 0 (summary skip-rate instrumentation, ~15 min) — ship with Epic 10
 10.8 Phase 1 (structured prompts — only if skip rate > 70%, ~2-3 hours) — post-launch, data-driven
 10.9 (recall remediation copy softening, ~1 hour) — post-launch, not day-one critical
