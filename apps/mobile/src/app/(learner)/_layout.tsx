@@ -622,8 +622,8 @@ export default function LearnerLayout() {
           tabBarStyle: {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
-            height: 56 + insets.bottom,
-            paddingBottom: insets.bottom,
+            height: 56 + Math.max(insets.bottom, 24),
+            paddingBottom: Math.max(insets.bottom, 24),
           },
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.muted,

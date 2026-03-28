@@ -1,5 +1,9 @@
 import { renderHook, act } from '@testing-library/react-native';
+import { NativeModules } from 'react-native';
 import { useHomeworkOcr } from './use-homework-ocr';
+
+// Simulate ML Kit native module being linked
+NativeModules.TextRecognition = { recognize: jest.fn() };
 
 // Mock ML Kit
 const mockRecognize = jest.fn();
