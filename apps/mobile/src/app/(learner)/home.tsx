@@ -61,7 +61,9 @@ export default function HomeScreen() {
       activeSubjects.length === 1 ? activeSubjects[0] : undefined;
     if (singleSubject) {
       router.push(
-        `/(learner)/session?mode=practice&subjectId=${singleSubject.id}&subjectName=${singleSubject.name}` as never
+        `/(learner)/session?mode=practice&subjectId=${
+          singleSubject.id
+        }&subjectName=${encodeURIComponent(singleSubject.name)}` as never
       );
       return;
     }
@@ -377,7 +379,11 @@ export default function HomeScreen() {
                   onPress={() => {
                     setShowPracticePicker(false);
                     router.push(
-                      `/(learner)/session?mode=practice&subjectId=${subject.id}&subjectName=${subject.name}` as never
+                      `/(learner)/session?mode=practice&subjectId=${
+                        subject.id
+                      }&subjectName=${encodeURIComponent(
+                        subject.name
+                      )}` as never
                     );
                   }}
                   className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"

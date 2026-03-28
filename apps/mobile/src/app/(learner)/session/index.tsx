@@ -130,6 +130,7 @@ export default function SessionScreen() {
               sessionType,
             },
           });
+          if (!res.ok) throw new Error(`Session start failed: ${res.status}`);
           const data = (await res.json()) as { session: { id: string } };
           newId = data.session.id;
         } else {

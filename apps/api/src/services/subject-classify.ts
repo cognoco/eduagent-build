@@ -62,9 +62,7 @@ export async function classifySubject(
     };
   }
 
-  const subjectList = subjects
-    .map((s) => `- ${s.name} (ID: ${s.id})`)
-    .join('\n');
+  const subjectList = subjects.map((s) => `- ${s.name}`).join('\n');
 
   const messages: ChatMessage[] = [
     { role: 'system', content: CLASSIFY_SYSTEM_PROMPT },
