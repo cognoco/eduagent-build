@@ -4,6 +4,7 @@ import {
   subjectCreateSchema,
   subjectUpdateSchema,
   subjectResolveInputSchema,
+  subjectClassifyInputSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -16,6 +17,7 @@ import {
   updateSubject,
 } from '../services/subject';
 import { resolveSubjectName } from '../services/subject-resolve';
+import { classifySubject } from '../services/subject-classify';
 import { notFound, apiError } from '../errors';
 
 type SubjectRouteEnv = {
@@ -43,6 +45,26 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
           502,
           ERROR_CODES.INTERNAL_ERROR,
           'Subject name resolution failed — please try again'
+        );
+      }
+    }
+  )
+  .post(
+    '/subjects/classify',
+    zValidator('json', subjectClassifyInputSchema),
+    async (c) => {
+      const { text } = c.req.valid('json');
+      const db = c.get('db');
+      const profileId = c.get('profileId');
+      try {
+        const result = await classifySubject(db, profileId, text);
+        return c.json(result);
+      } catch {
+        return apiError(
+          c,
+          502,
+          ERROR_CODES.INTERNAL_ERROR,
+          'Subject classification failed'
         );
       }
     }

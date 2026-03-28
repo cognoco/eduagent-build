@@ -64,6 +64,7 @@ export type SeedScenario =
   | 'trial-active'
   | 'trial-expired'
   | 'multi-subject'
+  | 'multi-subject-practice'
   | 'homework-ready'
   | 'trial-expired-child'
   | 'consent-withdrawn'
@@ -985,6 +986,47 @@ async function seedMultiSubject(
   };
 }
 
+/**
+ * Multi-subject scenario with 2+ ACTIVE subjects.
+ * Used by the practice subject picker E2E test (Story 10.23).
+ * The practice picker modal only appears when activeSubjects.length > 1.
+ */
+async function seedMultiSubjectPractice(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Practice Picker Learner',
+    personaType: 'LEARNER',
+  });
+
+  const { subjectId: physicsSubjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Physics',
+    'active'
+  );
+
+  const { subjectId: chemistrySubjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Chemistry',
+    'active'
+  );
+
+  return {
+    scenario: 'multi-subject-practice',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { physicsSubjectId, chemistrySubjectId },
+  };
+}
+
 async function seedHomeworkReady(
   db: Database,
   email: string,
@@ -1377,6 +1419,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'trial-active': seedTrialActive,
   'trial-expired': seedTrialExpired,
   'multi-subject': seedMultiSubject,
+  'multi-subject-practice': seedMultiSubjectPractice,
   'homework-ready': seedHomeworkReady,
   'trial-expired-child': seedTrialExpiredChild,
   'consent-withdrawn': seedConsentWithdrawn,

@@ -1122,6 +1122,28 @@ Two visual bugs identified from emulator screenshot review and fixed in app code
 
 ---
 
+### New Flows Added (2026-03-28) — Stories 4.12-4.14, 10.20-10.23
+
+Four new E2E flows added for Epic 4 (Learning Book navigation) and Epic 10 (Subject auto-inference). Not yet run — pending next test session.
+
+| # | Flow | Status | Story | Notes |
+|---|------|--------|-------|-------|
+| — | `learning/learning-book-navigation.yaml` | NEW | 4.12, 4.13 | In-session book link + post-session book link. Seed: `retention-due`. |
+| — | `retention/topic-detail-adaptive-buttons.yaml` | NEW | 4.14 | Continue Learning / Start Review adaptive buttons (`in_progress` state). Seed: `learning-active`. |
+| — | `retention/topic-detail.yaml` | UPDATED | 4.14 | Added `start-learning-button` assertion for `not_started` state. Corrected from outdated `start-review-button`. |
+| — | `subjects/practice-subject-picker.yaml` | NEW | 10.23 | Bottom-sheet picker with 2 active subjects. Seed: `multi-subject-practice` (new scenario). |
+
+**New seed scenario:** `multi-subject-practice` — creates 2 active subjects (Physics + Chemistry) for practice picker testing.
+
+**Not E2E tested (by design):**
+- **10.20 (API):** Covered by 10 unit tests in `subject-classify.test.ts` + 327 integration tests.
+- **10.21 (camera auto-detect):** Camera OCR unreliable on emulator. Single-subject fast-path (no LLM) best verified on physical device.
+- **10.22 (chat inference):** "Figuring out..." state is transient (<500ms), unassertable in Maestro. Freeform session behavior already covered by `freeform-session.yaml`.
+
+**Updated totals: 64 flows (+4 new, 1 updated). Passing count unchanged from Session 23 — new flows pending first run.**
+
+---
+
 ## References
 
 - **Bug details:** See `e2e-test-bugs.md` for all bug entries (BUG-1 through BUG-60) with root causes, fixes, and workarounds.

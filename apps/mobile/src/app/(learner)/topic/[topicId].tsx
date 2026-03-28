@@ -266,26 +266,117 @@ export default function TopicDetailScreen() {
           className="px-5 pb-6"
           style={{ paddingBottom: Math.max(insets.bottom, 24) }}
         >
-          <Pressable
-            onPress={() =>
-              router.push({
-                pathname: '/(learner)/session',
-                params: {
-                  mode: 'practice',
-                  subjectId,
-                  topicId,
-                },
-              })
-            }
-            className="bg-primary rounded-button py-3.5 items-center mb-2"
-            testID="start-review-button"
-            accessibilityLabel="Start review session"
-            accessibilityRole="button"
-          >
-            <Text className="text-text-inverse text-body font-semibold">
-              Start Review Session
-            </Text>
-          </Pressable>
+          {topicProgress.completionStatus === 'not_started' ? (
+            /* not_started: primary "Start Learning", no secondary */
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: '/(learner)/session',
+                  params: {
+                    mode: 'freeform',
+                    subjectId,
+                    topicId,
+                  },
+                })
+              }
+              className="bg-primary rounded-button py-3.5 items-center mb-2"
+              testID="start-learning-button"
+              accessibilityLabel="Start learning"
+              accessibilityRole="button"
+            >
+              <Text className="text-text-inverse text-body font-semibold">
+                Start Learning
+              </Text>
+            </Pressable>
+          ) : topicProgress.completionStatus === 'in_progress' ? (
+            /* in_progress: primary "Continue Learning" + secondary "Start Review Session" */
+            <>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/(learner)/session',
+                    params: {
+                      mode: 'freeform',
+                      subjectId,
+                      topicId,
+                    },
+                  })
+                }
+                className="bg-primary rounded-button py-3.5 items-center mb-2"
+                testID="continue-learning-button"
+                accessibilityLabel="Continue learning"
+                accessibilityRole="button"
+              >
+                <Text className="text-text-inverse text-body font-semibold">
+                  Continue Learning
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/(learner)/session',
+                    params: {
+                      mode: 'practice',
+                      subjectId,
+                      topicId,
+                    },
+                  })
+                }
+                className="border border-border rounded-button py-3 items-center mb-2"
+                testID="start-review-button"
+                accessibilityLabel="Start review session"
+                accessibilityRole="button"
+              >
+                <Text className="text-body font-semibold text-primary">
+                  Start Review Session
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            /* completed / verified / stable: primary "Start Review Session" + secondary "Continue Learning" */
+            <>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/(learner)/session',
+                    params: {
+                      mode: 'practice',
+                      subjectId,
+                      topicId,
+                    },
+                  })
+                }
+                className="bg-primary rounded-button py-3.5 items-center mb-2"
+                testID="start-review-button"
+                accessibilityLabel="Start review session"
+                accessibilityRole="button"
+              >
+                <Text className="text-text-inverse text-body font-semibold">
+                  Start Review Session
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/(learner)/session',
+                    params: {
+                      mode: 'freeform',
+                      subjectId,
+                      topicId,
+                    },
+                  })
+                }
+                className="border border-border rounded-button py-3 items-center mb-2"
+                testID="continue-learning-button"
+                accessibilityLabel="Continue learning"
+                accessibilityRole="button"
+              >
+                <Text className="text-body font-semibold text-primary">
+                  Continue Learning
+                </Text>
+              </Pressable>
+            </>
+          )}
           <View className="flex-row">
             <Pressable
               onPress={() =>

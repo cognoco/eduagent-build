@@ -1,0 +1,136 @@
+// ---------------------------------------------------------------------------
+// Subject Classification Service — Story 10.20
+// Classifies problem text against a learner's enrolled subjects.
+// Pure business logic, no Hono imports.
+// ---------------------------------------------------------------------------
+
+import type { SubjectClassifyResult } from '@eduagent/schemas';
+import type { Database } from '@eduagent/database';
+import { routeAndCall } from './llm';
+import type { ChatMessage } from './llm';
+import { listSubjects } from './subject';
+
+const CLASSIFY_SYSTEM_PROMPT = `You are a subject classifier for a tutoring platform.
+
+Given a piece of text (homework problem, question, or conversation) and a list of the student's enrolled subjects, determine which subject(s) the text belongs to.
+
+Return ONLY a JSON object with this structure:
+{
+  "matches": [
+    { "subjectName": "Exact Subject Name from list", "confidence": 0.0-1.0 }
+  ],
+  "suggestedSubjectName": "Name if no match found, or null"
+}
+
+Rules:
+- confidence should be 0.0-1.0 where 1.0 = certain match
+- If the text clearly matches one subject, return that with high confidence (>= 0.8)
+- If the text could match multiple subjects, return all with their respective confidences
+- If the text doesn't match any enrolled subject, return empty matches and suggest a subject name
+- Match against the EXACT subject names provided — don't invent new ones for matches
+- Be generous with matching — "solve 2x + 5 = 15" matches "Algebra", "Math", "Mathematics" etc.
+`;
+
+export async function classifySubject(
+  db: Database,
+  profileId: string,
+  text: string
+): Promise<SubjectClassifyResult> {
+  // Fetch learner's active subjects
+  const subjects = await listSubjects(db, profileId);
+
+  if (subjects.length === 0) {
+    return {
+      candidates: [],
+      needsConfirmation: true,
+      suggestedSubjectName: null,
+    };
+  }
+
+  // If only one subject, auto-match with high confidence
+  if (subjects.length === 1) {
+    return {
+      candidates: [
+        {
+          subjectId: subjects[0].id,
+          subjectName: subjects[0].name,
+          confidence: 0.9,
+        },
+      ],
+      needsConfirmation: false,
+      suggestedSubjectName: null,
+    };
+  }
+
+  const subjectList = subjects
+    .map((s) => `- ${s.name} (ID: ${s.id})`)
+    .join('\n');
+
+  const messages: ChatMessage[] = [
+    { role: 'system', content: CLASSIFY_SYSTEM_PROMPT },
+    {
+      role: 'user',
+      content: `Student's enrolled subjects:\n${subjectList}\n\nText to classify:\n${text}`,
+    },
+  ];
+
+  try {
+    const result = await routeAndCall(messages, 1); // Rung 1 = Gemini Flash (fast/cheap)
+
+    const jsonMatch = result.response.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return {
+        candidates: [],
+        needsConfirmation: true,
+        suggestedSubjectName: null,
+      };
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+    const rawMatches = Array.isArray(parsed.matches) ? parsed.matches : [];
+    const matches: Array<{ subjectName: string; confidence: number }> =
+      rawMatches.filter(
+        (m: unknown): m is { subjectName: string; confidence: number } =>
+          typeof m === 'object' &&
+          m !== null &&
+          'subjectName' in m &&
+          typeof (m as Record<string, unknown>).subjectName === 'string'
+      );
+
+    // Map LLM matches to candidates with subjectIds
+    const candidates = matches
+      .map((m) => {
+        const subject = subjects.find(
+          (s) => s.name.toLowerCase() === m.subjectName.toLowerCase()
+        );
+        if (!subject) return null;
+        return {
+          subjectId: subject.id,
+          subjectName: subject.name,
+          confidence: Math.min(1, Math.max(0, Number(m.confidence) || 0)),
+        };
+      })
+      .filter((c): c is NonNullable<typeof c> => c !== null)
+      .sort((a, b) => b.confidence - a.confidence);
+
+    const topCandidate = candidates[0];
+    const needsConfirmation =
+      !topCandidate || topCandidate.confidence < 0.8 || candidates.length > 1;
+
+    return {
+      candidates,
+      needsConfirmation,
+      suggestedSubjectName:
+        typeof parsed.suggestedSubjectName === 'string'
+          ? parsed.suggestedSubjectName
+          : null,
+    };
+  } catch {
+    // Failure handling: never block the user
+    return {
+      candidates: [],
+      needsConfirmation: true,
+      suggestedSubjectName: null,
+    };
+  }
+}

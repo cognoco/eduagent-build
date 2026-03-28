@@ -1,0 +1,170 @@
+# Flow: Learning Book Navigation — Cross-navigation from session and summary
+# Validates: Story 4.12 (Learning Book link on session summary) and
+#            Story 4.13 (Learning Book prompt during active non-homework sessions).
+# Tags: nightly, learning
+#
+# Journey: UX Journey 2 (Daily Learning Loop → Retention bridge)
+# Epics: Epic 3 (FR48 — Learning Book access points)
+# Prerequisite: Seeded user with completed topics + due retention cards
+#               (scenario: retention-due — ensures showBookLink = true because
+#               overallProgress.totalTopicsCompleted > 0)
+#
+# testID mapping:
+#   Session screen (session/index.tsx):
+#     - chat-input                    -> message input field
+#     - end-session-button            -> rendered in header when exchangeCount > 0
+#     - session-learning-book-link    -> LearningBookPrompt footer link (non-homework only)
+#
+#   Session summary ([sessionId].tsx):
+#     - summary-title                 -> "Session Complete" heading
+#     - session-takeaways             -> takeaway bullet list
+#     - go-to-learning-book           -> "See your Learning Book" link (always present)
+#
+#   Learning Book (book.tsx):
+#     - learning-book-loading         -> loading spinner
+#     - learning-book-empty           -> empty state (should NOT appear with retention-due)
+#     - subject-filter-tabs           -> subject filter strip (>1 subject)
+#
+#   Topic detail (topic/[topicId].tsx):
+#     - topic-detail-loading          -> loading spinner
+#     - topic-detail-empty            -> empty state
+appId: com.mentomate.app
+tags:
+  - nightly
+  - learning
+---
+# ── Setup ──────────────────────────────────────────────────────────────
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "retention-due"
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+- takeScreenshot: book-nav-01-home
+
+# ── Part 1: In-session Learning Book link (Story 4.13) ────────────────
+# Start a freeform session via the coaching card. Freeform mode is
+# non-homework, so the LearningBookPrompt footer should render when
+# overallProgress.totalTopicsCompleted > 0 (guaranteed by retention-due).
+
+- tapOn:
+    id: "coaching-card-primary"
+
+# 2. Session active — chat input present
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+- takeScreenshot: book-nav-02-session-started
+
+# 3. Verify the in-session Learning Book link is visible in the footer
+#    (LearningBookPrompt component, testID: session-learning-book-link).
+#    This link only appears for non-homework modes when totalTopicsCompleted > 0.
+- scrollUntilVisible:
+    element:
+      id: "session-learning-book-link"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    id: "session-learning-book-link"
+
+- takeScreenshot: book-nav-03-book-link-visible
+
+# ── Part 2: Complete session and check summary link (Story 4.12) ──────
+
+# 4. Exchange 1: send a message to establish exchangeCount > 0
+- tapOn:
+    id: "chat-input"
+- inputText: "Explain the concept to me"
+# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
+# (returnKeyType="send" triggers onSubmitEditing).
+- pressKey: Enter
+
+# 5. Wait for AI response (LLM can be slow — 60s timeout per BUG-47)
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 60000
+
+# 6. Exchange 2: follow-up to ensure session has enough content
+- tapOn:
+    id: "chat-input"
+- inputText: "Can you give me an example?"
+- pressKey: Enter
+
+# 7. Wait for AI response
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 60000
+
+# 8. Wait for end-session-button (rendered in header when exchangeCount > 0).
+#    BUG-37: button appears after LLM streaming response increments exchangeCount.
+- extendedWaitUntil:
+    visible:
+      id: "end-session-button"
+    timeout: 30000
+
+# 9. Tap end-session button
+- tapOn:
+    id: "end-session-button"
+
+# 10. Confirm the end session alert.
+#     Alert.alert title: "End Session", buttons: "Keep Going" and "End Session".
+- tapOn:
+    text: "End Session"
+
+# 11. Wait for session summary screen to load
+- extendedWaitUntil:
+    visible:
+      id: "summary-title"
+    timeout: 20000
+
+- takeScreenshot: book-nav-04-session-summary
+
+# 12. Verify session takeaways are present
+- assertVisible:
+    id: "session-takeaways"
+
+# 13. Scroll to and verify the "See your Learning Book" link exists
+#     (always present on session summary, testID: go-to-learning-book)
+- scrollUntilVisible:
+    element:
+      id: "go-to-learning-book"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    id: "go-to-learning-book"
+
+- takeScreenshot: book-nav-05-book-link-on-summary
+
+# ── Part 3: Navigate to Learning Book from summary ────────────────────
+
+# 14. Tap the Learning Book link on summary screen.
+#     handleGoToLearningBook navigates to topic detail if topicId + subjectId
+#     are present, otherwise to the book index. Seed data may or may not
+#     include topicId — we accept either destination.
+- tapOn:
+    id: "go-to-learning-book"
+
+# 15. Verify navigation arrived at Learning Book (book.tsx header text)
+#     or topic detail screen. Wait for the "Learning Book" heading which
+#     appears on the book index screen.
+- extendedWaitUntil:
+    visible:
+      text: "Learning Book"
+    timeout: 10000
+
+# 16. Verify the book is NOT empty (retention-due scenario has topics)
+- assertNotVisible:
+    id: "learning-book-empty"
+
+- takeScreenshot: book-nav-06-learning-book-arrived

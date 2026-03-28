@@ -74,6 +74,8 @@ testsprite_tests/
 .env.production
 .env.production.local
 .env*.local
+.env_old
+.env.development.local_old
 
 # Keep .env.example tracked
 !.env.example

@@ -92,6 +92,17 @@ jest.mock('../../../hooks/use-subjects', () => ({
   }),
 }));
 
+// Mock classify subject hook (subject auto-detection)
+const mockMutateAsync = jest.fn();
+jest.mock('../../../hooks/use-classify-subject', () => ({
+  useClassifySubject: jest.fn().mockReturnValue({
+    mutateAsync: mockMutateAsync,
+    isPending: false,
+    data: null,
+    error: null,
+  }),
+}));
+
 // Import mocks after jest.mock
 const { useCameraPermissions } = require('expo-camera');
 const { useHomeworkOcr } = require('../../../hooks/use-homework-ocr');
@@ -101,9 +112,18 @@ const mockRouter = {
   back: jest.fn(),
 };
 
+const { useClassifySubject } = require('../../../hooks/use-classify-subject');
+
 beforeEach(() => {
   jest.clearAllMocks();
   (useRouter as jest.Mock).mockReturnValue(mockRouter);
+  // Reset classify mock to default (no auto-detection)
+  (useClassifySubject as jest.Mock).mockReturnValue({
+    mutateAsync: mockMutateAsync,
+    isPending: false,
+    data: null,
+    error: null,
+  });
   (useLocalSearchParams as jest.Mock).mockReturnValue({
     subjectId: 'sub-123',
     subjectName: 'Mathematics',

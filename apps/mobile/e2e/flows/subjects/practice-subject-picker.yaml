@@ -1,0 +1,121 @@
+# Flow: Practice Subject Picker — Bottom-sheet picker for "Practice for a test"
+# Validates: when user taps "Practice for a test" with 2+ active subjects,
+# a subject picker bottom sheet appears listing all active subjects with
+# retention signals. Selecting a subject dismisses the picker and starts
+# a practice session.
+#
+# Story: 10.23 (Subject auto-inference — Practice subject picker)
+# Tags: nightly, subjects
+#
+# Journey: UX Journey 2 (Daily Learning Loop — Practice entry)
+# Epics: Epic 10 (FR — Subject Auto-Inference)
+# Prerequisite: Seeded user with 2+ ACTIVE subjects (scenario: multi-subject-practice)
+#               Creates Physics (active) + Chemistry (active).
+#
+# NOTE: The existing multi-subject seed only has 1 active subject (Physics),
+# which triggers auto-select (no picker). This flow uses multi-subject-practice
+# which has 2 active subjects so the picker modal is triggered.
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(learner)/home.tsx (home-scroll-view, practice-subject-picker,
+#     practice-subject-${subjectId})
+#   - apps/mobile/src/components/coaching/AdaptiveEntryCard.tsx (coaching-card)
+#   - apps/mobile/src/components/coaching/BaseCoachingCard.tsx (coaching-card-primary)
+#   - apps/mobile/src/components/session/ChatShell.tsx (chat-input)
+#
+# Environment variables set by seed-and-run.sh:
+#   ${PHYSICS_SUBJECT_ID}   — UUID of the Physics subject
+#   ${CHEMISTRY_SUBJECT_ID} — UUID of the Chemistry subject
+appId: com.mentomate.app
+tags:
+  - nightly
+  - subjects
+---
+# ── 1. Seed & sign in ─────────────────────────────────────────────────
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "multi-subject-practice"
+      API_URL: ${API_URL}
+
+# ── 2. Wait for home screen ───────────────────────────────────────────
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+- takeScreenshot: practice-picker-01-home
+
+# ── 3. Verify coaching card is loaded (teen persona: AdaptiveEntryCard) ──
+- assertVisible:
+    id: "coaching-card"
+
+# ── 4. Verify both active subjects are shown in subject list ──────────
+- scrollUntilVisible:
+    element:
+      text: "Your subjects"
+    direction: DOWN
+    timeout: 5000
+
+- assertVisible:
+    text: "Physics"
+
+- assertVisible:
+    text: "Chemistry"
+
+- takeScreenshot: practice-picker-02-subjects-visible
+
+# ── 5. Scroll back up to coaching card so "Practice for a test" is visible ──
+- scrollUntilVisible:
+    element:
+      text: "Practice for a test"
+    direction: UP
+    timeout: 5000
+
+# ── 6. Tap "Practice for a test" — secondary action on AdaptiveEntryCard ──
+# The secondary actions have no testID; they are rendered with text labels.
+# "Practice for a test" is the second action in the AdaptiveEntryCard footer.
+- tapOn:
+    text: "Practice for a test"
+
+# ── 7. Verify practice subject picker modal appears ───────────────────
+- extendedWaitUntil:
+    visible:
+      id: "practice-subject-picker"
+    timeout: 5000
+
+- takeScreenshot: practice-picker-03-picker-visible
+
+# ── 8. Verify picker heading ──────────────────────────────────────────
+- assertVisible:
+    text: "Which subject?"
+
+# ── 9. Verify both subjects are listed in the picker ──────────────────
+# Use text matching since subject UUIDs are dynamic.
+# The picker rows have testID "practice-subject-${subject.id}" but we
+# verify by visible text since the IDs are UUID v7 from the seed.
+- assertVisible:
+    text: "Physics"
+
+- assertVisible:
+    text: "Chemistry"
+
+# ── 10. Verify Cancel button is present ───────────────────────────────
+- assertVisible:
+    text: "Cancel"
+
+- takeScreenshot: practice-picker-04-picker-subjects
+
+# ── 11. Tap a subject to start a practice session ─────────────────────
+# Tap "Physics" in the picker to select it. After tapping, the picker
+# dismisses and the app navigates to the session screen.
+- tapOn:
+    id: "practice-subject-${PHYSICS_SUBJECT_ID}"
+
+# ── 12. Verify session screen loads (chat input visible) ──────────────
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+- takeScreenshot: practice-picker-05-session-started

@@ -20,13 +20,21 @@ import {
 } from '../../components/common';
 
 export default function SessionSummaryScreen() {
-  const { sessionId, subjectName, exchangeCount, escalationRung } =
-    useLocalSearchParams<{
-      sessionId: string;
-      subjectName?: string;
-      exchangeCount?: string;
-      escalationRung?: string;
-    }>();
+  const {
+    sessionId,
+    subjectName,
+    exchangeCount,
+    escalationRung,
+    subjectId,
+    topicId,
+  } = useLocalSearchParams<{
+    sessionId: string;
+    subjectName?: string;
+    exchangeCount?: string;
+    escalationRung?: string;
+    subjectId?: string;
+    topicId?: string;
+  }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -89,6 +97,17 @@ export default function SessionSummaryScreen() {
       });
     }
     router.replace('/(learner)/home');
+  };
+
+  const handleGoToLearningBook = (): void => {
+    if (topicId && subjectId) {
+      router.replace({
+        pathname: '/(learner)/topic/[topicId]',
+        params: { topicId, subjectId },
+      } as never);
+    } else {
+      router.replace('/(learner)/book');
+    }
   };
 
   const takeaways: string[] = [];
@@ -286,6 +305,19 @@ export default function SessionSummaryScreen() {
             </Text>
           </Pressable>
         )}
+
+        {/* Story 4.12: Post-session Learning Book navigation */}
+        <Pressable
+          onPress={handleGoToLearningBook}
+          className="py-3 items-center mt-1"
+          testID="go-to-learning-book"
+          accessibilityLabel="See your Learning Book"
+          accessibilityRole="link"
+        >
+          <Text className="text-caption text-text-secondary">
+            See your Learning Book
+          </Text>
+        </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   );

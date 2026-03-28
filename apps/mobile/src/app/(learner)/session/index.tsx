@@ -8,6 +8,7 @@ import {
   getOpeningMessage,
   SessionTimer,
   QuestionCounter,
+  LearningBookPrompt,
   type ChatMessage,
 } from '../../../components/session';
 import {
@@ -15,8 +16,11 @@ import {
   useStartSession,
   useCloseSession,
 } from '../../../hooks/use-sessions';
+import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { useStreaks } from '../../../hooks/use-streaks';
+import { useOverallProgress } from '../../../hooks/use-progress';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
+import { useApiClient } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
 
 export default function SessionScreen() {
@@ -40,6 +44,10 @@ export default function SessionScreen() {
   const effectiveMode = mode ?? 'freeform';
   const modeConfig = getModeConfig(effectiveMode);
   const { data: streak } = useStreaks();
+  const { data: overallProgress } = useOverallProgress();
+  const showBookLink =
+    effectiveMode !== 'homework' &&
+    (overallProgress?.totalTopicsCompleted ?? 0) > 0;
   const sessionExperience = streak?.longestStreak ?? 0;
   const openingContent = getOpeningMessage(
     effectiveMode,
@@ -59,6 +67,11 @@ export default function SessionScreen() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
     routeSessionId ?? null
   );
+  const [pendingClassification, setPendingClassification] = useState(false);
+  const [classifiedSubject, setClassifiedSubject] = useState<{
+    subjectId: string;
+    subjectName: string;
+  } | null>(null);
 
   const animationCleanupRef = useRef<(() => void) | null>(null);
 
@@ -72,6 +85,8 @@ export default function SessionScreen() {
       setEscalationRung(1);
       setIsClosing(false);
       setActiveSessionId(routeSessionId ?? null);
+      setPendingClassification(false);
+      setClassifiedSubject(null);
     }, [openingContent, routeSessionId])
   );
 
@@ -81,46 +96,106 @@ export default function SessionScreen() {
     };
   }, []);
 
-  const startSession = useStartSession(subjectId ?? '');
+  const effectiveSubjectId = classifiedSubject?.subjectId ?? subjectId ?? '';
+  const effectiveSubjectName = classifiedSubject?.subjectName ?? subjectName;
+
+  const apiClient = useApiClient();
+  const classifySubject = useClassifySubject();
+  const startSession = useStartSession(effectiveSubjectId);
   const closeSession = useCloseSession(activeSessionId ?? '');
   const { stream: streamMessage } = useStreamMessage(activeSessionId ?? '');
 
-  const ensureSession = useCallback(async (): Promise<string | null> => {
-    if (activeSessionId) return activeSessionId;
-    if (!subjectId) return null;
+  const ensureSession = useCallback(
+    async (overrideSubjectId?: string): Promise<string | null> => {
+      if (activeSessionId) return activeSessionId;
 
-    const sessionType =
-      effectiveMode === 'homework'
-        ? ('homework' as const)
-        : ('learning' as const);
+      const sid = overrideSubjectId ?? effectiveSubjectId;
+      if (!sid) return null;
 
-    try {
-      const result = await startSession.mutateAsync({
-        subjectId,
-        topicId: topicId ?? undefined,
-        sessionType,
-      });
-      const newId = result.session.id;
-      setActiveSessionId(newId);
-      return newId;
-    } catch {
-      return null;
-    }
-  }, [activeSessionId, subjectId, topicId, effectiveMode, startSession]);
+      const sessionType =
+        effectiveMode === 'homework'
+          ? ('homework' as const)
+          : ('learning' as const);
+
+      try {
+        let newId: string;
+        if (overrideSubjectId) {
+          // Use API client directly — useStartSession's URL param may be
+          // stale when called in the same render cycle as setClassifiedSubject.
+          const res = await apiClient.subjects[':subjectId'].sessions.$post({
+            param: { subjectId: overrideSubjectId },
+            json: {
+              subjectId: overrideSubjectId,
+              topicId: topicId ?? undefined,
+              sessionType,
+            },
+          });
+          const data = (await res.json()) as { session: { id: string } };
+          newId = data.session.id;
+        } else {
+          const result = await startSession.mutateAsync({
+            subjectId: sid,
+            topicId: topicId ?? undefined,
+            sessionType,
+          });
+          newId = result.session.id;
+        }
+        setActiveSessionId(newId);
+        return newId;
+      } catch {
+        return null;
+      }
+    },
+    [
+      activeSessionId,
+      effectiveSubjectId,
+      topicId,
+      effectiveMode,
+      apiClient,
+      startSession,
+    ]
+  );
 
   const handleSend = useCallback(
     async (text: string) => {
-      if (isStreaming) return;
+      if (isStreaming || pendingClassification) return;
 
       setMessages((prev) => [
         ...prev,
         { id: `user-${Date.now()}`, role: 'user', content: text },
       ]);
 
+      // Classify subject from first message when none was provided
+      let sessionSubjectId: string | undefined;
+      if (!subjectId && !classifiedSubject && messages.length <= 1) {
+        setPendingClassification(true);
+        try {
+          const result = await classifySubject.mutateAsync({ text });
+          if (!result.needsConfirmation && result.candidates.length === 1) {
+            const candidate = result.candidates[0];
+            setClassifiedSubject({
+              subjectId: candidate.subjectId,
+              subjectName: candidate.subjectName,
+            });
+            sessionSubjectId = candidate.subjectId;
+          }
+          // Ambiguous / no match → proceed without subject (freeform)
+        } catch {
+          // Classification failed — continue without subject
+        } finally {
+          setPendingClassification(false);
+        }
+      }
+
       try {
-        const sid = await ensureSession();
+        const sid = await ensureSession(sessionSubjectId);
         if (!sid) {
-          const errorMessage = subjectId
+          const hasSubject = !!(
+            subjectId ||
+            classifiedSubject ||
+            sessionSubjectId
+          );
+          const errorMessage = hasSubject
             ? "Couldn't start your session. Check your connection and try again."
             : 'Please select a subject first so I can help you learn.';
           animationCleanupRef.current = animateResponse(
@@ -173,7 +248,16 @@ export default function SessionScreen() {
         );
       }
     },
-    [isStreaming, ensureSession, streamMessage]
+    [
+      isStreaming,
+      pendingClassification,
+      subjectId,
+      classifiedSubject,
+      messages.length,
+      classifySubject,
+      ensureSession,
+      streamMessage,
+    ]
   );
 
   const hasAutoSentRef = useRef(false);
@@ -206,9 +290,11 @@ export default function SessionScreen() {
               router.replace({
                 pathname: `/session-summary/${activeSessionId}`,
                 params: {
-                  subjectName: subjectName ?? '',
+                  subjectName: effectiveSubjectName ?? '',
                   exchangeCount: String(exchangeCount),
                   escalationRung: String(escalationRung),
+                  subjectId: effectiveSubjectId ?? '',
+                  topicId: topicId ?? '',
                 },
               } as never);
             } catch (err: unknown) {
@@ -224,7 +310,9 @@ export default function SessionScreen() {
     isClosing,
     closeSession,
     router,
-    subjectName,
+    effectiveSubjectName,
+    effectiveSubjectId,
+    topicId,
     exchangeCount,
     escalationRung,
   ]);
@@ -259,19 +347,28 @@ export default function SessionScreen() {
       </View>
     ) : undefined;
 
+  const subtitle = pendingClassification
+    ? 'Figuring out what this is about...'
+    : modeConfig.subtitle;
+
   return (
     <ChatShell
       title={modeConfig.title}
-      subtitle={modeConfig.subtitle}
+      subtitle={subtitle}
       placeholder={modeConfig.placeholder}
       messages={messages}
       onSend={handleSend}
       isStreaming={isStreaming}
-      inputDisabled={isOffline}
+      inputDisabled={isOffline || pendingClassification}
       rightAction={headerRight}
       footer={
-        modeConfig.showQuestionCount ? (
-          <QuestionCounter count={userMessageCount} />
+        modeConfig.showQuestionCount || showBookLink ? (
+          <>
+            {modeConfig.showQuestionCount && (
+              <QuestionCounter count={userMessageCount} />
+            )}
+            {showBookLink && <LearningBookPrompt />}
+          </>
         ) : undefined
       }
     />

@@ -41,7 +41,11 @@ const OUTPUT_FILES = [
     description: 'Expo local env (apps/mobile/.env.local)',
     filter: (line) => {
       const trimmed = line.trim();
-      return !trimmed || trimmed.startsWith('#') || trimmed.startsWith('EXPO_PUBLIC_');
+      return (
+        !trimmed ||
+        trimmed.startsWith('#') ||
+        trimmed.startsWith('EXPO_PUBLIC_')
+      );
     },
   },
 ];
@@ -59,30 +63,43 @@ const CI_ENV_VARS = [
 
 function isCI() {
   return CI_ENV_VARS.some(
-    (v) => process.env[v] === 'true' || process.env[v] === '1' || (v !== 'CI' && process.env[v] !== undefined)
+    (v) =>
+      process.env[v] === 'true' ||
+      process.env[v] === '1' ||
+      (v !== 'CI' && process.env[v] !== undefined)
   );
 }
 
 function isDopplerInstalled() {
-  const result = spawnSync('doppler', ['--version'], { stdio: 'pipe', shell: true });
+  const result = spawnSync('doppler', ['--version'], {
+    stdio: 'pipe',
+    shell: true,
+  });
   return result.status === 0;
 }
 
 function isDopplerConfigured() {
-  const result = spawnSync('doppler', ['configure', 'get', 'project', '--plain'], {
-    stdio: 'pipe',
-    shell: true,
-  });
+  const result = spawnSync(
+    'doppler',
+    ['configure', 'get', 'project', '--plain'],
+    {
+      stdio: 'pipe',
+      shell: true,
+    }
+  );
   return result.status === 0 && result.stdout.toString().trim() !== '';
 }
 
 function downloadSecrets(config) {
   try {
-    return execSync(`doppler secrets download --config ${config} --no-file --format env`, {
-      encoding: 'utf-8',
-      shell: true,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    return execSync(
+      `doppler secrets download --config ${config} --no-file --format env`,
+      {
+        encoding: 'utf-8',
+        shell: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }
+    );
   } catch {
     return null;
   }
@@ -99,10 +116,14 @@ function checkStaleness(filePath) {
 }
 
 function main() {
-  console.log('\n\x1b[36m\x1b[1m[Doppler]\x1b[0m Setting up local environment...\n');
+  console.log(
+    '\n\x1b[36m\x1b[1m[Doppler]\x1b[0m Setting up local environment...\n'
+  );
 
   if (isCI()) {
-    console.log('\x1b[33m[Doppler]\x1b[0m Skipping env generation (CI environment)\n');
+    console.log(
+      '\x1b[33m[Doppler]\x1b[0m Skipping env generation (CI environment)\n'
+    );
     process.exit(0);
   }
 
@@ -111,14 +132,20 @@ function main() {
     console.log('   To set up Doppler for local development:');
     console.log('   1. Install CLI: https://docs.doppler.com/docs/install-cli');
     console.log('   2. Run: doppler login');
-    console.log('   3. Run: doppler setup  (select project: mentomate, config: dev)');
+    console.log(
+      '   3. Run: doppler setup  (select project: mentomate, config: dev)'
+    );
     console.log('   4. Run: pnpm env:sync\n');
     process.exit(0);
   }
 
   if (!isDopplerConfigured()) {
-    console.log('\x1b[33m[Doppler]\x1b[0m Doppler not configured for this project.\n');
-    console.log('   Run: doppler setup  (select project: mentomate, config: dev)');
+    console.log(
+      '\x1b[33m[Doppler]\x1b[0m Doppler not configured for this project.\n'
+    );
+    console.log(
+      '   Run: doppler setup  (select project: mentomate, config: dev)'
+    );
     console.log('   Then: pnpm env:sync\n');
     process.exit(0);
   }
@@ -126,12 +153,16 @@ function main() {
   // Check staleness of first output file
   const primaryFile = OUTPUT_FILES[0].path;
   if (fs.existsSync(primaryFile) && checkStaleness(primaryFile)) {
-    console.log(`\x1b[33m[Doppler]\x1b[0m Env files are over ${STALENESS_DAYS} days old — regenerating...\n`);
+    console.log(
+      `\x1b[33m[Doppler]\x1b[0m Env files are over ${STALENESS_DAYS} days old — regenerating...\n`
+    );
   }
 
   const content = downloadSecrets(DOPPLER_CONFIG);
   if (!content) {
-    console.log('\x1b[31m[Doppler]\x1b[0m Failed to download secrets from Doppler');
+    console.log(
+      '\x1b[31m[Doppler]\x1b[0m Failed to download secrets from Doppler'
+    );
     console.log('   Check your Doppler configuration and try: pnpm env:sync\n');
     const isManualSync = process.env.npm_lifecycle_event === 'env:sync';
     process.exit(isManualSync ? 1 : 0);
@@ -145,17 +176,35 @@ function main() {
   for (const output of OUTPUT_FILES) {
     const dir = path.dirname(output.path);
     if (!fs.existsSync(dir)) {
-      console.log(`\x1b[33m[Doppler]\x1b[0m Skipping ${output.description} (directory not found)`);
+      console.log(
+        `\x1b[33m[Doppler]\x1b[0m Skipping ${output.description} (directory not found)`
+      );
       continue;
     }
     const outputContent = output.filter
       ? content.split('\n').filter(output.filter).join('\n')
       : content;
-    fs.writeFileSync(output.path, header + '\n' + outputContent, { mode: 0o600 });
+    fs.writeFileSync(output.path, header + '\n' + outputContent, {
+      mode: 0o600,
+    });
     console.log(`\x1b[32m[Doppler]\x1b[0m Generated ${output.description}`);
   }
 
-  console.log('\n   \x1b[90mTo regenerate after secret changes:\x1b[0m pnpm env:sync\n');
+  console.log(
+    '\n   \x1b[90mTo regenerate after secret changes:\x1b[0m pnpm env:sync\n'
+  );
+
+  // Sync secrets to Cloudflare Workers (non-fatal — skips if wrangler not authenticated)
+  try {
+    const { syncSecrets } = require('./sync-secrets');
+    syncSecrets(['dev']);
+  } catch (err) {
+    console.log(
+      '\x1b[33m[Doppler]\x1b[0m Cloudflare Workers sync skipped:',
+      err.message
+    );
+    console.log('   To sync manually: pnpm secrets:sync\n');
+  }
 }
 
 main();

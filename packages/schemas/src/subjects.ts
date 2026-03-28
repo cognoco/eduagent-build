@@ -128,3 +128,26 @@ export const curriculumChallengeSchema = z.object({
 export type CurriculumChallengeInput = z.infer<
   typeof curriculumChallengeSchema
 >;
+
+// --- Subject Classification (Story 10.20) ---
+
+export const subjectClassifyInputSchema = z.object({
+  text: z.string().min(1).max(5000),
+});
+export type SubjectClassifyInput = z.infer<typeof subjectClassifyInputSchema>;
+
+export const subjectClassifyCandidateSchema = z.object({
+  subjectId: z.string().uuid(),
+  subjectName: z.string(),
+  confidence: z.number().min(0).max(1),
+});
+export type SubjectClassifyCandidate = z.infer<
+  typeof subjectClassifyCandidateSchema
+>;
+
+export const subjectClassifyResultSchema = z.object({
+  candidates: z.array(subjectClassifyCandidateSchema),
+  needsConfirmation: z.boolean(),
+  suggestedSubjectName: z.string().nullable().optional(),
+});
+export type SubjectClassifyResult = z.infer<typeof subjectClassifyResultSchema>;

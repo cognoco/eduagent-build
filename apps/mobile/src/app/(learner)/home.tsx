@@ -1,10 +1,11 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   Pressable,
   ScrollView,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,6 +36,41 @@ export default function HomeScreen() {
   const { persona } = useTheme();
   const themeColors = useThemeColors();
   const { profiles, activeProfile, switchProfile } = useProfile();
+
+  // Practice subject picker state
+  const [showPracticePicker, setShowPracticePicker] = useState(false);
+
+  const activeSubjects = useMemo(
+    () => subjects?.filter((s) => s.status === 'active') ?? [],
+    [subjects]
+  );
+
+  const handlePracticePress = useCallback((): void => {
+    // If coaching card has a subject-specific practice route, use it directly
+    if (
+      coachingCard.primaryRoute &&
+      coachingCard.primaryRoute.includes('mode=practice') &&
+      coachingCard.primaryRoute.includes('subjectId=')
+    ) {
+      router.push(coachingCard.primaryRoute as never);
+      return;
+    }
+
+    // Single active subject: auto-select and navigate
+    const singleSubject =
+      activeSubjects.length === 1 ? activeSubjects[0] : undefined;
+    if (singleSubject) {
+      router.push(
+        `/(learner)/session?mode=practice&subjectId=${singleSubject.id}&subjectName=${singleSubject.name}` as never
+      );
+      return;
+    }
+
+    // Multiple active subjects: show picker
+    if (activeSubjects.length > 1) {
+      setShowPracticePicker(true);
+    }
+  }, [coachingCard.primaryRoute, activeSubjects, router]);
 
   // First-time user redirect: send users with no subjects to create-subject
   const hasRedirected = useRef(false);
@@ -143,11 +179,7 @@ export default function HomeScreen() {
                 },
                 {
                   label: 'Practice for a test',
-                  onPress: () => {
-                    if (coachingCard.primaryRoute) {
-                      router.push(coachingCard.primaryRoute as never);
-                    }
-                  },
+                  onPress: handlePracticePress,
                 },
                 {
                   label: 'Just ask something',
@@ -310,6 +342,70 @@ export default function HomeScreen() {
           </View>
         </AnimatedEntry>
       </ScrollView>
+
+      {/* Practice for a test — subject picker bottom sheet */}
+      <Modal
+        visible={showPracticePicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPracticePicker(false)}
+        testID="practice-subject-picker"
+      >
+        <Pressable
+          className="flex-1 bg-black/40"
+          onPress={() => setShowPracticePicker(false)}
+          accessibilityLabel="Close subject picker"
+          accessibilityRole="button"
+        />
+        <View
+          className="bg-background rounded-t-3xl px-5 pb-8 pt-4"
+          style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+        >
+          <View className="items-center mb-4">
+            <View className="w-10 h-1 rounded-full bg-text-secondary/30" />
+          </View>
+          <Text className="text-h3 font-semibold text-text-primary mb-4">
+            Which subject?
+          </Text>
+          <ScrollView style={{ maxHeight: 320 }}>
+            {activeSubjects.map((subject) => {
+              const status = subjectRetention.get(subject.id) ?? 'weak';
+              return (
+                <Pressable
+                  key={subject.id}
+                  testID={`practice-subject-${subject.id}`}
+                  onPress={() => {
+                    setShowPracticePicker(false);
+                    router.push(
+                      `/(learner)/session?mode=practice&subjectId=${subject.id}&subjectName=${subject.name}` as never
+                    );
+                  }}
+                  className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
+                  accessibilityLabel={`Practice ${subject.name}`}
+                  accessibilityRole="button"
+                  style={{ minHeight: 48 }}
+                >
+                  <Text className="text-body font-medium text-text-primary">
+                    {subject.name}
+                  </Text>
+                  <RetentionSignal status={status} />
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <Pressable
+            onPress={() => setShowPracticePicker(false)}
+            className="mt-4 items-center py-3"
+            accessibilityLabel="Cancel"
+            accessibilityRole="button"
+            style={{ minHeight: 44 }}
+          >
+            <Text className="text-body text-text-secondary font-medium">
+              Cancel
+            </Text>
+          </Pressable>
+        </View>
+      </Modal>
     </View>
   );
 }

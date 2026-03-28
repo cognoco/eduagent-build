@@ -16,6 +16,7 @@ import { useThemeColors } from '../../../lib/theme';
 import { cameraReducer, initialCameraState } from './camera-reducer';
 import { useHomeworkOcr } from '../../../hooks/use-homework-ocr';
 import { useSubjects } from '../../../hooks/use-subjects';
+import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { CelebrationAnimation } from '../../../components/common';
 
 type FlashMode = 'off' | 'on' | 'auto';
@@ -40,6 +41,15 @@ export default function CameraScreen(): React.ReactNode {
   const [flash, setFlash] = useState<FlashMode>('off');
   const [showCelebration, setShowCelebration] = useState(true);
 
+  // Subject auto-classification state
+  const classifyMutation = useClassifySubject();
+  const [autoDetectedSubject, setAutoDetectedSubject] = useState<{
+    subjectId: string;
+    subjectName: string;
+  } | null>(null);
+  const [showSubjectPicker, setShowSubjectPicker] = useState(false);
+  const classifyTriggeredRef = useRef(false);
+
   // Reset state when screen regains focus (prevents stale state loop)
   useFocusEffect(
     useCallback(() => {
@@ -48,6 +58,9 @@ export default function CameraScreen(): React.ReactNode {
       setManualText('');
       setShowCelebration(true);
       setFlash('off');
+      setAutoDetectedSubject(null);
+      setShowSubjectPicker(false);
+      classifyTriggeredRef.current = false;
     }, [permission?.granted])
   );
 
@@ -67,6 +80,34 @@ export default function CameraScreen(): React.ReactNode {
       dispatch({ type: 'OCR_ERROR', message: ocr.error });
     }
   }, [ocr.status, ocr.text, ocr.error]);
+
+  // Auto-classify subject when OCR text is available and no subjectId
+  useEffect(() => {
+    async function classify(): Promise<void> {
+      if (
+        state.phase !== 'result' ||
+        !editedText ||
+        subjectId ||
+        classifyTriggeredRef.current
+      )
+        return;
+      classifyTriggeredRef.current = true;
+      try {
+        const result = await classifyMutation.mutateAsync({
+          text: editedText,
+        });
+        if (!result.needsConfirmation && result.candidates.length === 1) {
+          setAutoDetectedSubject(result.candidates[0]);
+        } else {
+          setShowSubjectPicker(true);
+        }
+      } catch {
+        setShowSubjectPicker(true);
+      }
+    }
+    classify();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.phase, editedText, subjectId]);
 
   const handleCapture = useCallback(async () => {
     const photo = await cameraRef.current?.takePictureAsync();
@@ -107,7 +148,10 @@ export default function CameraScreen(): React.ReactNode {
   );
 
   const handleConfirmResult = useCallback(() => {
-    if (!subjectId) {
+    const effectiveSubjectId = subjectId ?? autoDetectedSubject?.subjectId;
+    const effectiveSubjectName =
+      subjectName ?? autoDetectedSubject?.subjectName ?? '';
+    if (!effectiveSubjectId) {
       Alert.alert(
         'No subject selected',
         'Please go back and select a subject first.'
@@ -115,12 +159,19 @@ export default function CameraScreen(): React.ReactNode {
       return;
     }
     navigateToSession(
-      subjectId,
-      subjectName ?? '',
+      effectiveSubjectId,
+      effectiveSubjectName,
       editedText,
       state.imageUri ?? undefined
     );
-  }, [navigateToSession, subjectId, subjectName, editedText, state.imageUri]);
+  }, [
+    navigateToSession,
+    subjectId,
+    subjectName,
+    autoDetectedSubject,
+    editedText,
+    state.imageUri,
+  ]);
 
   const handlePickSubject = useCallback(
     (sid: string, sName: string) => {
@@ -129,16 +180,29 @@ export default function CameraScreen(): React.ReactNode {
     [navigateToSession, editedText, state.imageUri]
   );
 
-  const handleManualContinue = useCallback(() => {
-    if (!subjectId) {
-      Alert.alert(
-        'No subject selected',
-        'Please go back and select a subject first.'
-      );
+  const handleManualContinue = useCallback(async () => {
+    if (subjectId) {
+      navigateToSession(subjectId, subjectName ?? '', manualText);
       return;
     }
-    navigateToSession(subjectId, subjectName ?? '', manualText);
-  }, [navigateToSession, subjectId, subjectName, manualText]);
+    // No subjectId — auto-classify the manually typed text
+    try {
+      const result = await classifyMutation.mutateAsync({ text: manualText });
+      if (!result.needsConfirmation && result.candidates.length === 1) {
+        navigateToSession(
+          result.candidates[0].subjectId,
+          result.candidates[0].subjectName,
+          manualText
+        );
+      } else {
+        // Multiple candidates or low confidence — show picker
+        setShowSubjectPicker(true);
+      }
+    } catch {
+      // Classification failed — show picker
+      setShowSubjectPicker(true);
+    }
+  }, [navigateToSession, subjectId, subjectName, manualText, classifyMutation]);
 
   const handleManualPickSubject = useCallback(
     (sid: string, sName: string) => {
@@ -387,23 +451,90 @@ export default function CameraScreen(): React.ReactNode {
           accessibilityLabel="Recognized text, editable"
         />
 
-        {needsSubjectPick ? (
+        {/* Subject auto-detection loading indicator */}
+        {needsSubjectPick && classifyMutation.isPending && (
+          <Text
+            className="text-body-sm text-text-secondary mt-3"
+            testID="classify-loading"
+          >
+            Figuring out the subject...
+          </Text>
+        )}
+
+        {/* Auto-detected subject confirmation */}
+        {needsSubjectPick && autoDetectedSubject && !showSubjectPicker && (
+          <View
+            className="flex-row items-center gap-2 mt-3 mb-2"
+            testID="auto-detected-subject"
+          >
+            <Text className="text-sm text-text-secondary">
+              Looks like{' '}
+              <Text className="font-medium text-text-primary">
+                {autoDetectedSubject.subjectName}
+              </Text>
+            </Text>
+            <Pressable
+              onPress={() => setShowSubjectPicker(true)}
+              testID="change-subject-link"
+            >
+              <Text className="text-sm text-primary underline">Change</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Subject picker — shown when classification needs confirmation, fails, or user taps "Change" */}
+        {needsSubjectPick && showSubjectPicker && (
           <View className="mt-6" testID="subject-picker">
             <Text className="text-body font-semibold text-text-primary mb-3">
               Which subject is this for?
             </Text>
-            {subjects?.map((s) => (
-              <Pressable
-                key={s.id}
-                onPress={() => handlePickSubject(s.id, s.name)}
-                className="bg-surface-elevated rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
-                accessibilityLabel={`Select ${s.name}`}
-                accessibilityRole="button"
-                testID={`subject-pick-${s.id}`}
-              >
-                <Text className="text-body text-text-primary">{s.name}</Text>
-              </Pressable>
-            ))}
+            {/* Show classification candidates first (sorted by confidence) */}
+            {classifyMutation.data?.candidates
+              ?.slice()
+              .sort((a, b) => b.confidence - a.confidence)
+              .map((candidate, index) => (
+                <Pressable
+                  key={candidate.subjectId}
+                  onPress={() =>
+                    handlePickSubject(
+                      candidate.subjectId,
+                      candidate.subjectName
+                    )
+                  }
+                  className={`rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center ${
+                    index === 0
+                      ? 'bg-primary/10 border border-primary/30'
+                      : 'bg-surface-elevated'
+                  }`}
+                  accessibilityLabel={`Select ${candidate.subjectName}`}
+                  accessibilityRole="button"
+                  testID={`subject-pick-${candidate.subjectId}`}
+                >
+                  <Text className="text-body text-text-primary">
+                    {candidate.subjectName}
+                  </Text>
+                </Pressable>
+              ))}
+            {/* Remaining enrolled subjects not in candidates */}
+            {subjects
+              ?.filter(
+                (s) =>
+                  !classifyMutation.data?.candidates?.some(
+                    (c) => c.subjectId === s.id
+                  )
+              )
+              .map((s) => (
+                <Pressable
+                  key={s.id}
+                  onPress={() => handlePickSubject(s.id, s.name)}
+                  className="bg-surface-elevated rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
+                  accessibilityLabel={`Select ${s.name}`}
+                  accessibilityRole="button"
+                  testID={`subject-pick-${s.id}`}
+                >
+                  <Text className="text-body text-text-primary">{s.name}</Text>
+                </Pressable>
+              ))}
             <Pressable
               testID="retake-button"
               onPress={handleRetake}
@@ -416,7 +547,41 @@ export default function CameraScreen(): React.ReactNode {
               </Text>
             </Pressable>
           </View>
-        ) : (
+        )}
+
+        {/* No subject pick needed — show standard action buttons */}
+        {needsSubjectPick &&
+          !showSubjectPicker &&
+          !classifyMutation.isPending &&
+          autoDetectedSubject && (
+            <View className="flex-row gap-4 mt-6">
+              <Pressable
+                testID="retake-button"
+                onPress={handleRetake}
+                className="flex-1 bg-surface rounded-button py-4 min-h-[48px] items-center justify-center"
+                accessibilityLabel="Retake photo"
+                accessibilityRole="button"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  Retake
+                </Text>
+              </Pressable>
+              <Pressable
+                testID="confirm-button"
+                onPress={handleConfirmResult}
+                className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
+                accessibilityLabel="Start session with this problem"
+                accessibilityRole="button"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  Let&apos;s go
+                </Text>
+              </Pressable>
+            </View>
+          )}
+
+        {/* Subject already known — standard action buttons */}
+        {!needsSubjectPick && (
           <View className="flex-row gap-4 mt-6">
             <Pressable
               testID="retake-button"
@@ -490,7 +655,7 @@ export default function CameraScreen(): React.ReactNode {
                 accessibilityLabel="Type your problem manually"
               />
               <View className="gap-3">
-                {!subjectId && manualText.trim() ? (
+                {!subjectId && manualText.trim() && showSubjectPicker ? (
                   <>
                     <Text className="text-body font-semibold text-text-primary mt-2 mb-1">
                       Which subject is this for?
@@ -514,21 +679,25 @@ export default function CameraScreen(): React.ReactNode {
                   <Pressable
                     testID="manual-continue-button"
                     onPress={handleManualContinue}
-                    disabled={!manualText.trim()}
+                    disabled={!manualText.trim() || classifyMutation.isPending}
                     className={`rounded-button py-4 min-h-[48px] items-center justify-center ${
-                      manualText.trim() ? 'bg-primary' : 'bg-surface'
+                      manualText.trim() && !classifyMutation.isPending
+                        ? 'bg-primary'
+                        : 'bg-surface'
                     }`}
                     accessibilityLabel="Continue with typed problem"
                     accessibilityRole="button"
                   >
                     <Text
                       className={`text-body font-semibold ${
-                        manualText.trim()
+                        manualText.trim() && !classifyMutation.isPending
                           ? 'text-text-inverse'
                           : 'text-text-secondary'
                       }`}
                     >
-                      Continue →
+                      {classifyMutation.isPending
+                        ? 'Figuring out the subject...'
+                        : 'Continue →'}
                     </Text>
                   </Pressable>
                 )}
