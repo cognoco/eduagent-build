@@ -3,7 +3,8 @@
 # =============================================================================
 #
 # Account: Zwizzly (shared team account)
-# Account ID is provided via CLOUDFLARE_ACCOUNT_ID env var (managed in Doppler).
+# Hardcoded to prevent deploys landing on the wrong account when developers
+# have access to multiple Cloudflare accounts.
 #
 # Secrets: Managed in Doppler (project: mentomate, configs: prd/stg/dev)
 #          Synced to GitHub Actions via Doppler-GitHub integration.
@@ -20,6 +21,7 @@
 # =============================================================================
 
 name = "mentomate-api"
+account_id = "0bcf2a3befee2c8b247aad5a94b2354c"
 main = "src/index.ts"
 compatibility_date = "2025-12-01"
 compatibility_flags = ["nodejs_compat"]
