@@ -166,7 +166,7 @@ Monorepo with two apps: Expo mobile client + Hono API backend. **Starting from f
 | Asset | Value |
 |-------|-------|
 | Nx workspace config (`nx.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`) | Already has `@nx/expo/plugin`, `@nx/jest/plugin`, `@nx/eslint/plugin`, Nx Cloud |
-| GitHub Actions CI/CD (`ci.yml`, `mobile-ci.yml`, `deploy-staging.yml`, `deploy-production.yml`) | Lint, test, build, typecheck, deploy matrix with Nx Cloud caching |
+| GitHub Actions CI/CD (`ci.yml`, `mobile-ci.yml`, `deploy.yml`) | Lint, test, build, typecheck, deploy matrix with Nx Cloud caching |
 | `apps/mobile/` Expo shell | `app.json`, `eas.json`, `metro.config.js`, Jest config — keep and strip app code |
 | `packages/schemas/` | Zod schema pattern — becomes single source of shared types + validation |
 | `packages/test-utils/`, `packages/factory/` | Testing infrastructure — evaluate and keep what applies |
@@ -477,7 +477,7 @@ src/app/
 - **Mobile**: EAS Build + EAS Submit (App Store / Google Play)
 - **Database**: Neon (managed, auto-scaling)
 
-**CI/CD:** GitHub Actions from forked repo. Nx Cloud for remote caching and affected-only builds. Matrix: lint → typecheck → test → build → deploy (staging on PR merge, production on release tag).
+**CI/CD:** GitHub Actions from forked repo. Nx Cloud for remote caching and affected-only builds. Matrix: lint → typecheck → test → build → deploy (staging on push to main, production on manual dispatch with approval gate).
 
 **Environment configuration:** `.env` files per environment (dev/staging/prod). Cloudflare Workers uses `wrangler.toml` + Workers secrets for sensitive values. Neon branching for dev/staging databases.
 
@@ -803,8 +803,7 @@ eduagent/
 │   ├── workflows/
 │   │   ├── ci.yml                    # Lint → typecheck → test → build (Nx Cloud caching)
 │   │   ├── mobile-ci.yml            # EAS Build for PR previews
-│   │   ├── deploy-staging.yml       # Deploy on PR merge to main
-│   │   ├── deploy-production.yml    # Deploy on release tag
+│   │   ├── deploy.yml               # Deploy API (staging on push to main, production on manual dispatch)
 │   │   └── claude-code-review.yml   # AI-assisted PR review
 │   └── CODEOWNERS
 ├── .claude/                          # Claude Code config (from fork)
@@ -1399,7 +1398,7 @@ nx run-many --target=lint        # ESLint (import ordering, naming conventions)
 
 | Target | Staging | Production |
 |--------|---------|------------|
-| API | `wrangler deploy --env staging` (on PR merge) | `wrangler deploy --env production` (on release tag) |
+| API | `wrangler deploy --env staging` (on push to main) | `wrangler deploy --env production` (manual dispatch + approval) |
 | Mobile | EAS Build → internal distribution | EAS Submit → App Store / Google Play |
 | Database | Neon branch (auto-created per PR) | Neon main branch, migrations via CI |
 | KV | Staging KV namespace | Production KV namespace |

@@ -160,9 +160,9 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 
 **Complete — all routes production-ready:**
 - Epics 0-5: full API layer (~1,443 API tests + ~404 mobile tests + 15 integration test suites, all passing)
-- All 23 route files wired to real services with DB persistence (including `consent-web` browser flow and `test-seed` E2E endpoints)
+- All 24 route files wired to real services with DB persistence (including `consent-web` browser flow and `test-seed` E2E endpoints)
 - Mobile: 38+ screens (49 test suites), all using real API calls via TanStack Query + Hono RPC
-- Background jobs: 10 Inngest functions (session-completed chain, trial-expiry, consent-reminders, consent-revocation, account-deletion, review-reminder, payment-retry, quota-reset, topup-expiry-reminder, subject-auto-archive)
+- Background jobs: 11 Inngest functions (session-completed chain, trial-expiry, consent-reminders, consent-revocation, account-deletion, review-reminder, payment-retry, quota-reset, topup-expiry-reminder, subject-auto-archive)
 - Auth: Clerk (SSO + email/password), PasswordInput with show/hide + requirements
 - Billing: Stripe integration built (checkout, portal, webhooks, KV-cached status, quota metering) — **mobile must add native IAP (RevenueCat) before App Store submission** (Epic 9). Stripe code kept for future web client.
 - Email: Resend integration (consent emails, reminders)
@@ -180,7 +180,7 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 - Homework camera capture (Story 2.5): ML Kit OCR on device, camera state machine + `useHomeworkOcr` hook + full camera UI; server-side `OcrProvider` interface with stub implementation in `services/ocr.ts`
 - XP ledger: `insertSessionXpEntry()` wired in session-completed Step 3, `useXpSummary` hook for client-side XP display
 - Needs-deepening auto-promotion (FR63): `updateNeedsDeepeningProgress()` wired in session-completed Step 1b
-- E2E testing infrastructure: `test-seed` route for deterministic test data, 10 integration suites in `tests/integration/` (auth-chain, onboarding, session-completed-chain, stripe-webhook, account-deletion, health-cors, profile-isolation, test-seed, learning-session, retention-lifecycle), Maestro foundation (seed.js, setup flows, Nx e2e target, 4 Tier 1 smoke flows), enhanced CI workflow with PostgreSQL + API server for mobile-maestro job
+- E2E testing infrastructure: `test-seed` route for deterministic test data, 16 integration suites in `tests/integration/`, Maestro foundation (seed.js, setup flows, Nx e2e target, 4 Tier 1 smoke flows), enhanced CI workflow with PostgreSQL + API server for mobile-maestro job
 - Expo web mode: `.npmrc` with `shamefully-hoist=true` enables `expo start --web` in pnpm monorepo (required for Metro/Babel transitive plugin resolution). Web deps (`react-dom`, `react-native-web`) in root and mobile `package.json`.
 
 - UX audit remediation (55 gaps): consent gating (C16/COPPA), camera-first homework (C8), parent transcript view (C13), session mode configs (C7), math rendering (M21), animations (M22), dark mode, confidence scoring, retention trends, ProfileSwitcher, Inter font, Ionicons, WCAG contrast fixes, shared Button component

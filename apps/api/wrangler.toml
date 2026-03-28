@@ -20,7 +20,7 @@
 # This is NOT configured in wrangler.toml — it is a dashboard-level WAF rule.
 # =============================================================================
 
-name = "mentomate-api"
+name = "mentomate-api-dev"
 account_id = "0bcf2a3befee2c8b247aad5a94b2354c"
 main = "src/index.ts"
 compatibility_date = "2025-12-01"
@@ -98,6 +98,7 @@ preview_id = "db6f91e2639e44ce931f63f858593f3c"
 # Custom domain: api-stg.mentomate.com
 
 [env.staging]
+name = "mentomate-api-stg"
 compatibility_date = "2025-12-01"
 compatibility_flags = ["nodejs_compat"]
 
@@ -122,6 +123,7 @@ id = "cbed5036c909416487c3b9362da521d0"
 # Custom domain: api.mentomate.com
 
 [env.production]
+name = "mentomate-api-prd"
 compatibility_date = "2025-12-01"
 compatibility_flags = ["nodejs_compat"]
 
