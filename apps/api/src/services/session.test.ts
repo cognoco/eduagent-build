@@ -215,7 +215,7 @@ beforeEach(() => {
     newEscalationRung: 1,
     isUnderstandingCheck: false,
     provider: 'gemini',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     latencyMs: 150,
   });
 

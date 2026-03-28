@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
 import Svg, {
   Path,
@@ -78,7 +78,11 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
   const wordOp = useSharedValue(0);
   const fade = useSharedValue(1);
 
-  const done = useCallback(() => onComplete(), [onComplete]);
+  // Use a ref so the effect closure always calls the latest onComplete
+  // without re-triggering the animation choreography on prop identity changes.
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+  const done = useCallback(() => onCompleteRef.current(), []);
 
   // Tap to skip
   const skip = useCallback(() => {

@@ -8,7 +8,7 @@ import type { LLMProvider, ChatMessage, ModelConfig } from '../types';
 const TEST_API_KEY = 'test-gemini-key';
 const DEFAULT_CONFIG: ModelConfig = {
   provider: 'gemini',
-  model: 'gemini-2.0-flash',
+  model: 'gemini-2.5-flash',
   maxTokens: 4096,
 };
 
@@ -92,7 +92,7 @@ describe('Gemini Provider', () => {
       expect(fetchSpy).toHaveBeenCalledTimes(1);
 
       const [url, options] = fetchSpy.mock.calls[0];
-      expect(url).toContain('gemini-2.0-flash:generateContent');
+      expect(url).toContain('gemini-2.5-flash:generateContent');
       expect(url).toContain(`key=${TEST_API_KEY}`);
       expect(options.method).toBe('POST');
 

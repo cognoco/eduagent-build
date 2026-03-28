@@ -546,6 +546,7 @@ export default function LearnerLayout() {
   const { persona } = useTheme();
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
+  const insets = useSafeAreaInsets();
   const {
     activeProfile,
     isLoading: isProfileLoading,
@@ -621,8 +622,8 @@ export default function LearnerLayout() {
           tabBarStyle: {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
-            height: 64,
-            paddingBottom: 8,
+            height: 56 + insets.bottom,
+            paddingBottom: insets.bottom,
           },
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.muted,

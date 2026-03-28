@@ -2,6 +2,7 @@ import { Tabs, Redirect } from 'expo-router';
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@clerk/clerk-expo';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemeColors, useTokenVars } from '../../lib/theme';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
 import { useRevenueCatIdentity } from '../../hooks/use-revenuecat';
@@ -37,6 +38,7 @@ export default function ParentLayout() {
   const { persona } = useTheme();
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
+  const insets = useSafeAreaInsets();
 
   // Register push token on app launch (runs once, guarded internally)
   usePushTokenRegistration();
@@ -56,8 +58,8 @@ export default function ParentLayout() {
           tabBarStyle: {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
-            height: 64,
-            paddingBottom: 8,
+            height: 56 + insets.bottom,
+            paddingBottom: insets.bottom,
           },
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.muted,

@@ -279,6 +279,15 @@ export default function RootLayout() {
   });
   const [showSplash, setShowSplash] = useState(true);
 
+  const dismissSplash = useCallback(() => setShowSplash(false), []);
+
+  // Safety timeout: force-dismiss splash after 4s if animation callback never fires
+  useEffect(() => {
+    if (!showSplash) return;
+    const timer = setTimeout(dismissSplash, 4000);
+    return () => clearTimeout(timer);
+  }, [showSplash, dismissSplash]);
+
   useEffect(() => {
     if (fontsLoaded) {
       // Hide native splash — the AnimatedSplash component takes over
@@ -307,8 +316,8 @@ export default function RootLayout() {
         </ClerkProvider>
       </SafeAreaProvider>
       {showSplash && (
-        <SplashErrorBoundary onError={() => setShowSplash(false)}>
-          <AnimatedSplash onComplete={() => setShowSplash(false)} />
+        <SplashErrorBoundary onError={dismissSplash}>
+          <AnimatedSplash onComplete={dismissSplash} />
         </SplashErrorBoundary>
       )}
     </GestureHandlerRootView>

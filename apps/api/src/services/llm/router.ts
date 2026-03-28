@@ -18,7 +18,7 @@ function getModelConfig(rung: EscalationRung): ModelConfig {
 
   if (rung <= 2) {
     if (useGemini) {
-      return { provider: 'gemini', model: 'gemini-2.0-flash', maxTokens: 4096 };
+      return { provider: 'gemini', model: 'gemini-2.5-flash', maxTokens: 4096 };
     }
     return { provider: 'openai', model: 'gpt-4o-mini', maxTokens: 4096 };
   }

@@ -69,10 +69,10 @@ describe('LLM Router', () => {
 
     it('uses flash model for rung 1-2', async () => {
       const r1 = await routeAndCall([{ role: 'user', content: 'test' }], 1);
-      expect(r1.model).toBe('gemini-2.0-flash');
+      expect(r1.model).toBe('gemini-2.5-flash');
 
       const r2 = await routeAndCall([{ role: 'user', content: 'test' }], 2);
-      expect(r2.model).toBe('gemini-2.0-flash');
+      expect(r2.model).toBe('gemini-2.5-flash');
     });
 
     it('uses pro model for rung 3+', async () => {
@@ -126,7 +126,7 @@ describe('LLM Router', () => {
       );
 
       expect(result.provider).toBe('gemini');
-      expect(result.model).toBe('gemini-2.0-flash');
+      expect(result.model).toBe('gemini-2.5-flash');
 
       const chunks: string[] = [];
       for await (const chunk of result.stream) {

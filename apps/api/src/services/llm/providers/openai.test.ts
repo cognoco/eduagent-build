@@ -291,11 +291,11 @@ describe('OpenAI Provider', () => {
   });
 
   describe('model mapping', () => {
-    it('maps gemini-2.0-flash to gpt-4o-mini', async () => {
+    it('maps gemini-2.5-flash to gpt-4o-mini', async () => {
       mockFetch.mockResolvedValueOnce(createOkResponse('test'));
       await provider.chat(TEST_MESSAGES, {
         ...TEST_CONFIG,
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
       });
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.model).toBe('gpt-4o-mini');
@@ -316,13 +316,13 @@ describe('OpenAI Provider', () => {
       mockFetch.mockResolvedValueOnce(createOkResponse('test'));
       await provider.chat(TEST_MESSAGES, {
         ...TEST_CONFIG,
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.0-flash',
       });
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.model).toBe('gpt-4o-mini');
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('No model mapping for "gemini-2.5-flash"')
+        expect.stringContaining('No model mapping for "gemini-3.0-flash"')
       );
       warnSpy.mockRestore();
     });

@@ -2,6 +2,7 @@ import { useReducer, useRef, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
+  Image,
   Pressable,
   TextInput,
   Linking,
@@ -346,11 +347,21 @@ export default function CameraScreen(): React.ReactNode {
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       >
         <View className="flex-1 items-center justify-center px-6">
-          <View className="w-full aspect-[4/3] bg-surface rounded-card items-center justify-center">
-            <Text className="text-body text-text-secondary">
-              Photo captured
-            </Text>
-          </View>
+          {state.imageUri ? (
+            <Image
+              source={{ uri: state.imageUri }}
+              className="w-full aspect-[4/3] rounded-card"
+              resizeMode="contain"
+              testID="photo-preview"
+              accessibilityLabel="Captured homework photo"
+            />
+          ) : (
+            <View className="w-full aspect-[4/3] bg-surface rounded-card items-center justify-center">
+              <Text className="text-body text-text-secondary">
+                Photo captured
+              </Text>
+            </View>
+          )}
         </View>
         <View className="flex-row gap-4 px-6 pb-4">
           <Pressable

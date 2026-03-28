@@ -13,7 +13,7 @@ function llmResponse(json: Record<string, unknown>): void {
   mockRouteAndCall.mockResolvedValueOnce({
     response: JSON.stringify(json),
     provider: 'gemini',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     latencyMs: 50,
   });
 }
@@ -118,7 +118,7 @@ describe('resolveSubjectName', () => {
     mockRouteAndCall.mockResolvedValueOnce({
       response: 'Sorry, I cannot help with that.',
       provider: 'gemini',
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       latencyMs: 50,
     });
 

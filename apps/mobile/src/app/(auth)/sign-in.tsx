@@ -12,6 +12,7 @@ import { useSignIn, useSSO } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
@@ -29,6 +30,8 @@ const SCREEN_HEIGHT =
     ? Math.min(Dimensions.get('screen').height, 812)
     : Dimensions.get('screen').height;
 
+const HAS_SIGNED_IN_KEY = 'hasSignedInBefore';
+
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
   const router = useRouter();
@@ -40,7 +43,19 @@ export default function SignInScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+  const [isReturningUser, setIsReturningUser] = useState<boolean | null>(null);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const value = await SecureStore.getItemAsync(HAS_SIGNED_IN_KEY);
+        setIsReturningUser(value === 'true');
+      } catch {
+        setIsReturningUser(false);
+      }
+    })();
+  }, []);
 
   const { startSSOFlow: startGoogleSSO } = useSSO();
   const { startSSOFlow: startAppleSSO } = useSSO();
@@ -73,6 +88,7 @@ export default function SignInScreen() {
 
         if (createdSessionId && setActive) {
           await setActive({ session: createdSessionId });
+          void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
           // Two-step redirect: always land in (learner), then layout guard
           // checks persona and bounces parent users to /(parent)/dashboard.
           router.replace('/(learner)/home');
@@ -100,6 +116,7 @@ export default function SignInScreen() {
 
       if (signInAttempt.status === 'complete') {
         await setActive({ session: signInAttempt.createdSessionId });
+        void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
         // Two-step redirect: always land in (learner), then layout guard
         // checks persona and bounces parent users to /(parent)/dashboard.
         router.replace('/(learner)/home');
@@ -141,10 +158,12 @@ export default function SignInScreen() {
             on tall screens so the logo and form stay visually connected. */}
         <View className="flex-1" style={{ minHeight: 16, maxHeight: 32 }} />
         <Text className="text-h2 font-bold text-text-primary mb-1 text-center">
-          Welcome back
+          {isReturningUser ? 'Welcome back' : 'Welcome to MentoMate'}
         </Text>
         <Text className="text-body-sm text-text-secondary mb-6 text-center">
-          Sign in to continue learning
+          {isReturningUser
+            ? 'Sign in to continue learning'
+            : 'Sign in to start learning'}
         </Text>
 
         {error !== '' && (
