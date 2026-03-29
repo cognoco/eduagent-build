@@ -51,8 +51,11 @@ export function usePushTokenRegistration(): void {
         // Register with our API
         await registerPushToken.mutateAsync(tokenData.data);
         hasRegistered.current = true;
-      } catch {
-        // Silently fail — push token registration is non-critical
+      } catch (err) {
+        // Push registration is non-critical, but log in dev for debugging
+        if (__DEV__) {
+          console.warn('[Push Token] Registration failed:', err);
+        }
       }
     }
 
