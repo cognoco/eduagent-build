@@ -580,7 +580,7 @@ function ConsentPendingGate(): React.ReactElement {
 
 export default function LearnerLayout() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { persona, colorScheme, accentPresetId } = useTheme();
+  const { persona } = useTheme();
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
@@ -654,15 +654,10 @@ export default function LearnerLayout() {
     return <PostApprovalLanding onContinue={dismissPostApproval} />;
   }
 
-  // Force NativeWind to remount the CSS variable scope when accent changes,
-  // guaranteeing that --color-primary / --color-accent propagate to all
-  // tab screens (Bug #6 — accent color propagation).
-  const themeKey = `theme-${persona}-${colorScheme}-${
-    accentPresetId ?? 'default'
-  }`;
-
+  // key={themeKey} removed — crashes Android Fabric (MENTOMATE-MOBILE-6).
+  // NativeWind vars() style updates propagate without remounting.
   return (
-    <View key={themeKey} style={[{ flex: 1 }, tokenVars]}>
+    <View style={[{ flex: 1 }, tokenVars]}>
       <Tabs
         screenOptions={{
           headerShown: false,
