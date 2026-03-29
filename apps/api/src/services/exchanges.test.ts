@@ -284,6 +284,35 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain('TEACH BACK');
   });
 
+  it('includes casual learning mode guidance when mode is casual', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      learningMode: 'casual',
+    });
+    expect(prompt).toContain('CASUAL EXPLORER');
+    expect(prompt).toContain('Relaxed');
+    expect(prompt).toContain('Warm and encouraging');
+    expect(prompt).toContain('Low-pressure');
+  });
+
+  it('includes serious learning mode guidance when mode is serious', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      learningMode: 'serious',
+    });
+    expect(prompt).toContain('SERIOUS LEARNER');
+    expect(prompt).toContain('Efficient');
+    expect(prompt).toContain('Focused and academic');
+    expect(prompt).toContain('Rigorous');
+  });
+
+  it('omits learning mode section when not set', () => {
+    const prompt = buildSystemPrompt(baseContext);
+    expect(prompt).not.toContain('Learning mode:');
+    expect(prompt).not.toContain('CASUAL EXPLORER');
+    expect(prompt).not.toContain('SERIOUS LEARNER');
+  });
+
   it('works without optional fields', () => {
     const minimalContext: ExchangeContext = {
       sessionId: 'sess-1',

@@ -42,6 +42,7 @@ import { getTeachingPreference } from './retention-data';
 import { shouldTriggerEvaluate } from './evaluate';
 import { shouldTriggerTeachBack } from './teach-back';
 import { getRetentionStatus, type RetentionState } from './retention';
+import { getLearningMode } from './settings';
 import type { EscalationRung } from './llm';
 
 // ---------------------------------------------------------------------------
@@ -229,6 +230,7 @@ async function prepareExchangeContext(
     memory,
     teachingPref,
     metadataRows,
+    learningModeRecord,
   ] = await Promise.all([
     getSubject(db, profileId, session.subjectId),
     session.topicId
@@ -275,6 +277,8 @@ async function prepareExchangeContext(
           )
           .limit(1)
       : Promise.resolve([]),
+    // Learning mode: affects LLM tutoring style (casual vs serious)
+    getLearningMode(db, profileId),
   ]);
 
   const topic = topicRows[0];
@@ -456,6 +460,7 @@ async function prepareExchangeContext(
     interleavedTopics,
     verificationType,
     evaluateDifficultyRung,
+    learningMode: learningModeRecord.mode,
     // Gap 4: Populate retention status for prompt-level awareness
     retentionStatus: retentionStatusValue
       ? {
