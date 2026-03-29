@@ -251,6 +251,23 @@ Use the BMAD commands (`/bmad-bmm-create-prd`, `/bmad-bmm-create-architecture`, 
 
 ## Quality Rules
 
+### Pre-Release Impact Analysis (MANDATORY)
+
+**This app is near release. Every change can break production.** Before writing ANY code change, ask yourself:
+
+1. **What can break?** Trace the blast radius — what components, screens, and flows depend on the code you're changing? A "simple" color token change affects every screen. A layout `key` prop affects the entire navigation tree.
+2. **Does this change affect Android differently than iOS/web?** React Native Fabric, react-native-svg, react-native-reanimated, and react-native-screens all have Android-specific bugs. Test assumptions against Android behavior, not just iOS.
+3. **Does this change run during navigation transitions?** State updates that trigger tree remounts (`key` prop changes, context updates) during active fragment transactions will crash Android Fabric. Never force-remount navigation trees.
+4. **Will this change survive a theme/persona switch?** Profile switching triggers cascading re-renders. Ensure your change doesn't assume a stable component lifecycle.
+5. **Does this cost money or consume limited resources?** EAS builds, API calls to paid services, push notifications — never retry these on failure. Investigate first.
+
+6. **Is this really the best solution, or just the first one I thought of?** Before implementing, consider at least one alternative approach. A workaround that introduces new complexity (e.g., `key` prop to force remount) often causes worse problems than the original bug. Prefer the simplest solution that doesn't add moving parts.
+7. **What is the trade-off?** Every change has a downside. Find it. State it explicitly to the user before implementing. Example: "Removing `key={themeKey}` fixes the crash, but inactive tab screens may show stale accent colors until tapped — is that acceptable?" Let the user decide if the trade-off is worth it.
+
+If you cannot confidently answer these questions, **stop and discuss with the user before implementing.**
+
+### General Quality
+
 - **Always test your own work before concluding a task.** Run the relevant tests for any code you write or modify. Do not declare a task complete until tests pass.
 - **Always run E2E tests after implementing or fixing features.** Never skip E2E tests or declare work done without running them. If E2E infrastructure is down, explicitly report that rather than silently skipping.
 - **Run `pnpm exec tsc --noEmit` before every commit** to catch type errors locally. Also run `pnpm exec nx lint <project>` for any modified project. Do not push until both pass cleanly. This avoids multi-round CI fix-push cycles.
