@@ -48,26 +48,46 @@ export function AccentPicker({
               className="items-center"
             >
               <View
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: preset.swatch,
-                  borderWidth: isActive ? 3 : 0,
-                  borderColor: isActive ? colors.surface : undefined,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  // Outer ring for active state
-                  shadowColor: isActive ? preset.swatch : 'transparent',
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: isActive ? 0.4 : 0,
-                  shadowRadius: 6,
-                  elevation: isActive ? 4 : 0,
-                }}
+                style={
+                  isActive
+                    ? {
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        borderWidth: 3,
+                        borderColor: preset.swatch,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }
+                    : {
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        borderWidth: 3,
+                        borderColor: 'transparent',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }
+                }
               >
-                {isActive && (
-                  <Ionicons name="checkmark" size={18} color={colors.surface} />
-                )}
+                <View
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 17,
+                    backgroundColor: preset.swatch,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {isActive && (
+                    <Ionicons
+                      name="checkmark"
+                      size={18}
+                      color={colors.surface}
+                    />
+                  )}
+                </View>
               </View>
               <Text className="text-caption text-text-secondary mt-1">
                 {preset.label}
