@@ -1,4 +1,5 @@
 export { AccentPicker } from './AccentPicker';
+export { ApiUnreachableBanner } from './ApiUnreachableBanner';
 export { AnalogyDomainPicker } from './AnalogyDomainPicker';
 export { AnimatedEntry } from './AnimatedEntry';
 export { AnimatedFade } from './AnimatedFade';

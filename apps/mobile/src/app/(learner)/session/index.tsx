@@ -20,6 +20,7 @@ import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { useStreaks } from '../../../hooks/use-streaks';
 import { useOverallProgress } from '../../../hooks/use-progress';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
+import { useApiReachability } from '../../../hooks/use-api-reachability';
 import { useApiClient } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
 
@@ -56,6 +57,7 @@ export default function SessionScreen() {
   );
 
   const { isOffline } = useNetworkStatus();
+  const { isApiReachable, isChecked: apiChecked } = useApiReachability();
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'opening', role: 'ai', content: openingContent },
@@ -350,6 +352,8 @@ export default function SessionScreen() {
 
   const subtitle = pendingClassification
     ? 'Figuring out what this is about...'
+    : apiChecked && !isApiReachable
+    ? 'Server unreachable — messages may fail'
     : modeConfig.subtitle;
 
   return (
