@@ -1,17 +1,22 @@
 #!/usr/bin/env node
 
 /**
- * Generates local env files from Doppler for local development.
+ * Generates local env files from Doppler for local development,
+ * and syncs EXPO_PUBLIC_* vars into eas.json build profiles.
  *
  * This script runs during `pnpm install` but gracefully skips if:
  * - Running in CI environment
  * - Doppler CLI is not installed
  * - Doppler is not configured for this project
  *
- * Generates:
+ * Generates (gitignored, mode 0o600):
  * - .env.development.local  (root — used by db scripts via dotenv-cli)
  * - apps/api/.dev.vars      (Wrangler local secrets)
  * - apps/mobile/.env.local  (Expo local env — EXPO_PUBLIC_* vars only)
+ *
+ * Updates (committed):
+ * - apps/mobile/eas.json    (EXPO_PUBLIC_* + allowlisted vars per build profile)
+ *   Pulls from Doppler dev/stg/prd → development/preview/production profiles.
  *
  * All files except mobile receive the full Doppler config. The mobile
  * output is filtered to EXPO_PUBLIC_* variables only. Consumers read
@@ -105,6 +110,18 @@ function downloadSecrets(config) {
   }
 }
 
+function downloadSecretsJson(config) {
+  try {
+    const raw = execSync(
+      `doppler secrets download --config ${config} --no-file --format json`,
+      { encoding: 'utf-8', shell: true, stdio: ['pipe', 'pipe', 'pipe'] }
+    );
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 function checkStaleness(filePath) {
   try {
     const stats = fs.statSync(filePath);
@@ -113,6 +130,139 @@ function checkStaleness(filePath) {
   } catch {
     return false;
   }
+}
+
+// Doppler config → EAS build profile mapping
+const EAS_PROFILE_MAP = {
+  dev: 'development',
+  stg: 'preview',
+  prd: 'production',
+};
+
+// Non-EXPO_PUBLIC_* vars that should also be synced into eas.json env blocks
+const EAS_EXTRA_VARS = ['SENTRY_DISABLE_AUTO_UPLOAD'];
+
+/**
+ * Downloads EXPO_PUBLIC_* vars from all Doppler configs (dev/stg/prd)
+ * and merges them into the corresponding eas.json build profile env blocks.
+ * Preserves all non-env profile settings and any unmanaged env vars.
+ * Only writes if content actually changed (avoids git noise).
+ */
+function updateEasJson() {
+  const easPath = path.join(__dirname, '..', 'apps', 'mobile', 'eas.json');
+
+  if (!fs.existsSync(easPath)) {
+    console.log(
+      '\x1b[33m[Doppler]\x1b[0m Skipping eas.json update (file not found)'
+    );
+    return;
+  }
+
+  let easConfig;
+  try {
+    const raw = fs.readFileSync(easPath, 'utf-8');
+    easConfig = JSON.parse(raw);
+  } catch (err) {
+    console.log(
+      `\x1b[31m[Doppler]\x1b[0m Failed to parse eas.json: ${err.message}`
+    );
+    return;
+  }
+
+  console.log(
+    '\x1b[36m[Doppler]\x1b[0m Syncing EXPO_PUBLIC_* vars to eas.json...'
+  );
+
+  if (!easConfig.build) {
+    easConfig.build = {};
+  }
+
+  let updatedCount = 0;
+  let skippedCount = 0;
+
+  for (const [envKey, profileName] of Object.entries(EAS_PROFILE_MAP)) {
+    const secrets = downloadSecretsJson(envKey);
+    if (!secrets) {
+      console.log(
+        `\x1b[33m[Doppler]\x1b[0m   Skipping ${profileName} ` +
+          `(cannot access Doppler config "${envKey}")`
+      );
+      skippedCount++;
+      continue;
+    }
+
+    // Filter to EXPO_PUBLIC_* + allowlisted vars, skip empty values
+    const managedVars = {};
+    for (const [key, value] of Object.entries(secrets)) {
+      if (key.startsWith('EXPO_PUBLIC_') || EAS_EXTRA_VARS.includes(key)) {
+        if (value !== '') {
+          managedVars[key] = value;
+        }
+      }
+    }
+
+    // Ensure profile exists
+    if (!easConfig.build[profileName]) {
+      easConfig.build[profileName] = {};
+    }
+
+    // Merge: preserve unmanaged vars, set managed vars from Doppler
+    const existingEnv = easConfig.build[profileName].env || {};
+    const mergedEnv = {};
+
+    // Keep any vars not managed by this script
+    for (const [key, value] of Object.entries(existingEnv)) {
+      if (!key.startsWith('EXPO_PUBLIC_') && !EAS_EXTRA_VARS.includes(key)) {
+        mergedEnv[key] = value;
+      }
+    }
+
+    // Set all managed vars from Doppler
+    for (const [key, value] of Object.entries(managedVars)) {
+      mergedEnv[key] = value;
+    }
+
+    // Sort keys for deterministic output
+    const sortedEnv = {};
+    for (const key of Object.keys(mergedEnv).sort()) {
+      sortedEnv[key] = mergedEnv[key];
+    }
+
+    easConfig.build[profileName].env = sortedEnv;
+
+    const varCount = Object.keys(managedVars).length;
+    console.log(
+      `\x1b[32m[Doppler]\x1b[0m   ${profileName} \u2190 ${envKey}: ` +
+        `${varCount} vars synced`
+    );
+    updatedCount++;
+  }
+
+  if (updatedCount === 0) {
+    console.log(
+      '\x1b[33m[Doppler]\x1b[0m   No eas.json profiles updated ' +
+        '(could not access any Doppler configs)'
+    );
+    return;
+  }
+
+  // Deterministic formatting (matches Prettier for 2-space JSON)
+  const output = JSON.stringify(easConfig, null, 2) + '\n';
+
+  // Only write if content actually changed
+  const existing = fs.readFileSync(easPath, 'utf-8');
+  if (output === existing) {
+    console.log(
+      '\x1b[90m[Doppler]\x1b[0m   eas.json unchanged \u2014 no write needed'
+    );
+    return;
+  }
+
+  fs.writeFileSync(easPath, output, 'utf-8');
+  console.log(
+    `\x1b[32m[Doppler]\x1b[0m   eas.json updated ` +
+      `(${updatedCount} profiles, ${skippedCount} skipped)`
+  );
 }
 
 function main() {
@@ -189,6 +339,9 @@ function main() {
     });
     console.log(`\x1b[32m[Doppler]\x1b[0m Generated ${output.description}`);
   }
+
+  // Sync EXPO_PUBLIC_* vars to eas.json build profiles (dev/stg/prd)
+  updateEasJson();
 
   console.log(
     '\n   \x1b[90mTo regenerate after secret changes:\x1b[0m pnpm env:sync\n'

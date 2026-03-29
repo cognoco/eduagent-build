@@ -34,6 +34,7 @@ No CI/CD pipeline. Everything runs locally on your machine.
 pnpm install  →  postinstall hook  →  scripts/setup-env.js  →  Doppler CLI
                                           │
                                           ├─ writes local files (.dev.vars, .env.local, etc.)
+                                          ├─ updates apps/mobile/eas.json (EXPO_PUBLIC_* for all build profiles)
                                           └─ syncs dev secrets to Cloudflare Worker (via sync-secrets.js)
 ```
 
@@ -49,7 +50,17 @@ The `setup-env.js` script runs automatically after `pnpm install` (or manually v
 | `apps/api/.dev.vars` | Wrangler local dev server | Full config |
 | `apps/mobile/.env.local` | Expo dev client | Filtered to `EXPO_PUBLIC_*` only |
 
-4. Calls `sync-secrets.js` to sync dev secrets to the `mentomate-api-dev` Cloudflare Worker (non-fatal — skips if wrangler not authenticated)
+4. Updates **one committed file** — `apps/mobile/eas.json`:
+
+| Build Profile | Doppler Config | Contents |
+|---------------|----------------|----------|
+| `development` | `dev` | `EXPO_PUBLIC_*` + `SENTRY_DISABLE_AUTO_UPLOAD` |
+| `preview` | `stg` | `EXPO_PUBLIC_*` + `SENTRY_DISABLE_AUTO_UPLOAD` |
+| `production` | `prd` | `EXPO_PUBLIC_*` + `SENTRY_DISABLE_AUTO_UPLOAD` |
+
+   Gracefully skips profiles if the developer lacks access to that Doppler config. Only writes if content changed (avoids git noise). Commit eas.json after running `pnpm env:sync` if values changed.
+
+5. Calls `sync-secrets.js` to sync dev secrets to the `mentomate-api-dev` Cloudflare Worker (non-fatal — skips if wrangler not authenticated)
 
 The script has a **7-day staleness check** — if local files are older than 7 days, it re-downloads automatically.
 
@@ -289,15 +300,18 @@ GitHub:    deploy.yml ──▶ approval ──▶ EAS Build servers ──▶ A
 
 ### What gets baked into the build
 
-Mobile builds contain **no server secrets**. Only public config is included, hardcoded in `eas.json`:
+Mobile builds contain **no server secrets**. Only public config is included, synced from Doppler into `eas.json` by `scripts/setup-env.js`:
 
-| Variable | Value | Purpose |
-|----------|-------|---------|
-| `EXPO_PUBLIC_API_URL` | API endpoint URL | Which backend the app talks to |
-| `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key | Auth (safe to expose) |
-| `EXPO_PUBLIC_SENTRY_DSN` | Sentry DSN | Error reporting (safe to expose) |
+| Variable | Purpose |
+|----------|---------|
+| `EXPO_PUBLIC_API_URL` | Which backend the app talks to |
+| `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` | Auth (safe to expose — publishable key) |
+| `EXPO_PUBLIC_SENTRY_DSN` | Error reporting (safe to expose) |
+| `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` | RevenueCat iOS (safe to expose — public API key) |
+| `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID` | RevenueCat Android (safe to expose — public API key) |
+| `SENTRY_DISABLE_AUTO_UPLOAD` | Build-time flag (disables Sentry source map upload) |
 
-Doppler does **not** sync to EAS Build. These values are committed directly in `eas.json`.
+These values are synced from Doppler (dev/stg/prd configs) into the corresponding `eas.json` build profiles (development/preview/production) by `pnpm env:sync`. Since `eas.json` is committed, run `pnpm env:sync` and commit the result after changing values in Doppler.
 
 The only GitHub secret needed for CI-triggered builds is `EXPO_TOKEN` (authenticates `eas build`).
 
@@ -374,6 +388,7 @@ pnpm env:sync               # Local files + dev Worker sync (also runs on pnpm i
 ### When to run
 
 - **After changing a secret in Doppler** — run `pnpm secrets:sync <env>` for the affected environment(s)
+- **After changing an `EXPO_PUBLIC_*` var in Doppler** — run `pnpm env:sync`, then commit the updated `eas.json`
 - **After first clone** — `pnpm install` automatically syncs dev; run `pnpm secrets:sync stg prd` for staging/production
 - **Before first production deploy** — verify all production-required keys are set
 
@@ -432,7 +447,7 @@ If wrangler is not authenticated, the sync skips gracefully (does not break `pnp
 |---|---|---|---|
 | **Trigger** | `expo start` (local) | Push to main (auto) or `eas build` (local) | `eas build` (local) or `deploy.yml` (GitHub) |
 | **Output** | Dev client | APK (direct install) | AAB (App Bundle for stores) |
-| **Config source** | `.env.local` from Doppler | `eas.json` hardcoded | `eas.json` hardcoded |
+| **Config source** | `.env.local` from Doppler | `eas.json` (synced from Doppler) | `eas.json` (synced from Doppler) |
 | **Approval gate** | None | None | Only if via GitHub workflow |
 | **Distribution** | Local device | Internal (testers) | App Store / Google Play |
 | **Contains secrets?** | No (public vars only) | No (public vars only) | No (public vars only) |
@@ -450,5 +465,5 @@ If wrangler is not authenticated, the sync skips gracefully (does not break `pnp
 | `apps/api/wrangler.toml` | Cloudflare Workers config, KV namespaces, env vars |
 | `apps/api/src/config.ts` | Runtime env var validation (Zod schema) |
 | `apps/mobile/eas.json` | EAS build profiles and public env vars |
-| `scripts/setup-env.js` | Doppler → local files + dev Worker sync (postinstall hook) |
+| `scripts/setup-env.js` | Doppler → local files + eas.json env sync + dev Worker sync (postinstall hook) |
 | `scripts/sync-secrets.js` | Doppler → Cloudflare Workers secret sync (all environments) |
