@@ -138,8 +138,9 @@ export default function CreateProfileScreen() {
       const res = await client.profiles.$post({ json: body });
       const result = (await res.json()) as { profile: Profile };
       await queryClient.invalidateQueries({ queryKey: ['profiles'] });
-      await switchProfile(result.profile.id);
 
+      // Navigate FIRST — prevents crash from tree remount (themeKey change)
+      // destroying the modal's navigation state during switchProfile.
       if (consentRequired) {
         router.replace({
           pathname: '/consent',
@@ -148,6 +149,8 @@ export default function CreateProfileScreen() {
       } else {
         router.back();
       }
+
+      await switchProfile(result.profile.id);
     } catch (err: unknown) {
       setError(formatApiError(err));
     } finally {

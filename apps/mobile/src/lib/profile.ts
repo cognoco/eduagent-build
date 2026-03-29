@@ -110,9 +110,14 @@ export function ProfileProvider({
   const switchProfile = useCallback(
     async (profileId: string) => {
       await client.profiles.switch.$post({ json: { profileId } });
-      setActiveProfileId(profileId);
       await storage.setItem(ACTIVE_PROFILE_KEY, profileId);
-      await queryClient.invalidateQueries();
+      // State update LAST — triggers re-renders that change themeKey and
+      // remount the navigation tree.  Callers should close modals before
+      // awaiting this function to avoid navigation state corruption.
+      setActiveProfileId(profileId);
+      // Fire-and-forget: don't block the switch on query refetching.
+      // Queries refetch in background; components show stale-then-fresh data.
+      void queryClient.invalidateQueries();
     },
     [client, queryClient]
   );

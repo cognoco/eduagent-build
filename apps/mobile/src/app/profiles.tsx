@@ -15,8 +15,14 @@ export default function ProfilesScreen() {
   const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
 
   const handleSwitch = async (profileId: string) => {
-    await switchProfile(profileId);
+    // Close modal FIRST — prevents crash from tree remount (themeKey change)
+    // destroying the navigation state while the modal is still open.
     router.back();
+    try {
+      await switchProfile(profileId);
+    } catch {
+      // Profile switch failed — user is already back on previous screen
+    }
   };
 
   return (

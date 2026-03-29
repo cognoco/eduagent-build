@@ -104,7 +104,9 @@ function ThemedApp() {
   // When true, system color scheme changes are ignored (Bug #1 fix).
   const userExplicitChoice = useRef(false);
 
-  // Derive persona from active profile's personaType
+  // Derive persona + color scheme from active profile's personaType.
+  // Must set both together — raw setPersona without setColorScheme leaves
+  // the parent persona stuck in dark mode (themeKey mismatch).
   useEffect(() => {
     if (activeProfile) {
       const candidate = activeProfile.personaType.toLowerCase();
@@ -114,6 +116,7 @@ function ThemedApp() {
         candidate === 'parent'
       ) {
         setPersona(candidate);
+        setColorScheme(schemeForPersona(candidate as Persona));
       }
     }
   }, [activeProfile]);

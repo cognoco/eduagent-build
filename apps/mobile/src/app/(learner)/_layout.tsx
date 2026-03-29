@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, Redirect } from 'expo-router';
+import { Tabs, Redirect, useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -290,6 +290,43 @@ function PreviewSampleCoaching({
           This is a preview. Full access unlocks after parent approval.
         </Text>
       </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * Gate shown when no profile exists yet (first-time user after sign-up).
+ * Pushes to /create-profile as a modal so router.back() returns here
+ * and the layout re-evaluates the guard with the newly created profile.
+ */
+function CreateProfileGate(): React.ReactElement {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  return (
+    <View
+      className="flex-1 bg-background items-center justify-center px-6"
+      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      testID="create-profile-gate"
+    >
+      <Text className="text-h1 font-bold text-text-primary mb-3 text-center">
+        Welcome!
+      </Text>
+      <Text className="text-body text-text-secondary text-center mb-8">
+        Let's set up your profile so your coach can get to know you.
+      </Text>
+      <Pressable
+        onPress={() => router.push('/create-profile')}
+        className="bg-primary rounded-button py-3.5 px-8 items-center w-full"
+        style={{ minHeight: 48 }}
+        testID="create-profile-cta"
+        accessibilityRole="button"
+        accessibilityLabel="Get started"
+      >
+        <Text className="text-body font-semibold text-text-inverse">
+          Get started
+        </Text>
+      </Pressable>
     </View>
   );
 }
@@ -595,6 +632,9 @@ export default function LearnerLayout() {
 
   // Show nothing while profiles are still loading to avoid flash
   if (isProfileLoading) return null;
+
+  // No profile exists — show gate that pushes to profile creation modal
+  if (!activeProfile) return <CreateProfileGate />;
 
   // Gate: block app access when parental consent is pending (COPPA/GDPR)
   if (
