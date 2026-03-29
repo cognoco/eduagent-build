@@ -164,14 +164,31 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
   }, [done, reduceMotion]);
 
   // --- Animated props for SVG elements ---
+  // Android SVG fix: animating only `r` via useAnimatedProps can fail to trigger
+  // native re-renders when starting from r=0. Bundling `opacity` alongside `r`
+  // forces the native view update, matching how the dots (which already work) are
+  // structured. Without this, student/mentor/path stay invisible on Android APKs.
   const pathProps = useAnimatedProps(() => ({
     strokeDashoffset: PATH_LEN * (1 - pathDraw.value),
+    opacity: Math.min(pathDraw.value * 10, 1),
   }));
 
-  const studentOutProps = useAnimatedProps(() => ({ r: studentR.value }));
-  const studentInProps = useAnimatedProps(() => ({ r: studentInR.value }));
-  const mentorOutProps = useAnimatedProps(() => ({ r: mentorR.value }));
-  const mentorInProps = useAnimatedProps(() => ({ r: mentorInR.value }));
+  const studentOutProps = useAnimatedProps(() => ({
+    r: studentR.value,
+    opacity: Math.min(studentR.value / 2, 1),
+  }));
+  const studentInProps = useAnimatedProps(() => ({
+    r: studentInR.value,
+    opacity: Math.min(studentInR.value / 1, 1),
+  }));
+  const mentorOutProps = useAnimatedProps(() => ({
+    r: mentorR.value,
+    opacity: Math.min(mentorR.value / 2, 1),
+  }));
+  const mentorInProps = useAnimatedProps(() => ({
+    r: mentorInR.value,
+    opacity: Math.min(mentorInR.value / 1, 1),
+  }));
   const ringProps = useAnimatedProps(() => ({ opacity: ringOp.value }));
 
   const dot1Props = useAnimatedProps(() => ({
