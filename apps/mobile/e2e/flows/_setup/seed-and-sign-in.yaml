@@ -39,9 +39,13 @@ appId: com.mentomate.app
 # seed-and-run.sh should have already navigated past the dev-client launcher
 # and "Continue" overlay via ADB. Allow extra time in case bundle loading is
 # still finishing or the app needs to settle.
+# NOTE: Use sign-in-button testID (not heading text) — the heading changes
+# between "Welcome back" (returning) and "Welcome to MentoMate" (first-time)
+# depending on SecureStore state. pm clear wipes SecureStore, so after seed
+# the user is always first-time. testID is stable across both states.
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 120000
 
 # Visual audit: sign-in screen baseline (layout, SSO buttons, form fields)

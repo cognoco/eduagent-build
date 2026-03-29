@@ -114,7 +114,7 @@ tags:
 # ──────────────────────────────────────────────────
 # 7. Preview phase
 #    After capture the preview screen shows "Photo captured" text
-#    with retake-button and use-photo-button.
+#    with retake-button and camera-use-this-button.
 # ──────────────────────────────────────────────────
 - extendedWaitUntil:
     visible:
@@ -129,14 +129,14 @@ tags:
     optional: true
 
 - assertVisible:
-    id: "use-photo-button"
+    id: "camera-use-this-button"
     optional: true
 
 # ──────────────────────────────────────────────────
 # 8. Confirm photo — tap "Use this" to start OCR processing
 # ──────────────────────────────────────────────────
 - tapOn:
-    id: "use-photo-button"
+    id: "camera-use-this-button"
     optional: true
 
 # ──────────────────────────────────────────────────

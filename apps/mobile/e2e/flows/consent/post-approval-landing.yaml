@@ -27,7 +27,7 @@ tags:
 #    bundle loading, and "Continue" overlay dismissal.
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 120000
 
 # 2. Sign in with seeded credentials (from seed-and-run.sh env vars)

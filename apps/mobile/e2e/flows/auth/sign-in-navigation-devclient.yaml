@@ -10,10 +10,10 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 10000
 
-- assertVisible: "Sign in to continue learning"
+- assertVisible: "Sign in to start learning"
 - assertVisible:
     id: "google-sso-button"
 - assertVisible:
@@ -58,7 +58,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 10000
 
 - assertVisible:
@@ -93,7 +93,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 10000
 
 - assertVisible:

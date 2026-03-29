@@ -64,9 +64,9 @@ e2e/
    - tapOn:
        id: "sign-in-button"
    ```
-3. Use text selectors as a fallback:
+3. Use text selectors as a fallback (but prefer `id:` for screen detection):
    ```yaml
-   - assertVisible: "Welcome back"
+   - assertVisible: "Sign in to start learning"
    ```
 4. Tag flows for filtering:
    ```yaml

@@ -54,10 +54,30 @@ tags:
 - pressKey: Enter
 
 # 9. AI responds (chat input re-enabled after streaming)
+# M06 regression: 15s timeout catches Gemini hangs (FIX-01: no AbortSignal).
+# Bumped to 30s to match core-learning — first AI response can be slow
+# because the session is freshly created (cold start latency).
 - extendedWaitUntil:
     visible:
       id: "chat-input"
-    timeout: 15000
+    timeout: 30000
+
+# ── M06 guard: verify AI responded, not just input re-enabled ────────
+# Verify user message rendered (catches input-accepted-but-not-displayed bugs)
+- scrollUntilVisible:
+    element:
+      text: "I want to learn the basics"
+    direction: DOWN
+    timeout: 5000
+
+# Verify no error state appeared instead of an AI response
+- assertNotVisible: "Something went wrong"
+- assertNotVisible: "try again"
+- assertNotVisible: "offline"
+
+# Verify chat-messages area has content (AI must have responded)
+- assertVisible:
+    id: "chat-messages"
 
 # 10. Screenshot
 - takeScreenshot: first-session-started

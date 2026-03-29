@@ -1,0 +1,48 @@
+# Flow: M02 — Welcome Text: First-Time vs Returning User
+# Validates: sign-in screen shows "Welcome to MentoMate" (not "Welcome back")
+# for first-time users with clean SecureStore.
+# Tags: smoke, auth, regression
+#
+# Bug: M02 — "Welcome back" was hardcoded for all users. The fix made the heading
+# conditional on SecureStore key `hasSignedInBefore`. This test guards the
+# first-time path which is what new users see after app install.
+#
+# After pm clear (which every E2E test does), SecureStore is empty →
+# isReturningUser = false → heading = "Welcome to MentoMate".
+#
+# Source: apps/mobile/src/app/(auth)/sign-in.tsx lines 46-58, 161-167
+appId: com.mentomate.app
+tags:
+  - smoke
+  - auth
+  - regression
+---
+# 1. Launch from clean state via dev-client setup
+- runFlow: ../_setup/launch-devclient.yaml
+
+# ── M02 regression: First-time user welcome text ─────────────────────
+# After clearState, SecureStore has no `hasSignedInBefore` key.
+# The sign-in screen MUST show first-time copy, not returning-user copy.
+
+# 2. Verify first-time heading is shown
+- assertVisible: "Welcome to MentoMate"
+
+# 3. Verify first-time subtitle is shown
+- assertVisible: "Sign in to start learning"
+
+# 4. Negative assertions: returning-user text must NOT appear
+- assertNotVisible: "Welcome back"
+- assertNotVisible: "Sign in to continue learning"
+
+# 5. Verify the rest of the sign-in screen is intact (form fields, SSO, links)
+- assertVisible:
+    id: "google-sso-button"
+- assertVisible:
+    id: "sign-in-email"
+- assertVisible:
+    id: "sign-in-password"
+- assertVisible:
+    id: "sign-in-button"
+- assertVisible: "Sign up"
+
+- takeScreenshot: m02-first-time-welcome-text

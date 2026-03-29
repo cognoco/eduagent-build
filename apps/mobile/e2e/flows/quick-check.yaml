@@ -5,8 +5,9 @@ tags:
   - quick
 ---
 # Verify key sign-in elements are present
-- assertVisible: "Welcome back"
-- assertVisible: "Sign in to continue learning"
+- assertVisible:
+    id: "sign-in-button"
+- assertVisible: "Sign in to start learning"
 - assertVisible:
     id: "google-sso-button"
 - assertVisible:

@@ -246,7 +246,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 15000
 
 - takeScreenshot: nav-signed-out

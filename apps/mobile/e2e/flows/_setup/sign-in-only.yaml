@@ -9,10 +9,10 @@
 # the sign-in screen.
 appId: com.mentomate.app
 ---
-# 1. Wait for sign-in screen
+# 1. Wait for sign-in screen (testID stable across first-time / returning user)
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 120000
 
 # 2. Enter email

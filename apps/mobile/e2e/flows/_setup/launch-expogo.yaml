@@ -22,7 +22,8 @@ appId: host.exp.exponent
     point: "70%,25%"
 
 # Wait for sign-in screen (auth gate).
+# Use testID — heading varies: "Welcome to MentoMate" (first-time) vs "Welcome back" (returning).
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 60000

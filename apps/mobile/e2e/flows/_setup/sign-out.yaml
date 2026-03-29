@@ -25,8 +25,10 @@ appId: com.mentomate.app
 - tapOn:
     id: "sign-out-button"
 
-# Confirm sign-out by waiting for the auth gate
+# Confirm sign-out by waiting for the auth gate.
+# After sign-out the user has signed in before (SecureStore persists), so heading
+# is "Welcome back". But use testID for resilience.
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 10000

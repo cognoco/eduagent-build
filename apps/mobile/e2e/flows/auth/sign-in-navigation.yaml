@@ -19,7 +19,7 @@ tags:
 # ── Sign-in screen ──────────────────────────────────────────────────
 
 # 3. Verify all sign-in screen elements
-- assertVisible: "Sign in to continue learning"
+- assertVisible: "Sign in to start learning"
 - assertVisible:
     id: "google-sso-button"
 - assertVisible:
@@ -40,7 +40,7 @@ tags:
     id: "sign-in-email"
 - takeScreenshot: auth-nav-sign-in-keyboard
 - tapOn:
-    text: "Welcome back"
+    id: "sign-in-button"
 
 # ── Navigate to sign-up ─────────────────────────────────────────────
 
@@ -75,7 +75,7 @@ tags:
 # 7. Verify back on sign-in screen
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 5000
 
 - assertVisible:
@@ -114,7 +114,7 @@ tags:
 # 11. Verify back on sign-in screen
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 5000
 
 - assertVisible:

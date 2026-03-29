@@ -8,7 +8,7 @@ tags:
 - runFlow: _setup/launch-expogo.yaml
 
 # Verify key sign-in elements are present
-- assertVisible: "Sign in to continue learning"
+- assertVisible: "Sign in to start learning"
 - assertVisible:
     id: "google-sso-button"
 - assertVisible:

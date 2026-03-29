@@ -40,7 +40,7 @@ tags:
 # Verify the app launches (minimal smoke to keep the flow valid YAML)
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 120000
 
 - takeScreenshot: consent-deny-confirmation-placeholder

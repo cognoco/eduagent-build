@@ -27,7 +27,7 @@ tags:
 # 1. Wait for sign-in screen
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 120000
 
 # 2. Sign in with seeded credentials
