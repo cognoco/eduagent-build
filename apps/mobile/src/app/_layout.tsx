@@ -194,7 +194,7 @@ function ThemedApp() {
 /** Inner component that reads ThemeContext to inject CSS variables via vars() */
 function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
   const tokenVars = useTokenVars();
-  const { persona, accentPresetId } = useTheme();
+  const { persona } = useTheme();
   const { isOffline } = useNetworkStatus();
   const reduceMotion = useReducedMotion();
   const opacity = useSharedValue(1);
