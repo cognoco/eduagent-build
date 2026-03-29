@@ -45,8 +45,12 @@ export function ProfileSwitcher({
 
   return (
     <View
-      // On web, zIndex alone works. On native, we need elevation for Android.
-      style={Platform.OS === 'web' ? { zIndex: 50 } : undefined}
+      // On web, zIndex alone works. On Android, elevation is needed for z-ordering.
+      style={Platform.select({
+        web: { zIndex: 50 },
+        android: { zIndex: 50, elevation: 10 },
+        default: { zIndex: 50 },
+      })}
     >
       <Pressable
         onPress={() => setIsOpen((prev) => !prev)}

@@ -196,7 +196,14 @@ export default function SignUpScreen() {
             Verify your email
           </Text>
           <Text className="text-body-sm text-text-secondary mb-6">
-            We sent a verification code to {emailAddress}
+            We sent a verification code to{' '}
+            <Text
+              className="text-body-sm text-text-secondary font-semibold"
+              numberOfLines={1}
+              ellipsizeMode="middle"
+            >
+              {emailAddress}
+            </Text>
           </Text>
 
           {error !== '' && (

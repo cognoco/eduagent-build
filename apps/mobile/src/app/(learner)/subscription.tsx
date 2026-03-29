@@ -476,6 +476,16 @@ export default function SubscriptionScreen() {
   const [topUpPurchasing, setTopUpPurchasing] = useState(false);
   const [topUpPolling, setTopUpPolling] = useState(false);
 
+  // Track mount state so the top-up polling loop can bail out if the user
+  // navigates away mid-poll (prevents setState-on-unmounted warnings and
+  // unnecessary query invalidations).
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   // RevenueCat hooks
   const { data: offerings, isLoading: offeringsLoading } = useOfferings();
   const { data: customerInfo, isLoading: customerInfoLoading } =
@@ -593,6 +603,7 @@ export default function SubscriptionScreen() {
     }
 
     // Purchase succeeded on store side — now poll API for webhook confirmation
+    if (!mountedRef.current) return;
     setTopUpPurchasing(false);
     setTopUpPolling(true);
 
@@ -602,10 +613,13 @@ export default function SubscriptionScreen() {
     let confirmed = false;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (!mountedRef.current) break;
       await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      if (!mountedRef.current) break;
       await queryClient.invalidateQueries({ queryKey: ['usage'] });
       // Brief wait for the query to refetch
       await new Promise((resolve) => setTimeout(resolve, 500));
+      if (!mountedRef.current) break;
       const freshUsage = queryClient.getQueryData<{
         topUpCreditsRemaining: number;
       }>(['usage', activeProfile?.id]);
@@ -615,6 +629,7 @@ export default function SubscriptionScreen() {
       }
     }
 
+    if (!mountedRef.current) return;
     setTopUpPolling(false);
 
     if (confirmed) {

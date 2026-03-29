@@ -149,7 +149,15 @@ export default function ForgotPasswordScreen() {
             Reset password
           </Text>
           <Text className="text-body-sm text-text-secondary mb-6">
-            Enter the code sent to {emailAddress} and your new password
+            Enter the code sent to{' '}
+            <Text
+              className="text-body-sm text-text-secondary font-semibold"
+              numberOfLines={1}
+              ellipsizeMode="middle"
+            >
+              {emailAddress}
+            </Text>{' '}
+            and your new password
           </Text>
 
           {error !== '' && (
