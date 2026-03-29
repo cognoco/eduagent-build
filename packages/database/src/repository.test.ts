@@ -103,7 +103,7 @@ describe('createScopedRepository', () => {
           string,
           { findMany: (w?: unknown) => Promise<unknown[]> }
         >
-      )[namespace].findMany();
+      )[namespace]!.findMany();
 
       expect(findMany).toHaveBeenCalledWith({
         where: eq(table.profileId, TEST_PROFILE_ID),
@@ -140,7 +140,7 @@ describe('createScopedRepository', () => {
           string,
           { findMany: (w?: unknown) => Promise<unknown[]> }
         >
-      )[namespace].findMany(extraCondition);
+      )[namespace]!.findMany(extraCondition);
 
       expect(findMany).toHaveBeenCalledWith({
         where: and(eq(table.profileId, TEST_PROFILE_ID), extraCondition),
@@ -177,7 +177,7 @@ describe('createScopedRepository', () => {
           string,
           { findFirst: (w?: unknown) => Promise<unknown> }
         >
-      )[namespace].findFirst();
+      )[namespace]!.findFirst();
 
       expect(findFirst).toHaveBeenCalledWith({
         where: eq(table.profileId, TEST_PROFILE_ID),
@@ -194,7 +194,7 @@ describe('createScopedRepository', () => {
           string,
           { findFirst: (w?: unknown) => Promise<unknown> }
         >
-      )[namespace].findFirst(extraCondition);
+      )[namespace]!.findFirst(extraCondition);
 
       expect(findFirst).toHaveBeenCalledWith({
         where: and(eq(table.profileId, TEST_PROFILE_ID), extraCondition),
