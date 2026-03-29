@@ -28,14 +28,14 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
         entry ? (focused ? entry.focused : entry.default) : 'ellipse-outline'
       }
       size={22}
-      color={focused ? colors.accent : colors.muted}
+      color={focused ? colors.accent : colors.textSecondary}
     />
   );
 }
 
 export default function ParentLayout() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { persona } = useTheme();
+  const { persona, colorScheme, accentPresetId } = useTheme();
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
@@ -50,8 +50,15 @@ export default function ParentLayout() {
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
   if (persona !== 'parent') return <Redirect href="/(learner)/home" />;
 
+  // Force NativeWind to remount the CSS variable scope when accent changes,
+  // guaranteeing that --color-primary / --color-accent propagate to all
+  // tab screens (Bug #6 — accent color propagation).
+  const themeKey = `theme-${persona}-${colorScheme}-${
+    accentPresetId ?? 'default'
+  }`;
+
   return (
-    <View style={[{ flex: 1 }, tokenVars]}>
+    <View key={themeKey} style={[{ flex: 1 }, tokenVars]}>
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -62,7 +69,7 @@ export default function ParentLayout() {
             paddingBottom: Math.max(insets.bottom, 24),
           },
           tabBarActiveTintColor: colors.accent,
-          tabBarInactiveTintColor: colors.muted,
+          tabBarInactiveTintColor: colors.textSecondary,
           tabBarLabelStyle: { fontSize: 12 },
         }}
       >

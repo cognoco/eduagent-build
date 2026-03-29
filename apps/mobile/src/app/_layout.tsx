@@ -63,15 +63,32 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 5 * 60_000,
       retry: 2,
-      // Story 10.16: queries pause when offline instead of failing immediately.
-      // Mutations keep networkMode 'always' (default) so they fail immediately
-      // with a user-visible error rather than silently queuing.
-      networkMode: 'online',
+      // Bug #7 fix: changed from 'online' to 'always'. The 'online' mode
+      // pauses queries when the device is deemed offline, which causes
+      // infinite skeleton loading when the API is unreachable but the device
+      // has a network connection. With 'always', queries run immediately and
+      // fail with a proper error that the UI can handle with retry buttons.
+      // The OfflineBanner (from useNetworkStatus) still shows when offline.
+      networkMode: 'always',
     },
   },
 });
 
 const ACCENT_STORE_PREFIX = 'accentPreset_';
+
+/** Map persona to its designed color scheme */
+function schemeForPersona(p: Persona): ColorScheme {
+  switch (p) {
+    case 'teen':
+      return 'dark';
+    case 'learner':
+      return 'dark';
+    case 'parent':
+      return 'light';
+    default:
+      return 'dark';
+  }
+}
 
 function ThemedApp() {
   const { activeProfile } = useProfile();
@@ -83,6 +100,9 @@ function ThemedApp() {
   const [accentPresetId, setAccentPresetIdState] = useState<string | null>(
     null
   );
+  // Track whether the user has explicitly selected a persona/scheme.
+  // When true, system color scheme changes are ignored (Bug #1 fix).
+  const userExplicitChoice = useRef(false);
 
   // Derive persona from active profile's personaType
   useEffect(() => {
@@ -98,9 +118,11 @@ function ThemedApp() {
     }
   }, [activeProfile]);
 
-  // Sync system color scheme changes
+  // Sync system color scheme changes ONLY when user hasn't explicitly chosen.
+  // Bug #1: Previously this unconditionally overrode the scheme, causing
+  // "Parent (Light)" to render as dark when the system was in dark mode.
   useEffect(() => {
-    if (systemColorScheme) {
+    if (systemColorScheme && !userExplicitChoice.current) {
       setColorScheme(systemColorScheme as ColorScheme);
     }
   }, [systemColorScheme]);
@@ -133,16 +155,30 @@ function ThemedApp() {
     [activeProfile?.id]
   );
 
+  // Wrap setPersona to also update the color scheme to the persona's
+  // designed default and mark that the user made an explicit choice.
+  const setPersonaWithScheme = useCallback((p: Persona) => {
+    userExplicitChoice.current = true;
+    setPersona(p);
+    setColorScheme(schemeForPersona(p));
+  }, []);
+
   const themeValue = useMemo(
     () => ({
       persona,
-      setPersona,
+      setPersona: setPersonaWithScheme,
       colorScheme,
       setColorScheme,
       accentPresetId,
       setAccentPresetId,
     }),
-    [persona, colorScheme, accentPresetId, setAccentPresetId]
+    [
+      persona,
+      setPersonaWithScheme,
+      colorScheme,
+      accentPresetId,
+      setAccentPresetId,
+    ]
   );
 
   return (
@@ -155,7 +191,7 @@ function ThemedApp() {
 /** Inner component that reads ThemeContext to inject CSS variables via vars() */
 function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
   const tokenVars = useTokenVars();
-  const { persona } = useTheme();
+  const { persona, accentPresetId } = useTheme();
   const { isOffline } = useNetworkStatus();
   const reduceMotion = useReducedMotion();
   const opacity = useSharedValue(1);
@@ -175,8 +211,17 @@ function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
     flex: 1,
   }));
 
+  // The key forces NativeWind to remount the CSS variable scope when the
+  // accent/persona/scheme changes, guaranteeing that vars() values propagate
+  // to all descendant components.  Without this, NativeWind's internal
+  // observable caching can leave stale --color-primary / --color-accent
+  // values in inactive tab screens (Bug #6 — accent color propagation).
+  const themeKey = `theme-${persona}-${colorScheme}-${
+    accentPresetId ?? 'default'
+  }`;
+
   return (
-    <View style={[{ flex: 1 }, tokenVars]}>
+    <View key={themeKey} style={[{ flex: 1 }, tokenVars]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       {isOffline && <OfflineBanner />}
       <Animated.View style={fadeStyle}>
@@ -281,11 +326,17 @@ export default function RootLayout() {
 
   const dismissSplash = useCallback(() => setShowSplash(false), []);
 
-  // Safety timeout: force-dismiss splash after 4s if animation callback never fires
+  // Safety timeout: force-dismiss splash after 3.5s if animation callback never fires.
+  // Bug #9 fix: reduced from 4s → 3.5s primary, plus a hard 5s failsafe that
+  // always fires regardless of React lifecycle / Reanimated callback issues.
   useEffect(() => {
     if (!showSplash) return;
-    const timer = setTimeout(dismissSplash, 4000);
-    return () => clearTimeout(timer);
+    const primary = setTimeout(dismissSplash, 3500);
+    const failsafe = setTimeout(() => setShowSplash(false), 5000);
+    return () => {
+      clearTimeout(primary);
+      clearTimeout(failsafe);
+    };
   }, [showSplash, dismissSplash]);
 
   useEffect(() => {
