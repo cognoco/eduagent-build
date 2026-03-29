@@ -66,9 +66,10 @@ export default function ChildDetailScreen() {
   const restoreConsent = useRestoreConsent(profileId);
 
   const isWithdrawn = consentData?.consentStatus === 'WITHDRAWN';
-  const daysRemaining = isWithdrawn
-    ? getGracePeriodDaysRemaining(consentData.respondedAt)
-    : 0;
+  const daysRemaining =
+    isWithdrawn && consentData
+      ? getGracePeriodDaysRemaining(consentData.respondedAt)
+      : 0;
 
   const handleWithdrawConsent = useCallback(() => {
     const childName = child?.displayName ?? 'this child';
