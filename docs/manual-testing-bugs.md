@@ -28,6 +28,8 @@ Device: Physical Android phone
 
 **Files:** `apps/mobile/src/components/AnimatedSplash.tsx`, `apps/mobile/src/app/_layout.tsx`
 
+**E2E coverage:** `edge/animated-splash.yaml` exists but is BLOCKED in dev-client builds (BUG-69 — splash completes behind Expo overlay). Requires production APK to test.
+
 ---
 
 ## BUG-M02: "Welcome back" shown to first-time users
@@ -49,6 +51,8 @@ Device: Physical Android phone
 - Flag set after successful sign-in (both email/password and SSO paths)
 
 **File:** `apps/mobile/src/app/(auth)/sign-in.tsx`
+
+**E2E coverage:** NEW — `auth/welcome-text-first-time.yaml` verifies first-time users see "Welcome to MentoMate" (not "Welcome back"). All 32 flows updated from `text: "Welcome back"` to `id: "sign-in-button"` for stable screen detection.
 
 ---
 
@@ -88,6 +92,8 @@ Device: Physical Android phone
 
 **File:** `apps/mobile/src/app/(learner)/homework/camera.tsx`
 
+**E2E coverage:** `homework/camera-ocr.yaml` tests UI flow but all steps after permission are `optional: true` (emulator has no camera). Real device testing required.
+
 ---
 
 ## BUG-M05: Bottom navigation bar hidden behind system buttons
@@ -109,6 +115,8 @@ Device: Physical Android phone
 - Tab content area stays 56px; the area below extends to cover the system navigation zone with the surface background color.
 
 **Files:** `apps/mobile/src/app/(learner)/_layout.tsx`, `apps/mobile/src/app/(parent)/_layout.tsx`
+
+**E2E coverage:** STRENGTHENED — `core-learning.yaml` now taps each tab (not just `assertVisible`) before and after sessions. Tap + navigation verify catches tabs rendered behind system buttons.
 
 ---
 
@@ -133,6 +141,8 @@ Device: Physical Android phone
 
 **Files:** `apps/api/src/services/llm/router.ts`, `apps/api/src/services/llm/providers/openai.ts`, and related test files
 
+**E2E coverage:** STRENGTHENED — `core-learning.yaml` and `first-session.yaml` now assert `assertNotVisible: "Something went wrong"`, `"try again"`, `"offline"` after each AI exchange. 30s timeout catches Gemini hangs.
+
 ---
 
 ## BUG-M07: Home screen completely empty — no content loads
@@ -148,6 +158,8 @@ Device: Physical Android phone
 **If still broken after M06 deploy:** Investigate the subjects query and the redirect logic at `home.tsx:77-89` (new user with 0 subjects should redirect to create-subject).
 
 **File:** `apps/mobile/src/app/(learner)/home.tsx`
+
+**E2E coverage:** STRENGTHENED — `core-learning.yaml` now verifies "Your subjects" section heading and `assertNotVisible` for empty state text. Catches blank home where only header renders.
 
 ---
 
