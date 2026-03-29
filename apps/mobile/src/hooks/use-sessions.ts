@@ -10,6 +10,7 @@ import { useAuth } from '@clerk/clerk-expo';
 import type { LearningSession, SessionSummary } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
+import { combinedSignal } from '../lib/query-timeout';
 import { getApiUrl } from '../lib/api';
 import { streamSSEViaXHR } from '../lib/sse';
 
@@ -200,12 +201,18 @@ export function useSessionSummary(
 
   return useQuery({
     queryKey: ['session-summary', sessionId, activeProfile?.id],
-    queryFn: async () => {
-      const res = await client.sessions[':sessionId'].summary.$get({
-        param: { sessionId },
-      });
-      const data = await res.json();
-      return data.summary;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.sessions[':sessionId'].summary.$get({
+          param: { sessionId },
+          init: { signal },
+        } as never);
+        const data = await res.json();
+        return data.summary;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile && !!sessionId,
   });

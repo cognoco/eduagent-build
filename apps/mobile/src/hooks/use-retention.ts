@@ -7,6 +7,7 @@ import {
 import type { RetentionCardResponse } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
+import { combinedSignal } from '../lib/query-timeout';
 
 // ---------------------------------------------------------------------------
 // Recall test + relearn response types (mirror API route wrappers)
@@ -37,11 +38,17 @@ export function useRetentionTopics(subjectId: string) {
 
   return useQuery({
     queryKey: ['retention', 'subject', subjectId, activeProfile?.id],
-    queryFn: async () => {
-      const res = await client.subjects[':subjectId'].retention.$get({
-        param: { subjectId },
-      });
-      return await res.json();
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.subjects[':subjectId'].retention.$get({
+          param: { subjectId },
+          init: { signal },
+        } as never);
+        return await res.json();
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile && !!subjectId,
   });
@@ -55,12 +62,20 @@ export function useTopicRetention(
 
   return useQuery({
     queryKey: ['retention', 'topic', topicId, activeProfile?.id],
-    queryFn: async () => {
-      const res = await client.topics[':topicId'].retention.$get({
-        param: { topicId },
-      });
-      const data = (await res.json()) as { card: RetentionCardResponse | null };
-      return data.card;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.topics[':topicId'].retention.$get({
+          param: { topicId },
+          init: { signal },
+        } as never);
+        const data = (await res.json()) as {
+          card: RetentionCardResponse | null;
+        };
+        return data.card;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile && !!topicId,
   });

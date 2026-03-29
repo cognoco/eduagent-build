@@ -7,6 +7,7 @@ import {
 import type { Assessment, AssessmentEvaluation } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
+import { combinedSignal } from '../lib/query-timeout';
 
 export function useAssessment(
   assessmentId: string
@@ -16,12 +17,18 @@ export function useAssessment(
 
   return useQuery({
     queryKey: ['assessment', assessmentId, activeProfile?.id],
-    queryFn: async () => {
-      const res = await client.assessments[':assessmentId'].$get({
-        param: { assessmentId },
-      });
-      const data = (await res.json()) as { assessment: Assessment };
-      return data.assessment;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.assessments[':assessmentId'].$get({
+          param: { assessmentId },
+          init: { signal },
+        } as never);
+        const data = (await res.json()) as { assessment: Assessment };
+        return data.assessment;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile && !!assessmentId,
   });

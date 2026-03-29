@@ -23,6 +23,7 @@ import {
 } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import { getRevenueCatApiKey } from '../lib/revenuecat';
+import { combinedSignal } from '../lib/query-timeout';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,10 +95,20 @@ export function useRevenueCatIdentity(): void {
 export function useOfferings(): UseQueryResult<PurchasesOfferings | null> {
   return useQuery({
     queryKey: ['revenuecat', 'offerings'],
-    queryFn: async (): Promise<PurchasesOfferings | null> => {
-      if (!isRevenueCatAvailable()) return null;
-      const offerings = await Purchases.getOfferings();
-      return offerings;
+    queryFn: async ({
+      signal: querySignal,
+    }): Promise<PurchasesOfferings | null> => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        if (!isRevenueCatAvailable()) return null;
+        // RevenueCat SDK doesn't accept AbortSignal, but we check after
+        // the call returns so the query fails fast on timeout.
+        const offerings = await Purchases.getOfferings();
+        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+        return offerings;
+      } finally {
+        cleanup();
+      }
     },
     staleTime: 5 * 60_000, // 5 minutes — offerings don't change often
   });
@@ -116,10 +127,16 @@ export function useOfferings(): UseQueryResult<PurchasesOfferings | null> {
 export function useCustomerInfo(): UseQueryResult<CustomerInfo | null> {
   return useQuery({
     queryKey: ['revenuecat', 'customerInfo'],
-    queryFn: async (): Promise<CustomerInfo | null> => {
-      if (!isRevenueCatAvailable()) return null;
-      const info = await Purchases.getCustomerInfo();
-      return info;
+    queryFn: async ({ signal: querySignal }): Promise<CustomerInfo | null> => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        if (!isRevenueCatAvailable()) return null;
+        const info = await Purchases.getCustomerInfo();
+        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+        return info;
+      } finally {
+        cleanup();
+      }
     },
     staleTime: 60_000, // 1 minute — re-check entitlements periodically
   });

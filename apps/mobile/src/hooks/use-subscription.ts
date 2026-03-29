@@ -17,6 +17,7 @@ import type {
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
+import { combinedSignal } from '../lib/query-timeout';
 
 // ---------------------------------------------------------------------------
 // Types — prefer imports from @eduagent/schemas; local only for API-specific shapes
@@ -52,10 +53,17 @@ export function useSubscription(): UseQueryResult<SubscriptionData> {
 
   return useQuery({
     queryKey: ['subscription', activeProfile?.id],
-    queryFn: async () => {
-      const res = await client.subscription.$get();
-      const data = await res.json();
-      return data.subscription;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.subscription.$get({
+          init: { signal },
+        } as never);
+        const data = await res.json();
+        return data.subscription;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile,
   });
@@ -67,10 +75,17 @@ export function useUsage(): UseQueryResult<UsageData> {
 
   return useQuery({
     queryKey: ['usage', activeProfile?.id],
-    queryFn: async () => {
-      const res = await client.usage.$get();
-      const data = await res.json();
-      return data.usage;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.usage.$get({
+          init: { signal },
+        } as never);
+        const data = await res.json();
+        return data.usage;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile,
   });
@@ -90,10 +105,17 @@ export function useSubscriptionStatus(): UseQueryResult<SubscriptionStatusData> 
 
   return useQuery({
     queryKey: ['subscription-status', activeProfile?.id],
-    queryFn: async () => {
-      const res = await client.subscription.status.$get();
-      const data = await res.json();
-      return data.status;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.subscription.status.$get({
+          init: { signal },
+        } as never);
+        const data = await res.json();
+        return data.status;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile,
     staleTime: 60_000, // 1 min — fast endpoint, no need for aggressive refetching

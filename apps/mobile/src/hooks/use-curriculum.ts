@@ -8,6 +8,7 @@ import {
 import type { Curriculum } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
+import { combinedSignal } from '../lib/query-timeout';
 
 export function useCurriculum(
   subjectId: string
@@ -17,12 +18,18 @@ export function useCurriculum(
 
   return useQuery({
     queryKey: ['curriculum', subjectId, activeProfile?.id],
-    queryFn: async () => {
-      const res = await client.subjects[':subjectId'].curriculum.$get({
-        param: { subjectId },
-      });
-      const data = (await res.json()) as { curriculum: Curriculum | null };
-      return data.curriculum;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.subjects[':subjectId'].curriculum.$get({
+          param: { subjectId },
+          init: { signal },
+        } as never);
+        const data = (await res.json()) as { curriculum: Curriculum | null };
+        return data.curriculum;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile && !!subjectId,
   });

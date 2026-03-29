@@ -8,6 +8,7 @@ import {
 import type { InterviewState } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
+import { combinedSignal } from '../lib/query-timeout';
 
 // InterviewResponse is API-route-specific (includes exchangeCount, not extractedSignals)
 interface InterviewResponse {
@@ -24,12 +25,18 @@ export function useInterviewState(
 
   return useQuery({
     queryKey: ['interview', subjectId, activeProfile?.id],
-    queryFn: async () => {
-      const res = await client.subjects[':subjectId'].interview.$get({
-        param: { subjectId },
-      });
-      const data = await res.json();
-      return data.state;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.subjects[':subjectId'].interview.$get({
+          param: { subjectId },
+          init: { signal },
+        } as never);
+        const data = await res.json();
+        return data.state;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile && !!subjectId,
   });
