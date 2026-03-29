@@ -50,6 +50,7 @@ export default function CameraScreen(): React.ReactNode {
   } | null>(null);
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
   const classifyTriggeredRef = useRef(false);
+  const [manualSubjectName, setManualSubjectName] = useState('');
 
   // Reset state when screen regains focus (prevents stale state loop)
   useFocusEffect(
@@ -57,6 +58,7 @@ export default function CameraScreen(): React.ReactNode {
       dispatch({ type: 'RESET', hasPermission: permission?.granted ?? false });
       setEditedText('');
       setManualText('');
+      setManualSubjectName('');
       setShowCelebration(true);
       setFlash('off');
       setAutoDetectedSubject(null);
@@ -180,6 +182,18 @@ export default function CameraScreen(): React.ReactNode {
     },
     [navigateToSession, editedText, state.imageUri]
   );
+
+  const handleManualSubjectContinue = useCallback(() => {
+    if (!manualSubjectName.trim()) return;
+    // Use the typed subject name directly — the session screen / API
+    // will handle creating a new subject if it does not exist yet.
+    navigateToSession(
+      'new', // sentinel value — session start will create subject
+      manualSubjectName.trim(),
+      editedText,
+      state.imageUri ?? undefined
+    );
+  }, [navigateToSession, manualSubjectName, editedText, state.imageUri]);
 
   const handleManualContinue = useCallback(async () => {
     if (subjectId) {
@@ -376,15 +390,13 @@ export default function CameraScreen(): React.ReactNode {
             </Text>
           </Pressable>
           <Pressable
-            testID="use-photo-button"
+            testID="camera-use-this-button"
             onPress={handleConfirmPhoto}
-            className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
+            className="flex-1 bg-accent rounded-button py-4 min-h-[48px] items-center justify-center border border-accent"
             accessibilityLabel="Use this photo"
             accessibilityRole="button"
           >
-            <Text className="text-body font-semibold text-text-inverse">
-              Use this
-            </Text>
+            <Text className="text-body font-bold text-white">Use this</Text>
           </Pressable>
         </View>
       </View>
@@ -426,13 +438,16 @@ export default function CameraScreen(): React.ReactNode {
         testID="result-scroll"
       >
         <Pressable
-          testID="back-button"
+          testID="camera-back-button"
           onPress={handleClose}
-          className="self-start min-h-[48px] items-center justify-center mt-2"
+          className="self-start flex-row items-center min-h-[48px] mt-2 px-2"
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
-          <Text className="text-body font-medium text-primary">← Back</Text>
+          <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
+          <Text className="text-body font-semibold text-text-primary ml-1">
+            Back
+          </Text>
         </Pressable>
 
         {showCelebration && (
@@ -546,6 +561,42 @@ export default function CameraScreen(): React.ReactNode {
                   <Text className="text-body text-text-primary">{s.name}</Text>
                 </Pressable>
               ))}
+
+            {/* Manual subject entry — lets user type a subject name */}
+            <Text className="text-body-sm text-text-secondary mt-4 mb-2">
+              Or type a subject name:
+            </Text>
+            <TextInput
+              testID="camera-subject-input"
+              value={manualSubjectName}
+              onChangeText={setManualSubjectName}
+              placeholder="e.g. Biology, History..."
+              placeholderTextColor={colors.muted}
+              className="bg-surface rounded-button px-4 py-3 text-body text-text-primary min-h-[48px] mb-3 border border-border"
+              accessibilityLabel="Type a subject name"
+              autoCapitalize="words"
+            />
+            <Pressable
+              testID="camera-continue-button"
+              onPress={handleManualSubjectContinue}
+              disabled={!manualSubjectName.trim()}
+              className={`rounded-button py-4 min-h-[48px] items-center justify-center mb-2 ${
+                manualSubjectName.trim() ? 'bg-accent' : 'bg-surface-elevated'
+              }`}
+              accessibilityLabel="Continue with typed subject"
+              accessibilityRole="button"
+            >
+              <Text
+                className={`text-body font-semibold ${
+                  manualSubjectName.trim()
+                    ? 'text-white'
+                    : 'text-text-secondary'
+                }`}
+              >
+                Continue
+              </Text>
+            </Pressable>
+
             <Pressable
               testID="retake-button"
               onPress={handleRetake}

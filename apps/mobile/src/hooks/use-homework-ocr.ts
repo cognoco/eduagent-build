@@ -30,9 +30,9 @@ async function copyToCache(tempUri: string): Promise<string> {
 }
 
 async function resizeImage(uri: string): Promise<string> {
-  const result = await manipulateAsync(uri, [{ resize: { width: 1024 } }], {
+  const result = await manipulateAsync(uri, [{ resize: { width: 1600 } }], {
     format: SaveFormat.JPEG,
-    compress: 0.8,
+    compress: 0.9,
   });
   return result.uri;
 }

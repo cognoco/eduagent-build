@@ -341,7 +341,7 @@ describe('CameraScreen', () => {
 
     await waitFor(() => {
       expect(getByText(/what I see/i)).toBeTruthy();
-      expect(getByTestId('back-button')).toBeTruthy();
+      expect(getByTestId('camera-back-button')).toBeTruthy();
       expect(getByTestId('result-text-input')).toBeTruthy();
     });
   });

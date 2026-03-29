@@ -27,7 +27,7 @@ export function AccentPicker({
 
   return (
     <View testID="accent-picker">
-      <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2">
+      <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
         Accent Color
       </Text>
       <View className="flex-row flex-wrap gap-3">

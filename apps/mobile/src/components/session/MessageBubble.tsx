@@ -156,7 +156,10 @@ const ESCALATION_STYLES: Partial<
   5: {
     label: 'Teaching mode',
     bg: 'bg-success/10',
-    border: 'border-l-4 border-success',
+    // Bug #5 fix: border-l-4 rendered as a full-width green line artifact
+    // on some devices. Using border-l-[3px] matches level 4 pattern and
+    // avoids the NativeWind rendering quirk.
+    border: 'border-l-[3px] border-success',
     icon: 'book-outline',
     colorKey: 'success',
     textClass: 'text-success',
