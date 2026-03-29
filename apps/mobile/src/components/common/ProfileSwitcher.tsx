@@ -2,9 +2,11 @@ import { useState, useCallback, type ReactNode } from 'react';
 import { View, Text, Pressable, Platform } from 'react-native';
 import type { Profile } from '@eduagent/schemas';
 
-const PERSONA_LABELS: Record<string, string> = {
-  TEEN: 'Teen',
-  LEARNER: 'Learner',
+/** User-facing role labels — "Teen" and "Learner" both show as "Student"
+ * to avoid the confusing teen/learner distinction in the UI. */
+const ROLE_LABELS: Record<string, string> = {
+  TEEN: 'Student',
+  LEARNER: 'Student',
   PARENT: 'Parent',
 };
 
@@ -133,7 +135,7 @@ export function ProfileSwitcher({
                   } ${switching ? 'opacity-50' : ''}`}
                   accessibilityRole="menuitem"
                   accessibilityLabel={`${profile.displayName}, ${
-                    PERSONA_LABELS[profile.personaType] ?? profile.personaType
+                    ROLE_LABELS[profile.personaType] ?? profile.personaType
                   }${isActive ? ', active' : ''}`}
                   accessibilityState={{ selected: isActive }}
                   testID={`profile-option-${profile.id}`}
@@ -165,8 +167,7 @@ export function ProfileSwitcher({
                       {profile.displayName}
                     </Text>
                     <Text className="text-caption text-text-secondary">
-                      {PERSONA_LABELS[profile.personaType] ??
-                        profile.personaType}
+                      {ROLE_LABELS[profile.personaType] ?? profile.personaType}
                     </Text>
                   </View>
                   {isActive && (
