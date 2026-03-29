@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import type { Profile } from '@eduagent/schemas';
 
@@ -32,7 +32,7 @@ const profiles: Profile[] = [
 ];
 
 describe('ProfileSwitcher', () => {
-  const onSwitch = jest.fn();
+  const onSwitch = jest.fn().mockResolvedValue(undefined);
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -161,7 +161,7 @@ describe('ProfileSwitcher', () => {
     expect(screen.queryByTestId('profile-switcher-menu')).toBeNull();
   });
 
-  it('closes dropdown after selecting a profile', () => {
+  it('closes dropdown after selecting a profile', async () => {
     render(
       <ProfileSwitcher
         profiles={profiles}
@@ -173,10 +173,14 @@ describe('ProfileSwitcher', () => {
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
     fireEvent.press(screen.getByTestId('profile-option-p2'));
 
+    // handleSelect is async — flush microtasks so setIsOpen(false) commits
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(screen.queryByTestId('profile-switcher-menu')).toBeNull();
   });
 
-  it('shows persona badge for each profile', () => {
+  it('shows role label for each profile', () => {
     render(
       <ProfileSwitcher
         profiles={profiles}
@@ -186,7 +190,8 @@ describe('ProfileSwitcher', () => {
     );
 
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
-    expect(screen.getByText('Learner')).toBeTruthy();
+    // LEARNER displays as "Student", PARENT stays "Parent"
+    expect(screen.getByText('Student')).toBeTruthy();
     expect(screen.getByText('Parent')).toBeTruthy();
   });
 });
