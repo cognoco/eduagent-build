@@ -146,6 +146,7 @@ export function useRegisterPushToken(): UseMutationResult<
       const res = await client.settings['push-token'].$post({
         json: { token },
       });
+      await assertOk(res);
       const data = await res.json();
       return data;
     },
@@ -172,6 +173,7 @@ export function useNotifyParentSubscribe(): UseMutationResult<
   return useMutation({
     mutationFn: async () => {
       const res = await client.settings['notify-parent-subscribe'].$post();
+      await assertOk(res);
       const data = await res.json();
       return data as ParentSubscribeResult;
     },
@@ -199,6 +201,7 @@ export function useAnalogyDomain(
           param: { subjectId },
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = await res.json();
         return data.analogyDomain as AnalogyDomain | null;
       } finally {
@@ -224,6 +227,7 @@ export function useUpdateAnalogyDomain(
         param: { subjectId },
         json: { analogyDomain },
       });
+      await assertOk(res);
       const data = await res.json();
       return data.analogyDomain as AnalogyDomain | null;
     },

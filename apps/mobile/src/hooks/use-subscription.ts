@@ -60,6 +60,7 @@ export function useSubscription(): UseQueryResult<SubscriptionData> {
         const res = await client.subscription.$get({
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = await res.json();
         return data.subscription;
       } finally {
@@ -82,6 +83,7 @@ export function useUsage(): UseQueryResult<UsageData> {
         const res = await client.usage.$get({
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = await res.json();
         return data.usage;
       } finally {
@@ -112,6 +114,7 @@ export function useSubscriptionStatus(): UseQueryResult<SubscriptionStatusData> 
         const res = await client.subscription.status.$get({
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = await res.json();
         return data.status;
       } finally {
@@ -143,6 +146,7 @@ export function useCreateCheckout(): UseMutationResult<
   return useMutation({
     mutationFn: async (input: CheckoutRequest): Promise<CheckoutResponse> => {
       const res = await client.subscription.checkout.$post({ json: input });
+      await assertOk(res);
       return (await res.json()) as CheckoutResponse;
     },
   });
@@ -161,6 +165,7 @@ export function useCancelSubscription(): UseMutationResult<
   return useMutation({
     mutationFn: async (): Promise<CancelResponse> => {
       const res = await client.subscription.cancel.$post({ json: {} });
+      await assertOk(res);
       return (await res.json()) as CancelResponse;
     },
     onSuccess: () => {
@@ -182,6 +187,7 @@ export function useCreatePortalSession(): UseMutationResult<
   return useMutation({
     mutationFn: async (): Promise<PortalResponse> => {
       const res = await client.subscription.portal.$post({ json: {} });
+      await assertOk(res);
       return (await res.json()) as PortalResponse;
     },
   });
@@ -202,6 +208,7 @@ export function usePurchaseTopUp(): UseMutationResult<
       const res = await client.subscription['top-up'].$post({
         json: { amount: 500 },
       });
+      await assertOk(res);
       return (await res.json()) as TopUpResult;
     },
     onSuccess: () => {
@@ -222,6 +229,7 @@ export function useJoinByokWaitlist(): UseMutationResult<
   return useMutation({
     mutationFn: async (input: { email: string }) => {
       const res = await client['byok-waitlist'].$post({ json: input });
+      await assertOk(res);
       return (await res.json()) as ByokWaitlistResult;
     },
   });

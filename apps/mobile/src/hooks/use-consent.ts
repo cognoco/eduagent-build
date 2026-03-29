@@ -26,6 +26,7 @@ export function useRequestConsent(): UseMutationResult<
       input: ConsentRequest
     ): Promise<ConsentRequestResult> => {
       const res = await client.consent.request.$post({ json: input });
+      await assertOk(res);
       return (await res.json()) as ConsentRequestResult;
     },
   });
@@ -54,6 +55,7 @@ export function useConsentStatus(): UseQueryResult<ConsentStatusData> {
         const res = await client.consent['my-status'].$get({
           init: { signal },
         } as never);
+        await assertOk(res);
         return (await res.json()) as ConsentStatusData;
       } finally {
         cleanup();
@@ -111,6 +113,7 @@ export function useChildConsentStatus(
           param: { childProfileId: childProfileId! },
           init: { signal },
         } as never);
+        await assertOk(res);
         return (await res.json()) as ChildConsentData;
       } finally {
         cleanup();
@@ -140,6 +143,7 @@ export function useRevokeConsent(
       const res = await client.consent[':childProfileId'].revoke.$put({
         param: { childProfileId: childProfileId! },
       });
+      await assertOk(res);
       return (await res.json()) as RevokeConsentResult;
     },
     onSuccess: async () => {
@@ -192,6 +196,7 @@ export function useRestoreConsent(
       const res = await client.consent[':childProfileId'].restore.$put({
         param: { childProfileId: childProfileId! },
       });
+      await assertOk(res);
       return (await res.json()) as RestoreConsentResult;
     },
     onSuccess: async () => {
