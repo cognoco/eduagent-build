@@ -19,7 +19,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
+import { ClerkProvider, ClerkLoaded, useClerk } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Animated, {
@@ -36,6 +36,7 @@ import {
 } from '../lib/theme';
 import type { ColorScheme } from '../lib/design-tokens';
 import { ProfileProvider, useProfile } from '../lib/profile';
+import { setOnAuthExpired, clearOnAuthExpired } from '../lib/api-client';
 import { ErrorBoundary, OfflineBanner } from '../components/common';
 import { useNetworkStatus } from '../hooks/use-network-status';
 import { Sentry } from '../lib/sentry';
@@ -92,6 +93,7 @@ function schemeForPersona(p: Persona): ColorScheme {
 
 function ThemedApp() {
   const { activeProfile } = useProfile();
+  const { signOut } = useClerk();
   const [persona, setPersona] = useState<Persona>('teen');
   const systemColorScheme = useColorScheme();
   const [colorScheme, setColorScheme] = useState<ColorScheme>(
@@ -143,6 +145,16 @@ function ThemedApp() {
       }
     })();
   }, [activeProfile?.id]);
+
+  // Register 401 handler: when a Clerk token expires mid-session the API
+  // returns 401.  The api-client calls this callback which triggers signOut,
+  // unmounting authenticated UI and redirecting to sign-in via layout guards.
+  useEffect(() => {
+    setOnAuthExpired(() => {
+      void signOut();
+    });
+    return () => clearOnAuthExpired();
+  }, [signOut]);
 
   const setAccentPresetId = useCallback(
     (id: string | null) => {

@@ -21,6 +21,31 @@ import { useProfile } from './profile';
 
 import type { QuotaExceeded } from '@eduagent/schemas';
 
+// ---------------------------------------------------------------------------
+// Auth-expired callback — handles 401 from expired Clerk tokens
+// ---------------------------------------------------------------------------
+// Since this is a non-React utility file, we use a module-level callback
+// that the root layout sets once on mount (via setOnAuthExpired).  When a
+// 401 is received the callback triggers Clerk signOut + redirect to sign-in.
+// A guard flag prevents multiple simultaneous 401s from all racing to sign out.
+
+type AuthExpiredCallback = () => void;
+
+let _onAuthExpired: AuthExpiredCallback | null = null;
+let _authExpiredFiring = false;
+
+/** Register the callback that fires when a 401 (token expired) is received. */
+export function setOnAuthExpired(cb: AuthExpiredCallback): void {
+  _onAuthExpired = cb;
+  _authExpiredFiring = false;
+}
+
+/** Clear the callback (e.g. on unmount). */
+export function clearOnAuthExpired(): void {
+  _onAuthExpired = null;
+  _authExpiredFiring = false;
+}
+
 export type QuotaExceededDetails = QuotaExceeded['details'];
 export type UpgradeOption = QuotaExceededDetails['upgradeOptions'][number];
 
@@ -63,6 +88,16 @@ export function useApiClient(): ApiClient {
       const res = await globalThis.fetch(input, { ...init, headers });
 
       if (!res.ok) {
+        // 401 — auth token expired or invalid.  Trigger sign-out once
+        // (guard prevents multiple concurrent 401s from racing).
+        if (res.status === 401) {
+          if (_onAuthExpired && !_authExpiredFiring) {
+            _authExpiredFiring = true;
+            _onAuthExpired();
+          }
+          throw new Error('Session expired — signing out');
+        }
+
         if (res.status === 402) {
           const body = await res
             .json()
