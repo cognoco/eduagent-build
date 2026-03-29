@@ -115,9 +115,13 @@ export function ProfileProvider({
       // remount the navigation tree.  Callers should close modals before
       // awaiting this function to avoid navigation state corruption.
       setActiveProfileId(profileId);
-      // Fire-and-forget: don't block the switch on query refetching.
-      // Queries refetch in background; components show stale-then-fresh data.
-      void queryClient.invalidateQueries();
+      // resetQueries() immediately clears all cached data AND marks queries
+      // stale so components show loading states — NOT stale data from the
+      // previous child's profile.  This prevents a privacy leak where a
+      // parent briefly sees the wrong child's learning data during switch.
+      // (Previously fire-and-forget invalidateQueries which left old data
+      // visible until the refetch completed.)
+      await queryClient.resetQueries();
     },
     [client, queryClient]
   );

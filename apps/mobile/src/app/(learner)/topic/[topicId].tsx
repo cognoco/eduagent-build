@@ -125,7 +125,7 @@ export default function TopicDetailScreen() {
       ) : (
         <ScrollView
           className="flex-1 px-5"
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         >
           {/* Description */}
           {topicProgress.description ? (

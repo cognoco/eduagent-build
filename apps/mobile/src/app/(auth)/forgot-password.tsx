@@ -81,7 +81,14 @@ export default function ForgotPasswordScreen() {
       });
 
       if (result.status === 'complete') {
-        await setActive({ session: result.createdSessionId });
+        try {
+          await setActive({ session: result.createdSessionId });
+        } catch {
+          setError(
+            'Could not activate your session. Please try signing in again.'
+          );
+          return;
+        }
         router.replace('/(learner)/home');
       } else {
         setError('Password reset could not be completed. Please try again.');
@@ -122,7 +129,7 @@ export default function ForgotPasswordScreen() {
     return (
       <KeyboardAvoidingView
         className="flex-1 bg-background items-center"
-        behavior="padding"
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
           ref={resetScrollRef}
@@ -236,7 +243,7 @@ export default function ForgotPasswordScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background items-center"
-      behavior="padding"
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
         ref={scrollRef}

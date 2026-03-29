@@ -57,7 +57,13 @@ function getGracePeriodDaysRemaining(respondedAt: string | null): number {
 export default function ChildDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { profileId } = useLocalSearchParams<{ profileId: string }>();
+  const { profileId: rawProfileId } = useLocalSearchParams<{
+    profileId: string;
+  }>();
+  // Expo Router can return undefined during navigation transitions even though
+  // the generic says `string`. Make the type honest so hooks receive the real
+  // runtime type and their `enabled` guards prevent API calls with undefined.
+  const profileId = rawProfileId as string | undefined;
   const { data: child, isLoading } = useChildDetail(profileId);
   const { data: sessions, isLoading: sessionsLoading } =
     useChildSessions(profileId);
@@ -267,10 +273,10 @@ export default function ChildDetailScreen() {
 
             {isWithdrawn ? (
               <View
-                className="bg-error/10 rounded-card p-4"
+                className="bg-danger/10 rounded-card p-4"
                 testID="grace-period-banner"
               >
-                <Text className="text-body font-semibold text-error mb-1">
+                <Text className="text-body font-semibold text-danger mb-1">
                   Deletion pending
                 </Text>
                 <Text className="text-body-sm text-text-secondary mb-3">
@@ -301,12 +307,12 @@ export default function ChildDetailScreen() {
               <Pressable
                 onPress={handleWithdrawConsent}
                 disabled={revokeConsent.isPending}
-                className="border border-error rounded-lg py-3 items-center"
+                className="border border-danger rounded-lg py-3 items-center"
                 accessibilityLabel="Withdraw consent"
                 accessibilityRole="button"
                 testID="withdraw-consent-button"
               >
-                <Text className="text-body font-semibold text-error">
+                <Text className="text-body font-semibold text-danger">
                   {revokeConsent.isPending
                     ? 'Withdrawing...'
                     : 'Withdraw Consent'}

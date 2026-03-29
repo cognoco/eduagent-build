@@ -127,6 +127,11 @@ describe('ProfileProvider', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ ok: true }), { status: 200 })
     );
+    // Mock the profiles refetch triggered by resetQueries()
+    // (resetQueries clears cache then refetches, so a fresh response is needed)
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profiles: mockProfiles }), { status: 200 })
+    );
 
     const { result } = renderHook(() => useProfile(), {
       wrapper: createWrapper(),
@@ -140,12 +145,18 @@ describe('ProfileProvider', () => {
       await result.current.switchProfile('child-id');
     });
 
-    expect(mockFetch).toHaveBeenCalledTimes(3); // profiles GET + switch POST + invalidation refetch
+    // profiles GET + switch POST + resetQueries refetch
+    expect(mockFetch).toHaveBeenCalledTimes(3);
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
       'mentomate_active_profile_id',
       'child-id'
     );
-    expect(result.current.activeProfile?.id).toBe('child-id');
+
+    // After resetQueries, data is cleared then refetched.
+    // Wait for the refetch to populate activeProfile.
+    await waitFor(() => {
+      expect(result.current.activeProfile?.id).toBe('child-id');
+    });
   });
 
   it('returns empty profiles when API returns none', async () => {

@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -43,9 +49,20 @@ export default function LearningBookScreen() {
     null
   );
 
-  const { data: subjects, isLoading: subjectsLoading } = useSubjects();
-  const { data: overallProgress, isLoading: progressLoading } =
-    useOverallProgress();
+  const {
+    data: subjects,
+    isLoading: subjectsLoading,
+    isError: subjectsError,
+    refetch: refetchSubjects,
+    isRefetching: subjectsRefetching,
+  } = useSubjects();
+  const {
+    data: overallProgress,
+    isLoading: progressLoading,
+    isError: progressError,
+    refetch: refetchProgress,
+    isRefetching: progressRefetching,
+  } = useOverallProgress();
 
   // Fetch retention data for each subject
   const firstSubjectId = subjects?.[0]?.id ?? '';
@@ -109,7 +126,14 @@ export default function LearningBookScreen() {
     : allTopics;
 
   const isLoading = subjectsLoading || progressLoading || topicsLoading;
+  const isError = subjectsError || progressError;
+  const isRefetching = subjectsRefetching || progressRefetching;
   const subjectCount = new Set(allTopics.map((t) => t.subjectId)).size;
+
+  const handleRetry = (): void => {
+    void refetchSubjects();
+    void refetchProgress();
+  };
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -191,9 +215,38 @@ export default function LearningBookScreen() {
 
       <ScrollView
         className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
       >
-        {isLoading ? (
+        {isError ? (
+          <View
+            className="flex-1 items-center justify-center px-5 py-12"
+            testID="book-error"
+          >
+            <Text className="text-body text-text-secondary text-center mb-4">
+              Unable to load your learning book. Please try again.
+            </Text>
+            <Pressable
+              onPress={handleRetry}
+              disabled={isRefetching}
+              className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+              testID="book-retry-button"
+              accessibilityLabel="Retry loading"
+              accessibilityRole="button"
+            >
+              {isRefetching ? (
+                <ActivityIndicator
+                  size="small"
+                  color="white"
+                  testID="book-retry-loading"
+                />
+              ) : (
+                <Text className="text-text-inverse text-body font-semibold">
+                  Retry
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        ) : isLoading ? (
           <View className="py-8 items-center" testID="learning-book-loading">
             <BookPageFlipAnimation size={100} color={themeColors.accent} />
           </View>

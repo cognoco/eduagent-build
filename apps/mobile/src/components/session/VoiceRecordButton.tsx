@@ -52,7 +52,7 @@ export function VoiceRecordButton({
         onPress={onPress}
         disabled={disabled}
         className={`rounded-full p-3 min-h-[44px] min-w-[44px] items-center justify-center ${
-          isListening ? 'bg-error' : 'bg-surface-elevated'
+          isListening ? 'bg-danger' : 'bg-surface-elevated'
         }`}
         accessibilityLabel={isListening ? 'Stop recording' : 'Start recording'}
         accessibilityRole="button"

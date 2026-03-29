@@ -460,11 +460,15 @@ export default function SubscriptionScreen() {
     data: subscription,
     isLoading: subLoading,
     isError: subError,
+    refetch: refetchSub,
+    isRefetching: subRefetching,
   } = useSubscription();
   const {
     data: usage,
     isLoading: usageLoading,
     isError: usageError,
+    refetch: refetchUsage,
+    isRefetching: usageRefetching,
   } = useUsage();
   // const byokWaitlist = useJoinByokWaitlist();
 
@@ -695,9 +699,32 @@ export default function SubscriptionScreen() {
           className="flex-1 items-center justify-center px-5"
           testID="subscription-error"
         >
-          <Text className="text-body text-text-secondary text-center">
+          <Text className="text-body text-text-secondary text-center mb-4">
             Unable to load subscription details. Please try again.
           </Text>
+          <Pressable
+            onPress={() => {
+              void refetchSub();
+              void refetchUsage();
+            }}
+            disabled={subRefetching || usageRefetching}
+            className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+            testID="subscription-retry-button"
+            accessibilityLabel="Retry loading subscription"
+            accessibilityRole="button"
+          >
+            {subRefetching || usageRefetching ? (
+              <ActivityIndicator
+                size="small"
+                color="white"
+                testID="subscription-retry-loading"
+              />
+            ) : (
+              <Text className="text-text-inverse text-body font-semibold">
+                Retry
+              </Text>
+            )}
+          </Pressable>
         </View>
       ) : (
         <ScrollView

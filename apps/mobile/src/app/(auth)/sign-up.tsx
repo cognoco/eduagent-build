@@ -80,7 +80,14 @@ export default function SignUpScreen() {
         });
 
         if (createdSessionId && setActive) {
-          await setActive({ session: createdSessionId });
+          try {
+            await setActive({ session: createdSessionId });
+          } catch {
+            setError(
+              'Could not activate your session. Please try signing in again.'
+            );
+            return;
+          }
           router.replace('/(learner)/home');
         }
       } catch (err: unknown) {
@@ -121,7 +128,14 @@ export default function SignUpScreen() {
       });
 
       if (signUpAttempt.status === 'complete') {
-        await setActive({ session: signUpAttempt.createdSessionId });
+        try {
+          await setActive({ session: signUpAttempt.createdSessionId });
+        } catch {
+          setError(
+            'Could not activate your session. Please try signing in again.'
+          );
+          return;
+        }
         // Two-step redirect: always land in (learner), then layout guard
         // checks persona and bounces parent users to /(parent)/dashboard.
         router.replace('/(learner)/home');
@@ -162,7 +176,7 @@ export default function SignUpScreen() {
     return (
       <KeyboardAvoidingView
         className="flex-1 bg-background items-center"
-        behavior="padding"
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
           ref={verifyScrollRef}
@@ -258,7 +272,7 @@ export default function SignUpScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background items-center"
-      behavior="padding"
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
         ref={scrollRef}
