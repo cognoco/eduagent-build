@@ -647,6 +647,9 @@ export default function LearnerLayout() {
   // No profile exists — show gate that pushes to profile creation modal
   if (!activeProfile) return <CreateProfileGate />;
 
+  // No profile exists — show gate that pushes to profile creation modal
+  if (!activeProfile) return <CreateProfileGate />;
+
   // Gate: block app access when parental consent is pending (COPPA/GDPR)
   if (
     activeProfile?.consentStatus &&
