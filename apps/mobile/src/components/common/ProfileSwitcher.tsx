@@ -20,6 +20,7 @@ export function ProfileSwitcher({
   onSwitch,
 }: ProfileSwitcherProps): ReactNode {
   const [isOpen, setIsOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
 
   const activeProfile = profiles.find((p) => p.id === activeProfileId);
   const initials = activeProfile
@@ -32,13 +33,24 @@ export function ProfileSwitcher({
     : '?';
 
   const handleSelect = useCallback(
-    (profileId: string) => {
-      setIsOpen(false);
-      if (profileId !== activeProfileId) {
-        onSwitch(profileId);
+    async (profileId: string) => {
+      if (profileId === activeProfileId) {
+        setIsOpen(false);
+        return;
+      }
+      if (switching) return;
+      setSwitching(true);
+      try {
+        await onSwitch(profileId);
+        setIsOpen(false); // Only close on success
+      } catch {
+        // Switch failed — keep dropdown open so user can retry.
+        // The error will be surfaced by the profile context.
+      } finally {
+        setSwitching(false);
       }
     },
-    [activeProfileId, onSwitch]
+    [activeProfileId, onSwitch, switching]
   );
 
   if (profiles.length <= 1) return null;
@@ -115,9 +127,10 @@ export function ProfileSwitcher({
                 <Pressable
                   key={profile.id}
                   onPress={() => handleSelect(profile.id)}
+                  disabled={switching}
                   className={`px-4 py-3 flex-row items-center ${
                     isActive ? 'bg-primary-soft' : ''
-                  }`}
+                  } ${switching ? 'opacity-50' : ''}`}
                   accessibilityRole="menuitem"
                   accessibilityLabel={`${profile.displayName}, ${
                     PERSONA_LABELS[profile.personaType] ?? profile.personaType

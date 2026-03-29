@@ -3,6 +3,7 @@ import type { Streak, XpSummary } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 export function useStreaks(): UseQueryResult<Streak> {
   const client = useApiClient();
@@ -16,6 +17,7 @@ export function useStreaks(): UseQueryResult<Streak> {
         const res = await client.streaks.$get({
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = await res.json();
         return data.streak;
       } finally {
@@ -38,6 +40,7 @@ export function useXpSummary(): UseQueryResult<XpSummary> {
         const res = await client.xp.$get({
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = await res.json();
         return data.xp;
       } finally {

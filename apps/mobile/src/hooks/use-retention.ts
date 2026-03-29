@@ -8,6 +8,7 @@ import type { RetentionCardResponse } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 // ---------------------------------------------------------------------------
 // Recall test + relearn response types (mirror API route wrappers)
@@ -45,6 +46,7 @@ export function useRetentionTopics(subjectId: string) {
           param: { subjectId },
           init: { signal },
         } as never);
+        await assertOk(res);
         return await res.json();
       } finally {
         cleanup();
@@ -69,6 +71,7 @@ export function useTopicRetention(
           param: { topicId },
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = (await res.json()) as {
           card: RetentionCardResponse | null;
         };
@@ -93,6 +96,7 @@ export function useSubmitRecallTest() {
       const res = await client.retention['recall-test'].$post({
         json: input,
       });
+      await assertOk(res);
       const data = (await res.json()) as { result: RecallTestResult };
       return data.result;
     },
@@ -116,6 +120,7 @@ export function useStartRelearn() {
       const res = await client.retention.relearn.$post({
         json: input,
       });
+      await assertOk(res);
       return (await res.json()) as RelearnResult;
     },
     onSuccess: () => {

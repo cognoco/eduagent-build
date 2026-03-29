@@ -109,19 +109,25 @@ export function ProfileProvider({
 
   const switchProfile = useCallback(
     async (profileId: string) => {
-      await client.profiles.switch.$post({ json: { profileId } });
+      const res = await client.profiles.switch.$post({ json: { profileId } });
+      if (!res.ok) {
+        throw new Error('Failed to switch profile');
+      }
       await storage.setItem(ACTIVE_PROFILE_KEY, profileId);
       // State update LAST — triggers re-renders that change themeKey and
       // remount the navigation tree.  Callers should close modals before
       // awaiting this function to avoid navigation state corruption.
       setActiveProfileId(profileId);
-      // resetQueries() immediately clears all cached data AND marks queries
-      // stale so components show loading states — NOT stale data from the
-      // previous child's profile.  This prevents a privacy leak where a
-      // parent briefly sees the wrong child's learning data during switch.
-      // (Previously fire-and-forget invalidateQueries which left old data
-      // visible until the refetch completed.)
-      await queryClient.resetQueries();
+      // Reset all queries EXCEPT 'profiles' — profiles belong to the account
+      // (not the individual profile) so they don't change on switch.
+      // Resetting profiles causes isProfileLoading→true which triggers
+      // `return null` in the learner layout, blanking the entire screen until
+      // the refetch completes (blank-screen bug on profile switch).
+      // All other queries (subjects, progress, sessions, etc.) are correctly
+      // reset to prevent stale data leaking between child profiles.
+      await queryClient.resetQueries({
+        predicate: (query) => query.queryKey[0] !== 'profiles',
+      });
     },
     [client, queryClient]
   );

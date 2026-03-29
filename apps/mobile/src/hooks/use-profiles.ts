@@ -3,6 +3,7 @@ import { useAuth } from '@clerk/clerk-expo';
 import { useApiClient } from '../lib/api-client';
 import type { Profile } from '@eduagent/schemas';
 import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 export function useProfiles(): UseQueryResult<Profile[]> {
   const client = useApiClient();
@@ -16,6 +17,7 @@ export function useProfiles(): UseQueryResult<Profile[]> {
         const res = await client.profiles.$get({
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = await res.json();
         return data.profiles;
       } finally {

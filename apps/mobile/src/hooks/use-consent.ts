@@ -12,6 +12,7 @@ import type {
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 export function useRequestConsent(): UseMutationResult<
   ConsentRequestResult,

@@ -24,6 +24,7 @@ import {
 import { useAuth } from '@clerk/clerk-expo';
 import { getRevenueCatApiKey } from '../lib/revenuecat';
 import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -124,6 +124,11 @@ export async function createProfile(
     throw new Error('Users must be at least 11 years old to create a profile');
   }
 
+  // Prevent minors from selecting PARENT persona (access control gate)
+  if (consentCheck && consentCheck.age < 18 && input.personaType === 'PARENT') {
+    throw new Error('Parent profile requires age 18 or older');
+  }
+
   const [row] = await db
     .insert(profiles)
     .values({

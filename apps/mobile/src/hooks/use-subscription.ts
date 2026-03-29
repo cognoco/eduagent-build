@@ -18,6 +18,7 @@ import type {
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 // ---------------------------------------------------------------------------
 // Types — prefer imports from @eduagent/schemas; local only for API-specific shapes

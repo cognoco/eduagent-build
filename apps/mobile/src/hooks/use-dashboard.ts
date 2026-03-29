@@ -7,6 +7,7 @@ import type {
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 export function useDashboard(): UseQueryResult<DashboardData> {
   const client = useApiClient();

@@ -166,6 +166,7 @@ export function ChatShell({
 
   // Voice record button toggle
   const handleVoicePress = useCallback(async () => {
+    if (isStreaming) return; // Don't start recording during streaming
     if (isListening) {
       await stopListening();
       // After stopping, the transcript from the hook may still be empty
@@ -177,7 +178,7 @@ export function ChatShell({
       stopSpeaking();
       await startListening();
     }
-  }, [isListening, stopListening, startListening, stopSpeaking]);
+  }, [isStreaming, isListening, stopListening, startListening, stopSpeaking]);
 
   // Sync transcript from STT hook to pending transcript when recording stops
   useEffect(() => {

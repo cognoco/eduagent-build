@@ -64,7 +64,7 @@ export default function TopicDetailScreen() {
   if (!subjectId || !topicId) {
     return (
       <View className="flex-1 bg-background items-center justify-center">
-        <Text className="text-text-secondary">No topic selected</Text>
+        <ActivityIndicator size="large" color="#71717a" />
       </View>
     );
   }

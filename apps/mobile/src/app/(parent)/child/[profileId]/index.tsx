@@ -165,16 +165,17 @@ export default function ChildDetailScreen() {
             {child.subjects.map((subject) => (
               <Pressable
                 key={subject.name}
-                onPress={() =>
+                onPress={() => {
+                  if (!profileId) return;
                   router.push({
                     pathname:
                       '/(parent)/child/[profileId]/subjects/[subjectId]',
                     params: {
-                      profileId: profileId!,
+                      profileId,
                       subjectId: subject.name,
                     },
-                  } as never)
-                }
+                  } as never);
+                }}
                 className="bg-surface rounded-card p-4 mt-3 flex-row items-center justify-between"
                 accessibilityLabel={`View ${subject.name} details`}
                 accessibilityRole="button"
@@ -220,15 +221,16 @@ export default function ChildDetailScreen() {
           sessions.map((session) => (
             <Pressable
               key={session.sessionId}
-              onPress={() =>
+              onPress={() => {
+                if (!profileId) return;
                 router.push({
                   pathname: '/(parent)/child/[profileId]/session/[sessionId]',
                   params: {
-                    profileId: profileId!,
+                    profileId,
                     sessionId: session.sessionId,
                   },
-                } as never)
-              }
+                } as never);
+              }}
               className="bg-surface rounded-card p-4 mt-3"
               accessibilityLabel={`View session from ${formatSessionDate(
                 session.startedAt

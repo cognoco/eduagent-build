@@ -223,7 +223,10 @@ export default function CreateProfileScreen() {
             placeholder="Enter name"
             placeholderTextColor={colors.muted}
             value={displayName}
-            onChangeText={setDisplayName}
+            onChangeText={(value: string) => {
+              setDisplayName(value);
+              if (error) setError('');
+            }}
             maxLength={50}
             editable={!loading}
             testID="create-profile-name"
@@ -328,7 +331,13 @@ export default function CreateProfileScreen() {
           Profile type
         </Text>
         <View className="flex-row mb-8">
-          {PERSONA_OPTIONS.map((option) => {
+          {PERSONA_OPTIONS.filter(
+            (option) =>
+              // Hide PARENT option for minors (server enforces this too)
+              option.value !== 'PARENT' ||
+              !birthDate ||
+              detectPersona(birthDate) === 'PARENT'
+          ).map((option) => {
             const isSelected = personaType === option.value;
             return (
               <Pressable

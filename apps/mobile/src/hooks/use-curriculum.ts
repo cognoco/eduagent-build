@@ -9,6 +9,7 @@ import type { Curriculum } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 export function useCurriculum(
   subjectId: string
@@ -25,6 +26,7 @@ export function useCurriculum(
           param: { subjectId },
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = (await res.json()) as { curriculum: Curriculum | null };
         return data.curriculum;
       } finally {
@@ -47,6 +49,7 @@ export function useSkipTopic(
         param: { subjectId },
         json: { topicId },
       });
+      await assertOk(res);
       return (await res.json()) as { message: string };
     },
     onSuccess: () => {
@@ -69,6 +72,7 @@ export function useUnskipTopic(
         param: { subjectId },
         json: { topicId },
       });
+      await assertOk(res);
       return (await res.json()) as { message: string };
     },
     onSuccess: () => {
@@ -95,6 +99,7 @@ export function useChallengeCurriculum(
         param: { subjectId },
         json: { feedback },
       });
+      await assertOk(res);
       return (await res.json()) as { curriculum: Curriculum };
     },
     onSuccess: () => {
@@ -117,6 +122,7 @@ export function useExplainTopic(
       ].explain.$get({
         param: { subjectId, topicId },
       });
+      await assertOk(res);
       const data = (await res.json()) as { explanation: string };
       return data.explanation;
     },

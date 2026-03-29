@@ -9,6 +9,7 @@ import type { InterviewState } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 // InterviewResponse is API-route-specific (includes exchangeCount, not extractedSignals)
 interface InterviewResponse {
@@ -32,6 +33,7 @@ export function useInterviewState(
           param: { subjectId },
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = await res.json();
         return data.state;
       } finally {
@@ -54,6 +56,7 @@ export function useSendInterviewMessage(
         param: { subjectId },
         json: { message },
       });
+      await assertOk(res);
       return (await res.json()) as InterviewResponse;
     },
     onSuccess: () => {

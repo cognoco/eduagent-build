@@ -13,6 +13,7 @@ import type {
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 // ---------------------------------------------------------------------------
 // Types — NotificationPrefs is the API response shape (maxDailyPush required)
@@ -41,6 +42,7 @@ export function useNotificationSettings(): UseQueryResult<NotificationPrefs> {
         const res = await client.settings.notifications.$get({
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = await res.json();
         return data.preferences;
       } finally {
@@ -63,6 +65,7 @@ export function useLearningMode(): UseQueryResult<LearningMode> {
         const res = await client.settings['learning-mode'].$get({
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = await res.json();
         return data.mode;
       } finally {
@@ -89,6 +92,7 @@ export function useUpdateNotificationSettings(): UseMutationResult<
   return useMutation({
     mutationFn: async (input: NotificationPrefsInput) => {
       const res = await client.settings.notifications.$put({ json: input });
+      await assertOk(res);
       const data = await res.json();
       return data.preferences;
     },
@@ -114,6 +118,7 @@ export function useUpdateLearningMode(): UseMutationResult<
       const res = await client.settings['learning-mode'].$put({
         json: { mode },
       });
+      await assertOk(res);
       const data = await res.json();
       return data.mode;
     },

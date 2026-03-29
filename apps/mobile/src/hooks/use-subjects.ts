@@ -9,6 +9,7 @@ import type { Subject } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 export function useSubjects(): UseQueryResult<Subject[]> {
   const client = useApiClient();
@@ -22,6 +23,7 @@ export function useSubjects(): UseQueryResult<Subject[]> {
         const res = await client.subjects.$get({
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = await res.json();
         return data.subjects;
       } finally {
@@ -43,6 +45,7 @@ export function useCreateSubject(): UseMutationResult<
   return useMutation({
     mutationFn: async (input: { name: string; rawInput?: string }) => {
       const res = await client.subjects.$post({ json: input });
+      await assertOk(res);
       return (await res.json()) as { subject: Subject };
     },
     onSuccess: () => {

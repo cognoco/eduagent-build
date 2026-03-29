@@ -3,6 +3,7 @@ import type { SubjectProgress, TopicProgress } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 export function useSubjectProgress(
   subjectId: string
@@ -19,6 +20,7 @@ export function useSubjectProgress(
           param: { subjectId },
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = (await res.json()) as { progress: SubjectProgress };
         return data.progress;
       } finally {
@@ -41,6 +43,7 @@ export function useOverallProgress() {
         const res = await client.progress.overview.$get({
           init: { signal },
         } as never);
+        await assertOk(res);
         return await res.json();
       } finally {
         cleanup();
@@ -62,6 +65,7 @@ export function useContinueSuggestion() {
         const res = await client.progress.continue.$get({
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = await res.json();
         return data.suggestion;
       } finally {
@@ -90,6 +94,7 @@ export function useTopicProgress(
           param: { subjectId, topicId },
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = (await res.json()) as { topic: TopicProgress };
         return data.topic;
       } finally {
