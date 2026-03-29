@@ -244,7 +244,7 @@ export async function generateExport(
       displayName: row.displayName,
       avatarUrl: row.avatarUrl ?? null,
       birthDate: row.birthDate
-        ? row.birthDate.toISOString().split('T')[0]
+        ? row.birthDate.toISOString().split('T')[0]!
         : null,
       personaType: row.personaType,
       location: row.location ?? null,

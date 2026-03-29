@@ -158,14 +158,14 @@ export async function startInterleavedSession(
     throw new Error('No topics available for interleaved retrieval');
   }
 
-  const primarySubjectId = opts?.subjectId ?? topics[0].subjectId;
+  const primarySubjectId = opts?.subjectId ?? topics[0]!.subjectId;
 
   const [row] = await db
     .insert(learningSessions)
     .values({
       profileId,
       subjectId: primarySubjectId,
-      topicId: topics[0].topicId,
+      topicId: topics[0]!.topicId,
       sessionType: 'interleaved',
       status: 'active',
       escalationRung: 1,
@@ -181,7 +181,7 @@ export async function startInterleavedSession(
     .returning();
 
   return {
-    sessionId: row.id,
+    sessionId: row!.id,
     topics,
   };
 }
@@ -195,7 +195,7 @@ function shuffleArray<T>(arr: readonly T[]): T[] {
   const result = [...arr];
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
+    [result[i], result[j]] = [result[j]!, result[i]!];
   }
   return result;
 }

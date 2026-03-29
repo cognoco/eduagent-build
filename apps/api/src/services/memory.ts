@@ -101,9 +101,9 @@ function formatMemoryContext(contents: string[]): string {
   for (let i = 0; i < contents.length; i++) {
     // Truncate each content block to avoid overwhelming the prompt
     const truncated =
-      contents[i].length > 500
-        ? contents[i].slice(0, 500) + '...'
-        : contents[i];
+      contents[i]!.length > 500
+        ? contents[i]!.slice(0, 500) + '...'
+        : contents[i]!;
     lines.push(`[${i + 1}] ${truncated}`);
   }
 

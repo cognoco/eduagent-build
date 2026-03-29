@@ -140,14 +140,14 @@ export async function startSession(
 
   // Record session_start event for the audit log
   await db.insert(sessionEvents).values({
-    sessionId: row.id,
+    sessionId: row!.id,
     profileId,
     subjectId,
     eventType: 'session_start' as const,
     content: '',
   });
 
-  return mapSessionRow(row);
+  return mapSessionRow(row!);
 }
 
 export async function getSession(
@@ -403,13 +403,13 @@ async function prepareExchangeContext(
   }).length;
   const lastAiResponseAt =
     aiResponseEvents.length > 0
-      ? aiResponseEvents[aiResponseEvents.length - 1].createdAt
+      ? aiResponseEvents[aiResponseEvents.length - 1]!.createdAt
       : null;
 
   // 3d. Check the last AI response for [PARTIAL_PROGRESS] marker (Gap 3)
   const lastAiResponse =
     aiResponseEvents.length > 0
-      ? aiResponseEvents[aiResponseEvents.length - 1].content
+      ? aiResponseEvents[aiResponseEvents.length - 1]!.content
       : '';
   const previousResponseHadPartialProgress =
     detectPartialProgress(lastAiResponse);
@@ -832,16 +832,16 @@ export async function submitSummary(
     })
     .where(
       and(
-        eq(sessionSummaries.id, row.id),
+        eq(sessionSummaries.id, row!.id),
         eq(sessionSummaries.profileId, profileId)
       )
     );
 
   return {
     summary: {
-      id: row.id,
-      sessionId: row.sessionId,
-      content: row.content ?? input.content,
+      id: row!.id,
+      sessionId: row!.sessionId,
+      content: row!.content ?? input.content,
       aiFeedback: evaluation.feedback,
       status: finalStatus,
     },

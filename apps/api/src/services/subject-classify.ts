@@ -52,8 +52,8 @@ export async function classifySubject(
     return {
       candidates: [
         {
-          subjectId: subjects[0].id,
-          subjectName: subjects[0].name,
+          subjectId: subjects[0]!.id,
+          subjectName: subjects[0]!.name,
           confidence: 0.9,
         },
       ],

@@ -209,7 +209,7 @@ async function findClerkUserByEmail(
   }
 
   const users = (await res.json()) as ClerkUser[];
-  return users.length > 0 ? users[0] : null;
+  return users.length > 0 ? users[0]! : null;
 }
 
 /**
@@ -461,7 +461,7 @@ async function seedOnboardingComplete(
     profileId,
     email,
     password,
-    ids: { subjectId, topicId: topicIds[0] },
+    ids: { subjectId, topicId: topicIds[0]! },
   };
 }
 
@@ -524,7 +524,7 @@ async function seedLearningActive(
     profileId,
     email,
     password,
-    ids: { subjectId, sessionId, topicId: topicIds[0] },
+    ids: { subjectId, sessionId, topicId: topicIds[0]! },
   };
 }
 
@@ -566,7 +566,7 @@ async function seedRetentionDue(
     profileId,
     email,
     password,
-    ids: { subjectId, retentionCardId: cardValues[0].id },
+    ids: { subjectId, retentionCardId: cardValues[0]!.id },
   };
 }
 
@@ -588,7 +588,7 @@ async function seedFailedRecall3x(
     'Chemistry'
   );
 
-  const targetTopicId = topicIds[0];
+  const targetTopicId = topicIds[0]!;
 
   // Create retention card with low ease factor (struggling)
   await db.insert(retentionCards).values({
@@ -889,7 +889,7 @@ async function seedTrialActive(
     profileId,
     email,
     password,
-    ids: { subscriptionId, subjectId, topicId: topicIds[0] },
+    ids: { subscriptionId, subjectId, topicId: topicIds[0]! },
   };
 }
 
@@ -939,7 +939,7 @@ async function seedTrialExpired(
     profileId,
     email,
     password,
-    ids: { subscriptionId, subjectId, topicId: topicIds[0] },
+    ids: { subscriptionId, subjectId, topicId: topicIds[0]! },
   };
 }
 
@@ -1064,7 +1064,7 @@ async function seedHomeworkReady(
     profileId,
     email,
     password,
-    ids: { subjectId, sessionId, topicId: topicIds[0] },
+    ids: { subjectId, sessionId, topicId: topicIds[0]! },
   };
 }
 
@@ -1401,7 +1401,7 @@ async function seedDailyLimitReached(
     profileId,
     email,
     password,
-    ids: { subscriptionId, subjectId, sessionId, topicId: topicIds[0] },
+    ids: { subscriptionId, subjectId, sessionId, topicId: topicIds[0]! },
   };
 }
 

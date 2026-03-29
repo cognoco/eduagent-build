@@ -158,7 +158,7 @@ export async function createPendingConsentState(
     })
     .returning();
 
-  return mapConsentRow(row);
+  return mapConsentRow(row!);
 }
 
 /** Maximum number of consent resends (PRD lines 415, 420) */
@@ -460,7 +460,7 @@ export async function revokeConsent(
     )
     .returning();
 
-  return mapConsentRow(row);
+  return mapConsentRow(row!);
 }
 
 /**
@@ -511,5 +511,5 @@ export async function restoreConsent(
     )
     .returning();
 
-  return mapConsentRow(row);
+  return mapConsentRow(row!);
 }

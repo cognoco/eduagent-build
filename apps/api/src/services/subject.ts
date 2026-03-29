@@ -63,7 +63,7 @@ export async function createSubject(
       status: 'active',
     })
     .returning();
-  return mapSubjectRow(row);
+  return mapSubjectRow(row!);
 }
 
 export async function getSubject(

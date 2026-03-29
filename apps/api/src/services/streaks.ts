@@ -38,7 +38,7 @@ const MAX_GRACE_DAYS = 3;
 /** Parse ISO date string (YYYY-MM-DD) to Date object at midnight UTC */
 function parseDate(dateStr: string): Date {
   const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
+  return new Date(Date.UTC(year!, month! - 1, day!));
 }
 
 /** Calculate the number of days between two ISO date strings */

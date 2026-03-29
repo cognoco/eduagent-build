@@ -245,7 +245,7 @@ export async function challengeCurriculum(
   if (topics.length > 0) {
     await db.insert(curriculumTopics).values(
       topics.map((t, i) => ({
-        curriculumId: newCurriculum.id,
+        curriculumId: newCurriculum!.id,
         title: t.title,
         description: t.description,
         sortOrder: i,

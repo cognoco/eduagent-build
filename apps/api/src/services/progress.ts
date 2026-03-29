@@ -216,7 +216,7 @@ export async function getTopicProgress(
       ? await repo.sessionSummaries.findFirst(
           eq(
             sessionSummaries.sessionId,
-            topicSessions[topicSessions.length - 1].id
+            topicSessions[topicSessions.length - 1]!.id
           )
         )
       : undefined;

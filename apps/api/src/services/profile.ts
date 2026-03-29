@@ -29,7 +29,9 @@ function mapProfileRow(
     accountId: row.accountId,
     displayName: row.displayName,
     avatarUrl: row.avatarUrl ?? null,
-    birthDate: row.birthDate ? row.birthDate.toISOString().split('T')[0] : null,
+    birthDate: row.birthDate
+      ? row.birthDate.toISOString().split('T')[0]!
+      : null,
     personaType: row.personaType,
     location: row.location ?? null,
     isOwner: row.isOwner,
@@ -147,13 +149,13 @@ export async function createProfile(
   if (consentCheck?.required && consentCheck.consentType) {
     const state = await createPendingConsentState(
       db,
-      row.id,
+      row!.id,
       consentCheck.consentType
     );
     consentStatus = state.status;
   }
 
-  return mapProfileRow(row, consentStatus);
+  return mapProfileRow(row!, consentStatus);
 }
 
 /**

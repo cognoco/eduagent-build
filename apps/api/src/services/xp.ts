@@ -43,7 +43,7 @@ export function calculateTopicXp(
     transfer: 2,
   };
 
-  return Math.round(baseXp * depthMultiplier[verificationDepth]);
+  return Math.round(baseXp * depthMultiplier[verificationDepth]!);
 }
 
 /**

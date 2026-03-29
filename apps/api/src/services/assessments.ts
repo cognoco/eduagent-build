@@ -160,7 +160,7 @@ export function getNextVerificationDepth(
   if (currentIndex === -1 || currentIndex >= DEPTH_ORDER.length - 1) {
     return null;
   }
-  return DEPTH_ORDER[currentIndex + 1];
+  return DEPTH_ORDER[currentIndex + 1]!;
 }
 
 /**
@@ -299,7 +299,7 @@ export async function createAssessment(
       exchangeHistory: [],
     })
     .returning();
-  return mapAssessmentRow(row);
+  return mapAssessmentRow(row!);
 }
 
 export async function getAssessment(
