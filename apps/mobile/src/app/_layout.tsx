@@ -21,7 +21,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ClerkProvider, ClerkLoaded, useClerk } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  QueryCache,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -60,6 +64,17 @@ if (!clerkPublishableKey) {
 }
 
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      // Global fallback: report query failures to Sentry so silent blank
+      // screens become observable even when a screen forgets to handle
+      // isError. This does NOT replace per-screen error UI — use QueryGuard
+      // for that — but ensures no failure goes unnoticed.
+      Sentry.captureException(error, {
+        tags: { queryKey: JSON.stringify(query.queryKey) },
+      });
+    },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 5 * 60_000,

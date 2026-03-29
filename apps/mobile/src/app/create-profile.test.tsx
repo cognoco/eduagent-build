@@ -76,15 +76,20 @@ describe('CreateProfileScreen', () => {
     queryClient.clear();
   });
 
-  it('renders form fields', () => {
+  it('renders form fields (persona picker hidden, auto-detected)', () => {
     render(<CreateProfileScreen />, { wrapper: Wrapper });
 
     expect(screen.getByTestId('create-profile-name')).toBeTruthy();
     expect(screen.getByTestId('create-profile-birthdate')).toBeTruthy();
-    expect(screen.getByTestId('persona-teen')).toBeTruthy();
-    expect(screen.getByTestId('persona-learner')).toBeTruthy();
-    expect(screen.getByTestId('persona-parent')).toBeTruthy();
     expect(screen.getByTestId('create-profile-submit')).toBeTruthy();
+    // Birth date explanatory copy is visible
+    expect(
+      screen.getByText(/personalise how your coach talks to you/)
+    ).toBeTruthy();
+    // Persona picker buttons are hidden (auto-detected from birth date)
+    expect(screen.queryByTestId('persona-teen')).toBeNull();
+    expect(screen.queryByTestId('persona-learner')).toBeNull();
+    expect(screen.queryByTestId('persona-parent')).toBeNull();
   });
 
   it('disables submit when name is empty', () => {
@@ -198,33 +203,18 @@ describe('CreateProfileScreen', () => {
     });
   });
 
-  it('auto-detects persona from birthdate and shows hint', async () => {
+  it('auto-detects persona from birthdate (no picker shown)', async () => {
     render(<CreateProfileScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('create-profile-birthdate'));
     await act(() => {
-      // Set birthdate to a 10-year-old → TEEN
+      // Set birthdate to a 10-year-old → TEEN detected silently
       datePickerOnChange?.({ type: 'set' }, new Date(2016, 0, 1));
     });
 
-    const hint = screen.getByTestId('persona-auto-hint');
-    expect(hint).toBeTruthy();
-    expect(hint.props.children).toBeDefined();
-  });
-
-  it('allows manual persona override after auto-detection', async () => {
-    render(<CreateProfileScreen />, { wrapper: Wrapper });
-
-    fireEvent.press(screen.getByTestId('create-profile-birthdate'));
-    await act(() => {
-      datePickerOnChange?.({ type: 'set' }, new Date(2016, 0, 1));
-    });
-
-    // Override: select LEARNER manually
-    fireEvent.press(screen.getByTestId('persona-learner'));
-
-    // Auto-hint should disappear after manual override
+    // No persona picker or hint shown — detection is invisible to the user
     expect(screen.queryByTestId('persona-auto-hint')).toBeNull();
+    expect(screen.queryByTestId('persona-teen')).toBeNull();
   });
 
   it('displays error on API failure', async () => {
