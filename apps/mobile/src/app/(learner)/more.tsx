@@ -198,9 +198,9 @@ export default function MoreScreen() {
     'User';
 
   const personaLabels: Record<Persona, string> = {
-    teen: 'Teen (Dark)',
-    learner: 'Eager Learner (Calm)',
-    parent: 'Parent (Light)',
+    teen: 'Teen',
+    learner: 'Eager Learner',
+    parent: 'Parent',
   };
 
   const personas: Persona[] = ['teen', 'learner', 'parent'];

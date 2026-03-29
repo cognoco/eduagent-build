@@ -133,9 +133,9 @@ export default function ParentMoreScreen() {
   const childCount = dashboard?.children.length ?? 0;
 
   const personaLabels: Record<Persona, string> = {
-    teen: 'Teen (Dark)',
-    learner: 'Eager Learner (Calm)',
-    parent: 'Parent (Light)',
+    teen: 'Teen',
+    learner: 'Eager Learner',
+    parent: 'Parent',
   };
 
   const personas: Persona[] = ['teen', 'learner', 'parent'];
