@@ -118,15 +118,36 @@ export function ProfileProvider({
       // remount the navigation tree.  Callers should close modals before
       // awaiting this function to avoid navigation state corruption.
       setActiveProfileId(profileId);
-      // Reset all queries EXCEPT 'profiles' — profiles belong to the account
-      // (not the individual profile) so they don't change on switch.
-      // Resetting profiles causes isProfileLoading→true which triggers
-      // `return null` in the learner layout, blanking the entire screen until
-      // the refetch completes (blank-screen bug on profile switch).
-      // All other queries (subjects, progress, sessions, etc.) are correctly
-      // reset to prevent stale data leaking between child profiles.
+      // Reset profile-scoped queries to prevent stale data leaking between
+      // child profiles. Uses an allow-list so new query keys must be explicitly
+      // added here to be reset on switch. 'profiles' is excluded because it
+      // belongs to the account (not the individual profile) — resetting it
+      // causes isProfileLoading→true which triggers `return null` in the
+      // learner layout, blanking the entire screen (blank-screen bug).
+      const PROFILE_SCOPED_KEYS = [
+        'subjects',
+        'progress',
+        'sessions',
+        'curriculum',
+        'assessment',
+        'interview',
+        'consent-status',
+        'dashboard',
+        'streaks',
+        'xp',
+        'settings',
+        'subscription',
+        'usage',
+        'retention',
+        'coaching-card',
+        'topic',
+        'learning-modes',
+        'notification-preferences',
+        'teaching-preferences',
+      ];
       await queryClient.resetQueries({
-        predicate: (query) => query.queryKey[0] !== 'profiles',
+        predicate: (query) =>
+          PROFILE_SCOPED_KEYS.includes(String(query.queryKey[0])),
       });
     },
     [client, queryClient]

@@ -152,6 +152,52 @@ describe('ProfileProvider', () => {
     expect(result.current.activeProfile?.id).toBe('child-id');
   });
 
+  it('resets data queries on profile switch (cache isolation)', async () => {
+    // Simulate cached data from child A's session
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), { status: 200 })
+    );
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Seed query cache with data belonging to owner profile
+    queryClient.setQueryData(
+      ['subjects', 'owner-id'],
+      [{ id: 's1', name: 'Math' }]
+    );
+    queryClient.setQueryData(['progress', 'overview', 'owner-id'], {
+      subjects: [],
+    });
+    queryClient.setQueryData(['dashboard'], { children: [] });
+
+    // Verify data is cached
+    expect(queryClient.getQueryData(['subjects', 'owner-id'])).toBeTruthy();
+    expect(
+      queryClient.getQueryData(['progress', 'overview', 'owner-id'])
+    ).toBeTruthy();
+
+    // Switch to child profile
+    await act(async () => {
+      await result.current.switchProfile('child-id');
+    });
+
+    // All non-profiles queries must be reset (data cleared)
+    expect(queryClient.getQueryData(['subjects', 'owner-id'])).toBeUndefined();
+    expect(
+      queryClient.getQueryData(['progress', 'overview', 'owner-id'])
+    ).toBeUndefined();
+    expect(queryClient.getQueryData(['dashboard'])).toBeUndefined();
+
+    // Profiles query must survive (not reset) to avoid blank screen
+    expect(queryClient.getQueryData(['profiles'])).toBeTruthy();
+  });
+
   it('returns empty profiles when API returns none', async () => {
     mockFetch.mockReset();
     mockFetch.mockResolvedValueOnce(
