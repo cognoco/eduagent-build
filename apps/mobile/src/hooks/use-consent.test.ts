@@ -42,7 +42,7 @@ describe('checkConsentRequirement', () => {
   it('returns GDPR required for child under 16', () => {
     const tenYearsAgo = new Date();
     tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
-    const birthDate = tenYearsAgo.toISOString().split('T')[0];
+    const birthDate = tenYearsAgo.toISOString().split('T')[0]!;
 
     const { result } = renderHook(() => checkConsentRequirement(birthDate));
     expect(result.current.required).toBe(true);
@@ -52,7 +52,7 @@ describe('checkConsentRequirement', () => {
   it('returns GDPR required for 15-year-old (boundary)', () => {
     const fifteenYearsAgo = new Date();
     fifteenYearsAgo.setFullYear(fifteenYearsAgo.getFullYear() - 15);
-    const birthDate = fifteenYearsAgo.toISOString().split('T')[0];
+    const birthDate = fifteenYearsAgo.toISOString().split('T')[0]!;
 
     const { result } = renderHook(() => checkConsentRequirement(birthDate));
     expect(result.current.required).toBe(true);
@@ -63,7 +63,7 @@ describe('checkConsentRequirement', () => {
     const sixteenYearsAgo = new Date();
     sixteenYearsAgo.setFullYear(sixteenYearsAgo.getFullYear() - 16);
     sixteenYearsAgo.setDate(sixteenYearsAgo.getDate() - 1);
-    const birthDate = sixteenYearsAgo.toISOString().split('T')[0];
+    const birthDate = sixteenYearsAgo.toISOString().split('T')[0]!;
 
     const { result } = renderHook(() => checkConsentRequirement(birthDate));
     expect(result.current.required).toBe(false);
@@ -73,7 +73,7 @@ describe('checkConsentRequirement', () => {
   it('returns not required for adult', () => {
     const twentyYearsAgo = new Date();
     twentyYearsAgo.setFullYear(twentyYearsAgo.getFullYear() - 20);
-    const birthDate = twentyYearsAgo.toISOString().split('T')[0];
+    const birthDate = twentyYearsAgo.toISOString().split('T')[0]!;
 
     const { result } = renderHook(() => checkConsentRequirement(birthDate));
     expect(result.current.required).toBe(false);

@@ -41,7 +41,7 @@ describe('ProfileSwitcher', () => {
   it('renders nothing when only one profile exists', () => {
     const { toJSON } = render(
       <ProfileSwitcher
-        profiles={[profiles[0]]}
+        profiles={[profiles[0]!]}
         activeProfileId="p1"
         onSwitch={onSwitch}
       />

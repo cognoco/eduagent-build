@@ -45,7 +45,7 @@ export const SESSION_MODE_CONFIGS: Record<string, SessionModeConfig> = {
   },
 };
 
-const DEFAULT_CONFIG = SESSION_MODE_CONFIGS.freeform;
+const DEFAULT_CONFIG = SESSION_MODE_CONFIGS.freeform!;
 
 export function getModeConfig(mode: string): SessionModeConfig {
   return SESSION_MODE_CONFIGS[mode] ?? DEFAULT_CONFIG;

@@ -20,7 +20,7 @@ export interface VoicePlaybackBarProps {
 function nextRate(current: number): number {
   const idx = RATE_CYCLE.indexOf(current);
   const safeIdx = idx === -1 ? 0 : idx;
-  return RATE_CYCLE[(safeIdx + 1) % RATE_CYCLE.length];
+  return RATE_CYCLE[(safeIdx + 1) % RATE_CYCLE.length]!;
 }
 
 export function VoicePlaybackBar({

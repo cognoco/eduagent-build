@@ -107,9 +107,9 @@ export default function LearningBookScreen() {
           const enriched = topic as unknown as { topicTitle?: string };
           allTopics.push({
             topicId: topic.topicId,
-            subjectId: subject.id,
+            subjectId: subject!.id,
             name: enriched.topicTitle ?? topic.topicId,
-            subjectName: subject.name,
+            subjectName: subject!.name,
             retention,
             lastReviewedAt: topic.lastReviewedAt,
             repetitions: topic.repetitions,

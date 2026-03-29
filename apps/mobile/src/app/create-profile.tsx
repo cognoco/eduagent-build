@@ -90,7 +90,7 @@ export default function CreateProfileScreen() {
   const [birthDate, setBirthDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [personaType, setPersonaType] = useState<PersonaType>('LEARNER');
-  const [personaAutoDetected, setPersonaAutoDetected] = useState(false);
+  const [_personaAutoDetected, setPersonaAutoDetected] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();

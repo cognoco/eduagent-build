@@ -178,7 +178,7 @@ export default function SessionScreen() {
         try {
           const result = await classifySubject.mutateAsync({ text });
           if (!result.needsConfirmation && result.candidates.length === 1) {
-            const candidate = result.candidates[0];
+            const candidate = result.candidates[0]!;
             setClassifiedSubject({
               subjectId: candidate.subjectId,
               subjectName: candidate.subjectName,

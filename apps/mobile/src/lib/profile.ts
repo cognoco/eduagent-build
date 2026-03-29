@@ -96,7 +96,7 @@ export function ProfileProvider({
       if (activeProfileId) {
         setProfileWasRemoved(true);
       }
-      const owner = profiles.find((p) => p.isOwner) ?? profiles[0];
+      const owner = profiles.find((p) => p.isOwner) ?? profiles[0]!;
       setActiveProfileId(owner.id);
       void storage.setItem(ACTIVE_PROFILE_KEY, owner.id);
     }

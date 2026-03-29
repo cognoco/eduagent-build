@@ -45,7 +45,7 @@ describe('QueryGuard', () => {
     });
     const { getByTestId } = render(
       <QueryGuard query={query}>
-        {(data) => <Text>{data.length}</Text>}
+        {(data: string[]) => <Text>{data.length}</Text>}
       </QueryGuard>
     );
     expect(getByTestId('query-guard-loading')).toBeTruthy();
@@ -61,7 +61,7 @@ describe('QueryGuard', () => {
     });
     const { getByTestId, getByText } = render(
       <QueryGuard query={query}>
-        {(data) => <Text>{data.length}</Text>}
+        {(data: string[]) => <Text>{data.length}</Text>}
       </QueryGuard>
     );
     expect(getByTestId('query-guard-error')).toBeTruthy();
@@ -75,7 +75,7 @@ describe('QueryGuard', () => {
     const query = makeQuery<string[]>({ data: [] });
     const { getByTestId, getByText } = render(
       <QueryGuard query={query} emptyMessage="No items yet">
-        {(data) => <Text>{data.length}</Text>}
+        {(data: string[]) => <Text>{data.length}</Text>}
       </QueryGuard>
     );
     expect(getByTestId('query-guard-empty')).toBeTruthy();
@@ -86,7 +86,7 @@ describe('QueryGuard', () => {
     const query = makeQuery<string[]>({ data: ['a', 'b'] });
     const { getByText } = render(
       <QueryGuard query={query}>
-        {(data) => <Text>Count: {data.length}</Text>}
+        {(data: string[]) => <Text>Count: {data.length}</Text>}
       </QueryGuard>
     );
     expect(getByText('Count: 2')).toBeTruthy();
@@ -96,7 +96,7 @@ describe('QueryGuard', () => {
     const query = makeQuery<string[]>({ data: [] });
     const { getByText } = render(
       <QueryGuard query={query}>
-        {(data) => <Text>Count: {data.length}</Text>}
+        {(data: string[]) => <Text>Count: {data.length}</Text>}
       </QueryGuard>
     );
     expect(getByText('Count: 0')).toBeTruthy();
