@@ -47,6 +47,19 @@ pnpm run db:push:dev                     # Push schema to dev DB
 pnpm run db:generate                     # Generate migration
 ```
 
+## Available CLIs
+
+The following CLIs are installed and authenticated in this environment:
+
+| CLI | Path / Command | Purpose |
+|-----|---------------|---------|
+| **Doppler** | `C:\Tools\doppler\doppler.exe` | Secrets management (project: `mentomate`, configs: `dev`/`stg`/`prd`) |
+| **Wrangler** | `pnpm exec wrangler` | Cloudflare Workers deploy, secrets, dev server |
+| **GitHub CLI** | `gh` | PRs, issues, CI checks, API queries |
+| **EAS CLI** | `eas` | Expo Application Services (mobile builds, submissions) |
+
+**Secrets sync:** `pnpm secrets:sync [dev|stg|prd]` pushes Doppler secrets to Cloudflare Workers. See `docs/deployment-and-secrets.md` for the full flow.
+
 ## Testing Rules (Local Development)
 
 **Pre-commit runs surgical tests** via `scripts/pre-commit-tests.sh` — NOT `nx affected`.

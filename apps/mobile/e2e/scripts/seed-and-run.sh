@@ -202,7 +202,7 @@ if ! wait_for_text "DEVELOPMENT" "$LAUNCHER_TIMEOUT"; then
   sleep 2
   $ADB $DEVICE_FLAG shell uiautomator dump /sdcard/ui_dump.xml 2>/dev/null || true
   LAST_DUMP=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null || echo "")
-  if echo "$LAST_DUMP" | grep -q "Reload\|Welcome back\|Connected to"; then
+  if echo "$LAST_DUMP" | grep -q "Reload\|Welcome back\|Welcome to MentoMate\|sign-in-button\|Connected to"; then
     echo "[seed-and-run] App auto-connected to Metro (skipped launcher). Proceeding to bundle phase."
     SKIP_TO_BUNDLE=1
   else
@@ -291,7 +291,9 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
 
   if [ $DUMP_OK -eq 1 ]; then
     # Already on sign-in screen?
-    if echo "$DUMP" | grep -q "Welcome back"; then
+    # Match either first-time ("Welcome to MentoMate") or returning ("Welcome back")
+    # heading, OR the sign-in-button testID in the UI dump.
+    if echo "$DUMP" | grep -q "Welcome back\|Welcome to MentoMate\|sign-in-button"; then
       echo "[seed-and-run] Sign-in screen reached after ${BUNDLE_ELAPSED}s!"
       break
     fi

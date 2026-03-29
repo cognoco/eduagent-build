@@ -142,11 +142,24 @@ export default function DashboardScreen() {
             <CardSkeleton />
           </>
         ) : isError ? (
-          <View className="items-center justify-center py-12">
-            <Text className="text-body text-text-secondary">
-              Couldn't load your dashboard. Pull down to refresh, or check your
-              internet connection.
+          <View className="items-center justify-center py-12 px-4">
+            <Text className="text-h3 font-semibold text-text-primary mb-2">
+              Couldn't load your dashboard
             </Text>
+            <Text className="text-body text-text-secondary text-center mb-4">
+              Check your internet connection and try again.
+            </Text>
+            <Pressable
+              onPress={() => refetch()}
+              className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+              accessibilityLabel="Retry loading dashboard"
+              accessibilityRole="button"
+              testID="dashboard-retry-button"
+            >
+              <Text className="text-text-inverse text-body font-semibold">
+                Retry
+              </Text>
+            </Pressable>
           </View>
         ) : dashboard?.children && dashboard.children.length > 0 ? (
           <>

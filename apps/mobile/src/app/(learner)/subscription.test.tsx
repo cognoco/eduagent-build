@@ -339,17 +339,21 @@ describe('SubscriptionScreen', () => {
     expect(screen.getByText('$99.99 / annual')).toBeTruthy();
   });
 
-  it('shows no-offerings fallback when no packages are available', () => {
+  it('shows no-offerings fallback with static tier comparison when no packages are available', () => {
     mockOfferings = null;
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
     expect(screen.getByTestId('no-offerings')).toBeTruthy();
+    // Shows helpful availability message instead of "not available on this device"
     expect(
-      screen.getByText(
-        'In-app purchases are not available on this device. Please use the mobile app to subscribe.'
-      )
+      screen.getByText(/Subscription plans will be available soon/)
     ).toBeTruthy();
+    // Shows static tier cards
+    expect(screen.getByTestId('static-tier-free')).toBeTruthy();
+    expect(screen.getByTestId('static-tier-plus')).toBeTruthy();
+    expect(screen.getByTestId('static-tier-family')).toBeTruthy();
+    expect(screen.getByTestId('static-tier-pro')).toBeTruthy();
   });
 
   it('shows current plan info from subscription data', () => {

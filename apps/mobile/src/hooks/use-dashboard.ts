@@ -6,6 +6,7 @@ import type {
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
+import { combinedSignal } from '../lib/query-timeout';
 
 export function useDashboard(): UseQueryResult<DashboardData> {
   const client = useApiClient();
@@ -13,16 +14,29 @@ export function useDashboard(): UseQueryResult<DashboardData> {
 
   return useQuery({
     queryKey: ['dashboard', activeProfile?.id],
-    queryFn: async (): Promise<DashboardData> => {
-      const res = await client.dashboard.$get();
-      const data = (await res.json()) as DashboardData;
+    queryFn: async ({ signal: querySignal }): Promise<DashboardData> => {
+      // Bug #7 fix: combine TanStack Query's cancellation signal with a
+      // 10s timeout so the request aborts if the API is unreachable,
+      // instead of hanging forever and showing skeletons indefinitely.
+      const { signal, cleanup } = combinedSignal(querySignal);
 
-      if (data.children.length === 0) {
-        const demoRes = await client.dashboard.demo.$get();
-        return (await demoRes.json()) as DashboardData;
+      try {
+        const res = await client.dashboard.$get({
+          init: { signal },
+        } as never);
+        const data = (await res.json()) as DashboardData;
+
+        if (data.children.length === 0) {
+          const demoRes = await client.dashboard.demo.$get({
+            init: { signal },
+          } as never);
+          return (await demoRes.json()) as DashboardData;
+        }
+
+        return data;
+      } finally {
+        cleanup();
       }
-
-      return data;
     },
     enabled: !!activeProfile,
     staleTime: 30_000,

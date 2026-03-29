@@ -22,7 +22,8 @@ appId: com.mentomate.app
       visible: "Reload"
     file: dismiss-devtools.yaml
 
-# Verify sign-in screen
+# Verify sign-in screen (use testID — heading text varies by user state)
 - extendedWaitUntil:
-    visible: "Welcome back"
+    visible:
+      id: "sign-in-button"
     timeout: 30000

@@ -87,7 +87,7 @@ function withSafetyPreamble(messages: OpenAIMessage[]): OpenAIMessage[] {
 // ---------------------------------------------------------------------------
 
 const MODEL_MAP: Record<string, string> = {
-  'gemini-2.0-flash': 'gpt-4o-mini',
+  'gemini-2.5-flash': 'gpt-4o-mini',
   'gemini-2.5-pro': 'gpt-4o',
   // Identity mappings — no warn when config already names an OpenAI model
   'gpt-4o-mini': 'gpt-4o-mini',

@@ -55,7 +55,12 @@
           "backgroundColor": "#1e1b4b"
         }
       ],
-      ["expo-router", { "root": "./src/app" }],
+      [
+        "expo-router",
+        {
+          "root": "./src/app"
+        }
+      ],
       [
         "expo-camera",
         {
@@ -77,7 +82,15 @@
           "microphonePermission": "MentoMate needs microphone access for voice-based learning."
         }
       ],
-      "./plugins/withForceDarkDisabled"
+      "./plugins/withForceDarkDisabled",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "16.0"
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {

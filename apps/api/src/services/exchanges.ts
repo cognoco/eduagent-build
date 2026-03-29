@@ -10,6 +10,7 @@ import {
   getPartialProgressInstruction,
 } from './escalation';
 import { getEvaluateRungDescription } from './evaluate';
+import type { LearningMode } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Core Exchange Processing Pipeline — Story 2.1
@@ -44,6 +45,8 @@ export interface ExchangeContext {
   analogyDomain?: string;
   /** EVALUATE difficulty rung 1-4 (FR128-133) */
   evaluateDifficultyRung?: 1 | 2 | 3 | 4;
+  /** Learning mode: 'serious' (default) or 'casual' — affects tutoring tone */
+  learningMode?: LearningMode;
   /** SM-2 retention status for the current topic */
   retentionStatus?: {
     status: 'new' | 'strong' | 'fading' | 'weak' | 'forgotten';
@@ -121,6 +124,11 @@ export function buildSystemPrompt(context: ExchangeContext): string {
 
   // Persona voice
   sections.push(getPersonaVoice(context.personaType));
+
+  // Learning mode — adjusts pacing and tone
+  if (context.learningMode) {
+    sections.push(getLearningModeGuidance(context.learningMode));
+  }
 
   // Topic scope — interleaved sessions get a numbered list, others get a single topic
   if (context.interleavedTopics && context.interleavedTopics.length > 0) {
@@ -478,6 +486,25 @@ function getWorkedExampleGuidance(
     default:
       return '';
   }
+}
+
+function getLearningModeGuidance(mode: LearningMode): string {
+  if (mode === 'casual') {
+    return (
+      'Learning mode: CASUAL EXPLORER\n' +
+      'Pacing: Relaxed. Take your time with explanations. Use more examples and analogies.\n' +
+      'Tone: Warm and encouraging. Use everyday language. Light humor is fine.\n' +
+      'Assessment: Low-pressure. Frame checks as curiosity, not tests.\n' +
+      'If the learner wants to skip ahead or change topics, let them explore freely.'
+    );
+  }
+  return (
+    'Learning mode: SERIOUS LEARNER\n' +
+    'Pacing: Efficient. Be direct and concise. Minimize tangents.\n' +
+    'Tone: Focused and academic. Precise language. No filler.\n' +
+    'Assessment: Rigorous. Verify understanding at each step before progressing.\n' +
+    'Hold the learner to a high standard — do not move on until the concept is solid.'
+  );
 }
 
 /** Detect whether the LLM response contains an understanding check */

@@ -1,17 +1,23 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
+  TextInput,
   Pressable,
   ScrollView,
   ActivityIndicator,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CoachingCard, AdaptiveEntryCard } from '../../components/coaching';
 import { RetentionSignal } from '../../components/progress';
 import {
   AnimatedEntry,
+  ApiUnreachableBanner,
   ProfileSwitcher,
   PenWritingAnimation,
 } from '../../components/common';
@@ -21,12 +27,18 @@ import { useOverallProgress } from '../../hooks/use-progress';
 import { useStreaks } from '../../hooks/use-streaks';
 import { useCoachingCard } from '../../hooks/use-coaching-card';
 import { useSubscriptionStatus } from '../../hooks/use-subscription';
+import { useApiReachability } from '../../hooks/use-api-reachability';
 import { useTheme, useThemeColors } from '../../lib/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { data: subjects, isLoading: subjectsLoading } = useSubjects();
+  const {
+    data: subjects,
+    isLoading: subjectsLoading,
+    isError: subjectsError,
+    refetch: refetchSubjects,
+  } = useSubjects();
   const { data: overallProgress } = useOverallProgress();
   const { data: streak } = useStreaks();
   const firstSubjectId = subjects?.find((s) => s.status === 'active')?.id;
@@ -35,6 +47,78 @@ export default function HomeScreen() {
   const { persona } = useTheme();
   const themeColors = useThemeColors();
   const { profiles, activeProfile, switchProfile } = useProfile();
+
+  // Chat input state
+  const [chatInput, setChatInput] = useState('');
+  const {
+    isApiReachable,
+    isChecked: apiChecked,
+    recheck: recheckApi,
+  } = useApiReachability();
+
+  // Practice subject picker state
+  const [showPracticePicker, setShowPracticePicker] = useState(false);
+
+  const activeSubjects = useMemo(
+    () => subjects?.filter((s) => s.status === 'active') ?? [],
+    [subjects]
+  );
+
+  const handlePracticePress = useCallback((): void => {
+    // If coaching card has a subject-specific practice route, use it directly
+    if (
+      coachingCard.primaryRoute &&
+      coachingCard.primaryRoute.includes('mode=practice') &&
+      coachingCard.primaryRoute.includes('subjectId=')
+    ) {
+      router.push(coachingCard.primaryRoute as never);
+      return;
+    }
+
+    // Single active subject: auto-select and navigate
+    const singleSubject =
+      activeSubjects.length === 1 ? activeSubjects[0] : undefined;
+    if (singleSubject) {
+      router.push(
+        `/(learner)/session?mode=practice&subjectId=${
+          singleSubject.id
+        }&subjectName=${encodeURIComponent(singleSubject.name)}` as never
+      );
+      return;
+    }
+
+    // Multiple active subjects: show picker
+    if (activeSubjects.length > 1) {
+      setShowPracticePicker(true);
+    }
+  }, [coachingCard.primaryRoute, activeSubjects, router]);
+
+  const handleChatSubmit = useCallback((): void => {
+    const text = chatInput.trim();
+    if (!text) return;
+
+    const hasSubjects = activeSubjects.length > 0;
+
+    if (hasSubjects) {
+      // Has subjects — navigate as learning session. The session screen
+      // auto-classifies which subject from the user's message text.
+      router.push(
+        `/(learner)/session?mode=learning&problemText=${encodeURIComponent(
+          text
+        )}` as never
+      );
+    } else {
+      // No subjects yet — use freeform mode; session screen handles
+      // subject classification and can work without a subject.
+      router.push(
+        `/(learner)/session?mode=freeform&problemText=${encodeURIComponent(
+          text
+        )}` as never
+      );
+    }
+
+    setChatInput('');
+  }, [chatInput, activeSubjects, router]);
 
   // First-time user redirect: send users with no subjects to create-subject
   const hasRedirected = useRef(false);
@@ -66,7 +150,12 @@ export default function HomeScreen() {
   }
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+    <KeyboardAvoidingView
+      className="flex-1 bg-background"
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={0}
+      style={{ paddingTop: insets.top }}
+    >
       <View className="px-5 pt-4 pb-2 flex-row justify-between items-center">
         <View>
           <Text className="text-h1 font-bold text-text-primary">
@@ -108,10 +197,18 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {/* API unreachable warning (Bug #11) */}
+      {apiChecked && !isApiReachable && (
+        <View className="px-5 mt-2">
+          <ApiUnreachableBanner onRetry={recheckApi} />
+        </View>
+      )}
+
       <ScrollView
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 24 }}
         testID="home-scroll-view"
+        keyboardShouldPersistTaps="handled"
       >
         {isExceeded && (
           <View
@@ -126,7 +223,7 @@ export default function HomeScreen() {
         )}
 
         <AnimatedEntry>
-          {coachingCard.isLoading ? (
+          {coachingCard.isLoading && !subjectsError ? (
             <View className="bg-coaching-card rounded-card p-5 mt-4 items-center py-8">
               <PenWritingAnimation size={100} color={themeColors.accent} />
             </View>
@@ -143,11 +240,7 @@ export default function HomeScreen() {
                 },
                 {
                   label: 'Practice for a test',
-                  onPress: () => {
-                    if (coachingCard.primaryRoute) {
-                      router.push(coachingCard.primaryRoute as never);
-                    }
-                  },
+                  onPress: handlePracticePress,
                 },
                 {
                   label: 'Just ask something',
@@ -184,7 +277,7 @@ export default function HomeScreen() {
         {!subjectsLoading && subjects && subjects.length > 0 && (
           <AnimatedEntry delay={100}>
             <View className="mt-4">
-              <Text className="text-caption font-semibold text-text-secondary mb-2 uppercase tracking-wider">
+              <Text className="text-body-sm font-semibold text-text-primary opacity-70 mb-2 uppercase tracking-wider">
                 Retention
               </Text>
               <ScrollView
@@ -226,7 +319,30 @@ export default function HomeScreen() {
             <Text className="text-h3 font-semibold text-text-primary mb-3">
               Your subjects
             </Text>
-            {subjectsLoading ? (
+            {subjectsError ? (
+              <View
+                className="bg-surface rounded-card px-4 py-6 items-center"
+                testID="subjects-error"
+              >
+                <Text className="text-body font-semibold text-text-primary mb-1">
+                  Couldn't load subjects
+                </Text>
+                <Text className="text-body-sm text-text-secondary text-center mb-4">
+                  Check your connection and try again.
+                </Text>
+                <Pressable
+                  onPress={() => refetchSubjects()}
+                  className="bg-primary rounded-button py-3 items-center w-full min-h-[48px] justify-center"
+                  testID="subjects-retry-button"
+                  accessibilityLabel="Retry loading subjects"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-text-inverse text-body font-semibold">
+                    Retry
+                  </Text>
+                </Pressable>
+              </View>
+            ) : subjectsLoading ? (
               <View className="py-4 items-center">
                 <ActivityIndicator />
               </View>
@@ -310,6 +426,112 @@ export default function HomeScreen() {
           </View>
         </AnimatedEntry>
       </ScrollView>
-    </View>
+
+      {/* Chat input — primary way to start a learning session (Bug #10) */}
+      <View
+        className="px-4 py-3 bg-surface border-t border-surface-elevated flex-row items-end"
+        style={{ paddingBottom: Math.max(insets.bottom, 8) }}
+      >
+        <TextInput
+          className="flex-1 bg-background rounded-input px-4 py-3 text-body text-text-primary me-2"
+          placeholder="Ask me anything..."
+          placeholderTextColor={themeColors.muted}
+          value={chatInput}
+          onChangeText={setChatInput}
+          onSubmitEditing={handleChatSubmit}
+          maxLength={500}
+          returnKeyType="send"
+          blurOnSubmit={false}
+          testID="home-chat-input"
+          accessibilityLabel="Ask a question to start learning"
+        />
+        <Pressable
+          onPress={handleChatSubmit}
+          disabled={!chatInput.trim()}
+          className={`rounded-button px-5 py-3 min-h-[44px] min-w-[44px] items-center justify-center ${
+            chatInput.trim() ? 'bg-primary' : 'bg-surface-elevated'
+          }`}
+          testID="home-send-button"
+          accessibilityLabel="Start learning session"
+          accessibilityRole="button"
+        >
+          <Ionicons
+            name="send"
+            size={20}
+            color={
+              chatInput.trim() ? themeColors.textInverse : themeColors.muted
+            }
+          />
+        </Pressable>
+      </View>
+
+      {/* Practice for a test — subject picker bottom sheet */}
+      <Modal
+        visible={showPracticePicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPracticePicker(false)}
+        testID="practice-subject-picker"
+      >
+        <Pressable
+          className="flex-1 bg-black/40"
+          onPress={() => setShowPracticePicker(false)}
+          accessibilityLabel="Close subject picker"
+          accessibilityRole="button"
+        />
+        <View
+          className="bg-background rounded-t-3xl px-5 pb-8 pt-4"
+          style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+        >
+          <View className="items-center mb-4">
+            <View className="w-10 h-1 rounded-full bg-text-secondary/30" />
+          </View>
+          <Text className="text-h3 font-semibold text-text-primary mb-4">
+            Which subject?
+          </Text>
+          <ScrollView style={{ maxHeight: 320 }}>
+            {activeSubjects.map((subject) => {
+              const status = subjectRetention.get(subject.id) ?? 'weak';
+              return (
+                <Pressable
+                  key={subject.id}
+                  testID={`practice-subject-${subject.id}`}
+                  onPress={() => {
+                    setShowPracticePicker(false);
+                    router.push(
+                      `/(learner)/session?mode=practice&subjectId=${
+                        subject.id
+                      }&subjectName=${encodeURIComponent(
+                        subject.name
+                      )}` as never
+                    );
+                  }}
+                  className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
+                  accessibilityLabel={`Practice ${subject.name}`}
+                  accessibilityRole="button"
+                  style={{ minHeight: 48 }}
+                >
+                  <Text className="text-body font-medium text-text-primary">
+                    {subject.name}
+                  </Text>
+                  <RetentionSignal status={status} />
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <Pressable
+            onPress={() => setShowPracticePicker(false)}
+            className="mt-4 items-center py-3"
+            accessibilityLabel="Cancel"
+            accessibilityRole="button"
+            style={{ minHeight: 44 }}
+          >
+            <Text className="text-body text-text-secondary font-medium">
+              Cancel
+            </Text>
+          </Pressable>
+        </View>
+      </Modal>
+    </KeyboardAvoidingView>
   );
 }

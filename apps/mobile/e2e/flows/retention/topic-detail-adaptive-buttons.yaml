@@ -1,0 +1,93 @@
+# Flow N9b: Topic Detail — Adaptive Buttons for In-Progress Topic (Story 4.14)
+# Validates: adaptive action buttons show correct layout for in_progress topics.
+# When completionStatus = in_progress:
+#   - Primary: "Continue Learning" (continue-learning-button)
+#   - Secondary: "Start Review Session" (start-review-button)
+# Tags: nightly, retention
+#
+# Journey: UX Journey 2 (Retention management)
+# Epics: Story 4.14 (adaptive buttons)
+# Prerequisite: Seeded user with active session (scenario: learning-active)
+#
+# Seed note: learning-active creates a topic with 1 session (3 exchanges),
+# so computeCompletionStatus returns "in_progress" (sessionCount > 0, no
+# passed assessment). This triggers the in_progress button layout.
+#
+# testID mapping (topic/[topicId].tsx — Story 4.14 adaptive buttons):
+#   - continue-learning-button  -> primary button for in_progress
+#   - start-review-button       -> secondary button for in_progress
+#   - start-learning-button     -> only shown for not_started (should NOT appear)
+#   - request-retest-button     -> always visible bottom row
+appId: com.mentomate.app
+tags:
+  - nightly
+  - retention
+---
+# 1. Seed & sign in with learning-active scenario
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+# 2. Home screen
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 3. Navigate to Learning Book tab
+# BUG-10/BUG-30: Dev-client shows extra tabs, breaking point-tap positions.
+# Use accessibility label (tabBarAccessibilityLabel) for reliable matching.
+- tapOn: "Learning Book Tab"
+
+# 4. Wait for Learning Book to load
+- extendedWaitUntil:
+    visible:
+      text: "Learning Book"
+    timeout: 10000
+
+# 5. Wait for topic list to finish loading
+- extendedWaitUntil:
+    notVisible:
+      id: "learning-book-loading"
+    timeout: 10000
+    optional: true
+
+# 6. Tap the first topic. learning-active seeds "World History" with 3 topics.
+#    Topic 1 has the session, so it will be in_progress.
+- tapOn:
+    text: "World History Topic 1"
+
+# 7. Wait for topic detail screen to load
+- extendedWaitUntil:
+    visible:
+      id: "retention-card"
+    timeout: 15000
+    # learning-active may not seed retention cards; wait for Progress section instead
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      text: "Progress"
+    timeout: 10000
+
+# 8. Story 4.14: Verify in_progress adaptive buttons
+# Primary button: "Continue Learning"
+- assertVisible:
+    id: "continue-learning-button"
+
+# Secondary button: "Start Review Session"
+- assertVisible:
+    id: "start-review-button"
+
+# 9. Verify not_started button is NOT shown for in_progress topic
+- assertNotVisible:
+    id: "start-learning-button"
+
+# 10. Verify request-retest-button is present (always visible bottom row)
+- assertVisible:
+    id: "request-retest-button"
+
+# 11. Screenshot of in_progress adaptive buttons
+- takeScreenshot: topic-detail-in-progress-adaptive-buttons

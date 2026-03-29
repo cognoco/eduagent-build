@@ -59,6 +59,49 @@ const TIER_LIMITS: Record<SubscriptionTier, string> = {
   pro: '3,000 questions/month',
 };
 
+/** Static tier features for display when RevenueCat offerings are unavailable. */
+const TIER_FEATURES: Array<{
+  tier: SubscriptionTier;
+  features: string[];
+}> = [
+  {
+    tier: 'free',
+    features: [
+      '100 questions per month',
+      'All subjects',
+      'Spaced repetition',
+      'Learning Book',
+    ],
+  },
+  {
+    tier: 'plus',
+    features: [
+      '500 questions per month',
+      'All Free features',
+      'Priority AI responses',
+      'Detailed progress analytics',
+    ],
+  },
+  {
+    tier: 'family',
+    features: [
+      '1,500 questions per month (shared)',
+      'All Plus features',
+      'Up to 5 child profiles',
+      'Parent dashboard',
+    ],
+  },
+  {
+    tier: 'pro',
+    features: [
+      '3,000 questions per month',
+      'All Family features',
+      'Advanced coaching insights',
+      'Priority support',
+    ],
+  },
+];
+
 /** Map RevenueCat PACKAGE_TYPE to human-readable period labels. */
 const PACKAGE_PERIOD_LABEL: Partial<Record<PACKAGE_TYPE, string>> = {
   [PACKAGE_TYPE.MONTHLY]: 'Monthly',
@@ -659,7 +702,7 @@ export default function SubscriptionScreen() {
       ) : (
         <ScrollView
           className="flex-1 px-5"
-          contentContainerStyle={{ paddingBottom: 32 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
         >
           {/* Trial banner */}
           {isTrial && subscription?.trialEndsAt && (
@@ -676,7 +719,7 @@ export default function SubscriptionScreen() {
           )}
 
           {/* Current plan */}
-          <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-4">
+          <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-4">
             Current plan
           </Text>
           <View
@@ -733,7 +776,7 @@ export default function SubscriptionScreen() {
           {/* Usage meter */}
           {usage && (
             <View className="mt-4">
-              <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2">
+              <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
                 Usage this month
               </Text>
               <View className="bg-surface rounded-card px-4 py-3.5">
@@ -757,7 +800,7 @@ export default function SubscriptionScreen() {
           {/* RevenueCat Offerings — available packages */}
           {availablePackages.length > 0 && (
             <View testID="offerings-section">
-              <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
+              <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
                 Plans
               </Text>
               {availablePackages.map((pkg) => {
@@ -780,18 +823,50 @@ export default function SubscriptionScreen() {
             </View>
           )}
 
-          {/* No offerings fallback (RevenueCat not configured or web) */}
+          {/* No offerings fallback — show static tier comparison when RevenueCat is unavailable */}
           {availablePackages.length === 0 && !offeringsLoading && (
             <View testID="no-offerings">
-              <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
+              <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
                 Plans
               </Text>
-              <View className="bg-surface rounded-card px-4 py-3.5">
+              <View className="bg-surface rounded-card px-4 py-3.5 mb-3">
                 <Text className="text-body-sm text-text-secondary">
-                  In-app purchases are not available on this device. Please use
-                  the mobile app to subscribe.
+                  Subscription plans will be available soon.{' '}
+                  {isTrial
+                    ? `You're currently on the Free trial with ${TIER_LIMITS.free}.`
+                    : `You're on the ${TIER_LABELS[tier]} plan with ${TIER_LIMITS[tier]}.`}
                 </Text>
               </View>
+              {TIER_FEATURES.map((entry) => (
+                <View
+                  key={entry.tier}
+                  className={`bg-surface rounded-card px-4 py-3.5 mb-2 ${
+                    entry.tier === tier ? 'border border-primary' : ''
+                  }`}
+                  testID={`static-tier-${entry.tier}`}
+                >
+                  <View className="flex-row items-center justify-between mb-1.5">
+                    <Text className="text-body font-semibold text-text-primary">
+                      {TIER_LABELS[entry.tier]}
+                    </Text>
+                    {entry.tier === tier && (
+                      <View className="bg-primary-soft rounded-full px-2.5 py-0.5">
+                        <Text className="text-caption font-semibold text-primary">
+                          Current
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  {entry.features.map((feature) => (
+                    <Text
+                      key={feature}
+                      className="text-caption text-text-secondary ml-1 mb-0.5"
+                    >
+                      {'\u2022'} {feature}
+                    </Text>
+                  ))}
+                </View>
+              ))}
             </View>
           )}
 
@@ -824,7 +899,7 @@ export default function SubscriptionScreen() {
           {/* Top-up */}
           {isPaidTier && (
             <View className="mt-6" testID="top-up-section">
-              <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2">
+              <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
                 Need more questions?
               </Text>
               <Pressable
@@ -865,7 +940,7 @@ export default function SubscriptionScreen() {
           {/* Manage billing — deep links to platform subscription management */}
           {hasActiveSubscription && (
             <View className="mt-6" testID="manage-section">
-              <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2">
+              <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
                 Manage
               </Text>
               <Pressable
@@ -889,7 +964,7 @@ export default function SubscriptionScreen() {
 
           {/* BYOK waitlist — hidden until feature is ready
           <View className="mt-6">
-            <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2">
+            <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
               Bring your own key (coming soon)
             </Text>
             <View className="bg-surface rounded-card px-4 py-3.5">

@@ -45,7 +45,8 @@ tags:
 
 # Now sign-in screen should be visible
 - extendedWaitUntil:
-    visible: "Welcome back"
+    visible:
+      id: "sign-in-button"
     timeout: 30000
 
 - tapOn:

@@ -214,7 +214,7 @@ export default function MoreScreen() {
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 24 }}
       >
-        <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-4">
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-4">
           Appearance
         </Text>
         {personas.map((p) => (
@@ -256,7 +256,7 @@ export default function MoreScreen() {
           />
         </View>
 
-        <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
           Notifications
         </Text>
         <ToggleRow
@@ -272,7 +272,7 @@ export default function MoreScreen() {
           disabled={notifLoading || updateNotifications.isPending}
         />
 
-        <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
           Learning Mode
         </Text>
         {LEARNING_MODE_OPTIONS.map((opt) => (
@@ -302,7 +302,7 @@ export default function MoreScreen() {
           </Text>
         </Pressable>
 
-        <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
           Account
         </Text>
         <SettingsRow

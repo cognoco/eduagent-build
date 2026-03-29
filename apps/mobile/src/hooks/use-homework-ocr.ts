@@ -1,7 +1,16 @@
 import { useState, useCallback, useRef } from 'react';
+import { NativeModules, Platform } from 'react-native';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
+
+/**
+ * Check whether the ML Kit native module is linked in this build.
+ * Returns false for dev-client builds that predate the ML Kit dependency.
+ */
+function isTextRecognitionAvailable(): boolean {
+  return NativeModules.TextRecognition != null;
+}
 
 export type OcrStatus = 'idle' | 'processing' | 'done' | 'error';
 
@@ -21,9 +30,9 @@ async function copyToCache(tempUri: string): Promise<string> {
 }
 
 async function resizeImage(uri: string): Promise<string> {
-  const result = await manipulateAsync(uri, [{ resize: { width: 1024 } }], {
+  const result = await manipulateAsync(uri, [{ resize: { width: 1600 } }], {
     format: SaveFormat.JPEG,
-    compress: 0.8,
+    compress: 0.9,
   });
   return result.uri;
 }
@@ -50,6 +59,21 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
       setFailCount(0);
     }
 
+    if (!isTextRecognitionAvailable()) {
+      console.error(
+        '[OCR] ML Kit TextRecognition native module is not linked. ' +
+          'Rebuild the app with EAS to include @react-native-ml-kit/text-recognition.'
+      );
+      setFailCount((prev) => prev + 1);
+      setError(
+        Platform.OS === 'android'
+          ? 'Text recognition is not available in this build. A new app build is required.'
+          : 'Text recognition is not available. Please rebuild the app.'
+      );
+      setStatus('error');
+      return;
+    }
+
     try {
       const recognized = await recognizeText(uri);
       if (!recognized) {
@@ -60,7 +84,8 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
       }
       setText(recognized);
       setStatus('done');
-    } catch {
+    } catch (err) {
+      console.error('[OCR] Text recognition failed:', err);
       setFailCount((prev) => prev + 1);
       setError(
         "We couldn't read that clearly. Try taking the photo again with better lighting."

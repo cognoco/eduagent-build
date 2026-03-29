@@ -28,7 +28,7 @@ tags:
 # 1. Wait for sign-in screen (seed-and-run.sh handles app launch + dev-client)
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 120000
 
 # 2. Sign in with seeded credentials (from seed-and-run.sh env vars)
@@ -203,7 +203,7 @@ tags:
 # 28. Verify we return to the auth/sign-in screen
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 15000
 
 # 29. Final screenshot — back at auth screen after sign-out

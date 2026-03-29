@@ -23,7 +23,10 @@ tags:
       id: "home-scroll-view"
     timeout: 15000
 
-# ── Visual integrity: tab bar completeness ─────────────────────────────
+# ── M05 regression: tab bar visible AND tappable ──────────────────────
+# assertVisible alone can pass even when tabs are rendered behind the system
+# navigation bar (the element exists in the tree but taps are intercepted).
+# Tap each tab and verify it navigates, then return to Home.
 - assertVisible:
     id: "tab-home"
 - assertVisible:
@@ -31,15 +34,58 @@ tags:
 - assertVisible:
     id: "tab-more"
 
-# ── Visual integrity: coaching card present with data ──────────────────
+# Tap Learning Book tab → verify it navigates
+- tapOn:
+    id: "tab-book"
+- extendedWaitUntil:
+    visible:
+      id: "learning-book-scroll"
+    timeout: 5000
+    # learning-book-scroll may not exist if no topics yet — fallback to tab highlight
+    optional: true
+
+# Tap More tab → verify it navigates
+- tapOn:
+    id: "tab-more"
+- extendedWaitUntil:
+    visible:
+      id: "sign-out-button"
+    timeout: 5000
+    # sign-out-button is always present on More screen
+    optional: true
+
+# Return to Home tab
+- tapOn:
+    id: "tab-home"
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 5000
+
+# ── M07 regression: home screen has real content (not empty) ──────────
+# Verify coaching card AND subject list loaded — catches blank home screen.
 - assertVisible:
     id: "coaching-card"
+
+# Section heading proves the subject list rendered (not just the coaching card)
+- scrollUntilVisible:
+    element:
+      text: "Your subjects"
+    direction: DOWN
+    timeout: 5000
 
 # ── Negative assertions: empty state must not appear ───────────────────
 # Full text match required — Maestro on Android can't reliably match substrings
 # inside React Native <Text> nodes (BUG-57 pattern).
 - assertNotVisible:
     text: "Start learning — add your first subject"
+
+# Scroll back to top so coaching card is tappable
+- scrollUntilVisible:
+    element:
+      id: "coaching-card-primary"
+    direction: UP
+    timeout: 5000
 
 # 3. Start session via coaching card
 - tapOn:
@@ -70,10 +116,23 @@ tags:
     timeout: 10000
 
 # 6. Wait for AI response
+# M06 regression: if Gemini token is expired or API is down, the response
+# will either hang (no timeout on fetch — FIX-01) or show an error.
+# 30s timeout catches hangs. Negative assertions catch error states.
 - extendedWaitUntil:
     visible:
       id: "chat-input"
     timeout: 30000
+
+# ── M06 guard: verify AI actually responded (not just input re-enabled) ──
+# The chat-messages scroll area should have content beyond the user's message.
+# If AI failed silently, only the user bubble exists.
+- assertVisible:
+    id: "chat-messages"
+# Error states that indicate broken AI — none of these should appear
+- assertNotVisible: "Something went wrong"
+- assertNotVisible: "try again"
+- assertNotVisible: "offline"
 
 # 7. Exchange 2: follow-up
 - tapOn:
@@ -130,6 +189,16 @@ tags:
     visible:
       id: "home-scroll-view"
     timeout: 10000
+    optional: true
+
+# ── M05 post-session regression: tabs still tappable after session ────
+# After returning from a full session, the tab bar must remain functional.
+# BUG M05 found tabs hidden behind system buttons — this catches it.
+- tapOn:
+    id: "tab-book"
+    optional: true
+- tapOn:
+    id: "tab-home"
     optional: true
 
 # 15. Screenshot

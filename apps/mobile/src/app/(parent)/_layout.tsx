@@ -2,6 +2,7 @@ import { Tabs, Redirect } from 'expo-router';
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@clerk/clerk-expo';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemeColors, useTokenVars } from '../../lib/theme';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
 import { useRevenueCatIdentity } from '../../hooks/use-revenuecat';
@@ -27,16 +28,17 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
         entry ? (focused ? entry.focused : entry.default) : 'ellipse-outline'
       }
       size={22}
-      color={focused ? colors.accent : colors.muted}
+      color={focused ? colors.accent : colors.textSecondary}
     />
   );
 }
 
 export default function ParentLayout() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { persona } = useTheme();
+  const { persona, colorScheme, accentPresetId } = useTheme();
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
+  const insets = useSafeAreaInsets();
 
   // Register push token on app launch (runs once, guarded internally)
   usePushTokenRegistration();
@@ -48,19 +50,26 @@ export default function ParentLayout() {
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
   if (persona !== 'parent') return <Redirect href="/(learner)/home" />;
 
+  // Force NativeWind to remount the CSS variable scope when accent changes,
+  // guaranteeing that --color-primary / --color-accent propagate to all
+  // tab screens (Bug #6 — accent color propagation).
+  const themeKey = `theme-${persona}-${colorScheme}-${
+    accentPresetId ?? 'default'
+  }`;
+
   return (
-    <View style={[{ flex: 1 }, tokenVars]}>
+    <View key={themeKey} style={[{ flex: 1 }, tokenVars]}>
       <Tabs
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
-            height: 64,
-            paddingBottom: 8,
+            height: 56 + Math.max(insets.bottom, 24),
+            paddingBottom: Math.max(insets.bottom, 24),
           },
           tabBarActiveTintColor: colors.accent,
-          tabBarInactiveTintColor: colors.muted,
+          tabBarInactiveTintColor: colors.textSecondary,
           tabBarLabelStyle: { fontSize: 12 },
         }}
       >

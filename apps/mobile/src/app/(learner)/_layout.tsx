@@ -45,7 +45,7 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
         entry ? (focused ? entry.focused : entry.default) : 'ellipse-outline'
       }
       size={22}
-      color={focused ? colors.accent : colors.muted}
+      color={focused ? colors.accent : colors.textSecondary}
     />
   );
 }
@@ -543,9 +543,10 @@ function ConsentPendingGate(): React.ReactElement {
 
 export default function LearnerLayout() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { persona } = useTheme();
+  const { persona, colorScheme, accentPresetId } = useTheme();
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
+  const insets = useSafeAreaInsets();
   const {
     activeProfile,
     isLoading: isProfileLoading,
@@ -613,19 +614,26 @@ export default function LearnerLayout() {
     return <PostApprovalLanding onContinue={dismissPostApproval} />;
   }
 
+  // Force NativeWind to remount the CSS variable scope when accent changes,
+  // guaranteeing that --color-primary / --color-accent propagate to all
+  // tab screens (Bug #6 — accent color propagation).
+  const themeKey = `theme-${persona}-${colorScheme}-${
+    accentPresetId ?? 'default'
+  }`;
+
   return (
-    <View style={[{ flex: 1 }, tokenVars]}>
+    <View key={themeKey} style={[{ flex: 1 }, tokenVars]}>
       <Tabs
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
-            height: 64,
-            paddingBottom: 8,
+            height: 56 + Math.max(insets.bottom, 24),
+            paddingBottom: Math.max(insets.bottom, 24),
           },
           tabBarActiveTintColor: colors.accent,
-          tabBarInactiveTintColor: colors.muted,
+          tabBarInactiveTintColor: colors.textSecondary,
           tabBarLabelStyle: { fontSize: 12 },
         }}
       >
@@ -666,6 +674,10 @@ export default function LearnerLayout() {
           name="onboarding"
           options={{
             href: null,
+            // tabBarItemStyle hides the tab button so it does not occupy
+            // flexbox space when another tab is active (Expo Router v6 +
+            // React Navigation v7 regression — href:null alone is not enough).
+            tabBarItemStyle: { display: 'none' },
             tabBarStyle: { display: 'none' },
           }}
         />
@@ -673,6 +685,7 @@ export default function LearnerLayout() {
           name="session"
           options={{
             href: null,
+            tabBarItemStyle: { display: 'none' },
             tabBarStyle: { display: 'none' },
           }}
         />
@@ -680,18 +693,21 @@ export default function LearnerLayout() {
           name="topic"
           options={{
             href: null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen
           name="subscription"
           options={{
             href: null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen
           name="homework"
           options={{
             href: null,
+            tabBarItemStyle: { display: 'none' },
             tabBarStyle: { display: 'none' },
           }}
         />
@@ -699,6 +715,7 @@ export default function LearnerLayout() {
           name="subject"
           options={{
             href: null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
       </Tabs>

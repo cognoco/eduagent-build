@@ -248,6 +248,161 @@ describe('TopicDetailScreen', () => {
     });
   });
 
+  it('shows "Start Learning" button for not_started topics', () => {
+    mockUseTopicProgress.mockReturnValue({
+      data: {
+        topicId: 'topic-1',
+        title: 'New Topic',
+        description: '',
+        completionStatus: 'not_started',
+        retentionStatus: 'weak',
+        struggleStatus: 'normal',
+        masteryScore: null,
+        summaryExcerpt: null,
+        xpStatus: null,
+      },
+      isLoading: false,
+    });
+    mockUseTopicRetention.mockReturnValue({ data: null, isLoading: false });
+
+    render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('start-learning-button')).toBeTruthy();
+    expect(screen.getByText('Start Learning')).toBeTruthy();
+    expect(screen.queryByTestId('continue-learning-button')).toBeNull();
+    expect(screen.queryByTestId('start-review-button')).toBeNull();
+  });
+
+  it('navigates to freeform session on Start Learning press for not_started', () => {
+    mockUseTopicProgress.mockReturnValue({
+      data: {
+        topicId: 'topic-1',
+        title: 'New Topic',
+        description: '',
+        completionStatus: 'not_started',
+        retentionStatus: 'weak',
+        struggleStatus: 'normal',
+        masteryScore: null,
+        summaryExcerpt: null,
+        xpStatus: null,
+      },
+      isLoading: false,
+    });
+    mockUseTopicRetention.mockReturnValue({ data: null, isLoading: false });
+
+    render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('start-learning-button'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(learner)/session',
+      params: { mode: 'freeform', subjectId: 'sub-1', topicId: 'topic-1' },
+    });
+  });
+
+  it('shows primary "Continue Learning" + secondary "Start Review" for in_progress topics', () => {
+    mockUseTopicProgress.mockReturnValue({
+      data: {
+        topicId: 'topic-1',
+        title: 'Calculus',
+        description: '',
+        completionStatus: 'in_progress',
+        retentionStatus: 'weak',
+        struggleStatus: 'normal',
+        masteryScore: null,
+        summaryExcerpt: null,
+        xpStatus: null,
+      },
+      isLoading: false,
+    });
+    mockUseTopicRetention.mockReturnValue({ data: null, isLoading: false });
+
+    render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('continue-learning-button')).toBeTruthy();
+    expect(screen.getByText('Continue Learning')).toBeTruthy();
+    expect(screen.getByTestId('start-review-button')).toBeTruthy();
+    expect(screen.getByText('Start Review Session')).toBeTruthy();
+  });
+
+  it('navigates to freeform session on Continue Learning press for in_progress', () => {
+    mockUseTopicProgress.mockReturnValue({
+      data: {
+        topicId: 'topic-1',
+        title: 'Calculus',
+        description: '',
+        completionStatus: 'in_progress',
+        retentionStatus: 'weak',
+        struggleStatus: 'normal',
+        masteryScore: null,
+        summaryExcerpt: null,
+        xpStatus: null,
+      },
+      isLoading: false,
+    });
+    mockUseTopicRetention.mockReturnValue({ data: null, isLoading: false });
+
+    render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('continue-learning-button'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(learner)/session',
+      params: { mode: 'freeform', subjectId: 'sub-1', topicId: 'topic-1' },
+    });
+  });
+
+  it('shows primary "Start Review" + secondary "Continue Learning" for completed topics', () => {
+    mockUseTopicProgress.mockReturnValue({
+      data: {
+        topicId: 'topic-1',
+        title: 'Algebra',
+        description: '',
+        completionStatus: 'completed',
+        retentionStatus: 'strong',
+        struggleStatus: 'normal',
+        masteryScore: null,
+        summaryExcerpt: null,
+        xpStatus: null,
+      },
+      isLoading: false,
+    });
+    mockUseTopicRetention.mockReturnValue({ data: null, isLoading: false });
+
+    render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('start-review-button')).toBeTruthy();
+    expect(screen.getByTestId('continue-learning-button')).toBeTruthy();
+    expect(screen.getByText('Continue Learning')).toBeTruthy();
+  });
+
+  it('navigates to freeform session on Continue Learning press for completed topic', () => {
+    mockUseTopicProgress.mockReturnValue({
+      data: {
+        topicId: 'topic-1',
+        title: 'Algebra',
+        description: '',
+        completionStatus: 'completed',
+        retentionStatus: 'strong',
+        struggleStatus: 'normal',
+        masteryScore: null,
+        summaryExcerpt: null,
+        xpStatus: null,
+      },
+      isLoading: false,
+    });
+    mockUseTopicRetention.mockReturnValue({ data: null, isLoading: false });
+
+    render(<TopicDetailScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('continue-learning-button'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(learner)/session',
+      params: { mode: 'freeform', subjectId: 'sub-1', topicId: 'topic-1' },
+    });
+  });
+
   it('navigates to relearn page on Relearn press', () => {
     mockUseTopicProgress.mockReturnValue({
       data: {

@@ -11,7 +11,8 @@ appId: com.mentomate.app
 - tapOn:
     id: "back-to-sign-in"
     optional: true
+# Use testID — heading text varies by SecureStore state.
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 10000

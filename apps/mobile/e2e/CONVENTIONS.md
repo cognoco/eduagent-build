@@ -29,7 +29,32 @@ All dev-client flows should use the shared setup flow:
 - runFlow: _setup/launch-devclient.yaml
 ```
 
-This handles `clearState: true`, dev-client launcher, dev menu overlay, and the "Welcome back" wait.
+This handles `clearState: true`, dev-client launcher, dev menu overlay, and the sign-in screen wait.
+
+## Sign-in screen detection
+
+**Always use `id: "sign-in-button"` to detect the sign-in screen — never heading text.**
+
+The sign-in heading is conditional:
+- First-time user (clean SecureStore): `"Welcome to MentoMate"`
+- Returning user (`hasSignedInBefore` in SecureStore): `"Welcome back"`
+
+Since E2E tests always start from clean state (`pm clear`), the heading is always first-time.
+Using the testID makes flows resilient to both states.
+
+```yaml
+# ✅ Correct — works for both first-time and returning users
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 30000
+
+# ❌ Wrong — breaks after pm clear (shows "Welcome to MentoMate")
+- extendedWaitUntil:
+    visible:
+      text: "Welcome back"
+    timeout: 30000
+```
 
 ## Bundle proxy (Windows only)
 

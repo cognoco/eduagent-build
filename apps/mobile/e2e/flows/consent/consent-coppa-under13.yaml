@@ -24,7 +24,7 @@ tags:
 # ============================================================
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 120000
 
 - tapOn:

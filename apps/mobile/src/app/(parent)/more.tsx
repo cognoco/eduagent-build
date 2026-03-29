@@ -149,7 +149,7 @@ export default function ParentMoreScreen() {
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 24 }}
       >
-        <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-4">
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-4">
           Appearance
         </Text>
         {personas.map((p) => (
@@ -188,7 +188,7 @@ export default function ParentMoreScreen() {
           />
         </View>
 
-        <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
           Notifications
         </Text>
         <ToggleRow
@@ -204,7 +204,7 @@ export default function ParentMoreScreen() {
           disabled={notifLoading || updateNotifications.isPending}
         />
 
-        <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
           Family
         </Text>
         <SettingsRow
@@ -213,7 +213,7 @@ export default function ParentMoreScreen() {
           onPress={() => router.push('/(parent)/dashboard')}
         />
 
-        <Text className="text-caption font-semibold text-text-secondary uppercase tracking-wider mb-2 mt-6">
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
           Account
         </Text>
         <SettingsRow

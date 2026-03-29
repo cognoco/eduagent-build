@@ -312,6 +312,9 @@ CI always uploads screenshots as artifacts (`if: always()`), not just on failure
 | **Homework Help** | Camera capture -> OCR -> homework chat -> Socratic guidance (no direct answers) -> session marked "guided" | `full, homework` |
 | **Parent Dashboard** | Switch to parent persona -> view child progress -> see retention bars -> update notification prefs | `full, parent` |
 | **Multi-Subject** | Add second subject -> switch subjects -> pause first -> auto-archive check -> restore | `full, subjects` |
+| **Learning Book Navigation** | Start freeform session -> verify in-session book link -> end session -> verify summary book link -> navigate to Learning Book (Stories 4.12, 4.13) | `nightly, learning` |
+| **Topic Detail Adaptive Buttons** | Navigate to topic detail -> verify adaptive buttons match completionStatus (not_started/in_progress/completed) (Story 4.14) | `nightly, retention` |
+| **Practice Subject Picker** | Tap "Practice for a test" with 2+ active subjects -> picker appears -> select subject -> practice session starts (Story 10.23) | `nightly, subjects` |
 | **Subscription** | Start trial -> trial expiry warning -> upgrade to Plus -> quota visible -> top-up purchase | `full, billing` |
 | **Account Lifecycle** | Request deletion -> 7-day grace period -> cancel deletion -> re-request -> deletion executes -> data purged | `full, gdpr` |
 | **Adaptive Teaching** | 3 wrong answers -> direct instruction triggered -> "Needs Deepening" scheduled -> 3x success -> normal status | `full, adaptive` |
@@ -324,7 +327,7 @@ CI always uploads screenshots as artifacts (`if: always()`), not just on failure
 | Epic 1 | First Session | — | 1 |
 | Epic 2 | Core Learning | Homework Help | 2 |
 | Epic 3 | Retention | Assessment, Failed Recall, Adaptive | 4 |
-| Epic 4 | — | Parent Dashboard, Multi-Subject | 2 |
+| Epic 4 | — | Parent Dashboard, Multi-Subject, Learning Book Navigation, Topic Detail Buttons | 4 |
 | Epic 5 | — | Subscription | 1 |
 
 ---

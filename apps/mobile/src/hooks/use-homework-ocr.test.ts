@@ -1,5 +1,9 @@
 import { renderHook, act } from '@testing-library/react-native';
+import { NativeModules } from 'react-native';
 import { useHomeworkOcr } from './use-homework-ocr';
+
+// Simulate ML Kit native module being linked
+NativeModules.TextRecognition = { recognize: jest.fn() };
 
 // Mock ML Kit
 const mockRecognize = jest.fn();
@@ -67,7 +71,7 @@ describe('useHomeworkOcr', () => {
     });
   });
 
-  it('resizes cached image to 1024px width before OCR', async () => {
+  it('resizes cached image to 1600px width before OCR', async () => {
     mockRecognize.mockResolvedValue({ text: 'some text' });
 
     const { result } = renderHook(() => useHomeworkOcr());
@@ -79,8 +83,8 @@ describe('useHomeworkOcr', () => {
     // Verify resize receives the cached URI (not the original temp URI)
     expect(mockManipulateAsync).toHaveBeenCalledWith(
       expect.stringMatching(/^file:\/\/\/cache\/homework-\d+\.jpg$/),
-      [{ resize: { width: 1024 } }],
-      { format: 'jpeg', compress: 0.8 }
+      [{ resize: { width: 1600 } }],
+      { format: 'jpeg', compress: 0.9 }
     );
   });
 

@@ -26,7 +26,7 @@ tags:
 #    launcher, bundle loading, and "Continue" overlay dismissal.
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 120000
 
 # 2. Sign in with seeded credentials (from seed-and-run.sh env vars)
@@ -95,7 +95,7 @@ tags:
 # 13. Verify return to auth screen
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 15000
 
 # 14. Final screenshot — back at auth after sign-out

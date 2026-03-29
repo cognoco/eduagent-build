@@ -12,7 +12,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 10000
 
 # ── Test 1: Tap sign-in with empty fields ───────────────────────────
@@ -23,7 +23,7 @@ tags:
 # Should show validation error or stay on same screen
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 5000
 
 - takeScreenshot: sign-in-empty-submit
@@ -43,7 +43,7 @@ tags:
 # Should still be on sign-in screen (password required)
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 5000
 
 - takeScreenshot: sign-in-email-only
@@ -90,5 +90,5 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      text: "Welcome back"
+      id: "sign-in-button"
     timeout: 10000

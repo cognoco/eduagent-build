@@ -8,7 +8,7 @@ jest.mock('./llm', () => {
     routeAndCall: jest.fn().mockResolvedValue({
       response: 'Mock interview response echoing user input',
       provider: 'gemini',
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       latencyMs: 50,
     }),
     routeAndStream: jest.fn(),
@@ -156,7 +156,7 @@ describe('processInterviewExchange', () => {
       .mockResolvedValueOnce({
         response: 'Great session! [INTERVIEW_COMPLETE]',
         provider: 'gemini',
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         latencyMs: 50,
       })
       // Second call is extractSignals

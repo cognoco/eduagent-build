@@ -15,3 +15,4 @@ export {
   type VoicePlaybackBarProps,
 } from './VoicePlaybackBar';
 export { LivingBook } from './LivingBook';
+export { LearningBookPrompt } from './LearningBookPrompt';

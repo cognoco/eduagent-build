@@ -2,7 +2,7 @@
 # This flow uses Maestro's launchApp which is unreliable on WHPX (BUG-19).
 # run-without-seed.sh handles ADB launch + Metro + bundle + overlays, then
 # Maestro starts from the sign-in screen. All flows that previously used
-# this file now wait for "Welcome back" text directly.
+# this file now wait for sign-in-button testID directly.
 #
 # Kept for non-WHPX environments (real devices, KVM emulators).
 #
@@ -42,6 +42,8 @@ appId: com.mentomate.app
     file: dismiss-devtools.yaml
 
 # Now the sign-in screen should be fully accessible.
+# Use testID, not heading text — heading varies by first-time vs returning user.
 - extendedWaitUntil:
-    visible: "Welcome back"
+    visible:
+      id: "sign-in-button"
     timeout: 30000

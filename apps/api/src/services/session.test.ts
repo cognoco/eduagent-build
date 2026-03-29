@@ -44,6 +44,10 @@ jest.mock('./memory', () => ({
     .mockResolvedValue({ context: '', topicIds: [] }),
 }));
 
+jest.mock('./settings', () => ({
+  getLearningMode: jest.fn().mockResolvedValue({ mode: 'serious' }),
+}));
+
 import type { Database } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';
 import {
@@ -215,7 +219,7 @@ beforeEach(() => {
     newEscalationRung: 1,
     isUnderstandingCheck: false,
     provider: 'gemini',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     latencyMs: 150,
   });
 
