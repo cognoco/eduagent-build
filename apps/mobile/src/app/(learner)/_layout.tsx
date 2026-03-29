@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, Redirect } from 'expo-router';
+import { Tabs, Redirect, useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -295,6 +295,43 @@ function PreviewSampleCoaching({
 }
 
 /**
+ * Gate shown when no profile exists yet (first-time user after sign-up).
+ * Pushes to /create-profile as a modal so router.back() returns here
+ * and the layout re-evaluates the guard with the newly created profile.
+ */
+function CreateProfileGate(): React.ReactElement {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  return (
+    <View
+      className="flex-1 bg-background items-center justify-center px-6"
+      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      testID="create-profile-gate"
+    >
+      <Text className="text-h1 font-bold text-text-primary mb-3 text-center">
+        Welcome!
+      </Text>
+      <Text className="text-body text-text-secondary text-center mb-8">
+        Let's set up your profile so your coach can get to know you.
+      </Text>
+      <Pressable
+        onPress={() => router.push('/create-profile')}
+        className="bg-primary rounded-button py-3.5 px-8 items-center w-full"
+        style={{ minHeight: 48 }}
+        testID="create-profile-cta"
+        accessibilityRole="button"
+        accessibilityLabel="Get started"
+      >
+        <Text className="text-body font-semibold text-text-inverse">
+          Get started
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/**
  * Gate shown when a parent has withdrawn consent.
  * Child's access is fully blocked during the 7-day deletion grace period.
  * Different messaging from ConsentPendingGate — this is about account deletion.
@@ -543,7 +580,7 @@ function ConsentPendingGate(): React.ReactElement {
 
 export default function LearnerLayout() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { persona, colorScheme, accentPresetId } = useTheme();
+  const { persona } = useTheme();
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
@@ -596,6 +633,9 @@ export default function LearnerLayout() {
   // Show nothing while profiles are still loading to avoid flash
   if (isProfileLoading) return null;
 
+  // No profile exists — show gate that pushes to profile creation modal
+  if (!activeProfile) return <CreateProfileGate />;
+
   // Gate: block app access when parental consent is pending (COPPA/GDPR)
   if (
     activeProfile?.consentStatus &&
@@ -614,15 +654,10 @@ export default function LearnerLayout() {
     return <PostApprovalLanding onContinue={dismissPostApproval} />;
   }
 
-  // Force NativeWind to remount the CSS variable scope when accent changes,
-  // guaranteeing that --color-primary / --color-accent propagate to all
-  // tab screens (Bug #6 — accent color propagation).
-  const themeKey = `theme-${persona}-${colorScheme}-${
-    accentPresetId ?? 'default'
-  }`;
-
+  // key={themeKey} removed — crashes Android Fabric (MENTOMATE-MOBILE-6).
+  // NativeWind vars() style updates propagate without remounting.
   return (
-    <View key={themeKey} style={[{ flex: 1 }, tokenVars]}>
+    <View style={[{ flex: 1 }, tokenVars]}>
       <Tabs
         screenOptions={{
           headerShown: false,

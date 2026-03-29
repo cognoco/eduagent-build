@@ -168,21 +168,28 @@ export function BrandCelebration({
   }, [done, reduceMotion]);
 
   // --- Animated props ---
+  // Android SVG fix: bundling `opacity` alongside `r` forces native re-renders
+  // when starting from r=0. Without this, circles stay invisible on Android.
   const pathProps = useAnimatedProps(() => ({
     strokeDashoffset: PATH_LEN * (1 - pathDraw.value),
+    opacity: Math.min(pathDraw.value * 10, 1),
   }));
 
   const studentOutProps = useAnimatedProps(() => ({
     r: studentR.value * happyBounce.value,
+    opacity: Math.min(studentR.value / 2, 1),
   }));
   const studentInProps = useAnimatedProps(() => ({
     r: studentInR.value * happyBounce.value,
+    opacity: Math.min(studentInR.value / 1, 1),
   }));
   const mentorOutProps = useAnimatedProps(() => ({
     r: mentorR.value * happyBounce.value,
+    opacity: Math.min(mentorR.value / 2, 1),
   }));
   const mentorInProps = useAnimatedProps(() => ({
     r: mentorInR.value * happyBounce.value,
+    opacity: Math.min(mentorInR.value / 1, 1),
   }));
   const ringProps = useAnimatedProps(() => ({ opacity: ringOp.value }));
 

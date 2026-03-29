@@ -104,7 +104,9 @@ function ThemedApp() {
   // When true, system color scheme changes are ignored (Bug #1 fix).
   const userExplicitChoice = useRef(false);
 
-  // Derive persona from active profile's personaType
+  // Derive persona + color scheme from active profile's personaType.
+  // Must set both together — raw setPersona without setColorScheme leaves
+  // the parent persona stuck in dark mode (themeKey mismatch).
   useEffect(() => {
     if (activeProfile) {
       const candidate = activeProfile.personaType.toLowerCase();
@@ -114,6 +116,7 @@ function ThemedApp() {
         candidate === 'parent'
       ) {
         setPersona(candidate);
+        setColorScheme(schemeForPersona(candidate as Persona));
       }
     }
   }, [activeProfile]);
@@ -191,7 +194,7 @@ function ThemedApp() {
 /** Inner component that reads ThemeContext to inject CSS variables via vars() */
 function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
   const tokenVars = useTokenVars();
-  const { persona, accentPresetId } = useTheme();
+  const { persona } = useTheme();
   const { isOffline } = useNetworkStatus();
   const reduceMotion = useReducedMotion();
   const opacity = useSharedValue(1);
@@ -211,17 +214,13 @@ function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
     flex: 1,
   }));
 
-  // The key forces NativeWind to remount the CSS variable scope when the
-  // accent/persona/scheme changes, guaranteeing that vars() values propagate
-  // to all descendant components.  Without this, NativeWind's internal
-  // observable caching can leave stale --color-primary / --color-accent
-  // values in inactive tab screens (Bug #6 — accent color propagation).
-  const themeKey = `theme-${persona}-${colorScheme}-${
-    accentPresetId ?? 'default'
-  }`;
-
+  // Previously used key={themeKey} to force NativeWind CSS variable propagation
+  // (Bug #6). REMOVED: the key-based remount destroys the entire navigation
+  // tree, which crashes Android Fabric when FragmentManager is mid-transaction
+  // (Sentry MENTOMATE-MOBILE-6: IllegalStateException). NativeWind vars()
+  // style updates propagate without remounting — the key was overkill.
   return (
-    <View key={themeKey} style={[{ flex: 1 }, tokenVars]}>
+    <View style={[{ flex: 1 }, tokenVars]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       {isOffline && <OfflineBanner />}
       <Animated.View style={fadeStyle}>
