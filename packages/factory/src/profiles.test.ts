@@ -58,16 +58,16 @@ describe('buildProfileList', () => {
   it('increments counter across all items', () => {
     const profiles = buildProfileList(3);
 
-    expect(profiles[0].displayName).toBe('Test User 1');
-    expect(profiles[1].displayName).toBe('Test User 2');
-    expect(profiles[2].displayName).toBe('Test User 3');
+    expect(profiles[0]!.displayName).toBe('Test User 1');
+    expect(profiles[1]!.displayName).toBe('Test User 2');
+    expect(profiles[2]!.displayName).toBe('Test User 3');
   });
 
   it('applies overrides to all items', () => {
     const profiles = buildProfileList(2, { personaType: 'TEEN' });
 
-    expect(profiles[0].personaType).toBe('TEEN');
-    expect(profiles[1].personaType).toBe('TEEN');
+    expect(profiles[0]!.personaType).toBe('TEEN');
+    expect(profiles[1]!.personaType).toBe('TEEN');
   });
 
   it('returns empty array for count 0', () => {
