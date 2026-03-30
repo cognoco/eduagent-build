@@ -71,11 +71,65 @@ export const sessionTypeSchema = z.enum([
 ]);
 export type SessionType = z.infer<typeof sessionTypeSchema>;
 
+export const homeworkModeSchema = z.enum(['help_me', 'check_answer']);
+export type HomeworkMode = z.infer<typeof homeworkModeSchema>;
+
+export const homeworkProblemSourceSchema = z.enum(['ocr', 'manual']);
+export type HomeworkProblemSource = z.infer<typeof homeworkProblemSourceSchema>;
+
+export const homeworkProblemStatusSchema = z.enum([
+  'pending',
+  'active',
+  'completed',
+]);
+export type HomeworkProblemStatus = z.infer<typeof homeworkProblemStatusSchema>;
+
+export const homeworkProblemSchema = z.object({
+  id: z.string().min(1),
+  text: z.string().min(1).max(10000),
+  originalText: z.string().nullable().optional(),
+  source: homeworkProblemSourceSchema,
+  status: homeworkProblemStatusSchema.optional(),
+  selectedMode: homeworkModeSchema.nullable().optional(),
+});
+export type HomeworkProblem = z.infer<typeof homeworkProblemSchema>;
+
+export const homeworkSessionMetadataSchema = z
+  .object({
+    problemCount: z.number().int().min(0),
+    currentProblemIndex: z.number().int().min(0),
+    problems: z.array(homeworkProblemSchema),
+    ocrText: z.string().optional(),
+  })
+  .passthrough();
+export type HomeworkSessionMetadata = z.infer<
+  typeof homeworkSessionMetadataSchema
+>;
+
+export const homeworkSummarySchema = z.object({
+  problemCount: z.number().int().min(0),
+  practicedSkills: z.array(z.string()),
+  independentProblemCount: z.number().int().min(0),
+  guidedProblemCount: z.number().int().min(0),
+  summary: z.string().min(1),
+  displayTitle: z.string().min(1),
+});
+export type HomeworkSummary = z.infer<typeof homeworkSummarySchema>;
+
+export const sessionMetadataSchema = z
+  .object({
+    homework: homeworkSessionMetadataSchema.optional(),
+    homeworkSummary: homeworkSummarySchema.optional(),
+  })
+  .passthrough();
+export type SessionMetadata = z.infer<typeof sessionMetadataSchema>;
+
 export const sessionStartSchema = z.object({
   subjectId: z.string().uuid(),
   topicId: z.string().uuid().optional(),
   sessionType: sessionTypeSchema.default('learning'),
   verificationType: z.enum(['standard', 'evaluate', 'teach_back']).optional(),
+  metadata: sessionMetadataSchema.optional(),
 });
 export type SessionStartInput = z.infer<typeof sessionStartSchema>;
 
@@ -101,9 +155,6 @@ export type EscalationRung = z.infer<typeof escalationRungSchema>;
 
 // Exchange schemas
 
-export const homeworkModeSchema = z.enum(['help_me', 'check_answer']);
-export type HomeworkMode = z.infer<typeof homeworkModeSchema>;
-
 export const sessionMessageSchema = z.object({
   message: z.string().min(1).max(10000),
   sessionType: sessionTypeSchema.optional(),
@@ -128,6 +179,7 @@ export const learningSessionSchema = z.object({
   endedAt: z.string().datetime().nullable(),
   durationSeconds: z.number().int().nullable(),
   wallClockSeconds: z.number().int().nullable(),
+  metadata: sessionMetadataSchema.optional(),
 });
 export type LearningSession = z.infer<typeof learningSessionSchema>;
 
@@ -205,6 +257,11 @@ export const OCR_CONSTRAINTS = {
   maxFileSizeBytes: 5 * 1024 * 1024,
   acceptedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
 } as const;
+
+export const homeworkStateSyncSchema = z.object({
+  metadata: homeworkSessionMetadataSchema,
+});
+export type HomeworkStateSyncInput = z.infer<typeof homeworkStateSyncSchema>;
 
 // Interleaved session start — optional filters for topic selection
 

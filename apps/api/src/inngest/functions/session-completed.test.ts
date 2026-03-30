@@ -71,6 +71,15 @@ jest.mock('../../services/xp', () => ({
     mockInsertSessionXpEntry(...args),
 }));
 
+const mockExtractAndStoreHomeworkSummary = jest
+  .fn()
+  .mockResolvedValue(undefined);
+
+jest.mock('../../services/homework-summary', () => ({
+  extractAndStoreHomeworkSummary: (...args: unknown[]) =>
+    mockExtractAndStoreHomeworkSummary(...args),
+}));
+
 const mockIncrementSummarySkips = jest.fn().mockResolvedValue(1);
 const mockResetSummarySkips = jest.fn().mockResolvedValue(undefined);
 
@@ -134,6 +143,7 @@ function createEventData(
     topicId: 'topic-001',
     subjectId: 'subject-001',
     summaryStatus: 'pending',
+    sessionType: 'learning',
     escalationRungs: [1, 2],
     timestamp: '2026-02-17T10:00:00.000Z',
     ...overrides,
@@ -195,6 +205,7 @@ describe('sessionCompleted', () => {
       'write-coaching-card',
       'update-dashboard',
       'generate-embeddings',
+      'extract-homework-summary',
       'track-summary-skips',
     ]);
   });
@@ -461,6 +472,34 @@ describe('sessionCompleted', () => {
         'User: What is algebra?\n\nAI: Algebra is...',
         'pa-test-key-123'
       );
+    });
+  });
+
+  describe('extract-homework-summary step', () => {
+    it('skips homework extraction for non-homework sessions', async () => {
+      const { result } = (await executeSteps(createEventData())) as any;
+
+      expect(mockExtractAndStoreHomeworkSummary).not.toHaveBeenCalled();
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'extract-homework-summary'
+      );
+      expect(outcome.status).toBe('skipped');
+    });
+
+    it('extracts and stores summary for homework sessions', async () => {
+      const { result } = (await executeSteps(
+        createEventData({ sessionType: 'homework' })
+      )) as any;
+
+      expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'session-001'
+      );
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'extract-homework-summary'
+      );
+      expect(outcome.status).toBe('ok');
     });
   });
 

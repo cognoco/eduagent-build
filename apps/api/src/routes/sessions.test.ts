@@ -148,6 +148,8 @@ jest.mock('../services/session', () => {
         sessionId,
         topicId: null,
         subjectId: SUBJECT_ID,
+        sessionType: 'learning',
+        verificationType: null,
       })),
     flagContent: jest.fn().mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
@@ -158,6 +160,13 @@ jest.mock('../services/session', () => {
       content: 'Test summary',
       aiFeedback: null,
       status: 'submitted',
+    }),
+    syncHomeworkState: jest.fn().mockResolvedValue({
+      metadata: {
+        problemCount: 2,
+        currentProblemIndex: 1,
+        problems: [],
+      },
     }),
     submitSummary: jest
       .fn()
@@ -439,6 +448,7 @@ describe('session routes', () => {
         data: expect.objectContaining({
           sessionId: SESSION_ID,
           subjectId: SUBJECT_ID,
+          sessionType: 'learning',
           summaryStatus: 'skipped',
           timestamp: expect.any(String),
         }),
@@ -476,6 +486,63 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('POST /v1/sessions/:sessionId/homework-state', () => {
+    it('returns 200 for valid homework metadata', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/homework-state`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            metadata: {
+              problemCount: 2,
+              currentProblemIndex: 1,
+              problems: [
+                {
+                  id: 'problem-1',
+                  text: 'Solve 2x + 5 = 17',
+                  source: 'ocr',
+                  status: 'completed',
+                },
+                {
+                  id: 'problem-2',
+                  text: 'Factor x^2 + 3x + 2',
+                  source: 'manual',
+                  status: 'active',
+                },
+              ],
+            },
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.metadata.problemCount).toBe(2);
+    });
+
+    it('returns 400 for invalid homework metadata', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/homework-state`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            metadata: {
+              problemCount: -1,
+              currentProblemIndex: 0,
+              problems: [],
+            },
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
     });
   });
 

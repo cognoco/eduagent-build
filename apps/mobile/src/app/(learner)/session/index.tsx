@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import type { HomeworkProblem } from '@eduagent/schemas';
 import {
   ChatShell,
   animateResponse,
@@ -23,6 +24,11 @@ import { useNetworkStatus } from '../../../hooks/use-network-status';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
 import { useApiClient } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
+import {
+  buildHomeworkSessionMetadata,
+  parseHomeworkProblems,
+  withProblemMode,
+} from '../homework/problem-cards';
 
 export default function SessionScreen() {
   const {
@@ -32,6 +38,8 @@ export default function SessionScreen() {
     sessionId: routeSessionId,
     topicId,
     problemText,
+    homeworkProblems,
+    ocrText,
   } = useLocalSearchParams<{
     mode?: string;
     subjectId?: string;
@@ -39,10 +47,21 @@ export default function SessionScreen() {
     sessionId?: string;
     topicId?: string;
     problemText?: string;
+    homeworkProblems?: string;
+    ocrText?: string;
   }>();
   const router = useRouter();
 
   const effectiveMode = mode ?? 'freeform';
+  const initialHomeworkProblems = useMemo(
+    () =>
+      effectiveMode === 'homework'
+        ? parseHomeworkProblems(homeworkProblems, problemText)
+        : [],
+    [effectiveMode, homeworkProblems, problemText]
+  );
+  const initialProblemText =
+    initialHomeworkProblems[0]?.text ?? problemText ?? undefined;
   const modeConfig = getModeConfig(effectiveMode);
   const { data: streak } = useStreaks();
   const { data: overallProgress } = useOverallProgress();
@@ -53,7 +72,7 @@ export default function SessionScreen() {
   const openingContent = getOpeningMessage(
     effectiveMode,
     sessionExperience,
-    problemText
+    initialProblemText
   );
 
   const { isOffline } = useNetworkStatus();
@@ -75,11 +94,17 @@ export default function SessionScreen() {
     subjectId: string;
     subjectName: string;
   } | null>(null);
+  const [homeworkProblemsState, setHomeworkProblemsState] = useState<
+    HomeworkProblem[]
+  >(initialHomeworkProblems);
+  const [currentProblemIndex, setCurrentProblemIndex] = useState(0);
   const [homeworkMode, setHomeworkMode] = useState<
     'help_me' | 'check_answer' | undefined
   >(undefined);
 
   const animationCleanupRef = useRef<(() => void) | null>(null);
+  const hasAutoSentRef = useRef(false);
+  const queuedProblemTextRef = useRef<string | null>(null);
 
   // Reset state when screen regains focus (prevents stale state loop)
   useFocusEffect(
@@ -94,7 +119,11 @@ export default function SessionScreen() {
       setPendingClassification(false);
       setClassifyError(null);
       setClassifiedSubject(null);
-    }, [openingContent, routeSessionId])
+      setHomeworkProblemsState(initialHomeworkProblems);
+      setCurrentProblemIndex(0);
+      setHomeworkMode(undefined);
+      hasAutoSentRef.current = false;
+    }, [openingContent, routeSessionId, initialHomeworkProblems])
   );
 
   useEffect(() => {
@@ -111,6 +140,37 @@ export default function SessionScreen() {
   const startSession = useStartSession(effectiveSubjectId);
   const closeSession = useCloseSession(activeSessionId ?? '');
   const { stream: streamMessage } = useStreamMessage(activeSessionId ?? '');
+  const activeHomeworkProblem = homeworkProblemsState[currentProblemIndex];
+
+  const syncHomeworkMetadata = useCallback(
+    async (
+      targetSessionId: string,
+      problems: HomeworkProblem[],
+      problemIndex: number
+    ) => {
+      if (effectiveMode !== 'homework' || problems.length === 0) {
+        return;
+      }
+
+      const res = await apiClient.sessions[':sessionId'][
+        'homework-state'
+      ].$post({
+        param: { sessionId: targetSessionId },
+        json: {
+          metadata: buildHomeworkSessionMetadata(
+            problems,
+            problemIndex,
+            Array.isArray(ocrText) ? ocrText[0] : ocrText
+          ),
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Homework state sync failed: ${res.status}`);
+      }
+    },
+    [apiClient, effectiveMode, ocrText]
+  );
 
   const ensureSession = useCallback(
     async (overrideSubjectId?: string): Promise<string | null> => {
@@ -135,6 +195,18 @@ export default function SessionScreen() {
               subjectId: overrideSubjectId,
               topicId: topicId ?? undefined,
               sessionType,
+              ...(effectiveMode === 'homework' &&
+              homeworkProblemsState.length > 0
+                ? {
+                    metadata: {
+                      homework: buildHomeworkSessionMetadata(
+                        homeworkProblemsState,
+                        currentProblemIndex,
+                        Array.isArray(ocrText) ? ocrText[0] : ocrText
+                      ),
+                    },
+                  }
+                : {}),
             },
           });
           if (!res.ok) throw new Error(`Session start failed: ${res.status}`);
@@ -145,10 +217,32 @@ export default function SessionScreen() {
             subjectId: sid,
             topicId: topicId ?? undefined,
             sessionType,
+            ...(effectiveMode === 'homework' && homeworkProblemsState.length > 0
+              ? {
+                  metadata: {
+                    homework: buildHomeworkSessionMetadata(
+                      homeworkProblemsState,
+                      currentProblemIndex,
+                      Array.isArray(ocrText) ? ocrText[0] : ocrText
+                    ),
+                  },
+                }
+              : {}),
           });
           newId = result.session.id;
         }
         setActiveSessionId(newId);
+        if (effectiveMode === 'homework' && homeworkProblemsState.length > 0) {
+          try {
+            await syncHomeworkMetadata(
+              newId,
+              homeworkProblemsState,
+              currentProblemIndex
+            );
+          } catch {
+            // Keep the session alive even if homework metadata sync fails.
+          }
+        }
         return newId;
       } catch {
         return null;
@@ -161,6 +255,10 @@ export default function SessionScreen() {
       effectiveMode,
       apiClient,
       startSession,
+      homeworkProblemsState,
+      currentProblemIndex,
+      ocrText,
+      syncHomeworkMetadata,
     ]
   );
 
@@ -199,6 +297,21 @@ export default function SessionScreen() {
       }
 
       try {
+        const currentHomeworkProblemId =
+          effectiveMode === 'homework' ? activeHomeworkProblem?.id : undefined;
+        const updatedProblems =
+          effectiveMode === 'homework' && currentHomeworkProblemId
+            ? withProblemMode(
+                homeworkProblemsState,
+                currentHomeworkProblemId,
+                homeworkMode
+              )
+            : homeworkProblemsState;
+
+        if (updatedProblems !== homeworkProblemsState) {
+          setHomeworkProblemsState(updatedProblems);
+        }
+
         const sid = await ensureSession(sessionSubjectId);
         if (!sid) {
           const hasSubject = !!(
@@ -215,6 +328,18 @@ export default function SessionScreen() {
             setIsStreaming
           );
           return;
+        }
+
+        if (effectiveMode === 'homework' && updatedProblems.length > 0) {
+          try {
+            await syncHomeworkMetadata(
+              sid,
+              updatedProblems,
+              currentProblemIndex
+            );
+          } catch {
+            // Don't block the tutoring exchange on metadata sync.
+          }
         }
 
         const streamId = `ai-${Date.now()}`;
@@ -270,24 +395,91 @@ export default function SessionScreen() {
       messages.length,
       classifySubject,
       ensureSession,
+      activeHomeworkProblem,
+      homeworkProblemsState,
       streamMessage,
       effectiveMode,
       homeworkMode,
+      currentProblemIndex,
+      syncHomeworkMetadata,
     ]
   );
 
-  const hasAutoSentRef = useRef(false);
+  useEffect(() => {
+    if (!queuedProblemTextRef.current) {
+      return undefined;
+    }
+
+    const queuedProblemText = queuedProblemTextRef.current;
+    queuedProblemTextRef.current = null;
+    const timer = setTimeout(() => {
+      void handleSend(queuedProblemText);
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [currentProblemIndex, handleSend]);
 
   useEffect(() => {
-    if (problemText && !hasAutoSentRef.current) {
+    if (
+      effectiveMode === 'homework' &&
+      activeHomeworkProblem &&
+      !hasAutoSentRef.current
+    ) {
       hasAutoSentRef.current = true;
       const timer = setTimeout(() => {
-        handleSend(problemText);
+        handleSend(activeHomeworkProblem.text);
       }, 500);
       return () => clearTimeout(timer);
     }
     return undefined;
-  }, [problemText, handleSend]);
+  }, [effectiveMode, activeHomeworkProblem, handleSend]);
+
+  const handleNextProblem = useCallback(async () => {
+    if (
+      effectiveMode !== 'homework' ||
+      isStreaming ||
+      currentProblemIndex >= homeworkProblemsState.length - 1
+    ) {
+      return;
+    }
+
+    const nextProblemIndex = currentProblemIndex + 1;
+    const currentProblemId = activeHomeworkProblem?.id;
+    const updatedProblems =
+      currentProblemId != null
+        ? withProblemMode(homeworkProblemsState, currentProblemId, homeworkMode)
+        : homeworkProblemsState;
+
+    const nextProblem = updatedProblems[nextProblemIndex];
+    if (nextProblem) {
+      queuedProblemTextRef.current = nextProblem.text;
+    }
+
+    setHomeworkProblemsState(updatedProblems);
+    setCurrentProblemIndex(nextProblemIndex);
+    setHomeworkMode(undefined);
+
+    if (activeSessionId) {
+      try {
+        await syncHomeworkMetadata(
+          activeSessionId,
+          updatedProblems,
+          nextProblemIndex
+        );
+      } catch {
+        // Keep the local flow moving even if metadata sync fails.
+      }
+    }
+  }, [
+    effectiveMode,
+    isStreaming,
+    currentProblemIndex,
+    homeworkProblemsState,
+    activeHomeworkProblem,
+    homeworkMode,
+    activeSessionId,
+    syncHomeworkMetadata,
+  ]);
 
   const handleEndSession = useCallback(async () => {
     if (!activeSessionId || isClosing) return;
@@ -373,49 +565,80 @@ export default function SessionScreen() {
 
   const homeworkModeChips =
     effectiveMode === 'homework' ? (
-      <View className="flex-row px-4 pt-3 bg-surface border-t border-surface-elevated gap-2">
-        <Pressable
-          onPress={() => setHomeworkMode('help_me')}
-          className={`flex-1 rounded-button py-2 items-center ${
-            homeworkMode === 'help_me' ? 'bg-primary' : 'bg-surface-elevated'
-          }`}
-          testID="homework-mode-help-me"
-          accessibilityRole="button"
-          accessibilityLabel="Help me solve it"
-          accessibilityState={{ selected: homeworkMode === 'help_me' }}
-        >
-          <Text
-            className={`text-body-sm font-semibold ${
-              homeworkMode === 'help_me'
-                ? 'text-text-inverse'
-                : 'text-text-primary'
+      <View className="bg-surface border-t border-surface-elevated">
+        {homeworkProblemsState.length > 0 && (
+          <View className="flex-row items-center justify-between px-4 pt-3">
+            <View>
+              <Text
+                className="text-body-sm font-semibold text-text-primary"
+                testID="homework-problem-progress"
+              >
+                Problem {currentProblemIndex + 1} of{' '}
+                {homeworkProblemsState.length}
+              </Text>
+              <Text className="text-caption text-text-secondary mt-0.5">
+                {activeHomeworkProblem?.text.slice(0, 70) ?? ''}
+              </Text>
+            </View>
+            {currentProblemIndex < homeworkProblemsState.length - 1 && (
+              <Pressable
+                onPress={handleNextProblem}
+                className="rounded-full bg-primary/10 px-3 py-2"
+                testID="next-problem-chip"
+                accessibilityRole="button"
+                accessibilityLabel="Move to the next homework problem"
+              >
+                <Text className="text-body-sm font-semibold text-primary">
+                  Next problem
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+        <View className="flex-row px-4 py-3 gap-2">
+          <Pressable
+            onPress={() => setHomeworkMode('help_me')}
+            className={`flex-1 rounded-button py-2 items-center ${
+              homeworkMode === 'help_me' ? 'bg-primary' : 'bg-surface-elevated'
             }`}
+            testID="homework-mode-help-me"
+            accessibilityRole="button"
+            accessibilityLabel="Help me solve it"
+            accessibilityState={{ selected: homeworkMode === 'help_me' }}
           >
-            Help me solve it
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setHomeworkMode('check_answer')}
-          className={`flex-1 rounded-button py-2 items-center ${
-            homeworkMode === 'check_answer'
-              ? 'bg-primary'
-              : 'bg-surface-elevated'
-          }`}
-          testID="homework-mode-check-answer"
-          accessibilityRole="button"
-          accessibilityLabel="Check my answer"
-          accessibilityState={{ selected: homeworkMode === 'check_answer' }}
-        >
-          <Text
-            className={`text-body-sm font-semibold ${
+            <Text
+              className={`text-body-sm font-semibold ${
+                homeworkMode === 'help_me'
+                  ? 'text-text-inverse'
+                  : 'text-text-primary'
+              }`}
+            >
+              Help me solve it
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setHomeworkMode('check_answer')}
+            className={`flex-1 rounded-button py-2 items-center ${
               homeworkMode === 'check_answer'
-                ? 'text-text-inverse'
-                : 'text-text-primary'
+                ? 'bg-primary'
+                : 'bg-surface-elevated'
             }`}
+            testID="homework-mode-check-answer"
+            accessibilityRole="button"
+            accessibilityLabel="Check my answer"
+            accessibilityState={{ selected: homeworkMode === 'check_answer' }}
           >
-            Check my answer
-          </Text>
-        </Pressable>
+            <Text
+              className={`text-body-sm font-semibold ${
+                homeworkMode === 'check_answer'
+                  ? 'text-text-inverse'
+                  : 'text-text-primary'
+              }`}
+            >
+              Check my answer
+            </Text>
+          </Pressable>
+        </View>
       </View>
     ) : undefined;
 

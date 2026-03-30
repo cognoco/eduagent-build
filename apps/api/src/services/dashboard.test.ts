@@ -620,6 +620,16 @@ describe('getChildSessions', () => {
         escalationRung: 1,
         durationSeconds: null,
         wallClockSeconds: null,
+        metadata: {
+          homeworkSummary: {
+            problemCount: 5,
+            practicedSkills: ['linear equations'],
+            independentProblemCount: 3,
+            guidedProblemCount: 2,
+            summary: '5 problems, practiced linear equations.',
+            displayTitle: 'Math Homework',
+          },
+        },
       },
     ]);
 
@@ -638,6 +648,10 @@ describe('getChildSessions', () => {
     expect(result[1].endedAt).toBeNull();
     expect(result[1].durationSeconds).toBeNull();
     expect(result[1].wallClockSeconds).toBeNull();
+    expect(result[1].displayTitle).toBe('Math Homework');
+    expect(result[1].displaySummary).toBe(
+      '5 problems, practiced linear equations.'
+    );
   });
 });
 
@@ -700,6 +714,16 @@ describe('getChildSessionTranscript', () => {
       sessionType: 'learning',
       startedAt: sessionStart,
       exchangeCount: 4,
+      metadata: {
+        homeworkSummary: {
+          problemCount: 2,
+          practicedSkills: ['fractions'],
+          independentProblemCount: 1,
+          guidedProblemCount: 1,
+          summary: '2 problems, practiced fractions.',
+          displayTitle: 'Math Homework',
+        },
+      },
     });
 
     const t1 = new Date('2025-06-01T10:00:10Z');
@@ -748,6 +772,10 @@ describe('getChildSessionTranscript', () => {
     expect(result!.session.topicId).toBe(TOPIC_ID_1);
     expect(result!.session.startedAt).toBe(sessionStart.toISOString());
     expect(result!.session.exchangeCount).toBe(4);
+    expect(result!.session.displayTitle).toBe('Math Homework');
+    expect(result!.session.displaySummary).toBe(
+      '2 problems, practiced fractions.'
+    );
 
     expect(result!.exchanges).toHaveLength(4);
     expect(result!.exchanges[0].role).toBe('user');

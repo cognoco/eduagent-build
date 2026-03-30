@@ -7,7 +7,12 @@ import {
   type UseMutationResult,
 } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
-import type { LearningSession, SessionSummary } from '@eduagent/schemas';
+import type {
+  HomeworkSessionMetadata,
+  LearningSession,
+  SessionMetadata,
+  SessionSummary,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
@@ -42,12 +47,15 @@ interface SubmitSummaryResult {
   };
 }
 
-export function useStartSession(
-  subjectId: string
-): UseMutationResult<
+export function useStartSession(subjectId: string): UseMutationResult<
   SessionStartResult,
   Error,
-  { subjectId: string; topicId?: string; sessionType?: 'learning' | 'homework' }
+  {
+    subjectId: string;
+    topicId?: string;
+    sessionType?: 'learning' | 'homework';
+    metadata?: SessionMetadata;
+  }
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
@@ -57,6 +65,7 @@ export function useStartSession(
       subjectId: string;
       topicId?: string;
       sessionType?: 'learning' | 'homework';
+      metadata?: SessionMetadata;
     }): Promise<SessionStartResult> => {
       const res = await client.subjects[':subjectId'].sessions.$post({
         param: { subjectId },
@@ -64,6 +73,31 @@ export function useStartSession(
       });
       await assertOk(res);
       return (await res.json()) as SessionStartResult;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+    },
+  });
+}
+
+export function useSyncHomeworkState(
+  sessionId: string
+): UseMutationResult<
+  { metadata: HomeworkSessionMetadata },
+  Error,
+  { metadata: HomeworkSessionMetadata }
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { metadata: HomeworkSessionMetadata }) => {
+      const res = await client.sessions[':sessionId']['homework-state'].$post({
+        param: { sessionId },
+        json: input,
+      });
+      await assertOk(res);
+      return (await res.json()) as { metadata: HomeworkSessionMetadata };
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['sessions'] });
