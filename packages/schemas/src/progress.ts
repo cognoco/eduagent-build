@@ -80,6 +80,8 @@ export const dashboardChildSchema = z.object({
   sessionsLastWeek: z.number().int(),
   totalTimeThisWeek: z.number().int(),
   totalTimeLastWeek: z.number().int(),
+  exchangesThisWeek: z.number().int(),
+  exchangesLastWeek: z.number().int(),
   trend: z.enum(['up', 'down', 'stable']),
   subjects: z.array(
     z.object({

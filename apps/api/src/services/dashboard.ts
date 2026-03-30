@@ -24,6 +24,8 @@ export interface DashboardInput {
   sessionsLastWeek: number;
   totalTimeThisWeekMinutes: number;
   totalTimeLastWeekMinutes: number;
+  exchangesThisWeek: number;
+  exchangesLastWeek: number;
   subjectRetentionData: Array<{
     name: string;
     status: 'strong' | 'fading' | 'weak';
@@ -253,7 +255,17 @@ export async function getChildrenForParent(
       )
       .reduce((sum, s) => sum + getDisplaySeconds(s), 0);
 
-    // 6. Count guided metrics from session events
+    // 6. Sum exchange counts (FR215.4: "X minutes, Y exchanges")
+    const exchangesThisWeek = recentSessions
+      .filter((s) => s.startedAt >= startOfThisWeek)
+      .reduce((sum, s) => sum + s.exchangeCount, 0);
+    const exchangesLastWeek = recentSessions
+      .filter(
+        (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
+      )
+      .reduce((sum, s) => sum + s.exchangeCount, 0);
+
+    // 7. Count guided metrics from session events
     const guidedMetrics = await countGuidedMetrics(
       db,
       childProfileId,
@@ -276,6 +288,8 @@ export async function getChildrenForParent(
       sessionsLastWeek,
       totalTimeThisWeekMinutes: Math.round(totalTimeThisWeek / 60),
       totalTimeLastWeekMinutes: Math.round(totalTimeLastWeek / 60),
+      exchangesThisWeek,
+      exchangesLastWeek,
       subjectRetentionData,
       guidedCount: guidedMetrics.guidedCount,
       totalProblemCount: guidedMetrics.totalProblemCount,
@@ -293,6 +307,8 @@ export async function getChildrenForParent(
       sessionsLastWeek,
       totalTimeThisWeek: dashboardInput.totalTimeThisWeekMinutes,
       totalTimeLastWeek: dashboardInput.totalTimeLastWeekMinutes,
+      exchangesThisWeek: dashboardInput.exchangesThisWeek,
+      exchangesLastWeek: dashboardInput.exchangesLastWeek,
       trend,
       subjects: progress.subjects.map((s) => ({
         name: s.name,
