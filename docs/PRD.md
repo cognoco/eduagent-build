@@ -1033,7 +1033,7 @@ See also FR134-FR137 (Analogy Domain Preferences) for subject-level learning sty
 - FR28: Users can receive cognitive load management (1-2 concepts per message maximum)
 - FR29: Users can flag content that seems incorrect
 - FR30: Users can choose between "Learn something new" and "Get help with homework" modes
-- FR31: Users can receive Socratic guidance for homework (guided problem-solving, never answer-giving)
+- FR31: (Revised by FR228, Epic 14) Homework help uses direct explanation and verification — AI explains approaches, shows similar worked examples, and verifies student answers. Two modes per problem: "Check my answer" (brief verification) and "Help me solve it" (explain + similar example). AI never provides the final answer to the actual homework problem. Learning sessions retain Socratic guidance.
 - FR32: Users can photograph homework problems for AI analysis (v1.1)
 - FR33: Users can see sessions marked as "guided problem-solving" in Learning Book
 

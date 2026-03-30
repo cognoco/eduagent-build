@@ -1,8 +1,22 @@
-# Epic 12: Remove Persona Enum — Age + Role + Intent (POST-LAUNCH)
+# Epic 12: Remove Persona Enum — Age + Role + Intent-as-Cards (POST-LAUNCH)
 
 **Author:** Zuzka + Claude
-**Date:** 2026-03-29
-**Status:** Spec complete, development deferred to post-launch
+**Date:** 2026-03-30 (revised)
+**Status:** Spec complete (v2 — intent-as-cards redesign), development deferred to post-launch
+**Supersedes:** v1 (dynamic tab bar model, 2026-03-29)
+
+---
+
+## What Changed from v1 and Why
+
+| Original (v1) | Revised (v2) | Why |
+|---------------|-------------|-----|
+| `birthDate` (full date) for age | `birthYear` (integer) for age | Less PII. Age bracket changes on Jan 1, not birthday — no jarring mid-year voice shift. |
+| Dynamic Family tab (appears/disappears) | Stable tab bar + Family as home card | Dynamic tabs break muscle memory. Tab positions shift when Family appears/disappears. |
+| Session intent in profile settings | Per-session intent via home cards | Intent changes every session. Burying it in settings makes it stale by day 2. |
+| "What brings you here?" picker (considered) | AI-ranked cards, user taps to choose | Pickers cause frequency fatigue. Cards let the AI suggest without blocking. |
+| Parent dashboard = separate route group | Parent dashboard = home card showing real data | Parent oversight is a card tap, not a mode switch. Same app for everyone. |
+| Single coaching card on home | 2-3 ranked home cards | Multiple cards = multiple intents visible, no settings needed for intent switching. |
 
 ---
 
@@ -10,19 +24,34 @@
 
 The current system jams three independent concepts into one `personaType` enum (`TEEN | LEARNER | PARENT`):
 
-1. **Age** — computed from `birthDate`, drives LLM voice tone, session timer caps, and consent requirements
+1. **Age** — computed from `birthYear`, drives LLM voice tone and consent requirements
 2. **Parental relationship** — whether the account has linked children, drives oversight capabilities
 3. **Session intent** — what the user wants to do right now (homework, learn, browse, check kid's progress)
 
-None of these are personas. "Teen" is an age bracket. "Parent" is a relationship. "Eager learner" vs "casually browsing" is a mood. None belong in a profile enum.
+None of these are personas. "Teen" is an age bracket. "Parent" is a relationship. "Homework vs study" is a mood that changes daily. None belong in a profile enum.
+
+Additionally, session intent is currently buried in profile settings — a static choice that goes stale. A teen who usually does homework but today wants to study deeply must dig into Settings to change their mode. This friction kills spontaneity.
 
 ## Design Principles
 
 - The `personaType` field goes away entirely
-- Profile stores who you are: `displayName`, `birthDate`
-- The system derives everything else at runtime
-- A parent who wants to learn doesn't need a second profile
+- Profile stores who you are: `displayName`, `birthYear`
+- Age is derived at runtime from `birthYear`, never stored as a separate column
+- Parent capabilities are derived from `familyLinks` existence, no `isParent` flag
+- **Intent is not stored or asked — it's expressed per-session by tapping a home card**
+- A parent who wants to learn taps a learning card. Same profile. No switching.
 - The user never sees or picks a "persona"
+- The home screen IS the intent surface
+
+---
+
+## The Three Independent Axes
+
+| Concern | Source | Stored? | Changes when? |
+|---------|--------|---------|---------------|
+| **Age** (LLM voice, consent) | `birthYear` on profile | Yes (integer) | On year rollover |
+| **Role** (parent features) | `familyLinks` existence | Derived at runtime | When links added/removed |
+| **Intent** (session mode) | Home screen card taps | Not stored as setting | Every app open |
 
 ---
 
@@ -30,19 +59,19 @@ None of these are personas. "Teen" is an age bracket. "Parent" is a relationship
 
 ### FR200: Age-Based Classification (replaces persona auto-detection)
 
-- **FR200.1:** Age bracket is computed at runtime from `profile.birthDate`, never stored as a separate column.
+- **FR200.1:** Age bracket is computed at runtime from `profile.birthYear` and the current year, never stored as a separate column.
 - **FR200.2:** Age brackets: `child` (< 13), `adolescent` (13-17), `adult` (18+). These drive:
   - LLM voice tone (`getPersonaVoice()` → `getAgeVoice()`)
-  - Session timer caps (child: 15/20 min, adolescent/adult: 25/30 min)
-  - Consent requirements (< 16: GDPR parental consent required)
+  - Consent requirements (< 16: GDPR parental consent required — conservative: if `currentYear - birthYear <= 16`, require consent)
 - **FR200.3:** Age bracket labels are never shown to the user. The app just behaves appropriately.
 
 ### FR201: Dynamic Parent Capabilities
 
-- **FR201.1:** If `familyLinks` exist for the current profile (i.e., linked children), a "Family" tab appears in the tab bar automatically.
-- **FR201.2:** Parent oversight features (dashboard, transcripts, consent management) are available alongside learning features — not instead of them.
-- **FR201.3:** A parent can learn AND check their kid's progress from the same profile. No profile switching required.
-- **FR201.4:** When the last child link is removed, the Family tab disappears.
+- **FR201.1:** If `familyLinks` exist for the current profile as a parent (i.e., linked children), a **Family card** appears on the home screen with real child data (name, today's activity, reviews due).
+- **FR201.2:** Parent oversight features (dashboard, transcripts, consent management) are available alongside learning features — not instead of them. Accessed via Family card → dashboard navigation, not a separate tab or route group.
+- **FR201.3:** A parent can learn AND check their kid's progress from the same profile. No profile switching required. Different cards on the same home screen.
+- **FR201.4:** When the last child link is removed, the Family card disappears from the home screen. No tabs shift, no navigation changes — just one fewer card.
+- **FR201.5:** Cold-start case: when a new parent creates an account and indicates parental intent ("Do you have children who'll use EduAgent?" → Yes), but has not yet linked a child, a "Link your child" card appears on the home screen. The onboarding flow guides child linking.
 
 ### FR202: Theme Decoupling
 
@@ -53,169 +82,151 @@ None of these are personas. "Teen" is an age bracket. "Parent" is a relationship
 ### FR203: Database Migration
 
 - **FR203.1:** The `persona_type` PostgreSQL enum and column are removed from the `profiles` table.
-- **FR203.2:** Migration is reversible: a down migration re-adds the column and populates it from `birthDate` using the same age brackets.
-- **FR203.3:** API continues to accept `personaType` in profile creation requests during a transition period, but ignores it (derives from `birthDate`).
+- **FR203.2:** The `birth_date` column is migrated to `birth_year` (integer). Existing rows: extract year from `birth_date`.
+- **FR203.3:** A new `birth_year_set_by` column (nullable profile ID) tracks who set the birth year. If not null, the birth year was set by a parent and the child cannot edit it.
+- **FR203.4:** Migration is reversible: a down migration re-adds columns and populates from computed values.
+- **FR203.5:** API continues to accept `personaType` in profile creation requests during a transition period (2 mobile release cycles), but ignores it. After the transition window, the field is rejected with a 400 error. Deprecation header (`X-Deprecated-Field: personaType`) during transition.
 
 ### FR204: LLM Voice Refactor
 
-- **FR204.1:** `getPersonaVoice()` is replaced by `getAgeVoice(birthDate)` which computes age and returns the appropriate voice instructions.
+- **FR204.1:** `getPersonaVoice()` is replaced by `getAgeVoice(birthYear)` which computes age bracket and returns the appropriate voice instructions.
 - **FR204.2:** Voice tones remain the same — only the lookup key changes (age bracket instead of persona enum).
 - **FR204.3:** No change to the actual LLM prompt content — just how it's selected.
+- **FR204.4:** Age bracket transition is smooth: since `birthYear` (not full date) is used, the bracket only changes on January 1st — a natural boundary, not the user's birthday.
 
 ### FR205: Session Timer Refactor
 
-- **FR205.1:** `SessionTimerConfig.personaType` replaced by `SessionTimerConfig.birthDate`.
-- **FR205.2:** Timer logic changes from `if (personaType === 'TEEN')` to `if (computeAge(birthDate) < 13)`.
-- **FR205.3:** Adolescents (13-17) get the same timer caps as adults (25/30 min). Previously "TEEN" (<13) and "LEARNER" (13-17) had different thresholds only because they were separate enum values — the actual timer code treated TEEN as the only short-session persona.
+- **FR205.1:** `SessionTimerConfig.personaType` is removed entirely. Timer config no longer depends on persona or age.
+- **FR205.2:** Hard caps and nudge thresholds are removed — see Epic 13 (FR213). No forced session end for any age group.
+- **FR205.3:** Only silence detection remains: 8-min silence cap (Epic 13 FR210), 30-min auto-save/close. Age-agnostic.
+- **FR205.4:** If future product research indicates a need for session limits, implement as a parent-configurable setting — not a system-imposed hard cap.
+
+### FR206: Analytics & Event Schema Migration
+
+- **FR206.1:** All analytics events, Sentry tags, and Inngest event payloads that include `personaType` must be updated to use `ageBracket` (or remove the field if not needed).
+- **FR206.2:** If analytics dashboards or reports segment by persona, update them to segment by age bracket before dropping the column.
+- **FR206.3:** RevenueCat customer metadata that references persona must be updated to age bracket or removed.
+- **FR206.4:** Home card tap events tracked in `sessionEvents` with `eventType: 'home_card_tap'` and card type metadata — new analytics dimension for understanding intent patterns.
+
+### FR207: Prioritized Home Cards (NEW — the intent surface)
+
+- **FR207.1:** The home screen displays 2-3 ranked action cards, replacing the single coaching card (`AdaptiveEntryCard`). Each card represents a possible session intent or action.
+- **FR207.2:** Card types: Homework, Study/Continue, Review, Family, Resume Session (crash recovery), Link Child (cold-start). See Story 12.7 for full card type table.
+- **FR207.3:** Card ranking uses a simple heuristic (no ML): time-of-day patterns, recent session modes, reviews due, familyLinks, and dismissal history. `precomputeHomeCards(profileId)` replaces `precomputeCoachingCard()`.
+- **FR207.4:** Layout: primary card (large, full-width) is the AI's best bet. Secondary cards (smaller, side-by-side) are alternatives. Cold start: all cards equal-sized.
+- **FR207.5:** Minimum 2 cards visible at all times. The user always has a choice — never reduced to a single forced option.
+- **FR207.6:** Card taps are tracked in `sessionEvents` (`eventType: 'home_card_tap'`) to improve future ranking.
+- **FR207.7:** Each card has a dismiss affordance (× button). Dismissed cards hidden for current session. Cards dismissed 3+ times deprioritized in ranking. Co-designed with Epic 14 FR221.
+- **FR207.8:** Resume Session card (Epic 13 FR211 crash recovery) takes highest priority when present, displacing normal ranking.
 
 ---
 
 ## Architecture Decisions
 
-### AD1: No new enum — compute at runtime
+### AD1: Birth year, not birth date
 
-Age bracket is a pure function of `birthDate` and the current date. Storing it would create a stale-data problem (the bracket changes on the user's birthday). Compute it every time it's needed.
+`birthYear` (integer) instead of `birthDate` (date). Less PII under GDPR for minors. Age bracket changes on January 1st, not the user's birthday — no jarring mid-year voice change. Sufficient precision for `computeAgeBracket()`.
 
 ```typescript
 type AgeBracket = 'child' | 'adolescent' | 'adult';
 
-function computeAgeBracket(birthDate: string): AgeBracket {
-  const age = computeAge(birthDate);
+function computeAgeBracket(birthYear: number): AgeBracket {
+  const age = new Date().getFullYear() - birthYear;
   if (age < 13) return 'child';
   if (age < 18) return 'adolescent';
   return 'adult';
 }
 ```
 
-### AD2: Parent capabilities via familyLinks, not role flag
+Conservative GDPR: if `currentYear - birthYear <= 16`, require parental consent (assumes worst-case birthday within the year).
 
-No new `isParent` boolean. The `familyLinks` table already tracks parent-child relationships. Query it:
-- `familyLinks.length > 0` → show Family tab
-- `familyLinks.length === 0` → hide Family tab
+### AD2: Parent locks child's birth year
 
-This is already how the parent dashboard works — it queries `familyLinks` for the account. The change is making the tab bar dynamic rather than route-group-based.
+| Account type | Who sets birthYear | Can child edit? | Can parent edit? |
+|---|---|---|---|
+| Child (< 16, GDPR) | Parent creates profile, sets birth year | No — field disabled, "Set by your parent" | Yes |
+| Teen (16-17, self-signup) | Teen sets it themselves | Yes (they self-registered) | Can view if linked, not override |
+| Adult (18+) | Self | Yes | N/A |
 
-### AD3: Route groups merge
+Tracked via `birthYearSetBy` column (nullable profile ID). If not null, the field is read-only for the profile owner.
 
-Currently:
-- `(learner)/` — learning screens + tab bar (Home, Book, More)
-- `(parent)/` — parent dashboard + tab bar (Dashboard, More)
+### AD3: Parent capabilities via familyLinks, not role flag
 
-After:
-- `(app)/` — single route group with dynamic tab bar:
-  - Home, Book, More (always)
-  - Family (if familyLinks exist)
+No new `isParent` boolean. The `familyLinks` table already tracks parent-child relationships. Family card appears when `familyLinks` exist for the profile as a parent. Query is directional: only links where the current profile is the parent, not the child.
 
-The `persona === 'parent'` redirect in `_layout.tsx` is removed.
+### AD4: Home cards — the intent surface
 
-### AD4: Migration strategy
+Intent is not stored, not asked, and not a profile setting. It's expressed per-session by tapping a home card. The AI ranks cards based on behavioral signals:
+
+```typescript
+type HomeCardInput = {
+  reviewsDue: number;                    // from retention service
+  activeSubjects: Subject[];             // from curriculum
+  familyLinks: FamilyLink[];             // from DB (as parent only)
+  recentSessions: Session[];             // last 7 days
+  hourOfDay: number;                     // current time
+  dayOfWeek: number;                     // current day
+  lastSessionMode: string;               // what they did last time
+  modeFrequency: Record<string, number>; // homework: 12, study: 3, review: 5
+  dismissalCounts: Record<string, number>; // per card type, from sessionEvents
+};
+```
+
+No ML — just: "At this hour, on this day, what has this user done most often?" + "What's objectively due (reviews)?" + "Do they have family?"
+
+### AD5: Route groups merge — stable tabs
+
+Currently: `(learner)/` (Home, Book, More) and `(parent)/` (Dashboard, Book, More).
+
+After: `(app)/` — single route group with **stable** tab bar: Home, Book, More. Always 3 tabs, never changes. Parent dashboard is navigated to from the home screen Family card, not via a tab.
+
+This avoids the dynamic-tab anti-pattern (tabs appearing/disappearing breaks spatial muscle memory).
+
+### AD6: Migration strategy
 
 Phase 1 (backwards-compatible):
 1. Add `computeAgeBracket()` utility
-2. Replace all `personaType` reads with `computeAgeBracket(birthDate)`
-3. Keep `personaType` column but stop writing to it
-4. Tests verify age-based logic matches old persona-based logic
+2. Replace all `personaType` reads with `computeAgeBracket(birthYear)`
+3. Add `birthYear` column, populate from `birthDate`, add `birthYearSetBy`
+4. Build `precomputeHomeCards()` service
+5. Keep `personaType` column but stop writing to it
 
 Phase 2 (cleanup):
 1. Remove `personaType` from Zod schemas
-2. Drop column via Drizzle migration
+2. Drop `personaType` column and `birthDate` column via Drizzle migration
 3. Remove enum from PostgreSQL
 
 ---
 
-## Epic 12 — Stories
+## Stories
 
-### Story 12.1: Age-based LLM voice and timer caps
-
-**Scope:** Replace `getPersonaVoice(personaType)` with `getAgeVoice(birthDate)`. Replace `SessionTimerConfig.personaType` with `birthDate`-based age check. Pure backend refactor — no UI changes.
-
-**Acceptance criteria:**
-- `getAgeVoice()` returns same voice prompts as before, keyed by age bracket
-- Session timer caps unchanged: <13 gets 15/20 min, 13+ gets 25/30 min
-- All existing exchange and session-lifecycle tests pass with updated fixtures
-- No personaType references remain in `services/exchanges.ts` or `services/session-lifecycle.ts`
-
-**Tests:** Update fixtures in `exchanges.test.ts`, `session-lifecycle.test.ts`. Verify voice output matches for each age bracket.
-
-### Story 12.2: Dynamic tab bar — Family tab for parents
-
-**Scope:** Merge `(learner)` and `(parent)` route groups into single `(app)` group. Tab bar shows Family tab when `familyLinks` exist for the active profile.
-
-**Acceptance criteria:**
-- Single route group replaces both `(learner)` and `(parent)`
-- Tab bar: Home, Book, [Family if parent], More
-- Family tab contains current parent dashboard screens
-- A parent can access both learning and family screens without switching profiles
-- Navigation guards (consent, post-approval) still work
-
-**Tests:** Integration test for tab bar rendering with/without familyLinks. E2E flow: parent sees Family tab, taps it, sees dashboard, switches to Home, starts a learning session.
-
-### Story 12.3: Theme decoupled from persona
-
-**Scope:** Remove `schemeForPersona()` mapping. Theme follows system preference by default. Accent picker is the sole theme control. Design tokens no longer have persona-keyed palettes.
-
-**Acceptance criteria:**
-- `design-tokens.ts` has one light palette and one dark palette (no per-persona variants)
-- Color scheme follows system preference unless user overrides
-- Accent picker on More screen works independently of profile type
-- No `persona` parameter in theme token resolution
-
-**Tests:** Update theme-related tests. Verify accent picker works. E2E: switch between light/dark and verify colors.
-
-### Story 12.4: Remove personaType from database and schemas
-
-**Scope:** Drop `persona_type` column and enum from profiles table. Remove from Zod schemas. Update profile CRUD.
-
-**Acceptance criteria:**
-- `personaType` removed from `profileCreateSchema`, `profileUpdateSchema`, `profileSchema`
-- `persona_type` column dropped via Drizzle migration
-- `persona_type` enum removed from PostgreSQL
-- Profile creation derives all behavior from `birthDate`
-- Backwards-compatible: API ignores `personaType` if sent (no 400 error during client rollout)
-
-**Tests:** Update all 22 test files that reference personaType. Run full test suite. Run migration against dev database.
-
-### Story 12.5: Remove profile-based persona routing
-
-**Scope:** Remove `persona === 'parent'` redirect from learner layout. Remove `PersonaType` from mobile theme context. Clean up `detectPersona()` calls.
-
-**Acceptance criteria:**
-- No `persona` concept in mobile code
-- `useTheme()` no longer exposes `persona`
-- Home screen renders same content regardless of age (coaching card already adapts)
-- Profile creation form: just name + birthDate (persona picker already hidden in Task 2)
-
-**Tests:** Remove persona-specific assertions from mobile tests. E2E: verify all user types see the same app structure.
+See `docs/epics.md` Epic 12 stories section for full story details (Stories 12.1-12.7).
 
 ---
 
-## Dependency Order
+## Cross-Epic Interactions
 
-```
-Story 12.1 (LLM + timers)     — no dependencies, pure backend
-Story 12.3 (theme decoupling)  — no dependencies, pure frontend
-Story 12.2 (dynamic tab bar)   — depends on 12.1 (age logic exists)
-Story 12.5 (remove persona routing) — depends on 12.2 (single route group exists)
-Story 12.4 (DB migration)      — depends on 12.1 + 12.2 + 12.3 + 12.5 (all reads gone)
-```
-
-Stories 12.1 and 12.3 can be done in parallel. Story 12.4 is always last (removes the column only after all code stops reading it).
+| Epic | Interaction |
+|------|-------------|
+| **Epic 14 Story 14.1 (FR221)** | Card dismissal co-designed with Story 12.7. Dismissal data feeds home card ranking algorithm. |
+| **Epic 13 FR211** | Crash recovery "unfinished session" card becomes a home card with highest priority. |
+| **Epic 13 FR213** | Timer caps removed — coordinated with Story 12.1 (both remove persona from timer config). |
+| **Epic 7 FR121** | Age-based visualization threshold uses `birthYear` instead of `birthDate`. Trivial change. |
+| **Epic 3 FR130** | EVALUATE framing keyed by age bracket instead of persona. Same voices, different lookup. |
+| **Epic 14 FR219** | Quick-action chips in sessions use exchange metadata, not persona. No dependency. |
 
 ---
-
-## What Was Already Done (Task 2, 2026-03-29)
-
-- Persona picker hidden from `create-profile.tsx` (commented out, auto-detects from birthDate)
-- Birth date field has explanatory copy ("personalise how your coach talks to you")
-- ProfileSwitcher shows "Student" / "Parent" instead of "Teen" / "Learner" / "Parent"
-- `profiles.tsx` modal shows "Student" / "Parent" role labels
-- All tests updated and passing (170 tests, 17 suites)
 
 ## Risk Assessment
 
 | Risk | Mitigation |
 |------|-----------|
 | Route group merge breaks deep links | Audit all `router.push`/`router.replace` calls before merging |
-| familyLinks query adds latency to tab bar | Cache in React Query (already cached), show tabs optimistically |
-| Existing TEEN/LEARNER data in prod DB | Migration converts rows; computed age bracket is source of truth |
-| Third-party integrations read personaType | Audit: Sentry tags, Inngest event payloads, RevenueCat metadata |
+| Home card ranking feels wrong initially | Cold start shows equal cards. Ranking improves after 2-3 sessions. Manual override always available. |
+| Existing TEEN/LEARNER data in prod DB | Migration converts rows; `birthYear` extracted from `birthDate`; computed age bracket is source of truth |
+| Third-party integrations read personaType | Story 12.6 audits: Sentry tags, Inngest payloads, RevenueCat metadata |
+| Wrong `birthYear` → wrong age bracket | Parent locks child's `birthYear`. Adults can self-correct in Settings. |
+| `birthYear` less precise for GDPR age 16 | Conservative: `currentYear - birthYear <= 16` → require consent (worst-case birthday) |
+| `precomputeHomeCards` adds latency | Cache in React Query. Precompute in background (Inngest or on session-close). |
+| Backwards-compat window lingers | FR203.5: 2-release deadline, deprecation header, then reject |
+| "Browse & explore" card is redundant with Book tab | Don't include Browse as a card type. Book tab is the browse surface. Cards are for session-starting intents + family. |

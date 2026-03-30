@@ -18,7 +18,7 @@ This document provides the complete epic and story breakdown for EduAgent, decom
 
 ### Functional Requirements
 
-**Total: 149 FRs (121 MVP, 28 deferred to v1.1)**
+**Total: 172 FRs (121 MVP, 28 deferred v1.1, 8 Epic 13 session lifecycle, 3 Epic 7 additions, 12 Epic 14 human agency)**
 
 **User Management (FR1-FR12) — Epic 0:**
 
@@ -58,7 +58,7 @@ This document provides the complete epic and story breakdown for EduAgent, decom
 - FR28: Users can receive cognitive load management (1-2 concepts per message maximum)
 - FR29: Users can flag content that seems incorrect
 - FR30: Users can choose between "Learn something new" and "Get help with homework" modes
-- FR31: Users can receive Socratic guidance for homework (guided problem-solving, never answer-giving)
+- FR31: (Revised by FR228) Homework help uses direct explanation and verification — AI explains approaches, shows similar worked examples, and verifies student answers. Never provides the final answer to the actual homework problem. Two modes per problem: "Check my answer" (brief verification) and "Help me solve it" (explain + similar example). Learning sessions retain Socratic guidance. See Epic 14 FR228.
 - FR32: Users can photograph homework problems for AI analysis (moved to MVP from v1.1 per UX spec)
 - FR33: Users can see sessions marked as "guided problem-solving" in Learning Book
 
@@ -202,16 +202,16 @@ _These FRs happen within or at the close of a learning session. Distinct from Ep
 
 **Concept Map — Prerequisite-Aware Learning (FR118-FR127) — Epic 7 (v1.1):**
 
-- FR118: Topic prerequisite graph — DAG data model, `topic_prerequisites` join table, REQUIRED/RECOMMENDED relationship types, cycle detection
-- FR119: Prerequisite-aware session ordering — check prereq completion before recommending topic
-- FR120: Skip warning on prerequisite topics — dialog + log to `curriculumAdaptations.prerequisiteContext`
-- FR121: Visual concept map — read-only DAG visualization, nodes colored by retention status
-- FR122: Prerequisite edge generation — LLM generates edges on subject creation, targeted call for new topics
-- FR123: Graph-aware coaching card — new "newly unlocked" card type for topics with completed prerequisites
-- FR124: Orphan edge handling — skipped prereqs logged, dependents remain accessible
-- FR125: Prerequisite context as teaching signal — system prompt includes prereq context for gap bridging
-- FR126: Topological sort for learning path — default ordering uses DAG topological sort
-- FR127: Manual prerequisite override — parent/advanced learner marks prereq as "already known"
+- FR118: (Revised v2) Topic prerequisite graph — DAG data model, `topic_prerequisites` join table with `status` (ACTIVE/SKIPPED), single advisory relationship type (no REQUIRED/RECOMMENDED split), cycle detection, max depth 5
+- FR119: (Revised v2) Prerequisite-aware session ordering — advisory, not blocking. Topics with incomplete prerequisites are deprioritized but never hidden or locked. "Start Anyway" always available.
+- FR120: (Revised v2) Skip warning on prerequisite topics — dialog + soft-skip (edge `status` set to SKIPPED, not deleted). Reversible via restore. Logged to `curriculumAdaptations.prerequisiteContext`.
+- FR121: (Revised v2) Visual concept map — age-appropriate: Learning Journey path for under-13, Knowledge Graph (Sugiyama DAG) for 13+. Nodes colored by retention status. Every topic has a CTA — no locked state.
+- FR122: (Revised v2) Prerequisite edge generation — LLM generates edges on subject creation, targeted call for new topics. Per-edge human feedback: student/parent can flag bad prerequisites.
+- FR123: (Revised v2) Graph-aware coaching card — "newly ready" topics trigger Comet celebration (Epic 13 FR217). At-risk flagging when prerequisites decay.
+- FR124: (Revised v2) Skipped prerequisite handling — edge stays in DB with SKIPPED status. Coaching card notes missing foundation. Visible in concept map as faded.
+- FR125: Prerequisite context as teaching signal — system prompt includes prereq context for gap bridging (unchanged)
+- FR126: Topological sort for learning path — default ordering uses DAG topological sort (unchanged)
+- FR127: (Revised v2) Prerequisite override — any learner can self-override via "I already know this" (trust-based) or "Prove it" quiz (3-5 questions). Parent can also override. Not parent-only.
 
 **Full Voice Mode (FR144-FR145, FR147-FR149) — Epic 8 (v1.1):**
 
@@ -406,15 +406,19 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 | FR86-FR95 | Engagement & Motivation | Epic 4 | MVP |
 | FR96-FR107 | Language Learning | Epic 6 | v1.1 |
 | FR108-FR117 | Subscription Management | Epic 5 (Stripe, kept for web) + Epic 9 (native IAP for mobile) | MVP + pre-launch |
-| FR118-FR127 | Concept Map (Prerequisite-Aware Learning) | Epic 7 | v1.1 |
+| FR118-FR127 | Concept Map — Advisory Prerequisite Learning (revised v2) | Epic 7 | v1.1 |
 | FR144-FR145, FR147-FR149 | Full Voice Mode | Epic 8 | v1.1 |
 | FR146 | Language SPEAK/LISTEN Voice | Epic 6 | v1.1 |
+| FR150-FR152 | Epic 7 additions: suggestive decay quizzes, per-edge feedback, "prove it" quiz | Epic 7 | v1.1 |
+| FR210-FR217 | Session Lifecycle: active time, graceful close, hard cap removal, milestones, silence detection, parent dashboard, unified celebrations | Epic 13 | Pre-launch |
+| FR218-FR225 | Human Agency: per-message feedback, quick chips, topic switch, coaching dismiss, recall "I don't remember", escalation nudge, add topic, "something else" | Epic 14 | Pre/post-launch |
+| FR226-FR229 | Homework Overhaul: multi-problem sessions, problem card preview, explain-don't-question mode, learning extraction | Epic 14 | Pre/post-launch |
 
-**Coverage verification:** 12 + 10 + 11 + 8 + 1 + 9 + 7 + 8 + 6 + 4 + 6 + 10 + 9 + 10 + 12 + 10 + 10 + 5 + 1 = **149 FRs, zero gaps.**
+**Coverage verification:** 149 original + 3 (Epic 7 additions) + 8 (Epic 13) + 12 (Epic 14) = **172 FRs.**
 
 ## Epic List
 
-**11 epics total: 6 MVP (Epics 0-5), 2 pre-launch (Epics 9, 10), 3 deferred (Epics 6, 7, 8).**
+**14 epics total: 6 MVP (Epics 0-5), 2 pre-launch (Epics 9, 10), 3 deferred (Epics 6, 7, 8), 3 post-launch (Epics 11, 12, 13+14).**
 
 ### Epic 0: Project Foundation & User Registration
 
@@ -567,21 +571,25 @@ Users can learn languages using Four Strands methodology with explicit grammar i
 
 ---
 
-### Epic 7: Concept Map — Prerequisite-Aware Learning (DEFERRED — v1.1)
+### Epic 7: Concept Map — Advisory Prerequisite Learning (DEFERRED — v1.1, Revised v2)
 
 **Scope:** v1.1 (post-MVP, pre-launch)
-**FRs:** FR118-FR127 (10 FRs)
+**FRs:** FR118-FR127 (revised), FR150-FR152 (new) — 13 FRs total
+**Revision:** v2 — "Guide, Don't Gate" redesign (2026-03-30)
 
-Knowledge graph of topic prerequisite relationships. Currently curriculum topics are a flat ordered list (`sortOrder`). Epic 7 adds directed acyclic graph (DAG) edges between topics, enabling prerequisite-gated progression, graph-aware coaching, and visual knowledge map.
+Knowledge graph of topic prerequisite relationships. Currently curriculum topics are a flat ordered list (`sortOrder`). Epic 7 adds directed acyclic graph (DAG) edges between topics, enabling **advisory** prerequisite ordering, graph-aware coaching, and visual knowledge map. **Prerequisites never lock or block topics** — they inform recommendations and LLM context.
 
-**Key decisions:**
-- DAG data model (not graph DB) — separate `topic_prerequisites` join table with `REQUIRED | RECOMMENDED` relationship types
+**Key decisions (v2 — replaces v1):**
+- **Guide, don't gate.** All prerequisites are advisory (RECOMMENDED). No REQUIRED/RECOMMENDED split — single relationship type at launch. Topics are never locked behind prerequisite completion.
+- DAG data model (not graph DB) — `topic_prerequisites` join table with `status` enum (ACTIVE/SKIPPED). Edges are **never deleted** — skip sets status to SKIPPED (reversible).
 - SM-2 stays pure per-topic — graph awareness in coaching precomputation only
-- Skip + orphan pattern: skipping a prerequisite warns user, deletes edges, logs orphaned dependents in `curriculumAdaptations.prerequisiteContext` JSONB for LLM context injection
-- Adding a topic: targeted LLM call for new edges only (not full graph regeneration)
-- Visualization deferred to implementation — likely `react-native-svg` + Sugiyama layout. No WebView. Small graphs (15-50 nodes per subject).
+- **Suggestive decay quizzes** (FR150) replace re-locking: when prerequisites fade, prompt a lightweight quiz framed positively ("Quick check! Want to see how much you remember?"). 7-day cooldown. Always optional.
+- **"Prove it" quiz** (FR152): any learner can override a prerequisite by passing a 3-5 question quiz (not parent-only).
+- **Per-edge human feedback** (FR151): student or parent can flag bad prerequisite edges as "not needed."
+- **Age-appropriate visualization** (FR121 revised): Learning Journey path for under-13, Knowledge Graph (Sugiyama DAG) for 13+. Same data model, different rendering.
+- Topic unlock → Comet celebration via Epic 13's `queueCelebration()` (FR217). Zero animation work in Epic 7.
 
-**Dependencies:** Epic 3 (retention infrastructure), Epic 1 (curriculum/topic infrastructure)
+**Dependencies:** Epic 3 (retention infrastructure), Epic 1 (curriculum/topic infrastructure), Epic 13 Story 13.7 (celebration queue — only for Story 7.5)
 
 ---
 
@@ -657,8 +665,14 @@ Epic 0 ──→ Epic 1 ──→ Epic 2 ──→ Epic 3 ──→ Epic 4
                               Epic 8 (Full Voice, v1.1)
                                      │
                               Epic 6 (v1.1) ─────┘ (SPEAK/LISTEN depends on Epic 8.1-8.2)
-                                     │
-                              Epic 7 (v1.1) ← depends on Epic 1 + Epic 3
+
+Epic 11 (brand color)         ← no deps (independent)
+Epic 12 (persona → age+cards) ← no deps (but follow Epic 11 for accent defaults). Co-design: 12.7 ↔ 14.1
+Epic 13 (session lifecycle)   ← no deps. Sequencing: 13.2 before 12.1. FR211 integrates with 12.7 (recovery card)
+Epic 14 Phase A (agency)      ← Story 14.1 co-designs with Epic 12 Story 12.7 (home card dismissal)
+Epic 14 Phase B (homework)    ← no deps (independent, high priority)
+Epic 14 Phase C (session)     ← internal deps only (14.5 → 14.6 → 14.8)
+Epic 7 (v1.1, revised v2)    ← Epic 1 + Epic 3 + Epic 13 Story 13.7 (celebrations)
 ```
 
 ### Epic 11: Brand Color Refresh (Post-Launch)
@@ -676,7 +690,143 @@ Epic 0 ──→ Epic 1 ──→ Epic 2 ──→ Epic 3 ──→ Epic 4
 - 11.4: Update learner accent presets (replace purple option)
 - 11.5: Hardcoded violet color audit across codebase
 
-**Detailed plan:** `docs/plans/2026-03-25-brand-color-refresh.md`
+**Detailed spec:** See `docs/plans/2026-03-25-brand-color-refresh.md` (retained — design tokens reference).
+
+### Epic 12: Remove Persona Enum — Age + Role + Intent-as-Cards (Post-Launch)
+
+**Scope:** Post-launch architectural cleanup + home screen redesign
+**Stories:** 12.1–12.7
+**Depends on:** None (independent of all other epics, but should follow Epic 11 for default accent color)
+**Co-design with:** Epic 14 Story 14.1 (coaching card dismissal → home card dismissal)
+
+**Why:** The `personaType` enum (`TEEN | LEARNER | PARENT`) conflates three independent concerns — age, parental relationship, and session intent — into a single field. This prevents parents from using learning features without a second profile, forces artificial routing splits, and buries session intent in profile settings where it goes stale. The fix: three independent axes, all derived — no enum.
+
+**The three axes:**
+
+| Concern | Source | Stored? | Changes when? |
+|---------|--------|---------|---------------|
+| **Age** (LLM voice, consent) | `birthYear` on profile | Yes (integer, less PII than full date) | On year rollover (not jarring birthday) |
+| **Role** (parent features) | `familyLinks` existence | Derived at runtime | When links added/removed |
+| **Intent** (session mode) | Home screen card taps | Not stored as setting | Every app open — per-session |
+
+**Intent-as-cards model:** The home screen shows 2-3 prioritized action cards (homework, study, review, family). The AI ranks cards based on time-of-day patterns, recent sessions, reviews due, and `familyLinks`. The user "picks" intent by tapping a card. No picker, no settings, no "What brings you here?" question. The app learns from tap patterns.
+
+- The primary card (biggest) is the AI's best bet for what the user wants right now.
+- Secondary cards (smaller) are the alternatives — always visible, one tap.
+- The layout reshuffles based on behavior: a teen who does homework 4/5 weekday evenings sees homework as the primary card; on Saturdays, review floats to the top.
+- **Parent dashboard is a card**, not a tab or mode. It shows real data ("Emma: 45min today") and only appears when `familyLinks` exist. A parent who also learns sees both family and learning cards.
+- **Cold start (new user):** All cards equal-sized, no AI bet. After 2-3 sessions, cards start ranking by usage.
+- **Signup question for adults:** "Do you have children who'll use EduAgent?" → Yes triggers child-linking flow → Family card appears on home.
+
+**Stories:**
+- 12.1: Age-based LLM voice (replace `getPersonaVoice()` → `getAgeVoice(birthYear)`, `computeAgeBracket()` utility)
+- 12.2: Merge route groups — `(learner)` + `(parent)` → `(app)` with **stable** tab bar (Home, Book, More — no dynamic Family tab)
+- 12.3: Theme decoupled from persona — one light/dark palette, accent picker is sole theme control
+- 12.4: Remove `personaType` from database and Zod schemas (DB migration, backwards-compat acceptance window)
+- 12.5: Remove profile-based persona routing — no `persona` concept in mobile code
+- 12.6: Analytics and event schema migration — update Sentry tags, Inngest payloads, RevenueCat metadata from persona to age bracket
+- 12.7: **Prioritized home cards** — replace single coaching card with ranked multi-card home screen (the intent surface)
+
+**Dependency order:**
+```
+12.1 (backend) ──┐
+                  ├─→ 12.7 (home cards) ─→ 12.2 (route merge) ─→ 12.5 (routing) ──┐
+12.3 (theme)  ────┤                                                                  ├─→ 12.4 (DB migration)
+                  └─→ 12.6 (analytics) ─────────────────────────────────────────────┘
+```
+Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Story 14.1. Story 12.4 is always last.
+
+**Key design decisions:**
+- **Birth year, not full date.** `birthYear` (integer) is less PII than `birthDate`. Age bracket changes on Jan 1, not on the user's birthday (no jarring mid-year voice change). Sufficient for `computeAgeBracket()` → `child`/`adolescent`/`adult`.
+- **Parent locks child's birth year.** COPPA/GDPR protection — child cannot edit `birthYear` if set by a parent (field disabled, shows "Set by your parent"). Prevents age manipulation to bypass consent requirements.
+- **Self-signup teens (16-17)** set their own `birthYear`, editable. If a parent links later, parent can view but not override.
+- **Stable tab bar.** No dynamic Family tab appearing/disappearing. Family is a home screen card, not a tab. Tab bar stays `Home | Book | More` for all users.
+- Parent capabilities detected via `familyLinks` query, no `isParent` flag
+- API accepts `personaType` for 2 release cycles (deprecation header), then rejects
+- Coaching card precompute expands: `precomputeHomeCards(profileId)` → 2-3 ranked cards (replaces single `precomputeCoachingCard()`)
+
+**Cross-epic interactions:**
+- **Epic 14 Story 14.1 (FR221):** Coaching card dismissal must be redesigned for multi-card home screen. Per-card dismissal feeds ranking algorithm. Co-design required.
+- **Epic 13 FR211:** Crash recovery "unfinished session" card becomes a home card (highest priority, displaces normal ranking).
+- **Epic 7 FR121:** Age-based visualization threshold uses `birthYear` instead of `birthDate`. Trivial change.
+- **Epic 3 FR130:** EVALUATE framing keyed by age bracket instead of persona. Same voices, different lookup key.
+
+**Detailed spec:** See Epic 12 stories section below.
+
+### Epic 13: Session Lifecycle Overhaul — Honest Time, Learning Milestones, Graceful Close
+
+**Scope:** Pre-launch recommended (parent dashboard trust)
+**Stories:** 13.1–13.7
+**Depends on:** None (independent). **Sequencing note:** Story 13.2 must run before Epic 12 Story 12.1 — both remove `personaType` from `SessionTimerConfig`. Doing 13.2 first makes 12.1's timer work a no-op.
+
+**Why:** The parent dashboard shows inflated "study time" because `durationSeconds` is wall-clock (`now - startedAt`), not active learning time. A child who opens a session and walks away for 2 hours shows 2 hours of "study." Additionally, swiping the app closed orphans the session (no `endedAt`, no `durationSeconds`). Hard caps (20/30 min forced session end) exist in server code but were never enforced on the client — and they're hostile UX anyway. Replace all of this with: honest active time tracking (8-min silence cap that respects deep thought), graceful app-close handling, and celestial milestone animations that celebrate **learning achievements** (independent thinking, breakthroughs, mastery streaks) instead of clock time.
+
+**Stories:**
+- 13.1: Active time computation (8-min capped intervals) + `wallClockSeconds` column
+- 13.2: Remove hard caps and nudge — simplify to silence detection only
+- 13.3: Crash recovery — AsyncStorage markers on message send + Inngest stale session cron (no new API endpoint)
+- 13.4: Celebration animation library (4 reusable celestial components + `useCelebration()` hook + `useMilestoneTracker()`) + in-session triggers
+- 13.5: Context-aware silence detection — prompt only when AI asked a question and child is silent 8 min
+- 13.6: "I'm Done" button + summary screen (wall-clock time for child, milestone recap, no "focused time" shown to child)
+- 13.7: Post-session celebration queue — `pendingCelebrations` on coaching card cache, Inngest wiring for EVALUATE/TEACH_BACK/topic mastery/streaks, home screen playback
+
+**Dependency order:**
+```
+13.1 (active time)            ──┐
+13.2 (remove hard caps)       ──┤── parallelizable
+13.4 (celebration library)    ──┤
+                                │
+13.3 (crash recovery)         ──┤── after 13.1
+13.5 (silence UX)             ──┤── after 13.2
+13.6 (summary + recap)        ──┤── after 13.4
+13.7 (post-session queue)     ──┘── after 13.4 + 13.1
+```
+
+**Key design decisions:**
+- Active time = capped intervals between session events (8-min cap — respects reading, paper work, deep thought)
+- Milestones celebrate learning quality (escalation rung), not time: independent answers, streaks, breakthroughs
+- **Unified celebration system:** same 4 animation components used in-session (client-side, real-time from rung) AND post-session (server-queued via `pendingCelebrations` on coaching card cache, played on home screen mount). Future epics (7, 8) just call `queueCelebration()` — zero animation work.
+- Child sees wall-clock time + milestone recap on summary. Parent sees active time on dashboard. Different audiences, different needs.
+- No "focused time" shown to child — avoids guilt and prevents parent interrogation tool
+- Crash recovery: AsyncStorage on message send (primary) + AppState listener (backup) + Inngest cron (final fallback). No new endpoint.
+- Silence prompt is context-aware: only fires when AI asked a question and child hasn't responded (they're stuck, not thinking)
+
+---
+
+### Epic 14: Human Agency & Feedback — The Student Always Has a Voice
+
+**Scope:** Phase A pre-launch, Phase B+C post-launch
+**Stories:** 14.1–14.12 (12 stories across 3 phases)
+**FRs:** FR218-FR229 (12 FRs)
+**Depends on:** None (Phase A). Phase B depends on camera capture (Story 2.5). Phase C: 14.6 depends on 14.5, 14.8 depends on 14.6.
+**Co-design:** Story 14.1 co-designs with Epic 12 Story 12.7 (prioritized home cards). Card dismissal feeds into the home card ranking algorithm.
+
+**Why:** An audit of all learner-facing screens revealed that the system is well-designed at boundaries (subject creation, session start/end) but loses human agency during active interactions. The AI drives escalation, topic flow, and feedback — the student can only redirect by leaving. Additionally, the homework flow has critical gaps: Socratic questioning on routine homework is painfully slow, OCR errors go straight to the AI with no correction step, students can't work through multiple problems in one session, and parents see nothing about what was actually learned during homework.
+
+**Phase A — Low Effort, High Impact (Pre-Launch):**
+- 14.1: Home card dismissal (× button on each home card, dismissal tracking feeds ranking algorithm — co-design with Epic 12 Story 12.7)
+- 14.2: "I don't remember" on recall tests (dignified failure, hint then remediation)
+- 14.3: "Add my own topic" to curriculum (text input + LLM normalization + user confirmation)
+- 14.4: "Something else" on ambiguous subject suggestions (clarification input + "Just use my words" escape)
+
+**Phase B — Homework Overhaul (High Priority):**
+- 14.9: Problem card preview + OCR correction (client-side heuristic split → editable cards per problem)
+- 14.10: "Help me" vs "Check my answer" per problem (**no Socratic questioning in homework** — explain, verify, be brief)
+- 14.11: Multi-problem session flow (one session per homework sitting, "Next problem" chip, in-session camera)
+- 14.12: Homework learning extraction (LLM reads conversation → topics practiced, scaffolding level → parent dashboard + Learning Book)
+
+**Phase C — Session Agency (Post-Launch):**
+- 14.5: Per-message feedback ("Not helpful" / "That's incorrect" → system message to LLM)
+- 14.6: Quick-action chips ("I know this", "Explain differently", "Too easy", "Too hard")
+- 14.7: Topic switch mid-session (bottom sheet picker, seamless session transition)
+- 14.8: Escalation visibility + difficulty nudge ("Guided" / "Independent" label in session header)
+
+**Key design decisions:**
+- **Homework mode overhaul (FR228):** Replaces Socratic-only constraint with explain+verify approach. Two modes per problem: "Check my answer" (2-4 sentences) and "Help me solve it" (4-6 sentences + similar worked example). AI never gives the actual answer — shows similar examples. Teens get even shorter responses.
+- FR228 **overrides FR31** ("Socratic-only for homework") for homework sessions. Learning sessions retain Socratic guidance.
+- **Homework learning extraction (FR229):** Async Inngest step after homework session close. LLM reads exchanges → structured JSON (problemCount, topicsCovered, scaffoldingLevel, per-problem details). Stored in `learningSessions.metadata.homeworkSummary`. Parent sees "Math homework — 5 problems, practiced linear equations" instead of "Homework — 38 min."
+- All Phase A stories are independent and parallelizable.
+- Consistent feedback pattern: same affordance design (chips, dismiss, flag) across all screens.
 
 ---
 
@@ -689,6 +839,62 @@ Epic 0 ──→ Epic 1 ──→ Epic 2 ──→ Epic 3 ──→ Epic 4
 **Epic 7 dependencies:** Epic 3 (retention infrastructure — SM-2 data needed for graph-aware coaching) and Epic 1 (curriculum/topic infrastructure — `curriculumTopics` table must exist for prerequisite edges)
 
 **Epic 8 dependency chain:** Epic 3 Cluster G (Feynman Stage, MVP) establishes STT/TTS infrastructure → Epic 8 (Full Voice Mode, v1.1) extends it to all session types → Epic 6 (Language Learning SPEAK/LISTEN, v1.1) depends on Epic 8.1-8.2. This means Epic 8 core (8.1-8.2) must complete before Epic 6 language voice stories.
+
+---
+
+### Implementation Order (Least-Risk, Logical Sequence)
+
+**Context:** App is not live, no users. Order optimized for code safety (fewest merge conflicts, smallest blast radius per phase) and logical dependencies.
+
+```
+Phase 1 — Foundation cleanup (simplify existing code):
+  Epic 11       (brand color — design tokens only, zero logic)
+  Epic 13.1     (active time computation — backend only)
+  Epic 13.2     (remove hard caps — simplifies session-lifecycle.ts, must be before 12.1)
+
+Phase 2 — Quick wins (independent, small changes):
+  Epic 14 Phase A: 14.2, 14.3, 14.4  (recall, add topic, something else — all parallel)
+  Epic 14.10    (homework prompt change — one string edit in exchanges.ts, huge value)
+
+Phase 3 — Homework overhaul (sequential chain):
+  Epic 14.9     (problem card preview — camera.tsx, frontend only)
+  Epic 14.11    (multi-problem session — depends on 14.9 + 14.10)
+  Epic 14.12    (learning extraction — Inngest step, depends on 14.11)
+
+Phase 4 — Celebration system + session polish:
+  Epic 13.4     (celebration library — new components, no existing code modified)
+  Epic 13.3     (crash recovery — depends on 13.1)
+  Epic 13.5     (silence detection — depends on 13.2)
+  Epic 13.6     (summary + recap — depends on 13.4)
+  Epic 13.7     (celebration queue — depends on 13.4 + 13.1)
+
+Phase 5 — Architecture refactor:
+  Epic 12       (persona removal + prioritized home cards — big refactor, touches many files)
+  Epic 14.1     (home card dismissal — co-designs with 12.7, must follow 12.7)
+
+Phase 6 — New features:
+  Epic 7        (advisory prerequisites — new data model + services + UI, needs 13.7 for celebrations)
+  Epic 14 Phase C: 14.5-14.8  (session agency — chips, feedback, topic switch, escalation)
+```
+
+**Why this order:**
+- Phase 1 *simplifies* existing code (removes hard caps, dead constants) — makes later phases cleaner
+- Phase 2 delivers immediate user value with near-zero risk (prompt change + small independent UI additions)
+- Phase 3 is the homework overhaul — high daily-use-case value, contained to camera + session files
+- Phase 4 builds the celebration system that Phases 5-6 need
+- Phase 5 (Epic 12) is the biggest refactor — touch navigation, layouts, services, schema. Doing it after celebration system means 12.7 (home cards) can integrate celebrations
+- Phase 6 adds new features on a stable, refactored codebase
+
+### Open Questions — Resolved (2026-03-30)
+
+| # | Question | Decision | Rationale |
+|---|----------|----------|-----------|
+| 1 | "Check my answer" for open-ended subjects (essays, history) | Adapt to "Review my answer" — brief feedback on accuracy, completeness, what's missing. Same concise format. | Students still want quick verification, just framed as review. |
+| 2 | Multi-subject in one photo (math + French on one page) | Let the LLM handle it. Send all problems. Session tagged with primary subject. Learning extraction (FR229) captures all subjects in summary. | Simplest approach. No extra architecture. Rare case. |
+| 3 | FR31 contradiction with FR228 (Socratic vs explain) | FR31 rewritten (done). FR228 overrides for homework. Learning sessions retain Socratic guidance. | Contradictory FRs cause confusion. Single source of truth. |
+| 4 | Diagrams in homework (geometry, graphs) | Acknowledged in FR227.6 fallback: "I can't read diagrams yet — describe what you see, or skip this problem." Multimodal image input deferred to future. | Not 80/20 for launch. Fallback message is honest. |
+| 5 | Skip onboarding interview for homework-only users | Acknowledged as gap. Freeform mode partially covers it (home chat → session without subject). Camera flow still requires subject — future enhancement. | Low priority. Freeform path exists. |
+| 6 | Multiple coaching cards | YES — Epic 12 Story 12.7 replaces single card with ranked multi-card home screen. Firm decision (2026-03-30). Do not revert. | With Epic 7 suggestions, Epic 14 homework, existing cards — single-card system discards too many signals. |
 
 ---
 
@@ -2705,23 +2911,38 @@ All 12 FRs (FR96-FR107) + FR146 (Language SPEAK/LISTEN Voice, depends on Epic 8.
 
 ---
 
-## Epic 7: Concept Map — Prerequisite-Aware Learning (v1.1) — Stories
+## Epic 7: Concept Map — Advisory Prerequisite Learning (v1.1, Revised v2) — Stories
 
-**Scope:** FR118-FR127 (10 FRs), 6 stories
-**Dependencies:** Epic 3 (retention infrastructure), Epic 1 (curriculum/topic infrastructure)
+**Scope:** FR118-FR127 (revised), FR150-FR152 (new) — 13 FRs, 6 stories
+**Dependencies:** Epic 3 (retention infrastructure), Epic 1 (curriculum/topic infrastructure), Epic 13 Story 13.7 (celebration queue — for Story 7.5 only)
+**Revision:** v2 — "Guide, Don't Gate" redesign (2026-03-30). See "What Changed from v1" below.
 
-### Story 7.1: Topic Prerequisite Data Model
+### What Changed from v1
+
+| Original (v1) | Revised (v2) | Why |
+|---------------|-------------|-----|
+| REQUIRED prerequisites lock topics | All prerequisites are advisory | Hard locks frustrate students who learned prerequisites outside the app. The AI adapts — the graph shouldn't gatekeep. |
+| Two relationship types (REQUIRED/RECOMMENDED) | Single type at launch (all advisory) | Distinction adds complexity without changing user behavior when everything is advisory. |
+| "Skip Anyway" deletes prerequisite edges | Soft-skip: edge `status` set to SKIPPED, remains in DB | Edge deletion is irreversible. Kids don't understand the consequence. Soft-skip is reversible. |
+| Parent-only manual override (FR127) | Any learner can self-override via "prove it" quiz + parent can mark "already known" | A 14-year-old shouldn't need a parent to study algebra. |
+| No re-engagement for decaying topics | Periodic suggestive quizzes (FR150) | Instead of re-locking (infuriating) or ignoring decay (stale graph), prompt lightweight optional quizzes. |
+| Concept map: Sugiyama DAG for all ages | Age-appropriate: journey path for under-13, graph for 13+ | A 6-year-old cannot interpret a DAG. |
+| No per-edge human feedback | Student/parent can flag bad prerequisites (FR151) | LLM-generated edges have no validation loop without this. |
+| Topic unlock = coaching card notification | Topic unlock = Comet celebration (Epic 13 FR217) | Should feel like an achievement, not a notification. |
+
+### Story 7.1: Topic Prerequisite Data Model + Edge Generation
 
 As a system,
 I need a prerequisite graph data model and LLM edge generation,
-So that curriculum topics can express dependency relationships as a DAG.
+So that curriculum topics can express advisory dependency relationships.
 
 **Acceptance Criteria:**
 
 **Given** the database needs prerequisite support
 **When** the schema is created
-**Then** `topic_prerequisites` join table is created with `prerequisiteTopicId`, `dependentTopicId`, `relationshipType` (REQUIRED/RECOMMENDED enum), `createdAt`
-**And** DAG cycle detection is implemented in the service layer (topological sort validation before insert)
+**Then** `topic_prerequisites` join table created with `prerequisiteTopicId`, `dependentTopicId`, `status` (ACTIVE/SKIPPED enum, default ACTIVE), `createdAt`
+**And** DAG cycle detection implemented in service layer (topological sort validation before insert)
+**And** depth validation rejects chains deeper than 5 levels
 **And** LLM generates initial prerequisite edges on subject creation as part of curriculum generation
 **And** targeted edge generation for new topics added to existing curriculum (not full graph regeneration)
 
@@ -2729,106 +2950,135 @@ So that curriculum topics can express dependency relationships as a DAG.
 
 ---
 
-### Story 7.2: Prerequisite-Aware Session Ordering
+### Story 7.2: Advisory Prerequisite Ordering + Learning Book Indicators
 
 As a learner,
-I want my learning path to respect prerequisite order,
-So that I build knowledge on solid foundations.
+I want my learning path to suggest prerequisite order without blocking me,
+So that I can follow recommendations or forge my own path.
 
 **Acceptance Criteria:**
 
 **Given** a curriculum with prerequisite edges
 **When** the coaching card recommends the next topic
-**Then** coaching card checks prerequisites before recommending — topics with incomplete REQUIRED prerequisites are not surfaced
-**And** default ordering uses topological sort (prerequisite depth)
-**And** ties within the same topological layer are broken by retention urgency (most urgent first)
+**Then** topics with incomplete prerequisites are deprioritized but NOT hidden
+**And** default ordering uses topological sort (prerequisite depth), ties broken by retention urgency
+**And** Learning Book shows subtle "Builds on: [prerequisite]" indicators on topics with incomplete prerequisites
+**And** tapping a topic with incomplete prerequisites shows advisory dialog: "This builds on [prerequisite]. Review first, or dive right in?" with [Review Prerequisite] / [Start Anyway]
+**And** "Start Anyway" proceeds normally with no penalty
 
 **FRs:** FR119, FR126
 
 ---
 
-### Story 7.3: Skip Warning & Orphan Edge Handling
+### Story 7.3: Soft-Skip + Restore + Prerequisite Context Injection
 
 As a learner skipping a topic,
-I want to understand the impact on dependent topics,
-So that I make informed decisions about what to skip.
+I want to understand the impact and be able to undo my skip,
+So that I make informed, reversible decisions.
 
 **Acceptance Criteria:**
 
-**Given** a learner wants to skip a topic that has dependents
+**Given** a learner skips a topic that has dependents
 **When** the skip is initiated
-**Then** a warning dialog is shown listing dependent topics and relationship types
-**And** skip is logged in `curriculumAdaptations.prerequisiteContext` JSONB
-**And** dependent topics remain accessible (not locked) after prerequisite is skipped
-**And** coaching card notes missing foundation for topics with skipped prerequisites
+**Then** warning dialog shown listing dependent topics
+**And** "Skip Anyway" sets edge `status` to `SKIPPED` (not deleted)
+**And** skip logged in `curriculumAdaptations.prerequisiteContext` JSONB
+**And** dependent topics remain fully accessible
+**And** skipped prerequisites can be restored to ACTIVE from curriculum review
+**And** when LLM teaches a topic with skipped prerequisites, system prompt includes context for bridging knowledge gaps
 
-**FRs:** FR120, FR124
+**FRs:** FR120, FR124, FR125
 
 ---
 
-### Story 7.4: Prerequisite Context as Teaching Signal
+### Story 7.4: Prerequisite Override — Self-Service + "Prove It" Quiz
 
-As a learner studying a topic with skipped prerequisites,
-I want the AI tutor to bridge knowledge gaps,
-So that I can still learn effectively despite missing foundations.
+As a learner who already knows a prerequisite topic,
+I want to skip it without needing a parent,
+So that I can move to topics I actually need to learn.
 
 **Acceptance Criteria:**
 
-**Given** a learner is in a session for a topic with prerequisite context
-**When** `buildSystemPrompt()` constructs the LLM prompt
-**Then** prerequisite context is included when available (e.g., "student skipped fractions, which was a prerequisite for this topic")
-**And** LLM bridges knowledge gaps for topics with skipped prerequisites by providing foundational context inline
+**Given** a learner encounters a topic with prerequisite advisory
+**When** they want to override the prerequisite
+**Then** two paths available: "I already know this" (quick override, trust-based) and "Prove it" (3-5 question quiz)
+**And** "Prove it" quiz uses existing recall test infrastructure, 2/3 or 3/5 passing threshold
+**And** on pass: retention card created, Polar Star celebration, prerequisite marked as mastered
+**And** on fail: no penalty, suggestion to review, can retry anytime
+**And** parent can also mark "already known" from parent dashboard
+**And** override is recorded in `curriculumAdaptations` but reversible
 
-**FRs:** FR125
+**FRs:** FR127, FR152
 
 ---
 
-### Story 7.5: Graph-Aware Coaching Card
+### Story 7.5: Graph-Aware Coaching Card + Celebration + Suggestive Decay Quizzes
 
 As a learner progressing through a curriculum,
-I want coaching to reflect my prerequisite graph progress,
-So that I know when new topics are unlocked and when foundations are at risk.
+I want to be celebrated when I unlock new topics and gently reminded when foundations fade,
+So that I feel rewarded and stay on solid ground.
 
 **Acceptance Criteria:**
 
-**Given** the coaching card precomputation runs
-**When** prerequisite graph data is available
-**Then** coaching precomputation considers prerequisite graph
-**And** new "newly unlocked" card type surfaces topics whose REQUIRED prerequisites have all reached strong retention
-**And** at-risk flagging warns when foundational prerequisites drop to fading/weak for dependent topics
+**Given** coaching card precomputation runs after session completion
+**When** all prerequisites for a topic reach strong retention
+**Then** `queueCelebration(db, profileId, 'comet', 'topic_unlocked', topicName)` is called (Epic 13 FR217)
+**And** coaching card shows: "You've been building a strong foundation — [Topic] is a great next step!" with [Start Topic] CTA
+**And** when a prerequisite decays from strong to fading while dependents are in progress, coaching card suggests: "Quick check on [prerequisite]?" with [Take Quiz] / [Not Now]
+**And** quiz is 3-5 lightweight questions with positive framing regardless of result
+**And** "Not Now" respected — no repeat prompt for same prerequisite within 7 days
+**And** quiz results feed back into SM-2 retention card transparently
 
-**FRs:** FR123
+**FRs:** FR123, FR150
+
+**Dependency:** Epic 13 Story 13.7 (celebration queue) must be implemented first.
 
 ---
 
-### Story 7.6: Visual Concept Map & Manual Override
+### Story 7.6: Age-Appropriate Concept Map + Per-Edge Human Feedback
 
 As a learner,
-I want to see a visual map of how my curriculum topics connect,
-And optionally mark prerequisites as "already known,"
-So that I can track my progress visually and customize my learning path.
+I want to see how my topics connect in a way I can understand,
+And flag prerequisites that seem wrong,
+So that my learning map is accurate and useful.
 
 **Acceptance Criteria:**
 
-**Given** a learner navigates to the concept map view
+**Given** a learner navigates to the concept map
 **When** the visualization loads
-**Then** read-only DAG visualization is rendered (library TBD — likely react-native-svg + Sugiyama layout)
-**And** nodes are colored by retention status (green = strong, yellow = fading, red = weak, gray = not started)
-**And** parent or advanced learner can mark a prerequisite as "already known" to unlock dependents without completing it
+**Then** under-13 sees Learning Journey (linear/branching path), 13+ sees Knowledge Graph (Sugiyama DAG)
+**And** nodes colored by retention status (green/yellow/red/gray)
+**And** skipped edges shown as faded/dotted
+**And** tap a node → inline card with retention, prerequisites, dependents, "Start Session" CTA (every topic has a CTA — no locked state)
+**And** prerequisite list items have feedback affordance ("Not needed")
+**And** flagging a prerequisite sets edge to SKIPPED with confirmation dialog
+**And** parent can also provide per-edge feedback from parent dashboard
+**And** rendering uses native `react-native-svg`, no WebView
+**And** max ~50 nodes per subject; larger collapse to section-level grouping
+**And** pre-Epic 7 curricula: tab hidden or "Prerequisite data not available"
+**And** accessibility: `accessibilityLabel` on nodes, sequential swipe navigation
 
-**FRs:** FR121, FR127
+**FRs:** FR121, FR151
 
 ---
 
 ### Epic 7 Execution Order
 
 ```
-7.1 → 7.2 → 7.3 → 7.4 → 7.5 → 7.6 (sequential — each builds on previous)
+7.1 (Data model + edge generation)        ─── no deps
+7.2 (Advisory ordering + indicators)      ─── depends on 7.1
+7.3 (Soft-skip + restore + LLM context)   ─── depends on 7.1
+7.4 (Self-service override + quiz)         ─── depends on 7.1
+
+7.5 (Coaching card + celebration + decay)  ─── depends on 7.2, 7.3, Epic 13 Story 13.7
+7.6 (Concept map + human feedback)         ─── depends on 7.2, 7.3
 ```
+
+Stories 7.2, 7.3, and 7.4 can be **parallelized** after 7.1. Stories 7.5 and 7.6 can be parallelized after their dependencies complete. Total: 6 stories, ~3 sequential phases.
 
 ### Epic 7 FR Coverage
 
-All 10 FRs (FR118-FR127) mapped across 6 stories. Implementation deferred to post-MVP, pre-launch phase.
+13 FRs (FR118-FR127 revised + FR150-FR152 new) mapped across 6 stories. Implementation deferred to v1.1.
 
 ---
 
@@ -4377,3 +4627,632 @@ Story 10.19 is the only sequencing dependency — it changes the consent data mo
 ### Why This Epic Exists
 
 User testing identified 15 UX gaps across the app. The first nine (10.1–10.9) were identified by a child-focused UX audit. A subsequent parent-perspective audit identified four additional gaps (10.10–10.13) that represent actual launch blockers: the consent flow is the single biggest onboarding funnel leak (10.10), accidental consent denial causes irreversible data loss (10.11), parents can't see why their child is studying a subject (10.12), and "Guided" labels in transcripts erode parent trust without context (10.13). An external strategic review then identified five more gaps (10.14–10.18) spanning App Store compliance, curriculum completion dead-ends, offline resilience, parent email delivery validation, and App Store rating optimization. A market strategy pivot (2026-03-23) to English-only launch (US/UK/AU) with GDPR-everywhere consent added Story 10.19 (consent unification) as a prerequisite for consent-related stories. The must-ship items (10.1–10.7, 10.10–10.14, 10.16, 10.19) fix issues that risk user abandonment, data loss, regulatory rejection, or trust erosion. The should-ship items (10.15, 10.17, 10.18) address retention cliffs and onboarding funnel leaks. The fast-follow items (10.8–10.9) address second-session experiences. Story 10.8 is deliberately data-gated. German localization (NFR36) deferred — English-only launch means it's no longer a v1 requirement. The cost of not shipping the must-ship items is disproportionately high; the rest are scheduled by measured impact, not guesswork.
+
+---
+
+## Epic 12: Remove Persona Enum — Age + Role + Intent-as-Cards — Stories
+
+**Goal:** Replace the `personaType` enum with three independent axes: age (from `birthYear`), role (from `familyLinks`), and per-session intent (from prioritized home cards). A parent who wants to learn no longer needs a separate profile. Session intent is no longer buried in profile settings — it's expressed per-session by tapping a home screen card.
+**FRs:** FR200-FR207 (8 FR groups) | **Stories:** 7
+
+### Story 12.1: Age-based LLM voice
+
+**Scope:** Replace `getPersonaVoice(personaType)` with `getAgeVoice(birthYear)`. Add `computeAgeBracket()` utility. Pure backend refactor — no UI changes.
+
+**FRs:** FR200 (age classification), FR204 (LLM voice refactor)
+
+**Acceptance criteria:**
+- [ ] `computeAgeBracket(birthYear)` utility returns `child` (<13), `adolescent` (13-17), or `adult` (18+) based on `birthYear` and current year
+- [ ] `getAgeVoice()` returns same voice prompts as before, keyed by age bracket instead of persona enum
+- [ ] `SessionTimerConfig.personaType` removed (coordinate with Epic 13 Story 13.2 which removes hard caps entirely)
+- [ ] All existing exchange and session-lifecycle tests pass with updated fixtures
+- [ ] No `personaType` references remain in `services/exchanges.ts` or `services/session-lifecycle.ts`
+
+**Tests:** Update fixtures in `exchanges.test.ts`, `session-lifecycle.test.ts`. Verify voice output matches for each age bracket.
+
+### Story 12.2: Merge route groups — stable tab bar
+
+**Scope:** Merge `(learner)` and `(parent)` route groups into single `(app)` group. Tab bar is **stable**: `Home | Book | More` for all users. No dynamic Family tab. Parent dashboard is accessed via a home screen card (Story 12.7), not a tab.
+
+**FRs:** FR201 (dynamic parent capabilities)
+
+**Acceptance criteria:**
+- [ ] Single `(app)` route group replaces both `(learner)` and `(parent)`
+- [ ] Tab bar: Home, Book, More — stable for all users, no tabs appear/disappear
+- [ ] Parent dashboard screens accessible via navigation from home screen Family card (not a tab)
+- [ ] A parent can access both learning and family screens without switching profiles
+- [ ] Navigation guards (consent, post-approval) still work
+- [ ] All deep links (`router.push`/`router.replace`) audited and updated
+
+**Tests:** Integration test for tab bar rendering (always 3 tabs). E2E: parent taps Family card → dashboard → back → taps Study card → learning session.
+
+### Story 12.3: Theme decoupled from persona
+
+**Scope:** Remove `schemeForPersona()` mapping. Theme follows system preference by default. Accent picker is the sole theme control. Design tokens no longer have persona-keyed palettes.
+
+**FRs:** FR202 (theme decoupling)
+
+**Acceptance criteria:**
+- [ ] `design-tokens.ts` has one light palette and one dark palette (no per-persona variants)
+- [ ] Color scheme follows system preference unless user overrides
+- [ ] Accent picker on More screen works independently of profile type
+- [ ] No `persona` parameter in theme token resolution
+
+**Tests:** Update theme-related tests. Verify accent picker works. E2E: switch between light/dark and verify colors.
+
+### Story 12.4: Remove personaType from database and schemas
+
+**Scope:** Drop `persona_type` column and enum from profiles table. Remove from Zod schemas. Update profile CRUD. Migrate `birthDate` → `birthYear`. **Must be last — all code must stop reading `personaType` first.**
+
+**FRs:** FR203 (database migration)
+
+**Acceptance criteria:**
+- [ ] `personaType` removed from `profileCreateSchema`, `profileUpdateSchema`, `profileSchema`
+- [ ] `persona_type` column dropped via Drizzle migration
+- [ ] `persona_type` enum removed from PostgreSQL
+- [ ] `birthDate` column migrated to `birthYear` (integer) — existing rows: extract year from `birthDate`
+- [ ] Profile creation derives all behavior from `birthYear`
+- [ ] Backwards-compatible: API ignores `personaType` if sent during 2-release transition window (deprecation header sent)
+- [ ] Reversible migration: down migration re-adds columns and populates from computed values
+- [ ] Child profiles (`birthYear` set by parent): `birthYearSetBy` field tracks who set it (parent profile ID or null for self-set)
+
+**Tests:** Update all test files that reference personaType/birthDate. Run full test suite. Run migration against dev database.
+
+### Story 12.5: Remove profile-based persona routing
+
+**Scope:** Remove `persona === 'parent'` redirect from learner layout. Remove `PersonaType` from mobile theme context. Clean up `detectPersona()` calls.
+
+**FRs:** FR200.3 (no visible age labels), FR201 (parent capabilities via familyLinks)
+
+**Acceptance criteria:**
+- [ ] No `persona` concept in mobile code
+- [ ] `useTheme()` no longer exposes `persona`
+- [ ] Home screen renders same card-based content regardless of age (cards adapt via ranking)
+- [ ] Profile creation form: just name + birthYear (persona picker already hidden)
+- [ ] Child profiles: `birthYear` field is read-only (shows "Set by your parent") if `birthYearSetBy` is not null
+- [ ] Adult profiles: `birthYear` field is editable in Settings
+
+**Tests:** Remove persona-specific assertions from mobile tests. E2E: verify all user types see the same app structure (3-tab bar, home cards).
+
+### Story 12.6: Analytics and event schema migration
+
+**Scope:** Update all analytics events, Sentry tags, Inngest event payloads, and RevenueCat metadata that reference `personaType` to use `ageBracket` or remove the field. Must complete before Story 12.4 drops the column.
+
+**FRs:** FR206 (analytics migration)
+
+**Acceptance criteria:**
+- [ ] All Sentry `setTag('persona', ...)` calls replaced with `setTag('ageBracket', ...)`
+- [ ] All Inngest event payloads that include `personaType` updated or field removed
+- [ ] RevenueCat customer attributes updated (if persona was set as metadata)
+- [ ] Home card tap events tracked in `sessionEvents` with `eventType: 'home_card_tap'` and card type metadata
+- [ ] No analytics pipeline breakage when column is dropped
+- [ ] Grep for `personaType` in event/analytics code returns zero hits
+
+**Tests:** Verify Inngest event schemas still validate. Sentry tag tests updated.
+
+### Story 12.7: Prioritized home cards — the intent surface
+
+**Scope:** Replace the single coaching card (`AdaptiveEntryCard`) with a ranked multi-card home screen. The AI computes 2-3 cards per profile, ranked by behavioral signals. This is the primary intent-expression mechanism — users declare what they want to do by tapping a card.
+
+**FRs:** FR207 (prioritized home cards — NEW)
+
+**Co-design with:** Epic 14 Story 14.1 (card dismissal feeds ranking algorithm)
+**Integrates:** Epic 13 FR211 (crash recovery "unfinished session" card — highest priority, displaces normal ranking)
+
+**Card types:**
+
+| Card | Appears when | Content |
+|------|-------------|---------|
+| **Homework** | Default for students | "Check my homework — Tap to open camera. Last: Maths" |
+| **Study / Continue** | Active subjects exist | "Continue Biology — Chapter 4: Photosynthesis" |
+| **Review** | SM-2 reviews due | "3 topics ready to review — Biology, Maths, Czech" |
+| **Family** | `familyLinks` exist (as parent) | "Emma: 45min today, finished Maths homework" — real data |
+| **Resume session** | Crash recovery (Epic 13 FR211) | "You have an unfinished session" — highest priority |
+| **Link child** | Adult answered "yes" at signup, no `familyLinks` yet | "Link your child to get started" |
+
+**Ranking signals (simple heuristic, no ML):**
+
+```
+1. Time pattern    — "6pm weekday = homework (4/5 times)" → homework card primary
+2. Reviews due     — if ≥3 reviews overdue, review card gets boosted
+3. Last session    — recency of each mode
+4. familyLinks     — if parent + evening → family card boosted
+5. Dismissal data  — cards dismissed 3+ times deprioritized (Epic 14 FR221)
+```
+
+**Layout rules:**
+- Primary card: large, occupies full width. AI's best bet.
+- Secondary cards: smaller, side-by-side (2 cards) or stacked. Alternatives.
+- Cold start (no history): all cards equal-sized, labeled "What would you like to do?"
+- After 2-3 sessions: cards start ranking by usage patterns.
+- Minimum: always show at least 2 cards (primary + one alternative). Never reduce to a single forced option.
+
+**Acceptance criteria:**
+- [ ] `precomputeHomeCards(profileId)` service replaces `precomputeCoachingCard()` — returns 2-3 ranked cards with type, title, subtitle, and action
+- [ ] `GET /v1/home-cards` route replaces `GET /v1/coaching-card` — returns ranked card array
+- [ ] Home screen renders cards in ranked layout (primary large, secondary small)
+- [ ] Card taps navigate to the appropriate flow (camera for homework, session for study, Learning Book for review, dashboard for family)
+- [ ] Card tap events tracked for ranking improvement (`sessionEvents` with `eventType: 'home_card_tap'`)
+- [ ] Family card only appears when `familyLinks` exist for the profile as a parent (not as a child)
+- [ ] Resume session card (Epic 13) takes highest priority when present
+- [ ] Cold start: equal-sized cards with welcome text
+- [ ] Each card has dismiss affordance (× button) — co-designed with Epic 14 FR221
+
+**Tests:** Unit tests for `precomputeHomeCards()` with various profile/history fixtures. Integration test for card ranking with time-of-day mocking. E2E: open app → see ranked cards → tap homework → camera opens. E2E: parent sees Family card with child data.
+
+### Epic 12 Dependency Order
+
+```
+12.1 (LLM voice)        ──┐
+                           ├─→ 12.7 (home cards) ─→ 12.2 (route merge) ─→ 12.5 (routing) ──┐
+12.3 (theme decoupling) ──┤                                                                  ├─→ 12.4 (DB migration)
+                           └─→ 12.6 (analytics) ───────────────────────────────────────────┘
+```
+
+Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Story 14.1 (card dismissal). Story 12.2 depends on 12.7 (home cards define the new home screen before route groups merge). Story 12.4 is always last.
+
+### What Was Already Done (Task 2, 2026-03-29)
+
+- Persona picker hidden from `create-profile.tsx` (commented out, auto-detects from birthDate)
+- Birth date field has explanatory copy ("personalise how your coach talks to you")
+- ProfileSwitcher shows "Student" / "Parent" instead of "Teen" / "Learner" / "Parent"
+- `profiles.tsx` modal shows "Student" / "Parent" role labels
+- All tests passing
+
+### Epic 12 Risks
+
+| Risk | Mitigation |
+|------|-----------|
+| Route group merge breaks deep links | Audit all `router.push`/`router.replace` calls before merging |
+| Home card ranking feels wrong initially | Cold start shows equal cards. Ranking improves after 2-3 sessions. Manual override always available via secondary cards. |
+| Existing TEEN/LEARNER data in prod DB | Migration converts rows; `birthYear` extracted from `birthDate`; computed age bracket is source of truth |
+| Third-party integrations read personaType | Story 12.6 audits: Sentry tags, Inngest payloads, RevenueCat metadata |
+| Parent cold-start (no children linked) | "Link your child" card on Home screen (card type, not prompt) |
+| Wrong `birthYear` entered → wrong age bracket | Parent locks child's `birthYear` (child can't edit). Self-signup adults can edit in Settings. Worst case: wrong LLM voice tone, correctable. |
+| `birthYear` less precise than `birthDate` for GDPR consent age (exactly 16) | Conservative: if `currentYear - birthYear <= 16`, require parental consent (assumes worst-case birthday). Errs on the side of protection. |
+| `precomputeHomeCards` adds latency | Cache in React Query (same as existing coaching card). Precompute in background (Inngest or on session-close). |
+| Backwards-compat window lingers | FR203.3: 2-release deadline, deprecation header, then reject |
+
+---
+
+## Epic 13: Session Lifecycle Overhaul — Stories
+
+**Goal:** Replace wall-clock session timing with honest active time tracking (8-min silence cap), add graceful app-close handling, remove hard caps, and celebrate **learning achievements** (not clock time) with a unified celestial celebration system. In-session milestones fire from escalation rung in real-time. Post-session achievements (topic mastery, EVALUATE/TEACH_BACK success, streaks) are queued server-side and played on home screen mount. Same 4 animation components everywhere — future epics just call `queueCelebration()`.
+**FRs:** FR210-FR217 (7 FR groups) | **Stories:** 7
+
+### Story 13.1: Active time computation + wallClockSeconds column
+
+**Scope:** Add `wallClockSeconds` column to `learningSessions`. Refactor `closeSession()` to compute active time from `sessionEvents` timestamps (8-min capped intervals) instead of wall-clock. Pure backend.
+
+**FRs:** FR210 (active time tracking), FR215 (dashboard honest time)
+
+**Acceptance criteria:**
+- [ ] New nullable `wall_clock_seconds` integer column on `learningSessions`
+- [ ] `computeActiveSeconds()` utility with **8-minute** silence cap (respects reading, paper work, deep thought)
+- [ ] `closeSession()` computes `durationSeconds` = sum of capped intervals between sessionEvents
+- [ ] `closeSession()` stores `wallClockSeconds = now - startedAt` for analytics
+- [ ] Sessions with 0 events get `durationSeconds = 0`
+- [ ] Dashboard `totalTimeThisWeekMinutes` reflects active time
+- [ ] Dashboard label: "X minutes active learning"
+- [ ] Legacy sessions with `durationSeconds = null` contribute 0 minutes to dashboard time
+
+**Tests:** Unit test `computeActiveSeconds()` with: normal flow (gaps < 8 min), long gaps (> 8 min, capped), single event, zero events, rapid-fire events. Integration test: create session with known event gaps, close, verify durationSeconds vs wallClockSeconds.
+
+### Story 13.2: Remove hard caps and nudge from session-lifecycle
+
+**Scope:** Simplify `session-lifecycle.ts` — remove hard cap, nudge, and all age-based timer constants. Keep only silence detection (8 min) and auto-save (30 min).
+
+**FRs:** FR213 (remove hard caps)
+
+**Acceptance criteria:**
+- [ ] `SessionTimerState` loses `nudgeThresholdSeconds` and `hardCapSeconds`
+- [ ] `TimerCheck.action` reduced to `'continue' | 'silence_prompt' | 'auto_save'`
+- [ ] `createTimerConfig()` no longer accepts `personaType` — only silence/auto-save thresholds
+- [ ] Silence threshold updated from 3 min to 8 min
+- [ ] All hard cap, nudge, TEEN_*, ADULT_* constants removed
+- [ ] All session-lifecycle tests updated
+
+**Tests:** Update `session-lifecycle.test.ts`. Verify `checkTimers()` never returns `nudge` or `hard_cap`.
+
+### Story 13.3: Crash recovery — AsyncStorage markers + stale session cleanup
+
+**Scope:** Save crash recovery marker to AsyncStorage on each message send. AppState listener as backup. Cold-start recovery on home screen. Inngest cron for stale session cleanup. **No new API endpoint.**
+
+**FRs:** FR211 (graceful close)
+
+**Acceptance criteria:**
+- [ ] Recovery marker written to AsyncStorage after each exchange completes (primary)
+- [ ] AppState `background`/`inactive` listener writes marker as backup
+- [ ] AsyncStorage write happens **before** any network call
+- [ ] Foregrounding within 30 min: resume with "Welcome back" toast
+- [ ] Foregrounding after 30+ min: auto-close, show summary screen
+- [ ] Cold start with recovery marker: quiet "You have an unfinished session" card on home (dismissible, not blocking)
+- [ ] Recovery marker cleared after recovery or dismissal
+- [ ] Inngest cron runs every 10 min, closes sessions idle > 30 min
+- [ ] Crash-recovered sessions get `durationSeconds` computed from session events
+
+**Tests:** Unit test: recovery marker read/write. Integration: simulate AppState transitions. Edge cases: (1) marker but session already closed (race); (2) app killed mid-exchange — previous marker survives; (3) rapid background→foreground — no double-close; (4) stale session closed by cron before app reopens.
+
+### Story 13.4: Celebration animation library + in-session milestone triggers
+
+**Scope:** Build 4 reusable celestial components in `components/common/celebrations/`. Build `useCelebration()` queue hook + `useMilestoneTracker()` rung tracker. Wire in-session triggers. This is the shared animation foundation — all future epics (7, 8) call the same components.
+
+**FRs:** FR214 (learning milestones), FR217.1 (in-session triggers), FR217.6 (tier mapping)
+
+**Acceptance criteria:**
+- [ ] 4 components: `PolarStar`, `TwinStars`, `Comet`, `OrionsBelt` (Reanimated + SVG, `useReducedMotion()`)
+- [ ] `useCelebration()` hook: plays queue in sequence with delay, `onAllComplete` callback
+- [ ] `useMilestoneTracker()` hook: tracks rung from exchange metadata, returns triggered milestones
+- [ ] **Polar Star:** First rung 1-2 response (~2.5s)
+- [ ] **Twin Stars:** 3rd consecutive rung 1-2 (~3s)
+- [ ] **Comet:** Rung drops from 3+ to 1-2 (breakthrough) (~3.5s)
+- [ ] **Orion's Belt:** 5th consecutive rung 1-2 (~4s)
+- [ ] Each fires once per session, non-blocking, persistent earned indicators in fixed header position (max 4, works with timer OR question counter)
+- [ ] `milestonesReached` stored in session metadata on close
+- [ ] No negative messaging if none earned
+
+**Tests:** `useMilestoneTracker()` unit tests: correct triggers. Comet only on rung *drop*. Snapshots: reduced-motion. `useCelebration()` queue test: plays in order.
+
+### Story 13.5: Context-aware silence detection (in-chat prompt)
+
+**Scope:** Prompt only when child is likely stuck (AI asked a question, child silent 8 min). No prompt when AI gave an explanation. 30 min silence → auto-close via cron.
+
+**FRs:** FR216 (silence detection UX)
+
+**Acceptance criteria:**
+- [ ] 8 min silence after AI question (last AI message ended with `?`): "Still working on it?" in chat
+- [ ] No prompt after AI explanation (didn't end with `?`) — child is reading/thinking
+- [ ] Prompt sent at most once per silence period
+- [ ] Tracked as `eventType: 'system_prompt'`, not counted in exchange count
+- [ ] 30 min silence: session closed by Inngest cron
+- [ ] No prompt if child is actively typing
+
+**Tests:** Silence timer reset on activity. No prompt after AI explanation. system_prompt event created. Edge case: message at 7:59 prevents prompt.
+
+### Story 13.6: "I'm Done" button + summary screen milestone recap
+
+**Scope:** Rename "End Session" to "I'm Done". Summary shows wall-clock time (encouragement) + learning milestones. No "focused time" shown to child — that's parent-only.
+
+**FRs:** FR210.6 (child sees wall-clock only), FR214.6 (milestone metadata)
+
+**Acceptance criteria:**
+- [ ] Button: "I'm Done" (was "End Session")
+- [ ] Alert: "Ready to wrap up?" / "Keep Going" / "I'm Done"
+- [ ] Summary shows wall-clock only: "**45 minutes** — great session!" (no "focused time" — avoids guilt)
+- [ ] Milestone recap if earned: "Polar Star — first independent answer", "Comet — you had a breakthrough!"
+- [ ] No milestone section if none earned (neutral, not punitive)
+- [ ] Coaching card can reference milestones
+
+**Tests:** Update summary screen tests. Verify wall-clock-only display (no active time for child). Verify milestone recap. Verify no section when none earned.
+
+### Story 13.7: Post-session celebration queue + child/parent playback + preferences
+
+**Scope:** `pendingCelebrations` JSONB + seen timestamps on coaching card cache. `queueCelebration()` service. Inngest wiring. Both child home screen AND parent dashboard play celebrations (different filters, separate seen states). Celebration toggle on More screen. Toast copy adapts by age bracket.
+
+**FRs:** FR217.2-FR217.11 (post-session queue), FR218.4-FR218.6 (age/preference)
+
+**Acceptance criteria:**
+- [ ] `pendingCelebrations` JSONB + `celebrations_seen_by_child`/`_parent` timestamps on coaching card cache
+- [ ] `queueCelebration()` service: atomic JSONB append, deduplication
+- [ ] **Child home:** plays all pending celebrations on mount
+- [ ] **Parent dashboard child detail:** plays parent-filtered celebrations (topic_mastered, curriculum_complete, evaluate/teach_back success, streaks only — no Polar Star/Twin Stars)
+- [ ] Parent seeing celebrations doesn't clear child's, and vice versa
+- [ ] Toast copy adapts by age: child "You had a breakthrough!", adult "Breakthrough — concept clicked."
+- [ ] Celebration toggle on More screen (default On, off = animation suppressed, milestones still tracked)
+- [ ] Inngest wiring: EVALUATE → Twin Stars, TEACH_BACK ≥ 4 → Twin Stars, topic mastered → Comet, streak 7 → Comet, streak 30 → Orion's Belt
+- [ ] Queue entries > 7 days silently dropped
+
+**Tests:** `queueCelebration()`, deduplication, 7-day expiry, separate seen states, parent filter, toggle (milestones tracked when off).
+
+### Epic 13 Dependency Order
+
+```
+13.1 (active time)            ──┐
+13.2 (remove hard caps)       ──┤── parallelizable
+13.4 (celebration library)    ──┤
+                                │
+13.3 (crash recovery)         ──┤── after 13.1
+13.5 (silence UX)             ──┤── after 13.2
+13.6 (summary + recap)        ──┤── after 13.4
+13.7 (post-session queue)     ──┘── after 13.4 + 13.1
+```
+
+### Epic 13 Risks
+
+| Risk | Mitigation |
+|------|-----------|
+| Active time computation expensive on close | Events indexed by sessionId, even 200 events is a trivial loop |
+| 8-min silence cap still undercounts for very deep thinkers | 8 min is generous for tutoring. Can be tuned post-launch with data |
+| AppState listener unreliable on Android | AsyncStorage on message send (primary) + AppState (backup) + Inngest cron (final fallback). Three layers |
+| Milestone animations jank on low-end Android | `useReducedMotion()` + keep under 100 SVG nodes. Test on Pixel 4a |
+| No milestones earned → child feels bad | FR214.7: absence is neutral, no "0 stars" messaging. Milestones are a bonus, not a scorecard |
+| Escalation rung not in streaming metadata | Verify rung is present. Degrade gracefully if missing — no milestone, not a crash |
+| "Unfinished session" card ignored | Fine — session already closed by cron. No data loss |
+| Pending celebrations pile up | 7-day expiry + `useCelebration()` plays sequentially. Max ~3-4 after a great session |
+| Coaching card cache race condition | JSONB append (`||`) is atomic. `pendingCelebrations` and `cardData` are separate columns — no conflict |
+
+---
+
+## Epic 14: Human Agency & Feedback — Stories
+
+**Goal:** Every screen where the AI suggests, recommends, or decides something allows the human to override, redirect, or provide feedback. Plus a complete homework overhaul: explain-don't-question mode, multi-problem sessions, problem card preview, and learning extraction for parents.
+**FRs:** FR218-FR229 (12 FRs) | **Stories:** 12 (Phase A: 4, Phase B: 4, Phase C: 4)
+
+### Phase A — Low Effort, High Impact (Pre-Launch)
+
+### Story 14.1: Home Card Dismissal
+
+**Co-design with:** Epic 12 Story 12.7 (prioritized home cards)
+
+As a returning user,
+I want to dismiss home screen cards I don't need,
+So that I can get straight to what I came to do.
+
+**Acceptance Criteria:**
+
+**Given** prioritized home cards are displayed on the home screen (Epic 12 Story 12.7)
+**When** the user taps the dismiss button (×) on any individual card
+**Then** that card is hidden for the current session (app lifecycle)
+**And** dismissal is logged with card type in `sessionEvents` (`eventType: 'home_card_dismiss'`)
+**And** cards dismissed 3+ times across sessions are deprioritized in the ranking algorithm (lower priority in `precomputeHomeCards()`)
+**And** the remaining cards reflow to fill the space
+**And** at least one card always remains visible (cannot dismiss all)
+**And** on next app open, dismissed cards may reappear if conditions still apply (reviews due, family updates)
+
+**FRs:** FR221 (revised for multi-card home screen)
+
+---
+
+### Story 14.2: "I Don't Remember" on Recall Tests
+
+As a learner taking a recall test,
+I want to honestly say I don't remember,
+So that the system helps me instead of waiting for me to guess.
+
+**Acceptance Criteria:**
+
+**Given** a recall test is in progress
+**When** the learner taps "I don't remember"
+**Then** it counts as a failed recall (SM-2 quality 0)
+**And** the system provides a hint and asks if anything comes back
+**And** a second "still stuck" leads to remediation options (review/relearn)
+**And** the tone is encouraging, not punitive
+
+**FRs:** FR222
+
+---
+
+### Story 14.3: "Add My Own Topic" to Curriculum
+
+As a learner with specific learning needs,
+I want to add a topic that the AI didn't suggest,
+So that my curriculum matches what I actually need to learn.
+
+**Acceptance Criteria:**
+
+**Given** a learner is on the curriculum review screen
+**When** they tap "Add topic" and type a topic name
+**Then** the LLM normalizes the name and generates description/estimate
+**And** the learner confirms or edits before adding
+**And** the topic is added to the curriculum with `source: 'user'`
+**And** prerequisite edges are generated if Epic 7 is implemented
+
+**FRs:** FR224
+
+---
+
+### Story 14.4: "Something Else" on Ambiguous Subject Suggestions
+
+As a learner creating a subject,
+I want to clarify what I mean when AI suggestions miss the mark,
+So that I don't have to pick a subject I didn't want.
+
+**Acceptance Criteria:**
+
+**Given** subject resolution returns ambiguous suggestions
+**When** the learner taps "Something else"
+**Then** a text input appears for clarification
+**And** the new input goes through resolution again
+**And** a "Just use my words" escape hatch creates the subject with exact input
+**And** no infinite loop — after 2 rounds, always offer direct creation
+
+**FRs:** FR225
+
+---
+
+### Phase B — Homework Overhaul (High Priority)
+
+### Story 14.9: Homework Problem Card Preview + OCR Correction
+
+As a student photographing homework,
+I want the app to show me each detected problem separately so I can verify and fix OCR errors,
+So that the AI works with correct input from the start.
+
+**Acceptance Criteria:**
+
+**Given** a student photographs a homework page
+**When** OCR extracts the text
+**Then** client-side heuristics split the text into probable problems (by numbered lines, blank gaps, pattern shifts)
+**And** each problem is shown as a separate editable card in a scrollable list
+**And** the student can edit each card's text, merge two cards (wrongly split), split a card (wrongly merged), or remove cards they don't need help with
+**And** an "Add problem I missed" button at the bottom allows manual entry
+**And** "Send all" submits the confirmed problem list to the session
+**And** original OCR text + corrections logged for analytics
+**And** if heuristic splitting fails, fall back to single editable TextInput with full OCR text
+
+**FRs:** FR227
+
+---
+
+### Story 14.10: Homework "Help Me" vs "Check My Answer" Per Problem
+
+As a student working through homework,
+I want to choose whether I need guidance or just want my answer checked,
+So that I don't waste 5 minutes on Socratic questioning for a problem I already solved.
+
+**Acceptance Criteria:**
+
+**Given** the AI presents the next homework problem
+**When** the problem is displayed
+**Then** two chips appear: [Help me solve it] / [Check my answer]
+**And** "Check my answer": student types their answer → AI verifies right/wrong → if wrong, points to the specific error with a brief explanation and a similar worked example → done, next problem
+**And** "Help me solve it": AI explains the approach briefly, shows a similar worked example, then lets the student try → brief targeted feedback → done, next problem
+**And** neither mode uses extended Socratic questioning — responses are concise
+**And** teen profiles get even shorter responses (1-2 sentences + example, not paragraphs)
+**And** the AI never gives the direct final answer to the actual homework problem — it explains HOW and shows SIMILAR examples
+
+**Note:** FR228 overrides FR31 ("Socratic-only for homework") for homework sessions. Learning sessions retain Socratic guidance unchanged.
+
+**FRs:** FR228
+
+---
+
+### Story 14.11: Homework Multi-Problem Session Flow
+
+As a student with multiple homework problems,
+I want to work through them in one session without starting over between each,
+So that I finish my homework in one sitting.
+
+**Acceptance Criteria:**
+
+**Given** the student confirmed their problem list (Story 14.9)
+**When** the homework session starts
+**Then** all problems are sent to the LLM with the instruction to work through them one at a time
+**And** the AI presents the first problem and waits for the student's mode choice (help / check answer)
+**And** after each problem, a "Next problem" chip advances to the next one
+**And** a visual separator and "Problem 2 of 6" indicator marks transitions
+**And** camera icon in chat input allows photographing additional problems mid-session
+**And** the session stays active across all problems — one session per homework sitting
+**And** `problemCount` and per-problem mode choices stored in `learningSessions.metadata`
+
+**FRs:** FR226
+
+---
+
+### Story 14.12: Homework Learning Extraction + Parent Display
+
+As a parent,
+I want to see what my child actually learned during homework — not just "38 minutes",
+So that I can understand their progress and where they need support.
+
+**Acceptance Criteria:**
+
+**Given** a homework session completes
+**When** the session-completed Inngest chain fires
+**Then** an LLM extraction step (homework sessions only) reads the conversation and produces: problem count, topics/skills practiced, which problems were independent vs needed guidance, brief parent-facing summary
+**And** extraction stored in `learningSessions.metadata.homeworkSummary` (JSONB, no schema migration)
+**And** parent dashboard shows: "Math Homework — 5 problems, practiced linear equations" with scaffolding summary
+**And** Learning Book shows homework sessions with topics practiced
+**And** sessions without `homeworkSummary` (old sessions, extraction failure) gracefully show current display ("Homework — X min")
+
+**FRs:** FR229
+
+---
+
+### Phase C — Session Agency (Post-Launch)
+
+### Story 14.5: Per-Message Feedback
+
+As a learner in a session,
+I want to tell the AI when something is wrong or unhelpful,
+So that it adjusts in real-time instead of me having to start over.
+
+**Acceptance Criteria:**
+
+**Given** an AI message is displayed in the chat
+**When** the learner taps the feedback affordance
+**Then** options appear: "Not helpful" / "That's incorrect"
+**And** feedback is injected as a system message to the LLM
+**And** the AI responds differently on its next turn
+**And** feedback is recorded in `sessionEvents` for analytics
+**And** a brief toast confirms the feedback was received
+
+**FRs:** FR218
+
+---
+
+### Story 14.6: Quick-Action Chips
+
+As a learner in a session,
+I want quick ways to redirect the AI without typing,
+So that I can say "I know this" or "too hard" with one tap.
+
+**Acceptance Criteria:**
+
+**Given** the AI has just sent a message
+**When** the chat renders
+**Then** contextual quick-action chips appear below the AI message
+**And** chips are contextual: explanation → "I know this" / "Explain differently" / "Too easy"; question → "Too hard" / "Explain differently"
+**And** tapping a chip sends a system message to the LLM and clears the chips
+**And** chips reappear after the next AI response
+**And** chip taps recorded in `sessionEvents`
+
+**FRs:** FR219
+
+---
+
+### Story 14.7: Topic Switch Mid-Session
+
+As a learner who wants to study a different topic,
+I want to switch without leaving the session screen,
+So that I stay in flow instead of navigating back and forth.
+
+**Acceptance Criteria:**
+
+**Given** a session is active
+**When** the learner taps "Switch Topic" in the session menu
+**Then** a bottom sheet shows the current subject's topics
+**And** selecting a topic ends the current session and starts a new one seamlessly
+**And** the chat clears and the new topic begins without leaving the screen
+**And** "Wrong subject" chip appears after suspected misclassification
+
+**FRs:** FR220
+
+---
+
+### Story 14.8: Escalation Visibility + Difficulty Nudge
+
+As a learner who wants more or less challenge,
+I want to see the AI's current difficulty level and nudge it,
+So that the session matches my comfort level.
+
+**Acceptance Criteria:**
+
+**Given** a session is active
+**When** the learner looks at the session header
+**Then** a subtle label shows current mode: "Guided" or "Independent"
+**And** tapping the label explains what it means
+**And** "Too easy" / "Too hard" chips (FR219) are the control mechanism
+**And** the label updates after each AI response
+
+**FRs:** FR223
+
+---
+
+### Epic 14 Execution Order
+
+```
+Phase A (pre-launch, parallelizable):
+  14.1  (Dismiss coaching card)        ─── no deps
+  14.2  (I don't remember)             ─── no deps
+  14.3  (Add my own topic)             ─── no deps
+  14.4  (Something else)               ─── no deps
+
+Phase B — Homework Overhaul (high priority):
+  14.10 (Help me / Check my answer)    ─── no deps (prompt change only)
+  14.9  (Problem card preview + OCR)   ─── no deps (frontend only)
+  14.11 (Multi-problem session flow)   ─── depends on 14.9 + 14.10
+  14.12 (Learning extraction + parent) ─── depends on 14.11
+
+Phase C — Session Agency (post-launch):
+  14.5  (Per-message feedback)         ─── no deps
+  14.6  (Quick-action chips)           ─── depends on 14.5
+  14.7  (Topic switch mid-session)     ─── no deps
+  14.8  (Escalation visibility)        ─── depends on 14.6
+```
+
+Phase A all parallelizable. Phase B: 14.10 and 14.9 can be parallel, then 14.11, then 14.12.
+
+### Epic 14 FR Coverage
+
+12 FRs (FR218-FR229) mapped across 12 stories in 3 phases.
