@@ -410,7 +410,7 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 | FR144-FR145, FR147-FR149 | Full Voice Mode | Epic 8 | v1.1 |
 | FR146 | Language SPEAK/LISTEN Voice | Epic 6 | v1.1 |
 | FR150-FR152 | Epic 7 additions: suggestive decay quizzes, per-edge feedback, "prove it" quiz | Epic 7 | v1.1 |
-| FR210-FR217 | Session Lifecycle: active time, graceful close, hard cap removal, milestones, silence detection, parent dashboard, unified celebrations | Epic 13 | Pre-launch |
+| FR210-FR217 | Session Lifecycle: adaptive time tracking (LLM + pace calibration), graceful close + session resumption, hard cap removal, mastery + effort milestones, adaptive silence detection, parent dashboard (wall-clock + exchanges), unified celebrations | Epic 13 | Pre-launch |
 | FR218-FR225 | Human Agency: per-message feedback, quick chips, topic switch, coaching dismiss, recall "I don't remember", escalation nudge, add topic, "something else" | Epic 14 | Pre/post-launch |
 | FR226-FR229 | Homework Overhaul: multi-problem sessions, problem card preview, explain-don't-question mode, learning extraction | Epic 14 | Pre/post-launch |
 
@@ -668,29 +668,41 @@ Epic 0 ──→ Epic 1 ──→ Epic 2 ──→ Epic 3 ──→ Epic 4
 
 Epic 11 (brand color)         ← no deps (independent)
 Epic 12 (persona → age+cards) ← no deps (but follow Epic 11 for accent defaults). Co-design: 12.7 ↔ 14.1
-Epic 13 (session lifecycle)   ← no deps. Sequencing: 13.2 before 12.1. FR211 integrates with 12.7 (recovery card)
+Epic 13 (session lifecycle v3) ← no deps. Sequencing: 13.2 before 12.1. FR211 integrates with 12.7 (recovery/resume card). Cross-epic touchpoints: LLM metadata, teachingPreferences, Inngest chain (all additive)
 Epic 14 Phase A (agency)      ← Story 14.1 co-designs with Epic 12 Story 12.7 (home card dismissal)
 Epic 14 Phase B (homework)    ← no deps (independent, high priority)
 Epic 14 Phase C (session)     ← internal deps only (14.5 → 14.6 → 14.8)
 Epic 7 (v1.1, revised v2)    ← Epic 1 + Epic 3 + Epic 13 Story 13.7 (celebrations)
 ```
 
-### Epic 11: Brand Color Refresh (Post-Launch)
+### Epic 11: Brand Identity — Fixed Teal + Lavender, System Theme Toggle (Phase 1)
 
-**Scope:** Post-launch polish
-**Stories:** 11.1–11.5
+**Scope:** Phase 1 in implementation order — foundation for all subsequent visual work
+**Stories:** 11.1–11.3
 **Depends on:** None (independent of all other epics)
 
-**Why:** The current violet primary (`#7c3aed`/`#8b5cf6`) is strongly associated with AI-generated designs ("AI slop"). Replace teen default with brand blue (`#378ADD`) from the approved brand palette. Keep violet as a selectable accent. Also fix dark mode elevation contrast (cards invisible against background).
+**Why:** The app's brand identity should match the logo (`docs/logo-designs/dark background/horizontal-dark-panel.png`). The logo uses teal + lavender on deep navy — those are the app's colors. No accent picker. Fixed brand. Current issues: (1) dark background is neutral black `#18181b` not brand navy, (2) accent colors are hardcoded in many components (accent only changes buttons, not full UI — broken cascade), (3) persona-based theme defaults override system setting.
+
+**Key decisions:**
+- **Fixed brand colors. No accent picker.** Teal primary + lavender secondary, always. Like Duolingo is green, MentoMate is teal. Brand consistency > personalization. Accent pickers feel like toy apps and add engineering complexity for no real value.
+- **System theme toggle.** Default follows OS dark/light setting. User can override in app settings (dark / light / system). No persona-based defaults.
+- **Two themes only:**
+
+| | Dark mode (brand) | Light mode (functional) |
+|---|---|---|
+| Background | Navy `~#1a1a3e` | Cream `#faf5ee` |
+| Surface | Navy-tinted | White `#ffffff` |
+| Primary accent | Teal `#2dd4bf` | Teal `#0f766e` (darkened for contrast) |
+| Secondary accent | Lavender `#a78bfa` | Lavender `#6d28d9` (darkened for contrast) |
+| Accent-as-fill (buttons) | Same teal, dark text on top | Same teal, white text on top |
+
+- Logo SVGs already use teal + lavender — no regeneration needed.
+- If post-launch feedback demands color choice (unlikely), add a single "neutral/slate" mode. Don't build preemptively.
 
 **Stories:**
-- 11.1: Update teen persona default colors in `design-tokens.ts`
-- 11.2: Regenerate all logo SVGs with brand blue + teal
-- 11.3: Improve dark mode elevation contrast (background/surface/elevated steps)
-- 11.4: Update learner accent presets (replace purple option)
-- 11.5: Hardcoded violet color audit across codebase
-
-**Detailed spec:** See `docs/plans/2026-03-25-brand-color-refresh.md` (retained — design tokens reference).
+- 11.1: **Navy background + teal/lavender tokens** — shift dark mode bg/surface/elevated from neutral black to navy-tinted. Set teal as primary accent, lavender as secondary. Remove all persona-based theme defaults. Wire theme to system setting with user override. Remove accent picker UI.
+- 11.2: **Accent cascade fix (CRITICAL)** — audit every component for hardcoded accent hex values. Replace with `text-accent`/`bg-accent`/`border-accent` semantic tokens. Currently accent changes only apply to buttons — must cascade through tabs, toggles, progress bars, links, badges, icons, focus rings, selected states. Test on both dark and light mode.
+- 11.3: **Light mode pass** — ensure teal/lavender have readable darkened variants for cream background. Accent-as-fill (buttons) uses same bright teal with adaptive text color. Accent-as-text (links, active labels) uses auto-darkened variant. Visual review of all screens in light mode.
 
 ### Epic 12: Remove Persona Enum — Age + Role + Intent-as-Cards (Post-Launch)
 
@@ -756,40 +768,40 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 ### Epic 13: Session Lifecycle Overhaul — Honest Time, Learning Milestones, Graceful Close
 
 **Scope:** Pre-launch recommended (parent dashboard trust)
-**Stories:** 13.1–13.7
-**Depends on:** None (independent). **Sequencing note:** Story 13.2 must run before Epic 12 Story 12.1 — both remove `personaType` from `SessionTimerConfig`. Doing 13.2 first makes 12.1's timer work a no-op.
+**Stories:** 13.1–13.7 (v3 — post end-user challenge)
+**Depends on:** None (independent). **Sequencing notes:** (1) Story 13.2 must run before Epic 12 Story 12.1 — both remove `personaType` from `SessionTimerConfig`. Doing 13.2 first makes 12.1's timer work a no-op. (2) Story 13.7 (celebration queue) should run after Epic 12 Story 12.7 (multi-card home screen) so celebrations integrate with the home card system rather than the legacy single coaching card.
 
-**Why:** The parent dashboard shows inflated "study time" because `durationSeconds` is wall-clock (`now - startedAt`), not active learning time. A child who opens a session and walks away for 2 hours shows 2 hours of "study." Additionally, swiping the app closed orphans the session (no `endedAt`, no `durationSeconds`). Hard caps (20/30 min forced session end) exist in server code but were never enforced on the client — and they're hostile UX anyway. Replace all of this with: honest active time tracking (8-min silence cap that respects deep thought), graceful app-close handling, and celestial milestone animations that celebrate **learning achievements** (independent thinking, breakthroughs, mastery streaks) instead of clock time.
+**Why:** The parent dashboard shows wall-clock time with no engagement context — a child who walks away for 2 hours looks the same as one who studied 2 hours. Swiping the app closed orphans sessions. Hard caps (20/30 min forced end) are hostile. The timer communicates nothing about learning quality. Replace with: wall-clock + exchange count for honest engagement context, adaptive silence detection (LLM task estimates + per-student pace learning), session resumption on crash, and milestone celebrations that reward both **mastery** (independent thinking, breakthroughs) and **effort** (thoughtful responses, persistence after corrections) — ensuring every child who tries can earn recognition.
 
 **Stories:**
-- 13.1: Active time computation (8-min capped intervals) + `wallClockSeconds` column
-- 13.2: Remove hard caps and nudge — simplify to silence detection only
-- 13.3: Crash recovery — AsyncStorage markers on message send + Inngest stale session cron (no new API endpoint)
-- 13.4: Celebration animation library (4 reusable celestial components + `useCelebration()` hook + `useMilestoneTracker()`) + in-session triggers
-- 13.5: Context-aware silence detection — prompt only when AI asked a question and child is silent 8 min
-- 13.6: "I'm Done" button + summary screen (wall-clock time for child, milestone recap, no "focused time" shown to child)
-- 13.7: Post-session celebration queue — `pendingCelebrations` on coaching card cache, Inngest wiring for EVALUATE/TEACH_BACK/topic mastery/streaks, home screen playback
+- 13.1: Time tracking + `wallClockSeconds` column + dashboard engagement context (wall-clock + exchange count)
+- 13.2: Remove hard caps and nudge — simplify to adaptive silence + auto-save only
+- 13.3: Crash recovery — AsyncStorage markers + **session resumption within 30 min** + Inngest stale session cron
+- 13.4: Celebration animation library (4 celestial components + `useCelebration()` with 3-level filtering + `useMilestoneTracker()`) + **mastery + effort milestone** triggers
+- 13.5: **Adaptive silence detection** — LLM `expectedResponseMinutes` + per-session pace calibration + cross-session learned baseline
+- 13.6: "I'm Done" button + summary screen (wall-clock, milestone recap, **3-sec wait for fast post-session celebrations**)
+- 13.7: Post-session celebration queue on home card system (Epic 12 Story 12.7) + Inngest wiring + **3-level celebration toggle** (All / Big only / Off)
 
 **Dependency order:**
 ```
-13.1 (active time)            ──┐
+13.1 (time tracking)          ──┐
 13.2 (remove hard caps)       ──┤── parallelizable
 13.4 (celebration library)    ──┤
                                 │
-13.3 (crash recovery)         ──┤── after 13.1
-13.5 (silence UX)             ──┤── after 13.2
-13.6 (summary + recap)        ──┤── after 13.4
+13.3 (crash recovery+resume)  ──┤── after 13.1
+13.5 (adaptive silence)       ──┤── after 13.2
+13.6 (summary + recap + catch)──┤── after 13.4
 13.7 (post-session queue)     ──┘── after 13.4 + 13.1
 ```
 
-**Key design decisions:**
-- Active time = capped intervals between session events (8-min cap — respects reading, paper work, deep thought)
-- Milestones celebrate learning quality (escalation rung), not time: independent answers, streaks, breakthroughs
-- **Unified celebration system:** same 4 animation components used in-session (client-side, real-time from rung) AND post-session (server-queued via `pendingCelebrations` on coaching card cache, played on home screen mount). Future epics (7, 8) just call `queueCelebration()` — zero animation work.
-- Child sees wall-clock time + milestone recap on summary. Parent sees active time on dashboard. Different audiences, different needs.
-- No "focused time" shown to child — avoids guilt and prevents parent interrogation tool
-- Crash recovery: AsyncStorage on message send (primary) + AppState listener (backup) + Inngest cron (final fallback). No new endpoint.
-- Silence prompt is context-aware: only fires when AI asked a question and child hasn't responded (they're stuck, not thinking)
+**Key design decisions (v3 — revised after end-user challenge):**
+- **Wall-clock for everyone.** Both child and parent see wall-clock time — learning includes reading, paper work, and thinking away from the screen. Parent also sees exchange count for engagement context ("45 min, 18 exchanges" vs "120 min, 2 exchanges"). Active time is internal analytics only, never shown to any user.
+- **Adaptive silence, not fixed caps.** LLM estimates `expectedResponseMinutes` per exchange (quick recall = 2 min, multi-step proof = 12 min). Per-session pace calibration adjusts to each student (fast responder = 0.7x, slow reader = 2x). Cross-session learned baseline (`medianResponseSeconds` on `teachingPreferences`) eliminates cold-start from session 2 onward. Final threshold clamped to [2, 20] minutes.
+- **Mastery + effort milestones.** 4 mastery milestones (rung-based: independent answer, streak, breakthrough, mastery streak) + 2 effort milestones (engagement-based: Deep Diver for 3 thoughtful messages, Persistent for continuing after corrections). Every child who tries can earn recognition — struggling learners need encouragement most.
+- **Unified celebration system:** same animation components used in-session (client-side, real-time) AND post-session (server-queued on home card system from Epic 12 Story 12.7, played on home screen mount). **3-level toggle:** All (default) / Big only (Comet + Orion's Belt) / Off. Future epics just call `queueCelebration()`. **Note:** Story 13.7 should be built after 12.7 ships.
+- **Session resumption within 30 min.** Crash/background within 30 min: "Pick up where you left off?" with Continue/End options. After 30 min: auto-close + summary card. Three layers: AsyncStorage (primary) + AppState (backup) + Inngest cron (final fallback).
+- **3-second summary wait** catches fast post-session achievements (topic mastery typically <2s) at the moment they're most meaningful.
+- **Cross-epic touchpoints (all additive):** LLM response metadata (`expectedResponseMinutes`), `teachingPreferences` (2 new fields), session-completed Inngest chain (pace baseline step). No other epic spec needs changes.
 
 ---
 
@@ -849,7 +861,7 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 ```
 Phase 1 — Foundation cleanup (simplify existing code):
   Epic 11       (brand color — design tokens only, zero logic)
-  Epic 13.1     (active time computation — backend only)
+  Epic 13.1     (time tracking + wallClockSeconds + dashboard engagement context — backend only)
   Epic 13.2     (remove hard caps — simplifies session-lifecycle.ts, must be before 12.1)
 
 Phase 2 — Quick wins (independent, small changes):
@@ -862,11 +874,11 @@ Phase 3 — Homework overhaul (sequential chain):
   Epic 14.12    (learning extraction — Inngest step, depends on 14.11)
 
 Phase 4 — Celebration system + session polish:
-  Epic 13.4     (celebration library — new components, no existing code modified)
-  Epic 13.3     (crash recovery — depends on 13.1)
-  Epic 13.5     (silence detection — depends on 13.2)
-  Epic 13.6     (summary + recap — depends on 13.4)
-  Epic 13.7     (celebration queue — depends on 13.4 + 13.1)
+  Epic 13.4     (celebration library + mastery + effort milestones + 3-level filtering)
+  Epic 13.3     (crash recovery + session resumption — depends on 13.1)
+  Epic 13.5     (adaptive silence: LLM estimate + pace calibration + cross-session baseline — depends on 13.2)
+  Epic 13.6     (summary + recap + 3-sec fast celebration catch — depends on 13.4)
+  Epic 13.7     (celebration queue + 3-level toggle — depends on 13.4 + 13.1)
 
 Phase 5 — Architecture refactor:
   Epic 12       (persona removal + prioritized home cards — big refactor, touches many files)
@@ -878,10 +890,10 @@ Phase 6 — New features:
 ```
 
 **Why this order:**
-- Phase 1 *simplifies* existing code (removes hard caps, dead constants) — makes later phases cleaner
+- Phase 1 *simplifies* existing code (removes hard caps, dead constants, adds wallClockSeconds) — makes later phases cleaner
 - Phase 2 delivers immediate user value with near-zero risk (prompt change + small independent UI additions)
 - Phase 3 is the homework overhaul — high daily-use-case value, contained to camera + session files
-- Phase 4 builds the celebration system that Phases 5-6 need
+- Phase 4 builds the celebration system (mastery + effort milestones, adaptive silence with LLM estimation + learned pace, session resumption, 3-level toggle) that Phases 5-6 need. Story 13.5 adds cross-epic touchpoints: `expectedResponseMinutes` in LLM response metadata, `medianResponseSeconds` + `celebrationLevel` on `teachingPreferences`.
 - Phase 5 (Epic 12) is the biggest refactor — touch navigation, layouts, services, schema. Doing it after celebration system means 12.7 (home cards) can integrate celebrations
 - Phase 6 adds new features on a stable, refactored codebase
 
@@ -4815,145 +4827,172 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 
 ---
 
-## Epic 13: Session Lifecycle Overhaul — Stories
+## Epic 13: Session Lifecycle Overhaul — Stories (v3)
 
-**Goal:** Replace wall-clock session timing with honest active time tracking (8-min silence cap), add graceful app-close handling, remove hard caps, and celebrate **learning achievements** (not clock time) with a unified celestial celebration system. In-session milestones fire from escalation rung in real-time. Post-session achievements (topic mastery, EVALUATE/TEACH_BACK success, streaks) are queued server-side and played on home screen mount. Same 4 animation components everywhere — future epics just call `queueCelebration()`.
-**FRs:** FR210-FR217 (7 FR groups) | **Stories:** 7
+**Goal:** Add `wallClockSeconds` as the user-facing duration (both child and parent see wall-clock — learning includes paper work and thinking). Parent dashboard adds exchange count for engagement context. Internal `durationSeconds` stores active time (adaptive per-gap caps from LLM estimates + student pace) for analytics only. Adaptive silence detection replaces fixed thresholds. Session resumption within 30 min of crash. Mastery + effort milestones celebrate both independent thinking AND persistence/engagement. Unified celebration system with 3-level toggle (All / Big only / Off). Future epics just call `queueCelebration()`.
+**FRs:** FR210-FR217 (7 FR groups, FR210.8-10 added for adaptive silence) | **Stories:** 7
 
-### Story 13.1: Active time computation + wallClockSeconds column
+### Story 13.1: Time tracking + wallClockSeconds column + dashboard engagement context
 
-**Scope:** Add `wallClockSeconds` column to `learningSessions`. Refactor `closeSession()` to compute active time from `sessionEvents` timestamps (8-min capped intervals) instead of wall-clock. Pure backend.
+**Scope:** Add `wallClockSeconds` column to `learningSessions`. Refactor `closeSession()` to compute active time (adaptive per-gap caps) for internal analytics. Dashboard shows **wall-clock + exchange count** (not active time). Pure backend.
 
-**FRs:** FR210 (active time tracking), FR215 (dashboard honest time)
+**FRs:** FR210 (time tracking), FR215 (dashboard engagement context)
 
 **Acceptance criteria:**
 - [ ] New nullable `wall_clock_seconds` integer column on `learningSessions`
-- [ ] `computeActiveSeconds()` utility with **8-minute** silence cap (respects reading, paper work, deep thought)
-- [ ] `closeSession()` computes `durationSeconds` = sum of capped intervals between sessionEvents
-- [ ] `closeSession()` stores `wallClockSeconds = now - startedAt` for analytics
-- [ ] Sessions with 0 events get `durationSeconds = 0`
-- [ ] Dashboard `totalTimeThisWeekMinutes` reflects active time
-- [ ] Dashboard label: "X minutes active learning"
-- [ ] Legacy sessions with `durationSeconds = null` contribute 0 minutes to dashboard time
+- [ ] `computeActiveSeconds()` utility using per-gap caps from `expectedResponseMinutes` × pace multiplier (fallback: 10-min fixed cap)
+- [ ] `closeSession()` computes `durationSeconds` for internal analytics using adaptive capped-interval formula
+- [ ] `closeSession()` stores `wallClockSeconds = now - startedAt` as user-facing duration
+- [ ] Sessions with 0 events get `durationSeconds = 0` and `wallClockSeconds = now - startedAt`
+- [ ] Dashboard `totalTimeThisWeekMinutes` reflects **wall-clock** time (from `wallClockSeconds`)
+- [ ] Dashboard includes total exchange count for displayed sessions
+- [ ] Dashboard label: "**X minutes, Y exchanges**"
+- [ ] Legacy sessions with `wallClockSeconds = null` fall back to `durationSeconds`; if both null, contribute 0 minutes
 
-**Tests:** Unit test `computeActiveSeconds()` with: normal flow (gaps < 8 min), long gaps (> 8 min, capped), single event, zero events, rapid-fire events. Integration test: create session with known event gaps, close, verify durationSeconds vs wallClockSeconds.
+**Tests:** Unit test `computeActiveSeconds()` with: normal flow, long gaps (capped), adaptive caps (different per event), single event, zero events, rapid-fire events. Integration test: create session with known event gaps and LLM estimates, close, verify both columns. Dashboard test: verify wall-clock + exchange count display.
 
 ### Story 13.2: Remove hard caps and nudge from session-lifecycle
 
-**Scope:** Simplify `session-lifecycle.ts` — remove hard cap, nudge, and all age-based timer constants. Keep only silence detection (8 min) and auto-save (30 min).
+**Scope:** Simplify `session-lifecycle.ts` — remove hard cap, nudge, and all age-based timer constants. Keep only adaptive silence detection and auto-save (30 min).
 
 **FRs:** FR213 (remove hard caps)
 
 **Acceptance criteria:**
 - [ ] `SessionTimerState` loses `nudgeThresholdSeconds` and `hardCapSeconds`
 - [ ] `TimerCheck.action` reduced to `'continue' | 'silence_prompt' | 'auto_save'`
-- [ ] `createTimerConfig()` no longer accepts `personaType` — only silence/auto-save thresholds
-- [ ] Silence threshold updated from 3 min to 8 min
+- [ ] `createTimerConfig()` no longer accepts `personaType` — only needs auto-save threshold
+- [ ] Fixed silence threshold constants removed (silence is now adaptive per FR210.8-10)
 - [ ] All hard cap, nudge, TEEN_*, ADULT_* constants removed
 - [ ] All session-lifecycle tests updated
 
 **Tests:** Update `session-lifecycle.test.ts`. Verify `checkTimers()` never returns `nudge` or `hard_cap`.
 
-### Story 13.3: Crash recovery — AsyncStorage markers + stale session cleanup
+### Story 13.3: Crash recovery — AsyncStorage markers + session resumption + stale cleanup
 
-**Scope:** Save crash recovery marker to AsyncStorage on each message send. AppState listener as backup. Cold-start recovery on home screen. Inngest cron for stale session cleanup. **No new API endpoint.**
+**Scope:** Save crash recovery marker to AsyncStorage on each message send. AppState listener as backup. **Session resumption within 30 minutes** — child can continue where they left off. Inngest cron for stale session cleanup. No new API endpoint (session data loaded from existing endpoints).
 
-**FRs:** FR211 (graceful close)
+**FRs:** FR211 (graceful close + session resumption)
 
 **Acceptance criteria:**
 - [ ] Recovery marker written to AsyncStorage after each exchange completes (primary)
 - [ ] AppState `background`/`inactive` listener writes marker as backup
 - [ ] AsyncStorage write happens **before** any network call
-- [ ] Foregrounding within 30 min: resume with "Welcome back" toast
+- [ ] Foregrounding within 30 min: **session resumes** — chat history loaded from server, session screen restored, "Welcome back" toast
+- [ ] If last exchange was incomplete (user message, no AI response), discard it — child sends new message
 - [ ] Foregrounding after 30+ min: auto-close, show summary screen
-- [ ] Cold start with recovery marker: quiet "You have an unfinished session" card on home (dismissible, not blocking)
-- [ ] Recovery marker cleared after recovery or dismissal
+- [ ] Cold start with recovery marker + session still active (< 30 min): **"Pick up where you left off?"** card with [Continue Session] / [End & See Summary] (highest priority in Epic 12 Story 12.7 ranking, dismissible)
+- [ ] Cold start with recovery marker + session already closed (> 30 min or cron-closed): "Your session was saved" card → summary
+- [ ] Recovery marker cleared after recovery, resumption, or dismissal
 - [ ] Inngest cron runs every 10 min, closes sessions idle > 30 min
 - [ ] Crash-recovered sessions get `durationSeconds` computed from session events
 
-**Tests:** Unit test: recovery marker read/write. Integration: simulate AppState transitions. Edge cases: (1) marker but session already closed (race); (2) app killed mid-exchange — previous marker survives; (3) rapid background→foreground — no double-close; (4) stale session closed by cron before app reopens.
+**Tests:** Unit test: recovery marker read/write. Integration: simulate AppState transitions. Edge cases: (1) marker but session already closed (race); (2) app killed mid-exchange — previous marker survives; (3) rapid background→foreground — no double-close; (4) stale session closed by cron before app reopens; (5) resumption loads correct chat history; (6) incomplete last exchange handled gracefully.
 
-### Story 13.4: Celebration animation library + in-session milestone triggers
+### Story 13.4: Celebration animation library + mastery + effort milestone triggers
 
-**Scope:** Build 4 reusable celestial components in `components/common/celebrations/`. Build `useCelebration()` queue hook + `useMilestoneTracker()` rung tracker. Wire in-session triggers. This is the shared animation foundation — all future epics (7, 8) call the same components.
+**Scope:** Build 4 reusable celestial components in `components/common/celebrations/`. Build `useCelebration()` queue hook with **3-level celebration filtering** + `useMilestoneTracker()` for rung + engagement tracking. Wire in-session triggers for **mastery milestones** (rung-based) AND **effort milestones** (engagement-based). This is the shared animation foundation — all future epics (7, 8) call the same components.
 
 **FRs:** FR214 (learning milestones), FR217.1 (in-session triggers), FR217.6 (tier mapping)
 
 **Acceptance criteria:**
 - [ ] 4 components: `PolarStar`, `TwinStars`, `Comet`, `OrionsBelt` (Reanimated + SVG, `useReducedMotion()`)
-- [ ] `useCelebration()` hook: plays queue in sequence with delay, `onAllComplete` callback
-- [ ] `useMilestoneTracker()` hook: tracks rung from exchange metadata, returns triggered milestones
-- [ ] **Polar Star:** First rung 1-2 response (~2.5s)
-- [ ] **Twin Stars:** 3rd consecutive rung 1-2 (~3s)
-- [ ] **Comet:** Rung drops from 3+ to 1-2 (breakthrough) (~3.5s)
-- [ ] **Orion's Belt:** 5th consecutive rung 1-2 (~4s)
-- [ ] Each fires once per session, non-blocking, persistent earned indicators in fixed header position (max 4, works with timer OR question counter)
+- [ ] `useCelebration()` hook: plays queue in sequence with delay, **respects `celebrationLevel` setting** (all/big_only/off), `onAllComplete` callback
+- [ ] `useMilestoneTracker()` hook: tracks rung AND engagement metrics from exchange metadata, returns triggered milestones
+- [ ] **Mastery milestones (rung-based):**
+  - **Polar Star:** First rung 1-2 response (~2.5s)
+  - **Twin Stars:** 3rd consecutive rung 1-2 (~3s)
+  - **Comet:** Rung drops from 3+ to 1-2 (breakthrough) (~3.5s)
+  - **Orion's Belt:** 5th consecutive rung 1-2 (~4s)
+- [ ] **Effort milestones (engagement-based — every child can earn these):**
+  - **Deep Diver:** 3rd user message over 50 characters (thoughtful responses) — Tier 1 (PolarStar animation)
+  - **Persistent:** User continues after rung 4-5 correction (didn't give up) — Tier 2 (TwinStars animation)
+- [ ] Each fires once per session, non-blocking, persistent earned indicators in fixed header position (max 6, works with timer OR question counter)
 - [ ] `milestonesReached` stored in session metadata on close
-- [ ] No negative messaging if none earned
+- [ ] No negative messaging if none earned (mitigated by effort milestones — lower threshold for earning something)
+- [ ] Celebration registry includes `tier` field for level filtering
 
-**Tests:** `useMilestoneTracker()` unit tests: correct triggers. Comet only on rung *drop*. Snapshots: reduced-motion. `useCelebration()` queue test: plays in order.
+**Tests:** `useMilestoneTracker()` unit tests: correct triggers for rung AND engagement conditions. Comet only on rung *drop*. Deep Diver on 3rd long message. Persistent after correction + response. Snapshots: reduced-motion. `useCelebration()` queue test: plays in order. Level filtering: `big_only` skips tier 1-2, `off` skips all.
 
-### Story 13.5: Context-aware silence detection (in-chat prompt)
+### Story 13.5: Adaptive silence detection (LLM estimate + pace calibration + cross-session baseline)
 
-**Scope:** Prompt only when child is likely stuck (AI asked a question, child silent 8 min). No prompt when AI gave an explanation. 30 min silence → auto-close via cron.
+**Scope:** Replace fixed silence threshold with **LLM-adaptive system**. Add `expectedResponseMinutes` to exchange response metadata. Build per-session pace calibration. Add cross-session learned baseline to `teachingPreferences`. Silence prompt fires at computed threshold. 30-min full silence → auto-close via Inngest cron.
 
-**FRs:** FR216 (silence detection UX)
+**FRs:** FR210.8-10 (adaptive silence), FR216 (silence detection UX)
 
 **Acceptance criteria:**
-- [ ] 8 min silence after AI question (last AI message ended with `?`): "Still working on it?" in chat
-- [ ] No prompt after AI explanation (didn't end with `?`) — child is reading/thinking
+- [ ] LLM system prompt updated to request `expectedResponseMinutes` (1-20) per response
+- [ ] Exchange response metadata includes `expectedResponseMinutes` (optional integer)
+- [ ] `expectedResponseMinutes` stored per exchange in `sessionEvents`
+- [ ] Per-session `paceMultiplier` from ratio of actual response times to LLM estimates (median, clamped 0.5-3.0)
+- [ ] Before 3 exchanges: `paceMultiplier` initialized from cross-session baseline (or 1.0)
+- [ ] Silence threshold: `clamp(expectedResponseMinutes * paceMultiplier, 2, 20)` minutes
+- [ ] Fallback: 10 minutes if `expectedResponseMinutes` missing
+- [ ] Silence prompt in chat: "Still working on it? Take your time — I'm here when you're ready."
 - [ ] Prompt sent at most once per silence period
 - [ ] Tracked as `eventType: 'system_prompt'`, not counted in exchange count
-- [ ] 30 min silence: session closed by Inngest cron
 - [ ] No prompt if child is actively typing
+- [ ] 30 min silence: session closed by Inngest cron
+- [ ] New `medianResponseSeconds` nullable integer on `teachingPreferences`
+- [ ] Session-completed Inngest chain: new step updates `medianResponseSeconds` (exponential moving average: 80% old, 20% new)
+- [ ] Cross-session baseline seeds `paceMultiplier` on session start
 
-**Tests:** Silence timer reset on activity. No prompt after AI explanation. system_prompt event created. Edge case: message at 7:59 prevents prompt.
+**Tests:** `computePaceMultiplier()` with various ratios. Silence threshold edge cases (missing estimate, extreme multiplier, first session). Exponential moving average update. Integration: 3 exchanges → verify paceMultiplier adjusts. Cross-session: baseline persists and is read on next session.
 
-### Story 13.6: "I'm Done" button + summary screen milestone recap
+### Story 13.6: "I'm Done" button + summary screen milestone recap + fast celebration catch
 
-**Scope:** Rename "End Session" to "I'm Done". Summary shows wall-clock time (encouragement) + learning milestones. No "focused time" shown to child — that's parent-only.
+**Scope:** Rename "End Session" to "I'm Done". Summary shows wall-clock time (encouragement) + learning milestones (mastery + effort). **3-second wait** for fast post-session achievements before navigating to summary. No "focused time" shown to child.
 
 **FRs:** FR210.6 (child sees wall-clock only), FR214.6 (milestone metadata)
 
 **Acceptance criteria:**
 - [ ] Button: "I'm Done" (was "End Session")
 - [ ] Alert: "Ready to wrap up?" / "Keep Going" / "I'm Done"
-- [ ] Summary shows wall-clock only: "**45 minutes** — great session!" (no "focused time" — avoids guilt)
-- [ ] Milestone recap if earned: "Polar Star — first independent answer", "Comet — you had a breakthrough!"
+- [ ] After session close, brief "Wrapping up..." state (3 seconds max)
+- [ ] During 3-sec wait, check once for fast Inngest results (topic mastery, EVALUATE success)
+- [ ] If celebration arrives within 3 sec, include in summary screen
+- [ ] If nothing in 3 sec, proceed — home screen queue catches it later
+- [ ] Summary shows wall-clock only: "**45 minutes** — great session!" (no active time for child)
+- [ ] Milestone recap if earned (mastery + effort): "Polar Star — first independent answer", "Deep Diver — great thoughtful responses", "Comet — you had a breakthrough!"
 - [ ] No milestone section if none earned (neutral, not punitive)
-- [ ] Coaching card can reference milestones
+- [ ] Home cards can reference milestones
 
-**Tests:** Update summary screen tests. Verify wall-clock-only display (no active time for child). Verify milestone recap. Verify no section when none earned.
+**Tests:** Update summary screen tests. Verify wall-clock-only display. Verify milestone recap (including effort milestones). Verify no section when none earned. 3-sec wait: mock fast result at 1.5s → appears in summary. Mock no result → summary after 3s timeout.
 
-### Story 13.7: Post-session celebration queue + child/parent playback + preferences
+### Story 13.7: Post-session celebration queue + child/parent playback + 3-level preferences
 
-**Scope:** `pendingCelebrations` JSONB + seen timestamps on coaching card cache. `queueCelebration()` service. Inngest wiring. Both child home screen AND parent dashboard play celebrations (different filters, separate seen states). Celebration toggle on More screen. Toast copy adapts by age bracket.
+**Scope:** `pendingCelebrations` JSONB on the home card system (Epic 12 Story 12.7). `queueCelebration()` service. Inngest wiring. Both child home screen AND parent dashboard play celebrations (different filters, separate seen states). **Three-level celebration toggle** on More screen. Toast copy adapts by age bracket.
+
+**Depends on:** Epic 12 Story 12.7 (multi-card home screen must exist so celebrations integrate with the home card data model, not the legacy single coaching card).
 
 **FRs:** FR217.2-FR217.11 (post-session queue), FR218.4-FR218.6 (age/preference)
 
 **Acceptance criteria:**
-- [ ] `pendingCelebrations` JSONB + `celebrations_seen_by_child`/`_parent` timestamps on coaching card cache
+- [ ] `pendingCelebrations` JSONB + `celebrations_seen_by_child`/`_parent` timestamps on the home card cache (or equivalent table from Epic 12 Story 12.7)
+- [ ] `celebrationLevel` enum on `teachingPreferences`: `'all' | 'big_only' | 'off'` (default `'all'`)
 - [ ] `queueCelebration()` service: atomic JSONB append, deduplication
-- [ ] **Child home:** plays all pending celebrations on mount
-- [ ] **Parent dashboard child detail:** plays parent-filtered celebrations (topic_mastered, curriculum_complete, evaluate/teach_back success, streaks only — no Polar Star/Twin Stars)
+- [ ] **Child home:** plays pending celebrations on mount, respecting `celebrationLevel`
+- [ ] **Parent dashboard child detail:** plays parent-filtered celebrations (topic_mastered, curriculum_complete, evaluate/teach_back success, streaks only — no Polar Star/Twin Stars/Deep Diver/Persistent)
 - [ ] Parent seeing celebrations doesn't clear child's, and vice versa
 - [ ] Toast copy adapts by age: child "You had a breakthrough!", adult "Breakthrough — concept clicked."
-- [ ] Celebration toggle on More screen (default On, off = animation suppressed, milestones still tracked)
+- [ ] **Three-level celebration toggle on More screen:**
+  - All celebrations (default) — every milestone fires
+  - Big milestones only — Tier 3-4 (Comet + Orion's Belt) only
+  - Off — no animations, milestones still tracked in metadata
 - [ ] Inngest wiring: EVALUATE → Twin Stars, TEACH_BACK ≥ 4 → Twin Stars, topic mastered → Comet, streak 7 → Comet, streak 30 → Orion's Belt
 - [ ] Queue entries > 7 days silently dropped
 
-**Tests:** `queueCelebration()`, deduplication, 7-day expiry, separate seen states, parent filter, toggle (milestones tracked when off).
+**Tests:** `queueCelebration()`, deduplication, 7-day expiry, separate seen states, parent filter. 3-level toggle: `big_only` shows tier 3-4 only, `off` shows nothing, milestones tracked in all cases. `celebrationLevel` persisted correctly.
 
 ### Epic 13 Dependency Order
 
 ```
-13.1 (active time)            ──┐
+13.1 (time tracking)          ──┐
 13.2 (remove hard caps)       ──┤── parallelizable
 13.4 (celebration library)    ──┤
                                 │
-13.3 (crash recovery)         ──┤── after 13.1
-13.5 (silence UX)             ──┤── after 13.2
-13.6 (summary + recap)        ──┤── after 13.4
+13.3 (crash recovery+resume)  ──┤── after 13.1
+13.5 (adaptive silence)       ──┤── after 13.2
+13.6 (summary + recap + catch)──┤── after 13.4
 13.7 (post-session queue)     ──┘── after 13.4 + 13.1
 ```
 
@@ -4961,15 +5000,20 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 
 | Risk | Mitigation |
 |------|-----------|
-| Active time computation expensive on close | Events indexed by sessionId, even 200 events is a trivial loop |
-| 8-min silence cap still undercounts for very deep thinkers | 8 min is generous for tutoring. Can be tuned post-launch with data |
+| LLM `expectedResponseMinutes` inconsistent | Clamped to [2, 20] min. Pace multiplier smooths noise. 10-min fallback if missing. Non-catastrophic: prompt comes slightly early/late |
+| LLM anchors on a single value | System prompt gives explicit examples by task type. Monitor distribution post-launch. Fallback to 10-min if variance low |
+| Cross-session baseline drifts from model changes | Exponential moving average (80/20) = mostly historical. One weird session doesn't swing it. Can reset per-profile |
+| Active time uses stored LLM estimates (non-reproducible) | Active time is internal analytics only — never shown to users. Wall-clock is source of truth for all user-facing metrics |
 | AppState listener unreliable on Android | AsyncStorage on message send (primary) + AppState (backup) + Inngest cron (final fallback). Three layers |
+| Session resumption loads stale chat history | Chat history from server (sessionEvents) is always current. Incomplete last exchange detected and discarded |
 | Milestone animations jank on low-end Android | `useReducedMotion()` + keep under 100 SVG nodes. Test on Pixel 4a |
-| No milestones earned → child feels bad | FR214.7: absence is neutral, no "0 stars" messaging. Milestones are a bonus, not a scorecard |
-| Escalation rung not in streaming metadata | Verify rung is present. Degrade gracefully if missing — no milestone, not a crash |
+| No milestones earned → child feels bad | Mitigated by effort milestones (Deep Diver, Persistent) — any child who writes thoughtful responses or persists earns something. Absence still neutral, no "0 stars" messaging |
+| Escalation rung not in streaming metadata | Degrade gracefully — no mastery milestones for that exchange. Effort milestones (message length, persistence) still work without rung |
 | "Unfinished session" card ignored | Fine — session already closed by cron. No data loss |
-| Pending celebrations pile up | 7-day expiry + `useCelebration()` plays sequentially. Max ~3-4 after a great session |
-| Coaching card cache race condition | JSONB append (`||`) is atomic. `pendingCelebrations` and `cardData` are separate columns — no conflict |
+| Pending celebrations pile up | 7-day expiry + sequential playback. Max ~3-4 after a great session |
+| Home card cache race condition | JSONB append (`||`) is atomic. Separate columns — no conflict |
+| Celebration fatigue after weeks of use | 3-level toggle (all/big_only/off) lets users self-moderate. Registry pattern supports animation variants in future |
+| 3-sec summary wait feels sluggish | Show subtle animation. Navigate immediately if result arrives at 0.5s — 3s is a ceiling, not fixed delay |
 
 ---
 
