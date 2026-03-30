@@ -114,7 +114,8 @@ export function useStreamMessage(sessionId: string): {
     message: string,
     onChunk: (accumulated: string) => void,
     onDone: (result: { exchangeCount: number; escalationRung: number }) => void,
-    overrideSessionId?: string
+    overrideSessionId?: string,
+    options?: { homeworkMode?: 'help_me' | 'check_answer' }
   ) => Promise<void>;
   isStreaming: boolean;
 } {
@@ -140,7 +141,8 @@ export function useStreamMessage(sessionId: string): {
         exchangeCount: number;
         escalationRung: number;
       }) => void,
-      overrideSessionId?: string
+      overrideSessionId?: string,
+      options?: { homeworkMode?: 'help_me' | 'check_answer' }
     ): Promise<void> => {
       const effectiveSessionId = overrideSessionId ?? sessionIdRef.current;
       if (isStreamingRef.current || !effectiveSessionId) return;
@@ -161,10 +163,12 @@ export function useStreamMessage(sessionId: string): {
           headers['X-Profile-Id'] = profileIdRef.current;
 
         const url = `${getApiUrl()}/v1/sessions/${effectiveSessionId}/stream`;
+        const body: Record<string, unknown> = { message };
+        if (options?.homeworkMode) body.homeworkMode = options.homeworkMode;
         const { events, abort } = streamSSEViaXHR(url, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ message }),
+          body: JSON.stringify(body),
         });
         abortRef.current = abort;
 

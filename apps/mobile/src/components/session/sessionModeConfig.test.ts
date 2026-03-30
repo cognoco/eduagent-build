@@ -5,12 +5,16 @@ describe('getOpeningMessage', () => {
 
   it('returns problem-text override regardless of experience', () => {
     const msg = getOpeningMessage('homework', 0, 'Solve 2+2');
-    expect(msg).toBe("Got it. Let's work through this together.");
+    expect(msg).toBe(
+      "Got it. Let's work through this together. I'll keep it brief and clear."
+    );
   });
 
   it('returns problem-text override for experienced users too', () => {
     const msg = getOpeningMessage('learning', 10, 'Help with this');
-    expect(msg).toBe("Got it. Let's work through this together.");
+    expect(msg).toBe(
+      "Got it. Let's work through this together. I'll keep it brief and clear."
+    );
   });
 
   describe('first session (experience 0)', () => {

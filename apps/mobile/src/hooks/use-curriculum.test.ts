@@ -6,6 +6,7 @@ import {
   useSkipTopic,
   useUnskipTopic,
   useChallengeCurriculum,
+  useAddCurriculumTopic,
   useExplainTopic,
 } from './use-curriculum';
 
@@ -243,6 +244,54 @@ describe('useChallengeCurriculum', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
+  });
+});
+
+describe('useAddCurriculumTopic', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('previews a normalized topic draft', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          mode: 'preview',
+          preview: {
+            title: 'Trigonometry Basics',
+            description: 'Angles and triangle relationships',
+            estimatedMinutes: 35,
+          },
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useAddCurriculumTopic('subject-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate({ mode: 'preview', title: 'trig' });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data).toEqual({
+      mode: 'preview',
+      preview: {
+        title: 'Trigonometry Basics',
+        description: 'Angles and triangle relationships',
+        estimatedMinutes: 35,
+      },
+    });
   });
 });
 

@@ -248,8 +248,8 @@ interface AccentColors {
 export const accentPresets: Record<Persona, AccentPreset[]> = {
   teen: [
     {
-      id: 'violet',
-      label: 'Violet',
+      id: 'teal',
+      label: 'Teal',
       swatch: '#0d9488',
       light: {
         primary: '#0d9488',
@@ -345,9 +345,9 @@ export const accentPresets: Record<Persona, AccentPreset[]> = {
   ],
   learner: [
     {
-      id: 'indigo',
-      label: 'Indigo',
-      swatch: '#0d9488',
+      id: 'violet',
+      label: 'Violet',
+      swatch: '#8b5cf6',
       light: {
         primary: '#0d9488',
         primarySoft: 'rgba(13, 148, 136, 0.10)',

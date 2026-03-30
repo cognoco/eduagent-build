@@ -168,10 +168,21 @@ export type RetentionCardResponse = z.infer<typeof retentionCardSchema>;
 
 // Recall test submission
 
-export const recallTestSubmitSchema = z.object({
-  topicId: z.string().uuid(),
-  answer: z.string().min(1).max(10000),
-});
+export const recallTestSubmitSchema = z
+  .object({
+    topicId: z.string().uuid(),
+    answer: z.string().max(10000).optional().default(''),
+    attemptMode: z.enum(['standard', 'dont_remember']).optional(),
+  })
+  .refine(
+    (value) =>
+      value.attemptMode === 'dont_remember' ||
+      (value.answer ?? '').trim().length > 0,
+    {
+      message: 'Answer is required',
+      path: ['answer'],
+    }
+  );
 export type RecallTestSubmitInput = z.infer<typeof recallTestSubmitSchema>;
 
 // Relearn topic request

@@ -13,6 +13,9 @@ export const topicRelevanceSchema = z.enum([
 ]);
 export type TopicRelevance = z.infer<typeof topicRelevanceSchema>;
 
+export const curriculumTopicSourceSchema = z.enum(['generated', 'user']);
+export type CurriculumTopicSource = z.infer<typeof curriculumTopicSourceSchema>;
+
 // Subject schemas
 
 export const subjectCreateSchema = z.object({
@@ -109,6 +112,43 @@ export const generatedTopicSchema = z.object({
   estimatedMinutes: z.number().int(),
 });
 export type GeneratedTopic = z.infer<typeof generatedTopicSchema>;
+
+export const curriculumTopicPreviewSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().min(1).max(500),
+  estimatedMinutes: z.number().int().min(5).max(240),
+});
+export type CurriculumTopicPreview = z.infer<
+  typeof curriculumTopicPreviewSchema
+>;
+
+export const curriculumTopicAddSchema = z.discriminatedUnion('mode', [
+  z.object({
+    mode: z.literal('preview'),
+    title: z.string().min(1).max(200),
+  }),
+  z.object({
+    mode: z.literal('create'),
+    title: z.string().min(1).max(200),
+    description: z.string().min(1).max(500),
+    estimatedMinutes: z.number().int().min(5).max(240),
+  }),
+]);
+export type CurriculumTopicAddInput = z.infer<typeof curriculumTopicAddSchema>;
+
+export const curriculumTopicAddResponseSchema = z.discriminatedUnion('mode', [
+  z.object({
+    mode: z.literal('preview'),
+    preview: curriculumTopicPreviewSchema,
+  }),
+  z.object({
+    mode: z.literal('create'),
+    topic: curriculumTopicSchema,
+  }),
+]);
+export type CurriculumTopicAddResponse = z.infer<
+  typeof curriculumTopicAddResponseSchema
+>;
 
 // Curriculum interaction schemas
 

@@ -68,6 +68,31 @@ jest.mock('../services/curriculum', () => ({
     topics: [],
     generatedAt: new Date().toISOString(),
   }),
+  addCurriculumTopic: jest
+    .fn()
+    .mockImplementation((_db, _profileId, _subjectId, input) =>
+      input.mode === 'preview'
+        ? {
+            mode: 'preview',
+            preview: {
+              title: 'Trigonometry Basics',
+              description: 'Angles and triangle relationships',
+              estimatedMinutes: 35,
+            },
+          }
+        : {
+            mode: 'create',
+            topic: {
+              id: 'topic-added',
+              title: input.title,
+              description: input.description,
+              sortOrder: 5,
+              relevance: 'recommended',
+              estimatedMinutes: input.estimatedMinutes,
+              skipped: false,
+            },
+          }
+    ),
   explainTopicOrdering: jest
     .fn()
     .mockResolvedValue('This topic builds on fundamentals.'),
@@ -220,6 +245,74 @@ describe('curriculum routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /v1/subjects/:subjectId/curriculum/topics
+  // -------------------------------------------------------------------------
+
+  describe('POST /v1/subjects/:subjectId/curriculum/topics', () => {
+    it('returns 200 with preview payload', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/curriculum/topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            mode: 'preview',
+            title: 'trig',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.mode).toBe('preview');
+      expect(body.preview.title).toBe('Trigonometry Basics');
+    });
+
+    it('returns 200 with created topic payload', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/curriculum/topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            mode: 'create',
+            title: 'Trigonometry Basics',
+            description: 'Angles and triangle relationships',
+            estimatedMinutes: 35,
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.mode).toBe('create');
+      expect(body.topic.title).toBe('Trigonometry Basics');
+      expect(body.topic.sortOrder).toBe(5);
+    });
+
+    it('returns 400 when create payload is incomplete', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/curriculum/topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            mode: 'create',
+            title: 'Trigonometry Basics',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
     });
   });
 

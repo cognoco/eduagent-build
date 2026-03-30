@@ -75,6 +75,9 @@ export default function SessionScreen() {
     subjectId: string;
     subjectName: string;
   } | null>(null);
+  const [homeworkMode, setHomeworkMode] = useState<
+    'help_me' | 'check_answer' | undefined
+  >(undefined);
 
   const animationCleanupRef = useRef<(() => void) | null>(null);
 
@@ -246,7 +249,10 @@ export default function SessionScreen() {
             setExchangeCount(result.exchangeCount);
             setEscalationRung(result.escalationRung);
           },
-          sid
+          sid,
+          effectiveMode === 'homework' && homeworkMode
+            ? { homeworkMode }
+            : undefined
         );
       } catch (err: unknown) {
         animationCleanupRef.current = animateResponse(
@@ -265,6 +271,8 @@ export default function SessionScreen() {
       classifySubject,
       ensureSession,
       streamMessage,
+      effectiveMode,
+      homeworkMode,
     ]
   );
 
@@ -363,6 +371,54 @@ export default function SessionScreen() {
     ? 'Server unreachable — messages may fail'
     : modeConfig.subtitle;
 
+  const homeworkModeChips =
+    effectiveMode === 'homework' ? (
+      <View className="flex-row px-4 pt-3 bg-surface border-t border-surface-elevated gap-2">
+        <Pressable
+          onPress={() => setHomeworkMode('help_me')}
+          className={`flex-1 rounded-button py-2 items-center ${
+            homeworkMode === 'help_me' ? 'bg-primary' : 'bg-surface-elevated'
+          }`}
+          testID="homework-mode-help-me"
+          accessibilityRole="button"
+          accessibilityLabel="Help me solve it"
+          accessibilityState={{ selected: homeworkMode === 'help_me' }}
+        >
+          <Text
+            className={`text-body-sm font-semibold ${
+              homeworkMode === 'help_me'
+                ? 'text-text-inverse'
+                : 'text-text-primary'
+            }`}
+          >
+            Help me solve it
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setHomeworkMode('check_answer')}
+          className={`flex-1 rounded-button py-2 items-center ${
+            homeworkMode === 'check_answer'
+              ? 'bg-primary'
+              : 'bg-surface-elevated'
+          }`}
+          testID="homework-mode-check-answer"
+          accessibilityRole="button"
+          accessibilityLabel="Check my answer"
+          accessibilityState={{ selected: homeworkMode === 'check_answer' }}
+        >
+          <Text
+            className={`text-body-sm font-semibold ${
+              homeworkMode === 'check_answer'
+                ? 'text-text-inverse'
+                : 'text-text-primary'
+            }`}
+          >
+            Check my answer
+          </Text>
+        </Pressable>
+      </View>
+    ) : undefined;
+
   return (
     <ChatShell
       title={modeConfig.title}
@@ -373,6 +429,7 @@ export default function SessionScreen() {
       isStreaming={isStreaming}
       inputDisabled={isOffline || pendingClassification}
       rightAction={headerRight}
+      inputAccessory={homeworkModeChips}
       footer={
         modeConfig.showQuestionCount || showBookLink ? (
           <>

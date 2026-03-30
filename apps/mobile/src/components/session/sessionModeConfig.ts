@@ -13,7 +13,7 @@ export const SESSION_MODE_CONFIGS: Record<string, SessionModeConfig> = {
     subtitle: "Let's work through this together",
     placeholder: 'Describe what you need help with...',
     openingMessage:
-      "Got it. Let's work through this together.\n\nWhat do you think the first step is?",
+      "Got it. Let's work through this together.\n\nI'll keep it brief and clear. Tell me if you want help starting or want me to check your answer.",
     showTimer: false,
     showQuestionCount: true,
   },
@@ -98,7 +98,9 @@ export function getOpeningMessage(
   sessionExperience: number,
   problemText?: string
 ): string {
-  if (problemText) return "Got it. Let's work through this together.";
+  if (problemText) {
+    return "Got it. Let's work through this together. I'll keep it brief and clear.";
+  }
 
   if (sessionExperience <= 0) {
     return FIRST_SESSION[mode] ?? FIRST_SESSION.freeform!;

@@ -5,7 +5,11 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import type { Curriculum } from '@eduagent/schemas';
+import type {
+  Curriculum,
+  CurriculumTopicAddInput,
+  CurriculumTopicAddResponse,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
@@ -106,6 +110,37 @@ export function useChallengeCurriculum(
       void queryClient.invalidateQueries({
         queryKey: ['curriculum', subjectId],
       });
+    },
+  });
+}
+
+export function useAddCurriculumTopic(
+  subjectId: string
+): UseMutationResult<
+  CurriculumTopicAddResponse,
+  Error,
+  CurriculumTopicAddInput
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (
+      input: CurriculumTopicAddInput
+    ): Promise<CurriculumTopicAddResponse> => {
+      const res = await client.subjects[':subjectId'].curriculum.topics.$post({
+        param: { subjectId },
+        json: input,
+      });
+      await assertOk(res);
+      return (await res.json()) as CurriculumTopicAddResponse;
+    },
+    onSuccess: (result) => {
+      if (result.mode === 'create') {
+        void queryClient.invalidateQueries({
+          queryKey: ['curriculum', subjectId],
+        });
+      }
     },
   });
 }

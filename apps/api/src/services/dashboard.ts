@@ -240,11 +240,11 @@ export async function getChildrenForParent(
     ).length;
 
     // 5. Sum display duration for time tracking (seconds -> minutes)
-    // Prefer wall-clock when available, with fallback to legacy active duration.
+    // Prefer active time (gap-capped, FR210) with wall-clock fallback for legacy sessions.
     const getDisplaySeconds = (session: {
       wallClockSeconds: number | null;
       durationSeconds: number | null;
-    }): number => session.wallClockSeconds ?? session.durationSeconds ?? 0;
+    }): number => session.durationSeconds ?? session.wallClockSeconds ?? 0;
 
     const totalTimeThisWeek = recentSessions
       .filter((s) => s.startedAt >= startOfThisWeek)
