@@ -10,6 +10,8 @@ import { useAuth } from '@clerk/clerk-expo';
 import type { LearningSession, SessionSummary } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
+import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 import { getApiUrl } from '../lib/api';
 import { streamSSEViaXHR } from '../lib/sse';
 
@@ -60,6 +62,7 @@ export function useStartSession(
         param: { subjectId },
         json: input,
       });
+      await assertOk(res);
       return (await res.json()) as SessionStartResult;
     },
     onSuccess: () => {
@@ -79,6 +82,7 @@ export function useSendMessage(
         param: { sessionId },
         json: input,
       });
+      await assertOk(res);
       return (await res.json()) as MessageResult;
     },
   });
@@ -96,6 +100,7 @@ export function useCloseSession(
         param: { sessionId },
         json: {},
       });
+      await assertOk(res);
       return (await res.json()) as CloseResult;
     },
     onSuccess: () => {
@@ -200,12 +205,19 @@ export function useSessionSummary(
 
   return useQuery({
     queryKey: ['session-summary', sessionId, activeProfile?.id],
-    queryFn: async () => {
-      const res = await client.sessions[':sessionId'].summary.$get({
-        param: { sessionId },
-      });
-      const data = await res.json();
-      return data.summary;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.sessions[':sessionId'].summary.$get({
+          param: { sessionId },
+          init: { signal },
+        } as never);
+        await assertOk(res);
+        const data = await res.json();
+        return data.summary;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile && !!sessionId,
   });
@@ -223,6 +235,7 @@ export function useSubmitSummary(
         param: { sessionId },
         json: input,
       });
+      await assertOk(res);
       return (await res.json()) as SubmitSummaryResult;
     },
     onSuccess: () => {

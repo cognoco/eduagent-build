@@ -96,7 +96,7 @@ export function ProfileProvider({
       if (activeProfileId) {
         setProfileWasRemoved(true);
       }
-      const owner = profiles.find((p) => p.isOwner) ?? profiles[0];
+      const owner = profiles.find((p) => p.isOwner) ?? profiles[0]!;
       setActiveProfileId(owner.id);
       void storage.setItem(ACTIVE_PROFILE_KEY, owner.id);
     }
@@ -109,15 +109,46 @@ export function ProfileProvider({
 
   const switchProfile = useCallback(
     async (profileId: string) => {
-      await client.profiles.switch.$post({ json: { profileId } });
+      const res = await client.profiles.switch.$post({ json: { profileId } });
+      if (!res.ok) {
+        throw new Error('Failed to switch profile');
+      }
       await storage.setItem(ACTIVE_PROFILE_KEY, profileId);
       // State update LAST — triggers re-renders that change themeKey and
       // remount the navigation tree.  Callers should close modals before
       // awaiting this function to avoid navigation state corruption.
       setActiveProfileId(profileId);
-      // Fire-and-forget: don't block the switch on query refetching.
-      // Queries refetch in background; components show stale-then-fresh data.
-      void queryClient.invalidateQueries();
+      // Reset profile-scoped queries to prevent stale data leaking between
+      // child profiles. Uses an allow-list so new query keys must be explicitly
+      // added here to be reset on switch. 'profiles' is excluded because it
+      // belongs to the account (not the individual profile) — resetting it
+      // causes isProfileLoading→true which triggers `return null` in the
+      // learner layout, blanking the entire screen (blank-screen bug).
+      const PROFILE_SCOPED_KEYS = [
+        'subjects',
+        'progress',
+        'sessions',
+        'curriculum',
+        'assessment',
+        'interview',
+        'consent-status',
+        'dashboard',
+        'streaks',
+        'xp',
+        'settings',
+        'subscription',
+        'usage',
+        'retention',
+        'coaching-card',
+        'topic',
+        'learning-modes',
+        'notification-preferences',
+        'teaching-preferences',
+      ];
+      await queryClient.resetQueries({
+        predicate: (query) =>
+          PROFILE_SCOPED_KEYS.includes(String(query.queryKey[0])),
+      });
     },
     [client, queryClient]
   );

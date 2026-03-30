@@ -1,7 +1,8 @@
 import type React from 'react';
-import { View, Text, StyleSheet, useColorScheme } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import IconLight from '../../assets/images/logo-icon-light.svg';
 import IconDark from '../../assets/images/logo-icon-dark.svg';
+import { useTheme, useThemeColors } from '../lib/theme';
 
 // ── Size presets ──────────────────────────────────────────────
 const sizes = {
@@ -18,21 +19,21 @@ type MentomateLogoProps = {
 
 /**
  * Mentomate brand logo — SVG icon + native Text wordmark.
- * Automatically picks light/dark variant based on system color scheme.
- * Uses native Text for the wordmark to guarantee correct color rendering
- * on all screens (including pre-auth where ThemeContext is not available).
+ * Automatically picks light/dark variant based on the active theme.
+ * Uses useThemeColors() for persona-aware, accent-preset-aware colors.
  */
 export function MentomateLogo({
   size = 'md',
 }: MentomateLogoProps): React.JSX.Element {
-  const colorScheme = useColorScheme();
+  const { colorScheme } = useTheme();
+  const colors = useThemeColors();
   const isDark = colorScheme === 'dark';
   const s = sizes[size];
   const Icon = isDark ? IconDark : IconLight;
 
-  const mentColor = isDark ? '#8b5cf6' : '#8b5cf6';
-  const mateColor = isDark ? '#5eead4' : '#0d9488';
-  const circleColor = isDark ? '#a78bfa' : '#8b5cf6';
+  const mentColor = colors.accent;
+  const mateColor = colors.secondary;
+  const circleColor = colors.accent;
 
   return (
     <View

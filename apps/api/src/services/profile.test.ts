@@ -6,7 +6,7 @@ jest.mock('./consent', () => ({
   getConsentStatus: jest.fn().mockResolvedValue(null),
   checkConsentRequired: jest
     .fn()
-    .mockReturnValue({ required: false, consentType: null }),
+    .mockReturnValue({ required: false, consentType: null, age: 30 }),
   createPendingConsentState: jest.fn().mockResolvedValue({
     id: 'consent-1',
     profileId: 'profile-1',
@@ -226,6 +226,7 @@ describe('createProfile', () => {
     (checkConsentRequired as jest.Mock).mockReturnValueOnce({
       required: true,
       consentType: 'GDPR',
+      age: 9,
     });
     const row = mockProfileRow();
     const db = createMockDb({ insertReturning: [row] });
@@ -259,6 +260,60 @@ describe('createProfile', () => {
 
     expect(createPendingConsentState).not.toHaveBeenCalled();
     expect(result.consentStatus).toBeNull();
+  });
+
+  it('rejects PARENT persona for users under 18', async () => {
+    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
+      required: true,
+      consentType: 'GDPR',
+      age: 14,
+    });
+    const row = mockProfileRow();
+    const db = createMockDb({ insertReturning: [row] });
+
+    await expect(
+      createProfile(db, 'account-123', {
+        displayName: 'Teen',
+        personaType: 'PARENT',
+        birthDate: '2011-01-15',
+      })
+    ).rejects.toThrow('Parent profile requires age 18 or older');
+  });
+
+  it('allows PARENT persona for users 18 or older', async () => {
+    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
+      required: false,
+      consentType: null,
+      age: 35,
+    });
+    const row = mockProfileRow({ personaType: 'PARENT' });
+    const db = createMockDb({ insertReturning: [row] });
+
+    const result = await createProfile(db, 'account-123', {
+      displayName: 'Adult',
+      personaType: 'PARENT',
+      birthDate: '1990-01-15',
+    });
+
+    expect(result.personaType).toBe('PARENT');
+  });
+
+  it('allows TEEN persona for users under 18', async () => {
+    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
+      required: true,
+      consentType: 'GDPR',
+      age: 12,
+    });
+    const row = mockProfileRow({ personaType: 'TEEN' });
+    const db = createMockDb({ insertReturning: [row] });
+
+    const result = await createProfile(db, 'account-123', {
+      displayName: 'Young Learner',
+      personaType: 'TEEN',
+      birthDate: '2013-06-15',
+    });
+
+    expect(result.personaType).toBe('TEEN');
   });
 
   it('does not create consent state when no birthDate', async () => {

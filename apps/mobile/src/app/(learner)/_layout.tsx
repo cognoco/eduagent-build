@@ -630,8 +630,22 @@ export default function LearnerLayout() {
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
   if (persona === 'parent') return <Redirect href="/(parent)/dashboard" />;
 
-  // Show nothing while profiles are still loading to avoid flash
-  if (isProfileLoading) return null;
+  // Show a centered spinner while profiles load — never return null (blank
+  // screen) because the loading state also fires after switchProfile resets
+  // queries.  Returning null made the entire screen disappear on every
+  // profile switch and during initial load.
+  if (isProfileLoading)
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        testID="profile-loading"
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
+
+  // No profile exists — show gate that pushes to profile creation modal
+  if (!activeProfile) return <CreateProfileGate />;
 
   // No profile exists — show gate that pushes to profile creation modal
   if (!activeProfile) return <CreateProfileGate />;

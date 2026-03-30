@@ -65,7 +65,7 @@ describe('sm2', () => {
 
     // After the first two reviews (interval 1, then 6), intervals should keep growing
     for (let i = 3; i < intervals.length; i++) {
-      expect(intervals[i]).toBeGreaterThan(intervals[i - 1]);
+      expect(intervals[i]!).toBeGreaterThan(intervals[i - 1]!);
     }
   });
 

@@ -46,8 +46,8 @@ export default function SessionSummaryScreen() {
   const submitSummary = useSubmitSummary(sessionId ?? '');
   const { persona } = useTheme();
 
-  const exchanges = parseInt(exchangeCount ?? '0', 10);
-  const rung = parseInt(escalationRung ?? '1', 10);
+  const exchanges = parseInt(exchangeCount ?? '0', 10) || 0;
+  const rung = parseInt(escalationRung ?? '1', 10) || 1;
 
   if (!sessionId) {
     return (

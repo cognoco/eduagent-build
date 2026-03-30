@@ -7,6 +7,8 @@ import {
 import type { Assessment, AssessmentEvaluation } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
+import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 export function useAssessment(
   assessmentId: string
@@ -16,12 +18,19 @@ export function useAssessment(
 
   return useQuery({
     queryKey: ['assessment', assessmentId, activeProfile?.id],
-    queryFn: async () => {
-      const res = await client.assessments[':assessmentId'].$get({
-        param: { assessmentId },
-      });
-      const data = (await res.json()) as { assessment: Assessment };
-      return data.assessment;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.assessments[':assessmentId'].$get({
+          param: { assessmentId },
+          init: { signal },
+        } as never);
+        await assertOk(res);
+        const data = (await res.json()) as { assessment: Assessment };
+        return data.assessment;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile && !!assessmentId,
   });
@@ -38,6 +47,7 @@ export function useCreateAssessment(subjectId: string, topicId: string) {
       ].assessments.$post({
         param: { subjectId, topicId },
       });
+      await assertOk(res);
       return await res.json();
     },
     onSuccess: () => {
@@ -61,6 +71,7 @@ export function useSubmitAnswer(assessmentId: string) {
         param: { assessmentId },
         json: input,
       });
+      await assertOk(res);
       return (await res.json()) as { evaluation: AssessmentEvaluation };
     },
     onSuccess: () => {

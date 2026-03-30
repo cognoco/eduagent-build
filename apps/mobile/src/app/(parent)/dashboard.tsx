@@ -6,6 +6,7 @@ import {
   Alert,
   RefreshControl,
   InteractionManager,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -127,7 +128,7 @@ export default function DashboardScreen() {
       </View>
       <ScrollView
         className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         testID="dashboard-scroll"
         refreshControl={
           <RefreshControl
@@ -151,14 +152,23 @@ export default function DashboardScreen() {
             </Text>
             <Pressable
               onPress={() => refetch()}
+              disabled={isRefetching}
               className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
               accessibilityLabel="Retry loading dashboard"
               accessibilityRole="button"
               testID="dashboard-retry-button"
             >
-              <Text className="text-text-inverse text-body font-semibold">
-                Retry
-              </Text>
+              {isRefetching ? (
+                <ActivityIndicator
+                  size="small"
+                  color="white"
+                  testID="dashboard-retry-loading"
+                />
+              ) : (
+                <Text className="text-text-inverse text-body font-semibold">
+                  Retry
+                </Text>
+              )}
             </Pressable>
           </View>
         ) : dashboard?.children && dashboard.children.length > 0 ? (

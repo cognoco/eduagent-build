@@ -1,5 +1,12 @@
-import { useEffect, useCallback, useRef } from 'react';
-import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
+import { useEffect, useCallback, useRef, useMemo } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  Dimensions,
+  useColorScheme,
+} from 'react-native';
 import Svg, {
   Path,
   Circle,
@@ -19,6 +26,7 @@ import Animated, {
   runOnJS,
   useReducedMotion,
 } from 'react-native-reanimated';
+import { tokens } from '../lib/design-tokens';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -27,23 +35,46 @@ const { width: SCREEN_W } = Dimensions.get('window');
 const ICON_SIZE = Math.min(SCREEN_W * 0.44, 180);
 const PATH_LEN = 150; // approximate bezier arc length
 
-// Brand colors — dark-mode variants for the deep indigo splash background
-const C = {
-  bg: '#1e1b4b',
-  violet: '#8b5cf6',
-  teal: '#14b8a6',
-  pink: '#f9a8d4',
-  ltViolet: '#c4b5fd',
-  mint: '#99f6e4',
-  lavender: '#f3e8ff',
-  ltMint: '#ccfbf1',
-  sparkPink: '#fce7f3',
-  sparkViolet: '#ede9fe',
-  sparkMint: '#d1fae5',
-  text: '#8b5cf6',
-  textViolet: '#a78bfa',
-  textTeal: '#5eead4',
-} as const;
+/**
+ * Derive splash colors from the design token system.
+ *
+ * Note: AnimatedSplash renders outside the ThemeContext provider (see _layout.tsx),
+ * so we cannot use useThemeColors(). Instead we read tokens directly using the
+ * system color scheme and the default persona ('teen').
+ *
+ * Accent colors (violet/teal nodes, gradient stops, spark particles) derive
+ * from the teen persona tokens. Decorative pastel variants are computed from
+ * the accent/secondary tokens with lightened counterparts for visual contrast.
+ */
+function useSplashColors(isDark: boolean) {
+  return useMemo(() => {
+    const scheme = isDark ? 'dark' : 'light';
+    const c = tokens.teen[scheme].colors;
+
+    return {
+      bg: c.background,
+      // Primary accent for student node and wordmark "ment"
+      violet: c.accent,
+      // Secondary color for mentor node and wordmark "mate"
+      teal: c.secondary,
+      // Decorative stepping-stone dots — use primary, accent, secondary
+      pink: c.primary,
+      ltViolet: c.accent,
+      mint: c.secondary,
+      // Inner fills for student/mentor nodes — lighter variants
+      lavender: c.primarySoft,
+      ltMint: c.primarySoft,
+      // Spark particle colors — subtle decorative elements
+      sparkPink: c.primarySoft,
+      sparkViolet: c.primarySoft,
+      sparkMint: c.primarySoft,
+      // Wordmark text colors
+      text: c.accent,
+      textViolet: c.accent,
+      textTeal: c.secondary,
+    };
+  }, [isDark]);
+}
 
 type AnimatedSplashProps = {
   onComplete: () => void;
@@ -60,6 +91,9 @@ type AnimatedSplashProps = {
  * Tap anywhere to skip.
  */
 export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
+  const systemScheme = useColorScheme();
+  const isDark = systemScheme === 'dark';
+  const C = useSplashColors(isDark);
   const reduceMotion = useReducedMotion();
 
   // --- Shared values ---
@@ -271,7 +305,7 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
 
   return (
     <Animated.View
-      style={[styles.container, containerStyle]}
+      style={[styles.container, { backgroundColor: C.bg }, containerStyle]}
       testID="animated-splash"
     >
       <Pressable onPress={skip} style={styles.pressable}>
@@ -367,11 +401,13 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
           style={[styles.wordmark, wordmarkStyle]}
           testID="splash-wordmark"
         >
-          <Text style={styles.mentText}>ment</Text>
-          <View style={styles.circleO}>
-            <View style={styles.circleODot} />
+          <Text style={[styles.mentText, { color: C.text }]}>ment</Text>
+          <View style={[styles.circleO, { borderColor: C.textViolet }]}>
+            <View
+              style={[styles.circleODot, { backgroundColor: C.textViolet }]}
+            />
           </View>
-          <Text style={styles.mateText}>mate</Text>
+          <Text style={[styles.mateText, { color: C.textTeal }]}>mate</Text>
         </Animated.View>
       </Pressable>
     </Animated.View>
@@ -381,7 +417,6 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: C.bg,
     zIndex: 999,
     elevation: 999,
   },
@@ -398,7 +433,6 @@ const styles = StyleSheet.create({
   mentText: {
     fontFamily: 'AtkinsonHyperlegible_700Bold',
     fontSize: 28,
-    color: C.text,
     letterSpacing: -0.5,
   },
   circleO: {
@@ -406,7 +440,6 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     borderWidth: 1.8,
-    borderColor: C.textViolet,
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: 2,
@@ -416,12 +449,10 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: C.textViolet,
   },
   mateText: {
     fontFamily: 'AtkinsonHyperlegible_700Bold',
     fontSize: 28,
-    color: C.textTeal,
     letterSpacing: -0.5,
   },
 });

@@ -13,7 +13,7 @@ import Animated, {
 import Markdown from 'react-native-markdown-display';
 import { Ionicons } from '@expo/vector-icons';
 import { formatMathContent } from '../../lib/math-format';
-import { useThemeColors, type ThemeColors } from '../../lib/theme';
+import { useThemeColors } from '../../lib/theme';
 
 export type VerificationBadge = 'evaluate' | 'teach_back';
 
@@ -171,18 +171,20 @@ const ESCALATION_STYLES: Partial<
 // ---------------------------------------------------------------------------
 
 function buildMarkdownStyles(
-  _colors: ThemeColors
+  fallbackTextColor: string
 ): Record<string, TextStyle | { backgroundColor?: string }> {
-  // Text color is intentionally OMITTED from all styles.
-  // Color comes from NativeWind className="text-text-primary" on the
-  // custom inline/textgroup render rules (see `rules` prop below).
+  // Primary text color comes from NativeWind className="text-text-primary"
+  // on the custom inline/textgroup render rules (see `rules` prop below).
   // NativeWind resolves via CSS variables which are always in sync with
-  // background colors. Using useThemeColors() here caused a split-state
-  // bug: theme context returned light-mode colors (dark text) while
-  // NativeWind backgrounds stayed dark → invisible text.
+  // background colors. However, during theme transitions the React context
+  // (useThemeColors) and NativeWind CSS variables can briefly desync.
+  // To prevent invisible text (dark-on-dark or light-on-light) during that
+  // window, we set an explicit `color` on the base style as a safety net.
+  // Whichever system updates first wins — text is never invisible.
   const base: TextStyle = {
     fontSize: 15,
     lineHeight: 22,
+    color: fallbackTextColor,
   };
   return {
     body: base,
@@ -280,7 +282,10 @@ export function MessageBubble({
       : undefined;
   const isThinking = streaming && !content;
 
-  const mdStyles = useMemo(() => buildMarkdownStyles(colors), [colors]);
+  const mdStyles = useMemo(
+    () => buildMarkdownStyles(colors.textPrimary),
+    [colors.textPrimary]
+  );
 
   const bubbleBg = escalation
     ? `${escalation.bg} ${escalation.border}`

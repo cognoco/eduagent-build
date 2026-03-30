@@ -149,7 +149,7 @@ export async function createSubscription(
 
   const tierConfig = getTierConfig(tier);
   await db.insert(quotaPools).values({
-    subscriptionId: subRow.id,
+    subscriptionId: subRow!.id,
     monthlyLimit,
     usedThisMonth: 0,
     dailyLimit: tierConfig.dailyLimit,
@@ -157,7 +157,7 @@ export async function createSubscription(
     cycleResetAt,
   });
 
-  return mapSubscriptionRow(subRow);
+  return mapSubscriptionRow(subRow!);
 }
 
 /**
@@ -217,7 +217,7 @@ export async function updateSubscriptionFromWebhook(
     .where(eq(subscriptions.id, existing.id))
     .returning();
 
-  return mapSubscriptionRow(updated);
+  return mapSubscriptionRow(updated!);
 }
 
 /**
@@ -245,7 +245,7 @@ export async function linkStripeCustomer(
     .where(eq(subscriptions.id, existing.id))
     .returning();
 
-  return mapSubscriptionRow(updated);
+  return mapSubscriptionRow(updated!);
 }
 
 /**
@@ -294,7 +294,7 @@ export async function resetMonthlyQuota(
     .where(eq(quotaPools.id, existing.id))
     .returning();
 
-  return mapQuotaPoolRow(updated);
+  return mapQuotaPoolRow(updated!);
 }
 
 // ---------------------------------------------------------------------------
@@ -417,7 +417,7 @@ export async function activateSubscriptionFromCheckout(
     tierConfig.dailyLimit
   );
 
-  return mapSubscriptionRow(updated);
+  return mapSubscriptionRow(updated!);
 }
 
 // ---------------------------------------------------------------------------
@@ -994,7 +994,7 @@ export async function purchaseTopUpCredits(
     })
     .returning();
 
-  return mapTopUpCreditRow(row);
+  return mapTopUpCreditRow(row!);
 }
 
 /**
@@ -1537,7 +1537,7 @@ export async function updateSubscriptionFromRevenuecatWebhook(
     .where(eq(subscriptions.id, existing.id))
     .returning();
 
-  return mapSubscriptionRow(updated);
+  return mapSubscriptionRow(updated!);
 }
 
 /**
@@ -1592,7 +1592,7 @@ export async function activateSubscriptionFromRevenuecat(
     cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
 
     await db.insert(quotaPools).values({
-      subscriptionId: subRow.id,
+      subscriptionId: subRow!.id,
       monthlyLimit: tierConfig.monthlyQuota,
       usedThisMonth: 0,
       dailyLimit: tierConfig.dailyLimit,
@@ -1600,7 +1600,7 @@ export async function activateSubscriptionFromRevenuecat(
       cycleResetAt,
     });
 
-    return mapSubscriptionRow(subRow);
+    return mapSubscriptionRow(subRow!);
   }
 
   // Update existing subscription
@@ -1638,5 +1638,5 @@ export async function activateSubscriptionFromRevenuecat(
     tierConfig.dailyLimit
   );
 
-  return mapSubscriptionRow(updated);
+  return mapSubscriptionRow(updated!);
 }

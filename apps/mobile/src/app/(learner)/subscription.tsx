@@ -460,17 +460,31 @@ export default function SubscriptionScreen() {
     data: subscription,
     isLoading: subLoading,
     isError: subError,
+    refetch: refetchSub,
+    isRefetching: subRefetching,
   } = useSubscription();
   const {
     data: usage,
     isLoading: usageLoading,
     isError: usageError,
+    refetch: refetchUsage,
+    isRefetching: usageRefetching,
   } = useUsage();
   // const byokWaitlist = useJoinByokWaitlist();
 
   // Top-up IAP state
   const [topUpPurchasing, setTopUpPurchasing] = useState(false);
   const [topUpPolling, setTopUpPolling] = useState(false);
+
+  // Track mount state so the top-up polling loop can bail out if the user
+  // navigates away mid-poll (prevents setState-on-unmounted warnings and
+  // unnecessary query invalidations).
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // RevenueCat hooks
   const { data: offerings, isLoading: offeringsLoading } = useOfferings();
@@ -589,6 +603,7 @@ export default function SubscriptionScreen() {
     }
 
     // Purchase succeeded on store side — now poll API for webhook confirmation
+    if (!mountedRef.current) return;
     setTopUpPurchasing(false);
     setTopUpPolling(true);
 
@@ -598,10 +613,13 @@ export default function SubscriptionScreen() {
     let confirmed = false;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (!mountedRef.current) break;
       await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      if (!mountedRef.current) break;
       await queryClient.invalidateQueries({ queryKey: ['usage'] });
       // Brief wait for the query to refetch
       await new Promise((resolve) => setTimeout(resolve, 500));
+      if (!mountedRef.current) break;
       const freshUsage = queryClient.getQueryData<{
         topUpCreditsRemaining: number;
       }>(['usage', activeProfile?.id]);
@@ -611,6 +629,7 @@ export default function SubscriptionScreen() {
       }
     }
 
+    if (!mountedRef.current) return;
     setTopUpPolling(false);
 
     if (confirmed) {
@@ -695,9 +714,32 @@ export default function SubscriptionScreen() {
           className="flex-1 items-center justify-center px-5"
           testID="subscription-error"
         >
-          <Text className="text-body text-text-secondary text-center">
+          <Text className="text-body text-text-secondary text-center mb-4">
             Unable to load subscription details. Please try again.
           </Text>
+          <Pressable
+            onPress={() => {
+              void refetchSub();
+              void refetchUsage();
+            }}
+            disabled={subRefetching || usageRefetching}
+            className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+            testID="subscription-retry-button"
+            accessibilityLabel="Retry loading subscription"
+            accessibilityRole="button"
+          >
+            {subRefetching || usageRefetching ? (
+              <ActivityIndicator
+                size="small"
+                color="white"
+                testID="subscription-retry-loading"
+              />
+            ) : (
+              <Text className="text-text-inverse text-body font-semibold">
+                Retry
+              </Text>
+            )}
+          </Pressable>
         </View>
       ) : (
         <ScrollView

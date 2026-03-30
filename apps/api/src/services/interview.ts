@@ -170,7 +170,7 @@ export async function getOrCreateDraft(
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     })
     .returning();
-  return mapDraftRow(row);
+  return mapDraftRow(row!);
 }
 
 export async function getDraftState(
@@ -243,7 +243,7 @@ export async function persistCurriculum(
   if (topics.length > 0) {
     await db.insert(curriculumTopics).values(
       topics.map((t, i) => ({
-        curriculumId: curriculum.id,
+        curriculumId: curriculum!.id,
         title: t.title,
         description: t.description,
         sortOrder: i,

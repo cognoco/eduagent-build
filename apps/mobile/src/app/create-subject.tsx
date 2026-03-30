@@ -140,11 +140,12 @@ export default function CreateSubjectScreen() {
   const onNameChange = useCallback(
     (text: string) => {
       setName(text);
+      if (error) setError('');
       if (resolveState.phase === 'suggestion') {
         setResolveState({ phase: 'idle' });
       }
     },
-    [resolveState.phase]
+    [resolveState.phase, error]
   );
 
   const isAmbiguous =

@@ -11,6 +11,8 @@ import type {
   ConsentStatus,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
+import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 export function useRequestConsent(): UseMutationResult<
   ConsentRequestResult,
@@ -24,6 +26,7 @@ export function useRequestConsent(): UseMutationResult<
       input: ConsentRequest
     ): Promise<ConsentRequestResult> => {
       const res = await client.consent.request.$post({ json: input });
+      await assertOk(res);
       return (await res.json()) as ConsentRequestResult;
     },
   });
@@ -46,9 +49,17 @@ export function useConsentStatus(): UseQueryResult<ConsentStatusData> {
 
   return useQuery({
     queryKey: ['consent-status'],
-    queryFn: async (): Promise<ConsentStatusData> => {
-      const res = await client.consent['my-status'].$get();
-      return (await res.json()) as ConsentStatusData;
+    queryFn: async ({ signal: querySignal }): Promise<ConsentStatusData> => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.consent['my-status'].$get({
+          init: { signal },
+        } as never);
+        await assertOk(res);
+        return (await res.json()) as ConsentStatusData;
+      } finally {
+        cleanup();
+      }
     },
   });
 }
@@ -95,11 +106,18 @@ export function useChildConsentStatus(
 
   return useQuery({
     queryKey: ['consent', 'child', childProfileId],
-    queryFn: async (): Promise<ChildConsentData> => {
-      const res = await client.consent[':childProfileId'].status.$get({
-        param: { childProfileId: childProfileId! },
-      });
-      return (await res.json()) as ChildConsentData;
+    queryFn: async ({ signal: querySignal }): Promise<ChildConsentData> => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.consent[':childProfileId'].status.$get({
+          param: { childProfileId: childProfileId! },
+          init: { signal },
+        } as never);
+        await assertOk(res);
+        return (await res.json()) as ChildConsentData;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!childProfileId,
   });
@@ -125,13 +143,35 @@ export function useRevokeConsent(
       const res = await client.consent[':childProfileId'].revoke.$put({
         param: { childProfileId: childProfileId! },
       });
+      await assertOk(res);
       return (await res.json()) as RevokeConsentResult;
     },
     onSuccess: async () => {
+      // Consent changes affect all child-related data
       await queryClient.invalidateQueries({
-        queryKey: ['consent', 'child', childProfileId],
+        predicate: (query) => {
+          const key = String(query.queryKey[0]);
+          return [
+            'consent',
+            'consent-status',
+            'dashboard',
+            'progress',
+            'retention',
+            'sessions',
+            'session-summary',
+            'curriculum',
+            'interview',
+            'assessment',
+            'streaks',
+            'xp',
+            'subjects',
+            'settings',
+            'subscription',
+            'usage',
+            'subscription-status',
+          ].includes(key);
+        },
       });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -156,13 +196,35 @@ export function useRestoreConsent(
       const res = await client.consent[':childProfileId'].restore.$put({
         param: { childProfileId: childProfileId! },
       });
+      await assertOk(res);
       return (await res.json()) as RestoreConsentResult;
     },
     onSuccess: async () => {
+      // Consent changes affect all child-related data
       await queryClient.invalidateQueries({
-        queryKey: ['consent', 'child', childProfileId],
+        predicate: (query) => {
+          const key = String(query.queryKey[0]);
+          return [
+            'consent',
+            'consent-status',
+            'dashboard',
+            'progress',
+            'retention',
+            'sessions',
+            'session-summary',
+            'curriculum',
+            'interview',
+            'assessment',
+            'streaks',
+            'xp',
+            'subjects',
+            'settings',
+            'subscription',
+            'usage',
+            'subscription-status',
+          ].includes(key);
+        },
       });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }

@@ -1,0 +1,32 @@
+# Launch release APK (EAS preview build).
+#
+# Unlike launch-devclient.yaml, release APKs:
+# - Boot directly into the app (no dev-client launcher)
+# - No Metro connection needed
+# - No "Continue" overlay or dev tools to dismiss
+# - Hermes-compiled JS bundle is embedded in the APK
+#
+# Prerequisites:
+# - Release APK installed: adb install path/to/app.apk
+# - App state cleared: adb shell pm clear com.mentomate.app
+# - (Optional) Notification permission pre-granted:
+#     adb shell pm grant com.mentomate.app android.permission.POST_NOTIFICATIONS
+#
+# After this flow, the app is on the sign-in screen.
+appId: com.mentomate.app
+---
+- launchApp:
+    clearState: true
+
+# Release builds go directly to auth — no dev overlays.
+# Timeout is generous for cold start on low-end devices.
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 30000
+
+# Dismiss notification permission if shown (Android 13+)
+- runFlow:
+    when:
+      visible: "send you notifications"
+    file: dismiss-notifications.yaml

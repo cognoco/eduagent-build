@@ -72,9 +72,8 @@ export default function ProfilesScreen() {
           {profiles.map((profile) => {
             const isActive = profile.id === activeProfile?.id;
             const initial = profile.displayName.charAt(0).toUpperCase();
-            const personaLabel =
-              profile.personaType.charAt(0) +
-              profile.personaType.slice(1).toLowerCase();
+            const roleLabel =
+              profile.personaType === 'PARENT' ? 'Parent' : 'Student';
 
             return (
               <Pressable
@@ -93,7 +92,7 @@ export default function ProfilesScreen() {
                     {profile.displayName}
                   </Text>
                   <Text className="text-body-sm text-text-secondary">
-                    {personaLabel}
+                    {roleLabel}
                   </Text>
                 </View>
                 {isActive && (

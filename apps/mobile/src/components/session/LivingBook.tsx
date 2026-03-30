@@ -49,6 +49,12 @@ export function LivingBook({
     if (exchangeCount < prevCount.current) {
       // Session reset — sync the high-water mark so future increments animate
       prevCount.current = exchangeCount;
+      // Reset animation shared values to their initial state so the next
+      // increment triggers a fresh animation instead of being a no-op.
+      pageFlip.value = 0;
+      bookScale.value = 1;
+      sparkleOpacity.value = 0;
+      completionGlow.value = 0;
       return;
     }
     if (exchangeCount > prevCount.current) {
@@ -74,7 +80,14 @@ export function LivingBook({
         );
       }
     }
-  }, [exchangeCount, isExpressive, pageFlip, bookScale, sparkleOpacity]);
+  }, [
+    exchangeCount,
+    isExpressive,
+    pageFlip,
+    bookScale,
+    sparkleOpacity,
+    completionGlow,
+  ]);
 
   // Completion flourish
   useEffect(() => {

@@ -70,6 +70,7 @@ export default function SessionScreen() {
     routeSessionId ?? null
   );
   const [pendingClassification, setPendingClassification] = useState(false);
+  const [classifyError, setClassifyError] = useState<string | null>(null);
   const [classifiedSubject, setClassifiedSubject] = useState<{
     subjectId: string;
     subjectName: string;
@@ -88,6 +89,7 @@ export default function SessionScreen() {
       setIsClosing(false);
       setActiveSessionId(routeSessionId ?? null);
       setPendingClassification(false);
+      setClassifyError(null);
       setClassifiedSubject(null);
     }, [openingContent, routeSessionId])
   );
@@ -172,10 +174,11 @@ export default function SessionScreen() {
       let sessionSubjectId: string | undefined;
       if (!subjectId && !classifiedSubject && messages.length <= 1) {
         setPendingClassification(true);
+        setClassifyError(null);
         try {
           const result = await classifySubject.mutateAsync({ text });
           if (!result.needsConfirmation && result.candidates.length === 1) {
-            const candidate = result.candidates[0];
+            const candidate = result.candidates[0]!;
             setClassifiedSubject({
               subjectId: candidate.subjectId,
               subjectName: candidate.subjectName,
@@ -184,7 +187,9 @@ export default function SessionScreen() {
           }
           // Ambiguous / no match → proceed without subject (freeform)
         } catch {
-          // Classification failed — continue without subject
+          setClassifyError(
+            'Could not identify the subject. Please try again or select one manually.'
+          );
         } finally {
           setPendingClassification(false);
         }
@@ -352,6 +357,8 @@ export default function SessionScreen() {
 
   const subtitle = pendingClassification
     ? 'Figuring out what this is about...'
+    : classifyError
+    ? classifyError
     : apiChecked && !isApiReachable
     ? 'Server unreachable — messages may fail'
     : modeConfig.subtitle;

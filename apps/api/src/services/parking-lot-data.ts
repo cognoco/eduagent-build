@@ -70,5 +70,5 @@ export async function addParkingLotItem(
     })
     .returning();
 
-  return mapRow(row);
+  return mapRow(row!);
 }

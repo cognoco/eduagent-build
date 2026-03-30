@@ -94,7 +94,7 @@ export async function generateEmbedding(
 
   const json = (await response.json()) as VoyageEmbeddingResponse;
 
-  const vector = json.data[0].embedding;
+  const vector = json.data[0]!.embedding;
 
   return {
     vector,

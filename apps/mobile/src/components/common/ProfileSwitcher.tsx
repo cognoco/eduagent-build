@@ -2,9 +2,11 @@ import { useState, useCallback, type ReactNode } from 'react';
 import { View, Text, Pressable, Platform } from 'react-native';
 import type { Profile } from '@eduagent/schemas';
 
-const PERSONA_LABELS: Record<string, string> = {
-  TEEN: 'Teen',
-  LEARNER: 'Learner',
+/** User-facing role labels — "Teen" and "Learner" both show as "Student"
+ * to avoid the confusing teen/learner distinction in the UI. */
+const ROLE_LABELS: Record<string, string> = {
+  TEEN: 'Student',
+  LEARNER: 'Student',
   PARENT: 'Parent',
 };
 
@@ -20,6 +22,7 @@ export function ProfileSwitcher({
   onSwitch,
 }: ProfileSwitcherProps): ReactNode {
   const [isOpen, setIsOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
 
   const activeProfile = profiles.find((p) => p.id === activeProfileId);
   const initials = activeProfile
@@ -32,21 +35,36 @@ export function ProfileSwitcher({
     : '?';
 
   const handleSelect = useCallback(
-    (profileId: string) => {
-      setIsOpen(false);
-      if (profileId !== activeProfileId) {
-        onSwitch(profileId);
+    async (profileId: string) => {
+      if (profileId === activeProfileId) {
+        setIsOpen(false);
+        return;
+      }
+      if (switching) return;
+      setSwitching(true);
+      try {
+        await onSwitch(profileId);
+        setIsOpen(false); // Only close on success
+      } catch {
+        // Switch failed — keep dropdown open so user can retry.
+        // The error will be surfaced by the profile context.
+      } finally {
+        setSwitching(false);
       }
     },
-    [activeProfileId, onSwitch]
+    [activeProfileId, onSwitch, switching]
   );
 
   if (profiles.length <= 1) return null;
 
   return (
     <View
-      // On web, zIndex alone works. On native, we need elevation for Android.
-      style={Platform.OS === 'web' ? { zIndex: 50 } : undefined}
+      // On web, zIndex alone works. On Android, elevation is needed for z-ordering.
+      style={Platform.select({
+        web: { zIndex: 50 },
+        android: { zIndex: 50, elevation: 10 },
+        default: { zIndex: 50 },
+      })}
     >
       <Pressable
         onPress={() => setIsOpen((prev) => !prev)}
@@ -111,12 +129,13 @@ export function ProfileSwitcher({
                 <Pressable
                   key={profile.id}
                   onPress={() => handleSelect(profile.id)}
+                  disabled={switching}
                   className={`px-4 py-3 flex-row items-center ${
                     isActive ? 'bg-primary-soft' : ''
-                  }`}
+                  } ${switching ? 'opacity-50' : ''}`}
                   accessibilityRole="menuitem"
                   accessibilityLabel={`${profile.displayName}, ${
-                    PERSONA_LABELS[profile.personaType] ?? profile.personaType
+                    ROLE_LABELS[profile.personaType] ?? profile.personaType
                   }${isActive ? ', active' : ''}`}
                   accessibilityState={{ selected: isActive }}
                   testID={`profile-option-${profile.id}`}
@@ -148,8 +167,7 @@ export function ProfileSwitcher({
                       {profile.displayName}
                     </Text>
                     <Text className="text-caption text-text-secondary">
-                      {PERSONA_LABELS[profile.personaType] ??
-                        profile.personaType}
+                      {ROLE_LABELS[profile.personaType] ?? profile.personaType}
                     </Text>
                   </View>
                   {isActive && (

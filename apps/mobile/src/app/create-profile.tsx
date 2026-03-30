@@ -33,11 +33,13 @@ const SCREEN_HEIGHT =
 
 type PersonaType = 'TEEN' | 'LEARNER' | 'PARENT';
 
-const PERSONA_OPTIONS: { value: PersonaType; label: string }[] = [
-  { value: 'TEEN', label: 'Teen' },
-  { value: 'LEARNER', label: 'Learner' },
-  { value: 'PARENT', label: 'Parent' },
-];
+// Persona picker hidden — auto-detected from birth date (UX simplification).
+// Kept for potential future use if manual override is needed.
+// const PERSONA_OPTIONS: { value: PersonaType; label: string }[] = [
+//   { value: 'TEEN', label: 'Teen' },
+//   { value: 'LEARNER', label: 'Learner' },
+//   { value: 'PARENT', label: 'Parent' },
+// ];
 
 function formatDateForDisplay(date: Date): string {
   return date.toLocaleDateString(undefined, {
@@ -88,7 +90,7 @@ export default function CreateProfileScreen() {
   const [birthDate, setBirthDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [personaType, setPersonaType] = useState<PersonaType>('LEARNER');
-  const [personaAutoDetected, setPersonaAutoDetected] = useState(false);
+  const [_personaAutoDetected, setPersonaAutoDetected] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
@@ -223,7 +225,10 @@ export default function CreateProfileScreen() {
             placeholder="Enter name"
             placeholderTextColor={colors.muted}
             value={displayName}
-            onChangeText={setDisplayName}
+            onChangeText={(value: string) => {
+              setDisplayName(value);
+              if (error) setError('');
+            }}
             maxLength={50}
             editable={!loading}
             testID="create-profile-name"
@@ -233,6 +238,10 @@ export default function CreateProfileScreen() {
 
         <Text className="text-body-sm font-semibold text-text-secondary mb-1">
           Birth date
+        </Text>
+        <Text className="text-body-sm text-text-secondary mb-2">
+          We use your age to personalise how your coach talks to you and to
+          comply with privacy laws.
         </Text>
         <Pressable
           onPress={() => setShowDatePicker(true)}
@@ -307,6 +316,10 @@ export default function CreateProfileScreen() {
           </View>
         )}
 
+        {/* Spacer before submit — persona is auto-detected from birth date */}
+        <View className="h-6" />
+
+        {/* Persona picker hidden — auto-detected from birth date.
         {personaAutoDetected && birthDate && (
           <Text
             className="text-body-sm text-text-secondary mb-4"
@@ -318,17 +331,20 @@ export default function CreateProfileScreen() {
               : personaType === 'LEARNER'
               ? 'Learner'
               : 'Parent'}
-            . You can change it below.
+            .
           </Text>
         )}
-
-        {!personaAutoDetected && !birthDate && <View className="h-2" />}
 
         <Text className="text-body-sm font-semibold text-text-secondary mb-2">
           Profile type
         </Text>
         <View className="flex-row mb-8">
-          {PERSONA_OPTIONS.map((option) => {
+          {PERSONA_OPTIONS.filter(
+            (option) =>
+              option.value !== 'PARENT' ||
+              !birthDate ||
+              detectPersona(birthDate) === 'PARENT'
+          ).map((option) => {
             const isSelected = personaType === option.value;
             return (
               <Pressable
@@ -355,6 +371,7 @@ export default function CreateProfileScreen() {
             );
           })}
         </View>
+        */}
 
         <Button
           variant="primary"

@@ -1,0 +1,16 @@
+# Maestro E2E Configuration — Release APK
+# Used for testing production-like builds (EAS preview profile).
+#
+# Key differences from config.yaml (dev client):
+# - No Metro server connection needed
+# - No dev tools overlays to dismiss
+# - Hermes-compiled bundle (matches production behavior)
+# - Shorter timeouts (no bundle loading delay)
+#
+# Build: eas build --profile preview --platform android
+# Run:   pnpm test:e2e:release
+
+appId: com.mentomate.app
+
+# Release APKs start faster — no Metro bundle loading.
+defaultTimeout: 10000

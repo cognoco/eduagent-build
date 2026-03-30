@@ -67,7 +67,7 @@ export async function precomputeCoachingCard(
     const mostOverdue = overdueCards.sort(
       (a, b) =>
         (a.nextReviewAt?.getTime() ?? 0) - (b.nextReviewAt?.getTime() ?? 0)
-    )[0];
+    )[0]!;
 
     // Priority scales: 7 base + 1 per overdue card, capped at 10
     const priority = Math.min(7 + overdueCards.length - 1, 10);
@@ -142,7 +142,7 @@ export async function precomputeCoachingCard(
   // --- Priority 4: insight (verified topics) ---
   const verifiedCards = allCards.filter((c) => c.xpStatus === 'verified');
   if (verifiedCards.length > 0) {
-    const firstVerified = verifiedCards[0];
+    const firstVerified = verifiedCards[0]!;
     return {
       id,
       profileId,
@@ -159,7 +159,8 @@ export async function precomputeCoachingCard(
 
   // --- Priority 4: challenge (fallback) ---
   // If there are any retention cards, pick the first topic; otherwise use a placeholder
-  const fallbackTopicId = allCards.length > 0 ? allCards[0].topicId : profileId;
+  const fallbackTopicId =
+    allCards.length > 0 ? allCards[0]!.topicId : profileId;
   return {
     id,
     profileId,

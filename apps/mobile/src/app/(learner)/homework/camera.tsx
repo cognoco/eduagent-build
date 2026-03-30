@@ -100,7 +100,11 @@ export default function CameraScreen(): React.ReactNode {
           text: editedText,
         });
         if (!result.needsConfirmation && result.candidates.length === 1) {
-          setAutoDetectedSubject(result.candidates[0]);
+          const c = result.candidates[0]!;
+          setAutoDetectedSubject({
+            subjectId: c.subjectId,
+            subjectName: c.subjectName,
+          });
         } else {
           setShowSubjectPicker(true);
         }
@@ -205,8 +209,8 @@ export default function CameraScreen(): React.ReactNode {
       const result = await classifyMutation.mutateAsync({ text: manualText });
       if (!result.needsConfirmation && result.candidates.length === 1) {
         navigateToSession(
-          result.candidates[0].subjectId,
-          result.candidates[0].subjectName,
+          result.candidates[0]!.subjectId,
+          result.candidates[0]!.subjectName,
           manualText
         );
       } else {

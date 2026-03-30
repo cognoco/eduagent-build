@@ -37,6 +37,7 @@ export default function HomeScreen() {
     isLoading: subjectsLoading,
     isError: subjectsError,
     refetch: refetchSubjects,
+    isRefetching,
   } = useSubjects();
   const { data: overallProgress } = useOverallProgress();
   const { data: streak } = useStreaks();
@@ -205,7 +206,7 @@ export default function HomeScreen() {
 
       <ScrollView
         className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         testID="home-scroll-view"
         keyboardShouldPersistTaps="handled"
       >
@@ -331,14 +332,23 @@ export default function HomeScreen() {
                 </Text>
                 <Pressable
                   onPress={() => refetchSubjects()}
+                  disabled={isRefetching}
                   className="bg-primary rounded-button py-3 items-center w-full min-h-[48px] justify-center"
                   testID="subjects-retry-button"
                   accessibilityLabel="Retry loading subjects"
                   accessibilityRole="button"
                 >
-                  <Text className="text-text-inverse text-body font-semibold">
-                    Retry
-                  </Text>
+                  {isRefetching ? (
+                    <ActivityIndicator
+                      size="small"
+                      color="white"
+                      testID="subjects-retry-loading"
+                    />
+                  ) : (
+                    <Text className="text-text-inverse text-body font-semibold">
+                      Retry
+                    </Text>
+                  )}
                 </Pressable>
               </View>
             ) : subjectsLoading ? (
@@ -365,13 +375,19 @@ export default function HomeScreen() {
                         accessibilityRole="button"
                         testID={`home-subject-${subject.id}`}
                       >
-                        <Text className="text-body font-medium text-text-primary">
-                          {subject.name}
-                        </Text>
+                        <View className="flex-1 flex-shrink me-2">
+                          <Text
+                            className="text-body font-medium text-text-primary"
+                            numberOfLines={1}
+                          >
+                            {subject.name}
+                          </Text>
+                        </View>
                         <RetentionSignal
                           status={subjectRetention.get(subject.id) ?? 'strong'}
                         />
                       </Pressable>
+                      {/* end subject name pressable */}
                       <Pressable
                         onPress={() =>
                           router.push({

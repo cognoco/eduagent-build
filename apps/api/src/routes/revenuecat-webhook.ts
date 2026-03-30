@@ -124,7 +124,7 @@ function extractTierFromProductId(
 
   // Direct lookup
   if (productId in PRODUCT_TIER_MAP) {
-    return PRODUCT_TIER_MAP[productId];
+    return PRODUCT_TIER_MAP[productId]!;
   }
 
   // Fallback: parse com.eduagent.<tier>.<interval>

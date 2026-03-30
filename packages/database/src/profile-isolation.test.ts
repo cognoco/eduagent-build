@@ -154,7 +154,7 @@ describe('Profile Isolation (R-005)', () => {
             string,
             { findFirst: () => Promise<unknown> }
           >
-        )[name].findFirst();
+        )[name]!.findFirst();
 
         // Verify the where clause contains CHILD_PROFILE_ID
         const call = findFirst.mock.calls[0][0];
@@ -173,7 +173,7 @@ describe('Profile Isolation (R-005)', () => {
             string,
             { findMany: () => Promise<unknown[]> }
           >
-        )[name].findMany();
+        )[name]!.findMany();
 
         const call = findMany.mock.calls[0][0];
         expect(call.where).toBeDefined();

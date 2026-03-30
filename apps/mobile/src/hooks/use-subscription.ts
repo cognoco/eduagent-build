@@ -17,6 +17,8 @@ import type {
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
+import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 // ---------------------------------------------------------------------------
 // Types — prefer imports from @eduagent/schemas; local only for API-specific shapes
@@ -52,10 +54,18 @@ export function useSubscription(): UseQueryResult<SubscriptionData> {
 
   return useQuery({
     queryKey: ['subscription', activeProfile?.id],
-    queryFn: async () => {
-      const res = await client.subscription.$get();
-      const data = await res.json();
-      return data.subscription;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.subscription.$get({
+          init: { signal },
+        } as never);
+        await assertOk(res);
+        const data = await res.json();
+        return data.subscription;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile,
   });
@@ -67,10 +77,18 @@ export function useUsage(): UseQueryResult<UsageData> {
 
   return useQuery({
     queryKey: ['usage', activeProfile?.id],
-    queryFn: async () => {
-      const res = await client.usage.$get();
-      const data = await res.json();
-      return data.usage;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.usage.$get({
+          init: { signal },
+        } as never);
+        await assertOk(res);
+        const data = await res.json();
+        return data.usage;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile,
   });
@@ -90,10 +108,18 @@ export function useSubscriptionStatus(): UseQueryResult<SubscriptionStatusData> 
 
   return useQuery({
     queryKey: ['subscription-status', activeProfile?.id],
-    queryFn: async () => {
-      const res = await client.subscription.status.$get();
-      const data = await res.json();
-      return data.status;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.subscription.status.$get({
+          init: { signal },
+        } as never);
+        await assertOk(res);
+        const data = await res.json();
+        return data.status;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile,
     staleTime: 60_000, // 1 min — fast endpoint, no need for aggressive refetching
@@ -120,6 +146,7 @@ export function useCreateCheckout(): UseMutationResult<
   return useMutation({
     mutationFn: async (input: CheckoutRequest): Promise<CheckoutResponse> => {
       const res = await client.subscription.checkout.$post({ json: input });
+      await assertOk(res);
       return (await res.json()) as CheckoutResponse;
     },
   });
@@ -138,6 +165,7 @@ export function useCancelSubscription(): UseMutationResult<
   return useMutation({
     mutationFn: async (): Promise<CancelResponse> => {
       const res = await client.subscription.cancel.$post({ json: {} });
+      await assertOk(res);
       return (await res.json()) as CancelResponse;
     },
     onSuccess: () => {
@@ -159,6 +187,7 @@ export function useCreatePortalSession(): UseMutationResult<
   return useMutation({
     mutationFn: async (): Promise<PortalResponse> => {
       const res = await client.subscription.portal.$post({ json: {} });
+      await assertOk(res);
       return (await res.json()) as PortalResponse;
     },
   });
@@ -179,6 +208,7 @@ export function usePurchaseTopUp(): UseMutationResult<
       const res = await client.subscription['top-up'].$post({
         json: { amount: 500 },
       });
+      await assertOk(res);
       return (await res.json()) as TopUpResult;
     },
     onSuccess: () => {
@@ -199,6 +229,7 @@ export function useJoinByokWaitlist(): UseMutationResult<
   return useMutation({
     mutationFn: async (input: { email: string }) => {
       const res = await client['byok-waitlist'].$post({ json: input });
+      await assertOk(res);
       return (await res.json()) as ByokWaitlistResult;
     },
   });

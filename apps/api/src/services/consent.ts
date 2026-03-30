@@ -118,15 +118,16 @@ export function checkConsentRequired(birthDate: string): {
   required: boolean;
   consentType: ConsentType | null;
   belowMinimumAge?: boolean;
+  age: number;
 } {
   const age = calculateAge(birthDate);
   if (age < MINIMUM_AGE) {
-    return { required: true, consentType: 'GDPR', belowMinimumAge: true };
+    return { required: true, consentType: 'GDPR', belowMinimumAge: true, age };
   }
   if (age < 16) {
-    return { required: true, consentType: 'GDPR' };
+    return { required: true, consentType: 'GDPR', age };
   }
-  return { required: false, consentType: null };
+  return { required: false, consentType: null, age };
 }
 
 /**
@@ -157,7 +158,7 @@ export async function createPendingConsentState(
     })
     .returning();
 
-  return mapConsentRow(row);
+  return mapConsentRow(row!);
 }
 
 /** Maximum number of consent resends (PRD lines 415, 420) */
@@ -459,7 +460,7 @@ export async function revokeConsent(
     )
     .returning();
 
-  return mapConsentRow(row);
+  return mapConsentRow(row!);
 }
 
 /**
@@ -510,5 +511,5 @@ export async function restoreConsent(
     )
     .returning();
 
-  return mapConsentRow(row);
+  return mapConsentRow(row!);
 }

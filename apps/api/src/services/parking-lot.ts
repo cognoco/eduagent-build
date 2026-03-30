@@ -93,7 +93,7 @@ export function formatParkedQuestionForContext(
 
   const limited = questions.slice(0, MAX_PARKING_LOT_PER_TOPIC);
   for (let i = 0; i < limited.length; i++) {
-    lines.push(`${i + 1}. ${limited[i].question}`);
+    lines.push(`${i + 1}. ${limited[i]!.question}`);
   }
 
   if (questions.length > MAX_PARKING_LOT_PER_TOPIC) {

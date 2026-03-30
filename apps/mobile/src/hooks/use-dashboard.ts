@@ -7,6 +7,7 @@ import type {
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
+import { assertOk } from '../lib/assert-ok';
 
 export function useDashboard(): UseQueryResult<DashboardData> {
   const client = useApiClient();
@@ -24,12 +25,14 @@ export function useDashboard(): UseQueryResult<DashboardData> {
         const res = await client.dashboard.$get({
           init: { signal },
         } as never);
+        await assertOk(res);
         const data = (await res.json()) as DashboardData;
 
         if (data.children.length === 0) {
           const demoRes = await client.dashboard.demo.$get({
             init: { signal },
           } as never);
+          await assertOk(demoRes);
           return (await demoRes.json()) as DashboardData;
         }
 
@@ -53,12 +56,19 @@ export function useChildDetail(
 
   return useQuery({
     queryKey: ['dashboard', 'child', childProfileId],
-    queryFn: async () => {
-      const res = await client.dashboard.children[':profileId'].$get({
-        param: { profileId: childProfileId! },
-      });
-      const data = await res.json();
-      return data.child;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.dashboard.children[':profileId'].$get({
+          param: { profileId: childProfileId! },
+          init: { signal },
+        } as never);
+        await assertOk(res);
+        const data = await res.json();
+        return data.child;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile && !!childProfileId,
   });
@@ -73,14 +83,21 @@ export function useChildSubjectTopics(
 
   return useQuery({
     queryKey: ['dashboard', 'child', childProfileId, 'subject', subjectId],
-    queryFn: async () => {
-      const res = await client.dashboard.children[':profileId'].subjects[
-        ':subjectId'
-      ].$get({
-        param: { profileId: childProfileId!, subjectId: subjectId! },
-      });
-      const data = await res.json();
-      return data.topics;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.dashboard.children[':profileId'].subjects[
+          ':subjectId'
+        ].$get({
+          param: { profileId: childProfileId!, subjectId: subjectId! },
+          init: { signal },
+        } as never);
+        await assertOk(res);
+        const data = await res.json();
+        return data.topics;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile && !!childProfileId && !!subjectId,
   });
@@ -92,12 +109,21 @@ export function useChildSessions(childProfileId: string | undefined) {
 
   return useQuery({
     queryKey: ['dashboard', 'children', childProfileId, 'sessions'],
-    queryFn: async () => {
-      const res = await client.dashboard.children[':profileId'].sessions.$get({
-        param: { profileId: childProfileId! },
-      });
-      const data = await res.json();
-      return data.sessions;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.dashboard.children[':profileId'].sessions.$get(
+          {
+            param: { profileId: childProfileId! },
+            init: { signal },
+          } as never
+        );
+        await assertOk(res);
+        const data = await res.json();
+        return data.sessions;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile && !!childProfileId,
   });
@@ -119,14 +145,21 @@ export function useChildSessionTranscript(
       sessionId,
       'transcript',
     ],
-    queryFn: async () => {
-      const res = await client.dashboard.children[':profileId'].sessions[
-        ':sessionId'
-      ].transcript.$get({
-        param: { profileId: childProfileId!, sessionId: sessionId! },
-      });
-      const data = await res.json();
-      return data.transcript;
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.dashboard.children[':profileId'].sessions[
+          ':sessionId'
+        ].transcript.$get({
+          param: { profileId: childProfileId!, sessionId: sessionId! },
+          init: { signal },
+        } as never);
+        await assertOk(res);
+        const data = await res.json();
+        return data.transcript;
+      } finally {
+        cleanup();
+      }
     },
     enabled: !!activeProfile && !!childProfileId && !!sessionId,
   });

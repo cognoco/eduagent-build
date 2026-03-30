@@ -29,7 +29,9 @@ function mapProfileRow(
     accountId: row.accountId,
     displayName: row.displayName,
     avatarUrl: row.avatarUrl ?? null,
-    birthDate: row.birthDate ? row.birthDate.toISOString().split('T')[0] : null,
+    birthDate: row.birthDate
+      ? row.birthDate.toISOString().split('T')[0]!
+      : null,
     personaType: row.personaType,
     location: row.location ?? null,
     isOwner: row.isOwner,
@@ -124,6 +126,11 @@ export async function createProfile(
     throw new Error('Users must be at least 11 years old to create a profile');
   }
 
+  // Prevent minors from selecting PARENT persona (access control gate)
+  if (consentCheck && consentCheck.age < 18 && input.personaType === 'PARENT') {
+    throw new Error('Parent profile requires age 18 or older');
+  }
+
   const [row] = await db
     .insert(profiles)
     .values({
@@ -142,13 +149,13 @@ export async function createProfile(
   if (consentCheck?.required && consentCheck.consentType) {
     const state = await createPendingConsentState(
       db,
-      row.id,
+      row!.id,
       consentCheck.consentType
     );
     consentStatus = state.status;
   }
 
-  return mapProfileRow(row, consentStatus);
+  return mapProfileRow(row!, consentStatus);
 }
 
 /**

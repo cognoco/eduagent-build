@@ -82,7 +82,7 @@ describe('accent preset merging', () => {
 
   it('default preset (first in list) matches the base token colors', () => {
     for (const persona of personas) {
-      const defaultPreset = accentPresets[persona][0];
+      const defaultPreset = accentPresets[persona][0]!;
       for (const scheme of schemes) {
         const base = tokens[persona][scheme];
         const overrides = defaultPreset[scheme];
