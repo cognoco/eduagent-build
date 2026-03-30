@@ -24,6 +24,8 @@ export interface DashboardInput {
   sessionsLastWeek: number;
   totalTimeThisWeekMinutes: number;
   totalTimeLastWeekMinutes: number;
+  exchangesThisWeek: number;
+  exchangesLastWeek: number;
   subjectRetentionData: Array<{
     name: string;
     status: 'strong' | 'fading' | 'weak';
@@ -237,17 +239,33 @@ export async function getChildrenForParent(
       (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
     ).length;
 
-    // 5. Sum duration for time tracking (seconds -> minutes)
+    // 5. Sum display duration for time tracking (seconds -> minutes)
+    // Prefer wall-clock when available, with fallback to legacy active duration.
+    const getDisplaySeconds = (session: {
+      wallClockSeconds: number | null;
+      durationSeconds: number | null;
+    }): number => session.wallClockSeconds ?? session.durationSeconds ?? 0;
+
     const totalTimeThisWeek = recentSessions
       .filter((s) => s.startedAt >= startOfThisWeek)
-      .reduce((sum, s) => sum + (s.durationSeconds ?? 0), 0);
+      .reduce((sum, s) => sum + getDisplaySeconds(s), 0);
     const totalTimeLastWeek = recentSessions
       .filter(
         (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
       )
-      .reduce((sum, s) => sum + (s.durationSeconds ?? 0), 0);
+      .reduce((sum, s) => sum + getDisplaySeconds(s), 0);
 
-    // 6. Count guided metrics from session events
+    // 6. Sum exchange counts (FR215.4: "X minutes, Y exchanges")
+    const exchangesThisWeek = recentSessions
+      .filter((s) => s.startedAt >= startOfThisWeek)
+      .reduce((sum, s) => sum + s.exchangeCount, 0);
+    const exchangesLastWeek = recentSessions
+      .filter(
+        (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
+      )
+      .reduce((sum, s) => sum + s.exchangeCount, 0);
+
+    // 7. Count guided metrics from session events
     const guidedMetrics = await countGuidedMetrics(
       db,
       childProfileId,
@@ -270,6 +288,8 @@ export async function getChildrenForParent(
       sessionsLastWeek,
       totalTimeThisWeekMinutes: Math.round(totalTimeThisWeek / 60),
       totalTimeLastWeekMinutes: Math.round(totalTimeLastWeek / 60),
+      exchangesThisWeek,
+      exchangesLastWeek,
       subjectRetentionData,
       guidedCount: guidedMetrics.guidedCount,
       totalProblemCount: guidedMetrics.totalProblemCount,
@@ -287,6 +307,8 @@ export async function getChildrenForParent(
       sessionsLastWeek,
       totalTimeThisWeek: dashboardInput.totalTimeThisWeekMinutes,
       totalTimeLastWeek: dashboardInput.totalTimeLastWeekMinutes,
+      exchangesThisWeek: dashboardInput.exchangesThisWeek,
+      exchangesLastWeek: dashboardInput.exchangesLastWeek,
       trend,
       subjects: progress.subjects.map((s) => ({
         name: s.name,
@@ -376,6 +398,7 @@ export interface ChildSession {
   exchangeCount: number;
   escalationRung: number;
   durationSeconds: number | null;
+  wallClockSeconds: number | null;
 }
 
 export interface TranscriptExchange {
@@ -431,6 +454,7 @@ export async function getChildSessions(
     exchangeCount: s.exchangeCount,
     escalationRung: s.escalationRung,
     durationSeconds: s.durationSeconds,
+    wallClockSeconds: s.wallClockSeconds,
   }));
 }
 

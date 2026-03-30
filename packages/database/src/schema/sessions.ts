@@ -135,6 +135,7 @@ export const learningSessions = pgTable(
       .defaultNow(),
     endedAt: timestamp('ended_at', { withTimezone: true }),
     durationSeconds: integer('duration_seconds'),
+    wallClockSeconds: integer('wall_clock_seconds'),
     metadata: jsonb('metadata').default({}),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()

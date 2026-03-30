@@ -82,8 +82,11 @@ function mockSessionRow(
     status: 'active' | 'paused' | 'completed' | 'auto_closed';
     escalationRung: number;
     exchangeCount: number;
+    startedAt: Date;
+    lastActivityAt: Date;
     endedAt: Date | null;
     durationSeconds: number | null;
+    wallClockSeconds: number | null;
   }>
 ) {
   return {
@@ -95,10 +98,11 @@ function mockSessionRow(
     status: overrides?.status ?? 'active',
     escalationRung: overrides?.escalationRung ?? 1,
     exchangeCount: overrides?.exchangeCount ?? 0,
-    startedAt: NOW,
-    lastActivityAt: NOW,
+    startedAt: overrides?.startedAt ?? NOW,
+    lastActivityAt: overrides?.lastActivityAt ?? NOW,
     endedAt: overrides?.endedAt ?? null,
     durationSeconds: overrides?.durationSeconds ?? null,
+    wallClockSeconds: overrides?.wallClockSeconds ?? null,
     metadata: {},
     createdAt: NOW,
     updatedAt: NOW,
@@ -180,6 +184,38 @@ function createMockDb({
       },
     },
   } as unknown as Database;
+}
+
+function createCloseSessionDb(
+  events: Array<{
+    eventType: string;
+    content: string;
+    createdAt: Date;
+    metadata?: Record<string, unknown>;
+  }> = []
+): {
+  db: Database;
+  setMock: jest.Mock;
+} {
+  const whereMock = jest.fn().mockResolvedValue(undefined);
+  const setMock = jest.fn().mockReturnValue({
+    where: whereMock,
+  });
+
+  return {
+    db: {
+      update: jest.fn().mockReturnValue({
+        set: setMock,
+      }),
+      select: jest.fn().mockReturnValue(mockSelectChain([])),
+      query: {
+        sessionEvents: {
+          findMany: jest.fn().mockResolvedValue(events),
+        },
+      },
+    } as unknown as Database,
+    setMock,
+  };
 }
 
 function setupScopedRepo({
@@ -1135,6 +1171,68 @@ describe('closeSession', () => {
       'topic-002',
       'topic-003',
     ]);
+  });
+
+  it('stores 0 active seconds for 0-event sessions while preserving wall-clock time', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2025-01-15T10:15:00.000Z'));
+
+    try {
+      setupScopedRepo({
+        sessionFindFirst: mockSessionRow({
+          startedAt: new Date('2025-01-15T10:00:00.000Z'),
+          lastActivityAt: new Date('2025-01-15T10:00:00.000Z'),
+        }),
+      });
+      const { db, setMock } = createCloseSessionDb([]);
+
+      await closeSession(db, profileId, sessionId, {});
+
+      expect(setMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          durationSeconds: 0,
+          wallClockSeconds: 15 * 60,
+        })
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not copy wall-clock time into active duration when long gaps should be capped', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2025-01-15T10:30:00.000Z'));
+
+    try {
+      setupScopedRepo({
+        sessionFindFirst: mockSessionRow({
+          startedAt: new Date('2025-01-15T10:00:00.000Z'),
+          lastActivityAt: new Date('2025-01-15T10:25:00.000Z'),
+        }),
+      });
+      const { db, setMock } = createCloseSessionDb([
+        {
+          eventType: 'user_message',
+          content: 'First answer',
+          createdAt: new Date('2025-01-15T10:01:00.000Z'),
+        },
+        {
+          eventType: 'ai_response',
+          content: 'Think it through step by step',
+          createdAt: new Date('2025-01-15T10:25:00.000Z'),
+          metadata: { expectedResponseMinutes: 2 },
+        },
+      ]);
+
+      await closeSession(db, profileId, sessionId, {});
+
+      expect(setMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          durationSeconds: 4 * 60,
+          wallClockSeconds: 30 * 60,
+        })
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

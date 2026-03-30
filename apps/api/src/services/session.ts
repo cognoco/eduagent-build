@@ -46,6 +46,66 @@ import { getLearningMode } from './settings';
 import type { EscalationRung } from './llm';
 
 // ---------------------------------------------------------------------------
+// FR210: Active time computation (internal analytics)
+// ---------------------------------------------------------------------------
+
+const FALLBACK_GAP_CAP_SECONDS = 10 * 60; // 10 min when no LLM estimate
+const PACE_BUFFER = 1.5; // 1.5x buffer for slower-than-estimated work
+
+interface TimedEvent {
+  createdAt: Date;
+  metadata?: unknown;
+}
+
+/** Compute active learning seconds from session event timestamps.
+ *  Each inter-event gap is capped at the LLM-estimated expected response time
+ *  (from the later event's metadata) × pace buffer. Falls back to 10 min. */
+export function computeActiveSeconds(
+  sessionStartedAt: Date,
+  events: TimedEvent[]
+): number {
+  if (events.length === 0) return 0;
+
+  const sorted = [...events].sort(
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+  );
+
+  const first = sorted[0];
+  if (!first) return 0;
+
+  let total = 0;
+
+  // Gap from session start to first event
+  const firstGap = Math.max(
+    0,
+    (first.createdAt.getTime() - sessionStartedAt.getTime()) / 1000
+  );
+  total += Math.min(firstGap, perGapCap(first));
+
+  // Gaps between consecutive events
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const curr = sorted[i]!;
+    const next = sorted[i + 1]!;
+    const gap = Math.max(
+      0,
+      (next.createdAt.getTime() - curr.createdAt.getTime()) / 1000
+    );
+    total += Math.min(gap, perGapCap(next));
+  }
+
+  return Math.round(total);
+}
+
+function perGapCap(event: TimedEvent): number {
+  const meta = event.metadata as Record<string, unknown> | null | undefined;
+  const minutes = meta?.expectedResponseMinutes;
+  if (typeof minutes === 'number' && minutes > 0) {
+    return minutes * 60 * PACE_BUFFER;
+  }
+  return FALLBACK_GAP_CAP_SECONDS;
+}
+
+// ---------------------------------------------------------------------------
 // Mappers — Drizzle Date → API ISO string
 // ---------------------------------------------------------------------------
 
@@ -66,6 +126,7 @@ function mapSessionRow(
     lastActivityAt: row.lastActivityAt.toISOString(),
     endedAt: row.endedAt?.toISOString() ?? null,
     durationSeconds: row.durationSeconds ?? null,
+    wallClockSeconds: row.wallClockSeconds ?? null,
   };
 }
 
@@ -695,9 +756,21 @@ export async function closeSession(
   }
 
   const now = new Date();
-  const durationSeconds = Math.round(
-    (now.getTime() - new Date(session.startedAt).getTime()) / 1000
+  const sessionStartedAt = new Date(session.startedAt);
+  const wallClockSeconds = Math.max(
+    0,
+    Math.round((now.getTime() - sessionStartedAt.getTime()) / 1000)
   );
+
+  // FR210: Compute active time from session event gaps (internal analytics only)
+  const events = await db.query.sessionEvents.findMany({
+    where: and(
+      eq(sessionEvents.sessionId, sessionId),
+      eq(sessionEvents.profileId, profileId)
+    ),
+    orderBy: asc(sessionEvents.createdAt),
+  });
+  const durationSeconds = computeActiveSeconds(sessionStartedAt, events);
 
   await db
     .update(learningSessions)
@@ -705,6 +778,7 @@ export async function closeSession(
       status: 'completed',
       endedAt: now,
       durationSeconds,
+      wallClockSeconds,
       updatedAt: now,
     })
     .where(

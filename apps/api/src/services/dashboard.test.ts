@@ -66,6 +66,8 @@ function createDashboardInput(
     sessionsLastWeek: 2,
     totalTimeThisWeekMinutes: 60,
     totalTimeLastWeekMinutes: 30,
+    exchangesThisWeek: 15,
+    exchangesLastWeek: 8,
     subjectRetentionData: [
       { name: 'Math', status: 'strong' },
       { name: 'Science', status: 'fading' },
@@ -313,9 +315,24 @@ describe('getChildrenForParent', () => {
     lastWeekDate.setDate(lastWeekDate.getDate() - 7);
 
     mockSessionsFindMany.mockResolvedValue([
-      { startedAt: thisWeekDate, durationSeconds: 600 },
-      { startedAt: thisWeekDate, durationSeconds: 900 },
-      { startedAt: lastWeekDate, durationSeconds: 300 },
+      {
+        startedAt: thisWeekDate,
+        durationSeconds: 600,
+        wallClockSeconds: 600,
+        exchangeCount: 10,
+      },
+      {
+        startedAt: thisWeekDate,
+        durationSeconds: 900,
+        wallClockSeconds: 900,
+        exchangeCount: 12,
+      },
+      {
+        startedAt: lastWeekDate,
+        durationSeconds: 300,
+        wallClockSeconds: 300,
+        exchangeCount: 5,
+      },
     ]);
 
     mockSessionEventsFindMany.mockResolvedValue([
@@ -342,6 +359,8 @@ describe('getChildrenForParent', () => {
     expect(result[0].sessionsThisWeek).toBe(2);
     expect(result[0].sessionsLastWeek).toBe(1);
     expect(result[0].trend).toBe('up');
+    expect(result[0].exchangesThisWeek).toBe(22); // 10 + 12
+    expect(result[0].exchangesLastWeek).toBe(5);
     expect(result[0].subjects).toHaveLength(2);
     expect(result[0].subjects[0].name).toBe('Math');
     expect(result[0].subjects[0].rawInput).toBeNull();
@@ -588,6 +607,7 @@ describe('getChildSessions', () => {
         exchangeCount: 8,
         escalationRung: 2,
         durationSeconds: 600,
+        wallClockSeconds: 720,
       },
       {
         id: SESSION_ID_2,
@@ -599,6 +619,7 @@ describe('getChildSessions', () => {
         exchangeCount: 3,
         escalationRung: 1,
         durationSeconds: null,
+        wallClockSeconds: null,
       },
     ]);
 
@@ -612,9 +633,11 @@ describe('getChildSessions', () => {
     expect(result[0].exchangeCount).toBe(8);
     expect(result[0].escalationRung).toBe(2);
     expect(result[0].durationSeconds).toBe(600);
+    expect(result[0].wallClockSeconds).toBe(720);
     expect(result[0].startedAt).toBe(now.toISOString());
     expect(result[1].endedAt).toBeNull();
     expect(result[1].durationSeconds).toBeNull();
+    expect(result[1].wallClockSeconds).toBeNull();
   });
 });
 
