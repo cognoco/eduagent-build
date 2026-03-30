@@ -607,6 +607,7 @@ describe('getChildSessions', () => {
         exchangeCount: 8,
         escalationRung: 2,
         durationSeconds: 600,
+        wallClockSeconds: 720,
       },
       {
         id: SESSION_ID_2,
@@ -618,6 +619,7 @@ describe('getChildSessions', () => {
         exchangeCount: 3,
         escalationRung: 1,
         durationSeconds: null,
+        wallClockSeconds: null,
       },
     ]);
 
@@ -631,9 +633,11 @@ describe('getChildSessions', () => {
     expect(result[0].exchangeCount).toBe(8);
     expect(result[0].escalationRung).toBe(2);
     expect(result[0].durationSeconds).toBe(600);
+    expect(result[0].wallClockSeconds).toBe(720);
     expect(result[0].startedAt).toBe(now.toISOString());
     expect(result[1].endedAt).toBeNull();
     expect(result[1].durationSeconds).toBeNull();
+    expect(result[1].wallClockSeconds).toBeNull();
   });
 });
 

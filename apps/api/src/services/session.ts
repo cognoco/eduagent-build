@@ -54,7 +54,7 @@ const PACE_BUFFER = 1.5; // 1.5x buffer for slower-than-estimated work
 
 interface TimedEvent {
   createdAt: Date;
-  metadata?: Record<string, unknown> | null;
+  metadata?: unknown;
 }
 
 /** Compute active learning seconds from session event timestamps.
@@ -70,33 +70,36 @@ export function computeActiveSeconds(
     (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
   );
 
+  const first = sorted[0];
+  if (!first) return 0;
+
   let total = 0;
 
   // Gap from session start to first event
   const firstGap = Math.max(
     0,
-    (sorted[0].createdAt.getTime() - sessionStartedAt.getTime()) / 1000
+    (first.createdAt.getTime() - sessionStartedAt.getTime()) / 1000
   );
-  total += Math.min(firstGap, perGapCap(sorted[0]));
+  total += Math.min(firstGap, perGapCap(first));
 
   // Gaps between consecutive events
   for (let i = 0; i < sorted.length - 1; i++) {
+    const curr = sorted[i]!;
+    const next = sorted[i + 1]!;
     const gap = Math.max(
       0,
-      (sorted[i + 1].createdAt.getTime() - sorted[i].createdAt.getTime()) / 1000
+      (next.createdAt.getTime() - curr.createdAt.getTime()) / 1000
     );
-    total += Math.min(gap, perGapCap(sorted[i + 1]));
+    total += Math.min(gap, perGapCap(next));
   }
 
   return Math.round(total);
 }
 
 function perGapCap(event: TimedEvent): number {
-  const meta = event.metadata as {
-    expectedResponseMinutes?: number;
-  } | null;
+  const meta = event.metadata as Record<string, unknown> | null | undefined;
   const minutes = meta?.expectedResponseMinutes;
-  if (minutes && minutes > 0) {
+  if (typeof minutes === 'number' && minutes > 0) {
     return minutes * 60 * PACE_BUFFER;
   }
   return FALLBACK_GAP_CAP_SECONDS;
@@ -761,7 +764,10 @@ export async function closeSession(
 
   // FR210: Compute active time from session event gaps (internal analytics only)
   const events = await db.query.sessionEvents.findMany({
-    where: eq(sessionEvents.sessionId, sessionId),
+    where: and(
+      eq(sessionEvents.sessionId, sessionId),
+      eq(sessionEvents.profileId, profileId)
+    ),
     orderBy: asc(sessionEvents.createdAt),
   });
   const durationSeconds = computeActiveSeconds(sessionStartedAt, events);

@@ -425,8 +425,8 @@ export const accentPresets: Record<Persona, AccentPreset[]> = {
       label: 'Purple',
       swatch: '#6d28d9',
       light: {
-        primary: '#0d9488',
-        primarySoft: 'rgba(13, 148, 136, 0.10)',
+        primary: '#7c3aed',
+        primarySoft: 'rgba(124, 58, 237, 0.10)',
         secondary: '#8b5cf6',
         accent: '#a78bfa',
         coachBubble: 'rgba(124, 58, 237, 0.06)',
@@ -474,8 +474,8 @@ export const accentPresets: Record<Persona, AccentPreset[]> = {
       dark: {
         primary: '#2dd4bf',
         primarySoft: 'rgba(45, 212, 191, 0.12)',
-        secondary: '#a78bfa',
-        accent: '#a78bfa',
+        secondary: '#818cf8',
+        accent: '#818cf8',
         coachBubble: 'rgba(45, 212, 191, 0.08)',
       },
     },
