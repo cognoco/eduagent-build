@@ -237,15 +237,21 @@ export async function getChildrenForParent(
       (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
     ).length;
 
-    // 5. Sum duration for time tracking (seconds -> minutes)
+    // 5. Sum display duration for time tracking (seconds -> minutes)
+    // Prefer wall-clock when available, with fallback to legacy active duration.
+    const getDisplaySeconds = (session: {
+      wallClockSeconds: number | null;
+      durationSeconds: number | null;
+    }): number => session.wallClockSeconds ?? session.durationSeconds ?? 0;
+
     const totalTimeThisWeek = recentSessions
       .filter((s) => s.startedAt >= startOfThisWeek)
-      .reduce((sum, s) => sum + (s.durationSeconds ?? 0), 0);
+      .reduce((sum, s) => sum + getDisplaySeconds(s), 0);
     const totalTimeLastWeek = recentSessions
       .filter(
         (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
       )
-      .reduce((sum, s) => sum + (s.durationSeconds ?? 0), 0);
+      .reduce((sum, s) => sum + getDisplaySeconds(s), 0);
 
     // 6. Count guided metrics from session events
     const guidedMetrics = await countGuidedMetrics(
@@ -376,6 +382,7 @@ export interface ChildSession {
   exchangeCount: number;
   escalationRung: number;
   durationSeconds: number | null;
+  wallClockSeconds: number | null;
 }
 
 export interface TranscriptExchange {
@@ -431,6 +438,7 @@ export async function getChildSessions(
     exchangeCount: s.exchangeCount,
     escalationRung: s.escalationRung,
     durationSeconds: s.durationSeconds,
+    wallClockSeconds: s.wallClockSeconds,
   }));
 }
 

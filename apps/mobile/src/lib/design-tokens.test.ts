@@ -1,6 +1,35 @@
 import { tokens, tokensToCssVars, accentPresets } from './design-tokens';
 import type { Persona } from './theme';
 
+function hexToRgb(hex: string): [number, number, number] {
+  const normalized = hex.replace('#', '');
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+    throw new Error(`Expected 6-digit hex color, received "${hex}"`);
+  }
+
+  return [
+    Number.parseInt(normalized.slice(0, 2), 16),
+    Number.parseInt(normalized.slice(2, 4), 16),
+    Number.parseInt(normalized.slice(4, 6), 16),
+  ];
+}
+
+function rgbaToRgb(rgba: string): [number, number, number] {
+  const match = rgba.match(
+    /^rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*0?\.\d+\s*\)$/
+  );
+  if (!match) {
+    throw new Error(`Expected rgba color, received "${rgba}"`);
+  }
+
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function expectNavyTintedHex(hex: string) {
+  const [red, green, blue] = hexToRgb(hex);
+  expect(blue - Math.max(red, green)).toBeGreaterThanOrEqual(20);
+}
+
 describe('tokensToCssVars', () => {
   it('maps all color tokens to CSS variable keys', () => {
     const base = tokens.learner.dark;
@@ -52,11 +81,11 @@ describe('accent preset merging', () => {
     const base = tokens.learner.dark;
     const baseVars = tokensToCssVars(base);
 
-    const tealPreset = accentPresets.learner.find((p) => p.id === 'teal');
-    expect(tealPreset).toBeDefined();
-    if (!tealPreset) return; // narrowing guard; toBeDefined above catches failure
+    const nonDefaultPreset = accentPresets.learner.find((p) => p.id === 'rose');
+    expect(nonDefaultPreset).toBeDefined();
+    if (!nonDefaultPreset) return;
 
-    const overrides = tealPreset.dark;
+    const overrides = nonDefaultPreset.dark;
     const merged = {
       ...base,
       colors: { ...base.colors, ...overrides },
@@ -94,4 +123,36 @@ describe('accent preset merging', () => {
       }
     }
   });
+
+  it.each(personas)(
+    'every %s preset keeps primarySoft in the same hue family as primary',
+    (persona) => {
+      for (const preset of accentPresets[persona]) {
+        for (const scheme of schemes) {
+          expect(rgbaToRgb(preset[scheme].primarySoft)).toEqual(
+            hexToRgb(preset[scheme].primary)
+          );
+        }
+      }
+    }
+  );
+});
+
+describe('epic 11 dark palette contract', () => {
+  const personas: Persona[] = ['teen', 'learner', 'parent'];
+
+  it.each(personas)(
+    '%s dark theme uses navy-tinted background surfaces instead of the old neutral black palette',
+    (persona) => {
+      const dark = tokens[persona].dark.colors;
+
+      expect(dark.background).not.toBe('#18181b');
+      expect(dark.surface).not.toBe('#1a1a1a');
+      expect(dark.surfaceElevated).not.toBe('#262626');
+
+      expectNavyTintedHex(dark.background);
+      expectNavyTintedHex(dark.surface);
+      expectNavyTintedHex(dark.surfaceElevated);
+    }
+  );
 });

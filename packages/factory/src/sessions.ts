@@ -21,6 +21,7 @@ export function buildSession(
     lastActivityAt: now,
     endedAt: null,
     durationSeconds: null,
+    wallClockSeconds: null,
     ...overrides,
   };
 }

@@ -122,13 +122,14 @@ export const learningSessionSchema = z.object({
   lastActivityAt: z.string().datetime(),
   endedAt: z.string().datetime().nullable(),
   durationSeconds: z.number().int().nullable(),
+  wallClockSeconds: z.number().int().nullable(),
 });
 export type LearningSession = z.infer<typeof learningSessionSchema>;
 
 // Session close request
 
 export const sessionCloseSchema = z.object({
-  reason: z.enum(['user_ended', 'hard_cap', 'silence_timeout']).optional(),
+  reason: z.enum(['user_ended', 'silence_timeout']).optional(),
   summaryStatus: summaryStatusSchema.optional(),
 });
 export type SessionCloseInput = z.infer<typeof sessionCloseSchema>;
