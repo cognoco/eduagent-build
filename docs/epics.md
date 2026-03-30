@@ -734,9 +734,9 @@ Epic 7 (v1.1, revised v2)    ← Epic 1 + Epic 3 + Epic 13 Story 13.7 (celebrati
 - 12.1: Age-based LLM voice (replace `getPersonaVoice()` → `getAgeVoice(birthYear)`, `computeAgeBracket()` utility)
 - 12.2: Merge route groups — `(learner)` + `(parent)` → `(app)` with **stable** tab bar (Home, Book, More — no dynamic Family tab)
 - 12.3: Theme decoupled from persona — one light/dark palette, accent picker is sole theme control
-- 12.4: Remove `personaType` from database and Zod schemas (DB migration, backwards-compat acceptance window)
+- 12.4: Remove `personaType` from database and Zod schemas (DB migration — zero-user: skip backwards-compat window, skip down migration)
 - 12.5: Remove profile-based persona routing — no `persona` concept in mobile code
-- 12.6: Analytics and event schema migration — update Sentry tags, Inngest payloads, RevenueCat metadata from persona to age bracket
+- 12.6: Analytics, event schema, consent pipeline, Sentry age-gating, and test infrastructure migration (FR206.1-206.8) — update Sentry tags + age-gating function, consent service + middleware + consent-web deep links, test factory + test-seed, Inngest payloads, RevenueCat metadata
 - 12.7: **Prioritized home cards** — replace single coaching card with ranked multi-card home screen (the intent surface)
 
 **Dependency order:**
@@ -754,14 +754,19 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 - **Self-signup teens (16-17)** set their own `birthYear`, editable. If a parent links later, parent can view but not override.
 - **Stable tab bar.** No dynamic Family tab appearing/disappearing. Family is a home screen card, not a tab. Tab bar stays `Home | Book | More` for all users.
 - Parent capabilities detected via `familyLinks` query, no `isParent` flag
-- API accepts `personaType` for 2 release cycles (deprecation header), then rejects
+- **Zero users:** skip backwards-compat transition window (FR203.5), skip reversible migration (FR203.4), fresh schema instead of data migration (FR203.2). Reinstate if deferred past first real users.
 - Coaching card precompute expands: `precomputeHomeCards(profileId)` → 2-3 ranked cards (replaces single `precomputeCoachingCard()`)
 
 **Cross-epic interactions:**
 - **Epic 14 Story 14.1 (FR221):** Coaching card dismissal must be redesigned for multi-card home screen. Per-card dismissal feeds ranking algorithm. Co-design required.
 - **Epic 13 FR211:** Crash recovery "unfinished session" card becomes a home card (highest priority, displaces normal ranking).
+- **Epic 13 FR213:** Timer caps removed — coordinated with Story 12.1 (both remove persona from timer config). **13.2 must run first.**
 - **Epic 7 FR121:** Age-based visualization threshold uses `birthYear` instead of `birthDate`. Trivial change.
 - **Epic 3 FR130:** EVALUATE framing keyed by age bracket instead of persona. Same voices, different lookup key.
+- **Epic 0 (consent):** `checkConsentRequired(birthDate)` → `birthYear` formula. `ProfileMeta.birthDate` → `.birthYear`. Consent middleware + service pipeline update (FR206.7).
+- **Epic 0 (Sentry):** `evaluateSentryForProfile(birthDate)` → `birthYear` age calc. Apple compliance function, not just tags (FR206.5).
+- **Epic 0 (test infra):** `buildProfile()` factory + `test-seed.ts` (28 refs) — must migrate before other test updates (FR206.8).
+- **Epic 10 (consent-web):** Consent HTML deep links use `mentomate://parent/dashboard` and `?persona=learner` — must update after route merge (FR206.6).
 
 **Detailed spec:** See Epic 12 stories section below.
 
@@ -881,12 +886,19 @@ Phase 4 — Celebration system + session polish:
   Epic 13.7     (celebration queue + 3-level toggle — depends on 13.4 + 13.1)
 
 Phase 5 — Architecture refactor:
-  Epic 12       (persona removal + prioritized home cards — big refactor, touches many files)
+  Epic 12       (persona removal + prioritized home cards — big refactor, touches many files.
+                 Story 12.6 is the heaviest: consent pipeline, Sentry age-gating, test factory
+                 + test-seed (FR206.5-8), consent-web deep links — all before 12.4 drops columns.
+                 Zero-user: skip backwards-compat window + reversible migration.)
   Epic 14.1     (home card dismissal — co-designs with 12.7, must follow 12.7)
 
 Phase 6 — New features:
   Epic 7        (advisory prerequisites — new data model + services + UI, needs 13.7 for celebrations)
   Epic 14 Phase C: 14.5-14.8  (session agency — chips, feedback, topic switch, escalation)
+  Epic 8        (full voice mode — extends Feynman Stage STT/TTS to all session types)
+
+Phase 7 — Language learning:
+  Epic 6        (Four Strands methodology — depends on Epic 8.1-8.2 for SPEAK/LISTEN voice)
 ```
 
 **Why this order:**
@@ -894,8 +906,11 @@ Phase 6 — New features:
 - Phase 2 delivers immediate user value with near-zero risk (prompt change + small independent UI additions)
 - Phase 3 is the homework overhaul — high daily-use-case value, contained to camera + session files
 - Phase 4 builds the celebration system (mastery + effort milestones, adaptive silence with LLM estimation + learned pace, session resumption, 3-level toggle) that Phases 5-6 need. Story 13.5 adds cross-epic touchpoints: `expectedResponseMinutes` in LLM response metadata, `medianResponseSeconds` + `celebrationLevel` on `teachingPreferences`.
-- Phase 5 (Epic 12) is the biggest refactor — touch navigation, layouts, services, schema. Doing it after celebration system means 12.7 (home cards) can integrate celebrations
-- Phase 6 adds new features on a stable, refactored codebase
+- Phase 5 (Epic 12) is the biggest refactor — touch navigation, layouts, services, schema. Doing it after celebration system means 12.7 (home cards) can integrate celebrations. Story 12.6 is expanded (FR206.5-8): consent pipeline `birthDate`→`birthYear`, Sentry age-gating, test factory+seed (~1,443 tests depend on factory), consent-web HTML deep links. Update factory FIRST within 12.6 to avoid cascading test failures.
+- Phase 6 adds new features on a stable, refactored codebase. Epic 7 and 8 are independent and can be parallelized.
+- Phase 7 (Epic 6) is always last — depends on Epic 8 voice infrastructure for SPEAK/LISTEN stories.
+
+**Note (zero-user simplifications for Epic 12):** FR203.4 (reversible migration), FR203.5 (2-release backwards-compat window), and FR203.2 (data migration from `birthDate`) are all skipped — no production data exists. Reinstate if deferred past first real-user cohort.
 
 ### Open Questions — Resolved (2026-03-30)
 
@@ -4674,7 +4689,9 @@ User testing identified 15 UX gaps across the app. The first nine (10.1–10.9) 
 - [ ] Parent dashboard screens accessible via navigation from home screen Family card (not a tab)
 - [ ] A parent can access both learning and family screens without switching profiles
 - [ ] Navigation guards (consent, post-approval) still work
-- [ ] All deep links (`router.push`/`router.replace`) audited and updated
+- [ ] All mobile deep links (`router.push`/`router.replace`) audited and updated
+- [ ] All server-rendered deep links (consent-web HTML: `mentomate://parent/dashboard`, `mentomate://onboarding?persona=learner`) audited and updated (coordinated with Story 12.6 FR206.6)
+- [ ] Push notification `data.type` → client-side routing still works after route merge (push deep links use type-based routing, not path-based — verify no regression)
 
 **Tests:** Integration test for tab bar rendering (always 3 tabs). E2E: parent taps Family card → dashboard → back → taps Study card → learning session.
 
@@ -4694,21 +4711,27 @@ User testing identified 15 UX gaps across the app. The first nine (10.1–10.9) 
 
 ### Story 12.4: Remove personaType from database and schemas
 
-**Scope:** Drop `persona_type` column and enum from profiles table. Remove from Zod schemas. Update profile CRUD. Migrate `birthDate` → `birthYear`. **Must be last — all code must stop reading `personaType` first.**
+**Scope:** Drop `persona_type` column and enum from profiles table. Remove from Zod schemas. Update profile CRUD. Replace `birthDate` with `birthYear`. **Must be last — all code must stop reading `personaType` and `birthDate` first (Story 12.6 handles this).**
 
 **FRs:** FR203 (database migration)
 
 **Acceptance criteria:**
 - [ ] `personaType` removed from `profileCreateSchema`, `profileUpdateSchema`, `profileSchema`
+- [ ] `personaTypeSchema` removed from `packages/schemas/src/profiles.ts`
 - [ ] `persona_type` column dropped via Drizzle migration
 - [ ] `persona_type` enum removed from PostgreSQL
-- [ ] `birthDate` column migrated to `birthYear` (integer) — existing rows: extract year from `birthDate`
+- [ ] `birth_date` column dropped, `birth_year` (integer, not null) is the only age field
+- [ ] `birth_year_set_by` column (nullable profile ID) tracks who set the birth year
 - [ ] Profile creation derives all behavior from `birthYear`
-- [ ] Backwards-compatible: API ignores `personaType` if sent during 2-release transition window (deprecation header sent)
-- [ ] Reversible migration: down migration re-adds columns and populates from computed values
-- [ ] Child profiles (`birthYear` set by parent): `birthYearSetBy` field tracks who set it (parent profile ID or null for self-set)
+- [ ] Child profiles: `birthYear` field read-only if `birthYearSetBy` is not null
+- [ ] **Zero-user simplification:** No backwards-compat transition window (FR203.5 skipped). No down migration (FR203.4 skipped). `personaType` in request body is rejected immediately. See plan doc "Zero-User Simplifications" section.
 
-**Tests:** Update all test files that reference personaType/birthDate. Run full test suite. Run migration against dev database.
+**Prerequisite check before running this story:**
+- [ ] `grep -r "personaType" --include="*.ts" --include="*.tsx" | grep -v docs | grep -v dist | grep -v node_modules` returns zero hits (Story 12.6 completed)
+- [ ] `grep -r "birthDate" --include="*.ts" --include="*.tsx" | grep -v docs | grep -v dist | grep -v node_modules` returns zero hits (Story 12.6 completed)
+- [ ] Full test suite passes before migration (baseline from Story 12.6)
+
+**Tests:** Run migration against dev database. Full test suite. Profile CRUD integration tests with `birthYear` only.
 
 ### Story 12.5: Remove profile-based persona routing
 
@@ -4726,21 +4749,37 @@ User testing identified 15 UX gaps across the app. The first nine (10.1–10.9) 
 
 **Tests:** Remove persona-specific assertions from mobile tests. E2E: verify all user types see the same app structure (3-tab bar, home cards).
 
-### Story 12.6: Analytics and event schema migration
+### Story 12.6: Analytics, event schema, consent pipeline, and test infrastructure migration
 
-**Scope:** Update all analytics events, Sentry tags, Inngest event payloads, and RevenueCat metadata that reference `personaType` to use `ageBracket` or remove the field. Must complete before Story 12.4 drops the column.
+**Scope:** Update all analytics events, Sentry tags, Sentry age-gating, Inngest event payloads, RevenueCat metadata, consent pipeline, consent-web deep links, test factory, and test-seed service that reference `personaType` or `birthDate`. Must complete before Story 12.4 drops the columns.
 
-**FRs:** FR206 (analytics migration)
+**FRs:** FR206 (analytics migration — FR206.1-206.8)
 
 **Acceptance criteria:**
 - [ ] All Sentry `setTag('persona', ...)` calls replaced with `setTag('ageBracket', ...)`
+- [ ] `evaluateSentryForProfile(birthDate, consentStatus)` in `apps/mobile/src/lib/sentry.ts` updated to accept `birthYear: number` and use `currentYear - birthYear` for Apple-compliance age calculation (FR206.5)
 - [ ] All Inngest event payloads that include `personaType` updated or field removed
-- [ ] RevenueCat customer attributes updated (if persona was set as metadata)
+- [ ] RevenueCat customer attributes updated (if persona was set as metadata — research shows none currently, verify and document)
+- [ ] Consent-web HTML deep links updated: `mentomate://parent/dashboard` → post-merge route, `mentomate://onboarding?persona=learner` → remove `persona` param (FR206.6). These are in `apps/api/src/routes/consent-web.ts` server-rendered HTML, not mobile router calls.
+- [ ] `checkConsentRequired(birthDate)` in `apps/api/src/services/consent.ts` updated to accept `birthYear: number` and use conservative formula `currentYear - birthYear <= 16` (FR206.7)
+- [ ] `ProfileMeta` interface in `apps/api/src/middleware/profile-scope.ts` updated: `birthDate: string | null` → `birthYear: number | null`. All consent middleware consumers updated.
+- [ ] `buildProfile()` in `packages/factory/src/profiles.ts` updated: remove `personaType` default, add `birthYear` default (FR206.8). **Do this first** — broken factory breaks ~1,443 tests.
+- [ ] `test-seed.ts` (~28 persona refs) fully migrated to birthYear-based profile creation (FR206.8)
 - [ ] Home card tap events tracked in `sessionEvents` with `eventType: 'home_card_tap'` and card type metadata
 - [ ] No analytics pipeline breakage when column is dropped
-- [ ] Grep for `personaType` in event/analytics code returns zero hits
+- [ ] Grep for `personaType` in source code (excluding docs, dist, node_modules) returns zero hits
+- [ ] Grep for `birthDate` in source code (excluding docs, dist, node_modules) returns zero hits (replaced by `birthYear`)
+- [ ] Full test suite passes after all changes (run before Story 12.4 migration)
 
-**Tests:** Verify Inngest event schemas still validate. Sentry tag tests updated.
+**Recommended sub-task order within this story:**
+1. Test factory + test-seed (unblocks all other test runs)
+2. Consent service + middleware + consent-web deep links (GDPR-critical)
+3. Sentry age-gating (Apple compliance)
+4. Sentry tags, Inngest payloads, RevenueCat metadata
+5. Home card tap event type
+6. Full grep audit + test suite run
+
+**Tests:** Verify Inngest event schemas still validate. Sentry tag tests updated. Consent tests verify under-16/over-16 with `birthYear`. Factory-based test suite green.
 
 ### Story 12.7: Prioritized home cards — the intent surface
 
@@ -4811,19 +4850,28 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 - `profiles.tsx` modal shows "Student" / "Parent" role labels
 - All tests passing
 
+### Epic 12 Zero-User Simplifications
+
+**The app has zero users as of 2026-03-30.** The following FRs are simplified:
+- **FR203.4** (reversible migration): Skipped — no production data.
+- **FR203.5** (2-release backwards-compat window): Skipped — just remove `personaType`. No transition, no deprecation header.
+- **FR203.2** (extract year from existing `birthDate` rows): Fresh schema — seed data updated directly.
+
+**When to re-add:** If Epic 12 is deferred past the first real-user cohort.
+
 ### Epic 12 Risks
 
 | Risk | Mitigation |
 |------|-----------|
-| Route group merge breaks deep links | Audit all `router.push`/`router.replace` calls before merging |
+| Route group merge breaks deep links | Audit all `router.push`/`router.replace` calls AND server-rendered HTML links (consent-web, push payloads) before merging |
+| Consent pipeline breaks on `birthDate` → `birthYear` | FR206.7: `checkConsentRequired()`, `ProfileMeta`, consent middleware all updated in Story 12.6. Test with under-16 and over-16 profiles. |
+| ~1,443 API tests break at factory level | FR206.8: Update `buildProfile()` factory + test-seed FIRST, before any other test updates. Run full suite after factory change. |
+| Sentry age-gating breaks (Apple compliance) | FR206.5: `evaluateSentryForProfile` updated from `birthDate` to `birthYear` in Story 12.6. Distinct from Sentry tags. |
 | Home card ranking feels wrong initially | Cold start shows equal cards. Ranking improves after 2-3 sessions. Manual override always available via secondary cards. |
-| Existing TEEN/LEARNER data in prod DB | Migration converts rows; `birthYear` extracted from `birthDate`; computed age bracket is source of truth |
-| Third-party integrations read personaType | Story 12.6 audits: Sentry tags, Inngest payloads, RevenueCat metadata |
 | Parent cold-start (no children linked) | "Link your child" card on Home screen (card type, not prompt) |
 | Wrong `birthYear` entered → wrong age bracket | Parent locks child's `birthYear` (child can't edit). Self-signup adults can edit in Settings. Worst case: wrong LLM voice tone, correctable. |
 | `birthYear` less precise than `birthDate` for GDPR consent age (exactly 16) | Conservative: if `currentYear - birthYear <= 16`, require parental consent (assumes worst-case birthday). Errs on the side of protection. |
 | `precomputeHomeCards` adds latency | Cache in React Query (same as existing coaching card). Precompute in background (Inngest or on session-close). |
-| Backwards-compat window lingers | FR203.3: 2-release deadline, deprecation header, then reject |
 
 ---
 
