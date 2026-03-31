@@ -136,6 +136,7 @@ describe('profile routes', () => {
           body: JSON.stringify({
             displayName: 'Test User',
             personaType: 'LEARNER',
+            birthDate: '2008-06-15',
           }),
         },
         TEST_ENV
@@ -158,7 +159,27 @@ describe('profile routes', () => {
         {
           method: 'POST',
           headers: AUTH_HEADERS,
-          body: JSON.stringify({ personaType: 'TEEN' }),
+          body: JSON.stringify({
+            personaType: 'TEEN',
+            birthDate: '2014-03-10',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 when birthDate is missing', async () => {
+      const res = await app.request(
+        '/v1/profiles',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            displayName: 'Test User',
+            personaType: 'LEARNER',
+          }),
         },
         TEST_ENV
       );
@@ -175,6 +196,7 @@ describe('profile routes', () => {
           body: JSON.stringify({
             displayName: 'Test',
             personaType: 'INVALID',
+            birthDate: '2008-06-15',
           }),
         },
         TEST_ENV

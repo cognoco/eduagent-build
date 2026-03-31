@@ -9,7 +9,7 @@ export type LocationType = z.infer<typeof locationSchema>;
 
 export const profileCreateSchema = z.object({
   displayName: z.string().min(1).max(50),
-  birthDate: z.string().date().optional(),
+  birthDate: z.string().date(),
   personaType: personaTypeSchema.default('LEARNER'),
   avatarUrl: z.string().url().optional(),
   location: locationSchema.optional(),

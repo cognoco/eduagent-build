@@ -1,8 +1,10 @@
-import { Tabs, Redirect } from 'expo-router';
-import { View } from 'react-native';
+import React from 'react';
+import { Tabs, Redirect, useRouter } from 'expo-router';
+import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth, useClerk } from '@clerk/clerk-expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useProfile } from '../../lib/profile';
 import { useTheme, useThemeColors, useTokenVars } from '../../lib/theme';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
 import { useRevenueCatIdentity } from '../../hooks/use-revenuecat';
@@ -33,12 +35,90 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   );
 }
 
+/** Consent statuses that block app access */
+const PENDING_CONSENT_STATUSES = new Set([
+  'PENDING',
+  'PARENTAL_CONSENT_REQUESTED',
+]);
+
+/**
+ * Gate shown when no profile exists yet (first-time parent after sign-up).
+ */
+function CreateProfileGate(): React.ReactElement {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  return (
+    <View
+      className="flex-1 bg-background items-center justify-center px-6"
+      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      testID="create-profile-gate"
+    >
+      <Text className="text-h1 font-bold text-text-primary mb-3 text-center">
+        Welcome!
+      </Text>
+      <Text className="text-body text-text-secondary text-center mb-8">
+        Let's set up your profile so you can manage your family's learning.
+      </Text>
+      <Pressable
+        onPress={() => router.push('/create-profile')}
+        className="bg-primary rounded-button py-3.5 px-8 items-center w-full"
+        style={{ minHeight: 48 }}
+        testID="create-profile-cta"
+        accessibilityRole="button"
+        accessibilityLabel="Get started"
+      >
+        <Text className="text-body font-semibold text-text-inverse">
+          Get started
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * Gate shown when consent has been withdrawn (defense-in-depth for parent profiles).
+ */
+function ConsentWithdrawnGate(): React.ReactElement {
+  const insets = useSafeAreaInsets();
+  const { signOut } = useClerk();
+
+  return (
+    <View
+      className="flex-1 bg-background items-center justify-center px-6"
+      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      testID="consent-withdrawn-gate"
+    >
+      <Text
+        className="text-h1 font-bold text-text-primary mb-4 text-center"
+        accessibilityRole="header"
+      >
+        Account restricted
+      </Text>
+      <Text className="text-body text-text-secondary mb-8 text-center">
+        Your account access is currently restricted. Please contact support if
+        you believe this is an error.
+      </Text>
+      <Pressable
+        onPress={() => signOut()}
+        className="py-3.5 px-8 items-center w-full"
+        testID="withdrawn-sign-out"
+        accessibilityRole="button"
+        accessibilityLabel="Sign out"
+      >
+        <Text className="text-body font-semibold text-primary">Sign out</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function ParentLayout() {
   const { isLoaded, isSignedIn } = useAuth();
   const { persona } = useTheme();
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
+  const { activeProfile, isLoading: isProfileLoading } = useProfile();
 
   // Register push token on app launch (runs once, guarded internally)
   usePushTokenRegistration();
@@ -49,6 +129,33 @@ export default function ParentLayout() {
   if (!isLoaded) return null;
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
   if (persona !== 'parent') return <Redirect href="/(learner)/home" />;
+
+  // Show a centered spinner while profiles load
+  if (isProfileLoading)
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        testID="profile-loading"
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
+
+  // No profile exists — show gate that pushes to profile creation modal
+  if (!activeProfile) return <CreateProfileGate />;
+
+  // Gate: block app access when consent is pending (defense-in-depth — unlikely for adults)
+  if (
+    activeProfile?.consentStatus &&
+    PENDING_CONSENT_STATUSES.has(activeProfile.consentStatus)
+  ) {
+    return <CreateProfileGate />;
+  }
+
+  // Gate: block access when consent has been withdrawn
+  if (activeProfile?.consentStatus === 'WITHDRAWN') {
+    return <ConsentWithdrawnGate />;
+  }
 
   // key={themeKey} removed — crashes Android Fabric (MENTOMATE-MOBILE-6).
   // NativeWind vars() style updates propagate without remounting.
