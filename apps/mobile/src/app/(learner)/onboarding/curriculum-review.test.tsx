@@ -168,4 +168,41 @@ describe('CurriculumReviewScreen', () => {
       expect(screen.queryByTestId('add-topic-title-input')).toBeNull();
     });
   });
+
+  it('shows error when preview fails', async () => {
+    mockAddTopicMutateAsync.mockRejectedValueOnce(
+      new Error('API error 500: Internal server error')
+    );
+
+    render(<CurriculumReviewScreen />);
+
+    fireEvent.press(screen.getByTestId('add-topic-button'));
+    fireEvent.changeText(screen.getByTestId('add-topic-title-input'), 'trig');
+    fireEvent.press(screen.getByTestId('add-topic-preview'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/went wrong on our end/i)).toBeTruthy();
+    });
+  });
+
+  it('navigates back when back button is pressed', () => {
+    render(<CurriculumReviewScreen />);
+
+    fireEvent.press(screen.getByTestId('curriculum-back'));
+    expect(mockBack).toHaveBeenCalled();
+  });
+
+  it('cancels add-topic modal without creating', async () => {
+    render(<CurriculumReviewScreen />);
+
+    fireEvent.press(screen.getByTestId('add-topic-button'));
+    expect(screen.getByTestId('add-topic-title-input')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('add-topic-cancel'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('add-topic-title-input')).toBeNull();
+    });
+    expect(mockAddTopicMutateAsync).not.toHaveBeenCalled();
+  });
 });

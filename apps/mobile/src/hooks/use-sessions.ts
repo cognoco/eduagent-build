@@ -7,7 +7,12 @@ import {
   type UseMutationResult,
 } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
-import type { LearningSession, SessionSummary } from '@eduagent/schemas';
+import type {
+  LearningSession,
+  SessionMessageInput,
+  SessionSummary,
+  SessionTranscript,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
@@ -25,11 +30,14 @@ interface MessageResult {
   escalationRung: number;
   isUnderstandingCheck: boolean;
   exchangeCount: number;
+  expectedResponseMinutes: number;
 }
 
 interface CloseResult {
   message: string;
   sessionId: string;
+  wallClockSeconds: number;
+  shouldPromptCasualSwitch?: boolean;
 }
 
 interface SubmitSummaryResult {
@@ -88,20 +96,31 @@ export function useSendMessage(
   });
 }
 
-export function useCloseSession(
-  sessionId: string
-): UseMutationResult<CloseResult, Error, void> {
+export function useCloseSession(sessionId: string): UseMutationResult<
+  CloseResult,
+  Error,
+  {
+    reason?: 'user_ended' | 'silence_timeout';
+    summaryStatus?:
+      | 'pending'
+      | 'submitted'
+      | 'accepted'
+      | 'skipped'
+      | 'auto_closed';
+    milestonesReached?: string[];
+  }
+> {
   const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (input = {}) => {
       const res = await client.sessions[':sessionId'].close.$post({
         param: { sessionId },
-        json: {},
+        json: input,
       });
       await assertOk(res);
-      return (await res.json()) as CloseResult;
+      return (await res.json()) as unknown as CloseResult;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['sessions'] });
@@ -113,7 +132,11 @@ export function useStreamMessage(sessionId: string): {
   stream: (
     message: string,
     onChunk: (accumulated: string) => void,
-    onDone: (result: { exchangeCount: number; escalationRung: number }) => void,
+    onDone: (result: {
+      exchangeCount: number;
+      escalationRung: number;
+      expectedResponseMinutes?: number;
+    }) => void,
     overrideSessionId?: string,
     options?: { homeworkMode?: 'help_me' | 'check_answer' }
   ) => Promise<void>;
@@ -140,6 +163,7 @@ export function useStreamMessage(sessionId: string): {
       onDone: (result: {
         exchangeCount: number;
         escalationRung: number;
+        expectedResponseMinutes?: number;
       }) => void,
       overrideSessionId?: string,
       options?: { homeworkMode?: 'help_me' | 'check_answer' }
@@ -163,8 +187,12 @@ export function useStreamMessage(sessionId: string): {
           headers['X-Profile-Id'] = profileIdRef.current;
 
         const url = `${getApiUrl()}/v1/sessions/${effectiveSessionId}/stream`;
-        const body: Record<string, unknown> = { message };
-        if (options?.homeworkMode) body.homeworkMode = options.homeworkMode;
+        const body: SessionMessageInput = {
+          message,
+          ...(options?.homeworkMode
+            ? { homeworkMode: options.homeworkMode }
+            : {}),
+        };
         const { events, abort } = streamSSEViaXHR(url, {
           method: 'POST',
           headers,
@@ -181,6 +209,9 @@ export function useStreamMessage(sessionId: string): {
             onDone({
               exchangeCount: event.exchangeCount,
               escalationRung: event.escalationRung,
+              expectedResponseMinutes: (
+                event as { expectedResponseMinutes?: number }
+              ).expectedResponseMinutes,
             });
           }
         }
@@ -199,6 +230,54 @@ export function useStreamMessage(sessionId: string): {
   );
 
   return { stream, isStreaming };
+}
+
+export function useSessionTranscript(
+  sessionId: string
+): UseQueryResult<SessionTranscript | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['session-transcript', sessionId, activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const transcriptClient = (
+          client.sessions[':sessionId'] as Record<string, any>
+        )['transcript'];
+        const res = await transcriptClient.$get({
+          param: { sessionId },
+          init: { signal },
+        } as never);
+        await assertOk(res);
+        return (await res.json()) as SessionTranscript;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!sessionId,
+  });
+}
+
+export function useRecordSystemPrompt(
+  sessionId: string
+): UseMutationResult<{ ok: boolean }, Error, { content: string }> {
+  const client = useApiClient();
+
+  return useMutation({
+    mutationFn: async ({ content }: { content: string }) => {
+      const systemPromptClient = (
+        client.sessions[':sessionId'] as Record<string, any>
+      )['system-prompt'];
+      const res = await systemPromptClient.$post({
+        param: { sessionId },
+        json: { content },
+      });
+      await assertOk(res);
+      return (await res.json()) as { ok: boolean };
+    },
+  });
 }
 
 export function useSessionSummary(

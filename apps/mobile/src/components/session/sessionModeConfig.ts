@@ -13,7 +13,7 @@ export const SESSION_MODE_CONFIGS: Record<string, SessionModeConfig> = {
     subtitle: "Let's work through this together",
     placeholder: 'Describe what you need help with...',
     openingMessage:
-      "Got it. Let's work through this together.\n\nI'll keep it brief and clear. Tell me if you want help starting or want me to check your answer.",
+      "Got it. Let's work through this together.\n\nI'll keep it brief and clear. Use the buttons below to choose.",
     showTimer: false,
     showQuestionCount: true,
   },

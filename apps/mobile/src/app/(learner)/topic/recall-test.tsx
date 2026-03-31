@@ -12,7 +12,6 @@ import {
 } from '../../../components/progress';
 import { useSubmitRecallTest } from '../../../hooks/use-retention';
 import { formatApiError } from '../../../lib/format-api-error';
-import { useTheme } from '../../../lib/theme';
 
 const OPENING_MESSAGE: ChatMessage = {
   id: 'ai-opening',
@@ -33,7 +32,6 @@ function deriveStatus(retentionStatus?: string): RetentionStatus {
 
 export default function RecallTestScreen() {
   const router = useRouter();
-  const { persona } = useTheme();
   const { topicId, subjectId } = useLocalSearchParams<{
     topicId: string;
     subjectId: string;
@@ -208,7 +206,7 @@ export default function RecallTestScreen() {
       cooldownEndsAt={remediationData.cooldownEndsAt}
       onReviewRetest={handleReviewRetest}
       onRelearnTopic={handleRelearnTopic}
-      isLearner={persona === 'learner'}
+      isLearner
       onBookPress={() => router.push('/(learner)/book')}
     />
   ) : inputDisabled ? (
