@@ -23,7 +23,7 @@ FILE_COUNT=$(echo "$STAGED_TS_FILES" | wc -l | tr -d ' ')
 echo "pre-commit-tests: $FILE_COUNT TypeScript file(s) staged"
 
 # Bulk refactors — fall back to nx affected (excluding mobile for speed)
-if [ "$FILE_COUNT" -gt 100 ]; then
+if [ "$FILE_COUNT" -gt 20 ]; then
   echo "pre-commit-tests: >20 files staged, falling back to nx affected --exclude=mobile"
   NX_DAEMON=false pnpm exec nx affected -t test --base=HEAD~1 --exclude=mobile
   exit $?
