@@ -15,6 +15,7 @@ import {
   writeCoachingCardCache,
 } from '../../services/coaching-cards';
 import { insertSessionXpEntry } from '../../services/xp';
+import { extractAndStoreHomeworkSummary } from '../../services/homework-summary';
 import {
   incrementSummarySkips,
   resetSummarySkips,
@@ -69,6 +70,7 @@ export const sessionCompleted = inngest.createFunction(
       timestamp,
       interleavedTopicIds,
       verificationType,
+      sessionType,
     } = event.data;
 
     const outcomes: StepOutcome[] = [];
@@ -229,7 +231,23 @@ export const sessionCompleted = inngest.createFunction(
       )
     );
 
-    // Step 5: Track consecutive summary skips (FR94 — Casual Explorer prompt)
+    // Step 5: Extract parent-facing homework summary (Story 14.12)
+    outcomes.push(
+      await step.run('extract-homework-summary', async () => {
+        if (sessionType !== 'homework') {
+          return {
+            step: 'extract-homework-summary',
+            status: 'skipped' as const,
+          };
+        }
+        return runIsolated('extract-homework-summary', profileId, async () => {
+          const db = getStepDatabase();
+          await extractAndStoreHomeworkSummary(db, profileId, sessionId);
+        });
+      })
+    );
+
+    // Step 6: Track consecutive summary skips (FR94 — Casual Explorer prompt)
     outcomes.push(
       await step.run('track-summary-skips', async () =>
         runIsolated('track-summary-skips', profileId, async () => {

@@ -7,6 +7,7 @@ import {
   contentFlagSchema,
   summarySubmitSchema,
   interleavedSessionStartSchema,
+  homeworkStateSyncSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -25,6 +26,7 @@ import {
   flagContent,
   getSessionSummary,
   submitSummary,
+  syncHomeworkState,
 } from '../services/session';
 import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
@@ -218,6 +220,26 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         ...result,
         shouldPromptCasualSwitch: promptCasualSwitch,
       });
+    }
+  )
+
+  // Sync homework problem metadata + analytics events
+  .post(
+    '/sessions/:sessionId/homework-state',
+    zValidator('json', homeworkStateSyncSchema),
+    async (c) => {
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
+
+      const result = await syncHomeworkState(
+        db,
+        profileId,
+        c.req.param('sessionId'),
+        c.req.valid('json')
+      );
+
+      return c.json(result);
     }
   )
 

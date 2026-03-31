@@ -56,6 +56,7 @@ import {
   getSession,
   processMessage,
   closeSession,
+  syncHomeworkState,
   flagContent,
   getSessionSummary,
   submitSummary,
@@ -87,6 +88,7 @@ function mockSessionRow(
     endedAt: Date | null;
     durationSeconds: number | null;
     wallClockSeconds: number | null;
+    metadata: Record<string, unknown>;
   }>
 ) {
   return {
@@ -103,7 +105,7 @@ function mockSessionRow(
     endedAt: overrides?.endedAt ?? null,
     durationSeconds: overrides?.durationSeconds ?? null,
     wallClockSeconds: overrides?.wallClockSeconds ?? null,
-    metadata: {},
+    metadata: overrides?.metadata ?? {},
     createdAt: NOW,
     updatedAt: NOW,
   };
@@ -373,6 +375,40 @@ describe('startSession', () => {
         eventType: 'session_start',
         sessionId,
         profileId,
+      })
+    );
+  });
+
+  it('stores metadata when provided at session start', async () => {
+    const row = mockSessionRow({
+      metadata: {
+        homework: {
+          problemCount: 2,
+          currentProblemIndex: 0,
+          problems: [
+            {
+              id: 'problem-1',
+              text: 'Solve 2x + 5 = 17',
+              source: 'ocr',
+            },
+          ],
+        },
+      },
+    });
+    const db = createMockDb({ insertReturning: [row] });
+
+    await startSession(db, profileId, subjectId, {
+      subjectId,
+      sessionType: 'homework',
+      metadata: row.metadata,
+    });
+
+    const valuesFn = (db.insert as jest.Mock).mock.results[0].value.values;
+    expect(valuesFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          homework: expect.objectContaining({ problemCount: 2 }),
+        }),
       })
     );
   });
@@ -1233,6 +1269,123 @@ describe('closeSession', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe('syncHomeworkState', () => {
+  it('updates homework metadata for the session', async () => {
+    const row = mockSessionRow({ sessionType: 'homework' });
+    setupScopedRepo({ sessionFindFirst: row });
+    const db = createMockDb();
+
+    const result = await syncHomeworkState(db, profileId, sessionId, {
+      metadata: {
+        problemCount: 2,
+        currentProblemIndex: 1,
+        problems: [
+          {
+            id: 'problem-1',
+            text: 'Solve 2x + 5 = 17',
+            originalText: 'Solve 2x + 5 = l7',
+            source: 'ocr',
+            status: 'completed',
+            selectedMode: 'help_me',
+          },
+          {
+            id: 'problem-2',
+            text: 'Factor x^2 + 3x + 2',
+            source: 'manual',
+            status: 'active',
+            selectedMode: 'check_answer',
+          },
+        ],
+      },
+    });
+
+    expect(result.metadata.problemCount).toBe(2);
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it('logs OCR corrections and problem status events only once', async () => {
+    const row = mockSessionRow({
+      sessionType: 'homework',
+      metadata: {
+        homework: {
+          loggedCorrectionIds: ['problem-1'],
+          loggedStartedProblemIds: ['problem-1'],
+          loggedCompletedProblemIds: [],
+        },
+      },
+    });
+    setupScopedRepo({ sessionFindFirst: row });
+    const db = createMockDb();
+
+    await syncHomeworkState(db, profileId, sessionId, {
+      metadata: {
+        problemCount: 2,
+        currentProblemIndex: 1,
+        problems: [
+          {
+            id: 'problem-1',
+            text: 'Solve 2x + 5 = 17',
+            originalText: 'Solve 2x + 5 = l7',
+            source: 'ocr',
+            status: 'completed',
+            selectedMode: 'help_me',
+          },
+          {
+            id: 'problem-2',
+            text: 'Factor x^2 + 3x + 2',
+            source: 'manual',
+            status: 'active',
+            selectedMode: 'check_answer',
+          },
+        ],
+      },
+    });
+
+    const valuesFn = (db.insert as jest.Mock).mock.results[0].value.values;
+    expect(valuesFn).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: 'homework_problem_completed',
+          metadata: expect.objectContaining({ problemId: 'problem-1' }),
+        }),
+        expect.objectContaining({
+          eventType: 'homework_problem_started',
+          metadata: expect.objectContaining({ problemId: 'problem-2' }),
+        }),
+      ])
+    );
+    expect(valuesFn).not.toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ eventType: 'ocr_correction' }),
+      ])
+    );
+  });
+
+  it('rejects syncing state for non-homework sessions', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ sessionType: 'learning' }),
+    });
+    const db = createMockDb();
+
+    await expect(
+      syncHomeworkState(db, profileId, sessionId, {
+        metadata: {
+          problemCount: 1,
+          currentProblemIndex: 0,
+          problems: [
+            {
+              id: 'problem-1',
+              text: 'Solve 2x + 5 = 17',
+              source: 'manual',
+              status: 'active',
+            },
+          ],
+        },
+      })
+    ).rejects.toThrow('Homework state sync is only available');
   });
 });
 

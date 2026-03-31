@@ -4,6 +4,12 @@
   "include": ["nativewind-env.d.ts"],
   "references": [
     {
+      "path": "../../packages/schemas"
+    },
+    {
+      "path": "../api"
+    },
+    {
       "path": "./tsconfig.app.json"
     },
     {

@@ -69,6 +69,15 @@ jest.mock('../../apps/api/src/services/xp', () => ({
     mockInsertSessionXpEntry(...args),
 }));
 
+const mockExtractAndStoreHomeworkSummary = jest
+  .fn()
+  .mockResolvedValue(undefined);
+
+jest.mock('../../apps/api/src/services/homework-summary', () => ({
+  extractAndStoreHomeworkSummary: (...args: unknown[]) =>
+    mockExtractAndStoreHomeworkSummary(...args),
+}));
+
 const mockExtractSessionContent = jest
   .fn()
   .mockResolvedValue(
@@ -148,6 +157,7 @@ function createEventData(
     topicId: 'topic-int-001',
     subjectId: 'subject-int-001',
     summaryStatus: 'pending',
+    sessionType: 'learning',
     timestamp: '2026-02-23T10:00:00.000Z',
     ...overrides,
   };
@@ -170,15 +180,15 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
   });
 
   // -----------------------------------------------------------------------
-  // Happy path — all 7 steps execute successfully
+  // Happy path — all 8 steps execute successfully
   // -----------------------------------------------------------------------
 
-  it('executes all 7 steps and returns completed status', async () => {
+  it('executes all 8 steps and returns completed status', async () => {
     const result = await executeChain(createEventData());
 
     expect(result.status).toBe('completed');
     expect(result.sessionId).toBe('session-int-001');
-    expect(result.outcomes).toHaveLength(7);
+    expect(result.outcomes).toHaveLength(8);
 
     const stepNames = result.outcomes.map((o) => o.step);
     expect(stepNames).toEqual([
@@ -188,6 +198,7 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
       'write-coaching-card',
       'update-dashboard',
       'generate-embeddings',
+      'extract-homework-summary',
       'track-summary-skips',
     ]);
 
@@ -279,6 +290,16 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
       'topic-int-001',
       expect.stringContaining('photosynthesis'), // extracted content
       'pa-test-key-123' // Voyage API key
+    );
+  });
+
+  it('extracts homework summaries only for homework sessions', async () => {
+    await executeChain(createEventData({ sessionType: 'homework' }));
+
+    expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalledWith(
+      expect.anything(),
+      'profile-int-001',
+      'session-int-001'
     );
   });
 

@@ -322,14 +322,16 @@ describe('CameraScreen', () => {
           subjectId: 'sub-123',
           subjectName: 'Mathematics',
           problemText: 'Solve for x: 2x + 5 = 13',
+          homeworkProblems: expect.any(String),
+          ocrText: 'Solve for x: 2x + 5 = 13',
         }),
       })
     );
   }, 15_000);
 
-  it('shows "Here\'s what I see:" label and back button in result phase', async () => {
+  it('shows editable problem cards and the back button in result phase', async () => {
     (useHomeworkOcr as jest.Mock).mockReturnValue({
-      text: 'Some text',
+      text: '1. Solve 2x + 5 = 17\n2. Factor x^2 + 3x + 2',
       status: 'done',
       error: null,
       failCount: 0,
@@ -340,9 +342,11 @@ describe('CameraScreen', () => {
     const { getByTestId, getByText } = render(<CameraScreen />);
 
     await waitFor(() => {
-      expect(getByText(/what I see/i)).toBeTruthy();
+      expect(getByText(/problems I found/i)).toBeTruthy();
       expect(getByTestId('camera-back-button')).toBeTruthy();
       expect(getByTestId('result-text-input')).toBeTruthy();
+      expect(getByTestId('problem-card-1')).toBeTruthy();
+      expect(getByTestId('add-problem-button')).toBeTruthy();
     });
   });
 });

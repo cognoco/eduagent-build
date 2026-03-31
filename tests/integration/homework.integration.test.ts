@@ -27,6 +27,13 @@ jest.mock('../../apps/api/src/services/session', () => ({
     '../../apps/api/src/services/session'
   ),
   startSession: mockStartSession,
+  syncHomeworkState: jest.fn().mockResolvedValue({
+    metadata: {
+      problemCount: 2,
+      currentProblemIndex: 1,
+      problems: [],
+    },
+  }),
   SubjectInactiveError: mockSubjectInactiveError,
 }));
 

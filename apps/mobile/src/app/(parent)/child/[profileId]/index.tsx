@@ -240,12 +240,20 @@ export default function ChildDetailScreen() {
             >
               <View className="flex-row items-center justify-between mb-1">
                 <Text className="text-body font-medium text-text-primary">
-                  {formatSessionDate(session.startedAt)}
+                  {session.homeworkSummary?.displayTitle ??
+                    formatSessionDate(session.startedAt)}
                 </Text>
                 <Text className="text-caption text-text-secondary">
-                  {session.sessionType}
+                  {session.homeworkSummary
+                    ? formatSessionDate(session.startedAt)
+                    : session.sessionType}
                 </Text>
               </View>
+              {session.displaySummary ? (
+                <Text className="text-caption text-text-secondary mb-2">
+                  {session.displaySummary}
+                </Text>
+              ) : null}
               <View className="flex-row items-center">
                 <Text className="text-caption text-text-secondary me-4">
                   {session.exchangeCount} exchanges
