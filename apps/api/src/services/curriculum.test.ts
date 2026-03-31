@@ -386,6 +386,69 @@ describe('addCurriculumTopic', () => {
     expect(insertedValues.source).toBe('user');
     expect(insertedValues.sortOrder).toBe(5);
   });
+
+  it('throws when subject not found', async () => {
+    const db = createMockDb({ subjectFindFirst: undefined });
+
+    await expect(
+      addCurriculumTopic(db, PROFILE_ID, SUBJECT_ID, {
+        mode: 'create',
+        title: 'Test',
+        description: 'Desc',
+        estimatedMinutes: 30,
+      })
+    ).rejects.toThrow('Subject not found');
+  });
+
+  it('throws when curriculum not found', async () => {
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: undefined,
+    });
+
+    await expect(
+      addCurriculumTopic(db, PROFILE_ID, SUBJECT_ID, {
+        mode: 'create',
+        title: 'Test',
+        description: 'Desc',
+        estimatedMinutes: 30,
+      })
+    ).rejects.toThrow('Curriculum not found');
+  });
+
+  it('falls back to default preview when LLM fails', async () => {
+    const failProvider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<string> {
+        throw new Error('LLM unavailable');
+      },
+      // eslint-disable-next-line require-yield
+      async *chatStream(): AsyncIterable<string> {
+        throw new Error('LLM unavailable');
+      },
+    };
+    registerProvider(failProvider);
+
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow({ name: 'Mathematics' }),
+      curriculumFindFirst: mockCurriculumRow(),
+    });
+
+    const result = await addCurriculumTopic(db, PROFILE_ID, SUBJECT_ID, {
+      mode: 'preview',
+      title: 'trig',
+    });
+
+    expect(result.mode).toBe('preview');
+    if (result.mode === 'preview') {
+      expect(result.preview.title).toBe('Trig');
+      expect(result.preview.description).toContain('Mathematics');
+      expect(result.preview.estimatedMinutes).toBe(30);
+    }
+
+    // Restore normal provider
+    registerProvider(createAddTopicMockProvider());
+  });
 });
 
 // ---------------------------------------------------------------------------

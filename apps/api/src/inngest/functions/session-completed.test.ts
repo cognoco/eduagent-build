@@ -2,9 +2,36 @@
 // Session Completed — Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn(() => ({})),
-}));
+jest.mock('@eduagent/database', () => {
+  const col = (name: string) => ({ name });
+  return {
+    createDatabase: jest.fn(() => {
+      const chainable = () => ({
+        from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+      });
+      return {
+        query: {
+          sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
+          curriculumTopics: { findFirst: jest.fn().mockResolvedValue(null) },
+          streaks: { findFirst: jest.fn().mockResolvedValue(null) },
+        },
+        select: chainable,
+      };
+    }),
+    sessionEvents: {
+      sessionId: col('sessionId'),
+      profileId: col('profileId'),
+      createdAt: col('createdAt'),
+    },
+    retentionCards: {
+      profileId: col('profileId'),
+      topicId: col('topicId'),
+      repetitions: col('repetitions'),
+    },
+    curriculumTopics: { id: col('id'), title: col('title') },
+    streaks: { profileId: col('profileId') },
+  };
+});
 
 const mockStoreSessionEmbedding = jest.fn().mockResolvedValue(undefined);
 const mockExtractSessionContent = jest
@@ -73,11 +100,20 @@ jest.mock('../../services/xp', () => ({
 
 const mockIncrementSummarySkips = jest.fn().mockResolvedValue(1);
 const mockResetSummarySkips = jest.fn().mockResolvedValue(undefined);
+const mockUpdateMedianResponseSeconds = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('../../services/settings', () => ({
   incrementSummarySkips: (...args: unknown[]) =>
     mockIncrementSummarySkips(...args),
   resetSummarySkips: (...args: unknown[]) => mockResetSummarySkips(...args),
+  updateMedianResponseSeconds: (...args: unknown[]) =>
+    mockUpdateMedianResponseSeconds(...args),
+}));
+
+const mockQueueCelebration = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../../services/celebrations', () => ({
+  queueCelebration: (...args: unknown[]) => mockQueueCelebration(...args),
 }));
 
 const mockProcessEvaluateCompletion = jest.fn().mockResolvedValue(undefined);
@@ -196,6 +232,8 @@ describe('sessionCompleted', () => {
       'update-dashboard',
       'generate-embeddings',
       'track-summary-skips',
+      'update-pace-baseline',
+      'queue-celebrations',
     ]);
   });
 
@@ -206,7 +244,7 @@ describe('sessionCompleted', () => {
     const statuses = result.outcomes
       .filter((o: any) => o.status !== 'skipped')
       .map((o: any) => o.status);
-    expect(statuses).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok']);
+    expect(statuses).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok']);
     // verification-completion step should be skipped for standard sessions
     const verificationOutcome = result.outcomes.find(
       (o: any) => o.step === 'process-verification-completion'

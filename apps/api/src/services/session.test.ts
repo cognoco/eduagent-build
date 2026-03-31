@@ -59,6 +59,7 @@ import {
   flagContent,
   getSessionSummary,
   submitSummary,
+  computeActiveSeconds,
 } from './session';
 import { processExchange } from './exchanges';
 import { evaluateEscalation } from './escalation';
@@ -158,6 +159,7 @@ function createMockDb({
     metadata?: Record<string, unknown>;
   }>,
   selectResults = [] as unknown[][],
+  learningSessionFindFirst = mockSessionRow(),
 } = {}): Database {
   const selectMock = jest.fn();
   for (const result of selectResults) {
@@ -179,6 +181,9 @@ function createMockDb({
     }),
     select: selectMock,
     query: {
+      learningSessions: {
+        findFirst: jest.fn().mockResolvedValue(learningSessionFindFirst),
+      },
       sessionEvents: {
         findMany: jest.fn().mockResolvedValue(findManyEvents),
       },
@@ -192,7 +197,8 @@ function createCloseSessionDb(
     content: string;
     createdAt: Date;
     metadata?: Record<string, unknown>;
-  }> = []
+  }> = [],
+  rawSession: ReturnType<typeof mockSessionRow> = mockSessionRow()
 ): {
   db: Database;
   setMock: jest.Mock;
@@ -209,6 +215,9 @@ function createCloseSessionDb(
       }),
       select: jest.fn().mockReturnValue(mockSelectChain([])),
       query: {
+        learningSessions: {
+          findFirst: jest.fn().mockResolvedValue(rawSession),
+        },
         sessionEvents: {
           findMany: jest.fn().mockResolvedValue(events),
         },
@@ -272,6 +281,66 @@ beforeEach(() => {
     truncated: false,
   });
 });
+
+// ---------------------------------------------------------------------------
+// computeActiveSeconds — pure function, no mocks needed
+// ---------------------------------------------------------------------------
+
+describe('computeActiveSeconds', () => {
+  const baseTime = new Date('2025-01-15T10:00:00.000Z');
+
+  function eventAt(
+    offsetSeconds: number,
+    meta?: Record<string, unknown>
+  ): { createdAt: Date; metadata?: unknown } {
+    return {
+      createdAt: new Date(baseTime.getTime() + offsetSeconds * 1000),
+      metadata: meta,
+    };
+  }
+
+  it('returns 0 for empty events array', () => {
+    expect(computeActiveSeconds(baseTime, [])).toBe(0);
+  });
+
+  it('returns actual gap for a single event within cap', () => {
+    // 30s after start, well under 600s fallback cap
+    expect(computeActiveSeconds(baseTime, [eventAt(30)])).toBe(30);
+  });
+
+  it('sums gaps between consecutive events', () => {
+    const events = [eventAt(10), eventAt(70)];
+    // start→first = 10s, first→second = 60s, total = 70s
+    expect(computeActiveSeconds(baseTime, events)).toBe(70);
+  });
+
+  it('caps gap at FALLBACK_GAP_CAP_SECONDS (600s) when exceeded', () => {
+    // 900s (15 min) after start → capped at 600s
+    expect(computeActiveSeconds(baseTime, [eventAt(900)])).toBe(600);
+  });
+
+  it('uses expectedResponseMinutes from metadata for custom cap', () => {
+    // metadata says 2 min expected → cap = 2 * 60 * 1.5 = 180s
+    // event at 300s → capped to 180s
+    const events = [eventAt(300, { expectedResponseMinutes: 2 })];
+    expect(computeActiveSeconds(baseTime, events)).toBe(180);
+  });
+
+  it('sorts events when provided out of order', () => {
+    const events = [eventAt(60), eventAt(10)];
+    // After sort: [10s, 60s]
+    // start→10s = 10, 10s→60s = 50, total = 60
+    expect(computeActiveSeconds(baseTime, events)).toBe(60);
+  });
+
+  it('clamps negative gap to 0 when event precedes session start', () => {
+    const events = [{ createdAt: new Date(baseTime.getTime() - 5000) }];
+    // gap = -5s → Math.max(0, -5) = 0
+    expect(computeActiveSeconds(baseTime, events)).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 
 describe('startSession', () => {
   it('throws when subject not found for profile (ownership guard)', async () => {
