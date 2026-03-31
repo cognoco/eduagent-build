@@ -10,7 +10,11 @@ import {
   learningModes,
   type Database,
 } from '@eduagent/database';
-import type { NotificationPrefsInput, LearningMode } from '@eduagent/schemas';
+import type {
+  NotificationPrefsInput,
+  LearningMode,
+  CelebrationLevel,
+} from '@eduagent/schemas';
 import type { NotificationPayload } from './notifications';
 
 // ---------------------------------------------------------------------------
@@ -26,6 +30,8 @@ export interface NotificationPrefs {
 
 export interface LearningModeRecord {
   mode: LearningMode;
+  medianResponseSeconds?: number | null;
+  celebrationLevel?: CelebrationLevel;
 }
 
 // ---------------------------------------------------------------------------
@@ -41,6 +47,8 @@ const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
 
 const DEFAULT_LEARNING_MODE: LearningModeRecord = {
   mode: 'serious',
+  medianResponseSeconds: null,
+  celebrationLevel: 'all',
 };
 
 // ---------------------------------------------------------------------------
@@ -119,7 +127,11 @@ export async function getLearningMode(
 
   if (!row) return { ...DEFAULT_LEARNING_MODE };
 
-  return { mode: row.mode };
+  return {
+    mode: row.mode,
+    medianResponseSeconds: row.medianResponseSeconds,
+    celebrationLevel: row.celebrationLevel as CelebrationLevel,
+  };
 }
 
 export async function upsertLearningMode(
@@ -141,6 +153,83 @@ export async function upsertLearningMode(
   }
 
   return { mode };
+}
+
+export async function getCelebrationLevel(
+  db: Database,
+  profileId: string
+): Promise<CelebrationLevel> {
+  const row = await db.query.learningModes.findFirst({
+    where: eq(learningModes.profileId, profileId),
+  });
+
+  return (row?.celebrationLevel as CelebrationLevel | undefined) ?? 'all';
+}
+
+export async function upsertCelebrationLevel(
+  db: Database,
+  profileId: string,
+  celebrationLevel: CelebrationLevel
+): Promise<{ celebrationLevel: CelebrationLevel }> {
+  const existing = await db.query.learningModes.findFirst({
+    where: eq(learningModes.profileId, profileId),
+  });
+
+  if (existing) {
+    await db
+      .update(learningModes)
+      .set({ celebrationLevel, updatedAt: new Date() })
+      .where(eq(learningModes.profileId, profileId));
+  } else {
+    await db
+      .insert(learningModes)
+      .values({ profileId, celebrationLevel, mode: 'serious' });
+  }
+
+  return { celebrationLevel };
+}
+
+export async function getMedianResponseSeconds(
+  db: Database,
+  profileId: string
+): Promise<number | null> {
+  const row = await db.query.learningModes.findFirst({
+    where: eq(learningModes.profileId, profileId),
+  });
+  return row?.medianResponseSeconds ?? null;
+}
+
+export async function updateMedianResponseSeconds(
+  db: Database,
+  profileId: string,
+  sessionMedianSeconds: number
+): Promise<number> {
+  const existing = await db.query.learningModes.findFirst({
+    where: eq(learningModes.profileId, profileId),
+  });
+
+  const nextMedian =
+    existing?.medianResponseSeconds != null
+      ? Math.round(
+          existing.medianResponseSeconds * 0.8 + sessionMedianSeconds * 0.2
+        )
+      : Math.round(sessionMedianSeconds);
+
+  if (existing) {
+    await db
+      .update(learningModes)
+      .set({ medianResponseSeconds: nextMedian, updatedAt: new Date() })
+      .where(eq(learningModes.profileId, profileId));
+  } else {
+    await db.insert(learningModes).values({
+      profileId,
+      mode: 'serious',
+      medianResponseSeconds: nextMedian,
+      celebrationLevel: 'all',
+    });
+  }
+
+  return nextMedian;
 }
 
 // ---------------------------------------------------------------------------

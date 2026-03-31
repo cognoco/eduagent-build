@@ -62,6 +62,7 @@ export interface ExchangeResult {
   response: string;
   newEscalationRung: EscalationRung;
   isUnderstandingCheck: boolean;
+  expectedResponseMinutes: number;
   /** Whether the LLM flagged this topic for deepening (rung 5 exit) */
   needsDeepening: boolean;
   /** Whether the LLM signalled partial progress (Gap 3) */
@@ -95,6 +96,53 @@ const UNDERSTANDING_CHECK_PATTERNS = [
   'try to describe',
   'in your own words',
 ];
+
+export function estimateExpectedResponseMinutes(
+  response: string,
+  context: Pick<ExchangeContext, 'sessionType'>
+): number {
+  const trimmed = response.trim();
+  const lower = trimmed.toLowerCase();
+  const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+  const questionCount = (trimmed.match(/\?/g) ?? []).length;
+
+  if (
+    context.sessionType === 'homework' &&
+    /(show|solve|work through|try this|similar example|step)/i.test(trimmed)
+  ) {
+    return 6;
+  }
+
+  if (
+    questionCount > 0 &&
+    wordCount <= 30 &&
+    /(what|why|how|which|can you|try|does that)/i.test(lower)
+  ) {
+    return 2;
+  }
+
+  if (
+    /(take your time|work it out|pause here|on paper|try solving|come back when)/i.test(
+      lower
+    )
+  ) {
+    return 8;
+  }
+
+  if (wordCount >= 140) {
+    return 10;
+  }
+
+  if (wordCount >= 90) {
+    return 8;
+  }
+
+  if (wordCount >= 45) {
+    return 5;
+  }
+
+  return 3;
+}
 
 // ---------------------------------------------------------------------------
 // System prompt assembly
@@ -366,6 +414,10 @@ export async function processExchange(
     response: cleanResponse,
     newEscalationRung: context.escalationRung,
     isUnderstandingCheck,
+    expectedResponseMinutes: estimateExpectedResponseMinutes(
+      cleanResponse,
+      context
+    ),
     needsDeepening,
     partialProgress,
     provider: result.provider,

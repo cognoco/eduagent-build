@@ -21,6 +21,8 @@ import {
   useUpdateNotificationSettings,
   useLearningMode,
   useUpdateLearningMode,
+  useCelebrationLevel,
+  useUpdateCelebrationLevel,
 } from '../../hooks/use-settings';
 import { useSubscription } from '../../hooks/use-subscription';
 
@@ -146,6 +148,9 @@ export default function MoreScreen() {
   const updateNotifications = useUpdateNotificationSettings();
   const { data: learningMode, isLoading: modeLoading } = useLearningMode();
   const updateLearningMode = useUpdateLearningMode();
+  const { data: celebrationLevel, isLoading: celebrationLoading } =
+    useCelebrationLevel();
+  const updateCelebrationLevel = useUpdateCelebrationLevel();
 
   const pushEnabled = notifPrefs?.pushEnabled ?? false;
   const weeklyDigest = notifPrefs?.dailyReminders ?? false;
@@ -286,6 +291,46 @@ export default function MoreScreen() {
             testID={`learning-mode-${opt.mode}`}
           />
         ))}
+
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
+          Celebrations
+        </Text>
+        <LearningModeOption
+          title="All celebrations"
+          description="Show every milestone, including quick wins"
+          selected={celebrationLevel === 'all'}
+          disabled={celebrationLoading || updateCelebrationLevel.isPending}
+          onPress={() => {
+            if (celebrationLevel !== 'all') {
+              updateCelebrationLevel.mutate('all');
+            }
+          }}
+          testID="celebration-level-all"
+        />
+        <LearningModeOption
+          title="Big milestones only"
+          description="Keep Comet and Orion's Belt, skip the smaller pops"
+          selected={celebrationLevel === 'big_only'}
+          disabled={celebrationLoading || updateCelebrationLevel.isPending}
+          onPress={() => {
+            if (celebrationLevel !== 'big_only') {
+              updateCelebrationLevel.mutate('big_only');
+            }
+          }}
+          testID="celebration-level-big-only"
+        />
+        <LearningModeOption
+          title="Off"
+          description="Track milestones quietly without animations"
+          selected={celebrationLevel === 'off'}
+          disabled={celebrationLoading || updateCelebrationLevel.isPending}
+          onPress={() => {
+            if (celebrationLevel !== 'off') {
+              updateCelebrationLevel.mutate('off');
+            }
+          }}
+          testID="celebration-level-off"
+        />
 
         <Pressable
           onPress={() => router.push('/(learner)/homework/camera')}

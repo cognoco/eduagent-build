@@ -37,6 +37,12 @@ interface CloseResult {
   message: string;
   sessionId: string;
   wallClockSeconds: number;
+  summaryStatus?:
+    | 'pending'
+    | 'submitted'
+    | 'accepted'
+    | 'skipped'
+    | 'auto_closed';
   shouldPromptCasualSwitch?: boolean;
 }
 
@@ -48,6 +54,17 @@ interface SubmitSummaryResult {
     aiFeedback: string;
     status: 'accepted' | 'submitted';
   };
+}
+
+interface SkipSummaryResult {
+  summary: {
+    id: string;
+    sessionId: string;
+    content: string;
+    aiFeedback: string | null;
+    status: 'skipped' | 'submitted' | 'accepted';
+  };
+  shouldPromptCasualSwitch?: boolean;
 }
 
 export function useStartSession(
@@ -320,6 +337,31 @@ export function useSubmitSummary(
       });
       await assertOk(res);
       return (await res.json()) as SubmitSummaryResult;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['session-summary', sessionId],
+      });
+    },
+  });
+}
+
+export function useSkipSummary(
+  sessionId: string
+): UseMutationResult<SkipSummaryResult, Error, void> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const summaryClient = (
+        client.sessions[':sessionId'] as Record<string, any>
+      )['summary'];
+      const res = await summaryClient.skip.$post({
+        param: { sessionId },
+      });
+      await assertOk(res);
+      return (await res.json()) as SkipSummaryResult;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({

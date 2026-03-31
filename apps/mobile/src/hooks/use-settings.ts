@@ -9,6 +9,7 @@ import type {
   NotificationPrefsInput,
   LearningMode,
   AnalogyDomain,
+  CelebrationLevel,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
@@ -76,6 +77,32 @@ export function useLearningMode(): UseQueryResult<LearningMode> {
   });
 }
 
+export function useCelebrationLevel(): UseQueryResult<CelebrationLevel> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['settings', 'celebration-level', activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const celebrationLevelClient = (client.settings as Record<string, any>)[
+          'celebration-level'
+        ];
+        const res = await celebrationLevelClient.$get({
+          init: { signal },
+        } as never);
+        await assertOk(res);
+        const data = await res.json();
+        return data.celebrationLevel as CelebrationLevel;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Mutation hooks
 // ---------------------------------------------------------------------------
@@ -125,6 +152,35 @@ export function useUpdateLearningMode(): UseMutationResult<
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['settings', 'learning-mode', activeProfile?.id],
+      });
+    },
+  });
+}
+
+export function useUpdateCelebrationLevel(): UseMutationResult<
+  CelebrationLevel,
+  Error,
+  CelebrationLevel
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
+
+  return useMutation({
+    mutationFn: async (celebrationLevel: CelebrationLevel) => {
+      const celebrationLevelClient = (client.settings as Record<string, any>)[
+        'celebration-level'
+      ];
+      const res = await celebrationLevelClient.$put({
+        json: { celebrationLevel },
+      });
+      await assertOk(res);
+      const data = await res.json();
+      return data.celebrationLevel as CelebrationLevel;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['settings', 'celebration-level', activeProfile?.id],
       });
     },
   });

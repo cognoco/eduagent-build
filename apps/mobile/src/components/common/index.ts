@@ -7,6 +7,7 @@ export { BookPageFlipAnimation } from './BookPageFlipAnimation';
 export { BrandCelebration } from './BrandCelebration';
 export { Button } from './Button';
 export { CelebrationAnimation } from './CelebrationAnimation';
+export * from './celebrations';
 export { CheckmarkPopAnimation } from './CheckmarkPopAnimation';
 export { ErrorBoundary } from './ErrorBoundary';
 export { OfflineBanner } from './OfflineBanner';

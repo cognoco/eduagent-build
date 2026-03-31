@@ -1,4 +1,9 @@
-import { sessionSummaries, type Database } from '@eduagent/database';
+import {
+  createScopedRepository,
+  sessionSummaries,
+  type Database,
+} from '@eduagent/database';
+import { and, eq } from 'drizzle-orm';
 import type { SummaryStatus } from '@eduagent/schemas';
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
@@ -14,6 +19,37 @@ export interface SummaryEvaluation {
   hasUnderstandingGaps: boolean;
   gapAreas?: string[];
   isAccepted: boolean;
+}
+
+type SessionSummaryRow = typeof sessionSummaries.$inferSelect;
+
+const SUMMARY_STATUS_PRIORITY: Record<SummaryStatus, number> = {
+  pending: 0,
+  auto_closed: 1,
+  skipped: 2,
+  submitted: 3,
+  accepted: 4,
+};
+
+async function findSessionSummaryRow(
+  db: Database,
+  profileId: string,
+  sessionId: string
+): Promise<SessionSummaryRow | undefined> {
+  const repo = createScopedRepository(db, profileId);
+  return repo.sessionSummaries.findFirst(
+    eq(sessionSummaries.sessionId, sessionId)
+  );
+}
+
+function mergeSummaryStatus(
+  existingStatus: SummaryStatus,
+  incomingStatus: SummaryStatus
+): SummaryStatus {
+  return SUMMARY_STATUS_PRIORITY[incomingStatus] >
+    SUMMARY_STATUS_PRIORITY[existingStatus]
+    ? incomingStatus
+    : existingStatus;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,13 +155,52 @@ export async function createPendingSessionSummary(
   profileId: string,
   topicId: string | null,
   status: SummaryStatus
-): Promise<void> {
-  await db.insert(sessionSummaries).values({
-    sessionId,
-    profileId,
-    topicId: topicId ?? null,
-    status,
-    content: null,
-    aiFeedback: null,
-  });
+): Promise<SessionSummaryRow> {
+  const existing = await findSessionSummaryRow(db, profileId, sessionId);
+
+  if (!existing) {
+    const [row] = await db
+      .insert(sessionSummaries)
+      .values({
+        sessionId,
+        profileId,
+        topicId: topicId ?? null,
+        status,
+        content: null,
+        aiFeedback: null,
+      })
+      .returning();
+
+    return row!;
+  }
+
+  const nextStatus = mergeSummaryStatus(
+    existing.status as SummaryStatus,
+    status
+  );
+  const nextTopicId = existing.topicId ?? topicId ?? null;
+  const now = new Date();
+
+  if (existing.status !== nextStatus || existing.topicId !== nextTopicId) {
+    await db
+      .update(sessionSummaries)
+      .set({
+        topicId: nextTopicId,
+        status: nextStatus,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(sessionSummaries.id, existing.id),
+          eq(sessionSummaries.profileId, profileId)
+        )
+      );
+  }
+
+  return {
+    ...existing,
+    topicId: nextTopicId,
+    status: nextStatus,
+    updatedAt: now,
+  };
 }

@@ -12,7 +12,11 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemeColors } from '../../lib/theme';
-import { useSubmitSummary } from '../../hooks/use-sessions';
+import {
+  useSessionTranscript,
+  useSkipSummary,
+  useSubmitSummary,
+} from '../../hooks/use-sessions';
 import { Sentry } from '../../lib/sentry';
 import {
   CheckmarkPopAnimation,
@@ -27,6 +31,9 @@ export default function SessionSummaryScreen() {
     escalationRung,
     subjectId,
     topicId,
+    wallClockSeconds,
+    milestones,
+    fastCelebrations,
   } = useLocalSearchParams<{
     sessionId: string;
     subjectName?: string;
@@ -34,6 +41,9 @@ export default function SessionSummaryScreen() {
     escalationRung?: string;
     subjectId?: string;
     topicId?: string;
+    wallClockSeconds?: string;
+    milestones?: string;
+    fastCelebrations?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -44,16 +54,65 @@ export default function SessionSummaryScreen() {
   const [submitted, setSubmitted] = useState(false);
 
   const submitSummary = useSubmitSummary(sessionId ?? '');
+  const skipSummary = useSkipSummary(sessionId ?? '');
+  const transcript = useSessionTranscript(sessionId ?? '');
   const { persona } = useTheme();
 
-  const exchanges = parseInt(exchangeCount ?? '0', 10) || 0;
+  const fallbackSession = transcript.data?.session;
+  const exchanges =
+    parseInt(exchangeCount ?? '', 10) || fallbackSession?.exchangeCount || 0;
   const rung = parseInt(escalationRung ?? '1', 10) || 1;
+  const wallClockMinutes = Math.max(
+    1,
+    Math.round(
+      (parseInt(wallClockSeconds ?? '', 10) ||
+        fallbackSession?.wallClockSeconds ||
+        0) / 60
+    )
+  );
+  const parsedMilestones = (() => {
+    if (!milestones) {
+      return fallbackSession?.milestonesReached ?? [];
+    }
+
+    try {
+      return JSON.parse(decodeURIComponent(milestones)) as string[];
+    } catch {
+      return fallbackSession?.milestonesReached ?? [];
+    }
+  })();
+  const parsedFastCelebrations = (() => {
+    try {
+      return JSON.parse(decodeURIComponent(fastCelebrations ?? '[]')) as Array<{
+        reason?: string;
+        detail?: string | null;
+      }>;
+    } catch {
+      return [] as Array<{ reason?: string; detail?: string | null }>;
+    }
+  })();
 
   if (!sessionId) {
     return (
       <View className="flex-1 bg-background items-center justify-center px-6">
         <Text className="text-text-secondary text-body text-center">
           Session not found.
+        </Text>
+      </View>
+    );
+  }
+
+  if (
+    !exchangeCount &&
+    !wallClockSeconds &&
+    transcript.isLoading &&
+    !transcript.data
+  ) {
+    return (
+      <View className="flex-1 bg-background items-center justify-center px-6">
+        <ActivityIndicator />
+        <Text className="text-text-secondary text-body text-center mt-3">
+          Loading your session summary...
         </Text>
       </View>
     );
@@ -86,9 +145,17 @@ export default function SessionSummaryScreen() {
     }
   };
 
-  const handleContinue = (): void => {
+  const handleContinue = async (): Promise<void> => {
     // Story 10.8 Phase 0: summary_skipped event (only when not yet submitted)
     if (!submitted) {
+      if (skipSummary.isPending) return;
+
+      try {
+        await skipSummary.mutateAsync();
+      } catch {
+        return;
+      }
+
       Sentry.addBreadcrumb({
         category: 'summary',
         message: 'summary_skipped',
@@ -105,12 +172,25 @@ export default function SessionSummaryScreen() {
         pathname: '/(learner)/topic/[topicId]',
         params: { topicId, subjectId },
       } as never);
+    } else if (fallbackSession?.topicId && fallbackSession.subjectId) {
+      router.replace({
+        pathname: '/(learner)/topic/[topicId]',
+        params: {
+          topicId: fallbackSession.topicId,
+          subjectId: fallbackSession.subjectId,
+        },
+      } as never);
     } else {
       router.replace('/(learner)/book');
     }
   };
 
   const takeaways: string[] = [];
+  takeaways.push(
+    `${wallClockMinutes} minute${
+      wallClockMinutes === 1 ? '' : 's'
+    } - great session!`
+  );
   if (exchanges > 0) {
     takeaways.push(
       `You worked through ${exchanges} exchange${exchanges === 1 ? '' : 's'}`
@@ -125,6 +205,25 @@ export default function SessionSummaryScreen() {
     takeaways.push('Great effort today');
   }
 
+  const milestoneLabels = parsedMilestones.map((milestone) => {
+    switch (milestone) {
+      case 'polar_star':
+        return 'Polar Star - first independent answer';
+      case 'deep_diver':
+        return 'Deep Diver - great thoughtful responses';
+      case 'comet':
+        return 'Comet - you had a breakthrough!';
+      case 'orions_belt':
+        return "Orion's Belt - 5 in a row without help!";
+      case 'persistent':
+        return 'Persistent - you kept going';
+      case 'twin_stars':
+        return 'Twin Stars - three strong answers in a row';
+      default:
+        return milestone;
+    }
+  });
+
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background"
@@ -138,7 +237,9 @@ export default function SessionSummaryScreen() {
       >
         <View className="flex-row items-center">
           <Pressable
-            onPress={handleContinue}
+            onPress={() => {
+              void handleContinue();
+            }}
             className="me-2 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityLabel="Close and go home"
             accessibilityRole="button"
@@ -186,6 +287,47 @@ export default function SessionSummaryScreen() {
           </Text>
         </View>
 
+        {milestoneLabels.length > 0 ? (
+          <View
+            className="bg-surface rounded-card p-4 mb-4"
+            testID="milestone-recap"
+          >
+            <Text className="text-body font-semibold text-text-primary mb-2">
+              Milestones
+            </Text>
+            {milestoneLabels.map((label) => (
+              <View key={label} className="flex-row items-start mt-1">
+                <Text className="text-body text-text-secondary me-2">
+                  {'\u2022'}
+                </Text>
+                <Text className="text-body text-text-primary flex-1">
+                  {label}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {parsedFastCelebrations.length > 0 ? (
+          <View
+            className="bg-surface rounded-card p-4 mb-4"
+            testID="fast-celebrations"
+          >
+            <Text className="text-body font-semibold text-text-primary mb-2">
+              Fresh wins
+            </Text>
+            {parsedFastCelebrations.map((celebration, index) => (
+              <Text
+                key={`${celebration.reason ?? 'celebration'}-${index}`}
+                className="text-body text-text-primary mt-1"
+              >
+                {celebration.detail ??
+                  'A new achievement landed right after your session.'}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+
         {/* Your Words section */}
         <View className="mb-4">
           <Text className="text-body font-semibold text-text-primary mb-2">
@@ -222,6 +364,16 @@ export default function SessionSummaryScreen() {
                 >
                   Couldn't save your summary. Check your connection and try
                   again — your work won't be lost.
+                </Text>
+              )}
+
+              {skipSummary.isError && (
+                <Text
+                  className="text-body-sm text-danger mt-2"
+                  testID="skip-summary-error"
+                >
+                  Couldn't skip your summary right now. Check your connection
+                  and try again.
                 </Text>
               )}
 
@@ -282,19 +434,23 @@ export default function SessionSummaryScreen() {
         {/* Skip / Continue */}
         {!submitted ? (
           <Pressable
-            onPress={handleContinue}
+            onPress={() => {
+              void handleContinue();
+            }}
             className="py-3 items-center"
             testID="skip-summary-button"
             accessibilityLabel="Skip summary"
             accessibilityRole="button"
           >
             <Text className="text-body-sm text-text-secondary">
-              Skip for now
+              {skipSummary.isPending ? 'Skipping...' : 'Skip for now'}
             </Text>
           </Pressable>
         ) : (
           <Pressable
-            onPress={handleContinue}
+            onPress={() => {
+              void handleContinue();
+            }}
             className="bg-primary rounded-button py-3 items-center mt-2"
             testID="continue-button"
             accessibilityLabel="Continue to home"

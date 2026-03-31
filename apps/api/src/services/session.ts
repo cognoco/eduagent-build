@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, inArray } from 'drizzle-orm';
+import { eq, and, asc, inArray, lt } from 'drizzle-orm';
 import {
   learningSessions,
   sessionEvents,
@@ -27,6 +27,7 @@ import {
   processExchange,
   streamExchange,
   detectUnderstandingCheck,
+  estimateExpectedResponseMinutes,
   type ExchangeContext,
 } from './exchanges';
 import {
@@ -34,7 +35,7 @@ import {
   getRetentionAwareStartingRung,
   detectPartialProgress,
 } from './escalation';
-import { evaluateSummary } from './summaries';
+import { createPendingSessionSummary, evaluateSummary } from './summaries';
 import { getSubject } from './subject';
 import { fetchPriorTopics, buildPriorLearningContext } from './prior-learning';
 import { retrieveRelevantMemory } from './memory';
@@ -42,7 +43,11 @@ import { getTeachingPreference } from './retention-data';
 import { shouldTriggerEvaluate } from './evaluate';
 import { shouldTriggerTeachBack } from './teach-back';
 import { getRetentionStatus, type RetentionState } from './retention';
-import { getLearningMode } from './settings';
+import {
+  getLearningMode,
+  incrementSummarySkips,
+  resetSummarySkips,
+} from './settings';
 import type { EscalationRung } from './llm';
 
 // ---------------------------------------------------------------------------
@@ -142,6 +147,17 @@ function mapSummaryRow(
   };
 }
 
+async function findSessionSummaryRow(
+  db: Database,
+  profileId: string,
+  sessionId: string
+): Promise<typeof sessionSummaries.$inferSelect | undefined> {
+  const repo = createScopedRepository(db, profileId);
+  return repo.sessionSummaries.findFirst(
+    eq(sessionSummaries.sessionId, sessionId)
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Core functions
 // ---------------------------------------------------------------------------
@@ -231,6 +247,7 @@ export interface ExchangeBehavioralMetrics {
   isUnderstandingCheck: boolean;
   timeToAnswerMs: number | null;
   hintCountInSession: number;
+  expectedResponseMinutes?: number;
   /** FR228: Homework mode used for this exchange */
   homeworkMode?: 'help_me' | 'check_answer';
 }
@@ -564,6 +581,7 @@ async function persistExchangeResult(
       isUnderstandingCheck: behavioral.isUnderstandingCheck,
       timeToAnswerMs: behavioral.timeToAnswerMs,
       hintCountInSession: behavioral.hintCountInSession,
+      expectedResponseMinutes: behavioral.expectedResponseMinutes,
     }),
   };
 
@@ -638,6 +656,7 @@ export async function processMessage(
   escalationRung: number;
   isUnderstandingCheck: boolean;
   exchangeCount: number;
+  expectedResponseMinutes: number;
 }> {
   // Early exchange limit check — runs before expensive prepareExchangeContext
   // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
@@ -668,6 +687,7 @@ export async function processMessage(
       isUnderstandingCheck: result.isUnderstandingCheck,
       timeToAnswerMs,
       hintCountInSession: hintCount,
+      expectedResponseMinutes: result.expectedResponseMinutes,
       homeworkMode: input.homeworkMode,
     }
   );
@@ -677,6 +697,7 @@ export async function processMessage(
     escalationRung: effectiveRung,
     isUnderstandingCheck: result.isUnderstandingCheck,
     exchangeCount: newExchangeCount,
+    expectedResponseMinutes: result.expectedResponseMinutes,
   };
 }
 
@@ -692,9 +713,11 @@ export async function streamMessage(
   options?: { voyageApiKey?: string }
 ): Promise<{
   stream: AsyncIterable<string>;
-  onComplete: (
-    fullResponse: string
-  ) => Promise<{ exchangeCount: number; escalationRung: number }>;
+  onComplete: (fullResponse: string) => Promise<{
+    exchangeCount: number;
+    escalationRung: number;
+    expectedResponseMinutes: number;
+  }>;
 }> {
   // Early exchange limit check — runs before expensive prepareExchangeContext
   // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
@@ -716,6 +739,10 @@ export async function streamMessage(
   return {
     stream: result.stream,
     async onComplete(fullResponse: string) {
+      const expectedResponseMinutes = estimateExpectedResponseMinutes(
+        fullResponse,
+        context
+      );
       const newExchangeCount = await persistExchangeResult(
         db,
         profileId,
@@ -728,10 +755,15 @@ export async function streamMessage(
           isUnderstandingCheck: detectUnderstandingCheck(fullResponse),
           timeToAnswerMs,
           hintCountInSession: hintCount,
+          expectedResponseMinutes,
           homeworkMode: input.homeworkMode,
         }
       );
-      return { exchangeCount: newExchangeCount, escalationRung: effectiveRung };
+      return {
+        exchangeCount: newExchangeCount,
+        escalationRung: effectiveRung,
+        expectedResponseMinutes,
+      };
     },
   };
 }
@@ -748,13 +780,26 @@ export async function closeSession(
   subjectId: string;
   sessionType: string;
   verificationType: string | null;
+  wallClockSeconds: number;
+  summaryStatus:
+    | 'pending'
+    | 'submitted'
+    | 'accepted'
+    | 'skipped'
+    | 'auto_closed';
   interleavedTopicIds?: string[];
 }> {
-  void input;
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
     throw new Error('Session not found');
   }
+
+  const rawSession = await db.query.learningSessions.findFirst({
+    where: and(
+      eq(learningSessions.id, sessionId),
+      eq(learningSessions.profileId, profileId)
+    ),
+  });
 
   const now = new Date();
   const sessionStartedAt = new Date(session.startedAt);
@@ -772,14 +817,27 @@ export async function closeSession(
     orderBy: asc(sessionEvents.createdAt),
   });
   const durationSeconds = computeActiveSeconds(sessionStartedAt, events);
+  const effectiveSummaryStatus =
+    input.summaryStatus ??
+    (input.reason === 'silence_timeout' ? 'auto_closed' : 'pending');
+  const nextStatus =
+    effectiveSummaryStatus === 'auto_closed' ||
+    input.reason === 'silence_timeout'
+      ? 'auto_closed'
+      : 'completed';
 
   await db
     .update(learningSessions)
     .set({
-      status: 'completed',
+      status: nextStatus,
       endedAt: now,
       durationSeconds,
       wallClockSeconds,
+      metadata: {
+        ...(((rawSession?.metadata as Record<string, unknown> | undefined) ??
+          {}) as Record<string, unknown>),
+        milestonesReached: input.milestonesReached ?? [],
+      },
       updatedAt: now,
     })
     .where(
@@ -788,6 +846,14 @@ export async function closeSession(
         eq(learningSessions.profileId, profileId)
       )
     );
+
+  await createPendingSessionSummary(
+    db,
+    sessionId,
+    profileId,
+    session.topicId ?? null,
+    effectiveSummaryStatus
+  );
 
   // FR92: Extract interleaved topic IDs from session metadata
   let interleavedTopicIds: string[] | undefined;
@@ -811,14 +877,202 @@ export async function closeSession(
   }
 
   return {
-    message: 'Session closed',
+    message:
+      nextStatus === 'auto_closed' ? 'Session auto-closed' : 'Session closed',
     sessionId,
     topicId: session.topicId ?? null,
     subjectId: session.subjectId,
     sessionType: session.sessionType,
     verificationType: session.verificationType ?? null,
+    wallClockSeconds,
+    summaryStatus: effectiveSummaryStatus,
     interleavedTopicIds,
   };
+}
+
+export async function closeStaleSessions(
+  db: Database,
+  cutoff: Date
+): Promise<
+  Array<{
+    profileId: string;
+    sessionId: string;
+    topicId: string | null;
+    subjectId: string;
+    sessionType: string;
+    verificationType: string | null;
+    wallClockSeconds: number;
+    summaryStatus:
+      | 'pending'
+      | 'submitted'
+      | 'accepted'
+      | 'skipped'
+      | 'auto_closed';
+    interleavedTopicIds?: string[];
+  }>
+> {
+  const staleSessions = await db.query.learningSessions.findMany({
+    where: and(
+      eq(learningSessions.status, 'active'),
+      lt(learningSessions.lastActivityAt, cutoff)
+    ),
+  });
+
+  const results: Array<{
+    profileId: string;
+    sessionId: string;
+    topicId: string | null;
+    subjectId: string;
+    sessionType: string;
+    verificationType: string | null;
+    wallClockSeconds: number;
+    summaryStatus:
+      | 'pending'
+      | 'submitted'
+      | 'accepted'
+      | 'skipped'
+      | 'auto_closed';
+    interleavedTopicIds?: string[];
+  }> = [];
+
+  for (const staleSession of staleSessions) {
+    const result = await closeSession(
+      db,
+      staleSession.profileId,
+      staleSession.id,
+      {
+        reason: 'silence_timeout',
+        summaryStatus: 'auto_closed',
+      }
+    );
+
+    results.push({
+      profileId: staleSession.profileId,
+      ...result,
+    });
+  }
+
+  return results;
+}
+
+export async function getSessionTranscript(
+  db: Database,
+  profileId: string,
+  sessionId: string
+): Promise<{
+  session: {
+    sessionId: string;
+    subjectId: string;
+    topicId: string | null;
+    sessionType: 'learning' | 'homework' | 'interleaved';
+    startedAt: string;
+    exchangeCount: number;
+    milestonesReached: string[];
+    wallClockSeconds: number | null;
+  };
+  exchanges: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: string;
+    escalationRung?: number;
+    isSystemPrompt?: boolean;
+  }>;
+} | null> {
+  const session = await getSession(db, profileId, sessionId);
+  if (!session) return null;
+
+  const events = await db.query.sessionEvents.findMany({
+    where: and(
+      eq(sessionEvents.sessionId, sessionId),
+      eq(sessionEvents.profileId, profileId)
+    ),
+    orderBy: asc(sessionEvents.createdAt),
+  });
+
+  const exchanges = events
+    .filter(
+      (event) =>
+        event.eventType === 'user_message' ||
+        event.eventType === 'ai_response' ||
+        event.eventType === 'system_prompt'
+    )
+    .map((event) => {
+      const meta = event.metadata as Record<string, unknown> | null;
+      const isSystemPrompt = event.eventType === 'system_prompt';
+      return {
+        role: event.eventType === 'user_message' ? 'user' : 'assistant',
+        content: event.content,
+        timestamp: event.createdAt.toISOString(),
+        isSystemPrompt,
+        escalationRung:
+          !isSystemPrompt && typeof meta?.escalationRung === 'number'
+            ? meta.escalationRung
+            : undefined,
+      } as const;
+    });
+
+  const rawSession = await db.query.learningSessions.findFirst({
+    where: and(
+      eq(learningSessions.id, sessionId),
+      eq(learningSessions.profileId, profileId)
+    ),
+  });
+
+  const metadata =
+    (rawSession?.metadata as Record<string, unknown> | null) ?? {};
+  const milestonesReached = Array.isArray(metadata['milestonesReached'])
+    ? metadata['milestonesReached'].filter(
+        (value): value is string => typeof value === 'string'
+      )
+    : [];
+
+  return {
+    session: {
+      sessionId: session.id,
+      subjectId: session.subjectId,
+      topicId: session.topicId,
+      sessionType: session.sessionType,
+      startedAt: session.startedAt,
+      exchangeCount: session.exchangeCount,
+      milestonesReached,
+      wallClockSeconds: session.wallClockSeconds,
+    },
+    exchanges,
+  };
+}
+
+export async function recordSystemPrompt(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  content: string
+): Promise<void> {
+  const session = await getSession(db, profileId, sessionId);
+  if (!session) {
+    throw new Error('Session not found');
+  }
+
+  await db.insert(sessionEvents).values({
+    sessionId,
+    profileId,
+    subjectId: session.subjectId,
+    topicId: session.topicId,
+    eventType: 'system_prompt',
+    content,
+  });
+
+  await db
+    .update(learningSessions)
+    .set({
+      lastActivityAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId)
+      )
+    );
 }
 
 export async function flagContent(
@@ -851,11 +1105,70 @@ export async function getSessionSummary(
   profileId: string,
   sessionId: string
 ): Promise<SessionSummary | null> {
-  const repo = createScopedRepository(db, profileId);
-  const row = await repo.sessionSummaries.findFirst(
-    eq(sessionSummaries.sessionId, sessionId)
-  );
+  const row = await findSessionSummaryRow(db, profileId, sessionId);
   return row ? mapSummaryRow(row) : null;
+}
+
+export async function skipSummary(
+  db: Database,
+  profileId: string,
+  sessionId: string
+): Promise<{
+  summary: {
+    id: string;
+    sessionId: string;
+    content: string;
+    aiFeedback: string | null;
+    status: 'skipped' | 'submitted' | 'accepted';
+  };
+}> {
+  const session = await getSession(db, profileId, sessionId);
+  if (!session) {
+    throw new Error('Session not found');
+  }
+
+  const existing = await findSessionSummaryRow(db, profileId, sessionId);
+  const existingStatus = existing?.status as
+    | 'pending'
+    | 'submitted'
+    | 'accepted'
+    | 'skipped'
+    | 'auto_closed'
+    | undefined;
+
+  if (existingStatus === 'submitted' || existingStatus === 'accepted') {
+    return {
+      summary: {
+        id: existing.id,
+        sessionId: existing.sessionId,
+        content: existing.content ?? '',
+        aiFeedback: existing.aiFeedback ?? null,
+        status: existingStatus,
+      },
+    };
+  }
+
+  const row = await createPendingSessionSummary(
+    db,
+    sessionId,
+    profileId,
+    session.topicId ?? null,
+    'skipped'
+  );
+
+  if (existingStatus !== 'skipped') {
+    await incrementSummarySkips(db, profileId);
+  }
+
+  return {
+    summary: {
+      id: row.id,
+      sessionId: row.sessionId,
+      content: row.content ?? '',
+      aiFeedback: row.aiFeedback ?? null,
+      status: 'skipped',
+    },
+  };
 }
 
 export async function submitSummary(
@@ -874,20 +1187,10 @@ export async function submitSummary(
 }> {
   // Fetch session for topicId and subject name
   const session = await getSession(db, profileId, sessionId);
-  const subject = session
-    ? await getSubject(db, profileId, session.subjectId)
-    : null;
-
-  const [row] = await db
-    .insert(sessionSummaries)
-    .values({
-      sessionId,
-      profileId,
-      topicId: session?.topicId ?? null,
-      content: input.content,
-      status: 'submitted',
-    })
-    .returning();
+  if (!session) {
+    throw new Error('Session not found');
+  }
+  const subject = await getSubject(db, profileId, session.subjectId);
 
   // Evaluate summary via LLM
   const evaluation = await evaluateSummary(
@@ -896,27 +1199,59 @@ export async function submitSummary(
     input.content
   );
 
-  // Update summary with AI feedback and status
   const finalStatus = evaluation.isAccepted ? 'accepted' : 'submitted';
-  await db
-    .update(sessionSummaries)
-    .set({
+  const existing = await findSessionSummaryRow(db, profileId, sessionId);
+  const now = new Date();
+  let finalRow: typeof sessionSummaries.$inferSelect;
+
+  if (existing) {
+    await db
+      .update(sessionSummaries)
+      .set({
+        topicId: existing.topicId ?? session.topicId ?? null,
+        content: input.content,
+        aiFeedback: evaluation.feedback,
+        status: finalStatus,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(sessionSummaries.id, existing.id),
+          eq(sessionSummaries.profileId, profileId)
+        )
+      );
+
+    finalRow = {
+      ...existing,
+      topicId: existing.topicId ?? session.topicId ?? null,
+      content: input.content,
       aiFeedback: evaluation.feedback,
       status: finalStatus,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(sessionSummaries.id, row!.id),
-        eq(sessionSummaries.profileId, profileId)
-      )
-    );
+      updatedAt: now,
+    };
+  } else {
+    const [inserted] = await db
+      .insert(sessionSummaries)
+      .values({
+        sessionId,
+        profileId,
+        topicId: session.topicId ?? null,
+        content: input.content,
+        aiFeedback: evaluation.feedback,
+        status: finalStatus,
+      })
+      .returning();
+
+    finalRow = inserted!;
+  }
+
+  await resetSummarySkips(db, profileId);
 
   return {
     summary: {
-      id: row!.id,
-      sessionId: row!.sessionId,
-      content: row!.content ?? input.content,
+      id: finalRow.id,
+      sessionId: finalRow.sessionId,
+      content: finalRow.content ?? input.content,
       aiFeedback: evaluation.feedback,
       status: finalStatus,
     },

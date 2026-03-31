@@ -7,6 +7,7 @@ import {
   useCloseSession,
   useStreamMessage,
   useSessionSummary,
+  useSkipSummary,
   useSubmitSummary,
 } from './use-sessions';
 
@@ -232,6 +233,34 @@ describe('useCloseSession', () => {
 
     expect(mockFetch).toHaveBeenCalled();
   });
+
+  it('sends milestonesReached in the close payload', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          message: 'Session closed',
+          sessionId: 'session-1',
+          wallClockSeconds: 600,
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useCloseSession('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        reason: 'user_ended',
+        milestonesReached: ['polar_star', 'comet'],
+      });
+    });
+
+    const [, fetchInit] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(fetchInit.body as string);
+    expect(body.milestonesReached).toEqual(['polar_star', 'comet']);
+  });
 });
 
 describe('useSessionSummary', () => {
@@ -356,6 +385,46 @@ describe('useSubmitSummary', () => {
     });
 
     expect(result.current.error).toBeInstanceOf(Error);
+  });
+});
+
+describe('useSkipSummary', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('calls POST /sessions/:sessionId/summary/skip', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          summary: {
+            id: 'summary-1',
+            sessionId: 'session-1',
+            content: '',
+            aiFeedback: null,
+            status: 'skipped',
+          },
+          shouldPromptCasualSwitch: false,
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useSkipSummary('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(result.current.data?.summary.status).toBe('skipped');
   });
 });
 

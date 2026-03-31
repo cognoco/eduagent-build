@@ -4,6 +4,10 @@ import {
   upsertNotificationPrefs,
   getLearningMode,
   upsertLearningMode,
+  getCelebrationLevel,
+  upsertCelebrationLevel,
+  getMedianResponseSeconds,
+  updateMedianResponseSeconds,
   getLearningModeRules,
   getConsecutiveSummarySkips,
   incrementSummarySkips,
@@ -154,16 +158,28 @@ describe('getLearningMode', () => {
     const db = createMockDb({ findFirstResult: undefined });
     const result = await getLearningMode(db, profileId);
 
-    expect(result).toEqual({ mode: 'serious' });
+    expect(result).toEqual({
+      mode: 'serious',
+      medianResponseSeconds: null,
+      celebrationLevel: 'all',
+    });
   });
 
   it('returns stored mode when row exists', async () => {
     const db = createMockDb({
-      findFirstResult: { mode: 'casual' },
+      findFirstResult: {
+        mode: 'casual',
+        medianResponseSeconds: 240,
+        celebrationLevel: 'big_only',
+      },
     });
     const result = await getLearningMode(db, profileId);
 
-    expect(result).toEqual({ mode: 'casual' });
+    expect(result).toEqual({
+      mode: 'casual',
+      medianResponseSeconds: 240,
+      celebrationLevel: 'big_only',
+    });
   });
 });
 
@@ -186,6 +202,72 @@ describe('upsertLearningMode', () => {
     expect(result).toEqual({ mode: 'casual' });
     expect(db.update).toHaveBeenCalled();
     expect(db.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('getCelebrationLevel', () => {
+  it('defaults to all when no row exists', async () => {
+    const db = createMockDb({ findFirstResult: undefined });
+    await expect(getCelebrationLevel(db, profileId)).resolves.toBe('all');
+  });
+
+  it('returns stored celebration level when present', async () => {
+    const db = createMockDb({
+      findFirstResult: { celebrationLevel: 'big_only' },
+    });
+    await expect(getCelebrationLevel(db, profileId)).resolves.toBe('big_only');
+  });
+});
+
+describe('upsertCelebrationLevel', () => {
+  it('inserts when no row exists', async () => {
+    const db = createMockDb({ findFirstResult: undefined });
+    await expect(upsertCelebrationLevel(db, profileId, 'off')).resolves.toEqual(
+      { celebrationLevel: 'off' }
+    );
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('updates when row exists', async () => {
+    const db = createMockDb({
+      findFirstResult: { celebrationLevel: 'all' },
+    });
+    await expect(
+      upsertCelebrationLevel(db, profileId, 'big_only')
+    ).resolves.toEqual({ celebrationLevel: 'big_only' });
+    expect(db.update).toHaveBeenCalled();
+  });
+});
+
+describe('median response baseline', () => {
+  it('returns null when no row exists', async () => {
+    const db = createMockDb({ findFirstResult: undefined });
+    await expect(getMedianResponseSeconds(db, profileId)).resolves.toBeNull();
+  });
+
+  it('returns stored median response seconds', async () => {
+    const db = createMockDb({
+      findFirstResult: { medianResponseSeconds: 210 },
+    });
+    await expect(getMedianResponseSeconds(db, profileId)).resolves.toBe(210);
+  });
+
+  it('creates a new baseline when none exists', async () => {
+    const db = createMockDb({ findFirstResult: undefined });
+    await expect(updateMedianResponseSeconds(db, profileId, 180)).resolves.toBe(
+      180
+    );
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('updates baseline using exponential moving average', async () => {
+    const db = createMockDb({
+      findFirstResult: { medianResponseSeconds: 200 },
+    });
+    await expect(updateMedianResponseSeconds(db, profileId, 100)).resolves.toBe(
+      180
+    );
+    expect(db.update).toHaveBeenCalled();
   });
 });
 

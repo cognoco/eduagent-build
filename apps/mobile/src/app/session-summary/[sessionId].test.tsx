@@ -8,15 +8,16 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockReplace = jest.fn();
+const mockParams = {
+  sessionId: '660e8400-e29b-41d4-a716-446655440000',
+  subjectName: 'Mathematics',
+  exchangeCount: '5',
+  escalationRung: '2',
+} as Record<string, string | undefined>;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
-  useLocalSearchParams: () => ({
-    sessionId: '660e8400-e29b-41d4-a716-446655440000',
-    subjectName: 'Mathematics',
-    exchangeCount: '5',
-    escalationRung: '2',
-  }),
+  useLocalSearchParams: () => mockParams,
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -24,6 +25,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 const mockSubmitMutateAsync = jest.fn();
+const mockSkipMutateAsync = jest.fn();
 
 jest.mock('../../hooks/use-sessions', () => ({
   useSubmitSummary: () => ({
@@ -31,6 +33,16 @@ jest.mock('../../hooks/use-sessions', () => ({
     isPending: false,
     isError: false,
     error: null,
+  }),
+  useSkipSummary: () => ({
+    mutateAsync: mockSkipMutateAsync,
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
+  useSessionTranscript: () => ({
+    data: null,
+    isLoading: false,
   }),
 }));
 
@@ -57,6 +69,22 @@ const SessionSummaryScreen = require('./[sessionId]').default;
 describe('SessionSummaryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSkipMutateAsync.mockResolvedValue({
+      summary: {
+        id: 'summary-1',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: '',
+        aiFeedback: null,
+        status: 'skipped',
+      },
+      shouldPromptCasualSwitch: false,
+    });
+    mockParams.subjectName = 'Mathematics';
+    mockParams.exchangeCount = '5';
+    mockParams.escalationRung = '2';
+    mockParams.wallClockSeconds = undefined;
+    mockParams.milestones = undefined;
+    mockParams.fastCelebrations = undefined;
   });
 
   afterEach(() => {
@@ -156,13 +184,38 @@ describe('SessionSummaryScreen', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
   });
 
-  it('allows skipping summary', () => {
+  it('persists skip before leaving the screen', async () => {
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
     const skipButton = screen.getByTestId('skip-summary-button');
     expect(skipButton).toBeTruthy();
 
     fireEvent.press(skipButton);
-    expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+
+    await waitFor(() => {
+      expect(mockSkipMutateAsync).toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+    });
+  });
+
+  it('renders milestone recap and fast celebrations when provided', () => {
+    mockParams.wallClockSeconds = '900';
+    mockParams.milestones = encodeURIComponent(
+      JSON.stringify(['polar_star', 'persistent'])
+    );
+    mockParams.fastCelebrations = encodeURIComponent(
+      JSON.stringify([
+        { reason: 'topic_mastered', detail: 'Quadratic Equations' },
+      ])
+    );
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    expect(screen.getByTestId('milestone-recap')).toBeTruthy();
+    expect(screen.getByText(/Polar Star/)).toBeTruthy();
+    expect(screen.getByText(/Persistent/)).toBeTruthy();
+    expect(screen.getByTestId('fast-celebrations')).toBeTruthy();
+    expect(screen.getByText('Quadratic Equations')).toBeTruthy();
+    expect(screen.getByText(/15 minutes - great session!/)).toBeTruthy();
   });
 });

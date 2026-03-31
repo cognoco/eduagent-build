@@ -148,7 +148,44 @@ jest.mock('../services/session', () => {
         sessionId,
         topicId: null,
         subjectId: SUBJECT_ID,
+        sessionType: 'learning',
+        verificationType: null,
+        wallClockSeconds: 600,
+        summaryStatus: 'pending',
       })),
+    getSessionTranscript: jest.fn().mockResolvedValue({
+      session: {
+        sessionId: SESSION_ID,
+        subjectId: SUBJECT_ID,
+        topicId: null,
+        sessionType: 'learning',
+        startedAt: new Date().toISOString(),
+        exchangeCount: 2,
+        milestonesReached: ['polar_star'],
+        wallClockSeconds: 600,
+      },
+      exchanges: [
+        {
+          role: 'user',
+          content: 'What is gravity?',
+          timestamp: new Date().toISOString(),
+        },
+        {
+          role: 'assistant',
+          content: 'Gravity pulls objects together.',
+          timestamp: new Date().toISOString(),
+          escalationRung: 1,
+        },
+        {
+          role: 'assistant',
+          content:
+            "Still working on it? Take your time - I'm here when you're ready.",
+          timestamp: new Date().toISOString(),
+          isSystemPrompt: true,
+        },
+      ],
+    }),
+    recordSystemPrompt: jest.fn().mockResolvedValue(undefined),
     flagContent: jest.fn().mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
     }),
@@ -159,6 +196,15 @@ jest.mock('../services/session', () => {
       aiFeedback: null,
       status: 'submitted',
     }),
+    skipSummary: jest.fn().mockImplementation((_db, _profileId, sessionId) => ({
+      summary: {
+        id: 'summary-1',
+        sessionId,
+        content: '',
+        aiFeedback: null,
+        status: 'skipped',
+      },
+    })),
     submitSummary: jest
       .fn()
       .mockImplementation((_db, _profileId, sessionId, input) => ({
@@ -234,7 +280,13 @@ jest.mock('../inngest/client', () => ({
 }));
 
 import { inngest } from '../inngest/client';
-import { processMessage, streamMessage } from '../services/session';
+import {
+  closeSession,
+  processMessage,
+  streamMessage,
+  getSessionTranscript,
+  recordSystemPrompt,
+} from '../services/session';
 import { shouldPromptCasualSwitch } from '../services/settings';
 import { app } from '../index';
 
@@ -388,6 +440,55 @@ describe('session routes', () => {
   });
 
   // -------------------------------------------------------------------------
+  // GET /v1/sessions/:sessionId/transcript
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/sessions/:sessionId/transcript', () => {
+    it('returns 200 with transcript payload', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/transcript`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.session.sessionId).toBe(SESSION_ID);
+      expect(body.exchanges).toHaveLength(3);
+      expect(body.exchanges[2]).toEqual(
+        expect.objectContaining({ isSystemPrompt: true })
+      );
+      expect(getSessionTranscript).toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /v1/sessions/:sessionId/system-prompt
+  // -------------------------------------------------------------------------
+
+  describe('POST /v1/sessions/:sessionId/system-prompt', () => {
+    it('records a system prompt without counting it as an exchange', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/system-prompt`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            content:
+              "Still working on it? Take your time - I'm here when you're ready.",
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ok: true });
+      expect(recordSystemPrompt).toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // POST /v1/sessions/:sessionId/close
   // -------------------------------------------------------------------------
 
@@ -439,10 +540,51 @@ describe('session routes', () => {
         data: expect.objectContaining({
           sessionId: SESSION_ID,
           subjectId: SUBJECT_ID,
-          summaryStatus: 'skipped',
+          summaryStatus: 'pending',
           timestamp: expect.any(String),
         }),
       });
+    });
+
+    it('uses the closeSession result summaryStatus when the request body omits it', async () => {
+      await app.request(
+        `/v1/sessions/${SESSION_ID}/close`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      expect(sendSpy).toHaveBeenCalledWith({
+        name: 'app/session.completed',
+        data: expect.objectContaining({
+          sessionId: SESSION_ID,
+          summaryStatus: 'pending',
+        }),
+      });
+    });
+
+    it('forwards milestonesReached to the closeSession service', async () => {
+      await app.request(
+        `/v1/sessions/${SESSION_ID}/close`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ milestonesReached: ['polar_star', 'comet'] }),
+        },
+        TEST_ENV
+      );
+
+      expect(closeSession).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(String),
+        SESSION_ID,
+        expect.objectContaining({
+          milestonesReached: ['polar_star', 'comet'],
+        })
+      );
     });
 
     it('returns shouldPromptCasualSwitch true when threshold exceeded', async () => {
@@ -601,6 +743,25 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('POST /v1/sessions/:sessionId/summary/skip', () => {
+    it('returns 200 with skipped summary state', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary/skip`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.summary.status).toBe('skipped');
+      expect(body.shouldPromptCasualSwitch).toBe(false);
     });
   });
 

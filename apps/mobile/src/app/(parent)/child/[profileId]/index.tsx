@@ -10,6 +10,11 @@ import {
   useChildDetail,
   useChildSessions,
 } from '../../../../hooks/use-dashboard';
+import { useCelebration } from '../../../../hooks/use-celebration';
+import {
+  useMarkCelebrationsSeen,
+  usePendingCelebrations,
+} from '../../../../hooks/use-celebrations';
 import {
   useChildConsentStatus,
   useRevokeConsent,
@@ -67,9 +72,23 @@ export default function ChildDetailScreen() {
   const { data: child, isLoading } = useChildDetail(profileId);
   const { data: sessions, isLoading: sessionsLoading } =
     useChildSessions(profileId);
+  const pendingCelebrations = usePendingCelebrations({
+    profileId,
+    viewer: 'parent',
+  });
+  const markCelebrationsSeen = useMarkCelebrationsSeen();
   const { data: consentData } = useChildConsentStatus(profileId);
   const revokeConsent = useRevokeConsent(profileId);
   const restoreConsent = useRestoreConsent(profileId);
+  const { CelebrationOverlay } = useCelebration({
+    queue: pendingCelebrations.data ?? [],
+    celebrationLevel: 'all',
+    audience: 'adult',
+    onAllComplete: () => {
+      if (!profileId) return;
+      void markCelebrationsSeen.mutateAsync({ viewer: 'parent', profileId });
+    },
+  });
 
   const isWithdrawn = consentData?.consentStatus === 'WITHDRAWN';
   const daysRemaining =
@@ -324,6 +343,7 @@ export default function ChildDetailScreen() {
           </View>
         )}
       </ScrollView>
+      {CelebrationOverlay}
     </View>
   );
 }

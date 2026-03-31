@@ -149,6 +149,7 @@ export const sessionTranscriptExchangeSchema = z.object({
   content: z.string(),
   timestamp: z.string().datetime(),
   escalationRung: z.number().int().min(1).max(5).optional(),
+  isSystemPrompt: z.boolean().optional(),
 });
 export type SessionTranscriptExchange = z.infer<
   typeof sessionTranscriptExchangeSchema

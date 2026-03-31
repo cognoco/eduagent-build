@@ -20,6 +20,11 @@ import {
   ProfileSwitcher,
   PenWritingAnimation,
 } from '../../components/common';
+import { useCelebration } from '../../hooks/use-celebration';
+import {
+  useMarkCelebrationsSeen,
+  usePendingCelebrations,
+} from '../../hooks/use-celebrations';
 import { useProfile } from '../../lib/profile';
 import { useSubjects } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
@@ -28,9 +33,17 @@ import { useCoachingCard } from '../../hooks/use-coaching-card';
 import { useSubscriptionStatus } from '../../hooks/use-subscription';
 import { useApiReachability } from '../../hooks/use-api-reachability';
 import { useTheme, useThemeColors } from '../../lib/theme';
+import { useCelebrationLevel } from '../../hooks/use-settings';
+import {
+  clearSessionRecoveryMarker,
+  isRecoveryMarkerFresh,
+  readSessionRecoveryMarker,
+} from '../../lib/session-recovery';
+import { useApiClient } from '../../lib/api-client';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const apiClient = useApiClient();
   const insets = useSafeAreaInsets();
   const {
     data: subjects,
@@ -43,6 +56,9 @@ export default function HomeScreen() {
   const { data: streak } = useStreaks();
   const firstSubjectId = subjects?.find((s) => s.status === 'active')?.id;
   const coachingCard = useCoachingCard(firstSubjectId);
+  const { data: celebrationLevel = 'all' } = useCelebrationLevel();
+  const pendingCelebrations = usePendingCelebrations();
+  const markCelebrationsSeen = useMarkCelebrationsSeen();
   const { data: subStatus } = useSubscriptionStatus();
   const { persona } = useTheme();
   const themeColors = useThemeColors();
@@ -55,6 +71,19 @@ export default function HomeScreen() {
     isChecked: apiChecked,
     recheck: recheckApi,
   } = useApiReachability();
+  const [recoveryCard, setRecoveryCard] = useState<{
+    sessionId: string;
+    subjectName?: string;
+    active: boolean;
+  } | null>(null);
+  const { CelebrationOverlay } = useCelebration({
+    queue: pendingCelebrations.data ?? [],
+    celebrationLevel,
+    audience: persona === 'learner' ? 'adult' : 'child',
+    onAllComplete: () => {
+      void markCelebrationsSeen.mutateAsync({ viewer: 'child' });
+    },
+  });
 
   // Practice subject picker state
   const [showPracticePicker, setShowPracticePicker] = useState(false);
@@ -133,6 +162,45 @@ export default function HomeScreen() {
       router.replace('/create-subject');
     }
   }, [subjectsLoading, subjects, router]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    void (async () => {
+      const marker = await readSessionRecoveryMarker();
+      if (!marker || !mounted) return;
+
+      try {
+        const res = await apiClient.sessions[':sessionId'].$get({
+          param: { sessionId: marker.sessionId },
+        });
+        if (!res.ok) {
+          await clearSessionRecoveryMarker();
+          return;
+        }
+
+        const data = (await res.json()) as {
+          session: { id: string; status: string };
+        };
+        if (!mounted) return;
+
+        setRecoveryCard({
+          sessionId: marker.sessionId,
+          subjectName: marker.subjectName,
+          active:
+            data.session.status === 'active' && isRecoveryMarkerFresh(marker),
+        });
+      } catch {
+        if (mounted) {
+          setRecoveryCard(null);
+        }
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [apiClient]);
 
   // Only show a gentle banner when the learner has hit their limit
   // Guard for monthlyLimit > 0: unlimited plans (limit=0) should never show this
@@ -221,6 +289,90 @@ export default function HomeScreen() {
             </Text>
           </View>
         )}
+
+        {recoveryCard ? (
+          <View
+            className="bg-surface rounded-card px-4 py-4 mt-4"
+            testID="unfinished-session-card"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              {recoveryCard.active
+                ? 'Pick up where you left off?'
+                : 'Your session was saved'}
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-1">
+              {recoveryCard.subjectName
+                ? recoveryCard.subjectName
+                : 'Your last session is ready.'}
+            </Text>
+            <View className="flex-row gap-2 mt-3">
+              <Pressable
+                onPress={() => {
+                  if (recoveryCard.active) {
+                    void clearSessionRecoveryMarker();
+                    router.push({
+                      pathname: '/(learner)/session',
+                      params: { sessionId: recoveryCard.sessionId },
+                    } as never);
+                  } else {
+                    void clearSessionRecoveryMarker();
+                    router.push(
+                      `/session-summary/${recoveryCard.sessionId}` as never
+                    );
+                  }
+                }}
+                className="flex-1 bg-primary rounded-button py-3 items-center"
+              >
+                <Text className="text-text-inverse text-body font-semibold">
+                  {recoveryCard.active ? 'Continue Session' : 'See Summary'}
+                </Text>
+              </Pressable>
+              {recoveryCard.active ? (
+                <Pressable
+                  onPress={() => {
+                    void (async () => {
+                      try {
+                        const res = await apiClient.sessions[
+                          ':sessionId'
+                        ].close.$post({
+                          param: { sessionId: recoveryCard.sessionId },
+                          json: {
+                            reason: 'silence_timeout',
+                            summaryStatus: 'auto_closed',
+                          },
+                        });
+                        if (!res.ok) {
+                          setRecoveryCard(null);
+                          return;
+                        }
+                        await clearSessionRecoveryMarker();
+                        router.push(
+                          `/session-summary/${recoveryCard.sessionId}` as never
+                        );
+                      } catch {
+                        setRecoveryCard(null);
+                      }
+                    })();
+                  }}
+                  className="flex-1 bg-surface-elevated rounded-button py-3 items-center"
+                >
+                  <Text className="text-text-secondary text-body font-semibold">
+                    End & See Summary
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+            <Pressable
+              onPress={() => {
+                void clearSessionRecoveryMarker();
+                setRecoveryCard(null);
+              }}
+              className="mt-3 self-start"
+            >
+              <Text className="text-caption text-text-secondary">Dismiss</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <AnimatedEntry>
           {coachingCard.isLoading && !subjectsError ? (
@@ -547,6 +699,7 @@ export default function HomeScreen() {
           </Pressable>
         </View>
       </Modal>
+      {CelebrationOverlay}
     </KeyboardAvoidingView>
   );
 }
