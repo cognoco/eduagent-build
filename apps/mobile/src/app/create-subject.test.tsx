@@ -4,7 +4,6 @@ import {
   fireEvent,
   waitFor,
 } from '@testing-library/react-native';
-import React from 'react';
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
