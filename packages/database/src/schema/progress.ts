@@ -15,6 +15,11 @@ import { xpStatusEnum } from './assessments';
 import { generateUUIDv7 } from '../utils/uuid';
 
 export const learningModeEnum = pgEnum('learning_mode', ['serious', 'casual']);
+export const celebrationLevelEnum = pgEnum('celebration_level', [
+  'all',
+  'big_only',
+  'off',
+]);
 
 export const streaks = pgTable('streaks', {
   id: uuid('id')
@@ -133,6 +138,10 @@ export const learningModes = pgTable('learning_modes', {
   consecutiveSummarySkips: integer('consecutive_summary_skips')
     .notNull()
     .default(0),
+  medianResponseSeconds: integer('median_response_seconds'),
+  celebrationLevel: celebrationLevelEnum('celebration_level')
+    .notNull()
+    .default('all'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -150,6 +159,13 @@ export const coachingCardCache = pgTable('coaching_card_cache', {
     .references(() => profiles.id, { onDelete: 'cascade' })
     .unique(),
   cardData: jsonb('card_data').notNull(),
+  pendingCelebrations: jsonb('pending_celebrations').notNull().default([]),
+  celebrationsSeenByChild: timestamp('celebrations_seen_by_child', {
+    withTimezone: true,
+  }),
+  celebrationsSeenByParent: timestamp('celebrations_seen_by_parent', {
+    withTimezone: true,
+  }),
   contextHash: text('context_hash'),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true })

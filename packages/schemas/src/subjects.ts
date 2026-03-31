@@ -81,6 +81,7 @@ export const curriculumTopicSchema = z.object({
   relevance: topicRelevanceSchema,
   estimatedMinutes: z.number().int(),
   skipped: z.boolean(),
+  source: curriculumTopicSourceSchema.optional(),
 });
 export type CurriculumTopic = z.infer<typeof curriculumTopicSchema>;
 
