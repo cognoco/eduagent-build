@@ -36,6 +36,7 @@ interface ChatShellProps {
   inputDisabled?: boolean;
   rightAction?: React.ReactNode;
   footer?: React.ReactNode;
+  inputAccessory?: React.ReactNode;
   placeholder?: string;
   /** When set to 'teach_back', voice defaults ON. Otherwise voice defaults OFF but toggle is always visible. */
   verificationType?: string;
@@ -94,6 +95,7 @@ export function ChatShell({
   inputDisabled = false,
   rightAction,
   footer,
+  inputAccessory,
   placeholder = 'Type a message...',
   verificationType,
   messagesTestID,
@@ -313,53 +315,58 @@ export function ChatShell({
 
       {/* Input */}
       {!inputDisabled && (
-        <View
-          className="flex-row items-end px-4 py-3 bg-surface border-t border-surface-elevated"
-          style={{ paddingBottom: Math.max(insets.bottom, 8) }}
-        >
-          <TextInput
-            className="flex-1 bg-background rounded-input px-4 py-3 text-body text-text-primary me-2"
-            placeholder={placeholder}
-            placeholderTextColor={colors.muted}
-            value={input}
-            onChangeText={setInput}
-            onSubmitEditing={handleSend}
-            maxLength={5000}
-            returnKeyType="send"
-            blurOnSubmit={false}
-            editable={!isStreaming}
-            testID="chat-input"
-            accessibilityLabel="Message input"
-          />
-          {isVoiceEnabled && (
-            <View className="me-2">
-              <VoiceRecordButton
-                isListening={isListening}
-                onPress={handleVoicePress}
-                disabled={isStreaming}
-              />
-            </View>
-          )}
-          <Pressable
-            onPress={handleSend}
-            disabled={!input.trim() || isStreaming}
-            className={`rounded-button px-5 py-3 min-h-[44px] min-w-[44px] items-center justify-center ${
-              input.trim() && !isStreaming
-                ? 'bg-primary'
-                : 'bg-surface-elevated'
-            }`}
-            testID="send-button"
-            accessibilityLabel="Send message"
-            accessibilityRole="button"
+        <View>
+          {inputAccessory}
+          <View
+            className="flex-row items-end px-4 py-3 bg-surface border-t border-surface-elevated"
+            style={{ paddingBottom: Math.max(insets.bottom, 8) }}
           >
-            <Ionicons
-              name="send"
-              size={20}
-              color={
-                input.trim() && !isStreaming ? colors.textInverse : colors.muted
-              }
+            <TextInput
+              className="flex-1 bg-background rounded-input px-4 py-3 text-body text-text-primary me-2"
+              placeholder={placeholder}
+              placeholderTextColor={colors.muted}
+              value={input}
+              onChangeText={setInput}
+              onSubmitEditing={handleSend}
+              maxLength={5000}
+              returnKeyType="send"
+              blurOnSubmit={false}
+              editable={!isStreaming}
+              testID="chat-input"
+              accessibilityLabel="Message input"
             />
-          </Pressable>
+            {isVoiceEnabled && (
+              <View className="me-2">
+                <VoiceRecordButton
+                  isListening={isListening}
+                  onPress={handleVoicePress}
+                  disabled={isStreaming}
+                />
+              </View>
+            )}
+            <Pressable
+              onPress={handleSend}
+              disabled={!input.trim() || isStreaming}
+              className={`rounded-button px-5 py-3 min-h-[44px] min-w-[44px] items-center justify-center ${
+                input.trim() && !isStreaming
+                  ? 'bg-primary'
+                  : 'bg-surface-elevated'
+              }`}
+              testID="send-button"
+              accessibilityLabel="Send message"
+              accessibilityRole="button"
+            >
+              <Ionicons
+                name="send"
+                size={20}
+                color={
+                  input.trim() && !isStreaming
+                    ? colors.textInverse
+                    : colors.muted
+                }
+              />
+            </Pressable>
+          </View>
         </View>
       )}
     </KeyboardAvoidingView>

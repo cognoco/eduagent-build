@@ -10,7 +10,7 @@ import {
   getPartialProgressInstruction,
 } from './escalation';
 import { getEvaluateRungDescription } from './evaluate';
-import type { LearningMode } from '@eduagent/schemas';
+import type { LearningMode, HomeworkMode } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Core Exchange Processing Pipeline — Story 2.1
@@ -53,6 +53,8 @@ export interface ExchangeContext {
     easeFactor?: number;
     daysSinceLastReview?: number;
   };
+  /** FR228: Homework mode — "Help me solve it" or "Check my answer" */
+  homeworkMode?: HomeworkMode;
 }
 
 /** Result of processing a single exchange */
@@ -154,7 +156,13 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   sections.push(`Subject: ${context.subjectName}`);
 
   // Session type
-  sections.push(getSessionTypeGuidance(context.sessionType));
+  sections.push(
+    getSessionTypeGuidance(
+      context.sessionType,
+      context.homeworkMode,
+      context.personaType
+    )
+  );
 
   // Escalation state and guidance
   sections.push(
@@ -432,14 +440,52 @@ function getPersonaVoice(personaType: 'TEEN' | 'LEARNER' | 'PARENT'): string {
 }
 
 function getSessionTypeGuidance(
-  sessionType: 'learning' | 'homework' | 'interleaved'
+  sessionType: 'learning' | 'homework' | 'interleaved',
+  homeworkMode?: HomeworkMode,
+  personaType?: 'TEEN' | 'LEARNER' | 'PARENT'
 ): string {
   if (sessionType === 'homework') {
+    const isTeen = personaType === 'TEEN';
+    const brevity = isTeen
+      ? 'Be very brief: 1-2 sentences plus an example. Teens want speed, not essays.'
+      : 'Be brief: usually 2-6 sentences, focused on the exact problem in front of the learner.';
+
+    if (homeworkMode === 'check_answer') {
+      return (
+        'Session type: HOMEWORK HELP — CHECK MY ANSWER mode\n' +
+        'The learner wants their answer verified. ' +
+        brevity +
+        '\n' +
+        'Say whether the answer is right or wrong. If wrong, point to the specific error and explain why briefly.\n' +
+        'Then show a similar worked example (different numbers/context) so the learner sees the correct method.\n' +
+        'Do not reveal the final answer to the actual homework problem.\n' +
+        'Do not ask Socratic follow-up questions — the learner wants a check, not a conversation.'
+      );
+    }
+
+    if (homeworkMode === 'help_me') {
+      return (
+        'Session type: HOMEWORK HELP — HELP ME SOLVE IT mode\n' +
+        'The learner wants guidance on how to approach this problem. ' +
+        brevity +
+        '\n' +
+        'Explain the approach briefly, then show a similar worked example (different numbers/context).\n' +
+        'Let the learner try the actual problem. Provide brief targeted feedback when they respond.\n' +
+        'Do not reveal the final answer to the actual homework problem.\n' +
+        'Ask a question only when it genuinely helps unblock the learner.'
+      );
+    }
+
+    // No mode selected yet — generic homework guidance
     return (
       'Session type: HOMEWORK HELP\n' +
-      'CRITICAL: This is a homework session. You must use ONLY Socratic questioning.\n' +
-      'NEVER provide direct answers. Guide the learner to discover the answer themselves.\n' +
-      'Ask questions that break the problem into smaller, manageable pieces.'
+      'CRITICAL: This is a homework session. Default to concise explanation and answer-checking, not Socratic interrogation.\n' +
+      brevity +
+      '\n' +
+      'If the learner asks you to check an answer, say whether it is right, identify the error if needed, and explain why.\n' +
+      'Show a similar worked example (different numbers/context) when explaining methods.\n' +
+      'Do not reveal the final answer unless the learner has already shown it.\n' +
+      'Ask a question only when it genuinely helps unblock the learner.'
     );
   }
   if (sessionType === 'interleaved') {

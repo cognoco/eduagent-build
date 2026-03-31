@@ -399,6 +399,38 @@ describe('processRecallTest', () => {
     expect(result.remediation).toBeUndefined();
   });
 
+  it('treats "I don\'t remember" as quality 0 and returns a hint', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.3,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 1,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'feedback_only',
+    });
+
+    const db = createMockDb();
+    const result = await processRecallTest(db, profileId, {
+      topicId,
+      attemptMode: 'dont_remember',
+    });
+
+    expect(processRecallResult).toHaveBeenCalledWith(expect.any(Object), 0);
+    expect(result.failureCount).toBe(1);
+    expect(result.hint).toContain("That's okay");
+  });
+
   it('returns redirect_to_learning_book with remediation on 3+ failures', async () => {
     const card = mockRetentionCardRow();
     setupScopedRepo({ retentionCardFindFirst: card });

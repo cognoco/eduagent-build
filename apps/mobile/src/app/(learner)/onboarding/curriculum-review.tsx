@@ -17,6 +17,7 @@ import {
   useSkipTopic,
   useUnskipTopic,
   useChallengeCurriculum,
+  useAddCurriculumTopic,
 } from '../../../hooks/use-curriculum';
 import { formatApiError } from '../../../lib/format-api-error';
 
@@ -50,8 +51,15 @@ export default function CurriculumScreen() {
   const skipTopic = useSkipTopic(subjectId ?? '');
   const unskipTopic = useUnskipTopic(subjectId ?? '');
   const challengeCurriculum = useChallengeCurriculum(subjectId ?? '');
+  const addCurriculumTopic = useAddCurriculumTopic(subjectId ?? '');
   const [showChallengeModal, setShowChallengeModal] = useState(false);
   const [challengeFeedback, setChallengeFeedback] = useState('');
+  const [showAddTopicModal, setShowAddTopicModal] = useState(false);
+  const [addTopicTitle, setAddTopicTitle] = useState('');
+  const [addTopicDescription, setAddTopicDescription] = useState('');
+  const [addTopicMinutes, setAddTopicMinutes] = useState('');
+  const [addTopicError, setAddTopicError] = useState('');
+  const [addTopicPreviewReady, setAddTopicPreviewReady] = useState(false);
 
   if (!subjectId) {
     return (
@@ -69,6 +77,64 @@ export default function CurriculumScreen() {
       setShowChallengeModal(false);
     } catch (err: unknown) {
       Alert.alert('Curriculum update failed', formatApiError(err));
+    }
+  };
+
+  const resetAddTopicModal = () => {
+    setAddTopicTitle('');
+    setAddTopicDescription('');
+    setAddTopicMinutes('');
+    setAddTopicError('');
+    setAddTopicPreviewReady(false);
+  };
+
+  const handlePreviewTopic = async () => {
+    if (!addTopicTitle.trim()) return;
+    try {
+      setAddTopicError('');
+      const result = await addCurriculumTopic.mutateAsync({
+        mode: 'preview',
+        title: addTopicTitle.trim(),
+      });
+      if (result.mode === 'preview') {
+        setAddTopicTitle(result.preview.title);
+        setAddTopicDescription(result.preview.description);
+        setAddTopicMinutes(String(result.preview.estimatedMinutes));
+        setAddTopicPreviewReady(true);
+      }
+    } catch (err: unknown) {
+      setAddTopicError(formatApiError(err));
+    }
+  };
+
+  const handleCreateTopic = async () => {
+    const estimatedMinutes = Number(addTopicMinutes);
+    if (
+      !addTopicTitle.trim() ||
+      !addTopicDescription.trim() ||
+      !Number.isFinite(estimatedMinutes)
+    ) {
+      setAddTopicError('Add a title, description, and estimated minutes.');
+      return;
+    }
+
+    try {
+      setAddTopicError('');
+      const result = await addCurriculumTopic.mutateAsync({
+        mode: 'create',
+        title: addTopicTitle.trim(),
+        description: addTopicDescription.trim(),
+        estimatedMinutes: Math.max(
+          5,
+          Math.min(240, Math.round(estimatedMinutes))
+        ),
+      });
+      if (result.mode === 'create') {
+        resetAddTopicModal();
+        setShowAddTopicModal(false);
+      }
+    } catch (err: unknown) {
+      setAddTopicError(formatApiError(err));
     }
   };
 
@@ -202,6 +268,18 @@ export default function CurriculumScreen() {
               </View>
             </View>
           ))}
+
+          <Pressable
+            onPress={() => setShowAddTopicModal(true)}
+            className="bg-surface-elevated rounded-button py-3 px-4 items-center mb-4"
+            testID="add-topic-button"
+            accessibilityRole="button"
+            accessibilityLabel="Add topic"
+          >
+            <Text className="text-body font-semibold text-primary">
+              Add topic
+            </Text>
+          </Pressable>
         </ScrollView>
       )}
 
@@ -297,6 +375,120 @@ export default function CurriculumScreen() {
                     }`}
                   >
                     Regenerate
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showAddTopicModal} animationType="slide" transparent>
+        <View className="flex-1 bg-black/50 justify-end">
+          <View
+            className="bg-background rounded-t-3xl px-5 pt-6 pb-8"
+            style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+          >
+            <Text className="text-h3 font-bold text-text-primary mb-3">
+              Add a topic
+            </Text>
+            <Text className="text-body-sm text-text-secondary mb-4">
+              Add something the generated curriculum missed. We'll suggest a
+              clean title first, then you can edit before saving.
+            </Text>
+
+            {addTopicError !== '' && (
+              <View
+                className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+                accessibilityRole="alert"
+              >
+                <Text className="text-danger text-body-sm">
+                  {addTopicError}
+                </Text>
+              </View>
+            )}
+
+            <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+              Topic
+            </Text>
+            <TextInput
+              className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
+              placeholder="e.g. Trigonometry, The French Revolution"
+              placeholderTextColor={colors.muted}
+              value={addTopicTitle}
+              onChangeText={(text) => {
+                setAddTopicTitle(text);
+                if (addTopicError) setAddTopicError('');
+              }}
+              testID="add-topic-title-input"
+            />
+
+            {addTopicPreviewReady && (
+              <>
+                <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+                  Description
+                </Text>
+                <TextInput
+                  className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
+                  placeholder="Short description"
+                  placeholderTextColor={colors.muted}
+                  value={addTopicDescription}
+                  onChangeText={setAddTopicDescription}
+                  multiline
+                  testID="add-topic-description-input"
+                />
+
+                <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+                  Estimated minutes
+                </Text>
+                <TextInput
+                  className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
+                  placeholder="30"
+                  placeholderTextColor={colors.muted}
+                  value={addTopicMinutes}
+                  onChangeText={setAddTopicMinutes}
+                  keyboardType="number-pad"
+                  testID="add-topic-minutes-input"
+                />
+              </>
+            )}
+
+            <View className="flex-row">
+              <Pressable
+                onPress={() => {
+                  resetAddTopicModal();
+                  setShowAddTopicModal(false);
+                }}
+                className="flex-1 rounded-button py-3 items-center bg-surface me-2"
+                testID="add-topic-cancel"
+              >
+                <Text className="text-body text-text-primary">Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={
+                  addTopicPreviewReady ? handleCreateTopic : handlePreviewTopic
+                }
+                disabled={!addTopicTitle.trim() || addCurriculumTopic.isPending}
+                className={`flex-1 rounded-button py-3 items-center ${
+                  addTopicTitle.trim() ? 'bg-primary' : 'bg-surface-elevated'
+                }`}
+                testID={
+                  addTopicPreviewReady
+                    ? 'add-topic-confirm'
+                    : 'add-topic-preview'
+                }
+              >
+                {addCurriculumTopic.isPending ? (
+                  <ActivityIndicator color={colors.textInverse} />
+                ) : (
+                  <Text
+                    className={`text-body font-semibold ${
+                      addTopicTitle.trim()
+                        ? 'text-text-inverse'
+                        : 'text-text-secondary'
+                    }`}
+                  >
+                    {addTopicPreviewReady ? 'Add topic' : 'Preview'}
                   </Text>
                 )}
               </Pressable>

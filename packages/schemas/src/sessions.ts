@@ -101,9 +101,14 @@ export type EscalationRung = z.infer<typeof escalationRungSchema>;
 
 // Exchange schemas
 
+export const homeworkModeSchema = z.enum(['help_me', 'check_answer']);
+export type HomeworkMode = z.infer<typeof homeworkModeSchema>;
+
 export const sessionMessageSchema = z.object({
   message: z.string().min(1).max(10000),
   sessionType: sessionTypeSchema.optional(),
+  /** FR228: Homework mode — "Help me solve it" or "Check my answer" */
+  homeworkMode: homeworkModeSchema.optional(),
 });
 export type SessionMessageInput = z.infer<typeof sessionMessageSchema>;
 

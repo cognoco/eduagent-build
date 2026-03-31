@@ -72,13 +72,58 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('LEARNING');
   });
 
-  it('includes homework session guidance with Socratic-only rule', () => {
+  it('includes homework session guidance with explain-first rule', () => {
     const prompt = buildSystemPrompt({
       ...baseContext,
       sessionType: 'homework',
     });
     expect(prompt).toContain('HOMEWORK');
-    expect(prompt).toContain('NEVER provide direct answers');
+    expect(prompt).toContain('concise explanation and answer-checking');
+    expect(prompt).toContain('Ask a question only when it genuinely helps');
+  });
+
+  it('includes CHECK MY ANSWER mode guidance when homeworkMode is check_answer', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      sessionType: 'homework',
+      homeworkMode: 'check_answer',
+    });
+    expect(prompt).toContain('CHECK MY ANSWER');
+    expect(prompt).toContain('similar worked example');
+    expect(prompt).toContain('not a conversation');
+  });
+
+  it('includes HELP ME SOLVE IT mode guidance when homeworkMode is help_me', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      sessionType: 'homework',
+      homeworkMode: 'help_me',
+    });
+    expect(prompt).toContain('HELP ME SOLVE IT');
+    expect(prompt).toContain('similar worked example');
+    expect(prompt).toContain('Explain the approach briefly');
+  });
+
+  it('uses teen brevity in homework mode for TEEN persona', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      personaType: 'TEEN',
+      sessionType: 'homework',
+      homeworkMode: 'check_answer',
+    });
+    expect(prompt).toContain('1-2 sentences');
+    expect(prompt).toContain('Teens want speed');
+  });
+
+  it('uses standard brevity in homework mode for LEARNER persona', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      personaType: 'LEARNER',
+      sessionType: 'homework',
+      homeworkMode: 'check_answer',
+    });
+    expect(prompt).toContain('2-6 sentences');
+    expect(prompt).not.toContain('Teens want speed');
   });
 
   it('includes escalation guidance for the current rung', () => {

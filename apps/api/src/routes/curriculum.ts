@@ -4,6 +4,7 @@ import {
   topicSkipSchema,
   topicUnskipSchema,
   curriculumChallengeSchema,
+  curriculumTopicAddSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -15,6 +16,7 @@ import {
   unskipTopic,
   challengeCurriculum,
   explainTopicOrdering,
+  addCurriculumTopic,
 } from '../services/curriculum';
 import { notFound, unauthorized, apiError } from '../errors';
 
@@ -110,6 +112,38 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     }
   )
   // Challenge/regenerate curriculum
+  .post(
+    '/subjects/:subjectId/curriculum/topics',
+    zValidator('json', curriculumTopicAddSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = c.get('profileId');
+      if (!profileId)
+        return unauthorized(
+          c,
+          'Profile selection required (X-Profile-Id header)'
+        );
+      const subjectId = c.req.param('subjectId');
+      const input = c.req.valid('json');
+      try {
+        const result = await addCurriculumTopic(
+          db,
+          profileId,
+          subjectId,
+          input
+        );
+        return c.json(result);
+      } catch (error) {
+        if (error instanceof Error) {
+          if (error.message === 'Subject not found')
+            return notFound(c, 'Subject not found');
+          if (error.message === 'Curriculum not found')
+            return notFound(c, 'Curriculum not found');
+        }
+        throw error;
+      }
+    }
+  )
   .post(
     '/subjects/:subjectId/curriculum/challenge',
     zValidator('json', curriculumChallengeSchema),

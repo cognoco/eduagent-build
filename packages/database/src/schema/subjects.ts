@@ -24,6 +24,11 @@ export const topicRelevanceEnum = pgEnum('topic_relevance', [
   'emerging',
 ]);
 
+export const curriculumTopicSourceEnum = pgEnum('curriculum_topic_source', [
+  'generated',
+  'user',
+]);
+
 export const subjects = pgTable(
   'subjects',
   {
@@ -76,6 +81,7 @@ export const curriculumTopics = pgTable('curriculum_topics', {
   description: text('description').notNull(),
   sortOrder: integer('sort_order').notNull(),
   relevance: topicRelevanceEnum('relevance').notNull().default('core'),
+  source: curriculumTopicSourceEnum('source').notNull().default('generated'),
   estimatedMinutes: integer('estimated_minutes').notNull(),
   skipped: boolean('skipped').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true })

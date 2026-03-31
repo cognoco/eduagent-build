@@ -12,6 +12,7 @@ import {
   unskipTopic,
   challengeCurriculum,
   explainTopicOrdering,
+  addCurriculumTopic,
 } from './curriculum';
 import type { CurriculumInput } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -37,6 +38,12 @@ const sampleTopics = JSON.stringify([
   },
 ]);
 
+const sampleTopicPreview = JSON.stringify({
+  title: 'Trigonometry Basics',
+  description: 'Angles, triangles, and the sine-cosine-tangent toolkit',
+  estimatedMinutes: 35,
+});
+
 /** Provider that returns a valid JSON curriculum */
 function createCurriculumMockProvider(): LLMProvider {
   return {
@@ -52,6 +59,18 @@ function createCurriculumMockProvider(): LLMProvider {
       _config: ModelConfig
     ): AsyncIterable<string> {
       yield sampleTopics;
+    },
+  };
+}
+
+function createAddTopicMockProvider(): LLMProvider {
+  return {
+    id: 'gemini',
+    async chat(): Promise<string> {
+      return sampleTopicPreview;
+    },
+    async *chatStream(): AsyncIterable<string> {
+      yield sampleTopicPreview;
     },
   };
 }
@@ -289,6 +308,83 @@ describe('getCurriculum', () => {
       estimatedMinutes: 45,
       skipped: true,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// addCurriculumTopic tests
+// ---------------------------------------------------------------------------
+
+describe('addCurriculumTopic', () => {
+  beforeAll(() => {
+    registerProvider(createAddTopicMockProvider());
+  });
+
+  afterAll(() => {
+    registerProvider(createMockProvider('gemini'));
+  });
+
+  it('returns a normalized preview before creating', async () => {
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow({ name: 'Mathematics' }),
+      curriculumFindFirst: mockCurriculumRow(),
+    });
+
+    const result = await addCurriculumTopic(db, PROFILE_ID, SUBJECT_ID, {
+      mode: 'preview',
+      title: 'trig',
+    });
+
+    expect(result.mode).toBe('preview');
+    if (result.mode === 'preview') {
+      expect(result.preview.title).toBe('Trigonometry Basics');
+      expect(result.preview.estimatedMinutes).toBe(35);
+    }
+  });
+
+  it('creates a user topic at the end of the curriculum', async () => {
+    const existingTopics = [
+      mockTopicRow({ id: 'topic-2', sortOrder: 4, title: 'Advanced Topic' }),
+      mockTopicRow({ id: 'topic-1', sortOrder: 0, title: 'Intro' }),
+    ];
+    const createdTopic = {
+      ...mockTopicRow({
+        id: 'topic-user',
+        sortOrder: 5,
+        title: 'Trigonometry Basics',
+        relevance: 'recommended',
+        estimatedMinutes: 35,
+      }),
+      description: 'Angles, triangles, and the sine-cosine-tangent toolkit',
+      skipped: false,
+      source: 'user',
+    };
+
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow({ name: 'Mathematics' }),
+      curriculumFindFirst: mockCurriculumRow(),
+      topicsFindMany: existingTopics,
+      insertReturning: [createdTopic],
+    });
+
+    const result = await addCurriculumTopic(db, PROFILE_ID, SUBJECT_ID, {
+      mode: 'create',
+      title: 'Trigonometry Basics',
+      description: 'Angles, triangles, and the sine-cosine-tangent toolkit',
+      estimatedMinutes: 35,
+    });
+
+    expect(result.mode).toBe('create');
+    if (result.mode === 'create') {
+      expect(result.topic.title).toBe('Trigonometry Basics');
+      expect(result.topic.sortOrder).toBe(5);
+      expect(result.topic.relevance).toBe('recommended');
+    }
+
+    const insertedValues = (db.insert as jest.Mock).mock.results[0].value.values
+      .mock.calls[0][0];
+    expect(insertedValues.source).toBe('user');
+    expect(insertedValues.sortOrder).toBe(5);
   });
 });
 

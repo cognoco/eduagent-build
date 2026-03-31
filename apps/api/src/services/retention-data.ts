@@ -253,10 +253,21 @@ export interface RecallTestResponse {
   xpChange: string;
   nextReviewAt: string;
   failureCount: number;
+  hint?: string;
   failureAction?: 'feedback_only' | 'redirect_to_learning_book';
   remediation?: RecallTestRemediation;
   cooldownActive?: boolean;
   cooldownEndsAt?: string;
+}
+
+function buildRecallHint(
+  topicTitle: string,
+  topicDescription?: string | null
+): string {
+  const hintSource = topicDescription?.trim()
+    ? topicDescription.trim()
+    : `${topicTitle} is the key idea to focus on.`;
+  return `That's okay — let's see what you do remember. Here's a hint: ${hintSource} Does anything come back?`;
 }
 
 export async function processRecallTest(
@@ -276,7 +287,8 @@ export async function processRecallTest(
   // FR54: Anti-cramming cooldown — 24-hour minimum between recall tests
   const state = rowToRetentionState(effectiveCard);
   const lastTestAt = effectiveCard.lastReviewedAt?.toISOString() ?? null;
-  if (!canRetestTopic(state, lastTestAt)) {
+  const attemptMode = input.attemptMode ?? 'standard';
+  if (attemptMode === 'standard' && !canRetestTopic(state, lastTestAt)) {
     // non-null: canRetestTopic returns true when lastTestAt is null,
     // so we only reach this branch when lastTestAt is set.
     const cooldownEndsAt = new Date(
@@ -300,8 +312,10 @@ export async function processRecallTest(
     where: eq(curriculumTopics.id, input.topicId),
   });
   const topicTitle = topic?.title ?? input.topicId;
-
-  const quality = await evaluateRecallQuality(input.answer, topicTitle);
+  const quality =
+    attemptMode === 'dont_remember'
+      ? 0
+      : await evaluateRecallQuality(input.answer ?? '', topicTitle);
   // state was already computed above for cooldown check — reuse it
   const result = processRecallResult(state, quality);
 
@@ -336,6 +350,13 @@ export async function processRecallTest(
     failureCount: result.newState.failureCount,
     failureAction: result.failureAction,
   };
+
+  if (
+    attemptMode === 'dont_remember' &&
+    result.failureAction !== 'redirect_to_learning_book'
+  ) {
+    response.hint = buildRecallHint(topicTitle, topic?.description);
+  }
 
   // Add remediation data when redirect is triggered (3+ failures)
   if (result.failureAction === 'redirect_to_learning_book') {

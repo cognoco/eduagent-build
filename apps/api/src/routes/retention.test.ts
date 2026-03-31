@@ -205,6 +205,36 @@ describe('retention routes', () => {
       expect(body.result.nextReviewAt).toBeDefined();
     });
 
+    it('accepts dont_remember submissions without an answer body', async () => {
+      (processRecallTest as jest.Mock).mockResolvedValue({
+        passed: false,
+        masteryScore: 0.4,
+        xpChange: 'decayed',
+        nextReviewAt: '2026-02-22T10:00:00.000Z',
+        failureCount: 1,
+        hint: "That's okay — let's see what you do remember.",
+      });
+
+      const res = await app.request(
+        '/v1/retention/recall-test',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            topicId: TOPIC_ID,
+            attemptMode: 'dont_remember',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.result.failureCount).toBe(1);
+      expect(body.result.hint).toContain("That's okay");
+    });
+
     it('returns 400 with missing topicId', async () => {
       const res = await app.request(
         '/v1/retention/recall-test',
@@ -213,6 +243,23 @@ describe('retention routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({
             answer: 'Some answer without topicId',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 when standard recall answer is blank', async () => {
+      const res = await app.request(
+        '/v1/retention/recall-test',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            topicId: TOPIC_ID,
+            answer: '',
           }),
         },
         TEST_ENV

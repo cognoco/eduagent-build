@@ -17,6 +17,7 @@ import { assertOk } from '../lib/assert-ok';
 interface RecallTestResult {
   passed: boolean;
   failureCount: number;
+  hint?: string;
   failureAction?: 'feedback_only' | 'redirect_to_learning_book';
   remediation?: {
     cooldownEndsAt: string;
@@ -91,7 +92,8 @@ export function useSubmitRecallTest() {
   return useMutation({
     mutationFn: async (input: {
       topicId: string;
-      answer: string;
+      answer?: string;
+      attemptMode?: 'standard' | 'dont_remember';
     }): Promise<RecallTestResult> => {
       const res = await client.retention['recall-test'].$post({
         json: input,

@@ -1,7 +1,11 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { renderHook, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useRetentionTopics, useTopicRetention } from './use-retention';
+import {
+  useRetentionTopics,
+  useTopicRetention,
+  useSubmitRecallTest,
+} from './use-retention';
 
 const mockFetch = jest.fn();
 jest.mock('../lib/api-client', () => ({
@@ -145,5 +149,54 @@ describe('useTopicRetention', () => {
     });
 
     expect(result.current.data).toBeNull();
+  });
+});
+
+describe('useSubmitRecallTest', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('submits a dont_remember recall attempt without an answer', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          result: {
+            passed: false,
+            failureCount: 1,
+            hint: 'Start from the main idea.',
+            failureAction: 'feedback_only',
+          },
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useSubmitRecallTest(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate({
+        topicId: 'topic-1',
+        attemptMode: 'dont_remember',
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data).toEqual({
+      passed: false,
+      failureCount: 1,
+      hint: 'Start from the main idea.',
+      failureAction: 'feedback_only',
+    });
   });
 });

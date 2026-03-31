@@ -12,6 +12,9 @@ import type {
   CurriculumInput,
   GeneratedTopic,
   Curriculum,
+  CurriculumTopicAddInput,
+  CurriculumTopicAddResponse,
+  CurriculumTopicPreview,
 } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
@@ -22,6 +25,19 @@ const CURRICULUM_SYSTEM_PROMPT = `You are MentoMate's curriculum designer. Based
 generate a personalized learning curriculum. Return a JSON array of topics with this structure:
 [{"title": "Topic Name", "description": "What the learner will learn", "relevance": "core|recommended|contemporary|emerging", "estimatedMinutes": 30}]
 Order topics pedagogically. Include 8-15 topics.`;
+
+const ADD_TOPIC_PREVIEW_PROMPT = `You are helping a learner add one topic to an existing curriculum.
+Given a subject name and the learner's rough topic idea, normalize it into a clear topic title,
+write a short description, and estimate how long the topic should take.
+
+Return ONLY JSON:
+{"title":"Clear Topic Title","description":"Short learner-friendly description","estimatedMinutes":30}
+
+Rules:
+- Keep the title concise and specific
+- Keep description under 120 characters
+- estimatedMinutes must be an integer between 5 and 240
+- Do not reject valid school topics just because they are niche`;
 
 export async function generateCurriculum(
   input: CurriculumInput
@@ -46,6 +62,70 @@ Interview Summary: ${input.interviewSummary}`,
   }
 
   return JSON.parse(jsonMatch[0]) as GeneratedTopic[];
+}
+
+function fallbackTopicPreview(
+  subjectName: string,
+  rawTitle: string
+): CurriculumTopicPreview {
+  const normalizedTitle = rawTitle
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/^./, (char) => char.toUpperCase());
+
+  return {
+    title: normalizedTitle,
+    description: `Study ${normalizedTitle} in ${subjectName} with guided practice.`,
+    estimatedMinutes: 30,
+  };
+}
+
+export async function previewCurriculumTopic(
+  subjectName: string,
+  rawTitle: string
+): Promise<CurriculumTopicPreview> {
+  const trimmedTitle = rawTitle.trim();
+  const messages: ChatMessage[] = [
+    { role: 'system', content: ADD_TOPIC_PREVIEW_PROMPT },
+    {
+      role: 'user',
+      content: `Subject: ${subjectName}\nTopic idea: ${trimmedTitle}`,
+    },
+  ];
+
+  try {
+    const result = await routeAndCall(messages, 1);
+    const jsonMatch = result.response.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return fallbackTopicPreview(subjectName, trimmedTitle);
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+    const preview = {
+      title: String(parsed.title ?? trimmedTitle).trim(),
+      description: String(parsed.description ?? '').trim(),
+      estimatedMinutes: Number(parsed.estimatedMinutes ?? 30),
+    };
+
+    if (
+      preview.title.length === 0 ||
+      preview.description.length === 0 ||
+      !Number.isFinite(preview.estimatedMinutes)
+    ) {
+      return fallbackTopicPreview(subjectName, trimmedTitle);
+    }
+
+    return {
+      title: preview.title.slice(0, 200),
+      description: preview.description.slice(0, 500),
+      estimatedMinutes: Math.max(
+        5,
+        Math.min(240, Math.round(preview.estimatedMinutes))
+      ),
+    };
+  } catch {
+    return fallbackTopicPreview(subjectName, trimmedTitle);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +173,69 @@ export async function getCurriculum(
       skipped: t.skipped,
     })),
     generatedAt: curriculum.generatedAt.toISOString(),
+  };
+}
+
+export async function addCurriculumTopic(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  input: CurriculumTopicAddInput
+): Promise<CurriculumTopicAddResponse> {
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
+  if (!subject) throw new Error('Subject not found');
+
+  const curriculum = await db.query.curricula.findFirst({
+    where: eq(curricula.subjectId, subjectId),
+    orderBy: desc(curricula.version),
+  });
+  if (!curriculum) throw new Error('Curriculum not found');
+
+  if (input.mode === 'preview') {
+    const preview = await previewCurriculumTopic(subject.name, input.title);
+    return {
+      mode: 'preview',
+      preview,
+    };
+  }
+
+  const existingTopics = await db.query.curriculumTopics.findMany({
+    where: eq(curriculumTopics.curriculumId, curriculum.id),
+    orderBy: desc(curriculumTopics.sortOrder),
+  });
+  const nextSortOrder =
+    existingTopics.length > 0 ? existingTopics[0]!.sortOrder + 1 : 0;
+
+  const [createdTopic] = await db
+    .insert(curriculumTopics)
+    .values({
+      curriculumId: curriculum.id,
+      title: input.title.trim(),
+      description: input.description.trim(),
+      sortOrder: nextSortOrder,
+      relevance: 'recommended',
+      source: 'user',
+      estimatedMinutes: input.estimatedMinutes,
+    })
+    .returning();
+
+  await db
+    .update(curricula)
+    .set({ updatedAt: new Date() })
+    .where(eq(curricula.id, curriculum.id));
+
+  return {
+    mode: 'create',
+    topic: {
+      id: createdTopic!.id,
+      title: createdTopic!.title,
+      description: createdTopic!.description,
+      sortOrder: createdTopic!.sortOrder,
+      relevance: createdTopic!.relevance,
+      estimatedMinutes: createdTopic!.estimatedMinutes,
+      skipped: createdTopic!.skipped,
+    },
   };
 }
 

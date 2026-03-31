@@ -46,6 +46,9 @@ export default function CreateSubjectScreen() {
   const [resolveState, setResolveState] = useState<ResolveState>({
     phase: 'idle',
   });
+  const [resolveRounds, setResolveRounds] = useState(0);
+  const [showClarifyInput, setShowClarifyInput] = useState(false);
+  const [clarificationInput, setClarificationInput] = useState('');
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
   const isBusy =
@@ -54,14 +57,15 @@ export default function CreateSubjectScreen() {
   const showSuggestion = resolveState.phase === 'suggestion';
 
   const doCreate = useCallback(
-    async (subjectName: string) => {
+    async (subjectName: string, rawInputOverride?: string) => {
       setResolveState({ phase: 'creating' });
       setError('');
       try {
         const rawInput =
-          originalInput && originalInput !== subjectName
+          rawInputOverride ??
+          (originalInput && originalInput !== subjectName
             ? originalInput
-            : undefined;
+            : undefined);
         const result = await createSubject.mutateAsync({
           name: subjectName,
           ...(rawInput ? { rawInput } : {}),
@@ -81,38 +85,40 @@ export default function CreateSubjectScreen() {
     [createSubject, router, originalInput]
   );
 
+  const resolveInput = useCallback(
+    async (rawInput: string) => {
+      const trimmedInput = rawInput.trim();
+      if (!trimmedInput) return;
+
+      setResolveRounds((prev) => prev + 1);
+      setOriginalInput(trimmedInput);
+      setResolveState({ phase: 'resolving' });
+      setError('');
+
+      try {
+        const result = await resolveSubject.mutateAsync({
+          rawInput: trimmedInput,
+        });
+
+        if (result.status === 'direct_match') {
+          await doCreate(result.resolvedName ?? trimmedInput);
+          return;
+        }
+
+        setShowClarifyInput(false);
+        setResolveState({ phase: 'suggestion', result });
+      } catch {
+        await doCreate(trimmedInput, trimmedInput);
+      }
+    },
+    [doCreate, resolveSubject]
+  );
+
   const onSubmit = useCallback(async () => {
     if (!canSubmit) return;
     setError('');
-    setOriginalInput(name.trim());
-    setResolveState({ phase: 'resolving' });
-
-    try {
-      const result = await resolveSubject.mutateAsync({
-        rawInput: name.trim(),
-      });
-
-      if (result.status === 'direct_match') {
-        await doCreate(result.resolvedName ?? name.trim());
-        return;
-      }
-
-      if (result.status === 'no_match') {
-        setError(
-          result.displayMessage ||
-            "I couldn't find a matching subject. Try a subject name like 'Physics' or describe what you'd like to learn."
-        );
-        setResolveState({ phase: 'idle' });
-        return;
-      }
-
-      // corrected, resolved, or ambiguous — show suggestion card(s)
-      setResolveState({ phase: 'suggestion', result });
-    } catch {
-      // Resolve failed — fall through to create with raw name
-      await doCreate(name.trim());
-    }
-  }, [canSubmit, name, resolveSubject, doCreate]);
+    await resolveInput(name.trim());
+  }, [canSubmit, name, resolveInput]);
 
   const onPickSuggestion = useCallback(
     async (suggestionName: string) => {
@@ -134,8 +140,29 @@ export default function CreateSubjectScreen() {
     if (resolveState.result.resolvedName) {
       setName(resolveState.result.resolvedName);
     }
+    setShowClarifyInput(false);
+    setClarificationInput('');
     setResolveState({ phase: 'idle' });
   }, [resolveState]);
+
+  const onSomethingElse = useCallback(() => {
+    setShowClarifyInput(true);
+    setClarificationInput('');
+    setError('');
+  }, []);
+
+  const onClarifySubmit = useCallback(async () => {
+    if (!clarificationInput.trim() || isBusy) return;
+    setName(clarificationInput.trim());
+    await resolveInput(clarificationInput.trim());
+  }, [clarificationInput, isBusy, resolveInput]);
+
+  const onUseMyWords = useCallback(async () => {
+    const rawInput = (clarificationInput || originalInput || name).trim();
+    if (!rawInput) return;
+    setName(rawInput);
+    await doCreate(rawInput, rawInput);
+  }, [clarificationInput, doCreate, name, originalInput]);
 
   const onNameChange = useCallback(
     (text: string) => {
@@ -150,6 +177,9 @@ export default function CreateSubjectScreen() {
 
   const isAmbiguous =
     showSuggestion && resolveState.result.status === 'ambiguous';
+  const isNoMatch = showSuggestion && resolveState.result.status === 'no_match';
+  const allowUseMyWords = isNoMatch || resolveRounds >= 2;
+  const exactWords = (clarificationInput || originalInput || name).trim();
 
   return (
     <KeyboardAvoidingView
@@ -280,12 +310,102 @@ export default function CreateSubjectScreen() {
                 />
               </Pressable>
             ))}
+            <Pressable
+              onPress={onSomethingElse}
+              className="bg-surface rounded-card px-4 py-3 mt-2 border border-border min-h-[52px] justify-center"
+              testID="subject-something-else"
+              accessibilityRole="button"
+              accessibilityLabel="Something else"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Something else
+              </Text>
+              <Text className="text-body-sm text-text-secondary mt-0.5">
+                Be as specific as you like.
+              </Text>
+            </Pressable>
+
+            {showClarifyInput && (
+              <View className="mt-3" testID="subject-clarify-card">
+                <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+                  What exactly do you want to learn?
+                </Text>
+                <TextInput
+                  className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-3"
+                  placeholder="e.g. ant colonies, Roman roads, solving fractions..."
+                  placeholderTextColor={colors.muted}
+                  value={clarificationInput}
+                  onChangeText={setClarificationInput}
+                  editable={!isBusy}
+                  testID="subject-clarify-input"
+                />
+                <Button
+                  variant="primary"
+                  label="Check this instead"
+                  onPress={onClarifySubmit}
+                  disabled={!clarificationInput.trim() || isBusy}
+                  loading={isBusy}
+                  testID="subject-clarify-submit"
+                />
+              </View>
+            )}
+
+            {allowUseMyWords && exactWords !== '' && (
+              <Pressable
+                onPress={onUseMyWords}
+                className="mt-3 py-2 items-center"
+                testID="subject-use-my-words"
+                accessibilityRole="button"
+                accessibilityLabel={`Just use ${exactWords} as my subject`}
+              >
+                <Text className="text-body-sm font-semibold text-primary">
+                  Just use "{exactWords}" as my subject
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+
+        {isNoMatch && resolveState.phase === 'suggestion' && (
+          <View
+            className="bg-primary-soft rounded-card px-4 py-4 mb-4"
+            testID="subject-no-match-card"
+          >
+            <Text
+              className="text-body text-text-primary mb-3"
+              testID="subject-suggestion-message"
+            >
+              {resolveState.result.displayMessage ||
+                "I couldn't match that cleanly, but we can still use your exact words."}
+            </Text>
+            {exactWords !== '' && (
+              <Button
+                variant="primary"
+                label={`Just use "${exactWords}"`}
+                onPress={onUseMyWords}
+                disabled={isBusy}
+                loading={isBusy}
+                testID="subject-use-my-words"
+              />
+            )}
+            <Pressable
+              onPress={onEditSuggestion}
+              className="py-3 items-center mt-2"
+              testID="subject-no-match-edit"
+              accessibilityRole="button"
+              accessibilityLabel="Edit subject name"
+            >
+              <Text className="text-body-sm font-semibold text-primary">
+                Edit instead
+              </Text>
+            </Pressable>
           </View>
         )}
 
         {/* Single suggestion: corrected or resolved */}
         {showSuggestion &&
           !isAmbiguous &&
+          !isNoMatch &&
           resolveState.phase === 'suggestion' && (
             <View
               className="bg-primary-soft rounded-card px-4 py-4 mb-4"

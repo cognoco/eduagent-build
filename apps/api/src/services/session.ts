@@ -231,6 +231,8 @@ export interface ExchangeBehavioralMetrics {
   isUnderstandingCheck: boolean;
   timeToAnswerMs: number | null;
   hintCountInSession: number;
+  /** FR228: Homework mode used for this exchange */
+  homeworkMode?: 'help_me' | 'check_answer';
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +272,7 @@ async function prepareExchangeContext(
   profileId: string,
   sessionId: string,
   userMessage: string,
-  options?: { voyageApiKey?: string }
+  options?: { voyageApiKey?: string; homeworkMode?: 'help_me' | 'check_answer' }
 ): Promise<ExchangePrep> {
   // 1. Load session
   const session = await getSession(db, profileId, sessionId);
@@ -532,6 +534,8 @@ async function prepareExchangeContext(
           daysSinceLastReview,
         }
       : undefined,
+    // FR228: Homework mode — passed from client per exchange
+    homeworkMode: options?.homeworkMode,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };
@@ -555,6 +559,7 @@ async function persistExchangeResult(
     escalationRung: effectiveRung,
     sessionType: session.sessionType,
     ...(session.sessionType === 'homework' && { isHomework: true }),
+    ...(behavioral?.homeworkMode && { homeworkMode: behavioral.homeworkMode }),
     ...(behavioral && {
       isUnderstandingCheck: behavioral.isUnderstandingCheck,
       timeToAnswerMs: behavioral.timeToAnswerMs,
@@ -639,13 +644,10 @@ export async function processMessage(
   await checkExchangeLimit(db, profileId, sessionId);
 
   const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
-    await prepareExchangeContext(
-      db,
-      profileId,
-      sessionId,
-      input.message,
-      options
-    );
+    await prepareExchangeContext(db, profileId, sessionId, input.message, {
+      ...options,
+      homeworkMode: input.homeworkMode,
+    });
 
   const result = await processExchange(context, input.message);
 
@@ -666,6 +668,7 @@ export async function processMessage(
       isUnderstandingCheck: result.isUnderstandingCheck,
       timeToAnswerMs,
       hintCountInSession: hintCount,
+      homeworkMode: input.homeworkMode,
     }
   );
 
@@ -698,13 +701,10 @@ export async function streamMessage(
   await checkExchangeLimit(db, profileId, sessionId);
 
   const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
-    await prepareExchangeContext(
-      db,
-      profileId,
-      sessionId,
-      input.message,
-      options
-    );
+    await prepareExchangeContext(db, profileId, sessionId, input.message, {
+      ...options,
+      homeworkMode: input.homeworkMode,
+    });
 
   // Compute time-to-answer before streaming begins
   const timeToAnswerMs = lastAiResponseAt
@@ -728,6 +728,7 @@ export async function streamMessage(
           isUnderstandingCheck: detectUnderstandingCheck(fullResponse),
           timeToAnswerMs,
           hintCountInSession: hintCount,
+          homeworkMode: input.homeworkMode,
         }
       );
       return { exchangeCount: newExchangeCount, escalationRung: effectiveRung };

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ChatShell,
@@ -21,6 +21,9 @@ const OPENING_MESSAGE: ChatMessage = {
     "What comes to mind about this topic? Just share what you remember \u2014 there's no wrong answer.",
 };
 
+const DONT_REMEMBER_FALLBACK_HINT =
+  "That's okay — let's see what you do remember. Here's a small hint: think about the main idea or first step tied to this topic. Does anything come back?";
+
 function deriveStatus(retentionStatus?: string): RetentionStatus {
   if (retentionStatus === 'strong') return 'strong';
   if (retentionStatus === 'fading') return 'fading';
@@ -41,6 +44,7 @@ export default function RecallTestScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([OPENING_MESSAGE]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [inputDisabled, setInputDisabled] = useState(false);
+  const [dontRememberCount, setDontRememberCount] = useState(0);
   const [remediationData, setRemediationData] = useState<{
     failureCount: number;
     cooldownEndsAt?: string;
@@ -118,6 +122,7 @@ export default function RecallTestScreen() {
     // Reset state and try again
     setMessages([OPENING_MESSAGE]);
     setInputDisabled(false);
+    setDontRememberCount(0);
     setRemediationData(null);
   }, []);
 
@@ -128,6 +133,63 @@ export default function RecallTestScreen() {
       params: { topicId, subjectId },
     });
   }, [router, topicId, subjectId]);
+
+  const handleDontRemember = useCallback(() => {
+    if (!topicId) return;
+
+    const nextCount = dontRememberCount + 1;
+    setDontRememberCount(nextCount);
+
+    const userMsg: ChatMessage = {
+      id: `user-idr-${Date.now()}`,
+      role: 'user',
+      content: nextCount === 1 ? "I don't remember." : 'Still stuck.',
+    };
+    setMessages((prev) => [...prev, userMsg]);
+
+    submitRecallTest.mutate(
+      { topicId, attemptMode: 'dont_remember' },
+      {
+        onSuccess: (result) => {
+          if (
+            result.failureAction === 'redirect_to_learning_book' ||
+            nextCount >= 2
+          ) {
+            cleanupRef.current = animateResponse(
+              "Thanks for saying that honestly. Let's switch to review so this feels doable again.",
+              setMessages,
+              setIsStreaming,
+              () => {
+                setInputDisabled(true);
+                setRemediationData({
+                  failureCount: result.failureCount,
+                  cooldownEndsAt: result.remediation?.cooldownEndsAt,
+                  retentionStatus: deriveStatus(
+                    result.remediation?.retentionStatus
+                  ),
+                });
+              }
+            );
+            return;
+          }
+
+          cleanupRef.current = animateResponse(
+            result.hint ?? DONT_REMEMBER_FALLBACK_HINT,
+            setMessages,
+            setIsStreaming
+          );
+        },
+        onError: (err: Error) => {
+          setDontRememberCount((prev) => Math.max(prev - 1, 0));
+          cleanupRef.current = animateResponse(
+            formatApiError(err),
+            setMessages,
+            setIsStreaming
+          );
+        },
+      }
+    );
+  }, [dontRememberCount, submitRecallTest, topicId]);
 
   if (!topicId) {
     return (
@@ -157,6 +219,24 @@ export default function RecallTestScreen() {
     </View>
   ) : undefined;
 
+  const inputAccessory = !inputDisabled ? (
+    <View className="px-4 pt-3 bg-surface border-t border-surface-elevated">
+      <Pressable
+        onPress={handleDontRemember}
+        className="self-start rounded-button px-4 py-2 bg-surface-elevated"
+        testID="recall-dont-remember-button"
+        accessibilityRole="button"
+        accessibilityLabel={
+          dontRememberCount > 0 ? 'Still stuck' : "I don't remember"
+        }
+      >
+        <Text className="text-body-sm font-medium text-text-primary">
+          {dontRememberCount > 0 ? 'Still stuck' : "I don't remember"}
+        </Text>
+      </Pressable>
+    </View>
+  ) : undefined;
+
   return (
     <View testID="recall-test-screen" style={{ flex: 1 }}>
       <ChatShell
@@ -167,6 +247,7 @@ export default function RecallTestScreen() {
         isStreaming={isStreaming}
         inputDisabled={inputDisabled}
         footer={footer}
+        inputAccessory={inputAccessory}
         placeholder="Explain what you remember..."
         messagesTestID="recall-messages"
       />
