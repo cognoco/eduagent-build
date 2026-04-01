@@ -65,6 +65,7 @@ testsprite_tests/
 # Environment variables
 # IMPORTANT: .env.example IS tracked (template for developers)
 # All other .env files contain secrets and MUST NOT be committed
+.env*
 .env
 .env.local
 .env.development
