@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
-  TextInput,
+  // TextInput,  // COMMENTED OUT per BUG-13: only used by removed chat input
   Pressable,
   ScrollView,
   ActivityIndicator,
@@ -64,8 +64,8 @@ export default function HomeScreen() {
   const themeColors = useThemeColors();
   const { profiles, activeProfile, switchProfile } = useProfile();
 
-  // Chat input state
-  const [chatInput, setChatInput] = useState('');
+  // Chat input state — COMMENTED OUT per BUG-13: home is card-based hub, not chat
+  // const [chatInput, setChatInput] = useState('');
   const {
     isApiReachable,
     isChecked: apiChecked,
@@ -122,32 +122,29 @@ export default function HomeScreen() {
     }
   }, [coachingCard.primaryRoute, activeSubjects, router]);
 
-  const handleChatSubmit = useCallback((): void => {
-    const text = chatInput.trim();
-    if (!text) return;
-
-    const hasSubjects = activeSubjects.length > 0;
-
-    if (hasSubjects) {
-      // Has subjects — navigate as learning session. The session screen
-      // auto-classifies which subject from the user's message text.
-      router.push(
-        `/(learner)/session?mode=learning&problemText=${encodeURIComponent(
-          text
-        )}` as never
-      );
-    } else {
-      // No subjects yet — use freeform mode; session screen handles
-      // subject classification and can work without a subject.
-      router.push(
-        `/(learner)/session?mode=freeform&problemText=${encodeURIComponent(
-          text
-        )}` as never
-      );
-    }
-
-    setChatInput('');
-  }, [chatInput, activeSubjects, router]);
+  // COMMENTED OUT per BUG-13: chat input removed from home screen
+  // const handleChatSubmit = useCallback((): void => {
+  //   const text = chatInput.trim();
+  //   if (!text) return;
+  //
+  //   const hasSubjects = activeSubjects.length > 0;
+  //
+  //   if (hasSubjects) {
+  //     router.push(
+  //       `/(learner)/session?mode=learning&problemText=${encodeURIComponent(
+  //         text
+  //       )}` as never
+  //     );
+  //   } else {
+  //     router.push(
+  //       `/(learner)/session?mode=freeform&problemText=${encodeURIComponent(
+  //         text
+  //       )}` as never
+  //     );
+  //   }
+  //
+  //   setChatInput('');
+  // }, [chatInput, activeSubjects, router]);
 
   // First-time user redirect: send users with no subjects to create-subject
   const hasRedirected = useRef(false);
@@ -593,7 +590,8 @@ export default function HomeScreen() {
         </AnimatedEntry>
       </ScrollView>
 
-      {/* Chat input — primary way to start a learning session (Bug #10) */}
+      {/* COMMENTED OUT per BUG-13: home screen is card-based hub, chat input belongs on session screen.
+          To re-enable: also uncomment chatInput state (line ~68), handleChatSubmit (line ~126), and TextInput import (line ~5).
       <View
         className="px-4 py-3 bg-surface border-t border-surface-elevated flex-row items-end"
         style={{ paddingBottom: Math.max(insets.bottom, 8) }}
@@ -630,6 +628,7 @@ export default function HomeScreen() {
           />
         </Pressable>
       </View>
+      */}
 
       {/* Practice for a test — subject picker bottom sheet */}
       <Modal

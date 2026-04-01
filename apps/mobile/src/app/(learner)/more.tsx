@@ -13,7 +13,8 @@ import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import type { LearningMode } from '@eduagent/schemas';
 import { useTheme, type Persona } from '../../lib/theme';
-import { AccentPicker } from '../../components/common';
+// COMMENTED OUT per BUG-9: accent picker removed (fixed brand decision)
+// import { AccentPicker } from '../../components/common';
 import { useProfile } from '../../lib/profile';
 import { useExportData } from '../../hooks/use-account';
 import {
@@ -139,7 +140,9 @@ export default function MoreScreen() {
   const { signOut } = useAuth();
   const { user } = useUser();
   const { activeProfile } = useProfile();
-  const { persona, setPersona, accentPresetId, setAccentPresetId } = useTheme();
+  // accentPresetId/setAccentPresetId commented out with AccentPicker (BUG-9)
+  const { persona, setPersona /* , accentPresetId, setAccentPresetId */ } =
+    useTheme();
   const exportData = useExportData();
 
   const { data: subscription } = useSubscription();
@@ -253,6 +256,7 @@ export default function MoreScreen() {
           </Pressable>
         ))}
 
+        {/* COMMENTED OUT per BUG-9: fixed brand — no user-configurable accent colors at MVP
         <View className="mt-4">
           <AccentPicker
             persona={persona}
@@ -260,6 +264,7 @@ export default function MoreScreen() {
             setAccentPresetId={setAccentPresetId}
           />
         </View>
+        */}
 
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
           Notifications
