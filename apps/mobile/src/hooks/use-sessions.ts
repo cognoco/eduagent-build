@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import type {
+  CelebrationReason,
   HomeworkSessionMetadata,
   LearningSession,
   SessionMessageInput,
@@ -155,7 +156,7 @@ export function useCloseSession(sessionId: string): UseMutationResult<
       | 'accepted'
       | 'skipped'
       | 'auto_closed';
-    milestonesReached?: string[];
+    milestonesReached?: CelebrationReason[];
   }
 > {
   const client = useApiClient();
@@ -165,7 +166,7 @@ export function useCloseSession(sessionId: string): UseMutationResult<
     mutationFn: async (input = {}) => {
       const res = await client.sessions[':sessionId'].close.$post({
         param: { sessionId },
-        json: input,
+        json: input as Record<string, unknown>,
       });
       await assertOk(res);
       return (await res.json()) as unknown as CloseResult;

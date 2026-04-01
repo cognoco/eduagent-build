@@ -91,28 +91,34 @@ jest.mock('../../../hooks/use-api-reachability', () => ({
   useApiReachability: () => ({ isApiReachable: true, isChecked: true }),
 }));
 
+const mockCelebrationLevel = { data: 'full' };
 jest.mock('../../../hooks/use-settings', () => ({
-  useCelebrationLevel: () => ({ data: 'full' }),
+  useCelebrationLevel: () => mockCelebrationLevel,
 }));
 
+const mockTrigger = jest.fn();
+const NullOverlay = () => null;
+const mockCelebrationResult = { CelebrationOverlay: NullOverlay, trigger: mockTrigger };
 jest.mock('../../../hooks/use-celebration', () => ({
-  useCelebration: () => ({
-    CelebrationOverlay: () => null,
-    trigger: jest.fn(),
-  }),
+  useCelebration: () => mockCelebrationResult,
 }));
 
+const mockTrackExchangeResult = { triggered: [] as string[], trackerState: {} };
+const mockTrackExchange = jest.fn().mockReturnValue(mockTrackExchangeResult);
+const mockHydrate = jest.fn();
+const mockResetMilestones = jest.fn();
+const mockMilestoneTracker = {
+  milestonesReached: [] as string[],
+  trackerState: {},
+  trackExchange: mockTrackExchange,
+  hydrate: mockHydrate,
+  reset: mockResetMilestones,
+};
 jest.mock('../../../hooks/use-milestone-tracker', () => ({
   celebrationForReason: jest.fn(),
   createMilestoneTrackerStateFromMilestones: jest.fn().mockReturnValue({}),
   normalizeMilestoneTrackerState: jest.fn().mockReturnValue({}),
-  useMilestoneTracker: () => ({
-    milestonesReached: [],
-    trackerState: {},
-    trackExchange: jest.fn().mockReturnValue({ triggered: [], trackerState: {} }),
-    hydrate: jest.fn(),
-    reset: jest.fn(),
-  }),
+  useMilestoneTracker: () => mockMilestoneTracker,
 }));
 
 jest.mock('../../../lib/session-recovery', () => ({
