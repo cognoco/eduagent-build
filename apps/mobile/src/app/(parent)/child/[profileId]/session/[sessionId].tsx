@@ -56,13 +56,21 @@ export default function SessionTranscriptScreen() {
         </Pressable>
         <View className="flex-1">
           <Text className="text-h2 font-bold text-text-primary">
-            Session Transcript
+            {transcript?.session.homeworkSummary?.displayTitle ??
+              'Session Transcript'}
           </Text>
           {transcript && (
-            <Text className="text-body-sm text-text-secondary mt-0.5">
-              {sessionDate} &middot; {transcript.session.exchangeCount}{' '}
-              exchanges &middot; {transcript.session.sessionType}
-            </Text>
+            <>
+              <Text className="text-body-sm text-text-secondary mt-0.5">
+                {sessionDate} &middot; {transcript.session.exchangeCount}{' '}
+                exchanges &middot; {transcript.session.sessionType}
+              </Text>
+              {transcript.session.displaySummary ? (
+                <Text className="text-caption text-text-secondary mt-1">
+                  {transcript.session.displaySummary}
+                </Text>
+              ) : null}
+            </>
           )}
         </View>
       </View>

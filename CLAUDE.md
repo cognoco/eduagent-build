@@ -174,7 +174,7 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 **Complete — all routes production-ready:**
 - Epics 0-5: full API layer (~1,649 API tests + ~617 mobile tests + 16 integration test suites, all passing)
 - All 24 route files wired to real services with DB persistence (including `consent-web` browser flow and `test-seed` E2E endpoints)
-- Mobile: 38+ screens (73 test suites), all using real API calls via TanStack Query + Hono RPC
+- Mobile: 38+ screens (74 test suites), all using real API calls via TanStack Query + Hono RPC
 - Background jobs: 11 Inngest functions (session-completed chain, trial-expiry, consent-reminders, consent-revocation, account-deletion, review-reminder, payment-retry, quota-reset, topup-expiry-reminder, subject-auto-archive)
 - Auth: Clerk (SSO + email/password), PasswordInput with show/hide + requirements
 - Billing: Stripe integration built (checkout, portal, webhooks, KV-cached status, quota metering) — **mobile must add native IAP (RevenueCat) before App Store submission** (Epic 9). Stripe code kept for future web client.

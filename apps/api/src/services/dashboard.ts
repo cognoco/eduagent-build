@@ -14,7 +14,12 @@ import {
   curriculumTopics,
   type Database,
 } from '@eduagent/database';
-import type { DashboardChild, TopicProgress } from '@eduagent/schemas';
+import type {
+  DashboardChild,
+  HomeworkSummary,
+  SessionMetadata,
+  TopicProgress,
+} from '@eduagent/schemas';
 import { getOverallProgress, getTopicProgress } from './progress';
 
 export interface DashboardInput {
@@ -171,6 +176,31 @@ function getStartOfWeek(date: Date): Date {
   d.setUTCDate(diff);
   d.setUTCHours(0, 0, 0, 0);
   return d;
+}
+
+function getSessionMetadata(metadata: unknown): SessionMetadata {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return {};
+  }
+  return metadata as SessionMetadata;
+}
+
+function formatSessionDisplayTitle(
+  sessionType: string,
+  homeworkSummary?: HomeworkSummary | null
+): string {
+  if (homeworkSummary?.displayTitle) {
+    return homeworkSummary.displayTitle;
+  }
+
+  switch (sessionType) {
+    case 'homework':
+      return 'Homework';
+    case 'interleaved':
+      return 'Interleaved Practice';
+    default:
+      return 'Learning';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -399,6 +429,9 @@ export interface ChildSession {
   escalationRung: number;
   durationSeconds: number | null;
   wallClockSeconds: number | null;
+  displayTitle: string;
+  displaySummary: string | null;
+  homeworkSummary: HomeworkSummary | null;
 }
 
 export interface TranscriptExchange {
@@ -416,6 +449,9 @@ export interface ChildSessionTranscript {
     sessionType: string;
     startedAt: string;
     exchangeCount: number;
+    displayTitle: string;
+    displaySummary: string | null;
+    homeworkSummary: HomeworkSummary | null;
   };
   exchanges: TranscriptExchange[];
 }
@@ -444,18 +480,26 @@ export async function getChildSessions(
     limit: 50,
   });
 
-  return sessions.map((s) => ({
-    sessionId: s.id,
-    subjectId: s.subjectId,
-    topicId: s.topicId,
-    sessionType: s.sessionType,
-    startedAt: s.startedAt.toISOString(),
-    endedAt: s.endedAt?.toISOString() ?? null,
-    exchangeCount: s.exchangeCount,
-    escalationRung: s.escalationRung,
-    durationSeconds: s.durationSeconds,
-    wallClockSeconds: s.wallClockSeconds,
-  }));
+  return sessions.map((s) => {
+    const metadata = getSessionMetadata(s.metadata);
+    const homeworkSummary = metadata.homeworkSummary ?? null;
+
+    return {
+      sessionId: s.id,
+      subjectId: s.subjectId,
+      topicId: s.topicId,
+      sessionType: s.sessionType,
+      startedAt: s.startedAt.toISOString(),
+      endedAt: s.endedAt?.toISOString() ?? null,
+      exchangeCount: s.exchangeCount,
+      escalationRung: s.escalationRung,
+      durationSeconds: s.durationSeconds,
+      wallClockSeconds: s.wallClockSeconds,
+      displayTitle: formatSessionDisplayTitle(s.sessionType, homeworkSummary),
+      displaySummary: homeworkSummary?.summary ?? null,
+      homeworkSummary,
+    };
+  });
 }
 
 /**
@@ -516,6 +560,9 @@ export async function getChildSessionTranscript(
     return exchange;
   });
 
+  const metadata = getSessionMetadata(session.metadata);
+  const homeworkSummary = metadata.homeworkSummary ?? null;
+
   return {
     session: {
       sessionId: session.id,
@@ -524,6 +571,12 @@ export async function getChildSessionTranscript(
       sessionType: session.sessionType,
       startedAt: session.startedAt.toISOString(),
       exchangeCount: session.exchangeCount,
+      displayTitle: formatSessionDisplayTitle(
+        session.sessionType,
+        homeworkSummary
+      ),
+      displaySummary: homeworkSummary?.summary ?? null,
+      homeworkSummary,
     },
     exchanges,
   };

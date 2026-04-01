@@ -298,15 +298,23 @@ async function createBaseProfile(
     displayName: string;
     personaType: 'TEEN' | 'LEARNER' | 'PARENT';
     isOwner?: boolean;
+    birthDate?: Date;
   }
 ): Promise<string> {
   const profileId = generateUUIDv7();
+  // Default birth dates by persona so consent pipeline always has age data
+  const defaultBirthDates: Record<string, Date> = {
+    TEEN: new Date('2014-06-15'),
+    LEARNER: new Date('2008-06-15'),
+    PARENT: new Date('1990-01-01'),
+  };
   await db.insert(profiles).values({
     id: profileId,
     accountId,
     displayName: opts.displayName,
     personaType: opts.personaType,
     isOwner: opts.isOwner ?? true,
+    birthDate: opts.birthDate ?? defaultBirthDates[opts.personaType]!,
   });
   return profileId;
 }

@@ -5,6 +5,7 @@ import {
   useStartSession,
   useSendMessage,
   useCloseSession,
+  useSyncHomeworkState,
   useStreamMessage,
   useSessionSummary,
   useSkipSummary,
@@ -119,6 +120,60 @@ describe('useStartSession', () => {
     const body = JSON.parse(fetchInit.body as string);
     expect(body.topicId).toBe('topic-1');
     expect(body.sessionType).toBe('homework');
+  });
+
+  it('passes homework metadata to the API when provided', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          session: {
+            id: 'session-1',
+            subjectId: 'subject-1',
+            sessionType: 'homework',
+            status: 'active',
+            escalationRung: 1,
+            exchangeCount: 0,
+            startedAt: '2025-01-01T00:00:00Z',
+            lastActivityAt: '2025-01-01T00:00:00Z',
+            endedAt: null,
+            durationSeconds: null,
+          },
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useStartSession('subject-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate({
+        subjectId: 'subject-1',
+        sessionType: 'homework',
+        metadata: {
+          homework: {
+            problemCount: 2,
+            currentProblemIndex: 0,
+            problems: [
+              {
+                id: 'problem-1',
+                text: 'Solve 2x + 5 = 17',
+                source: 'ocr',
+              },
+            ],
+          },
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    const [, fetchInit] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(fetchInit.body as string);
+    expect(body.metadata.homework.problemCount).toBe(2);
   });
 
   it('calls POST /subjects/:subjectId/sessions', async () => {
@@ -260,6 +315,52 @@ describe('useCloseSession', () => {
     const [, fetchInit] = mockFetch.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(fetchInit.body as string);
     expect(body.milestonesReached).toEqual(['polar_star', 'comet']);
+  });
+});
+
+describe('useSyncHomeworkState', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('calls POST /sessions/:sessionId/homework-state', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          metadata: {
+            problemCount: 2,
+            currentProblemIndex: 1,
+            problems: [],
+          },
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useSyncHomeworkState('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate({
+        metadata: {
+          problemCount: 2,
+          currentProblemIndex: 1,
+          problems: [],
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
   });
 });
 

@@ -13,12 +13,19 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import type { HomeworkProblem } from '@eduagent/schemas';
 import { useThemeColors } from '../../../lib/theme';
 import { cameraReducer, initialCameraState } from './camera-reducer';
 import { useHomeworkOcr } from '../../../hooks/use-homework-ocr';
 import { useSubjects } from '../../../hooks/use-subjects';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { CelebrationAnimation } from '../../../components/common';
+import {
+  createHomeworkProblem,
+  getHomeworkProblemText,
+  serializeHomeworkProblems,
+  splitHomeworkProblems,
+} from './problem-cards';
 
 type FlashMode = 'off' | 'on' | 'auto';
 
@@ -37,7 +44,8 @@ export default function CameraScreen(): React.ReactNode {
   const cameraRef = useRef<CameraView>(null);
   const { data: subjects } = useSubjects();
 
-  const [editedText, setEditedText] = useState('');
+  const [ocrText, setOcrText] = useState('');
+  const [draftProblems, setDraftProblems] = useState<HomeworkProblem[]>([]);
   const [manualText, setManualText] = useState('');
   const [flash, setFlash] = useState<FlashMode>('off');
   const [showCelebration, setShowCelebration] = useState(true);
@@ -56,7 +64,8 @@ export default function CameraScreen(): React.ReactNode {
   useFocusEffect(
     useCallback(() => {
       dispatch({ type: 'RESET', hasPermission: permission?.granted ?? false });
-      setEditedText('');
+      setOcrText('');
+      setDraftProblems([]);
       setManualText('');
       setManualSubjectName('');
       setShowCelebration(true);
@@ -78,18 +87,21 @@ export default function CameraScreen(): React.ReactNode {
   useEffect(() => {
     if (ocr.status === 'done' && ocr.text) {
       dispatch({ type: 'OCR_SUCCESS', text: ocr.text });
-      setEditedText(ocr.text);
+      setOcrText(ocr.text);
+      setDraftProblems(splitHomeworkProblems(ocr.text));
     } else if (ocr.status === 'error' && ocr.error) {
       dispatch({ type: 'OCR_ERROR', message: ocr.error });
     }
   }, [ocr.status, ocr.text, ocr.error]);
+
+  const combinedProblemText = getHomeworkProblemText(draftProblems);
 
   // Auto-classify subject when OCR text is available and no subjectId
   useEffect(() => {
     async function classify(): Promise<void> {
       if (
         state.phase !== 'result' ||
-        !editedText ||
+        !combinedProblemText ||
         subjectId ||
         classifyTriggeredRef.current
       )
@@ -97,7 +109,7 @@ export default function CameraScreen(): React.ReactNode {
       classifyTriggeredRef.current = true;
       try {
         const result = await classifyMutation.mutateAsync({
-          text: editedText,
+          text: combinedProblemText,
         });
         if (!result.needsConfirmation && result.candidates.length === 1) {
           const c = result.candidates[0]!;
@@ -114,7 +126,7 @@ export default function CameraScreen(): React.ReactNode {
     }
     classify();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.phase, editedText, subjectId]);
+  }, [state.phase, combinedProblemText, subjectId]);
 
   const handleCapture = useCallback(async () => {
     const photo = await cameraRef.current?.takePictureAsync();
@@ -139,7 +151,14 @@ export default function CameraScreen(): React.ReactNode {
   }, [ocr]);
 
   const navigateToSession = useCallback(
-    (sid: string, sName: string, problemText: string, imageUri?: string) => {
+    (
+      sid: string,
+      sName: string,
+      problemText: string,
+      problems?: HomeworkProblem[],
+      imageUri?: string,
+      sourceOcrText?: string
+    ) => {
       router.replace({
         pathname: '/(learner)/session',
         params: {
@@ -147,6 +166,10 @@ export default function CameraScreen(): React.ReactNode {
           subjectId: sid,
           subjectName: sName,
           problemText,
+          ...(problems && problems.length > 0
+            ? { homeworkProblems: serializeHomeworkProblems(problems) }
+            : {}),
+          ...(sourceOcrText ? { ocrText: sourceOcrText } : {}),
           ...(imageUri ? { imageUri } : {}),
         },
       } as never);
@@ -158,6 +181,13 @@ export default function CameraScreen(): React.ReactNode {
     const effectiveSubjectId = subjectId ?? autoDetectedSubject?.subjectId;
     const effectiveSubjectName =
       subjectName ?? autoDetectedSubject?.subjectName ?? '';
+    if (!combinedProblemText.trim()) {
+      Alert.alert(
+        'No problems found',
+        'Please keep at least one problem card.'
+      );
+      return;
+    }
     if (!effectiveSubjectId) {
       Alert.alert(
         'No subject selected',
@@ -168,23 +198,40 @@ export default function CameraScreen(): React.ReactNode {
     navigateToSession(
       effectiveSubjectId,
       effectiveSubjectName,
-      editedText,
-      state.imageUri ?? undefined
+      combinedProblemText,
+      draftProblems,
+      state.imageUri ?? undefined,
+      ocrText
     );
   }, [
     navigateToSession,
     subjectId,
     subjectName,
     autoDetectedSubject,
-    editedText,
+    combinedProblemText,
+    draftProblems,
     state.imageUri,
+    ocrText,
   ]);
 
   const handlePickSubject = useCallback(
     (sid: string, sName: string) => {
-      navigateToSession(sid, sName, editedText, state.imageUri ?? undefined);
+      navigateToSession(
+        sid,
+        sName,
+        combinedProblemText,
+        draftProblems,
+        state.imageUri ?? undefined,
+        ocrText
+      );
     },
-    [navigateToSession, editedText, state.imageUri]
+    [
+      navigateToSession,
+      combinedProblemText,
+      draftProblems,
+      state.imageUri,
+      ocrText,
+    ]
   );
 
   const handleManualSubjectContinue = useCallback(() => {
@@ -194,10 +241,19 @@ export default function CameraScreen(): React.ReactNode {
     navigateToSession(
       'new', // sentinel value — session start will create subject
       manualSubjectName.trim(),
-      editedText,
-      state.imageUri ?? undefined
+      combinedProblemText,
+      draftProblems,
+      state.imageUri ?? undefined,
+      ocrText
     );
-  }, [navigateToSession, manualSubjectName, editedText, state.imageUri]);
+  }, [
+    navigateToSession,
+    manualSubjectName,
+    combinedProblemText,
+    draftProblems,
+    state.imageUri,
+    ocrText,
+  ]);
 
   const handleManualContinue = useCallback(async () => {
     if (subjectId) {
@@ -236,6 +292,30 @@ export default function CameraScreen(): React.ReactNode {
 
   const toggleFlash = useCallback(() => {
     setFlash((prev) => (prev === 'off' ? 'on' : 'off'));
+  }, []);
+
+  const handleProblemTextChange = useCallback(
+    (problemId: string, text: string) => {
+      setDraftProblems((prev) =>
+        prev.map((problem) =>
+          problem.id === problemId ? { ...problem, text } : problem
+        )
+      );
+    },
+    []
+  );
+
+  const handleAddProblem = useCallback(() => {
+    setDraftProblems((prev) => [
+      ...prev,
+      createHomeworkProblem('', { source: 'manual', originalText: null }),
+    ]);
+  }, []);
+
+  const handleRemoveProblem = useCallback((problemId: string) => {
+    setDraftProblems((prev) =>
+      prev.filter((problem) => problem.id !== problemId)
+    );
   }, []);
 
   // ---- Permission phase ----
@@ -467,19 +547,62 @@ export default function CameraScreen(): React.ReactNode {
         )}
 
         <Text className="text-body text-text-secondary mt-4 mb-3">
-          Here&apos;s what I see:
+          Here are the problems I found:
         </Text>
 
-        <TextInput
-          testID="result-text-input"
-          value={editedText}
-          onChangeText={setEditedText}
-          multiline
-          className="bg-surface rounded-card p-4 text-body text-text-primary min-h-[120px]"
-          textAlignVertical="top"
-          placeholderTextColor={colors.muted}
-          accessibilityLabel="Recognized text, editable"
-        />
+        <View className="gap-3">
+          {draftProblems.map((problem, index) => (
+            <View
+              key={problem.id}
+              className="bg-surface rounded-card p-4"
+              testID={`problem-card-${index}`}
+            >
+              <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-body font-semibold text-text-primary">
+                  Problem {index + 1}
+                </Text>
+                {draftProblems.length > 1 && (
+                  <Pressable
+                    onPress={() => handleRemoveProblem(problem.id)}
+                    testID={`remove-problem-${index}`}
+                    accessibilityLabel={`Remove problem ${index + 1}`}
+                    accessibilityRole="button"
+                  >
+                    <Text className="text-body-sm text-danger">Remove</Text>
+                  </Pressable>
+                )}
+              </View>
+
+              <TextInput
+                testID={
+                  index === 0 ? 'result-text-input' : `problem-input-${index}`
+                }
+                value={problem.text}
+                onChangeText={(text) =>
+                  handleProblemTextChange(problem.id, text)
+                }
+                multiline
+                className="bg-background rounded-card p-4 text-body text-text-primary min-h-[120px]"
+                textAlignVertical="top"
+                placeholder={`Problem ${index + 1}`}
+                placeholderTextColor={colors.muted}
+                accessibilityLabel={`Problem ${index + 1}, editable`}
+              />
+            </View>
+          ))}
+        </View>
+
+        <Pressable
+          testID="add-problem-button"
+          onPress={handleAddProblem}
+          className="mt-3 self-start bg-surface-elevated rounded-button px-4 py-3 min-h-[48px] justify-center"
+          accessibilityLabel="Add another problem card"
+          accessibilityRole="button"
+        >
+          <Text className="text-body-sm font-semibold text-text-primary">
+            Add another problem
+          </Text>
+        </Pressable>
 
         {/* Subject auto-detection loading indicator */}
         {needsSubjectPick && classifyMutation.isPending && (

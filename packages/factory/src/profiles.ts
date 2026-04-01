@@ -9,6 +9,7 @@ export function buildProfile(
   return {
     displayName: `Test User ${counter}`,
     personaType: 'LEARNER',
+    birthDate: '2008-06-15',
     ...overrides,
   };
 }
