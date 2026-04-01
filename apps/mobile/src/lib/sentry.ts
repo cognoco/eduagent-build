@@ -65,39 +65,30 @@ export function isSentryEnabled(): boolean {
   return sentryActive;
 }
 
-/**
- * Calculates age from a birth date string (YYYY-MM-DD).
- */
-function calculateAge(birthDate: string): number {
-  const birth = new Date(birthDate);
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    age--;
-  }
-  return age;
+/** Calculates age from a birth year using the current calendar year. */
+function calculateAge(birthYear: number): number {
+  return new Date().getFullYear() - birthYear;
 }
 
 /**
  * Evaluates whether Sentry should be enabled for the given profile.
  *
- * @param birthDate - Profile birth date (YYYY-MM-DD) or null
+ * @param birthYear - Profile birth year or null
  * @param consentStatus - Current consent status or null
  */
 export function evaluateSentryForProfile(
-  birthDate: string | null,
+  birthYear: number | null,
   consentStatus: string | null
 ): void {
   if (!getSentryDsn()) return;
 
-  // No birth date → can't determine age → enable (adult assumed)
-  if (!birthDate) {
+  // No birth year → can't determine age → enable (adult assumed)
+  if (birthYear == null) {
     enableSentry();
     return;
   }
 
-  const age = calculateAge(birthDate);
+  const age = calculateAge(birthYear);
 
   if (age < 13) {
     // Under 13: only enable if consent is CONSENTED

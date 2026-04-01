@@ -177,11 +177,11 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 
 **Complete — all routes production-ready:**
 - Epics 0-5: full API layer (~1,649 API tests + ~617 mobile tests + 16 integration test suites, all passing)
-- All 24 route files wired to real services with DB persistence (including `consent-web` browser flow and `test-seed` E2E endpoints)
+- All 25 route files wired to real services with DB persistence (including `consent-web` browser flow, `test-seed` E2E endpoints, `revenuecat-webhook`, and `celebrations`)
 - Mobile: 38+ screens (74 test suites), all using real API calls via TanStack Query + Hono RPC
-- Background jobs: 11 Inngest functions (session-completed chain, trial-expiry, consent-reminders, consent-revocation, account-deletion, review-reminder, payment-retry, quota-reset, topup-expiry-reminder, subject-auto-archive)
+- Background jobs: 11 Inngest functions (session-completed chain, trial-expiry, consent-reminders, consent-revocation, account-deletion, review-reminder, payment-retry, quota-reset, topup-expiry-reminder, subject-auto-archive, session-stale-cleanup)
 - Auth: Clerk (SSO + email/password), PasswordInput with show/hide + requirements
-- Billing: Stripe integration built (checkout, portal, webhooks, KV-cached status, quota metering) — **mobile must add native IAP (RevenueCat) before App Store submission** (Epic 9). Stripe code kept for future web client.
+- Billing: Stripe integration built (checkout, portal, webhooks, KV-cached status, quota metering) + RevenueCat native IAP (Epic 9 complete). Stripe code kept dormant for future web client.
 - Email: Resend integration (consent emails, reminders)
 - Push: Expo Push API (trial warnings, review reminders, daily reminders) + `usePushTokenRegistration` hook auto-registers Expo push tokens on mount in both learner and parent layouts
 - Consent middleware: `consentMiddleware` blocks data-collecting routes for profiles with pending/revoked consent (AUDIT-001)
@@ -206,6 +206,26 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 **Not yet integrated:** OCR provider (server-side fallback; ML Kit primary on device).
 
 **Epic 9 (COMPLETE): Native In-App Purchases** — Apple StoreKit 2 / Google Play Billing via RevenueCat SDK integrated. Existing Stripe code **kept intact** (dormant) for future web client and B2B/school licensing. Business logic (quota metering, subscription tiers, KV caching) is payment-agnostic and unchanged.
+
+**Epic 10 (PRE-LAUNCH UX POLISH) — Nearly complete (verified 2026-04-01):**
+- 15 stories fully done, 7 stories with minor gaps, 1 story not built (10.17 email delivery feedback)
+- Fully done: topic skip undo (10.1), child-friendly consent text (10.2), profile removal alert (10.3), relearn descriptions (10.6), Living Book animation (10.7), recall remediation copy (10.9), consent deny confirmation (10.11), subject raw input audit (10.12), guided label tooltip (10.13), offline action gating (10.16), consent unification/GDPR-everywhere (10.19), subject classification service (10.20), camera auto-detection (10.21), practice-for-test picker (10.23)
+- Partial gaps: actionable errors missing session streaming message (10.4), curriculum label buttons mismatch (10.5), session summary Phase 1 not built (10.8), consent handoff missing animation (10.10), privacyPolicyUrl missing from app.json (10.14), Learning Book empty state for completion (10.15), rating prompt hook not integrated (10.18), session subject inference missing ambiguous picker (10.22)
+- Not built: parent email delivery feedback (10.17)
+
+**Epic 11 (BRAND IDENTITY) — Complete (verified 2026-04-01):**
+- 11.1: Navy dark bg (#1a1a3e), teal primary, lavender secondary, persona-based defaults removed
+- 11.2: Accent cascade — no hardcoded hex in components, semantic tokens via `useThemeColors()`
+- 11.3: Light mode — darkened teal (#0d9488) and lavender (#8b5cf6) for cream (#faf5ee) background
+
+**Epic 13 (SESSION LIFECYCLE) — Complete (all 7 stories verified 2026-04-01):**
+- 13.1: `wallClockSeconds` column, `computeActiveSeconds()` with adaptive per-gap caps, dashboard shows wall-clock + exchange count
+- 13.2: Hard caps/nudge removed, adaptive silence replaces fixed thresholds
+- 13.3: Crash recovery via SecureStore markers, 30-min session resumption, Inngest stale session cron (every 10 min)
+- 13.4: 4 celestial celebration components (PolarStar, TwinStars, Comet, OrionsBelt), `useCelebration()` queue with 3-level filtering, `useMilestoneTracker()` with mastery + effort milestones
+- 13.5: Adaptive silence — LLM `expectedResponseMinutes`, per-session `paceMultiplier` (0.5-3.0), cross-session `medianResponseSeconds` baseline
+- 13.6: "I'm Done" button, wall-clock summary, milestone recap, 3-sec fast celebration catch
+- 13.7: `queueCelebration()` service, `/celebrations/pending` + `/celebrations/seen` routes, Inngest wiring (EVALUATE→TwinStars, topic mastered→Comet, streak→Comet/OrionsBelt), 7-day expiry, separate child/parent seen states
 
 **Epic 3 extensions — now implemented:**
 - **EVALUATE verification type (Devil's Advocate, FR128-FR133)** — 8th verification type. AI presents flawed reasoning for student to critique (Bloom's Level 5-6). Strong-retention gating (`shouldTriggerEvaluate`), modified SM-2 quality floor (2-3 for failure), `evaluateDifficultyRung` 1-4 on retention card, three-strike escalation, `evaluate-data.ts` DB service, eligibility route (`GET /v1/topics/:topicId/evaluate-eligibility`), wired into session-completed Step 1c.

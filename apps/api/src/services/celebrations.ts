@@ -1,15 +1,15 @@
-import { eq } from 'drizzle-orm';
-import {
-  coachingCardCache,
-  generateUUIDv7,
-  type Database,
-} from '@eduagent/database';
+import type { Database } from '@eduagent/database';
 import type {
   CelebrationLevel,
   CelebrationName,
   CelebrationReason,
   PendingCelebration,
 } from '@eduagent/schemas';
+import {
+  findHomeSurfaceCache,
+  markHomeSurfaceCelebrationsSeen,
+  writeHomeSurfacePendingCelebrations,
+} from './home-surface-cache';
 
 const CELEBRATION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -21,23 +21,6 @@ export const PARENT_VISIBLE_REASONS: CelebrationReason[] = [
   'streak_7',
   'streak_30',
 ];
-
-export function buildFallbackCard(profileId: string) {
-  const now = new Date();
-  return {
-    id: generateUUIDv7(),
-    profileId,
-    type: 'challenge' as const,
-    title: 'Ready for a challenge?',
-    body: 'Keep building momentum.',
-    priority: 3,
-    expiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: now.toISOString(),
-    topicId: profileId,
-    difficulty: 'easy' as const,
-    xpReward: 10,
-  };
-}
 
 export function filterCelebrationsByLevel(
   celebrations: PendingCelebration[],
@@ -96,9 +79,7 @@ export async function queueCelebration(
   reason: CelebrationReason,
   detail?: string | null
 ): Promise<PendingCelebration[]> {
-  const row = await db.query.coachingCardCache.findFirst({
-    where: eq(coachingCardCache.profileId, profileId),
-  });
+  const row = await findHomeSurfaceCache(db, profileId);
 
   const nextEntry: PendingCelebration = {
     celebration,
@@ -120,22 +101,7 @@ export async function queueCelebration(
     ? existing
     : [...existing, nextEntry];
 
-  if (row) {
-    await db
-      .update(coachingCardCache)
-      .set({
-        pendingCelebrations,
-        updatedAt: new Date(),
-      })
-      .where(eq(coachingCardCache.profileId, profileId));
-  } else {
-    await db.insert(coachingCardCache).values({
-      profileId,
-      cardData: buildFallbackCard(profileId),
-      pendingCelebrations,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-    });
-  }
+  await writeHomeSurfacePendingCelebrations(db, profileId, pendingCelebrations);
 
   return pendingCelebrations;
 }
@@ -145,9 +111,7 @@ export async function getPendingCelebrations(
   profileId: string,
   viewer: 'child' | 'parent'
 ): Promise<PendingCelebration[]> {
-  const row = await db.query.coachingCardCache.findFirst({
-    where: eq(coachingCardCache.profileId, profileId),
-  });
+  const row = await findHomeSurfaceCache(db, profileId);
 
   if (!row) return [];
 
@@ -162,16 +126,14 @@ export async function getPendingCelebrations(
 
   // Opportunistically clean out expired entries.
   if (filtered.length !== pending.length) {
-    await db
-      .update(coachingCardCache)
-      .set({
-        pendingCelebrations: pending.filter(
-          (entry) =>
-            filterPendingCelebrations([entry], { viewer: 'child' }).length > 0
-        ),
-        updatedAt: new Date(),
-      })
-      .where(eq(coachingCardCache.profileId, profileId));
+    await writeHomeSurfacePendingCelebrations(
+      db,
+      profileId,
+      pending.filter(
+        (entry) =>
+          filterPendingCelebrations([entry], { viewer: 'child' }).length > 0
+      )
+    );
   }
 
   return filtered;
@@ -182,14 +144,5 @@ export async function markCelebrationsSeen(
   profileId: string,
   viewer: 'child' | 'parent'
 ): Promise<void> {
-  const now = new Date();
-  await db
-    .update(coachingCardCache)
-    .set({
-      ...(viewer === 'child'
-        ? { celebrationsSeenByChild: now }
-        : { celebrationsSeenByParent: now }),
-      updatedAt: now,
-    })
-    .where(eq(coachingCardCache.profileId, profileId));
+  await markHomeSurfaceCelebrationsSeen(db, profileId, viewer);
 }

@@ -46,6 +46,9 @@ jest.mock('../services/profile', () => ({
       displayName: input.displayName,
       avatarUrl: input.avatarUrl ?? null,
       birthDate: input.birthDate ?? null,
+      birthYear:
+        input.birthYear ??
+        (input.birthDate ? Number(input.birthDate.slice(0, 4)) : null),
       personaType: input.personaType ?? 'LEARNER',
       location: null,
       isOwner: isOwner ?? false,
@@ -59,6 +62,7 @@ jest.mock('../services/profile', () => ({
     displayName: 'Test User',
     avatarUrl: null,
     birthDate: null,
+    birthYear: null,
     personaType: 'LEARNER',
     location: null,
     isOwner: false,
@@ -72,6 +76,7 @@ jest.mock('../services/profile', () => ({
     displayName: 'Updated Name',
     avatarUrl: null,
     birthDate: null,
+    birthYear: null,
     personaType: 'LEARNER',
     location: null,
     isOwner: false,
@@ -148,9 +153,31 @@ describe('profile routes', () => {
       expect(body.profile).toBeDefined();
       expect(body.profile.displayName).toBe('Test User');
       expect(body.profile.personaType).toBe('LEARNER');
+      expect(body.profile.birthYear).toBe(2008);
       expect(body.profile.accountId).toBeDefined();
       expect(body.profile.createdAt).toBeDefined();
       expect(body.profile.updatedAt).toBeDefined();
+    });
+
+    it('returns 201 with birthYear-only profile data', async () => {
+      const res = await app.request(
+        '/v1/profiles',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            displayName: 'Birth Year User',
+            birthYear: 2014,
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(201);
+
+      const body = await res.json();
+      expect(body.profile.displayName).toBe('Birth Year User');
+      expect(body.profile.birthYear).toBe(2014);
     });
 
     it('returns 400 when displayName is missing', async () => {
@@ -170,7 +197,7 @@ describe('profile routes', () => {
       expect(res.status).toBe(400);
     });
 
-    it('returns 400 when birthDate is missing', async () => {
+    it('returns 400 when no age field is provided', async () => {
       const res = await app.request(
         '/v1/profiles',
         {

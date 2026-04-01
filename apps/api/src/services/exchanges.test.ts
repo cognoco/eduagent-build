@@ -20,6 +20,8 @@ beforeAll(() => {
   registerProvider(createMockProvider('gemini'));
 });
 
+const currentYear = new Date().getFullYear();
+
 /** Base context reused across tests */
 const baseContext: ExchangeContext = {
   sessionId: 'sess-1',
@@ -30,7 +32,7 @@ const baseContext: ExchangeContext = {
   sessionType: 'learning',
   escalationRung: 1,
   exchangeHistory: [],
-  personaType: 'TEEN',
+  birthYear: currentYear - 14,
 };
 
 // ---------------------------------------------------------------------------
@@ -49,22 +51,22 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('quadratic formula');
   });
 
-  it('includes persona voice for TEEN', () => {
+  it('includes youth voice for adolescent learners', () => {
     const prompt = buildSystemPrompt(baseContext);
     expect(prompt).toContain('Peer-adjacent and matter-of-fact');
   });
 
-  it('includes persona voice for LEARNER', () => {
+  it('includes adult voice for adult learners', () => {
     const prompt = buildSystemPrompt({
       ...baseContext,
-      personaType: 'LEARNER',
+      birthYear: currentYear - 25,
     });
     expect(prompt).toContain('Sharp and collegial');
   });
 
-  it('includes persona voice for PARENT', () => {
-    const prompt = buildSystemPrompt({ ...baseContext, personaType: 'PARENT' });
-    expect(prompt).toContain('Professional and data-forward');
+  it('falls back to adult voice when birthYear is unavailable', () => {
+    const prompt = buildSystemPrompt({ ...baseContext, birthYear: null });
+    expect(prompt).toContain('Sharp and collegial');
   });
 
   it('includes learning session guidance', () => {
@@ -104,10 +106,10 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Explain the approach briefly');
   });
 
-  it('uses teen brevity in homework mode for TEEN persona', () => {
+  it('uses youth brevity in homework mode for adolescent learners', () => {
     const prompt = buildSystemPrompt({
       ...baseContext,
-      personaType: 'TEEN',
+      birthYear: currentYear - 14,
       sessionType: 'homework',
       homeworkMode: 'check_answer',
     });
@@ -115,10 +117,10 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Teens want speed');
   });
 
-  it('uses standard brevity in homework mode for LEARNER persona', () => {
+  it('uses standard brevity in homework mode for adult learners', () => {
     const prompt = buildSystemPrompt({
       ...baseContext,
-      personaType: 'LEARNER',
+      birthYear: currentYear - 25,
       sessionType: 'homework',
       homeworkMode: 'check_answer',
     });
@@ -366,7 +368,7 @@ describe('buildSystemPrompt', () => {
       sessionType: 'learning',
       escalationRung: 1,
       exchangeHistory: [],
-      personaType: 'LEARNER',
+      birthYear: null,
     };
 
     const prompt = buildSystemPrompt(minimalContext);

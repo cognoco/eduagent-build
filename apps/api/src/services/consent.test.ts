@@ -22,6 +22,7 @@ import {
 } from './consent';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
+const CURRENT_YEAR = new Date().getFullYear();
 
 function mockConsentRow(
   overrides?: Partial<{
@@ -86,50 +87,35 @@ function createMockDb({
 
 describe('checkConsentRequired', () => {
   it('requires GDPR consent for child under 16', () => {
-    // 10-year-old
-    const result = checkConsentRequired('2016-06-15');
+    const result = checkConsentRequired(CURRENT_YEAR - 10);
 
     expect(result.required).toBe(true);
     expect(result.consentType).toBe('GDPR');
   });
 
-  it('requires GDPR consent for 15-year-old (boundary)', () => {
-    const fifteenYearsAgo = new Date();
-    fifteenYearsAgo.setFullYear(fifteenYearsAgo.getFullYear() - 15);
-    const birthDate = fifteenYearsAgo.toISOString().split('T')[0];
-
-    const result = checkConsentRequired(birthDate);
+  it('requires GDPR consent for someone turning 16 this year', () => {
+    const result = checkConsentRequired(CURRENT_YEAR - 16);
 
     expect(result.required).toBe(true);
     expect(result.consentType).toBe('GDPR');
   });
 
-  it('does not require consent for 16-year-old (boundary)', () => {
-    const sixteenYearsAgo = new Date();
-    sixteenYearsAgo.setFullYear(sixteenYearsAgo.getFullYear() - 16);
-    // Subtract an extra day to ensure they're fully 16
-    sixteenYearsAgo.setDate(sixteenYearsAgo.getDate() - 1);
-    const birthDate = sixteenYearsAgo.toISOString().split('T')[0];
-
-    const result = checkConsentRequired(birthDate);
+  it('does not require consent for 17-year-old', () => {
+    const result = checkConsentRequired(CURRENT_YEAR - 17);
 
     expect(result.required).toBe(false);
     expect(result.consentType).toBeNull();
   });
 
   it('does not require consent for adult', () => {
-    const result = checkConsentRequired('1990-01-01');
+    const result = checkConsentRequired(CURRENT_YEAR - 30);
 
     expect(result.required).toBe(false);
     expect(result.consentType).toBeNull();
   });
 
   it('flags belowMinimumAge for child under 11', () => {
-    const nineYearsAgo = new Date();
-    nineYearsAgo.setFullYear(nineYearsAgo.getFullYear() - 9);
-    const birthDate = nineYearsAgo.toISOString().split('T')[0];
-
-    const result = checkConsentRequired(birthDate);
+    const result = checkConsentRequired(CURRENT_YEAR - 9);
 
     expect(result.required).toBe(true);
     expect(result.consentType).toBe('GDPR');

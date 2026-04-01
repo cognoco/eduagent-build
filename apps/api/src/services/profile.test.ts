@@ -140,6 +140,7 @@ describe('createProfile', () => {
     const result = await createProfile(db, 'account-123', {
       displayName: 'Test User',
       personaType: 'LEARNER',
+      birthYear: 2008,
     });
 
     expect(result).toHaveProperty('id');
@@ -147,6 +148,7 @@ describe('createProfile', () => {
     expect(result).toHaveProperty('displayName');
     expect(result).toHaveProperty('avatarUrl');
     expect(result).toHaveProperty('birthDate');
+    expect(result).toHaveProperty('birthYear');
     expect(result).toHaveProperty('personaType');
     expect(result).toHaveProperty('isOwner');
     expect(result).toHaveProperty('createdAt');
@@ -159,7 +161,7 @@ describe('createProfile', () => {
     const result = await createProfile(
       db,
       'account-123',
-      { displayName: 'Owner', personaType: 'PARENT' },
+      { displayName: 'Owner', personaType: 'PARENT', birthYear: 1990 },
       true
     );
 
@@ -172,6 +174,7 @@ describe('createProfile', () => {
     const result = await createProfile(db, 'account-123', {
       displayName: 'Non-owner',
       personaType: 'LEARNER',
+      birthYear: 2008,
     });
 
     expect(result.isOwner).toBe(false);
@@ -182,6 +185,7 @@ describe('createProfile', () => {
     const db = createMockDb({ insertReturning: [row] });
     const result = await createProfile(db, 'account-123', {
       displayName: 'Default Persona',
+      birthYear: 2008,
     });
 
     expect(result.personaType).toBe('LEARNER');
@@ -193,6 +197,7 @@ describe('createProfile', () => {
     const result = await createProfile(db, 'account-123', {
       displayName: 'Timestamp Test',
       personaType: 'TEEN',
+      birthYear: 2014,
     });
 
     expect(result.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
@@ -219,6 +224,7 @@ describe('createProfile', () => {
     expect(result.personaType).toBe('PARENT');
     expect(result.avatarUrl).toBe('https://example.com/avatar.png');
     expect(result.birthDate).toBe('1990-01-15');
+    expect(result.birthYear).toBe(1990);
     expect(result.accountId).toBe('acct-1');
   });
 
@@ -234,11 +240,11 @@ describe('createProfile', () => {
     const result = await createProfile(
       db,
       'account-123',
-      { displayName: 'Child', birthDate: '2016-06-15' },
+      { displayName: 'Child', birthYear: 2016 },
       false
     );
 
-    expect(checkConsentRequired).toHaveBeenCalledWith('2016-06-15');
+    expect(checkConsentRequired).toHaveBeenCalledWith(2016);
     expect(createPendingConsentState).toHaveBeenCalledWith(db, row.id, 'GDPR');
     expect(result.consentStatus).toBe('PENDING');
   });
@@ -254,7 +260,7 @@ describe('createProfile', () => {
     const result = await createProfile(
       db,
       'account-123',
-      { displayName: 'Adult', birthDate: '1990-01-15' },
+      { displayName: 'Adult', birthYear: 1990 },
       false
     );
 
@@ -275,7 +281,7 @@ describe('createProfile', () => {
       createProfile(db, 'account-123', {
         displayName: 'Teen',
         personaType: 'PARENT',
-        birthDate: '2011-01-15',
+        birthYear: 2011,
       })
     ).rejects.toThrow('Parent profile requires age 18 or older');
   });
@@ -292,7 +298,7 @@ describe('createProfile', () => {
     const result = await createProfile(db, 'account-123', {
       displayName: 'Adult',
       personaType: 'PARENT',
-      birthDate: '1990-01-15',
+      birthYear: 1990,
     });
 
     expect(result.personaType).toBe('PARENT');
@@ -310,26 +316,40 @@ describe('createProfile', () => {
     const result = await createProfile(db, 'account-123', {
       displayName: 'Young Learner',
       personaType: 'TEEN',
-      birthDate: '2013-06-15',
+      birthYear: 2013,
     });
 
     expect(result.personaType).toBe('TEEN');
   });
 
-  it('does not create consent state when no birthDate', async () => {
+  it('stores a derived legacy birthDate for birthYear-only input', async () => {
     const row = mockProfileRow();
     const db = createMockDb({ insertReturning: [row] });
 
     const result = await createProfile(
       db,
       'account-123',
-      { displayName: 'No BD' },
+      { displayName: 'No BD', birthYear: 2008 },
       false
     );
 
-    expect(checkConsentRequired).not.toHaveBeenCalled();
+    const insertCall = (db.insert as jest.Mock).mock.results[0].value;
+    const valuesCall = insertCall.values as jest.Mock;
+    const insertedValues = valuesCall.mock.calls[0][0];
+
+    expect(checkConsentRequired).toHaveBeenCalledWith(2008);
     expect(createPendingConsentState).not.toHaveBeenCalled();
     expect(result.consentStatus).toBeNull();
+    expect(insertedValues.birthDate).toBeInstanceOf(Date);
+    expect(insertedValues.birthDate.toISOString()).toContain('2008-01-01');
+  });
+
+  it('throws when neither birthDate nor birthYear is provided', async () => {
+    const db = createMockDb({ insertReturning: [mockProfileRow()] });
+
+    await expect(
+      createProfile(db, 'account-123', { displayName: 'Missing Age' })
+    ).rejects.toThrow('Profile birthYear or birthDate is required');
   });
 });
 

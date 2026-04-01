@@ -7,19 +7,42 @@ export type PersonaType = z.infer<typeof personaTypeSchema>;
 export const locationSchema = z.enum(['EU', 'US', 'OTHER']);
 export type LocationType = z.infer<typeof locationSchema>;
 
-export const profileCreateSchema = z.object({
+const currentYear = new Date().getFullYear();
+
+export const birthYearSchema = z
+  .number()
+  .int()
+  .min(currentYear - 120)
+  .max(currentYear);
+
+const profileCreateFields = z.object({
   displayName: z.string().min(1).max(50),
-  birthDate: z.string().date(),
+  birthDate: z.string().date().optional(),
+  birthYear: birthYearSchema.optional(),
   personaType: personaTypeSchema.default('LEARNER'),
   avatarUrl: z.string().url().optional(),
   location: locationSchema.optional(),
 });
 
+export const profileCreateSchema = profileCreateFields.superRefine(
+  (value, ctx) => {
+    if (value.birthDate || value.birthYear != null) {
+      return;
+    }
+
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['birthYear'],
+      message: 'birthDate or birthYear is required',
+    });
+  }
+);
+
 export type ProfileCreateInput = z.infer<typeof profileCreateSchema>;
 
-export const profileUpdateSchema = profileCreateSchema
+export const profileUpdateSchema = profileCreateFields
   .partial()
-  .omit({ birthDate: true, location: true });
+  .omit({ birthDate: true, birthYear: true, location: true });
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 
 export const profileSwitchSchema = z.object({
@@ -34,6 +57,7 @@ export const profileSchema = z.object({
   displayName: z.string(),
   avatarUrl: z.string().url().nullable(),
   birthDate: z.string().date().nullable(),
+  birthYear: birthYearSchema.nullable().optional(),
   personaType: personaTypeSchema,
   location: locationSchema.nullable(),
   isOwner: z.boolean(),

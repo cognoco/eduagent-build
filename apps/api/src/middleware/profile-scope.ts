@@ -4,13 +4,14 @@
 // ---------------------------------------------------------------------------
 
 import { createMiddleware } from 'hono/factory';
+import { birthYearFromDateLike } from '@eduagent/schemas';
 import type { Account } from '../services/account';
 import { getProfile, findOwnerProfile } from '../services/profile';
 import type { Database } from '@eduagent/database';
 import { forbidden } from '../errors';
 
 export interface ProfileMeta {
-  birthDate: string | null;
+  birthYear: number | null;
   location: 'EU' | 'US' | 'OTHER' | null;
   consentStatus:
     | 'PENDING'
@@ -53,7 +54,8 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
           if (owner) {
             c.set('profileId', owner.id);
             c.set('profileMeta', {
-              birthDate: owner.birthDate,
+              birthYear:
+                owner.birthYear ?? birthYearFromDateLike(owner.birthDate),
               location: owner.location,
               consentStatus: owner.consentStatus,
             });
@@ -82,7 +84,7 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
     }
     c.set('profileId', profile.id);
     c.set('profileMeta', {
-      birthDate: profile.birthDate,
+      birthYear: profile.birthYear ?? birthYearFromDateLike(profile.birthDate),
       location: profile.location,
       consentStatus: profile.consentStatus,
     });

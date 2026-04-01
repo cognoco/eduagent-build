@@ -8,8 +8,7 @@ export function buildProfile(
   counter++;
   return {
     displayName: `Test User ${counter}`,
-    personaType: 'LEARNER',
-    birthDate: '2008-06-15',
+    birthYear: 2008,
     ...overrides,
   };
 }

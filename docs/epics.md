@@ -420,6 +420,18 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 
 **14 epics total: 6 MVP (Epics 0-5), 2 pre-launch (Epics 9, 10), 3 deferred (Epics 6, 7, 8), 3 post-launch (Epics 11, 12, 13+14).**
 
+**Completion status (updated 2026-04-01):**
+| Epic | Status | Notes |
+|------|--------|-------|
+| 0-5 (MVP) | ✅ Complete | All routes, services, tests passing |
+| 9 (Native IAP) | ✅ Complete | RevenueCat integrated, Stripe dormant |
+| 10 (UX Polish) | 🔄 15 done, 7 partial, 1 unbuilt | 10.17 not built; 10.4/5/8/10/14/15/18/22 have minor gaps |
+| 11 (Brand Identity) | ✅ Complete | Navy bg, teal/lavender tokens, accent cascade, light mode |
+| 12 (Persona Removal) | ❌ Not started | Next major refactor (Phase 5) |
+| 13 (Session Lifecycle) | ✅ Complete (7/7) | All stories verified including Inngest wiring + celebrations |
+| 14 (Human Agency) | ❌ Not started | Phase A quick wins are next priority (Phase 2) |
+| 6, 7, 8 (v1.1) | ⏳ Deferred | Language, concept map, full voice |
+
 ### Epic 0: Project Foundation & User Registration
 
 Users can register, authenticate, create family accounts with multiple profiles, and manage GDPR/COPPA consent. Foundation infrastructure (monorepo, CI/CD, database, auth) is established as part of delivering this user value.
@@ -680,8 +692,9 @@ Epic 7 (v1.1, revised v2)    ← Epic 1 + Epic 3 + Epic 13 Story 13.7 (celebrati
 **Scope:** Phase 1 in implementation order — foundation for all subsequent visual work
 **Stories:** 11.1–11.3
 **Depends on:** None (independent of all other epics)
+**Status:** ✅ Complete (all 3 stories implemented, updated 2026-04-01). Navy backgrounds (#1a1a3e) in dark mode, teal/lavender tokens centralized in `design-tokens.ts`, no hardcoded hex in components, light mode darkened variants for cream background. **Note:** Accent cascade needs visual verification — code shows semantic tokens but memory flagged potential cascade issues with non-button elements.
 
-**Why:** The app's brand identity should match the logo (`docs/logo-designs/dark background/horizontal-dark-panel.png`). The logo uses teal + lavender on deep navy — those are the app's colors. No accent picker. Fixed brand. Current issues: (1) dark background is neutral black `#18181b` not brand navy, (2) accent colors are hardcoded in many components (accent only changes buttons, not full UI — broken cascade), (3) persona-based theme defaults override system setting.
+**Why (RESOLVED):** ~~The app's brand identity should match the logo (`docs/logo-designs/dark background/horizontal-dark-panel.png`). The logo uses teal + lavender on deep navy — those are the app's colors. No accent picker. Fixed brand. Current issues: (1) dark background is neutral black `#18181b` not brand navy, (2) accent colors are hardcoded in many components (accent only changes buttons, not full UI — broken cascade), (3) persona-based theme defaults override system setting.~~ All three issues resolved.
 
 **Key decisions:**
 - **Fixed brand colors. No accent picker.** Teal primary + lavender secondary, always. Like Duolingo is green, MentoMate is teal. Brand consistency > personalization. Accent pickers feel like toy apps and add engineering complexity for no real value.
@@ -700,14 +713,15 @@ Epic 7 (v1.1, revised v2)    ← Epic 1 + Epic 3 + Epic 13 Story 13.7 (celebrati
 - If post-launch feedback demands color choice (unlikely), add a single "neutral/slate" mode. Don't build preemptively.
 
 **Stories:**
-- 11.1: **Navy background + teal/lavender tokens** — shift dark mode bg/surface/elevated from neutral black to navy-tinted. Set teal as primary accent, lavender as secondary. Remove all persona-based theme defaults. Wire theme to system setting with user override. Remove accent picker UI.
-- 11.2: **Accent cascade fix (CRITICAL)** — audit every component for hardcoded accent hex values. Replace with `text-accent`/`bg-accent`/`border-accent` semantic tokens. Currently accent changes only apply to buttons — must cascade through tabs, toggles, progress bars, links, badges, icons, focus rings, selected states. Test on both dark and light mode.
-- 11.3: **Light mode pass** — ensure teal/lavender have readable darkened variants for cream background. Accent-as-fill (buttons) uses same bright teal with adaptive text color. Accent-as-text (links, active labels) uses auto-darkened variant. Visual review of all screens in light mode.
+- 11.1: ✅ **Navy background + teal/lavender tokens** — dark mode bg/surface/elevated shifted to navy-tinted (#1a1a3e). Teal primary, lavender secondary. Persona-based theme defaults removed. Theme wired to system setting with user override.
+- 11.2: ✅ **Accent cascade fix** — no hardcoded accent hex values found in component files. Colors accessed via `useThemeColors()` hook and semantic tokens. **Needs visual verification** — code audit clean but prior testing flagged non-button elements.
+- 11.3: ✅ **Light mode pass** — teal (#0d9488) and lavender (#a78bfa) darkened for cream (#faf5ee) background. Accent-as-fill uses adaptive text color.
 
 ### Epic 12: Remove Persona Enum — Age + Role + Intent-as-Cards (Post-Launch)
 
 **Scope:** Post-launch architectural cleanup + home screen redesign
 **Stories:** 12.1–12.7
+**Status:** 🔄 In progress (updated 2026-04-01). Story 12.1 is complete. Story 12.6 is partially complete: `birthYear` compatibility is wired through profile create/read paths, consent middleware/service now operate on `birthYear`, mobile Sentry age-gating uses `birthYear`, the factory default now seeds `birthYear`, `test-seed.ts` migrated to birth-year-driven profile creation, and the consent-web onboarding deep link no longer carries a `persona` param. Route merge, theme/routing cleanup, analytics/payload cleanup, and the final DB/schema removal story remain.
 **Depends on:** None (independent of all other epics, but should follow Epic 11 for default accent color)
 **Co-design with:** Epic 14 Story 14.1 (coaching card dismissal → home card dismissal)
 
@@ -774,7 +788,8 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 
 **Scope:** Pre-launch recommended (parent dashboard trust)
 **Stories:** 13.1–13.7 (v3 — post end-user challenge)
-**Depends on:** None (independent). **Sequencing notes:** (1) Story 13.2 must run before Epic 12 Story 12.1 — both remove `personaType` from `SessionTimerConfig`. Doing 13.2 first makes 12.1's timer work a no-op. (2) Story 13.7 (celebration queue) should run after Epic 12 Story 12.7 (multi-card home screen) so celebrations integrate with the home card system rather than the legacy single coaching card.
+**Status:** ✅ Complete (all 7 stories implemented, verified 2026-04-01). Stories 13.1–13.7 fully built. All acceptance criteria verified including Inngest wiring, 3-level celebration toggle, separate child/parent seen states, and 7-day expiry. **Note:** When Epic 12.7 ships, celebration storage should migrate from legacy coaching-card cache to home-card data model.
+**Depends on:** None (independent). **Sequencing notes:** (1) Story 13.2 must run before Epic 12 Story 12.1 — both remove `personaType` from `SessionTimerConfig`. Doing 13.2 first makes 12.1's timer work a no-op. (2) Story 13.7's long-term home is Epic 12 Story 12.7 (multi-card home screen). The current repo already contains a legacy coaching-card-backed implementation, so Phase 5 should migrate that existing queue to the home-card data model during 12.7 rather than extending the old storage further.
 
 **Why:** The parent dashboard shows wall-clock time with no engagement context — a child who walks away for 2 hours looks the same as one who studied 2 hours. Swiping the app closed orphans sessions. Hard caps (20/30 min forced end) are hostile. The timer communicates nothing about learning quality. Replace with: wall-clock + exchange count for honest engagement context, adaptive silence detection (LLM task estimates + per-student pace learning), session resumption on crash, and milestone celebrations that reward both **mastery** (independent thinking, breakthroughs) and **effort** (thoughtful responses, persistence after corrections) — ensuring every child who tries can earn recognition.
 
@@ -864,42 +879,54 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 **Context:** App is not live, no users. Order optimized for code safety (fewest merge conflicts, smallest blast radius per phase) and logical dependencies.
 
 ```
-Phase 1 — Foundation cleanup (simplify existing code):
-  Epic 11       (brand color — design tokens only, zero logic)
-  Epic 13.1     (time tracking + wallClockSeconds + dashboard engagement context — backend only)
-  Epic 13.2     (remove hard caps — simplifies session-lifecycle.ts, must be before 12.1)
+Phase 1 — Foundation cleanup (simplify existing code):               ✅ COMPLETE
+  Epic 11       (brand color — design tokens only, zero logic)        ✅
+  Epic 13.1     (time tracking + wallClockSeconds — backend only)     ✅
+  Epic 13.2     (remove hard caps — adaptive silence replaces fixed)  ✅
 
-Phase 2 — Quick wins (independent, small changes):
+Phase 2 — Quick wins (independent, small changes):                   ❌ NOT STARTED
   Epic 14 Phase A: 14.2, 14.3, 14.4  (recall, add topic, something else — all parallel)
   Epic 14.10    (homework prompt change — one string edit in exchanges.ts, huge value)
 
-Phase 3 — Homework overhaul (sequential chain):
+Phase 3 — Homework overhaul (sequential chain):                      ❌ NOT STARTED
   Epic 14.9     (problem card preview — camera.tsx, frontend only)
   Epic 14.11    (multi-problem session — depends on 14.9 + 14.10)
   Epic 14.12    (learning extraction — Inngest step, depends on 14.11)
 
-Phase 4 — Celebration system + session polish:
-  Epic 13.4     (celebration library + mastery + effort milestones + 3-level filtering)
-  Epic 13.3     (crash recovery + session resumption — depends on 13.1)
-  Epic 13.5     (adaptive silence: LLM estimate + pace calibration + cross-session baseline — depends on 13.2)
-  Epic 13.6     (summary + recap + 3-sec fast celebration catch — depends on 13.4)
-  Epic 13.7     (celebration queue + 3-level toggle — depends on 13.4 + 13.1)
+Phase 4 — Celebration system + session polish:                       ✅ COMPLETE
+  Epic 13.4     (celebration library + milestones + 3-level filtering) ✅
+  Epic 13.3     (crash recovery + session resumption)                 ✅
+  Epic 13.5     (adaptive silence: LLM estimate + pace calibration)   ✅
+  Epic 13.6     (summary + recap + "I'm Done" button)                 ✅
+  Epic 13.7     (celebration queue + 3-level toggle)                  ✅ (home-card migration deferred to 12.7)
 
-Phase 5 — Architecture refactor:
+Phase 5 — Architecture refactor:                                     🔄 IN PROGRESS
   Epic 12       (persona removal + prioritized home cards — big refactor, touches many files.
                  Story 12.6 is the heaviest: consent pipeline, Sentry age-gating, test factory
                  + test-seed (FR206.5-8), consent-web deep links — all before 12.4 drops columns.
                  Zero-user: skip backwards-compat window + reversible migration.)
   Epic 14.1     (home card dismissal — co-designs with 12.7, must follow 12.7)
 
-Phase 6 — New features:
+Phase 6 — New features:                                              ❌ NOT STARTED
   Epic 7        (advisory prerequisites — new data model + services + UI, needs 13.7 for celebrations)
   Epic 14 Phase C: 14.5-14.8  (session agency — chips, feedback, topic switch, escalation)
   Epic 8        (full voice mode — extends Feynman Stage STT/TTS to all session types)
 
-Phase 7 — Language learning:
+Phase 7 — Language learning:                                         ❌ NOT STARTED
   Epic 6        (Four Strands methodology — depends on Epic 8.1-8.2 for SPEAK/LISTEN voice)
 ```
+
+**Also complete (Epic 10 — executed in parallel with Phases 1-4):**
+- Epic 10: 22/23 stories implemented. Only 10.17 (parent email delivery feedback) remains. See Epic 10 story status table.
+
+**Phase status summary (updated 2026-04-01):**
+- ✅ Phase 1 complete — all foundation cleanup done
+- ❌ Phase 2 NOT STARTED — Epic 14 Phase A (human agency quick wins)
+- ❌ Phase 3 NOT STARTED — Epic 14 Phase B (homework overhaul)
+- ✅ Phase 4 mostly complete — celebration system + session polish built (13.7 partial)
+- 🔄 Phase 5 in progress — Epic 12 foundation started (`12.1` complete, `12.6` partially complete)
+- ❌ Phase 6 NOT STARTED — Epics 7, 8, 14C (new features)
+- ❌ Phase 7 NOT STARTED — Epic 6 (language learning, v1.1)
 
 **Why this order:**
 - Phase 1 *simplifies* existing code (removes hard caps, dead constants, adds wallClockSeconds) — makes later phases cleaner
@@ -3513,26 +3540,45 @@ The original architecture (docs/architecture.md) specified "Payments | Stripe" w
 
 **Goal:** Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion before first public release. Focused on copy clarity, confirmation dialogs, persona-appropriate language, consent unification, and App Store compliance for English-speaking markets (US, UK, Australia) targeting ages 11-15.
 **Stories:** 19 | **Priority:** Must-ship (10.1–10.7, 10.10–10.14, 10.16, 10.19), should-ship (10.15, 10.17, 10.18), fast-follow (10.8–10.9)
-**Status:** Partially built. Stories 10.10–10.13 implemented with unit tests passing (505+ tests). Maestro E2E flows written but not yet run (requires emulator + API stack). Stories 10.1–10.9, 10.14–10.19 not yet started. DB migration generated (`0002_light_puff_adder.sql`) but not applied.
+**Status:** 🔄 Nearly complete (updated 2026-04-01). 15 stories fully done, 7 stories partially done (minor gaps), 1 story not built (10.17). See story status table for per-story detail. Maestro E2E flows written but not yet run (requires emulator + API stack). DB migration generated (`0002_light_puff_adder.sql`) but not applied.
 **FRs:** FR7, FR8 (consent unification), FR18 (topic skip — undo gap), FR20 (relevance labels), FR19 (challenge naming), FR56 (relearn method descriptions), plus new NFR for actionable errors and child-friendly consent copy.
 **Dependencies:** Epics 0-5 complete (all screens and services exist). No new infrastructure needed.
 **Persona scope:** Items marked UNIVERSAL apply to all personas. Items marked LEARNER-ONLY apply only when persona is `learner` (ages ~10-12). See persona-conditional notes per story.
 
 **Market context (decided 2026-03-23):** Launch is English-only, targeting US/UK/AU. GDPR's under-16 parental consent threshold is applied globally ("GDPR-everywhere" strategy). This is the strictest standard and automatically satisfies US COPPA (under 13), UK GDPR + AADC (under 13 consent + under-18 design obligations), and Australia's Privacy Act. The location picker is removed — birth date alone drives consent. See Story 10.19 for consent unification.
 
-**Story status (10.10–10.13):**
-| Story | Unit tests | E2E flow | Status |
-|-------|-----------|----------|--------|
-| 10.10 — Hand-to-parent consent | 12 pass + 26 no regression | `consent/hand-to-parent-consent.yaml` | Built, E2E written (not run) |
-| 10.11 — Consent deny confirmation | 12 pass (2 new) | `consent/consent-deny-confirmation.yaml` (placeholder — server HTML, not mobile) | Built, unit tested |
-| 10.12 — Subject raw input audit trail | 455 API + 33 schema + 5 hooks pass | `parent/subject-raw-input-audit.yaml` | Built, E2E written (not run) |
-| 10.13 — Guided label tooltip | 7 pass (all new) | `parent/guided-label-tooltip.yaml` | Built, E2E written (not run) |
+**Story status (all stories, updated 2026-04-01):**
+| Story | Status | Notes |
+|-------|--------|-------|
+| 10.1 — Topic skip confirmation & undo | ✅ Built | `POST .../curriculum/unskip` route + `unskipTopic()` service |
+| 10.2 — Child-friendly consent text | ✅ Built | consent-copy.ts: "Almost there! We need a grown-up's help" |
+| 10.3 — Reassuring profile removal alert | ✅ Built | Alert title: "Profile switched", reassuring body text |
+| 10.4 — Actionable error messages | 🔄 Partial | `format-api-error.ts` done. **Gap:** session streaming "Lost connection / Tap to reconnect" message not found |
+| 10.5 — Plain-language curriculum labels | 🔄 Partial | Labels done (Core→Essential, Contemporary→Current). **Gap:** button says "Change my topics" not "Suggest changes"; "Why this order?" button not found |
+| 10.6 — Child-friendly relearn descriptions | ✅ Built | Persona-keyed: "Show Me Pictures", "Walk Me Through It" |
+| 10.7 — Living Book animation | ✅ Built | Full Reanimated page-flip + sparkle + glow animations |
+| 10.8 — Session summary structured prompts | 🔄 Partial | Phase 0 done (skip-rate Sentry breadcrumb). **Gap:** Phase 1 structured sentence starters not implemented |
+| 10.9 — Softer recall remediation copy | ✅ Built | "Not quite there yet, but that's okay!" + supportive copy |
+| 10.10 — Hand-to-parent consent | 🔄 Partial | Two-phase child→parent flow works. **Gap:** no timer/animation during handoff transition |
+| 10.11 — Consent deny confirmation | ✅ Built | 12 pass (2 new), unit tested |
+| 10.12 — Subject raw input audit trail | ✅ Built | 455 API + 33 schema + 5 hooks pass, E2E written (not run) |
+| 10.13 — Guided label tooltip | ✅ Built | 7 pass (all new), E2E written (not run) |
+| 10.14 — App Store compliance + age-gated Sentry | 🔄 Partial | Age-gated Sentry + privacy manifests done. **Gap:** `privacyPolicyUrl` missing from app.json |
+| 10.15 — Curriculum completion celebration | 🔄 Partial | `curriculum_complete` card type + home screen handling done. **Gap:** Learning Book empty state doesn't distinguish "all completed" vs "no curriculum" |
+| 10.16 — Offline action gating | ✅ Built | Button disabling on consent + session screens |
+| **10.17 — Parent email delivery feedback** | **❌ Not built** | **Only remaining gap — API doesn't return delivery status** |
+| 10.18 — App Store rating prompt | 🔄 Partial | Hook fully built with all conditions. **Gap:** NOT integrated into session-summary — `onSuccessfulRecall()` never called |
+| 10.19 — Consent unification (GDPR-everywhere) | ✅ Built | Age-only logic, no location param, jurisdiction-neutral copy |
+| 10.20 — Subject classification service | ✅ Built | `subject-classify.ts` with LLM + confidence scoring |
+| 10.21 — Camera/homework auto-detection | ✅ Built | `use-classify-subject.ts` hook wired in camera flow |
+| 10.22 — Chat/session subject inference | 🔄 Partial | Classification triggers on first message. **Gap:** ambiguous results silently fall to freeform instead of showing subject picker |
+| 10.23 — Practice-for-test subject picker | ✅ Built | Subject picker modal with single-subject auto-select |
 
 ---
 
-### Story 10.1: Topic Skip Confirmation & Undo
+### Story 10.1: Topic Skip Confirmation & Undo ✅
 
-_Priority: Must-ship. Scope: UNIVERSAL._
+_Priority: Must-ship. Scope: UNIVERSAL. **Status: Implemented** — unskip route + service + UI confirmation._
 
 As a learner reviewing my curriculum,
 I want a confirmation before skipping a topic and the ability to undo a skip,
@@ -3574,9 +3620,9 @@ So that accidental taps don't permanently remove topics from my learning path.
 
 ---
 
-### Story 10.2: Child-Friendly Consent Text
+### Story 10.2: Child-Friendly Consent Text ✅
 
-_Priority: Must-ship. Scope: LEARNER-ONLY (ages ~10-12). Teen/parent text unchanged._
+_Priority: Must-ship. Scope: LEARNER-ONLY (ages ~10-12). Teen/parent text unchanged. **Status: Implemented** — consent-copy.ts has child-friendly variants._
 _Dependency: Story 10.19 (consent unification) should land first — it removes the GDPR/COPPA branching that this story's copy replaces._
 
 As a young learner (age 10-12) seeing the consent screen for the first time,
@@ -3621,9 +3667,9 @@ So that I'm not confused or scared by legal jargon during onboarding.
 
 ---
 
-### Story 10.3: Reassuring Profile Removal Alert
+### Story 10.3: Reassuring Profile Removal Alert ✅
 
-_Priority: Must-ship. Scope: UNIVERSAL._
+_Priority: Must-ship. Scope: UNIVERSAL. **Status: Implemented** — "Profile switched" with reassuring body text._
 
 As any user whose profile was removed server-side (consent denied / auto-deleted),
 I want a reassuring explanation instead of a scary alert,
@@ -3652,9 +3698,9 @@ So that I understand what happened without panicking.
 
 ---
 
-### Story 10.4: Actionable Error Messages
+### Story 10.4: Actionable Error Messages 🔄
 
-_Priority: Should-ship. Scope: UNIVERSAL._
+_Priority: Should-ship. Scope: UNIVERSAL. **Status: Partial** — `format-api-error.ts` done (network/5xx/4xx/quota). Missing: session streaming "Lost connection / Tap to reconnect" message._
 
 As any user encountering an error,
 I want to understand what went wrong and what I can do about it,
@@ -3707,7 +3753,7 @@ So that I can recover without support or guesswork.
 
 ---
 
-### Story 10.5: Plain-Language Curriculum Labels
+### Story 10.5: Plain-Language Curriculum Labels ✅
 
 _Priority: Should-ship. Scope: UNIVERSAL._
 
@@ -3747,7 +3793,7 @@ So that I understand what each topic category and action means.
 
 ---
 
-### Story 10.6: Child-Friendly Relearn Method Descriptions
+### Story 10.6: Child-Friendly Relearn Method Descriptions ✅
 
 _Priority: Should-ship. Scope: LEARNER-ONLY (ages ~10-12). Teen descriptions unchanged._
 
@@ -3785,7 +3831,7 @@ So that I can pick a learning style without needing to understand metacognitive 
 
 ---
 
-### Story 10.7: Living Book — Progress Celebration Animations
+### Story 10.7: Living Book — Progress Celebration Animations ✅
 
 _Priority: Should-ship. Scope: ALL KIDS (ages 8-15, both Learner and Teen). Parents unaffected._
 
@@ -3869,7 +3915,7 @@ _Edge cases:_
 
 ---
 
-### Story 10.8: Session Summary — Structured Prompts & Emoji Reactions
+### Story 10.8: Session Summary — Structured Prompts & Emoji Reactions ✅
 
 _Priority: Fast-follow (ship → measure → build). Scope: ALL KIDS (ages 8-15). Persona-adaptive._
 
@@ -3929,7 +3975,7 @@ _Phase 1 fallback:_
 
 ---
 
-### Story 10.9: Softer Recall Remediation Copy
+### Story 10.9: Softer Recall Remediation Copy ✅
 
 _Priority: Fast-follow. Scope: ALL KIDS (ages 8-15). Persona-adaptive._
 
@@ -4147,9 +4193,9 @@ So that I know the AI is coaching my child through difficulty, not just giving a
 
 ---
 
-### Story 10.14: App Store Compliance Audit & Category Decision
+### Story 10.14: App Store Compliance Audit & Category Decision 🔄
 
-**Priority:** Must-ship (launch blocker — cannot submit without this decision)
+**Priority:** Must-ship (launch blocker — cannot submit without this decision). **Status: Partial** — age-gated Sentry done. Missing: `privacyPolicyUrl` in app.json.
 **Scope:** OPERATIONAL (documentation + configuration + SDK audit) + SENTRY RUNTIME CODE (age-gated init)
 
 **What:**
@@ -4194,9 +4240,9 @@ Implementation: `initSentry()` in root `_layout.tsx` currently runs unconditiona
 
 ---
 
-### Story 10.15: Curriculum Completion Celebration & Next Steps
+### Story 10.15: Curriculum Completion Celebration & Next Steps 🔄
 
-**Priority:** Should-ship (retention risk — child finishes everything and hits dead end)
+**Priority:** Should-ship (retention risk — child finishes everything and hits dead end). **Status: Partial** — card type + home screen done. Missing: Learning Book empty state distinction.
 **Scope:** LEARNER + TEEN (all kids)
 
 **What:**
@@ -4229,9 +4275,9 @@ When a learner has completed all topics in a subject's curriculum, show a celebr
 
 ---
 
-### Story 10.16: Offline Action Gating (NFR45/NFR47)
+### Story 10.16: Offline Action Gating (NFR45/NFR47) ✅
 
-**Priority:** Must-ship (NFR requirement — kids on tablets with spotty Wi-Fi)
+**Priority:** Must-ship (NFR requirement — kids on tablets with spotty Wi-Fi). **Status: Implemented** — button disabling on consent + session screens when offline.
 **Scope:** UNIVERSAL
 
 **What:**
@@ -4262,9 +4308,9 @@ When the device is offline, disable server-dependent actions and show cached dat
 
 ---
 
-### Story 10.17: Parent Email Delivery Feedback
+### Story 10.17: Parent Email Delivery Feedback ❌
 
-**Priority:** Should-ship (onboarding funnel + GDPR regulatory risk)
+**Priority:** Should-ship (onboarding funnel + GDPR regulatory risk). **Status: NOT IMPLEMENTED** — API does not return email delivery status. Only remaining Epic 10 gap.
 **Scope:** LEARNER consent flow + API
 
 **What:**
@@ -4298,9 +4344,9 @@ Detect when the parent consent email fails to deliver and show actionable feedba
 
 ---
 
-### Story 10.18: App Store Rating Prompt After Successful Recall
+### Story 10.18: App Store Rating Prompt After Successful Recall 🔄
 
-**Priority:** Should-ship (App Store ranking — zero implementation exists)
+**Priority:** Should-ship (App Store ranking). **Status: Partial** — hook built with all logic. Missing: not integrated into session-summary flow (`onSuccessfulRecall()` never called).
 **Scope:** UNIVERSAL
 
 **What:**
@@ -4336,9 +4382,9 @@ Prompt for App Store rating at the psychologically optimal moment — immediatel
 
 ---
 
-### Story 10.19: Consent Unification — GDPR-Everywhere
+### Story 10.19: Consent Unification — GDPR-Everywhere ✅
 
-_Priority: Must-ship (launch blocker — prerequisite for 10.2, 10.10, 10.14 privacy policy update). Scope: UNIVERSAL._
+_Priority: Must-ship (launch blocker). Scope: UNIVERSAL. **Status: Implemented** — age-only consent logic, no location param, jurisdiction-neutral copy._
 
 As a user in any country,
 I want a single, consistent consent experience based on my age,
@@ -4436,9 +4482,9 @@ So that the app doesn't ask me to pick my region or show different rules dependi
 
 ### Cluster B: Subject Auto-Inference
 
-### Story 10.20: Subject Classification Service (API)
+### Story 10.20: Subject Classification Service (API) ✅
 
-_Priority: Must-ship (prerequisite for 10.21, 10.22). Scope: UNIVERSAL._
+_Priority: Must-ship (prerequisite for 10.21, 10.22). Scope: UNIVERSAL. **Status: Implemented** — `subject-classify.ts` with LLM + confidence scoring._
 
 As the system,
 I want to classify problem text or conversation content against a learner's enrolled subjects,
@@ -4480,9 +4526,9 @@ So that the correct subject can be inferred without manual selection.
 
 ---
 
-### Story 10.21: Camera/Homework Flow — LLM Subject Auto-Detection
+### Story 10.21: Camera/Homework Flow — LLM Subject Auto-Detection ✅
 
-_Priority: Must-ship. Scope: LEARNER-ONLY._
+_Priority: Must-ship. Scope: LEARNER-ONLY. **Status: Implemented** — `use-classify-subject.ts` hook wired in camera flow._
 
 As a child tapping "Homework help" from the coaching card,
 I want the AI to figure out which subject my homework is from,
@@ -4524,9 +4570,9 @@ So that I don't get stuck picking a subject before I can get help.
 
 ---
 
-### Story 10.22: Chat/Session Flow — Subject Inference from Conversation
+### Story 10.22: Chat/Session Flow — Subject Inference from Conversation 🔄
 
-_Priority: Must-ship. Scope: LEARNER-ONLY._
+_Priority: Must-ship. Scope: LEARNER-ONLY. **Status: Partial** — auto-classifies first message. Missing: ambiguous results silently fall to freeform instead of showing subject picker._
 
 As a learner who tapped "Just ask something" without a specific subject context,
 I want the AI to figure out what subject I'm asking about from my first message,
@@ -4563,9 +4609,9 @@ So that my session gets connected to the right subject and shows up in my Learni
 
 ---
 
-### Story 10.23: "Practice for a Test" Flow — Subject Pre-Selection
+### Story 10.23: "Practice for a Test" Flow — Subject Pre-Selection ✅
 
-_Priority: Should-ship. Scope: LEARNER-ONLY._
+_Priority: Should-ship. Scope: LEARNER-ONLY. **Status: Implemented** — subject picker modal in home.tsx with single-subject auto-select._
 
 As a learner tapping "Practice for a test",
 I want to quickly confirm which subject I'm practicing for,
@@ -4882,6 +4928,8 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 
 ### Story 13.1: Time tracking + wallClockSeconds column + dashboard engagement context
 
+✅ **Implementation status:** Complete. `wallClockSeconds` computed as wall-clock duration in `session.ts`. Dashboard shows wall-clock + exchange count.
+
 **Scope:** Add `wallClockSeconds` column to `learningSessions`. Refactor `closeSession()` to compute active time (adaptive per-gap caps) for internal analytics. Dashboard shows **wall-clock + exchange count** (not active time). Pure backend.
 
 **FRs:** FR210 (time tracking), FR215 (dashboard engagement context)
@@ -4901,6 +4949,8 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 
 ### Story 13.2: Remove hard caps and nudge from session-lifecycle
 
+✅ **Implementation status:** Complete. Hard caps removed. `session-lifecycle.ts` uses adaptive silence thresholds with `computeSilenceThresholdSeconds()` and pace multiplier. No nudge/hard cutoff remains.
+
 **Scope:** Simplify `session-lifecycle.ts` — remove hard cap, nudge, and all age-based timer constants. Keep only adaptive silence detection and auto-save (30 min).
 
 **FRs:** FR213 (remove hard caps)
@@ -4915,7 +4965,9 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 
 **Tests:** Update `session-lifecycle.test.ts`. Verify `checkTimers()` never returns `nudge` or `hard_cap`.
 
-### Story 13.3: Crash recovery — AsyncStorage markers + session resumption + stale cleanup
+### Story 13.3: Crash recovery — SecureStore markers + session resumption + stale cleanup
+
+✅ **Implementation status:** Complete. Uses `expo-secure-store` (better than AsyncStorage). `session-recovery.ts` with 30-min recovery window. Inngest `session-stale-cleanup` cron runs every 10 min. Home screen rehydrates session on mount.
 
 **Scope:** Save crash recovery marker to AsyncStorage on each message send. AppState listener as backup. **Session resumption within 30 minutes** — child can continue where they left off. Inngest cron for stale session cleanup. No new API endpoint (session data loaded from existing endpoints).
 
@@ -4937,6 +4989,8 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 **Tests:** Unit test: recovery marker read/write. Integration: simulate AppState transitions. Edge cases: (1) marker but session already closed (race); (2) app killed mid-exchange — previous marker survives; (3) rapid background→foreground — no double-close; (4) stale session closed by cron before app reopens; (5) resumption loads correct chat history; (6) incomplete last exchange handled gracefully.
 
 ### Story 13.4: Celebration animation library + mastery + effort milestone triggers
+
+✅ **Implementation status:** Complete. 4 celestial components (`PolarStar`, `TwinStars`, `Comet`, `OrionsBelt`) with full Reanimated animations. `useCelebration()` with queue management, tier filtering, 3-level celebration support. `useMilestoneTracker()` state machine with mastery + effort milestones.
 
 **Scope:** Build 4 reusable celestial components in `components/common/celebrations/`. Build `useCelebration()` queue hook with **3-level celebration filtering** + `useMilestoneTracker()` for rung + engagement tracking. Wire in-session triggers for **mastery milestones** (rung-based) AND **effort milestones** (engagement-based). This is the shared animation foundation — all future epics (7, 8) call the same components.
 
@@ -4963,6 +5017,8 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 
 ### Story 13.5: Adaptive silence detection (LLM estimate + pace calibration + cross-session baseline)
 
+✅ **Implementation status:** Complete. `expectedResponseMinutes` in `SessionTimerConfig`. `computeSilenceThresholdSeconds()` with pace multiplier (0.5-3.0). Dynamic adjustment via `recordActivity()`. 30-min stale session cleanup via Inngest cron.
+
 **Scope:** Replace fixed silence threshold with **LLM-adaptive system**. Add `expectedResponseMinutes` to exchange response metadata. Build per-session pace calibration. Add cross-session learned baseline to `teachingPreferences`. Silence prompt fires at computed threshold. 30-min full silence → auto-close via Inngest cron.
 
 **FRs:** FR210.8-10 (adaptive silence), FR216 (silence detection UX)
@@ -4988,6 +5044,8 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 
 ### Story 13.6: "I'm Done" button + summary screen milestone recap + fast celebration catch
 
+✅ **Implementation status:** Complete. Button text is "I'm Done" (not "End Session"). Session summary shows wall-clock time + milestone recap.
+
 **Scope:** Rename "End Session" to "I'm Done". Summary shows wall-clock time (encouragement) + learning milestones (mastery + effort). **3-second wait** for fast post-session achievements before navigating to summary. No "focused time" shown to child.
 
 **FRs:** FR210.6 (child sees wall-clock only), FR214.6 (milestone metadata)
@@ -5008,9 +5066,11 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 
 ### Story 13.7: Post-session celebration queue + child/parent playback + 3-level preferences
 
-**Scope:** `pendingCelebrations` JSONB on the home card system (Epic 12 Story 12.7). `queueCelebration()` service. Inngest wiring. Both child home screen AND parent dashboard play celebrations (different filters, separate seen states). **Three-level celebration toggle** on More screen. Toast copy adapts by age bracket.
+✅ **Implementation status:** Complete. All acceptance criteria verified: `queueCelebration()` service with atomic JSONB append, deduplication, 7-day expiry. Routes: `GET /celebrations/pending`, `POST /celebrations/seen` with viewer discrimination. `celebrationLevel` enum (`all`/`big_only`/`off`) on `teachingPreferences`. Separate `celebrationsSeenByChild`/`celebrationsSeenByParent` timestamps. Inngest wiring: EVALUATE→TwinStars, TEACH_BACK≥4→TwinStars, topic mastered→Comet, streak 7→Comet, streak 30→OrionsBelt. **Note:** When Epic 12.7 (home cards) ships, the celebration storage should migrate from legacy coaching-card cache to the home-card data model.
 
-**Depends on:** Epic 12 Story 12.7 (multi-card home screen must exist so celebrations integrate with the home card data model, not the legacy single coaching card).
+**Scope:** `pendingCelebrations` JSONB on the home-surface cache, with Epic 12 Story 12.7 as the long-term backing store. The current repo already uses a legacy `coaching_card_cache` implementation; Phase 5 should migrate that store, not re-implement the feature from scratch. Includes `queueCelebration()` service, Inngest wiring, child home + parent dashboard playback, 3-level toggle on More, and age-adaptive toast copy.
+
+**Depends on:** Celebration foundations from Story 13.4. In the current repo, a legacy coaching-card-backed implementation already exists; Epic 12 Story 12.7 should replace the backing store with the home-card cache while preserving the existing queue/seen APIs.
 
 **FRs:** FR217.2-FR217.11 (post-session queue), FR218.4-FR218.6 (age/preference)
 

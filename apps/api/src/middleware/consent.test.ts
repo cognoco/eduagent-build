@@ -35,31 +35,31 @@ function createApp(options: {
 }
 
 const CHILD_PENDING_META: ProfileMeta = {
-  birthDate: '2014-06-15', // ~11 years old → under 16, consent required
+  birthYear: new Date().getFullYear() - 12,
   location: null,
   consentStatus: 'PENDING',
 };
 
 const CHILD_REQUESTED_META: ProfileMeta = {
-  birthDate: '2016-03-10', // ~9 years old → under 16, consent required
+  birthYear: new Date().getFullYear() - 10,
   location: null,
   consentStatus: 'PARENTAL_CONSENT_REQUESTED',
 };
 
 const WITHDRAWN_CHILD_META: ProfileMeta = {
-  birthDate: '2014-06-15',
+  birthYear: new Date().getFullYear() - 12,
   location: null,
   consentStatus: 'WITHDRAWN',
 };
 
 const CONSENTED_CHILD_META: ProfileMeta = {
-  birthDate: '2014-06-15',
+  birthYear: new Date().getFullYear() - 12,
   location: null,
   consentStatus: 'CONSENTED',
 };
 
 const ADULT_META: ProfileMeta = {
-  birthDate: '1990-01-01',
+  birthYear: new Date().getFullYear() - 25,
   location: null,
   consentStatus: null,
 };
@@ -118,10 +118,10 @@ describe('consentMiddleware', () => {
     expect(res.status).toBe(200);
   });
 
-  it('passes through when birthDate is missing', async () => {
+  it('passes through when birthYear is missing', async () => {
     const app = createApp({
       profileId: 'p-1',
-      profileMeta: { birthDate: null, location: null, consentStatus: null },
+      profileMeta: { birthYear: null, location: null, consentStatus: null },
     });
     const res = await app.request('/v1/subjects');
     expect(res.status).toBe(200);

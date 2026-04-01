@@ -55,44 +55,36 @@ describe('enableSentry / disableSentry', () => {
 });
 
 describe('evaluateSentryForProfile', () => {
-  it('enables Sentry when no birthDate (adult assumed)', () => {
+  it('enables Sentry when no birthYear (adult assumed)', () => {
     evaluateSentryForProfile(null, null);
     expect(isSentryEnabled()).toBe(true);
   });
 
   it('enables Sentry for user aged 13+', () => {
-    const thirteenYearsAgo = new Date();
-    thirteenYearsAgo.setFullYear(thirteenYearsAgo.getFullYear() - 14);
-    const birthDate = thirteenYearsAgo.toISOString().split('T')[0]!;
+    const birthYear = new Date().getFullYear() - 14;
 
-    evaluateSentryForProfile(birthDate, null);
+    evaluateSentryForProfile(birthYear, null);
     expect(isSentryEnabled()).toBe(true);
   });
 
   it('enables Sentry for under-13 with CONSENTED status', () => {
-    const tenYearsAgo = new Date();
-    tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
-    const birthDate = tenYearsAgo.toISOString().split('T')[0]!;
+    const birthYear = new Date().getFullYear() - 10;
 
-    evaluateSentryForProfile(birthDate, 'CONSENTED');
+    evaluateSentryForProfile(birthYear, 'CONSENTED');
     expect(isSentryEnabled()).toBe(true);
   });
 
   it('disables Sentry for under-13 with PENDING consent', () => {
-    const tenYearsAgo = new Date();
-    tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
-    const birthDate = tenYearsAgo.toISOString().split('T')[0]!;
+    const birthYear = new Date().getFullYear() - 10;
 
-    evaluateSentryForProfile(birthDate, 'PENDING');
+    evaluateSentryForProfile(birthYear, 'PENDING');
     expect(isSentryEnabled()).toBe(false);
   });
 
   it('disables Sentry for under-13 with null consent', () => {
-    const tenYearsAgo = new Date();
-    tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
-    const birthDate = tenYearsAgo.toISOString().split('T')[0]!;
+    const birthYear = new Date().getFullYear() - 10;
 
-    evaluateSentryForProfile(birthDate, null);
+    evaluateSentryForProfile(birthYear, null);
     expect(isSentryEnabled()).toBe(false);
   });
 
@@ -101,20 +93,16 @@ describe('evaluateSentryForProfile', () => {
     enableSentry();
     expect(isSentryEnabled()).toBe(true);
 
-    const elevenYearsAgo = new Date();
-    elevenYearsAgo.setFullYear(elevenYearsAgo.getFullYear() - 11);
-    const birthDate = elevenYearsAgo.toISOString().split('T')[0]!;
+    const birthYear = new Date().getFullYear() - 11;
 
-    evaluateSentryForProfile(birthDate, 'WITHDRAWN');
+    evaluateSentryForProfile(birthYear, 'WITHDRAWN');
     expect(isSentryEnabled()).toBe(false);
   });
 
   it('disables Sentry for 14-year-old with PENDING consent', () => {
-    const fourteenYearsAgo = new Date();
-    fourteenYearsAgo.setFullYear(fourteenYearsAgo.getFullYear() - 14);
-    const birthDate = fourteenYearsAgo.toISOString().split('T')[0]!;
+    const birthYear = new Date().getFullYear() - 14;
 
-    evaluateSentryForProfile(birthDate, 'PENDING');
+    evaluateSentryForProfile(birthYear, 'PENDING');
     expect(isSentryEnabled()).toBe(false);
   });
 
@@ -122,29 +110,23 @@ describe('evaluateSentryForProfile', () => {
     enableSentry();
     expect(isSentryEnabled()).toBe(true);
 
-    const fourteenYearsAgo = new Date();
-    fourteenYearsAgo.setFullYear(fourteenYearsAgo.getFullYear() - 14);
-    const birthDate = fourteenYearsAgo.toISOString().split('T')[0]!;
+    const birthYear = new Date().getFullYear() - 14;
 
-    evaluateSentryForProfile(birthDate, 'WITHDRAWN');
+    evaluateSentryForProfile(birthYear, 'WITHDRAWN');
     expect(isSentryEnabled()).toBe(false);
   });
 
   it('enables Sentry for 14-year-old with CONSENTED status', () => {
-    const fourteenYearsAgo = new Date();
-    fourteenYearsAgo.setFullYear(fourteenYearsAgo.getFullYear() - 14);
-    const birthDate = fourteenYearsAgo.toISOString().split('T')[0]!;
+    const birthYear = new Date().getFullYear() - 14;
 
-    evaluateSentryForProfile(birthDate, 'CONSENTED');
+    evaluateSentryForProfile(birthYear, 'CONSENTED');
     expect(isSentryEnabled()).toBe(true);
   });
 
   it('enables Sentry for 16+ regardless of consent', () => {
-    const twentyYearsAgo = new Date();
-    twentyYearsAgo.setFullYear(twentyYearsAgo.getFullYear() - 20);
-    const birthDate = twentyYearsAgo.toISOString().split('T')[0]!;
+    const birthYear = new Date().getFullYear() - 20;
 
-    evaluateSentryForProfile(birthDate, null);
+    evaluateSentryForProfile(birthYear, null);
     expect(isSentryEnabled()).toBe(true);
   });
 });
