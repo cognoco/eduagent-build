@@ -176,7 +176,7 @@ export default function SignUpScreen() {
     return (
       <KeyboardAvoidingView
         className="flex-1 bg-background items-center"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior="padding"
       >
         <ScrollView
           ref={verifyScrollRef}
@@ -279,7 +279,7 @@ export default function SignUpScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background items-center"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior="padding"
     >
       <ScrollView
         ref={scrollRef}

@@ -5,33 +5,34 @@
 /*
  * Fallback values for Tailwind build-time processing.
  * Runtime values are injected from design-tokens.ts via NativeWind vars().
- * The :root block defines the teen (default) theme as a baseline.
+ * The :root block mirrors the teen dark theme (default for unauthenticated screens).
+ * Keep in sync with tokens.teen.dark in design-tokens.ts.
  */
 :root {
-  --color-background: #0f0f0f;
-  --color-surface: #1a1a1a;
-  --color-surface-elevated: #262626;
+  --color-background: #1a1a3e;
+  --color-surface: #22224a;
+  --color-surface-elevated: #2a2a54;
   --color-text-primary: #f5f5f5;
   --color-text-secondary: #a3a3a3;
-  --color-text-inverse: #0f0f0f;
-  --color-primary: #7c3aed;
-  --color-primary-soft: rgba(124, 58, 237, 0.15);
+  --color-text-inverse: #ffffff;
+  --color-primary: #2dd4bf;
+  --color-primary-soft: rgba(45, 212, 191, 0.16);
   --color-secondary: #a78bfa;
-  --color-accent: #a855f7;
+  --color-accent: #a78bfa;
   --color-success: #22c55e;
   --color-warning: #eab308;
   --color-danger: #ef4444;
   --color-info: #38bdf8;
-  --color-border: #262626;
+  --color-border: #2a2a54;
   --color-muted: #525252;
   --color-retention-strong: #22c55e;
   --color-retention-fading: #eab308;
   --color-retention-weak: #f97316;
   --color-retention-forgotten: #737373;
-  --color-coaching-card: #262626;
-  --color-coach-bubble: rgba(139, 92, 246, 0.12);
+  --color-coaching-card: #2a2a54;
+  --color-coach-bubble: rgba(45, 212, 191, 0.12);
   --color-homework-lane: #f59e0b;
-  --spacing-card-padding: 20px;
+  --spacing-card-padding: 24px;
   --radius-card: 16px;
   --radius-button: 12px;
   --radius-input: 10px;

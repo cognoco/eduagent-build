@@ -42,7 +42,7 @@ export function useKeyboardScroll(): KeyboardScrollResult {
         const y = positions.current[name];
         if (y !== undefined) {
           scrollRef.current?.scrollTo({
-            y: Math.max(0, y - 80),
+            y: Math.max(0, y - 140),
             animated: true,
           });
         }
