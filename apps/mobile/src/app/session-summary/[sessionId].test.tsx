@@ -54,6 +54,12 @@ jest.mock('../../lib/theme', () => ({
   useTheme: () => ({ persona: 'teen' }),
 }));
 
+jest.mock('../../lib/sentry', () => ({
+  Sentry: {
+    addBreadcrumb: jest.fn(),
+  },
+}));
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, gcTime: 0 } },
 });
