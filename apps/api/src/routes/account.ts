@@ -23,14 +23,22 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
 
     const profileIds = await getProfileIdsForAccount(db, account.id);
 
-    await inngest.send({
-      name: 'app/account.deletion-scheduled',
-      data: {
-        accountId: account.id,
-        profileIds,
-        timestamp: new Date().toISOString(),
-      },
-    });
+    try {
+      await inngest.send({
+        name: 'app/account.deletion-scheduled',
+        data: {
+          accountId: account.id,
+          profileIds,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      console.warn(
+        `[account] Failed to dispatch deletion event for ${account.id}: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+    }
 
     return c.json({
       message: 'Deletion scheduled',

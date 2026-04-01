@@ -77,6 +77,7 @@ jest.mock('../services/export', () => ({
 }));
 
 import { app } from '../index';
+import { inngest } from '../inngest/client';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
@@ -94,6 +95,10 @@ describe('account routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/account/delete', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
     it('returns 200 with deletion schedule', async () => {
       const res = await app.request(
         '/v1/account/delete',
@@ -110,6 +115,33 @@ describe('account routes', () => {
       expect(body.message).toBe('Deletion scheduled');
       expect(body.gracePeriodEnds).toBeDefined();
       expect(() => new Date(body.gracePeriodEnds)).not.toThrow();
+    });
+
+    it('still returns 200 when deletion event dispatch fails', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      (inngest.send as jest.Mock).mockRejectedValueOnce(
+        new Error('Inngest unavailable')
+      );
+
+      const res = await app.request(
+        '/v1/account/delete',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+        },
+        TEST_ENV
+      );
+
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.message).toBe('Deletion scheduled');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to dispatch deletion event')
+      );
+
+      warnSpy.mockRestore();
     });
 
     it('returns 401 without auth header', async () => {
