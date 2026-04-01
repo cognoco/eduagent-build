@@ -41,8 +41,10 @@ export function useKeyboardScroll(): KeyboardScrollResult {
       setTimeout(() => {
         const y = positions.current[name];
         if (y !== undefined) {
+          // 140px: calibrated for compact Android phones (S10e) in edge-to-edge
+          // mode, where the keyboard sits higher than on typical devices.
           scrollRef.current?.scrollTo({
-            y: Math.max(0, y - 80),
+            y: Math.max(0, y - 140),
             animated: true,
           });
         }

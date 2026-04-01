@@ -129,7 +129,7 @@ export default function ForgotPasswordScreen() {
     return (
       <KeyboardAvoidingView
         className="flex-1 bg-background items-center"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior="padding"
       >
         <ScrollView
           ref={resetScrollRef}
@@ -251,7 +251,7 @@ export default function ForgotPasswordScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background items-center"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior="padding"
     >
       <ScrollView
         ref={scrollRef}
