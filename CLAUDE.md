@@ -60,6 +60,10 @@ The following CLIs are installed and authenticated in this environment:
 
 **Secrets sync:** `pnpm secrets:sync [dev|stg|prd]` pushes Doppler secrets to Cloudflare Workers. See `docs/deployment-and-secrets.md` for the full flow.
 
+## Notion Integration
+
+**Before any Notion database operation, consult the `/notion` skill.** It defines when to use MCP tools vs REST API, work item lifecycle, resolution recording rules, and key database IDs. Work items live in L-Space > ZAF > Work Items.
+
 ## Testing Rules (Local Development)
 
 **Pre-commit runs surgical tests** via `scripts/pre-commit-tests.sh` — NOT `nx affected`.
