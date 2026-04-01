@@ -7,11 +7,13 @@ import {
   TextInput,
   KeyboardAvoidingView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemeColors } from '../../lib/theme';
+import { useUpdateLearningMode } from '../../hooks/use-settings';
 import {
   useSessionTranscript,
   useSkipSummary,
@@ -55,6 +57,7 @@ export default function SessionSummaryScreen() {
 
   const submitSummary = useSubmitSummary(sessionId ?? '');
   const skipSummary = useSkipSummary(sessionId ?? '');
+  const updateLearningMode = useUpdateLearningMode();
   const transcript = useSessionTranscript(sessionId ?? '');
   const { persona } = useTheme();
 
@@ -150,8 +153,11 @@ export default function SessionSummaryScreen() {
     if (!submitted) {
       if (skipSummary.isPending) return;
 
+      let skipResult:
+        | Awaited<ReturnType<typeof skipSummary.mutateAsync>>
+        | undefined;
       try {
-        await skipSummary.mutateAsync();
+        skipResult = await skipSummary.mutateAsync();
       } catch {
         return;
       }
@@ -162,6 +168,43 @@ export default function SessionSummaryScreen() {
         data: { sessionId, persona, exchangeCount: exchanges },
         level: 'info',
       });
+
+      if (skipResult?.shouldPromptCasualSwitch) {
+        Alert.alert(
+          'Try Casual Explorer?',
+          'You can keep learning without writing a summary each time. Switch now?',
+          [
+            {
+              text: 'Not now',
+              style: 'cancel',
+              onPress: () => router.replace('/(learner)/home'),
+            },
+            {
+              text: 'Switch',
+              onPress: () => {
+                void (async () => {
+                  try {
+                    await updateLearningMode.mutateAsync('casual');
+                    router.replace('/(learner)/home');
+                  } catch {
+                    Alert.alert(
+                      "Couldn't switch right now",
+                      'You can change your learning mode later in More.',
+                      [
+                        {
+                          text: 'OK',
+                          onPress: () => router.replace('/(learner)/home'),
+                        },
+                      ]
+                    );
+                  }
+                })();
+              },
+            },
+          ]
+        );
+        return;
+      }
     }
     router.replace('/(learner)/home');
   };

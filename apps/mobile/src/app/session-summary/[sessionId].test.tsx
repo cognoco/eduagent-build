@@ -5,6 +5,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import React from 'react';
+import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockReplace = jest.fn();
@@ -24,8 +25,13 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
+jest.mock('@expo/vector-icons', () => ({
+  Ionicons: () => null,
+}));
+
 const mockSubmitMutateAsync = jest.fn();
 const mockSkipMutateAsync = jest.fn();
+const mockUpdateLearningModeMutateAsync = jest.fn();
 
 jest.mock('../../hooks/use-sessions', () => ({
   useSubmitSummary: () => ({
@@ -43,6 +49,12 @@ jest.mock('../../hooks/use-sessions', () => ({
   useSessionTranscript: () => ({
     data: null,
     isLoading: false,
+  }),
+}));
+
+jest.mock('../../hooks/use-settings', () => ({
+  useUpdateLearningMode: () => ({
+    mutateAsync: mockUpdateLearningModeMutateAsync,
   }),
 }));
 
@@ -75,6 +87,7 @@ const SessionSummaryScreen = require('./[sessionId]').default;
 describe('SessionSummaryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     mockSkipMutateAsync.mockResolvedValue({
       summary: {
         id: 'summary-1',
@@ -200,6 +213,51 @@ describe('SessionSummaryScreen', () => {
 
     await waitFor(() => {
       expect(mockSkipMutateAsync).toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+    });
+  });
+
+  it('prompts to switch to Casual Explorer when skip threshold is reached', async () => {
+    mockSkipMutateAsync.mockResolvedValueOnce({
+      summary: {
+        id: 'summary-1',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: '',
+        aiFeedback: null,
+        status: 'skipped',
+      },
+      shouldPromptCasualSwitch: true,
+    });
+    mockUpdateLearningModeMutateAsync.mockResolvedValueOnce('casual');
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    fireEvent.press(screen.getByTestId('skip-summary-button'));
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Try Casual Explorer?',
+        'You can keep learning without writing a summary each time. Switch now?',
+        expect.arrayContaining([
+          expect.objectContaining({ text: 'Not now' }),
+          expect.objectContaining({ text: 'Switch' }),
+        ])
+      );
+    });
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    const promptButtons = (Alert.alert as jest.Mock).mock.calls[0]?.[2] as
+      | Array<{ text?: string; onPress?: () => void }>
+      | undefined;
+    const switchButton = promptButtons?.find(
+      (button) => button.text === 'Switch'
+    );
+    expect(switchButton?.onPress).toBeDefined();
+
+    switchButton?.onPress?.();
+
+    await waitFor(() => {
+      expect(mockUpdateLearningModeMutateAsync).toHaveBeenCalledWith('casual');
       expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
     });
   });

@@ -97,8 +97,10 @@ jest.mock('../../../hooks/use-settings', () => ({
 }));
 
 const mockTrigger = jest.fn();
-const NullOverlay = () => null;
-const mockCelebrationResult = { CelebrationOverlay: NullOverlay, trigger: mockTrigger };
+const mockCelebrationResult = {
+  CelebrationOverlay: null,
+  trigger: mockTrigger,
+};
 jest.mock('../../../hooks/use-celebration', () => ({
   useCelebration: () => mockCelebrationResult,
 }));
@@ -126,6 +128,11 @@ jest.mock('../../../lib/session-recovery', () => ({
   readSessionRecoveryMarker: jest.fn().mockResolvedValue(null),
   writeSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
 }));
+
+const { readSessionRecoveryMarker: mockReadSessionRecoveryMarker } =
+  require('../../../lib/session-recovery') as {
+    readSessionRecoveryMarker: jest.Mock;
+  };
 
 jest.mock('../../../lib/api-client', () => ({
   useApiClient: () => ({
@@ -249,5 +256,32 @@ describe('SessionScreen homework flow', () => {
     expect(screen.getByTestId('homework-problem-progress')).toHaveTextContent(
       'Problem 2 of 2'
     );
+  });
+
+  it('hydrates milestone tracker state from the recovery marker when resuming', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      sessionId: 'session-1',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+    });
+    mockReadSessionRecoveryMarker.mockResolvedValueOnce({
+      sessionId: 'session-1',
+      updatedAt: new Date().toISOString(),
+      milestoneTracker: {
+        milestonesReached: ['polar_star'],
+        consecutiveLowRung: 1,
+        longMessageCount: 0,
+        awaitingPersistence: false,
+        previousRung: 2,
+      },
+    });
+
+    render(<SessionScreen />);
+
+    await waitFor(() => {
+      expect(mockReadSessionRecoveryMarker).toHaveBeenCalled();
+      expect(mockHydrate).toHaveBeenCalled();
+    });
   });
 });

@@ -309,7 +309,6 @@ export default function HomeScreen() {
               <Pressable
                 onPress={() => {
                   if (recoveryCard.active) {
-                    void clearSessionRecoveryMarker();
                     router.push({
                       pathname: '/(learner)/session',
                       params: { sessionId: recoveryCard.sessionId },

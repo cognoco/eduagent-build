@@ -6,6 +6,23 @@
 
 ---
 
+## Progress Update
+
+These follow-up items were completed during the broader stabilization pass and are now tracked here so the plan reflects real progress:
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Session buildability and shared type contract recovery | completed | Removed lingering session-flow compile blockers, refreshed stale shared declarations, and restored passing API/mobile typecheck. |
+| Account lifecycle truthfulness | completed | Made account deletion resilient to background event-send failures and updated mobile account hooks/tests so non-2xx responses surface as errors. |
+| Subscription error truthfulness | completed | Prevented the child paywall from masking subscription fetch failures and added a regression test that keeps the error state visible. |
+| Summary state integrity | completed | Persisted learner skip state end to end and restored the Casual Explorer prompt when the backend threshold is reached. |
+| Milestone resume safety | completed | Preserved the recovery marker on resume, re-hydrated tracker state, and added recovery-path tests so earned milestones survive session continuation. |
+| System prompt transcript recovery | completed | Confirmed persisted `system_prompt` events are included in the transcript payload and restored in the resumed learner chat flow. |
+| Validation path repair | completed | Added committed app-level Jest `.cjs` configs plus `test:api:unit` and `test:mobile:unit` scripts; Nx plugin-worker startup still times out in this environment, so direct Jest is the reliable path. |
+| Regression checklist pass | completed | Ran targeted API and mobile session suites covering close/skip/submit, stale auto-close handling, milestone recovery, transcript restore, and learner/parent celebration visibility paths. |
+
+---
+
 ## Goal
 
 Fix the current regressions in the learner session flow before further session-lifecycle work lands:
@@ -111,9 +128,9 @@ Fix the current regressions in the learner session flow before further session-l
 **Issue:** IF4
 
 **Files likely involved**
-- `jest.config.ts`
-- `apps/api/jest.config.ts`
-- `apps/mobile/jest.config.cts`
+- `jest.config.cjs`
+- `apps/api/jest.config.cjs`
+- `apps/mobile/jest.config.cjs`
 - `tsconfig.base.json`
 - Nx/Jest project wiring as needed
 
@@ -148,6 +165,7 @@ Why this order:
 
 ## Regression Checklist
 
+Completed:
 - Close session and skip summary.
 - Close session and submit accepted summary.
 - Auto-close stale session and open summary screen.

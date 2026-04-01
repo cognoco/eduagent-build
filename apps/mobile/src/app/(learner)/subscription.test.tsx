@@ -33,7 +33,7 @@ jest.mock('../../lib/theme', () => ({
 
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
-    activeProfile: { id: 'profile-1', displayName: 'Alex', isOwner: true },
+    activeProfile: mockActiveProfile,
   }),
 }));
 
@@ -73,17 +73,34 @@ jest.mock('../../hooks/use-revenuecat', () => ({
 // Subscription hooks mocks
 let mockSubscription: Record<string, unknown> | undefined;
 let mockSubLoading = false;
+let mockSubError = false;
+const mockRefetchSub = jest.fn();
+let mockSubRefetching = false;
 let mockUsage: Record<string, unknown> | undefined;
 let mockUsageLoading = false;
+let mockUsageError = false;
+const mockRefetchUsage = jest.fn();
+let mockUsageRefetching = false;
+let mockActiveProfile = {
+  id: 'profile-1',
+  displayName: 'Alex',
+  isOwner: true,
+};
 
 jest.mock('../../hooks/use-subscription', () => ({
   useSubscription: () => ({
     data: mockSubscription,
     isLoading: mockSubLoading,
+    isError: mockSubError,
+    refetch: mockRefetchSub,
+    isRefetching: mockSubRefetching,
   }),
   useUsage: () => ({
     data: mockUsage,
     isLoading: mockUsageLoading,
+    isError: mockUsageError,
+    refetch: mockRefetchUsage,
+    isRefetching: mockUsageRefetching,
   }),
   usePurchaseTopUp: () => ({
     mutateAsync: jest.fn(),
@@ -275,8 +292,19 @@ describe('SubscriptionScreen', () => {
     mockRestoreIsPending = false;
     mockSubscription = { tier: 'free', status: 'trial' };
     mockSubLoading = false;
+    mockSubError = false;
+    mockRefetchSub.mockReset();
+    mockSubRefetching = false;
     mockUsage = undefined;
     mockUsageLoading = false;
+    mockUsageError = false;
+    mockRefetchUsage.mockReset();
+    mockUsageRefetching = false;
+    mockActiveProfile = {
+      id: 'profile-1',
+      displayName: 'Alex',
+      isOwner: true,
+    };
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
   });
@@ -307,6 +335,22 @@ describe('SubscriptionScreen', () => {
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
     expect(screen.getByTestId('subscription-loading')).toBeTruthy();
+  });
+
+  it('shows the error state instead of the child paywall when subscription loading fails', () => {
+    mockActiveProfile = {
+      id: 'child-1',
+      displayName: 'Alex',
+      isOwner: false,
+    };
+    mockSubscription = undefined;
+    mockSubLoading = false;
+    mockSubError = true;
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('subscription-error')).toBeTruthy();
+    expect(screen.queryByTestId('child-paywall')).toBeNull();
   });
 
   // -------------------------------------------------------------------------
