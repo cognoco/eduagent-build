@@ -279,7 +279,7 @@ describe('useCloseSession', () => {
     });
 
     await act(async () => {
-      result.current.mutate();
+      result.current.mutate({});
     });
 
     await waitFor(() => {
