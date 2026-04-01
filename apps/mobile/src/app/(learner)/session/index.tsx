@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View, Text, Pressable, Alert } from 'react-native';
+import { AppState, View, Text, Pressable, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import type { HomeworkProblem } from '@eduagent/schemas';
+import type { PendingCelebration, HomeworkProblem } from '@eduagent/schemas';
 import {
   ChatShell,
   animateResponse,
@@ -16,19 +16,71 @@ import {
   useStreamMessage,
   useStartSession,
   useCloseSession,
+  useSessionTranscript,
+  useRecordSystemPrompt,
 } from '../../../hooks/use-sessions';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { useStreaks } from '../../../hooks/use-streaks';
 import { useOverallProgress } from '../../../hooks/use-progress';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
+import { useCelebrationLevel } from '../../../hooks/use-settings';
+import { useCelebration } from '../../../hooks/use-celebration';
+import {
+  celebrationForReason,
+  createMilestoneTrackerStateFromMilestones,
+  normalizeMilestoneTrackerState,
+  useMilestoneTracker,
+} from '../../../hooks/use-milestone-tracker';
 import { useApiClient } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
+import {
+  clearSessionRecoveryMarker,
+  readSessionRecoveryMarker,
+  writeSessionRecoveryMarker,
+} from '../../../lib/session-recovery';
 import {
   buildHomeworkSessionMetadata,
   parseHomeworkProblems,
   withProblemMode,
 } from '../homework/problem-cards';
+
+function computePaceMultiplier(
+  history: Array<{ actualSeconds: number; expectedMinutes: number }>
+): number {
+  if (history.length < 3) return 1;
+  const ratios = history
+    .map(
+      (entry) => entry.actualSeconds / Math.max(60, entry.expectedMinutes * 60)
+    )
+    .sort((a, b) => a - b);
+  const middle = Math.floor(ratios.length / 2);
+  const median =
+    ratios.length % 2 === 0
+      ? (ratios[middle - 1]! + ratios[middle]!) / 2
+      : ratios[middle]!;
+  return Math.min(3, Math.max(0.5, Number(median.toFixed(2))));
+}
+
+function serializeMilestones(milestones: string[]): string {
+  return encodeURIComponent(JSON.stringify(milestones));
+}
+
+function serializeCelebrations(celebrations: PendingCelebration[]): string {
+  return encodeURIComponent(JSON.stringify(celebrations));
+}
+
+function MilestoneDots({ count }: { count: number }) {
+  if (count <= 0) return null;
+
+  return (
+    <View className="ms-2 flex-row items-center gap-1" testID="milestone-dots">
+      {Array.from({ length: Math.min(count, 6) }).map((_, index) => (
+        <View key={index} className="w-2 h-2 rounded-full bg-primary" />
+      ))}
+    </View>
+  );
+}
 
 export default function SessionScreen() {
   const {
@@ -65,6 +117,7 @@ export default function SessionScreen() {
   const modeConfig = getModeConfig(effectiveMode);
   const { data: streak } = useStreaks();
   const { data: overallProgress } = useOverallProgress();
+  const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const showBookLink =
     effectiveMode !== 'homework' &&
     (overallProgress?.totalTopicsCompleted ?? 0) > 0;
@@ -101,10 +154,33 @@ export default function SessionScreen() {
   const [homeworkMode, setHomeworkMode] = useState<
     'help_me' | 'check_answer' | undefined
   >(undefined);
+  const [draftText, setDraftText] = useState('');
+  const [resumedBanner, setResumedBanner] = useState(false);
+  const [responseHistory, setResponseHistory] = useState<
+    Array<{ actualSeconds: number; expectedMinutes: number }>
+  >([]);
 
   const animationCleanupRef = useRef<(() => void) | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAiAtRef = useRef<number | null>(null);
+  const lastExpectedMinutesRef = useRef(10);
   const hasAutoSentRef = useRef(false);
+  const hasHydratedRecoveryRef = useRef(false);
   const queuedProblemTextRef = useRef<string | null>(null);
+
+  const transcript = useSessionTranscript(routeSessionId ?? '');
+  const recordSystemPrompt = useRecordSystemPrompt(activeSessionId ?? '');
+  const {
+    milestonesReached,
+    trackerState,
+    trackExchange,
+    hydrate,
+    reset: resetMilestones,
+  } = useMilestoneTracker();
+  const { CelebrationOverlay, trigger } = useCelebration({
+    celebrationLevel,
+    audience: 'child',
+  });
 
   // Reset state when screen regains focus (prevents stale state loop)
   useFocusEffect(
@@ -119,16 +195,24 @@ export default function SessionScreen() {
       setPendingClassification(false);
       setClassifyError(null);
       setClassifiedSubject(null);
+      setDraftText('');
+      setResumedBanner(false);
+      setResponseHistory([]);
+      hasHydratedRecoveryRef.current = false;
+      resetMilestones();
       setHomeworkProblemsState(initialHomeworkProblems);
       setCurrentProblemIndex(0);
       setHomeworkMode(undefined);
       hasAutoSentRef.current = false;
-    }, [openingContent, routeSessionId, initialHomeworkProblems])
+    }, [openingContent, resetMilestones, routeSessionId, initialHomeworkProblems])
   );
 
   useEffect(() => {
     return () => {
       animationCleanupRef.current?.();
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+      }
     };
   }, []);
 
@@ -170,6 +254,155 @@ export default function SessionScreen() {
       }
     },
     [apiClient, effectiveMode, ocrText]
+  );
+
+  useEffect(() => {
+    if (!routeSessionId || !transcript.data) return;
+
+    const transcriptMessages = transcript.data.exchanges
+      .filter((entry, index, all) => {
+        if (entry.role !== 'user') return true;
+        return index !== all.length - 1 || all[index + 1]?.role === 'assistant';
+      })
+      .map((entry, index) => ({
+        id: `${entry.isSystemPrompt ? 'system' : entry.role}-${index}-${
+          entry.timestamp
+        }`,
+        role: entry.role === 'assistant' ? ('ai' as const) : ('user' as const),
+        content: entry.content,
+        escalationRung: entry.escalationRung,
+      }));
+
+    setMessages(
+      transcriptMessages.length > 0
+        ? transcriptMessages
+        : [{ id: 'opening', role: 'ai', content: openingContent }]
+    );
+    setExchangeCount(transcript.data.session.exchangeCount);
+    setEscalationRung(
+      transcript.data.exchanges
+        .filter((entry) => entry.role === 'assistant' && !entry.isSystemPrompt)
+        .at(-1)?.escalationRung ?? 1
+    );
+    setActiveSessionId(routeSessionId);
+    setResumedBanner(true);
+  }, [openingContent, routeSessionId, transcript.data]);
+
+  useEffect(() => {
+    if (!routeSessionId || hasHydratedRecoveryRef.current) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      const marker = await readSessionRecoveryMarker();
+      if (cancelled || hasHydratedRecoveryRef.current) return;
+
+      if (marker?.sessionId === routeSessionId && marker.milestoneTracker) {
+        hydrate(normalizeMilestoneTrackerState(marker.milestoneTracker));
+        hasHydratedRecoveryRef.current = true;
+        return;
+      }
+
+      const transcriptMilestones =
+        transcript.data?.session.milestonesReached ?? [];
+      if (transcriptMilestones.length > 0) {
+        hydrate(
+          createMilestoneTrackerStateFromMilestones(transcriptMilestones)
+        );
+        hasHydratedRecoveryRef.current = true;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrate, routeSessionId, transcript.data?.session.milestonesReached]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (
+        (nextState === 'background' || nextState === 'inactive') &&
+        activeSessionId
+      ) {
+        void writeSessionRecoveryMarker({
+          sessionId: activeSessionId,
+          subjectId: effectiveSubjectId || undefined,
+          subjectName: effectiveSubjectName || undefined,
+          topicId: topicId ?? undefined,
+          mode: effectiveMode,
+          milestoneTracker: trackerState,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    });
+
+    return () => subscription.remove();
+  }, [
+    activeSessionId,
+    effectiveMode,
+    effectiveSubjectId,
+    effectiveSubjectName,
+    trackerState,
+    topicId,
+  ]);
+
+  const scheduleSilencePrompt = useCallback(
+    (sessionIdToUse: string, expectedResponseMinutes: number) => {
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+      }
+
+      const thresholdMinutes = Math.min(
+        20,
+        Math.max(
+          2,
+          expectedResponseMinutes * computePaceMultiplier(responseHistory)
+        )
+      );
+
+      silenceTimerRef.current = setTimeout(async () => {
+        if (draftText.trim()) return;
+
+        const prompt =
+          "Still working on it? Take your time - I'm here when you're ready.";
+
+        setMessages((prev) => {
+          if (prev.some((message) => message.id === 'silence-prompt')) {
+            return prev;
+          }
+          return [
+            ...prev,
+            { id: 'silence-prompt', role: 'ai', content: prompt },
+          ];
+        });
+
+        try {
+          await recordSystemPrompt.mutateAsync({ content: prompt });
+        } catch {
+          // Best effort only.
+        }
+
+        await writeSessionRecoveryMarker({
+          sessionId: sessionIdToUse,
+          subjectId: effectiveSubjectId || undefined,
+          subjectName: effectiveSubjectName || undefined,
+          topicId: topicId ?? undefined,
+          mode: effectiveMode,
+          milestoneTracker: trackerState,
+          updatedAt: new Date().toISOString(),
+        });
+      }, thresholdMinutes * 60 * 1000);
+    },
+    [
+      draftText,
+      effectiveMode,
+      effectiveSubjectId,
+      effectiveSubjectName,
+      recordSystemPrompt,
+      responseHistory,
+      trackerState,
+      topicId,
+    ]
   );
 
   const ensureSession = useCallback(
@@ -270,6 +503,7 @@ export default function SessionScreen() {
         ...prev,
         { id: `user-${Date.now()}`, role: 'user', content: text },
       ]);
+      setResumedBanner(false);
 
       // Classify subject from first message when none was provided
       let sessionSubjectId: string | undefined;
@@ -330,6 +564,16 @@ export default function SessionScreen() {
           return;
         }
 
+        await writeSessionRecoveryMarker({
+          sessionId: sid,
+          subjectId: (sessionSubjectId ?? effectiveSubjectId) || undefined,
+          subjectName: effectiveSubjectName || undefined,
+          topicId: topicId ?? undefined,
+          mode: effectiveMode,
+          milestoneTracker: trackerState,
+          updatedAt: new Date().toISOString(),
+        });
+
         if (effectiveMode === 'homework' && updatedProblems.length > 0) {
           try {
             await syncHomeworkMetadata(
@@ -343,6 +587,7 @@ export default function SessionScreen() {
         }
 
         const streamId = `ai-${Date.now()}`;
+        const previousAiAt = lastAiAtRef.current;
         setMessages((prev) => [
           ...prev,
           { id: streamId, role: 'ai', content: '', streaming: true },
@@ -358,7 +603,21 @@ export default function SessionScreen() {
               )
             );
           },
-          (result) => {
+          async (result) => {
+            const { triggered, trackerState: nextTrackerState } = trackExchange(
+              {
+                userMessage: text,
+                escalationRung: result.escalationRung,
+              }
+            );
+            triggered.forEach((reason) => {
+              trigger({
+                celebration: celebrationForReason(reason),
+                reason,
+                detail: null,
+              });
+            });
+
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === streamId
@@ -373,6 +632,29 @@ export default function SessionScreen() {
             setIsStreaming(false);
             setExchangeCount(result.exchangeCount);
             setEscalationRung(result.escalationRung);
+            if (previousAiAt) {
+              setResponseHistory((prev) => [
+                ...prev,
+                {
+                  actualSeconds: Math.round((Date.now() - previousAiAt) / 1000),
+                  expectedMinutes: lastExpectedMinutesRef.current,
+                },
+              ]);
+            }
+            const expectedResponseMinutes =
+              result.expectedResponseMinutes ?? 10;
+            lastExpectedMinutesRef.current = expectedResponseMinutes;
+            lastAiAtRef.current = Date.now();
+            scheduleSilencePrompt(sid, expectedResponseMinutes);
+            await writeSessionRecoveryMarker({
+              sessionId: sid,
+              subjectId: (sessionSubjectId ?? effectiveSubjectId) || undefined,
+              subjectName: effectiveSubjectName || undefined,
+              topicId: topicId ?? undefined,
+              mode: effectiveMode,
+              milestoneTracker: nextTrackerState,
+              updatedAt: new Date().toISOString(),
+            });
           },
           sid,
           effectiveMode === 'homework' && homeworkMode
@@ -399,9 +681,16 @@ export default function SessionScreen() {
       homeworkProblemsState,
       streamMessage,
       effectiveMode,
+      effectiveSubjectId,
+      effectiveSubjectName,
       homeworkMode,
       currentProblemIndex,
       syncHomeworkMetadata,
+      scheduleSilencePrompt,
+      trackerState,
+      topicId,
+      trackExchange,
+      trigger,
     ]
   );
 
@@ -420,19 +709,43 @@ export default function SessionScreen() {
   }, [currentProblemIndex, handleSend]);
 
   useEffect(() => {
-    if (
-      effectiveMode === 'homework' &&
-      activeHomeworkProblem &&
-      !hasAutoSentRef.current
-    ) {
+    if (problemText && !routeSessionId && !hasAutoSentRef.current) {
       hasAutoSentRef.current = true;
       const timer = setTimeout(() => {
-        handleSend(activeHomeworkProblem.text);
+        void handleSend(problemText);
       }, 500);
       return () => clearTimeout(timer);
     }
     return undefined;
-  }, [effectiveMode, activeHomeworkProblem, handleSend]);
+  }, [problemText, handleSend, routeSessionId]);
+
+  const fetchFastCelebrations = useCallback(async (): Promise<
+    PendingCelebration[]
+  > => {
+    const celebrationsClient = (apiClient as Record<string, any>)[
+      'celebrations'
+    ];
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < 3000) {
+      const res = await celebrationsClient.pending.$get();
+      if (res.ok) {
+        const data = (await res.json()) as {
+          pendingCelebrations: PendingCelebration[];
+        };
+        if (data.pendingCelebrations.length > 0) {
+          await celebrationsClient.seen.$post({
+            json: { viewer: 'child' },
+          });
+          return data.pendingCelebrations;
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
+    return [];
+  }, [apiClient]);
 
   const handleNextProblem = useCallback(async () => {
     if (
@@ -484,35 +797,40 @@ export default function SessionScreen() {
   const handleEndSession = useCallback(async () => {
     if (!activeSessionId || isClosing) return;
 
-    Alert.alert(
-      'End Session',
-      'Ready to wrap up? You can write a summary of what you learned.',
-      [
-        { text: 'Keep Going', style: 'cancel' },
-        {
-          text: 'End Session',
-          onPress: async () => {
-            setIsClosing(true);
-            try {
-              await closeSession.mutateAsync();
-              router.replace({
-                pathname: `/session-summary/${activeSessionId}`,
-                params: {
-                  subjectName: effectiveSubjectName ?? '',
-                  exchangeCount: String(exchangeCount),
-                  escalationRung: String(escalationRung),
-                  subjectId: effectiveSubjectId ?? '',
-                  topicId: topicId ?? '',
-                },
-              } as never);
-            } catch (err: unknown) {
-              setIsClosing(false);
-              Alert.alert('Error', formatApiError(err));
-            }
-          },
+    Alert.alert('Ready to wrap up?', 'Keep going or finish this session now.', [
+      { text: 'Keep Going', style: 'cancel' },
+      {
+        text: "I'm Done",
+        onPress: async () => {
+          setIsClosing(true);
+          try {
+            const result = await closeSession.mutateAsync({
+              reason: 'user_ended',
+              summaryStatus: 'pending',
+              milestonesReached,
+            });
+            const fastCelebrations = await fetchFastCelebrations();
+            await clearSessionRecoveryMarker();
+            router.replace({
+              pathname: `/session-summary/${activeSessionId}`,
+              params: {
+                subjectName: effectiveSubjectName ?? '',
+                exchangeCount: String(exchangeCount),
+                escalationRung: String(escalationRung),
+                subjectId: effectiveSubjectId ?? '',
+                topicId: topicId ?? '',
+                wallClockSeconds: String(result.wallClockSeconds),
+                milestones: serializeMilestones(milestonesReached),
+                fastCelebrations: serializeCelebrations(fastCelebrations),
+              },
+            } as never);
+          } catch (err: unknown) {
+            setIsClosing(false);
+            Alert.alert('Error', formatApiError(err));
+          }
         },
-      ]
-    );
+      },
+    ]);
   }, [
     activeSessionId,
     isClosing,
@@ -523,6 +841,8 @@ export default function SessionScreen() {
     topicId,
     exchangeCount,
     escalationRung,
+    fetchFastCelebrations,
+    milestonesReached,
   ]);
 
   const showEndSession = exchangeCount > 0;
@@ -538,19 +858,20 @@ export default function SessionScreen() {
       disabled={isClosing || isStreaming}
       className="ms-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
       testID="end-session-button"
-      accessibilityLabel="End session"
+      accessibilityLabel="I'm done"
       accessibilityRole="button"
     >
       <Text className="text-body-sm font-semibold text-text-secondary">
-        {isClosing ? 'Closing...' : 'Done'}
+        {isClosing ? 'Wrapping up...' : "I'm Done"}
       </Text>
     </Pressable>
   ) : null;
 
   const headerRight =
-    modeConfig.showTimer || showEndSession ? (
+    modeConfig.showTimer || showEndSession || milestonesReached.length > 0 ? (
       <View className="flex-row items-center">
         {modeConfig.showTimer && <SessionTimer />}
+        <MilestoneDots count={milestonesReached.length} />
         {endSessionButton}
       </View>
     ) : undefined;
@@ -559,8 +880,10 @@ export default function SessionScreen() {
     ? 'Figuring out what this is about...'
     : classifyError
     ? classifyError
+    : resumedBanner
+    ? 'Welcome back - your session is ready.'
     : apiChecked && !isApiReachable
-    ? 'Server unreachable — messages may fail'
+    ? 'Server unreachable - messages may fail'
     : modeConfig.subtitle;
 
   const homeworkModeChips =
@@ -643,26 +966,30 @@ export default function SessionScreen() {
     ) : undefined;
 
   return (
-    <ChatShell
-      title={modeConfig.title}
-      subtitle={subtitle}
-      placeholder={modeConfig.placeholder}
-      messages={messages}
-      onSend={handleSend}
-      isStreaming={isStreaming}
-      inputDisabled={isOffline || pendingClassification}
-      rightAction={headerRight}
-      inputAccessory={homeworkModeChips}
-      footer={
-        modeConfig.showQuestionCount || showBookLink ? (
-          <>
-            {modeConfig.showQuestionCount && (
-              <QuestionCounter count={userMessageCount} />
-            )}
-            {showBookLink && <LearningBookPrompt />}
-          </>
-        ) : undefined
-      }
-    />
+    <View className="flex-1">
+      <ChatShell
+        title={modeConfig.title}
+        subtitle={subtitle}
+        placeholder={modeConfig.placeholder}
+        messages={messages}
+        onSend={handleSend}
+        isStreaming={isStreaming}
+        inputDisabled={isOffline || pendingClassification}
+        rightAction={headerRight}
+        inputAccessory={homeworkModeChips}
+        onDraftChange={setDraftText}
+        footer={
+          modeConfig.showQuestionCount || showBookLink ? (
+            <>
+              {modeConfig.showQuestionCount && (
+                <QuestionCounter count={userMessageCount} />
+              )}
+              {showBookLink && <LearningBookPrompt />}
+            </>
+          ) : undefined
+        }
+      />
+      {CelebrationOverlay}
+    </View>
   );
 }

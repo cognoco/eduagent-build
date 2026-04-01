@@ -1,7 +1,6 @@
 # Flow S1: Onboarding — Sign-Up to First Subject
-# Validates: full onboarding journey from sign-up through profile creation
-# to subject creation and interview screen.
-# Tags: smoke, onboarding
+# Validates: sign-up UI through Clerk email-verification handoff.
+# Tags: manual, onboarding
 #
 # Journey: UX Journey 1 (Onboarding)
 # Epics: Epic 0 (FR1-FR9), Epic 1 (FR13)
@@ -11,7 +10,7 @@
 # endpoint + sign-in instead. This flow tests the full sign-up path.
 appId: com.mentomate.app
 tags:
-  - smoke
+  - manual
   - onboarding
 ---
 # 1. Wait for sign-in screen (app launched by run-without-seed.sh via ADB)

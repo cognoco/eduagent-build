@@ -17,8 +17,12 @@ jest.mock('./escalation', () => ({
   detectPartialProgress: jest.fn().mockReturnValue(false),
 }));
 
+const mockCreatePendingSessionSummary = jest.fn();
+
 jest.mock('./summaries', () => ({
   evaluateSummary: jest.fn(),
+  createPendingSessionSummary: (...args: unknown[]) =>
+    mockCreatePendingSessionSummary(...args),
 }));
 
 jest.mock('./subject', () => ({
@@ -44,8 +48,14 @@ jest.mock('./memory', () => ({
     .mockResolvedValue({ context: '', topicIds: [] }),
 }));
 
+const mockIncrementSummarySkips = jest.fn().mockResolvedValue(1);
+const mockResetSummarySkips = jest.fn().mockResolvedValue(undefined);
+
 jest.mock('./settings', () => ({
   getLearningMode: jest.fn().mockResolvedValue({ mode: 'serious' }),
+  incrementSummarySkips: (...args: unknown[]) =>
+    mockIncrementSummarySkips(...args),
+  resetSummarySkips: (...args: unknown[]) => mockResetSummarySkips(...args),
 }));
 
 import type { Database } from '@eduagent/database';
@@ -58,8 +68,11 @@ import {
   closeSession,
   syncHomeworkState,
   flagContent,
+  getSessionTranscript,
   getSessionSummary,
+  skipSummary,
   submitSummary,
+  computeActiveSeconds,
 } from './session';
 import { processExchange } from './exchanges';
 import { evaluateEscalation } from './escalation';
@@ -160,6 +173,7 @@ function createMockDb({
     metadata?: Record<string, unknown>;
   }>,
   selectResults = [] as unknown[][],
+  learningSessionFindFirst = mockSessionRow(),
 } = {}): Database {
   const selectMock = jest.fn();
   for (const result of selectResults) {
@@ -181,6 +195,9 @@ function createMockDb({
     }),
     select: selectMock,
     query: {
+      learningSessions: {
+        findFirst: jest.fn().mockResolvedValue(learningSessionFindFirst),
+      },
       sessionEvents: {
         findMany: jest.fn().mockResolvedValue(findManyEvents),
       },
@@ -194,7 +211,8 @@ function createCloseSessionDb(
     content: string;
     createdAt: Date;
     metadata?: Record<string, unknown>;
-  }> = []
+  }> = [],
+  rawSession: ReturnType<typeof mockSessionRow> = mockSessionRow()
 ): {
   db: Database;
   setMock: jest.Mock;
@@ -211,6 +229,9 @@ function createCloseSessionDb(
       }),
       select: jest.fn().mockReturnValue(mockSelectChain([])),
       query: {
+        learningSessions: {
+          findFirst: jest.fn().mockResolvedValue(rawSession),
+        },
         sessionEvents: {
           findMany: jest.fn().mockResolvedValue(events),
         },
@@ -236,6 +257,9 @@ function setupScopedRepo({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockCreatePendingSessionSummary.mockResolvedValue(
+    mockSummaryRow({ status: 'pending' })
+  );
 
   // Default mocks for exchange-related services
   (getSubject as jest.Mock).mockResolvedValue({
@@ -274,6 +298,66 @@ beforeEach(() => {
     truncated: false,
   });
 });
+
+// ---------------------------------------------------------------------------
+// computeActiveSeconds — pure function, no mocks needed
+// ---------------------------------------------------------------------------
+
+describe('computeActiveSeconds', () => {
+  const baseTime = new Date('2025-01-15T10:00:00.000Z');
+
+  function eventAt(
+    offsetSeconds: number,
+    meta?: Record<string, unknown>
+  ): { createdAt: Date; metadata?: unknown } {
+    return {
+      createdAt: new Date(baseTime.getTime() + offsetSeconds * 1000),
+      metadata: meta,
+    };
+  }
+
+  it('returns 0 for empty events array', () => {
+    expect(computeActiveSeconds(baseTime, [])).toBe(0);
+  });
+
+  it('returns actual gap for a single event within cap', () => {
+    // 30s after start, well under 600s fallback cap
+    expect(computeActiveSeconds(baseTime, [eventAt(30)])).toBe(30);
+  });
+
+  it('sums gaps between consecutive events', () => {
+    const events = [eventAt(10), eventAt(70)];
+    // start→first = 10s, first→second = 60s, total = 70s
+    expect(computeActiveSeconds(baseTime, events)).toBe(70);
+  });
+
+  it('caps gap at FALLBACK_GAP_CAP_SECONDS (600s) when exceeded', () => {
+    // 900s (15 min) after start → capped at 600s
+    expect(computeActiveSeconds(baseTime, [eventAt(900)])).toBe(600);
+  });
+
+  it('uses expectedResponseMinutes from metadata for custom cap', () => {
+    // metadata says 2 min expected → cap = 2 * 60 * 1.5 = 180s
+    // event at 300s → capped to 180s
+    const events = [eventAt(300, { expectedResponseMinutes: 2 })];
+    expect(computeActiveSeconds(baseTime, events)).toBe(180);
+  });
+
+  it('sorts events when provided out of order', () => {
+    const events = [eventAt(60), eventAt(10)];
+    // After sort: [10s, 60s]
+    // start→10s = 10, 10s→60s = 50, total = 60
+    expect(computeActiveSeconds(baseTime, events)).toBe(60);
+  });
+
+  it('clamps negative gap to 0 when event precedes session start', () => {
+    const events = [{ createdAt: new Date(baseTime.getTime() - 5000) }];
+    // gap = -5s → Math.max(0, -5) = 0
+    expect(computeActiveSeconds(baseTime, events)).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 
 describe('startSession', () => {
   it('throws when subject not found for profile (ownership guard)', async () => {
@@ -1163,6 +1247,21 @@ describe('closeSession', () => {
     expect(result.sessionId).toBe(sessionId);
   });
 
+  it('defaults normal session closures to pending summary state', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    const db = createMockDb();
+    const result = await closeSession(db, profileId, sessionId, {});
+
+    expect(result.summaryStatus).toBe('pending');
+    expect(mockCreatePendingSessionSummary).toHaveBeenCalledWith(
+      db,
+      sessionId,
+      profileId,
+      null,
+      'pending'
+    );
+  });
+
   it('returns sessionType for all session types', async () => {
     setupScopedRepo({ sessionFindFirst: mockSessionRow() });
     const db = createMockDb();
@@ -1269,6 +1368,50 @@ describe('closeSession', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe('getSessionTranscript', () => {
+  it('includes persisted system prompts in transcript exchanges', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    const db = createMockDb({
+      learningSessionFindFirst: mockSessionRow(),
+      findManyEvents: [
+        {
+          eventType: 'user_message',
+          content: 'What is gravity?',
+          createdAt: NOW,
+        },
+        {
+          eventType: 'ai_response',
+          content: 'Gravity pulls objects together.',
+          createdAt: new Date(NOW.getTime() + 1000),
+          metadata: { escalationRung: 2 },
+        },
+        {
+          eventType: 'system_prompt',
+          content:
+            "Still working on it? Take your time - I'm here when you're ready.",
+          createdAt: new Date(NOW.getTime() + 2000),
+        },
+      ],
+    });
+
+    const result = await getSessionTranscript(db, profileId, sessionId);
+
+    expect(result?.exchanges).toEqual([
+      expect.objectContaining({ role: 'user', isSystemPrompt: false }),
+      expect.objectContaining({
+        role: 'assistant',
+        escalationRung: 2,
+        isSystemPrompt: false,
+      }),
+      expect.objectContaining({
+        role: 'assistant',
+        isSystemPrompt: true,
+        escalationRung: undefined,
+      }),
+    ]);
   });
 });
 
@@ -1422,6 +1565,49 @@ describe('getSessionSummary', () => {
   });
 });
 
+describe('skipSummary', () => {
+  it('persists skipped summary state and increments the skip counter once', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow(),
+      summaryFindFirst: mockSummaryRow({ status: 'pending' }),
+    });
+    mockCreatePendingSessionSummary.mockResolvedValueOnce(
+      mockSummaryRow({ status: 'skipped' })
+    );
+    const db = createMockDb();
+
+    const result = await skipSummary(db, profileId, sessionId);
+
+    expect(result.summary.status).toBe('skipped');
+    expect(mockCreatePendingSessionSummary).toHaveBeenCalledWith(
+      db,
+      sessionId,
+      profileId,
+      null,
+      'skipped'
+    );
+    expect(mockIncrementSummarySkips).toHaveBeenCalledWith(db, profileId);
+  });
+
+  it('does not overwrite an already submitted summary', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow(),
+      summaryFindFirst: mockSummaryRow({
+        status: 'accepted',
+        content: 'I learned about gravity.',
+        aiFeedback: 'Nice summary.',
+      }),
+    });
+    const db = createMockDb();
+
+    const result = await skipSummary(db, profileId, sessionId);
+
+    expect(result.summary.status).toBe('accepted');
+    expect(mockCreatePendingSessionSummary).not.toHaveBeenCalled();
+    expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
+  });
+});
+
 describe('submitSummary', () => {
   it('returns summary with LLM-evaluated feedback', async () => {
     setupScopedRepo({ sessionFindFirst: mockSessionRow() });
@@ -1480,9 +1666,11 @@ describe('submitSummary', () => {
   });
 
   it('updates summary row with feedback and status', async () => {
-    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
-    const summaryRow = mockSummaryRow({ id: 'new-summary' });
-    const db = createMockDb({ insertReturning: [summaryRow] });
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow(),
+      summaryFindFirst: mockSummaryRow({ id: 'existing-summary' }),
+    });
+    const db = createMockDb();
 
     await submitSummary(db, profileId, sessionId, {
       content: 'Valid summary content here.',
@@ -1490,12 +1678,15 @@ describe('submitSummary', () => {
 
     // Should call db.update to persist the AI feedback
     expect(db.update).toHaveBeenCalled();
+    expect(mockResetSummarySkips).toHaveBeenCalledWith(db, profileId);
   });
 
   it('scopes submitSummary update to profileId (defense-in-depth)', async () => {
-    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
-    const summaryRow = mockSummaryRow({ id: 'new-summary' });
-    const db = createMockDb({ insertReturning: [summaryRow] });
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow(),
+      summaryFindFirst: mockSummaryRow({ id: 'existing-summary' }),
+    });
+    const db = createMockDb();
 
     await submitSummary(db, profileId, sessionId, {
       content: 'Summary content for profile scoping test.',

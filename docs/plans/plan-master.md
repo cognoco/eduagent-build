@@ -8,15 +8,18 @@
 
 ## Status Summary
 
-| Epic | Status | Scope |
+| Epic / Phase | Status | Scope |
 |------|--------|-------|
 | 0-5 | **COMPLETE** | Foundation, onboarding, learning, retention, progress, billing |
 | 9 | **COMPLETE** | Native IAP (RevenueCat) |
 | 10 | **COMPLETE** | Pre-launch UX polish |
-| **11** | **TODO** | Brand identity — dark-first, logo-derived colors |
+| Phase 1 | **COMPLETE** | Epic 11.1 brand tokens + Story 13.1-13.2 wallClock/hard-cap |
+| Phase 2 | **COMPLETE** | Stories 14.2, 14.3, 14.4, 14.10 (quick wins) |
+| Phase 2.5 | **COMPLETE** | Code review remediation — deploy blockers, test gaps, UX polish |
+| **11** | **IN PROGRESS** | Brand identity — 11.1 done, 11.2 accent cascade pending |
 | **12** | **TODO** | Remove persona enum — age + role + intent-as-cards |
-| **13** | **TODO** | Session lifecycle overhaul — honest time, milestones, graceful close |
-| **14** | **TODO** | Human agency & feedback — the student always has a voice |
+| **13** | **IN PROGRESS** | Session lifecycle — 13.1-13.2 done, 13.3-13.7 pending |
+| **14** | **IN PROGRESS** | Human agency — 14.2-14.4, 14.10 done, rest pending |
 | **7** | **TODO** | Concept map — advisory prerequisite learning (v1.1) |
 | **8** | **TODO** | Full voice mode (v1.1) |
 | **6** | **TODO** | Language learning — Four Strands (v1.1) |
@@ -51,6 +54,48 @@
 | **Story 14.10** | "Help me" vs "Check my answer" (homework explain-don't-question) | One prompt edit in `exchanges.ts` — huge daily-use value |
 
 **Exit criteria:** All 4 features working, related tests pass.
+
+---
+
+### Phase 2.5 — Code Review Remediation (Phase 1+2) ✅ COMPLETE
+
+**Goal:** Fix all findings from the Phase 1+2 code review before moving forward. No new features — only correctness, test coverage, and polish on already-shipped code.
+
+**Context:** Code review of `phase4` branch (44 files, ~5k lines) found 3 HIGH, 6 MEDIUM, and 6 LOW issues across API services, mobile screens, shared schemas, and design tokens.
+
+**Result:** 13 of 15 findings fixed. 2 were already resolved before implementation (L5 double border, L6 unused `_config`). Migration `0004_uneven_mandroid.sql` generated (also captures celebration, quota, and learning_modes schema drift). All tests pass. `tsc --noEmit` clean.
+
+#### Stream A — Deploy Blockers (HIGH, do first) ✅
+
+| # | Severity | Status | Issue | Resolution |
+|---|----------|--------|-------|------------|
+| H1 | **HIGH** | ✅ | Missing SQL migration for `wallClockSeconds` | Generated `0004_uneven_mandroid.sql` (also covers celebration_level enum, quota daily_limit, coaching cache celebrations, learning_modes median/celebration columns) |
+| H2 | **HIGH** | ✅ | `curriculumTopicSchema` missing `source` field | Added `source: curriculumTopicSourceSchema.optional()` + fixed both topic mappers in `curriculum.ts` (getCurriculum + addCurriculumTopic) |
+
+#### Stream B — Test Coverage Gaps (HIGH + MEDIUM) ✅
+
+| # | Severity | Status | Issue | Resolution |
+|---|----------|--------|-------|------------|
+| H3 | **HIGH** | ✅ | `computeActiveSeconds` zero tests | Added 7-case `describe('computeActiveSeconds')` block — pure function tests, no mocks |
+| M2 | MEDIUM | ✅ | Missing curriculum error-path tests | Added 3 service tests (subject 404, curriculum 404, LLM fallback) + 2 route tests (subject 404, curriculum 404) |
+| L2 | LOW | ✅ | `curriculum-review.test.tsx` only happy path | Added 3 tests: error state, back navigation, cancel modal |
+| L3 | LOW | ✅ | `recall-test.test.tsx` only one test | Added 3 tests: immediate remediation, successful recall, error handling. Extended ChatShell mock with onSend support |
+
+#### Stream C — Logic & UX Polish (MEDIUM + LOW) ✅
+
+| # | Severity | Status | Issue | Resolution |
+|---|----------|--------|-------|------------|
+| M1 | MEDIUM | ✅ | `dont_remember` bypasses cooldown | Removed `attemptMode === 'standard'` guard — cooldown now applies to all attempt modes |
+| M3 | MEDIUM | ✅ | Learner `violet` preset misleading | Changed primary to actual violet (#7c3aed light, #a78bfa dark). Reordered: teal first (default), violet second |
+| M4 | MEDIUM | ✅ | Parent `indigo` = duplicate of teal | Changed swatch + primary to actual indigo (#4f46e5 light, #818cf8 dark) |
+| M5 | MEDIUM | ✅ | Homework opening message copy mismatch | Updated: "Tell me if you want..." → "Use the buttons below to choose." |
+| M6 | MEDIUM | ✅ | `recall-test.tsx` reads persona | Removed `useTheme` import, hardcoded `isLearner` (always true in `(learner)/` route group) |
+| L1 | LOW | ✅ | `resolveRounds` never resets | Added `setResolveRounds(0)` in `onNameChange` |
+| L4 | LOW | ✅ | `streamMessage` body untyped | Changed `Record<string, unknown>` → `SessionMessageInput` from `@eduagent/schemas` |
+| L5 | LOW | ✅ N/A | Double `border-t` in ChatShell | Already resolved — only single border exists |
+| L6 | LOW | ✅ N/A | `_config` parameter unused | Already resolved — no `_config` in current `session-lifecycle.ts` |
+
+**Exit criteria met:** All HIGH/MEDIUM findings fixed. `tsc --noEmit` clean. All related tests pass (402 API + 307 mobile). Migration file generated.
 
 ---
 
@@ -181,7 +226,7 @@ These files are modified by 2+ phases. Agents working on these must read the cur
 | `apps/api/src/services/coaching-cards.ts` | ~308 | Phase 5 (replaced by `precomputeHomeCards()`) |
 | `apps/api/src/services/exchanges.ts` | ~526 | Phase 1 (13.2 timer), Phase 4 (13.5 `expectedResponseMinutes`), Phase 5 (12.1 age voice) |
 | `packages/database/src/schema/profiles.ts` | ~127 | Phase 5 (12.4 drops `personaType`, adds `birthYear`) |
-| `apps/mobile/src/lib/design-tokens.ts` | ~573 | Phase 1 (Epic 11 brand colors), Phase 5 (12.3 remove persona palettes) |
+| `apps/mobile/src/lib/design-tokens.ts` | ~573 | Phase 1 (Epic 11 brand colors), Phase 2.5 (M3/M4 preset fixes), Phase 5 (12.3 remove persona palettes) |
 | `packages/factory/src/profiles.ts` | varies | Phase 5 (12.6 FR206.8 — remove `personaType` default, add `birthYear`) |
 
 ---

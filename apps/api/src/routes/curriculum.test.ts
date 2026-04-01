@@ -298,6 +298,58 @@ describe('curriculum routes', () => {
       expect(body.topic.sortOrder).toBe(5);
     });
 
+    it('returns 404 when subject not found', async () => {
+      const { addCurriculumTopic } = jest.requireMock<
+        typeof import('../services/curriculum')
+      >('../services/curriculum');
+      (addCurriculumTopic as jest.Mock).mockRejectedValueOnce(
+        new Error('Subject not found')
+      );
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/curriculum/topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            mode: 'create',
+            title: 'Test',
+            description: 'Desc',
+            estimatedMinutes: 30,
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 404 when curriculum not found', async () => {
+      const { addCurriculumTopic } = jest.requireMock<
+        typeof import('../services/curriculum')
+      >('../services/curriculum');
+      (addCurriculumTopic as jest.Mock).mockRejectedValueOnce(
+        new Error('Curriculum not found')
+      );
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/curriculum/topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            mode: 'create',
+            title: 'Test',
+            description: 'Desc',
+            estimatedMinutes: 30,
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+    });
+
     it('returns 400 when create payload is incomplete', async () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/curriculum/topics`,

@@ -171,6 +171,7 @@ export default function CreateSubjectScreen() {
       if (resolveState.phase === 'suggestion') {
         setResolveState({ phase: 'idle' });
       }
+      setResolveRounds(0);
     },
     [resolveState.phase, error]
   );

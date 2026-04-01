@@ -53,8 +53,8 @@ run_seeded "consent-pending"        "flows/consent/consent-pending-gate.yaml"
 run_seeded "pre-profile"            "flows/consent/coppa-flow.yaml"
 run_seeded "pre-profile"            "flows/consent/profile-creation-consent.yaml"
 
-# Sign-up (no seed)
-run_noseed "flows/onboarding/sign-up-flow.yaml"
+# Sign-up (manual-only)
+log_result "SKIP" "flows/onboarding/sign-up-flow.yaml" "(manual-only: requires Clerk email verification)"
 
 # LLM-dependent (re-test with fixes)
 run_seeded "onboarding-complete" "flows/onboarding/analogy-preference-flow.yaml"

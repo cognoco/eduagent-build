@@ -171,6 +171,7 @@ export async function getCurriculum(
       relevance: t.relevance,
       estimatedMinutes: t.estimatedMinutes,
       skipped: t.skipped,
+      source: t.source,
     })),
     generatedAt: curriculum.generatedAt.toISOString(),
   };
@@ -235,6 +236,7 @@ export async function addCurriculumTopic(
       relevance: createdTopic!.relevance,
       estimatedMinutes: createdTopic!.estimatedMinutes,
       skipped: createdTopic!.skipped,
+      source: createdTopic!.source,
     },
   };
 }

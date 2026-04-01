@@ -662,8 +662,10 @@ export default function SubscriptionScreen() {
   // ---------------------------------------------------------------------------
 
   const isChild = activeProfile ? !activeProfile.isOwner : false;
+  const hasLoadError = subError || usageError;
   const trialOrExpired =
-    subscription?.status === 'expired' || (!subscription && !subLoading);
+    !hasLoadError &&
+    (subscription?.status === 'expired' || (!subscription && !subLoading));
   if (isChild && trialOrExpired) {
     return <ChildPaywall />;
   }
@@ -709,7 +711,7 @@ export default function SubscriptionScreen() {
         >
           <ActivityIndicator />
         </View>
-      ) : subError || usageError ? (
+      ) : hasLoadError ? (
         <View
           className="flex-1 items-center justify-center px-5"
           testID="subscription-error"

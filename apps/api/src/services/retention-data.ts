@@ -288,7 +288,7 @@ export async function processRecallTest(
   const state = rowToRetentionState(effectiveCard);
   const lastTestAt = effectiveCard.lastReviewedAt?.toISOString() ?? null;
   const attemptMode = input.attemptMode ?? 'standard';
-  if (attemptMode === 'standard' && !canRetestTopic(state, lastTestAt)) {
+  if (!canRetestTopic(state, lastTestAt)) {
     // non-null: canRetestTopic returns true when lastTestAt is null,
     // so we only reach this branch when lastTestAt is set.
     const cooldownEndsAt = new Date(

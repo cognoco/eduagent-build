@@ -49,6 +49,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://eduagent:eduagent@localhost:5432/tests
       CI: true
+      NX_DAEMON: false
+      NX_ISOLATE_PLUGINS: false
     steps:
       - uses: actions/checkout@v4
         with:
@@ -70,7 +72,7 @@ jobs:
         run: pnpm --filter @eduagent/database db:push
 
       - name: Run API integration tests
-        run: pnpm exec nx run api:test:integration
+        run: pnpm exec jest --config tests/integration/jest.config.cjs --maxWorkers=2
 
   mobile-maestro:
     name: Mobile Maestro E2E Tests
@@ -97,6 +99,8 @@ jobs:
       DATABASE_URL: postgresql://eduagent:eduagent@localhost:5432/tests
       NODE_ENV: test
       CI: true
+      NX_DAEMON: false
+      NX_ISOLATE_PLUGINS: false
       # Expo inlines EXPO_PUBLIC_* vars at JS bundle time.
       # Clerk publishable key is needed for auth screens to render.
       EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY }}
@@ -139,7 +143,7 @@ jobs:
 
       # Build workspace deps that the mobile app imports at prebuild time
       - name: Build schemas package
-        run: pnpm exec nx run schemas:build
+        run: pnpm exec tsc --build packages/schemas/tsconfig.lib.json
 
       # Write .dev.vars so wrangler dev can pass secrets into the Workers runtime.
       # wrangler dev runs in an isolated V8 sandbox — it does NOT inherit shell
@@ -152,7 +156,7 @@ jobs:
       # Start API server in background (NODE_ENV=test enables __test/* routes)
       - name: Start API server (background)
         run: |
-          pnpm exec nx dev api &
+          pnpm --dir apps/api exec wrangler dev &
           echo "Waiting for API server..."
           for i in $(seq 1 30); do
             if curl -sf http://localhost:8787/v1/health > /dev/null 2>&1; then

@@ -57,6 +57,23 @@ describe('useDeleteAccount', () => {
     expect(mockFetch).toHaveBeenCalled();
     expect(data.gracePeriodEnds).toBe('2026-02-24T00:00:00.000Z');
   });
+
+  it('throws when POST /account/delete returns non-2xx', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: { message: 'Unable to schedule deletion' } }),
+        { status: 500 }
+      )
+    );
+
+    const { result } = renderHook(() => useDeleteAccount(), {
+      wrapper: createWrapper(),
+    });
+
+    await expect(result.current.mutateAsync()).rejects.toThrow(
+      'Unable to schedule deletion'
+    );
+  });
 });
 
 describe('useCancelDeletion', () => {
@@ -83,6 +100,23 @@ describe('useCancelDeletion', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(data.message).toBe('Deletion cancelled');
+  });
+
+  it('throws when POST /account/cancel-deletion returns non-2xx', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: { message: 'Unable to cancel deletion' } }),
+        { status: 403 }
+      )
+    );
+
+    const { result } = renderHook(() => useCancelDeletion(), {
+      wrapper: createWrapper(),
+    });
+
+    await expect(result.current.mutateAsync()).rejects.toThrow(
+      'Unable to cancel deletion'
+    );
   });
 });
 
@@ -114,5 +148,22 @@ describe('useExportData', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(data.exportedAt).toBeDefined();
+  });
+
+  it('throws when GET /account/export returns non-2xx', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: { message: 'Unable to export data' } }),
+        { status: 500 }
+      )
+    );
+
+    const { result } = renderHook(() => useExportData(), {
+      wrapper: createWrapper(),
+    });
+
+    await expect(result.current.mutateAsync()).rejects.toThrow(
+      'Unable to export data'
+    );
   });
 });

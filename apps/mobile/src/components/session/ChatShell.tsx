@@ -37,6 +37,7 @@ interface ChatShellProps {
   rightAction?: React.ReactNode;
   footer?: React.ReactNode;
   inputAccessory?: React.ReactNode;
+  onDraftChange?: (text: string) => void;
   placeholder?: string;
   /** When set to 'teach_back', voice defaults ON. Otherwise voice defaults OFF but toggle is always visible. */
   verificationType?: string;
@@ -96,6 +97,7 @@ export function ChatShell({
   rightAction,
   footer,
   inputAccessory,
+  onDraftChange,
   placeholder = 'Type a message...',
   verificationType,
   messagesTestID,
@@ -161,10 +163,11 @@ export function ChatShell({
     if (!input.trim() || isStreaming) return;
     const text = input.trim();
     setInput('');
+    onDraftChange?.('');
     // Stop TTS when user sends a message
     if (isVoiceEnabled) stopSpeaking();
     onSend(text);
-  }, [input, isStreaming, onSend, isVoiceEnabled, stopSpeaking]);
+  }, [input, isStreaming, onDraftChange, onSend, isVoiceEnabled, stopSpeaking]);
 
   // Voice record button toggle
   const handleVoicePress = useCallback(async () => {
@@ -195,8 +198,16 @@ export function ChatShell({
     stopSpeaking();
     onSend(pendingTranscript.trim());
     setPendingTranscript('');
+    onDraftChange?.('');
     clearTranscript();
-  }, [pendingTranscript, isStreaming, onSend, clearTranscript, stopSpeaking]);
+  }, [
+    pendingTranscript,
+    isStreaming,
+    onDraftChange,
+    onSend,
+    clearTranscript,
+    stopSpeaking,
+  ]);
 
   const handleVoiceDiscard = useCallback(() => {
     setPendingTranscript('');
@@ -326,7 +337,10 @@ export function ChatShell({
               placeholder={placeholder}
               placeholderTextColor={colors.muted}
               value={input}
-              onChangeText={setInput}
+              onChangeText={(text) => {
+                setInput(text);
+                onDraftChange?.(text);
+              }}
               onSubmitEditing={handleSend}
               maxLength={5000}
               returnKeyType="send"

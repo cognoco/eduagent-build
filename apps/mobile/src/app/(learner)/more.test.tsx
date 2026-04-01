@@ -50,9 +50,13 @@ const mockNotifData = {
 };
 
 const mockLearningModeMutate = jest.fn();
+const mockCelebrationLevelMutate = jest.fn();
 let mockLearningMode: string | undefined = 'serious';
 let mockLearningModeLoading = false;
 let mockLearningModePending = false;
+let mockCelebrationLevel: 'all' | 'big_only' | 'off' | undefined = 'all';
+let mockCelebrationLevelLoading = false;
+let mockCelebrationLevelPending = false;
 
 jest.mock('../../hooks/use-settings', () => ({
   useNotificationSettings: () => ({
@@ -70,6 +74,14 @@ jest.mock('../../hooks/use-settings', () => ({
   useUpdateLearningMode: () => ({
     mutate: mockLearningModeMutate,
     isPending: mockLearningModePending,
+  }),
+  useCelebrationLevel: () => ({
+    data: mockCelebrationLevel,
+    isLoading: mockCelebrationLevelLoading,
+  }),
+  useUpdateCelebrationLevel: () => ({
+    mutate: mockCelebrationLevelMutate,
+    isPending: mockCelebrationLevelPending,
   }),
 }));
 
@@ -94,6 +106,9 @@ describe('MoreScreen — Learning Mode', () => {
     mockLearningMode = 'serious';
     mockLearningModeLoading = false;
     mockLearningModePending = false;
+    mockCelebrationLevel = 'all';
+    mockCelebrationLevelLoading = false;
+    mockCelebrationLevelPending = false;
   });
 
   it('renders the Learning Mode section header', () => {
@@ -199,6 +214,23 @@ describe('MoreScreen — Learning Mode', () => {
     expect(screen.getByText('Appearance')).toBeTruthy();
     expect(screen.getByText('Notifications')).toBeTruthy();
     expect(screen.getByText('Learning Mode')).toBeTruthy();
+    expect(screen.getByText('Celebrations')).toBeTruthy();
     expect(screen.getByText('Account')).toBeTruthy();
+  });
+
+  it('renders celebration level options', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('celebration-level-all')).toBeTruthy();
+    expect(screen.getByTestId('celebration-level-big-only')).toBeTruthy();
+    expect(screen.getByTestId('celebration-level-off')).toBeTruthy();
+  });
+
+  it('updates celebration level when selecting big milestones only', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('celebration-level-big-only'));
+
+    expect(mockCelebrationLevelMutate).toHaveBeenCalledWith('big_only');
   });
 });

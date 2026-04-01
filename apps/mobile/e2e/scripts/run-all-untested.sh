@@ -139,9 +139,9 @@ else
 fi
 
 # ─── GROUP 2: Standalone flows (no seed, fresh sign-up via Clerk) ───
-# These do fresh sign-ups — they need a working Clerk instance
+# These do fresh sign-ups or consent requests — only fully automated flows run here.
 
-run_standalone "flows/onboarding/sign-up-flow.yaml"
+log_result "SKIP" "flows/onboarding/sign-up-flow.yaml" "(manual-only: requires Clerk email verification)"
 run_standalone "flows/consent/coppa-flow.yaml"
 run_standalone "flows/consent/profile-creation-consent.yaml"
 run_standalone "flows/consent/consent-pending-gate.yaml"

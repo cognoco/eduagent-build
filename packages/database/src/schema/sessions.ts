@@ -22,6 +22,7 @@ export const draftStatusEnum = pgEnum('draft_status', [
 export const sessionEventTypeEnum = pgEnum('session_event_type', [
   'user_message',
   'ai_response',
+  'system_prompt',
   'ocr_correction',
   'understanding_check',
   'session_start',

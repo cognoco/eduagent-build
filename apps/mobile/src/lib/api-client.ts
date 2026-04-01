@@ -82,7 +82,7 @@ export function useApiClient(): ApiClient {
       const token = await getTokenRef.current();
       const headers = new Headers(init?.headers);
       if (token) headers.set('Authorization', `Bearer ${token}`);
-      if (profileIdRef.current)
+      if (profileIdRef.current && !headers.has('X-Profile-Id'))
         headers.set('X-Profile-Id', profileIdRef.current);
 
       const res = await globalThis.fetch(input, { ...init, headers });

@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { chatExchangeSchema } from './common.js';
 import { verificationTypeSchema } from './assessments.js';
+import {
+  celebrationReasonSchema,
+  pendingCelebrationSchema,
+} from './progress.js';
 
 // Interview schemas
 
@@ -188,8 +192,49 @@ export type LearningSession = z.infer<typeof learningSessionSchema>;
 export const sessionCloseSchema = z.object({
   reason: z.enum(['user_ended', 'silence_timeout']).optional(),
   summaryStatus: summaryStatusSchema.optional(),
+  milestonesReached: z.array(celebrationReasonSchema).optional(),
 });
 export type SessionCloseInput = z.infer<typeof sessionCloseSchema>;
+
+export const sessionTranscriptExchangeSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string(),
+  timestamp: z.string().datetime(),
+  escalationRung: z.number().int().min(1).max(5).optional(),
+  isSystemPrompt: z.boolean().optional(),
+});
+export type SessionTranscriptExchange = z.infer<
+  typeof sessionTranscriptExchangeSchema
+>;
+
+export const sessionTranscriptSchema = z.object({
+  session: z.object({
+    sessionId: z.string().uuid(),
+    subjectId: z.string().uuid(),
+    topicId: z.string().uuid().nullable(),
+    sessionType: sessionTypeSchema,
+    startedAt: z.string().datetime(),
+    exchangeCount: z.number().int(),
+    milestonesReached: z.array(celebrationReasonSchema).default([]),
+    wallClockSeconds: z.number().int().nullable().optional(),
+  }),
+  exchanges: z.array(sessionTranscriptExchangeSchema),
+});
+export type SessionTranscript = z.infer<typeof sessionTranscriptSchema>;
+
+export const sessionDonePayloadSchema = z.object({
+  exchangeCount: z.number().int(),
+  escalationRung: escalationRungSchema,
+  expectedResponseMinutes: z.number().int().min(1).max(20).optional(),
+});
+export type SessionDonePayload = z.infer<typeof sessionDonePayloadSchema>;
+
+export const fastCelebrationSummarySchema = z.object({
+  celebrations: z.array(pendingCelebrationSchema),
+});
+export type FastCelebrationSummary = z.infer<
+  typeof fastCelebrationSummarySchema
+>;
 
 // Content flag
 

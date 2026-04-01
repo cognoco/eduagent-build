@@ -19,12 +19,21 @@ import { extractAndStoreHomeworkSummary } from '../../services/homework-summary'
 import {
   incrementSummarySkips,
   resetSummarySkips,
+  updateMedianResponseSeconds,
 } from '../../services/settings';
 import {
   processEvaluateCompletion,
   processTeachBackCompletion,
 } from '../../services/verification-completion';
 import { captureException } from '../../services/sentry';
+import { queueCelebration } from '../../services/celebrations';
+import {
+  curriculumTopics,
+  retentionCards,
+  sessionEvents,
+  streaks,
+} from '@eduagent/database';
+import { and, asc, eq } from 'drizzle-orm';
 
 // ---------------------------------------------------------------------------
 // Step error isolation — each step catches its own errors so that a failure
@@ -74,6 +83,57 @@ export const sessionCompleted = inngest.createFunction(
     } = event.data;
 
     const outcomes: StepOutcome[] = [];
+
+    const loadTopicTitle = async (
+      db: ReturnType<typeof getStepDatabase>,
+      currentTopicId: string | null | undefined
+    ): Promise<string | null> => {
+      if (!currentTopicId) return null;
+      const [topic] = await db
+        .select({ title: curriculumTopics.title })
+        .from(curriculumTopics)
+        .where(eq(curriculumTopics.id, currentTopicId))
+        .limit(1);
+      return topic?.title ?? null;
+    };
+
+    const computeSessionMedianResponseSeconds = async () => {
+      const db = getStepDatabase();
+      const events = await db.query.sessionEvents.findMany({
+        where: and(
+          eq(sessionEvents.sessionId, sessionId),
+          eq(sessionEvents.profileId, profileId)
+        ),
+        orderBy: asc(sessionEvents.createdAt),
+      });
+
+      let lastAiAt: Date | null = null;
+      const responseSeconds: number[] = [];
+
+      for (const event of events) {
+        if (event.eventType === 'ai_response') {
+          lastAiAt = event.createdAt;
+          continue;
+        }
+
+        if (
+          event.eventType === 'user_message' &&
+          lastAiAt &&
+          event.createdAt > lastAiAt
+        ) {
+          responseSeconds.push(
+            Math.round((event.createdAt.getTime() - lastAiAt.getTime()) / 1000)
+          );
+        }
+      }
+
+      if (responseSeconds.length === 0) return null;
+      const sorted = [...responseSeconds].sort((a, b) => a - b);
+      const middle = Math.floor(sorted.length / 2);
+      return sorted.length % 2 === 0
+        ? Math.round((sorted[middle - 1]! + sorted[middle]!) / 2)
+        : sorted[middle]!;
+    };
 
     // FR92: Determine which topics need retention updates
     // Interleaved sessions update all practiced topics; others update the single topicId
@@ -259,6 +319,87 @@ export const sessionCompleted = inngest.createFunction(
             summaryStatus === 'accepted'
           ) {
             await resetSummarySkips(db, profileId);
+          }
+        })
+      )
+    );
+
+    outcomes.push(
+      await step.run('update-pace-baseline', async () =>
+        runIsolated('update-pace-baseline', profileId, async () => {
+          const db = getStepDatabase();
+          const sessionMedianSeconds =
+            await computeSessionMedianResponseSeconds();
+          if (sessionMedianSeconds == null) return;
+          await updateMedianResponseSeconds(
+            db,
+            profileId,
+            sessionMedianSeconds
+          );
+        })
+      )
+    );
+
+    outcomes.push(
+      await step.run('queue-celebrations', async () =>
+        runIsolated('queue-celebrations', profileId, async () => {
+          const db = getStepDatabase();
+          const quality = event.data.qualityRating as number | undefined;
+          const currentTopicId = topicId as string | null | undefined;
+          const currentVerification = verificationType as string | undefined;
+
+          if (currentVerification === 'evaluate' && (quality ?? 0) >= 4) {
+            await queueCelebration(
+              db,
+              profileId,
+              'twin_stars',
+              'evaluate_success'
+            );
+          }
+
+          if (currentVerification === 'teach_back' && (quality ?? 0) >= 4) {
+            await queueCelebration(
+              db,
+              profileId,
+              'twin_stars',
+              'teach_back_success'
+            );
+          }
+
+          if (currentTopicId && (quality ?? 0) >= 4) {
+            const [retentionCard] = await db
+              .select({ repetitions: retentionCards.repetitions })
+              .from(retentionCards)
+              .where(
+                and(
+                  eq(retentionCards.profileId, profileId),
+                  eq(retentionCards.topicId, currentTopicId)
+                )
+              )
+              .limit(1);
+
+            if ((retentionCard?.repetitions ?? 0) > 2) {
+              const topicTitle = await loadTopicTitle(db, currentTopicId);
+              await queueCelebration(
+                db,
+                profileId,
+                'comet',
+                'topic_mastered',
+                topicTitle ?? currentTopicId
+              );
+            }
+          }
+
+          const streak = await db.query.streaks.findFirst({
+            where: eq(streaks.profileId, profileId),
+          });
+
+          if (streak?.currentStreak === 7) {
+            await queueCelebration(db, profileId, 'comet', 'streak_7');
+          }
+
+          if (streak?.currentStreak === 30) {
+            await queueCelebration(db, profileId, 'orions_belt', 'streak_30');
           }
         })
       )

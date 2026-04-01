@@ -4,8 +4,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   useNotificationSettings,
   useLearningMode,
+  useCelebrationLevel,
   useUpdateNotificationSettings,
   useUpdateLearningMode,
+  useUpdateCelebrationLevel,
   useRegisterPushToken,
 } from './use-settings';
 
@@ -137,6 +139,35 @@ describe('useLearningMode', () => {
   });
 });
 
+describe('useCelebrationLevel', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('fetches celebration level from API', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ celebrationLevel: 'big_only' }), {
+        status: 200,
+      })
+    );
+
+    const { result } = renderHook(() => useCelebrationLevel(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data).toBe('big_only');
+  });
+});
+
 describe('useUpdateNotificationSettings', () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -226,6 +257,35 @@ describe('useRegisterPushToken', () => {
 
     await act(async () => {
       await result.current.mutateAsync('ExponentPushToken[abc123]');
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+  });
+});
+
+describe('useUpdateCelebrationLevel', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('calls PUT with celebration level', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ celebrationLevel: 'off' }), {
+        status: 200,
+      })
+    );
+
+    const { result } = renderHook(() => useUpdateCelebrationLevel(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync('off');
     });
 
     expect(mockFetch).toHaveBeenCalled();

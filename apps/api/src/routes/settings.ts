@@ -5,6 +5,7 @@ import {
   learningModeUpdateSchema,
   pushTokenRegisterSchema,
   analogyDomainUpdateSchema,
+  celebrationLevelUpdateSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -14,6 +15,8 @@ import {
   upsertNotificationPrefs,
   getLearningMode,
   upsertLearningMode,
+  getCelebrationLevel,
+  upsertCelebrationLevel,
   registerPushToken,
 } from '../services/settings';
 import { notifyParentToSubscribe } from '../services/notifications';
@@ -79,6 +82,31 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       const body = c.req.valid('json');
       const result = await upsertLearningMode(db, profileId, body.mode);
       return c.json({ mode: result.mode });
+    }
+  )
+
+  .get('/settings/celebration-level', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const celebrationLevel = await getCelebrationLevel(db, profileId);
+    return c.json({ celebrationLevel });
+  })
+
+  .put(
+    '/settings/celebration-level',
+    zValidator('json', celebrationLevelUpdateSchema),
+    async (c) => {
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
+      const body = c.req.valid('json');
+      const result = await upsertCelebrationLevel(
+        db,
+        profileId,
+        body.celebrationLevel
+      );
+      return c.json(result);
     }
   )
 

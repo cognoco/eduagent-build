@@ -3,6 +3,41 @@ import { z } from 'zod';
 export const learningModeSchema = z.enum(['serious', 'casual']);
 export type LearningMode = z.infer<typeof learningModeSchema>;
 
+export const celebrationNameSchema = z.enum([
+  'polar_star',
+  'twin_stars',
+  'comet',
+  'orions_belt',
+]);
+export type CelebrationName = z.infer<typeof celebrationNameSchema>;
+
+export const celebrationReasonSchema = z.enum([
+  'polar_star',
+  'twin_stars',
+  'comet',
+  'orions_belt',
+  'deep_diver',
+  'persistent',
+  'topic_mastered',
+  'curriculum_complete',
+  'evaluate_success',
+  'teach_back_success',
+  'streak_7',
+  'streak_30',
+]);
+export type CelebrationReason = z.infer<typeof celebrationReasonSchema>;
+
+export const celebrationLevelSchema = z.enum(['all', 'big_only', 'off']);
+export type CelebrationLevel = z.infer<typeof celebrationLevelSchema>;
+
+export const pendingCelebrationSchema = z.object({
+  celebration: celebrationNameSchema,
+  reason: celebrationReasonSchema,
+  detail: z.string().nullable().optional(),
+  queuedAt: z.string().datetime(),
+});
+export type PendingCelebration = z.infer<typeof pendingCelebrationSchema>;
+
 export const streakSchema = z.object({
   currentStreak: z.number().int().min(0),
   longestStreak: z.number().int().min(0),
@@ -35,6 +70,18 @@ export const learningModeUpdateSchema = z.object({
   mode: learningModeSchema,
 });
 export type LearningModeUpdate = z.infer<typeof learningModeUpdateSchema>;
+
+export const celebrationLevelUpdateSchema = z.object({
+  celebrationLevel: celebrationLevelSchema,
+});
+export type CelebrationLevelUpdate = z.infer<
+  typeof celebrationLevelUpdateSchema
+>;
+
+export const celebrationSeenSchema = z.object({
+  viewer: z.enum(['child', 'parent']),
+});
+export type CelebrationSeenInput = z.infer<typeof celebrationSeenSchema>;
 
 export const pushTokenRegisterSchema = z.object({
   token: z.string().min(1),
@@ -94,6 +141,13 @@ export const dashboardChildSchema = z.object({
   retentionTrend: z.enum(['improving', 'declining', 'stable']),
 });
 export type DashboardChild = z.infer<typeof dashboardChildSchema>;
+
+export const coachingCardCelebrationResponseSchema = z.object({
+  pendingCelebrations: z.array(pendingCelebrationSchema),
+});
+export type CoachingCardCelebrationResponse = z.infer<
+  typeof coachingCardCelebrationResponseSchema
+>;
 
 // Dashboard data — parent view wrapper
 

@@ -100,8 +100,8 @@ run_seeded "pre-profile"            "flows/consent/hand-to-parent-consent.yaml"
 run_seeded "parent-with-children" "flows/parent/subject-raw-input-audit.yaml"
 run_seeded "parent-with-children" "flows/parent/guided-label-tooltip.yaml"
 
-# ─── GROUP 12: Sign-up flow (PARTIAL by design — Clerk verification) ───
-run_noseed "flows/onboarding/sign-up-flow.yaml"
+# ─── GROUP 12: Sign-up flow (manual only — Clerk email verification) ───
+log_result "SKIP" "flows/onboarding/sign-up-flow.yaml" "(manual-only: requires Clerk email verification)"
 
 # ─── GROUP 13: Skipped flows ───
 log_result "SKIP" "flows/app-launch-expogo.yaml" "(Expo Go — wrong app type for dev-client)"

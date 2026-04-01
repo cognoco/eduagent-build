@@ -63,6 +63,12 @@ jest.mock('../services/settings', () => ({
   upsertLearningMode: jest
     .fn()
     .mockImplementation((_db, _profileId, mode) => Promise.resolve({ mode })),
+  getCelebrationLevel: jest.fn().mockResolvedValue('all'),
+  upsertCelebrationLevel: jest
+    .fn()
+    .mockImplementation((_db, _profileId, celebrationLevel) =>
+      Promise.resolve({ celebrationLevel })
+    ),
 }));
 
 jest.mock('../services/retention-data', () => ({
@@ -80,6 +86,8 @@ import {
   upsertNotificationPrefs,
   getLearningMode,
   upsertLearningMode,
+  getCelebrationLevel,
+  upsertCelebrationLevel,
 } from '../services/settings';
 import { getAnalogyDomain, setAnalogyDomain } from '../services/retention-data';
 
@@ -337,6 +345,78 @@ describe('settings routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('GET /v1/settings/celebration-level', () => {
+    it('returns 200 with celebration level', async () => {
+      const res = await app.request(
+        '/v1/settings/celebration-level',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.celebrationLevel).toBe('all');
+    });
+
+    it('calls getCelebrationLevel service', async () => {
+      await app.request(
+        '/v1/settings/celebration-level',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(getCelebrationLevel).toHaveBeenCalled();
+    });
+  });
+
+  describe('PUT /v1/settings/celebration-level', () => {
+    it('returns 200 with updated celebration level', async () => {
+      const res = await app.request(
+        '/v1/settings/celebration-level',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ celebrationLevel: 'big_only' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.celebrationLevel).toBe('big_only');
+    });
+
+    it('calls upsertCelebrationLevel service', async () => {
+      await app.request(
+        '/v1/settings/celebration-level',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ celebrationLevel: 'off' }),
+        },
+        TEST_ENV
+      );
+
+      expect(upsertCelebrationLevel).toHaveBeenCalled();
+    });
+
+    it('returns 400 with invalid body', async () => {
+      const res = await app.request(
+        '/v1/settings/celebration-level',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ celebrationLevel: 'loud' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
     });
   });
 

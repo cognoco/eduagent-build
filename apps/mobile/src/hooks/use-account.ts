@@ -5,6 +5,7 @@ import type {
   DataExport,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
+import { assertOk } from '../lib/assert-ok';
 
 export function useDeleteAccount(): UseMutationResult<
   AccountDeletionResponse,
@@ -16,6 +17,7 @@ export function useDeleteAccount(): UseMutationResult<
   return useMutation({
     mutationFn: async (): Promise<AccountDeletionResponse> => {
       const res = await client.account.delete.$post({ json: {} });
+      await assertOk(res);
       return (await res.json()) as AccountDeletionResponse;
     },
   });
@@ -31,6 +33,7 @@ export function useCancelDeletion(): UseMutationResult<
   return useMutation({
     mutationFn: async (): Promise<CancelDeletionResponse> => {
       const res = await client.account['cancel-deletion'].$post({ json: {} });
+      await assertOk(res);
       return (await res.json()) as CancelDeletionResponse;
     },
   });
@@ -42,6 +45,7 @@ export function useExportData(): UseMutationResult<DataExport, Error, void> {
   return useMutation({
     mutationFn: async (): Promise<DataExport> => {
       const res = await client.account.export.$get();
+      await assertOk(res);
       return (await res.json()) as DataExport;
     },
   });

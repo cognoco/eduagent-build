@@ -60,9 +60,8 @@ tags:
       id: "home-scroll-view"
     timeout: 15000
 
-# 4. Navigate to More tab (BUG-15: use text, not testID)
-- tapOn:
-    text: "More"
+# 4. Navigate to More tab
+- tapOn: "More Tab"
 
 # 5. Wait for More screen
 - extendedWaitUntil:

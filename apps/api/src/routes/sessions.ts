@@ -25,6 +25,9 @@ import {
   closeSession,
   flagContent,
   getSessionSummary,
+  getSessionTranscript,
+  recordSystemPrompt,
+  skipSummary,
   submitSummary,
   syncHomeworkState,
 } from '../services/session';
@@ -114,6 +117,19 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     }
   )
 
+  .get('/sessions/:sessionId/transcript', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const transcript = await getSessionTranscript(
+      db,
+      profileId,
+      c.req.param('sessionId')
+    );
+    if (!transcript) return notFound(c, 'Session not found');
+    return c.json(transcript);
+  })
+
   // Stream a message response via SSE
   .post(
     '/sessions/:sessionId/stream',
@@ -153,6 +169,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               type: 'done',
               exchangeCount: result.exchangeCount,
               escalationRung: result.escalationRung,
+              expectedResponseMinutes: result.expectedResponseMinutes,
             }),
           });
         });
@@ -197,7 +214,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             sessionType: result.sessionType,
             verificationType: result.verificationType,
             interleavedTopicIds: result.interleavedTopicIds,
-            summaryStatus: body.summaryStatus,
+            summaryStatus: result.summaryStatus,
             timestamp: new Date().toISOString(),
           },
         });
@@ -222,6 +239,25 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       });
     }
   )
+
+  .post('/sessions/:sessionId/system-prompt', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const body = await c.req.json<{ content?: string }>();
+
+    if (!body.content || typeof body.content !== 'string') {
+      return apiError(c, 400, ERROR_CODES.VALIDATION_ERROR, 'Content required');
+    }
+
+    await recordSystemPrompt(
+      db,
+      profileId,
+      c.req.param('sessionId'),
+      body.content
+    );
+    return c.json({ ok: true });
+  })
 
   // Sync homework problem metadata + analytics events
   .post(
@@ -272,6 +308,18 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       c.req.param('sessionId')
     );
     return c.json({ summary });
+  })
+
+  .post('/sessions/:sessionId/summary/skip', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const result = await skipSummary(db, profileId, c.req.param('sessionId'));
+    const promptCasualSwitch = await shouldPromptCasualSwitch(db, profileId);
+    return c.json({
+      ...result,
+      shouldPromptCasualSwitch: promptCasualSwitch,
+    });
   })
 
   // Submit learner summary ("Your Words")

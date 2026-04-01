@@ -40,6 +40,7 @@ import { progressRoutes } from './routes/progress';
 import { streakRoutes } from './routes/streaks';
 import { settingsRoutes } from './routes/settings';
 import { coachingCardRoutes } from './routes/coaching-card';
+import { celebrationRoutes } from './routes/celebrations';
 import { dashboardRoutes } from './routes/dashboard';
 import { billingRoutes } from './routes/billing';
 import { stripeWebhookRoute } from './routes/stripe-webhook';
@@ -177,6 +178,7 @@ const routes = api
   .route('/', streakRoutes)
   .route('/', settingsRoutes)
   .route('/', coachingCardRoutes)
+  .route('/', celebrationRoutes)
   .route('/', dashboardRoutes)
   .route('/', billingRoutes)
   .route('/', stripeWebhookRoute)

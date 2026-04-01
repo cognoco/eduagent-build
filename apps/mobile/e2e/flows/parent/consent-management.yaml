@@ -86,9 +86,15 @@ tags:
 - takeScreenshot: consent-mgmt-02-confirm-dialog
 
 # 11. Tap "WITHDRAW" button in the alert to confirm
-#     Android Alert buttons render in CAPS. The "Withdraw" text is the button label.
+#     React Native passes the title-cased label through to the native alert.
+- tapOn:
+    text: "Withdraw"
+    optional: true
+
+# Android OEM skins may still expose the destructive button in all caps.
 - tapOn:
     text: "WITHDRAW"
+    optional: true
 
 # 12. Wait for grace period banner to appear (consent is now WITHDRAWN)
 - extendedWaitUntil:

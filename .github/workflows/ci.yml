@@ -30,6 +30,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://eduagent:eduagent@localhost:5432/tests
       CI: true
+      NX_DAEMON: false
+      NX_ISOLATE_PLUGINS: false
     steps:
       - uses: actions/checkout@v4
         with:

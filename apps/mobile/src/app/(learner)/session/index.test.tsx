@@ -65,6 +65,8 @@ jest.mock('../../../hooks/use-sessions', () => ({
   useStreamMessage: () => ({
     stream: mockStream,
   }),
+  useSessionTranscript: () => ({ data: null }),
+  useRecordSystemPrompt: () => ({ mutateAsync: jest.fn() }),
 }));
 
 jest.mock('../../../hooks/use-classify-subject', () => ({
@@ -88,6 +90,49 @@ jest.mock('../../../hooks/use-network-status', () => ({
 jest.mock('../../../hooks/use-api-reachability', () => ({
   useApiReachability: () => ({ isApiReachable: true, isChecked: true }),
 }));
+
+const mockCelebrationLevel = { data: 'full' };
+jest.mock('../../../hooks/use-settings', () => ({
+  useCelebrationLevel: () => mockCelebrationLevel,
+}));
+
+const mockTrigger = jest.fn();
+const mockCelebrationResult = {
+  CelebrationOverlay: null,
+  trigger: mockTrigger,
+};
+jest.mock('../../../hooks/use-celebration', () => ({
+  useCelebration: () => mockCelebrationResult,
+}));
+
+const mockTrackExchangeResult = { triggered: [] as string[], trackerState: {} };
+const mockTrackExchange = jest.fn().mockReturnValue(mockTrackExchangeResult);
+const mockHydrate = jest.fn();
+const mockResetMilestones = jest.fn();
+const mockMilestoneTracker = {
+  milestonesReached: [] as string[],
+  trackerState: {},
+  trackExchange: mockTrackExchange,
+  hydrate: mockHydrate,
+  reset: mockResetMilestones,
+};
+jest.mock('../../../hooks/use-milestone-tracker', () => ({
+  celebrationForReason: jest.fn(),
+  createMilestoneTrackerStateFromMilestones: jest.fn().mockReturnValue({}),
+  normalizeMilestoneTrackerState: jest.fn().mockReturnValue({}),
+  useMilestoneTracker: () => mockMilestoneTracker,
+}));
+
+jest.mock('../../../lib/session-recovery', () => ({
+  clearSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
+  readSessionRecoveryMarker: jest.fn().mockResolvedValue(null),
+  writeSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
+}));
+
+const { readSessionRecoveryMarker: mockReadSessionRecoveryMarker } =
+  require('../../../lib/session-recovery') as {
+    readSessionRecoveryMarker: jest.Mock;
+  };
 
 jest.mock('../../../lib/api-client', () => ({
   useApiClient: () => ({
@@ -211,5 +256,32 @@ describe('SessionScreen homework flow', () => {
     expect(screen.getByTestId('homework-problem-progress')).toHaveTextContent(
       'Problem 2 of 2'
     );
+  });
+
+  it('hydrates milestone tracker state from the recovery marker when resuming', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      sessionId: 'session-1',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+    });
+    mockReadSessionRecoveryMarker.mockResolvedValueOnce({
+      sessionId: 'session-1',
+      updatedAt: new Date().toISOString(),
+      milestoneTracker: {
+        milestonesReached: ['polar_star'],
+        consecutiveLowRung: 1,
+        longMessageCount: 0,
+        awaitingPersistence: false,
+        previousRung: 2,
+      },
+    });
+
+    render(<SessionScreen />);
+
+    await waitFor(() => {
+      expect(mockReadSessionRecoveryMarker).toHaveBeenCalled();
+      expect(mockHydrate).toHaveBeenCalled();
+    });
   });
 });

@@ -3,6 +3,7 @@ import { consentReminder } from './functions/consent-reminders';
 import { consentRevocation } from './functions/consent-revocation';
 import { scheduledDeletion } from './functions/account-deletion';
 import { sessionCompleted } from './functions/session-completed';
+import { sessionStaleCleanup } from './functions/session-stale-cleanup';
 import { reviewReminder } from './functions/review-reminder';
 import { trialExpiry } from './functions/trial-expiry';
 import { paymentRetry } from './functions/payment-retry';
@@ -16,6 +17,7 @@ export {
   consentRevocation,
   scheduledDeletion,
   sessionCompleted,
+  sessionStaleCleanup,
   reviewReminder,
   trialExpiry,
   paymentRetry,
@@ -30,6 +32,7 @@ export const functions = [
   consentRevocation,
   scheduledDeletion,
   sessionCompleted,
+  sessionStaleCleanup,
   reviewReminder,
   trialExpiry,
   paymentRetry,
