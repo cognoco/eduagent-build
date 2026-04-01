@@ -1294,7 +1294,10 @@ export async function skipSummary(
     | 'auto_closed'
     | undefined;
 
-  if (existingStatus === 'submitted' || existingStatus === 'accepted') {
+  if (
+    existing &&
+    (existingStatus === 'submitted' || existingStatus === 'accepted')
+  ) {
     return {
       summary: {
         id: existing.id,

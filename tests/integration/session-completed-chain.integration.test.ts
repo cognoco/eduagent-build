@@ -4,7 +4,7 @@
  * Tests the Inngest session-completed function end-to-end by directly
  * invoking the handler with a mock step runner. Validates:
  *
- * 1. Happy path: all 6 steps execute and return correct outcomes
+ * 1. Happy path: all 10 steps execute and return correct outcomes
  * 2. Error isolation: one step failing does not block others
  * 3. Skip logic: no topicId → retention/deepening steps skip
  * 4. Summary tracking: skipped → increment, submitted → reset
@@ -15,9 +15,29 @@
  * validation from the integration test suite.
  */
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn(() => ({})),
-}));
+jest.mock('@eduagent/database', () => {
+  const chainable = () => {
+    const chain: Record<string, any> = {};
+    chain.select = jest.fn().mockReturnValue(chain);
+    chain.from = jest.fn().mockReturnValue(chain);
+    chain.where = jest.fn().mockReturnValue(chain);
+    chain.limit = jest.fn().mockResolvedValue([]);
+    chain.orderBy = jest.fn().mockReturnValue(chain);
+    chain.query = {
+      sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
+      streaks: { findFirst: jest.fn().mockResolvedValue(null) },
+    };
+    return chain;
+  };
+  return {
+    createDatabase: jest.fn(chainable),
+    // Re-export ORM helpers so they resolve without errors
+    retentionCards: { repetitions: 'repetitions', profileId: 'profileId', topicId: 'topicId' },
+    curriculumTopics: { id: 'id', title: 'title' },
+    sessionEvents: { sessionId: 'sessionId', profileId: 'profileId', createdAt: 'createdAt' },
+    streaks: { profileId: 'profileId' },
+  };
+});
 
 const mockUpdateRetentionFromSession = jest.fn().mockResolvedValue(undefined);
 const mockUpdateNeedsDeepeningProgress = jest.fn().mockResolvedValue(undefined);
@@ -95,10 +115,30 @@ jest.mock('../../apps/api/src/services/embeddings', () => ({
 const mockIncrementSummarySkips = jest.fn().mockResolvedValue(1);
 const mockResetSummarySkips = jest.fn().mockResolvedValue(undefined);
 
+const mockUpdateMedianResponseSeconds = jest.fn().mockResolvedValue(undefined);
+
 jest.mock('../../apps/api/src/services/settings', () => ({
   incrementSummarySkips: (...args: unknown[]) =>
     mockIncrementSummarySkips(...args),
   resetSummarySkips: (...args: unknown[]) => mockResetSummarySkips(...args),
+  updateMedianResponseSeconds: (...args: unknown[]) =>
+    mockUpdateMedianResponseSeconds(...args),
+}));
+
+const mockProcessEvaluateCompletion = jest.fn().mockResolvedValue(undefined);
+const mockProcessTeachBackCompletion = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../../apps/api/src/services/verification-completion', () => ({
+  processEvaluateCompletion: (...args: unknown[]) =>
+    mockProcessEvaluateCompletion(...args),
+  processTeachBackCompletion: (...args: unknown[]) =>
+    mockProcessTeachBackCompletion(...args),
+}));
+
+const mockQueueCelebration = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../../apps/api/src/services/celebrations', () => ({
+  queueCelebration: (...args: unknown[]) => mockQueueCelebration(...args),
 }));
 
 const mockCaptureException = jest.fn();
@@ -183,12 +223,12 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
   // Happy path — all 8 steps execute successfully
   // -----------------------------------------------------------------------
 
-  it('executes all 8 steps and returns completed status', async () => {
+  it('executes all 10 steps and returns completed status', async () => {
     const result = await executeChain(createEventData());
 
     expect(result.status).toBe('completed');
     expect(result.sessionId).toBe('session-int-001');
-    expect(result.outcomes).toHaveLength(8);
+    expect(result.outcomes).toHaveLength(10);
 
     const stepNames = result.outcomes.map((o) => o.step);
     expect(stepNames).toEqual([
@@ -200,6 +240,8 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
       'generate-embeddings',
       'extract-homework-summary',
       'track-summary-skips',
+      'update-pace-baseline',
+      'queue-celebrations',
     ]);
 
     // All steps should be 'ok' or 'skipped' (verification skipped when no verificationType)

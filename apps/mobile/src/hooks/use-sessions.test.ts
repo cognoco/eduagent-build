@@ -525,7 +525,9 @@ describe('useSkipSummary', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
-    expect(result.current.data?.summary.status).toBe('skipped');
+    await waitFor(() => {
+      expect(result.current.data?.summary.status).toBe('skipped');
+    });
   });
 });
 

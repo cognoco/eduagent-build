@@ -65,6 +65,8 @@ jest.mock('../../../hooks/use-sessions', () => ({
   useStreamMessage: () => ({
     stream: mockStream,
   }),
+  useSessionTranscript: () => ({ data: null }),
+  useRecordSystemPrompt: () => ({ mutateAsync: jest.fn() }),
 }));
 
 jest.mock('../../../hooks/use-classify-subject', () => ({
@@ -87,6 +89,36 @@ jest.mock('../../../hooks/use-network-status', () => ({
 
 jest.mock('../../../hooks/use-api-reachability', () => ({
   useApiReachability: () => ({ isApiReachable: true, isChecked: true }),
+}));
+
+jest.mock('../../../hooks/use-settings', () => ({
+  useCelebrationLevel: () => ({ data: 'full' }),
+}));
+
+jest.mock('../../../hooks/use-celebration', () => ({
+  useCelebration: () => ({
+    CelebrationOverlay: () => null,
+    trigger: jest.fn(),
+  }),
+}));
+
+jest.mock('../../../hooks/use-milestone-tracker', () => ({
+  celebrationForReason: jest.fn(),
+  createMilestoneTrackerStateFromMilestones: jest.fn().mockReturnValue({}),
+  normalizeMilestoneTrackerState: jest.fn().mockReturnValue({}),
+  useMilestoneTracker: () => ({
+    milestonesReached: [],
+    trackerState: {},
+    trackExchange: jest.fn().mockReturnValue({ triggered: [], trackerState: {} }),
+    hydrate: jest.fn(),
+    reset: jest.fn(),
+  }),
+}));
+
+jest.mock('../../../lib/session-recovery', () => ({
+  clearSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
+  readSessionRecoveryMarker: jest.fn().mockResolvedValue(null),
+  writeSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../../../lib/api-client', () => ({
