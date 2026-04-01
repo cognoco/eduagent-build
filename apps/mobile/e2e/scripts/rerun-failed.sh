@@ -13,13 +13,14 @@ export TEMP="${TEMP:-C:\\tools\\tmp}"
 export TMP="${TMP:-C:\\tools\\tmp}"
 
 RESULTS_FILE="$E2E_DIR/scripts/rerun-results-$(date +%Y%m%d-%H%M%S).txt"
-PASS=0 FAIL=0 TOTAL=0
+PASS=0 FAIL=0 SKIP=0 TOTAL=0
 
 log() {
   local s="$1" f="$2" n="${3:-}"
   echo "[$s] $f $n" | tee -a "$RESULTS_FILE"
   [ "$s" = "PASS" ] && ((PASS++))
   [ "$s" = "FAIL" ] && ((FAIL++))
+  [ "$s" = "SKIP" ] && ((SKIP++))
   ((TOTAL++))
 }
 
@@ -93,12 +94,12 @@ run_s "consent-withdrawn-solo" "flows/consent/consent-withdrawn-gate.yaml"
 run_s "onboarding-complete" "flows/consent/post-approval-landing.yaml"
 
 # Standalone
-run_m "flows/onboarding/sign-up-flow.yaml"
+log "SKIP" "flows/onboarding/sign-up-flow.yaml" "(manual-only: requires Clerk email verification)"
 run_m "flows/consent/coppa-flow.yaml"
 run_m "flows/consent/profile-creation-consent.yaml"
 run_m "flows/consent/consent-pending-gate.yaml"
 
 echo -e "\n=========================================="
 echo "RE-RUN COMPLETE — $(date)" | tee -a "$RESULTS_FILE"
-echo "  PASS: $PASS / FAIL: $FAIL / TOTAL: $TOTAL" | tee -a "$RESULTS_FILE"
+echo "  PASS: $PASS / FAIL: $FAIL / SKIP: $SKIP / TOTAL: $TOTAL" | tee -a "$RESULTS_FILE"
 echo "Results: $RESULTS_FILE"

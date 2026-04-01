@@ -1,184 +1,71 @@
-# Issue Fix Plan — Session Recovery, Summary State, and Celebration Integrity
+# Issue Fix Plan — Living Review Follow-Up
 
 **Author:** Codex
-**Date:** 2026-03-31
-**Context:** Follow-up plan for the current project-wide code review. This plan covers the concrete issues found in the active session, summary, and celebration flows.
+**Created:** 2026-03-31
+**Last updated:** 2026-04-01
+**Purpose:** Keep a compact running record of code-review follow-up work that has already been addressed, plus a place to append future review rounds.
 
 ---
 
-## Progress Update
+## Current Status
 
-These follow-up items were completed during the broader stabilization pass and are now tracked here so the plan reflects real progress:
+Review Round 1 follow-up remains complete.
 
-| Item | Status | Notes |
-|------|--------|-------|
-| Session buildability and shared type contract recovery | completed | Removed lingering session-flow compile blockers, refreshed stale shared declarations, and restored passing API/mobile typecheck. |
-| Account lifecycle truthfulness | completed | Made account deletion resilient to background event-send failures and updated mobile account hooks/tests so non-2xx responses surface as errors. |
-| Subscription error truthfulness | completed | Prevented the child paywall from masking subscription fetch failures and added a regression test that keeps the error state visible. |
-| Summary state integrity | completed | Persisted learner skip state end to end and restored the Casual Explorer prompt when the backend threshold is reached. |
-| Milestone resume safety | completed | Preserved the recovery marker on resume, re-hydrated tracker state, and added recovery-path tests so earned milestones survive session continuation. |
-| System prompt transcript recovery | completed | Confirmed persisted `system_prompt` events are included in the transcript payload and restored in the resumed learner chat flow. |
-| Validation path repair | completed | Added committed app-level Jest `.cjs` configs plus `test:api:unit` and `test:mobile:unit` scripts; Nx plugin-worker startup still times out in this environment, so direct Jest is the reliable path. |
-| Regression checklist pass | completed | Ran targeted API and mobile session suites covering close/skip/submit, stale auto-close handling, milestone recovery, transcript restore, and learner/parent celebration visibility paths. |
+Review Round 2 follow-up is partially complete.
+
+Current open items:
+- API routes still retain `account.id` fallbacks when `profileId` is missing, so a failed owner-profile resolution can still degrade into incorrect profile scoping.
 
 ---
 
-## Goal
+## Addressed Issues
 
-Fix the current regressions in the learner session flow before further session-lifecycle work lands:
+### Review Round 1 — Session Recovery and Validation
 
-1. Summary skips are not persisted.
-2. Milestones are lost across session resume.
-3. Persisted system prompts are not restored in resumed sessions.
-4. Validation confidence is reduced by the current Jest/Nx runner instability.
-
----
-
-## Findings Summary
-
-| ID | Severity | Area | Issue |
-|----|----------|------|-------|
-| IF1 | High | Session close + summary flow | "Skip for now" no longer updates backend summary state, so skip tracking and Casual Explorer prompting silently break. |
-| IF2 | Medium-High | Session recovery + milestone tracking | Milestones earned before app backgrounding/crash are lost on resume and can be re-triggered or omitted from the final summary. |
-| IF3 | Medium | Transcript recovery | `system_prompt` events are persisted but excluded from transcript restore, so recovery drops the silence nudge history it just saved. |
-| IF4 | Medium | Validation tooling | Project test execution is currently unreliable from this environment due Jest/TS config and Nx plugin-worker failures. |
+| Area | Status | Short summary |
+|------|--------|---------------|
+| Session buildability and shared type contracts | completed | Removed session-flow compile blockers, refreshed stale shared declarations, and restored API/mobile typecheck stability. |
+| Account lifecycle truthfulness | completed | Improved account deletion error handling so failed background event dispatches do not falsely look successful. |
+| Subscription error truthfulness | completed | Stopped child paywall flows from masking subscription fetch failures. |
+| Summary state integrity | completed | Restored persisted summary skip/submit state and Casual Explorer prompt behavior. |
+| Milestone resume safety | completed | Preserved milestone state across resume and recovery flows so progress is not lost or duplicated. |
+| System prompt transcript recovery | completed | Included persisted `system_prompt` events in transcript recovery and restored them in learner session resume flows. |
+| Validation path repair | completed | Added direct Jest `.cjs` configs and stable unit test scripts for API and mobile flows. |
+| Regression checklist pass | completed | Covered close/skip/submit, stale auto-close, milestone recovery, transcript restore, and celebration visibility paths. |
 
 ---
 
-## Fix Streams
+## Validation Notes
 
-### Stream A — Restore Summary State Integrity
-
-**Issue:** IF1
-
-**Files likely involved**
-- `apps/mobile/src/app/(learner)/session/index.tsx`
-- `apps/mobile/src/app/session-summary/[sessionId].tsx`
-- `apps/mobile/src/hooks/use-sessions.ts`
-- `apps/api/src/routes/sessions.ts`
-- `apps/api/src/inngest/functions/session-completed.ts`
-
-**Plan**
-- Decide on a single source of truth for post-close summary state.
-- Preferred approach:
-  - Close the session with `summaryStatus: 'pending'` when the learner finishes normally.
-  - Add an explicit backend action for "skip summary" so the summary decision is persisted after the summary screen.
-  - Ensure "submit summary" also finalizes summary state server-side if it has not already been updated.
-- Keep auto-closed sessions on `summaryStatus: 'auto_closed'`.
-- Verify `incrementSummarySkips`, `resetSummarySkips`, and `shouldPromptCasualSwitch` are driven by real learner behavior again.
-
-**Acceptance criteria**
-- Skipping the summary produces a persisted backend state of `skipped`.
-- Submitting the summary produces a persisted backend state of `submitted` or `accepted`.
-- Casual-switch prompting works again from real skip counts.
+- `pnpm test:api:unit` is currently passing.
+- `pnpm test:mobile:unit` is currently passing again after re-scoping the mobile Jest config to mobile tests and restoring schema import compatibility.
+- Nx plugin-worker startup may still be unreliable in this environment, so direct Jest remains the preferred targeted validation path.
 
 ---
 
-### Stream B — Make Milestones Resume-Safe
+## Next Review
 
-**Issue:** IF2
+### Review Round 2
 
-**Files likely involved**
-- `apps/mobile/src/app/(learner)/session/index.tsx`
-- `apps/mobile/src/hooks/use-milestone-tracker.ts`
-- `apps/mobile/src/lib/session-recovery.ts`
-- `apps/api/src/services/session.ts`
-- `packages/schemas/src/sessions.ts`
+Status: completed on 2026-04-01
 
-**Plan**
-- Persist milestone progress before session close instead of only at close time.
-- Choose one of these implementations:
-  - Add milestone state to the recovery marker and restore it on resume.
-  - Better: persist milestones in session metadata incrementally via API so recovery is server-backed.
-- Ensure restored sessions hydrate both:
-  - already reached milestones
-  - enough tracker state to avoid duplicate firing
-- Preserve milestone recap on the final summary route even after a resumed session.
+Scope:
+- New project-wide code review against the current repository state.
+- Focus on correctness, regressions, missing tests, and any newly introduced risky patterns.
 
-**Acceptance criteria**
-- A learner can background or crash mid-session, resume, and keep prior milestones.
-- Previously earned milestones do not replay unless a genuinely new one is reached.
-- Final summary recap contains milestones earned before and after resume.
+Finding summary:
+- Found and repaired a test-harness regression in the mobile direct Jest path.
+- Found a remaining profile-scope fallback pattern in API routes that can still turn a missing owner profile into incorrect account-scoped behavior.
+
+Open items:
+1. Remove `?? account.id` route fallbacks for profile-scoped endpoints and replace them with an explicit missing-profile failure path.
+2. Add tests for the no-owner / owner-resolution-failure branch in `profileScopeMiddleware` and at least one representative route.
 
 ---
 
-### Stream C — Include System Prompts in Recovery Transcript
+## Change Log
 
-**Issue:** IF3
-
-**Files likely involved**
-- `apps/api/src/services/session.ts`
-- `packages/schemas/src/sessions.ts`
-- `apps/mobile/src/app/(learner)/session/index.tsx`
-
-**Plan**
-- Expand transcript response to include `system_prompt` events, or add a dedicated transcript event model that can represent them safely.
-- Update the mobile restore logic to render restored system prompts in a controlled way.
-- Keep transcript rendering rules strict so only intended event types appear in the learner chat.
-
-**Acceptance criteria**
-- A persisted silence nudge survives session recovery.
-- Transcript payload and client rendering stay type-safe.
-- No unintended internal-only events leak into the learner UI.
-
----
-
-### Stream D — Repair Validation Path
-
-**Issue:** IF4
-
-**Files likely involved**
-- `jest.config.cjs`
-- `apps/api/jest.config.cjs`
-- `apps/mobile/jest.config.cjs`
-- `tsconfig.base.json`
-- Nx/Jest project wiring as needed
-
-**Plan**
-- Fix the Jest/TypeScript config mismatch causing `TS5095`.
-- Fix or document the Nx plugin-worker startup issue if it is environmental.
-- Re-enable reliable targeted test runs for API and mobile session flows.
-- Add tests for the new fixes rather than relying only on mock-heavy happy paths.
-
-**Acceptance criteria**
-- Targeted API and mobile test suites can be run reliably.
-- New tests cover:
-  - summary skip persistence
-  - milestone restoration
-  - transcript restoration of system prompts
-
----
-
-## Recommended Order
-
-1. Stream A — summary state integrity
-2. Stream B — milestone resume safety
-3. Stream C — transcript/system prompt recovery
-4. Stream D — validation tooling, then full regression pass
-
-Why this order:
-- Stream A fixes the only clear high-severity behavior regression.
-- Stream B and Stream C both touch recovery behavior and should be aligned after summary state is stable.
-- Stream D should happen before final merge so the fix set can be verified properly.
-
----
-
-## Regression Checklist
-
-Completed:
-- Close session and skip summary.
-- Close session and submit accepted summary.
-- Auto-close stale session and open summary screen.
-- Trigger milestones, background app, resume session, continue learning.
-- Trigger a silence prompt, background app, resume session, confirm restored chat state.
-- Confirm celebration polling and "seen" behavior still work for learner and parent views.
-
----
-
-## Definition of Done
-
-- Summary state is persisted correctly for skip, submit, accept, and auto-close.
-- Session recovery preserves milestones and relevant system prompts.
-- No duplicate celebration or milestone firing after resume.
-- Automated tests exist for each fixed bug path.
-- Project test execution path is reliable enough to validate the touched flows.
+- 2026-03-31: Initial issue-fix plan created from code-review findings.
+- 2026-04-01: Converted into a living follow-up document with completed-item summary and next-review section.
+- 2026-04-01: Added Review Round 2 findings and reopened active follow-up items.
+- 2026-04-01: Repaired the mobile Jest config boundary so `pnpm test:mobile:unit` is reliable again.

@@ -6,7 +6,10 @@ module.exports = {
   preset: 'jest-expo',
   moduleFileExtensions: ['ts', 'js', 'html', 'tsx', 'jsx'],
   setupFilesAfterEnv: ['<rootDir>/apps/mobile/src/test-setup.ts'],
+  testMatch: ['<rootDir>/apps/mobile/src/**/*.(spec|test).[jt]s?(x)'],
   moduleNameMapper: {
+    '^@eduagent/schemas$': '<rootDir>/packages/schemas/src/index.ts',
+    '^(\\.{1,2}/.*)\\.[jt]s$': '$1',
     '\\.svg$': '@nx/expo/plugins/jest/svg-mock',
   },
   transform: {

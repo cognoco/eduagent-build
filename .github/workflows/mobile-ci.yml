@@ -48,6 +48,9 @@ jobs:
   # Check if mobile is actually affected by the changes
   check-affected:
     runs-on: ubuntu-latest
+    env:
+      NX_DAEMON: false
+      NX_ISOLATE_PLUGINS: false
     outputs:
       mobile-affected: ${{ steps.check.outputs.affected }}
     steps:
@@ -74,14 +77,23 @@ jobs:
       - name: Check if mobile affected
         id: check
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            BASE="origin/${{ github.base_ref }}"
-          else
-            BASE="HEAD~1"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "affected=true" >> "$GITHUB_OUTPUT"
+            echo "Manual run — treating mobile as affected"
+            exit 0
           fi
-          affected=$(pnpm exec nx show projects --affected --base=$BASE 2>/dev/null || echo "")
-          echo "Affected projects: $affected"
-          if echo "$affected" | grep -q "mobile"; then
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="origin/${{ github.base_ref }}...HEAD"
+          else
+            BASE="HEAD~1 HEAD"
+          fi
+
+          changed_files=$(git diff --name-only $BASE)
+          echo "Changed files:"
+          echo "$changed_files"
+
+          if echo "$changed_files" | grep -Eq '^(apps/mobile/|packages/schemas/|\.github/workflows/mobile-ci\.yml$)'; then
             echo "affected=true" >> $GITHUB_OUTPUT
             echo "Mobile is affected"
           else
@@ -96,6 +108,9 @@ jobs:
       (github.event_name != 'workflow_dispatch' && needs.check-affected.outputs.mobile-affected == 'true') ||
       (github.event_name == 'workflow_dispatch' && inputs.skip_tests != true)
     runs-on: ubuntu-latest
+    env:
+      NX_DAEMON: false
+      NX_ISOLATE_PLUGINS: false
     steps:
       - uses: actions/checkout@v4
 
@@ -111,7 +126,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Run mobile lint
-        run: pnpm exec nx run mobile:lint
+        run: pnpm exec eslint -c apps/mobile/eslint.config.mjs apps/mobile
 
   # Test mobile code
   test:
@@ -135,7 +150,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Run mobile tests
-        run: pnpm exec nx run mobile:test
+        run: pnpm test:mobile:unit
 
   # Build preview APK on merge to main (Android only for PoC)
   build-preview:
@@ -145,6 +160,9 @@ jobs:
       github.ref == 'refs/heads/main' &&
       needs.check-affected.outputs.mobile-affected == 'true'
     runs-on: ubuntu-latest
+    env:
+      NX_DAEMON: false
+      NX_ISOLATE_PLUGINS: false
     steps:
       - uses: actions/checkout@v4
 
@@ -179,6 +197,9 @@ jobs:
       github.event_name == 'workflow_dispatch' &&
       (inputs.skip_tests == true || (needs.lint.result == 'success' && needs.test.result == 'success'))
     runs-on: ubuntu-latest
+    env:
+      NX_DAEMON: false
+      NX_ISOLATE_PLUGINS: false
     steps:
       - uses: actions/checkout@v4
 

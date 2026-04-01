@@ -46,7 +46,7 @@ run_seeded "consent-pending"        "flows/consent/consent-pending-gate.yaml"
 run_seeded "pre-profile"            "flows/consent/coppa-flow.yaml"
 run_seeded "pre-profile"            "flows/consent/profile-creation-consent.yaml"
 
-run_noseed "flows/onboarding/sign-up-flow.yaml"
+log_result "SKIP" "flows/onboarding/sign-up-flow.yaml" "(manual-only: requires Clerk email verification)"
 
 echo ""
 echo "==========================================" | tee -a "$RESULTS_FILE"

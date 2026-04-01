@@ -2,7 +2,6 @@
 # Mirrors app-launch.yaml but uses Expo Go appId + deep link
 appId: host.exp.exponent
 tags:
-  - smoke
   - local
 ---
 - runFlow: _setup/launch-expogo.yaml
