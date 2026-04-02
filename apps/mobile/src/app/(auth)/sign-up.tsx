@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { useSignUp, useSSO } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useWebBrowserWarmup } from '../../hooks/use-web-browser-warmup';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
