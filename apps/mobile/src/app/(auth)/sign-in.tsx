@@ -175,6 +175,10 @@ export default function SignInScreen() {
         setError('No session was created. Please try again.');
         return;
       }
+      if (!setActive) {
+        setError('Authentication not loaded. Please try again.');
+        return;
+      }
 
       try {
         await setActive({ session: sessionId });
@@ -195,6 +199,8 @@ export default function SignInScreen() {
 
   const prepareVerificationStep = useCallback(
     async (attempt: SignInAttemptLike) => {
+      if (!signIn) return false;
+
       if (attempt.status === 'needs_first_factor') {
         const emailFactor =
           attempt.supportedFirstFactors?.find(isEmailCodeFactor) ?? null;
@@ -292,7 +298,7 @@ export default function SignInScreen() {
   );
 
   const onSignInPress = useCallback(async () => {
-    if (!isLoaded || !canSubmit) return;
+    if (!isLoaded || !canSubmit || !signIn) return;
 
     setError('');
     setLoading(true);
@@ -325,7 +331,8 @@ export default function SignInScreen() {
   ]);
 
   const onVerifyPress = useCallback(async () => {
-    if (!isLoaded || !pendingVerification || code.trim() === '') return;
+    if (!isLoaded || !signIn || !pendingVerification || code.trim() === '')
+      return;
 
     setError('');
     setLoading(true);
@@ -364,15 +371,18 @@ export default function SignInScreen() {
   ]);
 
   const onResendCode = useCallback(async () => {
-    if (!isLoaded || !pendingVerification || resending) return;
+    if (!isLoaded || !signIn || !pendingVerification || resending) return;
 
     setError('');
     setResending(true);
 
     try {
-      if (pendingVerification.stage === 'first_factor') {
+      if (
+        pendingVerification.stage === 'first_factor' &&
+        pendingVerification.strategy === 'email_code'
+      ) {
         await signIn.prepareFirstFactor({
-          strategy: pendingVerification.strategy,
+          strategy: 'email_code',
           emailAddressId: pendingVerification.emailAddressId,
         });
       } else if (pendingVerification.strategy === 'email_code') {
