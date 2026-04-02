@@ -67,6 +67,9 @@ jest.mock('../../../hooks/use-sessions', () => ({
   }),
   useSessionTranscript: () => ({ data: null }),
   useRecordSystemPrompt: () => ({ mutateAsync: jest.fn() }),
+  useFlagSessionContent: () => ({ mutateAsync: jest.fn() }),
+  useParkingLot: () => ({ data: [], isLoading: false }),
+  useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
 
 jest.mock('../../../hooks/use-classify-subject', () => ({
@@ -81,6 +84,28 @@ jest.mock('../../../hooks/use-streaks', () => ({
 
 jest.mock('../../../hooks/use-progress', () => ({
   useOverallProgress: () => ({ data: { totalTopicsCompleted: 0 } }),
+}));
+
+jest.mock('../../../hooks/use-subjects', () => ({
+  useSubjects: () => ({
+    data: [{ id: 'subject-1', name: 'Math', status: 'active' }],
+  }),
+}));
+
+jest.mock('../../../hooks/use-curriculum', () => ({
+  useCurriculum: () => ({
+    data: {
+      topics: [
+        {
+          id: 'topic-1',
+          title: 'Topic 1',
+          description: 'Desc',
+          skipped: false,
+        },
+      ],
+    },
+    isLoading: false,
+  }),
 }));
 
 jest.mock('../../../hooks/use-network-status', () => ({

@@ -6,6 +6,7 @@ const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
+  useLocalSearchParams: () => ({}),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -15,6 +16,9 @@ jest.mock('react-native-safe-area-context', () => ({
 const mockUseSubjects = jest.fn();
 jest.mock('../../hooks/use-subjects', () => ({
   useSubjects: () => mockUseSubjects(),
+  useUpdateSubject: () => ({
+    mutateAsync: jest.fn(),
+  }),
 }));
 
 const mockUseOverallProgress = jest.fn();
@@ -22,10 +26,56 @@ jest.mock('../../hooks/use-progress', () => ({
   useOverallProgress: () => mockUseOverallProgress(),
 }));
 
-const mockUseRetentionTopics = jest.fn();
-jest.mock('../../hooks/use-retention', () => ({
-  useRetentionTopics: () => mockUseRetentionTopics(),
+jest.mock('@tanstack/react-query', () => {
+  const actual = jest.requireActual('@tanstack/react-query');
+  return {
+    ...actual,
+    useQueries: jest.fn(),
+  };
+});
+
+jest.mock('../../components/progress', () => ({
+  RetentionSignal: ({ status }: { status: string }) => {
+    const { Text } = require('react-native');
+    const label =
+      status === 'strong'
+        ? 'Thriving'
+        : status === 'fading'
+        ? 'Fading'
+        : status === 'forgotten'
+        ? 'Forgotten'
+        : 'Weak';
+    return <Text>{label}</Text>;
+  },
 }));
+
+jest.mock('../../components/common', () => ({
+  BookPageFlipAnimation: () => null,
+}));
+
+jest.mock('../../lib/theme', () => ({
+  useThemeColors: () => ({ accent: '#2563eb' }),
+}));
+
+jest.mock('../../lib/api-client', () => ({
+  useApiClient: () => ({
+    subjects: {
+      ':subjectId': {
+        retention: {
+          $get: jest.fn(),
+        },
+      },
+    },
+  }),
+}));
+
+jest.mock('../../lib/profile', () => ({
+  useProfile: () => ({ activeProfile: { id: 'profile-1' } }),
+}));
+
+const { useQueries: mockUseQueries } = require('@tanstack/react-query') as {
+  useQueries: jest.Mock;
+};
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -45,10 +95,7 @@ const LearningBookScreen = require('./book').default;
 describe('LearningBookScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseRetentionTopics.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-    });
+    mockUseQueries.mockReturnValue([]);
   });
 
   it('shows loading state', () => {
@@ -94,23 +141,27 @@ describe('LearningBookScreen', () => {
       },
       isLoading: false,
     });
-    mockUseRetentionTopics.mockReturnValue({
-      data: {
-        topics: [
-          {
-            topicId: 'topic-1',
-            easeFactor: 2.5,
-            intervalDays: 7,
-            repetitions: 3,
-            nextReviewAt: '2026-02-25T00:00:00Z',
-            xpStatus: 'verified',
-            failureCount: 0,
-          },
-        ],
-        reviewDueCount: 0,
+    mockUseQueries.mockReturnValue([
+      {
+        data: {
+          topics: [
+            {
+              topicId: 'topic-1',
+              topicTitle: 'topic-1',
+              easeFactor: 2.5,
+              intervalDays: 7,
+              repetitions: 3,
+              nextReviewAt: '2026-02-25T00:00:00Z',
+              lastReviewedAt: null,
+              xpStatus: 'verified',
+              failureCount: 0,
+            },
+          ],
+          reviewDueCount: 0,
+        },
+        isLoading: false,
       },
-      isLoading: false,
-    });
+    ]);
 
     render(<LearningBookScreen />, { wrapper: createWrapper() });
 
@@ -128,23 +179,27 @@ describe('LearningBookScreen', () => {
       data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
       isLoading: false,
     });
-    mockUseRetentionTopics.mockReturnValue({
-      data: {
-        topics: [
-          {
-            topicId: 'topic-1',
-            easeFactor: 1.5,
-            intervalDays: 1,
-            repetitions: 1,
-            nextReviewAt: null,
-            xpStatus: 'pending',
-            failureCount: 0,
-          },
-        ],
-        reviewDueCount: 0,
+    mockUseQueries.mockReturnValue([
+      {
+        data: {
+          topics: [
+            {
+              topicId: 'topic-1',
+              topicTitle: 'topic-1',
+              easeFactor: 1.5,
+              intervalDays: 1,
+              repetitions: 1,
+              nextReviewAt: null,
+              lastReviewedAt: null,
+              xpStatus: 'pending',
+              failureCount: 0,
+            },
+          ],
+          reviewDueCount: 0,
+        },
+        isLoading: false,
       },
-      isLoading: false,
-    });
+    ]);
 
     render(<LearningBookScreen />, { wrapper: createWrapper() });
 
@@ -189,31 +244,31 @@ describe('LearningBookScreen', () => {
       data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
       isLoading: false,
     });
-    // Return topics for the first subject only (mock is called for all subjects)
-    let callCount = 0;
-    mockUseRetentionTopics.mockImplementation(() => {
-      callCount++;
-      if (callCount <= 1) {
-        return {
-          data: {
-            topics: [
-              {
-                topicId: 'topic-1',
-                easeFactor: 2.5,
-                intervalDays: 7,
-                repetitions: 3,
-                nextReviewAt: null,
-                xpStatus: 'verified',
-                failureCount: 0,
-              },
-            ],
-            reviewDueCount: 0,
-          },
-          isLoading: false,
-        };
-      }
-      return { data: { topics: [], reviewDueCount: 0 }, isLoading: false };
-    });
+    mockUseQueries.mockReturnValue([
+      {
+        data: {
+          topics: [
+            {
+              topicId: 'topic-1',
+              topicTitle: 'topic-1',
+              easeFactor: 2.5,
+              intervalDays: 7,
+              repetitions: 3,
+              nextReviewAt: null,
+              lastReviewedAt: null,
+              xpStatus: 'verified',
+              failureCount: 0,
+            },
+          ],
+          reviewDueCount: 0,
+        },
+        isLoading: false,
+      },
+      {
+        data: { topics: [], reviewDueCount: 0 },
+        isLoading: false,
+      },
+    ]);
 
     render(<LearningBookScreen />, { wrapper: createWrapper() });
 

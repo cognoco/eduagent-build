@@ -170,6 +170,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               exchangeCount: result.exchangeCount,
               escalationRung: result.escalationRung,
               expectedResponseMinutes: result.expectedResponseMinutes,
+              aiEventId: result.aiEventId,
             }),
           });
         });
@@ -244,7 +245,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     const db = c.get('db');
     const account = c.get('account');
     const profileId = c.get('profileId') ?? account.id;
-    const body = await c.req.json<{ content?: string }>();
+    const body = await c.req.json<{
+      content?: string;
+      metadata?: Record<string, unknown>;
+    }>();
 
     if (!body.content || typeof body.content !== 'string') {
       return apiError(c, 400, ERROR_CODES.VALIDATION_ERROR, 'Content required');
@@ -254,7 +258,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       db,
       profileId,
       c.req.param('sessionId'),
-      body.content
+      body.content,
+      body.metadata
     );
     return c.json({ ok: true });
   })

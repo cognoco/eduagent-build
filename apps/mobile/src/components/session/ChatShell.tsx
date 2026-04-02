@@ -25,6 +25,8 @@ export interface ChatMessage {
   streaming?: boolean;
   escalationRung?: number;
   verificationBadge?: VerificationBadge;
+  eventId?: string;
+  isSystemPrompt?: boolean;
 }
 
 interface ChatShellProps {
@@ -39,6 +41,7 @@ interface ChatShellProps {
   inputAccessory?: React.ReactNode;
   onDraftChange?: (text: string) => void;
   placeholder?: string;
+  renderMessageActions?: (message: ChatMessage) => React.ReactNode;
   /** When set to 'teach_back', voice defaults ON. Otherwise voice defaults OFF but toggle is always visible. */
   verificationType?: string;
   /** Optional testID for the message scroll area (used by E2E flows). */
@@ -99,6 +102,7 @@ export function ChatShell({
   inputAccessory,
   onDraftChange,
   placeholder = 'Type a message...',
+  renderMessageActions,
   verificationType,
   messagesTestID,
 }: ChatShellProps) {
@@ -298,6 +302,7 @@ export function ChatShell({
             streaming={msg.streaming}
             escalationRung={msg.escalationRung}
             verificationBadge={msg.verificationBadge}
+            actions={renderMessageActions?.(msg)}
           />
         ))}
         {footer}

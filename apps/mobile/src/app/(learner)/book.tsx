@@ -1,28 +1,52 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   Pressable,
   ScrollView,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useQueries } from '@tanstack/react-query';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { Subject } from '@eduagent/schemas';
 import {
   RetentionSignal,
   type RetentionStatus,
 } from '../../components/progress';
 import { BookPageFlipAnimation } from '../../components/common';
 import { useThemeColors } from '../../lib/theme';
-import { useSubjects } from '../../hooks/use-subjects';
+import { useSubjects, useUpdateSubject } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
-import { useRetentionTopics } from '../../hooks/use-retention';
+import { useApiClient } from '../../lib/api-client';
+import { useProfile } from '../../lib/profile';
+import { combinedSignal } from '../../lib/query-timeout';
+import { assertOk } from '../../lib/assert-ok';
+
+interface SubjectRetentionTopic {
+  topicId: string;
+  topicTitle?: string;
+  easeFactor: number;
+  intervalDays: number;
+  repetitions: number;
+  nextReviewAt: string | null;
+  lastReviewedAt: string | null;
+  xpStatus: 'pending' | 'verified' | 'decayed';
+  failureCount: number;
+}
+
+interface SubjectRetentionResponse {
+  topics: SubjectRetentionTopic[];
+  reviewDueCount: number;
+}
 
 interface EnrichedTopic {
   topicId: string;
   subjectId: string;
   name: string;
   subjectName: string;
+  subjectStatus: Subject['status'];
   retention: RetentionStatus;
   lastReviewedAt: string | null;
   repetitions: number;
@@ -41,13 +65,59 @@ function formatLastPracticed(iso: string | null): string | null {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+function getTopicRetention(topic: SubjectRetentionTopic): RetentionStatus {
+  if (topic.failureCount >= 3 || topic.xpStatus === 'decayed') {
+    return 'forgotten';
+  }
+  if (topic.repetitions === 0) {
+    return 'weak';
+  }
+  return topic.easeFactor >= 2.5 ? 'strong' : 'fading';
+}
+
+function SubjectStatusPill({
+  status,
+}: {
+  status: Subject['status'];
+}): React.ReactElement | null {
+  if (status === 'active') return null;
+
+  return (
+    <View
+      className={
+        status === 'paused'
+          ? 'rounded-full px-2 py-1 bg-warning/15'
+          : 'rounded-full px-2 py-1 bg-text-secondary/15'
+      }
+    >
+      <Text
+        className={
+          status === 'paused'
+            ? 'text-caption font-medium text-warning'
+            : 'text-caption font-medium text-text-secondary'
+        }
+      >
+        {status === 'paused' ? 'Paused' : 'Archived'}
+      </Text>
+    </View>
+  );
+}
+
 export default function LearningBookScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
+  const apiClient = useApiClient();
+  const { activeProfile } = useProfile();
+  const { subjectId: routeSubjectId } = useLocalSearchParams<{
+    subjectId?: string;
+  }>();
+
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(
-    null
+    routeSubjectId ?? null
   );
+  const [showManageSubjects, setShowManageSubjects] = useState(false);
+  const [pendingSubjectId, setPendingSubjectId] = useState<string | null>(null);
 
   const {
     data: subjects,
@@ -55,7 +125,7 @@ export default function LearningBookScreen() {
     isError: subjectsError,
     refetch: refetchSubjects,
     isRefetching: subjectsRefetching,
-  } = useSubjects();
+  } = useSubjects({ includeInactive: true });
   const {
     data: overallProgress,
     isLoading: progressLoading,
@@ -63,19 +133,35 @@ export default function LearningBookScreen() {
     refetch: refetchProgress,
     isRefetching: progressRefetching,
   } = useOverallProgress();
+  const updateSubject = useUpdateSubject();
 
-  // Fetch retention data for each subject
-  const firstSubjectId = subjects?.[0]?.id ?? '';
-  const secondSubjectId = subjects?.[1]?.id ?? '';
-  const thirdSubjectId = subjects?.[2]?.id ?? '';
+  useEffect(() => {
+    if (routeSubjectId) {
+      setSelectedSubjectId(routeSubjectId);
+    }
+  }, [routeSubjectId]);
 
-  const first = useRetentionTopics(firstSubjectId);
-  const second = useRetentionTopics(secondSubjectId);
-  const third = useRetentionTopics(thirdSubjectId);
+  const retentionQueries = useQueries({
+    queries: (subjects ?? []).map((subject) => ({
+      queryKey: ['retention', 'subject', subject.id, activeProfile?.id],
+      queryFn: async ({ signal: querySignal }: { signal?: AbortSignal }) => {
+        const { signal, cleanup } = combinedSignal(querySignal);
+        try {
+          const res = await apiClient.subjects[':subjectId'].retention.$get({
+            param: { subjectId: subject.id },
+            init: { signal },
+          } as never);
+          await assertOk(res);
+          return (await res.json()) as SubjectRetentionResponse;
+        } finally {
+          cleanup();
+        }
+      },
+      enabled: !!activeProfile && !!subject.id,
+      retry: false,
+    })),
+  });
 
-  const retentionBySubject = [first, second, third];
-
-  // Build retention status map from progress data
   const retentionMap = new Map<string, RetentionStatus>();
   if (overallProgress?.subjects) {
     for (const sp of overallProgress.subjects) {
@@ -83,74 +169,101 @@ export default function LearningBookScreen() {
     }
   }
 
-  // Build enriched topic list from retention queries
-  const allTopics: EnrichedTopic[] = [];
-  const topicsLoading =
-    (firstSubjectId && first.isLoading) ||
-    (secondSubjectId && second.isLoading) ||
-    (thirdSubjectId && third.isLoading);
+  const allTopics = useMemo(() => {
+    if (!subjects) return [] as EnrichedTopic[];
 
-  if (subjects) {
-    for (let i = 0; i < Math.min(subjects.length, 3); i++) {
-      const subject = subjects[i];
-      const retentionData = retentionBySubject[i]?.data;
-      if (retentionData?.topics) {
-        for (const topic of retentionData.topics) {
-          const retention: RetentionStatus =
-            topic.xpStatus === 'decayed'
-              ? 'forgotten'
-              : topic.repetitions === 0
-              ? 'weak'
-              : topic.easeFactor >= 2.5
-              ? 'strong'
-              : 'fading';
-          const enriched = topic as unknown as { topicTitle?: string };
-          allTopics.push({
-            topicId: topic.topicId,
-            subjectId: subject!.id,
-            name: enriched.topicTitle ?? topic.topicId,
-            subjectName: subject!.name,
-            retention,
-            lastReviewedAt: topic.lastReviewedAt,
-            repetitions: topic.repetitions,
-            failureCount: topic.failureCount,
-          });
-        }
-      }
-    }
-  }
+    return subjects.flatMap((subject, index) => {
+      const retentionData = retentionQueries[index]?.data;
+      if (!retentionData?.topics) return [];
 
-  // Apply subject filter
+      return retentionData.topics.map((topic) => ({
+        topicId: topic.topicId,
+        subjectId: subject.id,
+        name: topic.topicTitle ?? topic.topicId,
+        subjectName: subject.name,
+        subjectStatus: subject.status,
+        retention: getTopicRetention(topic),
+        lastReviewedAt: topic.lastReviewedAt,
+        repetitions: topic.repetitions,
+        failureCount: topic.failureCount,
+      }));
+    });
+  }, [retentionQueries, subjects]);
+
   const filteredTopics = selectedSubjectId
-    ? allTopics.filter((t) => t.subjectId === selectedSubjectId)
+    ? allTopics.filter((topic) => topic.subjectId === selectedSubjectId)
     : allTopics;
 
+  const topicsLoading = retentionQueries.some((query) => query.isLoading);
+  const topicsError = retentionQueries.some((query) => query.isError);
+  const topicsRefetching = retentionQueries.some((query) => query.isRefetching);
   const isLoading = subjectsLoading || progressLoading || topicsLoading;
-  const isError = subjectsError || progressError;
-  const isRefetching = subjectsRefetching || progressRefetching;
-  const subjectCount = new Set(allTopics.map((t) => t.subjectId)).size;
+  const isError = subjectsError || progressError || topicsError;
+  const isRefetching =
+    subjectsRefetching || progressRefetching || topicsRefetching;
+  const subjectCount = subjects?.length ?? 0;
 
   const handleRetry = (): void => {
     void refetchSubjects();
     void refetchProgress();
+    retentionQueries.forEach((query) => {
+      void query.refetch();
+    });
+  };
+
+  const handleSubjectStatusChange = async (
+    subject: Subject,
+    status: Subject['status']
+  ): Promise<void> => {
+    setPendingSubjectId(subject.id);
+    try {
+      await updateSubject.mutateAsync({
+        subjectId: subject.id,
+        status,
+      });
+
+      if (
+        selectedSubjectId === subject.id &&
+        status !== 'active' &&
+        filteredTopics.length === 0
+      ) {
+        setSelectedSubjectId(null);
+      }
+    } finally {
+      setPendingSubjectId(null);
+    }
   };
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      <View className="px-5 pt-4 pb-2">
-        <Text className="text-h1 font-bold text-text-primary">
-          Learning Book
-        </Text>
-        <Text className="text-body-sm text-text-secondary mt-1">
-          {isLoading
-            ? 'Loading...'
-            : `${allTopics.length} topics across ${subjectCount} subject${
-                subjectCount === 1 ? '' : 's'
-              }`}
-        </Text>
+      <View className="px-5 pt-4 pb-2 flex-row items-start justify-between">
+        <View className="flex-1 me-3">
+          <Text className="text-h1 font-bold text-text-primary">
+            Learning Book
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {isLoading
+              ? 'Loading...'
+              : `${allTopics.length} topics across ${subjectCount} subject${
+                  subjectCount === 1 ? '' : 's'
+                }`}
+          </Text>
+        </View>
+        {subjectCount > 0 && (
+          <Pressable
+            onPress={() => setShowManageSubjects(true)}
+            className="rounded-full bg-surface-elevated px-4 py-2"
+            testID="manage-subjects-button"
+            accessibilityRole="button"
+            accessibilityLabel="Manage subjects"
+          >
+            <Text className="text-body-sm font-semibold text-primary">
+              Manage
+            </Text>
+          </Pressable>
+        )}
       </View>
 
-      {/* Subject filter tabs */}
       {subjects && subjects.length > 1 && (
         <ScrollView
           horizontal
@@ -184,30 +297,33 @@ export default function LearningBookScreen() {
                   selectedSubjectId === subject.id ? null : subject.id
                 )
               }
-              className={`rounded-full px-4 py-2 flex-row items-center ${
+              className={`rounded-full px-4 py-2 ${
                 selectedSubjectId === subject.id
                   ? 'bg-primary'
                   : 'bg-surface-elevated'
               }`}
               testID={`filter-${subject.id}`}
             >
-              <Text
-                className={`text-body-sm font-medium ${
-                  selectedSubjectId === subject.id
-                    ? 'text-text-inverse'
-                    : 'text-text-secondary'
-                }`}
-              >
-                {subject.name}
-              </Text>
-              {retentionMap.has(subject.id) && (
-                <View className="ms-2">
-                  <RetentionSignal
-                    status={retentionMap.get(subject.id)!}
-                    compact
-                  />
-                </View>
-              )}
+              <View className="flex-row items-center">
+                <Text
+                  className={`text-body-sm font-medium ${
+                    selectedSubjectId === subject.id
+                      ? 'text-text-inverse'
+                      : 'text-text-secondary'
+                  }`}
+                >
+                  {subject.name}
+                </Text>
+                {retentionMap.has(subject.id) &&
+                  subject.status === 'active' && (
+                    <View className="ms-2">
+                      <RetentionSignal
+                        status={retentionMap.get(subject.id)!}
+                        compact
+                      />
+                    </View>
+                  )}
+              </View>
             </Pressable>
           ))}
         </ScrollView>
@@ -253,7 +369,7 @@ export default function LearningBookScreen() {
         ) : filteredTopics.length > 0 ? (
           filteredTopics.map((topic) => (
             <Pressable
-              key={topic.topicId}
+              key={`${topic.subjectId}-${topic.topicId}`}
               onPress={() =>
                 router.push({
                   pathname: `/(learner)/topic/${topic.topicId}`,
@@ -270,12 +386,13 @@ export default function LearningBookScreen() {
                   <Text className="text-body font-medium text-text-primary">
                     {topic.name}
                   </Text>
-                  <View className="flex-row items-center mt-1">
+                  <View className="flex-row items-center mt-1 gap-2">
                     <Text className="text-caption text-text-secondary">
                       {topic.subjectName}
                     </Text>
+                    <SubjectStatusPill status={topic.subjectStatus} />
                     {topic.repetitions > 0 && (
-                      <Text className="text-caption text-text-secondary ms-2">
+                      <Text className="text-caption text-text-secondary">
                         {topic.repetitions}{' '}
                         {topic.repetitions === 1 ? 'session' : 'sessions'}
                       </Text>
@@ -302,12 +419,146 @@ export default function LearningBookScreen() {
             className="bg-surface rounded-card px-4 py-6 items-center"
             testID="learning-book-empty"
           >
-            <Text className="text-body text-text-secondary">
-              No topics yet — add a subject to get started
+            <Text className="text-body text-text-secondary text-center">
+              {selectedSubjectId
+                ? 'No topics in this subject yet.'
+                : 'No topics yet — add a subject to get started'}
             </Text>
           </View>
         )}
       </ScrollView>
+
+      <Modal
+        visible={showManageSubjects}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowManageSubjects(false)}
+      >
+        <View className="flex-1 bg-black/40 justify-end">
+          <View
+            className="bg-background rounded-t-3xl px-5 pt-5"
+            style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+          >
+            <View className="items-center mb-4">
+              <View className="w-10 h-1 rounded-full bg-text-secondary/30" />
+            </View>
+            <Text className="text-h3 font-semibold text-text-primary mb-2">
+              Manage subjects
+            </Text>
+            <Text className="text-body-sm text-text-secondary mb-4">
+              Pause a subject to hide it from active learning, or archive it to
+              move it fully out of the way until you restore it.
+            </Text>
+
+            <ScrollView style={{ maxHeight: 360 }}>
+              {(subjects ?? []).map((subject) => {
+                const isPending = pendingSubjectId === subject.id;
+                return (
+                  <View
+                    key={subject.id}
+                    className="bg-surface rounded-card px-4 py-4 mb-3"
+                  >
+                    <View className="flex-row items-center justify-between mb-3">
+                      <Text className="text-body font-semibold text-text-primary flex-1 me-3">
+                        {subject.name}
+                      </Text>
+                      <SubjectStatusPill status={subject.status} />
+                    </View>
+
+                    <View className="flex-row gap-2">
+                      {subject.status === 'active' ? (
+                        <>
+                          <Pressable
+                            onPress={() =>
+                              void handleSubjectStatusChange(subject, 'paused')
+                            }
+                            disabled={isPending}
+                            className="flex-1 rounded-button bg-surface-elevated py-2.5 items-center"
+                            testID={`pause-subject-${subject.id}`}
+                          >
+                            <Text className="text-body-sm font-semibold text-text-primary">
+                              {isPending ? 'Saving...' : 'Pause'}
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() =>
+                              void handleSubjectStatusChange(
+                                subject,
+                                'archived'
+                              )
+                            }
+                            disabled={isPending}
+                            className="flex-1 rounded-button bg-surface-elevated py-2.5 items-center"
+                            testID={`archive-subject-${subject.id}`}
+                          >
+                            <Text className="text-body-sm font-semibold text-text-primary">
+                              Archive
+                            </Text>
+                          </Pressable>
+                        </>
+                      ) : subject.status === 'paused' ? (
+                        <>
+                          <Pressable
+                            onPress={() =>
+                              void handleSubjectStatusChange(subject, 'active')
+                            }
+                            disabled={isPending}
+                            className="flex-1 rounded-button bg-primary py-2.5 items-center"
+                            testID={`resume-subject-${subject.id}`}
+                          >
+                            <Text className="text-body-sm font-semibold text-text-inverse">
+                              {isPending ? 'Saving...' : 'Resume'}
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() =>
+                              void handleSubjectStatusChange(
+                                subject,
+                                'archived'
+                              )
+                            }
+                            disabled={isPending}
+                            className="flex-1 rounded-button bg-surface-elevated py-2.5 items-center"
+                            testID={`archive-subject-${subject.id}`}
+                          >
+                            <Text className="text-body-sm font-semibold text-text-primary">
+                              Archive
+                            </Text>
+                          </Pressable>
+                        </>
+                      ) : (
+                        <Pressable
+                          onPress={() =>
+                            void handleSubjectStatusChange(subject, 'active')
+                          }
+                          disabled={isPending}
+                          className="flex-1 rounded-button bg-primary py-2.5 items-center"
+                          testID={`restore-subject-${subject.id}`}
+                        >
+                          <Text className="text-body-sm font-semibold text-text-inverse">
+                            {isPending ? 'Saving...' : 'Restore'}
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+
+            <Pressable
+              onPress={() => setShowManageSubjects(false)}
+              className="items-center py-3"
+              accessibilityRole="button"
+              accessibilityLabel="Close manage subjects"
+            >
+              <Text className="text-body font-semibold text-text-secondary">
+                Close
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

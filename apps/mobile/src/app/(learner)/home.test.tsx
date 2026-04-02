@@ -28,8 +28,39 @@ jest.mock('@expo/vector-icons', () => ({
 }));
 
 jest.mock('../../components/coaching', () => ({
-  CoachingCard: () => null,
-  AdaptiveEntryCard: () => null,
+  HomeActionCard: ({
+    title,
+    subtitle,
+    primaryLabel,
+    secondaryLabel,
+    onPrimary,
+    onSecondary,
+    testID,
+  }: {
+    title: string;
+    subtitle: string;
+    primaryLabel: string;
+    secondaryLabel?: string;
+    onPrimary: () => void;
+    onSecondary?: () => void;
+    testID?: string;
+  }) => {
+    const { View, Text, Pressable } = require('react-native');
+    return (
+      <View testID={testID}>
+        <Text>{title}</Text>
+        <Text>{subtitle}</Text>
+        <Pressable onPress={onPrimary}>
+          <Text>{primaryLabel}</Text>
+        </Pressable>
+        {secondaryLabel && onSecondary ? (
+          <Pressable onPress={onSecondary}>
+            <Text>{secondaryLabel}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  },
 }));
 
 jest.mock('../../components/progress', () => ({
@@ -62,21 +93,15 @@ jest.mock('../../hooks/use-progress', () => ({
   useOverallProgress: () => ({
     data: { totalTopicsCompleted: 0, subjects: [] },
   }),
+  useContinueSuggestion: () => ({
+    data: null,
+    isLoading: false,
+  }),
 }));
 
 jest.mock('../../hooks/use-streaks', () => ({
   useStreaks: () => ({
     data: { currentStreak: 0, longestStreak: 0 },
-  }),
-}));
-
-jest.mock('../../hooks/use-coaching-card', () => ({
-  useCoachingCard: () => ({
-    isLoading: false,
-    headline: 'Keep going',
-    subtext: 'Ready when you are',
-    primaryLabel: 'Start',
-    secondaryLabel: 'Review',
   }),
 }));
 
@@ -138,6 +163,11 @@ jest.mock('../../lib/api-client', () => ({
       },
     },
   }),
+}));
+
+jest.mock('../../lib/home-card-dismissals', () => ({
+  readHomeCardDismissals: jest.fn().mockResolvedValue({}),
+  incrementHomeCardDismissal: jest.fn().mockResolvedValue({}),
 }));
 
 const HomeScreen = require('./home').default;
