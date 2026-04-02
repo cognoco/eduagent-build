@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
+import { useWebBrowserWarmup } from '../../hooks/use-web-browser-warmup';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
@@ -60,31 +61,7 @@ export default function SignInScreen() {
   const { startSSOFlow: startGoogleSSO } = useSSO();
   const { startSSOFlow: startAppleSSO } = useSSO();
 
-  useEffect(() => {
-    if (Platform.OS !== 'android') return;
-
-    let isActive = true;
-    let warmedUp = false;
-
-    void (async () => {
-      try {
-        await WebBrowser.warmUpAsync();
-        if (!isActive) {
-          void WebBrowser.coolDownAsync().catch(() => undefined);
-          return;
-        }
-        warmedUp = true;
-      } catch {
-        // Some Android devices do not expose the Custom Tabs service.
-      }
-    })();
-
-    return () => {
-      isActive = false;
-      if (!warmedUp) return;
-      void WebBrowser.coolDownAsync().catch(() => undefined);
-    };
-  }, []);
+  useWebBrowserWarmup();
 
   const canSubmit = emailAddress.trim() !== '' && password !== '' && !loading;
 

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
+import { migrateSecureStoreKey } from '../../lib/migrate-secure-store-key';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Purchases from 'react-native-purchases';
@@ -249,8 +250,15 @@ function PackageOption({
 
 const NOTIFY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+// Key renamed from colon to dash delimiter — colons caused SecureStore
+// crashes on some Android devices. See migrate-secure-store-key.ts.
 function getNotifyStorageKey(profileId: string): string {
   return `child-paywall-notified-at-${profileId}`;
+}
+
+/** @deprecated Old colon-delimited key — used only for migration. */
+function getLegacyNotifyStorageKey(profileId: string): string {
+  return `child-paywall-notified-at:${profileId}`;
 }
 
 function computeHoursRemaining(notifiedAtMs: number): number {
@@ -272,6 +280,15 @@ function ChildPaywall(): React.ReactElement {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const profileId = activeProfile?.id ?? '';
+
+  // One-time migration from old colon-delimited SecureStore key
+  useEffect(() => {
+    if (!profileId) return;
+    void migrateSecureStoreKey(
+      getLegacyNotifyStorageKey(profileId),
+      getNotifyStorageKey(profileId)
+    );
+  }, [profileId]);
 
   // Restore persisted notified timestamp on mount
   useEffect(() => {
