@@ -4,7 +4,7 @@ user_name: 'Zuzka'
 date: '2026-02-15'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 49
+rule_count: 53
 optimized_for_llm: true
 source: 'docs/architecture.md'
 ---
@@ -86,6 +86,9 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 - **No Zustand at MVP.** Add only when shared client state crosses navigation boundaries and doesn't come from the server.
 - **Expo Router route groups:** `(auth)/`, `(learner)/`, `(parent)/`. Root `_layout.tsx` sets persona CSS variables.
 - **Expo Image** (built into SDK 54) for all images. No additional library.
+- **SecureStore keys must use Expo-safe characters only.** Keys may contain only alphanumeric characters, `.`, `-`, and `_`. Never use `:` in persisted keys; prefer patterns like `${prefix}-${profileId}`.
+- **`expo-web-browser` warm-up is best-effort on Android.** Guard `warmUpAsync()` / `coolDownAsync()` with `Platform.OS === 'android'`, catch failures, and only cool down after a successful warm-up. Some devices do not expose the Custom Tabs service.
+- **Run Expo bundle/export commands from `apps/mobile`.** In this monorepo, running `expo export:embed` or similar commands from the repo root can make Expo resolve its default `AppEntry` against a nonexistent root `App`.
 
 ### Database & Data Rules
 
@@ -116,6 +119,7 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
 - **`packages/database/` is the single access point.** Import from `@eduagent/database`, never from internal paths.
 - **pgvector queries in `queries/embeddings.ts`** — raw SQL with cosine distance, not Drizzle relational.
 - **Migration workflow:** `drizzle-kit push` for dev, `drizzle-kit generate` + committed SQL for staging/prod. Never `push` against production.
+- **Schema changes require a rollout step.** A worker deploy or mobile build does not update Neon. For staging/prod, apply committed migrations against the target `DATABASE_URL` before releasing code that reads the new columns.
 
 ### LLM & AI Rules
 
