@@ -99,6 +99,8 @@ export default function SignInScreen() {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [isReturningUser, setIsReturningUser] = useState<boolean | null>(null);
+  const [verificationOffer, setVerificationOffer] =
+    useState<VerificationState | null>(null);
   const [pendingVerification, setPendingVerification] =
     useState<VerificationState | null>(null);
   const [code, setCode] = useState('');
@@ -129,9 +131,21 @@ export default function SignInScreen() {
   const canSubmit = emailAddress.trim() !== '' && password !== '' && !loading;
   const canSubmitCode =
     pendingVerification !== null && code.trim() !== '' && !loading;
+  const clearVerificationFlow = useCallback(
+    (clearError = false) => {
+      setVerificationOffer(null);
+      setPendingVerification(null);
+      setCode('');
+      if (clearError) {
+        setError('');
+      }
+    },
+    [setError]
+  );
 
   const onSSOPress = useCallback(
     async (strategy: 'oauth_google' | 'oauth_apple') => {
+      clearVerificationFlow();
       setError('');
       setOauthLoading(strategy);
 
@@ -159,14 +173,17 @@ export default function SignInScreen() {
           // Two-step redirect: always land in (learner), then layout guard
           // checks persona and bounces parent users to /(parent)/dashboard.
           router.replace('/(learner)/home');
+          return;
         }
+
+        setError('Sign-in could not be completed. Please try again.');
       } catch (err: unknown) {
         setError(extractClerkError(err));
       } finally {
         setOauthLoading(null);
       }
     },
-    [startGoogleSSO, startAppleSSO, setActive, router]
+    [clearVerificationFlow, startGoogleSSO, startAppleSSO, setActive, router]
   );
 
   const activateSession = useCallback(
@@ -190,6 +207,7 @@ export default function SignInScreen() {
       }
 
       setPendingVerification(null);
+      setVerificationOffer(null);
       setCode('');
       void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
       router.replace('/(learner)/home');
@@ -197,28 +215,20 @@ export default function SignInScreen() {
     [setActive, router]
   );
 
-  const prepareVerificationStep = useCallback(
-    async (attempt: SignInAttemptLike) => {
-      if (!signIn) return false;
-
+  const getVerificationStep = useCallback(
+    (attempt: SignInAttemptLike) => {
       if (attempt.status === 'needs_first_factor') {
         const emailFactor =
           attempt.supportedFirstFactors?.find(isEmailCodeFactor) ?? null;
 
         if (emailFactor) {
-          await signIn.prepareFirstFactor({
-            strategy: 'email_code',
-            emailAddressId: emailFactor.emailAddressId,
-          });
-          setPendingVerification({
+          return {
             stage: 'first_factor',
             strategy: 'email_code',
             identifier:
               emailFactor.safeIdentifier || emailAddress.trim() || 'your email',
             emailAddressId: emailFactor.emailAddressId,
-          });
-          setCode('');
-          return true;
+          } as const;
         }
       }
 
@@ -226,54 +236,73 @@ export default function SignInScreen() {
         const emailFactor =
           attempt.supportedSecondFactors?.find(isEmailCodeFactor) ?? null;
         if (emailFactor) {
-          await signIn.prepareSecondFactor({
-            strategy: 'email_code',
-            emailAddressId: emailFactor.emailAddressId,
-          });
-          setPendingVerification({
+          return {
             stage: 'second_factor',
             strategy: 'email_code',
             identifier:
               emailFactor.safeIdentifier || emailAddress.trim() || 'your email',
             emailAddressId: emailFactor.emailAddressId,
-          });
-          setCode('');
-          return true;
+          } as const;
         }
 
         const phoneFactor =
           attempt.supportedSecondFactors?.find(isPhoneCodeFactor) ?? null;
         if (phoneFactor) {
-          await signIn.prepareSecondFactor({
-            strategy: 'phone_code',
-            ...(phoneFactor.phoneNumberId
-              ? { phoneNumberId: phoneFactor.phoneNumberId }
-              : {}),
-          });
-          setPendingVerification({
+          return {
             stage: 'second_factor',
             strategy: 'phone_code',
             identifier: phoneFactor.safeIdentifier ?? 'your phone',
             phoneNumberId: phoneFactor.phoneNumberId,
-          });
-          setCode('');
-          return true;
+          } as const;
         }
       }
 
-      return false;
+      return null;
     },
-    [signIn, emailAddress]
+    [emailAddress]
+  );
+
+  const startVerificationFlow = useCallback(
+    async (step: VerificationState) => {
+      if (!signIn) {
+        throw new Error('Authentication not loaded.');
+      }
+
+      if (step.stage === 'first_factor' && step.strategy === 'email_code') {
+        await signIn.prepareFirstFactor({
+          strategy: 'email_code',
+          emailAddressId: step.emailAddressId,
+        });
+      } else if (step.strategy === 'email_code') {
+        await signIn.prepareSecondFactor({
+          strategy: 'email_code',
+          emailAddressId: step.emailAddressId,
+        });
+      } else {
+        await signIn.prepareSecondFactor({
+          strategy: 'phone_code',
+          ...(step.phoneNumberId ? { phoneNumberId: step.phoneNumberId } : {}),
+        });
+      }
+
+      setVerificationOffer(null);
+      setPendingVerification(step);
+      setCode('');
+    },
+    [signIn]
   );
 
   const handleIncompleteSignIn = useCallback(
     async (attempt: SignInAttemptLike) => {
-      const startedVerification = await prepareVerificationStep(attempt);
-      if (startedVerification) {
+      const nextVerificationStep = getVerificationStep(attempt);
+      if (nextVerificationStep) {
+        setVerificationOffer(nextVerificationStep);
+        setPendingVerification(null);
+        setCode('');
         return;
       }
 
-      setPendingVerification(null);
+      clearVerificationFlow();
 
       if (attempt.status === 'needs_new_password') {
         setError(
@@ -287,19 +316,20 @@ export default function SignInScreen() {
         attempt.status === 'needs_second_factor'
       ) {
         setError(
-          'Your account needs an additional verification step that this build could not start automatically. Please try again or use a different sign-in method.'
+          'This account needs an additional verification method that this build does not support yet. Please use a different sign-in method.'
         );
         return;
       }
 
       setError('Sign-in could not be completed. Please try again.');
     },
-    [prepareVerificationStep]
+    [clearVerificationFlow, getVerificationStep]
   );
 
   const onSignInPress = useCallback(async () => {
     if (!isLoaded || !canSubmit || !signIn) return;
 
+    clearVerificationFlow();
     setError('');
     setLoading(true);
 
@@ -325,10 +355,31 @@ export default function SignInScreen() {
     canSubmit,
     signIn,
     activateSession,
+    clearVerificationFlow,
     handleIncompleteSignIn,
     emailAddress,
     password,
   ]);
+
+  const onStartVerificationPress = useCallback(async () => {
+    if (!isLoaded || !verificationOffer) return;
+
+    setError('');
+    setLoading(true);
+
+    try {
+      await startVerificationFlow(verificationOffer);
+    } catch (err: unknown) {
+      setError(
+        extractClerkError(
+          err,
+          'We could not start verification. Please try signing in again.'
+        )
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [isLoaded, startVerificationFlow, verificationOffer]);
 
   const onVerifyPress = useCallback(async () => {
     if (!isLoaded || !signIn || !pendingVerification || code.trim() === '')
@@ -406,10 +457,8 @@ export default function SignInScreen() {
   }, [isLoaded, pendingVerification, resending, signIn]);
 
   const onBackFromVerification = useCallback(() => {
-    setPendingVerification(null);
-    setCode('');
-    setError('');
-  }, []);
+    clearVerificationFlow(true);
+  }, [clearVerificationFlow]);
 
   if (pendingVerification) {
     return (
@@ -589,7 +638,10 @@ export default function SignInScreen() {
             placeholder="you@example.com"
             placeholderTextColor={colors.muted}
             value={emailAddress}
-            onChangeText={setEmailAddress}
+            onChangeText={(value) => {
+              clearVerificationFlow(true);
+              setEmailAddress(value);
+            }}
             editable={!loading}
             testID="sign-in-email"
             onFocus={onFieldFocus('email')}
@@ -603,7 +655,10 @@ export default function SignInScreen() {
           <View className="mb-2">
             <PasswordInput
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                clearVerificationFlow(true);
+                setPassword(value);
+              }}
               placeholder="Enter your password"
               editable={!loading}
               testID="sign-in-password"
@@ -631,6 +686,34 @@ export default function SignInScreen() {
           loading={loading}
           testID="sign-in-button"
         />
+
+        {verificationOffer && (
+          <View
+            className="bg-primary/10 rounded-card px-4 py-4 mt-4"
+            testID="sign-in-verification-offer"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              Additional verification is available
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-2">
+              This account can continue with a verification code sent to{' '}
+              <Text className="font-semibold text-text-primary">
+                {verificationOffer.identifier}
+              </Text>
+              . We will only send the code if you choose to continue.
+            </Text>
+            <View className="mt-4">
+              <Button
+                variant="secondary"
+                label="Send verification code"
+                onPress={onStartVerificationPress}
+                disabled={loading}
+                loading={loading}
+                testID="sign-in-start-verification"
+              />
+            </View>
+          </View>
+        )}
 
         <View className="flex-row justify-center items-center mt-6">
           <Text className="text-body-sm text-text-secondary">

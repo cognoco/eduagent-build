@@ -26,18 +26,7 @@ import {
   QueryClient,
   QueryClientProvider,
 } from '@tanstack/react-query';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  useReducedMotion,
-} from 'react-native-reanimated';
-import {
-  ThemeContext,
-  useTheme,
-  useTokenVars,
-  type Persona,
-} from '../lib/theme';
+import { ThemeContext, useTokenVars, type Persona } from '../lib/theme';
 import type { ColorScheme } from '../lib/design-tokens';
 import { ProfileProvider, useProfile } from '../lib/profile';
 import { setOnAuthExpired, clearOnAuthExpired } from '../lib/api-client';
@@ -221,106 +210,84 @@ function ThemedApp() {
 /** Inner component that reads ThemeContext to inject CSS variables via vars() */
 function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
   const tokenVars = useTokenVars();
-  const { persona } = useTheme();
   const { isOffline } = useNetworkStatus();
-  const reduceMotion = useReducedMotion();
-  const opacity = useSharedValue(1);
-  const prevPersona = useRef(persona);
 
-  useEffect(() => {
-    if (prevPersona.current !== persona && !reduceMotion) {
-      // Brief fade on persona switch without destroying the React tree
-      opacity.value = 0.6;
-      opacity.value = withTiming(1, { duration: 250 });
-    }
-    prevPersona.current = persona;
-  }, [persona, reduceMotion, opacity]);
-
-  const fadeStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    flex: 1,
-  }));
-
-  // Previously used key={themeKey} to force NativeWind CSS variable propagation
-  // (Bug #6). REMOVED: the key-based remount destroys the entire navigation
-  // tree, which crashes Android Fabric when FragmentManager is mid-transaction
-  // (Sentry MENTOMATE-MOBILE-6: IllegalStateException). NativeWind vars()
-  // style updates propagate without remounting — the key was overkill.
+  // Keep the authenticated app shell fully opaque. A release-only persona fade
+  // here can get stuck mid-transition, leaving post-auth screens permanently
+  // washed out and the tab bar looking covered by a haze.
   return (
     <View style={[{ flex: 1 }, tokenVars]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       {isOffline && <OfflineBanner />}
-      <Animated.View style={fadeStyle}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(learner)" />
-          <Stack.Screen name="(parent)" />
-          <Stack.Screen name="sso-callback" />
-          <Stack.Screen
-            name="assessment"
-            options={{
-              presentation: 'fullScreenModal',
-              animation: 'slide_from_bottom',
-            }}
-          />
-          <Stack.Screen
-            name="session-summary"
-            options={{
-              presentation: 'fullScreenModal',
-              animation: 'slide_from_bottom',
-            }}
-          />
-          <Stack.Screen
-            name="profiles"
-            options={{
-              presentation: 'modal',
-              animation: 'slide_from_bottom',
-            }}
-          />
-          <Stack.Screen
-            name="create-profile"
-            options={{
-              presentation: 'modal',
-              animation: 'slide_from_bottom',
-            }}
-          />
-          <Stack.Screen
-            name="consent"
-            options={{
-              presentation: 'modal',
-              animation: 'slide_from_bottom',
-            }}
-          />
-          <Stack.Screen
-            name="delete-account"
-            options={{
-              presentation: 'modal',
-              animation: 'slide_from_bottom',
-            }}
-          />
-          <Stack.Screen
-            name="create-subject"
-            options={{
-              presentation: 'modal',
-              animation: 'slide_from_bottom',
-            }}
-          />
-          <Stack.Screen
-            name="privacy"
-            options={{
-              presentation: 'modal',
-              animation: 'slide_from_bottom',
-            }}
-          />
-          <Stack.Screen
-            name="terms"
-            options={{
-              presentation: 'modal',
-              animation: 'slide_from_bottom',
-            }}
-          />
-        </Stack>
-      </Animated.View>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(learner)" />
+        <Stack.Screen name="(parent)" />
+        <Stack.Screen name="sso-callback" />
+        <Stack.Screen
+          name="assessment"
+          options={{
+            presentation: 'fullScreenModal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="session-summary"
+          options={{
+            presentation: 'fullScreenModal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="profiles"
+          options={{
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="create-profile"
+          options={{
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="consent"
+          options={{
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="delete-account"
+          options={{
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="create-subject"
+          options={{
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="privacy"
+          options={{
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="terms"
+          options={{
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+      </Stack>
     </View>
   );
 }

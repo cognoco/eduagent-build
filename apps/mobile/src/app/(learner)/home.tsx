@@ -16,7 +16,6 @@ import {
   AnimatedEntry,
   ApiUnreachableBanner,
   ProfileSwitcher,
-  PenWritingAnimation,
 } from '../../components/common';
 import { useCelebration } from '../../hooks/use-celebration';
 import {
@@ -380,6 +379,38 @@ export default function HomeScreen() {
     .filter((card) => !hiddenCardIds.includes(card.id))
     .slice(0, 3);
 
+  const fallbackHomeCard = useMemo(() => {
+    if (activeSubjects.length > 0) {
+      return {
+        title: 'Pick your next step',
+        subtitle:
+          'Practice, review your Learning Book, or jump back into a question.',
+        primaryLabel: 'Practice now',
+        onPrimary: () => handlePracticePress(),
+        secondaryLabel: 'Open Learning Book',
+        onSecondary: () => router.push('/(learner)/book' as never),
+      };
+    }
+
+    if ((allSubjects?.length ?? 0) > 0) {
+      return {
+        title: 'Bring a subject back',
+        subtitle:
+          'Your saved subjects are still here. Restore one from your Learning Book to continue.',
+        primaryLabel: 'Open Learning Book',
+        onPrimary: () => router.push('/(learner)/book' as never),
+      };
+    }
+
+    return {
+      title: 'Add your first subject',
+      subtitle:
+        'Tell MentoMate what you want to learn and your home cards will appear here.',
+      primaryLabel: 'Add subject',
+      onPrimary: () => router.push('/create-subject' as never),
+    };
+  }, [activeSubjects.length, allSubjects, handlePracticePress, router]);
+
   const handleDismissHomeCard = useCallback(
     (cardId: HomeCardModel['id']) => {
       if (visibleHomeCards.length <= 1) return;
@@ -570,38 +601,54 @@ export default function HomeScreen() {
         <AnimatedEntry>
           {homeCardsLoading && !subjectsError ? (
             <View className="bg-coaching-card rounded-card p-5 mt-4 items-center py-8">
-              <PenWritingAnimation size={100} color={themeColors.accent} />
+              <ActivityIndicator size="large" color={themeColors.accent} />
+              <Text className="text-body-sm text-text-secondary mt-3">
+                Loading your next steps...
+              </Text>
             </View>
           ) : (
             <View className="mt-4 gap-3">
-              {visibleHomeCards.map((card, index) => (
-                <View
-                  key={card.id}
-                  testID={
-                    card.id === 'resume_session'
-                      ? 'unfinished-session-card'
-                      : undefined
-                  }
-                >
-                  <HomeActionCard
-                    title={card.title}
-                    subtitle={card.subtitle}
-                    badge={card.badge}
-                    primaryLabel={card.primaryLabel}
-                    secondaryLabel={card.secondaryLabel}
-                    onPrimary={() => void handleHomeCardPrimary(card)}
-                    onSecondary={
-                      card.secondaryLabel
-                        ? () => void handleHomeCardSecondary(card)
+              {visibleHomeCards.length > 0 ? (
+                visibleHomeCards.map((card, index) => (
+                  <View
+                    key={card.id}
+                    testID={
+                      card.id === 'resume_session'
+                        ? 'unfinished-session-card'
                         : undefined
                     }
-                    onDismiss={() => handleDismissHomeCard(card.id)}
-                    dismissDisabled={visibleHomeCards.length <= 1}
-                    compact={index > 0 || card.compact}
-                    testID={`home-card-${card.id}`}
-                  />
-                </View>
-              ))}
+                  >
+                    <HomeActionCard
+                      title={card.title}
+                      subtitle={card.subtitle}
+                      badge={card.badge}
+                      primaryLabel={card.primaryLabel}
+                      secondaryLabel={card.secondaryLabel}
+                      onPrimary={() => void handleHomeCardPrimary(card)}
+                      onSecondary={
+                        card.secondaryLabel
+                          ? () => void handleHomeCardSecondary(card)
+                          : undefined
+                      }
+                      onDismiss={() => handleDismissHomeCard(card.id)}
+                      dismissDisabled={visibleHomeCards.length <= 1}
+                      compact={index > 0 || card.compact}
+                      testID={`home-card-${card.id}`}
+                    />
+                  </View>
+                ))
+              ) : (
+                <HomeActionCard
+                  title={fallbackHomeCard.title}
+                  subtitle={fallbackHomeCard.subtitle}
+                  primaryLabel={fallbackHomeCard.primaryLabel}
+                  secondaryLabel={fallbackHomeCard.secondaryLabel}
+                  onPrimary={fallbackHomeCard.onPrimary}
+                  onSecondary={fallbackHomeCard.onSecondary}
+                  dismissDisabled
+                  testID="home-card-fallback"
+                />
+              )}
             </View>
           )}
         </AnimatedEntry>

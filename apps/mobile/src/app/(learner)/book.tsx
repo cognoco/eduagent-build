@@ -15,7 +15,6 @@ import {
   RetentionSignal,
   type RetentionStatus,
 } from '../../components/progress';
-import { BookPageFlipAnimation } from '../../components/common';
 import { useThemeColors } from '../../lib/theme';
 import { useSubjects, useUpdateSubject } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
@@ -197,11 +196,28 @@ export default function LearningBookScreen() {
   const topicsLoading = retentionQueries.some((query) => query.isLoading);
   const topicsError = retentionQueries.some((query) => query.isError);
   const topicsRefetching = retentionQueries.some((query) => query.isRefetching);
-  const isLoading = subjectsLoading || progressLoading || topicsLoading;
-  const isError = subjectsError || progressError || topicsError;
+  const isInitialLoading = subjectsLoading || progressLoading;
+  const hasBlockingError = subjectsError || progressError;
   const isRefetching =
     subjectsRefetching || progressRefetching || topicsRefetching;
   const subjectCount = subjects?.length ?? 0;
+  const selectedSubject =
+    subjects?.find((subject) => subject.id === selectedSubjectId) ?? null;
+  const subjectsForOverview = selectedSubject
+    ? [selectedSubject]
+    : subjects ?? [];
+  const showTopicLoadingState =
+    !isInitialLoading &&
+    !hasBlockingError &&
+    subjectCount > 0 &&
+    filteredTopics.length === 0 &&
+    topicsLoading;
+  const showTopicOverview =
+    !isInitialLoading &&
+    !hasBlockingError &&
+    filteredTopics.length === 0 &&
+    subjectCount > 0 &&
+    !topicsLoading;
 
   const handleRetry = (): void => {
     void refetchSubjects();
@@ -242,8 +258,10 @@ export default function LearningBookScreen() {
             Learning Book
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            {isLoading
-              ? 'Loading...'
+            {isInitialLoading
+              ? 'Loading your subjects...'
+              : showTopicLoadingState
+              ? 'Loading topic history...'
               : `${allTopics.length} topics across ${subjectCount} subject${
                   subjectCount === 1 ? '' : 's'
                 }`}
@@ -333,7 +351,7 @@ export default function LearningBookScreen() {
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
       >
-        {isError ? (
+        {hasBlockingError ? (
           <View
             className="flex-1 items-center justify-center px-5 py-12"
             testID="book-error"
@@ -362,69 +380,156 @@ export default function LearningBookScreen() {
               )}
             </Pressable>
           </View>
-        ) : isLoading ? (
+        ) : isInitialLoading ? (
           <View className="py-8 items-center" testID="learning-book-loading">
-            <BookPageFlipAnimation size={100} color={themeColors.accent} />
-          </View>
-        ) : filteredTopics.length > 0 ? (
-          filteredTopics.map((topic) => (
-            <Pressable
-              key={`${topic.subjectId}-${topic.topicId}`}
-              onPress={() =>
-                router.push({
-                  pathname: `/(learner)/topic/${topic.topicId}`,
-                  params: {
-                    subjectId: topic.subjectId,
-                  },
-                } as never)
-              }
-              className="bg-surface rounded-card px-4 py-3 mb-2"
-              testID={`topic-row-${topic.topicId}`}
-            >
-              <View className="flex-row items-center justify-between">
-                <View className="flex-1 me-3">
-                  <Text className="text-body font-medium text-text-primary">
-                    {topic.name}
-                  </Text>
-                  <View className="flex-row items-center mt-1 gap-2">
-                    <Text className="text-caption text-text-secondary">
-                      {topic.subjectName}
-                    </Text>
-                    <SubjectStatusPill status={topic.subjectStatus} />
-                    {topic.repetitions > 0 && (
-                      <Text className="text-caption text-text-secondary">
-                        {topic.repetitions}{' '}
-                        {topic.repetitions === 1 ? 'session' : 'sessions'}
-                      </Text>
-                    )}
-                  </View>
-                  {topic.failureCount >= 3 && (
-                    <Text className="text-caption text-warning mt-0.5">
-                      Needs attention
-                    </Text>
-                  )}
-                  {formatLastPracticed(topic.lastReviewedAt) && (
-                    <Text className="text-caption text-text-tertiary mt-0.5">
-                      Last practiced:{' '}
-                      {formatLastPracticed(topic.lastReviewedAt)}
-                    </Text>
-                  )}
-                </View>
-                <RetentionSignal status={topic.retention} />
-              </View>
-            </Pressable>
-          ))
-        ) : (
-          <View
-            className="bg-surface rounded-card px-4 py-6 items-center"
-            testID="learning-book-empty"
-          >
-            <Text className="text-body text-text-secondary text-center">
-              {selectedSubjectId
-                ? 'No topics in this subject yet.'
-                : 'No topics yet — add a subject to get started'}
+            <ActivityIndicator size="large" color={themeColors.accent} />
+            <Text className="text-body-sm text-text-secondary mt-3">
+              Loading your learning book...
             </Text>
           </View>
+        ) : (
+          <>
+            {topicsError && (
+              <View
+                className="bg-warning/10 rounded-card px-4 py-4 mb-3"
+                testID="learning-book-topic-warning"
+              >
+                <Text className="text-body-sm font-semibold text-warning">
+                  Some topic details could not be loaded yet.
+                </Text>
+                <Text className="text-body-sm text-text-secondary mt-1">
+                  Your subjects are still available below. Pull to retry later
+                  or tap retry now.
+                </Text>
+                <Pressable
+                  onPress={handleRetry}
+                  disabled={isRefetching}
+                  className="self-start mt-3 rounded-button bg-surface-elevated px-4 py-2"
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading topic details"
+                >
+                  <Text className="text-body-sm font-semibold text-text-primary">
+                    {isRefetching ? 'Retrying...' : 'Retry'}
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+
+            {filteredTopics.length > 0 ? (
+              filteredTopics.map((topic) => (
+                <Pressable
+                  key={`${topic.subjectId}-${topic.topicId}`}
+                  onPress={() =>
+                    router.push({
+                      pathname: `/(learner)/topic/${topic.topicId}`,
+                      params: {
+                        subjectId: topic.subjectId,
+                      },
+                    } as never)
+                  }
+                  className="bg-surface rounded-card px-4 py-3 mb-2"
+                  testID={`topic-row-${topic.topicId}`}
+                >
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-1 me-3">
+                      <Text className="text-body font-medium text-text-primary">
+                        {topic.name}
+                      </Text>
+                      <View className="flex-row items-center mt-1 gap-2">
+                        <Text className="text-caption text-text-secondary">
+                          {topic.subjectName}
+                        </Text>
+                        <SubjectStatusPill status={topic.subjectStatus} />
+                        {topic.repetitions > 0 && (
+                          <Text className="text-caption text-text-secondary">
+                            {topic.repetitions}{' '}
+                            {topic.repetitions === 1 ? 'session' : 'sessions'}
+                          </Text>
+                        )}
+                      </View>
+                      {topic.failureCount >= 3 && (
+                        <Text className="text-caption text-warning mt-0.5">
+                          Needs attention
+                        </Text>
+                      )}
+                      {formatLastPracticed(topic.lastReviewedAt) && (
+                        <Text className="text-caption text-text-tertiary mt-0.5">
+                          Last practiced:{' '}
+                          {formatLastPracticed(topic.lastReviewedAt)}
+                        </Text>
+                      )}
+                    </View>
+                    <RetentionSignal status={topic.retention} />
+                  </View>
+                </Pressable>
+              ))
+            ) : showTopicLoadingState ? (
+              <View
+                className="bg-surface rounded-card px-4 py-6 items-center"
+                testID="learning-book-topic-loading"
+              >
+                <ActivityIndicator size="small" color={themeColors.accent} />
+                <Text className="text-body text-text-primary text-center mt-3">
+                  Building your book pages...
+                </Text>
+                <Text className="text-body-sm text-text-secondary text-center mt-1">
+                  Your subjects are ready. Topic history is still loading.
+                </Text>
+              </View>
+            ) : showTopicOverview ? (
+              <View
+                className="bg-surface rounded-card px-4 py-5"
+                testID="learning-book-subject-overview"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  {selectedSubject
+                    ? `${selectedSubject.name} is ready`
+                    : 'Your learning book is ready'}
+                </Text>
+                <Text className="text-body-sm text-text-secondary mt-2">
+                  {selectedSubject
+                    ? 'This subject has not built out any topic history yet. Start a session and your book will begin filling in here.'
+                    : 'Your subjects are connected. Start a session and topic pages will begin filling in here as you learn and review.'}
+                </Text>
+
+                <View className="mt-4">
+                  {subjectsForOverview.map((subject) => (
+                    <View
+                      key={subject.id}
+                      className="flex-row items-center justify-between py-2"
+                    >
+                      <View className="flex-row items-center flex-1 me-3">
+                        <Text className="text-body-sm font-medium text-text-primary">
+                          {subject.name}
+                        </Text>
+                        <View className="ms-2">
+                          <SubjectStatusPill status={subject.status} />
+                        </View>
+                      </View>
+                      {retentionMap.has(subject.id) &&
+                        subject.status === 'active' && (
+                          <RetentionSignal
+                            status={retentionMap.get(subject.id)!}
+                            compact
+                          />
+                        )}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : (
+              <View
+                className="bg-surface rounded-card px-4 py-6 items-center"
+                testID="learning-book-empty"
+              >
+                <Text className="text-body text-text-secondary text-center">
+                  {selectedSubjectId
+                    ? 'No topics in this subject yet.'
+                    : 'No topics yet — add a subject to get started'}
+                </Text>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
 

@@ -1,11 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withDelay,
-  withTiming,
-  useReducedMotion,
-} from 'react-native-reanimated';
+import type { ReactNode } from 'react';
 
 interface AnimatedEntryProps {
   children: ReactNode;
@@ -13,22 +6,10 @@ interface AnimatedEntryProps {
 }
 
 export function AnimatedEntry({ children, delay = 0 }: AnimatedEntryProps) {
-  const reduceMotion = useReducedMotion();
-  const opacity = useSharedValue(reduceMotion ? 1 : 0);
-  const translateY = useSharedValue(reduceMotion ? 0 : 16);
+  void delay;
 
-  useEffect(() => {
-    if (reduceMotion) return;
-    opacity.value = withDelay(delay, withTiming(1, { duration: 300 }));
-    translateY.value = withDelay(delay, withTiming(0, { duration: 300 }));
-  }, [delay, reduceMotion, opacity, translateY]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  if (reduceMotion) return <>{children}</>;
-
-  return <Animated.View style={animatedStyle}>{children}</Animated.View>;
+  // Keep home content visible even if release animations fail to start.
+  // The original Reanimated entry effect could leave entire sections at
+  // opacity 0 on device builds.
+  return <>{children}</>;
 }
