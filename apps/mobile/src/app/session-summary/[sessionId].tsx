@@ -183,8 +183,6 @@ export default function SessionSummaryScreen() {
         level: 'info',
       });
 
-      await maybePromptForRecall();
-
       if (skipResult?.shouldPromptCasualSwitch) {
         Alert.alert(
           'Try Casual Explorer?',
@@ -193,7 +191,12 @@ export default function SessionSummaryScreen() {
             {
               text: 'Not now',
               style: 'cancel',
-              onPress: () => router.replace('/(learner)/home'),
+              onPress: () => {
+                void (async () => {
+                  await maybePromptForRecall();
+                  router.replace('/(learner)/home');
+                })();
+              },
             },
             {
               text: 'Switch',
@@ -201,6 +204,7 @@ export default function SessionSummaryScreen() {
                 void (async () => {
                   try {
                     await updateLearningMode.mutateAsync('casual');
+                    await maybePromptForRecall();
                     router.replace('/(learner)/home');
                   } catch {
                     Alert.alert(
@@ -209,7 +213,12 @@ export default function SessionSummaryScreen() {
                       [
                         {
                           text: 'OK',
-                          onPress: () => router.replace('/(learner)/home'),
+                          onPress: () => {
+                            void (async () => {
+                              await maybePromptForRecall();
+                              router.replace('/(learner)/home');
+                            })();
+                          },
                         },
                       ]
                     );
@@ -222,9 +231,7 @@ export default function SessionSummaryScreen() {
         return;
       }
     }
-    if (submitted) {
-      await maybePromptForRecall();
-    }
+    await maybePromptForRecall();
     router.replace('/(learner)/home');
   };
 

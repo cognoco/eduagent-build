@@ -210,7 +210,9 @@ describe('SessionSummaryScreen', () => {
     });
 
     fireEvent.press(screen.getByTestId('continue-button'));
-    expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+    });
   });
 
   it('triggers the rating prompt hook before leaving a recall summary', async () => {

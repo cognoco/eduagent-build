@@ -101,13 +101,16 @@ jest.mock('../services/consent', () => {
       consentType: 'GDPR',
     }),
     requestConsent: jest.fn().mockResolvedValue({
-      id: 'consent-1',
-      profileId: '550e8400-e29b-41d4-a716-446655440000',
-      consentType: 'GDPR',
-      status: 'PARENTAL_CONSENT_REQUESTED',
-      parentEmail: 'parent@example.com',
-      requestedAt: new Date().toISOString(),
-      respondedAt: null,
+      consentState: {
+        id: 'consent-1',
+        profileId: '550e8400-e29b-41d4-a716-446655440000',
+        consentType: 'GDPR',
+        status: 'PARENTAL_CONSENT_REQUESTED',
+        parentEmail: 'parent@example.com',
+        requestedAt: new Date().toISOString(),
+        respondedAt: null,
+      },
+      emailDelivered: true,
     }),
     processConsentResponse: jest
       .fn()
