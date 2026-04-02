@@ -105,10 +105,14 @@ type QuickChipId =
   | 'explain_differently'
   | 'too_easy'
   | 'too_hard'
+  | 'wrong_subject'
   | 'switch_topic'
   | 'park';
 
-type ContextualQuickChipId = Exclude<QuickChipId, 'switch_topic' | 'park'>;
+type ContextualQuickChipId = Exclude<
+  QuickChipId,
+  'switch_topic' | 'park' | 'wrong_subject'
+>;
 
 type MessageFeedbackState = 'helpful' | 'not_helpful' | 'incorrect';
 
@@ -255,12 +259,16 @@ export default function SessionScreen() {
   const [topicSwitcherSubjectId, setTopicSwitcherSubjectId] = useState<
     string | null
   >(subjectId ?? null);
+  const [showWrongSubjectChip, setShowWrongSubjectChip] = useState(false);
   const [consumedQuickChipMessageId, setConsumedQuickChipMessageId] = useState<
     string | null
   >(null);
   const [messageFeedback, setMessageFeedback] = useState<
     Record<string, MessageFeedbackState>
   >({});
+  const [confirmationToast, setConfirmationToast] = useState<string | null>(
+    null
+  );
 
   const animationCleanupRef = useRef<(() => void) | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -308,8 +316,10 @@ export default function SessionScreen() {
       setParkingLotDraft('');
       setShowTopicSwitcher(false);
       setTopicSwitcherSubjectId(subjectId ?? null);
+      setShowWrongSubjectChip(false);
       setConsumedQuickChipMessageId(null);
       setMessageFeedback({});
+      setConfirmationToast(null);
       hasHydratedRecoveryRef.current = false;
       resetMilestones();
       setHomeworkProblemsState(initialHomeworkProblems);
@@ -334,6 +344,16 @@ export default function SessionScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!confirmationToast) return undefined;
+
+    const timer = setTimeout(() => {
+      setConfirmationToast(null);
+    }, 2200);
+
+    return () => clearTimeout(timer);
+  }, [confirmationToast]);
+
   const effectiveSubjectId = classifiedSubject?.subjectId ?? subjectId ?? '';
   const effectiveSubjectName = classifiedSubject?.subjectName ?? subjectName;
   const switcherSubjectId = topicSwitcherSubjectId ?? effectiveSubjectId;
@@ -357,6 +377,10 @@ export default function SessionScreen() {
   const closeSession = useCloseSession(activeSessionId ?? '');
   const { stream: streamMessage } = useStreamMessage(activeSessionId ?? '');
   const activeHomeworkProblem = homeworkProblemsState[currentProblemIndex];
+
+  const showConfirmation = useCallback((message: string) => {
+    setConfirmationToast(message);
+  }, []);
 
   const syncHomeworkMetadata = useCallback(
     async (
@@ -657,10 +681,17 @@ export default function SessionScreen() {
               subjectId: candidate.subjectId,
               subjectName: candidate.subjectName,
             });
+            setShowWrongSubjectChip(false);
             sessionSubjectId = candidate.subjectId;
+          } else {
+            setShowWrongSubjectChip(result.needsConfirmation);
+            if (result.candidates[0]) {
+              setTopicSwitcherSubjectId(result.candidates[0].subjectId);
+            }
           }
           // Ambiguous / no match → proceed without subject (freeform)
         } catch {
+          setShowWrongSubjectChip(true);
           setClassifyError(
             'Could not identify the subject. Please try again or select one manually.'
           );
@@ -987,6 +1018,11 @@ export default function SessionScreen() {
 
   const handleQuickChip = useCallback(
     async (chip: QuickChipId, sourceMessageId?: string) => {
+      if (chip === 'wrong_subject') {
+        setShowTopicSwitcher(true);
+        return;
+      }
+
       if (chip === 'switch_topic') {
         setShowTopicSwitcher(true);
         return;
@@ -1006,6 +1042,15 @@ export default function SessionScreen() {
 
       const config = QUICK_CHIP_CONFIG[chip];
       if (!config) return;
+      const confirmationByChip: Partial<Record<ContextualQuickChipId, string>> =
+        {
+          hint: 'Adding a hint.',
+          example: 'Pulling a fresh example.',
+          know_this: 'Moving ahead.',
+          explain_differently: 'Trying a different angle.',
+          too_easy: 'Raising the challenge.',
+          too_hard: 'Breaking it down more.',
+        };
 
       if (activeSessionId) {
         try {
@@ -1022,9 +1067,14 @@ export default function SessionScreen() {
         setConsumedQuickChipMessageId(sourceMessageId);
       }
 
+      const confirmation = confirmationByChip[chip];
+      if (confirmation) {
+        showConfirmation(confirmation);
+      }
+
       await handleSend(config.prompt);
     },
-    [activeSessionId, handleSend, recordSystemPrompt]
+    [activeSessionId, handleSend, recordSystemPrompt, showConfirmation]
   );
 
   const handleMessageFeedback = useCallback(
@@ -1064,6 +1114,13 @@ export default function SessionScreen() {
           },
         });
         setMessageFeedback((prev) => ({ ...prev, [message.id]: action }));
+        showConfirmation(
+          action === 'helpful'
+            ? 'Keeping this pace.'
+            : action === 'not_helpful'
+            ? 'Adjusting the explanation.'
+            : "I'll correct that."
+        );
 
         const followUpPrompt = followUpPromptByAction[action];
         if (followUpPrompt) {
@@ -1073,7 +1130,13 @@ export default function SessionScreen() {
         Alert.alert('Could not save feedback', formatApiError(err));
       }
     },
-    [activeSessionId, flagSessionContent, handleSend, recordSystemPrompt]
+    [
+      activeSessionId,
+      flagSessionContent,
+      handleSend,
+      recordSystemPrompt,
+      showConfirmation,
+    ]
   );
 
   const handleSaveParkingLot = useCallback(async () => {
@@ -1090,25 +1153,43 @@ export default function SessionScreen() {
     try {
       await addParkingLotItem.mutateAsync({ question: parkingLotDraft.trim() });
       setParkingLotDraft('');
+      showConfirmation('Saved to your parking lot.');
     } catch (err: unknown) {
       Alert.alert('Could not save parking lot item', formatApiError(err));
     }
-  }, [activeSessionId, addParkingLotItem, parkingLotDraft]);
+  }, [activeSessionId, addParkingLotItem, parkingLotDraft, showConfirmation]);
 
   const handleTopicSwitch = useCallback(
-    (nextTopicId: string, nextSubjectId: string, nextSubjectName: string) => {
-      setShowTopicSwitcher(false);
-      router.push({
-        pathname: '/(learner)/session',
-        params: {
-          mode: 'learning',
-          subjectId: nextSubjectId,
-          subjectName: nextSubjectName,
-          topicId: nextTopicId,
-        },
-      } as never);
+    async (
+      nextTopicId: string,
+      nextSubjectId: string,
+      nextSubjectName: string
+    ) => {
+      try {
+        if (activeSessionId) {
+          await closeSession.mutateAsync({
+            reason: 'user_ended',
+            summaryStatus: 'skipped',
+          });
+          await clearSessionRecoveryMarker();
+        }
+
+        setShowWrongSubjectChip(false);
+        setShowTopicSwitcher(false);
+        router.replace({
+          pathname: '/(learner)/session',
+          params: {
+            mode: effectiveMode === 'freeform' ? 'learning' : effectiveMode,
+            subjectId: nextSubjectId,
+            subjectName: nextSubjectName,
+            topicId: nextTopicId,
+          },
+        } as never);
+      } catch (err: unknown) {
+        Alert.alert('Could not switch topic', formatApiError(err));
+      }
     },
-    [router]
+    [activeSessionId, closeSession, effectiveMode, router]
   );
 
   const showEndSession = exchangeCount > 0;
@@ -1311,24 +1392,35 @@ export default function SessionScreen() {
       message.id !== consumedQuickChipMessageId
         ? getContextualQuickChips(message)
         : [];
+    const messageControlChips: Array<{
+      id: QuickChipId;
+      label: string;
+    }> = [
+      ...contextualQuickChips.map((chipId) => ({
+        id: chipId as QuickChipId,
+        label: QUICK_CHIP_CONFIG[chipId].label,
+      })),
+      ...(showWrongSubjectChip && message.id === latestAiMessageId
+        ? [{ id: 'wrong_subject' as QuickChipId, label: 'Wrong subject' }]
+        : []),
+    ];
     const showFeedbackButtons = !!message.eventId;
 
-    if (contextualQuickChips.length === 0 && !showFeedbackButtons) {
+    if (messageControlChips.length === 0 && !showFeedbackButtons) {
       return null;
     }
 
     return (
       <View className="gap-2">
-        {contextualQuickChips.length > 0 && (
+        {messageControlChips.length > 0 && (
           <View className="flex-row flex-wrap gap-2">
-            {contextualQuickChips.map((chipId) => {
-              const chip = QUICK_CHIP_CONFIG[chipId];
+            {messageControlChips.map((chip) => {
               return (
                 <Pressable
-                  key={`${message.id}-${chipId}`}
-                  onPress={() => void handleQuickChip(chipId, message.id)}
+                  key={`${message.id}-${chip.id}`}
+                  onPress={() => void handleQuickChip(chip.id, message.id)}
                   className="rounded-full bg-surface-elevated px-3 py-1.5"
-                  testID={`quick-chip-${chipId}`}
+                  testID={`quick-chip-${chip.id}`}
                 >
                   <Text className="text-caption font-semibold text-text-secondary">
                     {chip.label}
@@ -1624,6 +1716,20 @@ export default function SessionScreen() {
           </View>
         </View>
       </Modal>
+      {confirmationToast ? (
+        <View
+          pointerEvents="none"
+          className="absolute left-4 right-4 z-50 items-center"
+          style={{ bottom: Math.max(insets.bottom, 16) + 88 }}
+          testID="session-confirmation-toast"
+        >
+          <View className="rounded-full bg-text-primary px-4 py-3">
+            <Text className="text-body-sm font-semibold text-text-inverse">
+              {confirmationToast}
+            </Text>
+          </View>
+        </View>
+      ) : null}
       {CelebrationOverlay}
     </View>
   );
