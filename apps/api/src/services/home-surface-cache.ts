@@ -33,6 +33,7 @@ export type HomeSurfaceCacheData = {
   cachedAt: string;
   legacyCoachingCard: CoachingCard;
   rankedHomeCards: HomeCard[];
+  coldStart?: boolean;
   interactionStats: HomeCardInteractionStats;
 };
 
@@ -63,9 +64,7 @@ function isCoachingCardLike(value: unknown): value is CoachingCard {
   );
 }
 
-function normalizeInteractionStats(
-  value: unknown
-): HomeCardInteractionStats {
+function normalizeInteractionStats(value: unknown): HomeCardInteractionStats {
   const record = isRecord(value) ? value : {};
   const normalizeCountMap = (
     input: unknown
@@ -154,13 +153,10 @@ export async function findHomeSurfaceCache(
 export async function readHomeSurfaceCacheData(
   db: Database,
   profileId: string
-): Promise<
-  | {
-      row: HomeSurfaceCacheRow;
-      data: HomeSurfaceCacheData;
-    }
-  | null
-> {
+): Promise<{
+  row: HomeSurfaceCacheRow;
+  data: HomeSurfaceCacheData;
+} | null> {
   const row = await findHomeSurfaceCache(db, profileId);
   if (!row) return null;
 
@@ -170,6 +166,11 @@ export async function readHomeSurfaceCacheData(
   };
 }
 
+// NOTE: read-modify-write is non-atomic. Two concurrent requests for the same
+// profile can race, silently dropping one update (e.g., lost interaction
+// counter increments). Acceptable for single-device mobile use at MVP.
+// If multi-device or parent+child concurrency becomes real, wrap in a
+// pg advisory lock or use a JSON-merge SQL expression.
 export async function mergeHomeSurfaceCacheData(
   db: Database,
   profileId: string,
@@ -229,7 +230,9 @@ export async function recordHomeCardInteraction(
   const occurredAt = new Date().toISOString();
 
   await mergeHomeSurfaceCacheData(db, profileId, (current) => {
-    const interactionStats = normalizeInteractionStats(current.interactionStats);
+    const interactionStats = normalizeInteractionStats(
+      current.interactionStats
+    );
     const countsKey =
       input.interactionType === 'tap' ? 'tapsByCardId' : 'dismissalsByCardId';
     const counts = interactionStats[countsKey];
@@ -249,7 +252,6 @@ export async function recordHomeCardInteraction(
 
     return {
       ...current,
-      rankedHomeCards: [],
       interactionStats,
     };
   });
@@ -262,12 +264,10 @@ export async function writeHomeSurfacePendingCelebrations(
 ): Promise<void> {
   const expiresAt = new Date(Date.now() + HOME_SURFACE_TTL_MS);
 
-  await mergeHomeSurfaceCacheData(
-    db,
-    profileId,
-    (current) => current,
-    { pendingCelebrations, expiresAt }
-  );
+  await mergeHomeSurfaceCacheData(db, profileId, (current) => current, {
+    pendingCelebrations,
+    expiresAt,
+  });
 }
 
 export async function markHomeSurfaceCelebrationsSeen(

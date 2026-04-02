@@ -49,28 +49,34 @@ export async function precomputeHomeCards(
   const repo = createScopedRepository(db, profileId);
   const now = new Date();
 
-  const [countResult, allSubjects, overallProgress, continueSuggestion, cached] =
-    await Promise.all([
-      db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(learningSessions)
-        .where(eq(learningSessions.profileId, profileId)),
-      repo.subjects.findMany(),
-      getOverallProgress(db, profileId),
-      getContinueSuggestion(db, profileId),
-      readHomeSurfaceCacheData(db, profileId),
-    ]);
+  const [
+    countResult,
+    allSubjects,
+    overallProgress,
+    continueSuggestion,
+    cached,
+  ] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(learningSessions)
+      .where(eq(learningSessions.profileId, profileId)),
+    repo.subjects.findMany(),
+    getOverallProgress(db, profileId),
+    getContinueSuggestion(db, profileId),
+    readHomeSurfaceCacheData(db, profileId),
+  ]);
 
   const sessionCount = countResult[0]?.count ?? 0;
   const coldStart = sessionCount < COLD_START_SESSION_THRESHOLD;
-  const interactionStats =
-    cached?.data.interactionStats ?? {
-      tapsByCardId: {},
-      dismissalsByCardId: {},
-      events: [],
-    };
+  const interactionStats = cached?.data.interactionStats ?? {
+    tapsByCardId: {},
+    dismissalsByCardId: {},
+    events: [],
+  };
 
-  const activeSubjects = allSubjects.filter((subject) => subject.status === 'active');
+  const activeSubjects = allSubjects.filter(
+    (subject) => subject.status === 'active'
+  );
   const firstActiveSubject = activeSubjects[0];
   const totalReviewDue =
     overallProgress.subjects.reduce(
@@ -128,8 +134,7 @@ export async function precomputeHomeCards(
       primaryLabel: continueSuggestion ? 'Continue topic' : 'Practice now',
       priority: studyPriority,
       subjectId: continueSuggestion?.subjectId ?? firstActiveSubject?.id,
-      subjectName:
-        continueSuggestion?.subjectName ?? firstActiveSubject?.name,
+      subjectName: continueSuggestion?.subjectName ?? firstActiveSubject?.name,
       topicId: continueSuggestion?.topicId,
     });
 
@@ -211,7 +216,7 @@ export async function getHomeCardsForProfile(
   ) {
     return {
       cards: cached.data.rankedHomeCards,
-      coldStart: cached.data.rankedHomeCards.every((card) => !card.compact),
+      coldStart: cached.data.coldStart ?? false,
     };
   }
 
@@ -223,6 +228,7 @@ export async function getHomeCardsForProfile(
     (current) => ({
       ...current,
       rankedHomeCards: next.cards,
+      coldStart: next.coldStart,
     }),
     { expiresAt: new Date(now.getTime() + HOME_CARD_TTL_MS) }
   );

@@ -23,8 +23,7 @@ export function useHomeCards(): UseQueryResult<HomeCardsResponse> {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const homeCardsClient = (client as Record<string, any>)['home-cards'];
-        const res = await homeCardsClient.$get({
+        const res = await client['home-cards'].$get({
           init: { signal },
         });
         await assertOk(res);
@@ -48,8 +47,7 @@ export function useTrackHomeCardInteraction(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (input: HomeCardInteractionInput) => {
-      const homeCardsClient = (client as Record<string, any>)['home-cards'];
-      const res = await homeCardsClient.interactions.$post({
+      const res = await client['home-cards'].interactions.$post({
         json: input,
       });
       await assertOk(res);
