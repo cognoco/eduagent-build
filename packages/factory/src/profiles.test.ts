@@ -15,7 +15,7 @@ describe('buildProfile', () => {
     expect(profile).toEqual({
       displayName: 'Test User 1',
       personaType: 'LEARNER',
-      birthDate: '2008-06-15',
+      birthYear: new Date().getFullYear() - 16,
     });
   });
 
@@ -30,18 +30,18 @@ describe('buildProfile', () => {
   it('applies overrides', () => {
     const profile = buildProfile({
       displayName: 'Custom Name',
-      personaType: 'TEEN',
+      birthYear: 2014,
     });
 
     expect(profile.displayName).toBe('Custom Name');
-    expect(profile.personaType).toBe('TEEN');
+    expect(profile.birthYear).toBe(2014);
   });
 
   it('merges partial overrides with defaults', () => {
-    const profile = buildProfile({ personaType: 'PARENT' });
+    const profile = buildProfile({ birthYear: 1990 });
 
     expect(profile.displayName).toBe('Test User 1');
-    expect(profile.personaType).toBe('PARENT');
+    expect(profile.birthYear).toBe(1990);
   });
 });
 
@@ -65,10 +65,10 @@ describe('buildProfileList', () => {
   });
 
   it('applies overrides to all items', () => {
-    const profiles = buildProfileList(2, { personaType: 'TEEN' });
+    const profiles = buildProfileList(2, { birthYear: 2014 });
 
-    expect(profiles[0]!.personaType).toBe('TEEN');
-    expect(profiles[1]!.personaType).toBe('TEEN');
+    expect(profiles[0]!.birthYear).toBe(2014);
+    expect(profiles[1]!.birthYear).toBe(2014);
   });
 
   it('returns empty array for count 0', () => {

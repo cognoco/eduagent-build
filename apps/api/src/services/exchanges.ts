@@ -10,7 +10,12 @@ import {
   getPartialProgressInstruction,
 } from './escalation';
 import { getEvaluateRungDescription } from './evaluate';
-import type { LearningMode, HomeworkMode } from '@eduagent/schemas';
+import {
+  computeAgeBracket,
+  type AgeBracket,
+  type LearningMode,
+  type HomeworkMode,
+} from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Core Exchange Processing Pipeline — Story 2.1
@@ -27,7 +32,7 @@ export interface ExchangeContext {
   sessionType: 'learning' | 'homework' | 'interleaved';
   escalationRung: EscalationRung;
   exchangeHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
-  personaType: 'TEEN' | 'LEARNER' | 'PARENT';
+  birthYear?: number | null;
   priorLearningContext?: string;
   embeddingMemoryContext?: string;
   workedExampleLevel?: 'full' | 'fading' | 'problem_first';
@@ -173,7 +178,8 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   );
 
   // Persona voice
-  sections.push(getPersonaVoice(context.personaType));
+  const ageBracket = resolveAgeBracket(context.birthYear);
+  sections.push(getAgeVoice(ageBracket));
 
   // Learning mode — adjusts pacing and tone
   if (context.learningMode) {
@@ -208,7 +214,7 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     getSessionTypeGuidance(
       context.sessionType,
       context.homeworkMode,
-      context.personaType
+      ageBracket
     )
   );
 
@@ -463,42 +469,38 @@ export async function streamExchange(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function getPersonaVoice(personaType: 'TEEN' | 'LEARNER' | 'PARENT'): string {
-  switch (personaType) {
-    case 'TEEN':
+function resolveAgeBracket(birthYear?: number | null): AgeBracket {
+  return birthYear == null ? 'adult' : computeAgeBracket(birthYear);
+}
+
+function getAgeVoice(ageBracket: AgeBracket): string {
+  switch (ageBracket) {
+    case 'child':
+    case 'adolescent':
       return (
         'Communication style: Peer-adjacent and matter-of-fact.\n' +
         'Talk like a slightly older student who gets it — not a "cool teacher" trying too hard.\n' +
         'Keep it short. Use everyday analogies. Skip the pep talks.\n' +
         'When they get something right, a simple "nice" or "that\'s it" is enough — no over-the-top praise.'
       );
-    case 'LEARNER':
+    case 'adult':
       return (
         'Communication style: Sharp and collegial.\n' +
         "Be direct. Respect the learner's time — no unnecessary scaffolding.\n" +
         'Use precise terminology; define new terms once, then use them freely.\n' +
         'Treat them as a capable adult who chose to learn this.'
       );
-    case 'PARENT':
-      return (
-        'Communication style: Professional and data-forward.\n' +
-        'Be concise. Parents are busy — lead with the key point, not the build-up.\n' +
-        'Use clear, structured explanations. Skip excessive encouragement.\n' +
-        'When this persona is learning, treat them as a competent adult with limited time.'
-      );
-    default:
-      return 'Communication style: Professional and supportive.';
   }
 }
 
 function getSessionTypeGuidance(
   sessionType: 'learning' | 'homework' | 'interleaved',
   homeworkMode?: HomeworkMode,
-  personaType?: 'TEEN' | 'LEARNER' | 'PARENT'
+  ageBracket: AgeBracket = 'adult'
 ): string {
   if (sessionType === 'homework') {
-    const isTeen = personaType === 'TEEN';
-    const brevity = isTeen
+    const isYouth = ageBracket === 'child' || ageBracket === 'adolescent';
+    const brevity = isYouth
       ? 'Be very brief: 1-2 sentences plus an example. Teens want speed, not essays.'
       : 'Be brief: usually 2-6 sentences, focused on the exact problem in front of the learner.';
 

@@ -26,6 +26,7 @@ import type {
   HomeworkSessionMetadata,
   SessionMetadata,
 } from '@eduagent/schemas';
+import { birthYearFromDateLike } from '@eduagent/schemas';
 import {
   processExchange,
   streamExchange,
@@ -376,6 +377,11 @@ async function prepareExchangeContext(
 
   const topic = topicRows[0];
   const [profile] = profileRows;
+  if (!profile) {
+    console.warn(
+      `[processExchange] Profile ${profileId} not found — birthYear will be null, LLM defaults to adult tone`
+    );
+  }
   const retentionCard = retentionRows[0];
 
   // Determine verification type: explicit from session, or auto-select from retention card
@@ -543,8 +549,7 @@ async function prepareExchangeContext(
     sessionType: session.sessionType as 'learning' | 'homework' | 'interleaved',
     escalationRung: effectiveRung,
     exchangeHistory,
-    personaType:
-      (profile?.personaType as 'TEEN' | 'LEARNER' | 'PARENT') ?? 'LEARNER',
+    birthYear: birthYearFromDateLike(profile?.birthDate ?? null),
     workedExampleLevel: interleavedTopics ? undefined : workedExampleLevel,
     priorLearningContext: priorLearning.contextText || undefined,
     embeddingMemoryContext: memory.context || undefined,

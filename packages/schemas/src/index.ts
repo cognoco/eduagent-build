@@ -1,6 +1,7 @@
 // Common
 export * from './common.js';
 export * from './errors.js';
+export * from './age.js';
 
 // Auth & Profiles
 export * from './auth.js';

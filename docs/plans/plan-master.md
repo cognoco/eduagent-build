@@ -12,14 +12,16 @@
 |------|--------|-------|
 | 0-5 | **COMPLETE** | Foundation, onboarding, learning, retention, progress, billing |
 | 9 | **COMPLETE** | Native IAP (RevenueCat) |
-| 10 | **COMPLETE** | Pre-launch UX polish |
-| Phase 1 | **COMPLETE** | Epic 11.1 brand tokens + Story 13.1-13.2 wallClock/hard-cap |
+| 10 | **NEARLY COMPLETE** | Pre-launch UX polish — 15 done, 7 partial, 1 unbuilt (10.17). See `docs/epics.md` for per-story detail. |
+| Phase 1 | **COMPLETE** | Epic 11 brand tokens + Story 13.1-13.2 wallClock/hard-cap |
 | Phase 2 | **COMPLETE** | Stories 14.2, 14.3, 14.4, 14.10 (quick wins) |
 | Phase 2.5 | **COMPLETE** | Code review remediation — deploy blockers, test gaps, UX polish |
-| **11** | **IN PROGRESS** | Brand identity — 11.1 done, 11.2 accent cascade pending |
-| **12** | **TODO** | Remove persona enum — age + role + intent-as-cards |
-| **13** | **IN PROGRESS** | Session lifecycle — 13.1-13.2 done, 13.3-13.7 pending |
-| **14** | **IN PROGRESS** | Human agency — 14.2-14.4, 14.10 done, rest pending |
+| Phase 3 | **COMPLETE** | Homework overhaul (14.9, 14.10, 14.11, 14.12) |
+| Phase 4 | **COMPLETE** | Celebration system + session polish (13.3-13.7) |
+| **11** | **COMPLETE** | Brand identity — all 3 stories verified 2026-04-01 |
+| **12** | **PARTIAL** | Remove persona enum — 12.1 complete, 12.6 compatibility slice in progress |
+| **13** | **COMPLETE** | Session lifecycle — all 7 stories verified 2026-04-01 |
+| **14** | **PARTIAL** | Human agency — 14.2-14.4, 14.9-14.12 done (Phases A+B). Phase C (14.1, 14.5-14.8) not started. |
 | **7** | **TODO** | Concept map — advisory prerequisite learning (v1.1) |
 | **8** | **TODO** | Full voice mode (v1.1) |
 | **6** | **TODO** | Language learning — Four Strands (v1.1) |
@@ -138,7 +140,7 @@
 | **Story 13.3** | Crash recovery — AsyncStorage markers + session resumption within 30 min + Inngest stale session cron | 13.1 (wallClockSeconds) |
 | **Story 13.5** | Adaptive silence — LLM `expectedResponseMinutes` + per-session pace calibration + cross-session learned baseline | 13.2 (caps removed) |
 | **Story 13.6** | "I'm Done" button + summary screen (wall-clock, milestone recap, 3-sec wait for fast celebrations) | 13.4 (celebrations) |
-| **Story 13.7** | Post-session celebration queue on home card system + Inngest wiring + 3-level toggle | 13.4 + 13.1. **Note:** 13.7 targets the CURRENT coaching card system. It will be migrated to the home card system in Phase 5 (Story 12.7). |
+| **Story 13.7** | Post-session celebration queue on home card system + Inngest wiring + 3-level toggle | 13.4 + 13.1. **Note:** The current repo already ships a legacy 13.7 path backed by `coaching_card_cache`. Phase 5 Story 12.7 should migrate that queue onto the new home-card cache instead of re-implementing it. |
 
 **Cross-epic touchpoints added by this phase:**
 - `expectedResponseMinutes` in LLM response metadata (13.5)

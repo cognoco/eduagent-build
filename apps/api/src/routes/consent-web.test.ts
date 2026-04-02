@@ -291,6 +291,8 @@ describe('consent-web routes', () => {
       expect(html).toContain('Family account ready!');
       expect(html).toContain("Emma's account is now active");
       expect(html).toContain("See Emma's Progress");
+      expect(html).toContain('mentomate://onboarding');
+      expect(html).not.toContain('persona=learner');
     });
 
     it('renders denial landing with real child name', async () => {

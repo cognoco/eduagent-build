@@ -11,6 +11,11 @@ import type {
   Profile,
 } from '@eduagent/schemas';
 import {
+  birthDateFromBirthYear,
+  birthYearFromDateLike,
+  computeAgeBracket,
+} from '@eduagent/schemas';
+import {
   getConsentStatus,
   checkConsentRequired,
   createPendingConsentState,
@@ -32,6 +37,7 @@ function mapProfileRow(
     birthDate: row.birthDate
       ? row.birthDate.toISOString().split('T')[0]!
       : null,
+    birthYear: birthYearFromDateLike(row.birthDate),
     personaType: row.personaType,
     location: row.location ?? null,
     isOwner: row.isOwner,
@@ -62,6 +68,15 @@ export async function listProfiles(
     })
   );
   return mapped;
+}
+
+function inferLegacyPersonaType(
+  birthYear: number
+): 'TEEN' | 'LEARNER' | 'PARENT' {
+  const ageBracket = computeAgeBracket(birthYear);
+  if (ageBracket === 'child') return 'TEEN';
+  // Adults default to LEARNER — PARENT is only assigned via explicit input.personaType
+  return 'LEARNER';
 }
 
 /**
@@ -116,10 +131,13 @@ export async function createProfile(
   input: ProfileCreateInput,
   isOwner?: boolean
 ): Promise<Profile> {
+  const birthYear = input.birthYear ?? birthYearFromDateLike(input.birthDate);
+  if (birthYear == null) {
+    throw new Error('Profile birthYear or birthDate is required');
+  }
+
   // Pre-compute consent check (single call — used for both age gate and consent state)
-  const consentCheck = input.birthDate
-    ? checkConsentRequired(input.birthDate)
-    : null;
+  const consentCheck = checkConsentRequired(birthYear);
 
   // Enforce minimum age (PRD line 386: ages 6-10 out of scope)
   if (consentCheck?.belowMinimumAge) {
@@ -131,14 +149,19 @@ export async function createProfile(
     throw new Error('Parent profile requires age 18 or older');
   }
 
+  const legacyPersonaType =
+    input.personaType ?? inferLegacyPersonaType(birthYear);
+
   const [row] = await db
     .insert(profiles)
     .values({
       accountId,
       displayName: input.displayName,
       avatarUrl: input.avatarUrl ?? null,
-      birthDate: input.birthDate ? new Date(input.birthDate) : null,
-      personaType: input.personaType ?? 'LEARNER',
+      birthDate: input.birthDate
+        ? new Date(input.birthDate)
+        : birthDateFromBirthYear(birthYear),
+      personaType: legacyPersonaType,
       location: input.location ?? null,
       isOwner: isOwner ?? false,
     })

@@ -599,7 +599,7 @@ describe('processMessage', () => {
         subjectName: 'Mathematics',
         sessionType: 'learning',
         escalationRung: 1,
-        personaType: 'LEARNER',
+        birthYear: null,
       }),
       'What is gravity?'
     );
@@ -754,13 +754,13 @@ describe('processMessage', () => {
     );
   });
 
-  it('loads personaType from profile', async () => {
+  it('derives birthYear from the profile birth date', async () => {
     setupScopedRepo({
       sessionFindFirst: mockSessionRow({ topicId: null }),
     });
     // No topicId → no topic select → first select is profile query
     const db = createMockDb({
-      selectResults: [[{ personaType: 'TEEN' }]],
+      selectResults: [[{ birthDate: new Date('2014-06-15T00:00:00.000Z') }]],
     });
     await processMessage(db, profileId, sessionId, {
       message: 'Hey there',
@@ -768,13 +768,13 @@ describe('processMessage', () => {
 
     expect(processExchange).toHaveBeenCalledWith(
       expect.objectContaining({
-        personaType: 'TEEN',
+        birthYear: 2014,
       }),
       'Hey there'
     );
   });
 
-  it('defaults personaType to LEARNER when profile not found', async () => {
+  it('defaults birthYear to null when profile is not found', async () => {
     setupScopedRepo({
       sessionFindFirst: mockSessionRow({ topicId: null }),
     });
@@ -787,7 +787,7 @@ describe('processMessage', () => {
 
     expect(processExchange).toHaveBeenCalledWith(
       expect.objectContaining({
-        personaType: 'LEARNER',
+        birthYear: null,
       }),
       'Hello'
     );

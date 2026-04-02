@@ -65,39 +65,34 @@ export function isSentryEnabled(): boolean {
   return sentryActive;
 }
 
-/**
- * Calculates age from a birth date string (YYYY-MM-DD).
+/** Calculates age from a birth year using the current calendar year.
+ *  Year-only approximation always rounds UP (overestimates age by up to 11
+ *  months), so the result errs toward *less* protection — consent/Sentry gates
+ *  must use `<=` thresholds to compensate (e.g., `age <= 16` not `age < 16`).
  */
-function calculateAge(birthDate: string): number {
-  const birth = new Date(birthDate);
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    age--;
-  }
-  return age;
+function calculateAge(birthYear: number): number {
+  return new Date().getFullYear() - birthYear;
 }
 
 /**
  * Evaluates whether Sentry should be enabled for the given profile.
  *
- * @param birthDate - Profile birth date (YYYY-MM-DD) or null
+ * @param birthYear - Profile birth year or null
  * @param consentStatus - Current consent status or null
  */
 export function evaluateSentryForProfile(
-  birthDate: string | null,
+  birthYear: number | null,
   consentStatus: string | null
 ): void {
   if (!getSentryDsn()) return;
 
-  // No birth date → can't determine age → enable (adult assumed)
-  if (!birthDate) {
+  // No birth year → can't determine age → enable (adult assumed)
+  if (birthYear == null) {
     enableSentry();
     return;
   }
 
-  const age = calculateAge(birthDate);
+  const age = calculateAge(birthYear);
 
   if (age < 13) {
     // Under 13: only enable if consent is CONSENTED
@@ -107,13 +102,13 @@ export function evaluateSentryForProfile(
       disableSentry();
     }
   } else if (
-    age < 16 &&
+    age <= 16 &&
     (consentStatus === 'WITHDRAWN' || consentStatus === 'PENDING')
   ) {
-    // 13–15 with withdrawn/pending consent: disable — parent opted out of data processing
+    // 13–16 with withdrawn/pending consent: disable — parent opted out of data processing
     disableSentry();
   } else {
-    // 13–15 with active consent, or 16+: enable
+    // 13–16 with active consent, or 17+: enable
     enableSentry();
   }
 }

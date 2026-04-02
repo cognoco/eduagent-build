@@ -1,5 +1,11 @@
 # Brand Color Refresh — Epic 11 Plan
 
+> **✅ Complete (2026-04-02):** Epic 11 fully implemented. All 3 stories verified against acceptance criteria on 2026-04-01:
+> - 11.1: Navy dark bg (#1a1a3e), teal primary, lavender secondary, persona defaults removed
+> - 11.2: Accent cascade — no hardcoded hex in components, semantic tokens via useThemeColors()
+> - 11.3: Light mode — darkened teal (#0d9488) and lavender (#8b5cf6) for cream (#faf5ee) background
+> **Note:** Accent cascade needs visual verification on a running device to confirm runtime behavior matches code audit.
+
 **Date:** 2026-03-25
 **Status:** Planned (post-launch)
 **Priority:** Post-launch polish — do not block release

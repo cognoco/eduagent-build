@@ -87,16 +87,9 @@ function mapConsentRow(row: typeof consentStates.$inferSelect): ConsentState {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Calculate age from birth date string (YYYY-MM-DD) */
-function calculateAge(birthDate: string): number {
-  const birth = new Date(birthDate);
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    age--;
-  }
-  return age;
+/** Approximate age from birth year using the current calendar year. */
+function calculateAge(birthYear: number): number {
+  return new Date().getFullYear() - birthYear;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,20 +104,23 @@ export const MINIMUM_AGE = 11;
  *
  * GDPR-everywhere model (Story 10.19): location is no longer a factor.
  * - Users under 11 are rejected entirely (PRD line 386)
- * - Users under 16 require GDPR consent
- * - Users 16+ do not require consent
+ * - Users ≤ 16 require GDPR consent (conservative: birth-year-only
+ *   precision cannot confirm they have turned 17)
+ * - Users 17+ do not require consent
  */
-export function checkConsentRequired(birthDate: string): {
+export function checkConsentRequired(birthYear: number): {
   required: boolean;
   consentType: ConsentType | null;
   belowMinimumAge?: boolean;
   age: number;
 } {
-  const age = calculateAge(birthDate);
+  const age = calculateAge(birthYear);
   if (age < MINIMUM_AGE) {
     return { required: true, consentType: 'GDPR', belowMinimumAge: true, age };
   }
-  if (age < 16) {
+  // With birth-year-only inputs, treat the "turning 16 this year" cohort as
+  // requiring consent until we have a more precise date.
+  if (age <= 16) {
     return { required: true, consentType: 'GDPR', age };
   }
   return { required: false, consentType: null, age };

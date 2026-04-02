@@ -13,6 +13,7 @@ import { useAuth, useClerk } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
+import { birthYearFromDateLike } from '@eduagent/schemas';
 import { useProfile } from '../../lib/profile';
 import { useTheme, useThemeColors, useTokenVars } from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
@@ -600,11 +601,13 @@ export default function LearnerLayout() {
   // Age-gated Sentry: re-evaluate on profile switch (Story 10.14)
   React.useEffect(() => {
     evaluateSentryForProfile(
-      activeProfile?.birthDate ?? null,
+      activeProfile?.birthYear ??
+        birthYearFromDateLike(activeProfile?.birthDate ?? null),
       activeProfile?.consentStatus ?? null
     );
   }, [
     activeProfile?.id,
+    activeProfile?.birthYear,
     activeProfile?.birthDate,
     activeProfile?.consentStatus,
   ]);

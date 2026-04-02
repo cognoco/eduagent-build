@@ -11,6 +11,7 @@ jest.mock('../services/profile', () => ({
         displayName: 'Test',
         personaType: 'LEARNER',
         birthDate: '2014-06-15',
+        birthYear: 2014,
         location: 'EU',
         consentStatus: 'CONSENTED',
       });
@@ -25,6 +26,7 @@ jest.mock('../services/profile', () => ({
         displayName: 'Owner',
         personaType: 'LEARNER',
         birthDate: '2014-06-15',
+        birthYear: 2014,
         location: 'EU',
         consentStatus: 'CONSENTED',
       });
@@ -61,7 +63,7 @@ describe('profileScopeMiddleware', () => {
     expect(res.status).toBe(200);
     expect(body.profileId).toBe('valid-profile-id');
     expect(body.profileMeta).toEqual({
-      birthDate: '2014-06-15',
+      birthYear: 2014,
       location: 'EU',
       consentStatus: 'CONSENTED',
     });
@@ -75,7 +77,7 @@ describe('profileScopeMiddleware', () => {
     expect(res.status).toBe(200);
     expect(body.profileId).toBe('owner-profile-id');
     expect(body.profileMeta).toEqual({
-      birthDate: '2014-06-15',
+      birthYear: 2014,
       location: 'EU',
       consentStatus: 'CONSENTED',
     });
