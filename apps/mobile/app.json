@@ -82,6 +82,7 @@
           "microphonePermission": "MentoMate needs microphone access for voice-based learning."
         }
       ],
+      "expo-updates",
       "./plugins/withForceDarkDisabled",
       [
         "expo-build-properties",
@@ -96,6 +97,15 @@
       "eas": {
         "projectId": "cbb7c7e1-cf56-45f2-9df8-f043bb8bb361"
       }
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/cbb7c7e1-cf56-45f2-9df8-f043bb8bb361",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 5000
     },
     "owner": "zuzanka14"
   }

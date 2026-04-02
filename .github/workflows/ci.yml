@@ -10,6 +10,17 @@ permissions:
   actions: read
   contents: read
 
+env:
+  # Paths that indicate a native change requiring a full EAS build.
+  # Used by the ota-update job to decide whether to publish an OTA update.
+  NATIVE_CHANGE_PATHS: >-
+    apps/mobile/app.json
+    apps/mobile/package.json
+    apps/mobile/eas.json
+    apps/mobile/plugins/
+    apps/mobile/android/
+    apps/mobile/ios/
+
 jobs:
   main:
     runs-on: ubuntu-latest
@@ -91,3 +102,88 @@ jobs:
         if: always()
         continue-on-error: true
         run: bash scripts/validate-doc-versions.sh
+
+  # ---------------------------------------------------------------------------
+  # OTA Update: publish JS bundle to EAS Update (preview channel)
+  # Runs after the main job passes, only on push to main, only when mobile
+  # files changed. Takes ~3 min instead of a full native build (~30 min).
+  # ---------------------------------------------------------------------------
+  ota-update:
+    needs: main
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if mobile files changed
+        id: mobile-check
+        run: |
+          changed=$(git diff --name-only HEAD~1 HEAD)
+          echo "Changed files:"
+          echo "$changed"
+
+          if echo "$changed" | grep -Eq '^apps/mobile/|^packages/schemas/'; then
+            echo "mobile_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "mobile_changed=false" >> "$GITHUB_OUTPUT"
+            echo "No mobile changes — skipping OTA update"
+          fi
+
+      - name: Check for native changes
+        if: steps.mobile-check.outputs.mobile_changed == 'true'
+        id: native-check
+        run: |
+          changed=$(git diff --name-only HEAD~1 HEAD)
+          native_patterns="apps/mobile/app.json apps/mobile/package.json apps/mobile/eas.json"
+
+          native_changed=false
+          for pattern in $native_patterns; do
+            if echo "$changed" | grep -q "^${pattern}"; then
+              native_changed=true
+              echo "Native change detected: $pattern"
+            fi
+          done
+
+          if echo "$changed" | grep -Eq '^apps/mobile/(plugins|android|ios)/'; then
+            native_changed=true
+            echo "Native change detected in plugins/android/ios directory"
+          fi
+
+          echo "native_changed=$native_changed" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v4
+        if: steps.mobile-check.outputs.mobile_changed == 'true'
+        with:
+          standalone: true
+
+      - uses: actions/setup-node@v4
+        if: steps.mobile-check.outputs.mobile_changed == 'true'
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+        if: steps.mobile-check.outputs.mobile_changed == 'true'
+
+      - name: Setup Expo
+        if: steps.mobile-check.outputs.mobile_changed == 'true'
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: 18.x
+          packager: npm
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Publish OTA update to preview channel
+        if: steps.mobile-check.outputs.mobile_changed == 'true'
+        working-directory: apps/mobile
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B | head -1)
+          echo "Publishing OTA update: $COMMIT_MSG"
+          eas update --branch preview --message "$COMMIT_MSG" --non-interactive
+
+      - name: Report native change (full build needed)
+        if: steps.native-check.outputs.native_changed == 'true'
+        run: |
+          echo "::warning::Native files changed — a full EAS build is also needed. Trigger via Mobile CI workflow_dispatch or wait for the automated build-preview job."
