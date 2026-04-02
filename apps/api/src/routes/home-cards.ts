@@ -28,7 +28,7 @@ export const homeCardRoutes = new Hono<HomeCardRouteEnv>()
       return c.json(
         {
           error: {
-            code: ERROR_CODES.PROFILE_NOT_FOUND,
+            code: ERROR_CODES.NOT_FOUND,
             message: 'Active profile required',
           },
         },
@@ -50,7 +50,7 @@ export const homeCardRoutes = new Hono<HomeCardRouteEnv>()
         return c.json(
           {
             error: {
-              code: ERROR_CODES.PROFILE_NOT_FOUND,
+              code: ERROR_CODES.NOT_FOUND,
               message: 'Active profile required',
             },
           },
