@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { chatExchangeSchema } from './common.js';
+import { chatExchangeSchema } from './common';
 
 // Verification depth
 

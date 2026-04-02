@@ -5,7 +5,7 @@ import {
   evaluateFailureActionSchema,
   retentionCardSchema,
   verificationTypeSchema,
-} from './assessments.js';
+} from './assessments';
 
 const TEST_UUID = '550e8400-e29b-41d4-a716-446655440000';
 
