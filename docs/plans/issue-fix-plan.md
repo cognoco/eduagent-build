@@ -13,11 +13,13 @@ Review Round 1 follow-up remains complete.
 
 Review Round 2 follow-up is partially complete.
 
-Review Round 3 runtime/device regression pass is in progress.
+Review Round 3 integration-hardening follow-up is open.
 
 Current open items:
 - API routes still retain `account.id` fallbacks when `profileId` is missing, so a failed owner-profile resolution can still degrade into incorrect profile scoping.
+- Speech-to-text wiring still needs a proper integration pass; the current transcript flow looks under-connected and may not receive real native recognition results reliably.
 - Native-bound test coverage is still too mock-heavy to reliably catch device-only regressions in auth, animation, and voice flows.
+- Mobile E2E coverage is still too shallow and too non-blocking to protect the learner experience from release-only regressions.
 
 ---
 
@@ -70,7 +72,7 @@ Open items:
 
 ### 2026-04-02 — Latest Expo Build Triage
 
-Status: in progress on 2026-04-02
+Status: code fixes applied on 2026-04-02; awaiting confirmation in the next fresh device build
 
 Priority bugs reported from the latest learner build:
 - Email/password sign-in unexpectedly triggered a verification-code flow that users experience as forced two-factor authentication.
@@ -93,8 +95,41 @@ Fixes applied:
 - Changed sign-in so verification-code continuation is explicit and opt-in instead of being auto-started after a password submit.
 - Removed persona switching from the learner More tab.
 
+Verification completed locally:
+- Targeted mobile Jest coverage passed for sign-in, Home, Learning Book, and More.
+- Mobile TypeScript passed after the changes.
+
 Follow-up to defer:
 - Broader mock/test-hardening work around native integrations and auth continuation paths should happen in a separate pass after the priority runtime regressions are stabilized.
+
+---
+
+## Deferred Quality Follow-Up
+
+### 2026-04-02 — Wiring, Mocks, and Missing Coverage
+
+Status: open
+
+Scope:
+- Follow-up from the post-fix code review focused on runtime wiring gaps, over-mocked tests, and missing integration coverage.
+
+Key findings:
+1. Speech-to-text looks insufficiently wired for production use. The recognition hook owns transcript state, but the current path does not clearly show native result events flowing back into that transcript, while the chat UI depends on it for preview/send behavior.
+2. Unit coverage around auth and voice is too mock-heavy. Several tests replace the real boundary with fake hook state or mocked shells, which means CI can prove mocked contracts while missing real-device failures.
+3. E2E coverage is too shallow for these risks. Current mobile flows do not verify that speech becomes transcript text or that audio behavior actually occurs on device.
+4. E2E protection is also too weak at the workflow level because advisory runs can fail without blocking merge.
+5. OAuth continuation paths still need more defensive handling and tests for cases where the provider returns without an immediately activatable session.
+
+Concrete follow-up items:
+1. Audit and, if needed, repair the speech-recognition result pipeline from native events into learner session transcript state.
+2. Add at least one higher-fidelity integration path for voice mode that exercises the real hook/component boundary instead of replacing both sides with mocks.
+3. Reduce mock substitution in learner-session and auth tests where it currently hides runtime behavior behind fake implementations.
+4. Expand mobile E2E coverage to include post-sign-in learner smoke checks, voice transcript capture, and basic playback verification where feasible.
+5. Tighten CI policy for critical E2E/auth smoke coverage so failures are visible and actionable instead of purely advisory.
+6. Add sign-in and sign-up tests for non-immediate OAuth continuation branches.
+
+Notes:
+- This section is intentionally separate from the 2026-04-02 runtime regression pass because the runtime bugs above are fixed in code, while these quality-hardening items remain open.
 
 ---
 
@@ -105,3 +140,4 @@ Follow-up to defer:
 - 2026-04-01: Added Review Round 2 findings and reopened active follow-up items.
 - 2026-04-01: Repaired the mobile Jest config boundary so `pnpm test:mobile:unit` is reliable again.
 - 2026-04-02: Added the current runtime/device regression pass covering sign-in, blank learner screens, washed-out theme rendering, and persona exposure in More.
+- 2026-04-02: Added the deferred quality follow-up section for missing wiring, over-mocked tests, shallow E2E coverage, and remaining auth integration risks.

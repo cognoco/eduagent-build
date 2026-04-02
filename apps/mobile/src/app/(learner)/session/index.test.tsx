@@ -7,6 +7,8 @@ const mockStartSession = jest.fn();
 const mockCloseSession = jest.fn();
 const mockStream = jest.fn();
 const mockHomeworkStatePost = jest.fn();
+const mockRecordSystemPrompt = jest.fn();
+const mockFlagSessionContent = jest.fn();
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -24,17 +26,34 @@ jest.mock('expo-router', () => ({
 jest.mock('../../../components/session', () => ({
   ChatShell: ({
     subtitle,
+    messages,
     inputAccessory,
     onSend,
+    renderMessageActions,
   }: {
     subtitle?: string;
+    messages?: Array<{ id: string; content: string }>;
     inputAccessory?: React.ReactNode;
     onSend: (text: string) => void;
+    renderMessageActions?: (message: {
+      id: string;
+      role: string;
+      content: string;
+      eventId?: string;
+      streaming?: boolean;
+      isSystemPrompt?: boolean;
+    }) => React.ReactNode;
   }) => {
     const { View, Text, Pressable } = require('react-native');
     return (
       <View>
         <Text testID="session-subtitle">{subtitle}</Text>
+        {(messages ?? []).map((message) => (
+          <View key={message.id} testID={`mock-message-${message.id}`}>
+            <Text>{message.content}</Text>
+            {renderMessageActions?.(message as never)}
+          </View>
+        ))}
         {inputAccessory}
         <Pressable
           testID="manual-send-button"
@@ -70,8 +89,8 @@ jest.mock('../../../hooks/use-sessions', () => ({
     stream: mockStream,
   }),
   useSessionTranscript: () => ({ data: null }),
-  useRecordSystemPrompt: () => ({ mutateAsync: jest.fn() }),
-  useFlagSessionContent: () => ({ mutateAsync: jest.fn() }),
+  useRecordSystemPrompt: () => ({ mutateAsync: mockRecordSystemPrompt }),
+  useFlagSessionContent: () => ({ mutateAsync: mockFlagSessionContent }),
   useParkingLot: () => ({ data: [], isLoading: false }),
   useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
@@ -191,6 +210,7 @@ describe('SessionScreen homework flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    let aiEventCount = 0;
     (useRouter as jest.Mock).mockReturnValue({
       replace: jest.fn(),
     });
@@ -231,11 +251,20 @@ describe('SessionScreen homework flow', () => {
         onDone: (result: {
           exchangeCount: number;
           escalationRung: number;
+          aiEventId?: string;
         }) => void
       ) => {
-        onDone({ exchangeCount: 1, escalationRung: 1 });
+        onDone({
+          exchangeCount: 1,
+          escalationRung: 1,
+          aiEventId: `event-${++aiEventCount}`,
+        });
       }
     );
+    mockRecordSystemPrompt.mockResolvedValue({ ok: true });
+    mockFlagSessionContent.mockResolvedValue({
+      message: 'Content flagged for review. Thank you!',
+    });
   });
 
   afterEach(() => {
@@ -285,6 +314,101 @@ describe('SessionScreen homework flow', () => {
     expect(screen.getByTestId('homework-problem-progress')).toHaveTextContent(
       'Problem 2 of 2'
     );
+  });
+
+  it('shows contextual learner-agency chips and session tools', () => {
+    render(<SessionScreen />);
+
+    expect(screen.getByText('I know this')).toBeTruthy();
+    expect(screen.getByText('Explain differently')).toBeTruthy();
+    expect(screen.getByText('Too easy')).toBeTruthy();
+    expect(screen.getByText('Example')).toBeTruthy();
+    expect(screen.getByText('Switch topic')).toBeTruthy();
+    expect(screen.getByText('Park it')).toBeTruthy();
+  });
+
+  it('records quick chips and learner feedback with follow-up prompts', async () => {
+    const screen = render(<SessionScreen />);
+
+    fireEvent.press(screen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(mockStartSession).toHaveBeenCalledTimes(1);
+      expect(mockStream).toHaveBeenCalledWith(
+        'Solve 2x + 5 = 17',
+        expect.any(Function),
+        expect.any(Function),
+        'session-1',
+        undefined
+      );
+    });
+
+    fireEvent.press(screen.getByTestId('quick-chip-too_easy'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(mockRecordSystemPrompt).toHaveBeenCalledWith({
+        content:
+          'The learner says this is too easy. Raise the challenge a little and ask for more independent thinking.',
+        metadata: { type: 'quick_chip', chip: 'too_easy' },
+      });
+      expect(mockStream).toHaveBeenCalledWith(
+        'That feels too easy. Can you make it more challenging?',
+        expect.any(Function),
+        expect.any(Function),
+        'session-1',
+        undefined
+      );
+    });
+
+    fireEvent.press(screen.getByTestId('message-feedback-not-helpful-event-2'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(mockRecordSystemPrompt).toHaveBeenCalledWith({
+        content:
+          'The learner marked the previous answer as not helpful. Re-explain more clearly with one new example.',
+        metadata: {
+          type: 'message_feedback',
+          value: 'not_helpful',
+          eventId: 'event-2',
+        },
+      });
+      expect(mockStream).toHaveBeenCalledWith(
+        'Can you explain that differently?',
+        expect.any(Function),
+        expect.any(Function),
+        'session-1',
+        undefined
+      );
+    });
+
+    fireEvent.press(screen.getByTestId('message-feedback-incorrect-event-3'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(mockFlagSessionContent).toHaveBeenCalledWith({
+        eventId: 'event-3',
+        reason: 'Learner marked response as incorrect',
+      });
+      expect(mockRecordSystemPrompt).toHaveBeenCalledWith({
+        content:
+          'The learner believes the previous answer was incorrect. Correct it clearly, explain what changed, and continue from there.',
+        metadata: {
+          type: 'message_feedback',
+          value: 'incorrect',
+          eventId: 'event-3',
+        },
+      });
+      expect(mockStream).toHaveBeenCalledWith(
+        'I think that answer is incorrect. Can you correct it and explain what changed?',
+        expect.any(Function),
+        expect.any(Function),
+        'session-1',
+        undefined
+      );
+    });
   });
 
   it('hydrates milestone tracker state from the recovery marker when resuming', async () => {

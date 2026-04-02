@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { HomeCardId } from '@eduagent/schemas';
 import { HomeActionCard } from '../../components/coaching';
 import { RetentionSignal } from '../../components/progress';
 import {
@@ -23,6 +24,10 @@ import {
   usePendingCelebrations,
 } from '../../hooks/use-celebrations';
 import { useProfile } from '../../lib/profile';
+import {
+  useHomeCards,
+  useTrackHomeCardInteraction,
+} from '../../hooks/use-home-cards';
 import { useSubjects } from '../../hooks/use-subjects';
 import {
   useContinueSuggestion,
@@ -39,10 +44,6 @@ import {
   readSessionRecoveryMarker,
 } from '../../lib/session-recovery';
 import { useApiClient } from '../../lib/api-client';
-import {
-  incrementHomeCardDismissal,
-  readHomeCardDismissals,
-} from '../../lib/home-card-dismissals';
 
 interface HomeCardModel {
   id:
@@ -59,6 +60,9 @@ interface HomeCardModel {
   secondaryLabel?: string;
   priority: number;
   compact?: boolean;
+  subjectId?: string;
+  subjectName?: string;
+  topicId?: string;
 }
 
 export default function HomeScreen() {
@@ -91,15 +95,14 @@ export default function HomeScreen() {
     isChecked: apiChecked,
     recheck: recheckApi,
   } = useApiReachability();
-  const [dismissalCounts, setDismissalCounts] = useState<
-    Record<string, number>
-  >({});
   const [hiddenCardIds, setHiddenCardIds] = useState<string[]>([]);
   const [recoveryCard, setRecoveryCard] = useState<{
     sessionId: string;
     subjectName?: string;
     active: boolean;
   } | null>(null);
+  const homeCardsQuery = useHomeCards();
+  const trackHomeCardInteraction = useTrackHomeCardInteraction();
   const { CelebrationOverlay } = useCelebration({
     queue: pendingCelebrations.data ?? [],
     celebrationLevel,
@@ -119,25 +122,8 @@ export default function HomeScreen() {
   const firstSubjectId = activeSubjects[0]?.id;
 
   useEffect(() => {
-    if (!activeProfile) {
-      setDismissalCounts({});
-      setHiddenCardIds([]);
-      return;
-    }
-
-    let cancelled = false;
-    void (async () => {
-      const counts = await readHomeCardDismissals(activeProfile.id);
-      if (!cancelled) {
-        setDismissalCounts(counts);
-        setHiddenCardIds([]);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeProfile]);
+    setHiddenCardIds([]);
+  }, [activeProfile?.id]);
 
   const handlePracticePress = useCallback((): void => {
     if (continueSuggestion) {
@@ -256,23 +242,10 @@ export default function HomeScreen() {
     }
   }
 
-  const homeCardsLoading = subjectsLoading || suggestionLoading;
+  const homeCardsLoading =
+    subjectsLoading || suggestionLoading || homeCardsQuery.isLoading;
 
-  const { rankedHomeCards, reviewTargetSubjectId } = useMemo(() => {
-    const totalReviewDue =
-      overallProgress?.subjects?.reduce(
-        (total, subject) => total + subject.urgencyScore,
-        0
-      ) ?? 0;
-    const reviewSubjectNames =
-      overallProgress?.subjects
-        ?.filter((subject) => subject.urgencyScore > 0)
-        .map((subject) => subject.name)
-        .slice(0, 3) ?? [];
-    const targetSubjectId =
-      overallProgress?.subjects?.find((subject) => subject.urgencyScore > 0)
-        ?.subjectId ?? firstSubjectId;
-
+  const rankedHomeCards = useMemo(() => {
     const cards: HomeCardModel[] = [];
 
     if (recoveryCard) {
@@ -288,92 +261,13 @@ export default function HomeScreen() {
         primaryLabel: recoveryCard.active ? 'Continue Session' : 'See Summary',
         secondaryLabel: recoveryCard.active ? 'End & See Summary' : undefined,
         priority: 100,
+        compact: false,
       });
     }
 
-    if (activeSubjects.length === 0 && (allSubjects?.length ?? 0) > 0) {
-      cards.push({
-        id: 'restore_subjects',
-        title: 'No active subjects right now',
-        subtitle:
-          'Restore or resume a subject from your Learning Book when you are ready.',
-        badge: 'Subject control',
-        primaryLabel: 'Manage subjects',
-        priority: 90,
-      });
-    } else {
-      if (totalReviewDue > 0) {
-        cards.push({
-          id: 'review',
-          title:
-            totalReviewDue === 1
-              ? '1 topic ready to review'
-              : `${totalReviewDue} topics ready to review`,
-          subtitle:
-            reviewSubjectNames.length > 0
-              ? reviewSubjectNames.join(', ')
-              : 'Open your Learning Book to revisit what needs another look.',
-          badge: totalReviewDue >= 3 ? 'Needs review' : 'Review',
-          primaryLabel: 'Open Learning Book',
-          priority: totalReviewDue >= 3 ? 88 : 74,
-          compact: true,
-        });
-      }
-
-      cards.push({
-        id: 'study',
-        title: continueSuggestion
-          ? `Continue ${continueSuggestion.subjectName}`
-          : `Study ${activeSubjects[0]?.name ?? 'your subject'}`,
-        subtitle: continueSuggestion
-          ? continueSuggestion.topicTitle
-          : 'Jump back into practice or keep building momentum.',
-        badge: continueSuggestion ? 'Continue' : 'Study',
-        primaryLabel: continueSuggestion ? 'Continue topic' : 'Practice now',
-        priority: continueSuggestion ? 82 : 68,
-      });
-
-      cards.push({
-        id: 'homework',
-        title: 'Homework help',
-        subtitle: firstSubjectId
-          ? `Snap a question and get direct help in ${activeSubjects[0]?.name}.`
-          : 'Snap a question and open the camera.',
-        badge: 'Quick start',
-        primaryLabel: 'Open camera',
-        priority: 70,
-        compact: true,
-      });
-
-      cards.push({
-        id: 'ask',
-        title: 'Just ask something',
-        subtitle:
-          'Start a freeform session when you want to switch gears or follow curiosity.',
-        primaryLabel: 'Start session',
-        priority: 56,
-        compact: true,
-      });
-    }
-
-    const ranked = cards
-      .map((card) => ({
-        ...card,
-        priority:
-          card.priority - ((dismissalCounts[card.id] ?? 0) >= 3 ? 20 : 0),
-      }))
-      .sort((a, b) => b.priority - a.priority);
-
-    return { rankedHomeCards: ranked, reviewTargetSubjectId: targetSubjectId };
-  }, [
-    activeSubjects,
-    allSubjects,
-    continueSuggestion,
-    dismissalCounts,
-    firstSubjectId,
-    overallProgress,
-    recoveryCard,
-  ]);
+    cards.push(...((homeCardsQuery.data?.cards as HomeCardModel[] | undefined) ?? []));
+    return cards;
+  }, [homeCardsQuery.data?.cards, recoveryCard]);
 
   const visibleHomeCards = rankedHomeCards
     .filter((card) => !hiddenCardIds.includes(card.id))
@@ -422,22 +316,26 @@ export default function HomeScreen() {
       if (cardId === 'resume_session') {
         void clearSessionRecoveryMarker();
         setRecoveryCard(null);
+        return;
       }
 
-      if (!activeProfile) return;
-      void (async () => {
-        const nextCounts = await incrementHomeCardDismissal(
-          activeProfile.id,
-          cardId
-        );
-        setDismissalCounts(nextCounts);
-      })();
+      trackHomeCardInteraction.mutate({
+        cardId: cardId as HomeCardId,
+        interactionType: 'dismiss',
+      });
     },
-    [activeProfile, visibleHomeCards.length]
+    [trackHomeCardInteraction, visibleHomeCards.length]
   );
 
   const handleHomeCardPrimary = useCallback(
     async (card: HomeCardModel) => {
+      if (card.id !== 'resume_session') {
+        trackHomeCardInteraction.mutate({
+          cardId: card.id as HomeCardId,
+          interactionType: 'tap',
+        });
+      }
+
       switch (card.id) {
         case 'resume_session':
           if (!recoveryCard) return;
@@ -455,20 +353,37 @@ export default function HomeScreen() {
           router.push('/(learner)/book' as never);
           return;
         case 'review':
-          if (reviewTargetSubjectId) {
+          if (card.subjectId) {
             router.push({
               pathname: '/(learner)/book',
-              params: { subjectId: reviewTargetSubjectId },
+              params: { subjectId: card.subjectId },
             } as never);
             return;
           }
           router.push('/(learner)/book' as never);
           return;
         case 'study':
+          if (card.subjectId && card.topicId) {
+            router.push(
+              `/(learner)/session?mode=practice&subjectId=${card.subjectId}&topicId=${card.topicId}` as never
+            );
+            return;
+          }
+          if (card.subjectId && card.subjectName) {
+            router.push(
+              `/(learner)/session?mode=practice&subjectId=${
+                card.subjectId
+              }&subjectName=${encodeURIComponent(card.subjectName)}` as never
+            );
+            return;
+          }
           handlePracticePress();
           return;
         case 'homework': {
-          const defaultSubject = activeSubjects[0];
+          const defaultSubject =
+            card.subjectId && card.subjectName
+              ? { id: card.subjectId, name: card.subjectName }
+              : activeSubjects[0];
           router.push(
             defaultSubject
               ? ({
@@ -484,8 +399,10 @@ export default function HomeScreen() {
         }
         case 'ask':
           router.push(
-            (firstSubjectId
-              ? `/(learner)/session?mode=freeform&subjectId=${firstSubjectId}`
+            ((card.subjectId ?? firstSubjectId)
+              ? `/(learner)/session?mode=freeform&subjectId=${
+                  card.subjectId ?? firstSubjectId
+                }`
               : '/(learner)/session?mode=freeform') as never
           );
       }
@@ -495,8 +412,8 @@ export default function HomeScreen() {
       firstSubjectId,
       handlePracticePress,
       recoveryCard,
-      reviewTargetSubjectId,
       router,
+      trackHomeCardInteraction,
     ]
   );
 
@@ -632,7 +549,7 @@ export default function HomeScreen() {
                       }
                       onDismiss={() => handleDismissHomeCard(card.id)}
                       dismissDisabled={visibleHomeCards.length <= 1}
-                      compact={index > 0 || card.compact}
+                      compact={card.compact}
                       testID={`home-card-${card.id}`}
                     />
                   </View>

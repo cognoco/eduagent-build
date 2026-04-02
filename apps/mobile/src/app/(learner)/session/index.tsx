@@ -98,12 +98,22 @@ function MilestoneDots({ count }: { count: number }) {
   );
 }
 
-type QuickChipId = 'hint' | 'example' | 'simpler' | 'switch_topic' | 'park';
+type QuickChipId =
+  | 'hint'
+  | 'example'
+  | 'know_this'
+  | 'explain_differently'
+  | 'too_easy'
+  | 'too_hard'
+  | 'switch_topic'
+  | 'park';
 
-type MessageFeedbackState = 'helpful' | 'retry' | 'flagged';
+type ContextualQuickChipId = Exclude<QuickChipId, 'switch_topic' | 'park'>;
+
+type MessageFeedbackState = 'helpful' | 'not_helpful' | 'incorrect';
 
 const QUICK_CHIP_CONFIG: Record<
-  Exclude<QuickChipId, 'switch_topic' | 'park'>,
+  ContextualQuickChipId,
   {
     label: string;
     prompt: string;
@@ -122,13 +132,44 @@ const QUICK_CHIP_CONFIG: Record<
     systemPrompt:
       'The learner wants a fresh worked example. Use one similar example and keep it concise.',
   },
-  simpler: {
-    label: 'Simpler',
-    prompt: 'Can you explain that more simply?',
+  know_this: {
+    label: 'I know this',
+    prompt: 'I know this part already. Can we move ahead?',
     systemPrompt:
-      'The learner wants a simpler explanation. Re-explain with plainer language and one concrete example.',
+      'The learner says they already know this. Briefly verify, then move forward or increase the challenge slightly.',
+  },
+  explain_differently: {
+    label: 'Explain differently',
+    prompt: 'Can you explain that differently?',
+    systemPrompt:
+      'The learner wants a different explanation. Re-explain with a new angle and one concrete example.',
+  },
+  too_easy: {
+    label: 'Too easy',
+    prompt: 'That feels too easy. Can you make it more challenging?',
+    systemPrompt:
+      'The learner says this is too easy. Raise the challenge a little and ask for more independent thinking.',
+  },
+  too_hard: {
+    label: 'Too hard',
+    prompt: 'That feels too hard. Can you break it down more?',
+    systemPrompt:
+      'The learner says this is too hard. Lower the difficulty, add more structure, and keep the next step small.',
   },
 };
+
+function getContextualQuickChips(
+  message: ChatMessage | undefined
+): ContextualQuickChipId[] {
+  if (!message) return [];
+
+  const questionLike = /\?(\s|$)/.test(message.content);
+  if (questionLike) {
+    return ['too_hard', 'explain_differently', 'hint'];
+  }
+
+  return ['know_this', 'explain_differently', 'too_easy', 'example'];
+}
 
 export default function SessionScreen() {
   const {
@@ -214,6 +255,9 @@ export default function SessionScreen() {
   const [topicSwitcherSubjectId, setTopicSwitcherSubjectId] = useState<
     string | null
   >(subjectId ?? null);
+  const [consumedQuickChipMessageId, setConsumedQuickChipMessageId] = useState<
+    string | null
+  >(null);
   const [messageFeedback, setMessageFeedback] = useState<
     Record<string, MessageFeedbackState>
   >({});
@@ -264,6 +308,7 @@ export default function SessionScreen() {
       setParkingLotDraft('');
       setShowTopicSwitcher(false);
       setTopicSwitcherSubjectId(subjectId ?? null);
+      setConsumedQuickChipMessageId(null);
       setMessageFeedback({});
       hasHydratedRecoveryRef.current = false;
       resetMilestones();
@@ -941,7 +986,7 @@ export default function SessionScreen() {
   ]);
 
   const handleQuickChip = useCallback(
-    async (chip: QuickChipId) => {
+    async (chip: QuickChipId, sourceMessageId?: string) => {
       if (chip === 'switch_topic') {
         setShowTopicSwitcher(true);
         return;
@@ -973,6 +1018,10 @@ export default function SessionScreen() {
         }
       }
 
+      if (sourceMessageId) {
+        setConsumedQuickChipMessageId(sourceMessageId);
+      }
+
       await handleSend(config.prompt);
     },
     [activeSessionId, handleSend, recordSystemPrompt]
@@ -982,27 +1031,32 @@ export default function SessionScreen() {
     async (message: ChatMessage, action: MessageFeedbackState) => {
       if (!message.eventId || !activeSessionId) return;
 
-      if (action === 'flagged') {
-        try {
-          await flagSessionContent.mutateAsync({
-            eventId: message.eventId,
-            reason: 'Flagged from learner session controls',
-          });
-          setMessageFeedback((prev) => ({ ...prev, [message.id]: action }));
-        } catch (err: unknown) {
-          Alert.alert('Could not flag message', formatApiError(err));
-        }
-        return;
-      }
-
-      const systemPrompt =
-        action === 'helpful'
-          ? 'The learner marked the previous answer as helpful. Keep the same pace and level of guidance.'
-          : 'The learner is still confused by the previous answer. Re-explain more simply with one new example.';
+      const systemPromptByAction: Record<MessageFeedbackState, string> = {
+        helpful:
+          'The learner marked the previous answer as helpful. Keep the same pace and level of guidance.',
+        not_helpful:
+          'The learner marked the previous answer as not helpful. Re-explain more clearly with one new example.',
+        incorrect:
+          'The learner believes the previous answer was incorrect. Correct it clearly, explain what changed, and continue from there.',
+      };
+      const followUpPromptByAction: Partial<
+        Record<MessageFeedbackState, string>
+      > = {
+        not_helpful: 'Can you explain that differently?',
+        incorrect:
+          'I think that answer is incorrect. Can you correct it and explain what changed?',
+      };
 
       try {
+        if (action === 'incorrect') {
+          await flagSessionContent.mutateAsync({
+            eventId: message.eventId,
+            reason: 'Learner marked response as incorrect',
+          });
+        }
+
         await recordSystemPrompt.mutateAsync({
-          content: systemPrompt,
+          content: systemPromptByAction[action],
           metadata: {
             type: 'message_feedback',
             value: action,
@@ -1011,8 +1065,9 @@ export default function SessionScreen() {
         });
         setMessageFeedback((prev) => ({ ...prev, [message.id]: action }));
 
-        if (action === 'retry') {
-          await handleSend('Can you try that a different way?');
+        const followUpPrompt = followUpPromptByAction[action];
+        if (followUpPrompt) {
+          await handleSend(followUpPrompt);
         }
       } catch (err: unknown) {
         Alert.alert('Could not save feedback', formatApiError(err));
@@ -1060,6 +1115,14 @@ export default function SessionScreen() {
 
   const userMessageCount = useMemo(
     () => messages.filter((m) => m.role === 'user').length,
+    [messages]
+  );
+  const latestAiMessageId = useMemo(
+    () =>
+      [...messages]
+        .reverse()
+        .find((message) => message.role === 'ai' && !message.streaming)
+        ?.id ?? null,
     [messages]
   );
 
@@ -1119,7 +1182,7 @@ export default function SessionScreen() {
     ? 'Server unreachable - messages may fail'
     : modeConfig.subtitle;
 
-  const quickChipAccessory = (
+  const sessionToolAccessory = (
     <View className="bg-surface border-t border-surface-elevated px-4 py-3">
       <ScrollView
         horizontal
@@ -1129,9 +1192,6 @@ export default function SessionScreen() {
       >
         {(
           [
-            { id: 'hint', label: 'Hint' },
-            { id: 'example', label: 'Example' },
-            { id: 'simpler', label: 'Simpler' },
             { id: 'switch_topic', label: 'Switch topic' },
             { id: 'park', label: 'Park it' },
           ] as Array<{ id: QuickChipId; label: string }>
@@ -1234,84 +1294,113 @@ export default function SessionScreen() {
 
   const sessionAccessory = (
     <>
-      {quickChipAccessory}
+      {sessionToolAccessory}
       {homeworkModeChips}
     </>
   );
 
   const renderMessageActions = (message: ChatMessage): React.ReactNode => {
-    if (
-      message.role !== 'ai' ||
-      message.streaming ||
-      message.isSystemPrompt ||
-      !message.eventId
-    ) {
+    if (message.role !== 'ai' || message.streaming || message.isSystemPrompt) {
       return null;
     }
 
     const feedbackState = messageFeedback[message.id];
+    const feedbackTestIdSuffix = message.eventId ?? message.id;
+    const contextualQuickChips =
+      message.id === latestAiMessageId &&
+      message.id !== consumedQuickChipMessageId
+        ? getContextualQuickChips(message)
+        : [];
+    const showFeedbackButtons = !!message.eventId;
+
+    if (contextualQuickChips.length === 0 && !showFeedbackButtons) {
+      return null;
+    }
 
     return (
-      <View className="flex-row flex-wrap gap-2">
-        <Pressable
-          onPress={() => void handleMessageFeedback(message, 'helpful')}
-          disabled={feedbackState === 'flagged'}
-          className={
-            feedbackState === 'helpful'
-              ? 'rounded-full bg-primary/15 px-3 py-1.5'
-              : 'rounded-full bg-surface-elevated px-3 py-1.5'
-          }
-          testID={`message-feedback-helpful-${message.id}`}
-        >
-          <Text
-            className={
-              feedbackState === 'helpful'
-                ? 'text-caption font-semibold text-primary'
-                : 'text-caption font-semibold text-text-secondary'
-            }
-          >
-            Helpful
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => void handleMessageFeedback(message, 'retry')}
-          disabled={feedbackState === 'flagged'}
-          className={
-            feedbackState === 'retry'
-              ? 'rounded-full bg-warning/15 px-3 py-1.5'
-              : 'rounded-full bg-surface-elevated px-3 py-1.5'
-          }
-          testID={`message-feedback-retry-${message.id}`}
-        >
-          <Text
-            className={
-              feedbackState === 'retry'
-                ? 'text-caption font-semibold text-warning'
-                : 'text-caption font-semibold text-text-secondary'
-            }
-          >
-            Try differently
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => void handleMessageFeedback(message, 'flagged')}
-          className={
-            feedbackState === 'flagged'
-              ? 'rounded-full bg-danger/15 px-3 py-1.5'
-              : 'rounded-full bg-surface-elevated px-3 py-1.5'
-          }
-          testID={`message-feedback-flag-${message.id}`}
-        >
-          <Text
-            className={
-              feedbackState === 'flagged'
-                ? 'text-caption font-semibold text-danger'
-                : 'text-caption font-semibold text-text-secondary'
-            }
-          >
-            Flag
-          </Text>
-        </Pressable>
+      <View className="gap-2">
+        {contextualQuickChips.length > 0 && (
+          <View className="flex-row flex-wrap gap-2">
+            {contextualQuickChips.map((chipId) => {
+              const chip = QUICK_CHIP_CONFIG[chipId];
+              return (
+                <Pressable
+                  key={`${message.id}-${chipId}`}
+                  onPress={() => void handleQuickChip(chipId, message.id)}
+                  className="rounded-full bg-surface-elevated px-3 py-1.5"
+                  testID={`quick-chip-${chipId}`}
+                >
+                  <Text className="text-caption font-semibold text-text-secondary">
+                    {chip.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+        {showFeedbackButtons && (
+          <View className="flex-row flex-wrap gap-2">
+            <Pressable
+              onPress={() => void handleMessageFeedback(message, 'helpful')}
+              disabled={feedbackState === 'incorrect'}
+              className={
+                feedbackState === 'helpful'
+                  ? 'rounded-full bg-primary/15 px-3 py-1.5'
+                  : 'rounded-full bg-surface-elevated px-3 py-1.5'
+              }
+              testID={`message-feedback-helpful-${feedbackTestIdSuffix}`}
+            >
+              <Text
+                className={
+                  feedbackState === 'helpful'
+                    ? 'text-caption font-semibold text-primary'
+                    : 'text-caption font-semibold text-text-secondary'
+                }
+              >
+                Helpful
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void handleMessageFeedback(message, 'not_helpful')}
+              disabled={feedbackState === 'incorrect'}
+              className={
+                feedbackState === 'not_helpful'
+                  ? 'rounded-full bg-warning/15 px-3 py-1.5'
+                  : 'rounded-full bg-surface-elevated px-3 py-1.5'
+              }
+              testID={`message-feedback-not-helpful-${feedbackTestIdSuffix}`}
+            >
+              <Text
+                className={
+                  feedbackState === 'not_helpful'
+                    ? 'text-caption font-semibold text-warning'
+                    : 'text-caption font-semibold text-text-secondary'
+                }
+              >
+                Not helpful
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void handleMessageFeedback(message, 'incorrect')}
+              className={
+                feedbackState === 'incorrect'
+                  ? 'rounded-full bg-danger/15 px-3 py-1.5'
+                  : 'rounded-full bg-surface-elevated px-3 py-1.5'
+              }
+              testID={`message-feedback-incorrect-${feedbackTestIdSuffix}`}
+            >
+              <Text
+                className={
+                  feedbackState === 'incorrect'
+                    ? 'text-caption font-semibold text-danger'
+                    : 'text-caption font-semibold text-text-secondary'
+                }
+              >
+                That&apos;s incorrect
+              </Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     );
   };
