@@ -21,6 +21,10 @@ const SignInScreen = require('./sign-in').default;
 
 describe('SignInScreen', () => {
   const mockCreate = jest.fn();
+  const mockPrepareFirstFactor = jest.fn();
+  const mockPrepareSecondFactor = jest.fn();
+  const mockAttemptFirstFactor = jest.fn();
+  const mockAttemptSecondFactor = jest.fn();
   const mockSetActive = jest.fn();
   const mockStartSSOFlow = jest.fn();
 
@@ -28,7 +32,13 @@ describe('SignInScreen', () => {
     jest.clearAllMocks();
     (useSignIn as jest.Mock).mockReturnValue({
       isLoaded: true,
-      signIn: { create: mockCreate },
+      signIn: {
+        create: mockCreate,
+        prepareFirstFactor: mockPrepareFirstFactor,
+        prepareSecondFactor: mockPrepareSecondFactor,
+        attemptFirstFactor: mockAttemptFirstFactor,
+        attemptSecondFactor: mockAttemptSecondFactor,
+      },
       setActive: mockSetActive,
     });
     (useSSO as jest.Mock).mockReturnValue({
@@ -87,6 +97,7 @@ describe('SignInScreen', () => {
 
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalledWith({
+        strategy: 'password',
         identifier: 'test@example.com',
         password: 'password123',
       });
@@ -119,6 +130,121 @@ describe('SignInScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Invalid credentials')).toBeTruthy();
+    });
+  });
+
+  it('starts email verification when Clerk requests it as the next step', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_first_factor',
+      createdSessionId: null,
+      supportedFirstFactors: [
+        {
+          strategy: 'email_code',
+          emailAddressId: 'email_123',
+          safeIdentifier: 't***@example.com',
+        },
+      ],
+    });
+    mockPrepareFirstFactor.mockResolvedValue(undefined);
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => {
+      expect(mockPrepareFirstFactor).toHaveBeenCalledWith({
+        strategy: 'email_code',
+        emailAddressId: 'email_123',
+      });
+    });
+
+    expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+    expect(screen.getByText('Enter verification code')).toBeTruthy();
+  });
+
+  it('continues sign-in with an emailed second-factor code', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [
+        {
+          strategy: 'email_code',
+          emailAddressId: 'email_456',
+          safeIdentifier: 't***@example.com',
+        },
+      ],
+    });
+    mockPrepareSecondFactor.mockResolvedValue(undefined);
+    mockAttemptSecondFactor.mockResolvedValue({
+      status: 'complete',
+      createdSessionId: 'sess_second_factor_123',
+    });
+    mockSetActive.mockResolvedValue(undefined);
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => {
+      expect(mockPrepareSecondFactor).toHaveBeenCalledWith({
+        strategy: 'email_code',
+        emailAddressId: 'email_456',
+      });
+    });
+
+    fireEvent.changeText(screen.getByTestId('sign-in-verify-code'), '123456');
+    fireEvent.press(screen.getByTestId('sign-in-verify-button'));
+
+    await waitFor(() => {
+      expect(mockAttemptSecondFactor).toHaveBeenCalledWith({
+        strategy: 'email_code',
+        code: '123456',
+      });
+    });
+
+    await waitFor(() => {
+      expect(mockSetActive).toHaveBeenCalledWith({
+        session: 'sess_second_factor_123',
+      });
+    });
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+    });
+  });
+
+  it('shows a generic unsupported verification message for non-email MFA methods', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [{ strategy: 'totp' }],
+    });
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Your account needs an additional verification step that this build could not start automatically. Please try again or use a different sign-in method.'
+        )
+      ).toBeTruthy();
     });
   });
 
