@@ -24,13 +24,16 @@ export function buildFallbackHomeSurfaceCard(profileId: string): CoachingCard {
     priority: 3,
     expiresAt: new Date(now.getTime() + HOME_SURFACE_TTL_MS).toISOString(),
     createdAt: now.toISOString(),
-    topicId: profileId,
+    topicId: generateUUIDv7(), // placeholder — no real topic for fallback card
     difficulty: 'easy',
     xpReward: 10,
   };
 }
 
-export async function findHomeSurfaceCache(db: Database, profileId: string) {
+export async function findHomeSurfaceCache(
+  db: Database,
+  profileId: string
+): Promise<typeof coachingCardCache.$inferSelect | undefined> {
   return db.query.coachingCardCache.findFirst({
     where: eq(coachingCardCache.profileId, profileId),
   });
@@ -55,6 +58,7 @@ export async function writeHomeSurfacePendingCelebrations(
       target: coachingCardCache.profileId,
       set: {
         pendingCelebrations,
+        expiresAt: new Date(now.getTime() + HOME_SURFACE_TTL_MS),
         updatedAt: now,
       },
     });

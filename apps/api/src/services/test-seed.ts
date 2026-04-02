@@ -275,8 +275,8 @@ async function deleteClerkTestUsers(
 // ---------------------------------------------------------------------------
 
 // Relative birth years — keeps fixtures stable as calendar year advances.
-// Adolescent (age 16) → LEARNER persona, subject to GDPR consent.
-const LEARNER_BIRTH_YEAR = new Date().getFullYear() - 16;
+// Age 17 → LEARNER persona, one year clear of the consent gate (age ≤ 16).
+const LEARNER_BIRTH_YEAR = new Date().getFullYear() - 17;
 
 function pastDate(daysAgo: number): Date {
   return new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
@@ -308,21 +308,23 @@ async function createBaseProfile(
     birthYear: number;
     isOwner?: boolean;
     birthDate?: Date;
+    personaType?: 'TEEN' | 'LEARNER' | 'PARENT';
   }
 ): Promise<string> {
   const profileId = generateUUIDv7();
-  const legacyPersonaType = (() => {
-    const ageBracket = computeAgeBracket(opts.birthYear);
-    if (ageBracket === 'child') return 'TEEN' as const;
-    // Adults default to LEARNER — PARENT only via explicit selection
-    return 'LEARNER' as const;
-  })();
+  const resolvedPersonaType =
+    opts.personaType ??
+    (() => {
+      const ageBracket = computeAgeBracket(opts.birthYear);
+      if (ageBracket === 'child') return 'TEEN' as const;
+      return 'LEARNER' as const;
+    })();
 
   await db.insert(profiles).values({
     id: profileId,
     accountId,
     displayName: opts.displayName,
-    personaType: legacyPersonaType,
+    personaType: resolvedPersonaType,
     isOwner: opts.isOwner ?? true,
     birthDate: opts.birthDate ?? birthDateFromBirthYear(opts.birthYear),
   });
@@ -666,6 +668,7 @@ async function seedParentWithChildren(
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Parent',
     birthYear: 1990,
+    personaType: 'PARENT',
     isOwner: true,
   });
 
@@ -734,6 +737,7 @@ async function seedParentMultiChild(
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Parent',
     birthYear: 1990,
+    personaType: 'PARENT',
     isOwner: true,
   });
 
@@ -1120,6 +1124,7 @@ async function seedTrialExpiredChild(
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Paywall Parent',
     birthYear: 1990,
+    personaType: 'PARENT',
     isOwner: true,
   });
 
@@ -1178,6 +1183,7 @@ async function seedConsentWithdrawn(
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Withdrawn Parent',
     birthYear: 1990,
+    personaType: 'PARENT',
     isOwner: true,
   });
 
@@ -1261,6 +1267,7 @@ async function seedParentSolo(
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Solo Parent',
     birthYear: 1990,
+    personaType: 'PARENT',
     isOwner: true,
   });
 

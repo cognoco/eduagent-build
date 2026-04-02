@@ -377,6 +377,11 @@ async function prepareExchangeContext(
 
   const topic = topicRows[0];
   const [profile] = profileRows;
+  if (!profile) {
+    console.warn(
+      `[processExchange] Profile ${profileId} not found — birthYear will be null, LLM defaults to adult tone`
+    );
+  }
   const retentionCard = retentionRows[0];
 
   // Determine verification type: explicit from session, or auto-select from retention card

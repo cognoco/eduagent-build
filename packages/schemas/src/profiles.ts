@@ -28,15 +28,28 @@ const profileCreateFields = z.object({
 
 export const profileCreateSchema = profileCreateFields.superRefine(
   (value, ctx) => {
-    if (value.birthDate || value.birthYear != null) {
+    if (!value.birthDate && value.birthYear == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['birthYear'],
+        message: 'birthDate or birthYear is required',
+      });
       return;
     }
 
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['birthYear'],
-      message: 'birthDate or birthYear is required',
-    });
+    // Reject conflicting birthDate + birthYear: consent/persona are derived from
+    // birthYear, but persistence prefers birthDate. A mismatch can skip consent.
+    if (value.birthDate && value.birthYear != null) {
+      const yearFromDate = new Date(value.birthDate).getUTCFullYear();
+      if (yearFromDate !== value.birthYear) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['birthYear'],
+          message:
+            'birthYear conflicts with birthDate — provide one or ensure they match',
+        });
+      }
+    }
   }
 );
 
@@ -44,7 +57,8 @@ export type ProfileCreateInput = z.infer<typeof profileCreateSchema>;
 
 export const profileUpdateSchema = profileCreateFields
   .partial()
-  .omit({ birthDate: true, birthYear: true, location: true });
+  .omit({ birthDate: true, birthYear: true, location: true })
+  .strict();
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 
 export const profileSwitchSchema = z.object({

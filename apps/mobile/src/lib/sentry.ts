@@ -65,7 +65,11 @@ export function isSentryEnabled(): boolean {
   return sentryActive;
 }
 
-/** Calculates age from a birth year using the current calendar year. */
+/** Calculates age from a birth year using the current calendar year.
+ *  Year-only approximation always rounds UP (overestimates age by up to 11
+ *  months), so the result errs toward *less* protection — consent/Sentry gates
+ *  must use `<=` thresholds to compensate (e.g., `age <= 16` not `age < 16`).
+ */
 function calculateAge(birthYear: number): number {
   return new Date().getFullYear() - birthYear;
 }
@@ -98,13 +102,13 @@ export function evaluateSentryForProfile(
       disableSentry();
     }
   } else if (
-    age < 16 &&
+    age <= 16 &&
     (consentStatus === 'WITHDRAWN' || consentStatus === 'PENDING')
   ) {
-    // 13–15 with withdrawn/pending consent: disable — parent opted out of data processing
+    // 13–16 with withdrawn/pending consent: disable — parent opted out of data processing
     disableSentry();
   } else {
-    // 13–15 with active consent, or 16+: enable
+    // 13–16 with active consent, or 17+: enable
     enableSentry();
   }
 }

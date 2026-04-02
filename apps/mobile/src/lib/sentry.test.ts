@@ -123,7 +123,15 @@ describe('evaluateSentryForProfile', () => {
     expect(isSentryEnabled()).toBe(true);
   });
 
-  it('enables Sentry for 16+ regardless of consent', () => {
+  it('disables Sentry for 16-year-old with WITHDRAWN consent', () => {
+    enableSentry();
+    const birthYear = new Date().getFullYear() - 16;
+
+    evaluateSentryForProfile(birthYear, 'WITHDRAWN');
+    expect(isSentryEnabled()).toBe(false);
+  });
+
+  it('enables Sentry for 17+ regardless of consent', () => {
     const birthYear = new Date().getFullYear() - 20;
 
     evaluateSentryForProfile(birthYear, null);
