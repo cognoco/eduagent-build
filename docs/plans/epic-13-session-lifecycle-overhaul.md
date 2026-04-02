@@ -2,7 +2,18 @@
 
 **Author:** Zuzka + Claude
 **Date:** 2026-03-30
-**Status:** Spec complete (v3 — post end-user challenge), priority TBD (pre-launch recommended — parent dashboard trust)
+**Status:** ALL 7 STORIES COMPLETE (verified 2026-04-01)
+
+> **Completion summary (2026-04-01 code audit):**
+> All stories 13.1 through 13.7 are implemented and verified. Key implementation details:
+>
+> - **13.1:** `wallClockSeconds` computed in `session.ts`, `computeActiveSeconds()` with adaptive per-gap caps, dashboard shows wall-clock + exchange count.
+> - **13.2:** Hard caps and nudge removed. `SessionTimerState` has no `nudgeThresholdSeconds`/`hardCapSeconds`. Adaptive silence replaces fixed thresholds. No `TEEN_*`/`ADULT_*` constants.
+> - **13.3:** Uses **SecureStore** for recovery markers (better choice than AsyncStorage — encrypted, persistent). 30-min recovery window. `AppState` listener backup. Inngest stale session cron every 10 min. "Pick up where you left off?" card on home screen.
+> - **13.4:** 4 celestial components (`PolarStar`, `TwinStars`, `Comet`, `OrionsBelt`) with full Reanimated animations. `useCelebration()` with queue/tier/3-level filtering. `useMilestoneTracker()` with mastery (`polar_star`, `twin_stars`, `comet`, `orions_belt`) + effort (`deep_diver`, `persistent`) milestones.
+> - **13.5:** `expectedResponseMinutes` in exchange metadata. `computeSilenceThresholdSeconds()` with pace multiplier (0.5-3.0). `medianResponseSeconds` on `teachingPreferences`. Session-completed chain updates baseline.
+> - **13.6:** Button text "I'm Done", alert "Ready to wrap up?", 3-sec fast celebration catch (polls for Inngest results), wall-clock-only summary, milestone recap.
+> - **13.7:** `queueCelebration()` service with atomic JSONB. `GET /celebrations/pending` + `POST /celebrations/seen` routes. `celebrationLevel` enum (`all`/`big_only`/`off`). Separate child/parent seen states. 7-day expiry. Inngest wiring (EVALUATE -> TwinStars, TEACH_BACK -> TwinStars, topic mastered -> Comet, streak 7 -> Comet, streak 30 -> OrionsBelt).
 
 ---
 
@@ -55,9 +66,9 @@ The server computes `hard_cap` (20 min for teens, 30 min for others) but the mob
 
 ### FR211: Graceful Session Close on App Background/Kill
 
-- **FR211.1:** The mobile session screen saves a crash recovery marker to `AsyncStorage` **on every message send** (after each exchange completes). This is simpler than a timed checkpoint interval, requires no new API endpoint, and covers the actual crash scenario: if the app dies, the last exchange is the recovery anchor.
+- **FR211.1:** The mobile session screen saves a crash recovery marker to `AsyncStorage` **on every message send** (after each exchange completes). This is simpler than a timed checkpoint interval, requires no new API endpoint, and covers the actual crash scenario: if the app dies, the last exchange is the recovery anchor. *(Implementation note: SecureStore used instead of AsyncStorage — encrypted and more persistent.)*
   - Recovery marker contains: `{ sessionId, exchangeCount, lastActivityTimestamp, savedAt }`.
-  - AsyncStorage write is local and fast — no network dependency.
+  - SecureStore write is local and fast — no network dependency.
 - **FR211.2:** The mobile session screen also listens to `AppState` changes. When the app transitions to `background` or `inactive`:
   - Write the recovery marker to AsyncStorage (in case the last exchange write was missed).
   - No network call needed — the server's `lastActivityAt` was already updated by the last exchange endpoint.
@@ -475,16 +486,16 @@ This eliminates cold-start inaccuracy from session 2 onward. The exponential mov
 **Scope:** Add `wallClockSeconds` column to `learningSessions`. Refactor `closeSession()` to compute active time from `sessionEvents` timestamps (adaptive per-gap caps) for internal analytics. Dashboard shows wall-clock + exchange count. Pure backend — no UI changes.
 
 **Acceptance criteria:**
-- [ ] New nullable `wall_clock_seconds` integer column on `learningSessions`
-- [ ] `computeActiveSeconds()` utility using per-gap caps from `expectedResponseMinutes` × pace multiplier (fallback: 10-min fixed cap)
-- [ ] `closeSession()` computes `durationSeconds` for internal analytics using capped-interval formula
-- [ ] `closeSession()` stores `wallClockSeconds = now - startedAt` as user-facing duration
-- [ ] Sessions with 0 events get `durationSeconds = 0` and `wallClockSeconds = now - startedAt`
-- [ ] Existing session-lifecycle tests updated
-- [ ] Dashboard `totalTimeThisWeekMinutes` reflects **wall-clock** time (from `wallClockSeconds`)
-- [ ] Dashboard includes total exchange count for displayed sessions
-- [ ] Dashboard label: "**X minutes, Y exchanges**"
-- [ ] Legacy sessions with `wallClockSeconds = null` fall back to existing `durationSeconds` for display; if that's also null, contribute 0 minutes
+- [x] New nullable `wall_clock_seconds` integer column on `learningSessions`
+- [x] `computeActiveSeconds()` utility using per-gap caps from `expectedResponseMinutes` × pace multiplier (fallback: 10-min fixed cap)
+- [x] `closeSession()` computes `durationSeconds` for internal analytics using capped-interval formula
+- [x] `closeSession()` stores `wallClockSeconds = now - startedAt` as user-facing duration
+- [x] Sessions with 0 events get `durationSeconds = 0` and `wallClockSeconds = now - startedAt`
+- [x] Existing session-lifecycle tests updated
+- [x] Dashboard `totalTimeThisWeekMinutes` reflects **wall-clock** time (from `wallClockSeconds`)
+- [x] Dashboard includes total exchange count for displayed sessions
+- [x] Dashboard label: "**X minutes, Y exchanges**"
+- [x] Legacy sessions with `wallClockSeconds = null` fall back to existing `durationSeconds` for display; if that's also null, contribute 0 minutes
 
 **Tests:** Unit test `computeActiveSeconds()` with: normal flow, long gaps (capped), adaptive caps (different per event), single event, zero events, rapid-fire events. Integration test: create session with known event gaps and LLM estimates, close, verify both durationSeconds and wallClockSeconds. Dashboard test: verify wall-clock + exchange count display.
 
@@ -493,12 +504,12 @@ This eliminates cold-start inaccuracy from session 2 onward. The exponential mov
 **Scope:** Simplify `session-lifecycle.ts` — remove hard cap, nudge, and all age-based timer constants. Keep only adaptive silence detection and auto-save (30 min).
 
 **Acceptance criteria:**
-- [ ] `SessionTimerState` loses `nudgeThresholdSeconds` and `hardCapSeconds`
-- [ ] `TimerCheck.action` reduced to `'continue' | 'silence_prompt' | 'auto_save'`
-- [ ] `createTimerConfig()` no longer accepts `personaType` — only needs auto-save threshold
-- [ ] Fixed silence threshold constants removed (silence is now adaptive per FR210.8-10)
-- [ ] All hard cap, nudge, TEEN_*, ADULT_* constants removed
-- [ ] All session-lifecycle tests updated
+- [x] `SessionTimerState` loses `nudgeThresholdSeconds` and `hardCapSeconds`
+- [x] `TimerCheck.action` reduced to `'continue' | 'silence_prompt' | 'auto_save'`
+- [x] `createTimerConfig()` no longer accepts `personaType` — only needs auto-save threshold
+- [x] Fixed silence threshold constants removed (silence is now adaptive per FR210.8-10)
+- [x] All hard cap, nudge, TEEN_*, ADULT_* constants removed
+- [x] All session-lifecycle tests updated
 
 **Tests:** Update `session-lifecycle.test.ts`. Verify `checkTimers()` never returns `nudge` or `hard_cap`.
 
@@ -507,18 +518,18 @@ This eliminates cold-start inaccuracy from session 2 onward. The exponential mov
 **Scope:** Save crash recovery marker to AsyncStorage on each message send. AppState listener as backup. Cold-start recovery check with **session resumption within 30 minutes**. Inngest cron for stale session cleanup. **No new API endpoint needed** (session data loaded from existing endpoints).
 
 **Acceptance criteria:**
-- [ ] Recovery marker written to AsyncStorage after each exchange completes
-- [ ] AppState `background`/`inactive` listener writes recovery marker as backup
-- [ ] AsyncStorage write happens **before** any network call (ordering critical)
-- [ ] Foregrounding within 30 min: **session resumes** — chat history loaded from server, session screen restored, "Welcome back" toast
-- [ ] If last exchange was incomplete (user message, no AI response), discard it — child sends new message
-- [ ] Foregrounding after 30+ min: session auto-closed, summary screen shown
-- [ ] Cold start with recovery marker + session still active (< 30 min): **"Pick up where you left off?"** card with [Continue Session] / [End & See Summary]
-- [ ] Cold start with recovery marker + session already closed (> 30 min or cron-closed): "Your session was saved" card → summary
-- [ ] Cards are dismissible — child may have intentionally quit
-- [ ] Recovery marker cleared after recovery, resumption, or dismissal
-- [ ] Inngest cron runs every 10 min, closes sessions idle > 30 min
-- [ ] Crash-recovered sessions get `durationSeconds` computed from session events
+- [x] Recovery marker written to SecureStore after each exchange completes *(implementation note: uses SecureStore instead of AsyncStorage — encrypted, more persistent, better choice)*
+- [x] AppState `background`/`inactive` listener writes recovery marker as backup
+- [x] SecureStore write happens **before** any network call (ordering critical)
+- [x] Foregrounding within 30 min: **session resumes** — chat history loaded from server, session screen restored, "Welcome back" toast
+- [x] If last exchange was incomplete (user message, no AI response), discard it — child sends new message
+- [x] Foregrounding after 30+ min: session auto-closed, summary screen shown
+- [x] Cold start with recovery marker + session still active (< 30 min): **"Pick up where you left off?"** card with [Continue Session] / [End & See Summary]
+- [x] Cold start with recovery marker + session already closed (> 30 min or cron-closed): "Your session was saved" card → summary
+- [x] Cards are dismissible — child may have intentionally quit
+- [x] Recovery marker cleared after recovery, resumption, or dismissal
+- [x] Inngest cron runs every 10 min, closes sessions idle > 30 min
+- [x] Crash-recovered sessions get `durationSeconds` computed from session events
 
 **Tests:** Unit test: recovery marker read/write. Integration test: simulate AppState transitions. Edge cases: (1) marker exists but session already closed server-side (race); (2) app killed mid-exchange — marker from previous exchange survives; (3) rapid background→foreground — no double-close; (4) stale session closed by cron before app reopens — card shows "session was saved"; (5) resumption loads correct chat history; (6) incomplete last exchange handled gracefully.
 
@@ -529,24 +540,24 @@ This eliminates cold-start inaccuracy from session 2 onward. The exponential mov
 **FRs:** FR214 (learning milestones), FR217.1 (in-session triggers), FR217.6 (tier mapping)
 
 **Acceptance criteria:**
-- [ ] Four animation components in `components/common/celebrations/`: `PolarStar`, `TwinStars`, `Comet`, `OrionsBelt`
-- [ ] Each component: Reanimated + SVG, `onComplete` callback, `useReducedMotion()` fallback, `testID`
-- [ ] `useCelebration()` hook: accepts a queue of celebrations, **respects `celebrationLevel` setting** (all/big_only/off), plays in sequence with delay between, fires `onAllComplete`
-- [ ] `useMilestoneTracker()` hook: tracks escalation rung AND engagement metrics from exchange metadata, returns triggered milestones
-- [ ] **Mastery milestones (rung-based):**
+- [x] Four animation components in `components/common/celebrations/`: `PolarStar`, `TwinStars`, `Comet`, `OrionsBelt`
+- [x] Each component: Reanimated + SVG, `onComplete` callback, `useReducedMotion()` fallback, `testID`
+- [x] `useCelebration()` hook: accepts a queue of celebrations, **respects `celebrationLevel` setting** (all/big_only/off), plays in sequence with delay between, fires `onAllComplete`
+- [x] `useMilestoneTracker()` hook: tracks escalation rung AND engagement metrics from exchange metadata, returns triggered milestones
+- [x] **Mastery milestones (rung-based):**
   - **Polar Star:** First AI response at rung 1-2
   - **Twin Stars:** 3rd consecutive rung 1-2
   - **Comet:** Rung drops from 3+ to 1-2 (breakthrough)
   - **Orion's Belt:** 5th consecutive rung 1-2
-- [ ] **Effort milestones (engagement-based):**
+- [x] **Effort milestones (engagement-based):**
   - **Deep Diver:** 3rd user message over 50 characters (thoughtful responses) — Tier 1 (PolarStar animation)
   - **Persistent:** User continues after a rung 4-5 correction (didn't give up) — Tier 2 (TwinStars animation)
-- [ ] Each milestone triggers exactly once per session
-- [ ] Animations overlay header, don't block chat input
-- [ ] Persistent earned indicators in fixed header position (max 6 dots) — works regardless of session mode (next to timer, question counter, or standalone)
-- [ ] `milestonesReached` stored in session metadata on close
-- [ ] No negative messaging if none earned — absence is neutral
-- [ ] Celebration registry includes `tier` field for level filtering
+- [x] Each milestone triggers exactly once per session
+- [x] Animations overlay header, don't block chat input
+- [x] Persistent earned indicators in fixed header position (max 6 dots) — works regardless of session mode (next to timer, question counter, or standalone)
+- [x] `milestonesReached` stored in session metadata on close
+- [x] No negative messaging if none earned — absence is neutral
+- [x] Celebration registry includes `tier` field for level filtering
 
 **Tests:** Unit test `useMilestoneTracker()`: correct triggers at each rung condition AND engagement condition. Comet only on rung *drop* (not always-low). Deep Diver fires on 3rd long message, not before. Persistent fires after correction + response, not on correction alone. Snapshot: reduced-motion fallback for each component. Component test: each fires once. `useCelebration()` queue test: plays in order. Level filtering test: `big_only` skips tier 1-2, `off` skips all.
 
@@ -557,21 +568,21 @@ This eliminates cold-start inaccuracy from session 2 onward. The exponential mov
 **FRs:** FR210.8-10 (adaptive silence), FR216 (silence detection UX)
 
 **Acceptance criteria:**
-- [ ] LLM system prompt updated to request `expectedResponseMinutes` (1-20) per response
-- [ ] Exchange response metadata schema includes `expectedResponseMinutes` (optional integer)
-- [ ] `expectedResponseMinutes` stored per exchange in `sessionEvents` (for active time computation on close)
-- [ ] Per-session `paceMultiplier` computed from ratio of actual response times to LLM estimates (median, clamped 0.5-3.0)
-- [ ] Before 3 exchanges: `paceMultiplier` initialized from cross-session baseline (or 1.0 if no baseline)
-- [ ] Silence threshold per exchange: `clamp(expectedResponseMinutes * paceMultiplier, 2, 20)` minutes
-- [ ] Fallback: 10 minutes if `expectedResponseMinutes` missing from response
-- [ ] Silence prompt appears in chat at computed threshold: "Still working on it? Take your time — I'm here when you're ready."
-- [ ] Prompt sent at most once per silence period
-- [ ] Tracked as `eventType: 'system_prompt'`, not counted in exchange count
-- [ ] No prompt if child is actively typing
-- [ ] 30 min full silence: session closed by Inngest cron (FR211.6)
-- [ ] New `medianResponseSeconds` nullable integer field on `teachingPreferences`
-- [ ] Session-completed Inngest chain: new step computes session median response time, updates `medianResponseSeconds` (exponential moving average: 80% old, 20% new)
-- [ ] Cross-session baseline used on session start to seed `paceMultiplier`
+- [x] LLM system prompt updated to request `expectedResponseMinutes` (1-20) per response
+- [x] Exchange response metadata schema includes `expectedResponseMinutes` (optional integer)
+- [x] `expectedResponseMinutes` stored per exchange in `sessionEvents` (for active time computation on close)
+- [x] Per-session `paceMultiplier` computed from ratio of actual response times to LLM estimates (median, clamped 0.5-3.0)
+- [x] Before 3 exchanges: `paceMultiplier` initialized from cross-session baseline (or 1.0 if no baseline)
+- [x] Silence threshold per exchange: `clamp(expectedResponseMinutes * paceMultiplier, 2, 20)` minutes
+- [x] Fallback: 10 minutes if `expectedResponseMinutes` missing from response
+- [x] Silence prompt appears in chat at computed threshold: "Still working on it? Take your time — I'm here when you're ready."
+- [x] Prompt sent at most once per silence period
+- [x] Tracked as `eventType: 'system_prompt'`, not counted in exchange count
+- [x] No prompt if child is actively typing
+- [x] 30 min full silence: session closed by Inngest cron (FR211.6)
+- [x] New `medianResponseSeconds` nullable integer field on `teachingPreferences`
+- [x] Session-completed Inngest chain: new step computes session median response time, updates `medianResponseSeconds` (exponential moving average: 80% old, 20% new)
+- [x] Cross-session baseline used on session start to seed `paceMultiplier`
 
 **Tests:** Unit: `computePaceMultiplier()` with various response time ratios. Unit: silence threshold computation with edge cases (missing estimate, extreme pace multiplier, first session). Unit: exponential moving average baseline update. Integration: simulate 3 exchanges, verify paceMultiplier adjusts. Edge case: LLM returns 1 (quick question) + slow student → threshold still ≥ 2 min. Edge case: LLM returns 20 (hard task) + fast student → threshold doesn't exceed 20 min. Cross-session: verify baseline persists and is read on next session start.
 
@@ -580,21 +591,21 @@ This eliminates cold-start inaccuracy from session 2 onward. The exponential mov
 **Scope:** Rename "End Session" to "I'm Done". Summary screen shows wall-clock time (encouragement) + learning milestone recap. Add 3-second wait for fast post-session achievements before navigating to summary. No "focused time" shown to child.
 
 **Acceptance criteria:**
-- [ ] Button: "I'm Done" (was "End Session")
-- [ ] Alert: "Ready to wrap up?" / "Keep Going" / "I'm Done"
-- [ ] After session close, show a brief "Wrapping up..." state (3 seconds max)
-- [ ] During the 3-second wait, check once for fast Inngest results (topic mastery, EVALUATE success typically compute in <2s)
-- [ ] If a celebration arrives within 3 seconds, include it in the summary screen
-- [ ] If nothing arrives in 3 seconds, proceed without — home screen queue catches it later
-- [ ] Summary shows wall-clock time only: "**45 minutes** — great session!"
-- [ ] No "focused time" or "active time" shown to child (internal analytics only)
-- [ ] Summary shows milestone recap if any milestones earned:
+- [x] Button: "I'm Done" (was "End Session")
+- [x] Alert: "Ready to wrap up?" / "Keep Going" / "I'm Done"
+- [x] After session close, show a brief "Wrapping up..." state (3 seconds max)
+- [x] During the 3-second wait, check once for fast Inngest results (topic mastery, EVALUATE success typically compute in <2s)
+- [x] If a celebration arrives within 3 seconds, include it in the summary screen
+- [x] If nothing arrives in 3 seconds, proceed without — home screen queue catches it later
+- [x] Summary shows wall-clock time only: "**45 minutes** — great session!"
+- [x] No "focused time" or "active time" shown to child (internal analytics only)
+- [x] Summary shows milestone recap if any milestones earned:
   - "Polar Star — first independent answer"
   - "Deep Diver — great thoughtful responses"
   - "Comet — you had a breakthrough!"
   - "Orion's Belt — 5 in a row without help!"
-- [ ] No milestone section if no milestones earned (neutral, not punitive)
-- [ ] Coaching card generation can reference milestones
+- [x] No milestone section if no milestones earned (neutral, not punitive)
+- [x] Coaching card generation can reference milestones
 
 **Tests:** Update summary screen tests. Verify wall-clock-only time display. Verify milestone recap renders (including effort milestones). Verify no section when none earned. Test 3-second wait: mock fast Inngest result arriving at 1.5s → appears in summary. Mock no result → summary shows after 3s timeout.
 
@@ -605,29 +616,29 @@ This eliminates cold-start inaccuracy from session 2 onward. The exponential mov
 **FRs:** FR217.2-FR217.11 (post-session queue), FR218.4-FR218.6 (age/preference)
 
 **Acceptance criteria:**
-- [ ] `pendingCelebrations` JSONB field on `coaching_card_cache` (default `[]`)
-- [ ] `celebrations_seen_by_child` and `celebrations_seen_by_parent` timestamp fields
-- [ ] `celebrationLevel` enum field on `teachingPreferences`: `'all' | 'big_only' | 'off'` (default `'all'`)
-- [ ] `queueCelebration(db, profileId, celebration, reason, detail?)` service function (atomic JSONB append)
-- [ ] Coaching card response includes `pendingCelebrations` filtered by child's `seenByChild` timestamp
-- [ ] `POST /v1/celebrations/seen` marks seen (accepts `viewer: 'child' | 'parent'`)
-- [ ] Inngest wiring:
+- [x] `pendingCelebrations` JSONB field on `coaching_card_cache` (default `[]`)
+- [x] `celebrations_seen_by_child` and `celebrations_seen_by_parent` timestamp fields
+- [x] `celebrationLevel` enum field on `teachingPreferences`: `'all' | 'big_only' | 'off'` (default `'all'`)
+- [x] `queueCelebration(db, profileId, celebration, reason, detail?)` service function (atomic JSONB append)
+- [x] Coaching card response includes `pendingCelebrations` filtered by child's `seenByChild` timestamp
+- [x] `POST /v1/celebrations/seen` marks seen (accepts `viewer: 'child' | 'parent'`) *(also: `GET /v1/celebrations/pending` route implemented)*
+- [x] Inngest wiring:
   - EVALUATE success → Twin Stars
   - TEACH_BACK quality ≥ 4 → Twin Stars
   - Topic mastered (quality ≥ 4, repetitions > 2) → Comet with topic name
   - 7-day streak → Comet
   - 30-day streak → Orion's Belt
-- [ ] **Child home screen:** plays pending celebrations on mount via `useCelebration()`, respecting `celebrationLevel`
-- [ ] **Parent dashboard child detail:** plays parent-filtered celebrations (`PARENT_VISIBLE_REASONS` set: topic_mastered, curriculum_complete, evaluate_success, teach_back_success, streak_7, streak_30)
-- [ ] Parent seeing celebrations doesn't clear them for child, and vice versa
-- [ ] Toast copy adapts by age: child "You had a breakthrough!", adult "Breakthrough — concept clicked."
-- [ ] **Three-level celebration toggle on More screen:**
+- [x] **Child home screen:** plays pending celebrations on mount via `useCelebration()`, respecting `celebrationLevel`
+- [x] **Parent dashboard child detail:** plays parent-filtered celebrations (`PARENT_VISIBLE_REASONS` set: topic_mastered, curriculum_complete, evaluate_success, teach_back_success, streak_7, streak_30)
+- [x] Parent seeing celebrations doesn't clear them for child, and vice versa
+- [x] Toast copy adapts by age: child "You had a breakthrough!", adult "Breakthrough — concept clicked."
+- [x] **Three-level celebration toggle on More screen:**
   - All celebrations (default) — every milestone fires
   - Big milestones only — Tier 3-4 (Comet + Orion's Belt) only
   - Off — no animations, milestones still tracked in metadata
-- [ ] When off: milestones still tracked in metadata (for coaching cards), only animation suppressed
-- [ ] Queue entries > 7 days silently dropped
-- [ ] Deduplication: same `(celebration, reason)` pair not queued twice
+- [x] When off: milestones still tracked in metadata (for coaching cards), only animation suppressed
+- [x] Queue entries > 7 days silently dropped
+- [x] Deduplication: same `(celebration, reason)` pair not queued twice
 
 **Tests:** `queueCelebration()` unit test. Deduplication. 7-day expiry. Separate seen states (child/parent). Parent filter test. API: `POST /celebrations/seen` with viewer param. Inngest integration: queue after EVALUATE success. Three-level toggle: verify `big_only` shows only tier 3-4, `off` shows nothing, milestones tracked in all cases. `celebrationLevel` persisted and read correctly.
 

@@ -1,5 +1,7 @@
 # E2E Test Results — Dev-Client on Android Emulator
 
+> **⚠️ Stale data (2026-04-02):** Last E2E session results are from mid-March 2026. All open bugs have been consolidated into the [MentoMate Bug Tracker](https://www.notion.so/b8ce802f11264a2fa123be5f888cbb23) in Notion. Future E2E results should be appended here AND tracked in Notion.
+
 **Date:** 2026-03-08 (updated 2026-03-13, Session 20)
 **Environment:** Windows 11 + WHPX emulator (New_Device, API 34, 1080x1920)
 **Build:** Dev-client APK built in WSL2 with expo-dev-client@~6.0.20

@@ -2,7 +2,28 @@
 
 **Author:** Zuzka + Claude
 **Date:** 2026-03-30
-**Status:** Spec complete, priority TBD (recommended: Phase A pre-launch, Phase B post-launch)
+**Status:** Partially implemented (6 of 12 stories complete as of 2026-04-01)
+
+---
+
+## Implementation Status (2026-04-01)
+
+| Story | Title | Status | Notes |
+|-------|-------|--------|-------|
+| 14.1 | Coaching card dismissal | NOT STARTED | Co-designs with Epic 12.7, blocked on persona removal |
+| 14.2 | "I don't remember" on recall tests | DONE | Hint then remediation flow implemented |
+| 14.3 | "Add my own topic" to curriculum | DONE | LLM normalization + user confirmation + `source: 'user'` |
+| 14.4 | "Something else" on ambiguous suggestions | DONE | Clarification input + "Just use my words" escape hatch |
+| 14.5 | Per-message feedback | NOT STARTED | |
+| 14.6 | Quick-action chips | NOT STARTED | |
+| 14.7 | Topic switch mid-session | NOT STARTED | |
+| 14.8 | Escalation visibility + difficulty nudge | NOT STARTED | |
+| 14.9 | Problem card preview + OCR correction | DONE | Client-side heuristic split, editable cards, merge/split, "Add problem I missed" |
+| 14.10 | "Help me" vs "Check my answer" per problem | DONE | Two chips, concise responses, teen gets shorter, AI never gives direct answer |
+| 14.11 | Multi-problem session flow | DONE | All problems sent to LLM, "Next problem" chip, problem counter, camera in chat |
+| 14.12 | Homework learning extraction | DONE | Inngest step, LLM reads conversation, structured JSON in `metadata.homeworkSummary` |
+
+**Summary:** Phase A is 3/4 complete (14.1 blocked). Phase B homework overhaul (14.9-14.12) is fully complete. Phase C session agency (14.5-14.8) is not started.
 
 ---
 
@@ -145,7 +166,7 @@ Specific gaps:
 
 ### Phase A — Low Effort, High Impact (Pre-Launch Recommended)
 
-#### Story 14.1: Coaching Card Dismissal
+#### Story 14.1: Coaching Card Dismissal — `NOT STARTED` (blocked on Epic 12.7)
 
 As a returning learner,
 I want to dismiss coaching card suggestions I don't need,
@@ -164,7 +185,7 @@ So that I can get straight to what I came to do.
 
 ---
 
-#### Story 14.2: "I Don't Remember" on Recall Tests
+#### Story 14.2: "I Don't Remember" on Recall Tests — `DONE`
 
 As a learner taking a recall test,
 I want to honestly say I don't remember,
@@ -183,7 +204,7 @@ So that the system helps me instead of waiting for me to guess.
 
 ---
 
-#### Story 14.3: "Add My Own Topic" to Curriculum
+#### Story 14.3: "Add My Own Topic" to Curriculum — `DONE`
 
 As a learner with specific learning needs,
 I want to add a topic that the AI didn't suggest,
@@ -202,7 +223,7 @@ So that my curriculum matches what I actually need to learn.
 
 ---
 
-#### Story 14.4: "Something Else" on Ambiguous Subject Suggestions
+#### Story 14.4: "Something Else" on Ambiguous Subject Suggestions — `DONE`
 
 As a learner creating a subject,
 I want to clarify what I mean when AI suggestions miss the mark,
@@ -223,7 +244,7 @@ So that I don't have to pick a subject I didn't want.
 
 ### Phase B — Medium Effort, High Impact (Post-Launch)
 
-#### Story 14.5: Per-Message Feedback
+#### Story 14.5: Per-Message Feedback — `NOT STARTED`
 
 As a learner in a session,
 I want to tell the AI when something is wrong or unhelpful,
@@ -243,7 +264,7 @@ So that it adjusts in real-time instead of me having to start over.
 
 ---
 
-#### Story 14.6: Quick-Action Chips
+#### Story 14.6: Quick-Action Chips — `NOT STARTED`
 
 As a learner in a session,
 I want quick ways to redirect the AI without typing,
@@ -263,7 +284,7 @@ So that I can say "I know this" or "too hard" with one tap.
 
 ---
 
-#### Story 14.7: Topic Switch Mid-Session
+#### Story 14.7: Topic Switch Mid-Session — `NOT STARTED`
 
 As a learner who wants to study a different topic,
 I want to switch without leaving the session screen,
@@ -282,7 +303,7 @@ So that I stay in flow instead of navigating back and forth.
 
 ---
 
-#### Story 14.8: Escalation Visibility + Difficulty Nudge
+#### Story 14.8: Escalation Visibility + Difficulty Nudge — `NOT STARTED`
 
 As a learner who wants more or less challenge,
 I want to see the AI's current difficulty level and nudge it,
@@ -301,7 +322,7 @@ So that the session matches my comfort level.
 
 ---
 
-#### Story 14.9: Homework Problem Card Preview + OCR Correction
+#### Story 14.9: Homework Problem Card Preview + OCR Correction — `DONE`
 
 As a student photographing homework,
 I want the app to show me each detected problem separately so I can verify and fix OCR errors,
@@ -322,7 +343,7 @@ So that the AI works with correct input from the start.
 
 ---
 
-#### Story 14.10: Homework "Help Me" vs "Check My Answer" Per Problem
+#### Story 14.10: Homework "Help Me" vs "Check My Answer" Per Problem — `DONE`
 
 As a student working through homework,
 I want to choose whether I need guidance or just want my answer checked,
@@ -343,7 +364,7 @@ So that I don't waste 5 minutes on Socratic questioning for a problem I already 
 
 ---
 
-#### Story 14.11: Homework Multi-Problem Session Flow
+#### Story 14.11: Homework Multi-Problem Session Flow — `DONE`
 
 As a student with multiple homework problems,
 I want to work through them in one session without starting over between each,
@@ -365,7 +386,7 @@ So that I finish my homework in one sitting.
 
 ---
 
-#### Story 14.12: Homework Learning Extraction + Parent Display
+#### Story 14.12: Homework Learning Extraction + Parent Display — `DONE`
 
 As a parent,
 I want to see what my child actually learned during homework — not just "38 minutes",
@@ -460,27 +481,27 @@ So that I can understand their progress and where they need support.
 
 ```
 Phase A (pre-launch, parallelizable):
-  14.1  (Dismiss coaching card)        ─── no deps, frontend only
-  14.2  (I don't remember)             ─── no deps, frontend + minor API
-  14.3  (Add my own topic)             ─── no deps, new API endpoint + frontend
-  14.4  (Something else)               ─── no deps, frontend only
+  14.1  (Dismiss coaching card)        ─── NOT STARTED — blocked on Epic 12.7
+  14.2  (I don't remember)             ─── DONE
+  14.3  (Add my own topic)             ─── DONE
+  14.4  (Something else)               ─── DONE
 
 Phase B — Homework Overhaul (high priority, sequential):
-  14.10 (Help me / Check my answer)    ─── no deps (prompt change only)
-  14.9  (Problem card preview + OCR)   ─── no deps (frontend only, camera.tsx)
-  14.11 (Multi-problem session flow)   ─── depends on 14.9 + 14.10
-  14.12 (Learning extraction + parent) ─── depends on 14.11 (needs homework sessions to extract from)
+  14.10 (Help me / Check my answer)    ─── DONE
+  14.9  (Problem card preview + OCR)   ─── DONE
+  14.11 (Multi-problem session flow)   ─── DONE
+  14.12 (Learning extraction + parent) ─── DONE
 
 Phase C — Session Agency (post-launch):
-  14.5  (Per-message feedback)         ─── no deps
-  14.6  (Quick-action chips)           ─── depends on 14.5 (same session event infrastructure)
-  14.7  (Topic switch mid-session)     ─── no deps (but complex — session lifecycle changes)
-  14.8  (Escalation visibility)        ─── depends on 14.6 (chips are the control mechanism)
+  14.5  (Per-message feedback)         ─── NOT STARTED
+  14.6  (Quick-action chips)           ─── NOT STARTED — depends on 14.5
+  14.7  (Topic switch mid-session)     ─── NOT STARTED
+  14.8  (Escalation visibility)        ─── NOT STARTED — depends on 14.6
 ```
 
-Phase A stories are independent and parallelizable.
-Phase B: 14.10 and 14.9 can be parallel (prompt vs frontend). Then 14.11, then 14.12.
-Phase C: light dependencies between stories.
+Phase A: 3/4 complete. 14.1 blocked on Epic 12.7 (persona removal co-design).
+Phase B: COMPLETE. All homework overhaul stories implemented.
+Phase C: Not started. These are post-launch enhancements.
 
 ---
 

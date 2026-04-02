@@ -1,5 +1,7 @@
 # Manual Testing Bugs — APK on Device
 
+> **📋 Superseded (2026-04-02):** All open bugs from this document have been transferred to the [MentoMate Bug Tracker](https://www.notion.so/b8ce802f11264a2fa123be5f888cbb23) in Notion. Fixed bugs are kept here as historical reference. Do not add new bugs to this file — use Notion instead.
+
 Reported: 2026-03-28
 Device: Physical Android phone
 
