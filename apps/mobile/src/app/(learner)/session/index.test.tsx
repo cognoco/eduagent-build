@@ -9,6 +9,8 @@ const mockStream = jest.fn();
 const mockHomeworkStatePost = jest.fn();
 const mockRecordSystemPrompt = jest.fn();
 const mockFlagSessionContent = jest.fn();
+const mockReplace = jest.fn();
+const mockClassifySubject = jest.fn();
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -97,7 +99,7 @@ jest.mock('../../../hooks/use-sessions', () => ({
 
 jest.mock('../../../hooks/use-classify-subject', () => ({
   useClassifySubject: () => ({
-    mutateAsync: jest.fn(),
+    mutateAsync: mockClassifySubject,
   }),
 }));
 
@@ -212,7 +214,7 @@ describe('SessionScreen homework flow', () => {
     jest.useFakeTimers();
     let aiEventCount = 0;
     (useRouter as jest.Mock).mockReturnValue({
-      replace: jest.fn(),
+      replace: mockReplace,
     });
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
@@ -264,6 +266,10 @@ describe('SessionScreen homework flow', () => {
     mockRecordSystemPrompt.mockResolvedValue({ ok: true });
     mockFlagSessionContent.mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
+    });
+    mockClassifySubject.mockResolvedValue({
+      candidates: [],
+      needsConfirmation: false,
     });
   });
 
@@ -361,6 +367,7 @@ describe('SessionScreen homework flow', () => {
         undefined
       );
     });
+    expect(screen.getByTestId('session-confirmation-toast')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('message-feedback-not-helpful-event-2'));
     await flushAsyncWork();
@@ -435,6 +442,46 @@ describe('SessionScreen homework flow', () => {
     await waitFor(() => {
       expect(mockReadSessionRecoveryMarker).toHaveBeenCalled();
       expect(mockHydrate).toHaveBeenCalled();
+    });
+  });
+
+  it('shows a wrong-subject recovery chip and replaces the session route in place', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+    });
+    mockClassifySubject.mockResolvedValue({
+      candidates: [
+        {
+          subjectId: 'subject-1',
+          subjectName: 'Math',
+          confidence: 0.62,
+        },
+      ],
+      needsConfirmation: true,
+    });
+
+    const screen = render(<SessionScreen />);
+
+    fireEvent.press(screen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(screen.getByText('Wrong subject')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('quick-chip-wrong_subject'));
+    fireEvent.press(screen.getByTestId('switch-topic-topic-1'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(learner)/session',
+        params: {
+          mode: 'learning',
+          subjectId: 'subject-1',
+          subjectName: 'Math',
+          topicId: 'topic-1',
+        },
+      });
     });
   });
 });

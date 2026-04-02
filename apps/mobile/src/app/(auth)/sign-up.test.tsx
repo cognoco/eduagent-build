@@ -29,6 +29,7 @@ describe('SignUpScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    delete process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY;
     (useSignUp as jest.Mock).mockReturnValue({
       isLoaded: true,
       signUp: {
@@ -47,10 +48,20 @@ describe('SignUpScreen', () => {
     render(<SignUpScreen />);
 
     expect(screen.getByTestId('sign-up-google-sso')).toBeTruthy();
+    expect(screen.queryByTestId('sign-up-openai-sso')).toBeNull();
     expect(screen.getByTestId('sign-up-email')).toBeTruthy();
     expect(screen.getByTestId('sign-up-password')).toBeTruthy();
     expect(screen.getByTestId('sign-up-button')).toBeTruthy();
     expect(screen.getByText('or continue with email')).toBeTruthy();
+  });
+
+  it('renders OpenAI SSO when configured', () => {
+    process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY = 'openai';
+
+    render(<SignUpScreen />);
+
+    expect(screen.getByTestId('sign-up-openai-sso')).toBeTruthy();
+    expect(screen.getByText('Continue with OpenAI')).toBeTruthy();
   });
 
   it('handles Google SSO sign-up', async () => {
@@ -197,6 +208,26 @@ describe('SignUpScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Incorrect code')).toBeTruthy();
+    });
+  });
+
+  it('handles OpenAI SSO sign-up when configured', async () => {
+    process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY = 'openai';
+    mockStartSSOFlow.mockResolvedValue({ createdSessionId: 'sess_openai' });
+    mockSetActive.mockResolvedValue(undefined);
+
+    render(<SignUpScreen />);
+
+    fireEvent.press(screen.getByTestId('sign-up-openai-sso'));
+
+    await waitFor(() => {
+      expect(mockStartSSOFlow).toHaveBeenCalledWith(
+        expect.objectContaining({ strategy: 'oauth_custom_openai' })
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockSetActive).toHaveBeenCalledWith({ session: 'sess_openai' });
     });
   });
 });
