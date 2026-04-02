@@ -351,7 +351,7 @@ describe('getOrCreateDraft', () => {
 
   it('maps dates to ISO strings', async () => {
     const row = mockDraftRow({ expiresAt: NOW });
-    const db = createMockDb({ findFirstResult: row });
+    const db = createMockDb({ findFirstResult: row, insertReturning: [row] });
 
     const result = await getOrCreateDraft(db, profileId, subjectId);
 

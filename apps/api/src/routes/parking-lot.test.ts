@@ -34,6 +34,7 @@ jest.mock('../services/parking-lot-data', () => ({
     items: [],
     count: 0,
   }),
+  MAX_ITEMS_PER_TOPIC: 10,
   addParkingLotItem: jest.fn().mockResolvedValue({
     id: 'new-item-id',
     question: 'Why does the sky appear blue?',

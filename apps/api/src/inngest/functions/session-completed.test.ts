@@ -235,9 +235,9 @@ describe('sessionCompleted', () => {
     const { result } = (await executeSteps(createEventData())) as any;
     const stepNames = result.outcomes.map((o: any) => o.step);
     expect(stepNames).toEqual([
+      'process-verification-completion',
       'update-retention',
       'update-needs-deepening',
-      'process-verification-completion',
       'write-coaching-card',
       'update-dashboard',
       'generate-embeddings',

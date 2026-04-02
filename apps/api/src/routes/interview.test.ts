@@ -79,6 +79,7 @@ jest.mock('../services/interview', () => ({
   getDraftState: jest.fn().mockResolvedValue(null),
   updateDraft: jest.fn().mockResolvedValue(undefined),
   persistCurriculum: jest.fn().mockResolvedValue(undefined),
+  buildDraftResumeSummary: jest.fn().mockReturnValue('Resume summary'),
 }));
 
 import { app } from '../index';
