@@ -1090,6 +1090,7 @@ export async function getSessionTranscript(
     subjectId: string;
     topicId: string | null;
     sessionType: 'learning' | 'homework' | 'interleaved';
+    verificationType?: 'standard' | 'evaluate' | 'teach_back' | null;
     startedAt: string;
     exchangeCount: number;
     milestonesReached: string[];
@@ -1159,6 +1160,7 @@ export async function getSessionTranscript(
       subjectId: session.subjectId,
       topicId: session.topicId,
       sessionType: session.sessionType,
+      verificationType: session.verificationType ?? null,
       startedAt: session.startedAt,
       exchangeCount: session.exchangeCount,
       milestonesReached,

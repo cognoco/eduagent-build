@@ -30,6 +30,7 @@ import { UsageMeter } from '../../components/common';
 import {
   useSubscription,
   useUsage,
+  useFamilySubscription,
   useJoinByokWaitlist,
   type SubscriptionTier,
 } from '../../hooks/use-subscription';
@@ -88,7 +89,7 @@ const TIER_FEATURES: Array<{
     features: [
       '1,500 questions per month (shared)',
       'All Plus features',
-      'Up to 5 child profiles',
+      'Up to 4 child profiles',
       'Parent dashboard',
     ],
   },
@@ -486,6 +487,9 @@ export default function SubscriptionScreen() {
     refetch: refetchUsage,
     isRefetching: usageRefetching,
   } = useUsage();
+  const { data: familySubscription } = useFamilySubscription(
+    subscription?.tier === 'family'
+  );
   const byokWaitlist = useJoinByokWaitlist();
 
   // Top-up IAP state
@@ -523,6 +527,7 @@ export default function SubscriptionScreen() {
     async (pkg: PurchasesPackage) => {
       try {
         await purchase.mutateAsync(pkg);
+        await Promise.all([refetchSub(), refetchUsage()]);
         Alert.alert('Success', 'Your subscription is now active!');
       } catch (error: unknown) {
         if (isPurchaseCancelledError(error)) {
@@ -542,7 +547,7 @@ export default function SubscriptionScreen() {
         );
       }
     },
-    [purchase]
+    [purchase, refetchSub, refetchUsage]
   );
 
   // ---------------------------------------------------------------------------
@@ -554,6 +559,7 @@ export default function SubscriptionScreen() {
       const info = await restore.mutateAsync();
       const restoredEntitlement = getActiveEntitlement(info);
       if (restoredEntitlement) {
+        await Promise.all([refetchSub(), refetchUsage()]);
         Alert.alert('Restored', 'Your subscription has been restored.');
       } else {
         Alert.alert(
@@ -567,7 +573,7 @@ export default function SubscriptionScreen() {
         'Could not restore purchases. Please try again.'
       );
     }
-  }, [restore]);
+  }, [refetchSub, refetchUsage, restore]);
 
   // ---------------------------------------------------------------------------
   // Manage billing — deep link to platform subscription management
@@ -853,6 +859,33 @@ export default function SubscriptionScreen() {
                 )}
                 <Text className="text-caption text-text-secondary mt-1">
                   Resets {new Date(usage.cycleResetAt).toLocaleDateString()}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {familySubscription && (
+            <View className="mt-4" testID="family-pool-section">
+              <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
+                Family pool
+              </Text>
+              <View className="bg-surface rounded-card px-4 py-3.5">
+                <Text className="text-body font-semibold text-text-primary">
+                  {familySubscription.profileCount} of{' '}
+                  {familySubscription.maxProfiles} profiles connected
+                </Text>
+                <Text className="text-caption text-text-secondary mt-1">
+                  {familySubscription.remainingQuestions} shared questions left
+                  this cycle.
+                </Text>
+                <Text className="text-caption text-text-secondary mt-1">
+                  {familySubscription.members
+                    .map((member) =>
+                      member.isOwner
+                        ? `${member.displayName} (owner)`
+                        : member.displayName
+                    )
+                    .join(', ')}
                 </Text>
               </View>
             </View>

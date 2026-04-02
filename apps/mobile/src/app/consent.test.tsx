@@ -159,6 +159,7 @@ describe('ConsentScreen', () => {
     mockMutateAsync.mockResolvedValue({
       message: 'Consent request sent',
       consentType: 'GDPR',
+      emailStatus: 'sent',
     });
 
     render(<ConsentScreen />, { wrapper: Wrapper });
@@ -193,6 +194,7 @@ describe('ConsentScreen', () => {
     mockMutateAsync.mockResolvedValue({
       message: 'Consent request sent',
       consentType: 'GDPR',
+      emailStatus: 'sent',
     });
 
     render(<ConsentScreen />, { wrapper: Wrapper });
@@ -218,6 +220,7 @@ describe('ConsentScreen', () => {
     mockMutateAsync.mockResolvedValue({
       message: 'Consent request sent',
       consentType: 'GDPR',
+      emailStatus: 'sent',
     });
 
     render(<ConsentScreen />, { wrapper: Wrapper });
@@ -257,6 +260,38 @@ describe('ConsentScreen', () => {
     });
 
     // Should remain on parent view, not transition to success
+    expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
+  });
+
+  it('shows a non-delivery fallback when the API reports failed email delivery', async () => {
+    mockMutateAsync.mockResolvedValue({
+      message: 'Consent request sent',
+      consentType: 'GDPR',
+      emailStatus: 'failed',
+    });
+
+    render(<ConsentScreen />, { wrapper: Wrapper });
+
+    fireEvent.press(screen.getByTestId('consent-handoff-button'));
+    fireEvent.changeText(
+      screen.getByTestId('consent-email'),
+      'parent@example.com'
+    );
+    fireEvent.press(screen.getByTestId('consent-submit'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('consent-success')).toBeTruthy();
+    });
+
+    expect(
+      screen.getByText("We couldn't confirm delivery yet")
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/could not confirm that the consent email reached/i)
+    ).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('consent-done'));
+    expect(mockBack).not.toHaveBeenCalled();
     expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
   });
 });

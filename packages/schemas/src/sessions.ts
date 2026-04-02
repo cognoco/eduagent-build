@@ -224,6 +224,7 @@ export const sessionTranscriptSchema = z.object({
     subjectId: z.string().uuid(),
     topicId: z.string().uuid().nullable(),
     sessionType: sessionTypeSchema,
+    verificationType: verificationTypeSchema.nullable().optional(),
     startedAt: z.string().datetime(),
     exchangeCount: z.number().int(),
     milestonesReached: z.array(celebrationReasonSchema).default([]),

@@ -32,6 +32,8 @@ jest.mock('@expo/vector-icons', () => ({
 const mockSubmitMutateAsync = jest.fn();
 const mockSkipMutateAsync = jest.fn();
 const mockUpdateLearningModeMutateAsync = jest.fn();
+const mockOnSuccessfulRecall = jest.fn();
+let mockTranscriptData: Record<string, unknown> | null = null;
 
 jest.mock('../../hooks/use-sessions', () => ({
   useSubmitSummary: () => ({
@@ -47,7 +49,7 @@ jest.mock('../../hooks/use-sessions', () => ({
     error: null,
   }),
   useSessionTranscript: () => ({
-    data: null,
+    data: mockTranscriptData,
     isLoading: false,
   }),
 }));
@@ -55,6 +57,12 @@ jest.mock('../../hooks/use-sessions', () => ({
 jest.mock('../../hooks/use-settings', () => ({
   useUpdateLearningMode: () => ({
     mutateAsync: mockUpdateLearningModeMutateAsync,
+  }),
+}));
+
+jest.mock('../../hooks/use-rating-prompt', () => ({
+  useRatingPrompt: () => ({
+    onSuccessfulRecall: mockOnSuccessfulRecall,
   }),
 }));
 
@@ -104,6 +112,8 @@ describe('SessionSummaryScreen', () => {
     mockParams.wallClockSeconds = undefined;
     mockParams.milestones = undefined;
     mockParams.fastCelebrations = undefined;
+    mockTranscriptData = null;
+    mockOnSuccessfulRecall.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -201,6 +211,51 @@ describe('SessionSummaryScreen', () => {
 
     fireEvent.press(screen.getByTestId('continue-button'));
     expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+  });
+
+  it('triggers the rating prompt hook before leaving a recall summary', async () => {
+    mockSubmitMutateAsync.mockResolvedValue({
+      summary: {
+        id: 'summary-1',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'I explained how factoring helps solve quadratic equations',
+        aiFeedback: 'Well done.',
+        status: 'accepted',
+      },
+    });
+    mockTranscriptData = {
+      session: {
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+        sessionType: 'learning',
+        verificationType: 'evaluate',
+        startedAt: '2026-04-01T00:00:00.000Z',
+        exchangeCount: 5,
+        milestonesReached: [],
+        wallClockSeconds: 600,
+      },
+      exchanges: [],
+    };
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('summary-input'),
+      'I explained how factoring helps solve quadratic equations'
+    );
+    fireEvent.press(screen.getByTestId('submit-summary-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('continue-button')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('continue-button'));
+
+    await waitFor(() => {
+      expect(mockOnSuccessfulRecall).toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+    });
   });
 
   it('persists skip before leaving the screen', async () => {

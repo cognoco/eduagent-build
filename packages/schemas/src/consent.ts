@@ -31,5 +31,6 @@ export type ConsentResponse = z.infer<typeof consentResponseSchema>;
 export const consentRequestResultSchema = z.object({
   message: z.string(),
   consentType: consentTypeSchema,
+  emailStatus: z.enum(['sent', 'failed']),
 });
 export type ConsentRequestResult = z.infer<typeof consentRequestResultSchema>;

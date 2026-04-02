@@ -606,3 +606,84 @@ Date: 2026-04-02
 
 - Epic 12.1's age-based voice refactor appears materially present in `apps/api/src/services/exchanges.ts`.
 - The earlier gap-analysis claim that `/v1/home-cards` was missing is now stale; the more accurate remaining gap is that the current implementation is still learner-only and still piggybacks on legacy home-surface storage.
+
+---
+
+# Epic 13 + Epic 14 Code Review Findings
+
+Date: 2026-04-02
+
+## Scope
+
+- Reviewed Epic 13 expectations from `docs/plans/epic-13-session-lifecycle-overhaul.md` and `docs/epics.md` against the current session-lifecycle, dashboard, recovery-marker, and celebration code in `apps/api/src` and `apps/mobile/src`.
+- Reviewed Epic 14 expectations from `docs/plans/epic-14-human-agency-feedback.md` and `docs/epics.md` against the current homework prompt assembly, session-agency controls, and event-model wiring in `apps/api/src`, `apps/mobile/src`, and `packages/*`.
+- This pass was code-inspection based. I did not rerun the full test suite.
+
+## Findings
+
+### 1. High: parent-facing duration still shows `durationSeconds` instead of the Epic 13 wall-clock metric
+
+- Epic/story: Epic 13 Story 13.1 and FR210.4-FR210.7 / FR215.1-FR215.4.
+- Evidence:
+  - The Epic 13 contract explicitly says `durationSeconds` is internal-only active time, while `wallClockSeconds` is the user-facing duration for both child and parent: `docs/plans/epic-13-session-lifecycle-overhaul.md:53-59`.
+  - The dashboard aggregate still prefers active time over wall-clock: `apps/api/src/services/dashboard.ts:272-277`.
+  - The parent child-detail session cards render `formatDuration(session.durationSeconds)`: `apps/mobile/src/app/(parent)/child/[profileId]/index.tsx:276-281`.
+  - The parent topic-detail session cards do the same: `apps/mobile/src/app/(parent)/child/[profileId]/topic/[topicId].tsx:196-200`.
+- Impact:
+  - Parent totals and per-session labels are still driven by the capped internal metric that Epic 13 explicitly said should never be shown to users.
+  - This undercuts the main trust-model change of Story 13.1, because off-screen study time and paper work are still undercounted on parent surfaces.
+
+### 2. High: the crash-recovery marker is global, so profile switching can erase another learner's resumable session
+
+- Epic/story: Epic 13 Story 13.3 / FR211, in a product that already supports multi-profile switching (`docs/epics.md:28-30`).
+- Evidence:
+  - The recovery marker uses one fixed SecureStore key and stores no `profileId`: `apps/mobile/src/lib/session-recovery.ts:4-20`.
+  - The learner session screen writes that shared marker on backgrounding/resume checkpoints: `apps/mobile/src/app/(learner)/session/index.tsx:479-493`.
+  - The learner home screen reads the same global marker and clears it whenever the current profile cannot fetch that session id: `apps/mobile/src/app/(learner)/home.tsx:195-204`.
+  - Story 13.3 assumes recovery is per learner session and resumes the correct active session within 30 minutes: `docs/plans/epic-13-session-lifecycle-overhaul.md:67-82`.
+- Impact:
+  - On a family account, switching to a different learner or parent profile can wipe the first learner's unfinished-session marker or replace it with a different session.
+  - That breaks the per-profile recovery guarantee Epic 13 is supposed to provide.
+
+### 3. High: homework prompt assembly still injects the retired Socratic-only guard into Epic 14 homework sessions
+
+- Epic/story: Epic 14 Stories 14.10-14.11 / FR228.1-FR228.6.
+- Evidence:
+  - FR228 explicitly replaces the old homework behavior and says homework mode must not use Socratic questioning: `docs/plans/epic-14-human-agency-feedback.md:430-455`.
+  - `getSessionTypeGuidance()` now emits the new explain-and-verify homework instructions for `help_me` and `check_answer`: `apps/api/src/services/exchanges.ts:499-540`.
+  - But `buildSystemPrompt()` appends both session-type guidance and escalation guidance: `apps/api/src/services/exchanges.ts:215-227`.
+  - `getEscalationPromptGuidance()` still adds `CRITICAL: ... Use only Socratic questioning to guide the learner.` for every homework rung: `apps/api/src/services/escalation.ts:217-287`.
+- Impact:
+  - The live homework prompt is internally contradictory: one section says "do not ask Socratic follow-up questions," while another says "use only Socratic questioning."
+  - That makes the shipped homework overhaul unstable and risks regressions back toward the deprecated Socratic flow that Epic 14 was meant to replace.
+
+### 4. Medium: quick chips and feedback actions remain live while a reply is streaming, so taps can be recorded without any follow-up reaching the model
+
+- Epic/story: Epic 14 Stories 14.5-14.8, especially FR219.4's "one action per AI response" contract.
+- Evidence:
+  - `handleSend()` immediately returns while `isStreaming` is true: `apps/mobile/src/app/(learner)/session/index.tsx:661-663`.
+  - `latestAiMessageId` ignores streaming placeholders, so the prior completed AI message remains the active chip source during the in-flight turn: `apps/mobile/src/app/(learner)/session/index.tsx:1201-1206`.
+  - `renderMessageActions()` still renders pressable chips and feedback buttons for that prior AI message while the session is streaming: `apps/mobile/src/app/(learner)/session/index.tsx:1383-1423`.
+  - `handleQuickChip()` records side effects and then calls `handleSend(config.prompt)`: `apps/mobile/src/app/(learner)/session/index.tsx:1019-1075`.
+  - `handleMessageFeedback()` does the same for corrective follow-up prompts: `apps/mobile/src/app/(learner)/session/index.tsx:1081-1127`.
+  - The story says chips should disappear after the learner types or taps one, and only one action should apply per AI response: `docs/plans/epic-14-human-agency-feedback.md:102-104`.
+- Impact:
+  - A learner can tap `Too hard`, `Explain differently`, or `That's incorrect` during streaming, see confirmation, and still have no follow-up sent because `handleSend()` bails out.
+  - That creates misleading UX and leaves behind recorded prompt/feedback side effects that did not actually influence the reply.
+
+### 5. Medium: Epic 14's quick-chip and feedback telemetry is still stored as generic `system_prompt` events instead of the dedicated event types the stories require
+
+- Epic/story: Epic 14 Stories 14.5-14.6 / FR218.3 and FR219.3.
+- Evidence:
+  - The spec calls for `sessionEvents` with `eventType: 'user_feedback'` and `eventType: 'quick_action'`: `docs/plans/epic-14-human-agency-feedback.md:79-83` and `docs/plans/epic-14-human-agency-feedback.md:102-103`.
+  - The session-event enum still has no `user_feedback` or `quick_action` variant: `packages/database/src/schema/sessions.ts:22-40`.
+  - Quick chips are persisted as `system_prompt` rows with metadata `{ type: 'quick_chip', chip }`: `apps/mobile/src/app/(learner)/session/index.tsx:1055-1060`.
+  - Message feedback is also persisted as `system_prompt` rows with metadata `{ type: 'message_feedback', value, eventId }`, with only the `incorrect` path also writing a generic `flag` event: `apps/mobile/src/app/(learner)/session/index.tsx:1101-1114`.
+- Impact:
+  - The learner-facing controls mostly exist, but the promised telemetry model does not.
+  - Analytics and future personalization cannot query these interactions as first-class event types, and the data is mixed into the same bucket as invisible prompt injections.
+
+## No new findings called out in these areas
+
+- Epic 13's milestone tracker, `I'm Done` flow, celebration queue service, and post-session summary wiring all look materially present.
+- Epic 14's add-topic flow, ambiguous-subject "Something else" path, multi-problem homework flow, and homework summary extraction all look materially wired up.

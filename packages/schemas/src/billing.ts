@@ -86,6 +86,24 @@ export type FamilyRemoveProfileInput = z.infer<
   typeof familyRemoveProfileSchema
 >;
 
+export const familyMemberSchema = z.object({
+  profileId: z.string().uuid(),
+  displayName: z.string(),
+  isOwner: z.boolean(),
+});
+export type FamilyMember = z.infer<typeof familyMemberSchema>;
+
+export const familySubscriptionSchema = z.object({
+  tier: z.enum(['family', 'pro']),
+  monthlyLimit: z.number().int(),
+  usedThisMonth: z.number().int(),
+  remainingQuestions: z.number().int(),
+  profileCount: z.number().int(),
+  maxProfiles: z.number().int(),
+  members: z.array(familyMemberSchema),
+});
+export type FamilySubscription = z.infer<typeof familySubscriptionSchema>;
+
 export const quotaExceededSchema = z.object({
   code: z.literal('QUOTA_EXCEEDED'),
   message: z.string(),

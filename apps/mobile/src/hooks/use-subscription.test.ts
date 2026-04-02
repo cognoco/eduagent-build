@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   useSubscription,
   useUsage,
+  useFamilySubscription,
   useCreateCheckout,
   useCancelSubscription,
   useCreatePortalSession,
@@ -224,6 +225,71 @@ describe('useUsage', () => {
 
     expect(result.current.data?.warningLevel).toBe('exceeded');
     expect(result.current.data?.remainingQuestions).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useFamilySubscription
+// ---------------------------------------------------------------------------
+
+describe('useFamilySubscription', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('fetches family pool status from GET /subscription/family', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          family: {
+            tier: 'family',
+            monthlyLimit: 1500,
+            usedThisMonth: 300,
+            remainingQuestions: 1200,
+            profileCount: 3,
+            maxProfiles: 4,
+            members: [
+              {
+                profileId: '550e8400-e29b-41d4-a716-446655440000',
+                displayName: 'Parent',
+                isOwner: true,
+              },
+            ],
+          },
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useFamilySubscription(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data?.profileCount).toBe(3);
+    expect(result.current.data?.maxProfiles).toBe(4);
+  });
+
+  it('returns null when the family endpoint responds 404', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('Not found', { status: 404 }));
+
+    const { result } = renderHook(() => useFamilySubscription(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data).toBeNull();
   });
 });
 

@@ -483,7 +483,7 @@ describe('RENEWAL', () => {
 // ---------------------------------------------------------------------------
 
 describe('CANCELLATION', () => {
-  it('updates subscription to cancelled', async () => {
+  it('keeps subscription active and sets cancelledAt for period-end cancellation', async () => {
     const res = await makeRequest(makeWebhookPayload('CANCELLATION'));
     expect(res.status).toBe(200);
 
@@ -491,7 +491,7 @@ describe('CANCELLATION', () => {
       mockDb,
       'acc-1',
       expect.objectContaining({
-        status: 'cancelled',
+        status: 'active',
         cancelledAt: expect.any(String),
       })
     );

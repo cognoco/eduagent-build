@@ -277,7 +277,9 @@ async function handleCancellation(
 
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
-    status: 'cancelled' as SubscriptionStatus,
+    // Keep the entitlement active until period end so mobile can render the
+    // correct "Cancelling" state from cancelledAt + active status.
+    status: 'active' as SubscriptionStatus,
     cancelledAt: new Date().toISOString(),
   });
 

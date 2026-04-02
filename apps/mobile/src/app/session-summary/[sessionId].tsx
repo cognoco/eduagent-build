@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemeColors } from '../../lib/theme';
 import { useUpdateLearningMode } from '../../hooks/use-settings';
+import { useRatingPrompt } from '../../hooks/use-rating-prompt';
 import {
   useSessionTranscript,
   useSkipSummary,
@@ -59,6 +60,7 @@ export default function SessionSummaryScreen() {
   const skipSummary = useSkipSummary(sessionId ?? '');
   const updateLearningMode = useUpdateLearningMode();
   const transcript = useSessionTranscript(sessionId ?? '');
+  const { onSuccessfulRecall } = useRatingPrompt();
   const { persona } = useTheme();
 
   const fallbackSession = transcript.data?.session;
@@ -94,6 +96,18 @@ export default function SessionSummaryScreen() {
       return [] as Array<{ reason?: string; detail?: string | null }>;
     }
   })();
+  const isRecallSummary =
+    transcript.data?.session.verificationType === 'evaluate' ||
+    transcript.data?.session.verificationType === 'teach_back';
+
+  const maybePromptForRecall = async (): Promise<void> => {
+    if (!isRecallSummary) return;
+    try {
+      await onSuccessfulRecall();
+    } catch {
+      // Best effort only — store review availability varies by device/store.
+    }
+  };
 
   if (!sessionId) {
     return (
@@ -169,6 +183,8 @@ export default function SessionSummaryScreen() {
         level: 'info',
       });
 
+      await maybePromptForRecall();
+
       if (skipResult?.shouldPromptCasualSwitch) {
         Alert.alert(
           'Try Casual Explorer?',
@@ -205,6 +221,9 @@ export default function SessionSummaryScreen() {
         );
         return;
       }
+    }
+    if (submitted) {
+      await maybePromptForRecall();
     }
     router.replace('/(learner)/home');
   };

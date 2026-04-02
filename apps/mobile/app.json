@@ -101,6 +101,7 @@
     "runtimeVersion": {
       "policy": "fingerprint"
     },
+    "privacyPolicyUrl": "https://mentomate.com/privacy-policy",
     "updates": {
       "url": "https://u.expo.dev/cbb7c7e1-cf56-45f2-9df8-f043bb8bb361",
       "enabled": true,

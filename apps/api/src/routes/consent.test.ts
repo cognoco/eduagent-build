@@ -164,6 +164,7 @@ describe('consent routes', () => {
       const body = await res.json();
       expect(body.message).toBe('Consent request sent to parent');
       expect(body.consentType).toBe('GDPR');
+      expect(body.emailStatus).toBe('sent');
     });
 
     it('returns 201 with COPPA consent type (backward compat)', async () => {
@@ -185,6 +186,44 @@ describe('consent routes', () => {
 
       const body = await res.json();
       expect(body.consentType).toBe('COPPA');
+      expect(body.emailStatus).toBe('sent');
+    });
+
+    it('returns emailStatus failed when delivery was not confirmed', async () => {
+      const { requestConsent: mockRequestConsent } = jest.requireMock(
+        '../services/consent'
+      ) as { requestConsent: jest.Mock };
+      mockRequestConsent.mockResolvedValueOnce({
+        consentState: {
+          id: 'consent-1',
+          profileId: '550e8400-e29b-41d4-a716-446655440000',
+          consentType: 'GDPR',
+          status: 'PARENTAL_CONSENT_REQUESTED',
+          parentEmail: 'parent@example.com',
+          requestedAt: new Date().toISOString(),
+          respondedAt: null,
+        },
+        emailDelivered: false,
+      });
+
+      const res = await app.request(
+        '/v1/consent/request',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+            parentEmail: 'parent@example.com',
+            consentType: 'GDPR',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(201);
+
+      const body = await res.json();
+      expect(body.emailStatus).toBe('failed');
     });
 
     it('returns 400 for invalid consent type', async () => {

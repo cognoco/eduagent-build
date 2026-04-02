@@ -38,7 +38,7 @@ export async function processEvaluateCompletion(
   profileId: string,
   sessionId: string,
   topicId: string
-): Promise<void> {
+): Promise<number | undefined> {
   // Find the last ai_response event for this session
   const events = await db
     .select()
@@ -60,7 +60,7 @@ export async function processEvaluateCompletion(
     if (assessment) break;
   }
 
-  if (!assessment) return; // No parseable assessment found
+  if (!assessment) return undefined; // No parseable assessment found
 
   // Load the retention card
   const cards = await db
@@ -75,7 +75,7 @@ export async function processEvaluateCompletion(
     .limit(1);
 
   const card = cards[0];
-  if (!card) return;
+  if (!card) return undefined;
 
   const currentRung = (card.evaluateDifficultyRung ?? 1) as 1 | 2 | 3 | 4;
 
@@ -134,6 +134,8 @@ export async function processEvaluateCompletion(
       })
       .where(eq(sessionEvents.id, events[0].id));
   }
+
+  return sm2Quality;
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +154,7 @@ export async function processTeachBackCompletion(
   profileId: string,
   sessionId: string,
   topicId: string
-): Promise<void> {
+): Promise<number | undefined> {
   // Suppress unused parameter warning — topicId reserved for future use
   void topicId;
 
@@ -177,7 +179,7 @@ export async function processTeachBackCompletion(
     if (assessment) break;
   }
 
-  if (!assessment) return; // No parseable assessment found
+  if (!assessment) return undefined; // No parseable assessment found
 
   // Map rubric to SM-2 quality
   const sm2Quality = mapTeachBackRubricToSm2(assessment);
@@ -195,4 +197,6 @@ export async function processTeachBackCompletion(
       })
       .where(eq(sessionEvents.id, events[0].id));
   }
+
+  return sm2Quality;
 }

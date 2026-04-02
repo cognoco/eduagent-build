@@ -81,6 +81,7 @@ let mockUsageLoading = false;
 let mockUsageError = false;
 const mockRefetchUsage = jest.fn();
 let mockUsageRefetching = false;
+let mockFamilySubscription: Record<string, unknown> | null = null;
 const mockMutateAsyncByokWaitlist = jest.fn();
 let mockByokWaitlistIsPending = false;
 let mockActiveProfile = {
@@ -103,6 +104,9 @@ jest.mock('../../hooks/use-subscription', () => ({
     isError: mockUsageError,
     refetch: mockRefetchUsage,
     isRefetching: mockUsageRefetching,
+  }),
+  useFamilySubscription: () => ({
+    data: mockFamilySubscription,
   }),
   usePurchaseTopUp: () => ({
     mutateAsync: jest.fn(),
@@ -302,6 +306,7 @@ describe('SubscriptionScreen', () => {
     mockUsageError = false;
     mockRefetchUsage.mockReset();
     mockUsageRefetching = false;
+    mockFamilySubscription = null;
     mockMutateAsyncByokWaitlist.mockReset();
     mockByokWaitlistIsPending = false;
     mockActiveProfile = {
@@ -467,6 +472,8 @@ describe('SubscriptionScreen', () => {
     await waitFor(() => {
       expect(mockMutateAsyncPurchase).toHaveBeenCalledWith(monthlyPkg);
     });
+    expect(mockRefetchSub).toHaveBeenCalled();
+    expect(mockRefetchUsage).toHaveBeenCalled();
     expect(Alert.alert).toHaveBeenCalledWith(
       'Success',
       'Your subscription is now active!'
@@ -577,6 +584,8 @@ describe('SubscriptionScreen', () => {
     await waitFor(() => {
       expect(mockMutateAsyncRestore).toHaveBeenCalled();
     });
+    expect(mockRefetchSub).toHaveBeenCalled();
+    expect(mockRefetchUsage).toHaveBeenCalled();
     expect(Alert.alert).toHaveBeenCalledWith(
       'Restored',
       'Your subscription has been restored.'
@@ -723,6 +732,30 @@ describe('SubscriptionScreen', () => {
 
     expect(screen.getByTestId('byok-waitlist-section')).toBeTruthy();
     expect(screen.getByText('Bring your own key')).toBeTruthy();
+  });
+
+  it('shows live family pool details for family subscriptions', () => {
+    mockSubscription = { tier: 'family', status: 'active' };
+    mockFamilySubscription = {
+      tier: 'family',
+      monthlyLimit: 1500,
+      usedThisMonth: 300,
+      remainingQuestions: 1200,
+      profileCount: 3,
+      maxProfiles: 4,
+      members: [
+        { profileId: 'p1', displayName: 'Parent', isOwner: true },
+        { profileId: 'p2', displayName: 'Alex', isOwner: false },
+        { profileId: 'p3', displayName: 'Mia', isOwner: false },
+      ],
+    };
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('family-pool-section')).toBeTruthy();
+    expect(screen.getByText('3 of 4 profiles connected')).toBeTruthy();
+    expect(screen.getByText(/1200 shared questions left/i)).toBeTruthy();
+    expect(screen.getByText(/Parent \(owner\), Alex, Mia/)).toBeTruthy();
   });
 
   it('joins the BYOK waitlist and clears the email field on success', async () => {
