@@ -1,7 +1,10 @@
 import { z } from 'zod';
-import { chatExchangeSchema } from './common';
-import { verificationTypeSchema } from './assessments';
-import { celebrationReasonSchema, pendingCelebrationSchema } from './progress';
+import { chatExchangeSchema } from './common.ts';
+import { verificationTypeSchema } from './assessments.ts';
+import {
+  celebrationReasonSchema,
+  pendingCelebrationSchema,
+} from './progress.ts';
 
 // Interview schemas
 

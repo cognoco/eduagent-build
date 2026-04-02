@@ -50,7 +50,7 @@ describe('useRatingPrompt', () => {
 
   it('prompts after 5 successful recalls', async () => {
     // Pre-set count to 4 (next call will be the 5th)
-    secureStore['rating-recall-success-count:profile-1'] = '4';
+    secureStore['rating-recall-success-count-profile-1'] = '4';
 
     const { result } = renderHook(() => useRatingPrompt());
     await act(async () => {
@@ -62,7 +62,7 @@ describe('useRatingPrompt', () => {
 
   it('does not prompt parent persona', async () => {
     mockProfile.personaType = 'PARENT';
-    secureStore['rating-recall-success-count:profile-1'] = '10';
+    secureStore['rating-recall-success-count-profile-1'] = '10';
 
     const { result } = renderHook(() => useRatingPrompt());
     await act(async () => {
@@ -74,8 +74,8 @@ describe('useRatingPrompt', () => {
   });
 
   it('does not prompt when prompted recently (within 90 days)', async () => {
-    secureStore['rating-recall-success-count:profile-1'] = '10';
-    secureStore['rating-last-prompt:profile-1'] = new Date(
+    secureStore['rating-recall-success-count-profile-1'] = '10';
+    secureStore['rating-last-prompt-profile-1'] = new Date(
       Date.now() - 30 * 24 * 60 * 60 * 1000
     ).toISOString(); // 30 days ago
 
@@ -91,7 +91,7 @@ describe('useRatingPrompt', () => {
     mockProfile.createdAt = new Date(
       Date.now() - 3 * 24 * 60 * 60 * 1000
     ).toISOString(); // 3 days ago
-    secureStore['rating-recall-success-count:profile-1'] = '10';
+    secureStore['rating-recall-success-count-profile-1'] = '10';
 
     const { result } = renderHook(() => useRatingPrompt());
     await act(async () => {

@@ -250,7 +250,7 @@ function PackageOption({
 const NOTIFY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function getNotifyStorageKey(profileId: string): string {
-  return `child-paywall-notified-at:${profileId}`;
+  return `child-paywall-notified-at-${profileId}`;
 }
 
 function computeHoursRemaining(notifiedAtMs: number): number {

@@ -1,4 +1,4 @@
-import { birthYearFromDateLike, computeAgeBracket } from './age';
+import { birthYearFromDateLike, computeAgeBracket } from './age.js';
 
 describe('computeAgeBracket', () => {
   it('returns child for ages under 13', () => {

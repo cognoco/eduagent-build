@@ -61,10 +61,28 @@ export default function SignInScreen() {
   const { startSSOFlow: startAppleSSO } = useSSO();
 
   useEffect(() => {
-    if (Platform.OS === 'web') return;
-    void WebBrowser.warmUpAsync();
+    if (Platform.OS !== 'android') return;
+
+    let isActive = true;
+    let warmedUp = false;
+
+    void (async () => {
+      try {
+        await WebBrowser.warmUpAsync();
+        if (!isActive) {
+          void WebBrowser.coolDownAsync().catch(() => undefined);
+          return;
+        }
+        warmedUp = true;
+      } catch {
+        // Some Android devices do not expose the Custom Tabs service.
+      }
+    })();
+
     return () => {
-      void WebBrowser.coolDownAsync();
+      isActive = false;
+      if (!warmedUp) return;
+      void WebBrowser.coolDownAsync().catch(() => undefined);
     };
   }, []);
 

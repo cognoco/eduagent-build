@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { profileSchema } from './profiles';
-import { consentStatusSchema, consentTypeSchema } from './consent';
+import { profileSchema } from './profiles.ts';
+import { consentStatusSchema, consentTypeSchema } from './consent.ts';
 
 export const accountDeletionResponseSchema = z.object({
   message: z.string(),

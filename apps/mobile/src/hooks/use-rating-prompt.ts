@@ -13,10 +13,10 @@ const MIN_DAYS_SINCE_CREATION = 7;
 const MIN_DAYS_BETWEEN_PROMPTS = 90;
 
 const RECALL_COUNT_KEY = (profileId: string): string =>
-  `rating-recall-success-count:${profileId}`;
+  `rating-recall-success-count-${profileId}`;
 
 const LAST_PROMPT_KEY = (profileId: string): string =>
-  `rating-last-prompt:${profileId}`;
+  `rating-last-prompt-${profileId}`;
 
 /**
  * Hook for prompting App Store rating at psychologically optimal moments.
