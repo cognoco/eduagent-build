@@ -177,7 +177,7 @@ describe('Gemini Provider', () => {
       ).rejects.toThrow('Gemini API error: Invalid API key');
     });
 
-    it('concatenates multiple system messages', async () => {
+    it('concatenates initial contiguous system messages into systemInstruction', async () => {
       fetchSpy.mockResolvedValue(mockFetchResponse(geminiResponse('response')));
 
       const messages: ChatMessage[] = [
@@ -189,6 +189,33 @@ describe('Gemini Provider', () => {
 
       const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
       expect(body.systemInstruction.parts[0].text).toBe('Rule 1\n\nRule 2');
+    });
+
+    it('converts mid-conversation system messages to positional user messages', async () => {
+      fetchSpy.mockResolvedValue(mockFetchResponse(geminiResponse('response')));
+
+      const messages: ChatMessage[] = [
+        { role: 'system', content: 'You are a tutor.' },
+        { role: 'user', content: 'Hello' },
+        { role: 'assistant', content: 'Hi there!' },
+        { role: 'system', content: 'Give a hint about gravity.' },
+        { role: 'user', content: 'I need help' },
+      ];
+      await provider.chat(messages, DEFAULT_CONFIG);
+
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      // Initial system message stays in systemInstruction
+      expect(body.systemInstruction.parts[0].text).toBe('You are a tutor.');
+      // Mid-conversation system message becomes a user message with wrapper
+      expect(body.contents).toEqual([
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there!' }] },
+        {
+          role: 'user',
+          parts: [{ text: '[Tutor instruction]: Give a hint about gravity.' }],
+        },
+        { role: 'user', parts: [{ text: 'I need help' }] },
+      ]);
     });
   });
 

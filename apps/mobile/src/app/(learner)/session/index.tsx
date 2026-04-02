@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { PendingCelebration, HomeworkProblem } from '@eduagent/schemas';
 import {
   ChatShell,
@@ -150,6 +151,7 @@ export default function SessionScreen() {
     ocrText?: string;
   }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const effectiveMode = mode ?? 'freeform';
   const initialHomeworkProblems = useMemo(
@@ -1346,7 +1348,10 @@ export default function SessionScreen() {
         onRequestClose={() => setShowParkingLot(false)}
       >
         <View className="flex-1 bg-black/40 justify-end">
-          <View className="bg-background rounded-t-3xl px-5 pt-5 pb-8">
+          <View
+            className="bg-background rounded-t-3xl px-5 pt-5"
+            style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+          >
             <View className="items-center mb-4">
               <View className="w-10 h-1 rounded-full bg-text-secondary/30" />
             </View>
@@ -1436,7 +1441,10 @@ export default function SessionScreen() {
         onRequestClose={() => setShowTopicSwitcher(false)}
       >
         <View className="flex-1 bg-black/40 justify-end">
-          <View className="bg-background rounded-t-3xl px-5 pt-5 pb-8">
+          <View
+            className="bg-background rounded-t-3xl px-5 pt-5"
+            style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+          >
             <View className="items-center mb-4">
               <View className="w-10 h-1 rounded-full bg-text-secondary/30" />
             </View>

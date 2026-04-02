@@ -8,6 +8,10 @@ const mockCloseSession = jest.fn();
 const mockStream = jest.fn();
 const mockHomeworkStatePost = jest.fn();
 
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
 jest.mock('expo-router', () => ({
   useRouter: jest.fn(),
   useLocalSearchParams: jest.fn(),

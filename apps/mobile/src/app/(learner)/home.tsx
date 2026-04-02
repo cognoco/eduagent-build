@@ -257,22 +257,23 @@ export default function HomeScreen() {
     }
   }
 
-  const totalReviewDue =
-    overallProgress?.subjects?.reduce(
-      (total, subject) => total + subject.urgencyScore,
-      0
-    ) ?? 0;
-  const reviewSubjectNames =
-    overallProgress?.subjects
-      ?.filter((subject) => subject.urgencyScore > 0)
-      .map((subject) => subject.name)
-      .slice(0, 3) ?? [];
-  const reviewTargetSubjectId =
-    overallProgress?.subjects?.find((subject) => subject.urgencyScore > 0)
-      ?.subjectId ?? firstSubjectId;
   const homeCardsLoading = subjectsLoading || suggestionLoading;
 
-  const rankedHomeCards = useMemo(() => {
+  const { rankedHomeCards, reviewTargetSubjectId } = useMemo(() => {
+    const totalReviewDue =
+      overallProgress?.subjects?.reduce(
+        (total, subject) => total + subject.urgencyScore,
+        0
+      ) ?? 0;
+    const reviewSubjectNames =
+      overallProgress?.subjects
+        ?.filter((subject) => subject.urgencyScore > 0)
+        .map((subject) => subject.name)
+        .slice(0, 3) ?? [];
+    const targetSubjectId =
+      overallProgress?.subjects?.find((subject) => subject.urgencyScore > 0)
+        ?.subjectId ?? firstSubjectId;
+
     const cards: HomeCardModel[] = [];
 
     if (recoveryCard) {
@@ -356,22 +357,23 @@ export default function HomeScreen() {
       });
     }
 
-    return cards
+    const ranked = cards
       .map((card) => ({
         ...card,
         priority:
           card.priority - ((dismissalCounts[card.id] ?? 0) >= 3 ? 20 : 0),
       }))
       .sort((a, b) => b.priority - a.priority);
+
+    return { rankedHomeCards: ranked, reviewTargetSubjectId: targetSubjectId };
   }, [
     activeSubjects,
     allSubjects,
     continueSuggestion,
     dismissalCounts,
     firstSubjectId,
+    overallProgress,
     recoveryCard,
-    reviewSubjectNames,
-    totalReviewDue,
   ]);
 
   const visibleHomeCards = rankedHomeCards

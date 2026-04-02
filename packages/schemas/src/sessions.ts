@@ -196,6 +196,13 @@ export const sessionCloseSchema = z.object({
 });
 export type SessionCloseInput = z.infer<typeof sessionCloseSchema>;
 
+// System prompt injection (quick chips: hint, example, simpler)
+export const systemPromptBodySchema = z.object({
+  content: z.string().min(1),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+export type SystemPromptBody = z.infer<typeof systemPromptBodySchema>;
+
 export const sessionTranscriptExchangeSchema = z.object({
   eventId: z.string().uuid().optional(),
   role: z.enum(['user', 'assistant']),

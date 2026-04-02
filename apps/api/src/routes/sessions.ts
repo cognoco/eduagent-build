@@ -8,6 +8,7 @@ import {
   summarySubmitSchema,
   interleavedSessionStartSchema,
   homeworkStateSyncSchema,
+  systemPromptBodySchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -241,28 +242,25 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     }
   )
 
-  .post('/sessions/:sessionId/system-prompt', async (c) => {
-    const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
-    const body = await c.req.json<{
-      content?: string;
-      metadata?: Record<string, unknown>;
-    }>();
+  .post(
+    '/sessions/:sessionId/system-prompt',
+    zValidator('json', systemPromptBodySchema),
+    async (c) => {
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
+      const body = c.req.valid('json');
 
-    if (!body.content || typeof body.content !== 'string') {
-      return apiError(c, 400, ERROR_CODES.VALIDATION_ERROR, 'Content required');
+      await recordSystemPrompt(
+        db,
+        profileId,
+        c.req.param('sessionId'),
+        body.content,
+        body.metadata
+      );
+      return c.json({ ok: true });
     }
-
-    await recordSystemPrompt(
-      db,
-      profileId,
-      c.req.param('sessionId'),
-      body.content,
-      body.metadata
-    );
-    return c.json({ ok: true });
-  })
+  )
 
   // Sync homework problem metadata + analytics events
   .post(
