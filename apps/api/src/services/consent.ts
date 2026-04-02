@@ -104,8 +104,9 @@ export const MINIMUM_AGE = 11;
  *
  * GDPR-everywhere model (Story 10.19): location is no longer a factor.
  * - Users under 11 are rejected entirely (PRD line 386)
- * - Users under 16 require GDPR consent
- * - Users 16+ do not require consent
+ * - Users ≤ 16 require GDPR consent (conservative: birth-year-only
+ *   precision cannot confirm they have turned 17)
+ * - Users 17+ do not require consent
  */
 export function checkConsentRequired(birthYear: number): {
   required: boolean;

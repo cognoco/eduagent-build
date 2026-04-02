@@ -41,26 +41,23 @@ export async function writeHomeSurfacePendingCelebrations(
   profileId: string,
   pendingCelebrations: PendingCelebration[]
 ): Promise<void> {
-  const row = await findHomeSurfaceCache(db, profileId);
   const now = new Date();
 
-  if (row) {
-    await db
-      .update(coachingCardCache)
-      .set({
+  await db
+    .insert(coachingCardCache)
+    .values({
+      profileId,
+      cardData: buildFallbackHomeSurfaceCard(profileId),
+      pendingCelebrations,
+      expiresAt: new Date(now.getTime() + HOME_SURFACE_TTL_MS),
+    })
+    .onConflictDoUpdate({
+      target: coachingCardCache.profileId,
+      set: {
         pendingCelebrations,
         updatedAt: now,
-      })
-      .where(eq(coachingCardCache.profileId, profileId));
-    return;
-  }
-
-  await db.insert(coachingCardCache).values({
-    profileId,
-    cardData: buildFallbackHomeSurfaceCard(profileId),
-    pendingCelebrations,
-    expiresAt: new Date(now.getTime() + HOME_SURFACE_TTL_MS),
-  });
+      },
+    });
 }
 
 export async function markHomeSurfaceCelebrationsSeen(

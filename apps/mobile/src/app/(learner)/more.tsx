@@ -256,7 +256,9 @@ export default function MoreScreen() {
           </Pressable>
         ))}
 
-        {/* COMMENTED OUT per BUG-9: fixed brand — no user-configurable accent colors at MVP
+        {/* COMMENTED OUT per BUG-9: fixed brand — no user-configurable accent colors at MVP.
+            To re-enable: also uncomment accentPresetId/setAccentPresetId in the useTheme()
+            destructuring (line ~144) and the AccentPicker import (line ~17).
         <View className="mt-4">
           <AccentPicker
             persona={persona}

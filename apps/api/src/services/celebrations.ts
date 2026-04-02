@@ -122,18 +122,15 @@ export async function getPendingCelebrations(
 
   const pending =
     (row.pendingCelebrations as PendingCelebration[] | null) ?? [];
-  const filtered = filterPendingCelebrations(pending, { viewer, seenAt });
+  const now = new Date();
+  const filtered = filterPendingCelebrations(pending, { viewer, seenAt, now });
 
-  // Opportunistically clean out expired entries.
-  if (filtered.length !== pending.length) {
-    await writeHomeSurfacePendingCelebrations(
-      db,
-      profileId,
-      pending.filter(
-        (entry) =>
-          filterPendingCelebrations([entry], { viewer: 'child' }).length > 0
-      )
-    );
+  // Opportunistically clean out expired/invalid entries only.
+  // Use viewer: 'child' (no seenAt) to strip just expired entries — child sees
+  // everything, so this avoids spurious writes caused by viewer/seen filtering.
+  const pruned = filterPendingCelebrations(pending, { viewer: 'child', now });
+  if (pruned.length !== pending.length) {
+    await writeHomeSurfacePendingCelebrations(db, profileId, pruned);
   }
 
   return filtered;

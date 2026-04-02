@@ -7,13 +7,15 @@ export type PersonaType = z.infer<typeof personaTypeSchema>;
 export const locationSchema = z.enum(['EU', 'US', 'OTHER']);
 export type LocationType = z.infer<typeof locationSchema>;
 
-const currentYear = new Date().getFullYear();
-
 export const birthYearSchema = z
   .number()
   .int()
-  .min(currentYear - 120)
-  .max(currentYear);
+  .refine((y) => y >= new Date().getFullYear() - 120, {
+    message: 'birthYear is too far in the past',
+  })
+  .refine((y) => y <= new Date().getFullYear(), {
+    message: 'birthYear cannot be in the future',
+  });
 
 const profileCreateFields = z.object({
   displayName: z.string().min(1).max(50),

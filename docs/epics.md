@@ -421,13 +421,14 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 **14 epics total: 6 MVP (Epics 0-5), 2 pre-launch (Epics 9, 10), 3 deferred (Epics 6, 7, 8), 3 post-launch (Epics 11, 12, 13+14).**
 
 **Completion status (updated 2026-04-01):**
+
 | Epic | Status | Notes |
 |------|--------|-------|
 | 0-5 (MVP) | ✅ Complete | All routes, services, tests passing |
 | 9 (Native IAP) | ✅ Complete | RevenueCat integrated, Stripe dormant |
 | 10 (UX Polish) | 🔄 15 done, 7 partial, 1 unbuilt | 10.17 not built; 10.4/5/8/10/14/15/18/22 have minor gaps |
 | 11 (Brand Identity) | ✅ Complete | Navy bg, teal/lavender tokens, accent cascade, light mode |
-| 12 (Persona Removal) | ❌ Not started | Next major refactor (Phase 5) |
+| 12 (Persona Removal) | 🔄 In progress | 12.1 complete; remaining cleanup + schema removal pending |
 | 13 (Session Lifecycle) | ✅ Complete (7/7) | All stories verified including Inngest wiring + celebrations |
 | 14 (Human Agency) | ❌ Not started | Phase A quick wins are next priority (Phase 2) |
 | 6, 7, 8 (v1.1) | ⏳ Deferred | Language, concept map, full voice |
@@ -923,7 +924,7 @@ Phase 7 — Language learning:                                         ❌ NOT S
 - ✅ Phase 1 complete — all foundation cleanup done
 - ❌ Phase 2 NOT STARTED — Epic 14 Phase A (human agency quick wins)
 - ❌ Phase 3 NOT STARTED — Epic 14 Phase B (homework overhaul)
-- ✅ Phase 4 mostly complete — celebration system + session polish built (13.7 partial)
+- ✅ Phase 4 complete — celebration system + session polish built (13.7 complete; home-card migration deferred to 12.7)
 - 🔄 Phase 5 in progress — Epic 12 foundation started (`12.1` complete, `12.6` partially complete)
 - ❌ Phase 6 NOT STARTED — Epics 7, 8, 14C (new features)
 - ❌ Phase 7 NOT STARTED — Epic 6 (language learning, v1.1)
@@ -3548,6 +3549,7 @@ The original architecture (docs/architecture.md) specified "Payments | Stripe" w
 **Market context (decided 2026-03-23):** Launch is English-only, targeting US/UK/AU. GDPR's under-16 parental consent threshold is applied globally ("GDPR-everywhere" strategy). This is the strictest standard and automatically satisfies US COPPA (under 13), UK GDPR + AADC (under 13 consent + under-18 design obligations), and Australia's Privacy Act. The location picker is removed — birth date alone drives consent. See Story 10.19 for consent unification.
 
 **Story status (all stories, updated 2026-04-01):**
+
 | Story | Status | Notes |
 |-------|--------|-------|
 | 10.1 — Topic skip confirmation & undo | ✅ Built | `POST .../curriculum/unskip` route + `unskipTopic()` service |

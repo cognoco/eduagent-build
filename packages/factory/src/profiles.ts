@@ -8,7 +8,8 @@ export function buildProfile(
   counter++;
   return {
     displayName: `Test User ${counter}`,
-    birthYear: 2008,
+    personaType: 'LEARNER' as const,
+    birthYear: new Date().getFullYear() - 16,
     ...overrides,
   };
 }

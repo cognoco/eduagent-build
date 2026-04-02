@@ -274,6 +274,10 @@ async function deleteClerkTestUsers(
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Relative birth years — keeps fixtures stable as calendar year advances.
+// Adolescent (age 16) → LEARNER persona, subject to GDPR consent.
+const LEARNER_BIRTH_YEAR = new Date().getFullYear() - 16;
+
 function pastDate(daysAgo: number): Date {
   return new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
 }
@@ -310,8 +314,8 @@ async function createBaseProfile(
   const legacyPersonaType = (() => {
     const ageBracket = computeAgeBracket(opts.birthYear);
     if (ageBracket === 'child') return 'TEEN' as const;
-    if (ageBracket === 'adolescent') return 'LEARNER' as const;
-    return 'PARENT' as const;
+    // Adults default to LEARNER — PARENT only via explicit selection
+    return 'LEARNER' as const;
   })();
 
   await db.insert(profiles).values({
@@ -390,7 +394,7 @@ async function seedOnboardingNoSubject(
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Learner',
-    birthYear: 2008,
+    birthYear: LEARNER_BIRTH_YEAR,
   });
 
   await db.insert(consentStates).values({
@@ -421,7 +425,7 @@ async function seedOnboardingComplete(
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Learner',
-    birthYear: 2008,
+    birthYear: LEARNER_BIRTH_YEAR,
   });
 
   await db.insert(consentStates).values({
@@ -488,7 +492,7 @@ async function seedLearningActive(
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Active Learner',
-    birthYear: 2008,
+    birthYear: LEARNER_BIRTH_YEAR,
   });
 
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
@@ -551,7 +555,7 @@ async function seedRetentionDue(
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Review Learner',
-    birthYear: 2008,
+    birthYear: LEARNER_BIRTH_YEAR,
   });
 
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
@@ -593,7 +597,7 @@ async function seedFailedRecall3x(
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Struggling Learner',
-    birthYear: 2008,
+    birthYear: LEARNER_BIRTH_YEAR,
   });
 
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
@@ -775,7 +779,7 @@ async function seedParentMultiChild(
   // Child 2 — learner with different subject
   const child2ProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Lucas',
-    birthYear: 2008,
+    birthYear: LEARNER_BIRTH_YEAR,
     isOwner: false,
   });
 
@@ -868,7 +872,7 @@ async function seedTrialActive(
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Trial User',
-    birthYear: 2008,
+    birthYear: LEARNER_BIRTH_YEAR,
   });
 
   const subscriptionId = generateUUIDv7();
@@ -916,7 +920,7 @@ async function seedTrialExpired(
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Expired Trial User',
-    birthYear: 2008,
+    birthYear: LEARNER_BIRTH_YEAR,
   });
 
   const subscriptionId = generateUUIDv7();
@@ -966,7 +970,7 @@ async function seedMultiSubject(
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Multi-Subject Learner',
-    birthYear: 2008,
+    birthYear: LEARNER_BIRTH_YEAR,
   });
 
   const { subjectId: activeSubjectId } = await createSubjectWithCurriculum(
@@ -1014,7 +1018,7 @@ async function seedMultiSubjectPractice(
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Practice Picker Learner',
-    birthYear: 2008,
+    birthYear: LEARNER_BIRTH_YEAR,
   });
 
   const { subjectId: physicsSubjectId } = await createSubjectWithCurriculum(
@@ -1050,7 +1054,7 @@ async function seedHomeworkReady(
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Homework Learner',
-    birthYear: 2008,
+    birthYear: LEARNER_BIRTH_YEAR,
   });
 
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
@@ -1222,7 +1226,7 @@ async function seedConsentWithdrawnSolo(
   // Single learner profile — no parent, no profile switch needed
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Withdrawn Learner',
-    birthYear: 2008,
+    birthYear: LEARNER_BIRTH_YEAR,
   });
 
   // Consent state: WITHDRAWN
@@ -1353,7 +1357,7 @@ async function seedDailyLimitReached(
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Daily Cap User',
-    birthYear: 2008,
+    birthYear: LEARNER_BIRTH_YEAR,
   });
 
   const subscriptionId = generateUUIDv7();

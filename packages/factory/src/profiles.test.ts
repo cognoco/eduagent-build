@@ -14,7 +14,8 @@ describe('buildProfile', () => {
 
     expect(profile).toEqual({
       displayName: 'Test User 1',
-      birthYear: 2008,
+      personaType: 'LEARNER',
+      birthYear: new Date().getFullYear() - 16,
     });
   });
 

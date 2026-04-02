@@ -26,7 +26,9 @@ function createMockDb(pendingCelebrations: unknown[] = []) {
       },
     },
     insert: jest.fn().mockReturnValue({
-      values: jest.fn().mockResolvedValue(undefined),
+      values: jest.fn().mockReturnValue({
+        onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),
+      }),
     }),
     update: jest.fn().mockReturnValue({
       set: jest.fn().mockReturnValue({
@@ -132,7 +134,8 @@ describe('queueCelebration', () => {
     );
 
     expect(result).toHaveLength(1);
-    expect(db.update).toHaveBeenCalled();
+    // Upsert writes via insert().onConflictDoUpdate(), not update()
+    expect(db.insert).toHaveBeenCalled();
   });
 
   it('allows same celebration + reason with different detail', async () => {

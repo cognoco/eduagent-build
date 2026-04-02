@@ -75,8 +75,8 @@ function inferLegacyPersonaType(
 ): 'TEEN' | 'LEARNER' | 'PARENT' {
   const ageBracket = computeAgeBracket(birthYear);
   if (ageBracket === 'child') return 'TEEN';
-  if (ageBracket === 'adolescent') return 'LEARNER';
-  return 'PARENT';
+  // Adults default to LEARNER — PARENT is only assigned via explicit input.personaType
+  return 'LEARNER';
 }
 
 /**
