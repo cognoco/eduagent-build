@@ -2,7 +2,6 @@ import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
-  // TextInput,  // COMMENTED OUT per BUG-13: only used by removed chat input
   Pressable,
   ScrollView,
   ActivityIndicator,
@@ -11,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CoachingCard, AdaptiveEntryCard } from '../../components/coaching';
+import { HomeActionCard } from '../../components/coaching';
 import { RetentionSignal } from '../../components/progress';
 import {
   AnimatedEntry,
@@ -26,9 +25,11 @@ import {
 } from '../../hooks/use-celebrations';
 import { useProfile } from '../../lib/profile';
 import { useSubjects } from '../../hooks/use-subjects';
-import { useOverallProgress } from '../../hooks/use-progress';
+import {
+  useContinueSuggestion,
+  useOverallProgress,
+} from '../../hooks/use-progress';
 import { useStreaks } from '../../hooks/use-streaks';
-import { useCoachingCard } from '../../hooks/use-coaching-card';
 import { useSubscriptionStatus } from '../../hooks/use-subscription';
 import { useApiReachability } from '../../hooks/use-api-reachability';
 import { useTheme, useThemeColors } from '../../lib/theme';
@@ -39,22 +40,43 @@ import {
   readSessionRecoveryMarker,
 } from '../../lib/session-recovery';
 import { useApiClient } from '../../lib/api-client';
+import {
+  incrementHomeCardDismissal,
+  readHomeCardDismissals,
+} from '../../lib/home-card-dismissals';
+
+interface HomeCardModel {
+  id:
+    | 'resume_session'
+    | 'restore_subjects'
+    | 'review'
+    | 'study'
+    | 'homework'
+    | 'ask';
+  title: string;
+  subtitle: string;
+  badge?: string;
+  primaryLabel: string;
+  secondaryLabel?: string;
+  priority: number;
+  compact?: boolean;
+}
 
 export default function HomeScreen() {
   const router = useRouter();
   const apiClient = useApiClient();
   const insets = useSafeAreaInsets();
   const {
-    data: subjects,
+    data: allSubjects,
     isLoading: subjectsLoading,
     isError: subjectsError,
     refetch: refetchSubjects,
     isRefetching,
-  } = useSubjects();
+  } = useSubjects({ includeInactive: true });
   const { data: overallProgress } = useOverallProgress();
+  const { data: continueSuggestion, isLoading: suggestionLoading } =
+    useContinueSuggestion();
   const { data: streak } = useStreaks();
-  const firstSubjectId = subjects?.find((s) => s.status === 'active')?.id;
-  const coachingCard = useCoachingCard(firstSubjectId);
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const pendingCelebrations = usePendingCelebrations();
   const markCelebrationsSeen = useMarkCelebrationsSeen();
@@ -70,6 +92,10 @@ export default function HomeScreen() {
     isChecked: apiChecked,
     recheck: recheckApi,
   } = useApiReachability();
+  const [dismissalCounts, setDismissalCounts] = useState<
+    Record<string, number>
+  >({});
+  const [hiddenCardIds, setHiddenCardIds] = useState<string[]>([]);
   const [recoveryCard, setRecoveryCard] = useState<{
     sessionId: string;
     subjectName?: string;
@@ -88,22 +114,40 @@ export default function HomeScreen() {
   const [showPracticePicker, setShowPracticePicker] = useState(false);
 
   const activeSubjects = useMemo(
-    () => subjects?.filter((s) => s.status === 'active') ?? [],
-    [subjects]
+    () => allSubjects?.filter((s) => s.status === 'active') ?? [],
+    [allSubjects]
   );
+  const firstSubjectId = activeSubjects[0]?.id;
 
-  const handlePracticePress = useCallback((): void => {
-    // If coaching card has a subject-specific practice route, use it directly
-    if (
-      coachingCard.primaryRoute &&
-      coachingCard.primaryRoute.includes('mode=practice') &&
-      coachingCard.primaryRoute.includes('subjectId=')
-    ) {
-      router.push(coachingCard.primaryRoute as never);
+  useEffect(() => {
+    if (!activeProfile) {
+      setDismissalCounts({});
+      setHiddenCardIds([]);
       return;
     }
 
-    // Single active subject: auto-select and navigate
+    let cancelled = false;
+    void (async () => {
+      const counts = await readHomeCardDismissals(activeProfile.id);
+      if (!cancelled) {
+        setDismissalCounts(counts);
+        setHiddenCardIds([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProfile]);
+
+  const handlePracticePress = useCallback((): void => {
+    if (continueSuggestion) {
+      router.push(
+        `/(learner)/session?mode=practice&subjectId=${continueSuggestion.subjectId}&topicId=${continueSuggestion.topicId}` as never
+      );
+      return;
+    }
+
     const singleSubject =
       activeSubjects.length === 1 ? activeSubjects[0] : undefined;
     if (singleSubject) {
@@ -119,7 +163,7 @@ export default function HomeScreen() {
     if (activeSubjects.length > 1) {
       setShowPracticePicker(true);
     }
-  }, [coachingCard.primaryRoute, activeSubjects, router]);
+  }, [continueSuggestion, activeSubjects, router]);
 
   // COMMENTED OUT per BUG-13: chat input removed from home screen
   // const handleChatSubmit = useCallback((): void => {
@@ -150,14 +194,14 @@ export default function HomeScreen() {
   useEffect(() => {
     if (
       !subjectsLoading &&
-      subjects &&
-      subjects.length === 0 &&
+      allSubjects &&
+      allSubjects.length === 0 &&
       !hasRedirected.current
     ) {
       hasRedirected.current = true;
       router.replace('/create-subject');
     }
-  }, [subjectsLoading, subjects, router]);
+  }, [subjectsLoading, allSubjects, router]);
 
   useEffect(() => {
     let mounted = true;
@@ -212,6 +256,243 @@ export default function HomeScreen() {
       subjectRetention.set(sp.subjectId, sp.retentionStatus);
     }
   }
+
+  const homeCardsLoading = subjectsLoading || suggestionLoading;
+
+  const { rankedHomeCards, reviewTargetSubjectId } = useMemo(() => {
+    const totalReviewDue =
+      overallProgress?.subjects?.reduce(
+        (total, subject) => total + subject.urgencyScore,
+        0
+      ) ?? 0;
+    const reviewSubjectNames =
+      overallProgress?.subjects
+        ?.filter((subject) => subject.urgencyScore > 0)
+        .map((subject) => subject.name)
+        .slice(0, 3) ?? [];
+    const targetSubjectId =
+      overallProgress?.subjects?.find((subject) => subject.urgencyScore > 0)
+        ?.subjectId ?? firstSubjectId;
+
+    const cards: HomeCardModel[] = [];
+
+    if (recoveryCard) {
+      cards.push({
+        id: 'resume_session',
+        title: recoveryCard.active
+          ? 'Pick up where you left off?'
+          : 'Your session was saved',
+        subtitle: recoveryCard.subjectName
+          ? recoveryCard.subjectName
+          : 'Your last session is ready.',
+        badge: 'Resume session',
+        primaryLabel: recoveryCard.active ? 'Continue Session' : 'See Summary',
+        secondaryLabel: recoveryCard.active ? 'End & See Summary' : undefined,
+        priority: 100,
+      });
+    }
+
+    if (activeSubjects.length === 0 && (allSubjects?.length ?? 0) > 0) {
+      cards.push({
+        id: 'restore_subjects',
+        title: 'No active subjects right now',
+        subtitle:
+          'Restore or resume a subject from your Learning Book when you are ready.',
+        badge: 'Subject control',
+        primaryLabel: 'Manage subjects',
+        priority: 90,
+      });
+    } else {
+      if (totalReviewDue > 0) {
+        cards.push({
+          id: 'review',
+          title:
+            totalReviewDue === 1
+              ? '1 topic ready to review'
+              : `${totalReviewDue} topics ready to review`,
+          subtitle:
+            reviewSubjectNames.length > 0
+              ? reviewSubjectNames.join(', ')
+              : 'Open your Learning Book to revisit what needs another look.',
+          badge: totalReviewDue >= 3 ? 'Needs review' : 'Review',
+          primaryLabel: 'Open Learning Book',
+          priority: totalReviewDue >= 3 ? 88 : 74,
+          compact: true,
+        });
+      }
+
+      cards.push({
+        id: 'study',
+        title: continueSuggestion
+          ? `Continue ${continueSuggestion.subjectName}`
+          : `Study ${activeSubjects[0]?.name ?? 'your subject'}`,
+        subtitle: continueSuggestion
+          ? continueSuggestion.topicTitle
+          : 'Jump back into practice or keep building momentum.',
+        badge: continueSuggestion ? 'Continue' : 'Study',
+        primaryLabel: continueSuggestion ? 'Continue topic' : 'Practice now',
+        priority: continueSuggestion ? 82 : 68,
+      });
+
+      cards.push({
+        id: 'homework',
+        title: 'Homework help',
+        subtitle: firstSubjectId
+          ? `Snap a question and get direct help in ${activeSubjects[0]?.name}.`
+          : 'Snap a question and open the camera.',
+        badge: 'Quick start',
+        primaryLabel: 'Open camera',
+        priority: 70,
+        compact: true,
+      });
+
+      cards.push({
+        id: 'ask',
+        title: 'Just ask something',
+        subtitle:
+          'Start a freeform session when you want to switch gears or follow curiosity.',
+        primaryLabel: 'Start session',
+        priority: 56,
+        compact: true,
+      });
+    }
+
+    const ranked = cards
+      .map((card) => ({
+        ...card,
+        priority:
+          card.priority - ((dismissalCounts[card.id] ?? 0) >= 3 ? 20 : 0),
+      }))
+      .sort((a, b) => b.priority - a.priority);
+
+    return { rankedHomeCards: ranked, reviewTargetSubjectId: targetSubjectId };
+  }, [
+    activeSubjects,
+    allSubjects,
+    continueSuggestion,
+    dismissalCounts,
+    firstSubjectId,
+    overallProgress,
+    recoveryCard,
+  ]);
+
+  const visibleHomeCards = rankedHomeCards
+    .filter((card) => !hiddenCardIds.includes(card.id))
+    .slice(0, 3);
+
+  const handleDismissHomeCard = useCallback(
+    (cardId: HomeCardModel['id']) => {
+      if (visibleHomeCards.length <= 1) return;
+
+      setHiddenCardIds((prev) =>
+        prev.includes(cardId) ? prev : [...prev, cardId]
+      );
+
+      if (cardId === 'resume_session') {
+        void clearSessionRecoveryMarker();
+        setRecoveryCard(null);
+      }
+
+      if (!activeProfile) return;
+      void (async () => {
+        const nextCounts = await incrementHomeCardDismissal(
+          activeProfile.id,
+          cardId
+        );
+        setDismissalCounts(nextCounts);
+      })();
+    },
+    [activeProfile, visibleHomeCards.length]
+  );
+
+  const handleHomeCardPrimary = useCallback(
+    async (card: HomeCardModel) => {
+      switch (card.id) {
+        case 'resume_session':
+          if (!recoveryCard) return;
+          if (recoveryCard.active) {
+            router.push({
+              pathname: '/(learner)/session',
+              params: { sessionId: recoveryCard.sessionId },
+            } as never);
+            return;
+          }
+          await clearSessionRecoveryMarker();
+          router.push(`/session-summary/${recoveryCard.sessionId}` as never);
+          return;
+        case 'restore_subjects':
+          router.push('/(learner)/book' as never);
+          return;
+        case 'review':
+          if (reviewTargetSubjectId) {
+            router.push({
+              pathname: '/(learner)/book',
+              params: { subjectId: reviewTargetSubjectId },
+            } as never);
+            return;
+          }
+          router.push('/(learner)/book' as never);
+          return;
+        case 'study':
+          handlePracticePress();
+          return;
+        case 'homework': {
+          const defaultSubject = activeSubjects[0];
+          router.push(
+            defaultSubject
+              ? ({
+                  pathname: '/(learner)/homework/camera',
+                  params: {
+                    subjectId: defaultSubject.id,
+                    subjectName: defaultSubject.name,
+                  },
+                } as never)
+              : ('/(learner)/homework/camera' as never)
+          );
+          return;
+        }
+        case 'ask':
+          router.push(
+            (firstSubjectId
+              ? `/(learner)/session?mode=freeform&subjectId=${firstSubjectId}`
+              : '/(learner)/session?mode=freeform') as never
+          );
+      }
+    },
+    [
+      activeSubjects,
+      firstSubjectId,
+      handlePracticePress,
+      recoveryCard,
+      reviewTargetSubjectId,
+      router,
+    ]
+  );
+
+  const handleHomeCardSecondary = useCallback(
+    async (card: HomeCardModel) => {
+      if (card.id !== 'resume_session' || !recoveryCard?.active) return;
+
+      try {
+        const res = await apiClient.sessions[':sessionId'].close.$post({
+          param: { sessionId: recoveryCard.sessionId },
+          json: {
+            reason: 'silence_timeout',
+            summaryStatus: 'auto_closed',
+          },
+        });
+        if (!res.ok) {
+          setRecoveryCard(null);
+          return;
+        }
+        await clearSessionRecoveryMarker();
+        router.push(`/session-summary/${recoveryCard.sessionId}` as never);
+      } catch {
+        setRecoveryCard(null);
+      }
+    },
+    [apiClient, recoveryCard, router]
+  );
 
   return (
     <KeyboardAvoidingView
@@ -286,142 +567,47 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {recoveryCard ? (
-          <View
-            className="bg-surface rounded-card px-4 py-4 mt-4"
-            testID="unfinished-session-card"
-          >
-            <Text className="text-body font-semibold text-text-primary">
-              {recoveryCard.active
-                ? 'Pick up where you left off?'
-                : 'Your session was saved'}
-            </Text>
-            <Text className="text-body-sm text-text-secondary mt-1">
-              {recoveryCard.subjectName
-                ? recoveryCard.subjectName
-                : 'Your last session is ready.'}
-            </Text>
-            <View className="flex-row gap-2 mt-3">
-              <Pressable
-                onPress={() => {
-                  if (recoveryCard.active) {
-                    router.push({
-                      pathname: '/(learner)/session',
-                      params: { sessionId: recoveryCard.sessionId },
-                    } as never);
-                  } else {
-                    void clearSessionRecoveryMarker();
-                    router.push(
-                      `/session-summary/${recoveryCard.sessionId}` as never
-                    );
-                  }
-                }}
-                className="flex-1 bg-primary rounded-button py-3 items-center"
-              >
-                <Text className="text-text-inverse text-body font-semibold">
-                  {recoveryCard.active ? 'Continue Session' : 'See Summary'}
-                </Text>
-              </Pressable>
-              {recoveryCard.active ? (
-                <Pressable
-                  onPress={() => {
-                    void (async () => {
-                      try {
-                        const res = await apiClient.sessions[
-                          ':sessionId'
-                        ].close.$post({
-                          param: { sessionId: recoveryCard.sessionId },
-                          json: {
-                            reason: 'silence_timeout',
-                            summaryStatus: 'auto_closed',
-                          },
-                        });
-                        if (!res.ok) {
-                          setRecoveryCard(null);
-                          return;
-                        }
-                        await clearSessionRecoveryMarker();
-                        router.push(
-                          `/session-summary/${recoveryCard.sessionId}` as never
-                        );
-                      } catch {
-                        setRecoveryCard(null);
-                      }
-                    })();
-                  }}
-                  className="flex-1 bg-surface-elevated rounded-button py-3 items-center"
-                >
-                  <Text className="text-text-secondary text-body font-semibold">
-                    End & See Summary
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
-            <Pressable
-              onPress={() => {
-                void clearSessionRecoveryMarker();
-                setRecoveryCard(null);
-              }}
-              className="mt-3 self-start"
-            >
-              <Text className="text-caption text-text-secondary">Dismiss</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
         <AnimatedEntry>
-          {coachingCard.isLoading && !subjectsError ? (
+          {homeCardsLoading && !subjectsError ? (
             <View className="bg-coaching-card rounded-card p-5 mt-4 items-center py-8">
               <PenWritingAnimation size={100} color={themeColors.accent} />
             </View>
-          ) : persona === 'teen' ? (
-            <AdaptiveEntryCard
-              headline={coachingCard.headline}
-              subtext={coachingCard.subtext}
-              actions={[
-                {
-                  label: 'Homework help',
-                  onPress: () => {
-                    router.push('/(learner)/homework/camera' as never);
-                  },
-                },
-                {
-                  label: 'Practice for a test',
-                  onPress: handlePracticePress,
-                },
-                {
-                  label: 'Just ask something',
-                  onPress: () =>
-                    router.push(
-                      (firstSubjectId
-                        ? `/(learner)/session?mode=freeform&subjectId=${firstSubjectId}`
-                        : '/(learner)/session?mode=freeform') as never
-                    ),
-                },
-              ]}
-            />
           ) : (
-            <CoachingCard
-              headline={coachingCard.headline}
-              subtext={coachingCard.subtext}
-              primaryLabel={coachingCard.primaryLabel}
-              secondaryLabel={coachingCard.secondaryLabel}
-              onPrimary={() => {
-                if (coachingCard.primaryRoute) {
-                  router.push(coachingCard.primaryRoute as never);
-                }
-              }}
-              onSecondary={() => {
-                if (coachingCard.secondaryRoute) {
-                  router.push(coachingCard.secondaryRoute as never);
-                }
-              }}
-            />
+            <View className="mt-4 gap-3">
+              {visibleHomeCards.map((card, index) => (
+                <View
+                  key={card.id}
+                  testID={
+                    card.id === 'resume_session'
+                      ? 'unfinished-session-card'
+                      : undefined
+                  }
+                >
+                  <HomeActionCard
+                    title={card.title}
+                    subtitle={card.subtitle}
+                    badge={card.badge}
+                    primaryLabel={card.primaryLabel}
+                    secondaryLabel={card.secondaryLabel}
+                    onPrimary={() => void handleHomeCardPrimary(card)}
+                    onSecondary={
+                      card.secondaryLabel
+                        ? () => void handleHomeCardSecondary(card)
+                        : undefined
+                    }
+                    onDismiss={() => handleDismissHomeCard(card.id)}
+                    dismissDisabled={visibleHomeCards.length <= 1}
+                    compact={index > 0 || card.compact}
+                    testID={`home-card-${card.id}`}
+                  />
+                </View>
+              ))}
+            </View>
           )}
         </AnimatedEntry>
 
         {/* Subject Retention Strip */}
-        {!subjectsLoading && subjects && subjects.length > 0 && (
+        {!subjectsLoading && activeSubjects.length > 0 && (
           <AnimatedEntry delay={100}>
             <View className="mt-4">
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 mb-2 uppercase tracking-wider">
@@ -433,7 +619,7 @@ export default function HomeScreen() {
                 contentContainerStyle={{ gap: 8 }}
                 testID="retention-strip"
               >
-                {subjects.map((subject) => {
+                {activeSubjects.map((subject) => {
                   const status = subjectRetention.get(subject.id) ?? 'weak';
                   return (
                     <Pressable
@@ -502,9 +688,9 @@ export default function HomeScreen() {
               <View className="py-4 items-center">
                 <ActivityIndicator />
               </View>
-            ) : subjects && subjects.length > 0 ? (
+            ) : activeSubjects.length > 0 ? (
               <>
-                {subjects.map(
+                {activeSubjects.map(
                   (subject: { id: string; name: string; status: string }) => (
                     <View
                       key={subject.id}
@@ -567,6 +753,24 @@ export default function HomeScreen() {
                   </Text>
                 </Pressable>
               </>
+            ) : allSubjects && allSubjects.length > 0 ? (
+              <View className="bg-surface rounded-card px-4 py-6 items-center">
+                <Text className="text-body text-text-secondary text-center">
+                  Your subjects are paused or archived. Restore one from the
+                  Learning Book to jump back in.
+                </Text>
+                <Pressable
+                  onPress={() => router.push('/(learner)/book' as never)}
+                  className="bg-primary rounded-button py-3 mt-4 items-center w-full"
+                  testID="manage-inactive-subjects-button"
+                  accessibilityLabel="Manage subjects in Learning Book"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-text-inverse text-body font-semibold">
+                    Manage subjects
+                  </Text>
+                </Pressable>
+              </View>
             ) : (
               <View className="bg-surface rounded-card px-4 py-6 items-center">
                 <Text className="text-body text-text-secondary">

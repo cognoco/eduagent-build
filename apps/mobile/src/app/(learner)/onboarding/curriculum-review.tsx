@@ -18,6 +18,7 @@ import {
   useUnskipTopic,
   useChallengeCurriculum,
   useAddCurriculumTopic,
+  useExplainTopic,
 } from '../../../hooks/use-curriculum';
 import { formatApiError } from '../../../lib/format-api-error';
 
@@ -52,6 +53,7 @@ export default function CurriculumScreen() {
   const unskipTopic = useUnskipTopic(subjectId ?? '');
   const challengeCurriculum = useChallengeCurriculum(subjectId ?? '');
   const addCurriculumTopic = useAddCurriculumTopic(subjectId ?? '');
+  const explainTopic = useExplainTopic(subjectId ?? '');
   const [showChallengeModal, setShowChallengeModal] = useState(false);
   const [challengeFeedback, setChallengeFeedback] = useState('');
   const [showAddTopicModal, setShowAddTopicModal] = useState(false);
@@ -60,6 +62,12 @@ export default function CurriculumScreen() {
   const [addTopicMinutes, setAddTopicMinutes] = useState('');
   const [addTopicError, setAddTopicError] = useState('');
   const [addTopicPreviewReady, setAddTopicPreviewReady] = useState(false);
+  const [showWhyModal, setShowWhyModal] = useState(false);
+  const [whyTopicTitle, setWhyTopicTitle] = useState('');
+  const [whyExplanation, setWhyExplanation] = useState('');
+  const [explainingTopicId, setExplainingTopicId] = useState<string | null>(
+    null
+  );
 
   if (!subjectId) {
     return (
@@ -138,6 +146,23 @@ export default function CurriculumScreen() {
     }
   };
 
+  const handleExplainTopic = async (
+    topicId: string,
+    topicTitle: string
+  ): Promise<void> => {
+    try {
+      setExplainingTopicId(topicId);
+      const explanation = await explainTopic.mutateAsync(topicId);
+      setWhyTopicTitle(topicTitle);
+      setWhyExplanation(explanation);
+      setShowWhyModal(true);
+    } catch (err: unknown) {
+      Alert.alert('Could not explain the order', formatApiError(err));
+    } finally {
+      setExplainingTopicId(null);
+    }
+  };
+
   const firstAvailableTopic = curriculum?.topics.find((t) => !t.skipped);
 
   return (
@@ -209,6 +234,22 @@ export default function CurriculumScreen() {
                   <Text className="text-body-sm text-text-secondary mt-1">
                     {topic.description}
                   </Text>
+                  <Pressable
+                    onPress={() =>
+                      void handleExplainTopic(topic.id, topic.title)
+                    }
+                    className="self-start mt-3"
+                    testID={`explain-${topic.id}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Why is ${topic.title} in this order`}
+                    disabled={explainingTopicId === topic.id}
+                  >
+                    <Text className="text-body-sm font-semibold text-primary">
+                      {explainingTopicId === topic.id
+                        ? 'Explaining...'
+                        : 'Why this order?'}
+                    </Text>
+                  </Pressable>
                   <View className="flex-row mt-2 items-center">
                     <View
                       className={`rounded-full px-2 py-0.5 me-2 ${
@@ -493,6 +534,37 @@ export default function CurriculumScreen() {
                 )}
               </Pressable>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showWhyModal} animationType="slide" transparent>
+        <View className="flex-1 bg-black/50 justify-end">
+          <View
+            className="bg-background rounded-t-3xl px-5 pt-6 pb-8"
+            style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+          >
+            <Text className="text-h3 font-bold text-text-primary mb-2">
+              Why this order?
+            </Text>
+            <Text className="text-body font-semibold text-text-primary mb-3">
+              {whyTopicTitle}
+            </Text>
+            <ScrollView style={{ maxHeight: 320 }}>
+              <Text className="text-body text-text-secondary">
+                {whyExplanation}
+              </Text>
+            </ScrollView>
+            <Pressable
+              onPress={() => setShowWhyModal(false)}
+              className="mt-5 rounded-button bg-primary py-3 items-center"
+              accessibilityRole="button"
+              accessibilityLabel="Close explanation"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                Close
+              </Text>
+            </Pressable>
           </View>
         </View>
       </Modal>

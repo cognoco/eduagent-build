@@ -32,6 +32,61 @@ const SCREEN_HEIGHT =
 
 const HAS_SIGNED_IN_KEY = 'hasSignedInBefore';
 
+type VerificationStage = 'first_factor' | 'second_factor';
+
+type VerificationState =
+  | {
+      stage: VerificationStage;
+      strategy: 'email_code';
+      identifier: string;
+      emailAddressId: string;
+    }
+  | {
+      stage: VerificationStage;
+      strategy: 'phone_code';
+      identifier: string;
+      phoneNumberId?: string;
+    };
+
+type EmailCodeFactor = {
+  strategy: 'email_code';
+  emailAddressId: string;
+  safeIdentifier?: string;
+};
+
+type PhoneCodeFactor = {
+  strategy: 'phone_code';
+  phoneNumberId?: string;
+  safeIdentifier?: string;
+};
+
+type SignInAttemptLike = {
+  status: string | null;
+  createdSessionId: string | null;
+  supportedFirstFactors?: unknown[] | null;
+  supportedSecondFactors?: unknown[] | null;
+};
+
+function isEmailCodeFactor(factor: unknown): factor is EmailCodeFactor {
+  return (
+    typeof factor === 'object' &&
+    factor !== null &&
+    'strategy' in factor &&
+    factor.strategy === 'email_code' &&
+    'emailAddressId' in factor &&
+    typeof factor.emailAddressId === 'string'
+  );
+}
+
+function isPhoneCodeFactor(factor: unknown): factor is PhoneCodeFactor {
+  return (
+    typeof factor === 'object' &&
+    factor !== null &&
+    'strategy' in factor &&
+    factor.strategy === 'phone_code'
+  );
+}
+
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
   const router = useRouter();
@@ -44,7 +99,8 @@ export default function SignInScreen() {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [isReturningUser, setIsReturningUser] = useState<boolean | null>(null);
-  const [pendingVerification, setPendingVerification] = useState(false);
+  const [pendingVerification, setPendingVerification] =
+    useState<VerificationState | null>(null);
   const [code, setCode] = useState('');
   const [resending, setResending] = useState(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
@@ -71,6 +127,8 @@ export default function SignInScreen() {
   useWebBrowserWarmup();
 
   const canSubmit = emailAddress.trim() !== '' && password !== '' && !loading;
+  const canSubmitCode =
+    pendingVerification !== null && code.trim() !== '' && !loading;
 
   const onSSOPress = useCallback(
     async (strategy: 'oauth_google' | 'oauth_apple') => {
@@ -117,6 +175,11 @@ export default function SignInScreen() {
         setError('No session was created. Please try again.');
         return;
       }
+      if (!setActive) {
+        setError('Authentication not loaded. Please try again.');
+        return;
+      }
+
       try {
         await setActive({ session: sessionId });
       } catch {
@@ -125,79 +188,171 @@ export default function SignInScreen() {
         );
         return;
       }
+
+      setPendingVerification(null);
+      setCode('');
       void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
       router.replace('/(learner)/home');
     },
     [setActive, router]
   );
 
+  const prepareVerificationStep = useCallback(
+    async (attempt: SignInAttemptLike) => {
+      if (!signIn) return false;
+
+      if (attempt.status === 'needs_first_factor') {
+        const emailFactor =
+          attempt.supportedFirstFactors?.find(isEmailCodeFactor) ?? null;
+
+        if (emailFactor) {
+          await signIn.prepareFirstFactor({
+            strategy: 'email_code',
+            emailAddressId: emailFactor.emailAddressId,
+          });
+          setPendingVerification({
+            stage: 'first_factor',
+            strategy: 'email_code',
+            identifier:
+              emailFactor.safeIdentifier || emailAddress.trim() || 'your email',
+            emailAddressId: emailFactor.emailAddressId,
+          });
+          setCode('');
+          return true;
+        }
+      }
+
+      if (attempt.status === 'needs_second_factor') {
+        const emailFactor =
+          attempt.supportedSecondFactors?.find(isEmailCodeFactor) ?? null;
+        if (emailFactor) {
+          await signIn.prepareSecondFactor({
+            strategy: 'email_code',
+            emailAddressId: emailFactor.emailAddressId,
+          });
+          setPendingVerification({
+            stage: 'second_factor',
+            strategy: 'email_code',
+            identifier:
+              emailFactor.safeIdentifier || emailAddress.trim() || 'your email',
+            emailAddressId: emailFactor.emailAddressId,
+          });
+          setCode('');
+          return true;
+        }
+
+        const phoneFactor =
+          attempt.supportedSecondFactors?.find(isPhoneCodeFactor) ?? null;
+        if (phoneFactor) {
+          await signIn.prepareSecondFactor({
+            strategy: 'phone_code',
+            ...(phoneFactor.phoneNumberId
+              ? { phoneNumberId: phoneFactor.phoneNumberId }
+              : {}),
+          });
+          setPendingVerification({
+            stage: 'second_factor',
+            strategy: 'phone_code',
+            identifier: phoneFactor.safeIdentifier ?? 'your phone',
+            phoneNumberId: phoneFactor.phoneNumberId,
+          });
+          setCode('');
+          return true;
+        }
+      }
+
+      return false;
+    },
+    [signIn, emailAddress]
+  );
+
+  const handleIncompleteSignIn = useCallback(
+    async (attempt: SignInAttemptLike) => {
+      const startedVerification = await prepareVerificationStep(attempt);
+      if (startedVerification) {
+        return;
+      }
+
+      setPendingVerification(null);
+
+      if (attempt.status === 'needs_new_password') {
+        setError(
+          'Your password needs to be updated before you can sign in. Use Forgot password? to reset it.'
+        );
+        return;
+      }
+
+      if (
+        attempt.status === 'needs_first_factor' ||
+        attempt.status === 'needs_second_factor'
+      ) {
+        setError(
+          'Your account needs an additional verification step that this build could not start automatically. Please try again or use a different sign-in method.'
+        );
+        return;
+      }
+
+      setError('Sign-in could not be completed. Please try again.');
+    },
+    [prepareVerificationStep]
+  );
+
   const onSignInPress = useCallback(async () => {
-    if (!isLoaded || !canSubmit) return;
+    if (!isLoaded || !canSubmit || !signIn) return;
 
     setError('');
     setLoading(true);
 
     try {
       const signInAttempt = await signIn.create({
-        identifier: emailAddress,
+        strategy: 'password',
+        identifier: emailAddress.trim(),
         password,
       });
 
       if (signInAttempt.status === 'complete') {
         await activateSession(signInAttempt.createdSessionId);
-      } else if (signInAttempt.status === 'needs_first_factor') {
-        // Clerk requires an additional verification step (e.g. email code).
-        // Prepare and show the verification UI.
-        const emailFactor = signInAttempt.supportedFirstFactors?.find(
-          (f) => f.strategy === 'email_code'
-        );
-        if (emailFactor && 'emailAddressId' in emailFactor) {
-          await signIn.prepareFirstFactor({
-            strategy: 'email_code',
-            emailAddressId: emailFactor.emailAddressId,
-          });
-          setPendingVerification(true);
-        } else {
-          setError(
-            'Your account requires a verification method this app doesn\u2019t support yet. ' +
-              `(status: ${signInAttempt.status})`
-          );
-        }
-      } else if (signInAttempt.status === 'needs_second_factor') {
-        setError(
-          'Two-factor authentication is not yet supported in this app. ' +
-            'Please disable 2FA in your account settings and try again.'
-        );
       } else {
-        setError(
-          `Sign-in could not be completed (status: ${signInAttempt.status}). Please try again.`
-        );
+        await handleIncompleteSignIn(signInAttempt);
       }
     } catch (err: unknown) {
       setError(extractClerkError(err));
     } finally {
       setLoading(false);
     }
-  }, [isLoaded, canSubmit, signIn, activateSession, emailAddress, password]);
+  }, [
+    isLoaded,
+    canSubmit,
+    signIn,
+    activateSession,
+    handleIncompleteSignIn,
+    emailAddress,
+    password,
+  ]);
 
   const onVerifyPress = useCallback(async () => {
-    if (!isLoaded || code.trim() === '') return;
+    if (!isLoaded || !signIn || !pendingVerification || code.trim() === '')
+      return;
 
     setError('');
     setLoading(true);
 
     try {
-      const result = await signIn.attemptFirstFactor({
-        strategy: 'email_code',
-        code,
-      });
+      const result =
+        pendingVerification.stage === 'first_factor'
+          ? await signIn.attemptFirstFactor({
+              strategy: pendingVerification.strategy,
+              code,
+            })
+          : await signIn.attemptSecondFactor({
+              strategy: pendingVerification.strategy,
+              code,
+            });
 
       if (result.status === 'complete') {
         await activateSession(result.createdSessionId);
       } else {
-        setError(
-          `Verification could not be completed (status: ${result.status}). Please try again.`
-        );
+        await handleIncompleteSignIn(result);
       }
     } catch (err: unknown) {
       setError(
@@ -206,22 +361,41 @@ export default function SignInScreen() {
     } finally {
       setLoading(false);
     }
-  }, [isLoaded, signIn, code, activateSession]);
+  }, [
+    isLoaded,
+    pendingVerification,
+    code,
+    signIn,
+    activateSession,
+    handleIncompleteSignIn,
+  ]);
 
   const onResendCode = useCallback(async () => {
-    if (!isLoaded || resending) return;
+    if (!isLoaded || !signIn || !pendingVerification || resending) return;
 
     setError('');
     setResending(true);
 
     try {
-      const emailFactor = signIn.supportedFirstFactors?.find(
-        (f) => f.strategy === 'email_code'
-      );
-      if (emailFactor && 'emailAddressId' in emailFactor) {
+      if (
+        pendingVerification.stage === 'first_factor' &&
+        pendingVerification.strategy === 'email_code'
+      ) {
         await signIn.prepareFirstFactor({
           strategy: 'email_code',
-          emailAddressId: emailFactor.emailAddressId,
+          emailAddressId: pendingVerification.emailAddressId,
+        });
+      } else if (pendingVerification.strategy === 'email_code') {
+        await signIn.prepareSecondFactor({
+          strategy: 'email_code',
+          emailAddressId: pendingVerification.emailAddressId,
+        });
+      } else {
+        await signIn.prepareSecondFactor({
+          strategy: 'phone_code',
+          ...(pendingVerification.phoneNumberId
+            ? { phoneNumberId: pendingVerification.phoneNumberId }
+            : {}),
         });
       }
     } catch (err: unknown) {
@@ -229,15 +403,13 @@ export default function SignInScreen() {
     } finally {
       setResending(false);
     }
-  }, [isLoaded, resending, signIn]);
+  }, [isLoaded, pendingVerification, resending, signIn]);
 
   const onBackFromVerification = useCallback(() => {
-    setPendingVerification(false);
+    setPendingVerification(null);
     setCode('');
     setError('');
   }, []);
-
-  const canSubmitCode = code.trim() !== '' && !loading;
 
   if (pendingVerification) {
     return (
@@ -259,7 +431,7 @@ export default function SignInScreen() {
         >
           <View className="flex-1" style={{ minHeight: 40 }} />
           <Text className="text-h2 font-bold text-text-primary mb-1">
-            Verify your email
+            Enter verification code
           </Text>
           <Text className="text-body-sm text-text-secondary mb-6">
             We sent a verification code to{' '}
@@ -268,7 +440,7 @@ export default function SignInScreen() {
               numberOfLines={1}
               ellipsizeMode="middle"
             >
-              {emailAddress}
+              {pendingVerification.identifier}
             </Text>
           </Text>
 

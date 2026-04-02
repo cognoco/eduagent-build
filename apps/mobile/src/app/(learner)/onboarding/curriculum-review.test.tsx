@@ -93,6 +93,12 @@ jest.mock('../../../hooks/use-curriculum', () => ({
     mutateAsync: mockAddTopicMutateAsync,
     isPending: false,
   }),
+  useExplainTopic: () => ({
+    mutateAsync: jest
+      .fn()
+      .mockResolvedValue({ explanation: 'Test explanation' }),
+    isPending: false,
+  }),
 }));
 
 const CurriculumReviewScreen = require('./curriculum-review').default;

@@ -450,12 +450,18 @@ async function prepareExchangeContext(
     : 'full'; // default for new topics
   const exchangeHistory = events
     .filter(
-      (e) => e.eventType === 'user_message' || e.eventType === 'ai_response'
+      (e) =>
+        e.eventType === 'user_message' ||
+        e.eventType === 'ai_response' ||
+        e.eventType === 'system_prompt'
     )
     .map((e) => ({
-      role: (e.eventType === 'user_message' ? 'user' : 'assistant') as
-        | 'user'
-        | 'assistant',
+      role:
+        e.eventType === 'user_message'
+          ? ('user' as const)
+          : e.eventType === 'system_prompt'
+          ? ('system' as const)
+          : ('assistant' as const),
       content: e.content,
     }));
 
@@ -585,7 +591,7 @@ async function persistExchangeResult(
   aiResponse: string,
   effectiveRung: EscalationRung,
   behavioral?: Partial<ExchangeBehavioralMetrics>
-): Promise<number> {
+): Promise<{ exchangeCount: number; aiEventId?: string }> {
   const previousRung = session.escalationRung;
 
   // Build ai_response metadata — always includes escalationRung,
@@ -604,23 +610,29 @@ async function persistExchangeResult(
   };
 
   // Persist events: user_message + ai_response (with behavioral metadata)
-  await db.insert(sessionEvents).values([
-    {
-      sessionId,
-      profileId,
-      subjectId: session.subjectId,
-      eventType: 'user_message' as const,
-      content: userMessage,
-    },
-    {
-      sessionId,
-      profileId,
-      subjectId: session.subjectId,
-      eventType: 'ai_response' as const,
-      content: aiResponse,
-      metadata: aiMetadata,
-    },
-  ]);
+  const insertedEvents = await db
+    .insert(sessionEvents)
+    .values([
+      {
+        sessionId,
+        profileId,
+        subjectId: session.subjectId,
+        eventType: 'user_message' as const,
+        content: userMessage,
+      },
+      {
+        sessionId,
+        profileId,
+        subjectId: session.subjectId,
+        eventType: 'ai_response' as const,
+        content: aiResponse,
+        metadata: aiMetadata,
+      },
+    ])
+    .returning({
+      id: sessionEvents.id,
+      eventType: sessionEvents.eventType,
+    });
 
   // Record escalation event if rung changed
   if (previousRung !== effectiveRung) {
@@ -652,7 +664,11 @@ async function persistExchangeResult(
       )
     );
 
-  return newExchangeCount;
+  return {
+    exchangeCount: newExchangeCount,
+    aiEventId: insertedEvents.find((event) => event.eventType === 'ai_response')
+      ?.id,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -675,6 +691,7 @@ export async function processMessage(
   isUnderstandingCheck: boolean;
   exchangeCount: number;
   expectedResponseMinutes: number;
+  aiEventId?: string;
 }> {
   // Early exchange limit check — runs before expensive prepareExchangeContext
   // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
@@ -693,7 +710,7 @@ export async function processMessage(
     ? Date.now() - lastAiResponseAt.getTime()
     : null;
 
-  const newExchangeCount = await persistExchangeResult(
+  const persisted = await persistExchangeResult(
     db,
     profileId,
     sessionId,
@@ -714,8 +731,9 @@ export async function processMessage(
     response: result.response,
     escalationRung: effectiveRung,
     isUnderstandingCheck: result.isUnderstandingCheck,
-    exchangeCount: newExchangeCount,
+    exchangeCount: persisted.exchangeCount,
     expectedResponseMinutes: result.expectedResponseMinutes,
+    aiEventId: persisted.aiEventId,
   };
 }
 
@@ -735,6 +753,7 @@ export async function streamMessage(
     exchangeCount: number;
     escalationRung: number;
     expectedResponseMinutes: number;
+    aiEventId?: string;
   }>;
 }> {
   // Early exchange limit check — runs before expensive prepareExchangeContext
@@ -761,7 +780,7 @@ export async function streamMessage(
         fullResponse,
         context
       );
-      const newExchangeCount = await persistExchangeResult(
+      const persisted = await persistExchangeResult(
         db,
         profileId,
         sessionId,
@@ -778,9 +797,10 @@ export async function streamMessage(
         }
       );
       return {
-        exchangeCount: newExchangeCount,
+        exchangeCount: persisted.exchangeCount,
         escalationRung: effectiveRung,
         expectedResponseMinutes,
+        aiEventId: persisted.aiEventId,
       };
     },
   };
@@ -989,6 +1009,7 @@ export async function getSessionTranscript(
     wallClockSeconds: number | null;
   };
   exchanges: Array<{
+    eventId?: string;
     role: 'user' | 'assistant';
     content: string;
     timestamp: string;
@@ -1018,6 +1039,7 @@ export async function getSessionTranscript(
       const meta = event.metadata as Record<string, unknown> | null;
       const isSystemPrompt = event.eventType === 'system_prompt';
       return {
+        eventId: event.id,
         role: event.eventType === 'user_message' ? 'user' : 'assistant',
         content: event.content,
         timestamp: event.createdAt.toISOString(),
@@ -1063,7 +1085,8 @@ export async function recordSystemPrompt(
   db: Database,
   profileId: string,
   sessionId: string,
-  content: string
+  content: string,
+  metadata?: Record<string, unknown>
 ): Promise<void> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
@@ -1077,6 +1100,7 @@ export async function recordSystemPrompt(
     topicId: session.topicId,
     eventType: 'system_prompt',
     content,
+    metadata: metadata ?? {},
   });
 
   await db
@@ -1244,8 +1268,6 @@ export async function flagContent(
   sessionId: string,
   input: ContentFlagInput
 ): Promise<{ message: string }> {
-  void input;
-
   // Look up the session to get its subjectId
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
@@ -1256,8 +1278,13 @@ export async function flagContent(
     sessionId,
     profileId,
     subjectId: session.subjectId,
+    topicId: session.topicId,
     eventType: 'flag',
     content: 'Content flagged',
+    metadata: {
+      eventId: input.eventId,
+      ...(input.reason ? { reason: input.reason } : {}),
+    },
   });
 
   return { message: 'Content flagged for review. Thank you!' };

@@ -31,7 +31,10 @@ export interface ExchangeContext {
   topicDescription?: string;
   sessionType: 'learning' | 'homework' | 'interleaved';
   escalationRung: EscalationRung;
-  exchangeHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
+  exchangeHistory: Array<{
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+  }>;
   birthYear?: number | null;
   priorLearningContext?: string;
   embeddingMemoryContext?: string;
@@ -391,7 +394,7 @@ export async function processExchange(
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
     ...context.exchangeHistory.map((e) => ({
-      role: e.role as 'user' | 'assistant',
+      role: e.role,
       content: e.content,
     })),
     { role: 'user' as const, content: userMessage },
@@ -446,7 +449,7 @@ export async function streamExchange(
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
     ...context.exchangeHistory.map((e) => ({
-      role: e.role as 'user' | 'assistant',
+      role: e.role,
       content: e.content,
     })),
     { role: 'user' as const, content: userMessage },

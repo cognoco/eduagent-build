@@ -1,6 +1,17 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { AppState, View, Text, Pressable, Alert } from 'react-native';
+import {
+  AppState,
+  View,
+  Text,
+  Pressable,
+  Alert,
+  Modal,
+  ScrollView,
+  TextInput,
+  ActivityIndicator,
+} from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { PendingCelebration, HomeworkProblem } from '@eduagent/schemas';
 import {
   ChatShell,
@@ -18,6 +29,9 @@ import {
   useCloseSession,
   useSessionTranscript,
   useRecordSystemPrompt,
+  useFlagSessionContent,
+  useParkingLot,
+  useAddParkingLotItem,
 } from '../../../hooks/use-sessions';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { useStreaks } from '../../../hooks/use-streaks';
@@ -26,6 +40,8 @@ import { useNetworkStatus } from '../../../hooks/use-network-status';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
 import { useCelebrationLevel } from '../../../hooks/use-settings';
 import { useCelebration } from '../../../hooks/use-celebration';
+import { useSubjects } from '../../../hooks/use-subjects';
+import { useCurriculum } from '../../../hooks/use-curriculum';
 import {
   celebrationForReason,
   createMilestoneTrackerStateFromMilestones,
@@ -82,6 +98,38 @@ function MilestoneDots({ count }: { count: number }) {
   );
 }
 
+type QuickChipId = 'hint' | 'example' | 'simpler' | 'switch_topic' | 'park';
+
+type MessageFeedbackState = 'helpful' | 'retry' | 'flagged';
+
+const QUICK_CHIP_CONFIG: Record<
+  Exclude<QuickChipId, 'switch_topic' | 'park'>,
+  {
+    label: string;
+    prompt: string;
+    systemPrompt: string;
+  }
+> = {
+  hint: {
+    label: 'Hint',
+    prompt: 'Give me a hint.',
+    systemPrompt:
+      'The learner tapped the hint chip. Give one short hint, not a full solution.',
+  },
+  example: {
+    label: 'Example',
+    prompt: 'Can you show a similar example?',
+    systemPrompt:
+      'The learner wants a fresh worked example. Use one similar example and keep it concise.',
+  },
+  simpler: {
+    label: 'Simpler',
+    prompt: 'Can you explain that more simply?',
+    systemPrompt:
+      'The learner wants a simpler explanation. Re-explain with plainer language and one concrete example.',
+  },
+};
+
 export default function SessionScreen() {
   const {
     mode,
@@ -103,6 +151,7 @@ export default function SessionScreen() {
     ocrText?: string;
   }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const effectiveMode = mode ?? 'freeform';
   const initialHomeworkProblems = useMemo(
@@ -159,6 +208,15 @@ export default function SessionScreen() {
   const [responseHistory, setResponseHistory] = useState<
     Array<{ actualSeconds: number; expectedMinutes: number }>
   >([]);
+  const [showParkingLot, setShowParkingLot] = useState(false);
+  const [parkingLotDraft, setParkingLotDraft] = useState('');
+  const [showTopicSwitcher, setShowTopicSwitcher] = useState(false);
+  const [topicSwitcherSubjectId, setTopicSwitcherSubjectId] = useState<
+    string | null
+  >(subjectId ?? null);
+  const [messageFeedback, setMessageFeedback] = useState<
+    Record<string, MessageFeedbackState>
+  >({});
 
   const animationCleanupRef = useRef<(() => void) | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -170,6 +228,10 @@ export default function SessionScreen() {
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
   const recordSystemPrompt = useRecordSystemPrompt(activeSessionId ?? '');
+  const flagSessionContent = useFlagSessionContent(activeSessionId ?? '');
+  const parkingLot = useParkingLot(activeSessionId ?? '');
+  const addParkingLotItem = useAddParkingLotItem(activeSessionId ?? '');
+  const { data: availableSubjects = [] } = useSubjects();
   const {
     milestonesReached,
     trackerState,
@@ -198,13 +260,24 @@ export default function SessionScreen() {
       setDraftText('');
       setResumedBanner(false);
       setResponseHistory([]);
+      setShowParkingLot(false);
+      setParkingLotDraft('');
+      setShowTopicSwitcher(false);
+      setTopicSwitcherSubjectId(subjectId ?? null);
+      setMessageFeedback({});
       hasHydratedRecoveryRef.current = false;
       resetMilestones();
       setHomeworkProblemsState(initialHomeworkProblems);
       setCurrentProblemIndex(0);
       setHomeworkMode(undefined);
       hasAutoSentRef.current = false;
-    }, [openingContent, resetMilestones, routeSessionId, initialHomeworkProblems])
+    }, [
+      openingContent,
+      resetMilestones,
+      routeSessionId,
+      initialHomeworkProblems,
+      subjectId,
+    ])
   );
 
   useEffect(() => {
@@ -218,6 +291,20 @@ export default function SessionScreen() {
 
   const effectiveSubjectId = classifiedSubject?.subjectId ?? subjectId ?? '';
   const effectiveSubjectName = classifiedSubject?.subjectName ?? subjectName;
+  const switcherSubjectId = topicSwitcherSubjectId ?? effectiveSubjectId;
+  const switcherCurriculum = useCurriculum(switcherSubjectId);
+
+  useEffect(() => {
+    if (effectiveSubjectId) {
+      setTopicSwitcherSubjectId((current) => current ?? effectiveSubjectId);
+      return;
+    }
+    if (availableSubjects.length > 0) {
+      setTopicSwitcherSubjectId(
+        (current) => current ?? availableSubjects[0]!.id
+      );
+    }
+  }, [availableSubjects, effectiveSubjectId]);
 
   const apiClient = useApiClient();
   const classifySubject = useClassifySubject();
@@ -270,6 +357,8 @@ export default function SessionScreen() {
         }`,
         role: entry.role === 'assistant' ? ('ai' as const) : ('user' as const),
         content: entry.content,
+        eventId: entry.eventId,
+        isSystemPrompt: entry.isSystemPrompt,
         escalationRung: entry.escalationRung,
       }));
 
@@ -372,7 +461,12 @@ export default function SessionScreen() {
           }
           return [
             ...prev,
-            { id: 'silence-prompt', role: 'ai', content: prompt },
+            {
+              id: 'silence-prompt',
+              role: 'ai',
+              content: prompt,
+              isSystemPrompt: true,
+            },
           ];
         });
 
@@ -624,6 +718,7 @@ export default function SessionScreen() {
                   ? {
                       ...m,
                       streaming: false,
+                      eventId: result.aiEventId,
                       escalationRung: result.escalationRung,
                     }
                   : m
@@ -845,6 +940,122 @@ export default function SessionScreen() {
     milestonesReached,
   ]);
 
+  const handleQuickChip = useCallback(
+    async (chip: QuickChipId) => {
+      if (chip === 'switch_topic') {
+        setShowTopicSwitcher(true);
+        return;
+      }
+
+      if (chip === 'park') {
+        if (!activeSessionId) {
+          Alert.alert(
+            'Start the conversation first',
+            'Send one message so this session has somewhere to save your parking lot.'
+          );
+          return;
+        }
+        setShowParkingLot(true);
+        return;
+      }
+
+      const config = QUICK_CHIP_CONFIG[chip];
+      if (!config) return;
+
+      if (activeSessionId) {
+        try {
+          await recordSystemPrompt.mutateAsync({
+            content: config.systemPrompt,
+            metadata: { type: 'quick_chip', chip },
+          });
+        } catch {
+          // Best effort only. The visible prompt still continues below.
+        }
+      }
+
+      await handleSend(config.prompt);
+    },
+    [activeSessionId, handleSend, recordSystemPrompt]
+  );
+
+  const handleMessageFeedback = useCallback(
+    async (message: ChatMessage, action: MessageFeedbackState) => {
+      if (!message.eventId || !activeSessionId) return;
+
+      if (action === 'flagged') {
+        try {
+          await flagSessionContent.mutateAsync({
+            eventId: message.eventId,
+            reason: 'Flagged from learner session controls',
+          });
+          setMessageFeedback((prev) => ({ ...prev, [message.id]: action }));
+        } catch (err: unknown) {
+          Alert.alert('Could not flag message', formatApiError(err));
+        }
+        return;
+      }
+
+      const systemPrompt =
+        action === 'helpful'
+          ? 'The learner marked the previous answer as helpful. Keep the same pace and level of guidance.'
+          : 'The learner is still confused by the previous answer. Re-explain more simply with one new example.';
+
+      try {
+        await recordSystemPrompt.mutateAsync({
+          content: systemPrompt,
+          metadata: {
+            type: 'message_feedback',
+            value: action,
+            eventId: message.eventId,
+          },
+        });
+        setMessageFeedback((prev) => ({ ...prev, [message.id]: action }));
+
+        if (action === 'retry') {
+          await handleSend('Can you try that a different way?');
+        }
+      } catch (err: unknown) {
+        Alert.alert('Could not save feedback', formatApiError(err));
+      }
+    },
+    [activeSessionId, flagSessionContent, handleSend, recordSystemPrompt]
+  );
+
+  const handleSaveParkingLot = useCallback(async () => {
+    if (!activeSessionId) {
+      Alert.alert(
+        'Start the conversation first',
+        'Send one message so this session has somewhere to save your parking lot.'
+      );
+      return;
+    }
+
+    if (!parkingLotDraft.trim()) return;
+
+    try {
+      await addParkingLotItem.mutateAsync({ question: parkingLotDraft.trim() });
+      setParkingLotDraft('');
+    } catch (err: unknown) {
+      Alert.alert('Could not save parking lot item', formatApiError(err));
+    }
+  }, [activeSessionId, addParkingLotItem, parkingLotDraft]);
+
+  const handleTopicSwitch = useCallback(
+    (nextTopicId: string, nextSubjectId: string, nextSubjectName: string) => {
+      setShowTopicSwitcher(false);
+      router.push({
+        pathname: '/(learner)/session',
+        params: {
+          mode: 'learning',
+          subjectId: nextSubjectId,
+          subjectName: nextSubjectName,
+          topicId: nextTopicId,
+        },
+      } as never);
+    },
+    [router]
+  );
+
   const showEndSession = exchangeCount > 0;
 
   const userMessageCount = useMemo(
@@ -867,14 +1078,36 @@ export default function SessionScreen() {
     </Pressable>
   ) : null;
 
-  const headerRight =
-    modeConfig.showTimer || showEndSession || milestonesReached.length > 0 ? (
-      <View className="flex-row items-center">
-        {modeConfig.showTimer && <SessionTimer />}
-        <MilestoneDots count={milestonesReached.length} />
-        {endSessionButton}
-      </View>
-    ) : undefined;
+  const agencyLabel = escalationRung >= 3 ? 'Guided' : 'Independent';
+  const agencyBadge = (
+    <Pressable
+      onPress={() =>
+        Alert.alert(
+          agencyLabel === 'Guided' ? 'Guided mode' : 'Independent mode',
+          agencyLabel === 'Guided'
+            ? 'Your mate is giving more structure right now because the conversation needed extra support.'
+            : 'Your mate is mostly letting you drive and checking in with lighter guidance.'
+        )
+      }
+      className="ms-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
+      accessibilityRole="button"
+      accessibilityLabel={`Session mode: ${agencyLabel}`}
+      testID="agency-badge"
+    >
+      <Text className="text-body-sm font-semibold text-text-secondary">
+        {agencyLabel}
+      </Text>
+    </Pressable>
+  );
+
+  const headerRight = (
+    <View className="flex-row items-center">
+      {modeConfig.showTimer && <SessionTimer />}
+      {agencyBadge}
+      <MilestoneDots count={milestonesReached.length} />
+      {endSessionButton}
+    </View>
+  );
 
   const subtitle = pendingClassification
     ? 'Figuring out what this is about...'
@@ -885,6 +1118,40 @@ export default function SessionScreen() {
     : apiChecked && !isApiReachable
     ? 'Server unreachable - messages may fail'
     : modeConfig.subtitle;
+
+  const quickChipAccessory = (
+    <View className="bg-surface border-t border-surface-elevated px-4 py-3">
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 8 }}
+        testID="session-quick-chips"
+      >
+        {(
+          [
+            { id: 'hint', label: 'Hint' },
+            { id: 'example', label: 'Example' },
+            { id: 'simpler', label: 'Simpler' },
+            { id: 'switch_topic', label: 'Switch topic' },
+            { id: 'park', label: 'Park it' },
+          ] as Array<{ id: QuickChipId; label: string }>
+        ).map((chip) => (
+          <Pressable
+            key={chip.id}
+            onPress={() => void handleQuickChip(chip.id)}
+            className="rounded-full bg-surface-elevated px-4 py-2"
+            accessibilityRole="button"
+            accessibilityLabel={chip.label}
+            testID={`quick-chip-${chip.id}`}
+          >
+            <Text className="text-body-sm font-semibold text-text-primary">
+              {chip.label}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
 
   const homeworkModeChips =
     effectiveMode === 'homework' ? (
@@ -965,6 +1232,90 @@ export default function SessionScreen() {
       </View>
     ) : undefined;
 
+  const sessionAccessory = (
+    <>
+      {quickChipAccessory}
+      {homeworkModeChips}
+    </>
+  );
+
+  const renderMessageActions = (message: ChatMessage): React.ReactNode => {
+    if (
+      message.role !== 'ai' ||
+      message.streaming ||
+      message.isSystemPrompt ||
+      !message.eventId
+    ) {
+      return null;
+    }
+
+    const feedbackState = messageFeedback[message.id];
+
+    return (
+      <View className="flex-row flex-wrap gap-2">
+        <Pressable
+          onPress={() => void handleMessageFeedback(message, 'helpful')}
+          disabled={feedbackState === 'flagged'}
+          className={
+            feedbackState === 'helpful'
+              ? 'rounded-full bg-primary/15 px-3 py-1.5'
+              : 'rounded-full bg-surface-elevated px-3 py-1.5'
+          }
+          testID={`message-feedback-helpful-${message.id}`}
+        >
+          <Text
+            className={
+              feedbackState === 'helpful'
+                ? 'text-caption font-semibold text-primary'
+                : 'text-caption font-semibold text-text-secondary'
+            }
+          >
+            Helpful
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => void handleMessageFeedback(message, 'retry')}
+          disabled={feedbackState === 'flagged'}
+          className={
+            feedbackState === 'retry'
+              ? 'rounded-full bg-warning/15 px-3 py-1.5'
+              : 'rounded-full bg-surface-elevated px-3 py-1.5'
+          }
+          testID={`message-feedback-retry-${message.id}`}
+        >
+          <Text
+            className={
+              feedbackState === 'retry'
+                ? 'text-caption font-semibold text-warning'
+                : 'text-caption font-semibold text-text-secondary'
+            }
+          >
+            Try differently
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => void handleMessageFeedback(message, 'flagged')}
+          className={
+            feedbackState === 'flagged'
+              ? 'rounded-full bg-danger/15 px-3 py-1.5'
+              : 'rounded-full bg-surface-elevated px-3 py-1.5'
+          }
+          testID={`message-feedback-flag-${message.id}`}
+        >
+          <Text
+            className={
+              feedbackState === 'flagged'
+                ? 'text-caption font-semibold text-danger'
+                : 'text-caption font-semibold text-text-secondary'
+            }
+          >
+            Flag
+          </Text>
+        </Pressable>
+      </View>
+    );
+  };
+
   return (
     <View className="flex-1">
       <ChatShell
@@ -976,8 +1327,9 @@ export default function SessionScreen() {
         isStreaming={isStreaming}
         inputDisabled={isOffline || pendingClassification}
         rightAction={headerRight}
-        inputAccessory={homeworkModeChips}
+        inputAccessory={sessionAccessory}
         onDraftChange={setDraftText}
+        renderMessageActions={renderMessageActions}
         footer={
           modeConfig.showQuestionCount || showBookLink ? (
             <>
@@ -989,6 +1341,200 @@ export default function SessionScreen() {
           ) : undefined
         }
       />
+      <Modal
+        visible={showParkingLot}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowParkingLot(false)}
+      >
+        <View className="flex-1 bg-black/40 justify-end">
+          <View
+            className="bg-background rounded-t-3xl px-5 pt-5"
+            style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+          >
+            <View className="items-center mb-4">
+              <View className="w-10 h-1 rounded-full bg-text-secondary/30" />
+            </View>
+            <Text className="text-h3 font-semibold text-text-primary mb-2">
+              Parking lot
+            </Text>
+            <Text className="text-body-sm text-text-secondary mb-4">
+              Save side questions for later so you can stay focused on this
+              session.
+            </Text>
+
+            <TextInput
+              value={parkingLotDraft}
+              onChangeText={setParkingLotDraft}
+              placeholder="What do you want to come back to later?"
+              className="bg-surface rounded-input px-4 py-3 text-body text-text-primary"
+              multiline
+              testID="parking-lot-input"
+            />
+
+            <Pressable
+              onPress={() => void handleSaveParkingLot()}
+              disabled={!parkingLotDraft.trim() || addParkingLotItem.isPending}
+              className={
+                parkingLotDraft.trim()
+                  ? 'bg-primary rounded-button py-3 mt-4 items-center'
+                  : 'bg-surface-elevated rounded-button py-3 mt-4 items-center'
+              }
+              testID="parking-lot-save"
+            >
+              {addParkingLotItem.isPending ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text
+                  className={
+                    parkingLotDraft.trim()
+                      ? 'text-body font-semibold text-text-inverse'
+                      : 'text-body font-semibold text-text-secondary'
+                  }
+                >
+                  Save question
+                </Text>
+              )}
+            </Pressable>
+
+            <ScrollView className="mt-4" style={{ maxHeight: 220 }}>
+              {(parkingLot.data ?? []).map((item) => (
+                <View
+                  key={item.id}
+                  className="bg-surface rounded-card px-4 py-3 mb-2"
+                  testID={`parking-lot-item-${item.id}`}
+                >
+                  <Text className="text-body text-text-primary">
+                    {item.question}
+                  </Text>
+                  <Text className="text-caption text-text-secondary mt-1">
+                    Saved for later
+                  </Text>
+                </View>
+              ))}
+              {parkingLot.isLoading ? (
+                <View className="py-4 items-center">
+                  <ActivityIndicator />
+                </View>
+              ) : parkingLot.data?.length ? null : (
+                <Text className="text-body-sm text-text-secondary mt-3">
+                  Nothing parked yet.
+                </Text>
+              )}
+            </ScrollView>
+
+            <Pressable
+              onPress={() => setShowParkingLot(false)}
+              className="items-center py-3 mt-3"
+            >
+              <Text className="text-body font-semibold text-text-secondary">
+                Close
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={showTopicSwitcher}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTopicSwitcher(false)}
+      >
+        <View className="flex-1 bg-black/40 justify-end">
+          <View
+            className="bg-background rounded-t-3xl px-5 pt-5"
+            style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+          >
+            <View className="items-center mb-4">
+              <View className="w-10 h-1 rounded-full bg-text-secondary/30" />
+            </View>
+            <Text className="text-h3 font-semibold text-text-primary mb-2">
+              Switch topic
+            </Text>
+            <Text className="text-body-sm text-text-secondary mb-4">
+              Start a new learning thread in another topic without losing this
+              conversation.
+            </Text>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8 }}
+              className="mb-4"
+            >
+              {availableSubjects.map((subject) => (
+                <Pressable
+                  key={subject.id}
+                  onPress={() => setTopicSwitcherSubjectId(subject.id)}
+                  className={
+                    switcherSubjectId === subject.id
+                      ? 'rounded-full bg-primary px-4 py-2'
+                      : 'rounded-full bg-surface-elevated px-4 py-2'
+                  }
+                  testID={`switch-subject-${subject.id}`}
+                >
+                  <Text
+                    className={
+                      switcherSubjectId === subject.id
+                        ? 'text-body-sm font-semibold text-text-inverse'
+                        : 'text-body-sm font-semibold text-text-secondary'
+                    }
+                  >
+                    {subject.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            <ScrollView style={{ maxHeight: 280 }}>
+              {switcherCurriculum.isLoading ? (
+                <View className="py-6 items-center">
+                  <ActivityIndicator />
+                </View>
+              ) : (
+                (switcherCurriculum.data?.topics ?? [])
+                  .filter((topic) => !topic.skipped)
+                  .map((topic) => {
+                    const subjectForTopic = availableSubjects.find(
+                      (subject) => subject.id === switcherSubjectId
+                    );
+                    if (!subjectForTopic) return null;
+                    return (
+                      <Pressable
+                        key={topic.id}
+                        onPress={() =>
+                          handleTopicSwitch(
+                            topic.id,
+                            subjectForTopic.id,
+                            subjectForTopic.name
+                          )
+                        }
+                        className="bg-surface rounded-card px-4 py-3 mb-2"
+                        testID={`switch-topic-${topic.id}`}
+                      >
+                        <Text className="text-body font-semibold text-text-primary">
+                          {topic.title}
+                        </Text>
+                        <Text className="text-body-sm text-text-secondary mt-1">
+                          {topic.description}
+                        </Text>
+                      </Pressable>
+                    );
+                  })
+              )}
+            </ScrollView>
+
+            <Pressable
+              onPress={() => setShowTopicSwitcher(false)}
+              className="items-center py-3 mt-3"
+            >
+              <Text className="text-body font-semibold text-text-secondary">
+                Close
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
       {CelebrationOverlay}
     </View>
   );

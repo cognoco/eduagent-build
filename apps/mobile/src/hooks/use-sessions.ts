@@ -9,8 +9,10 @@ import {
 import { useAuth } from '@clerk/clerk-expo';
 import type {
   CelebrationReason,
+  ContentFlagInput,
   HomeworkSessionMetadata,
   LearningSession,
+  ParkingLotItem,
   SessionMessageInput,
   SessionMetadata,
   SessionSummary,
@@ -34,6 +36,7 @@ interface MessageResult {
   isUnderstandingCheck: boolean;
   exchangeCount: number;
   expectedResponseMinutes: number;
+  aiEventId?: string;
 }
 
 interface CloseResult {
@@ -185,6 +188,7 @@ export function useStreamMessage(sessionId: string): {
       exchangeCount: number;
       escalationRung: number;
       expectedResponseMinutes?: number;
+      aiEventId?: string;
     }) => void,
     overrideSessionId?: string,
     options?: { homeworkMode?: 'help_me' | 'check_answer' }
@@ -213,6 +217,7 @@ export function useStreamMessage(sessionId: string): {
         exchangeCount: number;
         escalationRung: number;
         expectedResponseMinutes?: number;
+        aiEventId?: string;
       }) => void,
       overrideSessionId?: string,
       options?: { homeworkMode?: 'help_me' | 'check_answer' }
@@ -261,6 +266,7 @@ export function useStreamMessage(sessionId: string): {
               expectedResponseMinutes: (
                 event as { expectedResponseMinutes?: number }
               ).expectedResponseMinutes,
+              aiEventId: (event as { aiEventId?: string }).aiEventId,
             });
           }
         }
@@ -311,20 +317,102 @@ export function useSessionTranscript(
 
 export function useRecordSystemPrompt(
   sessionId: string
-): UseMutationResult<{ ok: boolean }, Error, { content: string }> {
+): UseMutationResult<
+  { ok: boolean },
+  Error,
+  { content: string; metadata?: Record<string, unknown> }
+> {
   const client = useApiClient();
 
   return useMutation({
-    mutationFn: async ({ content }: { content: string }) => {
+    mutationFn: async ({
+      content,
+      metadata,
+    }: {
+      content: string;
+      metadata?: Record<string, unknown>;
+    }) => {
       const systemPromptClient = (
         client.sessions[':sessionId'] as Record<string, any>
       )['system-prompt'];
       const res = await systemPromptClient.$post({
         param: { sessionId },
-        json: { content },
+        json: { content, metadata },
       });
       await assertOk(res);
       return (await res.json()) as { ok: boolean };
+    },
+  });
+}
+
+export function useFlagSessionContent(
+  sessionId: string
+): UseMutationResult<{ message: string }, Error, ContentFlagInput> {
+  const client = useApiClient();
+
+  return useMutation({
+    mutationFn: async (input: ContentFlagInput) => {
+      const res = await client.sessions[':sessionId'].flag.$post({
+        param: { sessionId },
+        json: input,
+      });
+      await assertOk(res);
+      return (await res.json()) as { message: string };
+    },
+  });
+}
+
+export function useParkingLot(
+  sessionId: string
+): UseQueryResult<ParkingLotItem[]> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['parking-lot', sessionId, activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const parkingLotClient = (
+          client.sessions[':sessionId'] as Record<string, any>
+        )['parking-lot'];
+        const res = await parkingLotClient.$get({
+          param: { sessionId },
+          init: { signal },
+        });
+        await assertOk(res);
+        const data = (await res.json()) as { items: ParkingLotItem[] };
+        return data.items;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!sessionId,
+  });
+}
+
+export function useAddParkingLotItem(
+  sessionId: string
+): UseMutationResult<{ item: ParkingLotItem }, Error, { question: string }> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { question: string }) => {
+      const parkingLotClient = (
+        client.sessions[':sessionId'] as Record<string, any>
+      )['parking-lot'];
+      const res = await parkingLotClient.$post({
+        param: { sessionId },
+        json: input,
+      });
+      await assertOk(res);
+      return (await res.json()) as { item: ParkingLotItem };
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['parking-lot', sessionId],
+      });
     },
   });
 }

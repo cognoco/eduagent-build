@@ -23,6 +23,7 @@ interface MessageBubbleProps {
   streaming?: boolean;
   escalationRung?: number;
   verificationBadge?: VerificationBadge;
+  actions?: React.ReactNode;
 }
 
 function ThinkingDot({ delay }: { delay: number }): React.ReactElement {
@@ -270,6 +271,7 @@ export function MessageBubble({
   streaming,
   escalationRung,
   verificationBadge,
+  actions,
 }: MessageBubbleProps): React.ReactElement {
   const isAI = role === 'ai';
   const colors = useThemeColors();
@@ -371,6 +373,7 @@ export function MessageBubble({
             {displayContent}
           </Text>
         )}
+        {actions ? <View className="mt-3">{actions}</View> : null}
       </View>
     </Animated.View>
   );

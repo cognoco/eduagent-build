@@ -63,13 +63,36 @@ function toGeminiRequest(
   messages: ChatMessage[],
   config: ModelConfig
 ): GeminiRequest {
-  const systemMessages = messages.filter((m) => m.role === 'system');
-  const chatMessages = messages.filter((m) => m.role !== 'system');
+  // Gemini only supports systemInstruction as a top-level field, not inline
+  // with chat turns. Use the first contiguous block of system messages as the
+  // system instruction. Any later system messages (e.g., quick-chip hints
+  // injected mid-conversation) are converted to user-role messages with a
+  // wrapper so they retain their positional context in the conversation.
+  let firstSystemBlockEnd = 0;
+  while (
+    firstSystemBlockEnd < messages.length &&
+    messages[firstSystemBlockEnd]!.role === 'system'
+  ) {
+    firstSystemBlockEnd++;
+  }
 
-  const contents = chatMessages.map((m) => ({
-    role: (m.role === 'assistant' ? 'model' : 'user') as 'user' | 'model',
-    parts: [{ text: m.content }],
-  }));
+  const initialSystemMessages = messages.slice(0, firstSystemBlockEnd);
+  const remainingMessages = messages.slice(firstSystemBlockEnd);
+
+  const contents = remainingMessages.map((m) => {
+    if (m.role === 'system') {
+      // Mid-conversation system prompt — inject as user message so Gemini
+      // sees it at the correct position in the conversation.
+      return {
+        role: 'user' as const,
+        parts: [{ text: `[Tutor instruction]: ${m.content}` }],
+      };
+    }
+    return {
+      role: (m.role === 'assistant' ? 'model' : 'user') as 'user' | 'model',
+      parts: [{ text: m.content }],
+    };
+  });
 
   const request: GeminiRequest = {
     contents,
@@ -77,9 +100,11 @@ function toGeminiRequest(
     safetySettings: SAFETY_SETTINGS_FOR_MINORS,
   };
 
-  if (systemMessages.length > 0) {
+  if (initialSystemMessages.length > 0) {
     request.systemInstruction = {
-      parts: [{ text: systemMessages.map((m) => m.content).join('\n\n') }],
+      parts: [
+        { text: initialSystemMessages.map((m) => m.content).join('\n\n') },
+      ],
     };
   }
 
