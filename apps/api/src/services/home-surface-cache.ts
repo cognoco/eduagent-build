@@ -183,7 +183,7 @@ export async function mergeHomeSurfaceCacheData(
   const now = new Date();
   const current =
     existing?.data ?? normalizeHomeSurfaceCacheData(undefined, profileId);
-  const next = {
+  const next: HomeSurfaceCacheData = {
     ...merge(current),
     kind: HOME_SURFACE_CACHE_KIND,
     cachedAt: now.toISOString(),

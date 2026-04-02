@@ -324,7 +324,7 @@ describe('SessionScreen homework flow', () => {
 
   // TODO: agent was stopped mid-implementation — unskip when chips are wired
   it.skip('shows contextual learner-agency chips and session tools', () => {
-    render(<SessionScreen />);
+    const screen = render(<SessionScreen />);
 
     expect(screen.getByText('I know this')).toBeTruthy();
     expect(screen.getByText('Explain differently')).toBeTruthy();
