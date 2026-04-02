@@ -44,7 +44,15 @@ export default function SignInScreen() {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [isReturningUser, setIsReturningUser] = useState<boolean | null>(null);
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [code, setCode] = useState('');
+  const [resending, setResending] = useState(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
+  const {
+    scrollRef: verifyScrollRef,
+    onFieldLayout: onVerifyFieldLayout,
+    onFieldFocus: onVerifyFieldFocus,
+  } = useKeyboardScroll();
 
   useEffect(() => {
     (async () => {
@@ -103,6 +111,26 @@ export default function SignInScreen() {
     [startGoogleSSO, startAppleSSO, setActive, router]
   );
 
+  const activateSession = useCallback(
+    async (sessionId: string | null) => {
+      if (!sessionId) {
+        setError('No session was created. Please try again.');
+        return;
+      }
+      try {
+        await setActive({ session: sessionId });
+      } catch {
+        setError(
+          'Could not activate your session. Please try signing in again.'
+        );
+        return;
+      }
+      void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
+      router.replace('/(learner)/home');
+    },
+    [setActive, router]
+  );
+
   const onSignInPress = useCallback(async () => {
     if (!isLoaded || !canSubmit) return;
 
@@ -116,27 +144,193 @@ export default function SignInScreen() {
       });
 
       if (signInAttempt.status === 'complete') {
-        try {
-          await setActive({ session: signInAttempt.createdSessionId });
-        } catch {
+        await activateSession(signInAttempt.createdSessionId);
+      } else if (signInAttempt.status === 'needs_first_factor') {
+        // Clerk requires an additional verification step (e.g. email code).
+        // Prepare and show the verification UI.
+        const emailFactor = signInAttempt.supportedFirstFactors?.find(
+          (f) => f.strategy === 'email_code'
+        );
+        if (emailFactor && 'emailAddressId' in emailFactor) {
+          await signIn.prepareFirstFactor({
+            strategy: 'email_code',
+            emailAddressId: emailFactor.emailAddressId,
+          });
+          setPendingVerification(true);
+        } else {
           setError(
-            'Could not activate your session. Please try signing in again.'
+            'Your account requires a verification method this app doesn\u2019t support yet. ' +
+              `(status: ${signInAttempt.status})`
           );
-          return;
         }
-        void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
-        // Two-step redirect: always land in (learner), then layout guard
-        // checks persona and bounces parent users to /(parent)/dashboard.
-        router.replace('/(learner)/home');
+      } else if (signInAttempt.status === 'needs_second_factor') {
+        setError(
+          'Two-factor authentication is not yet supported in this app. ' +
+            'Please disable 2FA in your account settings and try again.'
+        );
       } else {
-        setError('Sign-in could not be completed. Please try again.');
+        setError(
+          `Sign-in could not be completed (status: ${signInAttempt.status}). Please try again.`
+        );
       }
     } catch (err: unknown) {
       setError(extractClerkError(err));
     } finally {
       setLoading(false);
     }
-  }, [isLoaded, canSubmit, signIn, setActive, router, emailAddress, password]);
+  }, [isLoaded, canSubmit, signIn, activateSession, emailAddress, password]);
+
+  const onVerifyPress = useCallback(async () => {
+    if (!isLoaded || code.trim() === '') return;
+
+    setError('');
+    setLoading(true);
+
+    try {
+      const result = await signIn.attemptFirstFactor({
+        strategy: 'email_code',
+        code,
+      });
+
+      if (result.status === 'complete') {
+        await activateSession(result.createdSessionId);
+      } else {
+        setError(
+          `Verification could not be completed (status: ${result.status}). Please try again.`
+        );
+      }
+    } catch (err: unknown) {
+      setError(
+        extractClerkError(err, 'Invalid verification code. Please try again.')
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [isLoaded, signIn, code, activateSession]);
+
+  const onResendCode = useCallback(async () => {
+    if (!isLoaded || resending) return;
+
+    setError('');
+    setResending(true);
+
+    try {
+      const emailFactor = signIn.supportedFirstFactors?.find(
+        (f) => f.strategy === 'email_code'
+      );
+      if (emailFactor && 'emailAddressId' in emailFactor) {
+        await signIn.prepareFirstFactor({
+          strategy: 'email_code',
+          emailAddressId: emailFactor.emailAddressId,
+        });
+      }
+    } catch (err: unknown) {
+      setError(extractClerkError(err));
+    } finally {
+      setResending(false);
+    }
+  }, [isLoaded, resending, signIn]);
+
+  const onBackFromVerification = useCallback(() => {
+    setPendingVerification(false);
+    setCode('');
+    setError('');
+  }, []);
+
+  const canSubmitCode = code.trim() !== '' && !loading;
+
+  if (pendingVerification) {
+    return (
+      <KeyboardAvoidingView
+        className="flex-1 bg-background items-center"
+        behavior="padding"
+      >
+        <ScrollView
+          ref={verifyScrollRef}
+          className="flex-1"
+          contentContainerStyle={{
+            minHeight: SCREEN_HEIGHT,
+            paddingTop: insets.top + 24,
+            paddingBottom: insets.bottom + 24,
+            paddingHorizontal: 24,
+          }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+        >
+          <View className="flex-1" style={{ minHeight: 40 }} />
+          <Text className="text-h2 font-bold text-text-primary mb-1">
+            Verify your email
+          </Text>
+          <Text className="text-body-sm text-text-secondary mb-6">
+            We sent a verification code to{' '}
+            <Text
+              className="text-body-sm text-text-secondary font-semibold"
+              numberOfLines={1}
+              ellipsizeMode="middle"
+            >
+              {emailAddress}
+            </Text>
+          </Text>
+
+          {error !== '' && (
+            <View
+              className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+              accessibilityRole="alert"
+            >
+              <Text className="text-danger text-body-sm">{error}</Text>
+            </View>
+          )}
+
+          <View onLayout={onVerifyFieldLayout('code')}>
+            <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+              Verification code
+            </Text>
+            <TextInput
+              className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
+              placeholder="Enter 6-digit code"
+              placeholderTextColor={colors.muted}
+              keyboardType="number-pad"
+              value={code}
+              onChangeText={setCode}
+              editable={!loading}
+              testID="sign-in-verify-code"
+              onFocus={onVerifyFieldFocus('code')}
+            />
+          </View>
+
+          <Button
+            variant="primary"
+            label="Verify"
+            onPress={onVerifyPress}
+            disabled={!canSubmitCode}
+            loading={loading}
+            testID="sign-in-verify-button"
+          />
+
+          <View className="flex-row justify-center mt-4">
+            <Button
+              variant="tertiary"
+              size="small"
+              label="Resend code"
+              onPress={onResendCode}
+              loading={resending}
+              testID="sign-in-resend-code"
+            />
+          </View>
+
+          <View className="flex-row justify-center mt-2">
+            <Button
+              variant="tertiary"
+              size="small"
+              label="Back to sign in"
+              onPress={onBackFromVerification}
+              testID="sign-in-back-from-verify"
+            />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
