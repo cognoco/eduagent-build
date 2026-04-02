@@ -7,7 +7,6 @@
 
 import { eq, sql } from 'drizzle-orm';
 import {
-  coachingCardCache,
   learningSessions,
   streaks,
   createScopedRepository,
@@ -15,6 +14,10 @@ import {
   type Database,
 } from '@eduagent/database';
 import type { CoachingCard } from '@eduagent/schemas';
+import {
+  mergeHomeSurfaceCacheData,
+  readHomeSurfaceCacheData,
+} from './home-surface-cache';
 import { getStreakDisplayInfo, type StreakState } from './streaks';
 
 // ---------------------------------------------------------------------------
@@ -193,21 +196,15 @@ export async function writeCoachingCardCache(
   const now = new Date();
   const expiresAt = new Date(now.getTime() + TTL_MS);
 
-  await db
-    .insert(coachingCardCache)
-    .values({
-      profileId,
-      cardData: card,
-      expiresAt,
-    })
-    .onConflictDoUpdate({
-      target: coachingCardCache.profileId,
-      set: {
-        cardData: card,
-        expiresAt,
-        updatedAt: now,
-      },
-    });
+  await mergeHomeSurfaceCacheData(
+    db,
+    profileId,
+    (current) => ({
+      ...current,
+      legacyCoachingCard: card,
+    }),
+    { expiresAt }
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -222,16 +219,13 @@ export async function readCoachingCardCache(
   db: Database,
   profileId: string
 ): Promise<CoachingCard | null> {
-  const row = await db.query.coachingCardCache.findFirst({
-    where: eq(coachingCardCache.profileId, profileId),
-  });
-
-  if (!row) return null;
+  const cached = await readHomeSurfaceCacheData(db, profileId);
+  if (!cached) return null;
 
   const now = new Date();
-  if (row.expiresAt.getTime() <= now.getTime()) return null;
+  if (cached.row.expiresAt.getTime() <= now.getTime()) return null;
 
-  return row.cardData as CoachingCard;
+  return cached.data.legacyCoachingCard;
 }
 
 // ---------------------------------------------------------------------------

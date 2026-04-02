@@ -15,6 +15,10 @@ import * as SecureStore from 'expo-secure-store';
 import { useWebBrowserWarmup } from '../../hooks/use-web-browser-warmup';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
+import {
+  getOpenAISSOStrategy,
+  type SupportedSSOStrategy,
+} from '../../lib/clerk-sso';
 import { extractClerkError } from '../../lib/clerk-error';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
@@ -123,8 +127,8 @@ export default function SignInScreen() {
     })();
   }, []);
 
-  const { startSSOFlow: startGoogleSSO } = useSSO();
-  const { startSSOFlow: startAppleSSO } = useSSO();
+  const { startSSOFlow } = useSSO();
+  const openAIStrategy = getOpenAISSOStrategy();
 
   useWebBrowserWarmup();
 
@@ -144,16 +148,13 @@ export default function SignInScreen() {
   );
 
   const onSSOPress = useCallback(
-    async (strategy: 'oauth_google' | 'oauth_apple') => {
+    async (strategy: SupportedSSOStrategy) => {
       clearVerificationFlow();
       setError('');
       setOauthLoading(strategy);
 
       try {
-        const startSSO =
-          strategy === 'oauth_google' ? startGoogleSSO : startAppleSSO;
-
-        const { createdSessionId } = await startSSO({
+        const { createdSessionId } = await startSSOFlow({
           strategy,
           redirectUrl: Linking.createURL('/sso-callback', {
             scheme: 'mentomate',
@@ -183,7 +184,7 @@ export default function SignInScreen() {
         setOauthLoading(null);
       }
     },
-    [clearVerificationFlow, startGoogleSSO, startAppleSSO, setActive, router]
+    [clearVerificationFlow, router, setActive, startSSOFlow]
   );
 
   const activateSession = useCallback(
@@ -619,6 +620,19 @@ export default function SignInScreen() {
             testID="apple-sso-button"
           />
         </View>
+
+        {openAIStrategy ? (
+          <View className="mb-6">
+            <Button
+              variant="secondary"
+              label="Continue with OpenAI"
+              onPress={() => onSSOPress(openAIStrategy)}
+              disabled={oauthLoading !== null}
+              loading={oauthLoading === openAIStrategy}
+              testID="openai-sso-button"
+            />
+          </View>
+        ) : null}
 
         <View className="flex-row items-center mb-6">
           <View className="flex-1 h-px bg-border" />

@@ -30,6 +30,7 @@ describe('SignInScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    delete process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY;
     (useSignIn as jest.Mock).mockReturnValue({
       isLoaded: true,
       signIn: {
@@ -59,8 +60,18 @@ describe('SignInScreen', () => {
 
     expect(screen.getByTestId('google-sso-button')).toBeTruthy();
     expect(screen.getByTestId('apple-sso-button')).toBeTruthy();
+    expect(screen.queryByTestId('openai-sso-button')).toBeNull();
     expect(screen.getByText('Continue with Google')).toBeTruthy();
     expect(screen.getByText('Continue with Apple')).toBeTruthy();
+  });
+
+  it('renders OpenAI SSO when configured', () => {
+    process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY = 'openai';
+
+    render(<SignInScreen />);
+
+    expect(screen.getByTestId('openai-sso-button')).toBeTruthy();
+    expect(screen.getByText('Continue with OpenAI')).toBeTruthy();
   });
 
   it('renders forgot password link', () => {
@@ -312,6 +323,29 @@ describe('SignInScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByText('OAuth provider error')).toBeTruthy();
+    });
+  });
+
+  it('calls startSSOFlow for OpenAI when configured', async () => {
+    process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY = 'openai';
+    mockStartSSOFlow.mockResolvedValue({
+      createdSessionId: 'sess_openai_123',
+    });
+    mockSetActive.mockResolvedValue(undefined);
+
+    render(<SignInScreen />);
+    fireEvent.press(screen.getByTestId('openai-sso-button'));
+
+    await waitFor(() => {
+      expect(mockStartSSOFlow).toHaveBeenCalledWith(
+        expect.objectContaining({ strategy: 'oauth_custom_openai' })
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockSetActive).toHaveBeenCalledWith({
+        session: 'sess_openai_123',
+      });
     });
   });
 });

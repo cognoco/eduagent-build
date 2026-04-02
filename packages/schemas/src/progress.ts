@@ -231,3 +231,53 @@ export const coachingCardSchema = z.discriminatedUnion('type', [
   curriculumCompleteCardSchema,
 ]);
 export type CoachingCard = z.infer<typeof coachingCardSchema>;
+
+// ---------------------------------------------------------------------------
+// Home Cards (Epic 12 / Epic 14 home-surface parity)
+// ---------------------------------------------------------------------------
+
+export const homeCardIdSchema = z.enum([
+  'resume_session',
+  'restore_subjects',
+  'review',
+  'study',
+  'homework',
+  'ask',
+  'family',
+  'link_child',
+]);
+export type HomeCardId = z.infer<typeof homeCardIdSchema>;
+
+export const homeCardSchema = z.object({
+  id: homeCardIdSchema,
+  title: z.string(),
+  subtitle: z.string(),
+  badge: z.string().optional(),
+  primaryLabel: z.string(),
+  secondaryLabel: z.string().optional(),
+  priority: z.number().int(),
+  compact: z.boolean().optional(),
+  subjectId: z.string().uuid().optional(),
+  subjectName: z.string().optional(),
+  topicId: z.string().uuid().optional(),
+});
+export type HomeCard = z.infer<typeof homeCardSchema>;
+
+export const homeCardsResponseSchema = z.object({
+  cards: z.array(homeCardSchema),
+  coldStart: z.boolean(),
+});
+export type HomeCardsResponse = z.infer<typeof homeCardsResponseSchema>;
+
+export const homeCardInteractionTypeSchema = z.enum(['tap', 'dismiss']);
+export type HomeCardInteractionType = z.infer<
+  typeof homeCardInteractionTypeSchema
+>;
+
+export const homeCardInteractionSchema = z.object({
+  cardId: homeCardIdSchema,
+  interactionType: homeCardInteractionTypeSchema,
+});
+export type HomeCardInteractionInput = z.infer<
+  typeof homeCardInteractionSchema
+>;

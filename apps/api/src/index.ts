@@ -40,6 +40,7 @@ import { progressRoutes } from './routes/progress';
 import { streakRoutes } from './routes/streaks';
 import { settingsRoutes } from './routes/settings';
 import { coachingCardRoutes } from './routes/coaching-card';
+import { homeCardRoutes } from './routes/home-cards';
 import { celebrationRoutes } from './routes/celebrations';
 import { dashboardRoutes } from './routes/dashboard';
 import { billingRoutes } from './routes/billing';
@@ -178,6 +179,7 @@ const routes = api
   .route('/', streakRoutes)
   .route('/', settingsRoutes)
   .route('/', coachingCardRoutes)
+  .route('/', homeCardRoutes)
   .route('/', celebrationRoutes)
   .route('/', dashboardRoutes)
   .route('/', billingRoutes)

@@ -11,6 +11,7 @@ const mockReplace = jest.fn();
 const mockClearSessionRecoveryMarker = jest.fn().mockResolvedValue(undefined);
 const mockReadSessionRecoveryMarker = jest.fn();
 const mockSessionGet = jest.fn();
+const mockTrackHomeCardInteraction = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -86,6 +87,43 @@ jest.mock('../../hooks/use-subjects', () => ({
     isError: false,
     refetch: jest.fn(),
     isRefetching: false,
+  }),
+}));
+
+jest.mock('../../hooks/use-home-cards', () => ({
+  useHomeCards: () => ({
+    data: {
+      coldStart: false,
+      cards: [
+        {
+          id: 'study',
+          title: 'Continue Math',
+          subtitle: 'Fractions',
+          badge: 'Continue',
+          primaryLabel: 'Continue topic',
+          priority: 82,
+          compact: false,
+          subjectId: 'subject-1',
+          subjectName: 'Math',
+          topicId: 'topic-1',
+        },
+        {
+          id: 'homework',
+          title: 'Homework help',
+          subtitle: 'Snap a question and get direct help.',
+          badge: 'Quick start',
+          primaryLabel: 'Open camera',
+          priority: 74,
+          compact: true,
+          subjectId: 'subject-1',
+          subjectName: 'Math',
+        },
+      ],
+    },
+    isLoading: false,
+  }),
+  useTrackHomeCardInteraction: () => ({
+    mutate: mockTrackHomeCardInteraction,
   }),
 }));
 
@@ -165,11 +203,6 @@ jest.mock('../../lib/api-client', () => ({
   }),
 }));
 
-jest.mock('../../lib/home-card-dismissals', () => ({
-  readHomeCardDismissals: jest.fn().mockResolvedValue({}),
-  incrementHomeCardDismissal: jest.fn().mockResolvedValue({}),
-}));
-
 const HomeScreen = require('./home').default;
 
 describe('HomeScreen session recovery', () => {
@@ -203,5 +236,21 @@ describe('HomeScreen session recovery', () => {
       params: { sessionId: 'session-123' },
     });
     expect(mockClearSessionRecoveryMarker).not.toHaveBeenCalled();
+  });
+
+  it('navigates from API-ranked home cards and records taps', async () => {
+    render(<HomeScreen />);
+
+    fireEvent.press(screen.getByText('Continue topic'));
+
+    await waitFor(() => {
+      expect(mockTrackHomeCardInteraction).toHaveBeenCalledWith({
+        cardId: 'study',
+        interactionType: 'tap',
+      });
+      expect(mockPush).toHaveBeenCalledWith(
+        '/(learner)/session?mode=practice&subjectId=subject-1&topicId=topic-1'
+      );
+    });
   });
 });
