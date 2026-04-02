@@ -1,23 +1,23 @@
 // Common
-export * from './common.js';
-export * from './errors.js';
-export * from './age.js';
+export * from './common.ts';
+export * from './errors.ts';
+export * from './age.ts';
 
 // Auth & Profiles
-export * from './auth.js';
-export * from './profiles.js';
-export * from './consent.js';
-export * from './account.js';
+export * from './auth.ts';
+export * from './profiles.ts';
+export * from './consent.ts';
+export * from './account.ts';
 
 // Onboarding & Curriculum (Epic 1)
-export * from './subjects.js';
-export * from './sessions.js';
+export * from './subjects.ts';
+export * from './sessions.ts';
 
 // Assessment & Retention (Epic 3)
-export * from './assessments.js';
+export * from './assessments.ts';
 
 // Progress, Motivation & Dashboard (Epic 4)
-export * from './progress.js';
+export * from './progress.ts';
 
 // Subscription & Billing (Epic 5)
-export * from './billing.js';
+export * from './billing.ts';

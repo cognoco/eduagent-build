@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { consentStatusSchema } from './consent.js';
+import { consentStatusSchema } from './consent.ts';
 
 export const personaTypeSchema = z.enum(['TEEN', 'LEARNER', 'PARENT']);
 export type PersonaType = z.infer<typeof personaTypeSchema>;

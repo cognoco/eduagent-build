@@ -10,9 +10,9 @@ import {
 } from 'react-native';
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
+import { useWebBrowserWarmup } from '../../hooks/use-web-browser-warmup';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { extractClerkError } from '../../lib/clerk-error';
@@ -60,13 +60,7 @@ export default function SignInScreen() {
   const { startSSOFlow: startGoogleSSO } = useSSO();
   const { startSSOFlow: startAppleSSO } = useSSO();
 
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-    void WebBrowser.warmUpAsync();
-    return () => {
-      void WebBrowser.coolDownAsync();
-    };
-  }, []);
+  useWebBrowserWarmup();
 
   const canSubmit = emailAddress.trim() !== '' && password !== '' && !loading;
 

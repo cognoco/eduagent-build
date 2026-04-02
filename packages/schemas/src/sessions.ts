@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { chatExchangeSchema } from './common.js';
-import { verificationTypeSchema } from './assessments.js';
+import { chatExchangeSchema } from './common.ts';
+import { verificationTypeSchema } from './assessments.ts';
 import {
   celebrationReasonSchema,
   pendingCelebrationSchema,
-} from './progress.js';
+} from './progress.ts';
 
 // Interview schemas
 
