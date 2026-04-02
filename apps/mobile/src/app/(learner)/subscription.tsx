@@ -4,7 +4,7 @@ import {
   Text,
   Pressable,
   ScrollView,
-  // TextInput — commented out with BYOK waitlist section
+  TextInput,
   Alert,
   ActivityIndicator,
   Linking,
@@ -30,7 +30,7 @@ import { UsageMeter } from '../../components/common';
 import {
   useSubscription,
   useUsage,
-  // useJoinByokWaitlist, — commented out with BYOK waitlist section
+  useJoinByokWaitlist,
   type SubscriptionTier,
 } from '../../hooks/use-subscription';
 import {
@@ -54,7 +54,7 @@ const TIER_LABELS: Record<SubscriptionTier, string> = {
 };
 
 const TIER_LIMITS: Record<SubscriptionTier, string> = {
-  free: '100 questions/month',
+  free: '50 questions/month',
   plus: '500 questions/month',
   family: '1,500 questions/month (shared)',
   pro: '3,000 questions/month',
@@ -68,7 +68,7 @@ const TIER_FEATURES: Array<{
   {
     tier: 'free',
     features: [
-      '100 questions per month',
+      '50 questions per month',
       'All subjects',
       'Spaced repetition',
       'Learning Book',
@@ -466,8 +466,7 @@ export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
-  // BYOK waitlist state — commented out with BYOK waitlist section
-  // const [byokEmail, setByokEmail] = useState('');
+  const [byokEmail, setByokEmail] = useState('');
   const { activeProfile } = useProfile();
 
   const queryClient = useQueryClient();
@@ -487,7 +486,7 @@ export default function SubscriptionScreen() {
     refetch: refetchUsage,
     isRefetching: usageRefetching,
   } = useUsage();
-  // const byokWaitlist = useJoinByokWaitlist();
+  const byokWaitlist = useJoinByokWaitlist();
 
   // Top-up IAP state
   const [topUpPurchasing, setTopUpPurchasing] = useState(false);
@@ -660,19 +659,20 @@ export default function SubscriptionScreen() {
   }, [offerings, usage, queryClient, activeProfile?.id]);
 
   // ---------------------------------------------------------------------------
-  // BYOK waitlist handler — commented out with BYOK waitlist section
+  // BYOK waitlist handler
   // ---------------------------------------------------------------------------
 
-  // const handleByokSubmit = useCallback(async () => {
-  //   if (!byokEmail.trim()) return;
-  //   try {
-  //     await byokWaitlist.mutateAsync({ email: byokEmail.trim() });
-  //     Alert.alert('Waitlist', 'You have been added to the BYOK waitlist.');
-  //     setByokEmail('');
-  //   } catch {
-  //     Alert.alert('Error', 'Could not join waitlist. Try again.');
-  //   }
-  // }, [byokWaitlist, byokEmail]);
+  const handleByokSubmit = useCallback(async () => {
+    const email = byokEmail.trim();
+    if (!email) return;
+    try {
+      await byokWaitlist.mutateAsync({ email });
+      Alert.alert('Waitlist', 'You have been added to the BYOK waitlist.');
+      setByokEmail('');
+    } catch {
+      Alert.alert('Error', 'Could not join waitlist. Try again.');
+    }
+  }, [byokEmail, byokWaitlist]);
 
   // ---------------------------------------------------------------------------
   // Child profile gate — child sees the child-friendly paywall
@@ -1023,10 +1023,9 @@ export default function SubscriptionScreen() {
             </View>
           )}
 
-          {/* BYOK waitlist — hidden until feature is ready
-          <View className="mt-6">
+          <View className="mt-6" testID="byok-waitlist-section">
             <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
-              Bring your own key (coming soon)
+              Bring your own key
             </Text>
             <View className="bg-surface rounded-card px-4 py-3.5">
               <Text className="text-body-sm text-text-secondary mb-3">
@@ -1040,9 +1039,11 @@ export default function SubscriptionScreen() {
                   placeholder="your@email.com"
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoCorrect={false}
                   className="flex-1 bg-background rounded-button px-3 py-2.5 text-body text-text-primary me-2"
                   placeholderTextColor={colors.muted}
                   accessibilityLabel="Email for BYOK waitlist"
+                  testID="byok-waitlist-email-input"
                 />
                 <Pressable
                   onPress={handleByokSubmit}
@@ -1050,15 +1051,23 @@ export default function SubscriptionScreen() {
                   className="bg-primary rounded-button px-4 py-2.5 justify-center"
                   accessibilityLabel="Join BYOK waitlist"
                   accessibilityRole="button"
+                  testID="join-byok-waitlist-button"
                 >
-                  <Text className="text-text-inverse text-body font-semibold">
-                    Join
-                  </Text>
+                  {byokWaitlist.isPending ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.textInverse}
+                      testID="join-byok-waitlist-loading"
+                    />
+                  ) : (
+                    <Text className="text-text-inverse text-body font-semibold">
+                      Join
+                    </Text>
+                  )}
                 </Pressable>
               </View>
             </View>
           </View>
-          */}
         </ScrollView>
       )}
     </View>

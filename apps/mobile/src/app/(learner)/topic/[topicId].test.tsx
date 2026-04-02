@@ -17,6 +17,7 @@ jest.mock('react-native-safe-area-context', () => ({
 
 const mockUseTopicProgress = jest.fn();
 const mockUseTopicRetention = jest.fn();
+const mockUseTopicParkingLot = jest.fn();
 
 jest.mock('../../../hooks/use-progress', () => ({
   useTopicProgress: (...args: unknown[]) => mockUseTopicProgress(...args),
@@ -24,6 +25,10 @@ jest.mock('../../../hooks/use-progress', () => ({
 
 jest.mock('../../../hooks/use-retention', () => ({
   useTopicRetention: (...args: unknown[]) => mockUseTopicRetention(...args),
+}));
+
+jest.mock('../../../hooks/use-sessions', () => ({
+  useTopicParkingLot: (...args: unknown[]) => mockUseTopicParkingLot(...args),
 }));
 
 const { useLocalSearchParams } = require('expo-router') as {
@@ -51,6 +56,10 @@ describe('TopicDetailScreen', () => {
     useLocalSearchParams.mockReturnValue({
       subjectId: 'sub-1',
       topicId: 'topic-1',
+    });
+    mockUseTopicParkingLot.mockReturnValue({
+      data: [],
+      isLoading: false,
     });
   });
 
@@ -130,6 +139,17 @@ describe('TopicDetailScreen', () => {
       },
       isLoading: false,
     });
+    mockUseTopicParkingLot.mockReturnValue({
+      data: [
+        {
+          id: 'parked-1',
+          question: 'Why does factoring help here?',
+          explored: false,
+          createdAt: '2026-02-15T10:00:00.000Z',
+        },
+      ],
+      isLoading: false,
+    });
 
     render(<TopicDetailScreen />, { wrapper: createWrapper() });
 
@@ -145,6 +165,8 @@ describe('TopicDetailScreen', () => {
     expect(
       screen.getByText('Learned about variables and equations')
     ).toBeTruthy();
+    expect(screen.getByText('Parking Lot')).toBeTruthy();
+    expect(screen.getByText('Why does factoring help here?')).toBeTruthy();
   });
 
   it('shows struggle status when not normal', () => {

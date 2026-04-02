@@ -30,6 +30,10 @@ jest.mock('../services/account', () => ({
 
 jest.mock('../services/parking-lot-data', () => ({
   getParkingLotItems: jest.fn().mockResolvedValue({ items: [], count: 0 }),
+  getParkingLotItemsForTopic: jest.fn().mockResolvedValue({
+    items: [],
+    count: 0,
+  }),
   addParkingLotItem: jest.fn().mockResolvedValue({
     id: 'new-item-id',
     question: 'Why does the sky appear blue?',
@@ -38,9 +42,17 @@ jest.mock('../services/parking-lot-data', () => ({
   }),
 }));
 
+jest.mock('../services/session', () => ({
+  getSession: jest.fn().mockResolvedValue({
+    id: '660e8400-e29b-41d4-a716-446655440000',
+    topicId: '770e8400-e29b-41d4-a716-446655440000',
+  }),
+}));
+
 import { app } from '../index';
 import {
   getParkingLotItems,
+  getParkingLotItemsForTopic,
   addParkingLotItem,
 } from '../services/parking-lot-data';
 
@@ -179,7 +191,8 @@ describe('parking lot routes', () => {
         undefined, // db — not set in test env (no DATABASE_URL binding)
         'test-account-id', // profileId falls back to account.id
         SESSION_ID,
-        'Test question'
+        'Test question',
+        '770e8400-e29b-41d4-a716-446655440000'
       );
     });
 
@@ -228,6 +241,37 @@ describe('parking lot routes', () => {
       const body = await res.json();
       expect(body.code).toBe('QUOTA_EXCEEDED');
       expect(body.message).toContain('max 10');
+    });
+  });
+
+  describe('GET /v1/subjects/:subjectId/topics/:topicId/parking-lot', () => {
+    it('returns topic-linked parked questions', async () => {
+      (getParkingLotItemsForTopic as jest.Mock).mockResolvedValueOnce({
+        items: [
+          {
+            id: 'topic-item-1',
+            question: 'Why does factoring help here?',
+            explored: false,
+            createdAt: '2026-02-15T10:00:00.000Z',
+          },
+        ],
+        count: 1,
+      });
+
+      const res = await app.request(
+        '/v1/subjects/sub-1/topics/topic-1/parking-lot',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.items[0].question).toBe('Why does factoring help here?');
+      expect(getParkingLotItemsForTopic).toHaveBeenCalledWith(
+        undefined,
+        'test-account-id',
+        'topic-1'
+      );
     });
   });
 });

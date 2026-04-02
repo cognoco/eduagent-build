@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import {
+  GeminiOcrProvider,
   StubOcrProvider,
   createOcrProvider,
   getOcrProvider,
@@ -64,6 +65,11 @@ describe('createOcrProvider', () => {
     const provider = createOcrProvider('unknown');
     expect(provider).toBeInstanceOf(StubOcrProvider);
   });
+
+  it('returns GeminiOcrProvider when requested with an API key', () => {
+    const provider = createOcrProvider('gemini', 'test-key');
+    expect(provider).toBeInstanceOf(GeminiOcrProvider);
+  });
 });
 
 describe('getOcrProvider / setOcrProvider', () => {
@@ -89,6 +95,11 @@ describe('getOcrProvider / setOcrProvider', () => {
     expect(getOcrProvider()).toBe(custom);
   });
 
+  it('returns a Gemini provider when an API key is supplied', () => {
+    const provider = getOcrProvider('test-key');
+    expect(provider).toBeInstanceOf(GeminiOcrProvider);
+  });
+
   it('resets to default after resetOcrProvider', () => {
     const custom: OcrProvider = {
       extractText: jest.fn().mockResolvedValue({
@@ -103,5 +114,42 @@ describe('getOcrProvider / setOcrProvider', () => {
     const provider = getOcrProvider();
     expect(provider).toBeInstanceOf(StubOcrProvider);
     expect(provider).not.toBe(custom);
+  });
+});
+
+describe('GeminiOcrProvider', () => {
+  it('parses JSON OCR output from Gemini', async () => {
+    const provider = new GeminiOcrProvider('test-key');
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: '{"text":"Solve for x: 2x + 5 = 13","confidence":0.81}',
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200 }
+      )
+    );
+
+    try {
+      const result = await provider.extractText(
+        new ArrayBuffer(8),
+        'image/jpeg'
+      );
+
+      expect(result.text).toBe('Solve for x: 2x + 5 = 13');
+      expect(result.confidence).toBe(0.81);
+      expect(result.regions).toEqual([]);
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });

@@ -1243,10 +1243,12 @@ export async function listFamilyMembers(
  * Adds a profile to a family subscription.
  *
  * Checks:
- * - Subscription exists and has room (canAddProfile)
+ * - Subscription exists
  * - Subscription tier supports multi-profile (family or pro)
+ * - Target profile already belongs to the subscription account
  *
- * Returns the new profile count or null if rejected.
+ * Family membership is account-scoped. Until an invite/claim flow exists,
+ * cross-account profile transfers are rejected instead of re-parented.
  */
 export async function addProfileToSubscription(
   db: Database,
@@ -1266,19 +1268,15 @@ export async function addProfileToSubscription(
     return null;
   }
 
-  const allowed = await canAddProfile(db, subscriptionId);
-  if (!allowed) {
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, profileId),
+  });
+
+  // Family membership is currently modeled as shared account ownership.
+  // Until an invite/claim flow exists, never re-parent profiles across accounts.
+  if (!profile || profile.accountId !== sub.accountId) {
     return null;
   }
-
-  // Re-parent the profile to the subscription's account
-  await db
-    .update(profiles)
-    .set({
-      accountId: sub.accountId,
-      updatedAt: new Date(),
-    })
-    .where(eq(profiles.id, profileId));
 
   const count = await getProfileCountForSubscription(db, subscriptionId);
   return { profileCount: count };
@@ -1287,11 +1285,8 @@ export async function addProfileToSubscription(
 /**
  * Removes a profile from a family subscription.
  *
- * The removed profile needs its own free-tier subscription provisioned.
- * No clawback — questions already consumed remain spent.
- *
- * Returns the removed profile's new account ID (for notification purposes),
- * or null if the profile/subscription doesn't exist or the profile is the owner.
+ * Cross-account detachment is intentionally disabled until the backend has a
+ * verifiable invite/claim flow for the destination account.
  */
 export async function removeProfileFromSubscription(
   db: Database,
@@ -1323,19 +1318,11 @@ export async function removeProfileFromSubscription(
     return null;
   }
 
-  // Move profile to the new account
-  await db
-    .update(profiles)
-    .set({
-      accountId: newAccountId,
-      updatedAt: new Date(),
-    })
-    .where(eq(profiles.id, profileId));
-
-  // Provision a free-tier subscription for the removed profile's new account
-  await ensureFreeSubscription(db, newAccountId);
-
-  return { removedProfileId: profileId };
+  // Cross-account profile detachment needs an invite/claim flow so the
+  // destination account can be proven. Until that exists, reject the move
+  // instead of trusting a caller-supplied account ID.
+  void newAccountId;
+  return null;
 }
 
 /**

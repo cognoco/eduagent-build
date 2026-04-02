@@ -2,6 +2,24 @@ import { renderHook, act } from '@testing-library/react-native';
 import { NativeModules } from 'react-native';
 import { useHomeworkOcr } from './use-homework-ocr';
 
+const mockFetch = jest.fn();
+
+jest.mock('@clerk/clerk-expo', () => ({
+  useAuth: () => ({
+    getToken: jest.fn().mockResolvedValue('test-token'),
+  }),
+}));
+
+jest.mock('../lib/profile', () => ({
+  useProfile: () => ({
+    activeProfile: { id: 'profile-1' },
+  }),
+}));
+
+jest.mock('../lib/api', () => ({
+  getApiUrl: () => 'http://localhost:8787',
+}));
+
 // Simulate ML Kit native module being linked
 NativeModules.TextRecognition = { recognize: jest.fn() };
 
@@ -31,6 +49,7 @@ jest.mock('expo-file-system/legacy', () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   mockManipulateAsync.mockResolvedValue({ uri: 'file:///cache/resized.jpg' });
+  global.fetch = mockFetch as typeof fetch;
 });
 
 describe('useHomeworkOcr', () => {
@@ -117,6 +136,12 @@ describe('useHomeworkOcr', () => {
 
   it('handles ML Kit exception as error', async () => {
     mockRecognize.mockRejectedValue(new Error('ML Kit crash'));
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ text: 'Fallback OCR text from server' }),
+        { status: 200 }
+      )
+    );
 
     const { result } = renderHook(() => useHomeworkOcr());
 
@@ -124,11 +149,51 @@ describe('useHomeworkOcr', () => {
       await result.current.process('file:///tmp/photo.jpg');
     });
 
-    expect(result.current.status).toBe('error');
-    expect(result.current.error).toBe(
-      "We couldn't read that clearly. Try taking the photo again with better lighting."
+    expect(result.current.status).toBe('done');
+    expect(result.current.text).toBe('Fallback OCR text from server');
+    expect(result.current.failCount).toBe(0);
+  });
+
+  it('falls back to server OCR when ML Kit returns no text', async () => {
+    mockRecognize.mockResolvedValue({ text: '' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ text: 'Server-side OCR rescue text' }),
+        { status: 200 }
+      )
     );
-    expect(result.current.failCount).toBe(1);
+
+    const { result } = renderHook(() => useHomeworkOcr());
+
+    await act(async () => {
+      await result.current.process('file:///tmp/photo.jpg');
+    });
+
+    expect(result.current.status).toBe('done');
+    expect(result.current.text).toBe('Server-side OCR rescue text');
+  });
+
+  it('falls back to server OCR when the native module is unavailable', async () => {
+    const originalTextRecognition = NativeModules.TextRecognition;
+    NativeModules.TextRecognition = null;
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ text: 'Uploaded OCR text' }), {
+        status: 200,
+      })
+    );
+
+    const { result } = renderHook(() => useHomeworkOcr());
+
+    try {
+      await act(async () => {
+        await result.current.process('file:///tmp/photo.jpg');
+      });
+
+      expect(result.current.status).toBe('done');
+      expect(result.current.text).toBe('Uploaded OCR text');
+    } finally {
+      NativeModules.TextRecognition = originalTextRecognition;
+    }
   });
 
   it('retry() does NOT reset failCount', async () => {

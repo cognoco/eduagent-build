@@ -3,7 +3,11 @@ jest.mock('./parking-lot', () => ({
 }));
 
 import type { Database } from '@eduagent/database';
-import { getParkingLotItems, addParkingLotItem } from './parking-lot-data';
+import {
+  getParkingLotItems,
+  getParkingLotItemsForTopic,
+  addParkingLotItem,
+} from './parking-lot-data';
 
 const profileId = 'test-profile-id';
 const sessionId = '660e8400-e29b-41d4-a716-446655440000';
@@ -107,6 +111,27 @@ describe('getParkingLotItems', () => {
   });
 });
 
+describe('getParkingLotItemsForTopic', () => {
+  it('returns items linked to a topic', async () => {
+    const row = {
+      ...mockParkingLotRow({ id: 'topic-item-1', question: 'Topic question' }),
+      topicId,
+    };
+    const db = createMockDb();
+    (db.query.parkingLotItems.findMany as jest.Mock).mockResolvedValue([row]);
+
+    const result = await getParkingLotItemsForTopic(db, profileId, topicId);
+
+    expect(result.count).toBe(1);
+    expect(result.items[0]).toEqual({
+      id: 'topic-item-1',
+      question: 'Topic question',
+      explored: false,
+      createdAt: NOW.toISOString(),
+    });
+  });
+});
+
 // ---------------------------------------------------------------------------
 // addParkingLotItem
 // ---------------------------------------------------------------------------
@@ -187,6 +212,28 @@ describe('addParkingLotItem', () => {
       profileId,
       sessionId,
       'One too many'
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it('enforces the limit per topic when topicId is provided', async () => {
+    const existingRows = Array.from({ length: 10 }, (_, i) => ({
+      ...mockParkingLotRow({ id: `topic-item-${i}`, question: `Question ${i}` }),
+      topicId,
+    }));
+
+    const db = createMockDb();
+    (db.query.parkingLotItems.findMany as jest.Mock).mockResolvedValue(
+      existingRows
+    );
+
+    const result = await addParkingLotItem(
+      db,
+      profileId,
+      sessionId,
+      'One too many',
+      topicId
     );
 
     expect(result).toBeNull();

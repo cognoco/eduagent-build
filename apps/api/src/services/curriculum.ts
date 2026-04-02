@@ -4,6 +4,7 @@ import {
   curriculumTopics,
   curriculumAdaptations,
   subjects,
+  onboardingDrafts,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
@@ -370,13 +371,59 @@ export async function challengeCurriculum(
   });
 
   const newVersion = current ? current.version + 1 : 1;
+  const latestDraft = await db.query.onboardingDrafts.findFirst({
+    where: and(
+      eq(onboardingDrafts.profileId, profileId),
+      eq(onboardingDrafts.subjectId, subjectId)
+    ),
+    orderBy: desc(onboardingDrafts.updatedAt),
+  });
+
+  const extractedSignals =
+    latestDraft?.extractedSignals &&
+    typeof latestDraft.extractedSignals === 'object' &&
+    !Array.isArray(latestDraft.extractedSignals)
+      ? (latestDraft.extractedSignals as {
+          goals?: unknown;
+          experienceLevel?: unknown;
+          currentKnowledge?: unknown;
+        })
+      : {};
+  const draftGoals = Array.isArray(extractedSignals.goals)
+    ? extractedSignals.goals
+        .map((goal) => String(goal).trim())
+        .filter((goal) => goal.length > 0)
+    : [];
+  const draftExperienceLevel =
+    typeof extractedSignals.experienceLevel === 'string' &&
+    extractedSignals.experienceLevel.trim().length > 0
+      ? extractedSignals.experienceLevel.trim()
+      : 'beginner';
+  const draftConversation = Array.isArray(latestDraft?.exchangeHistory)
+    ? latestDraft.exchangeHistory
+        .map((exchange) => String(exchange?.content ?? '').trim())
+        .filter((content) => content.length > 0)
+        .join('\n')
+    : '';
+  const currentKnowledge =
+    typeof extractedSignals.currentKnowledge === 'string' &&
+    extractedSignals.currentKnowledge.trim().length > 0
+      ? extractedSignals.currentKnowledge.trim()
+      : '';
+  const interviewSummary = [
+    draftConversation,
+    currentKnowledge ? `Current knowledge: ${currentKnowledge}` : '',
+    `Learner feedback for regeneration: ${feedback.trim()}`,
+  ]
+    .filter((part) => part.length > 0)
+    .join('\n\n');
 
   // Generate new curriculum with feedback
   const topics = await generateCurriculum({
     subjectName: subject.name,
-    interviewSummary: feedback,
-    goals: [],
-    experienceLevel: 'intermediate',
+    interviewSummary,
+    goals: draftGoals,
+    experienceLevel: draftExperienceLevel,
   });
 
   const [newCurriculum] = await db

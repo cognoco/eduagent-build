@@ -391,6 +391,38 @@ export function useParkingLot(
   });
 }
 
+export function useTopicParkingLot(
+  subjectId: string,
+  topicId: string
+): UseQueryResult<ParkingLotItem[]> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['parking-lot', 'topic', subjectId, topicId, activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const subjectClient = client.subjects[':subjectId'] as Record<
+          string,
+          any
+        >;
+        const topicClient = subjectClient.topics[':topicId']['parking-lot'];
+        const res = await topicClient.$get({
+          param: { subjectId, topicId },
+          init: { signal },
+        });
+        await assertOk(res);
+        const data = (await res.json()) as { items: ParkingLotItem[] };
+        return data.items;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!subjectId && !!topicId,
+  });
+}
+
 export function useAddParkingLotItem(
   sessionId: string
 ): UseMutationResult<{ item: ParkingLotItem }, Error, { question: string }> {

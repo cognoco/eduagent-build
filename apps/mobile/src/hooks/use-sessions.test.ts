@@ -10,6 +10,7 @@ import {
   useSessionSummary,
   useSkipSummary,
   useSubmitSummary,
+  useTopicParkingLot,
 } from './use-sessions';
 
 const mockFetch = jest.fn();
@@ -576,5 +577,51 @@ describe('useStreamMessage', () => {
       exchangeCount: 1,
       escalationRung: 1,
     });
+  });
+});
+
+describe('useTopicParkingLot', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('calls GET /subjects/:subjectId/topics/:topicId/parking-lot', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          items: [
+            {
+              id: 'parked-1',
+              question: 'Why does factoring help here?',
+              explored: false,
+              createdAt: '2026-02-15T10:00:00.000Z',
+            },
+          ],
+          count: 1,
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(
+      () => useTopicParkingLot('subject-1', 'topic-1'),
+      {
+        wrapper: createWrapper(),
+      }
+    );
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(result.current.data?.[0]?.question).toBe(
+      'Why does factoring help here?'
+    );
   });
 });

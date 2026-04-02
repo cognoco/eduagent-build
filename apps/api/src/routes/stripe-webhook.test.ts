@@ -20,15 +20,27 @@ jest.mock('../services/billing', () => ({
 }));
 
 jest.mock('../services/subscription', () => ({
-  getTierConfig: jest.fn().mockReturnValue({
-    monthlyQuota: 500,
-    dailyLimit: null,
-    maxProfiles: 1,
-    priceMonthly: 18.99,
-    priceYearly: 168,
-    topUpPrice: 10,
-    topUpAmount: 500,
-  }),
+  getTierConfig: jest.fn((tier: string) =>
+    tier === 'free'
+      ? {
+          monthlyQuota: 50,
+          dailyLimit: 10,
+          maxProfiles: 1,
+          priceMonthly: 0,
+          priceYearly: 0,
+          topUpPrice: 0,
+          topUpAmount: 0,
+        }
+      : {
+          monthlyQuota: 500,
+          dailyLimit: null,
+          maxProfiles: 1,
+          priceMonthly: 18.99,
+          priceYearly: 168,
+          topUpPrice: 10,
+          topUpAmount: 500,
+        }
+  ),
 }));
 
 jest.mock('../inngest/client', () => ({
@@ -448,8 +460,15 @@ describe('customer.subscription.deleted', () => {
       'sub_stripe_123',
       expect.objectContaining({
         status: 'expired',
+        tier: 'free',
         cancelledAt: expect.any(String),
       })
+    );
+    expect(updateQuotaPoolLimit).toHaveBeenCalledWith(
+      mockDb,
+      'sub-internal-1',
+      50,
+      10
     );
   });
 });

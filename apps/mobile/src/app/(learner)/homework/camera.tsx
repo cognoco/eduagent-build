@@ -17,9 +17,10 @@ import type { HomeworkProblem } from '@eduagent/schemas';
 import { useThemeColors } from '../../../lib/theme';
 import { cameraReducer, initialCameraState } from './camera-reducer';
 import { useHomeworkOcr } from '../../../hooks/use-homework-ocr';
-import { useSubjects } from '../../../hooks/use-subjects';
+import { useCreateSubject, useSubjects } from '../../../hooks/use-subjects';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { CelebrationAnimation } from '../../../components/common';
+import { formatApiError } from '../../../lib/format-api-error';
 import {
   createHomeworkProblem,
   getHomeworkProblemText,
@@ -43,6 +44,7 @@ export default function CameraScreen(): React.ReactNode {
   const ocr = useHomeworkOcr();
   const cameraRef = useRef<CameraView>(null);
   const { data: subjects } = useSubjects();
+  const createSubject = useCreateSubject();
 
   const [ocrText, setOcrText] = useState('');
   const [draftProblems, setDraftProblems] = useState<HomeworkProblem[]>([]);
@@ -234,25 +236,50 @@ export default function CameraScreen(): React.ReactNode {
     ]
   );
 
-  const handleManualSubjectContinue = useCallback(() => {
-    if (!manualSubjectName.trim()) return;
-    // Use the typed subject name directly — the session screen / API
-    // will handle creating a new subject if it does not exist yet.
-    navigateToSession(
-      'new', // sentinel value — session start will create subject
-      manualSubjectName.trim(),
-      combinedProblemText,
-      draftProblems,
-      state.imageUri ?? undefined,
-      ocrText
+  const handleManualSubjectContinue = useCallback(async () => {
+    const typedName = manualSubjectName.trim();
+    if (!typedName) return;
+
+    const existingSubject = subjects?.find(
+      (subject) => subject.name.trim().toLowerCase() === typedName.toLowerCase()
     );
+    if (existingSubject) {
+      navigateToSession(
+        existingSubject.id,
+        existingSubject.name,
+        combinedProblemText,
+        draftProblems,
+        state.imageUri ?? undefined,
+        ocrText
+      );
+      return;
+    }
+
+    try {
+      const result = await createSubject.mutateAsync({
+        name: typedName,
+        rawInput: typedName,
+      });
+      navigateToSession(
+        result.subject.id,
+        result.subject.name,
+        combinedProblemText,
+        draftProblems,
+        state.imageUri ?? undefined,
+        ocrText
+      );
+    } catch (err: unknown) {
+      Alert.alert('Could not create subject', formatApiError(err));
+    }
   }, [
-    navigateToSession,
-    manualSubjectName,
     combinedProblemText,
+    createSubject,
     draftProblems,
-    state.imageUri,
+    manualSubjectName,
+    navigateToSession,
     ocrText,
+    state.imageUri,
+    subjects,
   ]);
 
   const handleManualContinue = useCallback(async () => {
@@ -705,10 +732,12 @@ export default function CameraScreen(): React.ReactNode {
             />
             <Pressable
               testID="camera-continue-button"
-              onPress={handleManualSubjectContinue}
-              disabled={!manualSubjectName.trim()}
+              onPress={() => void handleManualSubjectContinue()}
+              disabled={!manualSubjectName.trim() || createSubject.isPending}
               className={`rounded-button py-4 min-h-[48px] items-center justify-center mb-2 ${
-                manualSubjectName.trim() ? 'bg-accent' : 'bg-surface-elevated'
+                manualSubjectName.trim() && !createSubject.isPending
+                  ? 'bg-accent'
+                  : 'bg-surface-elevated'
               }`}
               accessibilityLabel="Continue with typed subject"
               accessibilityRole="button"
@@ -720,7 +749,7 @@ export default function CameraScreen(): React.ReactNode {
                     : 'text-text-secondary'
                 }`}
               >
-                Continue
+                {createSubject.isPending ? 'Creating subject...' : 'Continue'}
               </Text>
             </Pressable>
 

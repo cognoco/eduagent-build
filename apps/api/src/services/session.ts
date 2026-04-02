@@ -64,6 +64,7 @@ const PACE_BUFFER = 1.5; // 1.5x buffer for slower-than-estimated work
 interface TimedEvent {
   createdAt: Date;
   metadata?: unknown;
+  eventType?: string;
 }
 
 /** Compute active learning seconds from session event timestamps.
@@ -826,6 +827,7 @@ export async function closeSession(
     | 'skipped'
     | 'auto_closed';
   interleavedTopicIds?: string[];
+  escalationRungs?: number[];
 }> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
@@ -855,6 +857,7 @@ export async function closeSession(
     orderBy: asc(sessionEvents.createdAt),
   });
   const durationSeconds = computeActiveSeconds(sessionStartedAt, events);
+  const escalationRungs = collectEscalationRungs(events);
   const effectiveSummaryStatus =
     input.summaryStatus ??
     (input.reason === 'silence_timeout' ? 'auto_closed' : 'pending');
@@ -893,26 +896,17 @@ export async function closeSession(
     effectiveSummaryStatus
   );
 
-  // FR92: Extract interleaved topic IDs from session metadata
-  let interleavedTopicIds: string[] | undefined;
-  if (session.sessionType === 'interleaved') {
-    const [row] = await db
-      .select({ metadata: learningSessions.metadata })
-      .from(learningSessions)
-      .where(
-        and(
-          eq(learningSessions.id, sessionId),
-          eq(learningSessions.profileId, profileId)
-        )
-      )
-      .limit(1);
-    if (row?.metadata) {
-      const meta = row.metadata as {
-        interleavedTopics?: Array<{ topicId: string }>;
-      };
-      interleavedTopicIds = meta.interleavedTopics?.map((t) => t.topicId);
-    }
+  if (effectiveSummaryStatus === 'skipped') {
+    await incrementSummarySkips(db, profileId);
   }
+
+  // FR92: Extract interleaved topic IDs from session metadata
+  const interleavedTopicIds = await resolveInterleavedTopicIds(
+    db,
+    profileId,
+    sessionId,
+    session.sessionType
+  );
 
   return {
     message:
@@ -925,6 +919,97 @@ export async function closeSession(
     wallClockSeconds,
     summaryStatus: effectiveSummaryStatus,
     interleavedTopicIds,
+    escalationRungs,
+  };
+}
+
+function collectEscalationRungs(events: Array<TimedEvent>): number[] | undefined {
+  const rungs = Array.from(
+    new Set(
+      events
+        .filter((event) => event.eventType === 'ai_response')
+        .map((event) => {
+          const metadata = event.metadata as Record<string, unknown> | null;
+          return typeof metadata?.escalationRung === 'number'
+            ? metadata.escalationRung
+            : null;
+        })
+        .filter((rung): rung is number => rung != null)
+    )
+  ).sort((left, right) => left - right);
+
+  return rungs.length > 0 ? rungs : undefined;
+}
+
+async function resolveInterleavedTopicIds(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  sessionType: string
+): Promise<string[] | undefined> {
+  if (sessionType !== 'interleaved') {
+    return undefined;
+  }
+
+  const [row] = await db
+    .select({ metadata: learningSessions.metadata })
+    .from(learningSessions)
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId)
+      )
+    )
+    .limit(1);
+  if (!row?.metadata) {
+    return undefined;
+  }
+
+  const meta = row.metadata as {
+    interleavedTopics?: Array<{ topicId: string }>;
+  };
+  return meta.interleavedTopics?.map((topic) => topic.topicId);
+}
+
+export async function getSessionCompletionContext(
+  db: Database,
+  profileId: string,
+  sessionId: string
+): Promise<{
+  sessionId: string;
+  topicId: string | null;
+  subjectId: string;
+  sessionType: string;
+  verificationType: string | null;
+  interleavedTopicIds?: string[];
+  escalationRungs?: number[];
+}> {
+  const session = await getSession(db, profileId, sessionId);
+  if (!session) {
+    throw new Error('Session not found');
+  }
+
+  const events = await db.query.sessionEvents.findMany({
+    where: and(
+      eq(sessionEvents.sessionId, sessionId),
+      eq(sessionEvents.profileId, profileId)
+    ),
+    orderBy: asc(sessionEvents.createdAt),
+  });
+
+  return {
+    sessionId,
+    topicId: session.topicId ?? null,
+    subjectId: session.subjectId,
+    sessionType: session.sessionType,
+    verificationType: session.verificationType ?? null,
+    interleavedTopicIds: await resolveInterleavedTopicIds(
+      db,
+      profileId,
+      sessionId,
+      session.sessionType
+    ),
+    escalationRungs: collectEscalationRungs(events),
   };
 }
 
@@ -947,6 +1032,7 @@ export async function closeStaleSessions(
       | 'skipped'
       | 'auto_closed';
     interleavedTopicIds?: string[];
+    escalationRungs?: number[];
   }>
 > {
   const staleSessions = await db.query.learningSessions.findMany({
@@ -971,6 +1057,7 @@ export async function closeStaleSessions(
       | 'skipped'
       | 'auto_closed';
     interleavedTopicIds?: string[];
+    escalationRungs?: number[];
   }> = [];
 
   for (const staleSession of staleSessions) {

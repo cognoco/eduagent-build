@@ -76,3 +76,104 @@ Date: 2026-04-02
 
 - Epic 5 RevenueCat purchase/restore hooks, top-up credit grants, KV-backed quota reads, and the child-trial paywall all look materially wired up.
 - Epic 6 still appears intentionally deferred rather than half-shipped. `docs/epics.md:2900-2963` and `docs/architecture.md:47` / `docs/architecture.md:1138` describe it as v1.1-only, and a repo search across `apps/*` and `packages/*` for `pedagogy_mode`, `Four Strands`, `CEFR`, `FSI`, `comprehensible input`, and `fluency drill` returned no implementation hits outside docs.
+
+---
+
+# Epic 9 + Epic 10 Code Review Findings
+
+Date: 2026-04-02
+
+## Scope
+
+- Reviewed Epic 9 expectations from `docs/epics.md` against the current RevenueCat webhook flow, mobile subscription screen, and related billing hooks in `apps/api` and `apps/mobile`.
+- Reviewed Epic 10 partial / must-ship stories against the shipped consent, session-summary, session-classification, and Expo config code paths.
+- This pass is based on code inspection. I did not rerun Jest after the earlier targeted test attempt failed during plugin-worker startup.
+
+## Findings
+
+### 1. High: RevenueCat cancellation loses the cancel-at-period-end state the mobile UI depends on
+
+- Epic/story: Epic 9, Story 9.5.
+- Evidence:
+  - Story 9.5 requires cancellation to remain effective only at the end of the billing period, with status shown in-app from the subscription state: `docs/epics.md:3418-3420`.
+  - The RevenueCat cancellation handler immediately writes `status: 'cancelled'` plus `cancelledAt`, rather than keeping an `active` row with a scheduled end-of-period cancellation: `apps/api/src/routes/revenuecat-webhook.ts:270-286`.
+  - The billing API only exposes `cancelAtPeriodEnd` when `subscription.cancelledAt !== null && subscription.status === 'active'`: `apps/api/src/routes/billing.ts:107-117`.
+  - The learner subscription screen uses `cancelAtPeriodEnd` to render the `Cancelling` badge, the `Access until ...` copy, and the cancellation notice; otherwise it falls back to `hasActiveSubscription ? 'Active' : status` and `Renews ...`: `apps/mobile/src/app/(learner)/subscription.tsx:516-517` and `apps/mobile/src/app/(learner)/subscription.tsx:796-826`.
+- Impact:
+  - A store-side cancellation that should read as "cancelling at period end" is not surfaced that way through the API.
+  - While RevenueCat still reports an active entitlement, the app can show `Active` plus `Renews ...` even though the subscription has already been cancelled.
+
+### 2. Medium: successful mobile purchases do not refresh the API-backed subscription and usage state
+
+- Epic/story: Epic 9, Story 9.3.
+- Evidence:
+  - Story 9.3 requires the purchase result to update local state immediately: `docs/epics.md:3357-3366`.
+  - The subscription screen derives the displayed plan and quota from API hooks (`useSubscription()` / `useUsage()`) and reads RevenueCat entitlement state separately via `useCustomerInfo()`: `apps/mobile/src/app/(learner)/subscription.tsx:475-489` and `apps/mobile/src/app/(learner)/subscription.tsx:507-517`.
+  - `handlePurchase()` only awaits the purchase mutation and shows a success alert; it does not refetch API-side subscription or usage data: `apps/mobile/src/app/(learner)/subscription.tsx:523-527`.
+  - `usePurchase()` invalidates only the RevenueCat `customerInfo` query: `apps/mobile/src/hooks/use-revenuecat.ts:150-174`.
+  - The top-up flow explicitly polls and invalidates usage until webhook confirmation arrives, which highlights that the subscription purchase path has no equivalent sync step: `apps/mobile/src/app/(learner)/subscription.tsx:622-658`.
+- Impact:
+  - After a successful store purchase, the screen can keep showing stale tier/quota data until a manual refresh, remount, or later background refetch.
+  - RevenueCat entitlement state and API subscription state can temporarily disagree on the same screen.
+
+### 3. Medium: the family-plan purchase UI does not show the real family pool state and its static copy overstates capacity
+
+- Epic/story: Epic 9, Story 9.3.
+- Evidence:
+  - Story 9.3 requires the family plan UI to show profile count and shared-pool information: `docs/epics.md:3365`.
+  - The backend exposes a dedicated family endpoint that returns pool status plus members: `apps/api/src/routes/billing.ts:465-485`.
+  - The mobile subscription screen only loads generic subscription, usage, offerings, and customer-info hooks; there is no family-members / pool query in the screen, and the mobile billing hook file exposes no family query alongside those subscription hooks: `apps/mobile/src/app/(learner)/subscription.tsx:475-517` and `apps/mobile/src/hooks/use-subscription.ts:51-125`.
+  - The displayed family feature list is fully static and currently says `Up to 5 child profiles`, while the backend family tier config enforces `maxProfiles: 4`: `apps/mobile/src/app/(learner)/subscription.tsx:87-93` and `apps/api/src/services/subscription.ts:46-54`.
+- Impact:
+  - The Story 9.3 requirement to preserve the family-plan details UX is not met on mobile.
+  - The static copy also overpromises family capacity relative to backend enforcement.
+
+### 4. High: consent email delivery status is returned by the API but dropped before the mobile flow can act on it
+
+- Epic/story: Epic 10, Story 10.17.
+- Evidence:
+  - Story 10.17 requires the API to return delivery status and the mobile flow to branch on `sent` vs `failed`: `docs/epics.md:4313-4335`.
+  - The consent service already computes `emailDelivered`, and the route already returns `emailStatus: 'sent' | 'failed'`: `apps/api/src/services/consent.ts:166-245` and `apps/api/src/routes/consent.ts:99-105`.
+  - The shared `ConsentRequestResult` schema still only models `{ message, consentType }`: `packages/schemas/src/consent.ts:29-35`.
+  - The mobile request hook casts the server response to that reduced schema type: `apps/mobile/src/hooks/use-consent.ts:8-30`.
+  - The consent screen ignores the mutation result, always flips to `success`, and the success view hard-codes `We sent a consent link to ...`: `apps/mobile/src/app/consent.tsx:62-76` and `apps/mobile/src/app/consent.tsx:188-215`.
+- Impact:
+  - Email delivery failures are now detectable at the API boundary but still invisible in the app.
+  - The flow continues to show a false-success screen even when the backend explicitly knows delivery failed.
+
+### 5. High: `privacyPolicyUrl` is still missing from the Expo app config
+
+- Epic/story: Epic 10, Story 10.14.
+- Evidence:
+  - Story 10.14 marks the missing `privacyPolicyUrl` as the remaining launch-blocking config gap: `docs/epics.md:4200` and `docs/epics.md:4234`.
+  - `apps/mobile/app.json` contains the Expo app metadata, privacy manifests, and plugins, but there is still no `privacyPolicyUrl` field anywhere in the config: `apps/mobile/app.json:1-112`.
+- Impact:
+  - The App Store submission/compliance requirement remains open in code, not just in documentation.
+  - Epic 10.14 is still materially partial even though the Sentry gating work appears to be present.
+
+### 6. Medium: the rating-prompt hook exists but is never integrated into the session-summary flow
+
+- Epic/story: Epic 10, Story 10.18.
+- Evidence:
+  - Story 10.18 requires `session-summary/[sessionId].tsx` to call `useRatingPrompt()` / `onSuccessfulRecall()` before navigating home: `docs/epics.md:4351-4375`.
+  - The hook exists and encapsulates the recall-count, account-age, cooldown, and `StoreReview.requestReview()` logic: `apps/mobile/src/hooks/use-rating-prompt.ts:31-104`.
+  - A repo search only finds `useRatingPrompt` / `onSuccessfulRecall` inside the hook and its tests, not in the session-summary screen or other runtime callers: `rg -n "useRatingPrompt|onSuccessfulRecall" apps/mobile/src`.
+  - The session-summary screen handles submit/continue navigation directly with no rating-hook import or call: `apps/mobile/src/app/session-summary/[sessionId].tsx:124-209`.
+- Impact:
+  - The review prompt never fires in production despite the trigger logic being implemented.
+  - Story 10.18 remains dead code rather than a shipped user-facing behavior.
+
+### 7. Medium: ambiguous first-message subject classification still falls straight through to freeform
+
+- Epic/story: Epic 10, Story 10.22.
+- Evidence:
+  - Story 10.22 requires ambiguous classifications to trigger a natural confirmation / picker, with freeform fallback reserved for no-match cases: `docs/epics.md:4575-4601`.
+  - The session screen calls subject classification on the first message, but any result other than a single high-confidence match just toggles chip state and proceeds without a subject; the code comment is explicit: `Ambiguous / no match → proceed without subject (freeform)`: `apps/mobile/src/app/(learner)/session/index.tsx:671-692`.
+- Impact:
+  - Multiple-candidate cases skip the required confirmation step entirely.
+  - Ambiguous conversations are handled the same as true no-match fallback, so sessions are less likely to attach to the correct subject.
+
+## No new findings called out in these areas
+
+- Epic 9 RevenueCat SDK usage, restore-purchases flow, manage-billing deep links, and top-up polling after store purchase all look materially wired up.
+- Epic 10 consent unification and age-gated Sentry appear materially implemented; the remaining gaps I found are around delivery-status plumbing, App Store config, and unfinished client integrations.

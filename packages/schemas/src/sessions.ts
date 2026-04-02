@@ -25,6 +25,9 @@ export const interviewStateSchema = z.object({
   status: draftStatusSchema,
   exchangeCount: z.number().int(),
   subjectName: z.string(),
+  resumeSummary: z.string().nullable().optional(),
+  exchangeHistory: z.array(chatExchangeSchema).optional(),
+  expiresAt: z.string().datetime().nullable().optional(),
 });
 export type InterviewState = z.infer<typeof interviewStateSchema>;
 

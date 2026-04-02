@@ -82,6 +82,7 @@ jest.mock('../../../hooks/use-homework-ocr', () => ({
 }));
 
 // Mock subjects hook (used for inline subject picker when no subjectId provided)
+const mockCreateSubjectMutateAsync = jest.fn();
 jest.mock('../../../hooks/use-subjects', () => ({
   useSubjects: jest.fn().mockReturnValue({
     data: [
@@ -89,6 +90,10 @@ jest.mock('../../../hooks/use-subjects', () => ({
       { id: 'sub-456', name: 'Science', status: 'active' },
     ],
     isLoading: false,
+  }),
+  useCreateSubject: jest.fn().mockReturnValue({
+    mutateAsync: mockCreateSubjectMutateAsync,
+    isPending: false,
   }),
 }));
 
@@ -114,9 +119,12 @@ const mockRouter = {
 
 const { useClassifySubject } = require('../../../hooks/use-classify-subject');
 
-beforeEach(() => {
+  beforeEach(() => {
   jest.clearAllMocks();
   (useRouter as jest.Mock).mockReturnValue(mockRouter);
+  mockCreateSubjectMutateAsync.mockResolvedValue({
+    subject: { id: 'sub-created', name: 'Biology' },
+  });
   // Reset classify mock to default (no auto-detection)
   (useClassifySubject as jest.Mock).mockReturnValue({
     mutateAsync: mockMutateAsync,
@@ -348,5 +356,47 @@ describe('CameraScreen', () => {
       expect(getByTestId('problem-card-1')).toBeTruthy();
       expect(getByTestId('add-problem-button')).toBeTruthy();
     });
+  });
+
+  it('creates a new subject before continuing when the learner types one manually', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    mockMutateAsync.mockResolvedValueOnce({
+      needsConfirmation: true,
+      candidates: [],
+    });
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: 'Photosynthesis worksheet',
+      status: 'done',
+      error: null,
+      failCount: 0,
+      process: mockProcess,
+      retry: mockRetry,
+    });
+
+    const { getByTestId } = render(<CameraScreen />);
+
+    await waitFor(() => {
+      expect(getByTestId('subject-picker')).toBeTruthy();
+    });
+
+    fireEvent.changeText(getByTestId('camera-subject-input'), 'Biology');
+    fireEvent.press(getByTestId('camera-continue-button'));
+
+    await waitFor(() => {
+      expect(mockCreateSubjectMutateAsync).toHaveBeenCalledWith({
+        name: 'Biology',
+        rawInput: 'Biology',
+      });
+    });
+
+    expect(mockRouter.replace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(learner)/session',
+        params: expect.objectContaining({
+          subjectId: 'sub-created',
+          subjectName: 'Biology',
+        }),
+      })
+    );
   });
 });

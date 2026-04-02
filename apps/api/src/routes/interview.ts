@@ -11,6 +11,7 @@ import {
   getDraftState,
   updateDraft,
   persistCurriculum,
+  buildDraftResumeSummary,
 } from '../services/interview';
 import { notFound } from '../errors';
 
@@ -95,6 +96,13 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         exchangeCount: draft.exchangeHistory.filter((e) => e.role === 'user')
           .length,
         subjectName: subject?.name ?? 'Unknown',
+        ...(draft.exchangeHistory.length > 0
+          ? {
+              exchangeHistory: draft.exchangeHistory,
+              resumeSummary: buildDraftResumeSummary(draft),
+            }
+          : {}),
+        ...(draft.expiresAt ? { expiresAt: draft.expiresAt } : {}),
       },
     });
   });

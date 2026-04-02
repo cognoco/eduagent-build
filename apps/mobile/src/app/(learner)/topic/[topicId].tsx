@@ -13,6 +13,7 @@ import {
 } from '../../../components/progress';
 import { useTopicProgress } from '../../../hooks/use-progress';
 import { useTopicRetention } from '../../../hooks/use-retention';
+import { useTopicParkingLot } from '../../../hooks/use-sessions';
 
 function deriveRetentionStatus(
   card:
@@ -58,8 +59,10 @@ export default function TopicDetailScreen() {
   );
   const { data: retentionCard, isLoading: retentionLoading } =
     useTopicRetention(topicId ?? '');
+  const { data: parkedQuestions, isLoading: parkingLotLoading } =
+    useTopicParkingLot(subjectId ?? '', topicId ?? '');
 
-  const isLoading = progressLoading || retentionLoading;
+  const isLoading = progressLoading || retentionLoading || parkingLotLoading;
 
   if (!subjectId || !topicId) {
     return (
@@ -257,6 +260,28 @@ export default function TopicDetailScreen() {
               </Text>
             </View>
           )}
+
+          <View className="bg-surface rounded-card p-4 mb-3">
+            <Text className="text-body-sm font-semibold text-text-primary mb-2">
+              Parking Lot
+            </Text>
+            {parkedQuestions && parkedQuestions.length > 0 ? (
+              parkedQuestions.map((item) => (
+                <View key={item.id} className="flex-row items-start mt-1">
+                  <Text className="text-body text-text-secondary me-2">
+                    {'\u2022'}
+                  </Text>
+                  <Text className="text-body-sm text-text-primary flex-1">
+                    {item.question}
+                  </Text>
+                </View>
+              ))
+            ) : (
+              <Text className="text-body-sm text-text-secondary">
+                No parked questions for this topic yet.
+              </Text>
+            )}
+          </View>
         </ScrollView>
       )}
 

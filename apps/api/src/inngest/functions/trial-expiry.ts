@@ -26,6 +26,29 @@ import {
   TRIAL_EXTENDED_DAYS,
 } from '../../services/trial';
 import { sendPushNotification } from '../../services/notifications';
+import { findOwnerProfile } from '../../services/profile';
+
+async function sendTrialNotificationToAccountOwner(
+  accountId: string,
+  payload: {
+    title: string;
+    body: string;
+    type: 'trial_expiry';
+  }
+): Promise<{ sent: boolean; reason?: string }> {
+  const db = getStepDatabase();
+  const ownerProfile = await findOwnerProfile(db, accountId);
+  if (!ownerProfile) {
+    return { sent: false, reason: 'no_owner_profile' };
+  }
+
+  return sendPushNotification(db, {
+    profileId: ownerProfile.id,
+    title: payload.title,
+    body: payload.body,
+    type: payload.type,
+  });
+}
 
 export const trialExpiry = inngest.createFunction(
   { id: 'trial-expiry-check', name: 'Check and process trial expirations' },
@@ -109,13 +132,14 @@ export const trialExpiry = inngest.createFunction(
         );
 
         for (const trial of trialsToWarn) {
-          const db2 = getStepDatabase();
-          const result = await sendPushNotification(db2, {
-            profileId: trial.accountId,
-            title: 'Trial ending soon',
-            body: warningMessage,
-            type: 'trial_expiry',
-          });
+          const result = await sendTrialNotificationToAccountOwner(
+            trial.accountId,
+            {
+              title: 'Trial ending soon',
+              body: warningMessage,
+              type: 'trial_expiry',
+            }
+          );
           if (result.sent) sent++;
         }
       }
@@ -151,13 +175,14 @@ export const trialExpiry = inngest.createFunction(
           );
 
           for (const trial of expiredTrials) {
-            const db2 = getStepDatabase();
-            const result = await sendPushNotification(db2, {
-              profileId: trial.accountId,
-              title: 'Your trial has ended',
-              body: message,
-              type: 'trial_expiry',
-            });
+            const result = await sendTrialNotificationToAccountOwner(
+              trial.accountId,
+              {
+                title: 'Your trial has ended',
+                body: message,
+                type: 'trial_expiry',
+              }
+            );
             if (result.sent) sent++;
           }
         }
