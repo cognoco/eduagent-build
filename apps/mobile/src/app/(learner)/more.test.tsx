@@ -12,15 +12,7 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-const mockSetPersona = jest.fn();
-
 jest.mock('../../lib/theme', () => ({
-  useTheme: () => ({
-    persona: 'learner',
-    setPersona: mockSetPersona,
-    accentPresetId: null,
-    setAccentPresetId: jest.fn(),
-  }),
   useThemeColors: () => ({
     surface: '#ffffff',
     primary: '#6366f1',
@@ -211,7 +203,7 @@ describe('MoreScreen — Learning Mode', () => {
   it('renders other sections alongside learning mode', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByText('Appearance')).toBeTruthy();
+    expect(screen.queryByText('Appearance')).toBeNull();
     expect(screen.getByText('Notifications')).toBeTruthy();
     expect(screen.getByText('Learning Mode')).toBeTruthy();
     expect(screen.getByText('Celebrations')).toBeTruthy();

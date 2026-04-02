@@ -108,7 +108,7 @@ describe('LearningBookScreen', () => {
     render(<LearningBookScreen />, { wrapper: createWrapper() });
 
     expect(screen.getByTestId('learning-book-loading')).toBeTruthy();
-    expect(screen.getByText('Loading...')).toBeTruthy();
+    expect(screen.getByText('Loading your subjects...')).toBeTruthy();
   });
 
   it('shows empty state when no topics', () => {
@@ -230,6 +230,36 @@ describe('LearningBookScreen', () => {
     expect(screen.getByTestId('filter-all')).toBeTruthy();
     expect(screen.getByTestId('filter-sub-1')).toBeTruthy();
     expect(screen.getByTestId('filter-sub-2')).toBeTruthy();
+  });
+
+  it('shows a subject overview while topic history is still loading', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      isLoading: false,
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: {
+        subjects: [
+          { subjectId: 'sub-1', name: 'Math', retentionStatus: 'fading' },
+        ],
+        totalTopicsCompleted: 0,
+        totalTopicsVerified: 0,
+      },
+      isLoading: false,
+    });
+    mockUseQueries.mockReturnValue([
+      {
+        data: undefined,
+        isLoading: true,
+        isError: false,
+      },
+    ]);
+
+    render(<LearningBookScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('learning-book-topic-loading')).toBeTruthy();
+    expect(screen.getByText('Building your book pages...')).toBeTruthy();
+    expect(screen.queryByTestId('learning-book-loading')).toBeNull();
   });
 
   it('filters topics when subject tab is pressed', () => {

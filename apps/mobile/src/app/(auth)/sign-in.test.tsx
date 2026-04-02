@@ -133,7 +133,7 @@ describe('SignInScreen', () => {
     });
   });
 
-  it('starts email verification when Clerk requests it as the next step', async () => {
+  it('offers verification without sending a code automatically', async () => {
     mockCreate.mockResolvedValue({
       status: 'needs_first_factor',
       createdSessionId: null,
@@ -157,14 +157,12 @@ describe('SignInScreen', () => {
     fireEvent.press(screen.getByTestId('sign-in-button'));
 
     await waitFor(() => {
-      expect(mockPrepareFirstFactor).toHaveBeenCalledWith({
-        strategy: 'email_code',
-        emailAddressId: 'email_123',
-      });
+      expect(screen.getByTestId('sign-in-verification-offer')).toBeTruthy();
     });
 
-    expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
-    expect(screen.getByText('Enter verification code')).toBeTruthy();
+    expect(mockPrepareFirstFactor).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('sign-in-verify-code')).toBeNull();
+    expect(screen.getByText('Send verification code')).toBeTruthy();
   });
 
   it('continues sign-in with an emailed second-factor code', async () => {
@@ -194,6 +192,14 @@ describe('SignInScreen', () => {
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sign-in-verification-offer')).toBeTruthy();
+    });
+
+    expect(mockPrepareSecondFactor).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('sign-in-start-verification'));
 
     await waitFor(() => {
       expect(mockPrepareSecondFactor).toHaveBeenCalledWith({
@@ -242,7 +248,7 @@ describe('SignInScreen', () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          'Your account needs an additional verification step that this build could not start automatically. Please try again or use a different sign-in method.'
+          'This account needs an additional verification method that this build does not support yet. Please use a different sign-in method.'
         )
       ).toBeTruthy();
     });

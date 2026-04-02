@@ -1,18 +1,9 @@
-import {
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-  Switch,
-  Alert,
-  InteractionManager,
-} from 'react-native';
+import { View, Text, Pressable, ScrollView, Switch, Alert } from 'react-native';
 import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import type { LearningMode } from '@eduagent/schemas';
-import { useTheme, type Persona } from '../../lib/theme';
 // COMMENTED OUT per BUG-9: accent picker removed (fixed brand decision)
 // import { AccentPicker } from '../../components/common';
 import { useProfile } from '../../lib/profile';
@@ -140,9 +131,6 @@ export default function MoreScreen() {
   const { signOut } = useAuth();
   const { user } = useUser();
   const { activeProfile } = useProfile();
-  // accentPresetId/setAccentPresetId commented out with AccentPicker (BUG-9)
-  const { persona, setPersona /* , accentPresetId, setAccentPresetId */ } =
-    useTheme();
   const exportData = useExportData();
 
   const { data: subscription } = useSubscription();
@@ -205,14 +193,6 @@ export default function MoreScreen() {
     user?.primaryEmailAddress?.emailAddress ??
     'User';
 
-  const personaLabels: Record<Persona, string> = {
-    teen: 'Teen',
-    learner: 'Eager Learner',
-    parent: 'Parent',
-  };
-
-  const personas: Persona[] = ['teen', 'learner', 'parent'];
-
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2">
@@ -223,52 +203,6 @@ export default function MoreScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
       >
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-4">
-          Appearance
-        </Text>
-        {personas.map((p) => (
-          <Pressable
-            key={p}
-            onPress={() => {
-              if (p === 'parent') {
-                // Navigate first, then update persona after interactions settle
-                // to avoid layout guard redirect race condition (BUG-18)
-                router.replace('/(parent)/dashboard' as never);
-                InteractionManager.runAfterInteractions(() =>
-                  setPersona('parent')
-                );
-              } else {
-                setPersona(p);
-              }
-            }}
-            className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3.5 mb-2"
-            testID={`persona-theme-${p}`}
-            accessibilityLabel={`Select ${personaLabels[p]} theme`}
-            accessibilityRole="button"
-          >
-            <Text className="text-body text-text-primary">
-              {personaLabels[p]}
-            </Text>
-            {persona === p && (
-              <Text className="text-primary text-body font-semibold">
-                Active
-              </Text>
-            )}
-          </Pressable>
-        ))}
-
-        {/* COMMENTED OUT per BUG-9: fixed brand — no user-configurable accent colors at MVP.
-            To re-enable: also uncomment accentPresetId/setAccentPresetId in the useTheme()
-            destructuring (line ~144) and the AccentPicker import (line ~17).
-        <View className="mt-4">
-          <AccentPicker
-            persona={persona}
-            accentPresetId={accentPresetId}
-            setAccentPresetId={setAccentPresetId}
-          />
-        </View>
-        */}
-
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
           Notifications
         </Text>
         <ToggleRow
