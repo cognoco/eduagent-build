@@ -209,15 +209,15 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      # ── APK cache: skip the ~20 min native build when source is unchanged ──
-      # Key covers everything that affects APK contents: mobile source, shared
-      # packages, native config, and dependency lock file.
+      # ── APK cache: skip the ~20 min native build when native config is unchanged ──
+      # Key covers ONLY native-affecting files (not JS source). On cache hit,
+      # we re-bundle fresh JS and inject it into the cached APK, saving ~15 min.
       - name: Cache debug APK
         id: apk-cache
         uses: actions/cache@v4
         with:
           path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-          key: apk-debug-${{ hashFiles('apps/mobile/src/**', 'apps/mobile/app.json', 'apps/mobile/package.json', 'packages/schemas/src/**', 'pnpm-lock.yaml') }}
+          key: apk-debug-${{ hashFiles('apps/mobile/app.json', 'apps/mobile/package.json', 'apps/mobile/plugins/**', 'pnpm-lock.yaml') }}
 
       # --- Phase 1: strict pnpm install + schema push ---
       # db:push MUST run before shamefully-hoist. In strict mode, pnpm
@@ -295,7 +295,6 @@ jobs:
       # pipeline has a Babel plugin that replaces these with string literals,
       # but export:embed skips that step. We must inline them ourselves.
       - name: Patch expo-router context files for offline bundling
-        if: steps.apk-cache.outputs.cache-hit != 'true'
         run: |
           # require.context resolves paths relative to the FILE that contains
           # the call, not relative to projectRoot. In the pnpm store, _ctx.android.js
@@ -325,7 +324,6 @@ jobs:
       # - --dev false: dev mode tries to open DevTools WebSocket connections
       #   which crash in embedded (offline) APKs.
       - name: Bundle JS for offline APK
-        if: steps.apk-cache.outputs.cache-hit != 'true'
         working-directory: apps/mobile
         run: |
           mkdir -p android/app/src/main/assets
@@ -337,7 +335,41 @@ jobs:
             --bundle-output "$(pwd)/android/app/src/main/assets/index.android.bundle" \
             --assets-dest "$(pwd)/android/app/src/main/res"
 
-      # Compile debug APK via Gradle (now includes the pre-bundled JS)
+      # ── On cache HIT: swap fresh JS into the cached APK ──
+      # The cached APK has stale JS. Replace the bundle inside the ZIP
+      # and re-sign with a debug key so Android accepts it.
+      - name: Inject fresh JS into cached APK
+        if: steps.apk-cache.outputs.cache-hit == 'true'
+        run: |
+          APK="$(pwd)/apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk"
+          BUNDLE="$(pwd)/apps/mobile/android/app/src/main/assets/index.android.bundle"
+
+          echo "APK size before: $(stat -c%s "$APK") bytes"
+
+          # Replace JS bundle inside the APK (it's a ZIP archive)
+          TMPDIR=$(mktemp -d)
+          mkdir -p "$TMPDIR/assets"
+          cp "$BUNDLE" "$TMPDIR/assets/index.android.bundle"
+          (cd "$TMPDIR" && zip "$APK" assets/index.android.bundle)
+          rm -rf "$TMPDIR"
+
+          # Re-sign with debug key (apksigner handles v1+v2+v3 schemes)
+          if [ ! -f ~/.android/debug.keystore ]; then
+            mkdir -p ~/.android
+            keytool -genkey -v -keystore ~/.android/debug.keystore \
+              -storepass android -alias androiddebugkey -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          APKSIGNER=$(find "$ANDROID_SDK_ROOT/build-tools" -name "apksigner" -type f | sort -V | tail -1)
+          echo "Using apksigner: $APKSIGNER"
+          "$APKSIGNER" sign --ks ~/.android/debug.keystore --ks-pass pass:android \
+            --ks-key-alias androiddebugkey --key-pass pass:android "$APK"
+
+          echo "APK size after: $(stat -c%s "$APK") bytes"
+
+      # ── On cache MISS: full native build ──
+      # Compile debug APK via Gradle (includes the pre-bundled JS)
       - name: Build debug APK
         if: steps.apk-cache.outputs.cache-hit != 'true'
         working-directory: apps/mobile/android
