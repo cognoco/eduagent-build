@@ -3,6 +3,7 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   useStartSession,
+  useSetSessionInputMode,
   useSendMessage,
   useCloseSession,
   useSyncHomeworkState,
@@ -78,7 +79,7 @@ describe('useStartSession', () => {
     queryClient.clear();
   });
 
-  it('passes topicId and sessionType to the API', async () => {
+  it('passes topicId, sessionType, and inputMode to the API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -109,6 +110,7 @@ describe('useStartSession', () => {
         subjectId: 'subject-1',
         topicId: 'topic-1',
         sessionType: 'homework',
+        inputMode: 'voice',
       });
     });
 
@@ -121,6 +123,7 @@ describe('useStartSession', () => {
     const body = JSON.parse(fetchInit.body as string);
     expect(body.topicId).toBe('topic-1');
     expect(body.sessionType).toBe('homework');
+    expect(body.inputMode).toBe('voice');
   });
 
   it('passes homework metadata to the API when provided', async () => {
@@ -362,6 +365,52 @@ describe('useSyncHomeworkState', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
+  });
+});
+
+describe('useSetSessionInputMode', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('calls POST /sessions/:sessionId/input-mode with the requested mode', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          session: {
+            id: 'session-1',
+            subjectId: 'subject-1',
+            sessionType: 'learning',
+            status: 'active',
+            escalationRung: 1,
+            exchangeCount: 0,
+            startedAt: '2025-01-01T00:00:00Z',
+            lastActivityAt: '2025-01-01T00:00:00Z',
+            endedAt: null,
+            durationSeconds: null,
+            inputMode: 'voice',
+          },
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useSetSessionInputMode('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({ inputMode: 'voice' });
+    });
+
+    const [, fetchInit] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(fetchInit.body as string);
+    expect(body.inputMode).toBe('voice');
   });
 });
 

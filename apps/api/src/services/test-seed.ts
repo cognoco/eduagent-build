@@ -325,6 +325,7 @@ async function createBaseProfile(
     id: profileId,
     accountId,
     displayName: opts.displayName,
+    birthYear: opts.birthYear,
     personaType: resolvedPersonaType,
     isOwner: opts.isOwner ?? true,
     birthDate: opts.birthDate ?? birthDateFromBirthYear(opts.birthYear),

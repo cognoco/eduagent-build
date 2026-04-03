@@ -51,6 +51,7 @@ jest.mock('../../components/progress', () => ({
 
 jest.mock('../../components/common', () => ({
   BookPageFlipAnimation: () => null,
+  BrandCelebration: () => null,
 }));
 
 jest.mock('../../lib/theme', () => ({
@@ -309,5 +310,60 @@ describe('LearningBookScreen', () => {
     fireEvent.press(screen.getByTestId('filter-sub-2'));
 
     expect(screen.queryByTestId('topic-row-topic-1')).toBeNull();
+  });
+
+  it('shows a curriculum-complete banner when visible subjects are fully verified', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      isLoading: false,
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: {
+        subjects: [
+          {
+            subjectId: 'sub-1',
+            name: 'Math',
+            topicsTotal: 3,
+            topicsCompleted: 3,
+            topicsVerified: 3,
+            urgencyScore: 0,
+            retentionStatus: 'strong',
+            lastSessionAt: null,
+          },
+        ],
+        totalTopicsCompleted: 3,
+        totalTopicsVerified: 3,
+      },
+      isLoading: false,
+    });
+    mockUseQueries.mockReturnValue([
+      {
+        data: {
+          topics: [
+            {
+              topicId: 'topic-1',
+              topicTitle: 'Fractions',
+              easeFactor: 2.6,
+              intervalDays: 21,
+              repetitions: 5,
+              nextReviewAt: '2026-05-25T00:00:00Z',
+              lastReviewedAt: '2026-04-01T00:00:00Z',
+              xpStatus: 'verified',
+              failureCount: 0,
+            },
+          ],
+          reviewDueCount: 0,
+        },
+        isLoading: false,
+      },
+    ]);
+
+    render(<LearningBookScreen />, { wrapper: createWrapper() });
+
+    expect(
+      screen.getByTestId('learning-book-curriculum-complete')
+    ).toBeTruthy();
+    expect(screen.getByText("You've covered everything here!")).toBeTruthy();
+    expect(screen.getByText('Add another subject')).toBeTruthy();
   });
 });

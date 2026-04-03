@@ -12,16 +12,16 @@
 
 | Epic / Phase | Status | Details |
 |------|--------|-------|
-| **0-5** | **COMPLETE** | Foundation, onboarding, learning, retention, progress, billing |
-| **9** | **COMPLETE** | Native IAP (RevenueCat) |
-| **11** | **COMPLETE** | Brand identity — navy dark bg, teal/lavender tokens, light mode. Verified 2026-04-01. |
-| **13** | **COMPLETE** | Session lifecycle — all 7 stories. Wall-clock, crash recovery, celebrations, adaptive silence. Verified 2026-04-01. |
-| **14** | **COMPLETE** | Human agency — ALL stories (A+B+C). Recall "I don't remember", custom topics, homework modes, multi-problem homework, per-message feedback, quick-action chips, topic switch, escalation visibility, home card dismissal. All verified in code. |
-| **10** | **NEARLY COMPLETE** | Pre-launch UX polish — **1 genuine gap remaining**: 10.10 consent handoff animation (flow works, no animated transition). All other stories verified done including 10.17 (email delivery feedback). |
-| **8** | **NEARLY COMPLETE** | Voice gaps — inputMode persistence, session-start toggle, TTS pause/resume, haptics all built. On branch `feat/epic-8-voice-gaps` (not merged to main). VoiceOver/TalkBack spike deferred to v1.1. |
-| **12** | **PARTIAL** | Persona removal — see detailed breakdown below. 12.1 + 12.7 done. 12.6 ~40%. 12.2/12.3/12.4/12.5 not started. |
-| **7** | **NOT STARTED** | Concept map — advisory prerequisite learning. Zero code exists. All dependencies met (Epic 13 celebrations done). |
-| **6** | **NOT STARTED** | Language learning — Four Strands. Blocked on Epic 8 merge (nearly unblocked). |
+| 0-5 | **COMPLETE** | Foundation, onboarding, learning, retention, progress, billing |
+| 9 | **COMPLETE** | Native IAP (RevenueCat) |
+| 10 | **COMPLETE** | Pre-launch UX polish — all Story 10.1-10.23 slices shipped (updated 2026-04-03). |
+| 11 | **COMPLETE** | Brand identity — navy dark bg, teal/lavender tokens, light mode. Verified 2026-04-01. |
+| 13 | **COMPLETE** | Session lifecycle — all 7 stories. Wall-clock, crash recovery, celebrations, adaptive silence. Verified 2026-04-01. |
+| 14 | **COMPLETE** | Human agency — ALL stories (A+B+C). Verified in code 2026-04-03. |
+| **8** | **COMPLETE** | Full voice mode — Stories 8.1-8.5 shipped; 8.6 remains optional stretch work |
+| **12** | **PARTIAL** | Remove persona enum — 12.1 complete, 12.6 compatibility slice complete; route/theme/schema removal still pending |
+| **7** | **TODO** | Concept map — advisory prerequisite learning (v1.1) |
+| **6** | **TODO** | Language learning — Four Strands (v1.1) |
 
 ### Completed Phases (historical record)
 
@@ -129,15 +129,41 @@ These files are touched by remaining work. Agents must read current state before
 
 | File | Remaining touches |
 |------|-------------------|
-| `packages/database/src/schema/profiles.ts` | 12.4 (drop `personaType` + `birthDate`, add `birthYear`) |
+| `packages/database/src/schema/profiles.ts` | 12.4 (drop `personaType` + `birthDate`) |
 | `packages/schemas/src/profiles.ts` | 12.6 (remove `personaTypeSchema`) |
 | `packages/factory/src/profiles.ts` | 12.6 FR206.8 (remove `personaType` default) |
-| `apps/api/src/services/test-seed.ts` | 12.6 FR206.8 (9 `personaType` refs) |
+| `apps/api/src/services/test-seed.ts` | 12.6 FR206.8 (remaining `personaType` refs) |
 | `apps/mobile/src/app/_layout.tsx` | 12.3 (stop deriving persona from profile) |
 | `apps/mobile/src/lib/design-tokens.ts` | 12.3 (remove persona-keyed token structure) |
 | `apps/mobile/src/app/(learner)/_layout.tsx` | 12.2 + 12.5 (route merge + redirect removal) |
 | `apps/mobile/src/app/(parent)/_layout.tsx` | 12.2 + 12.5 (route merge + redirect removal) |
 | `apps/mobile/src/app/create-profile.tsx` | 12.6 (stop collecting personaType) |
+
+### Phase Details (reference)
+
+**Phase 5 — Architecture Refactor (Epic 12):**
+
+```
+12.1 (age voice)         ──┐
+12.3 (theme decoupling)  ──┤── parallel
+                            ├─→ 12.7 (home cards) ─→ 12.2 (route merge) ─→ 12.5 (routing cleanup) ──┐
+12.6 (the big migration) ──┤                                                                          ├─→ 12.4 (DB migration)
+                            └──────────────────────────────────────────────────────────────────────────┘
+```
+
+Story 12.6 is the heaviest — covers FR206.1-206.8. Compatibility slice complete (birthYear plumbing). Remaining: full grep audit for zero `personaType`/`birthDate` hits, then 12.4 drops columns.
+
+**Phase 6 — New Feature Systems:** Epic 7 (concept map), Epic 14 Phase C (session agency). Epic 8 now complete.
+
+**Phase 7 — Language Learning:** Epic 6 (Four Strands). Depends on Epic 8.1-8.2 (done).
+
+## Key Constraints
+
+1. **Story 12.6 FR206.8 (factory) before any other 12.x test updates** — broken factory breaks ~1,443 tests.
+2. **Story 12.7 before 14.1** — card dismissal needs the multi-card home screen to exist.
+3. **Story 13.7 before Epic 7 Story 7.5** — topic unlock celebration uses `queueCelebration()`.
+4. **Epic 8.1-8.2 before Epic 6 SPEAK/LISTEN** — voice infrastructure required (now done).
+5. **No parallel agents on the same hotspot file** — sequential execution for session screen, Inngest chain, and home screen work.
 
 ---
 

@@ -66,19 +66,20 @@ export function useConsentStatus(): UseQueryResult<ConsentStatusData> {
 
 /**
  * Pure client-side age check for consent requirements.
- * GDPR-everywhere: age < 16 requires consent (Story 10.19).
+ * Uses the same conservative birth-year rule as the API: if the learner turns
+ * 16 at any point in the current calendar year, consent is still required.
  */
-export function checkConsentRequirement(birthDate: string | null): {
+export function checkConsentRequirement(birthYear: number | null): {
   required: boolean;
   consentType: 'GDPR' | null;
 } {
-  if (!birthDate) {
+  if (birthYear == null) {
     return { required: false, consentType: null };
   }
 
-  const age = calculateAge(birthDate);
+  const age = calculateAge(birthYear);
 
-  if (age < 16) {
+  if (age <= 16) {
     return { required: true, consentType: 'GDPR' };
   }
 
@@ -233,13 +234,6 @@ export function useRestoreConsent(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function calculateAge(birthDate: string): number {
-  const birth = new Date(birthDate);
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    age--;
-  }
-  return age;
+function calculateAge(birthYear: number): number {
+  return new Date().getFullYear() - birthYear;
 }

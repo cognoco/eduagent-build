@@ -37,7 +37,7 @@ function mapProfileRow(
     birthDate: row.birthDate
       ? row.birthDate.toISOString().split('T')[0]!
       : null,
-    birthYear: birthYearFromDateLike(row.birthDate),
+    birthYear: row.birthYear ?? birthYearFromDateLike(row.birthDate),
     personaType: row.personaType,
     location: row.location ?? null,
     isOwner: row.isOwner,
@@ -158,6 +158,7 @@ export async function createProfile(
       accountId,
       displayName: input.displayName,
       avatarUrl: input.avatarUrl ?? null,
+      birthYear,
       birthDate: input.birthDate
         ? new Date(input.birthDate)
         : birthDateFromBirthYear(birthYear),

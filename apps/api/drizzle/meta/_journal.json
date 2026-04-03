@@ -43,6 +43,13 @@
       "when": 1775168032383,
       "tag": "0005_open_spiral",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1775217600000,
+      "tag": "0006_watery_birth_year",
+      "breakpoints": true
     }
   ]
 }

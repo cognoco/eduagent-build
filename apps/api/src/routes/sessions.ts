@@ -6,6 +6,7 @@ import {
   sessionCloseSchema,
   contentFlagSchema,
   sessionAnalyticsEventSchema,
+  sessionInputModeSchema,
   summarySubmitSchema,
   interleavedSessionStartSchema,
   homeworkStateSyncSchema,
@@ -34,6 +35,7 @@ import {
   skipSummary,
   submitSummary,
   syncHomeworkState,
+  setSessionInputMode,
 } from '../services/session';
 import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
@@ -258,6 +260,23 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
       await recordSessionEvent(db, profileId, c.req.param('sessionId'), body);
       return c.json({ ok: true });
+    }
+  )
+
+  .post(
+    '/sessions/:sessionId/input-mode',
+    zValidator('json', sessionInputModeSchema),
+    async (c) => {
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
+      const session = await setSessionInputMode(
+        db,
+        profileId,
+        c.req.param('sessionId'),
+        c.req.valid('json')
+      );
+      return c.json({ session });
     }
   )
 

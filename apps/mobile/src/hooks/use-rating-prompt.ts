@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import * as StoreReview from 'expo-store-review';
 import * as SecureStore from 'expo-secure-store';
+import { computeAgeBracket } from '@eduagent/schemas';
 import { useProfile } from '../lib/profile';
 import { migrateSecureStoreKey } from '../lib/migrate-secure-store-key';
 
@@ -32,7 +33,7 @@ const LEGACY_LAST_PROMPT_KEY = (profileId: string): string =>
  *
  * Trigger: after successful recall test (quality >= 3 in SM-2 terms).
  * Conditions: 5+ successful recalls, 7+ days since profile creation,
- * not prompted in 90 days. Only for learner/teen personas.
+ * not prompted in 90 days. Adult profiles are excluded.
  *
  * Story 10.18.
  */
@@ -58,8 +59,8 @@ export function useRatingPrompt(): {
   const onSuccessfulRecall = useCallback(async () => {
     if (!activeProfile) return;
 
-    // Parent profiles excluded
-    if (activeProfile.personaType === 'PARENT') return;
+    if (activeProfile.birthYear == null) return;
+    if (computeAgeBracket(activeProfile.birthYear) === 'adult') return;
 
     const profileId = activeProfile.id;
 

@@ -172,6 +172,7 @@ jest.mock('../services/session', () => {
         sessionType: 'learning',
         startedAt: new Date().toISOString(),
         exchangeCount: 2,
+        inputMode: 'text',
         milestonesReached: ['polar_star'],
         wallClockSeconds: 600,
       },
@@ -198,6 +199,22 @@ jest.mock('../services/session', () => {
     }),
     recordSystemPrompt: jest.fn().mockResolvedValue(undefined),
     recordSessionEvent: jest.fn().mockResolvedValue(undefined),
+    setSessionInputMode: jest
+      .fn()
+      .mockImplementation((_db, _profileId, sessionId, input) => ({
+        id: sessionId,
+        subjectId: SUBJECT_ID,
+        topicId: null,
+        sessionType: 'learning',
+        status: 'active',
+        escalationRung: 1,
+        exchangeCount: 2,
+        startedAt: new Date().toISOString(),
+        lastActivityAt: new Date().toISOString(),
+        endedAt: null,
+        durationSeconds: null,
+        inputMode: input.inputMode,
+      })),
     flagContent: jest.fn().mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
     }),
@@ -301,6 +318,7 @@ import {
   getSessionTranscript,
   recordSystemPrompt,
   recordSessionEvent,
+  setSessionInputMode,
 } from '../services/session';
 import {
   shouldPromptCasualSwitch,
@@ -478,6 +496,45 @@ describe('session routes', () => {
         expect.objectContaining({ isSystemPrompt: true })
       );
       expect(getSessionTranscript).toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /v1/sessions/:sessionId/input-mode', () => {
+    it('updates the persisted session input mode', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/input-mode`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ inputMode: 'voice' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.session.inputMode).toBe('voice');
+      expect(setSessionInputMode).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(String),
+        SESSION_ID,
+        { inputMode: 'voice' }
+      );
+    });
+
+    it('returns 400 for an invalid input mode', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/input-mode`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ inputMode: 'keyboard' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
     });
   });
 

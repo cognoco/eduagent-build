@@ -128,6 +128,7 @@ export type HomeworkSummary = z.infer<typeof homeworkSummarySchema>;
 
 export const sessionMetadataSchema = z
   .object({
+    inputMode: inputModeSchema.optional(),
     homework: homeworkSessionMetadataSchema.optional(),
     homeworkSummary: homeworkSummarySchema.optional(),
   })
@@ -181,8 +182,8 @@ export const learningSessionSchema = z.object({
   subjectId: z.string().uuid(),
   topicId: z.string().uuid().nullable(),
   sessionType: sessionTypeSchema,
-  verificationType: verificationTypeSchema.nullable(),
   inputMode: inputModeSchema,
+  verificationType: verificationTypeSchema.nullable(),
   status: sessionStatusSchema,
   escalationRung: escalationRungSchema,
   exchangeCount: z.number().int(),
@@ -246,6 +247,7 @@ export const sessionTranscriptSchema = z.object({
     subjectId: z.string().uuid(),
     topicId: z.string().uuid().nullable(),
     sessionType: sessionTypeSchema,
+    inputMode: inputModeSchema.default('text'),
     verificationType: verificationTypeSchema.nullable().optional(),
     startedAt: z.string().datetime(),
     exchangeCount: z.number().int(),
@@ -342,6 +344,11 @@ export const homeworkStateSyncSchema = z.object({
   metadata: homeworkSessionMetadataSchema,
 });
 export type HomeworkStateSyncInput = z.infer<typeof homeworkStateSyncSchema>;
+
+export const sessionInputModeSchema = z.object({
+  inputMode: inputModeSchema,
+});
+export type SessionInputModeInput = z.infer<typeof sessionInputModeSchema>;
 
 // Interleaved session start — optional filters for topic selection
 

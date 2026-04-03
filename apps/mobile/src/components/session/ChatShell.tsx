@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
+  AccessibilityInfo,
   View,
   Text,
   Pressable,
   ScrollView,
   TextInput,
   KeyboardAvoidingView,
+  Vibration,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,6 +48,8 @@ interface ChatShellProps {
   verificationType?: string;
   /** Explicit voice mode override from session-start input mode toggle (FR144). Takes precedence over verificationType. */
   initialVoiceEnabled?: boolean;
+  inputMode?: 'text' | 'voice';
+  onInputModeChange?: (mode: 'text' | 'voice') => void;
   /** Optional testID for the message scroll area (used by E2E flows). */
   messagesTestID?: string;
 }
@@ -107,6 +111,8 @@ export function ChatShell({
   renderMessageActions,
   verificationType,
   initialVoiceEnabled,
+  inputMode,
+  onInputModeChange,
   messagesTestID,
 }: ChatShellProps) {
   const router = useRouter();
@@ -114,11 +120,14 @@ export function ChatShell({
   const colors = useThemeColors();
   const scrollRef = useRef<ScrollView>(null);
   const [input, setInput] = useState('');
+  const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
 
   // Voice toggle — explicit initialVoiceEnabled (from input mode toggle) takes precedence.
   // Falls back to teach_back detection. Session-scoped only — NOT a persistent preference.
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(
-    initialVoiceEnabled ?? verificationType === 'teach_back'
+    inputMode
+      ? inputMode === 'voice'
+      : initialVoiceEnabled ?? verificationType === 'teach_back'
   );
 
   // STT hook
@@ -150,12 +159,41 @@ export function ChatShell({
   const lastSpokenIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (inputMode == null) {
+      return;
+    }
+    setIsVoiceEnabled(inputMode === 'voice');
+  }, [inputMode]);
+
+  useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    void AccessibilityInfo.isScreenReaderEnabled().then((enabled) => {
+      if (mounted) {
+        setScreenReaderEnabled(enabled);
+      }
+    });
+
+    const subscription = AccessibilityInfo.addEventListener(
+      'screenReaderChanged',
+      (enabled) => {
+        setScreenReaderEnabled(enabled);
+      }
+    );
+
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, []);
+
   // Auto-TTS: speak new AI messages when voice is enabled (Option A — complete only)
   useEffect(() => {
-    if (!isVoiceEnabled) return;
+    if (!isVoiceEnabled || screenReaderEnabled) return;
 
     // Find the last AI message that is NOT streaming
     const lastAiMessage = [...messages]
@@ -168,7 +206,15 @@ export function ChatShell({
 
     lastSpokenIdRef.current = lastAiMessage.id;
     speak(lastAiMessage.content);
-  }, [messages, isVoiceEnabled, speak]);
+  }, [messages, isVoiceEnabled, screenReaderEnabled, speak]);
+
+  const setVoiceEnabled = useCallback(
+    (enabled: boolean) => {
+      setIsVoiceEnabled(enabled);
+      onInputModeChange?.(enabled ? 'voice' : 'text');
+    },
+    [onInputModeChange]
+  );
 
   const handleSend = useCallback(() => {
     if (!input.trim() || isStreaming) return;
@@ -185,6 +231,7 @@ export function ChatShell({
     if (isStreaming) return; // Don't start recording during streaming
     if (isListening) {
       await stopListening();
+      Vibration.vibrate(12);
       // After stopping, the transcript from the hook may still be empty
       // because expo-speech-recognition updates asynchronously.
       // We snapshot the transcript in the next effect.
@@ -193,6 +240,7 @@ export function ChatShell({
       // Stop TTS when user starts recording
       stopSpeaking();
       await startListening();
+      Vibration.vibrate(12);
     }
   }, [isStreaming, isListening, stopListening, startListening, stopSpeaking]);
 
@@ -232,32 +280,44 @@ export function ChatShell({
     await startListening();
   }, [clearTranscript, startListening, stopSpeaking]);
 
-  const handleVoiceToggle = useCallback(async () => {
-    if (isVoiceEnabled) {
-      stopSpeaking();
-      if (isListening) {
-        await stopListening();
+  const handleSelectInputMode = useCallback(
+    async (mode: 'text' | 'voice') => {
+      if (mode === 'text') {
+        if (!isVoiceEnabled) {
+          return;
+        }
+        stopSpeaking();
+        if (isListening) {
+          await stopListening();
+        }
+        setPendingTranscript('');
+        clearTranscript();
+        setVoiceEnabled(false);
+        return;
       }
-      setPendingTranscript('');
-      clearTranscript();
-      setIsVoiceEnabled(false);
-      return;
-    }
-    setIsVoiceEnabled(true);
-  }, [
-    isVoiceEnabled,
-    stopSpeaking,
-    isListening,
-    stopListening,
-    clearTranscript,
-  ]);
 
-  // Always show VoiceToggle in header (all session types)
+      if (isVoiceEnabled) {
+        return;
+      }
+      setVoiceEnabled(true);
+    },
+    [
+      isVoiceEnabled,
+      stopSpeaking,
+      isListening,
+      stopListening,
+      clearTranscript,
+      setVoiceEnabled,
+    ]
+  );
+
   const headerRightContent = (
     <View className="flex-row items-center">
       <VoiceToggle
         isVoiceEnabled={isVoiceEnabled}
-        onToggle={handleVoiceToggle}
+        onToggle={() =>
+          void handleSelectInputMode(isVoiceEnabled ? 'text' : 'voice')
+        }
       />
       {rightAction}
     </View>
@@ -326,6 +386,7 @@ export function ChatShell({
           onResume={resumeSpeaking}
           onReplay={replay}
           onRateChange={setRate}
+          screenReaderEnabled={screenReaderEnabled}
         />
       )}
 
@@ -343,6 +404,62 @@ export function ChatShell({
       {!inputDisabled && (
         <View>
           {inputAccessory}
+          <View className="px-4 py-2 bg-surface border-t border-surface-elevated">
+            <View
+              className="flex-row rounded-full bg-surface-elevated p-1"
+              testID="input-mode-toggle"
+            >
+              <Pressable
+                onPress={() => void handleSelectInputMode('text')}
+                className={
+                  !isVoiceEnabled
+                    ? 'flex-1 rounded-full bg-background px-4 py-2 items-center'
+                    : 'flex-1 rounded-full px-4 py-2 items-center'
+                }
+                accessibilityRole="button"
+                accessibilityState={{ selected: !isVoiceEnabled }}
+                accessibilityLabel="Switch to text mode"
+                testID="input-mode-text"
+              >
+                <Text
+                  className={
+                    !isVoiceEnabled
+                      ? 'text-body-sm font-semibold text-text-primary'
+                      : 'text-body-sm font-semibold text-text-secondary'
+                  }
+                >
+                  Text mode
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void handleSelectInputMode('voice')}
+                className={
+                  isVoiceEnabled
+                    ? 'flex-1 rounded-full bg-background px-4 py-2 items-center'
+                    : 'flex-1 rounded-full px-4 py-2 items-center'
+                }
+                accessibilityRole="button"
+                accessibilityState={{ selected: isVoiceEnabled }}
+                accessibilityLabel="Switch to voice mode"
+                testID="input-mode-voice"
+              >
+                <Text
+                  className={
+                    isVoiceEnabled
+                      ? 'text-body-sm font-semibold text-text-primary'
+                      : 'text-body-sm font-semibold text-text-secondary'
+                  }
+                >
+                  Voice mode
+                </Text>
+              </Pressable>
+            </View>
+            {screenReaderEnabled && isVoiceEnabled ? (
+              <Text className="text-caption text-text-secondary mt-2">
+                Screen reader is on, so voice mode keeps manual playback only.
+              </Text>
+            ) : null}
+          </View>
           <View
             className="flex-row items-end px-4 py-3 bg-surface border-t border-surface-elevated"
             style={{ paddingBottom: Math.max(insets.bottom, 8) }}

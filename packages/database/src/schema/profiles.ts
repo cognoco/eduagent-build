@@ -58,6 +58,7 @@ export const profiles = pgTable(
     displayName: text('display_name').notNull(),
     avatarUrl: text('avatar_url'),
     birthDate: timestamp('birth_date', { mode: 'date' }),
+    birthYear: integer('birth_year'),
     personaType: personaTypeEnum('persona_type').notNull().default('LEARNER'),
     location: locationTypeEnum('location'),
     isOwner: boolean('is_owner').notNull().default(false),

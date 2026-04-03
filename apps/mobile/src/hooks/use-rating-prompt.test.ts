@@ -24,7 +24,7 @@ jest.mock('expo-secure-store', () => ({
 
 const mockProfile = {
   id: 'profile-1',
-  personaType: 'LEARNER',
+  birthYear: new Date().getFullYear() - 14,
   createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days ago
 };
 
@@ -60,8 +60,8 @@ describe('useRatingPrompt', () => {
     expect(mockRequestReview).toHaveBeenCalledTimes(1);
   });
 
-  it('does not prompt parent persona', async () => {
-    mockProfile.personaType = 'PARENT';
+  it('does not prompt adult profiles', async () => {
+    mockProfile.birthYear = new Date().getFullYear() - 25;
     secureStore['rating-recall-success-count-profile-1'] = '10';
 
     const { result } = renderHook(() => useRatingPrompt());
@@ -70,7 +70,7 @@ describe('useRatingPrompt', () => {
     });
 
     expect(mockRequestReview).not.toHaveBeenCalled();
-    mockProfile.personaType = 'LEARNER'; // restore
+    mockProfile.birthYear = new Date().getFullYear() - 14; // restore
   });
 
   it('does not prompt when prompted recently (within 90 days)', async () => {

@@ -16,6 +16,7 @@ import {
 } from '@eduagent/database';
 import type {
   SessionStartInput,
+  SessionInputModeInput,
   SessionMessageInput,
   SessionCloseInput,
   ContentFlagInput,
@@ -130,15 +131,17 @@ function mapSessionRow(
     Object.keys(row.metadata as Record<string, unknown>).length > 0
       ? (row.metadata as SessionMetadata)
       : undefined;
+  const inputMode =
+    (row.inputMode as 'text' | 'voice') ?? metadata?.inputMode ?? 'text';
 
   return {
     id: row.id,
     subjectId: row.subjectId,
     topicId: row.topicId ?? null,
     sessionType: row.sessionType,
+    inputMode,
     verificationType:
       (row.verificationType as 'standard' | 'evaluate' | 'teach_back') ?? null,
-    inputMode: (row.inputMode as 'text' | 'voice') ?? 'text',
     status: row.status,
     escalationRung: row.escalationRung,
     exchangeCount: row.exchangeCount,
@@ -275,7 +278,10 @@ export async function startSession(
       status: 'active',
       escalationRung: 1,
       exchangeCount: 0,
-      metadata: input.metadata ?? {},
+      metadata: {
+        ...(input.metadata ?? {}),
+        inputMode: input.inputMode ?? input.metadata?.inputMode ?? 'text',
+      },
     })
     .returning();
 
@@ -605,7 +611,8 @@ async function prepareExchangeContext(
     sessionType: session.sessionType as 'learning' | 'homework' | 'interleaved',
     escalationRung: effectiveRung,
     exchangeHistory,
-    birthYear: birthYearFromDateLike(profile?.birthDate ?? null),
+    birthYear:
+      profile?.birthYear ?? birthYearFromDateLike(profile?.birthDate ?? null),
     workedExampleLevel: interleavedTopics ? undefined : workedExampleLevel,
     priorLearningContext: priorLearning.contextText || undefined,
     embeddingMemoryContext: memory.context || undefined,
@@ -1141,6 +1148,7 @@ export async function getSessionTranscript(
     subjectId: string;
     topicId: string | null;
     sessionType: 'learning' | 'homework' | 'interleaved';
+    inputMode: 'text' | 'voice';
     verificationType?: 'standard' | 'evaluate' | 'teach_back' | null;
     startedAt: string;
     exchangeCount: number;
@@ -1211,6 +1219,7 @@ export async function getSessionTranscript(
       subjectId: session.subjectId,
       topicId: session.topicId,
       sessionType: session.sessionType,
+      inputMode: session.inputMode,
       verificationType: session.verificationType ?? null,
       startedAt: session.startedAt,
       exchangeCount: session.exchangeCount,
@@ -1260,6 +1269,50 @@ export async function recordSessionEvent(
     metadata: input.metadata,
     touchSession: true,
   });
+}
+
+export async function setSessionInputMode(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  input: SessionInputModeInput
+): Promise<LearningSession> {
+  const repo = createScopedRepository(db, profileId);
+  const row = await repo.sessions.findFirst(eq(learningSessions.id, sessionId));
+  if (!row) {
+    throw new Error('Session not found');
+  }
+
+  const existingMetadata =
+    row.metadata &&
+    typeof row.metadata === 'object' &&
+    !Array.isArray(row.metadata)
+      ? (row.metadata as SessionMetadata)
+      : {};
+
+  const [updated] = await db
+    .update(learningSessions)
+    .set({
+      inputMode: input.inputMode,
+      metadata: {
+        ...existingMetadata,
+        inputMode: input.inputMode,
+      },
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId)
+      )
+    )
+    .returning();
+
+  if (!updated) {
+    throw new Error('Session not found');
+  }
+
+  return mapSessionRow(updated);
 }
 
 type HomeworkTrackingMetadata = SessionMetadata & {

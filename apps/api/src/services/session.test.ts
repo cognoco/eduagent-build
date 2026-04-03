@@ -69,6 +69,7 @@ import {
   syncHomeworkState,
   flagContent,
   recordSessionEvent,
+  setSessionInputMode,
   getSessionTranscript,
   getSessionSummary,
   skipSummary,
@@ -102,9 +103,11 @@ function mockSessionRow(
     endedAt: Date | null;
     durationSeconds: number | null;
     wallClockSeconds: number | null;
+    inputMode: 'text' | 'voice';
     metadata: Record<string, unknown>;
   }>
 ) {
+  const meta = overrides?.metadata ?? {};
   return {
     id: overrides?.id ?? sessionId,
     profileId,
@@ -119,7 +122,11 @@ function mockSessionRow(
     endedAt: overrides?.endedAt ?? null,
     durationSeconds: overrides?.durationSeconds ?? null,
     wallClockSeconds: overrides?.wallClockSeconds ?? null,
-    metadata: overrides?.metadata ?? {},
+    inputMode:
+      overrides?.inputMode ??
+      (meta as Record<string, unknown>).inputMode ??
+      'text',
+    metadata: meta,
     createdAt: NOW,
     updatedAt: NOW,
   };
@@ -496,6 +503,30 @@ describe('startSession', () => {
         }),
       })
     );
+  });
+
+  it('stores inputMode in session metadata and returns it on the mapped session', async () => {
+    const row = mockSessionRow({
+      metadata: {
+        inputMode: 'voice',
+      },
+    });
+    const db = createMockDb({ insertReturning: [row] });
+
+    const result = await startSession(db, profileId, subjectId, {
+      subjectId,
+      inputMode: 'voice',
+    });
+
+    const valuesFn = (db.insert as jest.Mock).mock.results[0].value.values;
+    expect(valuesFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          inputMode: 'voice',
+        }),
+      })
+    );
+    expect(result.inputMode).toBe('voice');
   });
 
   it('throws SubjectInactiveError when subject is paused', async () => {
@@ -1448,6 +1479,66 @@ describe('getSessionTranscript', () => {
         escalationRung: undefined,
       }),
     ]);
+  });
+
+  it('returns the session input mode from persisted metadata', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({
+        metadata: { inputMode: 'voice' },
+      }),
+    });
+    const db = createMockDb({
+      learningSessionFindFirst: mockSessionRow({
+        metadata: { inputMode: 'voice' },
+      }),
+    });
+
+    const result = await getSessionTranscript(db, profileId, sessionId);
+
+    expect(result?.session.inputMode).toBe('voice');
+  });
+});
+
+describe('setSessionInputMode', () => {
+  it('updates session metadata with the new input mode', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({
+        metadata: { homework: { problemCount: 1 } },
+      }),
+    });
+
+    const updatedRow = mockSessionRow({
+      metadata: {
+        homework: { problemCount: 1 },
+        inputMode: 'voice',
+      },
+    });
+    const returningMock = jest.fn().mockResolvedValue([updatedRow]);
+    const whereMock = jest.fn().mockReturnValue({
+      returning: returningMock,
+    });
+    const setMock = jest.fn().mockReturnValue({
+      where: whereMock,
+    });
+    const db = {
+      update: jest.fn().mockReturnValue({
+        set: setMock,
+      }),
+    } as unknown as Database;
+
+    const result = await setSessionInputMode(db, profileId, sessionId, {
+      inputMode: 'voice',
+    });
+
+    expect(setMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          homework: { problemCount: 1 },
+          inputMode: 'voice',
+        }),
+      })
+    );
+    expect(result.inputMode).toBe('voice');
   });
 });
 

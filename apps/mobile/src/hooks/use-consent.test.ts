@@ -9,6 +9,8 @@ import {
   useRestoreConsent,
 } from './use-consent';
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 const mockFetch = jest.fn();
 jest.mock('../lib/api-client', () => ({
   useApiClient: () => {
@@ -33,51 +35,40 @@ function createWrapper() {
 }
 
 describe('checkConsentRequirement', () => {
-  it('returns not required when birthDate is null', () => {
-    const { result } = renderHook(() => checkConsentRequirement(null));
-    expect(result.current.required).toBe(false);
-    expect(result.current.consentType).toBeNull();
+  it('returns not required when birthYear is null', () => {
+    const result = checkConsentRequirement(null);
+    expect(result.required).toBe(false);
+    expect(result.consentType).toBeNull();
   });
 
   it('returns GDPR required for child under 16', () => {
-    const tenYearsAgo = new Date();
-    tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
-    const birthDate = tenYearsAgo.toISOString().split('T')[0]!;
-
-    const { result } = renderHook(() => checkConsentRequirement(birthDate));
-    expect(result.current.required).toBe(true);
-    expect(result.current.consentType).toBe('GDPR');
+    const result = checkConsentRequirement(CURRENT_YEAR - 10);
+    expect(result.required).toBe(true);
+    expect(result.consentType).toBe('GDPR');
   });
 
   it('returns GDPR required for 15-year-old (boundary)', () => {
-    const fifteenYearsAgo = new Date();
-    fifteenYearsAgo.setFullYear(fifteenYearsAgo.getFullYear() - 15);
-    const birthDate = fifteenYearsAgo.toISOString().split('T')[0]!;
-
-    const { result } = renderHook(() => checkConsentRequirement(birthDate));
-    expect(result.current.required).toBe(true);
-    expect(result.current.consentType).toBe('GDPR');
+    const result = checkConsentRequirement(CURRENT_YEAR - 15);
+    expect(result.required).toBe(true);
+    expect(result.consentType).toBe('GDPR');
   });
 
-  it('returns not required for 16-year-old (boundary)', () => {
-    const sixteenYearsAgo = new Date();
-    sixteenYearsAgo.setFullYear(sixteenYearsAgo.getFullYear() - 16);
-    sixteenYearsAgo.setDate(sixteenYearsAgo.getDate() - 1);
-    const birthDate = sixteenYearsAgo.toISOString().split('T')[0]!;
-
-    const { result } = renderHook(() => checkConsentRequirement(birthDate));
-    expect(result.current.required).toBe(false);
-    expect(result.current.consentType).toBeNull();
+  it('returns GDPR required for 16-year-old with the conservative birth-year rule', () => {
+    const result = checkConsentRequirement(CURRENT_YEAR - 16);
+    expect(result.required).toBe(true);
+    expect(result.consentType).toBe('GDPR');
   });
 
-  it('returns not required for adult', () => {
-    const twentyYearsAgo = new Date();
-    twentyYearsAgo.setFullYear(twentyYearsAgo.getFullYear() - 20);
-    const birthDate = twentyYearsAgo.toISOString().split('T')[0]!;
+  it('returns not required once the learner is clearly over the threshold', () => {
+    const result = checkConsentRequirement(CURRENT_YEAR - 17);
+    expect(result.required).toBe(false);
+    expect(result.consentType).toBeNull();
+  });
 
-    const { result } = renderHook(() => checkConsentRequirement(birthDate));
-    expect(result.current.required).toBe(false);
-    expect(result.current.consentType).toBeNull();
+  it('returns not required for adults', () => {
+    const result = checkConsentRequirement(CURRENT_YEAR - 20);
+    expect(result.required).toBe(false);
+    expect(result.consentType).toBeNull();
   });
 });
 

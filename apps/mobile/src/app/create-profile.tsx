@@ -95,10 +95,9 @@ export default function CreateProfileScreen() {
   const [loading, setLoading] = useState(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
-  const birthDateString = birthDate ? formatDateForApi(birthDate) : null;
+  const birthYear = birthDate ? birthDate.getFullYear() : null;
 
-  const { required: consentRequired } =
-    checkConsentRequirement(birthDateString);
+  const { required: consentRequired } = checkConsentRequirement(birthYear);
 
   const onDateChange = useCallback(
     (_event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -134,6 +133,7 @@ export default function CreateProfileScreen() {
       const body = {
         displayName: trimmedName,
         personaType,
+        birthYear: birthYear ?? undefined,
         birthDate: formatDateForApi(birthDate),
       };
 

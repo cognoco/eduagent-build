@@ -77,7 +77,20 @@ export async function precomputeHomeCards(
   const activeSubjects = allSubjects.filter(
     (subject) => subject.status === 'active'
   );
+  const progressBySubjectId = new Map(
+    overallProgress.subjects.map((subject) => [subject.subjectId, subject])
+  );
   const firstActiveSubject = activeSubjects[0];
+  const allActiveSubjectsVerified =
+    activeSubjects.length > 0 &&
+    activeSubjects.every((subject) => {
+      const progress = progressBySubjectId.get(subject.id);
+      return (
+        progress != null &&
+        progress.topicsTotal > 0 &&
+        progress.topicsVerified >= progress.topicsTotal
+      );
+    });
   const totalReviewDue =
     overallProgress.subjects.reduce(
       (total, subject) => total + subject.urgencyScore,
@@ -117,6 +130,19 @@ export async function precomputeHomeCards(
       priority: 85,
     });
   } else if (activeSubjects.length > 0) {
+    if (allActiveSubjectsVerified) {
+      cards.push({
+        id: 'curriculum_complete',
+        title: "You've mastered your subjects!",
+        subtitle:
+          'Celebrate the progress, keep reviewing when you want, or add something new to learn.',
+        badge: 'Big milestone',
+        primaryLabel: 'Add another subject',
+        secondaryLabel: 'Keep reviewing',
+        priority: 92,
+      });
+    }
+
     const studyPriority =
       68 +
       (continueSuggestion ? 12 : 0) +

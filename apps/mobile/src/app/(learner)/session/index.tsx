@@ -12,11 +12,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type {
-  PendingCelebration,
-  HomeworkProblem,
-  SubjectClassifyCandidate,
-} from '@eduagent/schemas';
+import type { PendingCelebration, HomeworkProblem } from '@eduagent/schemas';
 import {
   ChatShell,
   animateResponse,
@@ -35,6 +31,7 @@ import {
   useSessionTranscript,
   useRecordSystemPrompt,
   useRecordSessionEvent,
+  useSetSessionInputMode,
   useFlagSessionContent,
   useParkingLot,
   useAddParkingLotItem,
@@ -122,6 +119,15 @@ type ContextualQuickChipId = Exclude<
 >;
 
 type MessageFeedbackState = 'helpful' | 'not_helpful' | 'incorrect';
+
+interface PendingSubjectResolution {
+  originalText: string;
+  prompt: string;
+  candidates: Array<{
+    subjectId: string;
+    subjectName: string;
+  }>;
+}
 
 const CONFIRMATION_BY_CHIP: Partial<Record<ContextualQuickChipId, string>> = {
   hint: 'Adding a hint.',
@@ -258,6 +264,9 @@ export default function SessionScreen() {
     subjectId: string;
     subjectName: string;
   } | null>(null);
+  const [pendingSubjectResolution, setPendingSubjectResolution] =
+    useState<PendingSubjectResolution | null>(null);
+  const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
   const [homeworkProblemsState, setHomeworkProblemsState] = useState<
     HomeworkProblem[]
   >(initialHomeworkProblems);
@@ -267,7 +276,6 @@ export default function SessionScreen() {
   >(undefined);
   const [draftText, setDraftText] = useState('');
   const [resumedBanner, setResumedBanner] = useState(false);
-  const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
   const [responseHistory, setResponseHistory] = useState<
     Array<{ actualSeconds: number; expectedMinutes: number }>
   >([]);
@@ -278,16 +286,6 @@ export default function SessionScreen() {
     string | null
   >(subjectId ?? null);
   const [showWrongSubjectChip, setShowWrongSubjectChip] = useState(false);
-  const [ambiguousCandidates, setAmbiguousCandidates] = useState<
-    SubjectClassifyCandidate[] | null
-  >(null);
-  const [bufferedFirstMessage, setBufferedFirstMessage] = useState<
-    string | null
-  >(null);
-  const disambiguationRef = useRef<{
-    subjectId: string;
-    subjectName: string;
-  } | null>(null);
   const [consumedQuickChipMessageId, setConsumedQuickChipMessageId] = useState<
     string | null
   >(null);
@@ -310,6 +308,7 @@ export default function SessionScreen() {
   const transcript = useSessionTranscript(routeSessionId ?? '');
   const recordSystemPrompt = useRecordSystemPrompt(activeSessionId ?? '');
   const recordSessionEvent = useRecordSessionEvent(activeSessionId ?? '');
+  const setSessionInputMode = useSetSessionInputMode(activeSessionId ?? '');
   const flagSessionContent = useFlagSessionContent(activeSessionId ?? '');
   const parkingLot = useParkingLot(activeSessionId ?? '');
   const addParkingLotItem = useAddParkingLotItem(activeSessionId ?? '');
@@ -339,6 +338,8 @@ export default function SessionScreen() {
       setPendingClassification(false);
       setClassifyError(null);
       setClassifiedSubject(null);
+      setPendingSubjectResolution(null);
+      setInputMode('text');
       setDraftText('');
       setResumedBanner(false);
       setResponseHistory([]);
@@ -477,6 +478,7 @@ export default function SessionScreen() {
         .filter((entry) => entry.role === 'assistant' && !entry.isSystemPrompt)
         .at(-1)?.escalationRung ?? 1
     );
+    setInputMode(transcript.data.session.inputMode ?? 'text');
     setActiveSessionId(routeSessionId);
     setResumedBanner(true);
   }, [openingContent, routeSessionId, transcript.data]);
@@ -646,6 +648,7 @@ export default function SessionScreen() {
               homeworkProblemsState.length > 0
                 ? {
                     metadata: {
+                      inputMode,
                       homework: buildHomeworkSessionMetadata(
                         homeworkProblemsState,
                         currentProblemIndex,
@@ -668,6 +671,7 @@ export default function SessionScreen() {
             ...(effectiveMode === 'homework' && homeworkProblemsState.length > 0
               ? {
                   metadata: {
+                    inputMode,
                     homework: buildHomeworkSessionMetadata(
                       homeworkProblemsState,
                       currentProblemIndex,
@@ -708,85 +712,70 @@ export default function SessionScreen() {
       homeworkProblemsState,
       currentProblemIndex,
       ocrText,
+      inputMode,
       syncHomeworkMetadata,
     ]
   );
 
-  const handleSend = useCallback(
-    async (text: string) => {
-      if (isStreaming || pendingClassification) return;
-
-      // When called back after disambiguation, the ref carries the resolved subject
-      // and the user message was already added in the first call.
-      const isDisambiguationCallback = !!disambiguationRef.current;
-
-      if (!isDisambiguationCallback) {
-        setMessages((prev) => [
-          ...prev,
-          { id: createLocalMessageId('user'), role: 'user', content: text },
-        ]);
-        setResumedBanner(false);
+  const handleInputModeChange = useCallback(
+    (nextInputMode: 'text' | 'voice') => {
+      setInputMode(nextInputMode);
+      if (!activeSessionId) {
+        return;
       }
+      void setSessionInputMode
+        .mutateAsync({ inputMode: nextInputMode })
+        .catch(() => {
+          showConfirmation("Couldn't save that mode just now.");
+        });
+    },
+    [activeSessionId, setSessionInputMode, showConfirmation]
+  );
 
-      // Classify subject from first message when none was provided
-      let sessionSubjectId: string | undefined;
-      if (isDisambiguationCallback) {
-        const resolved = disambiguationRef.current!;
-        disambiguationRef.current = null;
-        setClassifiedSubject(resolved);
-        sessionSubjectId = resolved.subjectId;
-      } else if (!subjectId && !classifiedSubject && messages.length <= 1) {
-        setPendingClassification(true);
-        setClassifyError(null);
-        try {
-          const result = await classifySubject.mutateAsync({ text });
-          if (!result.needsConfirmation && result.candidates.length === 1) {
-            const candidate = result.candidates[0]!;
-            setClassifiedSubject({
-              subjectId: candidate.subjectId,
-              subjectName: candidate.subjectName,
-            });
-            setShowWrongSubjectChip(false);
-            sessionSubjectId = candidate.subjectId;
-          } else if (result.needsConfirmation && result.candidates.length > 1) {
-            // Multiple ambiguous candidates — ask the learner to pick
-            setAmbiguousCandidates(result.candidates);
-            setBufferedFirstMessage(text);
-            const names = result.candidates.map((c) => c.subjectName);
-            const listText =
-              names.length === 2
-                ? `**${names[0]}** or **${names[1]}**`
-                : names
-                    .slice(0, -1)
-                    .map((n) => `**${n}**`)
-                    .join(', ') + `, or **${names[names.length - 1]}**`;
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: createLocalMessageId('ai'),
-                role: 'ai',
-                content: `This sounds like it could be ${listText}. Which one are we working on?`,
-              },
-            ]);
-            return;
-          } else {
-            // Single low-confidence or no match → freeform + wrong-subject chip
-            setShowWrongSubjectChip(result.needsConfirmation);
-            if (result.candidates[0]) {
-              setTopicSwitcherSubjectId(result.candidates[0].subjectId);
-            }
-          }
-        } catch {
-          setShowWrongSubjectChip(true);
-          setClassifyError(
-            'Could not identify the subject. Please try again or select one manually.'
-          );
-        } finally {
-          setPendingClassification(false);
-        }
+  const openSubjectResolution = useCallback(
+    (
+      text: string,
+      prompt: string,
+      candidates: Array<{ subjectId: string; subjectName: string }>
+    ) => {
+      const dedupedCandidates = candidates.filter(
+        (candidate, index, all) =>
+          all.findIndex(
+            (entry) =>
+              entry.subjectId === candidate.subjectId &&
+              entry.subjectName === candidate.subjectName
+          ) === index
+      );
+
+      setPendingSubjectResolution({
+        originalText: text,
+        prompt,
+        candidates: dedupedCandidates,
+      });
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: createLocalMessageId('ai'),
+          role: 'ai',
+          content: prompt,
+          isSystemPrompt: true,
+        },
+      ]);
+    },
+    [createLocalMessageId]
+  );
+
+  const continueWithMessage = useCallback(
+    async (
+      text: string,
+      options?: {
+        sessionSubjectId?: string;
+        sessionSubjectName?: string;
       }
-
+    ) => {
       try {
+        const sessionSubjectId = options?.sessionSubjectId;
+        const sessionSubjectName = options?.sessionSubjectName;
         const currentHomeworkProblemId =
           effectiveMode === 'homework' ? activeHomeworkProblem?.id : undefined;
         const updatedProblems =
@@ -825,7 +814,8 @@ export default function SessionScreen() {
             sessionId: sid,
             profileId: activeProfile?.id ?? undefined,
             subjectId: (sessionSubjectId ?? effectiveSubjectId) || undefined,
-            subjectName: effectiveSubjectName || undefined,
+            subjectName:
+              sessionSubjectName ?? effectiveSubjectName ?? undefined,
             topicId: topicId ?? undefined,
             mode: effectiveMode,
             milestoneTracker: trackerState,
@@ -913,7 +903,8 @@ export default function SessionScreen() {
                 profileId: activeProfile?.id ?? undefined,
                 subjectId:
                   (sessionSubjectId ?? effectiveSubjectId) || undefined,
-                subjectName: effectiveSubjectName || undefined,
+                subjectName:
+                  sessionSubjectName ?? effectiveSubjectName ?? undefined,
                 topicId: topicId ?? undefined,
                 mode: effectiveMode,
                 milestoneTracker: nextTrackerState,
@@ -929,64 +920,176 @@ export default function SessionScreen() {
         );
       } catch (err: unknown) {
         animationCleanupRef.current = animateResponse(
-          formatApiError(err),
+          'Lost connection to your session. Tap send to reconnect.',
           setMessages,
           setIsStreaming
         );
       }
     },
     [
+      activeHomeworkProblem,
+      activeProfile?.id,
+      classifiedSubject,
+      createLocalMessageId,
+      currentProblemIndex,
+      effectiveMode,
+      effectiveSubjectId,
+      effectiveSubjectName,
+      ensureSession,
+      homeworkMode,
+      homeworkProblemsState,
+      scheduleSilencePrompt,
+      streamMessage,
+      subjectId,
+      syncHomeworkMetadata,
+      topicId,
+      trackExchange,
+      trackerState,
+      trigger,
+    ]
+  );
+
+  const handleResolveSubject = useCallback(
+    async (candidate: { subjectId: string; subjectName: string }) => {
+      if (!pendingSubjectResolution || isStreaming || pendingClassification) {
+        return;
+      }
+
+      setPendingSubjectResolution(null);
+      setClassifiedSubject(candidate);
+      setShowWrongSubjectChip(false);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: createLocalMessageId('ai'),
+          role: 'ai',
+          content: `Got it, we’re working on ${candidate.subjectName}.`,
+          isSystemPrompt: true,
+        },
+      ]);
+      await continueWithMessage(pendingSubjectResolution.originalText, {
+        sessionSubjectId: candidate.subjectId,
+        sessionSubjectName: candidate.subjectName,
+      });
+    },
+    [
+      continueWithMessage,
+      createLocalMessageId,
       isStreaming,
       pendingClassification,
+      pendingSubjectResolution,
+    ]
+  );
+
+  const handleSend = useCallback(
+    async (text: string) => {
+      if (isStreaming || pendingClassification) return;
+      if (pendingSubjectResolution) {
+        showConfirmation('Pick the subject first, then I’ll keep going.');
+        return;
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        { id: createLocalMessageId('user'), role: 'user', content: text },
+      ]);
+      setResumedBanner(false);
+
+      // Classify subject from first message when none was provided
+      let sessionSubjectId: string | undefined;
+      let sessionSubjectName: string | undefined;
+      if (!subjectId && !classifiedSubject && messages.length <= 1) {
+        setPendingClassification(true);
+        setClassifyError(null);
+        try {
+          const result = await classifySubject.mutateAsync({ text });
+          if (!result.needsConfirmation && result.candidates.length === 1) {
+            const candidate = result.candidates[0]!;
+            setClassifiedSubject({
+              subjectId: candidate.subjectId,
+              subjectName: candidate.subjectName,
+            });
+            setShowWrongSubjectChip(false);
+            sessionSubjectId = candidate.subjectId;
+            sessionSubjectName = candidate.subjectName;
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: createLocalMessageId('ai'),
+                role: 'ai',
+                content: `Got it, this sounds like ${candidate.subjectName}.`,
+                isSystemPrompt: true,
+              },
+            ]);
+          } else {
+            const subjectCandidates =
+              result.candidates.length > 0
+                ? result.candidates.map((candidate) => ({
+                    subjectId: candidate.subjectId,
+                    subjectName: candidate.subjectName,
+                  }))
+                : availableSubjects.map((candidate) => ({
+                    subjectId: candidate.id,
+                    subjectName: candidate.name,
+                  }));
+
+            if (subjectCandidates[0]) {
+              setTopicSwitcherSubjectId(subjectCandidates[0].subjectId);
+            }
+            setShowWrongSubjectChip(false);
+            openSubjectResolution(
+              text,
+              result.candidates.length > 1
+                ? `This sounds like it could be ${subjectCandidates
+                    .slice(0, 3)
+                    .map((candidate) => candidate.subjectName)
+                    .join(' or ')}. Which one are we working on?`
+                : "I couldn't place that yet. Pick the closest subject and we'll get moving.",
+              subjectCandidates
+            );
+            return;
+          }
+        } catch {
+          const fallbackCandidates = availableSubjects.map((candidate) => ({
+            subjectId: candidate.id,
+            subjectName: candidate.name,
+          }));
+          setShowWrongSubjectChip(false);
+          setClassifyError(
+            'Could not identify the subject automatically. Pick one below and we’ll keep going.'
+          );
+          if (fallbackCandidates.length > 0) {
+            openSubjectResolution(
+              text,
+              "I couldn't place that yet. Pick the closest subject and we'll get moving.",
+              fallbackCandidates
+            );
+            return;
+          }
+        } finally {
+          setPendingClassification(false);
+        }
+      }
+
+      await continueWithMessage(text, {
+        sessionSubjectId,
+        sessionSubjectName,
+      });
+    },
+    [
+      isStreaming,
+      pendingClassification,
+      pendingSubjectResolution,
       createLocalMessageId,
       subjectId,
       classifiedSubject,
       messages.length,
       classifySubject,
-      ensureSession,
-      activeHomeworkProblem,
-      homeworkProblemsState,
-      streamMessage,
-      effectiveMode,
-      effectiveSubjectId,
-      effectiveSubjectName,
-      homeworkMode,
-      currentProblemIndex,
-      syncHomeworkMetadata,
-      scheduleSilencePrompt,
-      activeProfile?.id,
-      trackerState,
-      topicId,
-      trackExchange,
-      trigger,
+      availableSubjects,
+      continueWithMessage,
+      openSubjectResolution,
+      showConfirmation,
     ]
-  );
-
-  const handleAmbiguousPick = useCallback(
-    (candidate: SubjectClassifyCandidate) => {
-      disambiguationRef.current = {
-        subjectId: candidate.subjectId,
-        subjectName: candidate.subjectName,
-      };
-      const text = bufferedFirstMessage;
-      setBufferedFirstMessage(null);
-      setAmbiguousCandidates(null);
-
-      // Show the learner's choice as a chat message
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: createLocalMessageId('user'),
-          role: 'user',
-          content: candidate.subjectName,
-        },
-      ]);
-
-      if (text) {
-        void handleSend(text);
-      }
-    },
-    [bufferedFirstMessage, createLocalMessageId, handleSend]
   );
 
   useEffect(() => {
@@ -1460,6 +1563,42 @@ export default function SessionScreen() {
     </View>
   );
 
+  const subjectResolutionAccessory = pendingSubjectResolution ? (
+    <View className="bg-surface border-t border-surface-elevated px-4 py-3">
+      <Text className="text-body-sm font-semibold text-text-primary">
+        Pick the subject
+      </Text>
+      <Text className="text-body-sm text-text-secondary mt-1 mb-3">
+        {pendingSubjectResolution.prompt}
+      </Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 8 }}
+        testID="session-subject-resolution"
+      >
+        {pendingSubjectResolution.candidates.map((candidate) => (
+          <Pressable
+            key={candidate.subjectId}
+            onPress={() => void handleResolveSubject(candidate)}
+            disabled={isStreaming || pendingClassification}
+            className="rounded-full bg-surface-elevated px-4 py-2"
+            accessibilityRole="button"
+            accessibilityLabel={`Choose ${candidate.subjectName}`}
+            accessibilityState={{
+              disabled: isStreaming || pendingClassification,
+            }}
+            testID={`subject-resolution-${candidate.subjectId}`}
+          >
+            <Text className="text-body-sm font-semibold text-text-primary">
+              {candidate.subjectName}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  ) : null;
+
   const homeworkModeChips =
     effectiveMode === 'homework' ? (
       <View className="bg-surface border-t border-surface-elevated">
@@ -1541,6 +1680,7 @@ export default function SessionScreen() {
 
   const sessionAccessory = (
     <>
+      {subjectResolutionAccessory}
       {sessionToolAccessory}
       {homeworkModeChips}
     </>
@@ -1575,40 +1715,13 @@ export default function SessionScreen() {
         : []),
     ];
     const showFeedbackButtons = !!message.eventId;
-    const showDisambiguation =
-      ambiguousCandidates &&
-      ambiguousCandidates.length > 0 &&
-      message.id === latestAiMessageId;
 
-    if (
-      messageControlChips.length === 0 &&
-      !showFeedbackButtons &&
-      !showDisambiguation
-    ) {
+    if (messageControlChips.length === 0 && !showFeedbackButtons) {
       return null;
     }
 
     return (
       <View className="gap-2">
-        {showDisambiguation && (
-          <View
-            className="flex-row flex-wrap gap-2"
-            testID="subject-disambiguation"
-          >
-            {ambiguousCandidates.map((candidate) => (
-              <Pressable
-                key={candidate.subjectId}
-                onPress={() => handleAmbiguousPick(candidate)}
-                className="rounded-full bg-primary px-4 py-2"
-                testID={`subject-pick-${candidate.subjectId}`}
-              >
-                <Text className="text-body-sm font-semibold text-text-inverse">
-                  {candidate.subjectName}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
         {messageControlChips.length > 0 && (
           <View className="flex-row flex-wrap gap-2">
             {messageControlChips.map((chip) => {
@@ -1706,8 +1819,13 @@ export default function SessionScreen() {
         onSend={handleSend}
         isStreaming={isStreaming}
         inputDisabled={
-          isOffline || pendingClassification || !!ambiguousCandidates
+          isOffline || pendingClassification || !!pendingSubjectResolution
         }
+        verificationType={
+          transcript.data?.session.verificationType ?? undefined
+        }
+        inputMode={inputMode}
+        onInputModeChange={handleInputModeChange}
         rightAction={headerRight}
         inputAccessory={sessionAccessory}
         onDraftChange={setDraftText}
