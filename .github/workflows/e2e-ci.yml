@@ -112,7 +112,8 @@ jobs:
   api-integration:
     name: API Integration Tests
     needs: check-changes
-    if: needs.check-changes.outputs.run-api-e2e == 'true'
+    # Only run on schedule/dispatch — ci.yml already covers integration tests on PR/push
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # Advisory — does not block PR merge
     continue-on-error: true

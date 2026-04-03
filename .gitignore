@@ -92,12 +92,6 @@ temp/*
 .worktrees/
 .claude/worktrees/
 
-# Agent-Vibes
-.agentvibes/
-.claude/audio
-.claude/tts*
-.claude/github-star-reminder.txt
-
 # TestSprite AI Testing (generated tests, ephemeral results)
 testsprite_tests/
 

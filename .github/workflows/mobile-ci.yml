@@ -48,9 +48,6 @@ jobs:
   # Check if mobile is actually affected by the changes
   check-affected:
     runs-on: ubuntu-latest
-    env:
-      NX_DAEMON: false
-      NX_ISOLATE_PLUGINS: false
     outputs:
       mobile-affected: ${{ steps.check.outputs.affected }}
       native-changed: ${{ steps.native-check.outputs.native_changed }}
@@ -63,17 +60,6 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           git fetch origin ${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}
-
-      - uses: pnpm/action-setup@v4
-        with:
-          standalone: true
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-
-      - run: pnpm install --frozen-lockfile
 
       - name: Check if mobile affected
         id: check
