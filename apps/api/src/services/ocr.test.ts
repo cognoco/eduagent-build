@@ -2,6 +2,15 @@
 // OCR Provider — Tests
 // ---------------------------------------------------------------------------
 
+jest.mock('./llm', () => ({
+  routeAndCall: jest.fn().mockResolvedValue({
+    response: '{"text":"Solve for x: 2x + 5 = 13","confidence":0.81}',
+    provider: 'gemini',
+    model: 'gemini-2.5-flash',
+    latencyMs: 120,
+  }),
+}));
+
 import {
   GeminiOcrProvider,
   StubOcrProvider,
@@ -11,6 +20,7 @@ import {
   resetOcrProvider,
   type OcrProvider,
 } from './ocr';
+import { routeAndCall } from './llm';
 
 describe('StubOcrProvider', () => {
   it('returns a valid OcrResult with text, confidence, and regions', async () => {
@@ -66,8 +76,8 @@ describe('createOcrProvider', () => {
     expect(provider).toBeInstanceOf(StubOcrProvider);
   });
 
-  it('returns GeminiOcrProvider when requested with an API key', () => {
-    const provider = createOcrProvider('gemini', 'test-key');
+  it('returns GeminiOcrProvider when requested', () => {
+    const provider = createOcrProvider('gemini');
     expect(provider).toBeInstanceOf(GeminiOcrProvider);
   });
 });
@@ -95,8 +105,8 @@ describe('getOcrProvider / setOcrProvider', () => {
     expect(getOcrProvider()).toBe(custom);
   });
 
-  it('returns a Gemini provider when an API key is supplied', () => {
-    const provider = getOcrProvider('test-key');
+  it('returns a Gemini provider when useRouter is truthy', () => {
+    const provider = getOcrProvider(true);
     expect(provider).toBeInstanceOf(GeminiOcrProvider);
   });
 
@@ -118,38 +128,47 @@ describe('getOcrProvider / setOcrProvider', () => {
 });
 
 describe('GeminiOcrProvider', () => {
-  it('parses JSON OCR output from Gemini', async () => {
-    const provider = new GeminiOcrProvider('test-key');
-    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          candidates: [
-            {
-              content: {
-                parts: [
-                  {
-                    text: '{"text":"Solve for x: 2x + 5 = 13","confidence":0.81}',
-                  },
-                ],
-              },
-            },
-          ],
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('routes through routeAndCall with multimodal message', async () => {
+    const provider = new GeminiOcrProvider();
+    const result = await provider.extractText(new ArrayBuffer(8), 'image/jpeg');
+
+    expect(result.text).toBe('Solve for x: 2x + 5 = 13');
+    expect(result.confidence).toBe(0.81);
+    expect(result.regions).toEqual([]);
+
+    expect(routeAndCall).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          role: 'user',
+          content: expect.arrayContaining([
+            expect.objectContaining({ type: 'text' }),
+            expect.objectContaining({
+              type: 'inline_data',
+              mimeType: 'image/jpeg',
+            }),
+          ]),
         }),
-        { status: 200 }
-      )
+      ],
+      1
     );
+  });
 
-    try {
-      const result = await provider.extractText(
-        new ArrayBuffer(8),
-        'image/jpeg'
-      );
+  it('handles plain-text response gracefully', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: 'Just some plain text without JSON',
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 100,
+    });
 
-      expect(result.text).toBe('Solve for x: 2x + 5 = 13');
-      expect(result.confidence).toBe(0.81);
-      expect(result.regions).toEqual([]);
-    } finally {
-      fetchSpy.mockRestore();
-    }
+    const provider = new GeminiOcrProvider();
+    const result = await provider.extractText(new ArrayBuffer(8), 'image/png');
+
+    expect(result.text).toBe('Just some plain text without JSON');
+    expect(result.confidence).toBe(0.75);
   });
 });

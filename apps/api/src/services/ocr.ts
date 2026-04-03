@@ -5,6 +5,7 @@
 // ---------------------------------------------------------------------------
 
 import type { OcrResult } from '@eduagent/schemas';
+import { routeAndCall, type ChatMessage } from './llm';
 
 const OCR_PROMPT = `Extract all readable text from this image.
 Return ONLY JSON with this shape:
@@ -52,16 +53,6 @@ export class StubOcrProvider implements OcrProvider {
   }
 }
 
-interface GeminiOcrResponse {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{
-        text?: string;
-      }>;
-    };
-  }>;
-}
-
 function arrayBufferToBase64(image: ArrayBuffer): string {
   const bytes = new Uint8Array(image);
 
@@ -83,7 +74,7 @@ function clampConfidence(value: unknown): number {
   return Math.max(0, Math.min(1, value));
 }
 
-function parseGeminiOcrText(raw: string): OcrResult {
+function parseOcrResponse(raw: string): OcrResult {
   const trimmed = raw.trim();
   try {
     const parsed = JSON.parse(trimmed) as {
@@ -105,56 +96,29 @@ function parseGeminiOcrText(raw: string): OcrResult {
   }
 }
 
+/**
+ * OCR provider that routes through the LLM router (routeAndCall).
+ * Uses multimodal messages so cost monitoring, circuit breaker, and
+ * error attribution are applied consistently.
+ */
 export class GeminiOcrProvider implements OcrProvider {
-  constructor(
-    private readonly apiKey: string,
-    private readonly model = 'gemini-2.5-flash'
-  ) {}
-
   async extractText(image: ArrayBuffer, mimeType: string): Promise<OcrResult> {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`,
+    const messages: ChatMessage[] = [
       {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': this.apiKey,
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { text: OCR_PROMPT },
-                {
-                  inline_data: {
-                    mime_type: mimeType,
-                    data: arrayBufferToBase64(image),
-                  },
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            maxOutputTokens: 2048,
-            responseMimeType: 'application/json',
+        role: 'user',
+        content: [
+          { type: 'text', text: OCR_PROMPT },
+          {
+            type: 'inline_data',
+            mimeType,
+            data: arrayBufferToBase64(image),
           },
-        }),
-        signal: AbortSignal.timeout(20_000),
-      }
-    );
+        ],
+      },
+    ];
 
-    if (!response.ok) {
-      throw new Error(`Gemini OCR failed (${response.status})`);
-    }
-
-    const data = (await response.json()) as GeminiOcrResponse;
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    if (!rawText) {
-      throw new Error('Gemini OCR returned no text');
-    }
-
-    return parseGeminiOcrText(rawText);
+    const result = await routeAndCall(messages, 1);
+    return parseOcrResponse(result.response);
   }
 }
 
@@ -164,14 +128,20 @@ export class GeminiOcrProvider implements OcrProvider {
 
 let _provider: OcrProvider | null = null;
 
-/** Returns the current OCR provider (defaults to StubOcrProvider). */
-export function getOcrProvider(apiKey?: string): OcrProvider {
+/**
+ * Returns the current OCR provider (defaults to StubOcrProvider).
+ *
+ * When `useRouter` is true the Gemini provider is returned — it routes
+ * through routeAndCall() so the API key comes from the registered LLM
+ * provider, not from a parameter here.
+ */
+export function getOcrProvider(useRouter?: boolean | string): OcrProvider {
   if (_provider) {
     return _provider;
   }
 
-  if (apiKey) {
-    _provider = new GeminiOcrProvider(apiKey);
+  if (useRouter) {
+    _provider = new GeminiOcrProvider();
     return _provider;
   }
 
@@ -193,13 +163,10 @@ export function resetOcrProvider(): void {
  * Factory for creating OCR providers by type name.
  * Extensible for future real providers.
  */
-export function createOcrProvider(type?: string, apiKey?: string): OcrProvider {
+export function createOcrProvider(type?: string): OcrProvider {
   switch (type) {
     case 'gemini':
-      if (!apiKey) {
-        throw new Error('Gemini OCR provider requires an API key');
-      }
-      return new GeminiOcrProvider(apiKey);
+      return new GeminiOcrProvider();
     default:
       return new StubOcrProvider();
   }

@@ -1,4 +1,10 @@
-import type { LLMProvider, ChatMessage, ModelConfig } from '../types';
+import {
+  getTextContent,
+  type LLMProvider,
+  type ChatMessage,
+  type ModelConfig,
+  type MessagePart,
+} from '../types';
 
 // ---------------------------------------------------------------------------
 // Gemini Provider — ARCH-8, ARCH-9
@@ -37,9 +43,14 @@ const SAFETY_SETTINGS_FOR_MINORS: GeminiSafetySetting[] = [
   },
 ];
 
+/** Gemini API part — text or inline binary data (images, etc.) */
+type GeminiPart =
+  | { text: string }
+  | { inline_data: { mime_type: string; data: string } };
+
 /** Gemini API request body shape */
 interface GeminiRequest {
-  contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>;
+  contents: Array<{ role: 'user' | 'model'; parts: GeminiPart[] }>;
   systemInstruction?: { parts: Array<{ text: string }> };
   generationConfig: { maxOutputTokens: number };
   safetySettings: GeminiSafetySetting[];
@@ -58,6 +69,17 @@ interface GeminiResponse {
 // ---------------------------------------------------------------------------
 // Message conversion
 // ---------------------------------------------------------------------------
+
+/** Convert ChatMessage content to Gemini API parts. */
+function toGeminiParts(content: string | MessagePart[]): GeminiPart[] {
+  if (typeof content === 'string') {
+    return [{ text: content }];
+  }
+  return content.map((part) => {
+    if (part.type === 'text') return { text: part.text };
+    return { inline_data: { mime_type: part.mimeType, data: part.data } };
+  });
+}
 
 function toGeminiRequest(
   messages: ChatMessage[],
@@ -85,12 +107,12 @@ function toGeminiRequest(
       // sees it at the correct position in the conversation.
       return {
         role: 'user' as const,
-        parts: [{ text: `[Tutor instruction]: ${m.content}` }],
+        parts: [{ text: `[Tutor instruction]: ${getTextContent(m.content)}` }],
       };
     }
     return {
       role: (m.role === 'assistant' ? 'model' : 'user') as 'user' | 'model',
-      parts: [{ text: m.content }],
+      parts: toGeminiParts(m.content),
     };
   });
 
@@ -103,7 +125,11 @@ function toGeminiRequest(
   if (initialSystemMessages.length > 0) {
     request.systemInstruction = {
       parts: [
-        { text: initialSystemMessages.map((m) => m.content).join('\n\n') },
+        {
+          text: initialSystemMessages
+            .map((m) => getTextContent(m.content))
+            .join('\n\n'),
+        },
       ],
     };
   }

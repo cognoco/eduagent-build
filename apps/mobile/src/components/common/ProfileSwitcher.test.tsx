@@ -1,4 +1,10 @@
-import { render, screen, fireEvent, act } from '@testing-library/react-native';
+import {
+  render,
+  screen,
+  fireEvent,
+  act,
+  userEvent,
+} from '@testing-library/react-native';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import type { Profile } from '@eduagent/schemas';
 
@@ -115,7 +121,7 @@ describe('ProfileSwitcher', () => {
     expect(screen.getByTestId('profile-option-p2')).toBeTruthy();
   });
 
-  it('calls onSwitch when selecting a different profile', () => {
+  it('calls onSwitch when selecting a different profile', async () => {
     render(
       <ProfileSwitcher
         profiles={profiles}
@@ -125,12 +131,16 @@ describe('ProfileSwitcher', () => {
     );
 
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
-    fireEvent.press(screen.getByTestId('profile-option-p2'));
+
+    await act(async () => {
+      await userEvent.press(screen.getByTestId('profile-option-p2'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
 
     expect(onSwitch).toHaveBeenCalledWith('p2');
   });
 
-  it('does not call onSwitch when selecting the active profile', () => {
+  it('does not call onSwitch when selecting the active profile', async () => {
     render(
       <ProfileSwitcher
         profiles={profiles}
@@ -140,7 +150,11 @@ describe('ProfileSwitcher', () => {
     );
 
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
-    fireEvent.press(screen.getByTestId('profile-option-p1'));
+
+    await act(async () => {
+      await userEvent.press(screen.getByTestId('profile-option-p1'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
 
     expect(onSwitch).not.toHaveBeenCalled();
   });
@@ -171,12 +185,13 @@ describe('ProfileSwitcher', () => {
     );
 
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
-    fireEvent.press(screen.getByTestId('profile-option-p2'));
 
     // handleSelect is async — flush microtasks so setIsOpen(false) commits
     await act(async () => {
-      await Promise.resolve();
+      await userEvent.press(screen.getByTestId('profile-option-p2'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
+
     expect(screen.queryByTestId('profile-switcher-menu')).toBeNull();
   });
 
