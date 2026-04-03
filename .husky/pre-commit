@@ -1,5 +1,14 @@
 #!/usr/bin/env sh
 pnpm exec lint-staged
 
+# Full project-reference type-check (incremental via composite tsconfig).
+# Emits .d.ts to dist/ (gitignored) + .tsbuildinfo (gitignored) for incremental caching.
+# Skip if no .ts/.tsx files are staged — docs/config-only commits need no tsc.
+STAGED_TS=$(git diff --cached --name-only --diff-filter=d -- '*.ts' '*.tsx')
+if [ -n "$STAGED_TS" ]; then
+  echo "pre-commit: running tsc --build (incremental)..."
+  pnpm exec tsc --build || exit 1
+fi
+
 # Surgical tests — only tests related to staged files (see scripts/pre-commit-tests.sh)
 bash scripts/pre-commit-tests.sh
