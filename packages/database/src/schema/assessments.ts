@@ -148,22 +148,31 @@ export const analogyDomainEnum = pgEnum('analogy_domain', [
   'gaming',
 ]);
 
-export const teachingPreferences = pgTable('teaching_preferences', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  profileId: uuid('profile_id')
-    .notNull()
-    .references(() => profiles.id, { onDelete: 'cascade' }),
-  subjectId: uuid('subject_id')
-    .notNull()
-    .references(() => subjects.id, { onDelete: 'cascade' }),
-  method: teachingMethodEnum('method').notNull(),
-  analogyDomain: analogyDomainEnum('analogy_domain'),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const teachingPreferences = pgTable(
+  'teaching_preferences',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    subjectId: uuid('subject_id')
+      .notNull()
+      .references(() => subjects.id, { onDelete: 'cascade' }),
+    method: teachingMethodEnum('method').notNull(),
+    analogyDomain: analogyDomainEnum('analogy_domain'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique('teaching_preferences_profile_subject_unique').on(
+      table.profileId,
+      table.subjectId
+    ),
+  ]
+);

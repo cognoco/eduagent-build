@@ -137,6 +137,7 @@ function createMockDb(options?: {
       values: jest.fn().mockReturnValue({
         returning: jest.fn().mockResolvedValue([]),
         onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+        onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),
       }),
     }),
     delete: jest.fn().mockReturnValue({
@@ -899,7 +900,7 @@ describe('getTeachingPreference', () => {
 });
 
 describe('setTeachingPreference', () => {
-  it('inserts new preference', async () => {
+  it('upserts new preference via INSERT ON CONFLICT DO UPDATE', async () => {
     const db = createMockDb();
     const result = await setTeachingPreference(
       db,
@@ -912,9 +913,11 @@ describe('setTeachingPreference', () => {
       method: 'step_by_step',
       analogyDomain: null,
     });
+    // Uses atomic upsert, not separate findFirst + insert/update
+    expect(db.insert).toHaveBeenCalled();
   });
 
-  it('inserts preference with analogyDomain', async () => {
+  it('upserts preference with analogyDomain', async () => {
     const db = createMockDb();
     const result = await setTeachingPreference(
       db,
@@ -932,13 +935,6 @@ describe('setTeachingPreference', () => {
 
   it('clears analogyDomain when null passed', async () => {
     const db = createMockDb();
-    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
-      id: 'pref-1',
-      profileId,
-      subjectId,
-      method: 'visual_diagrams',
-      analogyDomain: 'sports',
-    });
     const result = await setTeachingPreference(
       db,
       profileId,
@@ -950,6 +946,30 @@ describe('setTeachingPreference', () => {
       subjectId,
       method: 'visual_diagrams',
       analogyDomain: null,
+    });
+  });
+
+  it('reads back existing analogyDomain when not provided in upsert', async () => {
+    const db = createMockDb();
+    // Simulate existing row with analogyDomain already set
+    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
+      id: 'pref-1',
+      profileId,
+      subjectId,
+      method: 'step_by_step',
+      analogyDomain: 'sports',
+    });
+    const result = await setTeachingPreference(
+      db,
+      profileId,
+      subjectId,
+      'step_by_step'
+      // analogyDomain not passed — should read back existing
+    );
+    expect(result).toEqual({
+      subjectId,
+      method: 'step_by_step',
+      analogyDomain: 'sports',
     });
   });
 });
@@ -1001,39 +1021,26 @@ describe('getAnalogyDomain', () => {
 });
 
 describe('setAnalogyDomain', () => {
-  it('inserts new preference with default method when none exists', async () => {
+  it('upserts preference with default method via INSERT ON CONFLICT DO UPDATE', async () => {
     const db = createMockDb();
     const result = await setAnalogyDomain(db, profileId, subjectId, 'sports');
     expect(result).toBe('sports');
     expect(db.insert).toHaveBeenCalled();
   });
 
-  it('updates existing preference', async () => {
+  it('upserts analogy domain for existing preference', async () => {
     const db = createMockDb();
-    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
-      id: 'pref-1',
-      profileId,
-      subjectId,
-      method: 'visual_diagrams',
-      analogyDomain: 'cooking',
-    });
     const result = await setAnalogyDomain(db, profileId, subjectId, 'gaming');
     expect(result).toBe('gaming');
-    expect(db.update).toHaveBeenCalled();
+    // Uses atomic upsert — single insert with onConflictDoUpdate
+    expect(db.insert).toHaveBeenCalled();
   });
 
   it('clears analogy domain when null passed', async () => {
     const db = createMockDb();
-    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
-      id: 'pref-1',
-      profileId,
-      subjectId,
-      method: 'step_by_step',
-      analogyDomain: 'music',
-    });
     const result = await setAnalogyDomain(db, profileId, subjectId, null);
     expect(result).toBeNull();
-    expect(db.update).toHaveBeenCalled();
+    expect(db.insert).toHaveBeenCalled();
   });
 });
 
