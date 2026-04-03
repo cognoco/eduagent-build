@@ -31,7 +31,6 @@ import {
   curriculumTopics,
   retentionCards,
   sessionEvents,
-  streaks,
 } from '@eduagent/database';
 import { and, asc, eq } from 'drizzle-orm';
 
@@ -269,19 +268,32 @@ export const sessionCompleted = inngest.createFunction(
     );
 
     // Step 3: Update dashboard — streaks + XP
+    // Capture streak result to avoid re-querying in the celebrations step (race condition fix)
+    let updatedStreak: { currentStreak: number; longestStreak: number } | null =
+      null;
     outcomes.push(
-      await step.run('update-dashboard', async () =>
-        runIsolated('update-dashboard', profileId, async () => {
-          const db = getStepDatabase();
-          const today = timestamp
-            ? new Date(timestamp).toISOString().slice(0, 10)
-            : new Date().toISOString().slice(0, 10);
+      await step.run('update-dashboard', async () => {
+        const result = await runIsolated(
+          'update-dashboard',
+          profileId,
+          async () => {
+            const db = getStepDatabase();
+            const today = timestamp
+              ? new Date(timestamp).toISOString().slice(0, 10)
+              : new Date().toISOString().slice(0, 10);
 
-          await recordSessionActivity(db, profileId, today);
+            updatedStreak = await recordSessionActivity(db, profileId, today);
 
-          await insertSessionXpEntry(db, profileId, topicId ?? null, subjectId);
-        })
-      )
+            await insertSessionXpEntry(
+              db,
+              profileId,
+              topicId ?? null,
+              subjectId
+            );
+          }
+        );
+        return result;
+      })
     );
 
     // Step 4: Generate and store session embedding
@@ -405,15 +417,16 @@ export const sessionCompleted = inngest.createFunction(
             }
           }
 
-          const streak = await db.query.streaks.findFirst({
-            where: eq(streaks.profileId, profileId),
-          });
+          // Use the streak value from the update-dashboard step to avoid
+          // a race condition where concurrent session-completed events
+          // could read the same streak and queue duplicate celebrations.
+          const currentStreak = updatedStreak?.currentStreak ?? 0;
 
-          if (streak?.currentStreak === 7) {
+          if (currentStreak === 7) {
             await queueCelebration(db, profileId, 'comet', 'streak_7');
           }
 
-          if (streak?.currentStreak === 30) {
+          if (currentStreak === 30) {
             await queueCelebration(db, profileId, 'orions_belt', 'streak_30');
           }
         })

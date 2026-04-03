@@ -11,7 +11,6 @@ import {
   useInterviewState,
   useSendInterviewMessage,
 } from '../../../hooks/use-interview';
-import { useTheme } from '../../../lib/theme';
 import { formatApiError } from '../../../lib/format-api-error';
 
 const OPENING_MESSAGE =
@@ -25,7 +24,6 @@ export default function InterviewScreen() {
   const router = useRouter();
   const interviewState = useInterviewState(subjectId ?? '');
   const sendInterview = useSendInterviewMessage(subjectId ?? '');
-  const { persona } = useTheme();
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'opening', role: 'ai', content: OPENING_MESSAGE },
@@ -90,10 +88,9 @@ export default function InterviewScreen() {
         {
           id: 'expired',
           role: 'ai',
-          content:
-            state.resumeSummary?.trim()
-              ? `This interview expired after 7 days away. ${state.resumeSummary}`
-              : 'This interview expired after 7 days away. Restart to begin again.',
+          content: state.resumeSummary?.trim()
+            ? `This interview expired after 7 days away. ${state.resumeSummary}`
+            : 'This interview expired after 7 days away. Restart to begin again.',
         },
       ]);
       setRestartRequired(true);
@@ -107,7 +104,11 @@ export default function InterviewScreen() {
         'Continue your interview? We can pick up where you left off.';
       setMessages([
         ...mappedHistory,
-        { id: 'resume', role: 'ai', content: `Continue your interview? ${resumePrompt}` },
+        {
+          id: 'resume',
+          role: 'ai',
+          content: `Continue your interview? ${resumePrompt}`,
+        },
       ]);
     }
 
@@ -163,13 +164,11 @@ export default function InterviewScreen() {
       isStreaming={isStreaming}
       inputDisabled={interviewComplete || restartRequired}
       rightAction={
-        persona !== 'parent' ? (
-          <LivingBook
-            exchangeCount={exchangeCount}
-            isComplete={interviewComplete}
-            persona={persona}
-          />
-        ) : undefined
+        <LivingBook
+          exchangeCount={exchangeCount}
+          isComplete={interviewComplete}
+          persona="learner"
+        />
       }
       footer={
         interviewComplete ? (

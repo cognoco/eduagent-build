@@ -23,6 +23,7 @@ import {
   listFamilyMembers,
   addProfileToSubscription,
   removeProfileFromSubscription,
+  ProfileRemovalNotImplementedError,
   getFamilyPoolStatus,
 } from '../services/billing';
 import {
@@ -540,12 +541,25 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         return notFound(c, 'No subscription found');
       }
 
-      const result = await removeProfileFromSubscription(
-        db,
-        subscription.id,
-        profileId,
-        newAccountId
-      );
+      let result: { removedProfileId: string } | null;
+      try {
+        result = await removeProfileFromSubscription(
+          db,
+          subscription.id,
+          profileId,
+          newAccountId
+        );
+      } catch (err) {
+        if (err instanceof ProfileRemovalNotImplementedError) {
+          return apiError(
+            c,
+            501,
+            ERROR_CODES.INTERNAL_ERROR,
+            'Profile removal is not yet implemented. An invite/claim flow is required.'
+          );
+        }
+        throw err;
+      }
 
       if (!result) {
         return apiError(

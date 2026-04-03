@@ -11,7 +11,7 @@ import {
   MAX_ITEMS_PER_TOPIC,
 } from '../services/parking-lot-data';
 import { getSession } from '../services/session';
-import { apiError } from '../errors';
+import { apiError, notFound } from '../errors';
 
 type ParkingLotRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -57,13 +57,16 @@ export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
       const profileId = c.get('profileId') ?? account.id;
       const sessionId = c.req.param('sessionId');
       const session = await getSession(db, profileId, sessionId);
+      if (!session) {
+        return notFound(c, 'Session not found');
+      }
 
       const item = await addParkingLotItem(
         db,
         profileId,
         sessionId,
         question,
-        session?.topicId ?? undefined
+        session.topicId ?? undefined
       );
 
       if (!item) {

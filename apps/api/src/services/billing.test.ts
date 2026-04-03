@@ -1609,14 +1609,9 @@ describe('removeProfileFromSubscription', () => {
       profileFindFirst: childProfile,
     });
 
-    const result = await removeProfileFromSubscription(
-      db,
-      subscriptionId,
-      'p-child',
-      newAccountId
-    );
-
-    expect(result).toBeNull();
+    await expect(
+      removeProfileFromSubscription(db, subscriptionId, 'p-child', newAccountId)
+    ).rejects.toThrow('Profile removal requires an invite/claim flow');
     expect(db.update).not.toHaveBeenCalled();
     expect(db.insert).not.toHaveBeenCalled();
   });

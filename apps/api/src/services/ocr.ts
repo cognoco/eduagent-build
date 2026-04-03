@@ -90,8 +90,7 @@ function parseGeminiOcrText(raw: string): OcrResult {
       text?: unknown;
       confidence?: unknown;
     };
-    const text =
-      typeof parsed.text === 'string' ? parsed.text.trim() : trimmed;
+    const text = typeof parsed.text === 'string' ? parsed.text.trim() : trimmed;
     return {
       text,
       confidence: clampConfidence(parsed.confidence),
@@ -114,10 +113,13 @@ export class GeminiOcrProvider implements OcrProvider {
 
   async extractText(image: ArrayBuffer, mimeType: string): Promise<OcrResult> {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': this.apiKey,
+        },
         body: JSON.stringify({
           contents: [
             {

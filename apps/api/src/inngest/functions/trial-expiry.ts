@@ -29,6 +29,7 @@ import { sendPushNotification } from '../../services/notifications';
 import { findOwnerProfile } from '../../services/profile';
 
 async function sendTrialNotificationToAccountOwner(
+  db: ReturnType<typeof getStepDatabase>,
   accountId: string,
   payload: {
     title: string;
@@ -36,7 +37,6 @@ async function sendTrialNotificationToAccountOwner(
     type: 'trial_expiry';
   }
 ): Promise<{ sent: boolean; reason?: string }> {
-  const db = getStepDatabase();
   const ownerProfile = await findOwnerProfile(db, accountId);
   if (!ownerProfile) {
     return { sent: false, reason: 'no_owner_profile' };
@@ -65,12 +65,16 @@ export const trialExpiry = inngest.createFunction(
 
       let count = 0;
       for (const trial of expiredTrials) {
-        await transitionToExtendedTrial(
-          db,
-          trial.id,
-          EXTENDED_TRIAL_MONTHLY_EQUIVALENT
-        );
-        count++;
+        try {
+          await transitionToExtendedTrial(
+            db,
+            trial.id,
+            EXTENDED_TRIAL_MONTHLY_EQUIVALENT
+          );
+          count++;
+        } catch (err) {
+          console.error(`Failed to transition trial ${trial.id}:`, err);
+        }
       }
 
       return count;
@@ -93,13 +97,17 @@ export const trialExpiry = inngest.createFunction(
         const freeTier = getTierConfig('free');
 
         for (const trial of extendedTrials) {
-          await downgradeQuotaPool(
-            db,
-            trial.id,
-            freeTier.monthlyQuota,
-            freeTier.dailyLimit
-          );
-          count++;
+          try {
+            await downgradeQuotaPool(
+              db,
+              trial.id,
+              freeTier.monthlyQuota,
+              freeTier.dailyLimit
+            );
+            count++;
+          } catch (err) {
+            console.error(`Failed to downgrade trial ${trial.id}:`, err);
+          }
         }
 
         return count;
@@ -133,6 +141,7 @@ export const trialExpiry = inngest.createFunction(
 
         for (const trial of trialsToWarn) {
           const result = await sendTrialNotificationToAccountOwner(
+            db,
             trial.accountId,
             {
               title: 'Trial ending soon',
@@ -176,6 +185,7 @@ export const trialExpiry = inngest.createFunction(
 
           for (const trial of expiredTrials) {
             const result = await sendTrialNotificationToAccountOwner(
+              db,
               trial.accountId,
               {
                 title: 'Your trial has ended',

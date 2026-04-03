@@ -140,7 +140,7 @@ jobs:
 
           native_changed=false
           for pattern in $native_patterns; do
-            if echo "$changed" | grep -q "^${pattern}"; then
+            if echo "$changed" | grep -q "^${pattern}$"; then
               native_changed=true
               echo "Native change detected: $pattern"
             fi
@@ -172,15 +172,15 @@ jobs:
         uses: expo/expo-github-action@v8
         with:
           eas-version: 18.x
-          packager: npm
+          packager: pnpm
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Publish OTA update to preview channel
-        if: steps.mobile-check.outputs.mobile_changed == 'true'
+        if: steps.mobile-check.outputs.mobile_changed == 'true' && steps.native-check.outputs.native_changed != 'true'
         working-directory: apps/mobile
         run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B | head -1)
-          echo "Publishing OTA update: $COMMIT_MSG"
+          COMMIT_MSG=$(git log -1 --pretty=%B | head -1 | tr -cd '[:print:]' | cut -c1-200)
+          printf 'Publishing OTA update: %s\n' "$COMMIT_MSG"
           eas update --branch preview --message "$COMMIT_MSG" --non-interactive
 
       - name: Report native change (full build needed)

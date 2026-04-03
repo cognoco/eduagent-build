@@ -132,7 +132,12 @@ export async function processEvaluateCompletion(
           difficultyRungAfter: newRung,
         },
       })
-      .where(eq(sessionEvents.id, events[0].id));
+      .where(
+        and(
+          eq(sessionEvents.id, events[0].id),
+          eq(sessionEvents.profileId, profileId)
+        )
+      );
   }
 
   return sm2Quality;
@@ -195,7 +200,12 @@ export async function processTeachBackCompletion(
           sm2Quality,
         },
       })
-      .where(eq(sessionEvents.id, events[0].id));
+      .where(
+        and(
+          eq(sessionEvents.id, events[0].id),
+          eq(sessionEvents.profileId, profileId)
+        )
+      );
   }
 
   return sm2Quality;

@@ -443,6 +443,8 @@ export async function expireTrialSubscription(
 
 /**
  * Downgrades a quota pool to the given tier's monthly limit and resets usage.
+ * Idempotent: skips reset if the pool already has the target monthly limit,
+ * preventing Inngest retries from re-zeroing usage counters mid-cycle.
  */
 export async function downgradeQuotaPool(
   db: Database,
@@ -450,6 +452,15 @@ export async function downgradeQuotaPool(
   monthlyLimit: number,
   dailyLimit: number | null = null
 ): Promise<void> {
+  // Only update pools that haven't already been downgraded to this limit.
+  // This prevents retries from resetting usage counters for already-transitioned subscriptions.
+  const currentPool = await db.query.quotaPools.findFirst({
+    where: eq(quotaPools.subscriptionId, subscriptionId),
+  });
+  if (currentPool && currentPool.monthlyLimit === monthlyLimit) {
+    return; // Already at target tier — skip to preserve usage counters
+  }
+
   await db
     .update(quotaPools)
     .set({
@@ -1322,7 +1333,16 @@ export async function removeProfileFromSubscription(
   // destination account can be proven. Until that exists, reject the move
   // instead of trusting a caller-supplied account ID.
   void newAccountId;
-  return null;
+  throw new ProfileRemovalNotImplementedError();
+}
+
+export class ProfileRemovalNotImplementedError extends Error {
+  constructor() {
+    super(
+      'Profile removal requires an invite/claim flow that is not yet implemented'
+    );
+    this.name = 'ProfileRemovalNotImplementedError';
+  }
 }
 
 /**

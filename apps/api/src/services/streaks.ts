@@ -286,7 +286,7 @@ export async function recordSessionActivity(
   db: Database,
   profileId: string,
   today: string
-): Promise<void> {
+): Promise<{ currentStreak: number; longestStreak: number }> {
   const repo = createScopedRepository(db, profileId);
   const streakRow = await repo.streaks.findFirst();
 
@@ -301,7 +301,10 @@ export async function recordSessionActivity(
       lastActivityDate: update.newState.lastActivityDate,
       gracePeriodStartDate: update.newState.gracePeriodStartDate,
     });
-    return;
+    return {
+      currentStreak: update.newState.currentStreak,
+      longestStreak: update.newState.longestStreak,
+    };
   }
 
   const streakState: StreakState = {
@@ -323,4 +326,9 @@ export async function recordSessionActivity(
       updatedAt: new Date(),
     })
     .where(and(eq(streaks.id, streakRow.id), eq(streaks.profileId, profileId)));
+
+  return {
+    currentStreak: update.newState.currentStreak,
+    longestStreak: update.newState.longestStreak,
+  };
 }
