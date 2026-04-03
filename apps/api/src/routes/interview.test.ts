@@ -65,6 +65,17 @@ jest.mock('../services/interview', () => ({
     response: 'Tell me about your experience.',
     isComplete: false,
   }),
+  streamInterviewExchange: jest.fn().mockResolvedValue({
+    stream: (async function* () {
+      yield 'Tell me ';
+      yield 'about your ';
+      yield 'experience.';
+    })(),
+    onComplete: jest.fn().mockResolvedValue({
+      response: 'Tell me about your experience.',
+      isComplete: false,
+    }),
+  }),
   getOrCreateDraft: jest.fn().mockResolvedValue({
     id: 'draft-1',
     profileId: 'test-account-id',
@@ -86,6 +97,7 @@ import { app } from '../index';
 import { getSubject } from '../services/subject';
 import {
   processInterviewExchange,
+  streamInterviewExchange,
   getOrCreateDraft,
   getDraftState,
   updateDraft,
@@ -118,6 +130,18 @@ describe('interview routes', () => {
     (processInterviewExchange as jest.Mock).mockResolvedValue({
       response: 'Tell me about your experience.',
       isComplete: false,
+    });
+
+    (streamInterviewExchange as jest.Mock).mockResolvedValue({
+      stream: (async function* () {
+        yield 'Tell me ';
+        yield 'about your ';
+        yield 'experience.';
+      })(),
+      onComplete: jest.fn().mockResolvedValue({
+        response: 'Tell me about your experience.',
+        isComplete: false,
+      }),
     });
 
     (getOrCreateDraft as jest.Mock).mockResolvedValue({
@@ -312,6 +336,153 @@ describe('interview routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /v1/subjects/:subjectId/interview/stream (SSE)
+  // -------------------------------------------------------------------------
+
+  describe('POST /v1/subjects/:subjectId/interview/stream', () => {
+    it('returns SSE response with chunk and done events', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/interview/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'I want to learn calculus' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toContain('text/event-stream');
+
+      const body = await res.text();
+      expect(body).toContain('"type":"chunk"');
+      expect(body).toContain('"type":"done"');
+    });
+
+    it('calls streamInterviewExchange instead of processInterviewExchange', async () => {
+      await app.request(
+        `/v1/subjects/${SUBJECT_ID}/interview/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV
+      );
+
+      expect(streamInterviewExchange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subjectName: 'Mathematics',
+          exchangeHistory: [],
+        }),
+        'Hello'
+      );
+      // The non-streaming variant should not be called
+      expect(processInterviewExchange).not.toHaveBeenCalled();
+    });
+
+    it('calls updateDraft with exchange history after streaming', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/interview/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'I want to learn calculus' }),
+        },
+        TEST_ENV
+      );
+
+      // Consume the full SSE stream so all side effects complete
+      await res.text();
+
+      expect(updateDraft).toHaveBeenCalledWith(
+        undefined,
+        expect.any(String),
+        'draft-1',
+        expect.objectContaining({
+          exchangeHistory: expect.arrayContaining([
+            { role: 'user', content: 'I want to learn calculus' },
+            {
+              role: 'assistant',
+              content: 'Tell me about your experience.',
+            },
+          ]),
+        })
+      );
+    });
+
+    it('returns 404 when subject not found', async () => {
+      (getSubject as jest.Mock).mockResolvedValue(null);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/interview/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 400 with empty message', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/interview/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: '' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('calls persistCurriculum when interview completes during stream', async () => {
+      (streamInterviewExchange as jest.Mock).mockResolvedValue({
+        stream: (async function* () {
+          yield 'All done!';
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          response: 'All done!',
+          isComplete: true,
+          extractedSignals: {
+            goals: ['learn calculus'],
+            experienceLevel: 'beginner',
+            currentKnowledge: 'algebra',
+          },
+        }),
+      });
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/interview/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'I know algebra' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.text();
+      expect(body).toContain('"isComplete":true');
+
+      expect(updateDraft).toHaveBeenCalledWith(
+        undefined,
+        expect.any(String),
+        'draft-1',
+        expect.objectContaining({ status: 'completed' })
+      );
+      expect(persistCurriculum).toHaveBeenCalled();
     });
   });
 

@@ -1,7 +1,11 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useInterviewState, useSendInterviewMessage } from './use-interview';
+import {
+  useInterviewState,
+  useSendInterviewMessage,
+  useStreamInterviewMessage,
+} from './use-interview';
 
 const mockFetch = jest.fn();
 jest.mock('../lib/api-client', () => ({
@@ -21,6 +25,19 @@ jest.mock('../lib/api-client', () => ({
       },
     });
   },
+}));
+
+jest.mock('@clerk/clerk-expo', () => ({
+  useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
+}));
+
+jest.mock('../lib/api', () => ({
+  getApiUrl: () => 'http://localhost:8787',
+}));
+
+jest.mock('../lib/sse', () => ({
+  parseSSEStream: jest.fn(),
+  streamSSEViaXHR: jest.fn(),
 }));
 
 jest.mock('../lib/profile', () => ({
@@ -200,5 +217,120 @@ describe('useSendInterviewMessage', () => {
     });
 
     expect(result.current.error).toBeInstanceOf(Error);
+  });
+});
+
+describe('useStreamInterviewMessage', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('streams interview message via SSE and calls onChunk/onDone', async () => {
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+
+    streamSSEViaXHR.mockReturnValueOnce({
+      events: (async function* () {
+        yield { type: 'chunk', content: 'Tell ' };
+        yield { type: 'chunk', content: 'me ' };
+        yield { type: 'chunk', content: 'more.' };
+        yield {
+          type: 'done',
+          isComplete: false,
+          exchangeCount: 1,
+        };
+      })(),
+      abort: jest.fn(),
+    });
+
+    const { result } = renderHook(
+      () => useStreamInterviewMessage('subject-1'),
+      {
+        wrapper: createWrapper(),
+      }
+    );
+
+    const onChunk = jest.fn();
+    const onDone = jest.fn();
+
+    await act(async () => {
+      await result.current.stream('Hello', onChunk, onDone);
+    });
+
+    expect(streamSSEViaXHR).toHaveBeenCalled();
+    const [url] = streamSSEViaXHR.mock.calls[0] as [string, ...unknown[]];
+    expect(url).toContain('/subjects/subject-1/interview/stream');
+
+    // onChunk receives accumulated text
+    expect(onChunk).toHaveBeenCalledTimes(3);
+    expect(onChunk).toHaveBeenNthCalledWith(1, 'Tell ');
+    expect(onChunk).toHaveBeenNthCalledWith(2, 'Tell me ');
+    expect(onChunk).toHaveBeenNthCalledWith(3, 'Tell me more.');
+
+    expect(onDone).toHaveBeenCalledWith({
+      isComplete: false,
+      exchangeCount: 1,
+    });
+  });
+
+  it('does not stream when subjectId is empty', async () => {
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+
+    const { result } = renderHook(() => useStreamInterviewMessage(''), {
+      wrapper: createWrapper(),
+    });
+
+    const onChunk = jest.fn();
+    const onDone = jest.fn();
+
+    await act(async () => {
+      await result.current.stream('Hello', onChunk, onDone);
+    });
+
+    expect(streamSSEViaXHR).not.toHaveBeenCalled();
+    expect(onChunk).not.toHaveBeenCalled();
+  });
+
+  it('sends auth headers in the XHR request', async () => {
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+
+    streamSSEViaXHR.mockReturnValueOnce({
+      events: (async function* () {
+        yield { type: 'done', isComplete: false, exchangeCount: 1 };
+      })(),
+      abort: jest.fn(),
+    });
+
+    const { result } = renderHook(
+      () => useStreamInterviewMessage('subject-1'),
+      {
+        wrapper: createWrapper(),
+      }
+    );
+
+    await act(async () => {
+      await result.current.stream('Hi', jest.fn(), jest.fn());
+    });
+
+    const [, options] = streamSSEViaXHR.mock.calls[0] as [
+      string,
+      { headers: Record<string, string>; body: string }
+    ];
+    expect(options.headers['Authorization']).toBe('Bearer test-token');
+    expect(options.headers['X-Profile-Id']).toBe('test-profile-id');
+    expect(options.headers['Content-Type']).toBe('application/json');
+
+    const body = JSON.parse(options.body);
+    expect(body.message).toBe('Hi');
   });
 });

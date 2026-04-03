@@ -72,6 +72,7 @@ interface SkipSummaryResult {
     aiFeedback: string | null;
     status: 'skipped' | 'submitted' | 'accepted';
   };
+  shouldWarnSummarySkip?: boolean;
   shouldPromptCasualSwitch?: boolean;
 }
 
