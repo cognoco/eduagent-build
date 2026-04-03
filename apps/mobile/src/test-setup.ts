@@ -1,3 +1,25 @@
+jest.mock('@expo/vector-icons', () => {
+  const React = require('react');
+  const mockIcon = React.forwardRef(() => null);
+  mockIcon.displayName = 'MockIcon';
+  return {
+    __esModule: true,
+    Ionicons: mockIcon,
+    MaterialIcons: mockIcon,
+    FontAwesome: mockIcon,
+    FontAwesome5: mockIcon,
+    MaterialCommunityIcons: mockIcon,
+    Feather: mockIcon,
+    AntDesign: mockIcon,
+    Entypo: mockIcon,
+    EvilIcons: mockIcon,
+    Foundation: mockIcon,
+    Octicons: mockIcon,
+    SimpleLineIcons: mockIcon,
+    Zocial: mockIcon,
+  };
+});
+
 jest.mock('expo/src/winter/ImportMetaRegistry', () => ({
   ImportMetaRegistry: {
     get url() {

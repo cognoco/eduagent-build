@@ -8,6 +8,8 @@
 
 ## Status Summary
 
+*Last verified against codebase: 2026-04-03*
+
 | Epic / Phase | Status | Scope |
 |------|--------|-------|
 | 0-5 | **COMPLETE** | Foundation, onboarding, learning, retention, progress, billing |
@@ -19,12 +21,12 @@
 | Phase 3 | **COMPLETE** | Homework overhaul (14.9, 14.10, 14.11, 14.12) |
 | Phase 4 | **COMPLETE** | Celebration system + session polish (13.3-13.7) |
 | **11** | **COMPLETE** | Brand identity — all 3 stories verified 2026-04-01 |
-| **12** | **PARTIAL** | Remove persona enum — 12.1 complete, 12.6 compatibility slice in progress |
 | **13** | **COMPLETE** | Session lifecycle — all 7 stories verified 2026-04-01 |
-| **14** | **PARTIAL** | Human agency — 14.2-14.4, 14.9-14.12 done (Phases A+B). Phase C (14.1, 14.5-14.8) not started. |
+| **14** | **COMPLETE** | Human agency — all stories implemented (Phases A+B+C). See Phase 5 notes. |
+| **8** | **NEARLY COMPLETE** | Voice gap closure — 4/5 gaps done on `feat/epic-8-voice-gaps`. Gap 5 (VoiceOver/TalkBack) deferred to v1.1. |
+| **12** | **PARTIAL** | Remove persona enum — 12.1 logic complete (DB migration not run). Consent + Sentry clean. Factory, test-seed, schemas, route merge, home cards NOT done. |
 | **7** | **TODO** | Concept map — advisory prerequisite learning (v1.1) |
-| **8** | **TODO** | Full voice mode (v1.1) |
-| **6** | **TODO** | Language learning — Four Strands (v1.1) |
+| **6** | **TODO** | Language learning — Four Strands (v1.1). Blocked on Epic 8 voice infra (nearly unblocked). |
 
 ---
 
@@ -151,11 +153,25 @@
 
 ---
 
-### Phase 5 — Architecture Refactor (Epic 12)
+### Phase 5 — Architecture Refactor (Epic 12) ⏳ IN PROGRESS
 
 **Goal:** Remove persona concept, merge route groups, build prioritized home cards. The biggest single change.
 
-**Internal ordering:**
+**Current status (verified 2026-04-03):**
+
+| Story | Status | Notes |
+|-------|--------|-------|
+| **12.1** (age voice) | ✅ Logic complete | `exchanges.ts` uses `getAgeVoice(ageBracket)`, zero `personaType` refs. DB migration not yet run (`birthYear` computed at runtime from `birthDate`). |
+| **12.6** (big migration) | ⏳ ~20% done | Consent service + Sentry clean. **Factory, test-seed, schemas still use `personaType`** (~35 files). |
+| **12.3** (theme decoupling) | ❌ Not started | |
+| **12.7** (home cards) | ❌ Not started | |
+| **12.2** (route merge) | ❌ Not started | |
+| **12.5** (routing cleanup) | ❌ Not started | |
+| **12.4** (DB migration) | ❌ Not started | |
+
+**Note:** Story 14.1 (home card dismissal) was listed as depending on 12.7 (home cards), but **14.1 is already implemented** using the existing home card system with SecureStore-based dismissal tracking. When 12.7 ships the new multi-card home, the dismissal logic may need adjustment.
+
+**Internal ordering (unchanged):**
 ```
 12.1 (age voice)         ──┐
 12.3 (theme decoupling)  ──┤── parallel
@@ -164,11 +180,11 @@
                             └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Story 12.6 is the heaviest story in the entire epic.** It now covers FR206.1-206.8:
+**Story 12.6 remaining work (FR206.1-206.8):**
 1. **Test factory + test-seed** (FR206.8) — DO FIRST. `buildProfile()` default + 28 test-seed refs. Broken factory = ~1,443 broken tests.
-2. **Consent service + middleware** (FR206.7) — `checkConsentRequired(birthDate)` → `birthYear`. `ProfileMeta` interface change. GDPR-critical.
+2. ~~Consent service + middleware (FR206.7)~~ — ✅ Already clean (`checkConsentRequired(birthYear)` in place).
 3. **Consent-web deep links** (FR206.6) — `mentomate://parent/dashboard` → post-merge route. Server-rendered HTML, not mobile router calls.
-4. **Sentry age-gating** (FR206.5) — `evaluateSentryForProfile(birthDate)` → `birthYear`. Apple compliance function.
+4. ~~Sentry age-gating (FR206.5)~~ — ✅ Already clean (no `personaType` refs in Sentry).
 5. **Sentry tags, Inngest payloads, RevenueCat metadata** (FR206.1-206.3)
 6. **Home card tap event type** (FR206.4)
 7. **Full grep audit** — zero `personaType` and zero `birthDate` hits in source code.
@@ -178,29 +194,25 @@
 - FR203.5 (2-release backwards-compat window): **SKIPPED** — just remove `personaType`
 - FR203.2 (data migration from `birthDate`): **SKIPPED** — fresh schema, seed data updated directly
 
-**Then immediately after 12.7:**
-| Item | What | Depends on |
-|------|------|------------|
-| **Story 14.1** | Home card dismissal — × button, dismissal tracking feeds ranking algorithm | 12.7 (home cards) |
-
 **Exit criteria:** No persona concept in codebase. Single `(app)/` route group. Home screen shows 2-3 ranked intent cards. All ~1,443 API tests + ~404 mobile tests pass. Consent pipeline works with `birthYear`.
 
 ---
 
-### Phase 6 — New Feature Systems
+### Phase 6 — New Feature Systems ⏳ PARTIALLY COMPLETE
 
 **Goal:** Add prerequisite graph, full voice mode, and session agency features on the clean architecture.
 
-| Item | What | Depends on | Parallelizable? |
-|------|------|------------|-----------------|
-| **Epic 7** (all stories) | Concept map — advisory prerequisite DAG, graph-aware coaching, visual map | 13.7 (celebrations for topic unlock) | Yes — independent of Epic 8 |
-| **Epic 8** (all stories) | Full voice mode — voice-first for all session types, TTS playback, controls | Epic 3 Cluster G / Feynman (done) | Yes — independent of Epic 7 |
-| **Story 14.5** | Per-message feedback ("Not helpful" / "That's incorrect") | Independent | |
-| **Story 14.6** | Quick-action chips ("I know this", "Explain differently", "Too easy/hard") | 14.5 | |
-| **Story 14.7** | Topic switch mid-session | Independent | |
-| **Story 14.8** | Escalation visibility + difficulty nudge | 14.6 | |
+| Item | What | Status | Notes |
+|------|------|--------|-------|
+| **Epic 8** (voice gaps) | Voice-first session mode, TTS pause/resume, haptics | ✅ **NEARLY COMPLETE** | 4/5 gaps done on `feat/epic-8-voice-gaps`. Gap 5 (VoiceOver/TalkBack) deferred v1.1. Needs merge to main. |
+| **Story 14.1** | Home card dismissal (× button, tracking) | ✅ **DONE** | SecureStore-based dismissal, per-profile tracking, 3-card limit |
+| **Story 14.5** | Per-message feedback ("Not helpful" / "That's incorrect") | ✅ **DONE** | 3-button feedback UI, event tracking, adaptive system prompt injection |
+| **Story 14.6** | Quick-action chips (9 chip types) | ✅ **DONE** | "I know this", "Explain differently", "Too easy/hard", etc. Contextual display. |
+| **Story 14.7** | Topic switch mid-session | ✅ **DONE** | Switch topic chip + toolbar button + topic switcher modal |
+| **Story 14.8** | Escalation visibility + difficulty nudge | ✅ **DONE** | Agency badge ("Guided"/"Independent"), difficulty via too_easy/too_hard chips |
+| **Epic 7** (all stories) | Concept map — advisory prerequisite DAG, graph-aware coaching, visual map | ❌ **NOT STARTED** | Depends on 13.7 (done). No code exists. |
 
-**Exit criteria:** Concept map renders with retention-colored nodes. Voice mode works for all session types. Students can give per-message feedback and control difficulty.
+**Remaining exit criteria:** Merge Epic 8 branch. Epic 7: concept map renders with retention-colored nodes.
 
 ---
 
@@ -235,12 +247,12 @@ These files are modified by 2+ phases. Agents working on these must read the cur
 
 ## Key Constraints
 
-1. **Story 13.2 before Story 12.1** — both modify `SessionTimerConfig`. 13.2 removes caps; if done first, 12.1's timer work is a no-op.
-2. **Story 12.6 FR206.8 (factory) before any other 12.x test updates** — broken factory breaks ~1,443 tests.
-3. **Story 12.7 before 14.1** — card dismissal needs the multi-card home screen to exist.
-4. **Story 13.7 before Epic 7 Story 7.5** — topic unlock celebration uses `queueCelebration()`.
-5. **Epic 8.1-8.2 before Epic 6 SPEAK/LISTEN** — voice infrastructure required.
-6. **No parallel agents on the same hotspot file** — sequential execution for session screen, Inngest chain, and home screen work.
+1. ~~Story 13.2 before Story 12.1~~ — ✅ Both done (13.2 complete, 12.1 logic complete).
+2. **Story 12.6 FR206.8 (factory) before any other 12.x test updates** — broken factory breaks ~1,443 tests. Still applies.
+3. ~~Story 12.7 before 14.1~~ — ⚠️ 14.1 was implemented ahead of 12.7 using existing home card system. May need adjustment when 12.7 ships multi-card home.
+4. ~~Story 13.7 before Epic 7 Story 7.5~~ — ✅ 13.7 done. Epic 7 is unblocked.
+5. ~~Epic 8.1-8.2 before Epic 6 SPEAK/LISTEN~~ — ✅ Epic 8 voice infra nearly complete. Epic 6 is unblocked once Epic 8 branch merges.
+6. **No parallel agents on the same hotspot file** — sequential execution for session screen, Inngest chain, and home screen work. Still applies.
 
 ---
 
