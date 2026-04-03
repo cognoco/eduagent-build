@@ -143,14 +143,16 @@ export function createScopedRepository(db: Database, profileId: string) {
     },
 
     onboardingDrafts: {
-      async findMany(extraWhere?: SQL) {
+      async findMany(extraWhere?: SQL, orderBy?: SQL) {
         return db.query.onboardingDrafts.findMany({
           where: scopedWhere(onboardingDrafts, extraWhere),
+          ...(orderBy ? { orderBy } : {}),
         });
       },
-      async findFirst(extraWhere?: SQL) {
+      async findFirst(extraWhere?: SQL, orderBy?: SQL) {
         return db.query.onboardingDrafts.findFirst({
           where: scopedWhere(onboardingDrafts, extraWhere),
+          ...(orderBy ? { orderBy } : {}),
         });
       },
     },

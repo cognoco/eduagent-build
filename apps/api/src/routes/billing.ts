@@ -553,8 +553,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         if (err instanceof ProfileRemovalNotImplementedError) {
           return apiError(
             c,
-            501,
-            ERROR_CODES.INTERNAL_ERROR,
+            422,
+            ERROR_CODES.NOT_IMPLEMENTED,
             'Profile removal is not yet implemented. An invite/claim flow is required.'
           );
         }

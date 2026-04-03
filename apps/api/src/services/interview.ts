@@ -3,6 +3,7 @@ import {
   onboardingDrafts,
   curricula,
   curriculumTopics,
+  createScopedRepository,
   type Database,
 } from '@eduagent/database';
 import { routeAndCall, type ChatMessage } from './llm';
@@ -52,13 +53,11 @@ async function loadLatestDraftRow(
   profileId: string,
   subjectId: string
 ): Promise<typeof onboardingDrafts.$inferSelect | undefined> {
-  return db.query.onboardingDrafts.findFirst({
-    where: and(
-      eq(onboardingDrafts.profileId, profileId),
-      eq(onboardingDrafts.subjectId, subjectId)
-    ),
-    orderBy: desc(onboardingDrafts.updatedAt),
-  });
+  const repo = createScopedRepository(db, profileId);
+  return repo.onboardingDrafts.findFirst(
+    eq(onboardingDrafts.subjectId, subjectId),
+    desc(onboardingDrafts.updatedAt)
+  );
 }
 
 function isDraftExpired(row: typeof onboardingDrafts.$inferSelect): boolean {
@@ -69,10 +68,9 @@ function isDraftExpired(row: typeof onboardingDrafts.$inferSelect): boolean {
   );
 }
 
-export function buildDraftResumeSummary(draft: Pick<
-  OnboardingDraft,
-  'exchangeHistory' | 'extractedSignals'
->): string {
+export function buildDraftResumeSummary(
+  draft: Pick<OnboardingDraft, 'exchangeHistory' | 'extractedSignals'>
+): string {
   const signals = draft.extractedSignals as {
     goals?: unknown;
     experienceLevel?: unknown;

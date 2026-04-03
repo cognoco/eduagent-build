@@ -17,6 +17,7 @@ export const ERROR_CODES = {
   SUBJECT_INACTIVE: 'SUBJECT_INACTIVE',
   CONFLICT: 'CONFLICT',
   GONE: 'GONE',
+  NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

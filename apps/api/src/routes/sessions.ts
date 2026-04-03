@@ -451,13 +451,13 @@ async function dispatchSessionCompletedEvent(
     summaryTrackingHandled?: boolean;
   }
 ): Promise<void> {
-  const completion = await getSessionCompletionContext(
-    db,
-    profileId,
-    sessionId
-  );
-
   try {
+    const completion = await getSessionCompletionContext(
+      db,
+      profileId,
+      sessionId
+    );
+
     await inngest.send({
       name: 'app/session.completed',
       data: {
