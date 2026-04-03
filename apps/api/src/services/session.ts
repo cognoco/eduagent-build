@@ -25,6 +25,7 @@ import type {
   HomeworkStateSyncInput,
   HomeworkSessionMetadata,
   SessionMetadata,
+  SessionAnalyticsEventInput,
 } from '@eduagent/schemas';
 import { birthYearFromDateLike } from '@eduagent/schemas';
 import {
@@ -170,6 +171,52 @@ async function findSessionSummaryRow(
   return repo.sessionSummaries.findFirst(
     eq(sessionSummaries.sessionId, sessionId)
   );
+}
+
+type RecordableSessionEventType =
+  | 'system_prompt'
+  | 'quick_action'
+  | 'user_feedback'
+  | 'flag';
+
+async function insertSessionEvent(
+  db: Database,
+  session: LearningSession,
+  profileId: string,
+  input: {
+    sessionId: string;
+    eventType: RecordableSessionEventType;
+    content: string;
+    metadata?: Record<string, unknown>;
+    touchSession?: boolean;
+  }
+): Promise<void> {
+  await db.insert(sessionEvents).values({
+    sessionId: input.sessionId,
+    profileId,
+    subjectId: session.subjectId,
+    topicId: session.topicId,
+    eventType: input.eventType,
+    content: input.content,
+    metadata: input.metadata ?? {},
+  });
+
+  if (!input.touchSession) {
+    return;
+  }
+
+  await db
+    .update(learningSessions)
+    .set({
+      lastActivityAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, input.sessionId),
+        eq(learningSessions.profileId, profileId)
+      )
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -923,7 +970,9 @@ export async function closeSession(
   };
 }
 
-function collectEscalationRungs(events: Array<TimedEvent>): number[] | undefined {
+function collectEscalationRungs(
+  events: Array<TimedEvent>
+): number[] | undefined {
   const rungs = Array.from(
     new Set(
       events
@@ -1182,28 +1231,33 @@ export async function recordSystemPrompt(
     throw new Error('Session not found');
   }
 
-  await db.insert(sessionEvents).values({
+  await insertSessionEvent(db, session, profileId, {
     sessionId,
-    profileId,
-    subjectId: session.subjectId,
-    topicId: session.topicId,
     eventType: 'system_prompt',
     content,
-    metadata: metadata ?? {},
+    metadata,
+    touchSession: true,
   });
+}
 
-  await db
-    .update(learningSessions)
-    .set({
-      lastActivityAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
-      )
-    );
+export async function recordSessionEvent(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  input: SessionAnalyticsEventInput
+): Promise<void> {
+  const session = await getSession(db, profileId, sessionId);
+  if (!session) {
+    throw new Error('Session not found');
+  }
+
+  await insertSessionEvent(db, session, profileId, {
+    sessionId,
+    eventType: input.eventType,
+    content: input.content ?? '',
+    metadata: input.metadata,
+    touchSession: true,
+  });
 }
 
 type HomeworkTrackingMetadata = SessionMetadata & {
@@ -1363,11 +1417,8 @@ export async function flagContent(
     throw new Error('Session not found');
   }
 
-  await db.insert(sessionEvents).values({
+  await insertSessionEvent(db, session, profileId, {
     sessionId,
-    profileId,
-    subjectId: session.subjectId,
-    topicId: session.topicId,
     eventType: 'flag',
     content: 'Content flagged',
     metadata: {

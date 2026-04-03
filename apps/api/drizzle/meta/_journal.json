@@ -36,6 +36,13 @@
       "when": 1774988278976,
       "tag": "0004_uneven_mandroid",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1775168032383,
+      "tag": "0005_open_spiral",
+      "breakpoints": true
     }
   ]
 }

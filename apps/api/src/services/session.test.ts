@@ -68,6 +68,7 @@ import {
   closeSession,
   syncHomeworkState,
   flagContent,
+  recordSessionEvent,
   getSessionTranscript,
   getSessionSummary,
   skipSummary,
@@ -1577,6 +1578,21 @@ describe('flagContent', () => {
     });
 
     expect(result.message).toBe('Content flagged for review. Thank you!');
+  });
+});
+
+describe('recordSessionEvent', () => {
+  it('stores first-class quick-action analytics without failing the session flow', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    const db = createMockDb();
+
+    await expect(
+      recordSessionEvent(db, profileId, sessionId, {
+        eventType: 'quick_action',
+        content: 'too_easy',
+        metadata: { chip: 'too_easy' },
+      })
+    ).resolves.toBeUndefined();
   });
 });
 

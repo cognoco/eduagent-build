@@ -269,12 +269,12 @@ export async function getChildrenForParent(
       (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
     ).length;
 
-    // 5. Sum display duration for time tracking (seconds -> minutes)
-    // Prefer active time (gap-capped, FR210) with wall-clock fallback for legacy sessions.
+    // 5. Sum user-facing duration for time tracking (seconds -> minutes)
+    // Prefer wall-clock time with active-time fallback for legacy sessions.
     const getDisplaySeconds = (session: {
       wallClockSeconds: number | null;
       durationSeconds: number | null;
-    }): number => session.durationSeconds ?? session.wallClockSeconds ?? 0;
+    }): number => session.wallClockSeconds ?? session.durationSeconds ?? 0;
 
     const totalTimeThisWeek = recentSessions
       .filter((s) => s.startedAt >= startOfThisWeek)

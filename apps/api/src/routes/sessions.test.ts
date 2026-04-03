@@ -197,6 +197,7 @@ jest.mock('../services/session', () => {
       ],
     }),
     recordSystemPrompt: jest.fn().mockResolvedValue(undefined),
+    recordSessionEvent: jest.fn().mockResolvedValue(undefined),
     flagContent: jest.fn().mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
     }),
@@ -298,6 +299,7 @@ import {
   streamMessage,
   getSessionTranscript,
   recordSystemPrompt,
+  recordSessionEvent,
 } from '../services/session';
 import { shouldPromptCasualSwitch } from '../services/settings';
 import { app } from '../index';
@@ -497,6 +499,36 @@ describe('session routes', () => {
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ ok: true });
       expect(recordSystemPrompt).toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /v1/sessions/:sessionId/events', () => {
+    it('records a session analytics event', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/events`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            eventType: 'quick_action',
+            content: 'too_easy',
+            metadata: { chip: 'too_easy' },
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ok: true });
+      expect(recordSessionEvent).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(String),
+        SESSION_ID,
+        expect.objectContaining({
+          eventType: 'quick_action',
+          content: 'too_easy',
+        })
+      );
     });
   });
 

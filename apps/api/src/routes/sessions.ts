@@ -5,6 +5,7 @@ import {
   sessionMessageSchema,
   sessionCloseSchema,
   contentFlagSchema,
+  sessionAnalyticsEventSchema,
   summarySubmitSchema,
   interleavedSessionStartSchema,
   homeworkStateSyncSchema,
@@ -29,6 +30,7 @@ import {
   getSessionCompletionContext,
   getSessionTranscript,
   recordSystemPrompt,
+  recordSessionEvent,
   skipSummary,
   submitSummary,
   syncHomeworkState,
@@ -203,7 +205,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       );
 
       const shouldDispatchCompletionEvent =
-        result.summaryStatus !== 'pending' && result.summaryStatus !== 'submitted';
+        result.summaryStatus !== 'pending' &&
+        result.summaryStatus !== 'submitted';
       if (shouldDispatchCompletionEvent) {
         await dispatchSessionCompletedEvent(db, profileId, result.sessionId, {
           summaryStatus: result.summaryStatus,
@@ -237,6 +240,20 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         body.content,
         body.metadata
       );
+      return c.json({ ok: true });
+    }
+  )
+
+  .post(
+    '/sessions/:sessionId/events',
+    zValidator('json', sessionAnalyticsEventSchema),
+    async (c) => {
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
+      const body = c.req.valid('json');
+
+      await recordSessionEvent(db, profileId, c.req.param('sessionId'), body);
       return c.json({ ok: true });
     }
   )
@@ -307,10 +324,15 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       previousSummary.status === 'pending' ||
       previousSummary.status === 'auto_closed'
     ) {
-      await dispatchSessionCompletedEvent(db, profileId, c.req.param('sessionId'), {
-        summaryStatus: result.summary.status,
-        summaryTrackingHandled: true,
-      });
+      await dispatchSessionCompletedEvent(
+        db,
+        profileId,
+        c.req.param('sessionId'),
+        {
+          summaryStatus: result.summary.status,
+          summaryTrackingHandled: true,
+        }
+      );
     }
     const promptCasualSwitch = await shouldPromptCasualSwitch(db, profileId);
     return c.json({
@@ -349,7 +371,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           c.req.param('sessionId'),
           {
             summaryStatus: result.summary.status,
-            qualityRating: qualityRatingFromSummaryStatus(result.summary.status),
+            qualityRating: qualityRatingFromSummaryStatus(
+              result.summary.status
+            ),
             summaryTrackingHandled: true,
           }
         );
@@ -427,7 +451,11 @@ async function dispatchSessionCompletedEvent(
     summaryTrackingHandled?: boolean;
   }
 ): Promise<void> {
-  const completion = await getSessionCompletionContext(db, profileId, sessionId);
+  const completion = await getSessionCompletionContext(
+    db,
+    profileId,
+    sessionId
+  );
 
   try {
     await inngest.send({

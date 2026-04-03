@@ -29,6 +29,7 @@ import {
   useCloseSession,
   useSessionTranscript,
   useRecordSystemPrompt,
+  useRecordSessionEvent,
   useFlagSessionContent,
   useParkingLot,
   useAddParkingLotItem,
@@ -50,6 +51,7 @@ import {
 } from '../../../hooks/use-milestone-tracker';
 import { useApiClient } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
+import { useProfile } from '../../../lib/profile';
 import {
   clearSessionRecoveryMarker,
   readSessionRecoveryMarker,
@@ -197,6 +199,7 @@ export default function SessionScreen() {
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { activeProfile } = useProfile();
 
   const effectiveMode = mode ?? 'freeform';
   const initialHomeworkProblems = useMemo(
@@ -277,9 +280,11 @@ export default function SessionScreen() {
   const hasAutoSentRef = useRef(false);
   const hasHydratedRecoveryRef = useRef(false);
   const queuedProblemTextRef = useRef<string | null>(null);
+  const localMessageIdRef = useRef(0);
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
   const recordSystemPrompt = useRecordSystemPrompt(activeSessionId ?? '');
+  const recordSessionEvent = useRecordSessionEvent(activeSessionId ?? '');
   const flagSessionContent = useFlagSessionContent(activeSessionId ?? '');
   const parkingLot = useParkingLot(activeSessionId ?? '');
   const addParkingLotItem = useAddParkingLotItem(activeSessionId ?? '');
@@ -382,6 +387,11 @@ export default function SessionScreen() {
     setConfirmationToast(message);
   }, []);
 
+  const createLocalMessageId = useCallback((prefix: 'user' | 'ai') => {
+    localMessageIdRef.current += 1;
+    return `${prefix}-${Date.now()}-${localMessageIdRef.current}`;
+  }, []);
+
   const syncHomeworkMetadata = useCallback(
     async (
       targetSessionId: string,
@@ -452,7 +462,7 @@ export default function SessionScreen() {
     let cancelled = false;
 
     void (async () => {
-      const marker = await readSessionRecoveryMarker();
+      const marker = await readSessionRecoveryMarker(activeProfile?.id);
       if (cancelled || hasHydratedRecoveryRef.current) return;
 
       if (marker?.sessionId === routeSessionId && marker.milestoneTracker) {
@@ -474,7 +484,12 @@ export default function SessionScreen() {
     return () => {
       cancelled = true;
     };
-  }, [hydrate, routeSessionId, transcript.data?.session.milestonesReached]);
+  }, [
+    activeProfile?.id,
+    hydrate,
+    routeSessionId,
+    transcript.data?.session.milestonesReached,
+  ]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
@@ -482,21 +497,26 @@ export default function SessionScreen() {
         (nextState === 'background' || nextState === 'inactive') &&
         activeSessionId
       ) {
-        void writeSessionRecoveryMarker({
-          sessionId: activeSessionId,
-          subjectId: effectiveSubjectId || undefined,
-          subjectName: effectiveSubjectName || undefined,
-          topicId: topicId ?? undefined,
-          mode: effectiveMode,
-          milestoneTracker: trackerState,
-          updatedAt: new Date().toISOString(),
-        });
+        void writeSessionRecoveryMarker(
+          {
+            sessionId: activeSessionId,
+            profileId: activeProfile?.id ?? undefined,
+            subjectId: effectiveSubjectId || undefined,
+            subjectName: effectiveSubjectName || undefined,
+            topicId: topicId ?? undefined,
+            mode: effectiveMode,
+            milestoneTracker: trackerState,
+            updatedAt: new Date().toISOString(),
+          },
+          activeProfile?.id
+        );
       }
     });
 
     return () => subscription.remove();
   }, [
     activeSessionId,
+    activeProfile?.id,
     effectiveMode,
     effectiveSubjectId,
     effectiveSubjectName,
@@ -545,18 +565,23 @@ export default function SessionScreen() {
           // Best effort only.
         }
 
-        await writeSessionRecoveryMarker({
-          sessionId: sessionIdToUse,
-          subjectId: effectiveSubjectId || undefined,
-          subjectName: effectiveSubjectName || undefined,
-          topicId: topicId ?? undefined,
-          mode: effectiveMode,
-          milestoneTracker: trackerState,
-          updatedAt: new Date().toISOString(),
-        });
+        await writeSessionRecoveryMarker(
+          {
+            sessionId: sessionIdToUse,
+            profileId: activeProfile?.id ?? undefined,
+            subjectId: effectiveSubjectId || undefined,
+            subjectName: effectiveSubjectName || undefined,
+            topicId: topicId ?? undefined,
+            mode: effectiveMode,
+            milestoneTracker: trackerState,
+            updatedAt: new Date().toISOString(),
+          },
+          activeProfile?.id
+        );
       }, thresholdMinutes * 60 * 1000);
     },
     [
+      activeProfile?.id,
       draftText,
       effectiveMode,
       effectiveSubjectId,
@@ -646,6 +671,7 @@ export default function SessionScreen() {
     },
     [
       activeSessionId,
+      activeProfile?.id,
       effectiveSubjectId,
       topicId,
       effectiveMode,
@@ -664,7 +690,7 @@ export default function SessionScreen() {
 
       setMessages((prev) => [
         ...prev,
-        { id: `user-${Date.now()}`, role: 'user', content: text },
+        { id: createLocalMessageId('user'), role: 'user', content: text },
       ]);
       setResumedBanner(false);
 
@@ -734,15 +760,19 @@ export default function SessionScreen() {
           return;
         }
 
-        await writeSessionRecoveryMarker({
-          sessionId: sid,
-          subjectId: (sessionSubjectId ?? effectiveSubjectId) || undefined,
-          subjectName: effectiveSubjectName || undefined,
-          topicId: topicId ?? undefined,
-          mode: effectiveMode,
-          milestoneTracker: trackerState,
-          updatedAt: new Date().toISOString(),
-        });
+        await writeSessionRecoveryMarker(
+          {
+            sessionId: sid,
+            profileId: activeProfile?.id ?? undefined,
+            subjectId: (sessionSubjectId ?? effectiveSubjectId) || undefined,
+            subjectName: effectiveSubjectName || undefined,
+            topicId: topicId ?? undefined,
+            mode: effectiveMode,
+            milestoneTracker: trackerState,
+            updatedAt: new Date().toISOString(),
+          },
+          activeProfile?.id
+        );
 
         if (effectiveMode === 'homework' && updatedProblems.length > 0) {
           try {
@@ -756,7 +786,7 @@ export default function SessionScreen() {
           }
         }
 
-        const streamId = `ai-${Date.now()}`;
+        const streamId = createLocalMessageId('ai');
         const previousAiAt = lastAiAtRef.current;
         setMessages((prev) => [
           ...prev,
@@ -817,15 +847,20 @@ export default function SessionScreen() {
             lastExpectedMinutesRef.current = expectedResponseMinutes;
             lastAiAtRef.current = Date.now();
             scheduleSilencePrompt(sid, expectedResponseMinutes);
-            await writeSessionRecoveryMarker({
-              sessionId: sid,
-              subjectId: (sessionSubjectId ?? effectiveSubjectId) || undefined,
-              subjectName: effectiveSubjectName || undefined,
-              topicId: topicId ?? undefined,
-              mode: effectiveMode,
-              milestoneTracker: nextTrackerState,
-              updatedAt: new Date().toISOString(),
-            });
+            await writeSessionRecoveryMarker(
+              {
+                sessionId: sid,
+                profileId: activeProfile?.id ?? undefined,
+                subjectId:
+                  (sessionSubjectId ?? effectiveSubjectId) || undefined,
+                subjectName: effectiveSubjectName || undefined,
+                topicId: topicId ?? undefined,
+                mode: effectiveMode,
+                milestoneTracker: nextTrackerState,
+                updatedAt: new Date().toISOString(),
+              },
+              activeProfile?.id
+            );
           },
           sid,
           effectiveMode === 'homework' && homeworkMode
@@ -843,6 +878,7 @@ export default function SessionScreen() {
     [
       isStreaming,
       pendingClassification,
+      createLocalMessageId,
       subjectId,
       classifiedSubject,
       messages.length,
@@ -858,6 +894,7 @@ export default function SessionScreen() {
       currentProblemIndex,
       syncHomeworkMetadata,
       scheduleSilencePrompt,
+      activeProfile?.id,
       trackerState,
       topicId,
       trackExchange,
@@ -981,7 +1018,7 @@ export default function SessionScreen() {
               milestonesReached,
             });
             const fastCelebrations = await fetchFastCelebrations();
-            await clearSessionRecoveryMarker();
+            await clearSessionRecoveryMarker(activeProfile?.id);
             router.replace({
               pathname: `/session-summary/${activeSessionId}`,
               params: {
@@ -1013,11 +1050,21 @@ export default function SessionScreen() {
     exchangeCount,
     escalationRung,
     fetchFastCelebrations,
+    activeProfile?.id,
     milestonesReached,
   ]);
 
   const handleQuickChip = useCallback(
     async (chip: QuickChipId, sourceMessageId?: string) => {
+      if (
+        isStreaming &&
+        chip !== 'switch_topic' &&
+        chip !== 'park' &&
+        chip !== 'wrong_subject'
+      ) {
+        return;
+      }
+
       if (chip === 'wrong_subject') {
         setShowTopicSwitcher(true);
         return;
@@ -1054,6 +1101,19 @@ export default function SessionScreen() {
 
       if (activeSessionId) {
         try {
+          await recordSessionEvent.mutateAsync({
+            eventType: 'quick_action',
+            content: chip,
+            metadata: {
+              chip,
+              ...(sourceMessageId ? { sourceMessageId } : {}),
+            },
+          });
+        } catch {
+          // Best effort only. The visible prompt still continues below.
+        }
+
+        try {
           await recordSystemPrompt.mutateAsync({
             content: config.systemPrompt,
             metadata: { type: 'quick_chip', chip },
@@ -1074,12 +1134,19 @@ export default function SessionScreen() {
 
       await handleSend(config.prompt);
     },
-    [activeSessionId, handleSend, recordSystemPrompt, showConfirmation]
+    [
+      activeSessionId,
+      handleSend,
+      isStreaming,
+      recordSessionEvent,
+      recordSystemPrompt,
+      showConfirmation,
+    ]
   );
 
   const handleMessageFeedback = useCallback(
     async (message: ChatMessage, action: MessageFeedbackState) => {
-      if (!message.eventId || !activeSessionId) return;
+      if (!message.eventId || !activeSessionId || isStreaming) return;
 
       const systemPromptByAction: Record<MessageFeedbackState, string> = {
         helpful:
@@ -1098,6 +1165,19 @@ export default function SessionScreen() {
       };
 
       try {
+        try {
+          await recordSessionEvent.mutateAsync({
+            eventType: 'user_feedback',
+            content: action,
+            metadata: {
+              value: action,
+              eventId: message.eventId,
+            },
+          });
+        } catch {
+          // Best effort only. We still want the visible correction flow.
+        }
+
         if (action === 'incorrect') {
           await flagSessionContent.mutateAsync({
             eventId: message.eventId,
@@ -1134,6 +1214,8 @@ export default function SessionScreen() {
       activeSessionId,
       flagSessionContent,
       handleSend,
+      isStreaming,
+      recordSessionEvent,
       recordSystemPrompt,
       showConfirmation,
     ]
@@ -1171,7 +1253,7 @@ export default function SessionScreen() {
             reason: 'user_ended',
             summaryStatus: 'skipped',
           });
-          await clearSessionRecoveryMarker();
+          await clearSessionRecoveryMarker(activeProfile?.id);
         }
 
         setShowWrongSubjectChip(false);
@@ -1189,7 +1271,7 @@ export default function SessionScreen() {
         Alert.alert('Could not switch topic', formatApiError(err));
       }
     },
-    [activeSessionId, closeSession, effectiveMode, router]
+    [activeProfile?.id, activeSessionId, closeSession, effectiveMode, router]
   );
 
   const showEndSession = exchangeCount > 0;
@@ -1202,8 +1284,8 @@ export default function SessionScreen() {
     () =>
       [...messages]
         .reverse()
-        .find((message) => message.role === 'ai' && !message.streaming)
-        ?.id ?? null,
+        .find((message) => message.role === 'ai' && !message.streaming)?.id ??
+      null,
     [messages]
   );
 
@@ -1280,9 +1362,13 @@ export default function SessionScreen() {
           <Pressable
             key={chip.id}
             onPress={() => void handleQuickChip(chip.id)}
-            className="rounded-full bg-surface-elevated px-4 py-2"
+            disabled={isStreaming}
+            className={`rounded-full px-4 py-2 ${
+              isStreaming ? 'bg-surface' : 'bg-surface-elevated'
+            }`}
             accessibilityRole="button"
             accessibilityLabel={chip.label}
+            accessibilityState={{ disabled: isStreaming }}
             testID={`quick-chip-${chip.id}`}
           >
             <Text className="text-body-sm font-semibold text-text-primary">
@@ -1385,6 +1471,10 @@ export default function SessionScreen() {
       return null;
     }
 
+    if (isStreaming) {
+      return null;
+    }
+
     const feedbackState = messageFeedback[message.id];
     const feedbackTestIdSuffix = message.eventId ?? message.id;
     const contextualQuickChips =
@@ -1419,6 +1509,7 @@ export default function SessionScreen() {
                 <Pressable
                   key={`${message.id}-${chip.id}`}
                   onPress={() => void handleQuickChip(chip.id, message.id)}
+                  disabled={isStreaming}
                   className="rounded-full bg-surface-elevated px-3 py-1.5"
                   testID={`quick-chip-${chip.id}`}
                 >
@@ -1434,7 +1525,7 @@ export default function SessionScreen() {
           <View className="flex-row flex-wrap gap-2">
             <Pressable
               onPress={() => void handleMessageFeedback(message, 'helpful')}
-              disabled={feedbackState === 'incorrect'}
+              disabled={feedbackState === 'incorrect' || isStreaming}
               className={
                 feedbackState === 'helpful'
                   ? 'rounded-full bg-primary/15 px-3 py-1.5'
@@ -1454,7 +1545,7 @@ export default function SessionScreen() {
             </Pressable>
             <Pressable
               onPress={() => void handleMessageFeedback(message, 'not_helpful')}
-              disabled={feedbackState === 'incorrect'}
+              disabled={feedbackState === 'incorrect' || isStreaming}
               className={
                 feedbackState === 'not_helpful'
                   ? 'rounded-full bg-warning/15 px-3 py-1.5'
@@ -1474,6 +1565,7 @@ export default function SessionScreen() {
             </Pressable>
             <Pressable
               onPress={() => void handleMessageFeedback(message, 'incorrect')}
+              disabled={isStreaming}
               className={
                 feedbackState === 'incorrect'
                   ? 'rounded-full bg-danger/15 px-3 py-1.5'

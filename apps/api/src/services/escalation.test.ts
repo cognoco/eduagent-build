@@ -210,23 +210,25 @@ describe('getEscalationPromptGuidance', () => {
     expect(guidance).toContain('last step');
   });
 
-  it('adds homework guard for homework sessions', () => {
+  it('keeps rung guidance available for homework sessions', () => {
     const guidance = getEscalationPromptGuidance(1, 'homework');
 
-    expect(guidance).toContain('homework session');
-    expect(guidance).toContain('NEVER give the answer directly');
+    expect(guidance).toContain('Socratic');
+    expect(guidance).toContain('Rung 1');
   });
 
-  it('does not add homework guard for learning sessions', () => {
+  it('returns the same rung guidance shape for learning sessions', () => {
     const guidance = getEscalationPromptGuidance(1, 'learning');
 
-    expect(guidance).not.toContain('homework session');
+    expect(guidance).toContain('Socratic');
   });
 
-  it('includes homework guard at every rung for homework sessions', () => {
+  it('does not inject the retired homework-only guard at any rung', () => {
     for (const rung of [1, 2, 3, 4, 5] as const) {
       const guidance = getEscalationPromptGuidance(rung, 'homework');
-      expect(guidance).toContain('NEVER give the answer directly');
+      expect(guidance).not.toContain('homework session');
+      expect(guidance).not.toContain('NEVER give the answer directly');
+      expect(guidance).not.toContain('Use only Socratic questioning');
     }
   });
 

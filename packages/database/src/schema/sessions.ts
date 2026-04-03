@@ -23,6 +23,8 @@ export const sessionEventTypeEnum = pgEnum('session_event_type', [
   'user_message',
   'ai_response',
   'system_prompt',
+  'quick_action',
+  'user_feedback',
   'ocr_correction',
   'understanding_check',
   'session_start',

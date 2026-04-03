@@ -15,6 +15,7 @@ import type {
   ParkingLotItem,
   SessionMessageInput,
   SessionMetadata,
+  SessionAnalyticsEventInput,
   SessionSummary,
   SessionTranscript,
 } from '@eduagent/schemas';
@@ -338,6 +339,26 @@ export function useRecordSystemPrompt(
       const res = await systemPromptClient.$post({
         param: { sessionId },
         json: { content, metadata },
+      });
+      await assertOk(res);
+      return (await res.json()) as { ok: boolean };
+    },
+  });
+}
+
+export function useRecordSessionEvent(
+  sessionId: string
+): UseMutationResult<{ ok: boolean }, Error, SessionAnalyticsEventInput> {
+  const client = useApiClient();
+
+  return useMutation({
+    mutationFn: async (input: SessionAnalyticsEventInput) => {
+      const eventClient = (
+        client.sessions[':sessionId'] as Record<string, any>
+      )['events'];
+      const res = await eventClient.$post({
+        param: { sessionId },
+        json: input,
       });
       await assertOk(res);
       return (await res.json()) as { ok: boolean };

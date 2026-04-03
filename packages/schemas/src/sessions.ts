@@ -206,6 +206,23 @@ export const systemPromptBodySchema = z.object({
 });
 export type SystemPromptBody = z.infer<typeof systemPromptBodySchema>;
 
+export const sessionAnalyticsEventTypeSchema = z.enum([
+  'quick_action',
+  'user_feedback',
+]);
+export type SessionAnalyticsEventType = z.infer<
+  typeof sessionAnalyticsEventTypeSchema
+>;
+
+export const sessionAnalyticsEventSchema = z.object({
+  eventType: sessionAnalyticsEventTypeSchema,
+  content: z.string().max(1000).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+export type SessionAnalyticsEventInput = z.infer<
+  typeof sessionAnalyticsEventSchema
+>;
+
 export const sessionTranscriptExchangeSchema = z.object({
   eventId: z.string().uuid().optional(),
   role: z.enum(['user', 'assistant']),

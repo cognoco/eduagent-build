@@ -1,7 +1,7 @@
 # Epics vs Code Gap Analysis
 
-Date: 2026-04-02
-Updated after a verification pass against the current codebase and a learner-session agency control update.
+Date: 2026-04-03
+Updated after a 2026-04-02 verification pass against the current codebase and a 2026-04-03 targeted implementation/status update.
 
 ## Scope and method
 
@@ -10,6 +10,7 @@ Updated after a verification pass against the current codebase and a learner-ses
 - Negative gap = the epic/story expectation is still missing, only partially wired, or implemented with a materially different architecture than the stories describe.
 - Positive gap = the codebase is already ahead of the stories/status notes, so the docs should be updated to match reality.
 - This is still a summary document, not a line-by-line acceptance-criteria audit of every story in `epics.md`.
+- This file still does not contain dedicated Epic 3 or Epic 4 review sections; Epic 4 is only referenced indirectly from later epic notes.
 
 ## Executive summary
 
@@ -20,45 +21,37 @@ The previous draft overstated several learner-facing gaps. After re-checking the
 - Learning Book multi-subject browsing plus pause/resume/archive/restore controls
 - a learner-facing "Why this order?" flow in curriculum review
 
-The learner session surface is also stronger now than it was in the prior draft. It has per-message feedback, contextual quick chips (`I know this`, `Explain differently`, `Too easy`, `Too hard`, plus hint/example), a topic-switch sheet, parking lot access, and a visible `Guided` / `Independent` badge.
+The learner session surface is also stronger now than it was in the prior draft. It has per-message feedback, contextual quick chips (`I know this`, `Explain differently`, `Too easy`, `Too hard`, plus hint/example), a topic-switch sheet, parking lot access, a wrong-subject recovery chip, toast confirmations, and a visible `Guided` / `Independent` badge.
+
+A 2026-04-03 follow-up implementation pass also closed several high-confidence gaps from the review:
+
+- voice transcripts now reach the hook/UI state that `ChatShell` sends
+- parent-facing duration now prefers wall-clock time
+- session recovery markers are now profile-scoped
+- homework prompt assembly no longer re-injects the retired Socratic-only guard
+- quick chips and learner feedback now use dedicated session-event types and are blocked while streaming
 
 The biggest remaining negative gaps are now narrower than before:
 
-- Epic 12 home-card architecture is still client-side rather than API-backed
-- Epic 14 session-agency parity is close, but not fully story-complete
+- Epic 7 prerequisite-graph storage and sequencing are still missing
+- Epic 12 home-surface/backend migration plus route/persona cleanup are still incomplete
 - OpenAI OAuth is still absent from auth flows
 
 ## Remaining negative gaps
 
-### 1. Home cards are implemented in mobile UX, but Epic 12 backend parity is still missing
+### 1. Home cards are live across API and mobile, but Epic 12 backend parity is still incomplete
 
 - Epic expectation: Epic 12 Story 12.7 and Epic 14 Story 14.1 expect `precomputeHomeCards(profileId)`, `GET /v1/home-cards`, server-ranked cards, and dismissal/tap telemetry feeding the ranking model.
 - Code evidence:
-  - `apps/mobile/src/app/(learner)/home.tsx` builds and ranks multiple learner home cards (`resume_session`, `review`, `study`, `homework`, `ask`, `restore_subjects`) and renders the top 3.
-  - `apps/mobile/src/components/coaching/HomeActionCard.tsx` provides the dismiss affordance.
-  - `apps/mobile/src/lib/home-card-dismissals.ts` persists dismissal counts per profile in SecureStore, and `home.tsx` deprioritizes cards after 3 dismissals.
-  - The API still exposes the older single-card model in `apps/api/src/services/coaching-cards.ts` and `apps/api/src/routes/coaching-card.ts`.
-  - No server-side `precomputeHomeCards()`, `/home-cards`, `home_card_tap`, or `home_card_dismiss` event was found.
-- Assessment: Partial negative gap. The learner-facing UX exists, but the Epic 12 architecture and telemetry model are not fully implemented.
+  - `apps/api/src/routes/home-cards.ts` and `apps/mobile/src/hooks/use-home-cards.ts` show that `/v1/home-cards` plus interaction posting are live.
+  - `apps/mobile/src/app/(learner)/home.tsx` still renders a ranked learner-card surface with dismiss affordances.
+  - `apps/api/src/services/home-cards.ts` still only ranks learner-oriented cards and does not emit the spec-reserved `family` or `link_child` cards.
+  - `apps/api/src/services/home-surface-cache.ts` still stores ranked cards/interactions inside the legacy `coaching_card_cache` wrapper.
+  - `apps/api/src/index.ts` still mounts both `/coaching-card` and `/home-cards`.
+  - The target `home_card_tap` / `home_card_dismiss` analytics path is still not present in `sessionEvents`.
+- Assessment: Partial negative gap. The API route and learner UX exist, but the Epic 12 architecture and target telemetry migration are still incomplete.
 
-### 2. Session agency is mostly implemented, but not yet a perfect Story 14.5-14.8 match
-
-- Epic expectation: Epic 14 Phase C calls for per-message feedback, contextual quick chips, topic switching, and visible guidance mode controls.
-- Code evidence:
-  - `apps/mobile/src/app/(learner)/session/index.tsx` now includes:
-    - contextual quick chips under the latest AI message
-    - per-message feedback (`Helpful`, `Not helpful`, `That's incorrect`)
-    - `switch topic` and `park it` session tools
-    - learner-side `Guided` / `Independent` badge with an explanation dialog
-    - incorrect-answer flagging through `useFlagSessionContent`
-  - `apps/api/src/routes/sessions.ts` and `apps/api/src/services/session.ts` already support `system-prompt` recording and message flagging.
-- Remaining differences from the stories:
-  - topic switching still uses `router.push()` into a fresh session route rather than resetting in place on the same screen
-  - no explicit "Wrong subject" chip appears after suspected misclassification
-  - feedback/chip confirmation is implicit rather than a dedicated toast pattern
-- Assessment: Medium-confidence partial gap. This is no longer a broad missing-feature gap; it is now a smaller parity/polish gap.
-
-### 3. OpenAI OAuth is still not implemented in the auth flow
+### 2. OpenAI OAuth is still not implemented in the auth flow
 
 - Epic expectation: FR1 lists email/password, Google OAuth, Apple Sign-in, and OpenAI OAuth.
 - Code evidence:
@@ -112,6 +105,20 @@ The Learning Book now supports:
 
 The previous claim that this existed only in API/hooks was stale. Learners can request an explanation from curriculum review and see the response in a modal.
 
+### 5. Learner session-agency parity is materially stronger than the previous draft claimed
+
+- `apps/mobile/src/app/(learner)/session/index.tsx`
+- `apps/api/src/routes/sessions.ts`
+- `apps/api/src/services/session.ts`
+- `packages/schemas/src/sessions.ts`
+
+The previous top-level gap summary for Epic 14 session-agency parity is now stale. The current implementation includes:
+
+- wrong-subject recovery via a dedicated chip plus in-place `router.replace(...)`
+- dedicated confirmation toast handling for chips/feedback
+- quick-chip and learner-feedback analytics through first-class `quick_action` and `user_feedback` session events
+- streaming guards so chip/feedback actions do not fire while a reply is in flight
+
 ## Positive gaps
 
 These are places where the implementation is ahead of the stories/status notes. The right response is to update the docs, not to remove the feature from code.
@@ -125,6 +132,7 @@ These are places where the implementation is ahead of the stories/status notes. 
   - `apps/mobile/src/components/session/VoiceRecordButton.tsx`
   - `apps/mobile/src/components/session/VoicePlaybackBar.tsx`
   - `apps/mobile/src/app/(learner)/session/index.tsx`
+  - `apps/mobile/src/hooks/use-speech-recognition.ts`
 - Assessment: Positive gap. Voice is implemented with toggle, recording, playback, replay, and speed controls.
 
 ### 2. The homework overhaul from Epic 14 is largely implemented
@@ -208,8 +216,9 @@ These are places where the implementation is ahead of the stories/status notes. 
   - session lifecycle polish
   - celebrations
 - Keep the remaining implementation work focused on:
-  - home-surface backend parity (`precomputeHomeCards`, `/home-cards`, tap/dismiss telemetry)
-  - final Story 14.5-14.8 parity items
+  - Epic 7 prerequisite-graph persistence, sequencing, and learner-facing graph flows
+  - Epic 12 home-surface/backend cleanup (including family/link-child cards and the target analytics pipeline)
+  - Epic 12 route/persona simplification work
   - OpenAI OAuth product decision and, only if still desired, implementation
 
 ## Open question before prioritizing more auth work
@@ -284,15 +293,15 @@ Date: 2026-04-02
 - Impact:
   - FR121, FR127, FR151, and FR152 are still doc-only. There is no learner-facing graph, no parent/child prerequisite feedback path, and no self-service prerequisite override.
 
-### 6. High: Voice input is effectively nonfunctional because STT results never update the hook transcript
+### 6. Resolved on 2026-04-03: STT results now update the hook transcript and error state
 
 - Epic/story: Epic 8 Stories 8.1-8.3.
 - Evidence:
-  - `apps/mobile/src/hooks/use-speech-recognition.ts:54-147` creates `transcript` state but never calls `setTranscript()` with recognition results.
-  - The same hook says event listeners are handled via `useSpeechRecognitionEvent`, but the only repo hit for that symbol is the comment itself: `apps/mobile/src/hooks/use-speech-recognition.ts:97-99`.
-  - `apps/mobile/src/components/session/ChatShell.tsx:121-127` and `apps/mobile/src/components/session/ChatShell.tsx:192-206` depend on that `transcript` value to populate the pending voice draft and send it.
+  - `apps/mobile/src/hooks/use-speech-recognition.ts` now registers native `result` and `error` listeners, calls `setTranscript()` from recognition results, and updates hook error/status on native failures.
+  - `apps/mobile/src/hooks/use-speech-recognition.test.ts` now covers start-listening, result propagation, and native error propagation.
+  - `apps/mobile/src/components/session/ChatShell.tsx` still depends on the hook `transcript` value to populate the pending voice draft and send it, so this wiring now reaches the intended UI path.
 - Impact:
-  - The mic button can start and stop recognition, but as written no recognized text ever reaches the UI state that gets sent to the model.
+  - This is no longer an active Epic 8 gap. The remaining Epic 8 issues are the session-contract/input-mode gaps below, plus accessibility work.
 
 ### 7. High: Epic 8 never persists `input_mode` on the session model or the start-session contract
 
@@ -341,6 +350,7 @@ Date: 2026-04-02
 
 - Epic 8's Option A TTS behavior is present: `use-text-to-speech.ts` waits for completed responses, and `ChatShell` only speaks non-streaming AI messages.
 - I did not flag missing VAD as a defect because Story 8.6 is explicitly stretch and the current manual tap-to-stop approach matches the documented default.
+- The previous claim that STT transcripts never reached the UI is now stale after the 2026-04-03 hook fix.
 
 ---
 
@@ -621,69 +631,64 @@ Date: 2026-04-02
 
 ## Findings
 
-### 1. High: parent-facing duration still shows `durationSeconds` instead of the Epic 13 wall-clock metric
+### 1. Resolved on 2026-04-03: parent-facing duration now uses the Epic 13 wall-clock metric
 
 - Epic/story: Epic 13 Story 13.1 and FR210.4-FR210.7 / FR215.1-FR215.4.
 - Evidence:
   - The Epic 13 contract explicitly says `durationSeconds` is internal-only active time, while `wallClockSeconds` is the user-facing duration for both child and parent: `docs/plans/epic-13-session-lifecycle-overhaul.md:53-59`.
-  - The dashboard aggregate still prefers active time over wall-clock: `apps/api/src/services/dashboard.ts:272-277`.
-  - The parent child-detail session cards render `formatDuration(session.durationSeconds)`: `apps/mobile/src/app/(parent)/child/[profileId]/index.tsx:276-281`.
-  - The parent topic-detail session cards do the same: `apps/mobile/src/app/(parent)/child/[profileId]/topic/[topicId].tsx:196-200`.
+  - `apps/api/src/services/dashboard.ts` now prefers `session.wallClockSeconds ?? session.durationSeconds`.
+  - The parent child-detail session cards now render `formatDuration(session.wallClockSeconds ?? session.durationSeconds)`.
+  - The parent topic-detail session cards do the same.
 - Impact:
-  - Parent totals and per-session labels are still driven by the capped internal metric that Epic 13 explicitly said should never be shown to users.
-  - This undercuts the main trust-model change of Story 13.1, because off-screen study time and paper work are still undercounted on parent surfaces.
+  - This specific Epic 13.1 mismatch is no longer active.
 
-### 2. High: the crash-recovery marker is global, so profile switching can erase another learner's resumable session
+### 2. Resolved on 2026-04-03: crash-recovery markers are now scoped per profile
 
 - Epic/story: Epic 13 Story 13.3 / FR211, in a product that already supports multi-profile switching (`docs/epics.md:28-30`).
 - Evidence:
-  - The recovery marker uses one fixed SecureStore key and stores no `profileId`: `apps/mobile/src/lib/session-recovery.ts:4-20`.
-  - The learner session screen writes that shared marker on backgrounding/resume checkpoints: `apps/mobile/src/app/(learner)/session/index.tsx:479-493`.
-  - The learner home screen reads the same global marker and clears it whenever the current profile cannot fetch that session id: `apps/mobile/src/app/(learner)/home.tsx:195-204`.
+  - `apps/mobile/src/lib/session-recovery.ts` now derives profile-scoped keys and stores `profileId` on the marker.
+  - `apps/mobile/src/app/(learner)/session/index.tsx` writes and clears markers with `activeProfile?.id`.
+  - `apps/mobile/src/app/(learner)/home.tsx` reads and clears markers with `activeProfile?.id`, with a legacy fallback for older stored markers.
   - Story 13.3 assumes recovery is per learner session and resumes the correct active session within 30 minutes: `docs/plans/epic-13-session-lifecycle-overhaul.md:67-82`.
 - Impact:
-  - On a family account, switching to a different learner or parent profile can wipe the first learner's unfinished-session marker or replace it with a different session.
-  - That breaks the per-profile recovery guarantee Epic 13 is supposed to provide.
+  - This specific multi-profile recovery risk is no longer active.
 
-### 3. High: homework prompt assembly still injects the retired Socratic-only guard into Epic 14 homework sessions
+### 3. Resolved on 2026-04-03: homework prompt assembly no longer injects the retired Socratic-only guard
 
 - Epic/story: Epic 14 Stories 14.10-14.11 / FR228.1-FR228.6.
 - Evidence:
   - FR228 explicitly replaces the old homework behavior and says homework mode must not use Socratic questioning: `docs/plans/epic-14-human-agency-feedback.md:430-455`.
   - `getSessionTypeGuidance()` now emits the new explain-and-verify homework instructions for `help_me` and `check_answer`: `apps/api/src/services/exchanges.ts:499-540`.
-  - But `buildSystemPrompt()` appends both session-type guidance and escalation guidance: `apps/api/src/services/exchanges.ts:215-227`.
-  - `getEscalationPromptGuidance()` still adds `CRITICAL: ... Use only Socratic questioning to guide the learner.` for every homework rung: `apps/api/src/services/escalation.ts:217-287`.
+  - `buildSystemPrompt()` still appends both session-type guidance and escalation guidance: `apps/api/src/services/exchanges.ts:215-227`.
+  - `apps/api/src/services/escalation.ts` no longer adds the retired homework `Use only Socratic questioning` guard.
 - Impact:
-  - The live homework prompt is internally contradictory: one section says "do not ask Socratic follow-up questions," while another says "use only Socratic questioning."
-  - That makes the shipped homework overhaul unstable and risks regressions back toward the deprecated Socratic flow that Epic 14 was meant to replace.
+  - This prompt contradiction is no longer active.
 
-### 4. Medium: quick chips and feedback actions remain live while a reply is streaming, so taps can be recorded without any follow-up reaching the model
+### 4. Resolved on 2026-04-03: quick chips and feedback actions are no longer actionable while a reply is streaming
 
 - Epic/story: Epic 14 Stories 14.5-14.8, especially FR219.4's "one action per AI response" contract.
 - Evidence:
-  - `handleSend()` immediately returns while `isStreaming` is true: `apps/mobile/src/app/(learner)/session/index.tsx:661-663`.
-  - `latestAiMessageId` ignores streaming placeholders, so the prior completed AI message remains the active chip source during the in-flight turn: `apps/mobile/src/app/(learner)/session/index.tsx:1201-1206`.
-  - `renderMessageActions()` still renders pressable chips and feedback buttons for that prior AI message while the session is streaming: `apps/mobile/src/app/(learner)/session/index.tsx:1383-1423`.
-  - `handleQuickChip()` records side effects and then calls `handleSend(config.prompt)`: `apps/mobile/src/app/(learner)/session/index.tsx:1019-1075`.
-  - `handleMessageFeedback()` does the same for corrective follow-up prompts: `apps/mobile/src/app/(learner)/session/index.tsx:1081-1127`.
+  - `handleSend()` still returns while `isStreaming` is true, which is correct for the one-action-per-response contract.
+  - `renderMessageActions()` now returns `null` while streaming, so prior-message chips/feedback are hidden during the in-flight turn.
+  - Session tool chips are also disabled while streaming.
+  - `handleQuickChip()` and `handleMessageFeedback()` now short-circuit while streaming before recording follow-up control actions.
   - The story says chips should disappear after the learner types or taps one, and only one action should apply per AI response: `docs/plans/epic-14-human-agency-feedback.md:102-104`.
 - Impact:
-  - A learner can tap `Too hard`, `Explain differently`, or `That's incorrect` during streaming, see confirmation, and still have no follow-up sent because `handleSend()` bails out.
-  - That creates misleading UX and leaves behind recorded prompt/feedback side effects that did not actually influence the reply.
+  - This misleading in-flight action path is no longer active.
 
-### 5. Medium: Epic 14's quick-chip and feedback telemetry is still stored as generic `system_prompt` events instead of the dedicated event types the stories require
+### 5. Resolved on 2026-04-03: Epic 14 quick-chip and feedback telemetry now uses dedicated event types
 
 - Epic/story: Epic 14 Stories 14.5-14.6 / FR218.3 and FR219.3.
 - Evidence:
   - The spec calls for `sessionEvents` with `eventType: 'user_feedback'` and `eventType: 'quick_action'`: `docs/plans/epic-14-human-agency-feedback.md:79-83` and `docs/plans/epic-14-human-agency-feedback.md:102-103`.
-  - The session-event enum still has no `user_feedback` or `quick_action` variant: `packages/database/src/schema/sessions.ts:22-40`.
-  - Quick chips are persisted as `system_prompt` rows with metadata `{ type: 'quick_chip', chip }`: `apps/mobile/src/app/(learner)/session/index.tsx:1055-1060`.
-  - Message feedback is also persisted as `system_prompt` rows with metadata `{ type: 'message_feedback', value, eventId }`, with only the `incorrect` path also writing a generic `flag` event: `apps/mobile/src/app/(learner)/session/index.tsx:1101-1114`.
+  - `packages/database/src/schema/sessions.ts` and `packages/schemas/src/sessions.ts` now define `quick_action` and `user_feedback`.
+  - `apps/api/src/routes/sessions.ts` and `apps/api/src/services/session.ts` now expose a dedicated session-event recording path for those event types.
+  - `apps/mobile/src/app/(learner)/session/index.tsx` now records quick chips as `quick_action` events and message feedback as `user_feedback` events, while still preserving best-effort system-prompt context for model steering.
 - Impact:
-  - The learner-facing controls mostly exist, but the promised telemetry model does not.
-  - Analytics and future personalization cannot query these interactions as first-class event types, and the data is mixed into the same bucket as invisible prompt injections.
+  - This telemetry mismatch is no longer active.
 
 ## No new findings called out in these areas
 
 - Epic 13's milestone tracker, `I'm Done` flow, celebration queue service, and post-session summary wiring all look materially present.
 - Epic 14's add-topic flow, ambiguous-subject "Something else" path, multi-problem homework flow, and homework summary extraction all look materially wired up.
+- The 2026-04-03 follow-up implementation pass also resolved the parent-duration, profile-scoped recovery, homework-prompt, streaming-action, and session-event telemetry gaps called out above.
