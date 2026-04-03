@@ -161,6 +161,19 @@ jest.mock('../../apps/api/src/services/session', () => ({
   closeSession: jest.fn().mockResolvedValue({
     message: 'Session closed',
     sessionId: SESSION_ID,
+    topicId: null,
+    subjectId: SUBJECT_ID,
+    sessionType: 'learning',
+    verificationType: null,
+    wallClockSeconds: 120,
+    summaryStatus: 'pending',
+  }),
+  getSessionCompletionContext: jest.fn().mockResolvedValue({
+    sessionId: SESSION_ID,
+    topicId: null,
+    subjectId: SUBJECT_ID,
+    sessionType: 'learning',
+    verificationType: null,
   }),
   flagContent: jest.fn().mockResolvedValue({
     message: 'Content flagged for review. Thank you!',

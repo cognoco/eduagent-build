@@ -84,17 +84,8 @@ jest.mock('../../../hooks/use-homework-ocr', () => ({
 // Mock subjects hook (used for inline subject picker when no subjectId provided)
 const mockCreateSubjectMutateAsync = jest.fn();
 jest.mock('../../../hooks/use-subjects', () => ({
-  useSubjects: jest.fn().mockReturnValue({
-    data: [
-      { id: 'sub-123', name: 'Mathematics', status: 'active' },
-      { id: 'sub-456', name: 'Science', status: 'active' },
-    ],
-    isLoading: false,
-  }),
-  useCreateSubject: jest.fn().mockReturnValue({
-    mutateAsync: mockCreateSubjectMutateAsync,
-    isPending: false,
-  }),
+  useSubjects: jest.fn(),
+  useCreateSubject: jest.fn(),
 }));
 
 // Mock classify subject hook (subject auto-detection)
@@ -111,6 +102,10 @@ jest.mock('../../../hooks/use-classify-subject', () => ({
 // Import mocks after jest.mock
 const { useCameraPermissions } = require('expo-camera');
 const { useHomeworkOcr } = require('../../../hooks/use-homework-ocr');
+const {
+  useSubjects,
+  useCreateSubject,
+} = require('../../../hooks/use-subjects');
 
 const mockRouter = {
   replace: jest.fn(),
@@ -119,9 +114,20 @@ const mockRouter = {
 
 const { useClassifySubject } = require('../../../hooks/use-classify-subject');
 
-  beforeEach(() => {
+beforeEach(() => {
   jest.clearAllMocks();
   (useRouter as jest.Mock).mockReturnValue(mockRouter);
+  (useSubjects as jest.Mock).mockReturnValue({
+    data: [
+      { id: 'sub-123', name: 'Mathematics', status: 'active' },
+      { id: 'sub-456', name: 'Science', status: 'active' },
+    ],
+    isLoading: false,
+  });
+  (useCreateSubject as jest.Mock).mockReturnValue({
+    mutateAsync: mockCreateSubjectMutateAsync,
+    isPending: false,
+  });
   mockCreateSubjectMutateAsync.mockResolvedValue({
     subject: { id: 'sub-created', name: 'Biology' },
   });

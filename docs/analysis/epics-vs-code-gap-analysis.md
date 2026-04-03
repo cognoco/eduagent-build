@@ -692,3 +692,153 @@ Date: 2026-04-02
 - Epic 13's milestone tracker, `I'm Done` flow, celebration queue service, and post-session summary wiring all look materially present.
 - Epic 14's add-topic flow, ambiguous-subject "Something else" path, multi-problem homework flow, and homework summary extraction all look materially wired up.
 - The 2026-04-03 follow-up implementation pass also resolved the parent-duration, profile-scoped recovery, homework-prompt, streaming-action, and session-event telemetry gaps called out above.
+
+# Epic 3 + Epic 4 Code Review Findings
+
+Date: 2026-04-03
+
+## Scope
+
+- Reviewed Epic 3 expectations from `docs/epics.md` against the current assessment, retention, adaptive-teaching, EVALUATE, TEACH_BACK, and teaching-preference code in `apps/api/src`, `apps/mobile/src`, and `packages/*`.
+- Reviewed Epic 4 expectations from `docs/epics.md` against the current progress, streak, XP, Learning Book, topic-detail, notification, and parent-dashboard code in `apps/api/src` and `apps/mobile/src`.
+- This pass was code-inspection based. I did not rerun the full test suite.
+
+## Findings
+
+### 1. High: the standalone assessment flow never enters the retention lifecycle
+
+- Evidence:
+  - The learner assessment screen is a standalone flow that only creates an assessment row and submits answers; it is not tied to a session lifecycle: `apps/mobile/src/app/assessment/index.tsx:23-67`.
+  - The assessment API only creates and updates `assessments` rows: `apps/api/src/routes/assessments.ts:31-104`.
+  - That route never creates or updates a `retention_cards` row, never awards pending XP, and never dispatches `app/session.completed`.
+- Impact:
+  - A learner can pass a topic completion assessment and get a mastery score, but the topic never receives the Epic 3 synchronous SM-2 seed, review schedule, or downstream Epic 4 XP/retention state.
+  - Assessment-only topics can show as completed while remaining outside the delayed-recall pipeline the epic requires.
+
+### 2. High: EVALUATE failures are permanently treated as first failures
+
+- Evidence:
+  - `processEvaluateCompletion()` always calls `handleEvaluateFailure(1, currentRung)` on failure, regardless of prior failures: `apps/api/src/services/verification-completion.ts:88-102`.
+- Impact:
+  - Story 3.13's second-failure "lower difficulty" path and third-failure "exit to standard review" path never activate.
+  - Learners can get stuck receiving first-failure handling forever, which breaks the intended EVALUATE calibration loop.
+
+### 3. High: Honest Streak increments on any completed session, and paused/archived subjects still flow through the completion chain
+
+- Evidence:
+  - The session-completed Inngest function unconditionally runs retention, streak, and XP steps for every `app/session.completed` event; there is no subject-status check and no recall-pass gate around those steps: `apps/api/src/inngest/functions/session-completed.ts:202-224` and `apps/api/src/inngest/functions/session-completed.ts:272-283`.
+  - `recordSessionActivity()` increments streak state whenever it is called; it has no concept of "passed at least one recall test" versus "finished any session": `apps/api/src/services/streaks.ts:285-326`.
+- Impact:
+  - FR86 is violated because ordinary learning/homework sessions can grow the Honest Streak.
+  - Story 4.4's "paused/archived subjects do NOT generate review reminders or count against Honest Streak" contract is also not enforced at the async lifecycle boundary.
+
+### 4. High: XP summary data can never reflect delayed-recall verification or decay
+
+- Evidence:
+  - XP is inserted once per topic, then the service permanently no-ops when an `xp_ledger` row already exists: `apps/api/src/services/xp.ts:79-124`.
+  - Delayed recall updates `retention_cards.xp_status`, but does not update `xp_ledger`: `apps/api/src/services/retention-data.ts:322-343`.
+  - `/v1/xp` summary data is computed from `xp_ledger`, not from `retention_cards`: `apps/api/src/services/streaks.ts:237-255`.
+- Impact:
+  - In serious mode, pending XP never becomes verified in the aggregate XP API after delayed recall succeeds.
+  - If retention decays, topic-level retention can say "decayed" while the XP summary still counts the original pending/verified amounts, so Epic 4 progress metrics drift out of sync.
+
+### 5. Medium: the learner retention UI ignores the actual SM-2 due date
+
+- Evidence:
+  - The server-side progress service already computes retention from `nextReviewAt`: `apps/api/src/services/progress.ts:240-253`.
+  - The Learning Book re-derives topic retention from `failureCount`, `xpStatus`, `repetitions`, and `easeFactor`, ignoring `nextReviewAt`: `apps/mobile/src/app/(learner)/book.tsx:67-75`.
+  - Topic detail does the same: `apps/mobile/src/app/(learner)/topic/[topicId].tsx:18-30`.
+- Impact:
+  - Overdue topics can still render as `strong` or `fading` if their ease factor is high enough.
+  - Story 4.2's decay visualization no longer reflects the real Epic 3 schedule data, so learners can be told their memory is healthier than the spaced-repetition model says it is.
+
+### 6. Medium: teaching preferences are not constrained to one row per profile/subject
+
+- Evidence:
+  - `teaching_preferences` has no uniqueness constraint on `(profile_id, subject_id)`: `packages/database/src/schema/assessments.ts:151-169`.
+  - The write path is a read-then-update/insert sequence instead of an atomic upsert: `apps/api/src/services/retention-data.ts:532-578`.
+  - Reads use `findFirst(...)`, so duplicate rows would return whichever row the database happens to surface first: `apps/api/src/services/retention-data.ts:504-525`.
+- Impact:
+  - Concurrent saves can create duplicate teaching-preference rows for the same subject.
+  - Once that happens, method preference and analogy-domain retrieval become nondeterministic, which is especially risky for Epic 3's prompt-context behavior.
+
+---
+
+# Epic 1 + Epic 2 Code Review Findings
+
+Date: 2026-04-03
+
+## Scope
+
+- Reviewed Epic 1 expectations from `docs/epics.md` against subject creation, interview draft/resume flow, curriculum review, subject resolution, and curriculum routes/services in `apps/mobile/src`, `apps/api/src`, and `packages/*`.
+- Reviewed Epic 2 expectations from `docs/epics.md` against live session streaming, homework OCR, recall-bridge wiring, summary-skip handling, parking lot, and prior-learning code paths.
+- This pass was code-inspection based. I did not rerun the full test suite.
+
+## Findings
+
+### 1. High: Epic 1's interview flow still simulates streaming locally instead of using real SSE
+
+- Epic/story: Epic 1 Story 1.2 / FR14.
+- Evidence:
+  - The story explicitly requires streamed interview exchange via Hono `streamSSE()`.
+  - `apps/api/src/routes/interview.ts:24-69` handles the interview POST as a normal JSON response and never calls `streamSSE()`.
+  - `apps/mobile/src/hooks/use-interview.ts:43-54` waits for the full JSON body before returning.
+  - `apps/mobile/src/app/(learner)/onboarding/interview.tsx:136-152` then replays the already-finished response via `animateResponse(...)`.
+  - `apps/api/src/routes/interview.ts:51-60` also persists the curriculum before the final response returns, so the last interview turn blocks on curriculum generation instead of streaming progressively.
+- Impact:
+  - The onboarding interview does not actually exercise the streaming pattern Epic 1 says it establishes for later epics.
+  - Slow interview turns will feel stalled at the network layer even though the UI animates a fake stream afterward.
+
+### 2. High: Epic 1's performance-driven curriculum adaptation endpoint is still missing
+
+- Epic/story: Epic 1 Story 1.5 / FR21.
+- Evidence:
+  - `apps/api/src/routes/curriculum.ts:27-180` exposes get, skip, unskip, add-topic, challenge, and explain endpoints, but no adaptation endpoint that accepts performance data.
+  - `apps/mobile/src/hooks/use-curriculum.ts:18-165` only exposes hooks for those same paths; there is no mutation for performance-based curriculum adaptation.
+  - `packages/schemas/src/subjects.ts:117-171` defines add-topic, skip/unskip, and challenge payloads, but no adaptation request/response schema.
+  - `packages/database/src/schema/subjects.ts:95-116` gives `curriculum_adaptations` only `topicId`, `sortOrder`, and `skipReason`.
+  - `apps/api/src/services/curriculum.ts:249-349` writes adaptation rows only for manual skip/restore, not for re-prioritizing the remaining curriculum from learner performance.
+- Impact:
+  - FR21 is still doc-only; there is no end-to-end API path that reorders future topics from performance signals.
+  - The current adaptation storage cannot capture the before/after ordering and trigger metadata the story calls for.
+
+### 3. High: Epic 2's server OCR fallback still fails open to stub text when no Gemini key is configured
+
+- Epic/story: Epic 2 Story 2.5 / FR32 / ARCH-14.
+- Evidence:
+  - `apps/mobile/src/hooks/use-homework-ocr.ts:95-167` falls back to `/v1/ocr` whenever ML Kit is unavailable or fails to read text.
+  - `apps/api/src/routes/homework.ts:48-80` always serves `/v1/ocr` through `getOcrProvider(c.env.GEMINI_API_KEY)`.
+  - `apps/api/src/services/ocr.ts:165-177` defaults that provider to `StubOcrProvider` whenever no API key is present.
+  - `apps/api/src/services/ocr.ts:36-52` has that stub return fixed `"Stub OCR text for testing"` with high confidence.
+- Impact:
+  - In any environment missing `GEMINI_API_KEY`, the homework fallback path can silently return fake OCR success instead of failing closed.
+  - That makes OCR misconfiguration hard to detect and can send learners into bogus homework sessions.
+
+### 4. High: Epic 2's recall bridge is implemented only on the API; the learner flow never calls it
+
+- Epic/story: Epic 2 Story 2.7 / UX-15.
+- Evidence:
+  - The backend route and service exist in `apps/api/src/routes/sessions.ts:410-430` and `apps/api/src/services/recall-bridge.ts:31-78`.
+  - A repo search for `recall-bridge` returns no hits under `apps/mobile/src`.
+  - `apps/mobile/src/app/(learner)/session/index.tsx:1005-1034` closes the session and routes directly to `/session-summary/[sessionId]`.
+  - `apps/mobile/src/app/session-summary/[sessionId].tsx:165-236` only handles summary submit/skip plus home/book navigation; it never requests or displays recall warmup questions.
+- Impact:
+  - Learners never see the 1-2 question recall warmup after homework success.
+  - Story 2.7 is currently backend-only rather than a shipped learner journey.
+
+### 5. Medium: Epic 2's summary-skip flow skips the required 5-skip warning and only implements the 10-skip mode-switch prompt
+
+- Epic/story: Epic 2 Story 2.8 / FR37.
+- Evidence:
+  - The story requires two thresholds: warning after 5 consecutive summary skips, then a Casual Explorer prompt after 10.
+  - `apps/api/src/services/settings.ts:267-339` only defines `CASUAL_SWITCH_PROMPT_THRESHOLD = 10` plus `shouldPromptCasualSwitch()`.
+  - `apps/mobile/src/app/session-summary/[sessionId].tsx:186-231` only reacts to that final prompt flag; there is no intermediate warning path or API signal for the 5-skip milestone.
+- Impact:
+  - Learners get no early warning before the eventual mode-switch prompt.
+  - FR37 is only partially implemented.
+
+## No new findings called out in these areas
+
+- Epic 1 subject resolution, interview draft expiry/resume, curriculum relevance labels/time estimates, learner-facing "Why this order?" explanations, and the >80% skipped placement-choice UI all look materially present.
+- Epic 2 real session SSE streaming, parking lot learner UI, prior-learning prompt injection, and the session-summary close flow are materially present.
+- Some older Epic 2 story text is now stale because later epics superseded it, especially hard session caps/recovery timing (Epic 13) and Socratic-only homework behavior (Epic 14). The current code appears aligned to those later contracts rather than the older Epic 2 wording.

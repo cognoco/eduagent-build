@@ -113,6 +113,7 @@ jest.mock('../../apps/api/src/services/session', () => sessionMock());
 jest.mock('../../apps/api/src/services/llm', () => llmMock());
 
 import { app } from '../../apps/api/src/index';
+import { getTierConfig } from '../../apps/api/src/services/subscription';
 
 const TEST_ENV = {
   ENVIRONMENT: 'development',
@@ -131,6 +132,7 @@ const AUTH_HEADERS = {
   Authorization: 'Bearer test-token',
   'Content-Type': 'application/json',
 };
+const FREE_TIER = getTierConfig('free');
 
 // ---------------------------------------------------------------------------
 // GET /v1/subscription
@@ -155,12 +157,14 @@ describe('Integration: GET /v1/subscription', () => {
     const body = await res.json();
     expect(body.subscription.tier).toBe('free');
     expect(body.subscription.status).toBe('trial');
-    expect(body.subscription.monthlyLimit).toBe(100);
-    expect(body.subscription.remainingQuestions).toBe(100);
+    expect(body.subscription.monthlyLimit).toBe(FREE_TIER.monthlyQuota);
+    expect(body.subscription.remainingQuestions).toBe(FREE_TIER.monthlyQuota);
     // Dual-cap: free tier defaults include daily limit
-    expect(body.subscription.dailyLimit).toBe(10);
+    expect(body.subscription.dailyLimit).toBe(FREE_TIER.dailyLimit);
     expect(body.subscription.usedToday).toBe(0);
-    expect(body.subscription.dailyRemainingQuestions).toBe(10);
+    expect(body.subscription.dailyRemainingQuestions).toBe(
+      FREE_TIER.dailyLimit
+    );
   });
 
   it('returns 200 with existing subscription details (paid tier, no daily limit)', async () => {
@@ -435,11 +439,11 @@ describe('Integration: GET /v1/usage', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.usage.monthlyLimit).toBe(100);
+    expect(body.usage.monthlyLimit).toBe(FREE_TIER.monthlyQuota);
     expect(body.usage.usedThisMonth).toBe(0);
-    expect(body.usage.dailyLimit).toBe(10);
+    expect(body.usage.dailyLimit).toBe(FREE_TIER.dailyLimit);
     expect(body.usage.usedToday).toBe(0);
-    expect(body.usage.dailyRemainingQuestions).toBe(10);
+    expect(body.usage.dailyRemainingQuestions).toBe(FREE_TIER.dailyLimit);
   });
 });
 

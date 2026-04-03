@@ -67,6 +67,13 @@ jest.mock('../../apps/api/src/services/notifications', () => ({
   sendPushNotification: mockSendPushNotification,
 }));
 
+// --- Profile lookup mock ---
+
+const mockFindOwnerProfile = jest.fn();
+jest.mock('../../apps/api/src/services/profile', () => ({
+  findOwnerProfile: mockFindOwnerProfile,
+}));
+
 // --- Subscription config mock ---
 
 jest.mock('../../apps/api/src/services/subscription', () => ({
@@ -123,6 +130,9 @@ function createMockStep(): {
 describe('Integration: Inngest trial-expiry function', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockFindOwnerProfile.mockResolvedValue({
+      id: 'profile-owner',
+    });
   });
 
   it('captures the function handler from createFunction', () => {
