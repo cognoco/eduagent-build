@@ -66,11 +66,13 @@ export default function InterviewScreen() {
     }
 
     const mappedHistory =
-      state.exchangeHistory?.map((exchange, index) => ({
-        id: `draft-${index}`,
-        role: exchange.role === 'assistant' ? 'ai' : exchange.role,
-        content: exchange.content,
-      })) ?? [];
+      state.exchangeHistory?.map(
+        (exchange, index): ChatMessage => ({
+          id: `draft-${index}`,
+          role: exchange.role === 'assistant' ? 'ai' : 'user',
+          content: exchange.content,
+        })
+      ) ?? [];
 
     if (state.status === 'completed') {
       setMessages(
