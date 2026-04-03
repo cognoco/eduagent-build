@@ -12,6 +12,49 @@ const mockClearSessionRecoveryMarker = jest.fn().mockResolvedValue(undefined);
 const mockReadSessionRecoveryMarker = jest.fn();
 const mockSessionGet = jest.fn();
 const mockTrackHomeCardInteraction = jest.fn();
+const mockHomeCardsData: {
+  coldStart: boolean;
+  cards: Array<{
+    id: string;
+    title: string;
+    subtitle: string;
+    badge?: string;
+    primaryLabel: string;
+    secondaryLabel?: string;
+    priority: number;
+    compact?: boolean;
+    subjectId?: string;
+    subjectName?: string;
+    topicId?: string;
+  }>;
+} = {
+  coldStart: false,
+  cards: [
+    {
+      id: 'study',
+      title: 'Continue Math',
+      subtitle: 'Fractions',
+      badge: 'Continue',
+      primaryLabel: 'Continue topic',
+      priority: 82,
+      compact: false,
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      topicId: 'topic-1',
+    },
+    {
+      id: 'homework',
+      title: 'Homework help',
+      subtitle: 'Snap a question and get direct help.',
+      badge: 'Quick start',
+      primaryLabel: 'Open camera',
+      priority: 74,
+      compact: true,
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+    },
+  ],
+};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -92,34 +135,7 @@ jest.mock('../../hooks/use-subjects', () => ({
 
 jest.mock('../../hooks/use-home-cards', () => ({
   useHomeCards: () => ({
-    data: {
-      coldStart: false,
-      cards: [
-        {
-          id: 'study',
-          title: 'Continue Math',
-          subtitle: 'Fractions',
-          badge: 'Continue',
-          primaryLabel: 'Continue topic',
-          priority: 82,
-          compact: false,
-          subjectId: 'subject-1',
-          subjectName: 'Math',
-          topicId: 'topic-1',
-        },
-        {
-          id: 'homework',
-          title: 'Homework help',
-          subtitle: 'Snap a question and get direct help.',
-          badge: 'Quick start',
-          primaryLabel: 'Open camera',
-          priority: 74,
-          compact: true,
-          subjectId: 'subject-1',
-          subjectName: 'Math',
-        },
-      ],
-    },
+    data: mockHomeCardsData,
     isLoading: false,
   }),
   useTrackHomeCardInteraction: () => ({
@@ -208,6 +224,32 @@ const HomeScreen = require('./home').default;
 describe('HomeScreen session recovery', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockHomeCardsData.coldStart = false;
+    mockHomeCardsData.cards = [
+      {
+        id: 'study',
+        title: 'Continue Math',
+        subtitle: 'Fractions',
+        badge: 'Continue',
+        primaryLabel: 'Continue topic',
+        priority: 82,
+        compact: false,
+        subjectId: 'subject-1',
+        subjectName: 'Math',
+        topicId: 'topic-1',
+      },
+      {
+        id: 'homework',
+        title: 'Homework help',
+        subtitle: 'Snap a question and get direct help.',
+        badge: 'Quick start',
+        primaryLabel: 'Open camera',
+        priority: 74,
+        compact: true,
+        subjectId: 'subject-1',
+        subjectName: 'Math',
+      },
+    ];
     mockReadSessionRecoveryMarker.mockResolvedValue({
       sessionId: 'session-123',
       subjectName: 'Math',
@@ -252,6 +294,39 @@ describe('HomeScreen session recovery', () => {
       expect(mockPush).toHaveBeenCalledWith(
         '/(learner)/session?mode=practice&subjectId=subject-1&topicId=topic-1'
       );
+    });
+  });
+
+  it('routes curriculum-complete cards to add-subject and Learning Book', async () => {
+    mockHomeCardsData.cards = [
+      {
+        id: 'curriculum_complete',
+        title: "You've mastered your subjects!",
+        subtitle: 'Ready for something new?',
+        badge: 'Big milestone',
+        primaryLabel: 'Add another subject',
+        secondaryLabel: 'Keep reviewing',
+        priority: 92,
+        compact: false,
+      },
+    ];
+
+    render(<HomeScreen />);
+
+    fireEvent.press(screen.getByText('Add another subject'));
+
+    await waitFor(() => {
+      expect(mockTrackHomeCardInteraction).toHaveBeenCalledWith({
+        cardId: 'curriculum_complete',
+        interactionType: 'tap',
+      });
+      expect(mockPush).toHaveBeenCalledWith('/create-subject');
+    });
+
+    fireEvent.press(screen.getByText('Keep reviewing'));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/(learner)/book');
     });
   });
 });

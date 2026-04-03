@@ -9,9 +9,11 @@ const mockStream = jest.fn();
 const mockHomeworkStatePost = jest.fn();
 const mockRecordSystemPrompt = jest.fn();
 const mockRecordSessionEvent = jest.fn();
+const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
 const mockReplace = jest.fn();
 const mockClassifySubject = jest.fn();
+const mockDirectStartSession = jest.fn();
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -31,12 +33,16 @@ jest.mock('../../../components/session', () => ({
     subtitle,
     messages,
     inputAccessory,
+    inputMode,
+    onInputModeChange,
     onSend,
     renderMessageActions,
   }: {
     subtitle?: string;
     messages?: Array<{ id: string; content: string }>;
     inputAccessory?: React.ReactNode;
+    inputMode?: 'text' | 'voice';
+    onInputModeChange?: (mode: 'text' | 'voice') => void;
     onSend: (text: string) => void;
     renderMessageActions?: (message: {
       id: string;
@@ -51,6 +57,7 @@ jest.mock('../../../components/session', () => ({
     return (
       <View>
         <Text testID="session-subtitle">{subtitle}</Text>
+        <Text testID="mock-input-mode">{inputMode ?? 'text'}</Text>
         {(messages ?? []).map((message) => (
           <View key={message.id} testID={`mock-message-${message.id}`}>
             <Text>{message.content}</Text>
@@ -58,6 +65,18 @@ jest.mock('../../../components/session', () => ({
           </View>
         ))}
         {inputAccessory}
+        <Pressable
+          testID="mock-set-voice-mode"
+          onPress={() => onInputModeChange?.('voice')}
+        >
+          <Text>Voice mode</Text>
+        </Pressable>
+        <Pressable
+          testID="mock-set-text-mode"
+          onPress={() => onInputModeChange?.('text')}
+        >
+          <Text>Text mode</Text>
+        </Pressable>
         <Pressable
           testID="manual-send-button"
           onPress={() => onSend('Solve 2x + 5 = 17')}
@@ -95,6 +114,7 @@ jest.mock('../../../hooks/use-sessions', () => ({
   useSessionTranscript: () => ({ data: null }),
   useRecordSystemPrompt: () => ({ mutateAsync: mockRecordSystemPrompt }),
   useRecordSessionEvent: () => ({ mutateAsync: mockRecordSessionEvent }),
+  useSetSessionInputMode: () => ({ mutateAsync: mockSetSessionInputMode }),
   useFlagSessionContent: () => ({ mutateAsync: mockFlagSessionContent }),
   useParkingLot: () => ({ data: [], isLoading: false }),
   useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
@@ -196,6 +216,13 @@ jest.mock('../../../lib/api-client', () => ({
         },
       },
     },
+    subjects: {
+      ':subjectId': {
+        sessions: {
+          $post: mockDirectStartSession,
+        },
+      },
+    },
   }),
 }));
 
@@ -273,8 +300,17 @@ describe('SessionScreen homework flow', () => {
       }
     );
     mockRecordSystemPrompt.mockResolvedValue({ ok: true });
+    mockSetSessionInputMode.mockResolvedValue({
+      session: { id: 'session-1', inputMode: 'voice' },
+    });
     mockFlagSessionContent.mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
+    });
+    mockDirectStartSession.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        session: { id: 'session-1' },
+      }),
     });
     mockClassifySubject.mockResolvedValue({
       candidates: [],
@@ -483,42 +519,26 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
-  it('shows disambiguation buttons for ambiguous multi-candidate classification', async () => {
-    (useLocalSearchParams as jest.Mock).mockReturnValue({
-      mode: 'learning',
-    });
-    mockClassifySubject.mockResolvedValue({
-      candidates: [
-        { subjectId: 'subject-1', subjectName: 'Math', confidence: 0.6 },
-        { subjectId: 'subject-2', subjectName: 'Physics', confidence: 0.55 },
-      ],
-      needsConfirmation: true,
-    });
-
+  it('persists input-mode changes once the session exists', async () => {
     const screen = render(<SessionScreen />);
 
     fireEvent.press(screen.getByTestId('manual-send-button'));
     await flushAsyncWork();
 
     await waitFor(() => {
-      expect(screen.getByTestId('subject-disambiguation')).toBeTruthy();
+      expect(mockStartSession).toHaveBeenCalledTimes(1);
     });
 
-    // Verify both candidate buttons appear
-    expect(screen.getByTestId('subject-pick-subject-1')).toBeTruthy();
-    expect(screen.getByTestId('subject-pick-subject-2')).toBeTruthy();
-    expect(screen.getByText('Math')).toBeTruthy();
-    expect(screen.getByText('Physics')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('mock-set-voice-mode'));
 
-    // Verify the disambiguation prompt message content
-    expect(
-      screen.getByText(
-        'This sounds like it could be **Math** or **Physics**. Which one are we working on?'
-      )
-    ).toBeTruthy();
+    await waitFor(() => {
+      expect(mockSetSessionInputMode).toHaveBeenCalledWith({
+        inputMode: 'voice',
+      });
+    });
   });
 
-  it('shows a wrong-subject recovery chip and replaces the session route in place', async () => {
+  it('prompts for subject resolution before starting a session when classification is ambiguous', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
     });
@@ -529,6 +549,11 @@ describe('SessionScreen homework flow', () => {
           subjectName: 'Math',
           confidence: 0.62,
         },
+        {
+          subjectId: 'subject-2',
+          subjectName: 'Physics',
+          confidence: 0.58,
+        },
       ],
       needsConfirmation: true,
     });
@@ -539,22 +564,30 @@ describe('SessionScreen homework flow', () => {
     await flushAsyncWork();
 
     await waitFor(() => {
-      expect(screen.getByText('Wrong subject')).toBeTruthy();
+      expect(screen.getByTestId('session-subject-resolution')).toBeTruthy();
+      expect(screen.getAllByText(/math or physics/i).length).toBeGreaterThan(0);
     });
 
-    fireEvent.press(screen.getByTestId('quick-chip-wrong_subject'));
-    fireEvent.press(screen.getByTestId('switch-topic-topic-1'));
+    expect(mockStartSession).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('subject-resolution-subject-2'));
+    await flushAsyncWork();
 
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/(learner)/session',
-        params: {
-          mode: 'learning',
-          subjectId: 'subject-1',
-          subjectName: 'Math',
-          topicId: 'topic-1',
-        },
+      expect(mockDirectStartSession).toHaveBeenCalledWith({
+        param: { subjectId: 'subject-2' },
+        json: expect.objectContaining({
+          subjectId: 'subject-2',
+          inputMode: 'text',
+        }),
       });
+      expect(mockStream).toHaveBeenCalledWith(
+        'Solve 2x + 5 = 17',
+        expect.any(Function),
+        expect.any(Function),
+        'session-1',
+        undefined
+      );
     });
   });
 });

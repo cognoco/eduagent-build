@@ -15,6 +15,7 @@ import {
   RetentionSignal,
   type RetentionStatus,
 } from '../../components/progress';
+import { BrandCelebration } from '../../components/common';
 import { useThemeColors } from '../../lib/theme';
 import { useSubjects, useUpdateSubject } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
@@ -203,9 +204,24 @@ export default function LearningBookScreen() {
   const subjectCount = subjects?.length ?? 0;
   const selectedSubject =
     subjects?.find((subject) => subject.id === selectedSubjectId) ?? null;
+  const progressBySubjectId = new Map(
+    (overallProgress?.subjects ?? []).map((subject) => [
+      subject.subjectId,
+      subject,
+    ])
+  );
   const subjectsForOverview = selectedSubject
     ? [selectedSubject]
     : subjects ?? [];
+  const visibleProgressSubjects = subjectsForOverview
+    .map((subject) => progressBySubjectId.get(subject.id))
+    .filter((subject) => subject != null);
+  const showCurriculumCompleteBanner =
+    visibleProgressSubjects.length > 0 &&
+    visibleProgressSubjects.every(
+      (subject) =>
+        subject.topicsTotal > 0 && subject.topicsVerified >= subject.topicsTotal
+    );
   const showTopicLoadingState =
     !isInitialLoading &&
     !hasBlockingError &&
@@ -414,6 +430,41 @@ export default function LearningBookScreen() {
                 </Pressable>
               </View>
             )}
+
+            {showCurriculumCompleteBanner ? (
+              <View
+                className="bg-surface rounded-card px-4 py-5 mb-3"
+                testID="learning-book-curriculum-complete"
+              >
+                <View className="flex-row items-start">
+                  <View className="me-3 mt-1">
+                    <BrandCelebration size={36} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-body font-semibold text-text-primary">
+                      {selectedSubject
+                        ? `You've covered everything in ${selectedSubject.name}!`
+                        : "You've covered everything here!"}
+                    </Text>
+                    <Text className="text-body-sm text-text-secondary mt-2">
+                      Add a fresh subject when you want something new, or keep
+                      revisiting these topics to make the learning stick.
+                    </Text>
+                  </View>
+                </View>
+                <Pressable
+                  onPress={() => router.push('/create-subject')}
+                  className="bg-primary rounded-button py-3 mt-4 items-center"
+                  testID="learning-book-add-subject"
+                  accessibilityRole="button"
+                  accessibilityLabel="Add another subject"
+                >
+                  <Text className="text-text-inverse text-body font-semibold">
+                    Add another subject
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             {filteredTopics.length > 0 ? (
               filteredTopics.map((topic) => (

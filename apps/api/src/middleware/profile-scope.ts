@@ -4,7 +4,6 @@
 // ---------------------------------------------------------------------------
 
 import { createMiddleware } from 'hono/factory';
-import { birthYearFromDateLike } from '@eduagent/schemas';
 import type { Account } from '../services/account';
 import { getProfile, findOwnerProfile } from '../services/profile';
 import type { Database } from '@eduagent/database';
@@ -54,8 +53,7 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
           if (owner) {
             c.set('profileId', owner.id);
             c.set('profileMeta', {
-              birthYear:
-                owner.birthYear ?? birthYearFromDateLike(owner.birthDate),
+              birthYear: owner.birthYear ?? null,
               location: owner.location,
               consentStatus: owner.consentStatus,
             });
@@ -84,7 +82,7 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
     }
     c.set('profileId', profile.id);
     c.set('profileMeta', {
-      birthYear: profile.birthYear ?? birthYearFromDateLike(profile.birthDate),
+      birthYear: profile.birthYear ?? null,
       location: profile.location,
       consentStatus: profile.consentStatus,
     });

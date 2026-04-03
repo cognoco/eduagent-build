@@ -239,6 +239,7 @@ export type CoachingCard = z.infer<typeof coachingCardSchema>;
 export const homeCardIdSchema = z.enum([
   'resume_session',
   'restore_subjects',
+  'curriculum_complete',
   'review',
   'study',
   'homework',

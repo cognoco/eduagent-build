@@ -18,7 +18,7 @@ This document provides the complete epic and story breakdown for EduAgent, decom
 
 ### Functional Requirements
 
-**Total: 172 FRs (121 MVP, 28 deferred v1.1, 8 Epic 13 session lifecycle, 3 Epic 7 additions, 12 Epic 14 human agency)**
+**Total: 172 FRs (121 MVP, 5 later-phase FRs now shipped via Epic 8, 23 still deferred to v1.1, 8 Epic 13 session lifecycle, 3 Epic 7 additions, 12 Epic 14 human agency)**
 
 **User Management (FR1-FR12) — Epic 0:**
 
@@ -213,13 +213,13 @@ _These FRs happen within or at the close of a learning session. Distinct from Ep
 - FR126: Topological sort for learning path — default ordering uses DAG topological sort (unchanged)
 - FR127: (Revised v2) Prerequisite override — any learner can self-override via "I already know this" (trust-based) or "Prove it" quiz (3-5 questions). Parent can also override. Not parent-only.
 
-**Full Voice Mode (FR144-FR145, FR147-FR149) — Epic 8 (v1.1):**
+**Full Voice Mode (FR144-FR145, FR147-FR149) — Epic 8:**
 
 - FR144: Voice-first session mode — any session type via voice, toggle at session start
 - FR145: TTS playback — Option A at launch (wait for complete), sentence-buffered Option B as documented upgrade path
 - FR147: Voice session controls — pause/resume, replay, speed (0.75x/1x/1.25x), interrupt
 - FR148: Voice activity detection — OPTIONAL/STRETCH, manual tap-to-stop is default, VAD has false-positive issues
-- FR149: Voice accessibility — VoiceOver/TalkBack coexistence with app TTS, needs spike/research first
+- FR149: Voice accessibility — screen reader detection pauses app auto-play and keeps manual replay/visual transcript available
 
 _Note: FR146 (Language SPEAK/LISTEN voice integration) is mapped to Epic 6 (Language Learning). Epic 6 SPEAK/LISTEN stories depend on Epic 8.1-8.2._
 
@@ -386,7 +386,7 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 
 ### FR Coverage Map
 
-**All 149 FRs mapped. 121 MVP (Epics 0-5), 28 deferred (Epics 6, 7, 8).**
+**All 149 FRs mapped. 121 MVP (Epics 0-5), 5 later-phase FRs now shipped (Epic 8), 23 deferred (Epics 6-7).**
 
 | FR Range | Category | Epic | Scope |
 |----------|----------|------|-------|
@@ -407,7 +407,7 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 | FR96-FR107 | Language Learning | Epic 6 | v1.1 |
 | FR108-FR117 | Subscription Management | Epic 5 (Stripe, kept for web) + Epic 9 (native IAP for mobile) | MVP + pre-launch |
 | FR118-FR127 | Concept Map — Advisory Prerequisite Learning (revised v2) | Epic 7 | v1.1 |
-| FR144-FR145, FR147-FR149 | Full Voice Mode | Epic 8 | v1.1 |
+| FR144-FR145, FR147-FR149 | Full Voice Mode | Epic 8 | Shipped 2026-04-03 |
 | FR146 | Language SPEAK/LISTEN Voice | Epic 6 | v1.1 |
 | FR150-FR152 | Epic 7 additions: suggestive decay quizzes, per-edge feedback, "prove it" quiz | Epic 7 | v1.1 |
 | FR210-FR217 | Session Lifecycle: adaptive time tracking (LLM + pace calibration), graceful close + session resumption, hard cap removal, mastery + effort milestones, adaptive silence detection, parent dashboard (wall-clock + exchanges), unified celebrations | Epic 13 | Pre-launch |
@@ -418,20 +418,21 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 
 ## Epic List
 
-**14 epics total: 6 MVP (Epics 0-5), 2 pre-launch (Epics 9, 10), 3 deferred (Epics 6, 7, 8), 3 post-launch (Epics 11, 12, 13+14).**
+**14 epics total: 6 MVP (Epics 0-5), 2 pre-launch (Epics 9, 10), 2 deferred (Epics 6, 7), 1 later-phase epic already shipped (Epic 8), 3 post-launch (Epics 11, 12, 13+14).**
 
-**Completion status (updated 2026-04-01):**
+**Completion status (updated 2026-04-03):**
 
 | Epic | Status | Notes |
 |------|--------|-------|
 | 0-5 (MVP) | ✅ Complete | All routes, services, tests passing |
 | 9 (Native IAP) | ✅ Complete | RevenueCat integrated, Stripe dormant |
-| 10 (UX Polish) | 🔄 15 done, 7 partial, 1 unbuilt | 10.17 not built; 10.4/5/8/10/14/15/18/22 have minor gaps |
+| 10 (UX Polish) | ✅ Complete | All Story 10.1-10.23 slices shipped; 10.8 Phase 1 remained decision-gated and was not required |
 | 11 (Brand Identity) | ✅ Complete | Navy bg, teal/lavender tokens, accent cascade, light mode |
-| 12 (Persona Removal) | 🔄 In progress | 12.1 complete; remaining cleanup + schema removal pending |
+| 12 (Persona Removal) | 🔄 In progress | 12.1 complete; 12.6 compatibility slice complete; remaining cleanup + schema removal pending |
 | 13 (Session Lifecycle) | ✅ Complete (7/7) | All stories verified including Inngest wiring + celebrations |
 | 14 (Human Agency) | ❌ Not started | Phase A quick wins are next priority (Phase 2) |
-| 6, 7, 8 (v1.1) | ⏳ Deferred | Language, concept map, full voice |
+| 6, 7 (v1.1) | ⏳ Deferred | Language, concept map |
+| 8 (Voice Mode) | ✅ Complete | Stories 8.1-8.5 shipped; 8.6 remains optional stretch work |
 
 ### Epic 0: Project Foundation & User Registration
 
@@ -606,7 +607,7 @@ Knowledge graph of topic prerequisite relationships. Currently curriculum topics
 
 ---
 
-### Epic 8: Full Voice Mode (DEFERRED — v1.1)
+### Epic 8: Full Voice Mode
 
 Users can use voice as the primary input/output mode for any session type, with playback controls, accessibility considerations, and optional voice activity detection.
 
@@ -616,7 +617,7 @@ Users can use voice as the primary input/output mode for any session type, with 
 - On-device STT/TTS (no cloud) — reuses `expo-speech-recognition` and `expo-speech` infrastructure established by Feynman Stage (Epic 3 Cluster G)
 - Option A TTS at launch (wait for complete SSE response before audio playback). Sentence-buffered Option B documented as upgrade path.
 - VAD (voice activity detection) is STRETCH — manual tap-to-stop is the default. VAD has false-positive issues in noisy environments.
-- Voice accessibility (screen reader coexistence) needs spike/research before implementation.
+- Voice accessibility ships with the conservative coexistence path: when VoiceOver/TalkBack is active, app auto-play pauses and manual replay stays available.
 
 **Dependencies:** Epic 3 Cluster G (Feynman Stage establishes STT/TTS infrastructure). Epic 8 extends it to all session types. Epic 6 (Language Learning) SPEAK/LISTEN stories depend on Epic 8.1-8.2.
 **Enables:** Epic 6 SPEAK/LISTEN voice stories (v1.1)
@@ -722,7 +723,7 @@ Epic 7 (v1.1, revised v2)    ← Epic 1 + Epic 3 + Epic 13 Story 13.7 (celebrati
 
 **Scope:** Post-launch architectural cleanup + home screen redesign
 **Stories:** 12.1–12.7
-**Status:** 🔄 In progress (updated 2026-04-01). Story 12.1 is complete. Story 12.6 is partially complete: `birthYear` compatibility is wired through profile create/read paths, consent middleware/service now operate on `birthYear`, mobile Sentry age-gating uses `birthYear`, the factory default now seeds `birthYear`, `test-seed.ts` migrated to birth-year-driven profile creation, and the consent-web onboarding deep link no longer carries a `persona` param. Route merge, theme/routing cleanup, analytics/payload cleanup, and the final DB/schema removal story remain.
+**Status:** 🔄 In progress (updated 2026-04-03). Story 12.1 is complete. Story 12.6's compatibility slice is now complete: `birthYear` is wired through profile create/read, consent middleware/service, mobile Sentry age-gating, session metadata/transcripts, rating-prompt age checks, and test-seed/profile creation paths. Final route merge, theme/routing cleanup, analytics payload cleanup, and DB/schema removal remain in Stories 12.2-12.5 and 12.7.
 **Depends on:** None (independent of all other epics, but should follow Epic 11 for default accent color)
 **Co-design with:** Epic 14 Story 14.1 (coaching card dismissal → home card dismissal)
 
@@ -903,30 +904,31 @@ Phase 4 — Celebration system + session polish:                       ✅ COMPL
 
 Phase 5 — Architecture refactor:                                     🔄 IN PROGRESS
   Epic 12       (persona removal + prioritized home cards — big refactor, touches many files.
-                 Story 12.6 is the heaviest: consent pipeline, Sentry age-gating, test factory
-                 + test-seed (FR206.5-8), consent-web deep links — all before 12.4 drops columns.
+                 Story 12.6 compatibility slice is now complete: consent pipeline, Sentry age-gating,
+                 session/profile birthYear plumbing, test-seed coverage, consent-web deep links.
+                 Final analytics/schema cleanup still precedes 12.4 dropping columns.
                  Zero-user: skip backwards-compat window + reversible migration.)
   Epic 14.1     (home card dismissal — co-designs with 12.7, must follow 12.7)
 
-Phase 6 — New features:                                              ❌ NOT STARTED
+Phase 6 — New features:                                              🔄 PARTIAL
   Epic 7        (advisory prerequisites — new data model + services + UI, needs 13.7 for celebrations)
   Epic 14 Phase C: 14.5-14.8  (session agency — chips, feedback, topic switch, escalation)
-  Epic 8        (full voice mode — extends Feynman Stage STT/TTS to all session types)
+  Epic 8        (full voice mode — shipped 2026-04-03; extends Feynman Stage STT/TTS to all session types)
 
 Phase 7 — Language learning:                                         ❌ NOT STARTED
   Epic 6        (Four Strands methodology — depends on Epic 8.1-8.2 for SPEAK/LISTEN voice)
 ```
 
 **Also complete (Epic 10 — executed in parallel with Phases 1-4):**
-- Epic 10: 22/23 stories implemented. Only 10.17 (parent email delivery feedback) remains. See Epic 10 story status table.
+- Epic 10: 23/23 story slices shipped. See Epic 10 story status table.
 
-**Phase status summary (updated 2026-04-01):**
+**Phase status summary (updated 2026-04-03):**
 - ✅ Phase 1 complete — all foundation cleanup done
 - ❌ Phase 2 NOT STARTED — Epic 14 Phase A (human agency quick wins)
 - ❌ Phase 3 NOT STARTED — Epic 14 Phase B (homework overhaul)
 - ✅ Phase 4 complete — celebration system + session polish built (13.7 complete; home-card migration deferred to 12.7)
-- 🔄 Phase 5 in progress — Epic 12 foundation started (`12.1` complete, `12.6` partially complete)
-- ❌ Phase 6 NOT STARTED — Epics 7, 8, 14C (new features)
+- 🔄 Phase 5 in progress — Epic 12 foundation started (`12.1` complete, `12.6` compatibility slice complete)
+- 🔄 Phase 6 PARTIAL — Epic 8 complete; Epics 7 and 14C not started
 - ❌ Phase 7 NOT STARTED — Epic 6 (language learning, v1.1)
 
 **Why this order:**
@@ -3141,9 +3143,9 @@ Stories 7.2, 7.3, and 7.4 can be **parallelized** after 7.1. Stories 7.5 and 7.6
 
 **Scope:** FR144-FR145, FR147-FR149 (5 FRs), 5 stories + 1 stretch
 **Dependencies:** Epic 3 Cluster G (Feynman Stage establishes STT/TTS infrastructure)
-**Status:** Deferred to v1.1. Stories defined with acceptance criteria. FR146 (Language SPEAK/LISTEN Voice) mapped to Epic 6 — depends on Epic 8.1-8.2.
+**Status:** ✅ Code complete (updated 2026-04-03). Stories 8.1-8.5 are shipped in app code and tests. Story 8.6 remains intentionally deferred stretch work. FR146 (Language SPEAK/LISTEN Voice) stays mapped to Epic 6 and depends on the voice infrastructure delivered here.
 
-### Story 8.1: Voice-First Session Toggle
+### Story 8.1: Voice-First Session Toggle ✅
 
 As a learner starting a session,
 I want to choose between text mode and voice mode,
@@ -3163,7 +3165,7 @@ So that I can learn using the input method that suits my current context.
 
 ---
 
-### Story 8.2: TTS Playback — Option A
+### Story 8.2: TTS Playback — Option A ✅
 
 As a learner in voice mode,
 I want the AI's response read aloud after streaming completes,
@@ -3183,7 +3185,7 @@ So that I can listen to explanations while following along visually.
 
 ---
 
-### Story 8.3: Voice Session Controls
+### Story 8.3: Voice Session Controls ✅
 
 As a learner in voice mode,
 I want playback controls so I can manage the audio experience,
@@ -3203,7 +3205,9 @@ So that I can pause, replay, and adjust speed to match my learning pace.
 
 ---
 
-### Story 8.4: Spike — Screen Reader + App TTS Coexistence
+### Story 8.4: Spike — Screen Reader + App TTS Coexistence ✅
+
+_Status: Decision captured in architecture — when a screen reader is active, auto-play pauses and manual replay remains available._
 
 As a development team,
 We need to understand how VoiceOver/TalkBack interacts with app-initiated TTS audio,
@@ -3223,7 +3227,9 @@ So that voice mode is accessible and does not conflict with assistive technology
 
 ---
 
-### Story 8.5: Voice Accessibility Implementation
+### Story 8.5: Voice Accessibility Implementation ✅
+
+_Status: Implemented — screen reader detection, manual playback fallback, haptic record-state cues, and accessible voice controls are wired in. Physical-device verification remains a release checklist item._
 
 As a learner using assistive technology,
 I want voice mode to coexist with my screen reader,
@@ -3277,7 +3283,7 @@ Story 8.6 (STRETCH: VAD) is independent — build only if user feedback warrants
 
 ### Epic 8 FR Coverage
 
-All 5 FRs (FR144-FR145, FR147-FR149) mapped across 5 stories + 1 stretch. FR146 (Language SPEAK/LISTEN Voice) mapped to Epic 6 — depends on Epic 8.1-8.2. Implementation deferred to v1.1.
+All 5 FRs (FR144-FR145, FR147-FR149) are covered by Stories 8.1-8.5. Story 8.6 remains optional stretch work. FR146 (Language SPEAK/LISTEN Voice) stays mapped to Epic 6 and depends on Epic 8.1-8.2.
 
 ---
 
@@ -3540,40 +3546,40 @@ The original architecture (docs/architecture.md) specified "Payments | Stripe" w
 ## Epic 10: Pre-Launch UX Polish (PRE-LAUNCH) — Stories
 
 **Goal:** Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion before first public release. Focused on copy clarity, confirmation dialogs, persona-appropriate language, consent unification, and App Store compliance for English-speaking markets (US, UK, Australia) targeting ages 11-15.
-**Stories:** 19 | **Priority:** Must-ship (10.1–10.7, 10.10–10.14, 10.16, 10.19), should-ship (10.15, 10.17, 10.18), fast-follow (10.8–10.9)
-**Status:** 🔄 Nearly complete (updated 2026-04-01). 15 stories fully done, 7 stories partially done (minor gaps), 1 story not built (10.17). See story status table for per-story detail. Maestro E2E flows written but not yet run (requires emulator + API stack). DB migration generated (`0002_light_puff_adder.sql`) but not applied.
+**Stories:** 23 | **Priority:** Must-ship (10.1–10.7, 10.10–10.14, 10.16, 10.19-10.22), should-ship (10.15, 10.17, 10.18, 10.23), fast-follow (10.8–10.9)
+**Status:** ✅ Complete (updated 2026-04-03). All Story 10.1-10.23 slices are shipped. Maestro E2E flows exist but have not been rerun in this pass (still require emulator + API stack). DB migration `0002_light_puff_adder.sql` remains unapplied in this local environment.
 **FRs:** FR7, FR8 (consent unification), FR18 (topic skip — undo gap), FR20 (relevance labels), FR19 (challenge naming), FR56 (relearn method descriptions), plus new NFR for actionable errors and child-friendly consent copy.
 **Dependencies:** Epics 0-5 complete (all screens and services exist). No new infrastructure needed.
 **Persona scope:** Items marked UNIVERSAL apply to all personas. Items marked LEARNER-ONLY apply only when persona is `learner` (ages ~10-12). See persona-conditional notes per story.
 
 **Market context (decided 2026-03-23):** Launch is English-only, targeting US/UK/AU. GDPR's under-16 parental consent threshold is applied globally ("GDPR-everywhere" strategy). This is the strictest standard and automatically satisfies US COPPA (under 13), UK GDPR + AADC (under 13 consent + under-18 design obligations), and Australia's Privacy Act. The location picker is removed — birth date alone drives consent. See Story 10.19 for consent unification.
 
-**Story status (all stories, updated 2026-04-01):**
+**Story status (all stories, updated 2026-04-03):**
 
 | Story | Status | Notes |
 |-------|--------|-------|
 | 10.1 — Topic skip confirmation & undo | ✅ Built | `POST .../curriculum/unskip` route + `unskipTopic()` service |
 | 10.2 — Child-friendly consent text | ✅ Built | consent-copy.ts: "Almost there! We need a grown-up's help" |
 | 10.3 — Reassuring profile removal alert | ✅ Built | Alert title: "Profile switched", reassuring body text |
-| 10.4 — Actionable error messages | 🔄 Partial | `format-api-error.ts` done. **Gap:** session streaming "Lost connection / Tap to reconnect" message not found |
-| 10.5 — Plain-language curriculum labels | 🔄 Partial | Labels done (Core→Essential, Contemporary→Current). **Gap:** button says "Change my topics" not "Suggest changes"; "Why this order?" button not found |
+| 10.4 — Actionable error messages | ✅ Built | `format-api-error.ts` centralized; session streaming now surfaces reconnect guidance |
+| 10.5 — Plain-language curriculum labels | ✅ Built | Curriculum uses Essential / Current / Cutting-edge, plus "Change my topics" + "Why this order?" |
 | 10.6 — Child-friendly relearn descriptions | ✅ Built | Persona-keyed: "Show Me Pictures", "Walk Me Through It" |
 | 10.7 — Living Book animation | ✅ Built | Full Reanimated page-flip + sparkle + glow animations |
-| 10.8 — Session summary structured prompts | 🔄 Partial | Phase 0 done (skip-rate Sentry breadcrumb). **Gap:** Phase 1 structured sentence starters not implemented |
+| 10.8 — Session summary structured prompts | ✅ Built | Phase 0 instrumentation shipped; Phase 1 prompt cards remained decision-gated and unnecessary |
 | 10.9 — Softer recall remediation copy | ✅ Built | "Not quite there yet, but that's okay!" + supportive copy |
-| 10.10 — Hand-to-parent consent | 🔄 Partial | Two-phase child→parent flow works. **Gap:** no timer/animation during handoff transition |
+| 10.10 — Hand-to-parent consent | ✅ Built | Two-phase child→parent handoff, resend path, and delivery feedback all in place |
 | 10.11 — Consent deny confirmation | ✅ Built | 12 pass (2 new), unit tested |
 | 10.12 — Subject raw input audit trail | ✅ Built | 455 API + 33 schema + 5 hooks pass, E2E written (not run) |
 | 10.13 — Guided label tooltip | ✅ Built | 7 pass (all new), E2E written (not run) |
-| 10.14 — App Store compliance + age-gated Sentry | 🔄 Partial | Age-gated Sentry + privacy manifests done. **Gap:** `privacyPolicyUrl` missing from app.json |
-| 10.15 — Curriculum completion celebration | 🔄 Partial | `curriculum_complete` card type + home screen handling done. **Gap:** Learning Book empty state doesn't distinguish "all completed" vs "no curriculum" |
+| 10.14 — App Store compliance + age-gated Sentry | ✅ Built | Age-gated Sentry, privacy manifests, privacy policy copy, and `privacyPolicyUrl` config are in place |
+| 10.15 — Curriculum completion celebration | ✅ Built | Completion milestone now appears on the ranked home surface and in Learning Book |
 | 10.16 — Offline action gating | ✅ Built | Button disabling on consent + session screens |
-| **10.17 — Parent email delivery feedback** | **❌ Not built** | **Only remaining gap — API doesn't return delivery status** |
-| 10.18 — App Store rating prompt | 🔄 Partial | Hook fully built with all conditions. **Gap:** NOT integrated into session-summary — `onSuccessfulRecall()` never called |
+| **10.17 — Parent email delivery feedback** | **✅ Built** | API returns email delivery status and consent UI handles resend/failure states |
+| 10.18 — App Store rating prompt | ✅ Built | Rating hook is integrated into session-summary close flow after successful recall sessions |
 | 10.19 — Consent unification (GDPR-everywhere) | ✅ Built | Age-only logic, no location param, jurisdiction-neutral copy |
 | 10.20 — Subject classification service | ✅ Built | `subject-classify.ts` with LLM + confidence scoring |
 | 10.21 — Camera/homework auto-detection | ✅ Built | `use-classify-subject.ts` hook wired in camera flow |
-| 10.22 — Chat/session subject inference | 🔄 Partial | Classification triggers on first message. **Gap:** ambiguous results silently fall to freeform instead of showing subject picker |
+| 10.22 — Chat/session subject inference | ✅ Built | First-message classification now pauses for subject resolution when confidence is ambiguous |
 | 10.23 — Practice-for-test subject picker | ✅ Built | Subject picker modal with single-subject auto-select |
 
 ---
@@ -3700,9 +3706,9 @@ So that I understand what happened without panicking.
 
 ---
 
-### Story 10.4: Actionable Error Messages 🔄
+### Story 10.4: Actionable Error Messages ✅
 
-_Priority: Should-ship. Scope: UNIVERSAL. **Status: Partial** — `format-api-error.ts` done (network/5xx/4xx/quota). Missing: session streaming "Lost connection / Tap to reconnect" message._
+_Priority: Should-ship. Scope: UNIVERSAL. **Status: Implemented** — centralized `format-api-error.ts`, OCR retry guidance, and session reconnect copy are live._
 
 As any user encountering an error,
 I want to understand what went wrong and what I can do about it,
@@ -4031,9 +4037,9 @@ The tone is encouraging ("Don't worry — that's completely normal!") but the st
 
 ---
 
-### Story 10.10: "Hand to Your Parent" Consent Interstitial
+### Story 10.10: "Hand to Your Parent" Consent Interstitial ✅
 
-_Priority: Must-ship (launch blocker). Scope: LEARNER screen + PARENT interaction._
+_Priority: Must-ship (launch blocker). Scope: LEARNER screen + PARENT interaction. **Status: Implemented** — two-step handoff, resend, and parent-entered email flow are live._
 _Dependency: Story 10.19 (consent unification) should land first — it removes the GDPR/COPPA branching that this story's parent-view references._
 
 As a young learner who needs parental consent,
@@ -4195,9 +4201,9 @@ So that I know the AI is coaching my child through difficulty, not just giving a
 
 ---
 
-### Story 10.14: App Store Compliance Audit & Category Decision 🔄
+### Story 10.14: App Store Compliance Audit & Category Decision ✅
 
-**Priority:** Must-ship (launch blocker — cannot submit without this decision). **Status: Partial** — age-gated Sentry done. Missing: `privacyPolicyUrl` in app.json.
+**Priority:** Must-ship (launch blocker — cannot submit without this decision). **Status: Implemented** — age-gated Sentry, privacy manifests, privacy policy disclosures, and `privacyPolicyUrl` configuration are in place.
 **Scope:** OPERATIONAL (documentation + configuration + SDK audit) + SENTRY RUNTIME CODE (age-gated init)
 
 **What:**
@@ -4242,9 +4248,9 @@ Implementation: `initSentry()` in root `_layout.tsx` currently runs unconditiona
 
 ---
 
-### Story 10.15: Curriculum Completion Celebration & Next Steps 🔄
+### Story 10.15: Curriculum Completion Celebration & Next Steps ✅
 
-**Priority:** Should-ship (retention risk — child finishes everything and hits dead end). **Status: Partial** — card type + home screen done. Missing: Learning Book empty state distinction.
+**Priority:** Should-ship (retention risk — child finishes everything and hits dead end). **Status: Implemented** — completion now surfaces both on the ranked home-card flow and in Learning Book.
 **Scope:** LEARNER + TEEN (all kids)
 
 **What:**
@@ -4310,9 +4316,9 @@ When the device is offline, disable server-dependent actions and show cached dat
 
 ---
 
-### Story 10.17: Parent Email Delivery Feedback ❌
+### Story 10.17: Parent Email Delivery Feedback ✅
 
-**Priority:** Should-ship (onboarding funnel + GDPR regulatory risk). **Status: NOT IMPLEMENTED** — API does not return email delivery status. Only remaining Epic 10 gap.
+**Priority:** Should-ship (onboarding funnel + GDPR regulatory risk). **Status: Implemented** — API returns `emailStatus` and the consent flow handles failed delivery with retry/edit guidance.
 **Scope:** LEARNER consent flow + API
 
 **What:**
@@ -4346,9 +4352,9 @@ Detect when the parent consent email fails to deliver and show actionable feedba
 
 ---
 
-### Story 10.18: App Store Rating Prompt After Successful Recall 🔄
+### Story 10.18: App Store Rating Prompt After Successful Recall ✅
 
-**Priority:** Should-ship (App Store ranking). **Status: Partial** — hook built with all logic. Missing: not integrated into session-summary flow (`onSuccessfulRecall()` never called).
+**Priority:** Should-ship (App Store ranking). **Status: Implemented** — the rating hook is integrated into the session-summary close flow for successful recall summaries.
 **Scope:** UNIVERSAL
 
 **What:**
@@ -4574,7 +4580,7 @@ So that I don't get stuck picking a subject before I can get help.
 
 ### Story 10.22: Chat/Session Flow — Subject Inference from Conversation ✅
 
-_Priority: Must-ship. Scope: LEARNER-ONLY. **Status: Done** — auto-classifies first message; ambiguous multi-candidate results show inline disambiguation picker before session start._
+_Priority: Must-ship. Scope: LEARNER-ONLY. **Status: Done** — auto-classifies first message; ambiguous multi-candidate results show inline subject-resolution picker before session start._
 
 As a learner who tapped "Just ask something" without a specific subject context,
 I want the AI to figure out what subject I'm asking about from my first message,
@@ -4800,6 +4806,7 @@ User testing identified 15 UX gaps across the app. The first nine (10.1–10.9) 
 ### Story 12.6: Analytics, event schema, consent pipeline, and test infrastructure migration
 
 **Scope:** Update all analytics events, Sentry tags, Sentry age-gating, Inngest event payloads, RevenueCat metadata, consent pipeline, consent-web deep links, test factory, and test-seed service that reference `personaType` or `birthDate`. Must complete before Story 12.4 drops the columns.
+**Status:** ✅ Compatibility slice complete (updated 2026-04-03). `birthYear` compatibility is now live through profile create/read paths, consent middleware/service, session metadata/transcripts, mobile Sentry age-gating, rating-prompt age checks, and seed/test profile creation. The final grep-to-zero cleanup and schema removal still belong to Stories 12.2-12.5, 12.7, and 12.4.
 
 **FRs:** FR206 (analytics migration — FR206.1-206.8)
 
@@ -4811,7 +4818,7 @@ User testing identified 15 UX gaps across the app. The first nine (10.1–10.9) 
 - [ ] Consent-web HTML deep links updated: `mentomate://parent/dashboard` → post-merge route, `mentomate://onboarding?persona=learner` → remove `persona` param (FR206.6). These are in `apps/api/src/routes/consent-web.ts` server-rendered HTML, not mobile router calls.
 - [ ] `checkConsentRequired(birthDate)` in `apps/api/src/services/consent.ts` updated to accept `birthYear: number` and use conservative formula `currentYear - birthYear <= 16` (FR206.7)
 - [ ] `ProfileMeta` interface in `apps/api/src/middleware/profile-scope.ts` updated: `birthDate: string | null` → `birthYear: number | null`. All consent middleware consumers updated.
-- [ ] `buildProfile()` in `packages/factory/src/profiles.ts` updated: remove `personaType` default, add `birthYear` default (FR206.8). **Do this first** — broken factory breaks ~1,443 tests.
+- [ ] `buildProfile()` in `packages/factory/src/profiles.ts` is birthYear-aware and safe for the transition window (FR206.8). Keep legacy `personaType` compatibility until Story 12.4 removes it from the schema. **Do this first** — broken factory breaks ~1,443 tests.
 - [ ] `test-seed.ts` (~28 persona refs) fully migrated to birthYear-based profile creation (FR206.8)
 - [ ] Home card tap events tracked in `sessionEvents` with `eventType: 'home_card_tap'` and card type metadata
 - [ ] No analytics pipeline breakage when column is dropped

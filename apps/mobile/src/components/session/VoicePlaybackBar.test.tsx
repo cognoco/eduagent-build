@@ -198,4 +198,14 @@ describe('VoicePlaybackBar', () => {
     const replay = screen.getByTestId('voice-replay-button');
     expect(replay.props.accessibilityState?.disabled).toBe(false);
   });
+
+  it('shows the screen-reader playback note when auto-play is paused', () => {
+    render(<VoicePlaybackBar {...defaultProps} screenReaderEnabled={true} />);
+
+    expect(
+      screen.getByText(
+        'Auto-play is paused while your screen reader is active.'
+      )
+    ).toBeTruthy();
+  });
 });

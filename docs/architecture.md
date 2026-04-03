@@ -50,7 +50,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | EVALUATE Verification / Devil's Advocate | FR128-FR133 | Epic 3 | Medium — plausibly flawed reasoning for student critique, Bloom's Level 5-6, reuses escalation rung system |
 | Analogy Domain Preferences | FR134-FR137 | Epic 3 | Low — per-subject analogy domain selection, LLM prompt injection, reuses existing teaching preferences infrastructure |
 | Feynman Stage (TEACH_BACK) | FR138-FR143 | Epic 3 | MVP — teach-back verification via voice, on-device STT/TTS |
-| Full Voice Mode | FR144-FR145, FR147-FR149 | Epic 8 | v1.1 — voice-first sessions, TTS playback, voice controls, accessibility |
+| Full Voice Mode | FR144-FR145, FR147-FR149 | Epic 8 | Shipped 2026-04-03 — voice-first sessions, TTS playback, voice controls, accessibility |
 
 **Non-Functional Requirements driving architecture:**
 
@@ -1144,7 +1144,7 @@ Voice-first session mode, orthogonal to session type (learning/homework/interlea
 - **TTS playback:** Option A at launch — wait for complete SSE response, then `expo-speech` reads aloud. Sentence-buffered Option B documented as upgrade path: sentence boundary detection is non-trivial (abbreviations like "Dr.", decimals like "3.14", URLs, code snippets all produce false splits). Option B requires a robust sentence tokenizer and introduces partial-playback/cancel complexity.
 - **Voice session controls:** pause/resume TTS, replay last response, speed control (0.75x/1x/1.25x via `expo-speech` rate parameter), interrupt (stop current TTS and begin new STT recording).
 - **VAD (FR148):** Optional/stretch — manual tap-to-stop is the reliable default. Voice Activity Detection has false positives in noisy environments (classrooms, public transport). If implemented, use `expo-speech-recognition`'s built-in silence detection with a conservative threshold (2s silence), not a custom VAD model.
-- **Voice accessibility (FR149):** Requires spike — VoiceOver/TalkBack compete with app TTS for the audio channel. Options: (1) detect screen reader active and defer (disable app TTS, rely on screen reader for all audio output), or (2) audio ducking (lower screen reader volume during app TTS). Visual transcript is always available as fallback. This is a genuine UX research question, not a simple implementation task.
+- **Voice accessibility (FR149):** Shipped with the conservative coexistence strategy: detect when a screen reader is active, suppress app auto-play, keep the visual transcript available, and expose manual replay/speed controls plus haptics for recording state changes. This avoids competing audio channels while preserving voice-mode access. Physical iOS/Android verification is still recommended before store submission, but the product decision is no longer open.
 - **Epic 8 dependency chain:** Epic 8 stories 8.1-8.2 (voice infrastructure + voice session mode) must complete before Epic 6 (Language Learning) SPEAK/LISTEN stories. Voice is the platform; language learning is a consumer.
 
 **Onboarding as route-level split, not conditional rendering:**
@@ -1450,7 +1450,7 @@ No contradictory decisions found. The Workers → Railway/Fly fallback path is c
 | Epic 5: Subscription | Stripe webhook-synced, `decrement_quota` PostgreSQL function, KV-cached subscription status, family pool with row-level locking | Full |
 | Epic 6: Language Learning (v1.1) | Deferred. Route/service/schema/component extension points documented. No blocking architectural debt. | Deferred by design |
 | Epic 7: Concept Map (v1.1) | `topic_prerequisites` join table, DAG cycle detection service, graph-aware coaching card precomputation, `prerequisiteContext` JSONB on adaptations | Planned (v1.1) |
-| Epic 8: Full Voice Mode (v1.1) | On-device STT/TTS pipeline (`expo-speech-recognition` + `expo-speech`), voice session controls (pause/resume/replay/speed), VAD as stretch, voice accessibility spike needed. Dependency: Epic 8 before Epic 6 SPEAK/LISTEN | Planned (v1.1) |
+| Epic 8: Full Voice Mode (v1.1) | On-device STT/TTS pipeline (`expo-speech-recognition` + `expo-speech`), voice session controls (pause/resume/replay/speed), session-level input mode for all session types, screen-reader-aware manual playback fallback, VAD left as stretch. Dependency: Epic 8 before Epic 6 SPEAK/LISTEN | Implemented (8.6 stretch deferred) |
 
 **Functional Requirements Coverage (121 MVP FRs):**
 

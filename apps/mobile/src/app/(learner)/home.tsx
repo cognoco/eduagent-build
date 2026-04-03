@@ -49,6 +49,7 @@ interface HomeCardModel {
   id:
     | 'resume_session'
     | 'restore_subjects'
+    | 'curriculum_complete'
     | 'review'
     | 'study'
     | 'homework'
@@ -354,6 +355,9 @@ export default function HomeScreen() {
         case 'restore_subjects':
           router.push('/(learner)/book' as never);
           return;
+        case 'curriculum_complete':
+          router.push('/create-subject' as never);
+          return;
         case 'review':
           if (card.subjectId) {
             router.push({
@@ -421,6 +425,11 @@ export default function HomeScreen() {
 
   const handleHomeCardSecondary = useCallback(
     async (card: HomeCardModel) => {
+      if (card.id === 'curriculum_complete') {
+        router.push('/(learner)/book' as never);
+        return;
+      }
+
       if (card.id !== 'resume_session' || !recoveryCard?.active) return;
 
       try {

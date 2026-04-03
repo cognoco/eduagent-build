@@ -113,6 +113,37 @@ export function useStartSession(subjectId: string): UseMutationResult<
   });
 }
 
+export function useSetSessionInputMode(
+  sessionId: string
+): UseMutationResult<
+  SessionStartResult,
+  Error,
+  { inputMode: 'text' | 'voice' }
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { inputMode: 'text' | 'voice' }) => {
+      const inputModeClient = (
+        client.sessions[':sessionId'] as Record<string, any>
+      )['input-mode'];
+      const res = await inputModeClient.$post({
+        param: { sessionId },
+        json: input,
+      });
+      await assertOk(res);
+      return (await res.json()) as SessionStartResult;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['session-transcript', sessionId],
+      });
+      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+    },
+  });
+}
+
 export function useSyncHomeworkState(
   sessionId: string
 ): UseMutationResult<

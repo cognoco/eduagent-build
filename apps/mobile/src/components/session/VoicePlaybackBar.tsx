@@ -19,6 +19,7 @@ export interface VoicePlaybackBarProps {
   onResume: () => void;
   onReplay: () => void;
   onRateChange: (rate: number) => void;
+  screenReaderEnabled?: boolean;
 }
 
 function nextRate(current: number): number {
@@ -36,73 +37,81 @@ export function VoicePlaybackBar({
   onResume,
   onReplay,
   onRateChange,
+  screenReaderEnabled = false,
 }: VoicePlaybackBarProps) {
   const colors = useThemeColors();
 
   return (
     <View
-      className="flex-row items-center gap-2 px-4 py-2 bg-surface border-t border-surface-elevated"
+      className="px-4 py-2 bg-surface border-t border-surface-elevated"
       testID="voice-playback-bar"
     >
-      {/* Replay */}
-      <Pressable
-        onPress={onReplay}
-        disabled={isSpeaking && !isPaused}
-        accessibilityState={{ disabled: isSpeaking && !isPaused }}
-        className="min-h-[44px] min-w-[44px] items-center justify-center"
-        accessibilityLabel="Replay last AI message"
-        accessibilityRole="button"
-        testID="voice-replay-button"
-      >
-        <Ionicons
-          name="play-back"
-          size={22}
-          color={isSpeaking && !isPaused ? colors.muted : colors.primary}
-        />
-      </Pressable>
-
-      {/* Pause/Resume (visible when speaking or paused) */}
-      {(isSpeaking || isPaused) && (
+      {screenReaderEnabled ? (
+        <Text className="text-caption text-text-secondary mb-2">
+          Auto-play is paused while your screen reader is active.
+        </Text>
+      ) : null}
+      <View className="flex-row items-center gap-2">
+        {/* Replay */}
         <Pressable
-          onPress={isPaused ? onResume : onPause}
+          onPress={onReplay}
+          disabled={isSpeaking && !isPaused}
+          accessibilityState={{ disabled: isSpeaking && !isPaused }}
           className="min-h-[44px] min-w-[44px] items-center justify-center"
-          accessibilityLabel={isPaused ? 'Resume speaking' : 'Pause speaking'}
+          accessibilityLabel="Replay last AI message"
           accessibilityRole="button"
-          testID="voice-pause-resume-button"
+          testID="voice-replay-button"
         >
           <Ionicons
-            name={isPaused ? 'play' : 'pause'}
+            name="play-back"
             size={22}
-            color={colors.primary}
+            color={isSpeaking && !isPaused ? colors.muted : colors.primary}
           />
         </Pressable>
-      )}
 
-      {/* Stop (visible when speaking or paused) */}
-      {(isSpeaking || isPaused) && (
+        {/* Pause/Resume (visible when speaking or paused) */}
+        {(isSpeaking || isPaused) && (
+          <Pressable
+            onPress={isPaused ? onResume : onPause}
+            className="min-h-[44px] min-w-[44px] items-center justify-center"
+            accessibilityLabel={isPaused ? 'Resume speaking' : 'Pause speaking'}
+            accessibilityRole="button"
+            testID="voice-pause-resume-button"
+          >
+            <Ionicons
+              name={isPaused ? 'play' : 'pause'}
+              size={22}
+              color={colors.primary}
+            />
+          </Pressable>
+        )}
+
+        {/* Stop (visible when speaking or paused) */}
+        {(isSpeaking || isPaused) && (
+          <Pressable
+            onPress={onStop}
+            className="min-h-[44px] min-w-[44px] items-center justify-center"
+            accessibilityLabel="Stop speaking"
+            accessibilityRole="button"
+            testID="voice-stop-button"
+          >
+            <Ionicons name="stop" size={22} color={colors.primary} />
+          </Pressable>
+        )}
+
+        {/* Speed badge */}
         <Pressable
-          onPress={onStop}
-          className="min-h-[44px] min-w-[44px] items-center justify-center"
-          accessibilityLabel="Stop speaking"
+          onPress={() => onRateChange(nextRate(rate))}
+          className="min-h-[44px] px-3 items-center justify-center rounded-button bg-surface-elevated"
+          accessibilityLabel={`Speech speed ${rate}x. Tap to change.`}
           accessibilityRole="button"
-          testID="voice-stop-button"
+          testID="voice-rate-button"
         >
-          <Ionicons name="stop" size={22} color={colors.primary} />
+          <Text className="text-caption font-semibold text-text-secondary">
+            {rate}x
+          </Text>
         </Pressable>
-      )}
-
-      {/* Speed badge */}
-      <Pressable
-        onPress={() => onRateChange(nextRate(rate))}
-        className="min-h-[44px] px-3 items-center justify-center rounded-button bg-surface-elevated"
-        accessibilityLabel={`Speech speed ${rate}x. Tap to change.`}
-        accessibilityRole="button"
-        testID="voice-rate-button"
-      >
-        <Text className="text-caption font-semibold text-text-secondary">
-          {rate}x
-        </Text>
-      </Pressable>
+      </View>
     </View>
   );
 }
