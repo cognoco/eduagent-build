@@ -170,6 +170,40 @@ export type CurriculumChallengeInput = z.infer<
   typeof curriculumChallengeSchema
 >;
 
+// --- Performance-driven curriculum adaptation (FR21) ---
+
+export const curriculumAdaptSignalSchema = z.enum([
+  'struggling',
+  'mastered',
+  'too_easy',
+  'too_hard',
+]);
+export type CurriculumAdaptSignal = z.infer<typeof curriculumAdaptSignalSchema>;
+
+export const curriculumAdaptRequestSchema = z.object({
+  /** Topic that triggered the adaptation */
+  topicId: z.string().uuid(),
+  /** Performance signal that drives reordering */
+  signal: curriculumAdaptSignalSchema,
+  /** Optional context for the adaptation audit trail */
+  context: z.string().max(500).optional(),
+});
+export type CurriculumAdaptRequest = z.infer<
+  typeof curriculumAdaptRequestSchema
+>;
+
+export const curriculumAdaptResponseSchema = z.object({
+  /** Whether the curriculum was actually reordered */
+  adapted: z.boolean(),
+  /** The reordered topic IDs (new sort order) */
+  topicOrder: z.array(z.string().uuid()),
+  /** Human-readable explanation of what changed */
+  explanation: z.string(),
+});
+export type CurriculumAdaptResponse = z.infer<
+  typeof curriculumAdaptResponseSchema
+>;
+
 // --- Subject Classification (Story 10.20) ---
 
 export const subjectClassifyInputSchema = z.object({

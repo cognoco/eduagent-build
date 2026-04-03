@@ -13,8 +13,12 @@ import {
   challengeCurriculum,
   explainTopicOrdering,
   addCurriculumTopic,
+  adaptCurriculumFromPerformance,
 } from './curriculum';
-import type { CurriculumInput } from '@eduagent/schemas';
+import type {
+  CurriculumInput,
+  CurriculumAdaptRequest,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -660,7 +664,9 @@ describe('challengeCurriculum', () => {
       'Focus on proofs instead of intros'
     );
 
-    const userPrompt = capturedMessages.find((message) => message.role === 'user');
+    const userPrompt = capturedMessages.find(
+      (message) => message.role === 'user'
+    );
     expect(userPrompt?.content).toContain('Goals: ace exams');
     expect(userPrompt?.content).toContain('Experience Level: advanced');
     expect(userPrompt?.content).toContain('comfortable with derivatives');
@@ -713,5 +719,218 @@ describe('explainTopicOrdering', () => {
 
     expect(typeof result).toBe('string');
     expect(result.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// adaptCurriculumFromPerformance tests (FR21)
+// ---------------------------------------------------------------------------
+
+describe('adaptCurriculumFromPerformance', () => {
+  const TOPIC_A = 'topic-a';
+  const TOPIC_B = 'topic-b';
+  const TOPIC_C = 'topic-c';
+  const TOPIC_D = 'topic-d';
+
+  function fourTopics() {
+    return [
+      mockTopicRow({ id: TOPIC_A, sortOrder: 0, title: 'Intro' }),
+      mockTopicRow({ id: TOPIC_B, sortOrder: 1, title: 'Variables' }),
+      mockTopicRow({ id: TOPIC_C, sortOrder: 2, title: 'Functions' }),
+      mockTopicRow({ id: TOPIC_D, sortOrder: 3, title: 'Modules' }),
+    ];
+  }
+
+  it('returns adapted: false when curriculum not found', async () => {
+    const db = createMockDb({ subjectFindFirst: undefined });
+    const request: CurriculumAdaptRequest = {
+      topicId: TOPIC_A,
+      signal: 'struggling',
+    };
+
+    const result = await adaptCurriculumFromPerformance(
+      db,
+      PROFILE_ID,
+      SUBJECT_ID,
+      request
+    );
+
+    expect(result.adapted).toBe(false);
+    expect(result.topicOrder).toEqual([]);
+    expect(result.explanation).toBe('No curriculum found.');
+  });
+
+  it('returns adapted: false when topic not in curriculum', async () => {
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
+      topicsFindMany: fourTopics(),
+    });
+    const request: CurriculumAdaptRequest = {
+      topicId: 'nonexistent-topic-id',
+      signal: 'mastered',
+    };
+
+    const result = await adaptCurriculumFromPerformance(
+      db,
+      PROFILE_ID,
+      SUBJECT_ID,
+      request
+    );
+
+    expect(result.adapted).toBe(false);
+    expect(result.topicOrder).toHaveLength(4);
+    expect(result.explanation).toBe('Topic not found in curriculum.');
+  });
+
+  it('moves a struggling topic later in order', async () => {
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
+      topicsFindMany: fourTopics(),
+    });
+    const request: CurriculumAdaptRequest = {
+      topicId: TOPIC_A,
+      signal: 'struggling',
+    };
+
+    const result = await adaptCurriculumFromPerformance(
+      db,
+      PROFILE_ID,
+      SUBJECT_ID,
+      request
+    );
+
+    expect(result.adapted).toBe(true);
+    // TOPIC_A was at index 0, should move to index 0+2 = 2
+    expect(result.topicOrder).toEqual([TOPIC_B, TOPIC_C, TOPIC_A, TOPIC_D]);
+    expect(result.explanation).toContain('Intro');
+    expect(result.explanation).toContain('later');
+  });
+
+  it('moves a mastered topic earlier in order', async () => {
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
+      topicsFindMany: fourTopics(),
+    });
+    const request: CurriculumAdaptRequest = {
+      topicId: TOPIC_D,
+      signal: 'mastered',
+    };
+
+    const result = await adaptCurriculumFromPerformance(
+      db,
+      PROFILE_ID,
+      SUBJECT_ID,
+      request
+    );
+
+    expect(result.adapted).toBe(true);
+    // TOPIC_D was at index 3, should move to index 3-2 = 1
+    expect(result.topicOrder).toEqual([TOPIC_A, TOPIC_D, TOPIC_B, TOPIC_C]);
+    expect(result.explanation).toContain('Modules');
+    expect(result.explanation).toContain('earlier');
+  });
+
+  it('records an adaptation audit row', async () => {
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
+      topicsFindMany: fourTopics(),
+    });
+    const request: CurriculumAdaptRequest = {
+      topicId: TOPIC_B,
+      signal: 'too_hard',
+      context: 'Learner stuck on types',
+    };
+
+    await adaptCurriculumFromPerformance(db, PROFILE_ID, SUBJECT_ID, request);
+
+    // db.insert is called for the adaptation audit row (last call)
+    expect(db.insert).toHaveBeenCalled();
+    const insertCalls = (db.insert as jest.Mock).mock.results;
+    const lastInsert = insertCalls[insertCalls.length - 1];
+    const insertedValues = lastInsert.value.values.mock.calls[0][0];
+    expect(insertedValues.profileId).toBe(PROFILE_ID);
+    expect(insertedValues.subjectId).toBe(SUBJECT_ID);
+    expect(insertedValues.topicId).toBe(TOPIC_B);
+    expect(insertedValues.skipReason).toContain('too_hard');
+    expect(insertedValues.skipReason).toContain('Learner stuck on types');
+  });
+
+  it('handles too_easy signal by moving topic earlier', async () => {
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
+      topicsFindMany: fourTopics(),
+    });
+    const request: CurriculumAdaptRequest = {
+      topicId: TOPIC_C,
+      signal: 'too_easy',
+    };
+
+    const result = await adaptCurriculumFromPerformance(
+      db,
+      PROFILE_ID,
+      SUBJECT_ID,
+      request
+    );
+
+    expect(result.adapted).toBe(true);
+    // TOPIC_C was at index 2, should move to index 2-2 = 0
+    expect(result.topicOrder).toEqual([TOPIC_C, TOPIC_A, TOPIC_B, TOPIC_D]);
+    expect(result.explanation).toContain('earlier');
+  });
+
+  it('clamps movement to array bounds', async () => {
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
+      topicsFindMany: fourTopics(),
+    });
+
+    // Move last topic even later (already at end)
+    const result = await adaptCurriculumFromPerformance(
+      db,
+      PROFILE_ID,
+      SUBJECT_ID,
+      { topicId: TOPIC_D, signal: 'struggling' }
+    );
+
+    expect(result.adapted).toBe(true);
+    // TOPIC_D at index 3, target 3+2=5 clamped to length 3, so goes to end
+    expect(result.topicOrder[result.topicOrder.length - 1]).toBe(TOPIC_D);
+  });
+
+  it('skips already-skipped topics in reorder', async () => {
+    const topics = [
+      mockTopicRow({ id: TOPIC_A, sortOrder: 0, title: 'Intro' }),
+      mockTopicRow({
+        id: TOPIC_B,
+        sortOrder: 1,
+        title: 'Variables',
+        skipped: true,
+      }),
+      mockTopicRow({ id: TOPIC_C, sortOrder: 2, title: 'Functions' }),
+      mockTopicRow({ id: TOPIC_D, sortOrder: 3, title: 'Modules' }),
+    ];
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
+      topicsFindMany: topics,
+    });
+
+    const result = await adaptCurriculumFromPerformance(
+      db,
+      PROFILE_ID,
+      SUBJECT_ID,
+      { topicId: TOPIC_A, signal: 'struggling' }
+    );
+
+    expect(result.adapted).toBe(true);
+    // Skipped TOPIC_B should not appear in topicOrder
+    expect(result.topicOrder).not.toContain(TOPIC_B);
+    expect(result.topicOrder).toHaveLength(3);
   });
 });
