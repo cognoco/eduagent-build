@@ -38,7 +38,10 @@ import {
 import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
 import { incrementQuota } from '../services/billing';
-import { shouldPromptCasualSwitch } from '../services/settings';
+import {
+  shouldPromptCasualSwitch,
+  shouldWarnSummarySkip,
+} from '../services/settings';
 import { startInterleavedSession } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
 
@@ -335,9 +338,13 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       );
     }
     const promptCasualSwitch = await shouldPromptCasualSwitch(db, profileId);
+    const warnSummarySkip = promptCasualSwitch
+      ? false
+      : await shouldWarnSummarySkip(db, profileId);
     return c.json({
       ...result,
       shouldPromptCasualSwitch: promptCasualSwitch,
+      shouldWarnSummarySkip: warnSummarySkip,
     });
   })
 

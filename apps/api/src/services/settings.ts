@@ -267,6 +267,9 @@ export function getLearningModeRules(mode: LearningMode): LearningModeRules {
 // Summary Skip Tracking (for >10 consecutive skip prompt — FR94)
 // ---------------------------------------------------------------------------
 
+/** Threshold for showing a warning before the full casual-switch prompt */
+export const SKIP_WARNING_THRESHOLD = 5;
+
 /** Threshold for prompting the learner to switch to Casual Explorer */
 export const CASUAL_SWITCH_PROMPT_THRESHOLD = 10;
 
@@ -336,6 +339,28 @@ export async function shouldPromptCasualSwitch(
   const skips = row?.consecutiveSummarySkips ?? 0;
 
   return mode === 'serious' && skips >= CASUAL_SWITCH_PROMPT_THRESHOLD;
+}
+
+/**
+ * Returns true when the learner has skipped >= 5 but < 10 consecutive summaries
+ * AND is in 'serious' mode. Used for an early warning before the casual-switch prompt.
+ */
+export async function shouldWarnSummarySkip(
+  db: Database,
+  profileId: string
+): Promise<boolean> {
+  const row = await db.query.learningModes.findFirst({
+    where: eq(learningModes.profileId, profileId),
+  });
+
+  const mode = row?.mode ?? 'serious';
+  const skips = row?.consecutiveSummarySkips ?? 0;
+
+  return (
+    mode === 'serious' &&
+    skips >= SKIP_WARNING_THRESHOLD &&
+    skips < CASUAL_SWITCH_PROMPT_THRESHOLD
+  );
 }
 
 // ---------------------------------------------------------------------------

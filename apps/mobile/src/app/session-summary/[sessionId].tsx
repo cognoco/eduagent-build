@@ -183,6 +183,29 @@ export default function SessionSummaryScreen() {
         level: 'info',
       });
 
+      // 5-skip warning (FR37) — early nudge before the 10-skip casual-switch prompt
+      if (
+        skipResult?.shouldWarnSummarySkip &&
+        !skipResult?.shouldPromptCasualSwitch
+      ) {
+        Alert.alert(
+          'Summaries help you learn',
+          'Writing a quick summary after each session strengthens your memory. Try it next time!',
+          [
+            {
+              text: 'Got it',
+              onPress: () => {
+                void (async () => {
+                  await maybePromptForRecall();
+                  router.replace('/(learner)/home');
+                })();
+              },
+            },
+          ]
+        );
+        return;
+      }
+
       if (skipResult?.shouldPromptCasualSwitch) {
         Alert.alert(
           'Try Casual Explorer?',
