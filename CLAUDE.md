@@ -89,6 +89,22 @@ The following CLIs are installed and authenticated in this environment:
 6. **To run a whole project's tests** (rare, only when truly needed):
    `pnpm exec nx test api --no-coverage`
 
+### Local Test Loop (MANDATORY before committing)
+
+**Every commit must be preceded by a local verification loop.** The pre-commit hook is a safety net, not a substitute for testing your own work.
+
+```
+implement → run findRelatedTests for EACH changed file → fix failures → re-run → ✅ all green → THEN commit
+```
+
+**Do NOT:**
+- Commit and rely on the pre-commit hook to catch issues
+- Skip `findRelatedTests` because "it's a small change"
+- Declare work done without showing test output
+- Run tests once, see failures, fix them, and commit without re-running
+
+**The commit is the LAST step, not the verification step.**
+
 ## Key Architecture Rules
 
 Read `docs/project_context.md` for the full rules. The critical ones:
