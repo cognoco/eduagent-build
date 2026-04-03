@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
-// VoiceRecordButton — Microphone button for STT input (FR138-143)
+// VoiceRecordButton — Microphone button for STT input (FR138-143, FR147)
 // Tap to start, tap to stop. Shows transcript preview before sending.
+// Haptic feedback on state transitions (FR147).
 // ---------------------------------------------------------------------------
 
 import { View, Text, Pressable } from 'react-native';
@@ -14,6 +15,7 @@ import Animated, {
 import { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../lib/theme';
+import { hapticLight, hapticMedium, hapticSuccess } from '../../lib/haptics';
 
 interface VoiceRecordButtonProps {
   isListening: boolean;
@@ -46,10 +48,19 @@ export function VoiceRecordButton({
     transform: [{ scale: pulseScale.value }],
   }));
 
+  const handlePress = () => {
+    if (isListening) {
+      hapticMedium();
+    } else {
+      hapticLight();
+    }
+    onPress();
+  };
+
   return (
     <Animated.View style={animatedStyle}>
       <Pressable
-        onPress={onPress}
+        onPress={handlePress}
         disabled={disabled}
         className={`rounded-full p-3 min-h-[44px] min-w-[44px] items-center justify-center ${
           isListening ? 'bg-danger' : 'bg-surface-elevated'
@@ -88,12 +99,22 @@ export function VoiceTranscriptPreview({
 }: VoiceTranscriptPreviewProps) {
   if (!transcript) return null;
 
+  const handleSend = () => {
+    hapticSuccess();
+    onSend();
+  };
+
+  const handleDiscard = () => {
+    hapticLight();
+    onDiscard();
+  };
+
   return (
     <View className="mx-4 mb-2 p-3 bg-surface-elevated rounded-xl">
       <Text className="text-body text-text-primary mb-2">{transcript}</Text>
       <View className="flex-row gap-2">
         <Pressable
-          onPress={onSend}
+          onPress={handleSend}
           className="flex-1 bg-primary rounded-button py-2 items-center min-h-[44px] justify-center"
           accessibilityLabel="Send voice message"
           accessibilityRole="button"
@@ -111,7 +132,7 @@ export function VoiceTranscriptPreview({
           <Text className="text-text-secondary font-semibold">Re-record</Text>
         </Pressable>
         <Pressable
-          onPress={onDiscard}
+          onPress={handleDiscard}
           className="bg-surface rounded-button px-4 py-2 items-center min-h-[44px] justify-center"
           accessibilityLabel="Discard recording"
           accessibilityRole="button"

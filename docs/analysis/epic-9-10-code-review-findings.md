@@ -1,11 +1,11 @@
 # Epic 9 + Epic 10 Code Review Findings
 
 Date: 2026-04-02
-Updated: 2026-04-02 after implementation follow-up
+Updated: 2026-04-03 — all findings resolved
 
 ## Status
 
-Most of the previously tracked Epic 9 + Epic 10 issues from the mixed gap-analysis document were fixed on 2026-04-02.
+All previously tracked Epic 9 + Epic 10 issues are now resolved.
 
 ## Resolved on 2026-04-02
 
@@ -38,12 +38,15 @@ Most of the previously tracked Epic 9 + Epic 10 issues from the mixed gap-analys
 - `apps/mobile/src/app/session-summary/[sessionId].tsx` now calls `useRatingPrompt()` on recall-style summary exits.
 - `packages/schemas/src/sessions.ts` and `apps/api/src/services/session.ts` now expose transcript `verificationType` so the summary screen can detect recall sessions.
 
-## Remaining open finding
+## Resolved on 2026-04-03
 
-### 1. Ambiguous first-message subject classification still falls straight through to freeform
+### 7. Ambiguous first-message subject classification now shows disambiguation picker
 
 - Epic/story: Epic 10, Story 10.22.
-- The current learner session flow still treats ambiguous classifications the same as no-match fallback instead of opening a confirmation or picker step.
+- When classification returns multiple candidates with `needsConfirmation: true`, the session flow now pauses before `ensureSession`, shows a natural disambiguation prompt ("This sounds like it could be **Math** or **Physics**. Which one are we working on?"), and renders tappable subject candidate buttons.
+- Tapping a candidate resolves the subject, adds a user message, and replays the buffered first message to start the session with the correct subject.
+- Chat input is disabled during disambiguation to prevent premature messages.
+- Single low-confidence candidate still falls back to freeform + "Wrong subject" chip (existing behavior preserved).
 
 ## Notes
 

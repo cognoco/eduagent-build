@@ -14,5 +14,6 @@ export {
   VoicePlaybackBar,
   type VoicePlaybackBarProps,
 } from './VoicePlaybackBar';
+export { SessionInputModeToggle } from './SessionInputModeToggle';
 export { LivingBook } from './LivingBook';
 export { LearningBookPrompt } from './LearningBookPrompt';

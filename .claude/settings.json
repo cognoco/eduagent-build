@@ -1,4 +1,17 @@
 {
-  "hooks": {},
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if echo \"$CLAUDE_TOOL_INPUT\" | grep -q \"git commit\"; then echo \"⛔ PRE-COMMIT GATE: Before committing, you MUST have run findRelatedTests for ALL modified files in this session and confirmed they pass. If you have NOT done this yet, STOP — run the tests first, then retry the commit. The pre-commit hook catches some issues, but it is not a substitute for you verifying your own work.\"; fi'",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  },
   "$schema": "https://json.schemastore.org/claude-code-settings.json"
 }

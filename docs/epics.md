@@ -4572,9 +4572,9 @@ So that I don't get stuck picking a subject before I can get help.
 
 ---
 
-### Story 10.22: Chat/Session Flow — Subject Inference from Conversation 🔄
+### Story 10.22: Chat/Session Flow — Subject Inference from Conversation ✅
 
-_Priority: Must-ship. Scope: LEARNER-ONLY. **Status: Partial** — auto-classifies first message. Missing: ambiguous results silently fall to freeform instead of showing subject picker._
+_Priority: Must-ship. Scope: LEARNER-ONLY. **Status: Done** — auto-classifies first message; ambiguous multi-candidate results show inline disambiguation picker before session start._
 
 As a learner who tapped "Just ask something" without a specific subject context,
 I want the AI to figure out what subject I'm asking about from my first message,

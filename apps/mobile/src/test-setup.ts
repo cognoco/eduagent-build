@@ -1,3 +1,25 @@
+jest.mock('@expo/vector-icons', () => {
+  const React = require('react');
+  const mockIcon = React.forwardRef(() => null);
+  mockIcon.displayName = 'MockIcon';
+  return {
+    __esModule: true,
+    Ionicons: mockIcon,
+    MaterialIcons: mockIcon,
+    FontAwesome: mockIcon,
+    FontAwesome5: mockIcon,
+    MaterialCommunityIcons: mockIcon,
+    Feather: mockIcon,
+    AntDesign: mockIcon,
+    Entypo: mockIcon,
+    EvilIcons: mockIcon,
+    Foundation: mockIcon,
+    Octicons: mockIcon,
+    SimpleLineIcons: mockIcon,
+    Zocial: mockIcon,
+  };
+});
+
 jest.mock('expo/src/winter/ImportMetaRegistry', () => ({
   ImportMetaRegistry: {
     get url() {
@@ -173,3 +195,12 @@ jest.mock('expo-secure-store', () => ({
 if (typeof global.structuredClone === 'undefined') {
   global.structuredClone = (object) => JSON.parse(JSON.stringify(object));
 }
+
+// Force TanStack Query to notify synchronously in tests.
+// The default scheduler uses setTimeout(cb, 0) which causes React state updates
+// to fire after act() boundaries, triggering "not wrapped in act()" warnings.
+
+const { notifyManager } = require('@tanstack/react-query');
+notifyManager.setScheduler((cb: () => void) => {
+  cb();
+});

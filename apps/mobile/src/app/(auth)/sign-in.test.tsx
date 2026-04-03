@@ -3,6 +3,7 @@ import {
   screen,
   fireEvent,
   waitFor,
+  act,
 } from '@testing-library/react-native';
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
 
@@ -47,16 +48,18 @@ describe('SignInScreen', () => {
     });
   });
 
-  it('renders email and password inputs', () => {
+  it('renders email and password inputs', async () => {
     render(<SignInScreen />);
+    await act(async () => undefined);
 
     expect(screen.getByTestId('sign-in-email')).toBeTruthy();
     expect(screen.getByTestId('sign-in-password')).toBeTruthy();
     expect(screen.getByTestId('sign-in-button')).toBeTruthy();
   });
 
-  it('renders OAuth buttons', () => {
+  it('renders OAuth buttons', async () => {
     render(<SignInScreen />);
+    await act(async () => undefined);
 
     expect(screen.getByTestId('google-sso-button')).toBeTruthy();
     expect(screen.getByTestId('apple-sso-button')).toBeTruthy();
@@ -65,24 +68,27 @@ describe('SignInScreen', () => {
     expect(screen.getByText('Continue with Apple')).toBeTruthy();
   });
 
-  it('renders OpenAI SSO when configured', () => {
+  it('renders OpenAI SSO when configured', async () => {
     process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY = 'openai';
 
     render(<SignInScreen />);
+    await act(async () => undefined);
 
     expect(screen.getByTestId('openai-sso-button')).toBeTruthy();
     expect(screen.getByText('Continue with OpenAI')).toBeTruthy();
   });
 
-  it('renders forgot password link', () => {
+  it('renders forgot password link', async () => {
     render(<SignInScreen />);
+    await act(async () => undefined);
 
     expect(screen.getByTestId('forgot-password-link')).toBeTruthy();
     expect(screen.getByText('Forgot password?')).toBeTruthy();
   });
 
-  it('disables sign-in button when fields are empty', () => {
+  it('disables sign-in button when fields are empty', async () => {
     render(<SignInScreen />);
+    await act(async () => undefined);
 
     const button = screen.getByTestId('sign-in-button');
     expect(

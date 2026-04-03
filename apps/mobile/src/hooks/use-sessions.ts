@@ -82,7 +82,9 @@ export function useStartSession(subjectId: string): UseMutationResult<
   {
     subjectId: string;
     topicId?: string;
-    sessionType?: 'learning' | 'homework';
+    sessionType?: 'learning' | 'homework' | 'interleaved';
+    verificationType?: 'standard' | 'evaluate' | 'teach_back';
+    inputMode?: 'text' | 'voice';
     metadata?: SessionMetadata;
   }
 > {
@@ -93,7 +95,9 @@ export function useStartSession(subjectId: string): UseMutationResult<
     mutationFn: async (input: {
       subjectId: string;
       topicId?: string;
-      sessionType?: 'learning' | 'homework';
+      sessionType?: 'learning' | 'homework' | 'interleaved';
+      verificationType?: 'standard' | 'evaluate' | 'teach_back';
+      inputMode?: 'text' | 'voice';
       metadata?: SessionMetadata;
     }): Promise<SessionStartResult> => {
       const res = await client.subjects[':subjectId'].sessions.$post({

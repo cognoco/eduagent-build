@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react-native';
+import { renderHook, act } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -52,10 +52,13 @@ describe('useDeleteAccount', () => {
       wrapper: createWrapper(),
     });
 
-    const data = await result.current.mutateAsync();
+    let data: Awaited<ReturnType<typeof result.current.mutateAsync>>;
+    await act(async () => {
+      data = await result.current.mutateAsync();
+    });
 
     expect(mockFetch).toHaveBeenCalled();
-    expect(data.gracePeriodEnds).toBe('2026-02-24T00:00:00.000Z');
+    expect(data!.gracePeriodEnds).toBe('2026-02-24T00:00:00.000Z');
   });
 
   it('throws when POST /account/delete returns non-2xx', async () => {
@@ -70,9 +73,11 @@ describe('useDeleteAccount', () => {
       wrapper: createWrapper(),
     });
 
-    await expect(result.current.mutateAsync()).rejects.toThrow(
-      'Unable to schedule deletion'
-    );
+    await act(async () => {
+      await expect(result.current.mutateAsync()).rejects.toThrow(
+        'Unable to schedule deletion'
+      );
+    });
   });
 });
 
@@ -96,10 +101,13 @@ describe('useCancelDeletion', () => {
       wrapper: createWrapper(),
     });
 
-    const data = await result.current.mutateAsync();
+    let data: Awaited<ReturnType<typeof result.current.mutateAsync>>;
+    await act(async () => {
+      data = await result.current.mutateAsync();
+    });
 
     expect(mockFetch).toHaveBeenCalled();
-    expect(data.message).toBe('Deletion cancelled');
+    expect(data!.message).toBe('Deletion cancelled');
   });
 
   it('throws when POST /account/cancel-deletion returns non-2xx', async () => {
@@ -114,9 +122,11 @@ describe('useCancelDeletion', () => {
       wrapper: createWrapper(),
     });
 
-    await expect(result.current.mutateAsync()).rejects.toThrow(
-      'Unable to cancel deletion'
-    );
+    await act(async () => {
+      await expect(result.current.mutateAsync()).rejects.toThrow(
+        'Unable to cancel deletion'
+      );
+    });
   });
 });
 
@@ -144,10 +154,13 @@ describe('useExportData', () => {
       wrapper: createWrapper(),
     });
 
-    const data = await result.current.mutateAsync();
+    let data: Awaited<ReturnType<typeof result.current.mutateAsync>>;
+    await act(async () => {
+      data = await result.current.mutateAsync();
+    });
 
     expect(mockFetch).toHaveBeenCalled();
-    expect(data.exportedAt).toBeDefined();
+    expect(data!.exportedAt).toBeDefined();
   });
 
   it('throws when GET /account/export returns non-2xx', async () => {
@@ -162,8 +175,10 @@ describe('useExportData', () => {
       wrapper: createWrapper(),
     });
 
-    await expect(result.current.mutateAsync()).rejects.toThrow(
-      'Unable to export data'
-    );
+    await act(async () => {
+      await expect(result.current.mutateAsync()).rejects.toThrow(
+        'Unable to export data'
+      );
+    });
   });
 });

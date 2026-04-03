@@ -79,6 +79,7 @@ jest.mock('../../../components/session', () => ({
   SessionTimer: () => null,
   QuestionCounter: () => null,
   LearningBookPrompt: () => null,
+  SessionInputModeToggle: () => null,
 }));
 
 jest.mock('../../../hooks/use-sessions', () => ({
@@ -480,6 +481,41 @@ describe('SessionScreen homework flow', () => {
       expect(mockReadSessionRecoveryMarker).toHaveBeenCalled();
       expect(mockHydrate).toHaveBeenCalled();
     });
+  });
+
+  it('shows disambiguation buttons for ambiguous multi-candidate classification', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+    });
+    mockClassifySubject.mockResolvedValue({
+      candidates: [
+        { subjectId: 'subject-1', subjectName: 'Math', confidence: 0.6 },
+        { subjectId: 'subject-2', subjectName: 'Physics', confidence: 0.55 },
+      ],
+      needsConfirmation: true,
+    });
+
+    const screen = render(<SessionScreen />);
+
+    fireEvent.press(screen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('subject-disambiguation')).toBeTruthy();
+    });
+
+    // Verify both candidate buttons appear
+    expect(screen.getByTestId('subject-pick-subject-1')).toBeTruthy();
+    expect(screen.getByTestId('subject-pick-subject-2')).toBeTruthy();
+    expect(screen.getByText('Math')).toBeTruthy();
+    expect(screen.getByText('Physics')).toBeTruthy();
+
+    // Verify the disambiguation prompt message content
+    expect(
+      screen.getByText(
+        'This sounds like it could be **Math** or **Physics**. Which one are we working on?'
+      )
+    ).toBeTruthy();
   });
 
   it('shows a wrong-subject recovery chip and replaces the session route in place', async () => {

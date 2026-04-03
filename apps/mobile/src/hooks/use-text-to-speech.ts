@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// TTS Hook — expo-speech wrapper for AI voice output (FR144-145)
+// TTS Hook — expo-speech wrapper for AI voice output (FR144-145, FR147)
 // Option A: waits for complete response before TTS playback
 // ---------------------------------------------------------------------------
 
@@ -8,9 +8,12 @@ import * as Speech from 'expo-speech';
 
 export interface UseTextToSpeechResult {
   isSpeaking: boolean;
+  isPaused: boolean;
   rate: number;
   speak: (text: string) => void;
   stop: () => void;
+  pause: () => void;
+  resume: () => void;
   replay: () => void;
   setRate: (rate: number) => void;
 }
@@ -18,10 +21,17 @@ export interface UseTextToSpeechResult {
 /**
  * Hook wrapping expo-speech for TTS playback.
  * Follows Option A (wait for complete response before speaking).
+ * Supports pause/resume (FR147).
  * Cleans up on unmount.
+ *
+ * TODO (Epic 8 — Story 8.4): VoiceOver/TalkBack coexistence spike.
+ * When a screen reader is active, app TTS competes for the audio channel.
+ * Three documented approaches: (1) defer to screen reader, (2) audio ducking,
+ * (3) manual play button. Requires physical device testing. See FR149.
  */
 export function useTextToSpeech(): UseTextToSpeechResult {
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [rate, setRateState] = useState(1.0);
   const mountedRef = useRef(true);
   const rateRef = useRef(1.0);
@@ -40,6 +50,7 @@ export function useTextToSpeech(): UseTextToSpeechResult {
     Speech.stop();
 
     lastTextRef.current = text;
+    setIsPaused(false);
 
     Speech.speak(text, {
       rate: rateRef.current,
@@ -47,13 +58,22 @@ export function useTextToSpeech(): UseTextToSpeechResult {
         if (mountedRef.current) setIsSpeaking(true);
       },
       onDone: () => {
-        if (mountedRef.current) setIsSpeaking(false);
+        if (mountedRef.current) {
+          setIsSpeaking(false);
+          setIsPaused(false);
+        }
       },
       onStopped: () => {
-        if (mountedRef.current) setIsSpeaking(false);
+        if (mountedRef.current) {
+          setIsSpeaking(false);
+          setIsPaused(false);
+        }
       },
       onError: () => {
-        if (mountedRef.current) setIsSpeaking(false);
+        if (mountedRef.current) {
+          setIsSpeaking(false);
+          setIsPaused(false);
+        }
       },
     });
   }, []);
@@ -61,6 +81,17 @@ export function useTextToSpeech(): UseTextToSpeechResult {
   const stop = useCallback(() => {
     Speech.stop();
     setIsSpeaking(false);
+    setIsPaused(false);
+  }, []);
+
+  const pause = useCallback(() => {
+    Speech.pause();
+    setIsPaused(true);
+  }, []);
+
+  const resume = useCallback(() => {
+    Speech.resume();
+    setIsPaused(false);
   }, []);
 
   const replay = useCallback(() => {
@@ -74,5 +105,15 @@ export function useTextToSpeech(): UseTextToSpeechResult {
     setRateState(newRate);
   }, []);
 
-  return { isSpeaking, rate, speak, stop, replay, setRate };
+  return {
+    isSpeaking,
+    isPaused,
+    rate,
+    speak,
+    stop,
+    pause,
+    resume,
+    replay,
+    setRate,
+  };
 }

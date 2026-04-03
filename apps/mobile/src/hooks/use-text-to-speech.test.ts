@@ -4,10 +4,14 @@ import { useTextToSpeech } from './use-text-to-speech';
 // Mock expo-speech
 const mockSpeak = jest.fn();
 const mockStop = jest.fn();
+const mockPause = jest.fn();
+const mockResume = jest.fn();
 
 jest.mock('expo-speech', () => ({
   speak: (...args: unknown[]) => mockSpeak(...args),
   stop: (...args: unknown[]) => mockStop(...args),
+  pause: (...args: unknown[]) => mockPause(...args),
+  resume: (...args: unknown[]) => mockResume(...args),
 }));
 
 beforeEach(() => {
@@ -18,6 +22,11 @@ describe('useTextToSpeech', () => {
   it('initializes with isSpeaking false', () => {
     const { result } = renderHook(() => useTextToSpeech());
     expect(result.current.isSpeaking).toBe(false);
+  });
+
+  it('initializes with isPaused false', () => {
+    const { result } = renderHook(() => useTextToSpeech());
+    expect(result.current.isPaused).toBe(false);
   });
 
   it('initializes rate at 1.0', () => {
@@ -162,5 +171,106 @@ describe('useTextToSpeech', () => {
     const { unmount } = renderHook(() => useTextToSpeech());
     unmount();
     expect(mockStop).toHaveBeenCalled();
+  });
+
+  // --- Pause/Resume (FR147) ---
+
+  it('calls Speech.pause when pause() is invoked', () => {
+    const { result } = renderHook(() => useTextToSpeech());
+
+    act(() => {
+      result.current.pause();
+    });
+
+    expect(mockPause).toHaveBeenCalledTimes(1);
+    expect(result.current.isPaused).toBe(true);
+  });
+
+  it('calls Speech.resume when resume() is invoked', () => {
+    const { result } = renderHook(() => useTextToSpeech());
+
+    act(() => {
+      result.current.pause();
+    });
+    expect(result.current.isPaused).toBe(true);
+
+    act(() => {
+      result.current.resume();
+    });
+
+    expect(mockResume).toHaveBeenCalledTimes(1);
+    expect(result.current.isPaused).toBe(false);
+  });
+
+  it('stop() resets isPaused to false', () => {
+    const { result } = renderHook(() => useTextToSpeech());
+
+    act(() => {
+      result.current.pause();
+    });
+    expect(result.current.isPaused).toBe(true);
+
+    act(() => {
+      result.current.stop();
+    });
+    expect(result.current.isPaused).toBe(false);
+    expect(result.current.isSpeaking).toBe(false);
+  });
+
+  it('speak() resets isPaused to false', () => {
+    const { result } = renderHook(() => useTextToSpeech());
+
+    act(() => {
+      result.current.pause();
+    });
+    expect(result.current.isPaused).toBe(true);
+
+    act(() => {
+      result.current.speak('New text');
+    });
+    expect(result.current.isPaused).toBe(false);
+  });
+
+  it('onDone resets isPaused to false', () => {
+    const { result } = renderHook(() => useTextToSpeech());
+
+    act(() => {
+      result.current.speak('Test');
+    });
+
+    const callArgs = mockSpeak.mock.calls[0][1];
+    act(() => {
+      callArgs.onStart();
+    });
+
+    act(() => {
+      result.current.pause();
+    });
+    expect(result.current.isPaused).toBe(true);
+
+    act(() => {
+      callArgs.onDone();
+    });
+    expect(result.current.isPaused).toBe(false);
+    expect(result.current.isSpeaking).toBe(false);
+  });
+
+  it('onStopped resets isPaused to false', () => {
+    const { result } = renderHook(() => useTextToSpeech());
+
+    act(() => {
+      result.current.speak('Test');
+    });
+
+    const callArgs = mockSpeak.mock.calls[0][1];
+
+    act(() => {
+      result.current.pause();
+    });
+
+    act(() => {
+      callArgs.onStopped();
+    });
+    expect(result.current.isPaused).toBe(false);
   });
 });

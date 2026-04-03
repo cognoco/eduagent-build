@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { renderHook, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -106,15 +106,15 @@ describe('useRequestConsent', () => {
       wrapper: createWrapper(),
     });
 
-    await result.current.mutateAsync({
-      childProfileId: '550e8400-e29b-41d4-a716-446655440000',
-      parentEmail: 'parent@example.com',
-      consentType: 'GDPR',
+    await act(async () => {
+      await result.current.mutateAsync({
+        childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+      });
     });
 
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalled();
-    });
+    expect(mockFetch).toHaveBeenCalled();
   });
 });
 
@@ -188,10 +188,13 @@ describe('useRevokeConsent', () => {
       wrapper: createWrapper(),
     });
 
-    const data = await result.current.mutateAsync();
+    let data: Awaited<ReturnType<typeof result.current.mutateAsync>>;
+    await act(async () => {
+      data = await result.current.mutateAsync();
+    });
 
     expect(mockFetch).toHaveBeenCalled();
-    expect(data.consentStatus).toBe('WITHDRAWN');
+    expect(data!.consentStatus).toBe('WITHDRAWN');
   });
 });
 
@@ -221,9 +224,12 @@ describe('useRestoreConsent', () => {
       wrapper: createWrapper(),
     });
 
-    const data = await result.current.mutateAsync();
+    let data: Awaited<ReturnType<typeof result.current.mutateAsync>>;
+    await act(async () => {
+      data = await result.current.mutateAsync();
+    });
 
     expect(mockFetch).toHaveBeenCalled();
-    expect(data.consentStatus).toBe('CONSENTED');
+    expect(data!.consentStatus).toBe('CONSENTED');
   });
 });

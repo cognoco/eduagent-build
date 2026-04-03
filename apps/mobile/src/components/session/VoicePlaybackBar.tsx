@@ -1,5 +1,6 @@
 // ---------------------------------------------------------------------------
-// VoicePlaybackBar — TTS playback controls (replay, stop, speed) (Epic 8)
+// VoicePlaybackBar — TTS playback controls (replay, pause/resume, stop, speed)
+// (FR147: Voice Session Controls)
 // Shown below messages when voice mode is enabled.
 // ---------------------------------------------------------------------------
 
@@ -11,8 +12,11 @@ const RATE_CYCLE: readonly number[] = [0.75, 1.0, 1.25];
 
 export interface VoicePlaybackBarProps {
   isSpeaking: boolean;
+  isPaused: boolean;
   rate: number;
   onStop: () => void;
+  onPause: () => void;
+  onResume: () => void;
   onReplay: () => void;
   onRateChange: (rate: number) => void;
 }
@@ -25,8 +29,11 @@ function nextRate(current: number): number {
 
 export function VoicePlaybackBar({
   isSpeaking,
+  isPaused,
   rate,
   onStop,
+  onPause,
+  onResume,
   onReplay,
   onRateChange,
 }: VoicePlaybackBarProps) {
@@ -40,8 +47,8 @@ export function VoicePlaybackBar({
       {/* Replay */}
       <Pressable
         onPress={onReplay}
-        disabled={isSpeaking}
-        accessibilityState={{ disabled: isSpeaking }}
+        disabled={isSpeaking && !isPaused}
+        accessibilityState={{ disabled: isSpeaking && !isPaused }}
         className="min-h-[44px] min-w-[44px] items-center justify-center"
         accessibilityLabel="Replay last AI message"
         accessibilityRole="button"
@@ -50,12 +57,29 @@ export function VoicePlaybackBar({
         <Ionicons
           name="play-back"
           size={22}
-          color={isSpeaking ? colors.muted : colors.primary}
+          color={isSpeaking && !isPaused ? colors.muted : colors.primary}
         />
       </Pressable>
 
-      {/* Stop (only visible when speaking) */}
-      {isSpeaking && (
+      {/* Pause/Resume (visible when speaking or paused) */}
+      {(isSpeaking || isPaused) && (
+        <Pressable
+          onPress={isPaused ? onResume : onPause}
+          className="min-h-[44px] min-w-[44px] items-center justify-center"
+          accessibilityLabel={isPaused ? 'Resume speaking' : 'Pause speaking'}
+          accessibilityRole="button"
+          testID="voice-pause-resume-button"
+        >
+          <Ionicons
+            name={isPaused ? 'play' : 'pause'}
+            size={22}
+            color={colors.primary}
+          />
+        </Pressable>
+      )}
+
+      {/* Stop (visible when speaking or paused) */}
+      {(isSpeaking || isPaused) && (
         <Pressable
           onPress={onStop}
           className="min-h-[44px] min-w-[44px] items-center justify-center"
