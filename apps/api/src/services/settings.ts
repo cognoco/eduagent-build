@@ -264,7 +264,7 @@ export function getLearningModeRules(mode: LearningMode): LearningModeRules {
 }
 
 // ---------------------------------------------------------------------------
-// Summary Skip Tracking (for >10 consecutive skip prompt — FR94)
+// Summary Skip Tracking (FR37 5-skip warning + FR94 10-skip casual-switch prompt)
 // ---------------------------------------------------------------------------
 
 /** Threshold for showing a warning before the full casual-switch prompt */

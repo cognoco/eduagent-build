@@ -1039,6 +1039,8 @@ export default function SessionScreen() {
                 wallClockSeconds: String(result.wallClockSeconds),
                 milestones: serializeMilestones(milestonesReached),
                 fastCelebrations: serializeCelebrations(fastCelebrations),
+                sessionType:
+                  effectiveMode === 'homework' ? 'homework' : 'learning',
               },
             } as never);
           } catch (err: unknown) {

@@ -19,6 +19,7 @@ import {
   useSessionTranscript,
   useSkipSummary,
   useSubmitSummary,
+  useRecallBridge,
 } from '../../hooks/use-sessions';
 import { Sentry } from '../../lib/sentry';
 import {
@@ -37,6 +38,7 @@ export default function SessionSummaryScreen() {
     wallClockSeconds,
     milestones,
     fastCelebrations,
+    sessionType: sessionTypeParam,
   } = useLocalSearchParams<{
     sessionId: string;
     subjectName?: string;
@@ -47,6 +49,7 @@ export default function SessionSummaryScreen() {
     wallClockSeconds?: string;
     milestones?: string;
     fastCelebrations?: string;
+    sessionType?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -62,6 +65,12 @@ export default function SessionSummaryScreen() {
   const transcript = useSessionTranscript(sessionId ?? '');
   const { onSuccessfulRecall } = useRatingPrompt();
   const { persona } = useTheme();
+  const recallBridge = useRecallBridge(sessionId ?? '');
+  const [recallQuestions, setRecallQuestions] = useState<string[] | null>(null);
+
+  const isHomeworkSession =
+    sessionTypeParam === 'homework' ||
+    transcript.data?.session.sessionType === 'homework';
 
   const fallbackSession = transcript.data?.session;
   const exchanges =
@@ -254,6 +263,20 @@ export default function SessionSummaryScreen() {
         return;
       }
     }
+
+    // Fetch recall bridge for homework sessions (Story 2.7)
+    if (isHomeworkSession && !recallQuestions) {
+      try {
+        const result = await recallBridge.mutateAsync();
+        if (result.questions.length > 0) {
+          setRecallQuestions(result.questions);
+          return; // Stay on screen to show recall questions
+        }
+      } catch {
+        // Best effort — navigate home if recall bridge fails
+      }
+    }
+
     await maybePromptForRecall();
     router.replace('/(learner)/home');
   };
@@ -419,6 +442,45 @@ export default function SessionSummaryScreen() {
             ))}
           </View>
         ) : null}
+
+        {/* Recall bridge questions — shown after homework summary submit/skip (Story 2.7) */}
+        {recallQuestions && (
+          <View
+            className="bg-surface rounded-card p-4 mb-4"
+            testID="recall-bridge-questions"
+          >
+            <Text className="text-body font-semibold text-text-primary mb-2">
+              Quick recall check
+            </Text>
+            <Text className="text-body-sm text-text-secondary mb-4">
+              Nice work on that homework! Can you answer these about the method
+              you used?
+            </Text>
+            {recallQuestions.map((question, index) => (
+              <View key={index} className="mb-3">
+                <Text className="text-body text-text-primary">
+                  {index + 1}. {question}
+                </Text>
+              </View>
+            ))}
+            <Pressable
+              className="bg-primary rounded-button py-3 items-center mt-2"
+              onPress={() => {
+                void (async () => {
+                  await maybePromptForRecall();
+                  router.replace('/(learner)/home');
+                })();
+              }}
+              testID="recall-bridge-done-button"
+              accessibilityLabel="Done, head home"
+              accessibilityRole="button"
+            >
+              <Text className="text-text-inverse text-body font-semibold">
+                Done — head home
+              </Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* Your Words section */}
         <View className="mb-4">
