@@ -548,26 +548,33 @@ export async function adaptCurriculumFromPerformance(
   const reordered = [...remaining];
   if (targetIndex >= 0) {
     const [topic] = reordered.splice(targetIndex, 1);
-    switch (request.signal) {
-      case 'struggling':
-      case 'too_hard':
-        reordered.splice(Math.min(targetIndex + 2, reordered.length), 0, topic);
-        break;
-      case 'mastered':
-      case 'too_easy':
-        reordered.splice(Math.max(targetIndex - 2, 0), 0, topic);
-        break;
+    if (topic) {
+      switch (request.signal) {
+        case 'struggling':
+        case 'too_hard':
+          reordered.splice(
+            Math.min(targetIndex + 2, reordered.length),
+            0,
+            topic
+          );
+          break;
+        case 'mastered':
+        case 'too_easy':
+          reordered.splice(Math.max(targetIndex - 2, 0), 0, topic);
+          break;
+      }
     }
   }
 
   // Persist new sort order
   for (let i = 0; i < reordered.length; i++) {
+    const entry = reordered[i]!;
     await db
       .update(curriculumTopics)
       .set({ sortOrder: i, updatedAt: new Date() })
       .where(
         and(
-          eq(curriculumTopics.id, reordered[i].id),
+          eq(curriculumTopics.id, entry.id),
           eq(curriculumTopics.curriculumId, curriculum.id)
         )
       );
