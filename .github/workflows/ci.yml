@@ -10,17 +10,6 @@ permissions:
   actions: read
   contents: read
 
-env:
-  # Paths that indicate a native change requiring a full EAS build.
-  # Used by the ota-update job to decide whether to publish an OTA update.
-  NATIVE_CHANGE_PATHS: >-
-    apps/mobile/app.json
-    apps/mobile/package.json
-    apps/mobile/eas.json
-    apps/mobile/plugins/
-    apps/mobile/android/
-    apps/mobile/ios/
-
 jobs:
   main:
     runs-on: ubuntu-latest

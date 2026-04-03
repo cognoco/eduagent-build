@@ -118,6 +118,15 @@ type ContextualQuickChipId = Exclude<
 
 type MessageFeedbackState = 'helpful' | 'not_helpful' | 'incorrect';
 
+const CONFIRMATION_BY_CHIP: Partial<Record<ContextualQuickChipId, string>> = {
+  hint: 'Adding a hint.',
+  example: 'Pulling a fresh example.',
+  know_this: 'Moving ahead.',
+  explain_differently: 'Trying a different angle.',
+  too_easy: 'Raising the challenge.',
+  too_hard: 'Breaking it down more.',
+};
+
 const QUICK_CHIP_CONFIG: Record<
   ContextualQuickChipId,
   {
@@ -1089,15 +1098,6 @@ export default function SessionScreen() {
 
       const config = QUICK_CHIP_CONFIG[chip];
       if (!config) return;
-      const confirmationByChip: Partial<Record<ContextualQuickChipId, string>> =
-        {
-          hint: 'Adding a hint.',
-          example: 'Pulling a fresh example.',
-          know_this: 'Moving ahead.',
-          explain_differently: 'Trying a different angle.',
-          too_easy: 'Raising the challenge.',
-          too_hard: 'Breaking it down more.',
-        };
 
       if (activeSessionId) {
         try {
@@ -1127,7 +1127,7 @@ export default function SessionScreen() {
         setConsumedQuickChipMessageId(sourceMessageId);
       }
 
-      const confirmation = confirmationByChip[chip];
+      const confirmation = CONFIRMATION_BY_CHIP[chip];
       if (confirmation) {
         showConfirmation(confirmation);
       }

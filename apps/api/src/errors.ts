@@ -5,7 +5,7 @@ import type { ErrorCode } from '@eduagent/schemas';
 
 export function apiError(
   c: Context,
-  status: 400 | 401 | 403 | 404 | 409 | 410 | 422 | 429 | 500 | 502,
+  status: 400 | 401 | 403 | 404 | 409 | 410 | 422 | 429 | 500 | 501 | 502,
   code: ErrorCode,
   message: string,
   details?: unknown
