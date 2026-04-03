@@ -32,6 +32,7 @@ import {
   type RetentionState,
 } from './retention';
 import { canExitNeedsDeepening } from './adaptive-teaching';
+import { syncXpLedgerStatus } from './xp';
 import { routeAndCall, type ChatMessage } from './llm';
 
 // ---------------------------------------------------------------------------
@@ -341,6 +342,11 @@ export async function processRecallTest(
         eq(retentionCards.profileId, profileId)
       )
     );
+
+  // Sync xp_ledger to match the retention card's new xpStatus
+  if (result.xpChange === 'verified' || result.xpChange === 'decayed') {
+    await syncXpLedgerStatus(db, profileId, input.topicId, result.xpChange);
+  }
 
   const response: RecallTestResponse = {
     passed: result.passed,

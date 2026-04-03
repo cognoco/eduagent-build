@@ -29,10 +29,15 @@ jest.mock('./adaptive-teaching', () => ({
   canExitNeedsDeepening: jest.fn(),
 }));
 
+jest.mock('./xp', () => ({
+  syncXpLedgerStatus: jest.fn().mockResolvedValue(undefined),
+}));
+
 import type { Database } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';
 import { processRecallResult, getRetentionStatus } from './retention';
 import { canExitNeedsDeepening } from './adaptive-teaching';
+import { syncXpLedgerStatus } from './xp';
 import {
   registerProvider,
   createMockProvider,
@@ -583,6 +588,104 @@ describe('processRecallTest', () => {
     expect(result.failureCount).toBe(0);
     expect(result.failureAction).toBeUndefined();
     expect(result.remediation).toBeUndefined();
+  });
+
+  it('calls syncXpLedgerStatus with verified when delayed recall passes', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.6,
+        intervalDays: 10,
+        repetitions: 4,
+        failureCount: 0,
+        consecutiveSuccesses: 3,
+        xpStatus: 'verified',
+        nextReviewAt: '2026-02-25T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+
+    const db = createMockDb();
+    await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'Detailed explanation of the topic',
+    });
+
+    expect(syncXpLedgerStatus).toHaveBeenCalledWith(
+      db,
+      profileId,
+      topicId,
+      'verified'
+    );
+  });
+
+  it('calls syncXpLedgerStatus with decayed when recall fails with decay', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.3,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 2,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'feedback_only',
+    });
+
+    const db = createMockDb();
+    await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'Wrong answer',
+    });
+
+    expect(syncXpLedgerStatus).toHaveBeenCalledWith(
+      db,
+      profileId,
+      topicId,
+      'decayed'
+    );
+  });
+
+  it('does not call syncXpLedgerStatus when xpChange is none', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.5,
+        intervalDays: 1,
+        repetitions: 1,
+        failureCount: 0,
+        consecutiveSuccesses: 1,
+        xpStatus: 'pending',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'none',
+    });
+
+    const db = createMockDb();
+    await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'Some answer for the first recall',
+    });
+
+    expect(syncXpLedgerStatus).not.toHaveBeenCalled();
   });
 });
 
