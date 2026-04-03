@@ -176,7 +176,7 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 ## Current Status
 
 **Complete — all routes production-ready:**
-- Epics 0-5: full API layer (~1,684 API tests + ~662 mobile tests + 16 integration test suites, all passing)
+- Epics 0-5: full API layer (~1,705 API tests + ~664 mobile tests + 16 integration test suites, all passing)
 - All 25 route files wired to real services with DB persistence (including `consent-web` browser flow, `test-seed` E2E endpoints, `revenuecat-webhook`, and `celebrations`)
 - Mobile: 38+ screens (76 test suites), all using real API calls via TanStack Query + Hono RPC
 - Background jobs: 11 Inngest functions (session-completed chain, trial-expiry, consent-reminders, consent-revocation, account-deletion, review-reminder, payment-retry, quota-reset, topup-expiry-reminder, subject-auto-archive, session-stale-cleanup)
