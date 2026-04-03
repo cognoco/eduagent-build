@@ -1,10 +1,4 @@
-import {
-  render,
-  screen,
-  fireEvent,
-  act,
-  userEvent,
-} from '@testing-library/react-native';
+import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import type { Profile } from '@eduagent/schemas';
 
@@ -133,7 +127,7 @@ describe('ProfileSwitcher', () => {
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
 
     await act(async () => {
-      await userEvent.press(screen.getByTestId('profile-option-p2'));
+      fireEvent.press(screen.getByTestId('profile-option-p2'));
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
@@ -152,7 +146,7 @@ describe('ProfileSwitcher', () => {
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
 
     await act(async () => {
-      await userEvent.press(screen.getByTestId('profile-option-p1'));
+      fireEvent.press(screen.getByTestId('profile-option-p1'));
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
@@ -188,7 +182,7 @@ describe('ProfileSwitcher', () => {
 
     // handleSelect is async — flush microtasks so setIsOpen(false) commits
     await act(async () => {
-      await userEvent.press(screen.getByTestId('profile-option-p2'));
+      fireEvent.press(screen.getByTestId('profile-option-p2'));
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
