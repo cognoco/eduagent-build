@@ -19,14 +19,12 @@
       }
     ]
   },
-  "nxCloudId": "68f123c9e2ac117d7d820de4",
+  "nxCloudId": "69cfb5fbf78e31ce71994e18",
   "plugins": [
     {
       "plugin": "@nx/js/typescript",
       "options": {
-        "typecheck": {
-          "targetName": "typecheck"
-        },
+        "typecheck": { "targetName": "typecheck" },
         "build": {
           "targetName": "build",
           "configName": "tsconfig.lib.json",
@@ -35,18 +33,8 @@
         }
       }
     },
-    {
-      "plugin": "@nx/eslint/plugin",
-      "options": {
-        "targetName": "lint"
-      }
-    },
-    {
-      "plugin": "@nx/jest/plugin",
-      "options": {
-        "targetName": "test"
-      }
-    },
+    { "plugin": "@nx/eslint/plugin", "options": { "targetName": "lint" } },
+    { "plugin": "@nx/jest/plugin", "options": { "targetName": "test" } },
     {
       "plugin": "@nx/expo/plugin",
       "options": {
@@ -65,9 +53,7 @@
     }
   ],
   "targetDefaults": {
-    "test": {
-      "dependsOn": ["^build"]
-    },
+    "test": { "dependsOn": ["^build"] },
     "@nx/esbuild:esbuild": {
       "cache": true,
       "dependsOn": ["^build"],
@@ -81,14 +67,9 @@
         "{workspaceRoot}/packages/schemas/src/**"
       ],
       "executor": "nx:run-commands",
-      "options": {
-        "command": "maestro test e2e/flows/",
-        "cwd": "apps/mobile"
-      },
+      "options": { "command": "maestro test e2e/flows/", "cwd": "apps/mobile" },
       "configurations": {
-        "smoke": {
-          "command": "maestro test e2e/flows/ --include-tags=smoke"
-        }
+        "smoke": { "command": "maestro test e2e/flows/ --include-tags=smoke" }
       }
     },
     "format:check": {
