@@ -4,7 +4,19 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.vscode/**'
+      - '.idea/**'
+      - '.claude/**'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.vscode/**'
+      - '.idea/**'
+      - '.claude/**'
 
 permissions:
   actions: read
@@ -44,6 +56,19 @@ jobs:
         run: |
           git fetch origin ${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}
 
+      # Detect which areas of the codebase changed (used to skip integration tests
+      # when only mobile/non-API files changed)
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            api:
+              - 'apps/api/**'
+              - 'packages/database/**'
+              - 'packages/schemas/**'
+              - 'packages/retention/**'
+              - 'pnpm-lock.yaml'
+
       # This enables task distribution via Nx Cloud
       # Run this command as early as possible, before dependencies are installed
       # Learn more at https://nx.dev/ci/reference/nx-cloud-cli#npx-nxcloud-startcirun
@@ -82,8 +107,9 @@ jobs:
       # Note: Mobile build excluded - mobile:build requires EAS CLI which is handled by mobile-ci.yml
       - run: pnpm exec nx run-many -t lint test typecheck && pnpm exec nx run-many -t build --exclude=@eduagent/mobile
 
-      # Run API integration tests against real PostgreSQL
+      # Run API integration tests against real PostgreSQL (only when API-relevant files changed)
       - name: API integration tests
+        if: steps.changes.outputs.api == 'true'
         run: pnpm exec nx run api:test:integration
 
       # Self-healing CI: AI-powered fix proposals for failed tasks.
