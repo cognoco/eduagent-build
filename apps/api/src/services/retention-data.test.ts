@@ -29,10 +29,15 @@ jest.mock('./adaptive-teaching', () => ({
   canExitNeedsDeepening: jest.fn(),
 }));
 
+jest.mock('./xp', () => ({
+  syncXpLedgerStatus: jest.fn().mockResolvedValue(undefined),
+}));
+
 import type { Database } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';
 import { processRecallResult, getRetentionStatus } from './retention';
 import { canExitNeedsDeepening } from './adaptive-teaching';
+import { syncXpLedgerStatus } from './xp';
 import {
   registerProvider,
   createMockProvider,
@@ -132,6 +137,7 @@ function createMockDb(options?: {
       values: jest.fn().mockReturnValue({
         returning: jest.fn().mockResolvedValue([]),
         onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+        onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),
       }),
     }),
     delete: jest.fn().mockReturnValue({
@@ -584,6 +590,104 @@ describe('processRecallTest', () => {
     expect(result.failureAction).toBeUndefined();
     expect(result.remediation).toBeUndefined();
   });
+
+  it('calls syncXpLedgerStatus with verified when delayed recall passes', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.6,
+        intervalDays: 10,
+        repetitions: 4,
+        failureCount: 0,
+        consecutiveSuccesses: 3,
+        xpStatus: 'verified',
+        nextReviewAt: '2026-02-25T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+
+    const db = createMockDb();
+    await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'Detailed explanation of the topic',
+    });
+
+    expect(syncXpLedgerStatus).toHaveBeenCalledWith(
+      db,
+      profileId,
+      topicId,
+      'verified'
+    );
+  });
+
+  it('calls syncXpLedgerStatus with decayed when recall fails with decay', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.3,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 2,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'feedback_only',
+    });
+
+    const db = createMockDb();
+    await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'Wrong answer',
+    });
+
+    expect(syncXpLedgerStatus).toHaveBeenCalledWith(
+      db,
+      profileId,
+      topicId,
+      'decayed'
+    );
+  });
+
+  it('does not call syncXpLedgerStatus when xpChange is none', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.5,
+        intervalDays: 1,
+        repetitions: 1,
+        failureCount: 0,
+        consecutiveSuccesses: 1,
+        xpStatus: 'pending',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'none',
+    });
+
+    const db = createMockDb();
+    await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'Some answer for the first recall',
+    });
+
+    expect(syncXpLedgerStatus).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -796,7 +900,7 @@ describe('getTeachingPreference', () => {
 });
 
 describe('setTeachingPreference', () => {
-  it('inserts new preference', async () => {
+  it('upserts new preference via INSERT ON CONFLICT DO UPDATE', async () => {
     const db = createMockDb();
     const result = await setTeachingPreference(
       db,
@@ -809,9 +913,11 @@ describe('setTeachingPreference', () => {
       method: 'step_by_step',
       analogyDomain: null,
     });
+    // Uses atomic upsert, not separate findFirst + insert/update
+    expect(db.insert).toHaveBeenCalled();
   });
 
-  it('inserts preference with analogyDomain', async () => {
+  it('upserts preference with analogyDomain', async () => {
     const db = createMockDb();
     const result = await setTeachingPreference(
       db,
@@ -829,13 +935,6 @@ describe('setTeachingPreference', () => {
 
   it('clears analogyDomain when null passed', async () => {
     const db = createMockDb();
-    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
-      id: 'pref-1',
-      profileId,
-      subjectId,
-      method: 'visual_diagrams',
-      analogyDomain: 'sports',
-    });
     const result = await setTeachingPreference(
       db,
       profileId,
@@ -847,6 +946,30 @@ describe('setTeachingPreference', () => {
       subjectId,
       method: 'visual_diagrams',
       analogyDomain: null,
+    });
+  });
+
+  it('reads back existing analogyDomain when not provided in upsert', async () => {
+    const db = createMockDb();
+    // Simulate existing row with analogyDomain already set
+    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
+      id: 'pref-1',
+      profileId,
+      subjectId,
+      method: 'step_by_step',
+      analogyDomain: 'sports',
+    });
+    const result = await setTeachingPreference(
+      db,
+      profileId,
+      subjectId,
+      'step_by_step'
+      // analogyDomain not passed — should read back existing
+    );
+    expect(result).toEqual({
+      subjectId,
+      method: 'step_by_step',
+      analogyDomain: 'sports',
     });
   });
 });
@@ -898,39 +1021,26 @@ describe('getAnalogyDomain', () => {
 });
 
 describe('setAnalogyDomain', () => {
-  it('inserts new preference with default method when none exists', async () => {
+  it('upserts preference with default method via INSERT ON CONFLICT DO UPDATE', async () => {
     const db = createMockDb();
     const result = await setAnalogyDomain(db, profileId, subjectId, 'sports');
     expect(result).toBe('sports');
     expect(db.insert).toHaveBeenCalled();
   });
 
-  it('updates existing preference', async () => {
+  it('upserts analogy domain for existing preference', async () => {
     const db = createMockDb();
-    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
-      id: 'pref-1',
-      profileId,
-      subjectId,
-      method: 'visual_diagrams',
-      analogyDomain: 'cooking',
-    });
     const result = await setAnalogyDomain(db, profileId, subjectId, 'gaming');
     expect(result).toBe('gaming');
-    expect(db.update).toHaveBeenCalled();
+    // Uses atomic upsert — single insert with onConflictDoUpdate
+    expect(db.insert).toHaveBeenCalled();
   });
 
   it('clears analogy domain when null passed', async () => {
     const db = createMockDb();
-    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
-      id: 'pref-1',
-      profileId,
-      subjectId,
-      method: 'step_by_step',
-      analogyDomain: 'music',
-    });
     const result = await setAnalogyDomain(db, profileId, subjectId, null);
     expect(result).toBeNull();
-    expect(db.update).toHaveBeenCalled();
+    expect(db.insert).toHaveBeenCalled();
   });
 });
 

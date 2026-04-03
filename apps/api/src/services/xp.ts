@@ -123,3 +123,26 @@ export async function insertSessionXpEntry(
     verifiedAt: xpStatus === 'verified' ? new Date() : undefined,
   });
 }
+
+/**
+ * Syncs the xp_ledger row for a topic to match a retention-derived status change.
+ * Called after processRecallTest() updates retention_cards.xpStatus.
+ * No-ops if no xp_ledger entry exists for the topic.
+ */
+export async function syncXpLedgerStatus(
+  db: Database,
+  profileId: string,
+  topicId: string,
+  newStatus: 'verified' | 'decayed'
+): Promise<void> {
+  const now = new Date();
+  await db
+    .update(xpLedger)
+    .set({
+      status: newStatus,
+      ...(newStatus === 'verified' ? { verifiedAt: now } : {}),
+    })
+    .where(
+      and(eq(xpLedger.profileId, profileId), eq(xpLedger.topicId, topicId))
+    );
+}

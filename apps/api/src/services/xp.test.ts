@@ -21,6 +21,7 @@ import {
   verifyXp,
   decayXp,
   insertSessionXpEntry,
+  syncXpLedgerStatus,
 } from './xp';
 import { getLearningMode, getLearningModeRules } from './settings';
 
@@ -318,5 +319,55 @@ describe('insertSessionXpEntry', () => {
         amount: 80,
       })
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// syncXpLedgerStatus
+// ---------------------------------------------------------------------------
+
+function createMockSyncDb(): {
+  db: Database;
+  updateSet: jest.Mock;
+  updateWhere: jest.Mock;
+} {
+  const updateWhere = jest.fn().mockResolvedValue(undefined);
+  const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+
+  const db = {
+    update: jest.fn().mockReturnValue({ set: updateSet }),
+  } as unknown as Database;
+
+  return { db, updateSet, updateWhere };
+}
+
+describe('syncXpLedgerStatus', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('updates xp_ledger status to verified with verifiedAt timestamp', async () => {
+    const { db, updateSet } = createMockSyncDb();
+
+    await syncXpLedgerStatus(db, 'profile-001', 'topic-001', 'verified');
+
+    expect(db.update).toHaveBeenCalled();
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'verified',
+        verifiedAt: expect.any(Date),
+      })
+    );
+  });
+
+  it('updates xp_ledger status to decayed without verifiedAt', async () => {
+    const { db, updateSet } = createMockSyncDb();
+
+    await syncXpLedgerStatus(db, 'profile-001', 'topic-001', 'decayed');
+
+    expect(db.update).toHaveBeenCalled();
+    const setArg = updateSet.mock.calls[0][0];
+    expect(setArg.status).toBe('decayed');
+    expect(setArg.verifiedAt).toBeUndefined();
   });
 });

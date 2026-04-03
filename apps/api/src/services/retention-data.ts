@@ -32,6 +32,7 @@ import {
   type RetentionState,
 } from './retention';
 import { canExitNeedsDeepening } from './adaptive-teaching';
+import { syncXpLedgerStatus } from './xp';
 import { routeAndCall, type ChatMessage } from './llm';
 
 // ---------------------------------------------------------------------------
@@ -342,6 +343,11 @@ export async function processRecallTest(
       )
     );
 
+  // Sync xp_ledger to match the retention card's new xpStatus
+  if (result.xpChange === 'verified' || result.xpChange === 'decayed') {
+    await syncXpLedgerStatus(db, profileId, input.topicId, result.xpChange);
+  }
+
   const response: RecallTestResponse = {
     passed: result.passed,
     masteryScore: result.passed ? 0.75 : 0.4,
@@ -540,13 +546,14 @@ export async function setTeachingPreference(
   method: string;
   analogyDomain: string | null;
 }> {
-  // Check if preference exists
-  const existing = await db.query.teachingPreferences.findFirst({
-    where: and(
-      eq(teachingPreferences.profileId, profileId),
-      eq(teachingPreferences.subjectId, subjectId)
-    ),
-  });
+  const values: typeof teachingPreferences.$inferInsert = {
+    profileId,
+    subjectId,
+    method: method as TeachingMethod,
+    ...(analogyDomain !== undefined && {
+      analogyDomain: (analogyDomain as AnalogyDomainColumn) ?? null,
+    }),
+  };
 
   const updateFields: Record<string, unknown> = {
     method: method as TeachingMethod,
@@ -556,33 +563,30 @@ export async function setTeachingPreference(
     updateFields.analogyDomain = (analogyDomain as AnalogyDomainColumn) ?? null;
   }
 
-  if (existing) {
-    await db
-      .update(teachingPreferences)
-      .set(updateFields)
-      .where(
-        and(
-          eq(teachingPreferences.id, existing.id),
-          eq(teachingPreferences.profileId, profileId)
-        )
-      );
-  } else {
-    await db.insert(teachingPreferences).values({
-      profileId,
-      subjectId,
-      method: method as TeachingMethod,
-      ...(analogyDomain !== undefined && {
-        analogyDomain: (analogyDomain as AnalogyDomainColumn) ?? null,
-      }),
+  await db
+    .insert(teachingPreferences)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [teachingPreferences.profileId, teachingPreferences.subjectId],
+      set: updateFields,
     });
+
+  // When analogyDomain was not provided, read back the existing value
+  if (analogyDomain === undefined) {
+    const existing = await db.query.teachingPreferences.findFirst({
+      where: and(
+        eq(teachingPreferences.profileId, profileId),
+        eq(teachingPreferences.subjectId, subjectId)
+      ),
+    });
+    return {
+      subjectId,
+      method,
+      analogyDomain: existing?.analogyDomain ?? null,
+    };
   }
 
-  const effectiveDomain =
-    analogyDomain !== undefined
-      ? analogyDomain ?? null
-      : existing?.analogyDomain ?? null;
-
-  return { subjectId, method, analogyDomain: effectiveDomain };
+  return { subjectId, method, analogyDomain: analogyDomain ?? null };
 }
 
 export async function deleteTeachingPreference(
@@ -633,36 +637,23 @@ export async function setAnalogyDomain(
   subjectId: string,
   analogyDomain: string | null
 ): Promise<string | null> {
-  const existing = await db.query.teachingPreferences.findFirst({
-    where: and(
-      eq(teachingPreferences.profileId, profileId),
-      eq(teachingPreferences.subjectId, subjectId)
-    ),
-  });
-
   const domainValue = (analogyDomain as AnalogyDomainColumn) ?? null;
 
-  if (existing) {
-    await db
-      .update(teachingPreferences)
-      .set({
-        analogyDomain: domainValue,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(teachingPreferences.id, existing.id),
-          eq(teachingPreferences.profileId, profileId)
-        )
-      );
-  } else {
-    await db.insert(teachingPreferences).values({
+  await db
+    .insert(teachingPreferences)
+    .values({
       profileId,
       subjectId,
       method: 'step_by_step' as TeachingMethod,
       analogyDomain: domainValue,
+    })
+    .onConflictDoUpdate({
+      target: [teachingPreferences.profileId, teachingPreferences.subjectId],
+      set: {
+        analogyDomain: domainValue,
+        updatedAt: new Date(),
+      },
     });
-  }
 
   return analogyDomain;
 }
