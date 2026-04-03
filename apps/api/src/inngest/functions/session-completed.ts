@@ -171,14 +171,14 @@ export const sessionCompleted = inngest.createFunction(
           async () => {
             const db = getStepDatabase();
             if (vType === 'evaluate') {
-              return await processEvaluateCompletion(
+              await processEvaluateCompletion(
                 db,
                 profileId,
                 sessionId,
                 topicId
               );
             } else {
-              return await processTeachBackCompletion(
+              await processTeachBackCompletion(
                 db,
                 profileId,
                 sessionId,
@@ -196,8 +196,7 @@ export const sessionCompleted = inngest.createFunction(
         ? verificationCompletionOutcome.qualityRating
         : undefined;
     const completionQualityRating =
-      derivedQualityRating ??
-      (event.data.qualityRating as number | undefined);
+      derivedQualityRating ?? (event.data.qualityRating as number | undefined);
 
     // Step 1b: Update retention data via SM-2
     // Conservative: skip retention update when no quality rating was provided,

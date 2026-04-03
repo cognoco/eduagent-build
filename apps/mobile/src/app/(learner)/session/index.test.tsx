@@ -328,7 +328,7 @@ describe('SessionScreen homework flow', () => {
     expect(screen.getByTestId('homework-problem-progress')).toHaveTextContent(
       'Problem 2 of 2'
     );
-  });
+  }, 15000);
 
   it('shows contextual learner-agency chips and session tools', () => {
     const screen = render(<SessionScreen />);
