@@ -8,7 +8,7 @@ on:
 
 permissions:
   actions: read
-  contents: read
+  contents: write
 
 jobs:
   main:
@@ -85,6 +85,13 @@ jobs:
       # Run API integration tests against real PostgreSQL
       - name: API integration tests
         run: pnpm exec nx run api:test:integration
+
+      # Self-healing CI: AI-powered fix proposals for failed tasks.
+      # Analyzes failures and proposes code patches via PR comments.
+      # No-op when all tasks pass. See .nx/SELF_HEALING.md for project rules.
+      - name: Self-healing CI
+        if: always()
+        run: pnpm exec nx fix-ci
 
       # Advisory check: flag stale counts in CLAUDE.md (does not block PRs)
       - name: Validate CLAUDE.md counts
