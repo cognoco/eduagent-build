@@ -13,10 +13,33 @@ export interface ModelConfig {
   maxTokens: number;
 }
 
-/** Chat message format */
+/** Multimodal message parts for vision/image input */
+export interface TextPart {
+  type: 'text';
+  text: string;
+}
+
+export interface InlineDataPart {
+  type: 'inline_data';
+  mimeType: string;
+  data: string; // base64-encoded
+}
+
+export type MessagePart = TextPart | InlineDataPart;
+
+/** Chat message format — content is text or multimodal parts */
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
-  content: string;
+  content: string | MessagePart[];
+}
+
+/** Extract text-only content from a ChatMessage's content field. */
+export function getTextContent(content: string | MessagePart[]): string {
+  if (typeof content === 'string') return content;
+  return content
+    .filter((p): p is TextPart => p.type === 'text')
+    .map((p) => p.text)
+    .join('\n');
 }
 
 /** Provider interface — all LLM providers implement this */

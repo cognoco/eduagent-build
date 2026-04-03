@@ -14,7 +14,7 @@ describe('getTierConfig', () => {
   it('returns correct config for free tier', () => {
     const config = getTierConfig('free');
 
-    expect(config.monthlyQuota).toBe(100);
+    expect(config.monthlyQuota).toBe(50);
     expect(config.dailyLimit).toBe(10);
     expect(config.maxProfiles).toBe(1);
     expect(config.priceMonthly).toBe(0);

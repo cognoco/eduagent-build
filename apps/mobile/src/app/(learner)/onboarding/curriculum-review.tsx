@@ -164,6 +164,12 @@ export default function CurriculumScreen() {
   };
 
   const firstAvailableTopic = curriculum?.topics.find((t) => !t.skipped);
+  const skippedTopicCount =
+    curriculum?.topics.filter((topic) => topic.skipped).length ?? 0;
+  const shouldOfferPlacementAssessment =
+    !!curriculum &&
+    curriculum.topics.length > 0 &&
+    skippedTopicCount / curriculum.topics.length > 0.8;
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -324,8 +330,69 @@ export default function CurriculumScreen() {
         </ScrollView>
       )}
 
-      {/* Start learning button */}
-      {firstAvailableTopic && (
+      {/* Next-step actions */}
+      {firstAvailableTopic && shouldOfferPlacementAssessment ? (
+        <View
+          className="px-5 pb-6"
+          style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+        >
+          <View className="bg-surface rounded-card p-4 mb-3">
+            <Text className="text-body font-semibold text-text-primary mb-2">
+              You skipped most of this curriculum
+            </Text>
+            <Text className="text-body-sm text-text-secondary">
+              Want a faster path? You can take a placement check, continue with
+              the remaining advanced topics, or switch to a different subject.
+            </Text>
+          </View>
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: '/(learner)/topic/recall-test',
+                params: {
+                  subjectId,
+                  topicId: firstAvailableTopic.id,
+                },
+              })
+            }
+            className="bg-primary rounded-button py-3.5 items-center mb-2"
+            testID="placement-check-button"
+          >
+            <Text className="text-text-inverse text-body font-semibold">
+              Take placement check
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: '/(learner)/session',
+                params: {
+                  mode: 'learning',
+                  subjectId,
+                  topicId: firstAvailableTopic.id,
+                },
+              })
+            }
+            className="border border-border rounded-button py-3 items-center mb-2"
+            testID="continue-advanced-button"
+          >
+            <Text className="text-body font-semibold text-primary">
+              Continue with advanced topics
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.replace('/create-subject')}
+            className="py-3 items-center"
+            testID="choose-different-subject-button"
+            accessibilityLabel="Choose a different subject"
+            accessibilityRole="button"
+          >
+            <Text className="text-body text-primary font-semibold">
+              Choose a different subject
+            </Text>
+          </Pressable>
+        </View>
+      ) : firstAvailableTopic ? (
         <View
           className="px-5 pb-6"
           style={{ paddingBottom: Math.max(insets.bottom, 24) }}
@@ -360,7 +427,7 @@ export default function CurriculumScreen() {
             </Text>
           </Pressable>
         </View>
-      )}
+      ) : null}
 
       {/* Challenge modal */}
       <Modal visible={showChallengeModal} animationType="slide" transparent>

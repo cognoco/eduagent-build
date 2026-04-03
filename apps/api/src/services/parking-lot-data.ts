@@ -8,7 +8,7 @@ import { parkingLotItems, type Database } from '@eduagent/database';
 import { MAX_PARKING_LOT_PER_TOPIC } from './parking-lot';
 
 /** Re-export the max for route-level limit checks */
-export const MAX_ITEMS_PER_SESSION = MAX_PARKING_LOT_PER_TOPIC;
+export const MAX_ITEMS_PER_TOPIC = MAX_PARKING_LOT_PER_TOPIC;
 
 function mapRow(row: typeof parkingLotItems.$inferSelect): {
   id: string;
@@ -42,6 +42,24 @@ export async function getParkingLotItems(
   };
 }
 
+export async function getParkingLotItemsForTopic(
+  db: Database,
+  profileId: string,
+  topicId: string
+): Promise<{ items: ReturnType<typeof mapRow>[]; count: number }> {
+  const rows = await db.query.parkingLotItems.findMany({
+    where: and(
+      eq(parkingLotItems.topicId, topicId),
+      eq(parkingLotItems.profileId, profileId)
+    ),
+  });
+
+  return {
+    items: rows.map(mapRow),
+    count: rows.length,
+  };
+}
+
 export async function addParkingLotItem(
   db: Database,
   profileId: string,
@@ -50,13 +68,19 @@ export async function addParkingLotItem(
   topicId?: string
 ): Promise<ReturnType<typeof mapRow> | null> {
   const existing = await db.query.parkingLotItems.findMany({
-    where: and(
-      eq(parkingLotItems.sessionId, sessionId),
-      eq(parkingLotItems.profileId, profileId)
-    ),
+    where:
+      topicId != null
+        ? and(
+            eq(parkingLotItems.topicId, topicId),
+            eq(parkingLotItems.profileId, profileId)
+          )
+        : and(
+            eq(parkingLotItems.sessionId, sessionId),
+            eq(parkingLotItems.profileId, profileId)
+          ),
   });
 
-  if (existing.length >= MAX_ITEMS_PER_SESSION) {
+  if (existing.length >= MAX_ITEMS_PER_TOPIC) {
     return null;
   }
 

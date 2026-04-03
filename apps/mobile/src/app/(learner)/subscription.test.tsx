@@ -81,6 +81,9 @@ let mockUsageLoading = false;
 let mockUsageError = false;
 const mockRefetchUsage = jest.fn();
 let mockUsageRefetching = false;
+let mockFamilySubscription: Record<string, unknown> | null = null;
+const mockMutateAsyncByokWaitlist = jest.fn();
+let mockByokWaitlistIsPending = false;
 let mockActiveProfile = {
   id: 'profile-1',
   displayName: 'Alex',
@@ -102,13 +105,16 @@ jest.mock('../../hooks/use-subscription', () => ({
     refetch: mockRefetchUsage,
     isRefetching: mockUsageRefetching,
   }),
+  useFamilySubscription: () => ({
+    data: mockFamilySubscription,
+  }),
   usePurchaseTopUp: () => ({
     mutateAsync: jest.fn(),
     isPending: false,
   }),
   useJoinByokWaitlist: () => ({
-    mutateAsync: jest.fn(),
-    isPending: false,
+    mutateAsync: mockMutateAsyncByokWaitlist,
+    isPending: mockByokWaitlistIsPending,
   }),
 }));
 
@@ -300,6 +306,9 @@ describe('SubscriptionScreen', () => {
     mockUsageError = false;
     mockRefetchUsage.mockReset();
     mockUsageRefetching = false;
+    mockFamilySubscription = null;
+    mockMutateAsyncByokWaitlist.mockReset();
+    mockByokWaitlistIsPending = false;
     mockActiveProfile = {
       id: 'profile-1',
       displayName: 'Alex',
@@ -463,6 +472,8 @@ describe('SubscriptionScreen', () => {
     await waitFor(() => {
       expect(mockMutateAsyncPurchase).toHaveBeenCalledWith(monthlyPkg);
     });
+    expect(mockRefetchSub).toHaveBeenCalled();
+    expect(mockRefetchUsage).toHaveBeenCalled();
     expect(Alert.alert).toHaveBeenCalledWith(
       'Success',
       'Your subscription is now active!'
@@ -573,6 +584,8 @@ describe('SubscriptionScreen', () => {
     await waitFor(() => {
       expect(mockMutateAsyncRestore).toHaveBeenCalled();
     });
+    expect(mockRefetchSub).toHaveBeenCalled();
+    expect(mockRefetchUsage).toHaveBeenCalled();
     expect(Alert.alert).toHaveBeenCalledWith(
       'Restored',
       'Your subscription has been restored.'
@@ -712,5 +725,86 @@ describe('SubscriptionScreen', () => {
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
     expect(screen.getByText('Subscription')).toBeTruthy();
+  });
+
+  it('renders the BYOK waitlist section', () => {
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('byok-waitlist-section')).toBeTruthy();
+    expect(screen.getByText('Bring your own key')).toBeTruthy();
+  });
+
+  it('shows live family pool details for family subscriptions', () => {
+    mockSubscription = { tier: 'family', status: 'active' };
+    mockFamilySubscription = {
+      tier: 'family',
+      monthlyLimit: 1500,
+      usedThisMonth: 300,
+      remainingQuestions: 1200,
+      profileCount: 3,
+      maxProfiles: 4,
+      members: [
+        { profileId: 'p1', displayName: 'Parent', isOwner: true },
+        { profileId: 'p2', displayName: 'Alex', isOwner: false },
+        { profileId: 'p3', displayName: 'Mia', isOwner: false },
+      ],
+    };
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('family-pool-section')).toBeTruthy();
+    expect(screen.getByText('3 of 4 profiles connected')).toBeTruthy();
+    expect(screen.getByText(/1200 shared questions left/i)).toBeTruthy();
+    expect(screen.getByText(/Parent \(owner\), Alex, Mia/)).toBeTruthy();
+  });
+
+  it('joins the BYOK waitlist and clears the email field on success', async () => {
+    mockMutateAsyncByokWaitlist.mockResolvedValue({
+      message: 'Added to BYOK waitlist',
+      email: 'user@example.com',
+    });
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    fireEvent.changeText(
+      screen.getByTestId('byok-waitlist-email-input'),
+      'user@example.com'
+    );
+    fireEvent.press(screen.getByTestId('join-byok-waitlist-button'));
+
+    await waitFor(() => {
+      expect(mockMutateAsyncByokWaitlist).toHaveBeenCalledWith({
+        email: 'user@example.com',
+      });
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Waitlist',
+      'You have been added to the BYOK waitlist.'
+    );
+    expect(
+      screen.getByTestId('byok-waitlist-email-input').props.value
+    ).toBe('');
+  });
+
+  it('shows an error alert when joining the BYOK waitlist fails', async () => {
+    mockMutateAsyncByokWaitlist.mockRejectedValue(new Error('nope'));
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    fireEvent.changeText(
+      screen.getByTestId('byok-waitlist-email-input'),
+      'user@example.com'
+    );
+    fireEvent.press(screen.getByTestId('join-byok-waitlist-button'));
+
+    await waitFor(() => {
+      expect(mockMutateAsyncByokWaitlist).toHaveBeenCalled();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Error',
+      'Could not join waitlist. Try again.'
+    );
   });
 });

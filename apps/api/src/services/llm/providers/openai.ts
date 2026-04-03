@@ -1,4 +1,9 @@
-import type { LLMProvider, ChatMessage, ModelConfig } from '../types';
+import {
+  getTextContent,
+  type LLMProvider,
+  type ChatMessage,
+  type ModelConfig,
+} from '../types';
 
 // ---------------------------------------------------------------------------
 // OpenAI Provider — fallback for Gemini (ARCH-8, ARCH-9)
@@ -41,7 +46,7 @@ interface OpenAIResponse {
 function toOpenAIMessages(messages: ChatMessage[]): OpenAIMessage[] {
   return messages.map((m) => ({
     role: m.role,
-    content: m.content,
+    content: getTextContent(m.content),
   }));
 }
 

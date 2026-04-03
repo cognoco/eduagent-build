@@ -143,7 +143,7 @@ jest.mock('../services/session', () => {
     }),
     closeSession: jest
       .fn()
-      .mockImplementation((_db, _profileId, sessionId) => ({
+      .mockImplementation((_db, _profileId, sessionId, input = {}) => ({
         message: 'Session closed',
         sessionId,
         topicId: null,
@@ -151,7 +151,18 @@ jest.mock('../services/session', () => {
         sessionType: 'learning',
         verificationType: null,
         wallClockSeconds: 600,
-        summaryStatus: 'pending',
+        summaryStatus: input.summaryStatus ?? 'pending',
+        escalationRungs: [1, 2],
+      })),
+    getSessionCompletionContext: jest
+      .fn()
+      .mockImplementation((_db, _profileId, sessionId) => ({
+        sessionId,
+        topicId: null,
+        subjectId: SUBJECT_ID,
+        sessionType: 'learning',
+        verificationType: null,
+        escalationRungs: [1, 2],
       })),
     getSessionTranscript: jest.fn().mockResolvedValue({
       session: {
@@ -186,16 +197,11 @@ jest.mock('../services/session', () => {
       ],
     }),
     recordSystemPrompt: jest.fn().mockResolvedValue(undefined),
+    recordSessionEvent: jest.fn().mockResolvedValue(undefined),
     flagContent: jest.fn().mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
     }),
-    getSessionSummary: jest.fn().mockResolvedValue({
-      id: 'summary-1',
-      sessionId: SESSION_ID,
-      content: 'Test summary',
-      aiFeedback: null,
-      status: 'submitted',
-    }),
+    getSessionSummary: jest.fn().mockResolvedValue(null),
     skipSummary: jest.fn().mockImplementation((_db, _profileId, sessionId) => ({
       summary: {
         id: 'summary-1',
@@ -293,6 +299,7 @@ import {
   streamMessage,
   getSessionTranscript,
   recordSystemPrompt,
+  recordSessionEvent,
 } from '../services/session';
 import { shouldPromptCasualSwitch } from '../services/settings';
 import { app } from '../index';
@@ -495,6 +502,36 @@ describe('session routes', () => {
     });
   });
 
+  describe('POST /v1/sessions/:sessionId/events', () => {
+    it('records a session analytics event', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/events`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            eventType: 'quick_action',
+            content: 'too_easy',
+            metadata: { chip: 'too_easy' },
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ok: true });
+      expect(recordSessionEvent).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(String),
+        SESSION_ID,
+        expect.objectContaining({
+          eventType: 'quick_action',
+          content: 'too_easy',
+        })
+      );
+    });
+  });
+
   // -------------------------------------------------------------------------
   // POST /v1/sessions/:sessionId/close
   // -------------------------------------------------------------------------
@@ -531,7 +568,7 @@ describe('session routes', () => {
       expect(body.shouldPromptCasualSwitch).toBe(false);
     });
 
-    it('dispatches app/session.completed Inngest event with summaryStatus', async () => {
+    it('dispatches app/session.completed when close ends with a final summary status', async () => {
       await app.request(
         `/v1/sessions/${SESSION_ID}/close`,
         {
@@ -548,13 +585,14 @@ describe('session routes', () => {
           sessionId: SESSION_ID,
           subjectId: SUBJECT_ID,
           sessionType: 'learning',
-          summaryStatus: 'pending',
+          summaryStatus: 'skipped',
+          escalationRungs: [1, 2],
           timestamp: expect.any(String),
         }),
       });
     });
 
-    it('uses the closeSession result summaryStatus when the request body omits it', async () => {
+    it('does not dispatch app/session.completed while summary is still pending', async () => {
       await app.request(
         `/v1/sessions/${SESSION_ID}/close`,
         {
@@ -565,13 +603,7 @@ describe('session routes', () => {
         TEST_ENV
       );
 
-      expect(sendSpy).toHaveBeenCalledWith({
-        name: 'app/session.completed',
-        data: expect.objectContaining({
-          sessionId: SESSION_ID,
-          summaryStatus: 'pending',
-        }),
-      });
+      expect(sendSpy).not.toHaveBeenCalled();
     });
 
     it('forwards milestonesReached to the closeSession service', async () => {
@@ -778,6 +810,15 @@ describe('session routes', () => {
       expect(body.summary.sessionId).toBe(SESSION_ID);
       expect(body.summary.aiFeedback).toBeDefined();
       expect(body.summary.status).toBe('accepted');
+      expect(mockInngestSend).toHaveBeenCalledWith({
+        name: 'app/session.completed',
+        data: expect.objectContaining({
+          sessionId: SESSION_ID,
+          summaryStatus: 'accepted',
+          qualityRating: 4,
+          summaryTrackingHandled: true,
+        }),
+      });
     });
 
     it('returns 400 with too-short content', async () => {
@@ -827,6 +868,14 @@ describe('session routes', () => {
       const body = await res.json();
       expect(body.summary.status).toBe('skipped');
       expect(body.shouldPromptCasualSwitch).toBe(false);
+      expect(mockInngestSend).toHaveBeenCalledWith({
+        name: 'app/session.completed',
+        data: expect.objectContaining({
+          sessionId: SESSION_ID,
+          summaryStatus: 'skipped',
+          summaryTrackingHandled: true,
+        }),
+      });
     });
   });
 

@@ -1,8 +1,11 @@
 import { useState, useCallback, useRef } from 'react';
 import { NativeModules, Platform } from 'react-native';
+import { useAuth } from '@clerk/clerk-expo';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
+import { getApiUrl } from '../lib/api';
+import { useProfile } from '../lib/profile';
 
 /**
  * Check whether the ML Kit native module is linked in this build.
@@ -44,12 +47,73 @@ async function recognizeText(imageUri: string): Promise<string | null> {
   return text || null;
 }
 
+async function recognizeTextServerSide(
+  imageUri: string,
+  token: string | null,
+  profileId?: string
+): Promise<string | null> {
+  const uploadUri = await resizeImage(imageUri);
+  const formData = new FormData();
+  formData.append('image', {
+    uri: uploadUri,
+    name: `homework-${Date.now()}.jpg`,
+    type: 'image/jpeg',
+  } as unknown as Blob);
+
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (profileId) {
+    headers['X-Profile-Id'] = profileId;
+  }
+
+  const response = await fetch(`${getApiUrl()}/v1/ocr`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Server OCR failed (${response.status})`);
+  }
+
+  const payload = (await response.json()) as { text?: string | null };
+  const text = payload.text?.trim();
+  return text || null;
+}
+
 export function useHomeworkOcr(): UseHomeworkOcrResult {
+  const { getToken } = useAuth();
+  const { activeProfile } = useProfile();
   const [text, setText] = useState<string | null>(null);
   const [status, setStatus] = useState<OcrStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [failCount, setFailCount] = useState(0);
   const currentUriRef = useRef<string | null>(null);
+
+  const tryServerFallback = useCallback(
+    async (uri: string): Promise<boolean> => {
+      try {
+        const token = await getToken();
+        const recognized = await recognizeTextServerSide(
+          uri,
+          token ?? null,
+          activeProfile?.id
+        );
+        if (!recognized) {
+          return false;
+        }
+        setText(recognized);
+        setStatus('done');
+        return true;
+      } catch (err) {
+        console.error('[OCR] Server fallback failed:', err);
+        return false;
+      }
+    },
+    [activeProfile?.id, getToken]
+  );
 
   const runOcr = useCallback(async (uri: string, isRetry: boolean) => {
     setStatus('processing');
@@ -64,6 +128,9 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
         '[OCR] ML Kit TextRecognition native module is not linked. ' +
           'Rebuild the app with EAS to include @react-native-ml-kit/text-recognition.'
       );
+      if (await tryServerFallback(uri)) {
+        return;
+      }
       setFailCount((prev) => prev + 1);
       setError(
         Platform.OS === 'android'
@@ -77,6 +144,9 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
     try {
       const recognized = await recognizeText(uri);
       if (!recognized) {
+        if (await tryServerFallback(uri)) {
+          return;
+        }
         setFailCount((prev) => prev + 1);
         setError("Couldn't read any text from the image");
         setStatus('error');
@@ -86,13 +156,16 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
       setStatus('done');
     } catch (err) {
       console.error('[OCR] Text recognition failed:', err);
+      if (await tryServerFallback(uri)) {
+        return;
+      }
       setFailCount((prev) => prev + 1);
       setError(
         "We couldn't read that clearly. Try taking the photo again with better lighting."
       );
       setStatus('error');
     }
-  }, []);
+  }, [tryServerFallback]);
 
   const process = useCallback(
     async (uri: string) => {

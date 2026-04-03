@@ -5,6 +5,7 @@ import {
   sessionMessageSchema,
   sessionCloseSchema,
   contentFlagSchema,
+  sessionAnalyticsEventSchema,
   summarySubmitSchema,
   interleavedSessionStartSchema,
   homeworkStateSyncSchema,
@@ -26,8 +27,10 @@ import {
   closeSession,
   flagContent,
   getSessionSummary,
+  getSessionCompletionContext,
   getSessionTranscript,
   recordSystemPrompt,
+  recordSessionEvent,
   skipSummary,
   submitSummary,
   syncHomeworkState,
@@ -201,35 +204,14 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         body
       );
 
-      // Dispatch background job for retention, streaks, coaching.
-      // Wrapped in try-catch so the synchronous close response succeeds even
-      // if Inngest is temporarily unavailable (local dev without dev server,
-      // or transient network failure in production).
-      try {
-        await inngest.send({
-          name: 'app/session.completed',
-          data: {
-            profileId,
-            sessionId: result.sessionId,
-            topicId: result.topicId,
-            subjectId: result.subjectId,
-            sessionType: result.sessionType,
-            verificationType: result.verificationType,
-            interleavedTopicIds: result.interleavedTopicIds,
-            summaryStatus: result.summaryStatus,
-            timestamp: new Date().toISOString(),
-          },
+      const shouldDispatchCompletionEvent =
+        result.summaryStatus !== 'pending' &&
+        result.summaryStatus !== 'submitted';
+      if (shouldDispatchCompletionEvent) {
+        await dispatchSessionCompletedEvent(db, profileId, result.sessionId, {
+          summaryStatus: result.summaryStatus,
+          summaryTrackingHandled: result.summaryStatus === 'skipped',
         });
-      } catch (err) {
-        captureException(err, {
-          profileId,
-          extra: { sessionId: result.sessionId },
-        });
-        console.warn(
-          `[sessions] Failed to dispatch session.completed event for ${
-            result.sessionId
-          }: ${err instanceof Error ? err.message : String(err)}`
-        );
       }
 
       // Check if we should prompt the learner to switch to Casual Explorer
@@ -258,6 +240,20 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         body.content,
         body.metadata
       );
+      return c.json({ ok: true });
+    }
+  )
+
+  .post(
+    '/sessions/:sessionId/events',
+    zValidator('json', sessionAnalyticsEventSchema),
+    async (c) => {
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
+      const body = c.req.valid('json');
+
+      await recordSessionEvent(db, profileId, c.req.param('sessionId'), body);
       return c.json({ ok: true });
     }
   )
@@ -317,7 +313,27 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     const db = c.get('db');
     const account = c.get('account');
     const profileId = c.get('profileId') ?? account.id;
+    const previousSummary = await getSessionSummary(
+      db,
+      profileId,
+      c.req.param('sessionId')
+    );
     const result = await skipSummary(db, profileId, c.req.param('sessionId'));
+    if (
+      !previousSummary ||
+      previousSummary.status === 'pending' ||
+      previousSummary.status === 'auto_closed'
+    ) {
+      await dispatchSessionCompletedEvent(
+        db,
+        profileId,
+        c.req.param('sessionId'),
+        {
+          summaryStatus: result.summary.status,
+          summaryTrackingHandled: true,
+        }
+      );
+    }
     const promptCasualSwitch = await shouldPromptCasualSwitch(db, profileId);
     return c.json({
       ...result,
@@ -333,12 +349,35 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const db = c.get('db');
       const account = c.get('account');
       const profileId = c.get('profileId') ?? account.id;
+      const previousSummary = await getSessionSummary(
+        db,
+        profileId,
+        c.req.param('sessionId')
+      );
       const result = await submitSummary(
         db,
         profileId,
         c.req.param('sessionId'),
         c.req.valid('json')
       );
+      if (
+        !previousSummary ||
+        previousSummary.status === 'pending' ||
+        previousSummary.status === 'auto_closed'
+      ) {
+        await dispatchSessionCompletedEvent(
+          db,
+          profileId,
+          c.req.param('sessionId'),
+          {
+            summaryStatus: result.summary.status,
+            qualityRating: qualityRatingFromSummaryStatus(
+              result.summary.status
+            ),
+            summaryTrackingHandled: true,
+          }
+        );
+      }
       return c.json(result);
     }
   )
@@ -390,3 +429,65 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     const result = await generateRecallBridge(db, profileId, sessionId);
     return c.json(result);
   });
+
+function qualityRatingFromSummaryStatus(
+  status: 'accepted' | 'submitted'
+): number {
+  return status === 'accepted' ? 4 : 2;
+}
+
+async function dispatchSessionCompletedEvent(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  options: {
+    summaryStatus:
+      | 'pending'
+      | 'submitted'
+      | 'accepted'
+      | 'skipped'
+      | 'auto_closed';
+    qualityRating?: number;
+    summaryTrackingHandled?: boolean;
+  }
+): Promise<void> {
+  try {
+    const completion = await getSessionCompletionContext(
+      db,
+      profileId,
+      sessionId
+    );
+
+    await inngest.send({
+      name: 'app/session.completed',
+      data: {
+        profileId,
+        sessionId: completion.sessionId,
+        topicId: completion.topicId,
+        subjectId: completion.subjectId,
+        sessionType: completion.sessionType,
+        verificationType: completion.verificationType,
+        interleavedTopicIds: completion.interleavedTopicIds,
+        escalationRungs: completion.escalationRungs,
+        summaryStatus: options.summaryStatus,
+        ...(options.qualityRating != null
+          ? { qualityRating: options.qualityRating }
+          : {}),
+        ...(options.summaryTrackingHandled
+          ? { summaryTrackingHandled: true }
+          : {}),
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (err) {
+    captureException(err, {
+      profileId,
+      extra: { sessionId },
+    });
+    console.warn(
+      `[sessions] Failed to dispatch session.completed event for ${sessionId}: ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+  }
+}

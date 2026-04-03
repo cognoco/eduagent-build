@@ -10,6 +10,7 @@ import type {
   SubscriptionStatus,
   Subscription,
   Usage,
+  FamilySubscription,
   CheckoutRequest,
   CheckoutResponse,
   CancelResponse,
@@ -91,6 +92,47 @@ export function useUsage(): UseQueryResult<UsageData> {
       }
     },
     enabled: !!activeProfile,
+  });
+}
+
+export function useFamilySubscription(
+  enabled = true
+): UseQueryResult<FamilySubscription | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['subscription-family', activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const familyClient = client.subscription.family as {
+          $get: (input: { init: { signal: AbortSignal } }) => Promise<Response>;
+        };
+        try {
+          const res = await familyClient.$get({
+            init: { signal },
+          });
+          if (res.status === 404) {
+            return null;
+          }
+          await assertOk(res);
+          const data = await res.json();
+          return data.family as FamilySubscription;
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.message.startsWith('API error 404')
+          ) {
+            return null;
+          }
+          throw error;
+        }
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && enabled,
   });
 }
 

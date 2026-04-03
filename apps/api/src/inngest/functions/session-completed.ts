@@ -31,7 +31,6 @@ import {
   curriculumTopics,
   retentionCards,
   sessionEvents,
-  streaks,
 } from '@eduagent/database';
 import { and, asc, eq } from 'drizzle-orm';
 
@@ -45,6 +44,7 @@ interface StepOutcome {
   step: string;
   status: 'ok' | 'skipped' | 'failed';
   error?: string;
+  qualityRating?: number;
 }
 
 async function runIsolated(
@@ -145,59 +145,12 @@ export const sessionCompleted = inngest.createFunction(
       ? [topicId]
       : [];
 
-    // Step 1: Update retention data via SM-2
-    // Conservative: skip retention update when no quality rating was provided,
-    // rather than defaulting to 3 (which inflates metrics). Issue #19.
-    outcomes.push(
-      await step.run('update-retention', async () => {
-        if (retentionTopicIds.length === 0)
-          return { step: 'update-retention', status: 'skipped' as const };
-        const quality = event.data.qualityRating as number | undefined;
-        if (quality == null) {
-          console.warn(
-            `[session-completed] No qualityRating for session ${sessionId} — skipping retention update`
-          );
-          return { step: 'update-retention', status: 'skipped' as const };
-        }
-        return runIsolated('update-retention', profileId, async () => {
-          const db = getStepDatabase();
-          for (const tid of retentionTopicIds) {
-            await updateRetentionFromSession(
-              db,
-              profileId,
-              tid,
-              quality,
-              timestamp
-            );
-          }
-        });
-      })
-    );
-
-    // Step 1b: Update needs-deepening progress (FR63)
-    // Same conservative approach: skip when quality is not provided.
-    outcomes.push(
-      await step.run('update-needs-deepening', async () => {
-        if (retentionTopicIds.length === 0)
-          return { step: 'update-needs-deepening', status: 'skipped' as const };
-        const quality = event.data.qualityRating as number | undefined;
-        if (quality == null) {
-          return { step: 'update-needs-deepening', status: 'skipped' as const };
-        }
-        return runIsolated('update-needs-deepening', profileId, async () => {
-          const db = getStepDatabase();
-          for (const tid of retentionTopicIds) {
-            await updateNeedsDeepeningProgress(db, profileId, tid, quality);
-          }
-        });
-      })
-    );
-
-    // Step 1c: Process verification-specific completion (EVALUATE / TEACH_BACK)
+    // Step 1: Process verification-specific completion (EVALUATE / TEACH_BACK)
     // Parses structured assessment from LLM output, maps to SM-2 quality,
     // and stores in session_events for audit trail + downstream features.
-    outcomes.push(
-      await step.run('process-verification-completion', async () => {
+    const verificationCompletionOutcome = await step.run(
+      'process-verification-completion',
+      async () => {
         const vType = verificationType as string | null | undefined;
         if (!vType || (vType !== 'evaluate' && vType !== 'teach_back')) {
           return {
@@ -233,6 +186,64 @@ export const sessionCompleted = inngest.createFunction(
             }
           }
         );
+      }
+    );
+    outcomes.push(verificationCompletionOutcome);
+
+    const derivedQualityRating =
+      typeof verificationCompletionOutcome.qualityRating === 'number'
+        ? verificationCompletionOutcome.qualityRating
+        : undefined;
+    const completionQualityRating =
+      derivedQualityRating ?? (event.data.qualityRating as number | undefined);
+
+    // Step 1b: Update retention data via SM-2
+    // Conservative: skip retention update when no quality rating was provided,
+    // rather than defaulting to 3 (which inflates metrics). Issue #19.
+    outcomes.push(
+      await step.run('update-retention', async () => {
+        if (retentionTopicIds.length === 0)
+          return { step: 'update-retention', status: 'skipped' as const };
+        if (completionQualityRating == null) {
+          console.warn(
+            `[session-completed] No qualityRating for session ${sessionId} — skipping retention update`
+          );
+          return { step: 'update-retention', status: 'skipped' as const };
+        }
+        return runIsolated('update-retention', profileId, async () => {
+          const db = getStepDatabase();
+          for (const tid of retentionTopicIds) {
+            await updateRetentionFromSession(
+              db,
+              profileId,
+              tid,
+              completionQualityRating,
+              timestamp
+            );
+          }
+        });
+      })
+    );
+
+    // Step 1c: Update needs-deepening progress (FR63)
+    outcomes.push(
+      await step.run('update-needs-deepening', async () => {
+        if (retentionTopicIds.length === 0)
+          return { step: 'update-needs-deepening', status: 'skipped' as const };
+        if (completionQualityRating == null) {
+          return { step: 'update-needs-deepening', status: 'skipped' as const };
+        }
+        return runIsolated('update-needs-deepening', profileId, async () => {
+          const db = getStepDatabase();
+          for (const tid of retentionTopicIds) {
+            await updateNeedsDeepeningProgress(
+              db,
+              profileId,
+              tid,
+              completionQualityRating
+            );
+          }
+        });
       })
     );
 
@@ -257,19 +268,32 @@ export const sessionCompleted = inngest.createFunction(
     );
 
     // Step 3: Update dashboard — streaks + XP
+    // Capture streak result to avoid re-querying in the celebrations step (race condition fix)
+    let updatedStreak: { currentStreak: number; longestStreak: number } | null =
+      null;
     outcomes.push(
-      await step.run('update-dashboard', async () =>
-        runIsolated('update-dashboard', profileId, async () => {
-          const db = getStepDatabase();
-          const today = timestamp
-            ? new Date(timestamp).toISOString().slice(0, 10)
-            : new Date().toISOString().slice(0, 10);
+      await step.run('update-dashboard', async () => {
+        const result = await runIsolated(
+          'update-dashboard',
+          profileId,
+          async () => {
+            const db = getStepDatabase();
+            const today = timestamp
+              ? new Date(timestamp).toISOString().slice(0, 10)
+              : new Date().toISOString().slice(0, 10);
 
-          await recordSessionActivity(db, profileId, today);
+            updatedStreak = await recordSessionActivity(db, profileId, today);
 
-          await insertSessionXpEntry(db, profileId, topicId ?? null, subjectId);
-        })
-      )
+            await insertSessionXpEntry(
+              db,
+              profileId,
+              topicId ?? null,
+              subjectId
+            );
+          }
+        );
+        return result;
+      })
     );
 
     // Step 4: Generate and store session embedding
@@ -311,6 +335,9 @@ export const sessionCompleted = inngest.createFunction(
     outcomes.push(
       await step.run('track-summary-skips', async () =>
         runIsolated('track-summary-skips', profileId, async () => {
+          if (event.data.summaryTrackingHandled) {
+            return;
+          }
           const db = getStepDatabase();
           if (summaryStatus === 'skipped') {
             await incrementSummarySkips(db, profileId);
@@ -344,7 +371,7 @@ export const sessionCompleted = inngest.createFunction(
       await step.run('queue-celebrations', async () =>
         runIsolated('queue-celebrations', profileId, async () => {
           const db = getStepDatabase();
-          const quality = event.data.qualityRating as number | undefined;
+          const quality = completionQualityRating;
           const currentTopicId = topicId as string | null | undefined;
           const currentVerification = verificationType as string | undefined;
 
@@ -390,15 +417,16 @@ export const sessionCompleted = inngest.createFunction(
             }
           }
 
-          const streak = await db.query.streaks.findFirst({
-            where: eq(streaks.profileId, profileId),
-          });
+          // Use the streak value from the update-dashboard step to avoid
+          // a race condition where concurrent session-completed events
+          // could read the same streak and queue duplicate celebrations.
+          const currentStreak = updatedStreak?.currentStreak ?? 0;
 
-          if (streak?.currentStreak === 7) {
+          if (currentStreak === 7) {
             await queueCelebration(db, profileId, 'comet', 'streak_7');
           }
 
-          if (streak?.currentStreak === 30) {
+          if (currentStreak === 30) {
             await queueCelebration(db, profileId, 'orions_belt', 'streak_30');
           }
         })

@@ -51,6 +51,7 @@ import {
   getDraftState,
   updateDraft,
   persistCurriculum,
+  buildDraftResumeSummary,
 } from './interview';
 import type { InterviewContext, OnboardingDraft } from '@eduagent/schemas';
 import { routeAndCall } from './llm';
@@ -325,9 +326,32 @@ describe('getOrCreateDraft', () => {
     expect(db.insert).toHaveBeenCalled();
   });
 
+  it('creates a fresh draft when the latest in-progress draft is expired', async () => {
+    const expiredRow = mockDraftRow({
+      id: 'expired-draft',
+      expiresAt: new Date('2025-01-01T00:00:00.000Z'),
+    });
+    const newRow = mockDraftRow({ id: 'new-draft' });
+    const db = createMockDb({
+      findFirstResult: expiredRow,
+      insertReturning: [newRow],
+    });
+
+    jest.useFakeTimers().setSystemTime(new Date('2025-01-15T10:00:00.000Z'));
+    try {
+      const result = await getOrCreateDraft(db, profileId, subjectId);
+
+      expect(result.id).toBe('new-draft');
+      expect(db.update).toHaveBeenCalled();
+      expect(db.insert).toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('maps dates to ISO strings', async () => {
     const row = mockDraftRow({ expiresAt: NOW });
-    const db = createMockDb({ findFirstResult: row });
+    const db = createMockDb({ findFirstResult: row, insertReturning: [row] });
 
     const result = await getOrCreateDraft(db, profileId, subjectId);
 
@@ -376,6 +400,24 @@ describe('getDraftState', () => {
     expect(result!.exchangeHistory).toHaveLength(2);
   });
 
+  it('marks stale in-progress drafts as expired after 7 days', async () => {
+    const staleRow = mockDraftRow({
+      status: 'in_progress',
+      expiresAt: new Date('2025-01-01T00:00:00.000Z'),
+    });
+    const db = createMockDb({ findFirstResult: staleRow });
+
+    jest.useFakeTimers().setSystemTime(new Date('2025-01-15T10:00:00.000Z'));
+    try {
+      const result = await getDraftState(db, profileId, subjectId);
+
+      expect(result?.status).toBe('expired');
+      expect(db.update).toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('handles null exchangeHistory gracefully', async () => {
     const row = mockDraftRow({ exchangeHistory: null });
     const db = createMockDb({ findFirstResult: row });
@@ -416,6 +458,35 @@ describe('updateDraft', () => {
     });
 
     expect(db.update).toHaveBeenCalled();
+  });
+});
+
+describe('buildDraftResumeSummary', () => {
+  it('summarizes structured interview signals when available', () => {
+    const summary = buildDraftResumeSummary({
+      exchangeHistory: [],
+      extractedSignals: {
+        goals: ['learn calculus'],
+        experienceLevel: 'beginner',
+        currentKnowledge: 'basic algebra',
+      },
+    });
+
+    expect(summary).toContain('learn calculus');
+    expect(summary).toContain('beginner');
+    expect(summary).toContain('basic algebra');
+  });
+
+  it('falls back to learner messages when extracted signals are empty', () => {
+    const summary = buildDraftResumeSummary({
+      exchangeHistory: [
+        { role: 'user', content: 'I want to get better at essays' },
+        { role: 'assistant', content: 'What is hardest right now?' },
+      ],
+      extractedSignals: {},
+    });
+
+    expect(summary).toContain('essays');
   });
 });
 

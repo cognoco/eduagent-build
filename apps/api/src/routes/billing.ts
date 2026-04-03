@@ -23,12 +23,14 @@ import {
   listFamilyMembers,
   addProfileToSubscription,
   removeProfileFromSubscription,
+  ProfileRemovalNotImplementedError,
   getFamilyPoolStatus,
 } from '../services/billing';
 import {
   getWarningLevel,
   calculateRemainingQuestions,
 } from '../services/metering';
+import { getTierConfig } from '../services/subscription';
 import { createStripeClient } from '../services/stripe';
 import { readSubscriptionStatus } from '../services/kv';
 import { apiError, notFound } from '../errors';
@@ -72,6 +74,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   .get('/subscription', async (c) => {
     const db = c.get('db');
     const account = c.get('account');
+    const freeTier = getTierConfig('free');
 
     const subscription = await getSubscriptionByAccountId(db, account.id);
 
@@ -84,19 +87,19 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           trialEndsAt: null,
           currentPeriodEnd: null,
           cancelAtPeriodEnd: false,
-          monthlyLimit: 100,
+          monthlyLimit: freeTier.monthlyQuota,
           usedThisMonth: 0,
-          remainingQuestions: 100,
-          dailyLimit: 10,
+          remainingQuestions: freeTier.monthlyQuota,
+          dailyLimit: freeTier.dailyLimit,
           usedToday: 0,
-          dailyRemainingQuestions: 10,
+          dailyRemainingQuestions: freeTier.dailyLimit,
         },
       });
     }
 
     // Fetch quota pool for enriched response
     const quota = await getQuotaPool(db, subscription.id);
-    const monthlyLimit = quota?.monthlyLimit ?? 100;
+    const monthlyLimit = quota?.monthlyLimit ?? freeTier.monthlyQuota;
     const usedThisMonth = quota?.usedThisMonth ?? 0;
     const remaining = Math.max(0, monthlyLimit - usedThisMonth);
     const dailyLimit = quota?.dailyLimit ?? null;
@@ -322,27 +325,28 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   .get('/usage', async (c) => {
     const db = c.get('db');
     const account = c.get('account');
+    const freeTier = getTierConfig('free');
 
     const subscription = await getSubscriptionByAccountId(db, account.id);
 
     if (!subscription) {
       return c.json({
         usage: {
-          monthlyLimit: 100,
+          monthlyLimit: freeTier.monthlyQuota,
           usedThisMonth: 0,
-          remainingQuestions: 100,
+          remainingQuestions: freeTier.monthlyQuota,
           topUpCreditsRemaining: 0,
           warningLevel: 'none' as const,
           cycleResetAt: new Date().toISOString(),
-          dailyLimit: 10,
+          dailyLimit: freeTier.dailyLimit,
           usedToday: 0,
-          dailyRemainingQuestions: 10,
+          dailyRemainingQuestions: freeTier.dailyLimit,
         },
       });
     }
 
     const quota = await getQuotaPool(db, subscription.id);
-    const monthlyLimit = quota?.monthlyLimit ?? 100;
+    const monthlyLimit = quota?.monthlyLimit ?? freeTier.monthlyQuota;
     const usedThisMonth = quota?.usedThisMonth ?? 0;
     const dailyLimit = quota?.dailyLimit ?? null;
     const usedToday = quota?.usedToday ?? 0;
@@ -414,6 +418,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const db = c.get('db');
     const account = c.get('account');
     const kv = c.env.SUBSCRIPTION_KV;
+    const freeTier = getTierConfig('free');
 
     // Try KV first (fast path)
     if (kv) {
@@ -439,9 +444,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         status: {
           tier: 'free' as const,
           status: 'trial' as const,
-          monthlyLimit: 100,
+          monthlyLimit: freeTier.monthlyQuota,
           usedThisMonth: 0,
-          dailyLimit: 10,
+          dailyLimit: freeTier.dailyLimit,
           usedToday: 0,
         },
       });
@@ -453,7 +458,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       status: {
         tier: subscription.tier,
         status: subscription.status,
-        monthlyLimit: quota?.monthlyLimit ?? 100,
+        monthlyLimit: quota?.monthlyLimit ?? freeTier.monthlyQuota,
         usedThisMonth: quota?.usedThisMonth ?? 0,
         dailyLimit: quota?.dailyLimit ?? null,
         usedToday: quota?.usedToday ?? 0,
@@ -536,12 +541,25 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         return notFound(c, 'No subscription found');
       }
 
-      const result = await removeProfileFromSubscription(
-        db,
-        subscription.id,
-        profileId,
-        newAccountId
-      );
+      let result: { removedProfileId: string } | null;
+      try {
+        result = await removeProfileFromSubscription(
+          db,
+          subscription.id,
+          profileId,
+          newAccountId
+        );
+      } catch (err) {
+        if (err instanceof ProfileRemovalNotImplementedError) {
+          return apiError(
+            c,
+            422,
+            ERROR_CODES.NOT_IMPLEMENTED,
+            'Profile removal is not yet implemented. An invite/claim flow is required.'
+          );
+        }
+        throw err;
+      }
 
       if (!result) {
         return apiError(

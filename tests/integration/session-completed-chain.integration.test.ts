@@ -32,9 +32,17 @@ jest.mock('@eduagent/database', () => {
   return {
     createDatabase: jest.fn(chainable),
     // Re-export ORM helpers so they resolve without errors
-    retentionCards: { repetitions: 'repetitions', profileId: 'profileId', topicId: 'topicId' },
+    retentionCards: {
+      repetitions: 'repetitions',
+      profileId: 'profileId',
+      topicId: 'topicId',
+    },
     curriculumTopics: { id: 'id', title: 'title' },
-    sessionEvents: { sessionId: 'sessionId', profileId: 'profileId', createdAt: 'createdAt' },
+    sessionEvents: {
+      sessionId: 'sessionId',
+      profileId: 'profileId',
+      createdAt: 'createdAt',
+    },
     streaks: { profileId: 'profileId' },
   };
 });
@@ -232,9 +240,9 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
 
     const stepNames = result.outcomes.map((o) => o.step);
     expect(stepNames).toEqual([
+      'process-verification-completion',
       'update-retention',
       'update-needs-deepening',
-      'process-verification-completion',
       'write-coaching-card',
       'update-dashboard',
       'generate-embeddings',

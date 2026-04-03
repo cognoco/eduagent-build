@@ -8,7 +8,7 @@ jest.mock('@eduagent/database', () => ({
 
 jest.mock('../../services/subscription', () => ({
   getTierConfig: jest.fn().mockReturnValue({
-    monthlyQuota: 100,
+    monthlyQuota: 50,
     dailyLimit: 10,
     maxProfiles: 1,
   }),
@@ -54,6 +54,11 @@ jest.mock('../../services/notifications', () => ({
     mockSendPushNotification(...args),
 }));
 
+const mockFindOwnerProfile = jest.fn();
+jest.mock('../../services/profile', () => ({
+  findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
+}));
+
 import { trialExpiry } from './trial-expiry';
 
 // ---------------------------------------------------------------------------
@@ -81,6 +86,11 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.useFakeTimers({ now: NOW });
   process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
+  mockFindOwnerProfile.mockImplementation(
+    async (_db: unknown, accountId: string) => ({
+      id: `owner-${accountId}`,
+    })
+  );
 });
 
 afterEach(() => {
@@ -160,7 +170,7 @@ describe('trialExpiry', () => {
     expect(mockDowngradeQuotaPool).toHaveBeenCalledWith(
       expect.anything(),
       'sub-2',
-      100,
+      50,
       10
     );
   });
@@ -191,7 +201,7 @@ describe('trialExpiry', () => {
     expect(mockSendPushNotification).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        profileId: 'acc-3',
+        profileId: 'owner-acc-3',
         title: 'Trial ending soon',
         body: '3 days left of your trial',
         type: 'trial_expiry',
@@ -228,7 +238,7 @@ describe('trialExpiry', () => {
     expect(mockSendPushNotification).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        profileId: 'acc-4',
+        profileId: 'owner-acc-4',
         title: 'Your trial has ended',
         body: 'giving you 15/day for 2 more weeks',
         type: 'trial_expiry',
@@ -305,7 +315,7 @@ describe('trialExpiry', () => {
     expect(mockDowngradeQuotaPool).toHaveBeenCalledWith(
       expect.anything(),
       'sub-6',
-      100,
+      50,
       10
     );
   });

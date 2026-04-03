@@ -10,7 +10,11 @@ import { apiError } from '../errors';
 import { ERROR_CODES } from '@eduagent/schemas';
 
 type HomeworkRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+    GEMINI_API_KEY?: string;
+  };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -71,7 +75,7 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
     }
 
     const imageBuffer = await file.arrayBuffer();
-    const provider = getOcrProvider();
+    const provider = getOcrProvider(c.env.GEMINI_API_KEY);
     const result = await provider.extractText(imageBuffer, file.type);
     return c.json(result);
   });

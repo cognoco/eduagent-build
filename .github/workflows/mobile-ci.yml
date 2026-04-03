@@ -53,6 +53,7 @@ jobs:
       NX_ISOLATE_PLUGINS: false
     outputs:
       mobile-affected: ${{ steps.check.outputs.affected }}
+      native-changed: ${{ steps.native-check.outputs.native_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -100,6 +101,39 @@ jobs:
             echo "affected=false" >> $GITHUB_OUTPUT
             echo "Mobile is NOT affected"
           fi
+
+      - name: Check for native changes
+        id: native-check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "native_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Manual run — treating as native change"
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="origin/${{ github.base_ref }}...HEAD"
+          else
+            BASE="HEAD~1 HEAD"
+          fi
+
+          changed_files=$(git diff --name-only $BASE)
+          native_patterns="apps/mobile/app.json apps/mobile/package.json apps/mobile/eas.json"
+
+          native_changed=false
+          for pattern in $native_patterns; do
+            if echo "$changed_files" | grep -q "^${pattern}$"; then
+              native_changed=true
+              echo "Native change detected: $pattern"
+            fi
+          done
+
+          if echo "$changed_files" | grep -Eq '^apps/mobile/(plugins|android|ios)/'; then
+            native_changed=true
+            echo "Native change detected in plugins/android/ios directory"
+          fi
+
+          echo "native_changed=$native_changed" >> "$GITHUB_OUTPUT"
 
   # Lint mobile code
   lint:
@@ -152,13 +186,15 @@ jobs:
       - name: Run mobile tests
         run: pnpm test:mobile:unit
 
-  # Build preview APK on merge to main (Android only for PoC)
+  # Build preview APK on merge to main — only when native files changed.
+  # JS-only changes are delivered via OTA update (ci.yml ota-update job).
   build-preview:
     needs: [check-affected, lint, test]
     if: |
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
-      needs.check-affected.outputs.mobile-affected == 'true'
+      needs.check-affected.outputs.mobile-affected == 'true' &&
+      needs.check-affected.outputs.native-changed == 'true'
     runs-on: ubuntu-latest
     env:
       NX_DAEMON: false

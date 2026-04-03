@@ -6,9 +6,12 @@ import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import {
   getParkingLotItems,
+  getParkingLotItemsForTopic,
   addParkingLotItem,
+  MAX_ITEMS_PER_TOPIC,
 } from '../services/parking-lot-data';
-import { apiError } from '../errors';
+import { getSession } from '../services/session';
+import { apiError, notFound } from '../errors';
 
 type ParkingLotRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -32,6 +35,17 @@ export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
     return c.json(result);
   })
 
+  // Get parked questions linked to a topic for topic review
+  .get('/subjects/:subjectId/topics/:topicId/parking-lot', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const profileId = c.get('profileId') ?? account.id;
+    const topicId = c.req.param('topicId');
+
+    const result = await getParkingLotItemsForTopic(db, profileId, topicId);
+    return c.json(result);
+  })
+
   // Park a question for later
   .post(
     '/sessions/:sessionId/parking-lot',
@@ -42,15 +56,25 @@ export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
       const account = c.get('account');
       const profileId = c.get('profileId') ?? account.id;
       const sessionId = c.req.param('sessionId');
+      const session = await getSession(db, profileId, sessionId);
+      if (!session) {
+        return notFound(c, 'Session not found');
+      }
 
-      const item = await addParkingLotItem(db, profileId, sessionId, question);
+      const item = await addParkingLotItem(
+        db,
+        profileId,
+        sessionId,
+        question,
+        session.topicId ?? undefined
+      );
 
       if (!item) {
         return apiError(
           c,
           409,
           ERROR_CODES.QUOTA_EXCEEDED,
-          'Parking lot limit reached (max 10 items per session)'
+          `Parking lot limit reached (max ${MAX_ITEMS_PER_TOPIC} items per topic)`
         );
       }
 

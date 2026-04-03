@@ -154,6 +154,12 @@ function createMockDb({
   curriculumFindFirst = undefined as
     | ReturnType<typeof mockCurriculumRow>
     | undefined,
+  onboardingDraftFindFirst = undefined as
+    | {
+        extractedSignals?: Record<string, unknown>;
+        exchangeHistory?: Array<{ role: string; content: string }>;
+      }
+    | undefined,
   topicsFindMany = [] as ReturnType<typeof mockTopicRow>[],
   topicFindFirst = undefined as ReturnType<typeof mockTopicRow> | undefined,
   insertReturning = [] as unknown[],
@@ -165,6 +171,9 @@ function createMockDb({
       },
       curricula: {
         findFirst: jest.fn().mockResolvedValue(curriculumFindFirst),
+      },
+      onboardingDrafts: {
+        findFirst: jest.fn().mockResolvedValue(onboardingDraftFindFirst),
       },
       curriculumTopics: {
         findMany: jest.fn().mockResolvedValue(topicsFindMany),
@@ -593,6 +602,7 @@ describe('challengeCurriculum', () => {
       query: {
         subjects: { findFirst: subjectFindFirst },
         curricula: { findFirst: curriculaFindFirst },
+        onboardingDrafts: { findFirst: jest.fn().mockResolvedValue(undefined) },
         curriculumTopics: { findMany: topicsFindMany },
       },
       insert: jest.fn().mockReturnValue({
@@ -611,6 +621,52 @@ describe('challengeCurriculum', () => {
 
     expect(result).not.toBeNull();
     expect(result.version).toBe(2);
+  });
+
+  it('reuses original onboarding signals when regenerating curriculum', async () => {
+    let capturedMessages: ChatMessage[] = [];
+    registerProvider({
+      id: 'gemini',
+      async chat(messages: ChatMessage[]): Promise<string> {
+        capturedMessages = messages;
+        return sampleTopics;
+      },
+      async *chatStream(): AsyncIterable<string> {
+        yield sampleTopics;
+      },
+    });
+
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
+      onboardingDraftFindFirst: {
+        extractedSignals: {
+          goals: ['ace exams'],
+          experienceLevel: 'advanced',
+          currentKnowledge: 'comfortable with derivatives',
+        },
+        exchangeHistory: [
+          { role: 'user', content: 'I want to skip the basics.' },
+          { role: 'assistant', content: 'What have you already studied?' },
+        ],
+      },
+      insertReturning: [mockCurriculumRow({ id: 'curr-new', version: 2 })],
+    });
+
+    await challengeCurriculum(
+      db,
+      PROFILE_ID,
+      SUBJECT_ID,
+      'Focus on proofs instead of intros'
+    );
+
+    const userPrompt = capturedMessages.find((message) => message.role === 'user');
+    expect(userPrompt?.content).toContain('Goals: ace exams');
+    expect(userPrompt?.content).toContain('Experience Level: advanced');
+    expect(userPrompt?.content).toContain('comfortable with derivatives');
+    expect(userPrompt?.content).toContain('Focus on proofs instead of intros');
+
+    registerProvider(createCurriculumMockProvider());
   });
 });
 

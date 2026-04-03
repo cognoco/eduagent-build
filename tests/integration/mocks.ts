@@ -35,10 +35,45 @@ const SESSION_PATH = '../../apps/api/src/services/session';
 // Infrastructure mocks (manual — small, need specific shapes)
 // ---------------------------------------------------------------------------
 
-/** Mock `@eduagent/database` — returns an empty object for `createDatabase`. */
+/** Mock `@eduagent/database` — returns a chainable mock Drizzle client. */
 export function databaseMock(): Record<string, jest.Mock> {
+  function createBuilder(result: unknown[] = []) {
+    const builder = new Proxy(
+      {},
+      {
+        get(_target, prop) {
+          if (prop === 'then') return undefined;
+          if (prop === 'limit' || prop === 'returning' || prop === 'execute') {
+            return jest.fn().mockResolvedValue(result);
+          }
+          return jest.fn().mockReturnValue(builder);
+        },
+      }
+    );
+    return builder;
+  }
+
+  const queryProxy = new Proxy(
+    {},
+    {
+      get() {
+        return {
+          findFirst: jest.fn().mockResolvedValue(undefined),
+          findMany: jest.fn().mockResolvedValue([]),
+        };
+      },
+    }
+  );
+
   return {
-    createDatabase: jest.fn().mockReturnValue({}),
+    createDatabase: jest.fn().mockReturnValue({
+      query: queryProxy,
+      select: jest.fn().mockImplementation(() => createBuilder()),
+      insert: jest.fn().mockImplementation(() => createBuilder()),
+      update: jest.fn().mockImplementation(() => createBuilder()),
+      delete: jest.fn().mockImplementation(() => createBuilder()),
+      execute: jest.fn().mockResolvedValue([]),
+    }),
   };
 }
 

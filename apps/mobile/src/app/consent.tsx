@@ -29,6 +29,7 @@ const SCREEN_HEIGHT =
     : Dimensions.get('screen').height;
 
 type Phase = 'child' | 'parent' | 'success';
+type DeliveryState = 'sent' | 'failed';
 
 export default function ConsentScreen() {
   const insets = useSafeAreaInsets();
@@ -46,6 +47,7 @@ export default function ConsentScreen() {
   const [parentEmail, setParentEmail] = useState('');
   const [error, setError] = useState('');
   const [resending, setResending] = useState(false);
+  const [deliveryState, setDeliveryState] = useState<DeliveryState>('sent');
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
   // Hand-off copy uses learner variant (consent screen is always shown to children).
@@ -64,11 +66,12 @@ export default function ConsentScreen() {
 
     setError('');
     try {
-      await mutateAsync({
+      const result = await mutateAsync({
         childProfileId: profileId,
         parentEmail: parentEmail.trim(),
         consentType,
       });
+      setDeliveryState(result.emailStatus);
       setPhase('success');
     } catch (err: unknown) {
       setError(formatApiError(err));
@@ -80,11 +83,12 @@ export default function ConsentScreen() {
 
     setResending(true);
     try {
-      await mutateAsync({
+      const result = await mutateAsync({
         childProfileId: profileId,
         parentEmail: parentEmail.trim(),
         consentType,
       });
+      setDeliveryState(result.emailStatus);
     } catch {
       // Silently ignore resend errors — the user already has a success state
     } finally {
@@ -188,19 +192,37 @@ export default function ConsentScreen() {
         {phase === 'success' && (
           <View testID="consent-success">
             <Text className="text-h1 font-bold text-text-primary mb-4">
-              {copy.successMessage}
+              {deliveryState === 'sent'
+                ? copy.successMessage
+                : "We couldn't confirm delivery yet"}
             </Text>
             <Text className="text-body text-text-primary mb-2">
-              We sent a consent link to{' '}
-              <Text className="font-semibold">{parentEmail}</Text>.
+              {deliveryState === 'sent' ? (
+                <>
+                  We sent a consent link to{' '}
+                  <Text className="font-semibold">{parentEmail}</Text>.
+                </>
+              ) : (
+                <>
+                  We could not confirm that the consent email reached{' '}
+                  <Text className="font-semibold">{parentEmail}</Text>. Please
+                  double-check the address and try again.
+                </>
+              )}
             </Text>
             <Text className="text-body text-text-secondary mb-8">
-              {copy.successSpamHint}
+              {deliveryState === 'sent'
+                ? copy.successSpamHint
+                : 'You can resend the request now or go back and enter a different email address.'}
             </Text>
             <Button
               variant="primary"
-              label={copy.handBackButton}
-              onPress={() => router.back()}
+              label={
+                deliveryState === 'sent' ? copy.handBackButton : 'Go back'
+              }
+              onPress={() =>
+                deliveryState === 'sent' ? router.back() : setPhase('parent')
+              }
               testID="consent-done"
             />
             <View className="flex-row justify-center mt-4">

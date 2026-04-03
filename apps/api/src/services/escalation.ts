@@ -216,25 +216,19 @@ export function evaluateEscalation(
 
 /**
  * Returns prompt additions for the current escalation rung.
- * For homework sessions: Socratic-only, never give direct answers.
+ * Homework-mode behavior is handled by session-type guidance in exchanges.ts.
  */
 export function getEscalationPromptGuidance(
   rung: EscalationRung,
   sessionType: 'learning' | 'homework' | 'interleaved'
 ): string {
-  const homeworkGuard =
-    sessionType === 'homework'
-      ? '\nCRITICAL: This is a homework session. You must NEVER give the answer directly. Use only Socratic questioning to guide the learner.'
-      : '';
-
   switch (rung) {
     case 1:
       return (
         `Escalation Rung 1 — Socratic Questions (Easy):\n` +
         `Ask simple, guiding questions to help the learner discover the answer themselves.\n` +
         `Use open-ended questions that point toward the right direction.\n` +
-        `Keep the cognitive load low — one concept at a time.` +
-        homeworkGuard
+        `Keep the cognitive load low — one concept at a time.`
       );
 
     case 2:
@@ -247,8 +241,7 @@ export function getEscalationPromptGuidance(
         `If the learner expresses confusion, acknowledge it positively — they haven't got it *yet*.\n\n` +
         `Do NOT ask the same question with different wording.\n` +
         `Do NOT ask a question that requires the learner to hold more than one variable in mind simultaneously.\n` +
-        `Do NOT ask open-ended questions at this rung — every question must be answerable in one sentence or less.` +
-        homeworkGuard
+        `Do NOT ask open-ended questions at this rung — every question must be answerable in one sentence or less.`
       );
 
     case 3:
@@ -257,8 +250,7 @@ export function getEscalationPromptGuidance(
         `Demonstrate the method or concept using a DIFFERENT but similar problem.\n` +
         `Walk through the parallel example step-by-step.\n` +
         `Do NOT solve the original problem — show the approach on a new one.\n` +
-        `After the example, ask the learner what they noticed.` +
-        homeworkGuard
+        `After the example, ask the learner what they noticed.`
       );
 
     case 4:
@@ -267,8 +259,7 @@ export function getEscalationPromptGuidance(
         `Ask the learner to apply the method from the parallel example to the original problem.\n` +
         `Provide scaffolding: break the original problem into smaller steps.\n` +
         `Guide them through each step, but let them do the work.\n` +
-        `Celebrate partial progress — every step forward matters.` +
-        homeworkGuard
+        `Celebrate partial progress — every step forward matters.`
       );
 
     case 5:
@@ -283,8 +274,7 @@ export function getEscalationPromptGuidance(
         `- Deliver the full worked example collaboratively. Frame it as exploration, not failure.\n` +
         `- Suggest a break: "This is a tough one — let's come back to it fresh later."\n` +
         `- End your response with the marker [NEEDS_DEEPENING] on its own line (the system will flag this topic for review).\n` +
-        `- Do NOT loop. Do not keep asking variants of the same question. The learner has given their best effort.` +
-        homeworkGuard
+        `- Do NOT loop. Do not keep asking variants of the same question. The learner has given their best effort.`
       );
 
     default:

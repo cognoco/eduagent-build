@@ -197,7 +197,9 @@ export default function TopicDetailScreen() {
                   {session.exchangeCount} exchanges
                 </Text>
                 <Text className="text-caption text-text-secondary">
-                  {formatDuration(session.durationSeconds)}
+                  {formatDuration(
+                    session.wallClockSeconds ?? session.durationSeconds
+                  )}
                 </Text>
               </View>
             </Pressable>

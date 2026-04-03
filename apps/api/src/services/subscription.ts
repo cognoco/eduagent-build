@@ -26,7 +26,7 @@ export interface TierConfig {
 
 const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
   free: {
-    monthlyQuota: 100,
+    monthlyQuota: 50,
     dailyLimit: 10,
     maxProfiles: 1,
     priceMonthly: 0,

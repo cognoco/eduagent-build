@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import {
   onboardingDrafts,
   curricula,
@@ -25,6 +25,8 @@ Ask about the learner's goals, prior experience, and current knowledge level for
 Keep questions conversational and brief. After 3-5 exchanges when you have enough signal,
 respond with the special marker [INTERVIEW_COMPLETE] at the end of your response.`;
 
+const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 // ---------------------------------------------------------------------------
 // Row mapper — Drizzle Date → API ISO string
 // ---------------------------------------------------------------------------
@@ -44,6 +46,76 @@ function mapDraftRow(
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+async function loadLatestDraftRow(
+  db: Database,
+  profileId: string,
+  subjectId: string
+): Promise<typeof onboardingDrafts.$inferSelect | undefined> {
+  const repo = createScopedRepository(db, profileId);
+  return repo.onboardingDrafts.findFirst(
+    eq(onboardingDrafts.subjectId, subjectId),
+    desc(onboardingDrafts.updatedAt)
+  );
+}
+
+function isDraftExpired(row: typeof onboardingDrafts.$inferSelect): boolean {
+  return (
+    row.status === 'in_progress' &&
+    row.expiresAt != null &&
+    row.expiresAt.getTime() <= Date.now()
+  );
+}
+
+export function buildDraftResumeSummary(
+  draft: Pick<OnboardingDraft, 'exchangeHistory' | 'extractedSignals'>
+): string {
+  const signals = draft.extractedSignals as {
+    goals?: unknown;
+    experienceLevel?: unknown;
+    currentKnowledge?: unknown;
+  };
+  const goals = Array.isArray(signals.goals)
+    ? signals.goals
+        .map((goal) => String(goal).trim())
+        .filter((goal) => goal.length > 0)
+    : [];
+  const experienceLevel =
+    typeof signals.experienceLevel === 'string'
+      ? signals.experienceLevel.trim()
+      : '';
+  const currentKnowledge =
+    typeof signals.currentKnowledge === 'string'
+      ? signals.currentKnowledge.trim()
+      : '';
+
+  const parts: string[] = [];
+  if (goals.length > 0) {
+    parts.push(`We already talked about your goals: ${goals.join(', ')}.`);
+  }
+  if (experienceLevel) {
+    parts.push(`You described your current level as ${experienceLevel}.`);
+  }
+  if (currentKnowledge) {
+    parts.push(`You also mentioned: ${currentKnowledge}.`);
+  }
+
+  if (parts.length > 0) {
+    return parts.join(' ');
+  }
+
+  const learnerMessages = draft.exchangeHistory
+    .filter((exchange) => exchange.role === 'user')
+    .map((exchange) => exchange.content.trim())
+    .filter((content) => content.length > 0)
+    .slice(0, 2);
+
+  if (learnerMessages.length > 0) {
+    return `We already talked about ${learnerMessages.join(' and ')}.`;
+  }
+
+  return 'We already started talking about your goals, background, and current level.';
 }
 
 // ---------------------------------------------------------------------------
@@ -150,14 +222,25 @@ export async function getOrCreateDraft(
   profileId: string,
   subjectId: string
 ): Promise<OnboardingDraft> {
-  const repo = createScopedRepository(db, profileId);
-  const existing = await repo.onboardingDrafts.findFirst(
-    and(
-      eq(onboardingDrafts.subjectId, subjectId),
-      eq(onboardingDrafts.status, 'in_progress')
-    )
-  );
-  if (existing) return mapDraftRow(existing);
+  const existing = await loadLatestDraftRow(db, profileId, subjectId);
+  if (existing?.status === 'in_progress') {
+    if (!isDraftExpired(existing)) {
+      return mapDraftRow(existing);
+    }
+
+    await db
+      .update(onboardingDrafts)
+      .set({
+        status: 'expired',
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(onboardingDrafts.id, existing.id),
+          eq(onboardingDrafts.profileId, profileId)
+        )
+      );
+  }
 
   const [row] = await db
     .insert(onboardingDrafts)
@@ -167,7 +250,7 @@ export async function getOrCreateDraft(
       exchangeHistory: [],
       extractedSignals: {},
       status: 'in_progress',
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + DRAFT_TTL_MS),
     })
     .returning();
   return mapDraftRow(row!);
@@ -178,11 +261,32 @@ export async function getDraftState(
   profileId: string,
   subjectId: string
 ): Promise<OnboardingDraft | null> {
-  const repo = createScopedRepository(db, profileId);
-  const row = await repo.onboardingDrafts.findFirst(
-    eq(onboardingDrafts.subjectId, subjectId)
-  );
-  return row ? mapDraftRow(row) : null;
+  const row = await loadLatestDraftRow(db, profileId, subjectId);
+  if (!row) return null;
+
+  if (!isDraftExpired(row)) {
+    return mapDraftRow(row);
+  }
+
+  const now = new Date();
+  await db
+    .update(onboardingDrafts)
+    .set({
+      status: 'expired',
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(onboardingDrafts.id, row.id),
+        eq(onboardingDrafts.profileId, profileId)
+      )
+    );
+
+  return mapDraftRow({
+    ...row,
+    status: 'expired',
+    updatedAt: now,
+  });
 }
 
 export async function updateDraft(
@@ -195,10 +299,17 @@ export async function updateDraft(
     status?: DraftStatus;
   }
 ): Promise<void> {
+  const nextStatus = updates.status;
+  const nextExpiresAt =
+    nextStatus === 'completed' || nextStatus === 'expired'
+      ? undefined
+      : new Date(Date.now() + DRAFT_TTL_MS);
+
   await db
     .update(onboardingDrafts)
     .set({
       ...updates,
+      ...(nextExpiresAt ? { expiresAt: nextExpiresAt } : {}),
       updatedAt: new Date(),
     })
     .where(

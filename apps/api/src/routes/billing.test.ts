@@ -205,9 +205,9 @@ describe('billing routes', () => {
       expect(body.subscription.tier).toBe('free');
       expect(body.subscription.status).toBe('trial');
       expect(body.subscription.cancelAtPeriodEnd).toBe(false);
-      expect(body.subscription.monthlyLimit).toBe(100);
+      expect(body.subscription.monthlyLimit).toBe(50);
       expect(body.subscription.usedThisMonth).toBe(0);
-      expect(body.subscription.remainingQuestions).toBe(100);
+      expect(body.subscription.remainingQuestions).toBe(50);
       expect(body.subscription.dailyLimit).toBe(10);
       expect(body.subscription.usedToday).toBe(0);
       expect(body.subscription.dailyRemainingQuestions).toBe(10);
@@ -526,9 +526,9 @@ describe('billing routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.usage.monthlyLimit).toBe(100);
+      expect(body.usage.monthlyLimit).toBe(50);
       expect(body.usage.usedThisMonth).toBe(0);
-      expect(body.usage.remainingQuestions).toBe(100);
+      expect(body.usage.remainingQuestions).toBe(50);
       expect(body.usage.topUpCreditsRemaining).toBe(0);
       expect(body.usage.warningLevel).toBe('none');
       expect(body.usage.cycleResetAt).toBeDefined();
@@ -637,7 +637,7 @@ describe('billing routes', () => {
       const body = await res.json();
       expect(body.status.tier).toBe('free');
       expect(body.status.status).toBe('trial');
-      expect(body.status.monthlyLimit).toBe(100);
+      expect(body.status.monthlyLimit).toBe(50);
       expect(body.status.usedThisMonth).toBe(0);
       expect(body.status.dailyLimit).toBe(10);
       expect(body.status.usedToday).toBe(0);

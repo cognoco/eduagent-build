@@ -8,6 +8,7 @@ const mockCloseSession = jest.fn();
 const mockStream = jest.fn();
 const mockHomeworkStatePost = jest.fn();
 const mockRecordSystemPrompt = jest.fn();
+const mockRecordSessionEvent = jest.fn();
 const mockFlagSessionContent = jest.fn();
 const mockReplace = jest.fn();
 const mockClassifySubject = jest.fn();
@@ -92,6 +93,7 @@ jest.mock('../../../hooks/use-sessions', () => ({
   }),
   useSessionTranscript: () => ({ data: null }),
   useRecordSystemPrompt: () => ({ mutateAsync: mockRecordSystemPrompt }),
+  useRecordSessionEvent: () => ({ mutateAsync: mockRecordSessionEvent }),
   useFlagSessionContent: () => ({ mutateAsync: mockFlagSessionContent }),
   useParkingLot: () => ({ data: [], isLoading: false }),
   useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
@@ -199,6 +201,12 @@ jest.mock('../../../lib/api-client', () => ({
 jest.mock('../../../lib/format-api-error', () => ({
   formatApiError: (error: unknown) =>
     error instanceof Error ? error.message : 'Unknown error',
+}));
+
+jest.mock('../../../lib/profile', () => ({
+  useProfile: () => ({
+    activeProfile: { id: 'profile-1' },
+  }),
 }));
 
 describe('SessionScreen homework flow', () => {
@@ -320,10 +328,9 @@ describe('SessionScreen homework flow', () => {
     expect(screen.getByTestId('homework-problem-progress')).toHaveTextContent(
       'Problem 2 of 2'
     );
-  });
+  }, 15000);
 
-  // TODO: agent was stopped mid-implementation — unskip when chips are wired
-  it.skip('shows contextual learner-agency chips and session tools', () => {
+  it('shows contextual learner-agency chips and session tools', () => {
     const screen = render(<SessionScreen />);
 
     expect(screen.getByText('I know this')).toBeTruthy();
@@ -334,8 +341,7 @@ describe('SessionScreen homework flow', () => {
     expect(screen.getByText('Park it')).toBeTruthy();
   });
 
-  // TODO: agent was stopped mid-implementation — unskip when chips + toast are wired
-  it.skip('records quick chips and learner feedback with follow-up prompts', async () => {
+  it('records quick chips and learner feedback with follow-up prompts', async () => {
     const screen = render(<SessionScreen />);
 
     fireEvent.press(screen.getByTestId('manual-send-button'));
@@ -356,6 +362,15 @@ describe('SessionScreen homework flow', () => {
     await flushAsyncWork();
 
     await waitFor(() => {
+      expect(mockRecordSessionEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'quick_action',
+          content: 'too_easy',
+          metadata: expect.objectContaining({
+            chip: 'too_easy',
+          }),
+        })
+      );
       expect(mockRecordSystemPrompt).toHaveBeenCalledWith({
         content:
           'The learner says this is too easy. Raise the challenge a little and ask for more independent thinking.',
@@ -375,6 +390,16 @@ describe('SessionScreen homework flow', () => {
     await flushAsyncWork();
 
     await waitFor(() => {
+      expect(mockRecordSessionEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'user_feedback',
+          content: 'not_helpful',
+          metadata: {
+            value: 'not_helpful',
+            eventId: 'event-2',
+          },
+        })
+      );
       expect(mockRecordSystemPrompt).toHaveBeenCalledWith({
         content:
           'The learner marked the previous answer as not helpful. Re-explain more clearly with one new example.',
@@ -397,6 +422,16 @@ describe('SessionScreen homework flow', () => {
     await flushAsyncWork();
 
     await waitFor(() => {
+      expect(mockRecordSessionEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'user_feedback',
+          content: 'incorrect',
+          metadata: {
+            value: 'incorrect',
+            eventId: 'event-3',
+          },
+        })
+      );
       expect(mockFlagSessionContent).toHaveBeenCalledWith({
         eventId: 'event-3',
         reason: 'Learner marked response as incorrect',
@@ -447,8 +482,7 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
-  // TODO: agent was stopped mid-implementation — unskip when wrong-subject chip is wired
-  it.skip('shows a wrong-subject recovery chip and replaces the session route in place', async () => {
+  it('shows a wrong-subject recovery chip and replaces the session route in place', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
     });

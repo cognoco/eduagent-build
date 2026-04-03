@@ -68,6 +68,7 @@ const mockCloseSession = jest.fn();
 const mockFlagContent = jest.fn();
 const mockGetSessionSummary = jest.fn();
 const mockSubmitSummary = jest.fn();
+const mockGetSessionCompletionContext = jest.fn();
 
 jest.mock('../../apps/api/src/services/session', () => ({
   startSession: (...args: unknown[]) => mockStartSession(...args),
@@ -83,6 +84,8 @@ jest.mock('../../apps/api/src/services/session', () => ({
   closeSession: (...args: unknown[]) => mockCloseSession(...args),
   flagContent: (...args: unknown[]) => mockFlagContent(...args),
   getSessionSummary: (...args: unknown[]) => mockGetSessionSummary(...args),
+  getSessionCompletionContext: (...args: unknown[]) =>
+    mockGetSessionCompletionContext(...args),
   submitSummary: (...args: unknown[]) => mockSubmitSummary(...args),
 }));
 
@@ -175,7 +178,16 @@ describe('Integration: Learning Session Lifecycle', () => {
       topicId: TOPIC_ID,
       subjectId: SUBJECT_ID,
       sessionType: 'learning',
+      verificationType: null,
+      wallClockSeconds: 120,
       summaryStatus: 'pending',
+    });
+    mockGetSessionCompletionContext.mockResolvedValue({
+      sessionId: SESSION_ID,
+      topicId: TOPIC_ID,
+      subjectId: SUBJECT_ID,
+      sessionType: 'learning',
+      verificationType: null,
     });
     mockFlagContent.mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
@@ -389,7 +401,7 @@ describe('Integration: Learning Session Lifecycle', () => {
   // -----------------------------------------------------------------------
 
   describe('POST /v1/sessions/:sessionId/close', () => {
-    it('closes session and dispatches Inngest event', async () => {
+    it('closes session without dispatching completion event while summary is pending', async () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/close`,
         {
@@ -404,18 +416,7 @@ describe('Integration: Learning Session Lifecycle', () => {
       const body = await res.json();
       expect(body.sessionId).toBe(SESSION_ID);
       expect(body.shouldPromptCasualSwitch).toBe(false);
-
-      // Verify Inngest event dispatched
-      expect(inngestMock.inngest.send).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'app/session.completed',
-          data: expect.objectContaining({
-            sessionId: SESSION_ID,
-            topicId: TOPIC_ID,
-            subjectId: SUBJECT_ID,
-          }),
-        })
-      );
+      expect(inngestMock.inngest.send).not.toHaveBeenCalled();
     });
 
     it('includes shouldPromptCasualSwitch in response', async () => {
@@ -438,6 +439,40 @@ describe('Integration: Learning Session Lifecycle', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.shouldPromptCasualSwitch).toBe(true);
+    });
+
+    it('dispatches completion event when session closes with a terminal summary state', async () => {
+      mockCloseSession.mockResolvedValueOnce({
+        sessionId: SESSION_ID,
+        topicId: TOPIC_ID,
+        subjectId: SUBJECT_ID,
+        sessionType: 'learning',
+        verificationType: null,
+        wallClockSeconds: 120,
+        summaryStatus: 'accepted',
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/close`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ summaryStatus: 'accepted' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(inngestMock.inngest.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/session.completed',
+          data: expect.objectContaining({
+            sessionId: SESSION_ID,
+            topicId: TOPIC_ID,
+            subjectId: SUBJECT_ID,
+          }),
+        })
+      );
     });
   });
 

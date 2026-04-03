@@ -5,6 +5,16 @@
 // ---------------------------------------------------------------------------
 
 import type { OcrResult } from '@eduagent/schemas';
+import { routeAndCall, type ChatMessage } from './llm';
+
+const OCR_PROMPT = `Extract all readable text from this image.
+Return ONLY JSON with this shape:
+{"text":"full extracted text","confidence":0.0}
+
+Rules:
+- Preserve line breaks when they matter
+- Do not add explanations
+- confidence must be between 0 and 1`;
 
 // ---------------------------------------------------------------------------
 // Provider interface
@@ -43,17 +53,99 @@ export class StubOcrProvider implements OcrProvider {
   }
 }
 
+function arrayBufferToBase64(image: ArrayBuffer): string {
+  const bytes = new Uint8Array(image);
+
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(bytes).toString('base64');
+  }
+
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
+function clampConfidence(value: unknown): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 0.75;
+  }
+  return Math.max(0, Math.min(1, value));
+}
+
+function parseOcrResponse(raw: string): OcrResult {
+  const trimmed = raw.trim();
+  try {
+    const parsed = JSON.parse(trimmed) as {
+      text?: unknown;
+      confidence?: unknown;
+    };
+    const text = typeof parsed.text === 'string' ? parsed.text.trim() : trimmed;
+    return {
+      text,
+      confidence: clampConfidence(parsed.confidence),
+      regions: [],
+    };
+  } catch {
+    return {
+      text: trimmed,
+      confidence: 0.75,
+      regions: [],
+    };
+  }
+}
+
+/**
+ * OCR provider that routes through the LLM router (routeAndCall).
+ * Uses multimodal messages so cost monitoring, circuit breaker, and
+ * error attribution are applied consistently.
+ */
+export class GeminiOcrProvider implements OcrProvider {
+  async extractText(image: ArrayBuffer, mimeType: string): Promise<OcrResult> {
+    const messages: ChatMessage[] = [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: OCR_PROMPT },
+          {
+            type: 'inline_data',
+            mimeType,
+            data: arrayBufferToBase64(image),
+          },
+        ],
+      },
+    ];
+
+    const result = await routeAndCall(messages, 1);
+    return parseOcrResponse(result.response);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Factory + DI
 // ---------------------------------------------------------------------------
 
 let _provider: OcrProvider | null = null;
 
-/** Returns the current OCR provider (defaults to StubOcrProvider). */
-export function getOcrProvider(): OcrProvider {
-  if (!_provider) {
-    _provider = new StubOcrProvider();
+/**
+ * Returns the current OCR provider (defaults to StubOcrProvider).
+ *
+ * When `useRouter` is true the Gemini provider is returned — it routes
+ * through routeAndCall() so the API key comes from the registered LLM
+ * provider, not from a parameter here.
+ */
+export function getOcrProvider(useRouter?: boolean | string): OcrProvider {
+  if (_provider) {
+    return _provider;
   }
+
+  if (useRouter) {
+    _provider = new GeminiOcrProvider();
+    return _provider;
+  }
+
+  _provider = new StubOcrProvider();
   return _provider;
 }
 
@@ -73,8 +165,8 @@ export function resetOcrProvider(): void {
  */
 export function createOcrProvider(type?: string): OcrProvider {
   switch (type) {
-    // Future: case 'google-vision': return new GoogleVisionOcrProvider();
-    // Future: case 'workers-ai': return new WorkersAiOcrProvider();
+    case 'gemini':
+      return new GeminiOcrProvider();
     default:
       return new StubOcrProvider();
   }

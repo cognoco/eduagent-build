@@ -13,6 +13,22 @@ const mockSkipMutate = jest.fn();
 const mockUnskipMutate = jest.fn();
 const mockChallengeMutateAsync = jest.fn();
 const mockAddTopicMutateAsync = jest.fn();
+let mockCurriculumData = {
+  id: 'curriculum-1',
+  subjectId: 'subject-1',
+  version: 1,
+  topics: [
+    {
+      id: 'topic-1',
+      title: 'Algebra Basics',
+      description: 'Intro to expressions',
+      sortOrder: 0,
+      relevance: 'core',
+      estimatedMinutes: 20,
+      skipped: false,
+    },
+  ],
+};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -65,22 +81,7 @@ jest.mock('../../../lib/theme', () => ({
 
 jest.mock('../../../hooks/use-curriculum', () => ({
   useCurriculum: () => ({
-    data: {
-      id: 'curriculum-1',
-      subjectId: 'subject-1',
-      version: 1,
-      topics: [
-        {
-          id: 'topic-1',
-          title: 'Algebra Basics',
-          description: 'Intro to expressions',
-          sortOrder: 0,
-          relevance: 'core',
-          estimatedMinutes: 20,
-          skipped: false,
-        },
-      ],
-    },
+    data: mockCurriculumData,
     isLoading: false,
   }),
   useSkipTopic: () => ({ mutate: mockSkipMutate, isPending: false }),
@@ -106,6 +107,22 @@ const CurriculumReviewScreen = require('./curriculum-review').default;
 describe('CurriculumReviewScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCurriculumData = {
+      id: 'curriculum-1',
+      subjectId: 'subject-1',
+      version: 1,
+      topics: [
+        {
+          id: 'topic-1',
+          title: 'Algebra Basics',
+          description: 'Intro to expressions',
+          sortOrder: 0,
+          relevance: 'core',
+          estimatedMinutes: 20,
+          skipped: false,
+        },
+      ],
+    };
   });
 
   it('previews and confirms a user-added topic', async () => {
@@ -210,5 +227,75 @@ describe('CurriculumReviewScreen', () => {
       expect(screen.queryByTestId('add-topic-title-input')).toBeNull();
     });
     expect(mockAddTopicMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('offers placement actions after skipping more than 80% of topics', () => {
+    mockCurriculumData = {
+      id: 'curriculum-1',
+      subjectId: 'subject-1',
+      version: 3,
+      topics: [
+        {
+          id: 'topic-1',
+          title: 'Basics',
+          description: 'Start here',
+          sortOrder: 0,
+          relevance: 'core',
+          estimatedMinutes: 20,
+          skipped: true,
+        },
+        {
+          id: 'topic-2',
+          title: 'Intermediates',
+          description: 'Level up',
+          sortOrder: 1,
+          relevance: 'recommended',
+          estimatedMinutes: 25,
+          skipped: true,
+        },
+        {
+          id: 'topic-3',
+          title: 'Advanced Problems',
+          description: 'Stretch topics',
+          sortOrder: 2,
+          relevance: 'recommended',
+          estimatedMinutes: 30,
+          skipped: true,
+        },
+        {
+          id: 'topic-4',
+          title: 'Proof Techniques',
+          description: 'Go deeper',
+          sortOrder: 3,
+          relevance: 'emerging',
+          estimatedMinutes: 40,
+          skipped: true,
+        },
+        {
+          id: 'topic-5',
+          title: 'Exam Strategy',
+          description: 'Time pressure practice',
+          sortOrder: 4,
+          relevance: 'emerging',
+          estimatedMinutes: 35,
+          skipped: true,
+        },
+        {
+          id: 'topic-6',
+          title: 'Challenge Set',
+          description: 'Advanced only',
+          sortOrder: 5,
+          relevance: 'emerging',
+          estimatedMinutes: 45,
+          skipped: false,
+        },
+      ],
+    };
+
+    render(<CurriculumReviewScreen />);
+
+    expect(screen.getByTestId('placement-check-button')).toBeTruthy();
+    expect(screen.getByTestId('continue-advanced-button')).toBeTruthy();
+    expect(screen.getByTestId('choose-different-subject-button')).toBeTruthy();
   });
 });

@@ -37,6 +37,7 @@ import {
   computeAgeBracket,
 } from '@eduagent/schemas';
 import { listSubjects } from './subject';
+import { getTierConfig } from './subscription';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -920,6 +921,7 @@ async function seedTrialExpired(
   email: string,
   env: SeedEnv
 ): Promise<SeedResult> {
+  const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
@@ -941,9 +943,9 @@ async function seedTrialExpired(
   await db.insert(quotaPools).values({
     id: generateUUIDv7(),
     subscriptionId,
-    monthlyLimit: 100, // Free tier limit
+    monthlyLimit: freeTier.monthlyQuota,
     usedThisMonth: 12,
-    dailyLimit: 10,
+    dailyLimit: freeTier.dailyLimit,
     usedToday: 2,
     cycleResetAt: futureDate(13),
   });
@@ -1095,6 +1097,7 @@ async function seedTrialExpiredChild(
   email: string,
   env: SeedEnv
 ): Promise<SeedResult> {
+  const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
 
@@ -1113,9 +1116,9 @@ async function seedTrialExpiredChild(
   await db.insert(quotaPools).values({
     id: generateUUIDv7(),
     subscriptionId,
-    monthlyLimit: 100,
-    usedThisMonth: 100,
-    dailyLimit: 10,
+    monthlyLimit: freeTier.monthlyQuota,
+    usedThisMonth: freeTier.monthlyQuota,
+    dailyLimit: freeTier.dailyLimit,
     usedToday: 10,
     cycleResetAt: futureDate(13),
   });
@@ -1360,6 +1363,7 @@ async function seedDailyLimitReached(
   email: string,
   env: SeedEnv
 ): Promise<SeedResult> {
+  const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
@@ -1380,9 +1384,9 @@ async function seedDailyLimitReached(
   await db.insert(quotaPools).values({
     id: generateUUIDv7(),
     subscriptionId,
-    monthlyLimit: 100,
+    monthlyLimit: freeTier.monthlyQuota,
     usedThisMonth: 10,
-    dailyLimit: 10,
+    dailyLimit: freeTier.dailyLimit,
     usedToday: 10, // Daily cap fully used
     cycleResetAt: futureDate(30),
   });

@@ -10,7 +10,7 @@
 //   I6  — Trailing slash tolerated in route matching
 //   I7  — KV cache updated after decrement
 //
-// Dual-cap: free tier enforces 10 questions/day AND 100 questions/month.
+// Dual-cap: free tier enforces 10 questions/day AND 50 questions/month.
 // Paid tiers: monthly limit only (dailyLimit = null).
 // ---------------------------------------------------------------------------
 
@@ -130,6 +130,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
 
     const db = c.get('db');
     const kv = c.env?.SUBSCRIPTION_KV;
+    const freeTier = getTierConfig('free');
 
     // 1. Try KV cache for fast quota check (I4: wrapped in try/catch)
     let cached: CachedSubscriptionStatus | null = null;
@@ -163,7 +164,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       subscriptionStatus = subscription.status;
 
       const quota = await getQuotaPool(db, subscriptionId);
-      monthlyLimit = quota?.monthlyLimit ?? 100;
+      monthlyLimit = quota?.monthlyLimit ?? freeTier.monthlyQuota;
       usedThisMonth = quota?.usedThisMonth ?? 0;
       dailyLimit = quota?.dailyLimit ?? null;
       usedToday = quota?.usedToday ?? 0;

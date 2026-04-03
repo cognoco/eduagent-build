@@ -68,6 +68,7 @@ import {
   closeSession,
   syncHomeworkState,
   flagContent,
+  recordSessionEvent,
   getSessionTranscript,
   getSessionSummary,
   skipSummary,
@@ -1278,6 +1279,30 @@ describe('closeSession', () => {
     expect(result.interleavedTopicIds).toBeUndefined();
   });
 
+  it('returns the distinct escalation rungs used during the session', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    const db = createMockDb({
+      findManyEvents: [
+        {
+          eventType: 'ai_response',
+          content: 'First response',
+          createdAt: NOW,
+          metadata: { escalationRung: 1 },
+        },
+        {
+          eventType: 'ai_response',
+          content: 'Second response',
+          createdAt: new Date('2025-01-15T10:05:00.000Z'),
+          metadata: { escalationRung: 2 },
+        },
+      ],
+    });
+
+    const result = await closeSession(db, profileId, sessionId, {});
+
+    expect(result.escalationRungs).toEqual([1, 2]);
+  });
+
   it('returns interleavedTopicIds from metadata for interleaved sessions (FR92)', async () => {
     setupScopedRepo({
       sessionFindFirst: mockSessionRow({ sessionType: 'interleaved' }),
@@ -1306,6 +1331,17 @@ describe('closeSession', () => {
       'topic-002',
       'topic-003',
     ]);
+  });
+
+  it('increments summary skips immediately when a session is closed as skipped', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    const db = createMockDb();
+
+    await closeSession(db, profileId, sessionId, {
+      summaryStatus: 'skipped',
+    });
+
+    expect(mockIncrementSummarySkips).toHaveBeenCalledWith(db, profileId);
   });
 
   it('stores 0 active seconds for 0-event sessions while preserving wall-clock time', async () => {
@@ -1542,6 +1578,21 @@ describe('flagContent', () => {
     });
 
     expect(result.message).toBe('Content flagged for review. Thank you!');
+  });
+});
+
+describe('recordSessionEvent', () => {
+  it('stores first-class quick-action analytics without failing the session flow', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    const db = createMockDb();
+
+    await expect(
+      recordSessionEvent(db, profileId, sessionId, {
+        eventType: 'quick_action',
+        content: 'too_easy',
+        metadata: { chip: 'too_easy' },
+      })
+    ).resolves.toBeUndefined();
   });
 });
 

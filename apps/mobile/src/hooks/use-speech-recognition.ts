@@ -23,11 +23,7 @@ export interface UseSpeechRecognitionResult {
   clearTranscript: () => void;
 }
 
-/**
- * Lazily resolve `ExpoSpeechRecognitionModule` from the dynamic import.
- * Returns `null` if the package is not installed / fails to load.
- */
-async function loadSpeechModule(): Promise<{
+type SpeechRecognitionModule = {
   requestPermissionsAsync: () => Promise<{ granted: boolean }>;
   start: (opts: {
     lang: string;
@@ -35,7 +31,20 @@ async function loadSpeechModule(): Promise<{
     continuous: boolean;
   }) => void;
   stop: () => void;
-} | null> {
+  addListener?: (
+    eventName: 'result' | 'error',
+    listener: (event: unknown) => void
+  ) => { remove: () => void };
+};
+
+type SpeechRecognitionModuleLoader =
+  () => Promise<SpeechRecognitionModule | null>;
+
+/**
+ * Lazily resolve `ExpoSpeechRecognitionModule` from the dynamic import.
+ * Returns `null` if the package is not installed / fails to load.
+ */
+async function loadSpeechModule(): Promise<SpeechRecognitionModule | null> {
   try {
     const mod = await import('expo-speech-recognition');
     return mod.ExpoSpeechRecognitionModule ?? null;
@@ -51,7 +60,9 @@ async function loadSpeechModule(): Promise<{
  * Note: expo-speech-recognition requires the package to be installed.
  * If unavailable, all functions gracefully degrade (error state).
  */
-export function useSpeechRecognition(): UseSpeechRecognitionResult {
+export function useSpeechRecognition(
+  loadModule: SpeechRecognitionModuleLoader = loadSpeechModule
+): UseSpeechRecognitionResult {
   const [status, setStatus] = useState<SpeechRecognitionStatus>('idle');
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -64,12 +75,60 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    let resultSubscription: { remove: () => void } | undefined;
+    let errorSubscription: { remove: () => void } | undefined;
+
+    void (async () => {
+      const speechModule = await loadModule();
+      if (
+        cancelled ||
+        !speechModule ||
+        typeof speechModule.addListener !== 'function'
+      ) {
+        return;
+      }
+
+      resultSubscription = speechModule.addListener('result', (event) => {
+        if (!mountedRef.current) return;
+
+        const resultEvent = event as {
+          results?: Array<{ transcript?: string }>;
+        };
+        const nextTranscript = (resultEvent.results ?? [])
+          .map((result) => result.transcript?.trim() ?? '')
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+
+        if (!nextTranscript) return;
+        setTranscript(nextTranscript);
+        setError(null);
+      });
+
+      errorSubscription = speechModule.addListener('error', (event) => {
+        if (!mountedRef.current) return;
+
+        const errorEvent = event as { message?: string };
+        setError(errorEvent.message ?? 'Speech recognition failed');
+        setStatus('error');
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      resultSubscription?.remove();
+      errorSubscription?.remove();
+    };
+  }, [loadModule]);
+
   const startListening = useCallback(async () => {
     try {
       setError(null);
       setStatus('requesting_permission');
 
-      const speechModule = await loadSpeechModule();
+      const speechModule = await loadModule();
 
       if (!speechModule) {
         if (mountedRef.current) {
@@ -93,10 +152,6 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
         setTranscript('');
         setStatus('listening');
       }
-
-      // Start recognition — event listeners are handled via useSpeechRecognitionEvent
-      // at the component level (VoiceRecordButton / ChatShell). This hook only
-      // manages the imperative start/stop lifecycle.
       speechModule.start({
         lang: 'en-US',
         interimResults: true,
@@ -110,11 +165,11 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
         setStatus('error');
       }
     }
-  }, []);
+  }, [loadModule]);
 
   const stopListening = useCallback(async () => {
     try {
-      const speechModule = await loadSpeechModule();
+      const speechModule = await loadModule();
 
       if (speechModule) {
         speechModule.stop();
@@ -128,7 +183,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionResult {
         setStatus('idle');
       }
     }
-  }, []);
+  }, [loadModule]);
 
   const clearTranscript = useCallback(() => {
     setTranscript('');

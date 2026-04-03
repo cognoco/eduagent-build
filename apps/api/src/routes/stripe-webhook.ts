@@ -133,6 +133,7 @@ async function handleSubscriptionEvent(
 ): Promise<void> {
   const status = mapStripeStatus(stripeSubscription.status);
   if (!status) return;
+  const isExpired = status === 'expired';
 
   const updates: WebhookSubscriptionUpdate = {
     status,
@@ -143,7 +144,9 @@ async function handleSubscriptionEvent(
   const tier = extractPaidTier(
     stripeSubscription.metadata as Record<string, string> | undefined
   );
-  if (tier) {
+  if (isExpired) {
+    updates.tier = 'free';
+  } else if (tier) {
     updates.tier = tier;
   }
 
@@ -170,8 +173,16 @@ async function handleSubscriptionEvent(
   );
 
   if (updated) {
-    // If tier metadata present, sync quota pool limit to new tier
-    if (tier) {
+    if (isExpired) {
+      const freeTier = getTierConfig('free');
+      await updateQuotaPoolLimit(
+        db,
+        updated.id,
+        freeTier.monthlyQuota,
+        freeTier.dailyLimit
+      );
+    } else if (tier) {
+      // If tier metadata present, sync quota pool limit to new tier
       const tierConfig = getTierConfig(tier);
       await updateQuotaPoolLimit(
         db,
@@ -192,6 +203,7 @@ async function handleSubscriptionDeleted(
 ): Promise<void> {
   const updates: WebhookSubscriptionUpdate = {
     status: 'expired',
+    tier: 'free',
     cancelledAt: new Date().toISOString(),
     lastStripeEventTimestamp: eventTimestamp,
   };
@@ -203,6 +215,13 @@ async function handleSubscriptionDeleted(
   );
 
   if (updated) {
+    const freeTier = getTierConfig('free');
+    await updateQuotaPoolLimit(
+      db,
+      updated.id,
+      freeTier.monthlyQuota,
+      freeTier.dailyLimit
+    );
     await refreshKvCache(kv, db, updated.accountId);
   }
 }

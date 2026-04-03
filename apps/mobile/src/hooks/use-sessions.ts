@@ -15,6 +15,7 @@ import type {
   ParkingLotItem,
   SessionMessageInput,
   SessionMetadata,
+  SessionAnalyticsEventInput,
   SessionSummary,
   SessionTranscript,
 } from '@eduagent/schemas';
@@ -345,6 +346,26 @@ export function useRecordSystemPrompt(
   });
 }
 
+export function useRecordSessionEvent(
+  sessionId: string
+): UseMutationResult<{ ok: boolean }, Error, SessionAnalyticsEventInput> {
+  const client = useApiClient();
+
+  return useMutation({
+    mutationFn: async (input: SessionAnalyticsEventInput) => {
+      const eventClient = (
+        client.sessions[':sessionId'] as Record<string, any>
+      )['events'];
+      const res = await eventClient.$post({
+        param: { sessionId },
+        json: input,
+      });
+      await assertOk(res);
+      return (await res.json()) as { ok: boolean };
+    },
+  });
+}
+
 export function useFlagSessionContent(
   sessionId: string
 ): UseMutationResult<{ message: string }, Error, ContentFlagInput> {
@@ -388,6 +409,38 @@ export function useParkingLot(
       }
     },
     enabled: !!activeProfile && !!sessionId,
+  });
+}
+
+export function useTopicParkingLot(
+  subjectId: string,
+  topicId: string
+): UseQueryResult<ParkingLotItem[]> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['parking-lot', 'topic', subjectId, topicId, activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const subjectClient = client.subjects[':subjectId'] as Record<
+          string,
+          any
+        >;
+        const topicClient = subjectClient.topics[':topicId']['parking-lot'];
+        const res = await topicClient.$get({
+          param: { subjectId, topicId },
+          init: { signal },
+        });
+        await assertOk(res);
+        const data = (await res.json()) as { items: ParkingLotItem[] };
+        return data.items;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!subjectId && !!topicId,
   });
 }
 

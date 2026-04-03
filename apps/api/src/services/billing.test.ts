@@ -1508,20 +1508,22 @@ describe('addProfileToSubscription', () => {
     const sub = mockSubscriptionRow({ tier: 'family' });
     const db = createFamilyMockDb({
       subscriptionFindFirst: sub,
-      selectResult: [{ count: 2 }], // canAddProfile check + final count
+      profileFindFirst: mockProfileRow({ id: 'p-new', accountId }),
+      selectResult: [{ count: 2 }],
     });
 
     const result = await addProfileToSubscription(db, subscriptionId, 'p-new');
 
     expect(result).not.toBeNull();
     expect(result!.profileCount).toBe(2);
-    expect(db.update).toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
   });
 
   it('adds profile to pro tier when room exists', async () => {
     const sub = mockSubscriptionRow({ tier: 'pro' });
     const db = createFamilyMockDb({
       subscriptionFindFirst: sub,
+      profileFindFirst: mockProfileRow({ id: 'p-new', accountId }),
       selectResult: [{ count: 3 }],
     });
 
@@ -1531,10 +1533,11 @@ describe('addProfileToSubscription', () => {
     expect(result!.profileCount).toBe(3);
   });
 
-  it('returns null when family tier is full (4 profiles)', async () => {
+  it('returns null when the profile belongs to a different account', async () => {
     const sub = mockSubscriptionRow({ tier: 'family' });
     const db = createFamilyMockDb({
       subscriptionFindFirst: sub,
+      profileFindFirst: mockProfileRow({ id: 'p-new', accountId: 'other-acc' }),
       selectResult: [{ count: 4 }],
     });
 
@@ -1598,42 +1601,19 @@ describe('removeProfileFromSubscription', () => {
     expect(result).toBeNull();
   });
 
-  it('removes non-owner profile and provisions free subscription', async () => {
+  it('rejects removing non-owner profile until a verified detach flow exists', async () => {
     const sub = mockSubscriptionRow({ tier: 'family' });
     const childProfile = mockProfileRow({ id: 'p-child', isOwner: false });
-    // ensureFreeSubscription needs: getSubscriptionByAccountId returns null, then insert
-    const freeSub = mockSubscriptionRow({
-      id: 'sub-free',
-      accountId: newAccountId,
-      tier: 'free',
-      status: 'active',
-    });
     const db = createFamilyMockDb({
       subscriptionFindFirst: sub,
       profileFindFirst: childProfile,
-      insertReturning: [freeSub],
     });
 
-    // Override subscriptions.findFirst to return sub first (for removeProfile),
-    // then null for ensureFreeSubscription check, so it creates a new one
-    const findFirstMock = jest
-      .fn()
-      .mockResolvedValueOnce(sub) // removeProfileFromSubscription lookup
-      .mockResolvedValueOnce(undefined); // ensureFreeSubscription → getSubscriptionByAccountId
-
-    (db.query.subscriptions.findFirst as jest.Mock) = findFirstMock;
-
-    const result = await removeProfileFromSubscription(
-      db,
-      subscriptionId,
-      'p-child',
-      newAccountId
-    );
-
-    expect(result).not.toBeNull();
-    expect(result!.removedProfileId).toBe('p-child');
-    expect(db.update).toHaveBeenCalled(); // profile moved
-    expect(db.insert).toHaveBeenCalled(); // free subscription created
+    await expect(
+      removeProfileFromSubscription(db, subscriptionId, 'p-child', newAccountId)
+    ).rejects.toThrow('Profile removal requires an invite/claim flow');
+    expect(db.update).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
   });
 });
 

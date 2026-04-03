@@ -192,7 +192,7 @@ export default function HomeScreen() {
     let mounted = true;
 
     void (async () => {
-      const marker = await readSessionRecoveryMarker();
+      const marker = await readSessionRecoveryMarker(activeProfile?.id);
       if (!marker || !mounted) return;
 
       try {
@@ -200,7 +200,7 @@ export default function HomeScreen() {
           param: { sessionId: marker.sessionId },
         });
         if (!res.ok) {
-          await clearSessionRecoveryMarker();
+          await clearSessionRecoveryMarker(activeProfile?.id);
           return;
         }
 
@@ -225,7 +225,7 @@ export default function HomeScreen() {
     return () => {
       mounted = false;
     };
-  }, [apiClient]);
+  }, [activeProfile?.id, apiClient]);
 
   // Only show a gentle banner when the learner has hit their limit
   // Guard for monthlyLimit > 0: unlimited plans (limit=0) should never show this
@@ -265,7 +265,9 @@ export default function HomeScreen() {
       });
     }
 
-    cards.push(...((homeCardsQuery.data?.cards as HomeCardModel[] | undefined) ?? []));
+    cards.push(
+      ...((homeCardsQuery.data?.cards as HomeCardModel[] | undefined) ?? [])
+    );
     return cards;
   }, [homeCardsQuery.data?.cards, recoveryCard]);
 
@@ -314,7 +316,7 @@ export default function HomeScreen() {
       );
 
       if (cardId === 'resume_session') {
-        void clearSessionRecoveryMarker();
+        void clearSessionRecoveryMarker(activeProfile?.id);
         setRecoveryCard(null);
         return;
       }
@@ -324,7 +326,7 @@ export default function HomeScreen() {
         interactionType: 'dismiss',
       });
     },
-    [trackHomeCardInteraction, visibleHomeCards.length]
+    [activeProfile?.id, trackHomeCardInteraction, visibleHomeCards.length]
   );
 
   const handleHomeCardPrimary = useCallback(
@@ -346,7 +348,7 @@ export default function HomeScreen() {
             } as never);
             return;
           }
-          await clearSessionRecoveryMarker();
+          await clearSessionRecoveryMarker(activeProfile?.id);
           router.push(`/session-summary/${recoveryCard.sessionId}` as never);
           return;
         case 'restore_subjects':
@@ -399,7 +401,7 @@ export default function HomeScreen() {
         }
         case 'ask':
           router.push(
-            ((card.subjectId ?? firstSubjectId)
+            (card.subjectId ?? firstSubjectId
               ? `/(learner)/session?mode=freeform&subjectId=${
                   card.subjectId ?? firstSubjectId
                 }`
@@ -433,13 +435,13 @@ export default function HomeScreen() {
           setRecoveryCard(null);
           return;
         }
-        await clearSessionRecoveryMarker();
+        await clearSessionRecoveryMarker(activeProfile?.id);
         router.push(`/session-summary/${recoveryCard.sessionId}` as never);
       } catch {
         setRecoveryCard(null);
       }
     },
-    [apiClient, recoveryCard, router]
+    [activeProfile?.id, apiClient, recoveryCard, router]
   );
 
   return (

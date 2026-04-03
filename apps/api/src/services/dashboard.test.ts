@@ -318,19 +318,19 @@ describe('getChildrenForParent', () => {
       {
         startedAt: thisWeekDate,
         durationSeconds: 600,
-        wallClockSeconds: 600,
+        wallClockSeconds: 720,
         exchangeCount: 10,
       },
       {
         startedAt: thisWeekDate,
         durationSeconds: 900,
-        wallClockSeconds: 900,
+        wallClockSeconds: 1080,
         exchangeCount: 12,
       },
       {
         startedAt: lastWeekDate,
         durationSeconds: 300,
-        wallClockSeconds: 300,
+        wallClockSeconds: 360,
         exchangeCount: 5,
       },
     ]);
@@ -359,6 +359,8 @@ describe('getChildrenForParent', () => {
     expect(result[0].sessionsThisWeek).toBe(2);
     expect(result[0].sessionsLastWeek).toBe(1);
     expect(result[0].trend).toBe('up');
+    expect(result[0].totalTimeThisWeek).toBe(30);
+    expect(result[0].totalTimeLastWeek).toBe(6);
     expect(result[0].exchangesThisWeek).toBe(22); // 10 + 12
     expect(result[0].exchangesLastWeek).toBe(5);
     expect(result[0].subjects).toHaveLength(2);
