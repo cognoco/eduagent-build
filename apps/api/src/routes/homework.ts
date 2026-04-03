@@ -35,6 +35,7 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
       const session = await startSession(db, profileId, subjectId, {
         subjectId,
         sessionType: 'homework',
+        inputMode: 'text',
       });
       return c.json({ session }, 201);
     } catch (err) {

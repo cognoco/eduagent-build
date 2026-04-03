@@ -168,6 +168,7 @@ describe('homework routes', () => {
       expect(inputArg).toEqual({
         subjectId: SUBJECT_ID,
         sessionType: 'homework',
+        inputMode: 'text',
       });
     });
 

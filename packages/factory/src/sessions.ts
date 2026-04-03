@@ -14,6 +14,7 @@ export function buildSession(
     topicId: null,
     sessionType: 'learning',
     verificationType: null,
+    inputMode: 'text',
     status: 'active',
     escalationRung: 1,
     exchangeCount: 0,
