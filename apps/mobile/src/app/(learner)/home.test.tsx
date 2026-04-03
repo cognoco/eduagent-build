@@ -239,6 +239,7 @@ describe('HomeScreen session recovery', () => {
   });
 
   it('navigates from API-ranked home cards and records taps', async () => {
+    mockReadSessionRecoveryMarker.mockResolvedValue(null);
     render(<HomeScreen />);
 
     fireEvent.press(screen.getByText('Continue topic'));

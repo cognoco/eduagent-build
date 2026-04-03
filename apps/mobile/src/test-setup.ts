@@ -195,3 +195,12 @@ jest.mock('expo-secure-store', () => ({
 if (typeof global.structuredClone === 'undefined') {
   global.structuredClone = (object) => JSON.parse(JSON.stringify(object));
 }
+
+// Force TanStack Query to notify synchronously in tests.
+// The default scheduler uses setTimeout(cb, 0) which causes React state updates
+// to fire after act() boundaries, triggering "not wrapped in act()" warnings.
+
+const { notifyManager } = require('@tanstack/react-query');
+notifyManager.setScheduler((cb: () => void) => {
+  cb();
+});
