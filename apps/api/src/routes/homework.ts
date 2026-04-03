@@ -27,8 +27,7 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
   // Start a homework help session
   .post('/subjects/:subjectId/homework', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
     const subjectId = c.req.param('subjectId');
 
     try {

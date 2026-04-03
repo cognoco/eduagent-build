@@ -34,8 +34,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
     zValidator('json', interviewMessageSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = c.get('profileId');
       const subjectId = c.req.param('subjectId');
       const { message } = c.req.valid('json');
 
@@ -85,8 +84,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
     zValidator('json', interviewMessageSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = c.get('profileId');
       const subjectId = c.req.param('subjectId');
       const { message } = c.req.valid('json');
 
@@ -149,8 +147,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
   // Get current interview state
   .get('/subjects/:subjectId/interview', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
     const subjectId = c.req.param('subjectId');
 
     const draft = await getDraftState(db, profileId, subjectId);

@@ -69,10 +69,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', sessionStartSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = c.get('profileId');
       try {
         const session = await startSession(db, profileId, subjectId, input);
         return c.json({ session }, 201);
@@ -88,8 +87,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   // Get session state
   .get('/sessions/:sessionId', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
     const session = await getSession(db, profileId, c.req.param('sessionId'));
     if (!session) return notFound(c, 'Session not found');
     return c.json({ session });
@@ -101,8 +99,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', sessionMessageSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = c.get('profileId');
       const subscriptionId = c.get('subscriptionId');
 
       try {
@@ -128,8 +125,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
   .get('/sessions/:sessionId/transcript', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
     const transcript = await getSessionTranscript(
       db,
       profileId,
@@ -145,8 +141,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', sessionMessageSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = c.get('profileId');
       const subscriptionId = c.get('subscriptionId');
       const sessionId = c.req.param('sessionId');
       const input = c.req.valid('json');
@@ -199,8 +194,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', sessionCloseSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = c.get('profileId');
       const body = c.req.valid('json');
       const result = await closeSession(
         db,
@@ -234,8 +228,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', systemPromptBodySchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = c.get('profileId');
       const body = c.req.valid('json');
 
       await recordSystemPrompt(
@@ -254,8 +247,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', sessionAnalyticsEventSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = c.get('profileId');
       const body = c.req.valid('json');
 
       await recordSessionEvent(db, profileId, c.req.param('sessionId'), body);
@@ -268,8 +260,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', sessionInputModeSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = c.get('profileId');
       const session = await setSessionInputMode(
         db,
         profileId,
@@ -286,8 +277,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', homeworkStateSyncSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = c.get('profileId');
 
       const result = await syncHomeworkState(
         db,
@@ -306,8 +296,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', contentFlagSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = c.get('profileId');
       const result = await flagContent(
         db,
         profileId,
@@ -321,8 +310,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   // Get session summary
   .get('/sessions/:sessionId/summary', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
     const summary = await getSessionSummary(
       db,
       profileId,
@@ -333,8 +321,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
   .post('/sessions/:sessionId/summary/skip', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
     const previousSummary = await getSessionSummary(
       db,
       profileId,
@@ -373,8 +360,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', summarySubmitSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = c.get('profileId');
       const previousSummary = await getSessionSummary(
         db,
         profileId,
@@ -414,8 +400,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('json', interleavedSessionStartSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = c.get('profileId');
       const input = c.req.valid('json');
 
       try {
@@ -436,8 +421,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   // Generate recall bridge questions after homework success (Story 2.7)
   .post('/sessions/:sessionId/recall-bridge', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
     const sessionId = c.req.param('sessionId');
 
     const session = await getSession(db, profileId, sessionId);

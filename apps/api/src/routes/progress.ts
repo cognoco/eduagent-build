@@ -24,8 +24,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // Get subject progress with topic breakdown
   .get('/subjects/:subjectId/progress', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
     const subjectId = c.req.param('subjectId');
 
     const progress = await getSubjectProgress(db, profileId, subjectId);
@@ -36,8 +35,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // Get detailed topic progress
   .get('/subjects/:subjectId/topics/:topicId/progress', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
 
@@ -49,8 +47,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // Get overall progress across all subjects
   .get('/progress/overview', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
 
     const overview = await getOverallProgress(db, profileId);
     return c.json(overview);
@@ -59,8 +56,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   // Get "continue where I left off" suggestion
   .get('/progress/continue', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
 
     const suggestion = await getContinueSuggestion(db, profileId);
     return c.json({ suggestion });

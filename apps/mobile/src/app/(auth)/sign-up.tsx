@@ -285,7 +285,7 @@ export default function SignUpScreen() {
         contentContainerStyle={{
           minHeight: SCREEN_HEIGHT,
           paddingTop: insets.top + 24,
-          paddingBottom: insets.bottom + 24,
+          paddingBottom: insets.bottom + 40,
           paddingHorizontal: 24,
         }}
         keyboardShouldPersistTaps="handled"
@@ -424,7 +424,7 @@ export default function SignUpScreen() {
           .
         </Text>
 
-        <View className="flex-row justify-center items-center mt-6">
+        <View className="flex-row justify-center items-center mt-6 mb-8">
           <Text className="text-body-sm text-text-secondary">
             Already have an account?{' '}
           </Text>

@@ -24,8 +24,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   // Get parent dashboard data
   .get('/dashboard', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
 
     const children = await getChildrenForParent(db, profileId);
     return c.json({ children, demoMode: false });
@@ -34,8 +33,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   // Get detailed child data
   .get('/dashboard/children/:profileId', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const parentProfileId = c.get('profileId') ?? account.id;
+    const parentProfileId = c.get('profileId');
     const childProfileId = c.req.param('profileId');
 
     const child = await getChildDetail(db, parentProfileId, childProfileId);
@@ -45,8 +43,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   // Get child's subject detail
   .get('/dashboard/children/:profileId/subjects/:subjectId', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const parentProfileId = c.get('profileId') ?? account.id;
+    const parentProfileId = c.get('profileId');
     const childProfileId = c.req.param('profileId');
     const subjectId = c.req.param('subjectId');
 
@@ -62,8 +59,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   // List child's sessions
   .get('/dashboard/children/:profileId/sessions', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const parentProfileId = c.get('profileId') ?? account.id;
+    const parentProfileId = c.get('profileId');
     const childProfileId = c.req.param('profileId');
 
     const sessions = await getChildSessions(
@@ -79,8 +75,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     '/dashboard/children/:profileId/sessions/:sessionId/transcript',
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const parentProfileId = c.get('profileId') ?? account.id;
+      const parentProfileId = c.get('profileId');
       const childProfileId = c.req.param('profileId');
       const sessionId = c.req.param('sessionId');
 

@@ -37,6 +37,25 @@ jest.mock('../services/account', () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Mock profile service — middleware auto-resolves owner profile
+// ---------------------------------------------------------------------------
+
+jest.mock('../services/profile', () => ({
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+  findOwnerProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+}));
+
+// ---------------------------------------------------------------------------
 // Mock subject service
 // ---------------------------------------------------------------------------
 
@@ -47,7 +66,7 @@ jest.mock('../services/subject', () => ({
   createSubject: jest.fn(),
   getSubject: jest.fn().mockResolvedValue({
     id: SUBJECT_ID,
-    profileId: 'test-account-id',
+    profileId: 'test-profile-id',
     name: 'Mathematics',
     status: 'active',
     createdAt: new Date().toISOString(),
@@ -78,7 +97,7 @@ jest.mock('../services/interview', () => ({
   }),
   getOrCreateDraft: jest.fn().mockResolvedValue({
     id: 'draft-1',
-    profileId: 'test-account-id',
+    profileId: 'test-profile-id',
     subjectId: SUBJECT_ID,
     exchangeHistory: [],
     extractedSignals: {},
@@ -111,6 +130,7 @@ const TEST_ENV = {
 const AUTH_HEADERS = {
   Authorization: 'Bearer valid.jwt.token',
   'Content-Type': 'application/json',
+  'X-Profile-Id': 'test-profile-id',
 };
 
 describe('interview routes', () => {
@@ -120,7 +140,7 @@ describe('interview routes', () => {
     // Reset default mocks after clearAllMocks
     (getSubject as jest.Mock).mockResolvedValue({
       id: SUBJECT_ID,
-      profileId: 'test-account-id',
+      profileId: 'test-profile-id',
       name: 'Mathematics',
       status: 'active',
       createdAt: new Date().toISOString(),
@@ -146,7 +166,7 @@ describe('interview routes', () => {
 
     (getOrCreateDraft as jest.Mock).mockResolvedValue({
       id: 'draft-1',
-      profileId: 'test-account-id',
+      profileId: 'test-profile-id',
       subjectId: SUBJECT_ID,
       exchangeHistory: [],
       extractedSignals: {},
@@ -509,7 +529,7 @@ describe('interview routes', () => {
     it('returns 200 with state object when draft exists', async () => {
       (getDraftState as jest.Mock).mockResolvedValue({
         id: 'draft-1',
-        profileId: 'test-account-id',
+        profileId: 'test-profile-id',
         subjectId: SUBJECT_ID,
         exchangeHistory: [
           { role: 'user', content: 'Hello' },
@@ -541,7 +561,7 @@ describe('interview routes', () => {
     it('calls getDraftState and getSubject', async () => {
       (getDraftState as jest.Mock).mockResolvedValue({
         id: 'draft-1',
-        profileId: 'test-account-id',
+        profileId: 'test-profile-id',
         subjectId: SUBJECT_ID,
         exchangeHistory: [],
         extractedSignals: {},
@@ -564,7 +584,7 @@ describe('interview routes', () => {
     it('returns Unknown subject name when subject not found', async () => {
       (getDraftState as jest.Mock).mockResolvedValue({
         id: 'draft-1',
-        profileId: 'test-account-id',
+        profileId: 'test-profile-id',
         subjectId: SUBJECT_ID,
         exchangeHistory: [],
         extractedSignals: {},

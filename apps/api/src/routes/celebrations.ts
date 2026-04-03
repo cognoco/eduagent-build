@@ -24,8 +24,7 @@ type CelebrationRouteEnv = {
 export const celebrationRoutes = new Hono<CelebrationRouteEnv>()
   .get('/celebrations/pending', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
     const viewer = c.req.query('viewer') === 'parent' ? 'parent' : 'child';
     const celebrations = await getPendingCelebrations(db, profileId, viewer);
 
@@ -47,8 +46,7 @@ export const celebrationRoutes = new Hono<CelebrationRouteEnv>()
     zValidator('json', celebrationSeenSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = c.get('profileId');
       const body = c.req.valid('json');
 
       await markCelebrationsSeen(db, profileId, body.viewer);

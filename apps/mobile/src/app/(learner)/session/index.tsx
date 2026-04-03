@@ -920,7 +920,7 @@ export default function SessionScreen() {
         );
       } catch (err: unknown) {
         animationCleanupRef.current = animateResponse(
-          'Lost connection to your session. Tap send to reconnect.',
+          'Lost connection to your session. Tap to reconnect.',
           setMessages,
           setIsStreaming
         );

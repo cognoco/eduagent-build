@@ -18,8 +18,7 @@ export const coachingCardRoutes = new Hono<CoachingCardRouteEnv>()
   // Get coaching card for authenticated profile
   .get('/coaching-card', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
 
     const result = await getCoachingCardForProfile(db, profileId);
     return c.json(result);

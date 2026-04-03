@@ -18,8 +18,7 @@ export const streakRoutes = new Hono<StreakRouteEnv>()
   // Get current streak state
   .get('/streaks', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
 
     const streak = await getStreakData(db, profileId);
     return c.json({ streak });
@@ -28,8 +27,7 @@ export const streakRoutes = new Hono<StreakRouteEnv>()
   // Get XP summary
   .get('/xp', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
 
     const xp = await getXpSummary(db, profileId);
     return c.json({ xp });

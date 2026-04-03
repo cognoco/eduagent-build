@@ -27,8 +27,7 @@ export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
   // Get parked questions for a session
   .get('/sessions/:sessionId/parking-lot', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
     const sessionId = c.req.param('sessionId');
 
     const result = await getParkingLotItems(db, profileId, sessionId);
@@ -38,8 +37,7 @@ export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
   // Get parked questions linked to a topic for topic review
   .get('/subjects/:subjectId/topics/:topicId/parking-lot', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = c.get('profileId');
     const topicId = c.req.param('topicId');
 
     const result = await getParkingLotItemsForTopic(db, profileId, topicId);
@@ -53,8 +51,7 @@ export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
     async (c) => {
       const { question } = c.req.valid('json');
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = c.get('profileId');
       const sessionId = c.req.param('sessionId');
       const session = await getSession(db, profileId, sessionId);
       if (!session) {

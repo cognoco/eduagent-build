@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Platform,
   ScrollView,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -50,6 +51,27 @@ export default function ConsentScreen() {
   const [deliveryState, setDeliveryState] = useState<DeliveryState>('sent');
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
+  // BUG-26: Fade animation for phase transitions (child → parent → success)
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  const transitionToPhase = useCallback(
+    (newPhase: Phase) => {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setPhase(newPhase);
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      });
+    },
+    [fadeAnim]
+  );
+
   // Hand-off copy uses learner variant (consent screen is always shown to children).
   const copy = getConsentHandOffCopy('learner');
 
@@ -72,11 +94,18 @@ export default function ConsentScreen() {
         consentType,
       });
       setDeliveryState(result.emailStatus);
-      setPhase('success');
+      transitionToPhase('success');
     } catch (err: unknown) {
       setError(formatApiError(err));
     }
-  }, [canSubmit, profileId, consentType, parentEmail, mutateAsync]);
+  }, [
+    canSubmit,
+    profileId,
+    consentType,
+    parentEmail,
+    mutateAsync,
+    transitionToPhase,
+  ]);
 
   const onResendEmail = useCallback(async () => {
     if (!profileId || resending) return;
@@ -115,128 +144,132 @@ export default function ConsentScreen() {
         }}
         keyboardShouldPersistTaps="handled"
       >
-        {phase === 'child' && (
-          <View testID="consent-child-view">
-            <Text className="text-h1 font-bold text-text-primary mb-4">
-              {copy.childTitle}
-            </Text>
-            <Text className="text-body text-text-secondary mb-8">
-              {copy.childMessage}
-            </Text>
-            <Button
-              variant="primary"
-              label={copy.handOffButton}
-              onPress={() => setPhase('parent')}
-              testID="consent-handoff-button"
-            />
-          </View>
-        )}
+        <Animated.View style={{ opacity: fadeAnim }}>
+          {phase === 'child' && (
+            <View testID="consent-child-view">
+              <Text className="text-h1 font-bold text-text-primary mb-4">
+                {copy.childTitle}
+              </Text>
+              <Text className="text-body text-text-secondary mb-8">
+                {copy.childMessage}
+              </Text>
+              <Button
+                variant="primary"
+                label={copy.handOffButton}
+                onPress={() => transitionToPhase('parent')}
+                testID="consent-handoff-button"
+              />
+            </View>
+          )}
 
-        {phase === 'parent' && (
-          <View testID="consent-parent-view">
-            <Text className="text-h1 font-bold text-text-primary mb-4">
-              {copy.parentTitle}
-            </Text>
+          {phase === 'parent' && (
+            <View testID="consent-parent-view">
+              <Text className="text-h1 font-bold text-text-primary mb-4">
+                {copy.parentTitle}
+              </Text>
 
-            <Text className="text-body text-text-secondary mb-6">
-              {regulationText}
-            </Text>
+              <Text className="text-body text-text-secondary mb-6">
+                {regulationText}
+              </Text>
 
-            {error !== '' && (
-              <View
-                className="bg-danger/10 rounded-card px-4 py-3 mb-4"
-                accessibilityRole="alert"
-              >
-                <Text
-                  className="text-danger text-body-sm"
-                  testID="consent-error"
+              {error !== '' && (
+                <View
+                  className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+                  accessibilityRole="alert"
                 >
-                  {error}
+                  <Text
+                    className="text-danger text-body-sm"
+                    testID="consent-error"
+                  >
+                    {error}
+                  </Text>
+                </View>
+              )}
+
+              <View onLayout={onFieldLayout('email')}>
+                <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+                  {copy.parentEmailLabel}
+                </Text>
+                <TextInput
+                  className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-2"
+                  placeholder={copy.parentEmailPlaceholder}
+                  placeholderTextColor={colors.muted}
+                  value={parentEmail}
+                  onChangeText={setParentEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  editable={!isPending}
+                  testID="consent-email"
+                  onFocus={onFieldFocus('email')}
+                />
+                <Text className="text-body-sm text-text-secondary mb-6">
+                  {copy.spamWarning}
                 </Text>
               </View>
-            )}
 
-            <View onLayout={onFieldLayout('email')}>
-              <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-                {copy.parentEmailLabel}
-              </Text>
-              <TextInput
-                className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-2"
-                placeholder={copy.parentEmailPlaceholder}
-                placeholderTextColor={colors.muted}
-                value={parentEmail}
-                onChangeText={setParentEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-                editable={!isPending}
-                testID="consent-email"
-                onFocus={onFieldFocus('email')}
-              />
-              <Text className="text-body-sm text-text-secondary mb-6">
-                {copy.spamWarning}
-              </Text>
-            </View>
-
-            <Button
-              variant="primary"
-              label={copy.parentSubmitButton}
-              onPress={onSubmit}
-              disabled={!canSubmit}
-              loading={isPending}
-              testID="consent-submit"
-            />
-          </View>
-        )}
-
-        {phase === 'success' && (
-          <View testID="consent-success">
-            <Text className="text-h1 font-bold text-text-primary mb-4">
-              {deliveryState === 'sent'
-                ? copy.successMessage
-                : "We couldn't confirm delivery yet"}
-            </Text>
-            <Text className="text-body text-text-primary mb-2">
-              {deliveryState === 'sent' ? (
-                <>
-                  We sent a consent link to{' '}
-                  <Text className="font-semibold">{parentEmail}</Text>.
-                </>
-              ) : (
-                <>
-                  We could not confirm that the consent email reached{' '}
-                  <Text className="font-semibold">{parentEmail}</Text>. Please
-                  double-check the address and try again.
-                </>
-              )}
-            </Text>
-            <Text className="text-body text-text-secondary mb-8">
-              {deliveryState === 'sent'
-                ? copy.successSpamHint
-                : 'You can resend the request now or go back and enter a different email address.'}
-            </Text>
-            <Button
-              variant="primary"
-              label={
-                deliveryState === 'sent' ? copy.handBackButton : 'Go back'
-              }
-              onPress={() =>
-                deliveryState === 'sent' ? router.back() : setPhase('parent')
-              }
-              testID="consent-done"
-            />
-            <View className="flex-row justify-center mt-4">
               <Button
-                variant="tertiary"
-                size="small"
-                label="Resend email"
-                onPress={onResendEmail}
-                loading={resending}
-                testID="consent-resend-email"
+                variant="primary"
+                label={copy.parentSubmitButton}
+                onPress={onSubmit}
+                disabled={!canSubmit}
+                loading={isPending}
+                testID="consent-submit"
               />
             </View>
-          </View>
-        )}
+          )}
+
+          {phase === 'success' && (
+            <View testID="consent-success">
+              <Text className="text-h1 font-bold text-text-primary mb-4">
+                {deliveryState === 'sent'
+                  ? copy.successMessage
+                  : "We couldn't confirm delivery yet"}
+              </Text>
+              <Text className="text-body text-text-primary mb-2">
+                {deliveryState === 'sent' ? (
+                  <>
+                    We sent a consent link to{' '}
+                    <Text className="font-semibold">{parentEmail}</Text>.
+                  </>
+                ) : (
+                  <>
+                    We could not confirm that the consent email reached{' '}
+                    <Text className="font-semibold">{parentEmail}</Text>. Please
+                    double-check the address and try again.
+                  </>
+                )}
+              </Text>
+              <Text className="text-body text-text-secondary mb-8">
+                {deliveryState === 'sent'
+                  ? copy.successSpamHint
+                  : 'You can resend the request now or go back and enter a different email address.'}
+              </Text>
+              <Button
+                variant="primary"
+                label={
+                  deliveryState === 'sent' ? copy.handBackButton : 'Go back'
+                }
+                onPress={() =>
+                  deliveryState === 'sent'
+                    ? router.back()
+                    : transitionToPhase('parent')
+                }
+                testID="consent-done"
+              />
+              <View className="flex-row justify-center mt-4">
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  label="Resend email"
+                  onPress={onResendEmail}
+                  loading={resending}
+                  testID="consent-resend-email"
+                />
+              </View>
+            </View>
+          )}
+        </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
   );

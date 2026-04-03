@@ -233,7 +233,8 @@ export default function LearningBookScreen() {
     !hasBlockingError &&
     filteredTopics.length === 0 &&
     subjectCount > 0 &&
-    !topicsLoading;
+    !topicsLoading &&
+    !showCurriculumCompleteBanner;
 
   const handleRetry = (): void => {
     void refetchSubjects();
@@ -574,8 +575,10 @@ export default function LearningBookScreen() {
                 testID="learning-book-empty"
               >
                 <Text className="text-body text-text-secondary text-center">
-                  {selectedSubjectId
-                    ? 'No topics in this subject yet.'
+                  {showCurriculumCompleteBanner
+                    ? 'All topics reviewed — great work! Keep revisiting to make it stick.'
+                    : selectedSubjectId
+                    ? 'No topics in this subject yet. Start a session to begin building your book.'
                     : 'No topics yet — add a subject to get started'}
                 </Text>
               </View>
