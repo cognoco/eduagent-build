@@ -44,6 +44,8 @@ interface ChatShellProps {
   renderMessageActions?: (message: ChatMessage) => React.ReactNode;
   /** When set to 'teach_back', voice defaults ON. Otherwise voice defaults OFF but toggle is always visible. */
   verificationType?: string;
+  /** Explicit voice mode override from session-start input mode toggle (FR144). Takes precedence over verificationType. */
+  initialVoiceEnabled?: boolean;
   /** Optional testID for the message scroll area (used by E2E flows). */
   messagesTestID?: string;
 }
@@ -104,6 +106,7 @@ export function ChatShell({
   placeholder = 'Type a message...',
   renderMessageActions,
   verificationType,
+  initialVoiceEnabled,
   messagesTestID,
 }: ChatShellProps) {
   const router = useRouter();
@@ -112,9 +115,10 @@ export function ChatShell({
   const scrollRef = useRef<ScrollView>(null);
   const [input, setInput] = useState('');
 
-  // Voice toggle — defaults ON for teach_back, OFF for all others. Session-scoped.
+  // Voice toggle — explicit initialVoiceEnabled (from input mode toggle) takes precedence.
+  // Falls back to teach_back detection. Session-scoped only — NOT a persistent preference.
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(
-    verificationType === 'teach_back'
+    initialVoiceEnabled ?? verificationType === 'teach_back'
   );
 
   // STT hook
@@ -130,8 +134,11 @@ export function ChatShell({
   const {
     speak,
     stop: stopSpeaking,
+    pause: pauseSpeaking,
+    resume: resumeSpeaking,
     replay,
     isSpeaking: ttsPlaying,
+    isPaused: ttsPaused,
     rate,
     setRate,
   } = useTextToSpeech();
@@ -312,8 +319,11 @@ export function ChatShell({
       {isVoiceEnabled && !inputDisabled && (
         <VoicePlaybackBar
           isSpeaking={ttsPlaying}
+          isPaused={ttsPaused}
           rate={rate}
           onStop={stopSpeaking}
+          onPause={pauseSpeaking}
+          onResume={resumeSpeaking}
           onReplay={replay}
           onRateChange={setRate}
         />

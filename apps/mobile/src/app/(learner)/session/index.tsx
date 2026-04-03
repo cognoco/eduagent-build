@@ -12,7 +12,11 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { PendingCelebration, HomeworkProblem } from '@eduagent/schemas';
+import type {
+  PendingCelebration,
+  HomeworkProblem,
+  SubjectClassifyCandidate,
+} from '@eduagent/schemas';
 import {
   ChatShell,
   animateResponse,
@@ -21,6 +25,7 @@ import {
   SessionTimer,
   QuestionCounter,
   LearningBookPrompt,
+  SessionInputModeToggle,
   type ChatMessage,
 } from '../../../components/session';
 import {
@@ -262,6 +267,7 @@ export default function SessionScreen() {
   >(undefined);
   const [draftText, setDraftText] = useState('');
   const [resumedBanner, setResumedBanner] = useState(false);
+  const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
   const [responseHistory, setResponseHistory] = useState<
     Array<{ actualSeconds: number; expectedMinutes: number }>
   >([]);
@@ -272,6 +278,16 @@ export default function SessionScreen() {
     string | null
   >(subjectId ?? null);
   const [showWrongSubjectChip, setShowWrongSubjectChip] = useState(false);
+  const [ambiguousCandidates, setAmbiguousCandidates] = useState<
+    SubjectClassifyCandidate[] | null
+  >(null);
+  const [bufferedFirstMessage, setBufferedFirstMessage] = useState<
+    string | null
+  >(null);
+  const disambiguationRef = useRef<{
+    subjectId: string;
+    subjectName: string;
+  } | null>(null);
   const [consumedQuickChipMessageId, setConsumedQuickChipMessageId] = useState<
     string | null
   >(null);
@@ -625,6 +641,7 @@ export default function SessionScreen() {
               subjectId: overrideSubjectId,
               topicId: topicId ?? undefined,
               sessionType,
+              inputMode,
               ...(effectiveMode === 'homework' &&
               homeworkProblemsState.length > 0
                 ? {
@@ -647,6 +664,7 @@ export default function SessionScreen() {
             subjectId: sid,
             topicId: topicId ?? undefined,
             sessionType,
+            inputMode,
             ...(effectiveMode === 'homework' && homeworkProblemsState.length > 0
               ? {
                   metadata: {
@@ -684,6 +702,7 @@ export default function SessionScreen() {
       effectiveSubjectId,
       topicId,
       effectiveMode,
+      inputMode,
       apiClient,
       startSession,
       homeworkProblemsState,
@@ -697,15 +716,26 @@ export default function SessionScreen() {
     async (text: string) => {
       if (isStreaming || pendingClassification) return;
 
-      setMessages((prev) => [
-        ...prev,
-        { id: createLocalMessageId('user'), role: 'user', content: text },
-      ]);
-      setResumedBanner(false);
+      // When called back after disambiguation, the ref carries the resolved subject
+      // and the user message was already added in the first call.
+      const isDisambiguationCallback = !!disambiguationRef.current;
+
+      if (!isDisambiguationCallback) {
+        setMessages((prev) => [
+          ...prev,
+          { id: createLocalMessageId('user'), role: 'user', content: text },
+        ]);
+        setResumedBanner(false);
+      }
 
       // Classify subject from first message when none was provided
       let sessionSubjectId: string | undefined;
-      if (!subjectId && !classifiedSubject && messages.length <= 1) {
+      if (isDisambiguationCallback) {
+        const resolved = disambiguationRef.current!;
+        disambiguationRef.current = null;
+        setClassifiedSubject(resolved);
+        sessionSubjectId = resolved.subjectId;
+      } else if (!subjectId && !classifiedSubject && messages.length <= 1) {
         setPendingClassification(true);
         setClassifyError(null);
         try {
@@ -718,13 +748,34 @@ export default function SessionScreen() {
             });
             setShowWrongSubjectChip(false);
             sessionSubjectId = candidate.subjectId;
+          } else if (result.needsConfirmation && result.candidates.length > 1) {
+            // Multiple ambiguous candidates — ask the learner to pick
+            setAmbiguousCandidates(result.candidates);
+            setBufferedFirstMessage(text);
+            const names = result.candidates.map((c) => c.subjectName);
+            const listText =
+              names.length === 2
+                ? `**${names[0]}** or **${names[1]}**`
+                : names
+                    .slice(0, -1)
+                    .map((n) => `**${n}**`)
+                    .join(', ') + `, or **${names[names.length - 1]}**`;
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: createLocalMessageId('ai'),
+                role: 'ai',
+                content: `This sounds like it could be ${listText}. Which one are we working on?`,
+              },
+            ]);
+            return;
           } else {
+            // Single low-confidence or no match → freeform + wrong-subject chip
             setShowWrongSubjectChip(result.needsConfirmation);
             if (result.candidates[0]) {
               setTopicSwitcherSubjectId(result.candidates[0].subjectId);
             }
           }
-          // Ambiguous / no match → proceed without subject (freeform)
         } catch {
           setShowWrongSubjectChip(true);
           setClassifyError(
@@ -909,6 +960,33 @@ export default function SessionScreen() {
       trackExchange,
       trigger,
     ]
+  );
+
+  const handleAmbiguousPick = useCallback(
+    (candidate: SubjectClassifyCandidate) => {
+      disambiguationRef.current = {
+        subjectId: candidate.subjectId,
+        subjectName: candidate.subjectName,
+      };
+      const text = bufferedFirstMessage;
+      setBufferedFirstMessage(null);
+      setAmbiguousCandidates(null);
+
+      // Show the learner's choice as a chat message
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: createLocalMessageId('user'),
+          role: 'user',
+          content: candidate.subjectName,
+        },
+      ]);
+
+      if (text) {
+        void handleSend(text);
+      }
+    },
+    [bufferedFirstMessage, createLocalMessageId, handleSend]
   );
 
   useEffect(() => {
@@ -1497,13 +1575,40 @@ export default function SessionScreen() {
         : []),
     ];
     const showFeedbackButtons = !!message.eventId;
+    const showDisambiguation =
+      ambiguousCandidates &&
+      ambiguousCandidates.length > 0 &&
+      message.id === latestAiMessageId;
 
-    if (messageControlChips.length === 0 && !showFeedbackButtons) {
+    if (
+      messageControlChips.length === 0 &&
+      !showFeedbackButtons &&
+      !showDisambiguation
+    ) {
       return null;
     }
 
     return (
       <View className="gap-2">
+        {showDisambiguation && (
+          <View
+            className="flex-row flex-wrap gap-2"
+            testID="subject-disambiguation"
+          >
+            {ambiguousCandidates.map((candidate) => (
+              <Pressable
+                key={candidate.subjectId}
+                onPress={() => handleAmbiguousPick(candidate)}
+                className="rounded-full bg-primary px-4 py-2"
+                testID={`subject-pick-${candidate.subjectId}`}
+              >
+                <Text className="text-body-sm font-semibold text-text-inverse">
+                  {candidate.subjectName}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
         {messageControlChips.length > 0 && (
           <View className="flex-row flex-wrap gap-2">
             {messageControlChips.map((chip) => {
@@ -1600,20 +1705,27 @@ export default function SessionScreen() {
         messages={messages}
         onSend={handleSend}
         isStreaming={isStreaming}
-        inputDisabled={isOffline || pendingClassification}
+        inputDisabled={
+          isOffline || pendingClassification || !!ambiguousCandidates
+        }
         rightAction={headerRight}
         inputAccessory={sessionAccessory}
         onDraftChange={setDraftText}
         renderMessageActions={renderMessageActions}
+        initialVoiceEnabled={inputMode === 'voice'}
         footer={
-          modeConfig.showQuestionCount || showBookLink ? (
-            <>
-              {modeConfig.showQuestionCount && (
-                <QuestionCounter count={userMessageCount} />
-              )}
-              {showBookLink && <LearningBookPrompt />}
-            </>
-          ) : undefined
+          <>
+            {exchangeCount === 0 && (
+              <SessionInputModeToggle
+                mode={inputMode}
+                onModeChange={setInputMode}
+              />
+            )}
+            {modeConfig.showQuestionCount && (
+              <QuestionCounter count={userMessageCount} />
+            )}
+            {showBookLink && <LearningBookPrompt />}
+          </>
         }
       />
       <Modal

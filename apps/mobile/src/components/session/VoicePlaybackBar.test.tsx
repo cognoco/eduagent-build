@@ -19,8 +19,11 @@ jest.mock('@expo/vector-icons', () => {
 
 const defaultProps = {
   isSpeaking: false,
+  isPaused: false,
   rate: 1.0,
   onStop: jest.fn(),
+  onPause: jest.fn(),
+  onResume: jest.fn(),
   onReplay: jest.fn(),
   onRateChange: jest.fn(),
 };
@@ -35,14 +38,74 @@ describe('VoicePlaybackBar', () => {
     expect(screen.getByTestId('voice-rate-button')).toBeTruthy();
   });
 
-  it('hides stop button when not speaking', () => {
+  it('hides stop and pause/resume buttons when not speaking', () => {
     render(<VoicePlaybackBar {...defaultProps} isSpeaking={false} />);
 
     expect(screen.queryByTestId('voice-stop-button')).toBeNull();
+    expect(screen.queryByTestId('voice-pause-resume-button')).toBeNull();
   });
 
-  it('shows stop button when speaking', () => {
+  it('shows stop and pause buttons when speaking', () => {
     render(<VoicePlaybackBar {...defaultProps} isSpeaking={true} />);
+
+    expect(screen.getByTestId('voice-stop-button')).toBeTruthy();
+    expect(screen.getByTestId('voice-pause-resume-button')).toBeTruthy();
+  });
+
+  it('shows pause icon when speaking and not paused', () => {
+    render(
+      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={false} />
+    );
+
+    const pauseResumeButton = screen.getByTestId('voice-pause-resume-button');
+    expect(pauseResumeButton).toBeTruthy();
+    expect(screen.getByLabelText('Pause speaking')).toBeTruthy();
+  });
+
+  it('shows play icon when paused', () => {
+    render(
+      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={true} />
+    );
+
+    expect(screen.getByLabelText('Resume speaking')).toBeTruthy();
+  });
+
+  it('calls onPause when pause button is pressed', () => {
+    const onPause = jest.fn();
+    render(
+      <VoicePlaybackBar
+        {...defaultProps}
+        isSpeaking={true}
+        isPaused={false}
+        onPause={onPause}
+      />
+    );
+
+    fireEvent.press(screen.getByTestId('voice-pause-resume-button'));
+
+    expect(onPause).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onResume when resume button is pressed', () => {
+    const onResume = jest.fn();
+    render(
+      <VoicePlaybackBar
+        {...defaultProps}
+        isSpeaking={true}
+        isPaused={true}
+        onResume={onResume}
+      />
+    );
+
+    fireEvent.press(screen.getByTestId('voice-pause-resume-button'));
+
+    expect(onResume).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows stop button when paused', () => {
+    render(
+      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={true} />
+    );
 
     expect(screen.getByTestId('voice-stop-button')).toBeTruthy();
   });
@@ -118,10 +181,21 @@ describe('VoicePlaybackBar', () => {
     expect(screen.getByText('0.75x')).toBeTruthy();
   });
 
-  it('disables replay while speaking', () => {
-    render(<VoicePlaybackBar {...defaultProps} isSpeaking={true} />);
+  it('disables replay while speaking and not paused', () => {
+    render(
+      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={false} />
+    );
 
     const replay = screen.getByTestId('voice-replay-button');
     expect(replay.props.accessibilityState?.disabled).toBe(true);
+  });
+
+  it('enables replay when paused', () => {
+    render(
+      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={true} />
+    );
+
+    const replay = screen.getByTestId('voice-replay-button');
+    expect(replay.props.accessibilityState?.disabled).toBe(false);
   });
 });

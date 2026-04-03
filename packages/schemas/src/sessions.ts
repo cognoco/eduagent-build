@@ -78,6 +78,9 @@ export const sessionTypeSchema = z.enum([
 ]);
 export type SessionType = z.infer<typeof sessionTypeSchema>;
 
+export const inputModeSchema = z.enum(['text', 'voice']);
+export type InputMode = z.infer<typeof inputModeSchema>;
+
 export const homeworkModeSchema = z.enum(['help_me', 'check_answer']);
 export type HomeworkMode = z.infer<typeof homeworkModeSchema>;
 
@@ -136,6 +139,7 @@ export const sessionStartSchema = z.object({
   topicId: z.string().uuid().optional(),
   sessionType: sessionTypeSchema.default('learning'),
   verificationType: z.enum(['standard', 'evaluate', 'teach_back']).optional(),
+  inputMode: inputModeSchema.default('text'),
   metadata: sessionMetadataSchema.optional(),
 });
 export type SessionStartInput = z.infer<typeof sessionStartSchema>;
@@ -178,6 +182,7 @@ export const learningSessionSchema = z.object({
   topicId: z.string().uuid().nullable(),
   sessionType: sessionTypeSchema,
   verificationType: verificationTypeSchema.nullable(),
+  inputMode: inputModeSchema,
   status: sessionStatusSchema,
   escalationRung: escalationRungSchema,
   exchangeCount: z.number().int(),

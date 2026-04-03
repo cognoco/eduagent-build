@@ -138,6 +138,7 @@ function mapSessionRow(
     sessionType: row.sessionType,
     verificationType:
       (row.verificationType as 'standard' | 'evaluate' | 'teach_back') ?? null,
+    inputMode: (row.inputMode as 'text' | 'voice') ?? 'text',
     status: row.status,
     escalationRung: row.escalationRung,
     exchangeCount: row.exchangeCount,
@@ -270,6 +271,7 @@ export async function startSession(
       topicId: input.topicId ?? null,
       sessionType: input.sessionType ?? 'learning',
       verificationType: input.verificationType ?? null,
+      inputMode: input.inputMode ?? 'text',
       status: 'active',
       escalationRung: 1,
       exchangeCount: 0,
