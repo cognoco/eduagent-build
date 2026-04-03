@@ -416,6 +416,39 @@ describe('homework routes', () => {
       expect(res.status).toBe(200);
     });
 
+    it('returns 503 when OCR provider is not configured', async () => {
+      const { getOcrProvider } = require('../services/ocr') as {
+        getOcrProvider: jest.Mock;
+      };
+      getOcrProvider.mockImplementationOnce(() => {
+        throw new Error('OCR provider not configured');
+      });
+
+      const formData = new FormData();
+      formData.append(
+        'image',
+        new File([new ArrayBuffer(100)], 'test.jpg', { type: 'image/jpeg' })
+      );
+
+      const res = await app.request(
+        '/v1/ocr',
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid.jwt.token' },
+          body: formData,
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(503);
+
+      const body = await res.json();
+      expect(body.code).toBe('INTERNAL_ERROR');
+      expect(body.message).toBe(
+        'OCR service is not configured. Please contact support.'
+      );
+    });
+
     it('returns 401 without auth header', async () => {
       const formData = new FormData();
       formData.append(
