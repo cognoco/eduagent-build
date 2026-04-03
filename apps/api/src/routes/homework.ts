@@ -75,7 +75,17 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
     }
 
     const imageBuffer = await file.arrayBuffer();
-    const provider = getOcrProvider(c.env.GEMINI_API_KEY);
+    let provider;
+    try {
+      provider = getOcrProvider(c.env.GEMINI_API_KEY);
+    } catch {
+      return apiError(
+        c,
+        503,
+        ERROR_CODES.INTERNAL_ERROR,
+        'OCR service is not configured. Please contact support.'
+      );
+    }
     const result = await provider.extractText(imageBuffer, file.type);
     return c.json(result);
   });

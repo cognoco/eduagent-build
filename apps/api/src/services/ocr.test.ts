@@ -87,8 +87,18 @@ describe('getOcrProvider / setOcrProvider', () => {
     resetOcrProvider();
   });
 
-  it('returns StubOcrProvider by default', () => {
-    const provider = getOcrProvider();
+  it('throws when no provider configured and allowStub is not set', () => {
+    expect(() => getOcrProvider()).toThrow('OCR provider not configured');
+  });
+
+  it('throws when no provider configured and allowStub is false', () => {
+    expect(() => getOcrProvider(undefined, false)).toThrow(
+      'OCR provider not configured'
+    );
+  });
+
+  it('returns StubOcrProvider when allowStub is true', () => {
+    const provider = getOcrProvider(undefined, true);
     expect(provider).toBeInstanceOf(StubOcrProvider);
   });
 
@@ -102,11 +112,17 @@ describe('getOcrProvider / setOcrProvider', () => {
     };
     setOcrProvider(custom);
 
+    // When a provider is set via DI, getOcrProvider returns it regardless of args
     expect(getOcrProvider()).toBe(custom);
   });
 
   it('returns a Gemini provider when useRouter is truthy', () => {
     const provider = getOcrProvider(true);
+    expect(provider).toBeInstanceOf(GeminiOcrProvider);
+  });
+
+  it('returns a Gemini provider when useRouter is a string (API key)', () => {
+    const provider = getOcrProvider('some-gemini-key');
     expect(provider).toBeInstanceOf(GeminiOcrProvider);
   });
 
@@ -121,9 +137,8 @@ describe('getOcrProvider / setOcrProvider', () => {
     setOcrProvider(custom);
     resetOcrProvider();
 
-    const provider = getOcrProvider();
-    expect(provider).toBeInstanceOf(StubOcrProvider);
-    expect(provider).not.toBe(custom);
+    // After reset, calling without allowStub throws
+    expect(() => getOcrProvider()).toThrow('OCR provider not configured');
   });
 });
 

@@ -16,6 +16,8 @@ import type {
   CurriculumTopicAddInput,
   CurriculumTopicAddResponse,
   CurriculumTopicPreview,
+  CurriculumAdaptRequest,
+  CurriculumAdaptResponse,
 } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
@@ -509,4 +511,94 @@ export async function explainTopicOrdering(
 
   const result = await routeAndCall(messages, 2);
   return result.response;
+}
+
+// ---------------------------------------------------------------------------
+// Performance-driven curriculum adaptation (FR21)
+// ---------------------------------------------------------------------------
+
+export async function adaptCurriculumFromPerformance(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  request: CurriculumAdaptRequest
+): Promise<CurriculumAdaptResponse> {
+  const curriculum = await getCurriculum(db, profileId, subjectId);
+  if (!curriculum) {
+    return {
+      adapted: false,
+      topicOrder: [],
+      explanation: 'No curriculum found.',
+    };
+  }
+
+  const targetTopic = curriculum.topics.find((t) => t.id === request.topicId);
+  if (!targetTopic) {
+    return {
+      adapted: false,
+      topicOrder: curriculum.topics.map((t) => t.id),
+      explanation: 'Topic not found in curriculum.',
+    };
+  }
+
+  // Reorder: move struggling/too_hard topics later, mastered/too_easy earlier
+  const remaining = curriculum.topics.filter((t) => !t.skipped);
+  const targetIndex = remaining.findIndex((t) => t.id === request.topicId);
+
+  const reordered = [...remaining];
+  if (targetIndex >= 0) {
+    const [topic] = reordered.splice(targetIndex, 1);
+    if (topic) {
+      switch (request.signal) {
+        case 'struggling':
+        case 'too_hard':
+          reordered.splice(
+            Math.min(targetIndex + 2, reordered.length),
+            0,
+            topic
+          );
+          break;
+        case 'mastered':
+        case 'too_easy':
+          reordered.splice(Math.max(targetIndex - 2, 0), 0, topic);
+          break;
+      }
+    }
+  }
+
+  // Persist new sort order
+  for (let i = 0; i < reordered.length; i++) {
+    const entry = reordered[i]!;
+    await db
+      .update(curriculumTopics)
+      .set({ sortOrder: i, updatedAt: new Date() })
+      .where(
+        and(
+          eq(curriculumTopics.id, entry.id),
+          eq(curriculumTopics.curriculumId, curriculum.id)
+        )
+      );
+  }
+
+  // Record adaptation for audit
+  await db.insert(curriculumAdaptations).values({
+    profileId,
+    subjectId,
+    topicId: request.topicId,
+    sortOrder: reordered.findIndex((t) => t.id === request.topicId),
+    skipReason: `Performance adaptation: ${request.signal}${
+      request.context ? ' — ' + request.context : ''
+    }`,
+  });
+
+  const explanation =
+    request.signal === 'struggling' || request.signal === 'too_hard'
+      ? `Moved "${targetTopic.title}" later to give you more preparation time.`
+      : `Moved "${targetTopic.title}" earlier since you're ready.`;
+
+  return {
+    adapted: true,
+    topicOrder: reordered.map((t) => t.id),
+    explanation,
+  };
 }

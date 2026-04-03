@@ -31,6 +31,7 @@ jest.mock('@expo/vector-icons', () => ({
 
 const mockSubmitMutateAsync = jest.fn();
 const mockSkipMutateAsync = jest.fn();
+const mockRecallBridgeMutateAsync = jest.fn();
 const mockUpdateLearningModeMutateAsync = jest.fn();
 const mockOnSuccessfulRecall = jest.fn();
 let mockTranscriptData: Record<string, unknown> | null = null;
@@ -51,6 +52,12 @@ jest.mock('../../hooks/use-sessions', () => ({
   useSessionTranscript: () => ({
     data: mockTranscriptData,
     isLoading: false,
+  }),
+  useRecallBridge: () => ({
+    mutateAsync: mockRecallBridgeMutateAsync,
+    isPending: false,
+    isError: false,
+    error: null,
   }),
 }));
 
@@ -112,8 +119,10 @@ describe('SessionSummaryScreen', () => {
     mockParams.wallClockSeconds = undefined;
     mockParams.milestones = undefined;
     mockParams.fastCelebrations = undefined;
+    mockParams.sessionType = undefined;
     mockTranscriptData = null;
     mockOnSuccessfulRecall.mockResolvedValue(undefined);
+    mockRecallBridgeMutateAsync.mockRejectedValue(new Error('not homework'));
   });
 
   afterEach(() => {
@@ -317,6 +326,61 @@ describe('SessionSummaryScreen', () => {
       expect(mockUpdateLearningModeMutateAsync).toHaveBeenCalledWith('casual');
       expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
     });
+  });
+
+  it('shows recall bridge questions after homework skip', async () => {
+    mockParams.sessionType = 'homework';
+    mockRecallBridgeMutateAsync.mockResolvedValueOnce({
+      questions: ['What method did you use?', 'Why does it work?'],
+      topicId: 'topic-1',
+      topicTitle: 'Algebra',
+    });
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    fireEvent.press(screen.getByTestId('skip-summary-button'));
+
+    await waitFor(() => {
+      expect(mockSkipMutateAsync).toHaveBeenCalled();
+      expect(mockRecallBridgeMutateAsync).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('recall-bridge-questions')).toBeTruthy();
+      expect(screen.getByText('Quick recall check')).toBeTruthy();
+      expect(screen.getByText(/What method did you use/)).toBeTruthy();
+      expect(screen.getByText(/Why does it work/)).toBeTruthy();
+    });
+
+    // Should NOT have navigated home yet
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    // Press "Done — head home" to navigate
+    fireEvent.press(screen.getByTestId('recall-bridge-done-button'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+    });
+  });
+
+  it('skips recall bridge for non-homework sessions', async () => {
+    mockParams.sessionType = 'learning';
+    mockRecallBridgeMutateAsync.mockResolvedValueOnce({
+      questions: ['Should not appear'],
+      topicId: 'topic-1',
+      topicTitle: 'Algebra',
+    });
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    fireEvent.press(screen.getByTestId('skip-summary-button'));
+
+    await waitFor(() => {
+      expect(mockSkipMutateAsync).toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+    });
+
+    expect(mockRecallBridgeMutateAsync).not.toHaveBeenCalled();
   });
 
   it('renders milestone recap and fast celebrations when provided', () => {

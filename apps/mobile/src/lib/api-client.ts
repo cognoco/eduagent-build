@@ -88,14 +88,19 @@ export function useApiClient(): ApiClient {
       const res = await globalThis.fetch(input, { ...init, headers });
 
       if (!res.ok) {
-        // 401 — auth token expired or invalid.  Trigger sign-out once
-        // (guard prevents multiple concurrent 401s from racing).
+        // 401 handling — differentiate "expired token" from "no token yet".
+        // After setActive() Clerk may not have minted the JWT by the time
+        // the first API call fires (ProfileProvider query).  If no token
+        // was sent, this is a timing issue — let TanStack Query retry
+        // instead of signing the user out.
         if (res.status === 401) {
-          if (_onAuthExpired && !_authExpiredFiring) {
+          if (token && _onAuthExpired && !_authExpiredFiring) {
             _authExpiredFiring = true;
             _onAuthExpired();
           }
-          throw new Error('Session expired — signing out');
+          throw new Error(
+            token ? 'Session expired — signing out' : 'Auth token not ready'
+          );
         }
 
         if (res.status === 402) {

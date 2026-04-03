@@ -5,6 +5,7 @@ import {
   topicUnskipSchema,
   curriculumChallengeSchema,
   curriculumTopicAddSchema,
+  curriculumAdaptRequestSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -17,6 +18,7 @@ import {
   challengeCurriculum,
   explainTopicOrdering,
   addCurriculumTopic,
+  adaptCurriculumFromPerformance,
 } from '../services/curriculum';
 import { notFound, unauthorized, apiError } from '../errors';
 
@@ -171,6 +173,30 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         }
         throw error;
       }
+    }
+  )
+  // Performance-driven curriculum adaptation (FR21)
+  .post(
+    '/subjects/:subjectId/curriculum/adapt',
+    zValidator('json', curriculumAdaptRequestSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = c.get('profileId');
+      if (!profileId)
+        return unauthorized(
+          c,
+          'Profile selection required (X-Profile-Id header)'
+        );
+      const subjectId = c.req.param('subjectId');
+      const input = c.req.valid('json');
+
+      const result = await adaptCurriculumFromPerformance(
+        db,
+        profileId,
+        subjectId,
+        input
+      );
+      return c.json(result);
     }
   )
   // Explain topic ordering

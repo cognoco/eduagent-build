@@ -3,13 +3,12 @@ import { View, Text, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ChatShell,
-  animateResponse,
   LivingBook,
   type ChatMessage,
 } from '../../../components/session';
 import {
   useInterviewState,
-  useSendInterviewMessage,
+  useStreamInterviewMessage,
 } from '../../../hooks/use-interview';
 import { formatApiError } from '../../../lib/format-api-error';
 
@@ -23,12 +22,16 @@ export default function InterviewScreen() {
   }>();
   const router = useRouter();
   const interviewState = useInterviewState(subjectId ?? '');
-  const sendInterview = useSendInterviewMessage(subjectId ?? '');
+  const {
+    stream: streamInterview,
+    abort: abortStream,
+    isStreaming: isStreamingSSE,
+  } = useStreamInterviewMessage(subjectId ?? '');
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'opening', role: 'ai', content: OPENING_MESSAGE },
   ]);
-  const [isStreaming, setIsStreaming] = useState(false);
+  const isStreaming = isStreamingSSE;
   const [interviewComplete, setInterviewComplete] = useState(false);
   const [restartRequired, setRestartRequired] = useState(false);
   const seededDraftRef = useRef(false);
@@ -39,8 +42,6 @@ export default function InterviewScreen() {
     [messages]
   );
 
-  const animationCleanupRef = useRef<(() => void) | null>(null);
-
   useEffect(() => {
     seededDraftRef.current = false;
     setMessages([{ id: 'opening', role: 'ai', content: OPENING_MESSAGE }]);
@@ -50,9 +51,9 @@ export default function InterviewScreen() {
 
   useEffect(() => {
     return () => {
-      animationCleanupRef.current?.();
+      abortStream();
     };
-  }, []);
+  }, [abortStream]);
 
   useEffect(() => {
     if (seededDraftRef.current || interviewState.isLoading) {
@@ -118,44 +119,58 @@ export default function InterviewScreen() {
   }, [interviewState.data, interviewState.isLoading]);
 
   const handleRestartInterview = useCallback(() => {
-    animationCleanupRef.current?.();
+    abortStream();
     setMessages([{ id: 'opening', role: 'ai', content: OPENING_MESSAGE }]);
     setInterviewComplete(false);
-    setIsStreaming(false);
     setRestartRequired(false);
     seededDraftRef.current = true;
-  }, []);
+  }, [abortStream]);
 
   const handleSend = useCallback(
     async (text: string) => {
       if (isStreaming || !subjectId || restartRequired) return;
 
+      const streamMsgId = `ai-${Date.now()}`;
+
       setMessages((prev) => [
         ...prev,
         { id: `user-${Date.now()}`, role: 'user', content: text },
+        { id: streamMsgId, role: 'ai', content: '', streaming: true },
       ]);
 
       try {
-        const result = await sendInterview.mutateAsync(text);
-        animationCleanupRef.current = animateResponse(
-          result.response,
-          setMessages,
-          setIsStreaming,
-          () => {
+        await streamInterview(
+          text,
+          (accumulated) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === streamMsgId ? { ...m, content: accumulated } : m
+              )
+            );
+          },
+          (result) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === streamMsgId ? { ...m, streaming: false } : m
+              )
+            );
             if (result.isComplete) {
               setInterviewComplete(true);
             }
           }
         );
       } catch (err: unknown) {
-        animationCleanupRef.current = animateResponse(
-          formatApiError(err),
-          setMessages,
-          setIsStreaming
+        // On stream error, replace the streaming placeholder with error text
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === streamMsgId
+              ? { ...m, content: formatApiError(err), streaming: false }
+              : m
+          )
         );
       }
     },
-    [isStreaming, restartRequired, subjectId, sendInterview]
+    [isStreaming, restartRequired, subjectId, streamInterview]
   );
 
   return (

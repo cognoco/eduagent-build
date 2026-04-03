@@ -6,7 +6,7 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
-import { routeAndCall, type ChatMessage } from './llm';
+import { routeAndCall, routeAndStream, type ChatMessage } from './llm';
 import { generateCurriculum } from './curriculum';
 import type {
   InterviewContext,
@@ -211,6 +211,52 @@ export async function processInterviewExchange(
   }
 
   return { response: cleanResponse, isComplete };
+}
+
+// ---------------------------------------------------------------------------
+// Streaming interview exchange (FR14 — real SSE streaming)
+// ---------------------------------------------------------------------------
+
+export async function streamInterviewExchange(
+  context: InterviewContext,
+  userMessage: string
+): Promise<{
+  stream: AsyncIterable<string>;
+  onComplete: (fullResponse: string) => Promise<InterviewResult>;
+}> {
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: ${context.subjectName}`,
+    },
+    ...context.exchangeHistory.map((e) => ({
+      role: e.role as 'user' | 'assistant',
+      content: e.content,
+    })),
+    { role: 'user' as const, content: userMessage },
+  ];
+
+  const streamResult = await routeAndStream(messages, 1);
+
+  const onComplete = async (fullResponse: string): Promise<InterviewResult> => {
+    const isComplete = fullResponse.includes('[INTERVIEW_COMPLETE]');
+    const cleanResponse = fullResponse
+      .replace('[INTERVIEW_COMPLETE]', '')
+      .trim();
+
+    if (isComplete) {
+      const signals = await extractSignals([
+        ...context.exchangeHistory,
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content: cleanResponse },
+      ]);
+      return { response: cleanResponse, isComplete, extractedSignals: signals };
+    }
+
+    return { response: cleanResponse, isComplete };
+  };
+
+  return { stream: streamResult.stream, onComplete };
 }
 
 // ---------------------------------------------------------------------------

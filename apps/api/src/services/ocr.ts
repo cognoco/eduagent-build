@@ -129,13 +129,20 @@ export class GeminiOcrProvider implements OcrProvider {
 let _provider: OcrProvider | null = null;
 
 /**
- * Returns the current OCR provider (defaults to StubOcrProvider).
+ * Returns the current OCR provider.
  *
- * When `useRouter` is true the Gemini provider is returned — it routes
+ * When `useRouter` is truthy the Gemini provider is returned — it routes
  * through routeAndCall() so the API key comes from the registered LLM
  * provider, not from a parameter here.
+ *
+ * When `useRouter` is falsy and `allowStub` is true, returns StubOcrProvider
+ * (for tests only). Otherwise throws — fails closed so production never
+ * silently serves fake OCR results.
  */
-export function getOcrProvider(useRouter?: boolean | string): OcrProvider {
+export function getOcrProvider(
+  useRouter?: boolean | string,
+  allowStub?: boolean
+): OcrProvider {
   if (_provider) {
     return _provider;
   }
@@ -145,8 +152,14 @@ export function getOcrProvider(useRouter?: boolean | string): OcrProvider {
     return _provider;
   }
 
-  _provider = new StubOcrProvider();
-  return _provider;
+  if (allowStub) {
+    _provider = new StubOcrProvider();
+    return _provider;
+  }
+
+  throw new Error(
+    'OCR provider not configured: set GEMINI_API_KEY or use allowStub for testing'
+  );
 }
 
 /** Sets the OCR provider (for DI / testing). */
@@ -161,7 +174,8 @@ export function resetOcrProvider(): void {
 
 /**
  * Factory for creating OCR providers by type name.
- * Extensible for future real providers.
+ * @internal Test-only — not called from production routes.
+ * Production code uses `getOcrProvider()` which fails closed.
  */
 export function createOcrProvider(type?: string): OcrProvider {
   switch (type) {

@@ -46,6 +46,7 @@ jest.mock('./curriculum', () => ({
 import type { Database } from '@eduagent/database';
 import {
   processInterviewExchange,
+  streamInterviewExchange,
   extractSignals,
   getOrCreateDraft,
   getDraftState,
@@ -54,7 +55,7 @@ import {
   buildDraftResumeSummary,
 } from './interview';
 import type { InterviewContext, OnboardingDraft } from '@eduagent/schemas';
-import { routeAndCall } from './llm';
+import { routeAndCall, routeAndStream } from './llm';
 import { generateCurriculum } from './curriculum';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -198,6 +199,113 @@ describe('processInterviewExchange', () => {
           role: 'user',
           content: 'I have some experience with JavaScript.',
         }),
+      ]),
+      1
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// streamInterviewExchange (FR14 — SSE streaming variant)
+// ---------------------------------------------------------------------------
+
+describe('streamInterviewExchange', () => {
+  const baseContext: InterviewContext = {
+    subjectName: 'TypeScript',
+    exchangeHistory: [],
+  };
+
+  it('returns a stream and onComplete callback', async () => {
+    (routeAndStream as jest.Mock).mockResolvedValueOnce({
+      stream: (async function* () {
+        yield 'Hello ';
+        yield 'there!';
+      })(),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+    });
+
+    const result = await streamInterviewExchange(baseContext, 'Hi');
+
+    expect(result.stream).toBeDefined();
+    expect(result.onComplete).toBeDefined();
+    expect(typeof result.onComplete).toBe('function');
+  });
+
+  it('onComplete returns non-complete result when marker absent', async () => {
+    (routeAndStream as jest.Mock).mockResolvedValueOnce({
+      stream: (async function* () {
+        yield 'Tell me more.';
+      })(),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+    });
+
+    const { stream, onComplete } = await streamInterviewExchange(
+      baseContext,
+      'I want to learn TypeScript'
+    );
+
+    let fullText = '';
+    for await (const chunk of stream) {
+      fullText += chunk;
+    }
+
+    const result = await onComplete(fullText);
+
+    expect(result.isComplete).toBe(false);
+    expect(result.response).toBe('Tell me more.');
+    expect(result.extractedSignals).toBeUndefined();
+  });
+
+  it('onComplete strips marker and extracts signals when complete', async () => {
+    (routeAndStream as jest.Mock).mockResolvedValueOnce({
+      stream: (async function* () {
+        yield 'Great session! [INTERVIEW_COMPLETE]';
+      })(),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+    });
+
+    // extractSignals calls routeAndCall
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response:
+        '{"goals": ["learn TS"], "experienceLevel": "beginner", "currentKnowledge": "knows JS"}',
+    });
+
+    const { stream, onComplete } = await streamInterviewExchange(
+      baseContext,
+      'I know JS already'
+    );
+
+    let fullText = '';
+    for await (const chunk of stream) {
+      fullText += chunk;
+    }
+
+    const result = await onComplete(fullText);
+
+    expect(result.isComplete).toBe(true);
+    expect(result.response).toBe('Great session!');
+    expect(result.extractedSignals).toBeDefined();
+    expect(result.extractedSignals?.goals).toEqual(['learn TS']);
+  });
+
+  it('calls routeAndStream at rung 1', async () => {
+    (routeAndStream as jest.Mock).mockResolvedValueOnce({
+      stream: (async function* () {
+        yield 'ok';
+      })(),
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+    });
+
+    await streamInterviewExchange(baseContext, 'Hi');
+
+    expect(routeAndStream).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'system' }),
+        expect.objectContaining({ role: 'user', content: 'Hi' }),
       ]),
       1
     );

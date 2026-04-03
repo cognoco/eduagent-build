@@ -18,6 +18,7 @@ import type {
   SessionAnalyticsEventInput,
   SessionSummary,
   SessionTranscript,
+  RecallBridgeResult,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
@@ -71,6 +72,7 @@ interface SkipSummaryResult {
     aiFeedback: string | null;
     status: 'skipped' | 'submitted' | 'accepted';
   };
+  shouldWarnSummarySkip?: boolean;
   shouldPromptCasualSwitch?: boolean;
 }
 
@@ -540,6 +542,25 @@ export function useSkipSummary(
       void queryClient.invalidateQueries({
         queryKey: ['session-summary', sessionId],
       });
+    },
+  });
+}
+
+export function useRecallBridge(
+  sessionId: string
+): UseMutationResult<RecallBridgeResult, Error, void> {
+  const client = useApiClient();
+
+  return useMutation({
+    mutationFn: async (): Promise<RecallBridgeResult> => {
+      const recallBridgeClient = (
+        client.sessions[':sessionId'] as Record<string, any>
+      )['recall-bridge'];
+      const res = await recallBridgeClient.$post({
+        param: { sessionId },
+      });
+      await assertOk(res);
+      return (await res.json()) as RecallBridgeResult;
     },
   });
 }

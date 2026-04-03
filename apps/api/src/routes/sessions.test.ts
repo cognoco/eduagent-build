@@ -246,6 +246,7 @@ jest.mock('../services/session', () => {
 
 jest.mock('../services/settings', () => ({
   shouldPromptCasualSwitch: jest.fn().mockResolvedValue(false),
+  shouldWarnSummarySkip: jest.fn().mockResolvedValue(false),
 }));
 
 const mockStartInterleavedSession = jest.fn().mockResolvedValue({
@@ -301,7 +302,10 @@ import {
   recordSystemPrompt,
   recordSessionEvent,
 } from '../services/session';
-import { shouldPromptCasualSwitch } from '../services/settings';
+import {
+  shouldPromptCasualSwitch,
+  shouldWarnSummarySkip,
+} from '../services/settings';
 import { app } from '../index';
 
 const TEST_ENV = {
@@ -868,6 +872,7 @@ describe('session routes', () => {
       const body = await res.json();
       expect(body.summary.status).toBe('skipped');
       expect(body.shouldPromptCasualSwitch).toBe(false);
+      expect(body.shouldWarnSummarySkip).toBe(false);
       expect(mockInngestSend).toHaveBeenCalledWith({
         name: 'app/session.completed',
         data: expect.objectContaining({
@@ -876,6 +881,44 @@ describe('session routes', () => {
           summaryTrackingHandled: true,
         }),
       });
+    });
+
+    it('returns shouldWarnSummarySkip true when warning threshold reached', async () => {
+      (shouldWarnSummarySkip as jest.Mock).mockResolvedValueOnce(true);
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary/skip`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.shouldWarnSummarySkip).toBe(true);
+      expect(body.shouldPromptCasualSwitch).toBe(false);
+    });
+
+    it('shouldWarnSummarySkip is false when casual switch prompt takes over', async () => {
+      (shouldPromptCasualSwitch as jest.Mock).mockResolvedValueOnce(true);
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary/skip`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.shouldPromptCasualSwitch).toBe(true);
+      expect(body.shouldWarnSummarySkip).toBe(false);
     });
   });
 

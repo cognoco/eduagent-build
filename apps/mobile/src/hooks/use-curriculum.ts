@@ -9,6 +9,8 @@ import type {
   Curriculum,
   CurriculumTopicAddInput,
   CurriculumTopicAddResponse,
+  CurriculumAdaptRequest,
+  CurriculumAdaptResponse,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
@@ -160,6 +162,31 @@ export function useExplainTopic(
       await assertOk(res);
       const data = (await res.json()) as { explanation: string };
       return data.explanation;
+    },
+  });
+}
+
+export function useAdaptCurriculum(
+  subjectId: string
+): UseMutationResult<CurriculumAdaptResponse, Error, CurriculumAdaptRequest> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (
+      input: CurriculumAdaptRequest
+    ): Promise<CurriculumAdaptResponse> => {
+      const res = await client.subjects[':subjectId'].curriculum.adapt.$post({
+        param: { subjectId },
+        json: input,
+      });
+      await assertOk(res);
+      return (await res.json()) as unknown as CurriculumAdaptResponse;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['curriculum', subjectId],
+      });
     },
   });
 }

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { streamSSE } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
 import { interviewMessageSchema } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -7,6 +8,7 @@ import type { Account } from '../services/account';
 import { getSubject } from '../services/subject';
 import {
   processInterviewExchange,
+  streamInterviewExchange,
   getOrCreateDraft,
   getDraftState,
   updateDraft,
@@ -74,6 +76,73 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         response: result.response,
         isComplete: result.isComplete,
         exchangeCount: updatedHistory.filter((e) => e.role === 'user').length,
+      });
+    }
+  )
+  // Stream interview response via SSE (FR14)
+  .post(
+    '/subjects/:subjectId/interview/stream',
+    zValidator('json', interviewMessageSchema),
+    async (c) => {
+      const db = c.get('db');
+      const account = c.get('account');
+      const profileId = c.get('profileId') ?? account.id;
+      const subjectId = c.req.param('subjectId');
+      const { message } = c.req.valid('json');
+
+      const subject = await getSubject(db, profileId, subjectId);
+      if (!subject) return notFound(c, 'Subject not found');
+
+      const draft = await getOrCreateDraft(db, profileId, subjectId);
+
+      const { stream, onComplete } = await streamInterviewExchange(
+        { subjectName: subject.name, exchangeHistory: draft.exchangeHistory },
+        message
+      );
+
+      return streamSSE(c, async (sseStream) => {
+        let fullResponse = '';
+
+        for await (const chunk of stream) {
+          fullResponse += chunk;
+          await sseStream.writeSSE({
+            data: JSON.stringify({ type: 'chunk', content: chunk }),
+          });
+        }
+
+        const result = await onComplete(fullResponse);
+
+        const updatedHistory = [
+          ...draft.exchangeHistory,
+          { role: 'user' as const, content: message },
+          { role: 'assistant' as const, content: result.response },
+        ];
+
+        if (result.isComplete) {
+          await updateDraft(db, profileId, draft.id, {
+            exchangeHistory: updatedHistory,
+            extractedSignals: result.extractedSignals ?? draft.extractedSignals,
+            status: 'completed',
+          });
+          await persistCurriculum(db, subjectId, subject.name, {
+            ...draft,
+            exchangeHistory: updatedHistory,
+            extractedSignals: result.extractedSignals ?? draft.extractedSignals,
+          });
+        } else {
+          await updateDraft(db, profileId, draft.id, {
+            exchangeHistory: updatedHistory,
+          });
+        }
+
+        await sseStream.writeSSE({
+          data: JSON.stringify({
+            type: 'done',
+            isComplete: result.isComplete,
+            exchangeCount: updatedHistory.filter((e) => e.role === 'user')
+              .length,
+          }),
+        });
       });
     }
   )
