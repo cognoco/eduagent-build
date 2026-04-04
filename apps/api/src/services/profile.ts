@@ -269,3 +269,18 @@ export async function switchProfile(
   });
   return row ? { profileId: row.id } : null;
 }
+
+/**
+ * Returns the learner's age derived from birthYear. Falls back to 12 if
+ * birthYear is not set. Minimum returned age is 5.
+ */
+export async function getProfileAge(
+  db: Database,
+  profileId: string
+): Promise<number> {
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, profileId),
+  });
+  const currentYear = new Date().getUTCFullYear();
+  return profile?.birthYear ? Math.max(5, currentYear - profile.birthYear) : 12;
+}

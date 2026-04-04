@@ -46,12 +46,12 @@ export type ProfileScopeEnv = {
 };
 
 /**
- * Extracts profileId from a value that may be undefined, throwing 401 if absent.
+ * Extracts profileId from a value that may be undefined, throwing 400 if absent.
  * Use in route handlers: `const profileId = requireProfileId(c.get('profileId'));`
  */
 export function requireProfileId(profileId: string | undefined): string {
   if (!profileId) {
-    throw new HTTPException(401, {
+    throw new HTTPException(400, {
       message: 'Profile required — no profile resolved for this request',
     });
   }

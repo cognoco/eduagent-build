@@ -70,6 +70,16 @@ export default function CreateSubjectScreen() {
           name: subjectName,
           ...(rawInput ? { rawInput } : {}),
         });
+        if (result.structureType === 'broad') {
+          router.replace({
+            pathname: '/(learner)/library',
+            params: {
+              subjectId: result.subject.id,
+            },
+          } as never);
+          return;
+        }
+
         router.replace({
           pathname: '/(learner)/onboarding/interview',
           params: {

@@ -57,6 +57,9 @@ export const subjectResolveStatusSchema = z.enum([
 ]);
 export type SubjectResolveStatus = z.infer<typeof subjectResolveStatusSchema>;
 
+export const subjectStructureTypeSchema = z.enum(['broad', 'narrow']);
+export type SubjectStructureType = z.infer<typeof subjectStructureTypeSchema>;
+
 export const subjectSuggestionSchema = z.object({
   name: z.string(),
   description: z.string(),
@@ -80,6 +83,8 @@ export const curriculumTopicSchema = z.object({
   sortOrder: z.number().int(),
   relevance: topicRelevanceSchema,
   estimatedMinutes: z.number().int(),
+  bookId: z.string().uuid().nullable().optional(),
+  chapter: z.string().nullable().optional(),
   skipped: z.boolean(),
   source: curriculumTopicSourceSchema.optional(),
 });
@@ -93,6 +98,42 @@ export const curriculumSchema = z.object({
   generatedAt: z.string().datetime(),
 });
 export type Curriculum = z.infer<typeof curriculumSchema>;
+
+export const curriculumBookSchema = z.object({
+  id: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  title: z.string(),
+  description: z.string().nullable(),
+  emoji: z.string().nullable(),
+  sortOrder: z.number().int(),
+  topicsGenerated: z.boolean(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type CurriculumBook = z.infer<typeof curriculumBookSchema>;
+
+export const topicConnectionSchema = z.object({
+  id: z.string().uuid(),
+  topicAId: z.string().uuid(),
+  topicBId: z.string().uuid(),
+});
+export type TopicConnection = z.infer<typeof topicConnectionSchema>;
+
+export const bookProgressStatusSchema = z.enum([
+  'NOT_STARTED',
+  'IN_PROGRESS',
+  'COMPLETED',
+  'REVIEW_DUE',
+]);
+export type BookProgressStatus = z.infer<typeof bookProgressStatusSchema>;
+
+export const bookWithTopicsSchema = z.object({
+  book: curriculumBookSchema,
+  topics: z.array(curriculumTopicSchema),
+  connections: z.array(topicConnectionSchema),
+  status: bookProgressStatusSchema,
+});
+export type BookWithTopics = z.infer<typeof bookWithTopicsSchema>;
 
 // Curriculum generation input — used by the LLM curriculum generator
 
@@ -113,6 +154,56 @@ export const generatedTopicSchema = z.object({
   estimatedMinutes: z.number().int(),
 });
 export type GeneratedTopic = z.infer<typeof generatedTopicSchema>;
+
+export const generatedBookSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  emoji: z.string(),
+  sortOrder: z.number().int(),
+});
+export type GeneratedBook = z.infer<typeof generatedBookSchema>;
+
+export const generatedBookTopicSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  chapter: z.string(),
+  sortOrder: z.number().int(),
+  estimatedMinutes: z.number().int(),
+});
+export type GeneratedBookTopic = z.infer<typeof generatedBookTopicSchema>;
+
+export const generatedConnectionSchema = z.object({
+  topicA: z.string(),
+  topicB: z.string(),
+});
+export type GeneratedConnection = z.infer<typeof generatedConnectionSchema>;
+
+export const bookGenerationResultSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('broad'),
+    books: z.array(generatedBookSchema),
+  }),
+  z.object({
+    type: z.literal('narrow'),
+    topics: z.array(generatedTopicSchema),
+  }),
+]);
+export type BookGenerationResult = z.infer<typeof bookGenerationResultSchema>;
+
+export const bookTopicGenerationResultSchema = z.object({
+  topics: z.array(generatedBookTopicSchema),
+  connections: z.array(generatedConnectionSchema),
+});
+export type BookTopicGenerationResult = z.infer<
+  typeof bookTopicGenerationResultSchema
+>;
+
+export const bookTopicGenerateInputSchema = z.object({
+  priorKnowledge: z.string().max(2000).optional(),
+});
+export type BookTopicGenerateInput = z.infer<
+  typeof bookTopicGenerateInputSchema
+>;
 
 export const curriculumTopicPreviewSchema = z.object({
   title: z.string().min(1).max(200),

@@ -3,6 +3,18 @@ import type { TypedResponse } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
 import type { ErrorCode } from '@eduagent/schemas';
 
+/**
+ * Typed domain error for "not found" cases.
+ * Route handlers can catch `instanceof NotFoundError` instead of matching
+ * fragile error-message strings.
+ */
+export class NotFoundError extends Error {
+  constructor(resource: string) {
+    super(`${resource} not found`);
+    this.name = 'NotFoundError';
+  }
+}
+
 export function apiError(
   c: Context,
   status: 400 | 401 | 403 | 404 | 409 | 410 | 422 | 429 | 500 | 501 | 502 | 503,

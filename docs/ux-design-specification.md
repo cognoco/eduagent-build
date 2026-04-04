@@ -2388,7 +2388,7 @@ _Prerequisite-aware learning — visual knowledge graph, topological ordering, a
 
 **Screen: ConceptMapView**
 
-```
+```text
 ┌─────────────────────────────────┐
 │  ← Library    Concept Map │
 │                                 │
@@ -2412,7 +2412,7 @@ _Prerequisite-aware learning — visual knowledge graph, topological ordering, a
 
 **Node tap expanded state:**
 
-```
+```text
 ┌─────────────────────────────────┐
 │  ┌─────────────────────────┐    │
 │  │  Algebra                │    │
@@ -2454,7 +2454,7 @@ _Prerequisite-aware learning — visual knowledge graph, topological ordering, a
 3. **Prerequisite data loading fails:** Show standard Library list. Concept Map is progressive enhancement.
 
 **Implementation Notes:**
-- Location: `apps/mobile/src/app/(learner)/library/concept-map.tsx` (new screen) or toggle within existing library/index.tsx
+- Location: `apps/mobile/src/app/(learner)/library/concept-map.tsx` (new screen) or toggle within existing library.tsx
 - Layout: Custom Sugiyama layout algorithm (~100 LOC for small DAGs) or validated RN graph library — evaluate at implementation time
 - Rendering: `react-native-svg` for nodes, edges, and labels
 - Data: new API endpoint `GET /v1/curriculum/:subjectId/graph` returning topics + edges
@@ -2478,7 +2478,7 @@ _Prerequisite-aware learning — visual knowledge graph, topological ordering, a
 
 **Screen: Library (Enhanced)**
 
-```
+```text
 ┌─────────────────────────────────┐
 │  Library      [Map toggle]│
 │                                 │

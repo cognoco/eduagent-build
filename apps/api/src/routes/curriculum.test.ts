@@ -1,3 +1,5 @@
+import { NotFoundError } from '../errors';
+
 // ---------------------------------------------------------------------------
 // Mock JWT module so auth middleware passes with a valid token
 // ---------------------------------------------------------------------------
@@ -303,7 +305,7 @@ describe('curriculum routes', () => {
         typeof import('../services/curriculum')
       >('../services/curriculum');
       (addCurriculumTopic as jest.Mock).mockRejectedValueOnce(
-        new Error('Subject not found')
+        new NotFoundError('Subject')
       );
 
       const res = await app.request(
@@ -329,7 +331,7 @@ describe('curriculum routes', () => {
         typeof import('../services/curriculum')
       >('../services/curriculum');
       (addCurriculumTopic as jest.Mock).mockRejectedValueOnce(
-        new Error('Curriculum not found')
+        new NotFoundError('Curriculum')
       );
 
       const res = await app.request(

@@ -5,10 +5,14 @@
 // Pure business logic — no Hono imports.
 // ---------------------------------------------------------------------------
 
-import { eq, sql } from 'drizzle-orm';
+import { eq, and, gt, asc, sql } from 'drizzle-orm';
 import {
   learningSessions,
   streaks,
+  subjects,
+  curriculumBooks,
+  curriculumTopics,
+  curricula,
   createScopedRepository,
   generateUUIDv7,
   type Database,
@@ -60,6 +64,23 @@ export async function precomputeCoachingCard(
     where: eq(streaks.profileId, profileId),
   });
 
+  // --- Check urgency boost before priority cascade ---
+  let boostedSubjectIds = new Set<string>();
+  try {
+    const boostedSubjects = await db
+      .select({ id: subjects.id })
+      .from(subjects)
+      .where(
+        and(
+          eq(subjects.profileId, profileId),
+          gt(subjects.urgencyBoostUntil, now)
+        )
+      );
+    boostedSubjectIds = new Set(boostedSubjects.map((s) => s.id));
+  } catch {
+    // Urgency boost is optional — graceful degradation
+  }
+
   // --- Priority 1: review_due ---
   const overdueCards = allCards.filter(
     (c) => c.nextReviewAt && c.nextReviewAt.getTime() <= now.getTime()
@@ -75,14 +96,32 @@ export async function precomputeCoachingCard(
     // Priority scales: 7 base + 1 per overdue card, capped at 10
     const priority = Math.min(7 + overdueCards.length - 1, 10);
 
+    // Enrich with book context if topic belongs to a book
+    let body = `You have ${overdueCards.length} topic${
+      overdueCards.length > 1 ? 's' : ''
+    } ready for review.`;
+    try {
+      const overdueTopicRow = await db.query.curriculumTopics?.findFirst?.({
+        where: eq(curriculumTopics.id, mostOverdue.topicId),
+      });
+      if (overdueTopicRow?.bookId) {
+        const book = await db.query.curriculumBooks?.findFirst?.({
+          where: eq(curriculumBooks.id, overdueTopicRow.bookId),
+        });
+        if (book) {
+          body = `${overdueTopicRow.title} needs a review — in your ${book.title} book`;
+        }
+      }
+    } catch {
+      // Book context enrichment is optional — use default body
+    }
+
     return {
       id,
       profileId,
       type: 'review_due',
       title: 'Review due',
-      body: `You have ${overdueCards.length} topic${
-        overdueCards.length > 1 ? 's' : ''
-      } ready for review.`,
+      body,
       priority,
       expiresAt,
       createdAt,
@@ -142,6 +181,32 @@ export async function precomputeCoachingCard(
     }
   }
 
+  // --- Priority 3.5: continue_book (next topic in an in-progress book) ---
+  try {
+    const continueBookCard = await findContinueBookCard(
+      db,
+      profileId,
+      boostedSubjectIds,
+      { id, expiresAt, createdAt }
+    );
+    if (continueBookCard) return continueBookCard;
+  } catch {
+    // Book queries fail gracefully — fall through to next priority
+  }
+
+  // --- Priority 3.5: book_suggestion (next book when one is completed) ---
+  try {
+    const bookSuggestionCard = await findBookSuggestionCard(
+      db,
+      profileId,
+      boostedSubjectIds,
+      { id, expiresAt, createdAt }
+    );
+    if (bookSuggestionCard) return bookSuggestionCard;
+  } catch {
+    // Book queries fail gracefully — fall through to next priority
+  }
+
   // --- Priority 4: insight (verified topics) ---
   const verifiedCards = allCards.filter((c) => c.xpStatus === 'verified');
   if (verifiedCards.length > 0) {
@@ -177,6 +242,153 @@ export async function precomputeCoachingCard(
     difficulty: 'easy',
     xpReward: 10,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Epic 7: Book-aware card helpers
+// ---------------------------------------------------------------------------
+
+interface CardMeta {
+  id: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+/**
+ * Finds the next uncovered topic in an in-progress book.
+ * Returns a continue_book card or null.
+ */
+async function findContinueBookCard(
+  db: Database,
+  profileId: string,
+  boostedSubjectIds: Set<string>,
+  meta: CardMeta
+): Promise<CoachingCard | null> {
+  // Find books with generated topics for active subjects
+  const booksWithSubjects = await db
+    .select({
+      bookId: curriculumBooks.id,
+      bookTitle: curriculumBooks.title,
+      bookEmoji: curriculumBooks.emoji,
+      subjectId: curriculumBooks.subjectId,
+    })
+    .from(curriculumBooks)
+    .innerJoin(subjects, eq(curriculumBooks.subjectId, subjects.id))
+    .where(
+      and(
+        eq(subjects.profileId, profileId),
+        eq(subjects.status, 'active'),
+        eq(curriculumBooks.topicsGenerated, true)
+      )
+    )
+    .orderBy(asc(curriculumBooks.sortOrder));
+
+  for (const book of booksWithSubjects) {
+    // Get the curriculum for this subject
+    const curriculum = await db.query.curricula?.findFirst?.({
+      where: eq(curricula.subjectId, book.subjectId),
+    });
+    if (!curriculum) continue;
+
+    const topics = await db
+      .select()
+      .from(curriculumTopics)
+      .where(
+        and(
+          eq(curriculumTopics.curriculumId, curriculum.id),
+          eq(curriculumTopics.bookId, book.bookId),
+          eq(curriculumTopics.skipped, false)
+        )
+      )
+      .orderBy(asc(curriculumTopics.sortOrder));
+
+    // Find first topic without a completed session
+    for (const topic of topics) {
+      const hasSession = await db.query.learningSessions?.findFirst?.({
+        where: and(
+          eq(learningSessions.topicId, topic.id),
+          eq(learningSessions.profileId, profileId)
+        ),
+      });
+      if (!hasSession) {
+        const basePriority = 4;
+        const priority = boostedSubjectIds.has(book.subjectId)
+          ? Math.min(basePriority + 3, 10)
+          : basePriority;
+
+        return {
+          id: meta.id,
+          profileId,
+          type: 'continue_book',
+          title: `Next up in ${book.bookTitle}`,
+          body: `${topic.title} — ${topic.description ?? 'Continue learning'}`,
+          priority,
+          expiresAt: meta.expiresAt,
+          createdAt: meta.createdAt,
+          topicId: topic.id,
+          bookTitle: book.bookTitle,
+          bookEmoji: book.bookEmoji,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Finds a completed book whose subject has a next unbuilt or unstarted book.
+ * Returns a book_suggestion card or null.
+ */
+async function findBookSuggestionCard(
+  db: Database,
+  profileId: string,
+  boostedSubjectIds: Set<string>,
+  meta: CardMeta
+): Promise<CoachingCard | null> {
+  // Find active subjects with books
+  const activeSubjects = await db
+    .select({ id: subjects.id, name: subjects.name })
+    .from(subjects)
+    .where(
+      and(eq(subjects.profileId, profileId), eq(subjects.status, 'active'))
+    );
+
+  for (const subject of activeSubjects) {
+    const books = await db
+      .select()
+      .from(curriculumBooks)
+      .where(eq(curriculumBooks.subjectId, subject.id))
+      .orderBy(asc(curriculumBooks.sortOrder));
+
+    if (books.length === 0) continue;
+
+    // Find the first book that hasn't had topics generated yet
+    const nextUnbuilt = books.find((b) => !b.topicsGenerated);
+    if (nextUnbuilt) {
+      const basePriority = 3;
+      const priority = boostedSubjectIds.has(subject.id)
+        ? Math.min(basePriority + 3, 10)
+        : basePriority;
+
+      return {
+        id: meta.id,
+        profileId,
+        type: 'book_suggestion',
+        title: `Ready for a new book?`,
+        body: `${nextUnbuilt.title} is waiting in your ${subject.name} shelf`,
+        priority,
+        expiresAt: meta.expiresAt,
+        createdAt: meta.createdAt,
+        bookId: nextUnbuilt.id,
+        bookTitle: nextUnbuilt.title,
+        bookEmoji: nextUnbuilt.emoji,
+        subjectName: subject.name,
+      };
+    }
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------

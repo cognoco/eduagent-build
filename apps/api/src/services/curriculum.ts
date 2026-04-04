@@ -1,23 +1,35 @@
-import { eq, and, desc, asc } from 'drizzle-orm';
+import { eq, and, desc, asc, inArray } from 'drizzle-orm';
 import {
   curricula,
+  curriculumBooks,
   curriculumTopics,
   curriculumAdaptations,
+  topicConnections,
   subjects,
   onboardingDrafts,
+  learningSessions,
+  retentionCards,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
 import { routeAndCall, type ChatMessage } from './llm';
+import { NotFoundError } from '../errors';
 import type {
   CurriculumInput,
   GeneratedTopic,
   Curriculum,
+  CurriculumTopic,
+  CurriculumBook,
+  BookWithTopics,
+  BookProgressStatus,
   CurriculumTopicAddInput,
   CurriculumTopicAddResponse,
   CurriculumTopicPreview,
   CurriculumAdaptRequest,
   CurriculumAdaptResponse,
+  GeneratedBook,
+  GeneratedBookTopic,
+  GeneratedConnection,
 } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
@@ -131,6 +143,133 @@ export async function previewCurriculumTopic(
   }
 }
 
+function mapTopicRow(
+  row: typeof curriculumTopics.$inferSelect
+): CurriculumTopic {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    sortOrder: row.sortOrder,
+    relevance: row.relevance,
+    estimatedMinutes: row.estimatedMinutes,
+    bookId: row.bookId ?? null,
+    chapter: row.chapter ?? null,
+    skipped: row.skipped,
+    source: row.source,
+  };
+}
+
+function mapBookRow(row: typeof curriculumBooks.$inferSelect): CurriculumBook {
+  return {
+    id: row.id,
+    subjectId: row.subjectId,
+    title: row.title,
+    description: row.description ?? null,
+    emoji: row.emoji ?? null,
+    sortOrder: row.sortOrder,
+    topicsGenerated: row.topicsGenerated,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+async function getLatestCurriculumRow(
+  db: Database,
+  subjectId: string
+): Promise<typeof curricula.$inferSelect | undefined> {
+  return db.query.curricula.findFirst({
+    where: eq(curricula.subjectId, subjectId),
+    orderBy: desc(curricula.version),
+  });
+}
+
+export async function ensureCurriculum(
+  db: Database,
+  subjectId: string
+): Promise<typeof curricula.$inferSelect> {
+  const existing = await getLatestCurriculumRow(db, subjectId);
+  if (existing) {
+    return existing;
+  }
+
+  // Use onConflictDoNothing to handle concurrent inserts safely.
+  // The unique index on (subjectId, version) prevents duplicates.
+  await db
+    .insert(curricula)
+    .values({
+      subjectId,
+      version: 1,
+    })
+    .onConflictDoNothing();
+
+  // Re-read to get the row regardless of whether we inserted or another
+  // concurrent caller won the race.
+  const row = await getLatestCurriculumRow(db, subjectId);
+  return row!;
+}
+
+async function computeBookStatus(
+  db: Database,
+  profileId: string,
+  topicIds: string[]
+): Promise<BookProgressStatus> {
+  if (topicIds.length === 0) {
+    return 'NOT_STARTED';
+  }
+
+  const sessionRows = await db
+    .select({
+      topicId: learningSessions.topicId,
+      status: learningSessions.status,
+    })
+    .from(learningSessions)
+    .where(
+      and(
+        eq(learningSessions.profileId, profileId),
+        inArray(learningSessions.topicId, topicIds)
+      )
+    );
+
+  const completedTopicIds = new Set(
+    sessionRows
+      .filter(
+        (row) =>
+          row.topicId &&
+          (row.status === 'completed' || row.status === 'auto_closed')
+      )
+      .map((row) => row.topicId as string)
+  );
+
+  if (completedTopicIds.size === 0) {
+    return 'NOT_STARTED';
+  }
+
+  if (completedTopicIds.size < topicIds.length) {
+    return 'IN_PROGRESS';
+  }
+
+  const now = Date.now();
+  const reviewRows = await db
+    .select({
+      topicId: retentionCards.topicId,
+      nextReviewAt: retentionCards.nextReviewAt,
+    })
+    .from(retentionCards)
+    .where(
+      and(
+        eq(retentionCards.profileId, profileId),
+        inArray(retentionCards.topicId, topicIds)
+      )
+    );
+
+  const hasReviewDue = reviewRows.some(
+    (row) => row.nextReviewAt && row.nextReviewAt.getTime() <= now
+  );
+
+  return hasReviewDue ? 'REVIEW_DUE' : 'COMPLETED';
+}
+
 // ---------------------------------------------------------------------------
 // Persistence types
 // ---------------------------------------------------------------------------
@@ -166,18 +305,281 @@ export async function getCurriculum(
     id: curriculum.id,
     subjectId: curriculum.subjectId,
     version: curriculum.version,
-    topics: topics.map((t) => ({
-      id: t.id,
-      title: t.title,
-      description: t.description,
-      sortOrder: t.sortOrder,
-      relevance: t.relevance,
-      estimatedMinutes: t.estimatedMinutes,
-      skipped: t.skipped,
-      source: t.source,
-    })),
+    topics: topics.map(mapTopicRow),
     generatedAt: curriculum.generatedAt.toISOString(),
   };
+}
+
+export async function createBooks(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  books: GeneratedBook[]
+): Promise<CurriculumBook[]> {
+  if (books.length === 0) {
+    return [];
+  }
+
+  // Verify subject ownership via scoped repository
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
+  if (!subject) {
+    throw new NotFoundError('Subject');
+  }
+
+  const rows = await db
+    .insert(curriculumBooks)
+    .values(
+      books.map((book) => ({
+        subjectId,
+        title: book.title,
+        description: book.description,
+        emoji: book.emoji,
+        sortOrder: book.sortOrder,
+        topicsGenerated: false,
+      }))
+    )
+    .returning();
+
+  return rows.map(mapBookRow);
+}
+
+/**
+ * Persists LLM-generated topics for a narrow subject (no books).
+ * Creates a curriculum row if needed, then inserts the topics.
+ */
+export async function persistNarrowTopics(
+  db: Database,
+  subjectId: string,
+  topics: GeneratedTopic[]
+): Promise<void> {
+  if (topics.length === 0) return;
+
+  const curriculum = await ensureCurriculum(db, subjectId);
+  await db.insert(curriculumTopics).values(
+    topics.map((topic, index) => ({
+      curriculumId: curriculum.id,
+      title: topic.title,
+      description: topic.description,
+      sortOrder: index,
+      relevance: topic.relevance,
+      estimatedMinutes: topic.estimatedMinutes,
+    }))
+  );
+}
+
+export async function getBooks(
+  db: Database,
+  profileId: string,
+  subjectId: string
+): Promise<CurriculumBook[]> {
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
+  if (!subject) {
+    throw new NotFoundError('Subject');
+  }
+
+  const rows = await db.query.curriculumBooks.findMany({
+    where: eq(curriculumBooks.subjectId, subjectId),
+    orderBy: [asc(curriculumBooks.sortOrder), asc(curriculumBooks.createdAt)],
+  });
+
+  return rows.map(mapBookRow);
+}
+
+export async function getBookWithTopics(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  bookId: string
+): Promise<BookWithTopics | null> {
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
+  if (!subject) {
+    throw new NotFoundError('Subject');
+  }
+
+  const book = await db.query.curriculumBooks.findFirst({
+    where: and(
+      eq(curriculumBooks.id, bookId),
+      eq(curriculumBooks.subjectId, subjectId)
+    ),
+  });
+  if (!book) {
+    return null;
+  }
+
+  const curriculum = await getLatestCurriculumRow(db, subjectId);
+  const topicRows = curriculum
+    ? await db.query.curriculumTopics.findMany({
+        where: and(
+          eq(curriculumTopics.curriculumId, curriculum.id),
+          eq(curriculumTopics.bookId, bookId)
+        ),
+        orderBy: asc(curriculumTopics.sortOrder),
+      })
+    : [];
+
+  const topicIds = topicRows.map((topic) => topic.id);
+  const connectionRows =
+    topicIds.length > 0
+      ? await db
+          .select()
+          .from(topicConnections)
+          .where(
+            and(
+              inArray(topicConnections.topicAId, topicIds),
+              inArray(topicConnections.topicBId, topicIds)
+            )
+          )
+      : [];
+
+  const status = await computeBookStatus(
+    db,
+    profileId,
+    topicRows.filter((topic) => !topic.skipped).map((topic) => topic.id)
+  );
+
+  return {
+    book: mapBookRow(book),
+    topics: topicRows.map(mapTopicRow),
+    connections: connectionRows.map((connection) => ({
+      id: connection.id,
+      topicAId: connection.topicAId,
+      topicBId: connection.topicBId,
+    })),
+    status,
+  };
+}
+
+export async function persistBookTopics(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  bookId: string,
+  topics: GeneratedBookTopic[],
+  connections: GeneratedConnection[]
+): Promise<BookWithTopics> {
+  // Verify subject ownership
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
+  if (!subject) {
+    throw new NotFoundError('Subject');
+  }
+
+  // Verify book belongs to this subject
+  const book = await db.query.curriculumBooks.findFirst({
+    where: and(
+      eq(curriculumBooks.id, bookId),
+      eq(curriculumBooks.subjectId, subjectId)
+    ),
+  });
+  if (!book) {
+    throw new NotFoundError('Book');
+  }
+
+  const curriculum = await ensureCurriculum(db, subjectId);
+  const existingTopics = await db.query.curriculumTopics.findMany({
+    where: and(
+      eq(curriculumTopics.curriculumId, curriculum.id),
+      eq(curriculumTopics.bookId, bookId)
+    ),
+    orderBy: asc(curriculumTopics.sortOrder),
+  });
+
+  // Idempotent: if topics already exist, just ensure the flag is set
+  if (existingTopics.length > 0) {
+    await db
+      .update(curriculumBooks)
+      .set({
+        topicsGenerated: true,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(curriculumBooks.id, bookId),
+          eq(curriculumBooks.subjectId, subjectId)
+        )
+      );
+
+    const existing = await getBookWithTopics(db, profileId, subjectId, bookId);
+    if (!existing) {
+      throw new NotFoundError('Book');
+    }
+    return existing;
+  }
+
+  // Wrap topic + connection inserts + flag update in a transaction
+  // so a partial failure doesn't leave a half-generated book.
+  await db.transaction(async (tx) => {
+    if (topics.length > 0) {
+      await tx.insert(curriculumTopics).values(
+        topics.map((topic) => ({
+          curriculumId: curriculum.id,
+          title: topic.title,
+          description: topic.description,
+          sortOrder: topic.sortOrder,
+          relevance: 'core' as const,
+          estimatedMinutes: topic.estimatedMinutes,
+          bookId,
+          chapter: topic.chapter,
+        }))
+      );
+    }
+
+    const insertedTopicRows = await tx.query.curriculumTopics.findMany({
+      where: and(
+        eq(curriculumTopics.curriculumId, curriculum.id),
+        eq(curriculumTopics.bookId, bookId)
+      ),
+      orderBy: asc(curriculumTopics.sortOrder),
+    });
+
+    const topicIdByTitle = new Map(
+      insertedTopicRows.map((topic) => [topic.title, topic.id])
+    );
+    const seenConnectionKeys = new Set<string>();
+    const connectionValues: Array<typeof topicConnections.$inferInsert> = [];
+
+    for (const connection of connections) {
+      const topicAId = topicIdByTitle.get(connection.topicA);
+      const topicBId = topicIdByTitle.get(connection.topicB);
+      if (!topicAId || !topicBId || topicAId === topicBId) {
+        continue;
+      }
+
+      const key = [topicAId, topicBId].sort().join(':');
+      if (seenConnectionKeys.has(key)) {
+        continue;
+      }
+      seenConnectionKeys.add(key);
+      connectionValues.push({ topicAId, topicBId });
+    }
+
+    if (connectionValues.length > 0) {
+      await tx.insert(topicConnections).values(connectionValues);
+    }
+
+    await tx
+      .update(curriculumBooks)
+      .set({
+        topicsGenerated: true,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(curriculumBooks.id, bookId),
+          eq(curriculumBooks.subjectId, subjectId)
+        )
+      );
+  });
+
+  const result = await getBookWithTopics(db, profileId, subjectId, bookId);
+  if (!result) {
+    throw new NotFoundError('Book');
+  }
+
+  return result;
 }
 
 export async function addCurriculumTopic(
@@ -188,13 +590,13 @@ export async function addCurriculumTopic(
 ): Promise<CurriculumTopicAddResponse> {
   const repo = createScopedRepository(db, profileId);
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
-  if (!subject) throw new Error('Subject not found');
+  if (!subject) throw new NotFoundError('Subject');
 
   const curriculum = await db.query.curricula.findFirst({
     where: eq(curricula.subjectId, subjectId),
     orderBy: desc(curricula.version),
   });
-  if (!curriculum) throw new Error('Curriculum not found');
+  if (!curriculum) throw new NotFoundError('Curriculum');
 
   if (input.mode === 'preview') {
     const preview = await previewCurriculumTopic(subject.name, input.title);
@@ -231,16 +633,7 @@ export async function addCurriculumTopic(
 
   return {
     mode: 'create',
-    topic: {
-      id: createdTopic!.id,
-      title: createdTopic!.title,
-      description: createdTopic!.description,
-      sortOrder: createdTopic!.sortOrder,
-      relevance: createdTopic!.relevance,
-      estimatedMinutes: createdTopic!.estimatedMinutes,
-      skipped: createdTopic!.skipped,
-      source: createdTopic!.source,
-    },
+    topic: mapTopicRow(createdTopic!),
   };
 }
 
@@ -257,14 +650,14 @@ export async function skipTopic(
   // Verify ownership through scoped repository
   const repo = createScopedRepository(db, profileId);
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
-  if (!subject) throw new Error('Subject not found');
+  if (!subject) throw new NotFoundError('Subject');
 
   // Verify topic belongs to this subject's curriculum
   const curriculum = await db.query.curricula.findFirst({
     where: eq(curricula.subjectId, subjectId),
     orderBy: desc(curricula.version),
   });
-  if (!curriculum) throw new Error('Curriculum not found');
+  if (!curriculum) throw new NotFoundError('Curriculum');
 
   const topic = await db.query.curriculumTopics.findFirst({
     where: and(
@@ -272,7 +665,7 @@ export async function skipTopic(
       eq(curriculumTopics.curriculumId, curriculum.id)
     ),
   });
-  if (!topic) throw new Error('Topic not found in curriculum');
+  if (!topic) throw new NotFoundError('Topic');
 
   await db
     .update(curriculumTopics)
@@ -310,14 +703,14 @@ export async function unskipTopic(
   // Verify ownership through scoped repository
   const repo = createScopedRepository(db, profileId);
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
-  if (!subject) throw new Error('Subject not found');
+  if (!subject) throw new NotFoundError('Subject');
 
   // Verify topic belongs to this subject's curriculum
   const curriculum = await db.query.curricula.findFirst({
     where: eq(curricula.subjectId, subjectId),
     orderBy: desc(curricula.version),
   });
-  if (!curriculum) throw new Error('Curriculum not found');
+  if (!curriculum) throw new NotFoundError('Curriculum');
 
   const topic = await db.query.curriculumTopics.findFirst({
     where: and(
@@ -325,7 +718,7 @@ export async function unskipTopic(
       eq(curriculumTopics.curriculumId, curriculum.id)
     ),
   });
-  if (!topic) throw new Error('Topic not found in curriculum');
+  if (!topic) throw new NotFoundError('Topic');
 
   if (!topic.skipped) throw new Error('Topic is not skipped');
 
@@ -364,7 +757,7 @@ export async function challengeCurriculum(
 ): Promise<Curriculum> {
   const repo = createScopedRepository(db, profileId);
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
-  if (!subject) throw new Error('Subject not found');
+  if (!subject) throw new NotFoundError('Subject');
 
   // Load current curriculum to determine new version
   const current = await db.query.curricula.findFirst({
@@ -469,12 +862,12 @@ export async function explainTopicOrdering(
 ): Promise<string> {
   const repo = createScopedRepository(db, profileId);
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
-  if (!subject) throw new Error('Subject not found');
+  if (!subject) throw new NotFoundError('Subject');
 
   const topic = await db.query.curriculumTopics.findFirst({
     where: eq(curriculumTopics.id, topicId),
   });
-  if (!topic) throw new Error('Topic not found');
+  if (!topic) throw new NotFoundError('Topic');
 
   // Load surrounding topics for context
   const curriculum = await db.query.curricula.findFirst({

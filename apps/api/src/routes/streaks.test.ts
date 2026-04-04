@@ -119,6 +119,22 @@ describe('streak routes', () => {
       expect(body.streak.lastActivityDate).toBeNull();
     });
 
+    it('returns 400 when authenticated but missing X-Profile-Id header', async () => {
+      const res = await app.request(
+        '/v1/streaks',
+        {
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'Content-Type': 'application/json',
+          },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+      expect(getStreakData).not.toHaveBeenCalled();
+    });
+
     it('returns 401 without auth header', async () => {
       const res = await app.request('/v1/streaks', {}, TEST_ENV);
 

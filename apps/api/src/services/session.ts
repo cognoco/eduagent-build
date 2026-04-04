@@ -3,11 +3,13 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, inArray, lt } from 'drizzle-orm';
+import { eq, and, asc, desc, inArray, lt, isNotNull } from 'drizzle-orm';
 import {
   learningSessions,
   sessionEvents,
   sessionSummaries,
+  curricula,
+  curriculumBooks,
   curriculumTopics,
   profiles,
   retentionCards,
@@ -115,6 +117,112 @@ function perGapCap(event: TimedEvent): number {
     return minutes * 60 * PACE_BUFFER;
   }
   return FALLBACK_GAP_CAP_SECONDS;
+}
+
+function formatLearningRecency(endedAt: Date): string {
+  const diffDays = Math.floor(
+    (Date.now() - endedAt.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  if (diffDays <= 0) return 'covered today';
+  if (diffDays === 1) return 'covered yesterday';
+  if (diffDays < 7) return `covered ${diffDays} days ago`;
+  return `covered on ${endedAt.toISOString().slice(0, 10)}`;
+}
+
+async function buildBookLearningHistoryContext(
+  db: Database,
+  profileId: string,
+  currentTopicId: string,
+  bookId: string
+): Promise<string | undefined> {
+  const book = await db.query.curriculumBooks.findFirst({
+    where: eq(curriculumBooks.id, bookId),
+  });
+  if (!book) return undefined;
+
+  const curriculum = await db.query.curricula.findFirst({
+    where: eq(curricula.subjectId, book.subjectId),
+    orderBy: desc(curricula.version),
+  });
+  if (!curriculum) return undefined;
+
+  const topics = await db.query.curriculumTopics.findMany({
+    where: and(
+      eq(curriculumTopics.curriculumId, curriculum.id),
+      eq(curriculumTopics.bookId, bookId)
+    ),
+    orderBy: asc(curriculumTopics.sortOrder),
+  });
+  const topicIds = topics.map((topic) => topic.id);
+  if (topicIds.length === 0) return undefined;
+
+  // Filter to completed/auto_closed sessions with endedAt in SQL to
+  // avoid loading abandoned sessions into memory.
+  const sessions = await db
+    .select({
+      topicId: learningSessions.topicId,
+      endedAt: learningSessions.endedAt,
+    })
+    .from(learningSessions)
+    .where(
+      and(
+        eq(learningSessions.profileId, profileId),
+        inArray(learningSessions.topicId, topicIds),
+        inArray(learningSessions.status, ['completed', 'auto_closed']),
+        isNotNull(learningSessions.endedAt)
+      )
+    );
+
+  const latestByTopic = new Map<string, Date>();
+  for (const session of sessions) {
+    if (!session.topicId || !session.endedAt) continue;
+
+    const previous = latestByTopic.get(session.topicId);
+    if (!previous || previous.getTime() < session.endedAt.getTime()) {
+      latestByTopic.set(session.topicId, session.endedAt);
+    }
+  }
+
+  const lines = topics
+    .filter((topic) => topic.id !== currentTopicId)
+    .map((topic) => {
+      const latest = latestByTopic.get(topic.id);
+      if (!latest) return null;
+      return `- ${topic.title} — ${formatLearningRecency(latest)}`;
+    })
+    .filter((line): line is string => line != null)
+    .slice(0, 10);
+
+  if (lines.length === 0) return undefined;
+
+  return [
+    `Learning history in this book (${book.title}):`,
+    ...lines,
+    'Build on these naturally when they help the learner connect ideas.',
+  ].join('\n');
+}
+
+async function buildHomeworkLibraryContext(
+  db: Database,
+  subjectId: string
+): Promise<string | undefined> {
+  const curriculum = await db.query.curricula.findFirst({
+    where: eq(curricula.subjectId, subjectId),
+    orderBy: desc(curricula.version),
+  });
+  if (!curriculum) return undefined;
+
+  const topics = await db.query.curriculumTopics.findMany({
+    where: eq(curriculumTopics.curriculumId, curriculum.id),
+    orderBy: asc(curriculumTopics.sortOrder),
+  });
+  if (topics.length === 0) return undefined;
+
+  return [
+    "Topics already in the learner's Library for this subject:",
+    ...topics.slice(0, 12).map((topic) => `- ${topic.title}`),
+    'When useful, connect the homework to these topics naturally.',
+  ].join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -599,6 +707,23 @@ async function prepareExchangeContext(
 
   // 5. Build prior learning context (FR40 — bridge FR)
   const priorLearning = buildPriorLearningContext(priorTopics);
+  const learningHistoryParts = [
+    topic?.bookId
+      ? await buildBookLearningHistoryContext(
+          db,
+          profileId,
+          topic.id,
+          topic.bookId
+        )
+      : undefined,
+    session.sessionType === 'homework'
+      ? await buildHomeworkLibraryContext(db, session.subjectId)
+      : undefined,
+  ].filter((part): part is string => Boolean(part));
+  const learningHistoryContext =
+    learningHistoryParts.length > 0
+      ? learningHistoryParts.join('\n\n')
+      : undefined;
 
   // 6. Build ExchangeContext
   // For interleaved sessions: use the topic list, clear single-topic fields
@@ -615,6 +740,7 @@ async function prepareExchangeContext(
       profile?.birthYear ?? birthYearFromDateLike(profile?.birthDate ?? null),
     workedExampleLevel: interleavedTopics ? undefined : workedExampleLevel,
     priorLearningContext: priorLearning.contextText || undefined,
+    learningHistoryContext,
     embeddingMemoryContext: memory.context || undefined,
     teachingPreference: teachingPref?.method,
     analogyDomain: teachingPref?.analogyDomain ?? undefined,

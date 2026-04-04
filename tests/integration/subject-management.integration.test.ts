@@ -17,13 +17,13 @@
 // --- Subject service mocks ---
 
 const mockListSubjects = jest.fn();
-const mockCreateSubject = jest.fn();
+const mockCreateSubjectWithStructure = jest.fn();
 const mockGetSubject = jest.fn();
 const mockUpdateSubject = jest.fn();
 
 jest.mock('../../apps/api/src/services/subject', () => ({
   listSubjects: mockListSubjects,
-  createSubject: mockCreateSubject,
+  createSubjectWithStructure: mockCreateSubjectWithStructure,
   getSubject: mockGetSubject,
   updateSubject: mockUpdateSubject,
 }));
@@ -164,7 +164,10 @@ describe('Integration: POST /v1/subjects', () => {
   });
 
   it('returns 201 when creating subject', async () => {
-    mockCreateSubject.mockResolvedValue(MOCK_SUBJECT);
+    mockCreateSubjectWithStructure.mockResolvedValue({
+      subject: MOCK_SUBJECT,
+      structureType: 'narrow',
+    });
 
     const res = await app.request(
       '/v1/subjects',
@@ -180,7 +183,8 @@ describe('Integration: POST /v1/subjects', () => {
     const body = await res.json();
     expect(body.subject).toBeDefined();
     expect(body.subject.name).toBe('Mathematics');
-    expect(mockCreateSubject).toHaveBeenCalledWith(
+    expect(body.structureType).toBe('narrow');
+    expect(mockCreateSubjectWithStructure).toHaveBeenCalledWith(
       expect.anything(),
       expect.any(String),
       { name: 'Mathematics' }
@@ -199,7 +203,7 @@ describe('Integration: POST /v1/subjects', () => {
     );
 
     expect(res.status).toBe(400);
-    expect(mockCreateSubject).not.toHaveBeenCalled();
+    expect(mockCreateSubjectWithStructure).not.toHaveBeenCalled();
   });
 });
 

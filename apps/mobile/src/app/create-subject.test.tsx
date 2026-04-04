@@ -138,4 +138,34 @@ describe('CreateSubjectScreen', () => {
       },
     });
   });
+
+  it('routes broad subjects straight to the library shelf', async () => {
+    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+      status: 'direct_match',
+      resolvedName: 'History',
+      suggestions: [],
+      displayMessage: 'History works well.',
+    });
+
+    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
+      subject: {
+        id: 'subject-history',
+        name: 'History',
+      },
+      structureType: 'broad',
+      bookCount: 6,
+    });
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'history');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(learner)/library',
+        params: { subjectId: 'subject-history' },
+      });
+    });
+  });
 });

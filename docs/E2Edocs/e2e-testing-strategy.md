@@ -312,7 +312,7 @@ CI always uploads screenshots as artifacts (`if: always()`), not just on failure
 | **Homework Help** | Camera capture -> OCR -> homework chat -> Socratic guidance (no direct answers) -> session marked "guided" | `full, homework` |
 | **Parent Dashboard** | Switch to parent persona -> view child progress -> see retention bars -> update notification prefs | `full, parent` |
 | **Multi-Subject** | Add second subject -> switch subjects -> pause first -> auto-archive check -> restore | `full, subjects` |
-| **Library Navigation** | Start freeform session -> verify in-session book link -> end session -> verify summary book link -> navigate to Library (Stories 4.12, 4.13) | `nightly, learning` |
+| **Library Navigation** | Start freeform session -> verify in-session Library link -> end session -> verify summary Library link -> navigate to Library (Stories 4.12, 4.13) | `nightly, learning` |
 | **Topic Detail Adaptive Buttons** | Navigate to topic detail -> verify adaptive buttons match completionStatus (not_started/in_progress/completed) (Story 4.14) | `nightly, retention` |
 | **Practice Subject Picker** | Tap "Practice for a test" with 2+ active subjects -> picker appears -> select subject -> practice session starts (Story 10.23) | `nightly, subjects` |
 | **Subscription** | Start trial -> trial expiry warning -> upgrade to Plus -> quota visible -> top-up purchase | `full, billing` |
@@ -482,9 +482,9 @@ See `e2e-test-bugs.md` BUG-31 for full root cause analysis.
 
 On Android with Fabric (New Architecture), combining `KeyboardAvoidingView behavior="height"` with `android:windowSoftInputMode="adjustResize"` causes the keyboard to cover the send button in `ChatShell`. The `adjustResize` already resizes the layout, and `behavior="height"` applies a second offset — but because Fabric reports layout changes differently, the combined effect is insufficient, leaving the input/send area hidden behind the keyboard. This blocks all ~15 flows that require typing in a chat session. See `e2e-test-bugs.md` BUG-35.
 
-### react-native-svg + Fabric Crash (BUG-33 — Known Blocker)
+### react-native-svg + Fabric Crash (BUG-33 — FIXED)
 
-`react-native-svg` 15.12.1 with `newArchEnabled=true` (Fabric) crashes with `ClassCastException` in `RNSVGGroupManagerDelegate` when SVG components (particularly `G`) receive animated props from `react-native-reanimated`. This blocks the Library tab. See `e2e-test-bugs.md` BUG-33.
+`react-native-svg` 15.12.1 with `newArchEnabled=true` (Fabric) previously crashed with `ClassCastException` in `RNSVGGroupManagerDelegate` when SVG components (particularly `G`) received animated props from `react-native-reanimated`. Fixed 2026-03-11 by replacing animated SVG `<G>` transform with pure Reanimated `<Animated.View>` scaleX. Library tab flows should now work. See `e2e-test-bugs.md` BUG-33.
 
 ### Isolation Between Parallel CI Runs
 

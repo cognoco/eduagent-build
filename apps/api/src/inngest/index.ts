@@ -10,6 +10,7 @@ import { paymentRetry } from './functions/payment-retry';
 import { quotaReset } from './functions/quota-reset';
 import { topupExpiryReminder } from './functions/topup-expiry-reminder';
 import { subjectAutoArchive } from './functions/subject-auto-archive';
+import { bookPreGeneration } from './functions/book-pre-generation';
 
 export {
   inngest,
@@ -24,6 +25,7 @@ export {
   quotaReset,
   topupExpiryReminder,
   subjectAutoArchive,
+  bookPreGeneration,
 };
 
 // All Inngest functions to register with the serve handler
@@ -39,4 +41,5 @@ export const functions = [
   quotaReset,
   topupExpiryReminder,
   subjectAutoArchive,
+  bookPreGeneration,
 ];

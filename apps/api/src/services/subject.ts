@@ -10,11 +10,18 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
+import { getProfileAge } from './profile';
 import type {
   SubjectCreateInput,
   SubjectUpdateInput,
   Subject,
+  SubjectStructureType,
 } from '@eduagent/schemas';
+import {
+  createBooks,
+  ensureCurriculum,
+  persistNarrowTopics,
+} from './curriculum';
 
 // ---------------------------------------------------------------------------
 // Mapper — Drizzle Date → API ISO string
@@ -64,6 +71,64 @@ export async function createSubject(
     })
     .returning();
   return mapSubjectRow(row!);
+}
+
+export interface CreatedSubjectWithStructure {
+  subject: Subject;
+  structureType: SubjectStructureType;
+  bookCount?: number;
+}
+
+export async function createSubjectWithStructure(
+  db: Database,
+  profileId: string,
+  input: SubjectCreateInput
+): Promise<CreatedSubjectWithStructure> {
+  const subject = await createSubject(db, profileId, input);
+
+  try {
+    const learnerAge = await getProfileAge(db, profileId);
+
+    // Dynamic import — book-generation depends on LLM infra which may not
+    // initialize in all environments (integration tests without API keys).
+    const { detectSubjectType } = await import('./book-generation');
+    const structure = await detectSubjectType(subject.name, learnerAge);
+
+    if (structure.type === 'broad') {
+      await ensureCurriculum(db, subject.id);
+      const books = await createBooks(
+        db,
+        profileId,
+        subject.id,
+        structure.books
+      );
+      return {
+        subject,
+        structureType: 'broad',
+        ...(books.length > 0 ? { bookCount: books.length } : {}),
+      };
+    }
+
+    // Narrow subject — persist the LLM-generated topics as curriculum topics
+    if (structure.topics.length > 0) {
+      await persistNarrowTopics(db, subject.id, structure.topics);
+    }
+
+    return {
+      subject,
+      structureType: 'narrow',
+    };
+  } catch (error) {
+    console.warn(
+      '[createSubjectWithStructure] Falling back to narrow subject flow:',
+      error
+    );
+  }
+
+  return {
+    subject,
+    structureType: 'narrow',
+  };
 }
 
 export async function getSubject(

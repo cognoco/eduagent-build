@@ -50,32 +50,32 @@ export default function ConsentScreen() {
   const [resending, setResending] = useState(false);
   const [deliveryState, setDeliveryState] = useState<DeliveryState>('sent');
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const isTransitioningRef = useRef(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
   // BUG-26: Fade animation for phase transitions (child → parent → success)
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  const transitionToPhase = useCallback(
-    (newPhase: Phase) => {
-      if (isTransitioning) return;
-      setIsTransitioning(true);
+  const transitionToPhase = useCallback((newPhase: Phase) => {
+    if (isTransitioningRef.current) return;
+    isTransitioningRef.current = true;
+    setIsTransitioning(true);
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setPhase(newPhase);
       Animated.timing(fadeAnim, {
-        toValue: 0,
+        toValue: 1,
         duration: 300,
         useNativeDriver: true,
       }).start(() => {
-        setPhase(newPhase);
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(() => {
-          setIsTransitioning(false);
-        });
+        isTransitioningRef.current = false;
+        setIsTransitioning(false);
       });
-    },
-    [fadeAnim, isTransitioning]
-  );
+    });
+  }, []);
 
   // Hand-off copy uses learner variant (consent screen is always shown to children).
   const copy = getConsentHandOffCopy('learner');
