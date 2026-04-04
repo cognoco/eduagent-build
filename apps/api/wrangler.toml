@@ -101,6 +101,7 @@ preview_id = "db6f91e2639e44ce931f63f858593f3c"
 name = "mentomate-api-stg"
 compatibility_date = "2025-12-01"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = true
 routes = [
   { pattern = "api-stg.mentomate.com/*", zone_name = "mentomate.com" },
 ]
@@ -129,6 +130,7 @@ id = "cbed5036c909416487c3b9362da521d0"
 name = "mentomate-api-prd"
 compatibility_date = "2025-12-01"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = true
 routes = [
   { pattern = "api.mentomate.com/*", zone_name = "mentomate.com" },
 ]

@@ -301,7 +301,13 @@ class SplashErrorBoundary extends React.Component<
   static getDerivedStateFromError() {
     return { hasError: true };
   }
-  override componentDidCatch() {
+  override componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error(
+      '[AnimatedSplash] crashed:',
+      error.message,
+      info.componentStack
+    );
+    Sentry.captureException(error, { tags: { component: 'AnimatedSplash' } });
     this.props.onError();
   }
   override render() {
