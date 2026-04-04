@@ -4,6 +4,8 @@
 
 **Goal:** Fix 27 open bugs surfaced from closed-PR code reviews — covering API data integrity, CI/CD security, SSE error handling, home-cards cache corruption, mobile logic gaps, and type safety.
 
+**Status:** COMPLETE — 17 fixed, 3 false positives, 3 no-change-needed, 4 deferred. Branch `fix/pr-review-bugfixes` (4 commits).
+
 **Architecture:** Fixes grouped into 12 tasks by subsystem. Tasks 1-7 (first batch) and Tasks 8-12 (home-cards batch) are independent groups. All fixes are backward-compatible — no new tables, no new API routes, no breaking changes.
 
 **Tech Stack:** Hono, Drizzle ORM, Jest 30, GitHub Actions, React Native, NativeWind
@@ -26,32 +28,32 @@ These are not code bugs but ongoing quality gaps flagged in prior review rounds:
 | # | Sev | Bug | Task | Status |
 |---|-----|-----|------|--------|
 | 1 | Must fix | No migration for UNIQUE constraint on teaching_preferences | Deferred | - [ ] |
-| 2 | Must fix | Race condition in setTeachingPreference (non-atomic read-back) | 1 | - [ ] |
-| 3 | Should fix | syncXpLedgerStatus failure aborts recall test response | 1 | - [ ] |
-| 4 | Should fix | Silent no-op in syncXpLedgerStatus (no logging/return) | 1 | - [ ] |
-| 7 | Security | `contents: write` permission escalation in ci.yml | 6 | - [ ] |
-| 8 | Risk | Deploy to staging with no quality gate on push-to-main | 6 | - [ ] |
-| 9 | Bug | Missing zipalign before apksigner in E2E CI | 7 | - [ ] |
-| 10 | Bug | TMPDIR shadows POSIX-reserved env variable | 7 | - [ ] |
-| 11 | Risk | Non-JS assets silently stale on APK cache hit | 7 | - [ ] |
-| 12 | High | Homework + 5-skip warning blocks recall bridge | 5 | - [ ] |
-| 13 | Medium | Double DB round-trip on skip (5-9 range) | 4 | - [ ] |
+| 2 | Must fix | Race condition in setTeachingPreference (non-atomic read-back) | 1 | - [x] |
+| 3 | Should fix | syncXpLedgerStatus failure aborts recall test response | 1 | - [x] |
+| 4 | Should fix | Silent no-op in syncXpLedgerStatus (no logging/return) | 1 | - [x] |
+| 7 | Security | `contents: write` permission escalation in ci.yml | 6 | - [x] |
+| 8 | Risk | Deploy to staging with no quality gate on push-to-main | 6 | - [x] |
+| 9 | Bug | Missing zipalign before apksigner in E2E CI | 7 | - [x] |
+| 10 | Bug | TMPDIR shadows POSIX-reserved env variable | 7 | - [x] |
+| 11 | Risk | Non-JS assets silently stale on APK cache hit | 7 | - [x] |
+| 12 | High | Homework + 5-skip warning blocks recall bridge | 5 | - [x] |
+| 13 | Medium | Double DB round-trip on skip (5-9 range) | 4 | - [x] |
 | 14 | Medium | `Record<string, any>` casts erase Hono RPC type safety (×11) | Deferred | - [ ] |
-| 15 | Must fix | N+1 updates with no transaction in curriculum reorder | 2 | - [ ] |
-| 16 | Must fix | Interview SSE — no error event on post-stream failure | 3 | - [ ] |
-| 17 | Should fix | Unconditional abort in useStreamInterviewMessage finally | 5 | - [ ] |
-| 20 | Must fix | coldStart re-derived instead of stored | 8 | - [ ] |
-| 21 | Must fix | legacyCoachingCard required but guard skips validation | 8 | - [ ] |
-| 22 | Must fix | Cache bust on every interaction (rankedHomeCards: []) | 9 | - [ ] |
-| 23 | Should fix | isHomeworkWindow uses UTC, not user local time | 10 | - [ ] |
-| 24 | Should fix | Double DB read on every cache miss | 10 | - [ ] |
+| 15 | Must fix | N+1 updates with no transaction in curriculum reorder | 2 | - [x] |
+| 16 | Must fix | Interview SSE — no error event on post-stream failure | 3 | - [x] |
+| 17 | Should fix | Unconditional abort in useStreamInterviewMessage finally | 5 | - [x] |
+| 20 | Must fix | coldStart re-derived instead of stored | 8 | N/A — verified correct in current code |
+| 21 | Must fix | legacyCoachingCard required but guard skips validation | 8 | - [x] |
+| 22 | Must fix | Cache bust on every interaction (rankedHomeCards: []) | 9 | N/A — verified correct (spread preserves cards) |
+| 23 | Should fix | isHomeworkWindow uses UTC, not user local time | 10 | - [x] |
+| 24 | Should fix | Double DB read on every cache miss | 10 | - [x] |
 | 25 | Should fix | Read-modify-write race in mergeHomeSurfaceCacheData | Deferred | - [ ] |
-| 26 | Should fix | invalidateQueries on every tap causes card reordering | 11 | - [ ] |
+| 26 | Should fix | invalidateQueries on every tap causes card reordering | 11 | - [x] |
 | 27 | Type safety | use-home-cards.ts bypasses Hono RPC inference | Deferred | - [ ] |
-| 28 | Type safety | home.tsx cast as HomeCardModel[] | 11 | - [ ] |
-| 29 | Correctness | Skipped test for fully-implemented interactions route | 12 | - [ ] |
-| 30 | Correctness | Wrong-subject chip test references undeclared QuickChipId | 12 | - [ ] |
-| 31 | Dead code | getHomeCardIds has no consumer | 12 | - [ ] |
+| 28 | Type safety | home.tsx cast as HomeCardModel[] | 11 | - [x] (comment added) |
+| 29 | Correctness | Skipped test for fully-implemented interactions route | 12 | N/A — test infra can't resolve profileId; comment clarified |
+| 30 | Correctness | Wrong-subject chip test references undeclared QuickChipId | 12 | N/A — wrong_subject already in QuickChipId union |
+| 31 | Dead code | getHomeCardIds has no consumer | 12 | - [x] |
 
 ---
 
@@ -1196,3 +1198,4 @@ After all tasks: `pnpm exec tsc --noEmit` and `pnpm exec nx run api:lint` for fi
 ## Change Log
 
 - 2026-04-04: Full rewrite. Old completed items removed. 27 open bugs added from PR review triage across 6 subsystems, organized into 12 tasks + 4 deferred items.
+- 2026-04-04: All 12 tasks executed. 17 bugs fixed, 3 verified as false positives (#20, #22, #30), 2 verified as infra-only (#29) or already present (#28 — comment added). 4 remain deferred (#1, #14, #25, #27). Branch: `fix/pr-review-bugfixes`.
