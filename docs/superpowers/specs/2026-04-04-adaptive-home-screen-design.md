@@ -54,8 +54,9 @@ learn-new.tsx (learning fork)
 - Profile switcher (top-right, existing component)
 - Two large cards/buttons, vertically stacked:
   - **"Check child's progress"** → navigates to `/(parent)/dashboard`
+    - Includes a single-line highlight beneath the button: latest child activity summary (e.g., "Emma practiced 12 min today", "No activity today"). Source: `GET /v1/dashboard` → most recent child's `totalTimeThisWeek` or today's session data. If multiple children, show the most recently active child. If no activity data yet, show "See how they're doing".
   - **"Learn something"** → navigates to learner screen (`learn.tsx`)
-- No other elements. Intentionally minimal.
+- No other elements beyond these two cards + highlight. Intentionally minimal.
 
 **Size target:** ~50-100 lines (down from current 883).
 
@@ -76,7 +77,7 @@ learn-new.tsx (learning fork)
 
 **Card behaviour:**
 - **"Learn something new!"** → navigates to `learn-new.tsx`
-- **"Help with assignment?"** → launches homework session flow (camera capture, existing)
+- **"Help with assignment?"** → launches homework session flow (camera capture, existing). Subtitle on card: "Take a picture and we'll look at it together"
 - **"Repeat & review"** → navigates to Library screen (existing)
 
 **Header:** Time-aware greeting (see Greetings section) + profile switcher (top-right).
