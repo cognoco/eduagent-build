@@ -1,12 +1,12 @@
-# Account Security — Email 2FA & Password Change
+# Account Security — Password Change & SSO Detection
 
 **Date:** 2026-04-04
-**Status:** Approved
+**Status:** Partially implemented (password change + SSO detection live; 2FA deferred)
 **Epic:** Pre-Launch UX (standalone story)
 
 ## Story
 
-**As** an account owner, **I want** to enable email verification on sign-in and change my password from the settings screen, **so that** my account is protected and I can manage my credentials.
+**As** an account owner, **I want** to change my password from the settings screen, **so that** my account is protected and I can manage my credentials.
 
 ## Scope
 
@@ -15,19 +15,23 @@
 - Visible only when the current profile is the account owner
 - Adapts based on auth method: password users get full controls, SSO users see informational message
 
-### In Scope
+### In Scope (Implemented)
 
-- Email verification toggle on sign-in (enable/disable) — note: this is Clerk's email verification step, not a true 2FA method
 - Password change form (current + new + confirm)
 - "Forgot your password?" escape hatch (signs out, redirects to reset flow)
 - SSO detection and appropriate messaging
+- Account owner gating (non-owners don't see the section)
+
+### Deferred to 1,000+ users
+
+- **Email verification on sign-in** — originally spec'd as a per-user toggle, but Clerk only supports email verification instance-wide (all users or none), not as a per-user MFA method. The original implementation incorrectly conflated `prepareVerification` (email address verification) with `disableTOTP` (authenticator MFA) — two unrelated Clerk APIs. Removed to avoid shipping broken behavior. Options when revisited: (A) instance-wide email verification via Clerk Dashboard (zero code, adds friction to all users), (B) SMS OTP as true per-user MFA (requires phone number collection + Clerk Pro plan + per-SMS cost), (C) TOTP/authenticator app (parents unlikely to have one). Decision: adds sign-in friction that's not justified until the user base warrants it.
+- True 2FA via TOTP / authenticator app
+- True 2FA via SMS / phone-based OTP
+- Backup code management
+- Server-side audit logging of 2FA events
 
 ### Out of Scope
 
-- True 2FA via TOTP / authenticator app (Clerk supports this but deferred — parents unlikely to have authenticator apps)
-- True 2FA via SMS / phone-based OTP (Clerk supports this but deferred)
-- Backup code management
-- Server-side audit logging of 2FA events
 - Adding a password for SSO-only users (`user.createPassword()` — future enhancement)
 
 ## UI Design
@@ -150,37 +154,40 @@ No new dependencies needed. Everything uses existing Clerk SDK + existing UI com
 
 ## Acceptance Criteria
 
-### Email Verification on Sign-In
+### General
 
-> **Important:** Clerk does not support email as a true 2FA method. The toggle below controls Clerk's email verification step on sign-in — an additional verification prompt, not a second authentication factor. The UI labels this "Email Verification" (not "2FA") to avoid misleading users.
+- [x] AC-1: Account Security section only visible when current profile is the account owner
 
-- [ ] AC-1: Account Security section only visible when current profile is the account owner
-- [ ] AC-2: Toggle shows current email verification status (ON/OFF) based on Clerk user state
-- [ ] AC-3: Toggle OFF → ON: initiates Clerk's email verification enrollment flow (prepareEmailAddressVerification + attemptEmailAddressVerification), user enters code, email verification activates on sign-in
-- [ ] AC-4: Canceling mid-enable keeps email verification OFF
-- [ ] AC-5: Toggle ON → OFF: confirmation dialog ("Turn off email verification? You'll only need your password to sign in."), confirm disables email verification
-- [ ] AC-6: Canceling disable dialog keeps email verification ON
+### Email Verification on Sign-In — DEFERRED (1,000+ users)
+
+> AC-2 through AC-6 were originally implemented but removed — the implementation conflated two unrelated Clerk APIs. Deferred until user base justifies the added sign-in friction. See "Deferred" section above for options.
+
+- [ ] ~~AC-2: Toggle shows current email verification status (ON/OFF)~~
+- [ ] ~~AC-3: Toggle OFF → ON: initiates Clerk email verification flow~~
+- [ ] ~~AC-4: Canceling mid-enable keeps OFF~~
+- [ ] ~~AC-5: Toggle ON → OFF: confirmation dialog~~
+- [ ] ~~AC-6: Canceling disable dialog keeps ON~~
 
 ### Password Change
 
-- [ ] AC-7: Current, new, and confirm password fields with show/hide toggle
-- [ ] AC-8: New password shows requirements indicator (reused from sign-up)
-- [ ] AC-9: Mismatched confirm password shows inline error before submission
-- [ ] AC-10: Wrong current password shows Clerk error message
-- [ ] AC-11: Successful change shows toast and collapses form
-- [ ] AC-12: "Forgot your password?" link signs out and redirects to password reset flow
+- [x] AC-7: Current, new, and confirm password fields with show/hide toggle
+- [x] AC-8: New password shows requirements indicator (reused from sign-up)
+- [x] AC-9: Mismatched confirm password shows inline error before submission
+- [x] AC-10: Wrong current password shows Clerk error message
+- [x] AC-11: Successful change shows message and clears form
+- [x] AC-12: "Forgot your password?" link signs out and redirects to password reset flow
 
 ### SSO Users
 
-- [ ] AC-13: If `user.passwordEnabled === false`, show informational message instead of controls
-- [ ] AC-14: Informational message names the SSO provider (Google / Apple)
+- [x] AC-13: If `user.passwordEnabled === false`, show informational message instead of controls
+- [x] AC-14: Informational message names the SSO provider (Google / Apple)
 
 ### General
 
-- [ ] AC-15: All Clerk errors surfaced via `extractClerkError()` with user-friendly messages
-- [ ] AC-16: Works on both iOS and Android
-- [ ] AC-17: No regressions to existing sign-in email-code second factor flow
-- [ ] AC-18: Existing sign-in TOTP flow unaffected (if user has TOTP from another source)
+- [x] AC-15: All Clerk errors surfaced via `extractClerkError()` with user-friendly messages
+- [ ] AC-16: Works on both iOS and Android (not runtime-verified — needs device testing)
+- [x] AC-17: No regressions to existing sign-in flow
+- [x] AC-18: Existing sign-in TOTP flow unaffected
 
 ## Testing Strategy
 

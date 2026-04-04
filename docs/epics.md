@@ -608,7 +608,6 @@ The Library (formerly Learning Book) gains a hierarchical curriculum structure: 
 
 **Dependencies:** None (independent of all other epics). SM-2 unchanged. Celebrations optional (book completion badge works without Epic 13).
 **Launch scope:** Stories 7.1-7.4 (4 stories, 2 phases). Deferred: Stories 7.5-7.6.
-**Detailed spec:** `docs/superpowers/specs/2026-04-04-epic-7-library-design.md`
 
 ---
 
@@ -2904,56 +2903,151 @@ So that I can manage my usage and upgrade before hitting the ceiling.
 
 ---
 
-## Epic 6: Language Learning (DEFERRED — v1.1) — Placeholder Stories
+## Epic 6: Language Learning (DEFERRED — v1.1) — Stories
 
-**Scope:** FR96-FR107 (12 FRs)
-**Status:** Deferred to v1.1. Placeholder stories for scope confirmation and FR coverage only. Full acceptance criteria to be written during v1.1 planning based on MVP learnings.
-**Stories:** 5 (placeholders)
-**Dependencies:** Epics 0-3 (full learning infrastructure), specifically `packages/retention/` SM-2 engine
+**Scope:** FR96-FR107 (12 FRs) + FR146 (Language SPEAK/LISTEN Voice)
+**Status:** Deferred to v1.1. Full design complete — stories have acceptance criteria, data model, and prompt changes specified.
+**Stories:** 6
+**Dependencies:** Epics 0-3 (full learning infrastructure), Epic 8 (voice infrastructure — complete)
 
-### Story 6.1: Language Intent Detection & Methodology Switch
+### Core Concept
 
-FR96: System auto-detects language learning intent and switches from Socratic teaching to Four Strands methodology.
-FR97: Users can specify native language for grammar explanations in their target language.
+When a learner creates a language subject, the system detects it and switches from Socratic teaching to **Nation's Four Strands methodology** — session time splits roughly 25% across four activities:
+
+| Strand | Purpose | Teaching style |
+|--------|---------|---------------|
+| **Meaning-Focused Input** | Read/listen to comprehensible passages at 95–98% known words | Immersive, minimal interruption |
+| **Meaning-Focused Output** | Speak and write in the target language | Direct correction, not Socratic hints |
+| **Language-Focused Learning** | Explicit grammar and vocabulary instruction | Direct teaching ("In Spanish, adjectives come after nouns") |
+| **Fluency Development** | Timed drills for automatic retrieval | Speed-focused, scored |
+
+**Key pedagogical shift:** No Socratic escalation for languages. The AI teaches directly, corrects directly, and explains grammar explicitly.
+
+**Voice from day one:** The Epic 8 voice infrastructure (`expo-speech-recognition`, `expo-speech`) is already complete. All four strands use voice where appropriate.
+
+### Session Experience
+
+A language session rotates through the four strands. The LLM manages rotation within a session, spending roughly equal time on each. The system prompt dictates the current strand focus and the LLM transitions naturally.
+
+- **Input strand:** LLM generates a short passage using mostly known words + a few new ones. Learner reads (or listens via TTS). LLM asks comprehension questions. New vocabulary is highlighted and added to the tracker.
+- **Output strand:** LLM prompts the learner to speak or write. Uses speech recognition for spoken input. Gives direct, specific corrections: "You said 'yo soy bueno' — the correct form is 'yo soy bien' because…" No Socratic hinting.
+- **Grammar strand:** Explicit instruction. LLM teaches a grammar point relevant to the current micro-milestone. Uses native language for explanations. Follows with practice exercises.
+- **Fluency strand:** Timed drills — translate phrases, fill blanks, rapid-fire vocabulary recall. Scored on speed and accuracy. Voice input supported.
+
+### CEFR Micro-Milestones
+
+Instead of FSI hour estimates (demotivating), progress is shown as small, achievable milestones. Each CEFR level (A1→C2) is divided into micro-milestones:
+
+- A1.1: "Greetings & Introductions" — 50 words, 12 chunks, 3 grammar points
+- A1.2: "Numbers, Days & Time" — 45 words, 8 chunks, 2 grammar points
+- A1.3: "Ordering Food & Drinks" — 55 words, 15 chunks, 4 grammar points
+
+**What the learner sees:** Current milestone name + progress ("A1.3: Ordering Food — 38/55 words, 9/15 chunks"), a progress bar that's always close to filling, celebration on completion, next milestone preview, overall CEFR level badge.
+
+**What we do NOT show:** FSI hour estimates — internal calibration data only.
+
+### Data Model Changes
+
+**`subjects` table — new `pedagogyMode` enum:**
+`pedagogy_mode enum: 'socratic' (default) | 'four_strands'` — set during language subject creation, read by `buildSystemPrompt()` to switch prompt assembly. Orthogonal to existing `teaching_method` enum (which controls explanation style within any pedagogy).
+
+**`teachingPreferences` — new `nativeLanguage` column:**
+`nativeLanguage: text (nullable)` — ISO 639-1 code (e.g., 'en', 'de', 'cs'). Used in grammar explanations.
+
+**New `vocabulary` table:**
+Per-learner, per-subject vocabulary tracking: `id, profileId, subjectId, term, translation, type ('word'|'chunk'), cefrLevel, milestoneId (FK → curriculumTopics), mastered (boolean)`. Unique constraint on `(profileId, subjectId, term)`.
+
+**New `vocabularyRetentionCards` table:**
+SM-2 spaced repetition per vocabulary item — reuses `packages/retention/` algorithm, separate table from topic-level `retentionCards`. Fields: `id, profileId, vocabularyId, easeFactor, intervalDays, repetitions, lastReviewedAt, nextReviewAt, failureCount, consecutiveSuccesses`.
+
+**`curriculumTopics` — language metadata columns:**
+`cefrLevel (text), cefrSublevel (text), targetWordCount (integer), targetChunkCount (integer)` — all nullable, null for non-language topics.
+
+### System Prompt Changes
+
+When `pedagogyMode === 'four_strands'`, `buildSystemPrompt()` replaces Socratic escalation sections with:
+- **Role:** "You are a language teacher, not a Socratic guide. Teach directly."
+- **Error correction:** "Correct errors immediately and explicitly. Explain why using the learner's native language."
+- **Strand rotation:** "Balance time across Input, Output, Grammar, and Fluency activities within each session."
+- **Vocabulary extraction:** "When introducing new words or chunks, mark them clearly for the vocabulary tracker."
+
+Structured output per exchange includes: `{ newVocabulary: [{term, translation, type}], strand, grammarPoint }` — parsed in the exchange pipeline to update the vocabulary table.
+
+### Session Completion Pipeline
+
+Two new Inngest steps after existing Step 2 (`update-retention`):
+1. **`update-vocabulary-retention`** — extract practiced vocabulary from structured LLM output, run SM-2, persist `vocabularyRetentionCards`, mark items `mastered` at `consecutiveSuccesses >= 3`.
+2. **`check-milestone-completion`** — count mastered vocab for current milestone, complete milestone when targets met, queue celebration (Comet for milestone, OrionsBelt for CEFR level).
+
+### Language Registry
+
+Static data file with ~23 languages at launch (FSI Category I + II): Spanish, French, Italian, Portuguese, Dutch, Norwegian, Swedish, Danish, Romanian, German, Indonesian, Malay, Swahili. Each entry: `{ code, names/aliases, fsiCategory, fsiHours, cefrMilestones, sttLocale, ttsVoice }`. Post-launch expansion: Category III/IV (Russian, Chinese, Japanese, Korean, Arabic).
+
+FSI hours are internal calibration only — never shown to learners. Learners see CEFR micro-milestones.
+
+### Out of Scope
+
+RTL languages (Arabic, Hebrew), Category III/IV languages, handwriting recognition, curated vocabulary lists, formal language placement test, UI translations for language learning screens.
+
+### Story 6.1: Language Detection & Onboarding
+
+As a learner creating a language subject, I want the app to detect it and set up language-appropriate learning.
+
+**Acceptance Criteria:**
+- Three-layer detection: keyword match (~200 languages with aliases) → LLM boolean on `classifySubject()` → learner confirmation card
+- Native language selection stored on `teachingPreferences`
+- Self-assessed level picker: "Complete beginner" / "I know some basics" / "Conversational" / "Advanced"
+- CEFR-aligned curriculum generated starting from assessed level
+- `pedagogyMode = 'four_strands'` set on the subject
 
 **FRs:** FR96, FR97
 
 ---
 
-### Story 6.2: Explicit Grammar & Output Practice
+### Story 6.2: Four Strands Prompt Assembly & Direct Instruction
 
-FR99: Users receive explicit grammar instruction (direct teaching, not Socratic discovery — language learning requires different pedagogy).
-FR100: Users practice output (speaking/writing) every session.
-FR107: Users receive direct error correction (not Socratic hints — immediate correction is more effective for language errors).
+As a language learner, I want direct instruction and correction rather than Socratic questioning.
 
-**⚠️ Architectural prerequisite — per-subject pedagogy mode:**
-FR99 and FR107 represent a **meaningful behavior change from the Socratic default** used everywhere else. The existing within-session three-strike `switch_to_direct` mechanism (Epic 3, `adaptive-teaching.ts`) only triggers after repeated wrong answers — it's a fallback, not a default mode. Language learning needs direct correction as the _default_ pedagogy, not a fallback.
-
-**Required before implementation:**
-- A `pedagogy_mode` enum or similar flag on the `subjects` table (or a new `subject_config` table) distinguishing `'socratic'` (default for all current subjects) from `'four_strands'` (language learning).
-- The existing `teaching_method` enum (`visual_diagrams`, `step_by_step`, etc.) stays orthogonal — it controls _how_ to explain, while `pedagogy_mode` controls _whether_ to use Socratic questioning or direct instruction as the baseline teaching approach.
-- `buildSystemPrompt()` in `services/exchanges.ts` must read `pedagogy_mode` and switch between Socratic escalation ladder prompts and direct instruction prompts accordingly.
-- Auto-detection of language learning intent (FR96, Story 6.1) should set `pedagogy_mode` on the subject at creation time.
+**Acceptance Criteria:**
+- `buildSystemPrompt()` fork for `four_strands` mode — replaces Socratic escalation with direct instruction
+- Four Strands prompt templates (one per strand)
+- Direct error correction: "You said 'yo soy bueno' — the correct form is 'yo soy bien' because…"
+- Structured vocabulary extraction output format parsed in exchange pipeline
+- `pedagogy_mode` enum on `subjects` table distinguishing `'socratic'` from `'four_strands'`
 
 **FRs:** FR99, FR100, FR107
 
 ---
 
-### Story 6.3: Comprehensible Input & Vocabulary SR
+### Story 6.3: Vocabulary & Chunk Tracking with SM-2
 
-FR101: Users read comprehensible passages at 95-98% known words (Krashen's input hypothesis).
-FR102: Users practice vocabulary with spaced repetition — reuses `packages/retention/` SM-2 engine from Epic 3.
-FR105: Users learn collocations and phrases (not just isolated words).
+As a language learner, I want my vocabulary tracked and spaced for optimal retention.
+
+**Acceptance Criteria:**
+- `vocabulary` table and CRUD service
+- `vocabularyRetentionCards` table with SM-2 integration via `packages/retention/`
+- Vocabulary extraction from session exchanges (structured LLM output)
+- Comprehensible input generation (95–98% known words)
+- Chunk/collocation tracking alongside individual words
+- Items marked `mastered` at `consecutiveSuccesses >= 3`
 
 **FRs:** FR101, FR102, FR105
 
 ---
 
-### Story 6.4: CEFR Progress & FSI Time Estimates
+### Story 6.4: CEFR Micro-Milestones & Progress UI
 
-FR98: Users see realistic time estimates based on FSI language categories (600-2200 hours depending on language).
-FR103: Users see vocabulary count and CEFR progress tracking (A1 → A2 → B1 → B2 → C1 → C2).
-FR106: Users see hours studied vs FSI estimate for their target language.
+As a language learner, I want to see my progress as small, achievable milestones rather than raw hour estimates.
+
+**Acceptance Criteria:**
+- `cefrLevel`, `cefrSublevel`, `targetWordCount`, `targetChunkCount` columns on `curriculumTopics`
+- Milestone generation during curriculum creation (e.g., "A1.3: Ordering Food — 55 words, 15 chunks")
+- Progress API: words mastered / target, chunks mastered / target, current CEFR level
+- Milestone completion detection in session-completed pipeline
+- Celebration queueing on milestone/level completion (reuses Epic 13)
+- Mobile UI: milestone card, CEFR badge, next milestone preview
+- FSI hours used for internal calibration only — never shown to learners
+- Language registry with FSI data for ~23 languages
 
 **FRs:** FR98, FR103, FR106
 
@@ -2961,15 +3055,39 @@ FR106: Users see hours studied vs FSI estimate for their target language.
 
 ### Story 6.5: Fluency Drills
 
-FR104: Users practice fluency with time-pressured drills (speed and automaticity practice).
+As a language learner, I want timed practice for speed and automatic retrieval.
+
+**Acceptance Criteria:**
+- Timed drill UI component (timer, score, streak)
+- Voice input for spoken drills
+- Speed + accuracy scoring
+- Drill types: translation, fill-blank, rapid vocabulary recall
+- Difficulty progression within fluency strand
 
 **FRs:** FR104
 
 ---
 
+### Story 6.6: Voice Integration for Language Sessions
+
+As a language learner, I want to speak and listen in the target language during sessions.
+
+**Acceptance Criteria:**
+- STT language configuration per language subject (target language, not device language)
+- TTS for listening comprehension (input strand — reads passages aloud)
+- Voice input for output strand (speaking practice with pronunciation feedback via LLM)
+- Voice input for fluency drills (rapid-fire spoken responses)
+- All uses existing Epic 8 infrastructure — no new voice plumbing needed
+
+**FRs:** FR146
+
+---
+
 ### Epic 6 FR Coverage
 
-All 12 FRs (FR96-FR107) + FR146 (Language SPEAK/LISTEN Voice, depends on Epic 8.1-8.2) mapped across 5 placeholder stories. Full ACs deferred to v1.1 planning.
+All 12 FRs (FR96-FR107) + FR146 mapped across 6 stories. Implementation deferred to v1.1.
+
+**Implementation plan:** `docs/plans/epic-6-language-learning.md` (file maps, task breakdown, code snippets — ready to execute when v1.1 starts).
 
 ---
 
@@ -2978,8 +3096,6 @@ All 12 FRs (FR96-FR107) + FR146 (Language SPEAK/LISTEN Voice, depends on Epic 8.
 **Scope:** FR160-FR168 — 9 FRs, 6 stories (4 launch + 2 deferred)
 **Dependencies:** None
 **Revision:** v3 — "Know the Learner, Not the Graph" (2026-04-04). Full redesign replacing v2 prerequisite DAG.
-**Detailed spec:** `docs/superpowers/specs/2026-04-04-epic-7-library-design.md`
-
 ### What Changed from v2
 
 | v2 (prerequisite DAG) | v3 (self-building library) | Why |
@@ -2993,6 +3109,63 @@ All 12 FRs (FR96-FR107) + FR146 (Language SPEAK/LISTEN Voice, depends on Epic 8.
 | Two visualization modes (journey path vs Sugiyama DAG) | One visual map with age-adaptive styling (deferred) | Same layout for all ages, different visual density. One codebase. |
 | Flat topic list — 15 topics for "History" | Books + chapters — "History" becomes Ancient Egypt, Ancient Greece, etc. | The actual problem kids face, which v2 didn't solve |
 | No cross-session knowledge tracking | Enhanced session context (launch) + knowledge signals (deferred) | Homework and curriculum should talk to each other |
+
+### Design Principles
+
+1. **Self-building.** The learner adds a subject and the library materializes. No manual organization, no configuration, no "set up your curriculum." The LLM does the structural work.
+2. **Fastest path to learning wins.** A learner cramming for a test and a learner exploring for fun have different needs. The app serves both, but never makes the urgent learner browse before they can learn.
+3. **One knowledge map, many entry points.** Curriculum sessions, homework help, and review all write to the same record. The app knows what the learner has covered regardless of how they learned it.
+4. **Structure serves discovery, not compliance.** Books, chapters, and topic ordering exist so learners can see what's available and find what's interesting — not to enforce a sequence.
+5. **The LLM is the prerequisite engine.** It already knows how to bridge knowledge gaps in conversation. Give it full context about what the learner has covered and let it teach naturally. No graph infrastructure needed.
+6. **Show the shape of knowledge.** Learners benefit from seeing how topics relate to each other visually — spatially and aesthetically. The visualization should help you pick your next topic and mentally place what you've learned. Pretty AND functional.
+7. **Suggestions must be relevant to the learner's life.** "Next in the curriculum" is a guess. "You mentioned a test on Egypt" is useful. Coaching should reflect what the learner actually needs, not what's next in a sort order.
+
+### Architecture Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| **AD1: LLM decides broad vs narrow** | No hardcoded subject lists. "Science" is broad, "Photosynthesis" is narrow — LLM decides per request. If wrong: broad-as-narrow → flat list (functional); narrow-as-broad → single book (identical to no books). Easy to recover. |
+| **AD2: Lazy topic generation** | Topics generated on first book open (3-8s wait). Mitigations: book description + emoji + loading animation during wait; background pre-generation of next 1-2 books; monitor p95, switch to eager if >8s. |
+| **AD3: Knowledge signals are append-only** | (Deferred — Story 7.6) `knowledge_signals` is an append-only log, not a status field. Effective state = highest `coverage` across all signals. No state transitions, no conflicts, full history preserved. |
+| **AD4: No prerequisite infrastructure** | No `topic_prerequisites` table, DAG, cycle detection, topological sort, edge status, "prove it" quizzes, or skip/restore mechanics. `sortOrder` set by LLM is the curriculum. The LLM adapts in-session using learning history context. |
+| **AD5: Connections are not a DAG** | `topic_connections` uses symmetric untyped pairs — no direction, no status, no relationship type. No cycles possible. No locks. Purely visual hints for navigation. |
+| **AD6: Coaching priority boost is simple** | Test/deadline detection: one flag (`urgentUntil: Date`) on the subject. No calendar integration, schedule parser, or deadline management system. |
+| **AD7: Book visual identity — start simple** | LLM includes an emoji per book. Emoji + title + description is enough visual differentiation. Richer visuals (color themes, illustrations) can iterate post-launch. |
+
+### Risk Assessment
+
+| Risk | Mitigation |
+|------|------------|
+| LLM misjudges broad vs narrow | Low impact. Broad→narrow = flat list (functional). Narrow→broad = single book (identical). Learner can regenerate. |
+| Lazy topic generation too slow | Show book description + emoji + loading animation. Pre-generate next 1-2 books in background. Monitor p95; switch to eager if >8s. |
+| Topic matching produces bad matches | (Deferred) Only high-confidence matches recorded. Medium/low logged for analysis. Worst case: homework doesn't get credit — annoying, not harmful. |
+| Book cards all look the same | Start with emoji. Iterate to richer visuals post-launch. Monotonous grid still better than 15 flat disconnected topics. |
+| Learners don't browse books | Coaching cards provide the fast path (one tap from home to session). Book browsing is for exploration. App works even if a learner never opens the Library. |
+| Test/deadline detection unreliable | Best-effort. If missed, coaching behaves as before. If false positive, subject gets boosted briefly — harmless. |
+| LLM generates bad chapters or connections | Low stakes — chapters are visual grouping labels, connections are decorative lines. Neither affects learning. List view always works as fallback. |
+| Existing curricula break | Zero users — no existing curricula. Old flat flow is replaced, not wrapped. |
+| Visual map layout hard on mobile | List-with-chapters is default. Map view is additive and deferrable (Story 7.5). Chapter headers provide 80% of visual guidance. |
+| Age-adaptive styling adds complexity | CSS-level changes, not architecture. Two tiers with different sizing/color. Same components, different style props. Can ship with one style and add adaptation later. |
+
+### What Was Kept from v2 (in simpler form)
+
+| v2 Concept | v3 Evolution |
+|------------|-------------|
+| Visual representation of topic relationships | Topic map with chapters and connections — same goal, simpler implementation |
+| LLM generates relationships at topic creation | LLM generates chapters and connections alongside topics — same trigger, lighter output |
+| Topic nodes show retention/coverage status | Preserved — map nodes colored by coverage |
+| Accessibility on visualization | Preserved — `accessibilityLabel` on nodes, sequential swipe navigation |
+| Age-appropriate presentation | Preserved — age-adaptive styling (node size, color, tap targets) instead of two separate engines |
+
+### Interaction with Other Epics
+
+| Epic | Interaction |
+|------|------------|
+| **Epic 3** (retention) | SM-2 unchanged. Knowledge signals track exposure, SM-2 tracks retention. Both inform the LLM. |
+| **Epic 12** (persona removal) | No dependency. Age-adaptive styling uses `birthYear` (aligns with Epic 12's shift from persona to age-derived behavior). |
+| **Epic 12.7** (home cards) | Coaching card types from FR165 designed to work with both current single card system and future multi-card home screen. |
+| **Epic 13** (session lifecycle) | Session completion triggers knowledge signal matching (Story 7.6). Book completion can use celebration system if available. |
+| **Homework** | Story 7.2 integrates homework sessions into the knowledge map via enhanced session context. |
 
 ### Story 7.1: Curriculum Book Data Model + LLM Generation
 
@@ -3129,7 +3302,16 @@ So that I understand the shape of the subject and can navigate it intuitively.
 **Then** topics are shown as nodes, grouped into visual chapter clusters
 **And** connections between related topics are shown as light, non-directional lines
 **And** each topic node is colored by coverage status (not started / introduced / partial / done)
+**And** the suggested next topic has a subtle visual highlight
 **And** tapping any topic node starts a session — no locks, no warnings
+
+**Given** a book has no chapters or connections (pre-v3 data)
+**When** the learner views the book
+**Then** the map toggle is hidden — only list view is available
+
+**Given** the map has more than 20 topics
+**When** rendering
+**Then** chapters are collapsible — tap a chapter header to expand/collapse its topics
 
 **Note:** Deferred to fast-follow. List view with chapter grouping (Story 7.3) provides ~80% of the visual guidance value at launch.
 
@@ -3150,6 +3332,10 @@ So that I can see which topics I've already been exposed to regardless of how I 
 **Then** topic matching identifies which curriculum topics were covered (LLM-based, confidence-scored)
 **And** high-confidence matches create `knowledge_signals` records
 **And** the matched topics show updated progress in the Library
+
+**Given** a learner substantially covered "Pyramids" during homework
+**When** they view the Ancient Egypt book in the Library
+**Then** the Pyramids topic shows progress (e.g., "introduced via homework")
 
 **Note:** Deferred to fast-follow. FR163 (enhanced session context) already makes the LLM aware of cross-session learning through prompt enrichment.
 
@@ -3588,7 +3774,7 @@ The original architecture (docs/architecture.md) specified "Payments | Stripe" w
 ## Epic 10: Pre-Launch UX Polish (PRE-LAUNCH) — Stories
 
 **Goal:** Eliminate UX gaps that risk user abandonment, support volume, or regulatory confusion before first public release. Focused on copy clarity, confirmation dialogs, persona-appropriate language, consent unification, and App Store compliance for English-speaking markets (US, UK, Australia) targeting ages 11-15.
-**Stories:** 23 | **Priority:** Must-ship (10.1–10.7, 10.10–10.14, 10.16, 10.19-10.22), should-ship (10.15, 10.17, 10.18, 10.23), fast-follow (10.8–10.9)
+**Stories:** 24 | **Priority:** Must-ship (10.1–10.7, 10.10–10.14, 10.16, 10.19-10.22), should-ship (10.15, 10.17, 10.18, 10.23, 10.24), fast-follow (10.8–10.9)
 **Status:** ✅ Complete (updated 2026-04-03). All Story 10.1-10.23 slices are shipped. Maestro E2E flows exist but have not been rerun in this pass (still require emulator + API stack). DB migration `0002_light_puff_adder.sql` remains unapplied in this local environment.
 **FRs:** FR7, FR8 (consent unification), FR18 (topic skip — undo gap), FR20 (relevance labels), FR19 (challenge naming), FR56 (relearn method descriptions), plus new NFR for actionable errors and child-friendly consent copy.
 **Dependencies:** Epics 0-5 complete (all screens and services exist). No new infrastructure needed.
@@ -4691,6 +4877,33 @@ So that the AI pulls up the right topics to test me on.
 **FRs:** UX Journey 4
 
 **Dependencies:** None (independent of 10.20)
+
+---
+
+### Story 10.24: Account Security — Password Change & SSO Detection ✅
+
+_Priority: Should-ship. Scope: Account owners only (both learner + parent). **Status: Implemented** — `AccountSecurity` + `ChangePassword` components, wired in both more.tsx screens._
+
+As an account owner, I want to change my password and see my security status from the settings screen.
+
+**Acceptance Criteria:**
+
+- [x] Account Security section only visible when current profile is the account owner (`isOwner` check)
+- [x] Password users see: Change Password row (expandable form) with current + new + confirm fields
+- [x] New password field shows requirements indicator (reuses sign-up `PasswordInput` with `showRequirements`)
+- [x] Mismatched confirm password shows inline "Passwords do not match" error
+- [x] Wrong current password shows Clerk error via `extractClerkError()`
+- [x] Successful change shows "Password updated" message and clears form
+- [x] "Forgot your password?" link signs out and redirects to `/(auth)/sign-in` for reset flow
+- [x] SSO users (`passwordEnabled === false`) see info message: "Your account is secured via {Google/Apple}. Manage your security settings there."
+- [x] Provider name detected from `user.externalAccounts[0].provider`
+
+**Deferred to 1,000+ users:**
+- Email verification toggle on sign-in — Clerk doesn't support email as a per-user MFA method (only instance-wide). Original implementation incorrectly conflated `prepareVerification` with `disableTOTP`. Options when revisited: (A) instance-wide email verification via Clerk Dashboard, (B) SMS OTP as true per-user MFA, (C) TOTP/authenticator app.
+
+**Implementation:** Client-only via Clerk SDK — no API routes. Components: `components/account-security.tsx`, `components/change-password.tsx`. Wired in both `(learner)/more.tsx` and `(parent)/more.tsx`.
+
+**FRs:** Pre-launch UX (no numbered FR)
 
 ---
 

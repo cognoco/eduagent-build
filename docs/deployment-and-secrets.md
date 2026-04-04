@@ -395,6 +395,74 @@ Use these heuristics before assuming a fresh code regression:
 
 ---
 
+## EAS Update (Over-the-Air)
+
+JS-only changes can be deployed in ~5 minutes via EAS Update instead of a full native build (~30 min). This is the primary deployment path — most pushes to main are JS-only.
+
+### How it works
+
+`expo-updates` is installed in the mobile app. On every cold launch, the app checks for a new JS bundle from EAS Update servers. If one is available, it downloads (~2-3 sec) and applies. If download exceeds 5 seconds (bad network), it falls back to the cached bundle.
+
+### Runtime Version Strategy
+
+Uses Expo's **fingerprint** policy for `runtimeVersion` — auto-generates a hash of all native dependencies, plugins, and config. When native things change, the hash changes and OTA updates are ignored (preventing JS/native mismatches). No manual version management.
+
+### Update Channels
+
+| Build Profile | Channel | Purpose |
+|--------------|---------|---------|
+| `development` | `development` | Dev client builds (local Metro, no OTA) |
+| `preview` | `preview` | Internal testing — primary OTA target |
+| `production` | `production` | Store releases |
+
+### CI Integration
+
+The `ci.yml` workflow has an `ota-update` job that runs after the main CI job passes:
+- Only triggers on push to main (not PRs)
+- Publishes `eas update --branch preview` with the commit message
+- Takes ~3 min after CI passes
+- The installed preview APK receives the new bundle on next launch
+
+Full native builds (`mobile-ci.yml: build-preview`) only trigger when native-affecting files change: `app.json`, `package.json`, `eas.json`, `plugins/`, `android/`, `ios/`.
+
+### Typical flow
+
+```
+push to main (JS-only — 95% of merges)
+  ├── ci.yml: main job (lint, test, typecheck)    ~2 min
+  ├── ci.yml: ota-update (after main passes)      ~3 min  ← OTA live on device
+  └── mobile-ci.yml: build-preview                SKIPPED (no native changes)
+
+push to main (native change — rare)
+  ├── ci.yml: main job                            ~2 min
+  ├── ci.yml: ota-update (after main)             ~3 min
+  └── mobile-ci.yml: build-preview (after tests)  ~30 min
+```
+
+### App config
+
+```json
+{
+  "updates": {
+    "url": "https://u.expo.dev/cbb7c7e1-cf56-45f2-9df8-f043bb8bb361",
+    "enabled": true,
+    "checkAutomatically": "ON_LOAD",
+    "fallbackToCacheTimeout": 5000
+  },
+  "runtimeVersion": { "policy": "fingerprint" }
+}
+```
+
+### Risks
+
+| Risk | Mitigation |
+|------|-----------|
+| JS update calls native API not in installed build | Fingerprint policy auto-detects; mismatched updates ignored |
+| Broken JS update shipped | Fix forward with another push; `eas update:rollback` available |
+| 5-second launch delay on slow networks | Falls back to cached bundle after timeout |
+
+---
+
 ## Secrets Inventory
 
 All secrets managed in Doppler (project: `mentomate`, configs: `dev` / `stg` / `prd`):
