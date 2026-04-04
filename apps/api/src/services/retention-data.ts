@@ -520,6 +520,7 @@ export async function getTeachingPreference(
   subjectId: string;
   method: string;
   analogyDomain: string | null;
+  nativeLanguage: string | null;
 } | null> {
   const rows = await db.query.teachingPreferences.findFirst({
     where: and(
@@ -532,6 +533,7 @@ export async function getTeachingPreference(
         subjectId: rows.subjectId,
         method: rows.method,
         analogyDomain: rows.analogyDomain ?? null,
+        nativeLanguage: rows.nativeLanguage ?? null,
       }
     : null;
 }
@@ -550,6 +552,7 @@ export async function setTeachingPreference(
   subjectId: string;
   method: string;
   analogyDomain: string | null;
+  nativeLanguage: string | null;
 }> {
   const values: typeof teachingPreferences.$inferInsert = {
     profileId,
@@ -578,12 +581,14 @@ export async function setTeachingPreference(
     .returning({
       method: teachingPreferences.method,
       analogyDomain: teachingPreferences.analogyDomain,
+      nativeLanguage: teachingPreferences.nativeLanguage,
     });
 
   return {
     subjectId,
     method: row?.method ?? method,
     analogyDomain: row?.analogyDomain ?? null,
+    nativeLanguage: row?.nativeLanguage ?? null,
   };
 }
 
@@ -654,6 +659,50 @@ export async function setAnalogyDomain(
     });
 
   return analogyDomain;
+}
+
+export async function getNativeLanguage(
+  db: Database,
+  profileId: string,
+  subjectId: string
+): Promise<string | null> {
+  const [row] = await db
+    .select({ nativeLanguage: teachingPreferences.nativeLanguage })
+    .from(teachingPreferences)
+    .where(
+      and(
+        eq(teachingPreferences.profileId, profileId),
+        eq(teachingPreferences.subjectId, subjectId)
+      )
+    )
+    .limit(1);
+
+  return row?.nativeLanguage ?? null;
+}
+
+export async function setNativeLanguage(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  nativeLanguage: string | null
+): Promise<string | null> {
+  await db
+    .insert(teachingPreferences)
+    .values({
+      profileId,
+      subjectId,
+      method: 'step_by_step' as TeachingMethod,
+      nativeLanguage: nativeLanguage ?? null,
+    })
+    .onConflictDoUpdate({
+      target: [teachingPreferences.profileId, teachingPreferences.subjectId],
+      set: {
+        nativeLanguage: nativeLanguage ?? null,
+        updatedAt: new Date(),
+      },
+    });
+
+  return nativeLanguage;
 }
 
 // ---------------------------------------------------------------------------

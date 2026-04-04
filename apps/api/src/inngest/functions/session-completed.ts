@@ -4,6 +4,9 @@ import {
   updateRetentionFromSession,
   updateNeedsDeepeningProgress,
 } from '../../services/retention-data';
+import { getCurrentLanguageProgress } from '../../services/language-curriculum';
+import { extractVocabularyFromTranscript } from '../../services/vocabulary-extract';
+import { upsertExtractedVocabulary } from '../../services/vocabulary';
 import { createPendingSessionSummary } from '../../services/summaries';
 import { recordSessionActivity } from '../../services/streaks';
 import {
@@ -31,6 +34,7 @@ import {
   curriculumTopics,
   retentionCards,
   sessionEvents,
+  subjects,
 } from '@eduagent/database';
 import { and, asc, eq } from 'drizzle-orm';
 
@@ -88,6 +92,12 @@ export const sessionCompleted = inngest.createFunction(
     } = event.data;
 
     const outcomes: StepOutcome[] = [];
+    let previousLanguageProgress: Awaited<
+      ReturnType<typeof getCurrentLanguageProgress>
+    > | null = null;
+    let nextLanguageProgress: Awaited<
+      ReturnType<typeof getCurrentLanguageProgress>
+    > | null = null;
 
     const loadTopicTitle = async (
       db: ReturnType<typeof getStepDatabase>,
@@ -230,6 +240,96 @@ export const sessionCompleted = inngest.createFunction(
       })
     );
 
+    outcomes.push(
+      await step.run('update-vocabulary-retention', async () => {
+        if (!subjectId) {
+          return {
+            step: 'update-vocabulary-retention',
+            status: 'skipped' as const,
+          };
+        }
+
+        return runIsolated(
+          'update-vocabulary-retention',
+          profileId,
+          async () => {
+            const db = getStepDatabase();
+            const subject = await db.query.subjects.findFirst({
+              where: eq(subjects.id, subjectId),
+            });
+            if (
+              !subject ||
+              subject.pedagogyMode !== 'four_strands' ||
+              !subject.languageCode
+            ) {
+              return;
+            }
+
+            previousLanguageProgress = await getCurrentLanguageProgress(
+              db,
+              profileId,
+              subjectId
+            );
+
+            const events = await db.query.sessionEvents.findMany({
+              where: and(
+                eq(sessionEvents.sessionId, sessionId),
+                eq(sessionEvents.profileId, profileId)
+              ),
+              orderBy: asc(sessionEvents.createdAt),
+            });
+
+            const transcript = events
+              .filter(
+                (entry) =>
+                  entry.eventType === 'user_message' ||
+                  entry.eventType === 'ai_response'
+              )
+              .map((entry) => ({
+                role:
+                  entry.eventType === 'user_message'
+                    ? ('user' as const)
+                    : ('assistant' as const),
+                content: entry.content,
+              }));
+
+            const extractedVocabulary = await extractVocabularyFromTranscript(
+              transcript,
+              subject.languageCode
+            );
+
+            if (extractedVocabulary.length === 0) {
+              nextLanguageProgress = previousLanguageProgress;
+              return;
+            }
+
+            const quality = Math.max(
+              0,
+              Math.min(5, completionQualityRating ?? 3)
+            );
+            await upsertExtractedVocabulary(
+              db,
+              profileId,
+              subjectId,
+              extractedVocabulary.map((item) => ({
+                ...item,
+                milestoneId:
+                  previousLanguageProgress?.currentMilestone?.milestoneId ??
+                  undefined,
+                quality,
+              }))
+            );
+
+            nextLanguageProgress = await getCurrentLanguageProgress(
+              db,
+              profileId,
+              subjectId
+            );
+          }
+        );
+      })
+    );
+
     // Step 1c: Update needs-deepening progress (FR63)
     outcomes.push(
       await step.run('update-needs-deepening', async () => {
@@ -250,6 +350,35 @@ export const sessionCompleted = inngest.createFunction(
           }
         });
       })
+    );
+
+    outcomes.push(
+      await step.run('check-milestone-completion', async () =>
+        runIsolated('check-milestone-completion', profileId, async () => {
+          const db = getStepDatabase();
+          const previousMilestoneId =
+            previousLanguageProgress?.currentMilestone?.milestoneId;
+          const nextMilestoneId =
+            nextLanguageProgress?.currentMilestone?.milestoneId;
+
+          if (
+            !previousMilestoneId ||
+            !nextLanguageProgress ||
+            previousMilestoneId === nextMilestoneId
+          ) {
+            return;
+          }
+
+          await queueCelebration(
+            db,
+            profileId,
+            'comet',
+            'topic_mastered',
+            previousLanguageProgress?.currentMilestone?.milestoneTitle ??
+              previousMilestoneId
+          );
+        })
+      )
     );
 
     // Step 2: Write coaching card / session summary

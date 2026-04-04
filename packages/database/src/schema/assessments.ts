@@ -2,6 +2,7 @@ import {
   pgTable,
   uuid,
   integer,
+  text,
   timestamp,
   jsonb,
   numeric,
@@ -162,6 +163,7 @@ export const teachingPreferences = pgTable(
       .references(() => subjects.id, { onDelete: 'cascade' }),
     method: teachingMethodEnum('method').notNull(),
     analogyDomain: analogyDomainEnum('analogy_domain'),
+    nativeLanguage: text('native_language'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

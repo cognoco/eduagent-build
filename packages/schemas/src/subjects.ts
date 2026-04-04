@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  cefrLevelSchema,
+  languageCodeSchema,
+  pedagogyModeSchema,
+} from './language.ts';
 
 // Enums
 
@@ -21,12 +26,16 @@ export type CurriculumTopicSource = z.infer<typeof curriculumTopicSourceSchema>;
 export const subjectCreateSchema = z.object({
   name: z.string().min(1).max(200),
   rawInput: z.string().min(1).max(200).optional(),
+  pedagogyMode: pedagogyModeSchema.optional(),
+  languageCode: languageCodeSchema.optional(),
 });
 export type SubjectCreateInput = z.infer<typeof subjectCreateSchema>;
 
 export const subjectUpdateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   status: subjectStatusSchema.optional(),
+  pedagogyMode: pedagogyModeSchema.optional(),
+  languageCode: languageCodeSchema.nullable().optional(),
 });
 export type SubjectUpdateInput = z.infer<typeof subjectUpdateSchema>;
 
@@ -36,6 +45,8 @@ export const subjectSchema = z.object({
   name: z.string(),
   rawInput: z.string().nullable().optional(),
   status: subjectStatusSchema,
+  pedagogyMode: pedagogyModeSchema,
+  languageCode: languageCodeSchema.nullable().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -71,6 +82,9 @@ export const subjectResolveResultSchema = z.object({
   resolvedName: z.string().nullable(),
   suggestions: z.array(subjectSuggestionSchema),
   displayMessage: z.string(),
+  isLanguageLearning: z.boolean().optional(),
+  detectedLanguageCode: languageCodeSchema.nullable().optional(),
+  detectedLanguageName: z.string().nullable().optional(),
 });
 export type SubjectResolveResult = z.infer<typeof subjectResolveResultSchema>;
 
@@ -87,6 +101,10 @@ export const curriculumTopicSchema = z.object({
   chapter: z.string().nullable().optional(),
   skipped: z.boolean(),
   source: curriculumTopicSourceSchema.optional(),
+  cefrLevel: cefrLevelSchema.nullable().optional(),
+  cefrSublevel: z.string().nullable().optional(),
+  targetWordCount: z.number().int().nullable().optional(),
+  targetChunkCount: z.number().int().nullable().optional(),
 });
 export type CurriculumTopic = z.infer<typeof curriculumTopicSchema>;
 
@@ -153,6 +171,10 @@ export const generatedTopicSchema = z.object({
   description: z.string(),
   relevance: topicRelevanceSchema,
   estimatedMinutes: z.number().int(),
+  cefrLevel: cefrLevelSchema.optional(),
+  cefrSublevel: z.string().optional(),
+  targetWordCount: z.number().int().optional(),
+  targetChunkCount: z.number().int().optional(),
 });
 export type GeneratedTopic = z.infer<typeof generatedTopicSchema>;
 

@@ -13,6 +13,7 @@ jest.mock('@eduagent/database', () => {
         query: {
           sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
           curriculumTopics: { findFirst: jest.fn().mockResolvedValue(null) },
+          subjects: { findFirst: jest.fn().mockResolvedValue(null) },
           streaks: { findFirst: jest.fn().mockResolvedValue(null) },
         },
         select: chainable,
@@ -29,6 +30,7 @@ jest.mock('@eduagent/database', () => {
       repetitions: col('repetitions'),
     },
     curriculumTopics: { id: col('id'), title: col('title') },
+    subjects: { id: col('id'), profileId: col('profileId') },
     streaks: { profileId: col('profileId') },
   };
 });
@@ -53,6 +55,27 @@ jest.mock('../../services/retention-data', () => ({
     mockUpdateRetentionFromSession(...args),
   updateNeedsDeepeningProgress: (...args: unknown[]) =>
     mockUpdateNeedsDeepeningProgress(...args),
+}));
+
+const mockGetCurrentLanguageProgress = jest.fn().mockResolvedValue(null);
+
+jest.mock('../../services/language-curriculum', () => ({
+  getCurrentLanguageProgress: (...args: unknown[]) =>
+    mockGetCurrentLanguageProgress(...args),
+}));
+
+const mockExtractVocabularyFromTranscript = jest.fn().mockResolvedValue([]);
+
+jest.mock('../../services/vocabulary-extract', () => ({
+  extractVocabularyFromTranscript: (...args: unknown[]) =>
+    mockExtractVocabularyFromTranscript(...args),
+}));
+
+const mockUpsertExtractedVocabulary = jest.fn().mockResolvedValue([]);
+
+jest.mock('../../services/vocabulary', () => ({
+  upsertExtractedVocabulary: (...args: unknown[]) =>
+    mockUpsertExtractedVocabulary(...args),
 }));
 
 const mockCreatePendingSessionSummary = jest.fn().mockResolvedValue(undefined);
@@ -237,7 +260,9 @@ describe('sessionCompleted', () => {
     expect(stepNames).toEqual([
       'process-verification-completion',
       'update-retention',
+      'update-vocabulary-retention',
       'update-needs-deepening',
+      'check-milestone-completion',
       'write-coaching-card',
       'update-dashboard',
       'generate-embeddings',
@@ -255,7 +280,18 @@ describe('sessionCompleted', () => {
     const statuses = result.outcomes
       .filter((o: any) => o.status !== 'skipped')
       .map((o: any) => o.status);
-    expect(statuses).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok']);
+    expect(statuses).toEqual([
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+    ]);
     // verification-completion step should be skipped for standard sessions
     const verificationOutcome = result.outcomes.find(
       (o: any) => o.step === 'process-verification-completion'

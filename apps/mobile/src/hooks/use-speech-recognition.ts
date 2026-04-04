@@ -40,6 +40,10 @@ type SpeechRecognitionModule = {
 type SpeechRecognitionModuleLoader =
   () => Promise<SpeechRecognitionModule | null>;
 
+interface UseSpeechRecognitionOptions {
+  lang?: string;
+}
+
 /**
  * Lazily resolve `ExpoSpeechRecognitionModule` from the dynamic import.
  * Returns `null` if the package is not installed / fails to load.
@@ -61,8 +65,17 @@ async function loadSpeechModule(): Promise<SpeechRecognitionModule | null> {
  * If unavailable, all functions gracefully degrade (error state).
  */
 export function useSpeechRecognition(
-  loadModule: SpeechRecognitionModuleLoader = loadSpeechModule
+  optionsOrLoadModule?:
+    | UseSpeechRecognitionOptions
+    | SpeechRecognitionModuleLoader,
+  maybeLoadModule?: SpeechRecognitionModuleLoader
 ): UseSpeechRecognitionResult {
+  const options =
+    typeof optionsOrLoadModule === 'function' ? undefined : optionsOrLoadModule;
+  const loadModule =
+    typeof optionsOrLoadModule === 'function'
+      ? optionsOrLoadModule
+      : maybeLoadModule ?? loadSpeechModule;
   const [status, setStatus] = useState<SpeechRecognitionStatus>('idle');
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -153,7 +166,7 @@ export function useSpeechRecognition(
         setStatus('listening');
       }
       speechModule.start({
-        lang: 'en-US',
+        lang: options?.lang ?? 'en-US',
         interimResults: true,
         continuous: true,
       });
@@ -165,7 +178,7 @@ export function useSpeechRecognition(
         setStatus('error');
       }
     }
-  }, [loadModule]);
+  }, [loadModule, options?.lang]);
 
   const stopListening = useCallback(async () => {
     try {

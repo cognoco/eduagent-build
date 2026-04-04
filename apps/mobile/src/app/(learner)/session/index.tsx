@@ -53,6 +53,7 @@ import {
 } from '../../../hooks/use-milestone-tracker';
 import { useApiClient } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
+import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
 import { useProfile } from '../../../lib/profile';
 import {
   clearSessionRecoveryMarker,
@@ -387,6 +388,13 @@ export default function SessionScreen() {
 
   const effectiveSubjectId = classifiedSubject?.subjectId ?? subjectId ?? '';
   const effectiveSubjectName = classifiedSubject?.subjectName ?? subjectName;
+  const activeSubject = availableSubjects.find(
+    (availableSubject) => availableSubject.id === effectiveSubjectId
+  );
+  const languageVoiceLocale =
+    activeSubject?.pedagogyMode === 'four_strands'
+      ? getVoiceLocaleForLanguage(activeSubject.languageCode)
+      : undefined;
   const switcherSubjectId = topicSwitcherSubjectId ?? effectiveSubjectId;
   const switcherCurriculum = useCurriculum(switcherSubjectId);
 
@@ -1831,6 +1839,8 @@ export default function SessionScreen() {
         onDraftChange={setDraftText}
         renderMessageActions={renderMessageActions}
         initialVoiceEnabled={inputMode === 'voice'}
+        speechRecognitionLanguage={languageVoiceLocale}
+        textToSpeechLanguage={languageVoiceLocale}
         footer={
           <>
             {exchangeCount === 0 && (

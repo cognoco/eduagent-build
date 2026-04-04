@@ -10,6 +10,7 @@ import type {
   LearningMode,
   AnalogyDomain,
   CelebrationLevel,
+  LanguageCode,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
@@ -284,6 +285,61 @@ export function useUpdateAnalogyDomain(
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['settings', 'analogy-domain', activeProfile?.id, subjectId],
+      });
+    },
+  });
+}
+
+export function useNativeLanguage(
+  subjectId: string
+): UseQueryResult<LanguageCode | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['settings', 'native-language', activeProfile?.id, subjectId],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.settings.subjects[':subjectId'][
+          'native-language'
+        ].$get({
+          param: { subjectId },
+          init: { signal },
+        } as never);
+        await assertOk(res);
+        const data = await res.json();
+        return data.nativeLanguage as LanguageCode | null;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!subjectId,
+  });
+}
+
+export function useUpdateNativeLanguage(
+  subjectId: string
+): UseMutationResult<LanguageCode | null, Error, LanguageCode | null> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
+
+  return useMutation({
+    mutationFn: async (nativeLanguage: LanguageCode | null) => {
+      const res = await client.settings.subjects[':subjectId'][
+        'native-language'
+      ].$put({
+        param: { subjectId },
+        json: { nativeLanguage },
+      });
+      await assertOk(res);
+      const data = await res.json();
+      return data.nativeLanguage as LanguageCode | null;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['settings', 'native-language', activeProfile?.id, subjectId],
       });
     },
   });

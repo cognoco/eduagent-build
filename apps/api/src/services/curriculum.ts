@@ -16,6 +16,7 @@ import { routeAndCall, type ChatMessage } from './llm';
 import { NotFoundError } from '../errors';
 import type {
   CurriculumInput,
+  CefrLevel,
   GeneratedTopic,
   Curriculum,
   CurriculumTopic,
@@ -31,6 +32,7 @@ import type {
   GeneratedBookTopic,
   GeneratedConnection,
 } from '@eduagent/schemas';
+import { regenerateLanguageCurriculum } from './language-curriculum';
 
 // ---------------------------------------------------------------------------
 // Curriculum generation service — pure business logic, no Hono imports
@@ -157,6 +159,10 @@ function mapTopicRow(
     chapter: row.chapter ?? null,
     skipped: row.skipped,
     source: row.source,
+    cefrLevel: row.cefrLevel as CurriculumTopic['cefrLevel'],
+    cefrSublevel: row.cefrSublevel ?? null,
+    targetWordCount: row.targetWordCount ?? null,
+    targetChunkCount: row.targetChunkCount ?? null,
   };
 }
 
@@ -375,6 +381,10 @@ export async function persistNarrowTopics(
       sortOrder: index,
       relevance: topic.relevance,
       estimatedMinutes: topic.estimatedMinutes,
+      cefrLevel: topic.cefrLevel ?? null,
+      cefrSublevel: topic.cefrSublevel ?? null,
+      targetWordCount: topic.targetWordCount ?? null,
+      targetChunkCount: topic.targetChunkCount ?? null,
     }))
   );
 }
@@ -820,6 +830,36 @@ export async function challengeCurriculum(
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subject) throw new NotFoundError('Subject');
 
+  if (subject.pedagogyMode === 'four_strands' && subject.languageCode) {
+    const latestCurriculum = await db.query.curricula.findFirst({
+      where: eq(curricula.subjectId, subjectId),
+      orderBy: desc(curricula.version),
+    });
+    const latestTopics = latestCurriculum
+      ? await db.query.curriculumTopics.findMany({
+          where: eq(curriculumTopics.curriculumId, latestCurriculum.id),
+          orderBy: asc(curriculumTopics.sortOrder),
+        })
+      : [];
+    const startingLevel =
+      (latestTopics.find((topic) => topic.cefrLevel)?.cefrLevel as
+        | CefrLevel
+        | undefined) ?? 'A1';
+
+    await regenerateLanguageCurriculum(
+      db,
+      subjectId,
+      subject.languageCode,
+      startingLevel
+    );
+
+    const result = await getCurriculum(db, profileId, subjectId);
+    if (!result) {
+      throw new Error('Failed to retrieve generated curriculum');
+    }
+    return result;
+  }
+
   // Load current curriculum to determine new version
   const current = await db.query.curricula.findFirst({
     where: eq(curricula.subjectId, subjectId),
@@ -899,6 +939,10 @@ export async function challengeCurriculum(
         sortOrder: i,
         relevance: t.relevance,
         estimatedMinutes: t.estimatedMinutes,
+        cefrLevel: t.cefrLevel ?? null,
+        cefrSublevel: t.cefrSublevel ?? null,
+        targetWordCount: t.targetWordCount ?? null,
+        targetChunkCount: t.targetChunkCount ?? null,
       }))
     );
   }

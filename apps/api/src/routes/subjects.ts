@@ -5,6 +5,7 @@ import {
   subjectUpdateSchema,
   subjectResolveInputSchema,
   subjectClassifyInputSchema,
+  languageSetupSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -13,6 +14,7 @@ import { requireProfileId } from '../middleware/profile-scope';
 import {
   listSubjects,
   createSubjectWithStructure,
+  configureLanguageSubject,
   getSubject,
   updateSubject,
 } from '../services/subject';
@@ -92,6 +94,34 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       );
     }
   })
+  .put(
+    '/subjects/:id/language-setup',
+    zValidator('json', languageSetupSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      try {
+        const subject = await configureLanguageSubject(
+          db,
+          profileId,
+          c.req.param('id'),
+          c.req.valid('json')
+        );
+        return c.json({ subject });
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Subject not found') {
+          return notFound(c, 'Subject not found');
+        }
+        if (
+          err instanceof Error &&
+          err.message === 'Subject is not configured for language learning'
+        ) {
+          return apiError(c, 422, ERROR_CODES.VALIDATION_ERROR, err.message);
+        }
+        throw err;
+      }
+    }
+  )
   .get('/subjects/:id', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));

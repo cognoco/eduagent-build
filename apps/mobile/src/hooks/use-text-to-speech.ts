@@ -18,6 +18,10 @@ export interface UseTextToSpeechResult {
   setRate: (rate: number) => void;
 }
 
+interface UseTextToSpeechOptions {
+  language?: string;
+}
+
 /**
  * Hook wrapping expo-speech for TTS playback.
  * Follows Option A (wait for complete response before speaking).
@@ -29,7 +33,9 @@ export interface UseTextToSpeechResult {
  * Three documented approaches: (1) defer to screen reader, (2) audio ducking,
  * (3) manual play button. Requires physical device testing. See FR149.
  */
-export function useTextToSpeech(): UseTextToSpeechResult {
+export function useTextToSpeech(
+  options?: UseTextToSpeechOptions
+): UseTextToSpeechResult {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [rate, setRateState] = useState(1.0);
@@ -45,38 +51,42 @@ export function useTextToSpeech(): UseTextToSpeechResult {
     };
   }, []);
 
-  const speak = useCallback((text: string) => {
-    // Stop any ongoing speech first
-    Speech.stop();
+  const speak = useCallback(
+    (text: string) => {
+      // Stop any ongoing speech first
+      Speech.stop();
 
-    lastTextRef.current = text;
-    setIsPaused(false);
+      lastTextRef.current = text;
+      setIsPaused(false);
 
-    Speech.speak(text, {
-      rate: rateRef.current,
-      onStart: () => {
-        if (mountedRef.current) setIsSpeaking(true);
-      },
-      onDone: () => {
-        if (mountedRef.current) {
-          setIsSpeaking(false);
-          setIsPaused(false);
-        }
-      },
-      onStopped: () => {
-        if (mountedRef.current) {
-          setIsSpeaking(false);
-          setIsPaused(false);
-        }
-      },
-      onError: () => {
-        if (mountedRef.current) {
-          setIsSpeaking(false);
-          setIsPaused(false);
-        }
-      },
-    });
-  }, []);
+      Speech.speak(text, {
+        rate: rateRef.current,
+        language: options?.language,
+        onStart: () => {
+          if (mountedRef.current) setIsSpeaking(true);
+        },
+        onDone: () => {
+          if (mountedRef.current) {
+            setIsSpeaking(false);
+            setIsPaused(false);
+          }
+        },
+        onStopped: () => {
+          if (mountedRef.current) {
+            setIsSpeaking(false);
+            setIsPaused(false);
+          }
+        },
+        onError: () => {
+          if (mountedRef.current) {
+            setIsSpeaking(false);
+            setIsPaused(false);
+          }
+        },
+      });
+    },
+    [options?.language]
+  );
 
   const stop = useCallback(() => {
     Speech.stop();

@@ -85,6 +85,29 @@ describe('useSpeechRecognition', () => {
     expect(result.current.isListening).toBe(true);
   });
 
+  it('uses the configured language when provided', async () => {
+    mockLoadSpeechModule.mockResolvedValue({
+      requestPermissionsAsync: mockRequestPermissionsAsync,
+      start: mockStart,
+      stop: mockStop,
+      addListener: mockAddListener,
+    });
+    const { result } = renderHook(() =>
+      useSpeechRecognition({ lang: 'es-ES' }, mockLoadSpeechModule)
+    );
+    await flushEffects();
+
+    await act(async () => {
+      await result.current.startListening();
+    });
+
+    expect(mockStart).toHaveBeenCalledWith({
+      lang: 'es-ES',
+      interimResults: true,
+      continuous: true,
+    });
+  });
+
   it('updates transcript from native result events', async () => {
     mockLoadSpeechModule.mockResolvedValue({
       requestPermissionsAsync: mockRequestPermissionsAsync,

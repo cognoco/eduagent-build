@@ -80,6 +80,18 @@ export default function CreateSubjectScreen() {
           return;
         }
 
+        if (result.subject.pedagogyMode === 'four_strands') {
+          router.replace({
+            pathname: '/(learner)/onboarding/language-setup',
+            params: {
+              subjectId: result.subject.id,
+              languageCode: result.subject.languageCode ?? '',
+              languageName: result.subject.name,
+            },
+          } as never);
+          return;
+        }
+
         router.replace({
           pathname: '/(learner)/onboarding/interview',
           params: {

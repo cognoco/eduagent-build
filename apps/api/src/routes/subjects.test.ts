@@ -74,17 +74,32 @@ jest.mock('../services/subject', () => ({
         name: input.name,
         rawInput: input.rawInput ?? null,
         status: 'active',
+        pedagogyMode: 'socratic',
+        languageCode: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
       structureType: 'narrow',
     })),
+  configureLanguageSubject: jest.fn().mockResolvedValue({
+    id: 'test-subject-id',
+    profileId: 'test-profile-id',
+    name: 'Spanish',
+    rawInput: 'Learn Spanish',
+    status: 'active',
+    pedagogyMode: 'four_strands',
+    languageCode: 'es',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
   getSubject: jest.fn().mockResolvedValue({
     id: 'test-subject-id',
     profileId: 'test-account-id',
     name: 'Mathematics',
     rawInput: null,
     status: 'active',
+    pedagogyMode: 'socratic',
+    languageCode: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }),
@@ -94,6 +109,8 @@ jest.mock('../services/subject', () => ({
     name: 'Updated Subject',
     rawInput: null,
     status: 'active',
+    pedagogyMode: 'socratic',
+    languageCode: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }),
@@ -230,6 +247,8 @@ describe('subject routes', () => {
             name: input.name,
             rawInput: null,
             status: 'active',
+            pedagogyMode: 'socratic',
+            languageCode: null,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           },
@@ -297,6 +316,116 @@ describe('subject routes', () => {
           method: 'POST',
           body: JSON.stringify({ name: 'Mathematics' }),
           headers: { 'Content-Type': 'application/json' },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // PUT /v1/subjects/:id/language-setup
+  // -------------------------------------------------------------------------
+
+  describe('PUT /v1/subjects/:id/language-setup', () => {
+    it('returns 200 with configured language subject', async () => {
+      const res = await app.request(
+        '/v1/subjects/test-subject-id/language-setup',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            nativeLanguage: 'en',
+            startingLevel: 'A2',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.subject).toBeDefined();
+      expect(body.subject.pedagogyMode).toBe('four_strands');
+      expect(body.subject.languageCode).toBe('es');
+    });
+
+    it('returns 404 when subject is missing', async () => {
+      const { configureLanguageSubject } = jest.requireMock(
+        '../services/subject'
+      );
+      configureLanguageSubject.mockRejectedValueOnce(
+        new Error('Subject not found')
+      );
+
+      const res = await app.request(
+        '/v1/subjects/missing/language-setup',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            nativeLanguage: 'en',
+            startingLevel: 'A1',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 422 when subject is not a language subject', async () => {
+      const { configureLanguageSubject } = jest.requireMock(
+        '../services/subject'
+      );
+      configureLanguageSubject.mockRejectedValueOnce(
+        new Error('Subject is not configured for language learning')
+      );
+
+      const res = await app.request(
+        '/v1/subjects/test-subject-id/language-setup',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            nativeLanguage: 'en',
+            startingLevel: 'A1',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(422);
+    });
+
+    it('returns 400 with invalid body', async () => {
+      const res = await app.request(
+        '/v1/subjects/test-subject-id/language-setup',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            nativeLanguage: 'en',
+            startingLevel: 'Z9',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        '/v1/subjects/test-subject-id/language-setup',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nativeLanguage: 'en',
+            startingLevel: 'A1',
+          }),
         },
         TEST_ENV
       );
