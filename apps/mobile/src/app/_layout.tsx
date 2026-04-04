@@ -325,13 +325,20 @@ export default function RootLayout() {
 
   const dismissSplash = useCallback(() => setShowSplash(false), []);
 
-  // Safety timeout: force-dismiss splash after 3.5s if animation callback never fires.
-  // Bug #9 fix: reduced from 4s → 3.5s primary, plus a hard 5s failsafe that
-  // always fires regardless of React lifecycle / Reanimated callback issues.
+  // Safety timeout: force-dismiss splash if animation callback never fires.
+  // Diagnostic: log which path dismisses the splash so we can identify the bug.
   useEffect(() => {
     if (!showSplash) return;
-    const primary = setTimeout(dismissSplash, 3500);
-    const failsafe = setTimeout(() => setShowSplash(false), 5000);
+    const primary = setTimeout(() => {
+      console.warn(
+        '[Splash] DISMISSED by primary timeout (3.5s) — animation callback never fired'
+      );
+      dismissSplash();
+    }, 3500);
+    const failsafe = setTimeout(() => {
+      console.warn('[Splash] DISMISSED by failsafe timeout (5s)');
+      setShowSplash(false);
+    }, 5000);
     return () => {
       clearTimeout(primary);
       clearTimeout(failsafe);

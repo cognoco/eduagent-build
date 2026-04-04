@@ -1,0 +1,76 @@
+import { ScrollView, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { DashboardData } from '@eduagent/schemas';
+import { ProfileSwitcher } from '../common';
+import { useDashboard } from '../../hooks/use-dashboard';
+import { useProfile } from '../../lib/profile';
+import { getGreeting } from '../../lib/greeting';
+import { IntentCard } from './IntentCard';
+
+function getChildHighlight(dashboard: DashboardData | undefined): string {
+  if (!dashboard || dashboard.children.length === 0) {
+    return "See how they're doing";
+  }
+
+  const child = [...dashboard.children].sort(
+    (a, b) => b.totalTimeThisWeek - a.totalTimeThisWeek
+  )[0];
+
+  if (!child) {
+    return "See how they're doing";
+  }
+
+  if (child.totalTimeThisWeek > 0) {
+    const minutes = Math.round(child.totalTimeThisWeek / 60);
+    return `${child.displayName} practiced ${minutes} min this week`;
+  }
+
+  return 'No activity today';
+}
+
+export function ParentGateway(): React.ReactElement {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { profiles, activeProfile, switchProfile } = useProfile();
+  const { data: dashboard } = useDashboard();
+  const { title, subtitle } = getGreeting(activeProfile?.displayName ?? '');
+
+  return (
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerStyle={{
+        paddingTop: insets.top + 16,
+        paddingHorizontal: 20,
+        paddingBottom: insets.bottom + 24,
+      }}
+      testID="parent-gateway"
+    >
+      <View className="flex-row items-center justify-between mb-6">
+        <View className="flex-1 me-3">
+          <Text className="text-h2 font-bold text-text-primary">{title}</Text>
+          <Text className="text-body text-text-secondary mt-1">{subtitle}</Text>
+        </View>
+        <ProfileSwitcher
+          profiles={profiles}
+          activeProfileId={activeProfile?.id ?? ''}
+          onSwitch={switchProfile}
+        />
+      </View>
+
+      <View className="gap-4">
+        <IntentCard
+          title="Check child's progress"
+          subtitle={getChildHighlight(dashboard)}
+          onPress={() => router.push('/(parent)/dashboard' as never)}
+          testID="gateway-check-progress"
+        />
+        <IntentCard
+          title="Learn something"
+          onPress={() => router.push('/(learner)/learn' as never)}
+          testID="gateway-learn"
+        />
+      </View>
+    </ScrollView>
+  );
+}

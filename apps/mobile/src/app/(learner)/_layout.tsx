@@ -397,7 +397,7 @@ function ConsentWithdrawnGate(): React.ReactElement {
       {canSwitchFromConsentGate(activeProfile, profiles) && (
         <Pressable
           onPress={() => {
-            const other = profiles.find((p) => p.id !== activeProfile!.id);
+            const other = profiles.find((p) => p.id !== activeProfile?.id);
             if (other) void switchProfile(other.id);
           }}
           className="bg-surface rounded-button py-3.5 px-8 items-center mb-3 w-full"
@@ -580,7 +580,7 @@ function ConsentPendingGate(): React.ReactElement {
       {canSwitchFromConsentGate(activeProfile, profiles) && (
         <Pressable
           onPress={() => {
-            const other = profiles.find((p) => p.id !== activeProfile!.id);
+            const other = profiles.find((p) => p.id !== activeProfile?.id);
             if (other) void switchProfile(other.id);
           }}
           className="py-3.5 px-8 items-center mb-3 w-full"
@@ -609,7 +609,6 @@ function ConsentPendingGate(): React.ReactElement {
 
 export default function LearnerLayout() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { persona } = useTheme();
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
@@ -657,7 +656,6 @@ export default function LearnerLayout() {
 
   if (!isLoaded) return null;
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
-  if (persona === 'parent') return <Redirect href="/(parent)/dashboard" />;
 
   // Show a centered spinner while profiles load — never return null (blank
   // screen) because the loading state also fires after switchProfile resets
@@ -791,6 +789,20 @@ export default function LearnerLayout() {
         />
         <Tabs.Screen
           name="subject"
+          options={{
+            href: null,
+            tabBarItemStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="learn"
+          options={{
+            href: null,
+            tabBarItemStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="learn-new"
           options={{
             href: null,
             tabBarItemStyle: { display: 'none' },
