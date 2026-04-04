@@ -150,7 +150,11 @@ describe('SignInScreen', () => {
     });
   });
 
-  it('offers verification without sending a code automatically', async () => {
+  // ---------------------------------------------------------------------------
+  // Client Trust / verification flow — auto-send behavior
+  // ---------------------------------------------------------------------------
+
+  it('auto-sends verification code when first factor is required (Client Trust)', async () => {
     mockCreate.mockResolvedValue({
       status: 'needs_first_factor',
       createdSessionId: null,
@@ -173,16 +177,124 @@ describe('SignInScreen', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
 
+    // Auto-send: prepareFirstFactor called without user tapping a button
+    await waitFor(() => {
+      expect(mockPrepareFirstFactor).toHaveBeenCalledWith({
+        strategy: 'email_code',
+        emailAddressId: 'email_123',
+      });
+    });
+
+    // Goes straight to code entry screen (no intermediate banner)
+    await waitFor(() => {
+      expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('sign-in-verification-offer')).toBeNull();
+  });
+
+  it('completes first-factor verification end-to-end', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_first_factor',
+      createdSessionId: null,
+      supportedFirstFactors: [
+        {
+          strategy: 'email_code',
+          emailAddressId: 'email_123',
+          safeIdentifier: 't***@example.com',
+        },
+      ],
+    });
+    mockPrepareFirstFactor.mockResolvedValue(undefined);
+    mockAttemptFirstFactor.mockResolvedValue({
+      status: 'complete',
+      createdSessionId: 'sess_first_factor_ok',
+    });
+    mockSetActive.mockResolvedValue(undefined);
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    // Wait for auto-send → code entry screen
+    await waitFor(() => {
+      expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+    });
+
+    // Enter code and verify
+    fireEvent.changeText(screen.getByTestId('sign-in-verify-code'), '123456');
+    fireEvent.press(screen.getByTestId('sign-in-verify-button'));
+
+    await waitFor(() => {
+      expect(mockAttemptFirstFactor).toHaveBeenCalledWith({
+        strategy: 'email_code',
+        code: '123456',
+      });
+    });
+
+    await waitFor(() => {
+      expect(mockSetActive).toHaveBeenCalledWith({
+        session: 'sess_first_factor_ok',
+      });
+    });
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+    });
+  });
+
+  it('falls back to manual verification banner when auto-send fails', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_first_factor',
+      createdSessionId: null,
+      supportedFirstFactors: [
+        {
+          strategy: 'email_code',
+          emailAddressId: 'email_123',
+          safeIdentifier: 't***@example.com',
+        },
+      ],
+    });
+    // Auto-send fails (e.g. rate limited)
+    mockPrepareFirstFactor.mockRejectedValueOnce(
+      new Error('Too many requests')
+    );
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    // Falls back to the passive banner (no code entry screen yet)
     await waitFor(() => {
       expect(screen.getByTestId('sign-in-verification-offer')).toBeTruthy();
     });
-
-    expect(mockPrepareFirstFactor).not.toHaveBeenCalled();
     expect(screen.queryByTestId('sign-in-verify-code')).toBeNull();
     expect(screen.getByText('Send verification code')).toBeTruthy();
+
+    // User can manually retry from the banner
+    mockPrepareFirstFactor.mockResolvedValueOnce(undefined);
+    fireEvent.press(screen.getByTestId('sign-in-start-verification'));
+
+    await waitFor(() => {
+      expect(mockPrepareFirstFactor).toHaveBeenCalledTimes(2);
+    });
+
+    // Now shows code entry screen
+    await waitFor(() => {
+      expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+    });
   });
 
-  it('continues sign-in with an emailed second-factor code', async () => {
+  it('auto-sends verification code for second factor and completes', async () => {
     mockCreate.mockResolvedValue({
       status: 'needs_second_factor',
       createdSessionId: null,
@@ -210,14 +322,7 @@ describe('SignInScreen', () => {
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('sign-in-verification-offer')).toBeTruthy();
-    });
-
-    expect(mockPrepareSecondFactor).not.toHaveBeenCalled();
-
-    fireEvent.press(screen.getByTestId('sign-in-start-verification'));
-
+    // Auto-send: prepareSecondFactor called without user tapping a button
     await waitFor(() => {
       expect(mockPrepareSecondFactor).toHaveBeenCalledWith({
         strategy: 'email_code',
@@ -225,6 +330,12 @@ describe('SignInScreen', () => {
       });
     });
 
+    // Goes straight to code entry screen
+    await waitFor(() => {
+      expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+    });
+
+    // Enter code and verify
     fireEvent.changeText(screen.getByTestId('sign-in-verify-code'), '123456');
     fireEvent.press(screen.getByTestId('sign-in-verify-button'));
 
@@ -246,11 +357,128 @@ describe('SignInScreen', () => {
     });
   });
 
-  it('shows a generic unsupported verification message for non-email MFA methods', async () => {
+  // ---------------------------------------------------------------------------
+  // TOTP (authenticator app) 2FA
+  // ---------------------------------------------------------------------------
+
+  it('goes straight to TOTP code entry without prepare step', async () => {
     mockCreate.mockResolvedValue({
       status: 'needs_second_factor',
       createdSessionId: null,
       supportedSecondFactors: [{ strategy: 'totp' }],
+    });
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    // Goes straight to code entry — no prepare call needed for TOTP
+    await waitFor(() => {
+      expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+    });
+    expect(screen.getByText('Enter authenticator code')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Open your authenticator app and enter the 6-digit code.'
+      )
+    ).toBeTruthy();
+
+    // No prepare calls — TOTP codes are generated locally
+    expect(mockPrepareFirstFactor).not.toHaveBeenCalled();
+    expect(mockPrepareSecondFactor).not.toHaveBeenCalled();
+
+    // No "Resend code" button for TOTP
+    expect(screen.queryByTestId('sign-in-resend-code')).toBeNull();
+  });
+
+  it('completes TOTP second-factor verification end-to-end', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [{ strategy: 'totp' }],
+    });
+    mockAttemptSecondFactor.mockResolvedValue({
+      status: 'complete',
+      createdSessionId: 'sess_totp_ok',
+    });
+    mockSetActive.mockResolvedValue(undefined);
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    // Wait for code entry screen
+    await waitFor(() => {
+      expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+    });
+
+    // Enter TOTP code and verify
+    fireEvent.changeText(screen.getByTestId('sign-in-verify-code'), '482901');
+    fireEvent.press(screen.getByTestId('sign-in-verify-button'));
+
+    await waitFor(() => {
+      expect(mockAttemptSecondFactor).toHaveBeenCalledWith({
+        strategy: 'totp',
+        code: '482901',
+      });
+    });
+
+    await waitFor(() => {
+      expect(mockSetActive).toHaveBeenCalledWith({
+        session: 'sess_totp_ok',
+      });
+    });
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
+    });
+  });
+
+  it('prefers TOTP over email_code when both are available as second factor', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [
+        {
+          strategy: 'email_code',
+          emailAddressId: 'email_789',
+          safeIdentifier: 't***@example.com',
+        },
+        { strategy: 'totp' },
+      ],
+    });
+
+    render(<SignInScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com'
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    // Should use TOTP (no prepare, no email sent)
+    await waitFor(() => {
+      expect(screen.getByText('Enter authenticator code')).toBeTruthy();
+    });
+    expect(mockPrepareSecondFactor).not.toHaveBeenCalled();
+  });
+
+  it('shows unsupported message for unknown MFA methods', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [{ strategy: 'webauthn' }],
     });
 
     render(<SignInScreen />);
@@ -270,6 +498,10 @@ describe('SignInScreen', () => {
       ).toBeTruthy();
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // SSO sign-in
+  // ---------------------------------------------------------------------------
 
   it('calls startSSOFlow for Google and navigates on success', async () => {
     mockStartSSOFlow.mockResolvedValue({
@@ -330,6 +562,22 @@ describe('SignInScreen', () => {
     await waitFor(() => {
       expect(screen.getByText('OAuth provider error')).toBeTruthy();
     });
+  });
+
+  it('shows error when SSO returns no session', async () => {
+    mockStartSSOFlow.mockResolvedValue({
+      createdSessionId: null,
+    });
+
+    render(<SignInScreen />);
+    fireEvent.press(screen.getByTestId('google-sso-button'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Sign-in could not be completed. Please try again.')
+      ).toBeTruthy();
+    });
+    expect(mockSetActive).not.toHaveBeenCalled();
   });
 
   it('calls startSSOFlow for OpenAI when configured', async () => {

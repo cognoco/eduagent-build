@@ -50,6 +50,10 @@ type VerificationState =
       strategy: 'phone_code';
       identifier: string;
       phoneNumberId?: string;
+    }
+  | {
+      stage: VerificationStage;
+      strategy: 'totp';
     };
 
 type EmailCodeFactor = {
@@ -62,6 +66,10 @@ type PhoneCodeFactor = {
   strategy: 'phone_code';
   phoneNumberId?: string;
   safeIdentifier?: string;
+};
+
+type TotpFactor = {
+  strategy: 'totp';
 };
 
 type SignInAttemptLike = {
@@ -88,6 +96,15 @@ function isPhoneCodeFactor(factor: unknown): factor is PhoneCodeFactor {
     factor !== null &&
     'strategy' in factor &&
     factor.strategy === 'phone_code'
+  );
+}
+
+function isTotpFactor(factor: unknown): factor is TotpFactor {
+  return (
+    typeof factor === 'object' &&
+    factor !== null &&
+    'strategy' in factor &&
+    factor.strategy === 'totp'
   );
 }
 
@@ -234,6 +251,16 @@ export default function SignInScreen() {
       }
 
       if (attempt.status === 'needs_second_factor') {
+        // TOTP (authenticator app) takes priority — no network round-trip needed
+        const totpFactor =
+          attempt.supportedSecondFactors?.find(isTotpFactor) ?? null;
+        if (totpFactor) {
+          return {
+            stage: 'second_factor',
+            strategy: 'totp',
+          } as const;
+        }
+
         const emailFactor =
           attempt.supportedSecondFactors?.find(isEmailCodeFactor) ?? null;
         if (emailFactor) {
@@ -269,21 +296,27 @@ export default function SignInScreen() {
         throw new Error('Authentication not loaded.');
       }
 
-      if (step.stage === 'first_factor' && step.strategy === 'email_code') {
-        await signIn.prepareFirstFactor({
-          strategy: 'email_code',
-          emailAddressId: step.emailAddressId,
-        });
-      } else if (step.strategy === 'email_code') {
-        await signIn.prepareSecondFactor({
-          strategy: 'email_code',
-          emailAddressId: step.emailAddressId,
-        });
-      } else {
-        await signIn.prepareSecondFactor({
-          strategy: 'phone_code',
-          ...(step.phoneNumberId ? { phoneNumberId: step.phoneNumberId } : {}),
-        });
+      // TOTP doesn't need a prepare step — the authenticator app generates
+      // codes locally. Go straight to the code entry screen.
+      if (step.strategy !== 'totp') {
+        if (step.stage === 'first_factor' && step.strategy === 'email_code') {
+          await signIn.prepareFirstFactor({
+            strategy: 'email_code',
+            emailAddressId: step.emailAddressId,
+          });
+        } else if (step.strategy === 'email_code') {
+          await signIn.prepareSecondFactor({
+            strategy: 'email_code',
+            emailAddressId: step.emailAddressId,
+          });
+        } else {
+          await signIn.prepareSecondFactor({
+            strategy: 'phone_code',
+            ...(step.phoneNumberId
+              ? { phoneNumberId: step.phoneNumberId }
+              : {}),
+          });
+        }
       }
 
       setVerificationOffer(null);
@@ -297,9 +330,18 @@ export default function SignInScreen() {
     async (attempt: SignInAttemptLike) => {
       const nextVerificationStep = getVerificationStep(attempt);
       if (nextVerificationStep) {
-        setVerificationOffer(nextVerificationStep);
-        setPendingVerification(null);
-        setCode('');
+        // Auto-send the verification code instead of showing the passive
+        // "Additional verification available" banner.  Client Trust in Clerk
+        // keeps re-enabling itself; this makes the flow seamless regardless.
+        try {
+          await startVerificationFlow(nextVerificationStep);
+        } catch {
+          // If auto-send fails, fall back to the manual offer banner so the
+          // user can still tap "Send verification code" themselves.
+          setVerificationOffer(nextVerificationStep);
+          setPendingVerification(null);
+          setCode('');
+        }
         return;
       }
 
@@ -324,7 +366,7 @@ export default function SignInScreen() {
 
       setError('Sign-in could not be completed. Please try again.');
     },
-    [clearVerificationFlow, getVerificationStep]
+    [clearVerificationFlow, getVerificationStep, startVerificationFlow]
   );
 
   const onSignInPress = useCallback(async () => {
@@ -393,7 +435,9 @@ export default function SignInScreen() {
       const result =
         pendingVerification.stage === 'first_factor'
           ? await signIn.attemptFirstFactor({
-              strategy: pendingVerification.strategy,
+              strategy: pendingVerification.strategy as
+                | 'email_code'
+                | 'phone_code',
               code,
             })
           : await signIn.attemptSecondFactor({
@@ -442,7 +486,7 @@ export default function SignInScreen() {
           strategy: 'email_code',
           emailAddressId: pendingVerification.emailAddressId,
         });
-      } else {
+      } else if (pendingVerification.strategy === 'phone_code') {
         await signIn.prepareSecondFactor({
           strategy: 'phone_code',
           ...(pendingVerification.phoneNumberId
@@ -481,17 +525,25 @@ export default function SignInScreen() {
         >
           <View className="flex-1" style={{ minHeight: 40 }} />
           <Text className="text-h2 font-bold text-text-primary mb-1">
-            Enter verification code
+            {pendingVerification.strategy === 'totp'
+              ? 'Enter authenticator code'
+              : 'Enter verification code'}
           </Text>
           <Text className="text-body-sm text-text-secondary mb-6">
-            We sent a verification code to{' '}
-            <Text
-              className="text-body-sm text-text-secondary font-semibold"
-              numberOfLines={1}
-              ellipsizeMode="middle"
-            >
-              {pendingVerification.identifier}
-            </Text>
+            {pendingVerification.strategy === 'totp' ? (
+              'Open your authenticator app and enter the 6-digit code.'
+            ) : (
+              <>
+                We sent a verification code to{' '}
+                <Text
+                  className="text-body-sm text-text-secondary font-semibold"
+                  numberOfLines={1}
+                  ellipsizeMode="middle"
+                >
+                  {pendingVerification.identifier}
+                </Text>
+              </>
+            )}
           </Text>
 
           {error !== '' && (
@@ -529,16 +581,18 @@ export default function SignInScreen() {
             testID="sign-in-verify-button"
           />
 
-          <View className="flex-row justify-center mt-4">
-            <Button
-              variant="tertiary"
-              size="small"
-              label="Resend code"
-              onPress={onResendCode}
-              loading={resending}
-              testID="sign-in-resend-code"
-            />
-          </View>
+          {pendingVerification.strategy !== 'totp' && (
+            <View className="flex-row justify-center mt-4">
+              <Button
+                variant="tertiary"
+                size="small"
+                label="Resend code"
+                onPress={onResendCode}
+                loading={resending}
+                testID="sign-in-resend-code"
+              />
+            </View>
+          )}
 
           <View className="flex-row justify-center mt-2">
             <Button
@@ -712,7 +766,9 @@ export default function SignInScreen() {
             <Text className="text-body-sm text-text-secondary mt-2">
               This account can continue with a verification code sent to{' '}
               <Text className="font-semibold text-text-primary">
-                {verificationOffer.identifier}
+                {'identifier' in verificationOffer
+                  ? verificationOffer.identifier
+                  : 'your device'}
               </Text>
               . We will only send the code if you choose to continue.
             </Text>

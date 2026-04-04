@@ -97,7 +97,7 @@ jest.mock('../../../components/session', () => ({
   getOpeningMessage: jest.fn().mockReturnValue('Let us tackle this worksheet.'),
   SessionTimer: () => null,
   QuestionCounter: () => null,
-  LearningBookPrompt: () => null,
+  LibraryPrompt: () => null,
   SessionInputModeToggle: () => null,
 }));
 

@@ -21,7 +21,7 @@ export interface RecallTestResult {
   passed: boolean;
   newState: RetentionState;
   xpChange: 'verified' | 'decayed' | 'none';
-  failureAction?: 'feedback_only' | 'redirect_to_learning_book';
+  failureAction?: 'feedback_only' | 'redirect_to_library';
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ export function createInitialRetentionState(topicId: string): RetentionState {
  * - failureCount incremented, consecutiveSuccesses reset
  * - XP decays proportionally
  * - Failure 1-2: feedback_only
- * - Failure 3+: redirect_to_learning_book
+ * - Failure 3+: redirect_to_library
  */
 export function processRecallResult(
   state: RetentionState,
@@ -135,7 +135,7 @@ export function processRecallResult(
   };
 
   const failureAction: RecallTestResult['failureAction'] =
-    newFailureCount >= 3 ? 'redirect_to_learning_book' : 'feedback_only';
+    newFailureCount >= 3 ? 'redirect_to_library' : 'feedback_only';
 
   return {
     passed: false,

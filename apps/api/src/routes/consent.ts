@@ -8,6 +8,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
+import { requireProfileId } from '../middleware/profile-scope';
 import { getProfile } from '../services/profile';
 import {
   requestConsent,
@@ -36,7 +37,7 @@ type ConsentRouteEnv = {
     user: AuthUser;
     db: Database;
     account: Account;
-    profileId: string;
+    profileId: string | undefined;
   };
 };
 
@@ -133,6 +134,8 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     }
   )
   .get('/consent/my-status', async (c) => {
+    // This route intentionally works without a profile —
+    // returns null values when no profile is resolved.
     const profileId = c.get('profileId');
     if (!profileId) {
       return c.json({
@@ -153,7 +156,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
   // Get consent status for a child (parent view, includes respondedAt for countdown)
   .get('/consent/:childProfileId/status', async (c) => {
     const db = c.get('db');
-    const parentProfileId = c.get('profileId');
+    const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('childProfileId');
 
     try {
@@ -185,7 +188,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
   // Revoke consent for a child (parent-initiated, GDPR Art. 7(3))
   .put('/consent/:childProfileId/revoke', async (c) => {
     const db = c.get('db');
-    const parentProfileId = c.get('profileId');
+    const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('childProfileId');
 
     try {
@@ -234,7 +237,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
   // Restore consent (cancel revocation, within 7-day grace period)
   .put('/consent/:childProfileId/restore', async (c) => {
     const db = c.get('db');
-    const parentProfileId = c.get('profileId');
+    const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('childProfileId');
 
     try {

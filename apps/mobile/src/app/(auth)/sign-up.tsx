@@ -84,7 +84,10 @@ export default function SignUpScreen() {
             return;
           }
           router.replace('/(learner)/home');
+          return;
         }
+
+        setError('Sign-up could not be completed. Please try again.');
       } catch (err: unknown) {
         setError(extractClerkError(err));
       } finally {

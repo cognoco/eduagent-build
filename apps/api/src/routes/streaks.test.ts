@@ -28,6 +28,16 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
+jest.mock('../services/profile', () => ({
+  findOwnerProfile: jest.fn().mockResolvedValue(null),
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+}));
+
 jest.mock('../services/streaks', () => ({
   getStreakData: jest.fn(),
   getXpSummary: jest.fn(),
@@ -47,6 +57,7 @@ const TEST_ENV = {
 const AUTH_HEADERS = {
   Authorization: 'Bearer valid.jwt.token',
   'Content-Type': 'application/json',
+  'X-Profile-Id': 'test-profile-id',
 };
 
 beforeEach(() => {

@@ -18,7 +18,7 @@ interface RecallTestResult {
   passed: boolean;
   failureCount: number;
   hint?: string;
-  failureAction?: 'feedback_only' | 'redirect_to_learning_book';
+  failureAction?: 'feedback_only' | 'redirect_to_library';
   remediation?: {
     cooldownEndsAt: string;
     suggestionText: string;

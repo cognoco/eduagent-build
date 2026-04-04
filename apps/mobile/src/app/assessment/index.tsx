@@ -60,7 +60,7 @@ export default function AssessmentScreen() {
                 role: 'ai',
                 content: `You've got a solid grasp of most of this \u2014 ${Math.round(
                   evaluation.masteryScore * 100
-                )}% mastery! The areas to revisit will show up in your Learning Book.`,
+                )}% mastery! The areas to revisit will show up in your Library.`,
               },
             ]);
           }

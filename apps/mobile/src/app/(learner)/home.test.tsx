@@ -297,7 +297,7 @@ describe('HomeScreen session recovery', () => {
     });
   });
 
-  it('routes curriculum-complete cards to add-subject and Learning Book', async () => {
+  it('routes curriculum-complete cards to add-subject and Library', async () => {
     mockHomeCardsData.cards = [
       {
         id: 'curriculum_complete',
@@ -326,7 +326,7 @@ describe('HomeScreen session recovery', () => {
     fireEvent.press(screen.getByText('Keep reviewing'));
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/(learner)/book');
+      expect(mockPush).toHaveBeenCalledWith('/(learner)/library');
     });
   });
 });

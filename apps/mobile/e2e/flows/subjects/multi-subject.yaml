@@ -31,7 +31,7 @@ tags:
 - assertVisible:
     id: "tab-home"
 - assertVisible:
-    id: "tab-book"
+    id: "tab-library"
 - assertVisible:
     id: "tab-more"
 
@@ -66,17 +66,17 @@ tags:
 - assertNotVisible:
     text: "Start learning — add your first subject"
 
-# 5. Navigate to Learning Book tab
-- tapOn: "Learning Book Tab"
+# 5. Navigate to Library tab
+- tapOn: "Library Tab"
 
-# 6. Wait for Learning Book to render
+# 6. Wait for Library to render
 - extendedWaitUntil:
     visible:
-      text: "Learning Book"
+      text: "Library"
     timeout: 10000
 
-# 7. Screenshot: Learning Book content
-- takeScreenshot: multi-subject-02-learning-book
+# 7. Screenshot: Library content
+- takeScreenshot: multi-subject-02-library
 
 # 8. Navigate back to Home tab
 - tapOn: "Home Tab"

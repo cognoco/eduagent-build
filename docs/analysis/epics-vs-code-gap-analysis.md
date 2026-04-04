@@ -18,7 +18,7 @@ The previous draft overstated several learner-facing gaps. After re-checking the
 
 - a ranked 2-3 card learner home surface with dismiss controls
 - in-session parking lot UI
-- Learning Book multi-subject browsing plus pause/resume/archive/restore controls
+- Library multi-subject browsing plus pause/resume/archive/restore controls
 - a learner-facing "Why this order?" flow in curriculum review
 
 The learner session surface is also stronger now than it was in the prior draft. It has per-message feedback, contextual quick chips (`I know this`, `Explain differently`, `Too easy`, `Too hard`, plus hint/example), a topic-switch sheet, parking lot access, a wrong-subject recovery chip, toast confirmations, and a visible `Guided` / `Independent` badge.
@@ -80,15 +80,15 @@ The remaining gap is architectural parity with Epic 12, not absence of the learn
 
 This is not backend-only anymore. Learners can open a parking lot sheet, save questions, and view parked items during the session.
 
-### 3. Learning Book subject lifecycle is already implemented for multi-subject use
+### 3. Library subject lifecycle is already implemented for multi-subject use
 
-- `apps/mobile/src/app/(learner)/book.tsx`
+- `apps/mobile/src/app/(learner)/library.tsx`
 - `apps/mobile/src/hooks/use-subjects.ts`
 - `apps/api/src/routes/subjects.ts`
 - `apps/api/src/services/subject.ts`
 - `apps/api/src/inngest/functions/subject-auto-archive.ts`
 
-The Learning Book now supports:
+The Library now supports:
 
 - multi-subject browsing with filter tabs
 - loading retention data across all subjects via `useQueries`
@@ -206,7 +206,7 @@ These are places where the implementation is ahead of the stories/status notes. 
 
 - Update `epics.md` and any PRD/source-of-truth docs to reflect the features that are already live:
   - parking lot learner UI
-  - Learning Book subject lifecycle controls
+  - Library subject lifecycle controls
   - learner-facing `Why this order?`
   - current learner session agency controls
   - voice mode
@@ -700,7 +700,7 @@ Date: 2026-04-03
 ## Scope
 
 - Reviewed Epic 3 expectations from `docs/epics.md` against the current assessment, retention, adaptive-teaching, EVALUATE, TEACH_BACK, and teaching-preference code in `apps/api/src`, `apps/mobile/src`, and `packages/*`.
-- Reviewed Epic 4 expectations from `docs/epics.md` against the current progress, streak, XP, Learning Book, topic-detail, notification, and parent-dashboard code in `apps/api/src` and `apps/mobile/src`.
+- Reviewed Epic 4 expectations from `docs/epics.md` against the current progress, streak, XP, Library, topic-detail, notification, and parent-dashboard code in `apps/api/src` and `apps/mobile/src`.
 - This pass was code-inspection based. I did not rerun the full test suite.
 
 ## Findings
@@ -746,7 +746,7 @@ Date: 2026-04-03
 
 - Evidence:
   - The server-side progress service already computes retention from `nextReviewAt`: `apps/api/src/services/progress.ts:240-253`.
-  - The Learning Book re-derives topic retention from `failureCount`, `xpStatus`, `repetitions`, and `easeFactor`, ignoring `nextReviewAt`: `apps/mobile/src/app/(learner)/book.tsx:67-75`.
+  - The Library re-derives topic retention from `failureCount`, `xpStatus`, `repetitions`, and `easeFactor`, ignoring `nextReviewAt`: `apps/mobile/src/app/(learner)/library.tsx:67-75`.
   - Topic detail does the same: `apps/mobile/src/app/(learner)/topic/[topicId].tsx:18-30`.
 - Impact:
   - Overdue topics can still render as `strong` or `fading` if their ease factor is high enough.

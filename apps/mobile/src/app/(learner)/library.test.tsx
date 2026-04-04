@@ -91,9 +91,9 @@ function createWrapper() {
   };
 }
 
-const LearningBookScreen = require('./book').default;
+const LibraryScreen = require('./library').default;
 
-describe('LearningBookScreen', () => {
+describe('LibraryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseQueries.mockReturnValue([]);
@@ -106,9 +106,9 @@ describe('LearningBookScreen', () => {
       isLoading: true,
     });
 
-    render(<LearningBookScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('learning-book-loading')).toBeTruthy();
+    expect(screen.getByTestId('library-loading')).toBeTruthy();
     expect(screen.getByText('Loading your subjects...')).toBeTruthy();
   });
 
@@ -119,9 +119,9 @@ describe('LearningBookScreen', () => {
       isLoading: false,
     });
 
-    render(<LearningBookScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('learning-book-empty')).toBeTruthy();
+    expect(screen.getByTestId('library-empty')).toBeTruthy();
     expect(
       screen.getByText('No topics yet — add a subject to get started')
     ).toBeTruthy();
@@ -164,7 +164,7 @@ describe('LearningBookScreen', () => {
       },
     ]);
 
-    render(<LearningBookScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: createWrapper() });
 
     expect(screen.getByTestId('topic-row-topic-1')).toBeTruthy();
     expect(screen.getByText('Math')).toBeTruthy();
@@ -202,7 +202,7 @@ describe('LearningBookScreen', () => {
       },
     ]);
 
-    render(<LearningBookScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(screen.getByTestId('topic-row-topic-1'));
 
@@ -225,7 +225,7 @@ describe('LearningBookScreen', () => {
       isLoading: false,
     });
 
-    render(<LearningBookScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: createWrapper() });
 
     expect(screen.getByTestId('subject-filter-tabs')).toBeTruthy();
     expect(screen.getByTestId('filter-all')).toBeTruthy();
@@ -256,11 +256,11 @@ describe('LearningBookScreen', () => {
       },
     ]);
 
-    render(<LearningBookScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('learning-book-topic-loading')).toBeTruthy();
-    expect(screen.getByText('Building your book pages...')).toBeTruthy();
-    expect(screen.queryByTestId('learning-book-loading')).toBeNull();
+    expect(screen.getByTestId('library-topic-loading')).toBeTruthy();
+    expect(screen.getByText('Building your library...')).toBeTruthy();
+    expect(screen.queryByTestId('library-loading')).toBeNull();
   });
 
   it('filters topics when subject tab is pressed', () => {
@@ -301,7 +301,7 @@ describe('LearningBookScreen', () => {
       },
     ]);
 
-    render(<LearningBookScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: createWrapper() });
 
     // Initially shows all topics
     expect(screen.getByTestId('topic-row-topic-1')).toBeTruthy();
@@ -358,11 +358,9 @@ describe('LearningBookScreen', () => {
       },
     ]);
 
-    render(<LearningBookScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: createWrapper() });
 
-    expect(
-      screen.getByTestId('learning-book-curriculum-complete')
-    ).toBeTruthy();
+    expect(screen.getByTestId('library-curriculum-complete')).toBeTruthy();
     expect(screen.getByText("You've covered everything here!")).toBeTruthy();
     expect(screen.getByText('Add another subject')).toBeTruthy();
   });

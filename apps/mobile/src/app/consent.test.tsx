@@ -46,13 +46,10 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 const ConsentScreen = require('./consent').default;
 
-/** Advance fake timers past the 300ms fade-out + 300ms fade-in animation. */
+/** Drain all pending timers (fade-out + fade-in animations). */
 function flushFadeAnimation(): void {
   act(() => {
-    jest.advanceTimersByTime(350);
-  });
-  act(() => {
-    jest.advanceTimersByTime(350);
+    jest.runAllTimers();
   });
 }
 

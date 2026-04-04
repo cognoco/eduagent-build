@@ -1,10 +1,10 @@
-# Flow: Learning Book Navigation — Cross-navigation from session and summary
-# Validates: Story 4.12 (Learning Book link on session summary) and
-#            Story 4.13 (Learning Book prompt during active non-homework sessions).
+# Flow: Library Navigation — Cross-navigation from session and summary
+# Validates: Story 4.12 (Library link on session summary) and
+#            Story 4.13 (LibraryPrompt during active non-homework sessions).
 # Tags: nightly, learning
 #
 # Journey: UX Journey 2 (Daily Learning Loop → Retention bridge)
-# Epics: Epic 3 (FR48 — Learning Book access points)
+# Epics: Epic 3 (FR48 — Library access points)
 # Prerequisite: Seeded user with completed topics + due retention cards
 #               (scenario: retention-due — ensures showBookLink = true because
 #               overallProgress.totalTopicsCompleted > 0)
@@ -13,16 +13,16 @@
 #   Session screen (session/index.tsx):
 #     - chat-input                    -> message input field
 #     - end-session-button            -> rendered in header when exchangeCount > 0
-#     - session-learning-book-link    -> LearningBookPrompt footer link (non-homework only)
+#     - session-library-link          -> LibraryPrompt footer link (non-homework only)
 #
 #   Session summary ([sessionId].tsx):
 #     - summary-title                 -> "Session Complete" heading
 #     - session-takeaways             -> takeaway bullet list
-#     - go-to-learning-book           -> "See your Learning Book" link (always present)
+#     - go-to-library                 -> "See your Library" link (always present)
 #
-#   Learning Book (book.tsx):
-#     - learning-book-loading         -> loading spinner
-#     - learning-book-empty           -> empty state (should NOT appear with retention-due)
+#   Library (library.tsx):
+#     - library-loading               -> loading spinner
+#     - library-empty                 -> empty state (should NOT appear with retention-due)
 #     - subject-filter-tabs           -> subject filter strip (>1 subject)
 #
 #   Topic detail (topic/[topicId].tsx):
@@ -45,11 +45,11 @@ tags:
       id: "home-scroll-view"
     timeout: 15000
 
-- takeScreenshot: book-nav-01-home
+- takeScreenshot: library-nav-01-home
 
-# ── Part 1: In-session Learning Book link (Story 4.13) ────────────────
+# ── Part 1: In-session Library link (Story 4.13) ────────────────
 # Start a freeform session via the coaching card. Freeform mode is
-# non-homework, so the LearningBookPrompt footer should render when
+# non-homework, so the LibraryPrompt footer should render when
 # overallProgress.totalTopicsCompleted > 0 (guaranteed by retention-due).
 
 - tapOn:
@@ -61,21 +61,21 @@ tags:
       id: "chat-input"
     timeout: 15000
 
-- takeScreenshot: book-nav-02-session-started
+- takeScreenshot: library-nav-02-session-started
 
-# 3. Verify the in-session Learning Book link is visible in the footer
-#    (LearningBookPrompt component, testID: session-learning-book-link).
+# 3. Verify the in-session Library link is visible in the footer
+#    (LibraryPrompt component, testID: session-library-link).
 #    This link only appears for non-homework modes when totalTopicsCompleted > 0.
 - scrollUntilVisible:
     element:
-      id: "session-learning-book-link"
+      id: "session-library-link"
     direction: DOWN
     timeout: 10000
 
 - assertVisible:
-    id: "session-learning-book-link"
+    id: "session-library-link"
 
-- takeScreenshot: book-nav-03-book-link-visible
+- takeScreenshot: library-nav-03-library-link-visible
 
 # ── Part 2: Complete session and check summary link (Story 4.12) ──────
 
@@ -127,44 +127,44 @@ tags:
       id: "summary-title"
     timeout: 20000
 
-- takeScreenshot: book-nav-04-session-summary
+- takeScreenshot: library-nav-04-session-summary
 
 # 12. Verify session takeaways are present
 - assertVisible:
     id: "session-takeaways"
 
-# 13. Scroll to and verify the "See your Learning Book" link exists
-#     (always present on session summary, testID: go-to-learning-book)
+# 13. Scroll to and verify the "See your Library" link exists
+#     (always present on session summary, testID: go-to-library)
 - scrollUntilVisible:
     element:
-      id: "go-to-learning-book"
+      id: "go-to-library"
     direction: DOWN
     timeout: 10000
 
 - assertVisible:
-    id: "go-to-learning-book"
+    id: "go-to-library"
 
-- takeScreenshot: book-nav-05-book-link-on-summary
+- takeScreenshot: library-nav-05-library-link-on-summary
 
-# ── Part 3: Navigate to Learning Book from summary ────────────────────
+# ── Part 3: Navigate to Library from summary ────────────────────
 
-# 14. Tap the Learning Book link on summary screen.
-#     handleGoToLearningBook navigates to topic detail if topicId + subjectId
-#     are present, otherwise to the book index. Seed data may or may not
+# 14. Tap the Library link on summary screen.
+#     handleGoToLibrary navigates to topic detail if topicId + subjectId
+#     are present, otherwise to the library index. Seed data may or may not
 #     include topicId — we accept either destination.
 - tapOn:
-    id: "go-to-learning-book"
+    id: "go-to-library"
 
-# 15. Verify navigation arrived at Learning Book (book.tsx header text)
-#     or topic detail screen. Wait for the "Learning Book" heading which
-#     appears on the book index screen.
+# 15. Verify navigation arrived at Library (library.tsx header text)
+#     or topic detail screen. Wait for the "Library" heading which
+#     appears on the library index screen.
 - extendedWaitUntil:
     visible:
-      text: "Learning Book"
+      text: "Library"
     timeout: 10000
 
-# 16. Verify the book is NOT empty (retention-due scenario has topics)
+# 16. Verify the library is NOT empty (retention-due scenario has topics)
 - assertNotVisible:
-    id: "learning-book-empty"
+    id: "library-empty"
 
-- takeScreenshot: book-nav-06-learning-book-arrived
+- takeScreenshot: library-nav-06-library-arrived

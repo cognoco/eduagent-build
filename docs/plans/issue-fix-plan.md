@@ -77,26 +77,26 @@ Status: code fixes applied on 2026-04-02; awaiting confirmation in the next fres
 Priority bugs reported from the latest learner build:
 - Email/password sign-in unexpectedly triggered a verification-code flow that users experience as forced two-factor authentication.
 - Learner Home rendered the header but no actionable cards.
-- Learning Book stayed blank or appeared to hang on loading.
+- Library stayed blank or appeared to hang on loading.
 - Learner screens looked washed out compared with auth screens, including a hazy bottom navigation bar.
 - Persona switching was still exposed inside the learner More tab.
 
 Findings:
 1. Root learner shell opacity was being animated from a partially transparent state in [app/_layout.tsx], which could leave post-auth screens washed out in device builds and make the tab bar look like it was sitting behind a haze.
 2. Home content sections were wrapped in a reusable animated entry component that started at opacity `0`; on release/device builds that created a credible failure mode where the header rendered but the card stack never became visible.
-3. Learning Book treated per-subject topic-retention fetches as blocking for the whole screen, so subjects could already exist while the UI still showed only a loading state.
+3. Library treated per-subject topic-retention fetches as blocking for the whole screen, so subjects could already exist while the UI still showed only a loading state.
 4. The sign-in flow automatically prepared and sent email/phone verification codes whenever Clerk returned `needs_first_factor` or `needs_second_factor`, turning an optional continuation path into an unprompted code-send.
 5. The learner More screen still exposed persona switching under an Appearance section, which no longer matches the intended learner navigation model.
 
 Fixes applied:
 - Removed the root opacity fade from the authenticated app shell so learner surfaces render at full opacity immediately.
 - Replaced the risky `AnimatedEntry` release animation with a safe pass-through wrapper and added a Home fallback card path so Home never renders as a blank content area.
-- Changed Learning Book to unblock on subject/progress data, show inline topic-history loading/fallback states, and keep subject context visible even before retention data finishes.
+- Changed Library to unblock on subject/progress data, show inline topic-history loading/fallback states, and keep subject context visible even before retention data finishes.
 - Changed sign-in so verification-code continuation is explicit and opt-in instead of being auto-started after a password submit.
 - Removed persona switching from the learner More tab.
 
 Verification completed locally:
-- Targeted mobile Jest coverage passed for sign-in, Home, Learning Book, and More.
+- Targeted mobile Jest coverage passed for sign-in, Home, Library, and More.
 - Mobile TypeScript passed after the changes.
 
 Follow-up to defer:

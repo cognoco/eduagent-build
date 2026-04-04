@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
-import type { Account } from '../services/account';
+import { requireProfileId } from '../middleware/profile-scope';
 import { OCR_CONSTRAINTS } from '@eduagent/schemas';
 import { validationError } from '../errors';
 import { startSession, SubjectInactiveError } from '../services/session';
@@ -18,8 +18,7 @@ type HomeworkRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
-    account: Account;
-    profileId: string;
+    profileId: string | undefined;
   };
 };
 
@@ -27,7 +26,7 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
   // Start a homework help session
   .post('/subjects/:subjectId/homework', async (c) => {
     const db = c.get('db');
-    const profileId = c.get('profileId');
+    const profileId = requireProfileId(c.get('profileId'));
     const subjectId = c.req.param('subjectId');
 
     try {

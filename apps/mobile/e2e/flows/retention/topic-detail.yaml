@@ -1,5 +1,5 @@
 # Flow N9: Topic Detail — Retention Metrics and Adaptive Actions
-# Validates: user can navigate to topic detail screen from Learning Book,
+# Validates: user can navigate to topic detail screen from Library,
 # view retention metrics (mastery, memory strength, interval), and see
 # adaptive action buttons based on completionStatus (Story 4.14).
 # Tags: nightly, retention
@@ -23,10 +23,10 @@
 #   - request-retest-button     -> recall check / review-and-retest (always visible)
 #   - relearn-button            -> relearn (only after 3+ failures or needs_deepening)
 #
-# testID mapping (book/index.tsx):
+# testID mapping (library/index.tsx):
 #   - subject-filter-tabs     -> subject filter strip
-#   - learning-book-loading   -> loading spinner
-#   - learning-book-empty     -> empty state
+#   - library-loading         -> loading spinner
+#   - library-empty           -> empty state
 #   - topic-row-{topicId}     -> individual topic row
 appId: com.mentomate.app
 tags:
@@ -46,27 +46,27 @@ tags:
       id: "home-scroll-view"
     timeout: 15000
 
-# 3. Navigate to Learning Book tab
+# 3. Navigate to Library tab
 # BUG-10/BUG-30: Dev-client shows extra tabs, breaking point-tap positions.
 # Use accessibility label (tabBarAccessibilityLabel) for reliable matching.
-- tapOn: "Learning Book Tab"
+- tapOn: "Library Tab"
 
-# 4. Wait for Learning Book to load
+# 4. Wait for Library to load
 - extendedWaitUntil:
     visible:
-      text: "Learning Book"
+      text: "Library"
     timeout: 10000
 
 # 5. Wait for topic list to finish loading (loading spinner disappears)
 - extendedWaitUntil:
     notVisible:
-      id: "learning-book-loading"
+      id: "library-loading"
     timeout: 10000
     optional: true
 
 # 6. Verify topic rows are present (not empty state)
 - assertNotVisible:
-    id: "learning-book-empty"
+    id: "library-empty"
     optional: true
 
 # 7. Tap the first visible topic row. Topic rows in book.tsx show:
@@ -125,12 +125,12 @@ tags:
 # 17. Screenshot of full topic detail with retention metrics
 - takeScreenshot: topic-detail-retention
 
-# 18. Tap back to return to Learning Book
+# 18. Tap back to return to Library
 - tapOn:
     id: "topic-detail-back"
 
-# 19. Verify we're back on Learning Book
+# 19. Verify we're back on Library
 - extendedWaitUntil:
     visible:
-      text: "Learning Book"
+      text: "Library"
     timeout: 5000

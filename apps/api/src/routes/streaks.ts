@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
-import type { Account } from '../services/account';
+import { requireProfileId } from '../middleware/profile-scope';
 import { getStreakData, getXpSummary } from '../services/streaks';
 
 type StreakRouteEnv = {
@@ -9,8 +9,7 @@ type StreakRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
-    account: Account;
-    profileId: string;
+    profileId: string | undefined;
   };
 };
 
@@ -18,7 +17,7 @@ export const streakRoutes = new Hono<StreakRouteEnv>()
   // Get current streak state
   .get('/streaks', async (c) => {
     const db = c.get('db');
-    const profileId = c.get('profileId');
+    const profileId = requireProfileId(c.get('profileId'));
 
     const streak = await getStreakData(db, profileId);
     return c.json({ streak });
@@ -27,7 +26,7 @@ export const streakRoutes = new Hono<StreakRouteEnv>()
   // Get XP summary
   .get('/xp', async (c) => {
     const db = c.get('db');
-    const profileId = c.get('profileId');
+    const profileId = requireProfileId(c.get('profileId'));
 
     const xp = await getXpSummary(db, profileId);
     return c.json({ xp });

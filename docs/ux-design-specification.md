@@ -297,7 +297,7 @@ Competitors fail here emotionally: Duolingo feels productive in the moment but h
 
 **Photomath** — Camera → instant math solution with visual step-by-step breakdown. Multiple solving methods shown. Fails at: gives direct answers (zero integrity), no retention, math only. Transferable: Camera → problem recognition UX flow; visual step-by-step presentation; EduAgent = "Photomath that actually makes you learn and works for every subject."
 
-**Duolingo** — Micro-sessions (5 minutes feels achievable), visible progression (skill tree), placement onboarding, daily habit formation, playful tone. Fails at: hollow retention (users complete exercises but can't speak), guilt mechanics (streak-shame, passive-aggressive notifications), recognition over production (multiple choice, not producing language), patronizing at higher levels. Transferable: Micro-session format; placement/onboarding that meets you at your level; progression visibility for Learning Book.
+**Duolingo** — Micro-sessions (5 minutes feels achievable), visible progression (skill tree), placement onboarding, daily habit formation, playful tone. Fails at: hollow retention (users complete exercises but can't speak), guilt mechanics (streak-shame, passive-aggressive notifications), recognition over production (multiple choice, not producing language), patronizing at higher levels. Transferable: Micro-session format; placement/onboarding that meets you at your level; progression visibility for Library.
 
 **Cabuu** — Gesture-based vocabulary learning grounded in linguistic research ("Enactment Effect": things you physically DO are remembered better than things you read or see). Camera scan imports vocabulary from school textbooks. Connected to German school publishers (Klett, Cornelsen, Westermann). Targets parents but used by children — testimonial: "Even after many weeks, our daughter is still learning vocabulary without being told to." Transferable: Active/physical Apply step (not just text); camera scan as validated school-age input; curriculum alignment builds parent trust; the "learns without being told to" outcome is our Day 15 goal.
 
@@ -311,7 +311,7 @@ Competitors fail here emotionally: Duolingo feels productive in the moment but h
 | **TikTok** | Algorithm knows you, one-at-a-time, micro-format | Coaching card, single focus, 90-sec sessions |
 | **ChatGPT** | Conversational, zero learning curve, instant | "Just ask something," familiar interface |
 | **Photomath** | Camera → solution, visual steps | Homework photo input, step-by-step presentation |
-| **Duolingo** | Micro-sessions, placement onboarding, progression visibility | Session length, onboarding interview, Learning Book |
+| **Duolingo** | Micro-sessions, placement onboarding, progression visibility | Session length, onboarding interview, Library |
 | **Cabuu** | Gesture/physical learning (Enactment Effect), camera scan, curriculum-aligned | Active Apply step, homework scan, school textbook connection |
 | **Berlitz** | Immersive method, Present→Practice→Perform, "confidence not streaks" | Language mode immersion, validates learning loop, anti-streak positioning |
 
@@ -341,7 +341,7 @@ Competitors fail here emotionally: Duolingo feels productive in the moment but h
 **Adapt for our context:**
 - TikTok's algorithm → our coaching card AI (curates learning, not entertainment)
 - Cabuu's gesture/physical learning → our Apply step should feel active and embodied where possible
-- Duolingo's progression visibility → our Learning Book with knowledge connections, minus the gamification overload
+- Duolingo's progression visibility → our Library with knowledge connections, minus the gamification overload
 - Berlitz's Present→Practice→Perform → our Recall→Build→Apply→Close (recall-first is our twist)
 
 **Explicitly avoid:**
@@ -363,7 +363,7 @@ Competitors fail here emotionally: Duolingo feels productive in the moment but h
 | **LLM-codability** | Tailwind CSS is the most LLM-friendly styling approach in the JS ecosystem. For a team using AI code generation, this compounds on every feature, every screen. |
 | **Visual freedom** | EduAgent needs a teen-friendly look (Snapchat/TikTok-inspired), not Material Design corporate. Utility-first CSS gives maximum design flexibility. |
 | **Three-persona theming** | CSS variables via `vars()` — define a variable set per persona (teen/adult/parent), swap at login. Components stay identical; only tokens change. |
-| **Component ownership** | shadcn/ui copy-paste model means full code ownership. Critical when building highly custom components (coaching card, homework camera, Learning Book). |
+| **Component ownership** | shadcn/ui copy-paste model means full code ownership. Critical when building highly custom components (coaching card, homework camera, Library). |
 | **Stability** | NativeWind v4 is stable and widely used (~400K weekly downloads). React Native Reusables has 7.9K stars and active growth. |
 | **Expo compatibility** | Works with Expo; requires development builds (not Expo Go) for reliability. |
 
@@ -677,7 +677,7 @@ _Revised from PRD Journeys 1-5. Changes driven by UX decisions (Steps 2-9) and c
    - First lesson begins immediately (Recall → Build → Apply → Close)
 
 6. **Post-First-Session**
-   - Learning Book shows first entry
+   - Library shows first entry
    - Child: "Done for today. Come back when you need help."
    - Eager learner: Coaching card preview for next session
    - Parent (if applicable): can review first session — sees guided process, trust validated
@@ -761,7 +761,7 @@ _Revised from PRD Journeys 1-5. Changes driven by UX decisions (Steps 2-9) and c
 
 6. **Post-Session Close**
    - AI tells user when done: "Solid on this. I'll check in 4 days."
-   - Learning Book updated
+   - Library updated
    - No infinite scroll, no "one more lesson" dark pattern
 
 7. **Return Triggers (Pull, Not Push)**
@@ -796,7 +796,7 @@ _Revised from PRD Journeys 1-5. Changes driven by UX decisions (Steps 2-9) and c
 - One-sentence summary per child with traffic light signals (green/yellow/red)
 - TEMPORAL COMPARISON visible without any taps: "Alex practiced 4 times this week, up from 2 last week"
 - Drill-across (week-over-week trends) added alongside drill-down (child → subject → topic → session)
-- Glanceable dashboard replaces "switch into child's profile and review Learning Book" model
+- Glanceable dashboard replaces "switch into child's profile and review Library" model
 
 **Revised Flow:**
 
@@ -903,7 +903,7 @@ _Revised from PRD Journeys 1-5. Changes driven by UX decisions (Steps 2-9) and c
 
 5. **Solution Discovery** — Child arrives at answer through own reasoning
    - AI confirms or uses "not yet" framing: "Almost — check step 3 again"
-   - Session marked in Learning Book: "🎯 Guided problem-solving"
+   - Session marked in Library: "🎯 Guided problem-solving"
    - AI: "You got it."
 
 6. **Recall After the Win (Bridge/Completion Phase)** — Emotional window after success = maximum receptivity
@@ -929,7 +929,7 @@ _Revised from PRD Journeys 1-5. Changes driven by UX decisions (Steps 2-9) and c
    - AI: "This one's tricky. Let's build the foundation first, then come back."
    - Switches to teaching mode — teaches the underlying concept
    - Returns to homework after concept is understood
-   - Topic flagged as "Needs Deepening" in Learning Book
+   - Topic flagged as "Needs Deepening" in Library
    - Parent sees: "Concept gap identified and addressed before homework completed"
 
 3. **Child tries to game the system** ("Just tell me the answer" / "I don't care, give me the answer")
@@ -1042,7 +1042,7 @@ _Collected for the Architecture phase. These are hard technical requirements sur
 | OCR + subject classification pipeline | Journey 4 | Camera → problem parsed → subject detected in <3 seconds |
 | Coaching card precomputation | Journey 2 | Background job on session close prepares next session's adaptive opening |
 | Spaced repetition engine | Journey 2, 5 | Per-topic decay curves, per-vocabulary-item retention tracking |
-| Learning Book as structured data model | All | Persistent, queryable — not just chat logs |
+| Library as structured data model | All | Persistent, queryable — not just chat logs |
 | Parent-child account linking | Journey 3 | Permission model, session visibility, profile switching |
 | Parallel Example generator | Journey 4 | Needs access to problem templates by subject/type to generate similar-but-different problems |
 | Temporal comparison engine | Journey 3 | Week-over-week aggregation for parent dashboard trends |
@@ -1234,7 +1234,7 @@ EduAgent is not a menu-driven app. The primary navigation is the coaching card. 
 │  [Subject Strip - eager learner]    │  ← Secondary: manual override
 │                                     │
 ├─────────────────────────────────────┤
-│  [Home]  [Learning Book]  [More]    │  ← Bottom nav (3 items max)
+│  [Home]  [Library]  [More]    │  ← Bottom nav (3 items max)
 └─────────────────────────────────────┘
 ```
 
@@ -1253,7 +1253,7 @@ EduAgent is not a menu-driven app. The primary navigation is the coaching card. 
 | Item | What It Opens | Who Uses It |
 |------|--------------|-------------|
 | **Home** | Coaching card / Parent dashboard | All personas (dashboard IS home for parents) |
-| **Learning Book** | Progress reference, topic list, retention overview | Eager learner primarily; child occasionally |
+| **Library** | Progress reference, topic list, retention overview | Eager learner primarily; child occasionally |
 | **More** | Settings, account, notifications, help | All personas (low frequency) |
 
 **In-Session Navigation:**
@@ -1300,7 +1300,7 @@ EduAgent is not a menu-driven app. The primary navigation is the coaching card. 
 
 **Offline/Slow Connection:**
 - No connection: show last coaching card + "Offline — some features unavailable" banner
-- Cached content (Learning Book, recent sessions) available for review
+- Cached content (Library, recent sessions) available for review
 - No AI interaction possible offline (v2.0 consideration)
 - Banner dismissible, not blocking
 
@@ -1546,7 +1546,7 @@ MessageThread (base — rendering, streaming, scroll, input)
 
 #### Retention Signal
 
-- **Purpose:** Universal retention indicator. Single source of truth for "how well do you know this" across parent dashboard, subject strip, Learning Book, and session close.
+- **Purpose:** Universal retention indicator. Single source of truth for "how well do you know this" across parent dashboard, subject strip, Library, and session close.
 - **Content:** Color indicator + text label ("Strong" / "Fading" / "Weak" / "Forgotten")
 - **States:** Strong (green), Fading (yellow), Weak (red), Forgotten (gray)
 - **Variants:** Compact (icon + color, label on hover/tap), Full (color + text), Dashboard (color + text + trend arrow ↑↓→)
@@ -1564,9 +1564,9 @@ MessageThread (base — rendering, streaming, scroll, input)
 
 ---
 
-#### Learning Book Entry
+#### Library Entry
 
-- **Purpose:** Topic entry in the learner's progress reference. Building block of the Learning Book.
+- **Purpose:** Topic entry in the learner's progress reference. Building block of the Library.
 - **Content:** Topic name, retention signal, last practiced date, session count, building-block connections (v1.1 — see Epic 7 Concept Map specs below)
 - **States:** Strong, Fading, Weak, Forgotten, Never-started
 - **Variants:** Compact (list item), Expanded (with session history), Language (adds production vs recognition counts)
@@ -1639,7 +1639,7 @@ _Party Mode revision: Profile Switcher removed from Phase 1. Parent uses separat
 | PracticeChatWrapper + FreeformChatWrapper | Journey 2 — practice and freeform paths | Builds on MessageThread base |
 | Parallel Example View | Journey 4 — visual upgrade for step-by-step | Upgrades conversational fallback from Phase 1 |
 | Recall Challenge | Journey 4 — post-homework bridge | Valuable but core homework flow works without it |
-| Learning Book Entry | Journey 2 — progress reference | Compact variant first, expanded later |
+| Library Entry | Journey 2 — progress reference | Compact variant first, expanded later |
 | ParentDashboardSummary (enhanced) | Journey 3 — full drill-down and drill-across | Basic version ships in Phase 1 via BaseCoachingCard |
 
 **Phase 3 — Post-MVP Enhancement**:
@@ -1647,7 +1647,7 @@ _Party Mode revision: Profile Switcher removed from Phase 1. Parent uses separat
 | Component | Needed For | Notes |
 |-----------|-----------|-------|
 | Subject Retention Strip | Journey 2 — eager learner subject switching | Coaching card works without it; adds quick subject access |
-| Learning Book Entry (expanded) | Journey 5 — production vs recognition, building blocks | Full knowledge graph visualization |
+| Library Entry (expanded) | Journey 5 — production vs recognition, building blocks | Full knowledge graph visualization |
 | SessionCloseSummary (enhanced) | All journeys — richer coaching close | Basic version ships in Phase 1 via BaseCoachingCard |
 
 ### Phase Changes from Code Review
@@ -1691,7 +1691,7 @@ The primary experience is a phone screen held by a teenager doing homework. Ever
 
 The coaching card → conversation flow is inherently single-column. Adding side panels on larger screens adds complexity without improving the core interaction. The conversation IS the product — it needs focus, not more space.
 
-Post-MVP: tablet/desktop could show Learning Book as a side panel alongside conversation. But MVP ships single-column on all platforms.
+Post-MVP: tablet/desktop could show Library as a side panel alongside conversation. But MVP ships single-column on all platforms.
 
 ### Platform-Specific Adaptations
 
@@ -1713,7 +1713,7 @@ Post-MVP: tablet/desktop could show Learning Book as a side panel alongside conv
 
 **Tablet (v2.0):**
 - Same layout as mobile with increased padding and touch targets
-- Potential: side panel for Learning Book during conversation (post-MVP)
+- Potential: side panel for Library during conversation (post-MVP)
 - Camera works natively (same as mobile)
 - Landscape: conversation centered, increased side margins
 
@@ -2085,7 +2085,7 @@ _This is a server-rendered HTML page, not a mobile screen. Served by the API or 
 │  Book and see your progress.    │
 │                                 │
 │  ┌───────────────────────┐      │
-│  │  Browse Learning Book  │      │
+│  │  Browse Library  │      │
 │  └───────────────────────┘      │
 │                                 │
 └─────────────────────────────────┘
@@ -2098,8 +2098,8 @@ _This is a server-rendered HTML page, not a mobile screen. Served by the API or 
 | "Notify My Parent" tap | Sends push notification + email to account owner (parent). Rate limited: 1 notification per 24 hours per child profile. |
 | Already notified (within 24h) | CTA changes to "Parent notified ✓" (disabled). Show time until re-send: "You can remind them again in X hours." |
 | Notification success | Toast: "We let your parent know!" |
-| While waiting | Read-only access to Learning Book, progress/achievements. Sessions and write operations blocked. |
-| "Browse Learning Book" tap | Navigate to `/(learner)/book`. |
+| While waiting | Read-only access to Library, progress/achievements. Sessions and write operations blocked. |
+| "Browse Library" tap | Navigate to `/(learner)/library`. |
 | Parent subscribes | Paywall disappears on next API call. TanStack Query invalidation refreshes subscription status. |
 
 **Parent Notification Content:**
@@ -2116,7 +2116,7 @@ _This is a server-rendered HTML page, not a mobile screen. Served by the API or 
 **Design Guardrails:**
 - **No pricing display for children.** No tier labels, no dollar amounts, no payment forms.
 - **Coaching voice throughout.** Encouraging, not commercial. The tone is "you've done great, here's how to keep going" not "your trial ended, pay up."
-- **No dark patterns.** No urgency countdowns, no "your progress will be lost" threats. The child's Learning Book data persists regardless.
+- **No dark patterns.** No urgency countdowns, no "your progress will be lost" threats. The child's Library data persists regardless.
 
 **Implementation Notes:**
 - Location: `apps/mobile/src/app/(learner)/subscription.tsx` — add child detection at top of component. If `isChild`, render `ChildPaywall` variant instead of standard `SubscriptionScreen`.
@@ -2378,19 +2378,19 @@ _Prerequisite-aware learning — visual knowledge graph, topological ordering, a
 
 ### Concept Map Visualization Screen
 
-**Context:** Learning Book — visual knowledge graph view.
+**Context:** Library — visual knowledge graph view.
 
 **Actor:** Learner viewing their curriculum progress.
 
 **Goal:** Provide a visual representation of topic relationships showing which topics are mastered, in progress, locked, or at risk.
 
-**Trigger:** Learner taps "Concept Map" toggle/tab in the Learning Book screen.
+**Trigger:** Learner taps "Concept Map" toggle/tab in the Library screen.
 
 **Screen: ConceptMapView**
 
 ```
 ┌─────────────────────────────────┐
-│  ← Learning Book    Concept Map │
+│  ← Library    Concept Map │
 │                                 │
 │         [Fractions]             │
 │          ●  strong              │
@@ -2437,8 +2437,8 @@ _Prerequisite-aware learning — visual knowledge graph, topological ordering, a
 | Locked topic tap | Card shows prerequisites needed, no session CTA: "Master [prerequisites] to unlock this topic" |
 | "Start Review" tap | Navigate to session for that topic |
 | Pinch/zoom | Scale the graph (optional — evaluate during implementation) |
-| No prerequisite data (pre-Epic 7 curricula) | Fall back to Learning Book list view. Concept Map tab hidden or shows "Prerequisite data not available for this curriculum" |
-| Subject filter | Graph shows only topics for selected subject (like Learning Book tabs) |
+| No prerequisite data (pre-Epic 7 curricula) | Fall back to Library list view. Concept Map tab hidden or shows "Prerequisite data not available for this curriculum" |
+| Subject filter | Graph shows only topics for selected subject (like Library tabs) |
 
 **Design Guardrails:**
 - Node colors use NativeWind semantic tokens: `bg-success` (strong), `bg-warning` (fading), `bg-danger` (weak), `bg-muted` (locked)
@@ -2451,10 +2451,10 @@ _Prerequisite-aware learning — visual knowledge graph, topological ordering, a
 
 1. **Graph layout algorithm fails (cycle in data):** Show list view fallback with error logged to Sentry. This shouldn't happen if DAG validation works correctly.
 2. **Too many nodes for readable layout:** Collapse to section-level view (group topics by curriculum section, show inter-section edges).
-3. **Prerequisite data loading fails:** Show standard Learning Book list. Concept Map is progressive enhancement.
+3. **Prerequisite data loading fails:** Show standard Library list. Concept Map is progressive enhancement.
 
 **Implementation Notes:**
-- Location: `apps/mobile/src/app/(learner)/book/concept-map.tsx` (new screen) or toggle within existing book/index.tsx
+- Location: `apps/mobile/src/app/(learner)/library/concept-map.tsx` (new screen) or toggle within existing library/index.tsx
 - Layout: Custom Sugiyama layout algorithm (~100 LOC for small DAGs) or validated RN graph library — evaluate at implementation time
 - Rendering: `react-native-svg` for nodes, edges, and labels
 - Data: new API endpoint `GET /v1/curriculum/:subjectId/graph` returning topics + edges
@@ -2464,11 +2464,11 @@ _Prerequisite-aware learning — visual knowledge graph, topological ordering, a
 
 ---
 
-### Learning Book Prerequisite Ordering
+### Library Prerequisite Ordering
 
-**Context:** Learning Book — list view enhancement.
+**Context:** Library — list view enhancement.
 
-**Actor:** Learner browsing their Learning Book.
+**Actor:** Learner browsing their Library.
 
 **Goal:** Show topics in prerequisite order with locked/unlocked indicators, providing progression visibility even without the full graph visualization.
 
@@ -2476,11 +2476,11 @@ _Prerequisite-aware learning — visual knowledge graph, topological ordering, a
 
 **Enhancement:** Topics sorted by topological order (prerequisite depth). Topics with unmastered REQUIRED prerequisites show locked indicator.
 
-**Screen: Learning Book (Enhanced)**
+**Screen: Library (Enhanced)**
 
 ```
 ┌─────────────────────────────────┐
-│  Learning Book      [Map toggle]│
+│  Library      [Map toggle]│
 │                                 │
 │  Mathematics                    │
 │                                 │
@@ -2512,7 +2512,7 @@ _Prerequisite-aware learning — visual knowledge graph, topological ordering, a
 | "Map toggle" tap | Switch to Concept Map visualization |
 
 **Implementation Notes:**
-- Location: `apps/mobile/src/app/(learner)/book/index.tsx` (extend existing)
+- Location: `apps/mobile/src/app/(learner)/library/index.tsx` (extend existing)
 - Sort: topological sort utility function, fallback to `sortOrder`
 - Locked state: check retention status of REQUIRED prerequisites via API
 

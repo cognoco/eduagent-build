@@ -92,7 +92,7 @@ Bundle proxy required because BUG-7 (OkHttp chunked encoding error) became 100% 
 | B | `consent/coppa-flow.yaml` | Consent | None (fresh sign-up) |
 | C | `learning/freeform-session.yaml` | Learning | `learning-active` |
 | C | `homework/homework-from-entry-card.yaml` | Homework | `homework-ready` |
-| C | `parent/parent-learning-book.yaml` | Parent | `parent-with-children` |
+| C | `parent/parent-library.yaml` | Parent | `parent-with-children` |
 | C | `parent/demo-dashboard.yaml` | Parent | `parent-solo` |
 | C | `edge/empty-first-user.yaml` | Edge | `onboarding-complete` |
 
@@ -202,8 +202,8 @@ During investigation of why ALL seeded data (subjects, streaks, coaching cards) 
 | 2 | `consent/consent-withdrawn-gate.yaml` | `consent-withdrawn` | **FAIL** | 9/10 | `assert id: consent-withdrawn-gate` — home screen shown instead | BUG-27 |
 | 3 | `consent/post-approval-landing.yaml` | `onboarding-complete` | **FAIL** | 9/10 | `assert id: post-approval-landing` — home screen shown instead | BUG-28 |
 | 4 | `edge/empty-first-user.yaml` | `onboarding-complete` | **FAIL** | 12/14 | `assert id: create-subject-name` — no redirect to create-subject | Flow design |
-| 5 | `retention/learning-book.yaml` | `retention-due` | **FAIL** | 12/14 | `assert id: retention-strip` — not visible on home | BUG-31 |
-| 6 | `retention/topic-detail.yaml` | `retention-due` | **FAIL** | 13/15 | `assert "Learning Book" visible` — point-tap hit wrong tab | BUG-30 |
+| 5 | `retention/library.yaml` | `retention-due` | **FAIL** | 12/14 | `assert id: retention-strip` — not visible on home | BUG-31 |
+| 6 | `retention/topic-detail.yaml` | `retention-due` | **FAIL** | 13/15 | `assert "Library" visible` — point-tap hit wrong tab | BUG-30 |
 | 7 | `parent/demo-dashboard.yaml` | `parent-solo` | **FAIL** | 16/18 | `assert id: demo-banner` — testID not found on dashboard | BUG-29 |
 | 8 | `billing/subscription-details.yaml` | `trial-active` | **FAIL** | 0 (seed crash) | Seed API 500: missing DB column | BUG-26 |
 | 9 | `onboarding/create-subject.yaml` | `onboarding-complete` | **PASS** | 18/18 | — | — |
@@ -215,7 +215,7 @@ During investigation of why ALL seeded data (subjects, streaks, coaching cards) 
 
 1. **BUG-25 fix effectiveness: UNCLEAR.** Seeded subjects still not appearing on home screen (BUG-31). Could be that the API server wasn't restarted after the BUG-25 commit, or there's an additional issue with mobile-side profile resolution. Needs investigation.
 
-2. **BUG-10 (extra dev-client tabs) is now a HIGH-severity blocker.** The point-tap at `(50%,97%)` for Learning Book tab hits hidden routes exposed by BUG-10, causing cascading failures in 5+ flows (BUG-30). The fix for BUG-23 (adding `href: null` to `subject/` route) didn't cover all hidden routes — `session/`, `topic/`, `homework/`, and others are still exposed.
+2. **BUG-10 (extra dev-client tabs) is now a HIGH-severity blocker.** The point-tap at `(50%,97%)` for Library tab hits hidden routes exposed by BUG-10, causing cascading failures in 5+ flows (BUG-30). The fix for BUG-23 (adding `href: null` to `subject/` route) didn't cover all hidden routes — `session/`, `topic/`, `homework/`, and others are still exposed.
 
 3. **Consent flow infrastructure incomplete.** Both consent gates (withdrawn, post-approval) don't render — either the seed scenarios don't set the right state, or the mobile client doesn't check consent status on login (BUG-27, BUG-28).
 
@@ -237,21 +237,21 @@ During investigation of why ALL seeded data (subjects, streaks, coaching cards) 
 
 | Fix | Bug | What Changed | Files |
 |-----|-----|-------------|-------|
-| Book route flattening | BUG-30 | `(learner)/book/index.tsx` → `(learner)/book.tsx` (file route). Expo Router directory routes expose raw path in tab bar instead of configured `title`/`accessibilityLabel`. | `book.tsx`, `book.test.tsx` (new), `book/index.tsx` + `book/index.test.tsx` (deleted), `(parent)/book.tsx` |
+| Library route flattening | BUG-30 | `(learner)/library/index.tsx` → `(learner)/library.tsx` (file route). Expo Router directory routes expose raw path in tab bar instead of configured `title`/`accessibilityLabel`. | `library.tsx`, `library.test.tsx` (new), `library/index.tsx` + `library/index.test.tsx` (deleted), `(parent)/library.tsx` |
 | Accessibility labels | BUG-10/BUG-30 | Added `tabBarAccessibilityLabel` to all 3 visible tabs in both layouts. Maestro matches via Android `contentDescription`. | `(learner)/_layout.tsx`, `(parent)/_layout.tsx` |
-| Flow YAML updates | BUG-30 | Changed 7 flows from point-tap / text-tap to `tapOn: "Learning Book Tab"` | 7 YAML files (see BUG-30 entry) |
+| Flow YAML updates | BUG-30 | Changed 7 flows from point-tap / text-tap to `tapOn: "Library Tab"` | 7 YAML files (see BUG-30 entry) |
 | KeyboardAvoidingView | BUG-24 | Changed `behavior={undefined}` → `'height'` on Android across all 10 instances | `sign-in.tsx`, `sign-up.tsx`, `forgot-password.tsx`, `ChatShell.tsx`, `[sessionId].tsx` |
 | Dashboard loading | BUG-29 | Added `\|\| !dashboard` to loading check — prevents premature empty state when query is disabled | `(parent)/dashboard.tsx` |
 | More tab scroll | BUG-32 | Changed `extendedWaitUntil` to `scrollUntilVisible` UP for "Account" header | `more-tab-navigation.yaml` |
 
 **Verified on emulator:**
-- `Tap on "Learning Book Tab"... COMPLETED` — tab navigation works via accessibility label
-- Learning Book screen renders correctly (header, subtitle, tab bar highlighted)
+- `Tap on "Library Tab"... COMPLETED` — tab navigation works via accessibility label
+- Library screen renders correctly (header, subtitle, tab bar highlighted)
 - All 6 `book.test.tsx` unit tests pass
 - TypeScript compilation clean
 
 **Impact on flow pass/fail:**
-- BUG-30 fix unblocks: `multi-subject.yaml`, `topic-detail.yaml`, `learning-book.yaml`, `relearn-flow.yaml`, `view-curriculum.yaml`, `parent-tabs.yaml`, `parent-learning-book.yaml` (7 flows)
+- BUG-30 fix unblocks: `multi-subject.yaml`, `topic-detail.yaml`, `library.yaml`, `relearn-flow.yaml`, `view-curriculum.yaml`, `parent-tabs.yaml`, `parent-library.yaml` (7 flows)
 - BUG-32 fix unblocks: `more-tab-navigation.yaml` (1 flow)
 - BUG-29 fix unblocks: `demo-dashboard.yaml` (1 flow, needs re-test)
 - Remaining blockers: BUG-31 (seeded data not visible), BUG-26 (DB schema drift), BUG-27/BUG-28 (consent flow design)
@@ -262,15 +262,15 @@ During investigation of why ALL seeded data (subjects, streaks, coaching cards) 
 
 | # | Flow | Status | Notes |
 |---|------|--------|-------|
-| 1 | `subjects/multi-subject.yaml` | PARTIAL PASS | Home screen: `"Physics" is visible... COMPLETED`. Fails at Learning Book tab (BUG-33: SVG crash) |
-| 2 | `onboarding/view-curriculum.yaml` | PARTIAL PASS | Home screen: `"Your subjects" is visible... COMPLETED`. Fails at Learning Book tab (BUG-33: SVG crash) |
+| 1 | `subjects/multi-subject.yaml` | PARTIAL PASS | Home screen: `"Physics" is visible... COMPLETED`. Fails at Library tab (BUG-33: SVG crash) |
+| 2 | `onboarding/view-curriculum.yaml` | PARTIAL PASS | Home screen: `"Your subjects" is visible... COMPLETED`. Fails at Library tab (BUG-33: SVG crash) |
 
 **BUG-31 fix confirmed:**
 - `"Physics" is visible... COMPLETED` — seeded subjects now appear on home screen
 - `"Your subjects" is visible... COMPLETED` — home screen data pipeline working end-to-end
-- Both flows pass ALL steps up to Learning Book tab navigation
+- Both flows pass ALL steps up to Library tab navigation
 
-**BUG-33 discovered:** `react-native-svg` + Fabric (New Architecture) `ClassCastException` in `RNSVGGroupManagerDelegate`. The `BookPageFlipAnimation` component crashes when the Learning Book tab renders its loading state. 100% reproducible. This is a genuine app bug (not a test issue). See `e2e-test-bugs.md` for full details.
+**BUG-33 discovered:** `react-native-svg` + Fabric (New Architecture) `ClassCastException` in `RNSVGGroupManagerDelegate`. The `BookPageFlipAnimation` component crashes when the Library tab renders its loading state. 100% reproducible. This is a genuine app bug (not a test issue). See `e2e-test-bugs.md` for full details.
 
 **Files changed (BUG-31 fix):**
 - `apps/mobile/src/hooks/use-profiles.ts` — added `enabled: !!isSignedIn`
@@ -280,7 +280,7 @@ During investigation of why ALL seeded data (subjects, streaks, coaching cards) 
 
 **Impact:**
 - BUG-31 fix unblocks ALL ~30 data-dependent flows (home screen assertions now pass)
-- BUG-33 blocks flows that navigate to Learning Book tab (5+ flows)
+- BUG-33 blocks flows that navigate to Library tab (5+ flows)
 - Flows that only test home screen, account, settings, parent dashboard are now fully testable
 
 ### Session 9 (2026-03-10) — BUG-31 Fix Verification + Full Flow Sweep
@@ -336,15 +336,15 @@ During investigation of why ALL seeded data (subjects, streaks, coaching cards) 
 | 9 | `retention/recall-review.yaml` | retention-due | **PASS** | All mandatory steps COMPLETED. Recall-specific IDs warned (optional). Fallback to chat-input worked. | **LLM working!** Real AI welcome: "Welcome to your first practice session! Let's see what you know. Ready?" Input bar visible. |
 | 10 | `retention/retention-review.yaml` (1st) | retention-due | **FAIL** | YAML parse error: `inputText` + `optional: true` indentation. Fixed and re-ran. | — |
 | 10b | `retention/retention-review.yaml` (2nd) | retention-due | **FAIL** | `recall-test-screen` testID not found. App renders ChatShell, not a dedicated recall screen. | Real AI welcome visible. Practice Session with timer. **BUG-40** |
-| 11 | `retention/learning-book.yaml` | retention-due | **FAIL** | Tapped "Learning Book Tab" → SVG crash. `ClassCastException: java.lang.String cannot be cast` in `RNSVGGroupManagerDelegate`. | Full Java stacktrace error screen. **BUG-41 = BUG-33** |
-| 12 | `retention/topic-detail.yaml` | retention-due | **FAIL** | Same BUG-41 (SVG crash on Learning Book). | Same crash screen |
+| 11 | `retention/library.yaml` | retention-due | **FAIL** | Tapped "Library Tab" → SVG crash. `ClassCastException: java.lang.String cannot be cast` in `RNSVGGroupManagerDelegate`. | Full Java stacktrace error screen. **BUG-41 = BUG-33** |
+| 12 | `retention/topic-detail.yaml` | retention-due | **FAIL** | Same BUG-41 (SVG crash on Library). | Same crash screen |
 | 13 | `retention/failed-recall.yaml` | failed-recall-3x | **FAIL** | `recall-test-screen` testID not found (BUG-40). | Practice Session + real AI welcome visible |
-| 14 | `retention/relearn-flow.yaml` | failed-recall-3x | **FAIL** | Tapped "Learning Book Tab" → BUG-41 (SVG crash). | Same crash screen |
+| 14 | `retention/relearn-flow.yaml` | failed-recall-3x | **FAIL** | Tapped "Library Tab" → BUG-41 (SVG crash). | Same crash screen |
 | 15 | `billing/subscription.yaml` | trial-active | **PASS** (partial) | More tab opened, "Appearance" visible. No "Subscription"/"Billing" text found (all optional). | More tab screenshot: themes, accent colors, notifications, learning mode sections visible. No subscription entry. **BUG-42** |
 | 16 | `billing/subscription-details.yaml` | trial-active | **FAIL** | `Assert "Subscription" visible` — mandatory, not found on More tab. | Same as BUG-42 |
 | 17 | `parent/parent-dashboard.yaml` | parent-with-children | **FAIL** | `home-scroll-view` assertion fails — parent routes to `(parent)/dashboard`. Dashboard actually renders correctly! | **Beautiful dashboard:** "Test Teen" child card, 1 session, On Track, Mathematics Thriving. **BUG-33** (setup flow doesn't support parent routing) |
 | 18 | `parent/demo-dashboard.yaml` | parent-solo | **FAIL** | `switch-to-parent.yaml` fails — "Appearance" not visible on parent More tab. Dashboard already rendered correctly. | **Demo dashboard renders:** Preview banner, "Alex" child, 5 problems, Needs Attention, Math Thriving, Science Warming up. **BUG-33** |
-| 19 | `subjects/multi-subject.yaml` | multi-subject | **FAIL** | Home works ("Physics" visible), Learning Book → BUG-41 (SVG crash). | Same crash screen |
+| 19 | `subjects/multi-subject.yaml` | multi-subject | **FAIL** | Home works ("Physics" visible), Library → BUG-41 (SVG crash). | Same crash screen |
 
 **Session 10 total: 19 flow runs, 4 PASS, 1 PASS (partial), 14 FAIL**
 
@@ -386,7 +386,7 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 | 9 | `onboarding/curriculum-review-flow` | BUG-38 | **FAIL** | Same `add-subject-button` issue (BUG-44). |
 | 10 | `parent/child-drill-down` | BUG-33 | **PASS** | Dashboard → child detail → subject topics. |
 | 11 | `parent/consent-management` | BUG-33 | **PASS** | Dashboard → consent section → withdraw flow. |
-| 12 | `parent/parent-tabs` | BUG-33 | **PASS** | Home → Learning Book → More → Home. No SVG crash! |
+| 12 | `parent/parent-tabs` | BUG-33 | **PASS** | Home → Library → More → Home. No SVG crash! |
 | 13 | `parent/demo-dashboard` | BUG-33 | **PASS** | Demo banner + preview mode + child card. |
 | 14 | `account/profile-switching` | BUG-33 | **PASS** | Profile switcher UI + child switch. |
 | 15 | `homework/homework-flow` | BUG-39 | **FAIL** | BUG-43: coaching card auto-navigates to Practice Session after PostApprovalLanding dismissal. |
@@ -422,7 +422,7 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 | Partial: settings-toggles | 1 | **PARTIAL** — all settings OK, fails at parent switch-to-teen (BUG-18) |
 | Blocked by BUG-43 (coaching card auto-nav) | 4 | **Blocked** — homework-flow, camera-ocr, retention-review, failed-recall |
 | Blocked by BUG-44 (add-subject-button) | 3 | **Blocked** — analogy-preference, assessment-cycle, curriculum-review |
-| Blocked by BUG-41 (SVG crash) | 5 | **Blocked** — learning-book, topic-detail, relearn-flow, multi-subject, view-curriculum |
+| Blocked by BUG-41 (SVG crash) | 5 | **Blocked** — library, topic-detail, relearn-flow, multi-subject, view-curriculum |
 | Blocked by BUG-34 conflict (seed has subjects) | 1 | **Blocked** — empty-first-user (needs `onboarding-no-subjects` scenario) |
 | Blocked by BUG-36/37 (flow design) | 2 | **Blocked** — freeform-session, session-summary |
 | Blocked by BUG-42 (subscription UI) | 1 | **FAIL** — subscription-details |
@@ -436,7 +436,7 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 | Bug | Impact | Fix Type | Unblocks |
 |-----|--------|----------|----------|
 | **BUG-43** (coaching card auto-nav after PostApproval) | 4+ flows | Setup flow fix: add `pressKey: Back` after PostApproval dismiss, or skip dismiss for active-session scenarios | homework, retention flows |
-| **BUG-41** (SVG crash on Learning Book) | 5 flows | App code fix (react-native-svg Fabric compat) | learning-book, topic-detail, relearn, multi-subject, view-curriculum |
+| **BUG-41** (SVG crash on Library) | 5 flows | App code fix (react-native-svg Fabric compat) | library, topic-detail, relearn, multi-subject, view-curriculum |
 | **BUG-44** (`add-subject-button` not found) | 3 flows | Flow fix: scroll to button or check testID in home.tsx | analogy-pref, assessment, curriculum-review |
 | **BUG-36/37** (flow design) | 2 flows | Flow redesign | freeform-session, session-summary |
 | **BUG-42** (subscription UI scroll) | 1 flow | Flow fix: add scrollUntilVisible | subscription-details |
@@ -452,7 +452,7 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 | # | Flow | Status | Notes |
 |---|------|--------|-------|
 | 1 | `assessment/assessment-cycle` | **PASS** | Full onboarding + chat exchange |
-| 2 | `parent/parent-learning-book` | **PASS** | After BUG-48 fix |
+| 2 | `parent/parent-library` | **PASS** | After BUG-48 fix |
 | 3 | `learning/freeform-session` | **PASS** | 2-exchange AI chat working |
 | 4 | `consent/post-approval-landing` | **PASS** | Full PostApproval lifecycle |
 | 5 | `homework/homework-from-entry-card` | **PASS** | Coaching card → homework chat |
@@ -465,7 +465,7 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 | 12 | `learning/first-session` | **PASS** | Coaching card → first chat |
 | 13 | `learning/core-learning` | **PASS** | 3-exchange learning session |
 | 14 | `billing/subscription` | **PASS** | More tab → subscription area |
-| 15 | `retention/learning-book` | **PASS** | (Also confirmed in Session 13) |
+| 15 | `retention/library` | **PASS** | (Also confirmed in Session 13) |
 | 16 | `retention/retention-review` | **PASS** | (Also confirmed in Session 13) |
 | 17 | `retention/failed-recall` | **PASS** | (Also confirmed in Session 13) |
 | 18 | `onboarding/view-curriculum` | **PASS** | (Also confirmed in Session 13) |
@@ -475,7 +475,7 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 | 22 | `billing/child-paywall` | **FAIL** | BUG-52: sign-in as parent lands on dashboard, active profile is parent not child. Fixed: added switch-to-child.yaml setup step. Needs re-test. |
 | 23 | `homework/homework-flow` | **FAIL** | Navigation to homework session via HW tab broke; `chat-input` not found after optional steps |
 | 24 | `learning/session-summary` | **FAIL** | `end-session-button` not visible after 3 LLM exchanges (BUG-37: exchangeCount may not increment from streaming) |
-| 25 | `retention/topic-detail` | **FAIL** | `retention-card` testID not found in Learning Book |
+| 25 | `retention/topic-detail` | **FAIL** | `retention-card` testID not found in Library |
 | 26 | `retention/relearn-flow` | **FAIL** | Text "Every topic needs its own approach" not found on relearn screen; `relearn-button` found and tapped successfully |
 | 27 | `subjects/multi-subject` | **FAIL** | After tapping "Physics" on home, "Physics" not visible on next screen |
 | 28 | `edge/empty-first-user` | **FAIL** | Flow uses `onboarding-complete` scenario but expects empty state (`create-subject-name`) |
@@ -504,7 +504,7 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 
 1. **Highest pass rate yet.** 18/26 flows passing (69%) vs 9/18 in Session 11 (50%). BUG-48 fix and accumulated fixes from Sessions 12-13 are paying off.
 
-2. **Parent flows fully stable.** All 5 parent flows pass after BUG-48 fix — parent-dashboard, parent-learning-book, child-drill-down, parent-tabs, consent-management, demo-dashboard.
+2. **Parent flows fully stable.** All 5 parent flows pass after BUG-48 fix — parent-dashboard, parent-library, child-drill-down, parent-tabs, consent-management, demo-dashboard.
 
 3. **Learning/homework flows strong.** freeform-session, first-session, core-learning, homework-from-entry-card, camera-ocr all pass. The remaining failures are LLM-dependent or flow-design issues.
 
@@ -657,7 +657,7 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 | Post-auth (comprehensive, hardcoded creds) | 1 | **PASS** (65 steps) |
 | Quick-check / misc | 1 | **PASS** (simple screenshot) |
 | Seed-dependent (learning) | 5 | **PASS** (start-session, core-learning, first-session, freeform-session, homework-from-entry-card) |
-| Seed-dependent (retention) | 6 | **PASS** (recall-review, learning-book, retention-review, failed-recall, topic-detail, relearn-flow) |
+| Seed-dependent (retention) | 6 | **PASS** (recall-review, library, retention-review, failed-recall, topic-detail, relearn-flow) |
 | Seed-dependent (billing) | 2 | **PASS** (subscription, subscription-details; child-paywall counted separately below) |
 | Seed-dependent (onboarding — LLM) | 2 | **PASS** (analogy-preference-flow, curriculum-review-flow — fixed Session 17) |
 | Seed-dependent (onboarding) | 3 | **PASS** (create-subject, create-profile, view-curriculum) |
@@ -665,7 +665,7 @@ Cold-booted emulator after Maestro `inputText` DEADLINE_EXCEEDED systematic fail
 | Seed-dependent (consent) | 5 | **PASS** (post-approval-landing, consent-withdrawn-gate, consent-pending-gate, coppa-flow, profile-creation-consent) |
 | Seed-dependent (assessment) | 1 | **PASS** (assessment-cycle) |
 | Seed-dependent (homework) | 2 | **PASS** (camera-ocr, homework-flow) |
-| Seed-dependent (parent) | 6 | **PASS** (parent-dashboard, parent-learning-book, child-drill-down, parent-tabs, consent-management, demo-dashboard) |
+| Seed-dependent (parent) | 6 | **PASS** (parent-dashboard, parent-library, child-drill-down, parent-tabs, consent-management, demo-dashboard) |
 | Seed-dependent (parent) — profile switching | 1 | **PASS** (profile-switching) |
 | Seed-dependent (subjects) | 1 | **PASS** (multi-subject) |
 | Seed-dependent (edge) | 1 | **PASS** (empty-first-user) |
@@ -746,14 +746,14 @@ Full regression run to verify nothing broke from previously passing tests. Ran i
 | 19 | `learning/session-summary` | **FAIL** | LLM timeout: `chat-input` not visible after 2nd exchange (60s timeout) |
 | 20 | `assessment/assessment-cycle` | PASS | |
 | 21 | `retention/topic-detail` | PASS | |
-| 22 | `retention/learning-book` | PASS | |
+| 22 | `retention/library` | PASS | |
 | 23 | `retention/retention-review` | PASS | |
 | 24 | `retention/recall-review` | PASS | |
 | 25 | `retention/failed-recall` | PASS | |
 | 26 | `retention/relearn-flow` | PASS | |
 | 27 | `parent/parent-tabs` | PASS | |
 | 28 | `parent/parent-dashboard` | PASS | |
-| 29 | `parent/parent-learning-book` | PASS | |
+| 29 | `parent/parent-library` | PASS | |
 | 30 | `parent/child-drill-down` | PASS | |
 | 31 | `parent/consent-management` | PASS | |
 | 32 | `parent/demo-dashboard` | PASS | |
@@ -859,14 +859,14 @@ Two visual bugs identified from emulator screenshot review and fixed in app code
 | 18 | `learning/start-session` | **PASS** | |
 | 19 | `assessment/assessment-cycle` | FAIL → **PASS** | "New subject"→testID + timeout fix |
 | 20 | `retention/topic-detail` | **PASS** | |
-| 21 | `retention/learning-book` | **PASS** | |
+| 21 | `retention/library` | **PASS** | |
 | 22 | `retention/retention-review` | **PASS** | |
 | 23 | `retention/recall-review` | **PASS** | |
 | 24 | `retention/failed-recall` | **PASS** | |
 | 25 | `retention/relearn-flow` | **PASS** | |
 | 26 | `parent/parent-tabs` | **PASS** | |
 | 27 | `parent/parent-dashboard` | **PASS** | |
-| 28 | `parent/parent-learning-book` | **PASS** | |
+| 28 | `parent/parent-library` | **PASS** | |
 | 29 | `parent/child-drill-down` | **PASS** | |
 | 30 | `parent/consent-management` | **PASS** | |
 | 31 | `parent/demo-dashboard` | **PASS** | |
@@ -978,14 +978,14 @@ Two visual bugs identified from emulator screenshot review and fixed in app code
 | 19 | `learning/voice-mode-controls` | **PASS** | |
 | 20 | `assessment/assessment-cycle` | FAIL | Needs investigation |
 | 21 | `retention/topic-detail` | **PASS** | |
-| 22 | `retention/learning-book` | **PASS** | |
+| 22 | `retention/library` | **PASS** | |
 | 23 | `retention/retention-review` | **PASS** | |
 | 24 | `retention/recall-review` | **PASS** | |
 | 25 | `retention/failed-recall` | **PASS** | |
 | 26 | `retention/relearn-flow` | **PASS** | |
 | 27 | `parent/parent-tabs` | **PASS** | |
 | 28 | `parent/parent-dashboard` | **PASS** | |
-| 29 | `parent/parent-learning-book` | **PASS** | |
+| 29 | `parent/parent-library` | **PASS** | |
 | 30 | `parent/child-drill-down` | FAIL | Needs investigation |
 | 31 | `parent/consent-management` | FAIL | Needs investigation |
 | 32 | `parent/demo-dashboard` | **PASS** | |
@@ -1080,14 +1080,14 @@ Two visual bugs identified from emulator screenshot review and fixed in app code
 | 13 | `account/profile-switching` | **PASS** | |
 | 14 | `onboarding/create-profile-standalone` | **PASS** | |
 | 15 | `onboarding/create-subject` | **FAIL** | Maestro timing (assert OK, tap FAIL) |
-| 16 | `onboarding/view-curriculum` | **PASS** | V-007: Learning Book empty vs home data |
+| 16 | `onboarding/view-curriculum` | **PASS** | V-007: Library empty vs home data |
 | 17 | `onboarding/analogy-preference-flow` | **PASS** | |
 | 18 | `onboarding/curriculum-review-flow` | **FAIL** | LLM-dependent |
 | 19-21 | Billing (3 flows) | **All PASS** | Child paywall UX excellent |
 | 22-27 | Learning (6 flows) | **All PASS** | BUG-63 fix confirmed |
 | 28 | `assessment/assessment-cycle` | **FAIL** | Sign-in infra timing |
 | 29-34 | Retention (6 flows) | **All PASS** | SM-2 metrics render correctly |
-| 35 | `parent/parent-tabs` | **FAIL** | V-008: Learning Book shows wrong screen |
+| 35 | `parent/parent-tabs` | **FAIL** | V-008: Library shows wrong screen |
 | 36 | `parent/parent-dashboard` | **FAIL** | Sign-in infra timing |
 | 37-42 | Parent (6 remaining) | **All PASS** | |
 | 43-45 | Homework (3 flows) | **All PASS** | |
@@ -1114,7 +1114,7 @@ Two visual bugs identified from emulator screenshot review and fixed in app code
 | V-004 | MAJOR | Subscription detail | Perpetual loading spinner — no content loaded |
 | V-005 | MAJOR | Parent dashboard | Two empty gray cards — no child data rendered |
 | V-006 | MAJOR | Parent tab bar | 4th tab `child/[profileId]` leaks with broken icon |
-| V-008 | MAJOR | Parent Learning Book | Shows learner's "New subject" screen instead of curriculum |
+| V-008 | MAJOR | Parent Library | Shows learner's "New subject" screen instead of curriculum |
 
 **Key insight:** All 4 MAJOR visual bugs passed Maestro's functional assertions. They were caught only by reading the screenshots — validating the visual review approach.
 
@@ -1126,11 +1126,11 @@ Two visual bugs identified from emulator screenshot review and fixed in app code
 
 ### New Flows Added (2026-03-28) — Stories 4.12-4.14, 10.20-10.23
 
-Four new E2E flows added for Epic 4 (Learning Book navigation) and Epic 10 (Subject auto-inference). Not yet run — pending next test session.
+Four new E2E flows added for Epic 4 (Library navigation) and Epic 10 (Subject auto-inference). Not yet run — pending next test session.
 
 | # | Flow | Status | Story | Notes |
 |---|------|--------|-------|-------|
-| — | `learning/learning-book-navigation.yaml` | NEW | 4.12, 4.13 | In-session book link + post-session book link. Seed: `retention-due`. |
+| — | `learning/library-navigation.yaml` | NEW | 4.12, 4.13 | In-session library link + post-session library link. Seed: `retention-due`. |
 | — | `retention/topic-detail-adaptive-buttons.yaml` | NEW | 4.14 | Continue Learning / Start Review adaptive buttons (`in_progress` state). Seed: `learning-active`. |
 | — | `retention/topic-detail.yaml` | UPDATED | 4.14 | Added `start-learning-button` assertion for `not_started` state. Corrected from outdated `start-review-button`. |
 | — | `subjects/practice-subject-picker.yaml` | NEW | 10.23 | Bottom-sheet picker with 2 active subjects. Seed: `multi-subject-practice` (new scenario). |

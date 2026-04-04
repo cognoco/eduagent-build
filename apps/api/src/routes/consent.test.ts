@@ -67,6 +67,12 @@ jest.mock('../services/account', () => ({
 }));
 
 jest.mock('../services/profile', () => ({
+  findOwnerProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: 2010,
+    location: 'EU',
+    consentStatus: 'CONSENTED',
+  }),
   getProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
     accountId: 'test-account-id',

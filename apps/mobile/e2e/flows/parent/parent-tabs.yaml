@@ -1,4 +1,4 @@
-# Flow P4: Parent Tab Navigation — Dashboard, Learning Book, More
+# Flow P4: Parent Tab Navigation — Dashboard, Library, More
 # Validates: parent can navigate between the three bottom tabs and each
 # screen renders its expected content.
 # Tags: nightly, parent
@@ -6,7 +6,7 @@
 # Journey: UX Journey 4 (Parent Oversight)
 # Tab bar (from (parent)/_layout.tsx):
 #   "Home"          → dashboard.tsx    (testID: dashboard-scroll)
-#   "Learning Book" → book.tsx         (re-exports learner book; testID: subject-filter-tabs)
+#   "Library"       → library.tsx      (re-exports learner library; testID: subject-filter-tabs)
 #   "More"          → more.tsx         (testID: sign-out-button)
 appId: com.mentomate.app
 tags:
@@ -35,20 +35,20 @@ tags:
 # 4. Screenshot: Home tab (dashboard)
 - takeScreenshot: parent-tabs-01-home
 
-# ---------- Learning Book tab ----------
+# ---------- Library tab ----------
 
-# 5. Tap "Learning Book" tab (BUG-10: use accessibility label, not truncated text)
-- tapOn: "Learning Book Tab"
+# 5. Tap "Library" tab (BUG-10: use accessibility label, not truncated text)
+- tapOn: "Library Tab"
 
-# 6. Wait for Learning Book to render
+# 6. Wait for Library to render
 - extendedWaitUntil:
     visible:
       id: "subject-filter-tabs"
     timeout: 10000
     optional: true
 
-# 7. Screenshot: Learning Book tab
-- takeScreenshot: parent-tabs-02-learning-book
+# 7. Screenshot: Library tab
+- takeScreenshot: parent-tabs-02-library
 
 # ---------- More tab ----------
 

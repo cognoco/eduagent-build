@@ -49,6 +49,7 @@ export default function ConsentScreen() {
   const [error, setError] = useState('');
   const [resending, setResending] = useState(false);
   const [deliveryState, setDeliveryState] = useState<DeliveryState>('sent');
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
   // BUG-26: Fade animation for phase transitions (child → parent → success)
@@ -56,6 +57,8 @@ export default function ConsentScreen() {
 
   const transitionToPhase = useCallback(
     (newPhase: Phase) => {
+      if (isTransitioning) return;
+      setIsTransitioning(true);
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 300,
@@ -66,10 +69,12 @@ export default function ConsentScreen() {
           toValue: 1,
           duration: 300,
           useNativeDriver: true,
-        }).start();
+        }).start(() => {
+          setIsTransitioning(false);
+        });
       });
     },
-    [fadeAnim]
+    [fadeAnim, isTransitioning]
   );
 
   // Hand-off copy uses learner variant (consent screen is always shown to children).
@@ -81,7 +86,11 @@ export default function ConsentScreen() {
 
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail);
   const canSubmit =
-    isValidEmail && !isPending && phase === 'parent' && !isOffline;
+    isValidEmail &&
+    !isPending &&
+    !isTransitioning &&
+    phase === 'parent' &&
+    !isOffline;
 
   const onSubmit = useCallback(async () => {
     if (!canSubmit || !profileId) return;
@@ -144,7 +153,10 @@ export default function ConsentScreen() {
         }}
         keyboardShouldPersistTaps="handled"
       >
-        <Animated.View style={{ opacity: fadeAnim }}>
+        <Animated.View
+          style={{ opacity: fadeAnim }}
+          pointerEvents={isTransitioning ? 'none' : 'auto'}
+        >
           {phase === 'child' && (
             <View testID="consent-child-view">
               <Text className="text-h1 font-bold text-text-primary mb-4">

@@ -37,19 +37,19 @@ tags:
       id: "home-scroll-view"
     timeout: 15000
 
-# 3. Navigate to Learning Book tab
-- tapOn: "Learning Book Tab"
+# 3. Navigate to Library tab
+- tapOn: "Library Tab"
 
-# 4. Wait for Learning Book to load
+# 4. Wait for Library to load
 - extendedWaitUntil:
     visible:
-      text: "Learning Book"
+      text: "Library"
     timeout: 10000
 
 # 5. Wait for topics to load
 - extendedWaitUntil:
     notVisible:
-      id: "learning-book-loading"
+      id: "library-loading"
     timeout: 10000
     # Spinner may already be gone by the time we check
     optional: true

@@ -20,7 +20,7 @@ import {
   getOpeningMessage,
   SessionTimer,
   QuestionCounter,
-  LearningBookPrompt,
+  LibraryPrompt,
   SessionInputModeToggle,
   type ChatMessage,
 } from '../../../components/session';
@@ -1842,7 +1842,7 @@ export default function SessionScreen() {
             {modeConfig.showQuestionCount && (
               <QuestionCounter count={userMessageCount} />
             )}
-            {showBookLink && <LearningBookPrompt />}
+            {showBookLink && <LibraryPrompt />}
           </>
         }
       />

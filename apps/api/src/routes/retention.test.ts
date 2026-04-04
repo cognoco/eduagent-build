@@ -28,6 +28,16 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
+jest.mock('../services/profile', () => ({
+  findOwnerProfile: jest.fn().mockResolvedValue(null),
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+}));
+
 jest.mock('../services/retention-data', () => ({
   getSubjectRetention: jest.fn(),
   getTopicRetention: jest.fn(),
@@ -58,6 +68,7 @@ const TEST_ENV = {
 const AUTH_HEADERS = {
   Authorization: 'Bearer valid.jwt.token',
   'Content-Type': 'application/json',
+  'X-Profile-Id': 'test-profile-id',
 };
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';

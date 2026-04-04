@@ -327,7 +327,7 @@ In mid-2025, all three major AI providers launched **free tutoring features**:
 | **Data/personalization** | Learning history, mastery scores, style preferences | HIGH — lose all progress |
 | **Curriculum investment** | User's custom syllabus, bookmarked topics | MEDIUM |
 | **Relationship** | Tutor "knows" user's struggles, goals | MEDIUM |
-| **Content** | Learning Book with user's summaries | HIGH — user-created content |
+| **Content** | Library with user's summaries | HIGH — user-created content |
 
 ### If NO-GO or PIVOT: Alternatives
 

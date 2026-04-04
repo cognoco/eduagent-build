@@ -31,7 +31,7 @@ tags:
 - assertVisible:
     id: "tab-home"
 - assertVisible:
-    id: "tab-book"
+    id: "tab-library"
 - assertVisible:
     id: "tab-more"
 

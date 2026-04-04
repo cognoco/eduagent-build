@@ -105,7 +105,7 @@ Required: `DATABASE_URL` (Neon connection string). See `.env.example` for all va
 
 **Phase 1 mobile screens** (NativeWind + Expo Router):
 - Three-persona theming (teen dark / learner calm / parent light)
-- Tab navigation (Home, Learning Book, More)
+- Tab navigation (Home, Library, More)
 - Coaching card, chat, parent dashboard screens
 - Currently using mock data — not yet wired to API
 

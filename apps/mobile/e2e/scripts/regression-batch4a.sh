@@ -28,7 +28,7 @@ run_seeded "learning-active" "flows/learning/session-summary.yaml"
 
 # Retention (emulator crash victims)
 run_seeded "retention-due"    "flows/retention/topic-detail.yaml"
-run_seeded "retention-due"    "flows/retention/learning-book.yaml"
+run_seeded "retention-due"    "flows/retention/library.yaml"
 run_seeded "retention-due"    "flows/retention/retention-review.yaml"
 run_seeded "retention-due"    "flows/retention/recall-review.yaml"
 

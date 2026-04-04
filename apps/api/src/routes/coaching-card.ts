@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
-import type { Account } from '../services/account';
+import { requireProfileId } from '../middleware/profile-scope';
 import { getCoachingCardForProfile } from '../services/coaching-cards';
 
 type CoachingCardRouteEnv = {
@@ -9,8 +9,7 @@ type CoachingCardRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
-    account: Account;
-    profileId: string;
+    profileId: string | undefined;
   };
 };
 
@@ -18,7 +17,7 @@ export const coachingCardRoutes = new Hono<CoachingCardRouteEnv>()
   // Get coaching card for authenticated profile
   .get('/coaching-card', async (c) => {
     const db = c.get('db');
-    const profileId = c.get('profileId');
+    const profileId = requireProfileId(c.get('profileId'));
 
     const result = await getCoachingCardForProfile(db, profileId);
     return c.json(result);

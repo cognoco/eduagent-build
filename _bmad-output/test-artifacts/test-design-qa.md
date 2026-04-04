@@ -245,7 +245,7 @@ test('authenticated request succeeds', async () => {
 | **P1-005** | FR108-FR117: Subscription trial -> expiry -> upgrade -> quota | E2E (Maestro) | R-006 | Requires seed: `trial-active` and `trial-expired` |
 | **P1-006** | FR23-FR24: SSE streaming (start session -> stream AI response) | E2E (Maestro) | R-007 | Happy path only; disconnect handling is P3 |
 | **P1-007** | FR59-FR63: Adaptive teaching (three-strike -> direct instruction -> Needs Deepening) | E2E (Maestro) | — | Requires seed: `learning-active` with struggle state |
-| **P1-008** | FR67-FR70: Learning Book (browse topics, retention scores, "Your Words") | E2E (Maestro) | — | Read-only flow; validates data display |
+| **P1-008** | FR67-FR70: Library (browse topics, retention scores, "Your Words") | E2E (Maestro) | — | Read-only flow; validates data display |
 | **P1-009** | FR92: Interleaved retrieval (mixed topics, randomized questions) | Integration (API) | R-004 | API-level validation of topic mixing logic |
 | **P1-010** | Coaching card display (cached path <1s, fresh with skeleton) | E2E (Maestro) | — | Validates home screen entry point |
 | **P1-011** | **FR54: Anti-cramming enforcement** | Integration (API) | R-004, AUDIT | **NEW.** Verify `canRetestTopic()` is called in recall-test route — retest rejected within 24h. Function exists but is not wired in per audit. |

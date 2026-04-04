@@ -217,7 +217,7 @@ describe('useCoachingCard', () => {
     expect(result.current.isCurriculumComplete).toBe(true);
     expect(result.current.headline).toContain('mastered');
     expect(result.current.primaryRoute).toBe('/create-subject');
-    expect(result.current.secondaryRoute).toBe('/(learner)/book');
+    expect(result.current.secondaryRoute).toBe('/(learner)/library');
   });
 
   it('omits subjectId from freeform routes when no defaultSubjectId', async () => {

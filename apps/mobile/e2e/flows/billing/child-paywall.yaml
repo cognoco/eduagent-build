@@ -1,7 +1,7 @@
 # Flow: Child Paywall — Expired Trial Child-Friendly Paywall
 # Validates: when a child profile's trial has expired, the subscription screen
 # renders the ChildPaywall instead of the normal subscription UI. Verifies
-# heading, notify-parent button, alert, and browse-book navigation.
+# heading, notify-parent button, alert, and browse-library navigation.
 # Tags: nightly, billing, consent
 #
 # Journey: UX Journey 5 (Billing & Subscription) + Consent Lifecycle
@@ -123,22 +123,22 @@ tags:
 # 15. Screenshot after notify attempt
 - takeScreenshot: child-paywall-after-notify
 
-# 16. Verify browse book button
+# 16. Verify browse library button
 - assertVisible:
-    id: "browse-book-button"
+    id: "browse-library-button"
 
-# 17. Tap browse book button
+# 17. Tap browse library button
 - tapOn:
-    id: "browse-book-button"
+    id: "browse-library-button"
 
-# 18. Verify Learning Book screen loads
-# Navigation to Learning Book may be slow on emulator with expired trial state
+# 18. Verify Library screen loads
+# Navigation to Library may be slow on emulator with expired trial state
 - extendedWaitUntil:
     visible:
-      text: "Learning Book"
+      text: "Library"
     timeout: 15000
-    # Learning Book screen may not load if subscription gate blocks navigation
+    # Library screen may not load if subscription gate blocks navigation
     optional: true
 
 # 19. Final screenshot
-- takeScreenshot: child-paywall-learning-book
+- takeScreenshot: child-paywall-library

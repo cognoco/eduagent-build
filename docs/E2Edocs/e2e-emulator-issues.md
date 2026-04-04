@@ -991,7 +991,7 @@ export TEMP="C:\\tools\\tmp" && export TMP="C:\\tools\\tmp"
 **What works end-to-end:** Seed test data → sign in → home screen → More tab full verification → Privacy Policy → Terms of Service → theme cycling. All via Maestro automation (hardcoded credentials in the comprehensive flow).
 
 **Known limitations:**
-- Tab bar taps unreliable for "Home" and "Learning Book" (BUG-10, dev-client only)
+- Tab bar taps unreliable for "Home" and "Library" (BUG-10, dev-client only)
 - Theme switch timing requires `extendedWaitUntil` workaround (BUG-11)
 - Parent theme switch redirects to `(parent)/dashboard` (BUG-12, by design)
 - WHPX emulator slow — ANR dialogs during bundle loading (Issue 9)
@@ -1276,7 +1276,7 @@ The seed-and-sign-in pipeline went through 3 major revisions in Sessions 4-5:
 
 **tabBarButtonTestID fix** (relates to BUG-15)
 - `tabBarTestID` is the wrong prop name. Expo Router uses `tabBarButtonTestID` for the actual tab bar button.
-- Changed in both `(learner)/_layout.tsx` and `(parent)/_layout.tsx` for all 3 tabs (Home, Learning Book, More).
+- Changed in both `(learner)/_layout.tsx` and `(parent)/_layout.tsx` for all 3 tabs (Home, Library, More).
 - Text-based matching (`tapOn: text: "More"`) still recommended for E2E flows as Expo Router may not propagate testIDs to Android accessibility tree consistently.
 
 ### Setup Helper Inventory (10 files)
@@ -1498,25 +1498,25 @@ Make sure you're running Metro or that your bundle 'index...'
 
 ## Issue 14: Expo Router Directory Routes Break Tab Bar in Dev-Client (2026-03-10)
 
-**What happened:** The Learning Book tab (`(learner)/book/`) was unreachable via Maestro in dev-client builds. The `tabBarAccessibilityLabel: 'Learning Book Tab'` configured on the `Tabs.Screen` was being ignored — Android UIAutomator showed `content-desc="⏷, book/index"` instead of the configured label.
+**What happened:** The Library tab (`(learner)/library/`) was unreachable via Maestro in dev-client builds. The `tabBarAccessibilityLabel: 'Library Tab'` configured on the `Tabs.Screen` was being ignored — Android UIAutomator showed `content-desc="⏷, library/index"` instead of the configured label.
 
-**Root cause:** Expo Router treats **directory routes** (`book/index.tsx`) differently from **file routes** (`book.tsx`). When a tab screen is a directory route:
-1. The tab bar displays the raw path segment (`book/index`) instead of the configured `title` option
+**Root cause:** Expo Router treats **directory routes** (`library/index.tsx`) differently from **file routes** (`library.tsx`). When a tab screen is a directory route:
+1. The tab bar displays the raw path segment (`library/index`) instead of the configured `title` option
 2. `tabBarAccessibilityLabel` is NOT propagated to the Android `contentDescription`
 3. `tabBarButtonTestID` is also NOT propagated
 
 This is likely because Expo Router internally constructs a different screen name for directory routes (using the directory path) rather than the simple file name.
 
-**Discovery method:** `adb exec-out uiautomator dump /dev/stdout` showed the tab's `content-desc` attribute. The Learning Book tab had `content-desc="⏷, book/index"` while the Home tab (a file route) correctly had `content-desc="Home Tab"`.
+**Discovery method:** `adb exec-out uiautomator dump /dev/stdout` showed the tab's `content-desc` attribute. The Library tab had `content-desc="⏷, library/index"` while the Home tab (a file route) correctly had `content-desc="Home Tab"`.
 
 **Fix:**
-1. Flatten `book/index.tsx` → `book.tsx` (file route)
+1. Flatten `library/index.tsx` → `library.tsx` (file route)
 2. Update all import paths (component goes from `../../../hooks/...` to `../../hooks/...`)
-3. Update the `(parent)/book.tsx` re-export path
+3. Update the `(parent)/library.tsx` re-export path
 4. Update the test file paths similarly
 
 **Lesson for future agents:**
-- **Always use file routes for tab screens** (e.g., `book.tsx`, not `book/index.tsx`). Directory routes break tab bar configuration in dev-client.
+- **Always use file routes for tab screens** (e.g., `library.tsx`, not `library/index.tsx`). Directory routes break tab bar configuration in dev-client.
 - **Use `tabBarAccessibilityLabel`** (not `tabBarButtonTestID`) for tab navigation in Maestro flows. It maps to Android `contentDescription` which Maestro matches via `tapOn: "label"`.
 - **Verify with UIAutomator:** `adb exec-out uiautomator dump /dev/stdout | grep -o 'content-desc="[^"]*"'` shows what Maestro can actually see.
 - **Never use point-tap (`tapOn: point:`) for tab navigation** — dev-client builds show extra hidden tabs (BUG-10), shifting all tab positions unpredictably.
@@ -1525,7 +1525,7 @@ This is likely because Expo Router internally constructs a different screen name
 
 ## Issue 15: react-native-svg Crash on Fabric (New Architecture) — ClassCastException (2026-03-10)
 
-**What happens:** Navigating to the Learning Book tab crashes the app with a red error screen:
+**What happens:** Navigating to the Library tab crashes the app with a red error screen:
 
 ```
 java.lang.ClassCastException: java.lang.String cannot be cast to...
@@ -1541,7 +1541,7 @@ java.lang.ClassCastException: java.lang.String cannot be cast to...
 
 **Affected component:** `BookPageFlipAnimation.tsx` uses `Svg`, `Rect`, `Line`, `G` from react-native-svg. The `G` (Group) component triggers the Fabric `RNSVGGroupManagerDelegate` crash when receiving animated props from reanimated.
 
-**Reproduction:** 100% reproducible — tap "Learning Book Tab" on any seeded flow. The loading state renders `BookPageFlipAnimation` which crashes immediately.
+**Reproduction:** 100% reproducible — tap "Library Tab" on any seeded flow. The loading state renders `BookPageFlipAnimation` which crashes immediately.
 
 **Why home screen SVG doesn't crash:** `PenWritingAnimation` (also SVG) only renders during `coachingCard.isLoading` on the home screen. In E2E tests, the coaching card API responds fast enough that the loading state is never visible — the SVG never mounts.
 
@@ -1654,7 +1654,7 @@ After cold boot:
 
 When a `<Pressable testID="foo">` wraps `<Text>` children, Maestro's `text:` selector cannot find the inner text content. The testID on the outer `Pressable` makes it the accessibility target, and the inner text nodes become invisible to Maestro's accessibility tree scan.
 
-**Example (topic row in Learning Book):**
+**Example (topic row in Library):**
 ```tsx
 <Pressable testID={`book-topic-${topic.id}`} onPress={...}>
   <Text>{topic.name}</Text>          {/* invisible to text: selector */}

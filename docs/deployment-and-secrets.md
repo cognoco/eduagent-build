@@ -241,10 +241,19 @@ required manual release step.
 1. Generate and commit the migration SQL under `apps/api/drizzle/`.
 2. Point `DATABASE_URL` at the target environment and run
    `pnpm --filter @eduagent/database db:migrate`.
-3. Deploy the API worker with `wrangler deploy`.
-4. Rebuild or at least re-test the mobile app if the API contract changed.
-5. Check Sentry and the affected API route immediately after rollout for
+3. **Verify migration succeeded** before proceeding — new columns must exist
+   before the Workers bundle that references them is deployed. A deploy-first
+   ordering causes `column "..." does not exist` 500s on every affected route.
+4. Deploy the API worker with `wrangler deploy`.
+5. Rebuild or at least re-test the mobile app if the API contract changed.
+6. Check Sentry and the affected API route immediately after rollout for
    `column "... does not exist"` or similar schema drift errors.
+
+### Known migration-to-code dependencies
+
+| Migration | Column | Code that fails without it |
+|-----------|--------|---------------------------|
+| `0006_watery_birth_year.sql` | `profiles.birth_year` | `profileScopeMiddleware` → `ProfileMeta.birthYear`, LLM context injection, Sentry age-gating, consent checks |
 
 ---
 

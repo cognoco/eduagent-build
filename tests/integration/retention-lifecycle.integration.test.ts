@@ -315,9 +315,9 @@ describe('Integration: Retention Lifecycle', () => {
         xpChange: '0 XP',
         nextReviewAt: '2026-02-26T10:00:00.000Z',
         failureCount: 3,
-        failureAction: 'redirect_to_learning_book',
+        failureAction: 'redirect_to_library',
         remediation: {
-          action: 'redirect_to_learning_book',
+          action: 'redirect_to_library',
           topicId: TOPIC_ID,
           topicTitle: 'Introduction to Calculus',
           retentionStatus: 'fading',
@@ -342,7 +342,7 @@ describe('Integration: Retention Lifecycle', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.result.failureAction).toBe('redirect_to_learning_book');
+      expect(body.result.failureAction).toBe('redirect_to_library');
       expect(body.result.remediation).toBeDefined();
       expect(body.result.remediation.options).toContain('relearn_topic');
     });

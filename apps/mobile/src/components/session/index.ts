@@ -16,4 +16,4 @@ export {
 } from './VoicePlaybackBar';
 export { SessionInputModeToggle } from './SessionInputModeToggle';
 export { LivingBook } from './LivingBook';
-export { LearningBookPrompt } from './LearningBookPrompt';
+export { LibraryPrompt } from './LibraryPrompt';

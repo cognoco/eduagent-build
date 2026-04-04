@@ -23,7 +23,7 @@ run_seeded "learning-active" "flows/learning/session-summary.yaml"
 
 # Retention
 run_seeded "retention-due"    "flows/retention/topic-detail.yaml"
-run_seeded "retention-due"    "flows/retention/learning-book.yaml"
+run_seeded "retention-due"    "flows/retention/library.yaml"
 run_seeded "retention-due"    "flows/retention/retention-review.yaml"
 run_seeded "retention-due"    "flows/retention/recall-review.yaml"
 run_seeded "failed-recall-3x" "flows/retention/failed-recall.yaml"
@@ -32,7 +32,7 @@ run_seeded "failed-recall-3x" "flows/retention/relearn-flow.yaml"
 # Parent
 run_seeded "parent-with-children" "flows/parent/parent-tabs.yaml"
 run_seeded "parent-with-children" "flows/parent/parent-dashboard.yaml"
-run_seeded "parent-with-children" "flows/parent/parent-learning-book.yaml"
+run_seeded "parent-with-children" "flows/parent/parent-library.yaml"
 run_seeded "parent-with-children" "flows/parent/child-drill-down.yaml"
 run_seeded "parent-with-children" "flows/parent/consent-management.yaml"
 run_seeded "parent-solo"          "flows/parent/demo-dashboard.yaml"

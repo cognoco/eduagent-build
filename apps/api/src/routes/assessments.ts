@@ -6,7 +6,7 @@ import {
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
-import type { Account } from '../services/account';
+import { requireProfileId } from '../middleware/profile-scope';
 import {
   evaluateAssessmentAnswer,
   createAssessment,
@@ -21,8 +21,7 @@ type AssessmentRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
-    account: Account;
-    profileId: string;
+    profileId: string | undefined;
   };
 };
 
@@ -30,7 +29,7 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
   // Start a topic completion assessment
   .post('/subjects/:subjectId/topics/:topicId/assessments', async (c) => {
     const db = c.get('db');
-    const profileId = c.get('profileId');
+    const profileId = requireProfileId(c.get('profileId'));
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
 
@@ -62,7 +61,7 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
     zValidator('json', assessmentAnswerSchema),
     async (c) => {
       const db = c.get('db');
-      const profileId = c.get('profileId');
+      const profileId = requireProfileId(c.get('profileId'));
       const assessmentId = c.req.param('assessmentId');
       const { answer } = c.req.valid('json');
 
@@ -106,7 +105,7 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
   // Get assessment state
   .get('/assessments/:assessmentId', async (c) => {
     const db = c.get('db');
-    const profileId = c.get('profileId');
+    const profileId = requireProfileId(c.get('profileId'));
     const assessmentId = c.req.param('assessmentId');
 
     const assessment = await getAssessment(db, profileId, assessmentId);
@@ -120,7 +119,7 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
     zValidator('json', quickCheckResponseSchema),
     async (c) => {
       const db = c.get('db');
-      const profileId = c.get('profileId');
+      const profileId = requireProfileId(c.get('profileId'));
       const sessionId = c.req.param('sessionId');
       const { answer } = c.req.valid('json');
 

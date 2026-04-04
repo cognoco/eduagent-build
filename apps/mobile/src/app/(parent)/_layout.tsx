@@ -187,11 +187,11 @@ export default function ParentLayout() {
           }}
         />
         <Tabs.Screen
-          name="book"
+          name="library"
           options={{
-            title: 'Learning Book',
-            tabBarButtonTestID: 'tab-book',
-            tabBarAccessibilityLabel: 'Learning Book Tab',
+            title: 'Library',
+            tabBarButtonTestID: 'tab-library',
+            tabBarAccessibilityLabel: 'Library Tab',
             tabBarIcon: ({ focused }) => (
               <TabIcon name="Book" focused={focused} />
             ),

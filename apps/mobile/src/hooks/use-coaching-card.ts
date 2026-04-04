@@ -80,7 +80,7 @@ export function useCoachingCard(defaultSubjectId?: string): CoachingCardState {
         primaryLabel: 'Add a new subject',
         secondaryLabel: 'Keep reviewing',
         primaryRoute: '/create-subject',
-        secondaryRoute: '/(learner)/book',
+        secondaryRoute: '/(learner)/library',
         isLoading: false,
         isCurriculumComplete: true,
       };

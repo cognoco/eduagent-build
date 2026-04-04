@@ -124,7 +124,7 @@ export async function precomputeHomeCards(
       id: 'restore_subjects',
       title: 'No active subjects right now',
       subtitle:
-        'Restore or resume a subject from your Learning Book when you are ready.',
+        'Restore or resume a subject from your Library when you are ready.',
       badge: 'Subject control',
       primaryLabel: 'Manage subjects',
       priority: 85,
@@ -192,9 +192,9 @@ export async function precomputeHomeCards(
         subtitle:
           reviewSubjectNames.length > 0
             ? reviewSubjectNames.join(', ')
-            : 'Open your Learning Book to revisit what needs another look.',
+            : 'Open your Library to revisit what needs another look.',
         badge: totalReviewDue >= 3 ? 'Needs review' : 'Review',
-        primaryLabel: 'Open Learning Book',
+        primaryLabel: 'Open Library',
         priority: totalReviewDue >= 3 ? 90 : 76,
         subjectId: reviewSubject?.subjectId,
         compact: true,

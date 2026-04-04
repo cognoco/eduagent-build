@@ -10,7 +10,7 @@ import {
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
-import type { Account } from '../services/account';
+import { requireProfileId } from '../middleware/profile-scope';
 import {
   getCurriculum,
   skipTopic,
@@ -27,8 +27,7 @@ type CurriculumRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
-    account: Account;
-    profileId: string;
+    profileId: string | undefined;
   };
 };
 
@@ -36,12 +35,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
   // Get curriculum for a subject
   .get('/subjects/:subjectId/curriculum', async (c) => {
     const db = c.get('db');
-    const profileId = c.get('profileId');
-    if (!profileId)
-      return unauthorized(
-        c,
-        'Profile selection required (X-Profile-Id header)'
-      );
+    const profileId = requireProfileId(c.get('profileId'));
     const subjectId = c.req.param('subjectId');
     const curriculum = await getCurriculum(db, profileId, subjectId);
     return c.json({ curriculum });
@@ -52,7 +46,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     zValidator('json', topicSkipSchema),
     async (c) => {
       const db = c.get('db');
-      const profileId = c.get('profileId');
+      const profileId = requireProfileId(c.get('profileId'));
       if (!profileId)
         return unauthorized(
           c,
@@ -82,7 +76,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     zValidator('json', topicUnskipSchema),
     async (c) => {
       const db = c.get('db');
-      const profileId = c.get('profileId');
+      const profileId = requireProfileId(c.get('profileId'));
       if (!profileId)
         return unauthorized(
           c,
@@ -119,7 +113,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     zValidator('json', curriculumTopicAddSchema),
     async (c) => {
       const db = c.get('db');
-      const profileId = c.get('profileId');
+      const profileId = requireProfileId(c.get('profileId'));
       if (!profileId)
         return unauthorized(
           c,
@@ -151,7 +145,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     zValidator('json', curriculumChallengeSchema),
     async (c) => {
       const db = c.get('db');
-      const profileId = c.get('profileId');
+      const profileId = requireProfileId(c.get('profileId'));
       if (!profileId)
         return unauthorized(
           c,
@@ -181,7 +175,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     zValidator('json', curriculumAdaptRequestSchema),
     async (c) => {
       const db = c.get('db');
-      const profileId = c.get('profileId');
+      const profileId = requireProfileId(c.get('profileId'));
       if (!profileId)
         return unauthorized(
           c,
@@ -202,12 +196,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
   // Explain topic ordering
   .get('/subjects/:subjectId/curriculum/topics/:topicId/explain', async (c) => {
     const db = c.get('db');
-    const profileId = c.get('profileId');
-    if (!profileId)
-      return unauthorized(
-        c,
-        'Profile selection required (X-Profile-Id header)'
-      );
+    const profileId = requireProfileId(c.get('profileId'));
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
     try {

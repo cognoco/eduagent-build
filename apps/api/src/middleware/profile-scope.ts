@@ -4,11 +4,27 @@
 // ---------------------------------------------------------------------------
 
 import { createMiddleware } from 'hono/factory';
+import { HTTPException } from 'hono/http-exception';
 import type { Account } from '../services/account';
 import { getProfile, findOwnerProfile } from '../services/profile';
 import type { Database } from '@eduagent/database';
 import { forbidden } from '../errors';
 
+/**
+ * Profile metadata injected into Hono context by profileScopeMiddleware.
+ *
+ * MIGRATION DEPENDENCY: `birthYear` is populated from the `birth_year` column
+ * added by migration `0006_watery_birth_year.sql`. The service layer
+ * (`mapProfileRow`) falls back to `birthYearFromDateLike(birthDate)` when
+ * the column is NULL, but if the migration hasn't run at all the column
+ * won't exist and queries will 500. **Always apply pending migrations
+ * before deploying a Workers bundle that references new schema columns.**
+ *
+ * Consumers that depend on `birthYear` being non-null:
+ *   - LLM context injection (system prompt age bracketing)
+ *   - Sentry age-gating (under-13 PII scrubbing)
+ *   - Consent checks (GDPR under-16 / COPPA under-13)
+ */
 export interface ProfileMeta {
   birthYear: number | null;
   location: 'EU' | 'US' | 'OTHER' | null;
@@ -24,10 +40,23 @@ export type ProfileScopeEnv = {
   Variables: {
     db: Database;
     account: Account;
-    profileId: string;
+    profileId: string | undefined;
     profileMeta: ProfileMeta;
   };
 };
+
+/**
+ * Extracts profileId from a value that may be undefined, throwing 401 if absent.
+ * Use in route handlers: `const profileId = requireProfileId(c.get('profileId'));`
+ */
+export function requireProfileId(profileId: string | undefined): string {
+  if (!profileId) {
+    throw new HTTPException(401, {
+      message: 'Profile required — no profile resolved for this request',
+    });
+  }
+  return profileId;
+}
 
 export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
   async (c, next) => {

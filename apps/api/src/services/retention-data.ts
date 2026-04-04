@@ -239,7 +239,7 @@ export async function getTopicRetention(
 const RETEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 export interface RecallTestRemediation {
-  action: 'redirect_to_learning_book';
+  action: 'redirect_to_library';
   topicId: string;
   topicTitle: string;
   retentionStatus: string;
@@ -255,7 +255,7 @@ export interface RecallTestResponse {
   nextReviewAt: string;
   failureCount: number;
   hint?: string;
-  failureAction?: 'feedback_only' | 'redirect_to_learning_book';
+  failureAction?: 'feedback_only' | 'redirect_to_library';
   remediation?: RecallTestRemediation;
   cooldownActive?: boolean;
   cooldownEndsAt?: string;
@@ -359,20 +359,20 @@ export async function processRecallTest(
 
   if (
     attemptMode === 'dont_remember' &&
-    result.failureAction !== 'redirect_to_learning_book'
+    result.failureAction !== 'redirect_to_library'
   ) {
     response.hint = buildRecallHint(topicTitle, topic?.description);
   }
 
   // Add remediation data when redirect is triggered (3+ failures)
-  if (result.failureAction === 'redirect_to_learning_book') {
+  if (result.failureAction === 'redirect_to_library') {
     const retentionStatus = getRetentionStatus(result.newState);
     const cooldownEndsAt = new Date(
       Date.now() + RETEST_COOLDOWN_MS
     ).toISOString();
 
     response.remediation = {
-      action: 'redirect_to_learning_book',
+      action: 'redirect_to_library',
       topicId: input.topicId,
       topicTitle,
       retentionStatus,

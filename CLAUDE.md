@@ -207,7 +207,7 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 - Coaching cards: precompute service, 24h cache, `GET /v1/coaching-card` route, `AdaptiveEntryCard` wired on home screen
 - Session close summary: `SessionCloseSummary` screen at `/session-summary/[sessionId]`, replaces raw exchange-count display
 - Parent dashboard: real data from DB via `familyLinks` (children list, session counts, time, retention signals) + consent management (withdraw/restore) on child detail screen
-- Failed recall remediation (FR52-58): `processRecallTest()` returns `failureAction: redirect_to_learning_book` after 3+ failures; `startRelearn()` resets retention card and creates new session
+- Failed recall remediation (FR52-58): `processRecallTest()` returns `failureAction: redirect_to_library` after 3+ failures; `startRelearn()` resets retention card and creates new session
 - Interleaved retrieval (FR92): `services/interleaved.ts`, `interleavedSessionStartSchema`, `GET /v1/retention/stability`, full stack implemented
 - Recall bridge after homework (FR Story 2.7): `POST /v1/sessions/:sessionId/recall-bridge` + `generateRecallBridge()` service
 - Homework camera capture (Story 2.5): ML Kit OCR on device, camera state machine + `useHomeworkOcr` hook + full camera UI; server-side `OcrProvider` interface with stub implementation in `services/ocr.ts`
@@ -226,7 +226,7 @@ This applies to imports, `tsconfig.json` references, AND `package.json` deps. Pa
 **Epic 10 (PRE-LAUNCH UX POLISH) — Nearly complete (verified 2026-04-01):**
 - 15 stories fully done, 7 stories with minor gaps, 1 story not built (10.17 email delivery feedback)
 - Fully done: topic skip undo (10.1), child-friendly consent text (10.2), profile removal alert (10.3), relearn descriptions (10.6), Living Book animation (10.7), recall remediation copy (10.9), consent deny confirmation (10.11), subject raw input audit (10.12), guided label tooltip (10.13), offline action gating (10.16), consent unification/GDPR-everywhere (10.19), subject classification service (10.20), camera auto-detection (10.21), practice-for-test picker (10.23)
-- Partial gaps: actionable errors missing session streaming message (10.4), curriculum label buttons mismatch (10.5), session summary Phase 1 not built (10.8), consent handoff missing animation (10.10), privacyPolicyUrl missing from app.json (10.14), Learning Book empty state for completion (10.15), rating prompt hook not integrated (10.18), session subject inference missing ambiguous picker (10.22)
+- Partial gaps: actionable errors missing session streaming message (10.4), curriculum label buttons mismatch (10.5), session summary Phase 1 not built (10.8), consent handoff missing animation (10.10), privacyPolicyUrl missing from app.json (10.14), Library empty state for completion (10.15), rating prompt hook not integrated (10.18), session subject inference missing ambiguous picker (10.22)
 - Not built: parent email delivery feedback (10.17)
 
 **Epic 11 (BRAND IDENTITY) — Complete (verified 2026-04-01):**
