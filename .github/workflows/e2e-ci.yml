@@ -218,7 +218,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-          key: apk-debug-${{ hashFiles('apps/mobile/app.json', 'apps/mobile/package.json', 'apps/mobile/plugins/**', 'pnpm-lock.yaml') }}
+          key: apk-debug-${{ hashFiles('apps/mobile/app.json', 'apps/mobile/package.json', 'apps/mobile/plugins/**', 'apps/mobile/assets/**', 'pnpm-lock.yaml') }}
 
       # --- Phase 1: strict pnpm install + schema push ---
       # db:push MUST run before shamefully-hoist. In strict mode, pnpm
@@ -347,12 +347,22 @@ jobs:
 
           echo "APK size before: $(stat -c%s "$APK") bytes"
 
-          # Replace JS bundle inside the APK (it's a ZIP archive)
-          TMPDIR=$(mktemp -d)
-          mkdir -p "$TMPDIR/assets"
-          cp "$BUNDLE" "$TMPDIR/assets/index.android.bundle"
-          (cd "$TMPDIR" && zip "$APK" assets/index.android.bundle)
-          rm -rf "$TMPDIR"
+          # Replace JS bundle inside the APK (it's a ZIP archive).
+          # Use WORK_DIR (not TMPDIR) to avoid shadowing the POSIX temp
+          # directory variable used by keytool/apksigner (#10).
+          WORK_DIR=$(mktemp -d)
+          mkdir -p "$WORK_DIR/assets"
+          cp "$BUNDLE" "$WORK_DIR/assets/index.android.bundle"
+          (cd "$WORK_DIR" && zip "$APK" assets/index.android.bundle)
+          rm -rf "$WORK_DIR"
+
+          # zipalign MUST run BEFORE apksigner — signing invalidates
+          # alignment and alignment invalidates signatures. On API 30+
+          # misalignment causes INSTALL_FAILED_INVALID_APK (#9).
+          ZIPALIGN=$(find "$ANDROID_SDK_ROOT/build-tools" -name "zipalign" -type f | sort -V | tail -1)
+          echo "Using zipalign: $ZIPALIGN"
+          "$ZIPALIGN" -f -v 4 "$APK" "${APK}.aligned"
+          mv "${APK}.aligned" "$APK"
 
           # Re-sign with debug key (apksigner handles v1+v2+v3 schemes)
           if [ ! -f ~/.android/debug.keystore ]; then

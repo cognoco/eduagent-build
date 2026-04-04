@@ -282,7 +282,10 @@ jest.mock('../services/session', () => {
 
 jest.mock('../services/settings', () => ({
   shouldPromptCasualSwitch: jest.fn().mockResolvedValue(false),
-  shouldWarnSummarySkip: jest.fn().mockResolvedValue(false),
+  getSkipWarningFlags: jest.fn().mockResolvedValue({
+    shouldPromptCasualSwitch: false,
+    shouldWarnSummarySkip: false,
+  }),
 }));
 
 const mockStartInterleavedSession = jest.fn().mockResolvedValue({
@@ -341,7 +344,7 @@ import {
 } from '../services/session';
 import {
   shouldPromptCasualSwitch,
-  shouldWarnSummarySkip,
+  getSkipWarningFlags,
 } from '../services/settings';
 import { app } from '../index';
 
@@ -961,7 +964,10 @@ describe('session routes', () => {
     });
 
     it('returns shouldWarnSummarySkip true when warning threshold reached', async () => {
-      (shouldWarnSummarySkip as jest.Mock).mockResolvedValueOnce(true);
+      (getSkipWarningFlags as jest.Mock).mockResolvedValueOnce({
+        shouldPromptCasualSwitch: false,
+        shouldWarnSummarySkip: true,
+      });
 
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/summary/skip`,
@@ -980,7 +986,10 @@ describe('session routes', () => {
     });
 
     it('shouldWarnSummarySkip is false when casual switch prompt takes over', async () => {
-      (shouldPromptCasualSwitch as jest.Mock).mockResolvedValueOnce(true);
+      (getSkipWarningFlags as jest.Mock).mockResolvedValueOnce({
+        shouldPromptCasualSwitch: true,
+        shouldWarnSummarySkip: false,
+      });
 
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/summary/skip`,

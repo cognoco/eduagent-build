@@ -31,7 +31,7 @@ export type HomeCardInteractionStats = {
 export type HomeSurfaceCacheData = {
   kind: typeof HOME_SURFACE_CACHE_KIND;
   cachedAt: string;
-  legacyCoachingCard: CoachingCard;
+  legacyCoachingCard?: CoachingCard;
   rankedHomeCards: HomeCard[];
   coldStart?: boolean;
   interactionStats: HomeCardInteractionStats;

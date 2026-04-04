@@ -42,7 +42,7 @@ import { inngest } from '../inngest/client';
 import { incrementQuota } from '../services/billing';
 import {
   shouldPromptCasualSwitch,
-  shouldWarnSummarySkip,
+  getSkipWarningFlags,
 } from '../services/settings';
 import { startInterleavedSession } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
@@ -342,10 +342,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         }
       );
     }
-    const promptCasualSwitch = await shouldPromptCasualSwitch(db, profileId);
-    const warnSummarySkip = promptCasualSwitch
-      ? false
-      : await shouldWarnSummarySkip(db, profileId);
+    const {
+      shouldPromptCasualSwitch: promptCasualSwitch,
+      shouldWarnSummarySkip: warnSummarySkip,
+    } = await getSkipWarningFlags(db, profileId);
     return c.json({
       ...result,
       shouldPromptCasualSwitch: promptCasualSwitch,

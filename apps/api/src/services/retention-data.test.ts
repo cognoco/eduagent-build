@@ -137,7 +137,9 @@ function createMockDb(options?: {
       values: jest.fn().mockReturnValue({
         returning: jest.fn().mockResolvedValue([]),
         onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
-        onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),
+        onConflictDoUpdate: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([{}]),
+        }),
       }),
     }),
     delete: jest.fn().mockReturnValue({
@@ -919,6 +921,19 @@ describe('setTeachingPreference', () => {
 
   it('upserts preference with analogyDomain', async () => {
     const db = createMockDb();
+    // Mock .returning() to echo back what the DB would return after upsert
+    const returningMock = jest
+      .fn()
+      .mockResolvedValue([
+        { method: 'step_by_step', analogyDomain: 'cooking' },
+      ]);
+    (db.insert as jest.Mock).mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        onConflictDoUpdate: jest.fn().mockReturnValue({
+          returning: returningMock,
+        }),
+      }),
+    });
     const result = await setTeachingPreference(
       db,
       profileId,
@@ -935,6 +950,16 @@ describe('setTeachingPreference', () => {
 
   it('clears analogyDomain when null passed', async () => {
     const db = createMockDb();
+    const returningMock = jest
+      .fn()
+      .mockResolvedValue([{ method: 'visual_diagrams', analogyDomain: null }]);
+    (db.insert as jest.Mock).mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        onConflictDoUpdate: jest.fn().mockReturnValue({
+          returning: returningMock,
+        }),
+      }),
+    });
     const result = await setTeachingPreference(
       db,
       profileId,
@@ -949,22 +974,26 @@ describe('setTeachingPreference', () => {
     });
   });
 
-  it('reads back existing analogyDomain when not provided in upsert', async () => {
+  it('reads back existing analogyDomain via .returning() when not provided in upsert', async () => {
     const db = createMockDb();
-    // Simulate existing row with analogyDomain already set
-    (db.query.teachingPreferences.findFirst as jest.Mock).mockResolvedValue({
-      id: 'pref-1',
-      profileId,
-      subjectId,
-      method: 'step_by_step',
-      analogyDomain: 'sports',
+    // .returning() returns the full row including the existing analogyDomain
+    // that wasn't changed by this upsert — this is the atomic read-back
+    const returningMock = jest
+      .fn()
+      .mockResolvedValue([{ method: 'step_by_step', analogyDomain: 'sports' }]);
+    (db.insert as jest.Mock).mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        onConflictDoUpdate: jest.fn().mockReturnValue({
+          returning: returningMock,
+        }),
+      }),
     });
     const result = await setTeachingPreference(
       db,
       profileId,
       subjectId,
       'step_by_step'
-      // analogyDomain not passed — should read back existing
+      // analogyDomain not passed — .returning() reads back existing value atomically
     );
     expect(result).toEqual({
       subjectId,

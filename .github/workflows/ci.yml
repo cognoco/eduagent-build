@@ -20,7 +20,7 @@ on:
 
 permissions:
   actions: read
-  contents: write
+  contents: read
 
 jobs:
   main:
@@ -113,10 +113,12 @@ jobs:
         run: pnpm exec nx run api:test:integration
 
       # Self-healing CI: AI-powered fix proposals for failed tasks.
-      # Analyzes failures and proposes code patches via PR comments.
-      # No-op when all tasks pass. See .nx/SELF_HEALING.md for project rules.
+      # Runs with contents: read — logs suggestions only. If write access
+      # is needed for PR comments, move to a separate job with
+      # pull-requests: write permission only.
       - name: Self-healing CI
         if: always()
+        continue-on-error: true
         run: pnpm exec nx fix-ci
 
       # Advisory check: flag stale counts in CLAUDE.md (does not block PRs)

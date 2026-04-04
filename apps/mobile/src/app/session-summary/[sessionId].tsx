@@ -192,6 +192,21 @@ export default function SessionSummaryScreen() {
         level: 'info',
       });
 
+      // Fetch recall bridge for homework sessions BEFORE skip-warning alerts.
+      // The 5-skip warning returns early, so the recall bridge was previously
+      // unreachable for homework sessions in the 5-9 skip range (bug #12).
+      if (isHomeworkSession && !recallQuestions) {
+        try {
+          const result = await recallBridge.mutateAsync();
+          if (result.questions.length > 0) {
+            setRecallQuestions(result.questions);
+            return; // Stay on screen to show recall questions
+          }
+        } catch {
+          // Best effort — continue to skip-warning flow
+        }
+      }
+
       // 5-skip warning (FR37) — early nudge before the 10-skip casual-switch prompt
       if (
         skipResult?.shouldWarnSummarySkip &&
@@ -261,19 +276,6 @@ export default function SessionSummaryScreen() {
           ]
         );
         return;
-      }
-    }
-
-    // Fetch recall bridge for homework sessions (Story 2.7)
-    if (isHomeworkSession && !recallQuestions) {
-      try {
-        const result = await recallBridge.mutateAsync();
-        if (result.questions.length > 0) {
-          setRecallQuestions(result.questions);
-          return; // Stay on screen to show recall questions
-        }
-      } catch {
-        // Best effort — navigate home if recall bridge fails
       }
     }
 

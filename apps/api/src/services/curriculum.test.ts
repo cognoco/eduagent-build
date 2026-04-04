@@ -168,7 +168,7 @@ function createMockDb({
   topicFindFirst = undefined as ReturnType<typeof mockTopicRow> | undefined,
   insertReturning = [] as unknown[],
 } = {}): Database {
-  return {
+  const db = {
     query: {
       subjects: {
         findFirst: jest.fn().mockResolvedValue(subjectFindFirst),
@@ -194,7 +194,14 @@ function createMockDb({
         returning: jest.fn().mockResolvedValue(insertReturning),
       }),
     }),
+    // transaction() executes the callback with the same mock as tx context
+    transaction: jest
+      .fn()
+      .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn(db)
+      ),
   } as unknown as Database;
+  return db;
 }
 
 // ---------------------------------------------------------------------------
