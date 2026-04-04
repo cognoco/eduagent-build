@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, desc, inArray, lt } from 'drizzle-orm';
+import { eq, and, asc, desc, inArray, lt, isNotNull } from 'drizzle-orm';
 import {
   learningSessions,
   sessionEvents,
@@ -156,29 +156,26 @@ async function buildBookLearningHistoryContext(
   const topicIds = topics.map((topic) => topic.id);
   if (topicIds.length === 0) return undefined;
 
+  // Filter to completed/auto_closed sessions with endedAt in SQL to
+  // avoid loading abandoned sessions into memory.
   const sessions = await db
     .select({
       topicId: learningSessions.topicId,
       endedAt: learningSessions.endedAt,
-      status: learningSessions.status,
     })
     .from(learningSessions)
     .where(
       and(
         eq(learningSessions.profileId, profileId),
-        inArray(learningSessions.topicId, topicIds)
+        inArray(learningSessions.topicId, topicIds),
+        inArray(learningSessions.status, ['completed', 'auto_closed']),
+        isNotNull(learningSessions.endedAt)
       )
     );
 
   const latestByTopic = new Map<string, Date>();
   for (const session of sessions) {
-    if (
-      !session.topicId ||
-      !session.endedAt ||
-      (session.status !== 'completed' && session.status !== 'auto_closed')
-    ) {
-      continue;
-    }
+    if (!session.topicId || !session.endedAt) continue;
 
     const previous = latestByTopic.get(session.topicId);
     if (!previous || previous.getTime() < session.endedAt.getTime()) {

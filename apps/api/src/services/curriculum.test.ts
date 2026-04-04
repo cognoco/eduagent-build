@@ -319,7 +319,7 @@ describe('getCurriculum', () => {
 
     const result = await getCurriculum(db, PROFILE_ID, SUBJECT_ID);
 
-    expect(result!.topics[0]).toEqual({
+    expect(result!.topics[0]).toMatchObject({
       id: 'topic-1',
       title: 'Variables & Types',
       description: 'Learn about TypeScript type system',
@@ -329,8 +329,8 @@ describe('getCurriculum', () => {
       bookId: null,
       chapter: null,
       skipped: true,
-      source: undefined,
     });
+    expect(result!.topics[0].source).toBeUndefined();
   });
 });
 
@@ -504,7 +504,7 @@ describe('skipTopic', () => {
     });
     await expect(
       skipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
-    ).rejects.toThrow('Topic not found in curriculum');
+    ).rejects.toThrow('Topic not found');
   });
 
   it('calls update and insert on the database', async () => {
@@ -551,7 +551,7 @@ describe('unskipTopic', () => {
     });
     await expect(
       unskipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
-    ).rejects.toThrow('Topic not found in curriculum');
+    ).rejects.toThrow('Topic not found');
   });
 
   it('throws when topic is not currently skipped', async () => {

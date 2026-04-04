@@ -20,7 +20,7 @@ import {
   addCurriculumTopic,
   adaptCurriculumFromPerformance,
 } from '../services/curriculum';
-import { notFound, apiError } from '../errors';
+import { notFound, apiError, NotFoundError } from '../errors';
 
 type CurriculumRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -53,13 +53,8 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         await skipTopic(db, profileId, subjectId, topicId);
         return c.json({ message: 'Topic skipped', topicId });
       } catch (error) {
-        if (error instanceof Error) {
-          if (error.message === 'Subject not found')
-            return notFound(c, 'Subject not found');
-          if (error.message === 'Curriculum not found')
-            return notFound(c, 'Curriculum not found');
-          if (error.message === 'Topic not found in curriculum')
-            return notFound(c, 'Topic not found in curriculum');
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
         }
         throw error;
       }
@@ -78,20 +73,19 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         await unskipTopic(db, profileId, subjectId, topicId);
         return c.json({ message: 'Topic restored', topicId });
       } catch (error) {
-        if (error instanceof Error) {
-          if (error.message === 'Subject not found')
-            return notFound(c, 'Subject not found');
-          if (error.message === 'Curriculum not found')
-            return notFound(c, 'Curriculum not found');
-          if (error.message === 'Topic not found in curriculum')
-            return notFound(c, 'Topic not found in curriculum');
-          if (error.message === 'Topic is not skipped')
-            return apiError(
-              c,
-              422,
-              ERROR_CODES.VALIDATION_ERROR,
-              'Topic is not skipped'
-            );
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
+        }
+        if (
+          error instanceof Error &&
+          error.message === 'Topic is not skipped'
+        ) {
+          return apiError(
+            c,
+            422,
+            ERROR_CODES.VALIDATION_ERROR,
+            'Topic is not skipped'
+          );
         }
         throw error;
       }
@@ -115,11 +109,8 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         );
         return c.json(result);
       } catch (error) {
-        if (error instanceof Error) {
-          if (error.message === 'Subject not found')
-            return notFound(c, 'Subject not found');
-          if (error.message === 'Curriculum not found')
-            return notFound(c, 'Curriculum not found');
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
         }
         throw error;
       }
@@ -142,8 +133,8 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         );
         return c.json({ curriculum });
       } catch (error) {
-        if (error instanceof Error && error.message === 'Subject not found') {
-          return notFound(c, 'Subject not found');
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
         }
         throw error;
       }
@@ -159,13 +150,20 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
 
-      const result = await adaptCurriculumFromPerformance(
-        db,
-        profileId,
-        subjectId,
-        input
-      );
-      return c.json(result);
+      try {
+        const result = await adaptCurriculumFromPerformance(
+          db,
+          profileId,
+          subjectId,
+          input
+        );
+        return c.json(result);
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
+        }
+        throw error;
+      }
     }
   )
   // Explain topic ordering
@@ -183,11 +181,8 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
       );
       return c.json({ explanation });
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === 'Subject not found')
-          return notFound(c, 'Subject not found');
-        if (error.message === 'Topic not found')
-          return notFound(c, 'Topic not found');
+      if (error instanceof NotFoundError) {
+        return notFound(c, error.message);
       }
       throw error;
     }

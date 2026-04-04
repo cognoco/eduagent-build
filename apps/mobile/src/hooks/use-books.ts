@@ -24,11 +24,12 @@ export function useBooks(
   return useQuery({
     queryKey: ['books', subjectId, activeProfile?.id],
     queryFn: async ({ signal: querySignal }) => {
+      if (!subjectId) throw new Error('subjectId is required');
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- books route WIP, RPC type not yet inferred
         const res = await (client.subjects[':subjectId'] as any).books.$get({
-          param: { subjectId: subjectId! },
+          param: { subjectId },
           init: { signal },
         });
         await assertOk(res);
@@ -52,13 +53,15 @@ export function useBookWithTopics(
   return useQuery({
     queryKey: ['book', subjectId, bookId, activeProfile?.id],
     queryFn: async ({ signal: querySignal }) => {
+      if (!subjectId || !bookId)
+        throw new Error('subjectId and bookId are required');
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- books route WIP, RPC type not yet inferred
         const res = await (client.subjects[':subjectId'] as any).books[
           ':bookId'
         ].$get({
-          param: { subjectId: subjectId!, bookId: bookId! },
+          param: { subjectId, bookId },
           init: { signal },
         });
         await assertOk(res);
@@ -86,11 +89,16 @@ export function useGenerateBookTopics(
     mutationFn: async (
       input?: BookTopicGenerateInput
     ): Promise<BookWithTopics> => {
+      if (!subjectId || !bookId) {
+        throw new Error(
+          'Cannot generate topics: subjectId and bookId are required'
+        );
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- books route WIP, RPC type not yet inferred
       const res = await (client.subjects[':subjectId'] as any).books[':bookId'][
         'generate-topics'
       ].$post({
-        param: { subjectId: subjectId!, bookId: bookId! },
+        param: { subjectId, bookId },
         json: input ?? {},
       });
       await assertOk(res);

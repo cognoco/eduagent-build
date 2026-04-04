@@ -217,6 +217,15 @@ export default function LibraryScreen() {
     }
   }, [routeSubjectId]);
 
+  // Auto-generate topics when selecting an un-generated book
+  useEffect(() => {
+    if (!selectedSubjectId || !selectedBookId) return;
+    const book = booksQuery.data?.find((entry) => entry.id === selectedBookId);
+    if (book && !book.topicsGenerated && !generateBookTopics.isPending) {
+      generateBookTopics.mutate({});
+    }
+  }, [selectedSubjectId, selectedBookId, booksQuery.data]);
+
   const retentionQueries = useQueries({
     queries: (subjectsQuery.data ?? []).map((subject) => ({
       queryKey: ['retention', 'subject', subject.id, activeProfile?.id],
@@ -268,7 +277,12 @@ export default function LibraryScreen() {
     null;
   const selectedBook =
     booksQuery.data?.find((book) => book.id === selectedBookId) ?? null;
-  const activeBook = bookQuery.data ?? generateBookTopics.data ?? null;
+  // Guard against stale generateBookTopics data from a previously selected book
+  const generatedBook =
+    generateBookTopics.data?.book.id === selectedBookId
+      ? generateBookTopics.data
+      : null;
+  const activeBook = bookQuery.data ?? generatedBook ?? null;
   const flatSubjectTopics =
     curriculumQuery.data?.topics
       ?.filter((topic) => !topic.bookId)
@@ -286,6 +300,8 @@ export default function LibraryScreen() {
     void subjectsQuery.refetch();
     void progressQuery.refetch();
     retentionQueries.forEach((query) => void query.refetch());
+    void booksQuery.refetch();
+    void bookQuery.refetch();
   };
 
   const handleBack = (): void => {
@@ -420,7 +436,12 @@ export default function LibraryScreen() {
       );
     }
 
-    if (subjectsQuery.isError || progressQuery.isError) {
+    if (
+      subjectsQuery.isError ||
+      progressQuery.isError ||
+      booksQuery.isError ||
+      bookQuery.isError
+    ) {
       return (
         <View
           className="flex-1 items-center justify-center px-5 py-12"
@@ -506,23 +527,12 @@ export default function LibraryScreen() {
                     topicCount: activeBook.topics.filter(
                       (topic) => !topic.skipped
                     ).length,
-                    completedCount: activeBook.topics.filter(
-                      (topic) => !topic.skipped
-                    ).length,
                   },
                 }
               : undefined
           }
           onBookPress={(bookId) => {
             setSelectedBookId(bookId);
-            const book = booksQuery.data?.find((entry) => entry.id === bookId);
-            if (
-              book &&
-              !book.topicsGenerated &&
-              !generateBookTopics.isPending
-            ) {
-              generateBookTopics.mutate({});
-            }
           }}
         />
       );

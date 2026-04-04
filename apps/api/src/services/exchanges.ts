@@ -232,8 +232,10 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     sections.push(context.priorLearningContext);
   }
 
-  if (context.learningHistoryContext) {
-    sections.push(context.learningHistoryContext);
+  const learningHistory = context.learningHistoryContext?.trim();
+  if (learningHistory) {
+    // Keep bounded to avoid token blowups in routed models.
+    sections.push(learningHistory.slice(0, 4000));
   }
 
   // Embedding memory context (pgvector semantic retrieval)

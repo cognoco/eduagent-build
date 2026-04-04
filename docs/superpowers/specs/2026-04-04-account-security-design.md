@@ -34,7 +34,7 @@
 
 ### Password Users (`user.passwordEnabled === true`)
 
-```
+```text
 ┌─ Account Security ─────────────────────────┐
 │                                             │
 │  Email Verification              [OFF]      │
@@ -48,7 +48,7 @@
 
 ### SSO Users (`user.passwordEnabled === false`)
 
-```
+```text
 ┌─ Account Security ─────────────────────────┐
 │                                             │
 │  Your account is secured via Google.        │
@@ -104,19 +104,14 @@ No interactive controls. Informational message only. The provider name is detect
 
 The entire feature runs on the mobile client. Clerk's `useUser()` hook provides the `User` object, which exposes all necessary methods. No new API routes are needed.
 
-### New Files
+### Files (retroactive documentation — all already implemented)
 
-| File | Purpose |
-|------|---------|
-| `apps/mobile/src/components/account-security.tsx` | Shared section component — renders 2FA toggle + password change for password users, informational message for SSO users |
-| `apps/mobile/src/components/change-password.tsx` | Password change form with validation |
-
-### Modified Files
-
-| File | Change |
-|------|--------|
-| `apps/mobile/src/app/(learner)/more.tsx` | Import and render `<AccountSecurity />` for account owners |
-| `apps/mobile/src/app/(parent)/more.tsx` | Import and render `<AccountSecurity />` for account owners |
+| File | Purpose | Status |
+|------|---------|--------|
+| `apps/mobile/src/components/account-security.tsx` | Shared section component — renders 2FA toggle + password change for password users, informational message for SSO users | Implemented |
+| `apps/mobile/src/components/change-password.tsx` | Password change form with validation | Implemented |
+| `apps/mobile/src/app/(learner)/more.tsx` | Import and render `<AccountSecurity />` for account owners | Implemented |
+| `apps/mobile/src/app/(parent)/more.tsx` | Import and render `<AccountSecurity />` for account owners | Implemented |
 
 ### Clerk SDK Methods
 
@@ -125,8 +120,8 @@ The entire feature runs on the mobile client. Clerk's `useUser()` hook provides 
 | Check auth method | `user.passwordEnabled` | Boolean — true if user has a password |
 | Get SSO provider | `user.externalAccounts` | Array of linked OAuth providers |
 | Check 2FA status | `user.twoFactorEnabled` | Boolean — whether any 2FA is active |
-| Enable email 2FA | Clerk email verification flow | Send code → verify code |
-| Disable email 2FA | Clerk SDK disable method | Removes email as second factor |
+| Enable 2FA | Clerk TOTP/SMS flow | **Note:** Clerk does not support email as a 2FA method. Supported MFA: SMS OTP, TOTP (authenticator app), backup codes. The "Email Verification" toggle in the UI mockup above controls Clerk's email verification on sign-in, not a true second factor. |
+| Disable 2FA | `clerkClient.users.disableUserMFA(userId)` | Removes all MFA methods |
 | Change password | `user.updatePassword({ currentPassword, newPassword })` | Throws on wrong current password |
 
 ### Account Owner Detection

@@ -167,6 +167,8 @@ export const coachingCardTypeSchema = z.enum([
   'review_due',
   'challenge',
   'curriculum_complete',
+  'continue_book',
+  'book_suggestion',
 ]);
 export type CoachingCardType = z.infer<typeof coachingCardTypeSchema>;
 
@@ -223,12 +225,35 @@ export type CurriculumCompleteCard = z.infer<
   typeof curriculumCompleteCardSchema
 >;
 
+// --- Epic 7: Book-aware coaching cards ---
+
+export const continueBookCardSchema = z.object({
+  ...baseCoachingCardFields,
+  type: z.literal('continue_book'),
+  topicId: z.string().uuid(),
+  bookTitle: z.string(),
+  bookEmoji: z.string().nullable(),
+});
+export type ContinueBookCard = z.infer<typeof continueBookCardSchema>;
+
+export const bookSuggestionCardSchema = z.object({
+  ...baseCoachingCardFields,
+  type: z.literal('book_suggestion'),
+  bookId: z.string().uuid(),
+  bookTitle: z.string(),
+  bookEmoji: z.string().nullable(),
+  subjectName: z.string(),
+});
+export type BookSuggestionCard = z.infer<typeof bookSuggestionCardSchema>;
+
 export const coachingCardSchema = z.discriminatedUnion('type', [
   streakCardSchema,
   insightCardSchema,
   reviewDueCardSchema,
   challengeCardSchema,
   curriculumCompleteCardSchema,
+  continueBookCardSchema,
+  bookSuggestionCardSchema,
 ]);
 export type CoachingCard = z.infer<typeof coachingCardSchema>;
 

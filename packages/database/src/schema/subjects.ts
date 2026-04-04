@@ -7,6 +7,7 @@ import {
   timestamp,
   pgEnum,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles';
 import { generateUUIDv7 } from '../utils/uuid';
@@ -47,28 +48,42 @@ export const subjects = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    // Epic 7: Urgency boost for upcoming tests/deadlines
+    urgencyBoostUntil: timestamp('urgency_boost_until', {
+      withTimezone: true,
+    }),
+    urgencyBoostReason: text('urgency_boost_reason'),
   },
   (table) => [index('subjects_profile_id_idx').on(table.profileId)]
 );
 
-export const curricula = pgTable('curricula', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  subjectId: uuid('subject_id')
-    .notNull()
-    .references(() => subjects.id, { onDelete: 'cascade' }),
-  version: integer('version').notNull().default(1),
-  generatedAt: timestamp('generated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const curricula = pgTable(
+  'curricula',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    subjectId: uuid('subject_id')
+      .notNull()
+      .references(() => subjects.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull().default(1),
+    generatedAt: timestamp('generated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('curricula_subject_version_idx').on(
+      table.subjectId,
+      table.version
+    ),
+  ]
+);
 
 export const curriculumBooks = pgTable('curriculum_books', {
   id: uuid('id')

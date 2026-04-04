@@ -5,19 +5,23 @@
 
 import { eq, and, notInArray, sql } from 'drizzle-orm';
 import {
-  profiles,
   subjects,
   learningSessions,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
+import { getProfileAge } from './profile';
 import type {
   SubjectCreateInput,
   SubjectUpdateInput,
   Subject,
   SubjectStructureType,
 } from '@eduagent/schemas';
-import { createBooks, ensureCurriculum } from './curriculum';
+import {
+  createBooks,
+  ensureCurriculum,
+  persistNarrowTopics,
+} from './curriculum';
 
 // ---------------------------------------------------------------------------
 // Mapper — Drizzle Date → API ISO string
@@ -83,14 +87,7 @@ export async function createSubjectWithStructure(
   const subject = await createSubject(db, profileId, input);
 
   try {
-    const profile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, profileId),
-    });
-
-    const currentYear = new Date().getUTCFullYear();
-    const learnerAge = profile?.birthYear
-      ? Math.max(5, currentYear - profile.birthYear)
-      : 12;
+    const learnerAge = await getProfileAge(db, profileId);
 
     // Dynamic import — book-generation depends on LLM infra which may not
     // initialize in all environments (integration tests without API keys).
@@ -99,13 +96,28 @@ export async function createSubjectWithStructure(
 
     if (structure.type === 'broad') {
       await ensureCurriculum(db, subject.id);
-      const books = await createBooks(db, subject.id, structure.books);
+      const books = await createBooks(
+        db,
+        profileId,
+        subject.id,
+        structure.books
+      );
       return {
         subject,
         structureType: 'broad',
         ...(books.length > 0 ? { bookCount: books.length } : {}),
       };
     }
+
+    // Narrow subject — persist the LLM-generated topics as curriculum topics
+    if (structure.topics.length > 0) {
+      await persistNarrowTopics(db, subject.id, structure.topics);
+    }
+
+    return {
+      subject,
+      structureType: 'narrow',
+    };
   } catch (error) {
     console.warn(
       '[createSubjectWithStructure] Falling back to narrow subject flow:',

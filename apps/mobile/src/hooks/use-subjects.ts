@@ -17,7 +17,7 @@ interface UseSubjectsOptions {
 
 export interface CreateSubjectResponse {
   subject: Subject;
-  structureType?: 'broad' | 'narrow';
+  structureType: 'broad' | 'narrow';
   bookCount?: number;
 }
 

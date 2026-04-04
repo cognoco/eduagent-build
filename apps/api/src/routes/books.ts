@@ -1,17 +1,19 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { profiles, type Database } from '@eduagent/database';
-import { eq } from 'drizzle-orm';
+import type { Database } from '@eduagent/database';
 import { bookTopicGenerateInputSchema } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
-import { notFound } from '../errors';
+import { notFound, NotFoundError } from '../errors';
 import {
   getBooks,
   getBookWithTopics,
   persistBookTopics,
 } from '../services/curriculum';
 import { generateBookTopics } from '../services/book-generation';
+import { getProfileAge } from '../services/profile';
+import { inngest } from '../inngest/client';
 
 type BooksRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -22,49 +24,65 @@ type BooksRouteEnv = {
   };
 };
 
+const subjectParamSchema = z.object({
+  subjectId: z.string().uuid(),
+});
+
+const bookParamSchema = z.object({
+  subjectId: z.string().uuid(),
+  bookId: z.string().uuid(),
+});
+
 export const bookRoutes = new Hono<BooksRouteEnv>()
-  .get('/subjects/:subjectId/books', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const subjectId = c.req.param('subjectId');
+  .get(
+    '/subjects/:subjectId/books',
+    zValidator('param', subjectParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId } = c.req.valid('param');
 
-    try {
-      const books = await getBooks(db, profileId, subjectId);
-      return c.json({ books });
-    } catch (error) {
-      if (error instanceof Error && error.message === 'Subject not found') {
-        return notFound(c, 'Subject not found');
+      try {
+        const books = await getBooks(db, profileId, subjectId);
+        return c.json({ books });
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
+        }
+        throw error;
       }
-      throw error;
     }
-  })
-  .get('/subjects/:subjectId/books/:bookId', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const subjectId = c.req.param('subjectId');
-    const bookId = c.req.param('bookId');
+  )
+  .get(
+    '/subjects/:subjectId/books/:bookId',
+    zValidator('param', bookParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId, bookId } = c.req.valid('param');
 
-    try {
-      const book = await getBookWithTopics(db, profileId, subjectId, bookId);
-      if (!book) {
-        return notFound(c, 'Book not found');
+      try {
+        const book = await getBookWithTopics(db, profileId, subjectId, bookId);
+        if (!book) {
+          return notFound(c, 'Book not found');
+        }
+        return c.json(book);
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
+        }
+        throw error;
       }
-      return c.json(book);
-    } catch (error) {
-      if (error instanceof Error && error.message === 'Subject not found') {
-        return notFound(c, 'Subject not found');
-      }
-      throw error;
     }
-  })
+  )
   .post(
     '/subjects/:subjectId/books/:bookId/generate-topics',
+    zValidator('param', bookParamSchema),
     zValidator('json', bookTopicGenerateInputSchema),
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const subjectId = c.req.param('subjectId');
-      const bookId = c.req.param('bookId');
+      const { subjectId, bookId } = c.req.valid('param');
       const { priorKnowledge } = c.req.valid('json');
 
       try {
@@ -87,13 +105,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           return c.json(existing);
         }
 
-        const profile = await db.query.profiles.findFirst({
-          where: eq(profiles.id, profileId),
-        });
-        const currentYear = new Date().getUTCFullYear();
-        const learnerAge = profile?.birthYear
-          ? Math.max(5, currentYear - profile.birthYear)
-          : 12;
+        const learnerAge = await getProfileAge(db, profileId);
 
         const generated = await generateBookTopics(
           book.title,
@@ -111,13 +123,20 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           generated.connections
         );
 
+        // Fire-and-forget: pre-generate next books in background
+        inngest
+          .send({
+            name: 'app/book.topics-generated',
+            data: { subjectId, bookId, profileId },
+          })
+          .catch(() => {
+            // Non-critical — pre-generation is an optimization
+          });
+
         return c.json(persisted);
       } catch (error) {
-        if (error instanceof Error && error.message === 'Subject not found') {
-          return notFound(c, 'Subject not found');
-        }
-        if (error instanceof Error && error.message === 'Book not found') {
-          return notFound(c, 'Book not found');
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
         }
         throw error;
       }

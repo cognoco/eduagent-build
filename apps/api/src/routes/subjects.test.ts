@@ -196,7 +196,7 @@ describe('subject routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/subjects', () => {
-    it('returns 201 with valid subject name', async () => {
+    it('returns 201 with valid subject name and structureType narrow', async () => {
       const res = await app.request(
         '/v1/subjects',
         {
@@ -215,6 +215,43 @@ describe('subject routes', () => {
       expect(body.subject.status).toBe('active');
       expect(body.subject.createdAt).toBeDefined();
       expect(body.subject.updatedAt).toBeDefined();
+      expect(body.structureType).toBe('narrow');
+    });
+
+    it('returns 201 with structureType broad when service detects broad subject', async () => {
+      const { createSubjectWithStructure } = jest.requireMock<
+        Record<string, jest.Mock>
+      >('../services/subject');
+      createSubjectWithStructure.mockImplementationOnce(
+        (_db: unknown, profileId: string, input: { name: string }) => ({
+          subject: {
+            id: 'test-subject-id',
+            profileId,
+            name: input.name,
+            rawInput: null,
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          structureType: 'broad',
+          bookCount: 4,
+        })
+      );
+
+      const res = await app.request(
+        '/v1/subjects',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ name: 'World History' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(201);
+      const body = await res.json();
+      expect(body.structureType).toBe('broad');
+      expect(body.bookCount).toBe(4);
     });
 
     it('returns 400 when name is empty', async () => {
