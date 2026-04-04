@@ -147,7 +147,9 @@ export function useStreamInterviewMessage(subjectId: string): {
           }
         }
       } finally {
-        abortRef.current?.();
+        if (isStreamingRef.current) {
+          abortRef.current?.();
+        }
         abortRef.current = null;
         isStreamingRef.current = false;
         setIsStreaming(false);

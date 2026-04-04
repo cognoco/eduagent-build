@@ -127,16 +127,16 @@ export async function insertSessionXpEntry(
 /**
  * Syncs the xp_ledger row for a topic to match a retention-derived status change.
  * Called after processRecallTest() updates retention_cards.xpStatus.
- * No-ops if no xp_ledger entry exists for the topic.
+ * Returns true if a row was updated, false if no xp_ledger entry existed.
  */
 export async function syncXpLedgerStatus(
   db: Database,
   profileId: string,
   topicId: string,
   newStatus: 'verified' | 'decayed'
-): Promise<void> {
+): Promise<boolean> {
   const now = new Date();
-  await db
+  const result = await db
     .update(xpLedger)
     .set({
       status: newStatus,
@@ -144,5 +144,14 @@ export async function syncXpLedgerStatus(
     })
     .where(
       and(eq(xpLedger.profileId, profileId), eq(xpLedger.topicId, topicId))
+    )
+    .returning({ id: xpLedger.id });
+
+  if (result.length === 0) {
+    console.debug(
+      `[syncXpLedgerStatus] No xp_ledger row for profile=${profileId} topic=${topicId} — skipped`
     );
+    return false;
+  }
+  return true;
 }

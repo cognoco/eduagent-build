@@ -225,7 +225,7 @@ export async function readCoachingCardCache(
   const now = new Date();
   if (cached.row.expiresAt.getTime() <= now.getTime()) return null;
 
-  return cached.data.legacyCoachingCard;
+  return cached.data.legacyCoachingCard ?? null;
 }
 
 // ---------------------------------------------------------------------------

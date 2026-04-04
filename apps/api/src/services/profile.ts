@@ -15,6 +15,23 @@ import {
   birthYearFromDateLike,
   computeAgeBracket,
 } from '@eduagent/schemas';
+
+export type ProfileValidationCode =
+  | 'BIRTH_YEAR_REQUIRED'
+  | 'CHILD_AGE_VIOLATION'
+  | 'PARENT_AGE_VIOLATION';
+
+export class ProfileValidationError extends Error {
+  code: ProfileValidationCode;
+  field: string;
+
+  constructor(code: ProfileValidationCode, field: string, message: string) {
+    super(message);
+    this.name = 'ProfileValidationError';
+    this.code = code;
+    this.field = field;
+  }
+}
 import {
   getConsentStatus,
   checkConsentRequired,
@@ -133,7 +150,11 @@ export async function createProfile(
 ): Promise<Profile> {
   const birthYear = input.birthYear ?? birthYearFromDateLike(input.birthDate);
   if (birthYear == null) {
-    throw new Error('Profile birthYear or birthDate is required');
+    throw new ProfileValidationError(
+      'BIRTH_YEAR_REQUIRED',
+      'birthYear',
+      'Profile birthYear or birthDate is required'
+    );
   }
 
   // Pre-compute consent check (single call — used for both age gate and consent state)
@@ -141,12 +162,20 @@ export async function createProfile(
 
   // Enforce minimum age (PRD line 386: ages 6-10 out of scope)
   if (consentCheck?.belowMinimumAge) {
-    throw new Error('Users must be at least 11 years old to create a profile');
+    throw new ProfileValidationError(
+      'CHILD_AGE_VIOLATION',
+      'birthYear',
+      'Users must be at least 11 years old to create a profile'
+    );
   }
 
   // Prevent minors from selecting PARENT persona (access control gate)
   if (consentCheck && consentCheck.age < 18 && input.personaType === 'PARENT') {
-    throw new Error('Parent profile requires age 18 or older');
+    throw new ProfileValidationError(
+      'PARENT_AGE_VIOLATION',
+      'personaType',
+      'Parent profile requires age 18 or older'
+    );
   }
 
   const legacyPersonaType =

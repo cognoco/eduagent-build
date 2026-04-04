@@ -107,39 +107,56 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
           });
         }
 
-        const result = await onComplete(fullResponse);
+        try {
+          const result = await onComplete(fullResponse);
 
-        const updatedHistory = [
-          ...draft.exchangeHistory,
-          { role: 'user' as const, content: message },
-          { role: 'assistant' as const, content: result.response },
-        ];
+          const updatedHistory = [
+            ...draft.exchangeHistory,
+            { role: 'user' as const, content: message },
+            { role: 'assistant' as const, content: result.response },
+          ];
 
-        if (result.isComplete) {
-          await updateDraft(db, profileId, draft.id, {
-            exchangeHistory: updatedHistory,
-            extractedSignals: result.extractedSignals ?? draft.extractedSignals,
-            status: 'completed',
+          if (result.isComplete) {
+            // Save history first without marking complete — if persistCurriculum
+            // fails, the draft stays in-progress and the user can retry.
+            await updateDraft(db, profileId, draft.id, {
+              exchangeHistory: updatedHistory,
+              extractedSignals:
+                result.extractedSignals ?? draft.extractedSignals,
+            });
+            await persistCurriculum(db, subjectId, subject.name, {
+              ...draft,
+              exchangeHistory: updatedHistory,
+              extractedSignals:
+                result.extractedSignals ?? draft.extractedSignals,
+            });
+            // Only mark complete after curriculum is persisted
+            await updateDraft(db, profileId, draft.id, {
+              status: 'completed',
+            });
+          } else {
+            await updateDraft(db, profileId, draft.id, {
+              exchangeHistory: updatedHistory,
+            });
+          }
+
+          await sseStream.writeSSE({
+            data: JSON.stringify({
+              type: 'done',
+              isComplete: result.isComplete,
+              exchangeCount: updatedHistory.filter((e) => e.role === 'user')
+                .length,
+            }),
           });
-          await persistCurriculum(db, subjectId, subject.name, {
-            ...draft,
-            exchangeHistory: updatedHistory,
-            extractedSignals: result.extractedSignals ?? draft.extractedSignals,
-          });
-        } else {
-          await updateDraft(db, profileId, draft.id, {
-            exchangeHistory: updatedHistory,
+        } catch (err) {
+          console.error('[interview/stream] Post-stream write failed:', err);
+          await sseStream.writeSSE({
+            data: JSON.stringify({
+              type: 'error',
+              message: 'Failed to save interview progress. Please try again.',
+            }),
           });
         }
-
-        await sseStream.writeSSE({
-          data: JSON.stringify({
-            type: 'done',
-            isComplete: result.isComplete,
-            exchangeCount: updatedHistory.filter((e) => e.role === 'user')
-              .length,
-          }),
-        });
       });
     }
   )

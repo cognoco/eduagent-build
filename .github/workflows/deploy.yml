@@ -48,11 +48,11 @@ jobs:
   # API: Cloudflare Workers deployment
   # ---------------------------------------------------------------------------
 
-  # On push-to-main: skip quality gate — CI already validated via PR checks.
-  # On workflow_dispatch: full quality gate runs before deploy.
+  # Push-to-main: lightweight lint+typecheck (CI ran full suite on PR).
+  # Dispatch: full quality gate with unit + integration tests.
   api-quality-gate:
     name: API Quality Gate
-    if: github.event_name == 'workflow_dispatch' && inputs.api_environment != 'skip'
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.api_environment != 'skip')
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -97,9 +97,11 @@ jobs:
         run: pnpm exec nx run api:typecheck
 
       - name: Unit tests
+        if: github.event_name == 'workflow_dispatch'
         run: pnpm exec nx run api:test
 
       - name: Integration tests
+        if: github.event_name == 'workflow_dispatch'
         run: pnpm exec nx run api:test:integration
 
   api-confirm-production:
@@ -116,12 +118,12 @@ jobs:
   api-deploy:
     name: Deploy API (${{ github.event_name == 'push' && 'staging' || inputs.api_environment }})
     needs: [api-quality-gate, api-confirm-production]
-    # Push-to-main: deploy directly (CI validated via PR). Dispatch: require quality gate.
+    # Always require quality gate to pass before deploying.
     if: |
       always() &&
+      needs.api-quality-gate.result == 'success' &&
       (github.event_name == 'push' ||
-       (needs.api-quality-gate.result == 'success' &&
-        (needs.api-confirm-production.result == 'success' || needs.api-confirm-production.result == 'skipped')))
+       (needs.api-confirm-production.result == 'success' || needs.api-confirm-production.result == 'skipped'))
     runs-on: ubuntu-latest
     environment: ${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}
     steps:

@@ -343,9 +343,14 @@ export async function processRecallTest(
       )
     );
 
-  // Sync xp_ledger to match the retention card's new xpStatus
+  // Sync xp_ledger to match the retention card's new xpStatus (best-effort —
+  // XP bookkeeping should not abort the recall test response)
   if (result.xpChange === 'verified' || result.xpChange === 'decayed') {
-    await syncXpLedgerStatus(db, profileId, input.topicId, result.xpChange);
+    try {
+      await syncXpLedgerStatus(db, profileId, input.topicId, result.xpChange);
+    } catch (err) {
+      console.error('[processRecallTest] XP sync failed (non-fatal):', err);
+    }
   }
 
   const response: RecallTestResponse = {
@@ -563,30 +568,23 @@ export async function setTeachingPreference(
     updateFields.analogyDomain = (analogyDomain as AnalogyDomainColumn) ?? null;
   }
 
-  await db
+  const [row] = await db
     .insert(teachingPreferences)
     .values(values)
     .onConflictDoUpdate({
       target: [teachingPreferences.profileId, teachingPreferences.subjectId],
       set: updateFields,
+    })
+    .returning({
+      method: teachingPreferences.method,
+      analogyDomain: teachingPreferences.analogyDomain,
     });
 
-  // When analogyDomain was not provided, read back the existing value
-  if (analogyDomain === undefined) {
-    const existing = await db.query.teachingPreferences.findFirst({
-      where: and(
-        eq(teachingPreferences.profileId, profileId),
-        eq(teachingPreferences.subjectId, subjectId)
-      ),
-    });
-    return {
-      subjectId,
-      method,
-      analogyDomain: existing?.analogyDomain ?? null,
-    };
-  }
-
-  return { subjectId, method, analogyDomain: analogyDomain ?? null };
+  return {
+    subjectId,
+    method: row?.method ?? method,
+    analogyDomain: row?.analogyDomain ?? null,
+  };
 }
 
 export async function deleteTeachingPreference(

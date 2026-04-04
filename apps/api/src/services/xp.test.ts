@@ -326,12 +326,15 @@ describe('insertSessionXpEntry', () => {
 // syncXpLedgerStatus
 // ---------------------------------------------------------------------------
 
-function createMockSyncDb(): {
+function createMockSyncDb(
+  matchedRows: Array<{ id: string }> = [{ id: 'xp-1' }]
+): {
   db: Database;
   updateSet: jest.Mock;
   updateWhere: jest.Mock;
 } {
-  const updateWhere = jest.fn().mockResolvedValue(undefined);
+  const updateReturning = jest.fn().mockResolvedValue(matchedRows);
+  const updateWhere = jest.fn().mockReturnValue({ returning: updateReturning });
   const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
 
   const db = {
@@ -349,8 +352,14 @@ describe('syncXpLedgerStatus', () => {
   it('updates xp_ledger status to verified with verifiedAt timestamp', async () => {
     const { db, updateSet } = createMockSyncDb();
 
-    await syncXpLedgerStatus(db, 'profile-001', 'topic-001', 'verified');
+    const updated = await syncXpLedgerStatus(
+      db,
+      'profile-001',
+      'topic-001',
+      'verified'
+    );
 
+    expect(updated).toBe(true);
     expect(db.update).toHaveBeenCalled();
     expect(updateSet).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -363,11 +372,30 @@ describe('syncXpLedgerStatus', () => {
   it('updates xp_ledger status to decayed without verifiedAt', async () => {
     const { db, updateSet } = createMockSyncDb();
 
-    await syncXpLedgerStatus(db, 'profile-001', 'topic-001', 'decayed');
+    const updated = await syncXpLedgerStatus(
+      db,
+      'profile-001',
+      'topic-001',
+      'decayed'
+    );
 
+    expect(updated).toBe(true);
     expect(db.update).toHaveBeenCalled();
     const setArg = updateSet.mock.calls[0][0];
     expect(setArg.status).toBe('decayed');
     expect(setArg.verifiedAt).toBeUndefined();
+  });
+
+  it('returns false when no xp_ledger row exists', async () => {
+    const { db } = createMockSyncDb([]);
+
+    const updated = await syncXpLedgerStatus(
+      db,
+      'profile-001',
+      'nonexistent-topic',
+      'verified'
+    );
+
+    expect(updated).toBe(false);
   });
 });

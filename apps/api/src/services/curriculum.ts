@@ -566,29 +566,32 @@ export async function adaptCurriculumFromPerformance(
     }
   }
 
-  // Persist new sort order
-  for (let i = 0; i < reordered.length; i++) {
-    const entry = reordered[i]!;
-    await db
-      .update(curriculumTopics)
-      .set({ sortOrder: i, updatedAt: new Date() })
-      .where(
-        and(
-          eq(curriculumTopics.id, entry.id),
-          eq(curriculumTopics.curriculumId, curriculum.id)
-        )
-      );
-  }
+  // Persist new sort order + adaptation record atomically.
+  // Without a transaction, a mid-loop connection drop leaves
+  // topics in a partially-reordered state with no rollback.
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < reordered.length; i++) {
+      const entry = reordered[i]!;
+      await tx
+        .update(curriculumTopics)
+        .set({ sortOrder: i, updatedAt: new Date() })
+        .where(
+          and(
+            eq(curriculumTopics.id, entry.id),
+            eq(curriculumTopics.curriculumId, curriculum.id)
+          )
+        );
+    }
 
-  // Record adaptation for audit
-  await db.insert(curriculumAdaptations).values({
-    profileId,
-    subjectId,
-    topicId: request.topicId,
-    sortOrder: reordered.findIndex((t) => t.id === request.topicId),
-    skipReason: `Performance adaptation: ${request.signal}${
-      request.context ? ' — ' + request.context : ''
-    }`,
+    await tx.insert(curriculumAdaptations).values({
+      profileId,
+      subjectId,
+      topicId: request.topicId,
+      sortOrder: reordered.findIndex((t) => t.id === request.topicId),
+      skipReason: `Performance adaptation: ${request.signal}${
+        request.context ? ' — ' + request.context : ''
+      }`,
+    });
   });
 
   const explanation =

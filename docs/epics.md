@@ -406,10 +406,11 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 | FR86-FR95 | Engagement & Motivation | Epic 4 | MVP |
 | FR96-FR107 | Language Learning | Epic 6 | v1.1 |
 | FR108-FR117 | Subscription Management | Epic 5 (Stripe, kept for web) + Epic 9 (native IAP for mobile) | MVP + pre-launch |
-| FR118-FR127 | Concept Map — Advisory Prerequisite Learning (revised v2) | Epic 7 | v1.1 |
+| FR118-FR127 | ~~Concept Map — Advisory Prerequisite Learning~~ — **Superseded by FR160-FR168 (Epic 7 v3)** | ~~Epic 7 v2~~ | Replaced |
 | FR144-FR145, FR147-FR149 | Full Voice Mode | Epic 8 | Shipped 2026-04-03 |
 | FR146 | Language SPEAK/LISTEN Voice | Epic 6 | v1.1 |
-| FR150-FR152 | Epic 7 additions: suggestive decay quizzes, per-edge feedback, "prove it" quiz | Epic 7 | v1.1 |
+| FR150-FR152 | ~~Epic 7 additions: decay quizzes, per-edge feedback, "prove it" quiz~~ — **Cut in v3** | ~~Epic 7 v2~~ | Cut |
+| FR160-FR168 | Self-Building Library: curriculum books, chapters, LLM generation, enhanced session context, coaching cards, Library navigation, visual topic map, knowledge signals | Epic 7 v3 | Pre-launch (7.1-7.4), fast-follow (7.5-7.6) |
 | FR210-FR217 | Session Lifecycle: adaptive time tracking (LLM + pace calibration), graceful close + session resumption, hard cap removal, mastery + effort milestones, adaptive silence detection, parent dashboard (wall-clock + exchanges), unified celebrations | Epic 13 | Pre-launch |
 | FR218-FR225 | Human Agency: per-message feedback, quick chips, topic switch, coaching dismiss, recall "I don't remember", escalation nudge, add topic, "something else" | Epic 14 | Pre/post-launch |
 | FR226-FR229 | Homework Overhaul: multi-problem sessions, problem card preview, explain-don't-question mode, learning extraction | Epic 14 | Pre/post-launch |
@@ -585,25 +586,29 @@ Users can learn languages using Four Strands methodology with explicit grammar i
 
 ---
 
-### Epic 7: Concept Map — Advisory Prerequisite Learning (DEFERRED — v1.1, Revised v2)
+### Epic 7: The Self-Building Library — Curriculum Structure & Visual Navigation (PRE-LAUNCH)
 
-**Scope:** v1.1 (post-MVP, pre-launch)
-**FRs:** FR118-FR127 (revised), FR150-FR152 (new) — 13 FRs total
-**Revision:** v2 — "Guide, Don't Gate" redesign (2026-03-30)
+**Scope:** Pre-launch (building now — zero users, no migration needed)
+**FRs:** FR160-FR168 (9 FRs). Replaces v2 FR118-FR127, FR150-FR152.
+**Revision:** v3 — "Know the Learner, Not the Graph" (2026-04-04). Replaces v2 prerequisite DAG spec entirely.
 
-Knowledge graph of topic prerequisite relationships. Currently curriculum topics are a flat ordered list (`sortOrder`). Epic 7 adds directed acyclic graph (DAG) edges between topics, enabling **advisory** prerequisite ordering, graph-aware coaching, and visual knowledge map. **Prerequisites never lock or block topics** — they inform recommendations and LLM context.
+The Library (formerly Learning Book) gains a hierarchical curriculum structure: **Shelves (subjects) → Books (units) → Chapters (topic groups) → Topics**. Broad subjects like "History" produce books (Ancient Egypt, Ancient Greece, etc.), each with chapters and topics generated lazily by the LLM. The visual layout helps learners see the shape of a subject, track progress, and pick what to explore next. No prerequisite graph, no locking, no "prove it" quizzes. The LLM bridges knowledge gaps naturally in conversation via enhanced session context.
 
-**Key decisions (v2 — replaces v1):**
-- **Guide, don't gate.** All prerequisites are advisory (RECOMMENDED). No REQUIRED/RECOMMENDED split — single relationship type at launch. Topics are never locked behind prerequisite completion.
-- DAG data model (not graph DB) — `topic_prerequisites` join table with `status` enum (ACTIVE/SKIPPED). Edges are **never deleted** — skip sets status to SKIPPED (reversible).
-- SM-2 stays pure per-topic — graph awareness in coaching precomputation only
-- **Suggestive decay quizzes** (FR150) replace re-locking: when prerequisites fade, prompt a lightweight quiz framed positively ("Quick check! Want to see how much you remember?"). 7-day cooldown. Always optional.
-- **"Prove it" quiz** (FR152): any learner can override a prerequisite by passing a 3-5 question quiz (not parent-only).
-- **Per-edge human feedback** (FR151): student or parent can flag bad prerequisite edges as "not needed."
-- **Age-appropriate visualization** (FR121 revised): Learning Journey path for under-13, Knowledge Graph (Sugiyama DAG) for 13+. Same data model, different rendering.
-- Topic unlock → Comet celebration via Epic 13's `queueCelebration()` (FR217). Zero animation work in Epic 7.
+**Key decisions (v3 — replaces v2):**
+- **Self-building magic library.** The learner adds a subject and the library materializes — books, chapters, topics all LLM-generated. No manual organization.
+- **No prerequisite infrastructure.** No DAG, no `topic_prerequisites` table, no topological sort, no cycle detection, no edge status. Topic ordering is `sortOrder` set by LLM during generation. The LLM adapts in-session when learners jump around.
+- **LLM decides broad vs. narrow.** No hardcoded subject lists. "History" gets books; "Fractions" gets flat topics. LLM judgment, easy to recover from.
+- **Lazy topic generation.** Topics generated on first book open (3-8s), not upfront. Pre-generates next 1-2 books in background.
+- **Chapters as string labels.** `chapter` column on topics groups them visually ("The Story", "Daily Life", "Famous People"). No separate table.
+- **Lightweight topic connections.** Symmetric, untyped pairs (`topic_connections` table) for visual relationship hints. Not a DAG — no direction, no status. Purely navigational.
+- **Enhanced session context.** `buildSystemPrompt()` includes learning history block (what learner has covered in this book). LLM connects topics naturally.
+- **Context-aware coaching cards.** New card types: `book_suggestion`, `continue_book`, `homework_connection`. Test/deadline priority boost via simple flag.
+- **Visual topic map (deferred).** Map toggle with chapter clusters + connection lines. Ships as fast-follow; list-with-chapters provides 80% of value at launch.
+- **Knowledge signals (deferred).** LLM-based topic matching across session types (homework → curriculum). Ships as fast-follow; enhanced session context provides 90% of value at launch.
 
-**Dependencies:** Epic 3 (retention infrastructure), Epic 1 (curriculum/topic infrastructure), Epic 13 Story 13.7 (celebration queue — only for Story 7.5)
+**Dependencies:** None (independent of all other epics). SM-2 unchanged. Celebrations optional (book completion badge works without Epic 13).
+**Launch scope:** Stories 7.1-7.4 (4 stories, 2 phases). Deferred: Stories 7.5-7.6.
+**Detailed spec:** `docs/superpowers/specs/2026-04-04-epic-7-library-design.md`
 
 ---
 
@@ -686,7 +691,7 @@ Epic 13 (session lifecycle v3) ← no deps. Sequencing: 13.2 before 12.1. FR211 
 Epic 14 Phase A (agency)      ← Story 14.1 co-designs with Epic 12 Story 12.7 (home card dismissal)
 Epic 14 Phase B (homework)    ← no deps (independent, high priority)
 Epic 14 Phase C (session)     ← internal deps only (14.5 → 14.6 → 14.8)
-Epic 7 (v1.1, revised v2)    ← Epic 1 + Epic 3 + Epic 13 Story 13.7 (celebrations)
+Epic 7 (pre-launch, v3)      ← no deps (independent). Replaces v2 prerequisite DAG. Celebrations optional.
 ```
 
 ### Epic 11: Brand Identity — Fixed Teal + Lavender, System Theme Toggle (Phase 1)
@@ -2968,174 +2973,211 @@ All 12 FRs (FR96-FR107) + FR146 (Language SPEAK/LISTEN Voice, depends on Epic 8.
 
 ---
 
-## Epic 7: Concept Map — Advisory Prerequisite Learning (v1.1, Revised v2) — Stories
+## Epic 7: The Self-Building Library (v3) — Stories
 
-**Scope:** FR118-FR127 (revised), FR150-FR152 (new) — 13 FRs, 6 stories
-**Dependencies:** Epic 3 (retention infrastructure), Epic 1 (curriculum/topic infrastructure), Epic 13 Story 13.7 (celebration queue — for Story 7.5 only)
-**Revision:** v2 — "Guide, Don't Gate" redesign (2026-03-30). See "What Changed from v1" below.
+**Scope:** FR160-FR168 — 9 FRs, 6 stories (4 launch + 2 deferred)
+**Dependencies:** None
+**Revision:** v3 — "Know the Learner, Not the Graph" (2026-04-04). Full redesign replacing v2 prerequisite DAG.
+**Detailed spec:** `docs/superpowers/specs/2026-04-04-epic-7-library-design.md`
 
-### What Changed from v1
+### What Changed from v2
 
-| Original (v1) | Revised (v2) | Why |
-|---------------|-------------|-----|
-| REQUIRED prerequisites lock topics | All prerequisites are advisory | Hard locks frustrate students who learned prerequisites outside the app. The AI adapts — the graph shouldn't gatekeep. |
-| Two relationship types (REQUIRED/RECOMMENDED) | Single type at launch (all advisory) | Distinction adds complexity without changing user behavior when everything is advisory. |
-| "Skip Anyway" deletes prerequisite edges | Soft-skip: edge `status` set to SKIPPED, remains in DB | Edge deletion is irreversible. Kids don't understand the consequence. Soft-skip is reversible. |
-| Parent-only manual override (FR127) | Any learner can self-override via "prove it" quiz + parent can mark "already known" | A 14-year-old shouldn't need a parent to study algebra. |
-| No re-engagement for decaying topics | Periodic suggestive quizzes (FR150) | Instead of re-locking (infuriating) or ignoring decay (stale graph), prompt lightweight optional quizzes. |
-| Concept map: Sugiyama DAG for all ages | Age-appropriate: journey path for under-13, graph for 13+ | A 6-year-old cannot interpret a DAG. |
-| No per-edge human feedback | Student/parent can flag bad prerequisites (FR151) | LLM-generated edges have no validation loop without this. |
-| Topic unlock = coaching card notification | Topic unlock = Comet celebration (Epic 13 FR217) | Should feel like an achievement, not a notification. |
+| v2 (prerequisite DAG) | v3 (self-building library) | Why |
+|---|---|---|
+| `topic_prerequisites` join table with status management | `curriculum_books` table + `chapter` column + `topic_connections` | Structure serves discovery, not compliance |
+| DAG cycle detection + topological sort | Simple `sortOrder` integer | No graph = no cycles. LLM orders topics pedagogically. |
+| Soft-skip / restore status management | Nothing is locked, so nothing needs skipping | Learners just don't tap topics they don't want |
+| "Prove it" quiz (FR152) | Cut entirely | Learners don't need to prove anything. The LLM adapts in-session. |
+| Suggestive decay quizzes (FR150) | SM-2 coaching cards (existing) | Already handled. Adding another quiz mechanism is redundant. |
+| Per-edge human feedback (FR151) | Cut entirely | No edges exist to give feedback on. |
+| Two visualization modes (journey path vs Sugiyama DAG) | One visual map with age-adaptive styling (deferred) | Same layout for all ages, different visual density. One codebase. |
+| Flat topic list — 15 topics for "History" | Books + chapters — "History" becomes Ancient Egypt, Ancient Greece, etc. | The actual problem kids face, which v2 didn't solve |
+| No cross-session knowledge tracking | Enhanced session context (launch) + knowledge signals (deferred) | Homework and curriculum should talk to each other |
 
-### Story 7.1: Topic Prerequisite Data Model + Edge Generation
+### Story 7.1: Curriculum Book Data Model + LLM Generation
 
-As a system,
-I need a prerequisite graph data model and LLM edge generation,
-So that curriculum topics can express advisory dependency relationships.
+As a learner adding a broad subject,
+I want it organized into explorable books,
+So that I can see focused areas to dive into rather than a flat list of disconnected topics.
 
 **Acceptance Criteria:**
 
-**Given** the database needs prerequisite support
-**When** the schema is created
-**Then** `topic_prerequisites` join table created with `prerequisiteTopicId`, `dependentTopicId`, `status` (ACTIVE/SKIPPED enum, default ACTIVE), `createdAt`
-**And** DAG cycle detection implemented in service layer (topological sort validation before insert)
-**And** depth validation rejects chains deeper than 5 levels
-**And** LLM generates initial prerequisite edges on subject creation as part of curriculum generation
-**And** targeted edge generation for new topics added to existing curriculum (not full graph regeneration)
+**Given** a learner adds a new subject
+**When** the LLM determines it's broad (e.g., "History", "Science")
+**Then** books are generated with title, description, emoji, sortOrder, and stored in `curriculum_books`
+**And** no topics are generated yet — `topicsGenerated = false`
+**And** the learner sees book cards they can browse
 
-**FRs:** FR118, FR122
+**Given** a learner adds a narrow subject (e.g., "Fractions", "Shoe Polish")
+**When** the LLM determines it's narrow
+**Then** topics are generated directly (existing flow), `bookId = null`
+**And** no book rows are created
+**And** the learner sees the topic list directly (book level skipped in UI)
+
+**Given** a learner opens a book for the first time
+**When** the book's topics haven't been generated yet
+**Then** LLM generates 5-15 topics scoped to that book, each with a `chapter` label and `sortOrder`
+**And** LLM generates lightweight topic connections (max ~2 per topic, symmetric)
+**And** optionally asks one contextual question ("What do you already know?") with a [Just jump in] shortcut
+**And** topics are stored with `bookId`, `sortOrder`, `chapter`
+**And** connections are stored in `topic_connections`
+**And** `topicsGenerated` is set to `true`
+**And** background job queued to pre-generate next 1-2 books
+
+**FRs:** FR160, FR161, FR162
 
 ---
 
-### Story 7.2: Advisory Prerequisite Ordering + Library Indicators
+### Story 7.2: Enhanced Session Context
 
 As a learner,
-I want my learning path to suggest prerequisite order without blocking me,
-So that I can follow recommendations or forge my own path.
+I want the tutor to know what I've already covered in this book,
+So that sessions build on each other and the tutor connects topics naturally.
 
 **Acceptance Criteria:**
 
-**Given** a curriculum with prerequisite edges
-**When** the coaching card recommends the next topic
-**Then** topics with incomplete prerequisites are deprioritized but NOT hidden
-**And** default ordering uses topological sort (prerequisite depth), ties broken by retention urgency
-**And** Library shows subtle "Builds on: [prerequisite]" indicators on topics with incomplete prerequisites
-**And** tapping a topic with incomplete prerequisites shows advisory dialog: "This builds on [prerequisite]. Review first, or dive right in?" with [Review Prerequisite] / [Start Anyway]
-**And** "Start Anyway" proceeds normally with no penalty
+**Given** a learner starts a session on a topic within a book
+**When** the system prompt is built
+**Then** it includes a concise learning history block listing other topics in the book the learner has covered, with recency
+**And** the tutor naturally references prior learning: "Remember when we talked about the Old Kingdom?"
+**And** the learning history block is under 500 tokens
 
-**FRs:** FR119, FR126
+**Given** a learner does a homework session
+**When** the system prompt is built
+**Then** it includes the learner's curriculum topics so the tutor can make natural connections
+**And** the tutor may say: "By the way, you have Egyptian Pyramids in your Library — this homework is closely related!"
 
----
-
-### Story 7.3: Soft-Skip + Restore + Prerequisite Context Injection
-
-As a learner skipping a topic,
-I want to understand the impact and be able to undo my skip,
-So that I make informed, reversible decisions.
-
-**Acceptance Criteria:**
-
-**Given** a learner skips a topic that has dependents
-**When** the skip is initiated
-**Then** warning dialog shown listing dependent topics
-**And** "Skip Anyway" sets edge `status` to `SKIPPED` (not deleted)
-**And** skip logged in `curriculumAdaptations.prerequisiteContext` JSONB
-**And** dependent topics remain fully accessible
-**And** skipped prerequisites can be restored to ACTIVE from curriculum review
-**And** when LLM teaches a topic with skipped prerequisites, system prompt includes context for bridging knowledge gaps
-
-**FRs:** FR120, FR124, FR125
+**FRs:** FR163
 
 ---
 
-### Story 7.4: Prerequisite Override — Self-Service + "Prove It" Quiz
-
-As a learner who already knows a prerequisite topic,
-I want to skip it without needing a parent,
-So that I can move to topics I actually need to learn.
-
-**Acceptance Criteria:**
-
-**Given** a learner encounters a topic with prerequisite advisory
-**When** they want to override the prerequisite
-**Then** two paths available: "I already know this" (quick override, trust-based) and "Prove it" (3-5 question quiz)
-**And** "Prove it" quiz uses existing recall test infrastructure, 2/3 or 3/5 passing threshold
-**And** on pass: retention card created, Polar Star celebration, prerequisite marked as mastered
-**And** on fail: no penalty, suggestion to review, can retry anytime
-**And** parent can also mark "already known" from parent dashboard
-**And** override is recorded in `curriculumAdaptations` but reversible
-
-**FRs:** FR127, FR152
-
----
-
-### Story 7.5: Graph-Aware Coaching Card + Celebration + Suggestive Decay Quizzes
-
-As a learner progressing through a curriculum,
-I want to be celebrated when I unlock new topics and gently reminded when foundations fade,
-So that I feel rewarded and stay on solid ground.
-
-**Acceptance Criteria:**
-
-**Given** coaching card precomputation runs after session completion
-**When** all prerequisites for a topic reach strong retention
-**Then** `queueCelebration(db, profileId, 'comet', 'topic_unlocked', topicName)` is called (Epic 13 FR217)
-**And** coaching card shows: "You've been building a strong foundation — [Topic] is a great next step!" with [Start Topic] CTA
-**And** when a prerequisite decays from strong to fading while dependents are in progress, coaching card suggests: "Quick check on [prerequisite]?" with [Take Quiz] / [Not Now]
-**And** quiz is 3-5 lightweight questions with positive framing regardless of result
-**And** "Not Now" respected — no repeat prompt for same prerequisite within 7 days
-**And** quiz results feed back into SM-2 retention card transparently
-
-**FRs:** FR123, FR150
-
-**Dependency:** Epic 13 Story 13.7 (celebration queue) must be implemented first.
-
----
-
-### Story 7.6: Age-Appropriate Concept Map + Per-Edge Human Feedback
+### Story 7.3: Library Navigation (List View)
 
 As a learner,
-I want to see how my topics connect in a way I can understand,
-And flag prerequisites that seem wrong,
-So that my learning map is accurate and useful.
+I want to browse my shelves, books, chapters, and topics in a visual, intuitive way,
+So that my Library feels like exploring a world, not managing a database.
 
 **Acceptance Criteria:**
 
-**Given** a learner navigates to the concept map
-**When** the visualization loads
-**Then** under-13 sees Learning Journey (linear/branching path), 13+ sees Knowledge Graph (Sugiyama DAG)
-**And** nodes colored by retention status (green/yellow/red/gray)
-**And** skipped edges shown as faded/dotted
-**And** tap a node → inline card with retention, prerequisites, dependents, "Start Session" CTA (every topic has a CTA — no locked state)
-**And** prerequisite list items have feedback affordance ("Not needed")
-**And** flagging a prerequisite sets edge to SKIPPED with confirmation dialog
-**And** parent can also provide per-edge feedback from parent dashboard
-**And** rendering uses native `react-native-svg`, no WebView
-**And** max ~50 nodes per subject; larger collapse to section-level grouping
-**And** pre-Epic 7 curricula: tab hidden or "Prerequisite data not available"
-**And** accessibility: `accessibilityLabel` on nodes, sequential swipe navigation
+**Given** a learner opens the Library
+**When** they have subjects with books
+**Then** they see subject cards (shelves) with aggregate progress
+**And** tapping a subject shows book cards with emoji, description, and per-book progress
+**And** tapping a book shows the numbered topic list grouped by chapter, with coverage indicators
+**And** tapping any topic starts a session — no locks, no warnings
 
-**FRs:** FR121, FR151
+**Given** a learner has a narrow subject (no books)
+**When** they tap the subject card
+**Then** the book level is skipped — they go directly to the topic list
+
+**Given** a learner finishes all topics in a book
+**When** they return to the shelf view
+**Then** the book shows as completed
+**And** the next suggested book is visually highlighted
+
+**Given** a learner wants the flat retention view
+**When** they toggle "All Topics"
+**Then** they see every topic across all subjects sorted by retention urgency (existing behavior preserved)
+
+**FRs:** FR166, FR168
+
+---
+
+### Story 7.4: Context-Aware Coaching Cards
+
+As a learner,
+I want suggestions that reflect what I actually need right now,
+So that coaching feels helpful rather than generic.
+
+**Acceptance Criteria:**
+
+**Given** a learner finishes a book
+**When** coaching cards are precomputed
+**Then** a `book_suggestion` card appears suggesting the next book with engaging, specific copy
+
+**Given** a learner did homework that matches a curriculum topic
+**When** coaching cards are precomputed
+**Then** a `homework_connection` card appears: "You worked on [topic] in homework — want to go deeper?"
+
+**Given** a learner is mid-book
+**When** coaching cards are precomputed
+**Then** a `continue_book` card suggests the next topic in sort order
+
+**Given** a learner mentioned a test or deadline in a session
+**When** coaching cards are precomputed before the deadline
+**Then** cards for that subject get priority boost
+**And** the boost expires after the deadline date
+
+**FRs:** FR165
+
+---
+
+### Story 7.5: Visual Topic Map (deferred — fast-follow)
+
+As a learner,
+I want to see how topics in a book relate to each other visually,
+So that I understand the shape of the subject and can navigate it intuitively.
+
+**Acceptance Criteria:**
+
+**Given** a book has topics with chapters and connections
+**When** the learner views the book's topic list
+**Then** a map toggle is available alongside the list view
+
+**Given** the learner switches to map view
+**When** the map renders
+**Then** topics are shown as nodes, grouped into visual chapter clusters
+**And** connections between related topics are shown as light, non-directional lines
+**And** each topic node is colored by coverage status (not started / introduced / partial / done)
+**And** tapping any topic node starts a session — no locks, no warnings
+
+**Note:** Deferred to fast-follow. List view with chapter grouping (Story 7.3) provides ~80% of the visual guidance value at launch.
+
+**FRs:** FR167
+
+---
+
+### Story 7.6: Unified Knowledge Tracking (deferred — fast-follow)
+
+As a learner who studies through both curriculum and homework,
+I want homework progress to be visible in my Library,
+So that I can see which topics I've already been exposed to regardless of how I learned them.
+
+**Acceptance Criteria:**
+
+**Given** a session of any type (curriculum, homework, review) completes
+**When** the post-session Inngest chain runs
+**Then** topic matching identifies which curriculum topics were covered (LLM-based, confidence-scored)
+**And** high-confidence matches create `knowledge_signals` records
+**And** the matched topics show updated progress in the Library
+
+**Note:** Deferred to fast-follow. FR163 (enhanced session context) already makes the LLM aware of cross-session learning through prompt enrichment.
+
+**FRs:** FR164
 
 ---
 
 ### Epic 7 Execution Order
 
+**Launch scope (Stories 7.1-7.4):**
 ```
-7.1 (Data model + edge generation)        ─── no deps
-7.2 (Advisory ordering + indicators)      ─── depends on 7.1
-7.3 (Soft-skip + restore + LLM context)   ─── depends on 7.1
-7.4 (Self-service override + quiz)         ─── depends on 7.1
-
-7.5 (Coaching card + celebration + decay)  ─── depends on 7.2, 7.3, Epic 13 Story 13.7
-7.6 (Concept map + human feedback)         ─── depends on 7.2, 7.3
+7.1 (Book data model + generation + chapters/connections)  ─── no deps
+7.2 (Enhanced session context — prompt enrichment)         ─── no deps (can parallel with 7.1)
+7.3 (Library navigation — list view with chapters)         ─── depends on 7.1
+7.4 (Context-aware coaching cards)                         ─── depends on 7.1
 ```
 
-Stories 7.2, 7.3, and 7.4 can be **parallelized** after 7.1. Stories 7.5 and 7.6 can be parallelized after their dependencies complete. Total: 6 stories, ~3 sequential phases.
+Stories 7.1 and 7.2 can run in parallel. Then 7.3 and 7.4 in parallel. Total for launch: 4 stories, 2 phases.
+
+**Deferred (fast-follow):**
+```
+7.5 (Visual topic map)                                     ─── depends on 7.1, 7.3
+7.6 (Unified knowledge tracking — knowledge_signals)       ─── depends on 7.2
+```
 
 ### Epic 7 FR Coverage
 
-13 FRs (FR118-FR127 revised + FR150-FR152 new) mapped across 6 stories. Implementation deferred to v1.1.
+9 FRs (FR160-FR168) mapped across 6 stories. Launch: FR160-FR163, FR165-FR166, FR168. Deferred: FR164 (knowledge signals), FR167 (visual map).
 
 ---
 

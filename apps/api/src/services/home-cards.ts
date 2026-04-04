@@ -6,7 +6,6 @@ import {
 } from '@eduagent/database';
 import type {
   HomeCard,
-  HomeCardId,
   HomeCardInteractionInput,
   HomeCardsResponse,
 } from '@eduagent/schemas';
@@ -20,9 +19,14 @@ import { getContinueSuggestion, getOverallProgress } from './progress';
 const HOME_CARD_TTL_MS = 24 * 60 * 60 * 1000;
 const COLD_START_SESSION_THRESHOLD = 5;
 
+/**
+ * Approximate homework window — widened to 12:00-22:00 UTC to cover
+ * US afternoons through EU evenings. Will narrow once profile timezone
+ * is stored. See bug #23.
+ */
 function isHomeworkWindow(now: Date): boolean {
   const hour = now.getUTCHours();
-  return hour >= 15 && hour <= 21;
+  return hour >= 12 && hour <= 22;
 }
 
 function applyInteractionAdjustments(
@@ -44,7 +48,8 @@ function applyInteractionAdjustments(
 
 export async function precomputeHomeCards(
   db: Database,
-  profileId: string
+  profileId: string,
+  existingCache?: Awaited<ReturnType<typeof readHomeSurfaceCacheData>>
 ): Promise<HomeCardsResponse> {
   const repo = createScopedRepository(db, profileId);
   const now = new Date();
@@ -63,7 +68,10 @@ export async function precomputeHomeCards(
     repo.subjects.findMany(),
     getOverallProgress(db, profileId),
     getContinueSuggestion(db, profileId),
-    readHomeSurfaceCacheData(db, profileId),
+    // Reuse existing cache if provided, avoiding a duplicate DB read (#24)
+    existingCache !== undefined
+      ? Promise.resolve(existingCache)
+      : readHomeSurfaceCacheData(db, profileId),
   ]);
 
   const sessionCount = countResult[0]?.count ?? 0;
@@ -246,7 +254,7 @@ export async function getHomeCardsForProfile(
     };
   }
 
-  const next = await precomputeHomeCards(db, profileId);
+  const next = await precomputeHomeCards(db, profileId, cached);
 
   await mergeHomeSurfaceCacheData(
     db,
@@ -268,8 +276,4 @@ export async function trackHomeCardInteraction(
   input: HomeCardInteractionInput
 ): Promise<void> {
   await recordHomeCardInteraction(db, profileId, input);
-}
-
-export function getHomeCardIds(cards: HomeCard[]): HomeCardId[] {
-  return cards.map((card) => card.id);
 }

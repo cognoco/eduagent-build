@@ -363,6 +363,38 @@ export async function shouldWarnSummarySkip(
   );
 }
 
+/**
+ * Single-query replacement for calling shouldPromptCasualSwitch() and
+ * shouldWarnSummarySkip() independently. Returns both flags from one DB read.
+ */
+export async function getSkipWarningFlags(
+  db: Database,
+  profileId: string
+): Promise<{
+  shouldPromptCasualSwitch: boolean;
+  shouldWarnSummarySkip: boolean;
+}> {
+  const row = await db.query.learningModes.findFirst({
+    where: eq(learningModes.profileId, profileId),
+  });
+
+  const mode = row?.mode ?? 'serious';
+  const skips = row?.consecutiveSummarySkips ?? 0;
+
+  const promptCasualSwitch =
+    mode === 'serious' && skips >= CASUAL_SWITCH_PROMPT_THRESHOLD;
+  const warnSummarySkip =
+    !promptCasualSwitch &&
+    mode === 'serious' &&
+    skips >= SKIP_WARNING_THRESHOLD &&
+    skips < CASUAL_SWITCH_PROMPT_THRESHOLD;
+
+  return {
+    shouldPromptCasualSwitch: promptCasualSwitch,
+    shouldWarnSummarySkip: warnSummarySkip,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Push Token Registration
 // ---------------------------------------------------------------------------

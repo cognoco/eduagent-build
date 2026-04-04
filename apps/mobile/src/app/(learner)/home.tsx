@@ -267,6 +267,8 @@ export default function HomeScreen() {
     }
 
     cards.push(
+      // HomeCard from API is structurally compatible with HomeCardModel —
+      // same fields, HomeCard.id is a subset of HomeCardModel.id.
       ...((homeCardsQuery.data?.cards as HomeCardModel[] | undefined) ?? [])
     );
     return cards;
