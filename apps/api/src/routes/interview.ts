@@ -117,17 +117,22 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
           ];
 
           if (result.isComplete) {
+            // Save history first without marking complete — if persistCurriculum
+            // fails, the draft stays in-progress and the user can retry.
             await updateDraft(db, profileId, draft.id, {
               exchangeHistory: updatedHistory,
               extractedSignals:
                 result.extractedSignals ?? draft.extractedSignals,
-              status: 'completed',
             });
             await persistCurriculum(db, subjectId, subject.name, {
               ...draft,
               exchangeHistory: updatedHistory,
               extractedSignals:
                 result.extractedSignals ?? draft.extractedSignals,
+            });
+            // Only mark complete after curriculum is persisted
+            await updateDraft(db, profileId, draft.id, {
+              status: 'completed',
             });
           } else {
             await updateDraft(db, profileId, draft.id, {

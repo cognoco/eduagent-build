@@ -15,6 +15,7 @@ import {
   getProfile,
   updateProfile,
   switchProfile,
+  ProfileValidationError,
 } from '../services/profile';
 
 type ProfileEnv = {
@@ -44,17 +45,8 @@ export const profileRoutes = new Hono<ProfileEnv>()
       );
       return c.json({ profile }, 201);
     } catch (err) {
-      if (err instanceof Error) {
-        const msg = err.message;
-        if (msg.includes('at least 11 years old')) {
-          return validationError(c, { birthYear: [msg] });
-        }
-        if (msg.includes('age 18 or older')) {
-          return validationError(c, { personaType: [msg] });
-        }
-        if (msg.includes('birthYear or birthDate is required')) {
-          return validationError(c, { birthYear: [msg] });
-        }
+      if (err instanceof ProfileValidationError) {
+        return validationError(c, { [err.field]: [err.message] });
       }
       throw err;
     }
