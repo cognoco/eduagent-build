@@ -6,7 +6,7 @@
  *
  * 1. Request with X-Profile-Id belonging to the account → 200 (subjects returned)
  * 2. Request with X-Profile-Id NOT belonging to the account → 403 FORBIDDEN
- * 3. Request without X-Profile-Id → account-level fallback → 200
+ * 3. Request without X-Profile-Id → auto-resolves to owner profile → 200
  * 4. Profile middleware passes correct profileId to downstream service
  *
  * These tests validate the first layer of profile isolation (middleware).
@@ -33,8 +33,11 @@ jest.mock('../../apps/api/src/middleware/jwt', () => jwtMocks);
 // --- Profile service mock (profile-scope middleware calls getProfile) ---
 const mockGetProfile = jest.fn();
 
+const mockFindOwnerProfile = jest.fn();
+
 jest.mock('../../apps/api/src/services/profile', () => ({
   getProfile: mockGetProfile,
+  findOwnerProfile: mockFindOwnerProfile,
   listProfiles: jest.fn().mockResolvedValue([]),
   createProfile: jest.fn(),
   updateProfile: jest.fn(),
@@ -101,6 +104,14 @@ describe('Integration: Profile Isolation (P0-006)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     configureValidJWT();
+
+    // Default: findOwnerProfile auto-resolves to the owned profile
+    mockFindOwnerProfile.mockResolvedValue({
+      id: OWNED_PROFILE_ID,
+      birthYear: null,
+      location: null,
+      consentStatus: 'CONSENTED',
+    });
 
     // Default: owned profile returns valid profile object
     mockGetProfile.mockImplementation(
@@ -195,7 +206,7 @@ describe('Integration: Profile Isolation (P0-006)', () => {
     expect(mockListSubjects).not.toHaveBeenCalled();
   });
 
-  it('falls back to account-level access when X-Profile-Id is absent', async () => {
+  it('auto-resolves to owner profile when X-Profile-Id is absent', async () => {
     const res = await app.request(
       '/v1/subjects',
       {
@@ -205,14 +216,13 @@ describe('Integration: Profile Isolation (P0-006)', () => {
       TEST_ENV
     );
 
-    // Profile-scope middleware skips when header is absent
+    // Profile-scope middleware auto-resolves to owner profile via findOwnerProfile
     expect(res.status).toBe(200);
-    expect(mockGetProfile).not.toHaveBeenCalled();
 
-    // listSubjects called with account.id as fallback
+    // listSubjects called with owner profile ID (auto-resolved)
     expect(mockListSubjects).toHaveBeenCalledWith(
       expect.anything(),
-      MOCK_ACCOUNT_ID,
+      OWNED_PROFILE_ID,
       expect.anything()
     );
   });

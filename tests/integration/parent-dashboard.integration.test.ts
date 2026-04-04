@@ -52,6 +52,20 @@ jest.mock('../../apps/api/src/services/billing', () => billingMock());
 jest.mock('../../apps/api/src/services/settings', () => settingsMock());
 jest.mock('../../apps/api/src/services/session', () => sessionMock());
 jest.mock('../../apps/api/src/services/llm', () => llmMock());
+jest.mock('../../apps/api/src/services/profile', () => ({
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+  findOwnerProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+}));
 
 import { app } from '../../apps/api/src/index';
 
@@ -66,6 +80,7 @@ const SESSION_ID = '00000000-0000-4000-8000-000000000021';
 
 const AUTH_HEADERS = {
   Authorization: 'Bearer test-token',
+  'X-Profile-Id': 'test-profile-id',
 };
 
 // ---------------------------------------------------------------------------
