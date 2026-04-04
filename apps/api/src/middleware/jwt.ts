@@ -195,8 +195,14 @@ export async function verifyJWT(
     }
   }
 
-  // Validate audience claim (only when both config value and token claim exist)
-  if (options?.audience && payload.aud !== undefined) {
+  // Validate audience claim whenever audience enforcement is configured.
+  if (options?.audience) {
+    if (payload.aud === undefined) {
+      throw new Error(
+        `Invalid JWT: missing audience claim (expected ${options.audience})`
+      );
+    }
+
     const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
     if (!audiences.includes(options.audience)) {
       throw new Error(

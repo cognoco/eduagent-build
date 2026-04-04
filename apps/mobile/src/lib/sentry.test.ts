@@ -11,6 +11,7 @@ jest.mock('@sentry/react-native', () => ({
   init: jest.fn(),
   getClient: jest.fn(),
   setUser: jest.fn(),
+  getCurrentScope: jest.fn(() => ({ clear: jest.fn() })),
 }));
 
 // Helper: set EXPO_PUBLIC_SENTRY_DSN so the module doesn't no-op

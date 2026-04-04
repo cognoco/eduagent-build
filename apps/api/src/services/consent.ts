@@ -149,6 +149,9 @@ export async function createPendingConsentState(
       target: [consentStates.profileId, consentStates.consentType],
       set: {
         status: 'PENDING',
+        respondedAt: null,
+        parentEmail: null,
+        consentToken: null,
         updatedAt: sql`now()`,
       },
     })

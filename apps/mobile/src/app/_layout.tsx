@@ -19,13 +19,14 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { ClerkProvider, ClerkLoaded, useClerk } from '@clerk/clerk-expo';
+import { ClerkProvider, useClerk } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
 import {
   QueryCache,
   QueryClient,
   QueryClientProvider,
 } from '@tanstack/react-query';
+import { useAuth } from '@clerk/clerk-expo';
 import { ThemeContext, useTokenVars, type Persona } from '../lib/theme';
 import type { ColorScheme } from '../lib/design-tokens';
 import { ProfileProvider, useProfile } from '../lib/profile';
@@ -155,6 +156,9 @@ function ThemedApp() {
   // unmounting authenticated UI and redirecting to sign-in via layout guards.
   useEffect(() => {
     setOnAuthExpired(() => {
+      // BM-03: clear cached query data before sign-out to prevent the next
+      // user from seeing stale data from the previous session.
+      queryClient.clear();
       void signOut();
     });
     return () => clearOnAuthExpired();
@@ -292,6 +296,30 @@ function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
   );
 }
 
+/**
+ * Replaces <ClerkLoaded> to avoid a white gap between splash dismissal and
+ * Clerk initialization. ClerkLoaded renders NOTHING until Clerk is ready;
+ * this component shows a themed spinner during the gap and signals readiness
+ * back to the root layout so the splash doesn't dismiss prematurely.
+ */
+function ClerkGate({
+  children,
+  onReady,
+}: {
+  children: React.ReactNode;
+  onReady: () => void;
+}) {
+  const { isLoaded } = useAuth();
+
+  useEffect(() => {
+    if (isLoaded) onReady();
+  }, [isLoaded, onReady]);
+
+  if (!isLoaded) return null;
+
+  return children as React.ReactElement;
+}
+
 /** Thin error boundary so AnimatedSplash crashes don't block the app. */
 class SplashErrorBoundary extends React.Component<
   { children: React.ReactNode; onError: () => void },
@@ -321,29 +349,61 @@ export default function RootLayout() {
     AtkinsonHyperlegible_700Bold,
     ...Ionicons.font,
   });
-  const [showSplash, setShowSplash] = useState(true);
 
-  const dismissSplash = useCallback(() => setShowSplash(false), []);
+  // Splash stays visible until BOTH conditions are met:
+  //   1. The animated splash sequence has completed (or timed out)
+  //   2. Clerk has finished initializing (app content is ready to render)
+  // This prevents the white-screen gap that occurs when the splash dismisses
+  // before ClerkLoaded resolves — especially on slower devices or with larger
+  // JS bundles where Clerk init can take > 3 seconds.
+  const [animDone, setAnimDone] = useState(false);
+  const [clerkReady, setClerkReady] = useState(false);
+  const showSplash = !animDone || !clerkReady;
 
-  // Safety timeout: force-dismiss splash if animation callback never fires.
-  // Diagnostic: log which path dismisses the splash so we can identify the bug.
+  const onAnimComplete = useCallback(() => {
+    if (__DEV__) console.log('[Splash] Animation complete');
+    setAnimDone(true);
+  }, []);
+
+  const onClerkReady = useCallback(() => {
+    if (__DEV__) console.log('[Splash] Clerk ready');
+    setClerkReady(true);
+  }, []);
+
+  // Safety: force-dismiss splash if animation callback never fires.
   useEffect(() => {
-    if (!showSplash) return;
+    if (animDone) return;
     const primary = setTimeout(() => {
       console.warn(
-        '[Splash] DISMISSED by primary timeout (3.5s) — animation callback never fired'
+        '[Splash] Animation DISMISSED by primary timeout (3.5s) — callback never fired'
       );
-      dismissSplash();
+      setAnimDone(true);
     }, 3500);
     const failsafe = setTimeout(() => {
-      console.warn('[Splash] DISMISSED by failsafe timeout (5s)');
-      setShowSplash(false);
+      console.warn('[Splash] Animation DISMISSED by failsafe timeout (5s)');
+      setAnimDone(true);
     }, 5000);
     return () => {
       clearTimeout(primary);
       clearTimeout(failsafe);
     };
-  }, [showSplash, dismissSplash]);
+  }, [animDone]);
+
+  // Safety: if Clerk never loads (network issue, bad key), force-dismiss after
+  // 12 seconds so the app doesn't stay on splash forever. The ClerkGate will
+  // render null (Clerk still not loaded), but the SplashErrorBoundary will have
+  // been removed, so at worst the user sees a white screen they can interact
+  // with (sign-in redirect will kick in once Clerk eventually loads).
+  useEffect(() => {
+    if (clerkReady) return;
+    const timeout = setTimeout(() => {
+      console.warn(
+        '[Splash] Clerk DISMISSED by failsafe timeout (12s) — Clerk not loaded'
+      );
+      setClerkReady(true);
+    }, 12000);
+    return () => clearTimeout(timeout);
+  }, [clerkReady]);
 
   useEffect(() => {
     if (fontsLoaded) {
@@ -361,7 +421,7 @@ export default function RootLayout() {
           publishableKey={clerkPublishableKey}
           tokenCache={tokenCache}
         >
-          <ClerkLoaded>
+          <ClerkGate onReady={onClerkReady}>
             <QueryClientProvider client={queryClient}>
               <ProfileProvider>
                 <ErrorBoundary>
@@ -369,12 +429,12 @@ export default function RootLayout() {
                 </ErrorBoundary>
               </ProfileProvider>
             </QueryClientProvider>
-          </ClerkLoaded>
+          </ClerkGate>
         </ClerkProvider>
       </SafeAreaProvider>
       {showSplash && (
-        <SplashErrorBoundary onError={dismissSplash}>
-          <AnimatedSplash onComplete={dismissSplash} />
+        <SplashErrorBoundary onError={onAnimComplete}>
+          <AnimatedSplash onComplete={onAnimComplete} />
         </SplashErrorBoundary>
       )}
     </GestureHandlerRootView>

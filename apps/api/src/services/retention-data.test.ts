@@ -56,6 +56,7 @@ import {
   deleteTeachingPreference,
   getAnalogyDomain,
   setAnalogyDomain,
+  setNativeLanguage,
   updateNeedsDeepeningProgress,
   updateRetentionFromSession,
   evaluateRecallQuality,
@@ -184,6 +185,7 @@ function setupScopedRepo({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  setupScopedRepo();
   // Register a default gemini mock that returns quality '4' for recall tests
   registerProvider(createMockProvider('gemini'));
 });
@@ -271,6 +273,10 @@ describe('processRecallTest', () => {
     });
 
     const db = createMockDb({ retentionCardFindFirstQuery: newCard });
+    // ensureRetentionCard now checks findFirst before inserting
+    (db.query.retentionCards.findFirst as jest.Mock)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValue(newCard);
 
     (processRecallResult as jest.Mock).mockReturnValue({
       passed: true,
@@ -1006,6 +1012,17 @@ describe('setTeachingPreference', () => {
       nativeLanguage: null,
     });
   });
+
+  it('rejects writes for subjects outside the caller scope', async () => {
+    setupScopedRepo({ subjectFindFirst: null as unknown });
+    const db = createMockDb();
+
+    await expect(
+      setTeachingPreference(db, profileId, subjectId, 'step_by_step')
+    ).rejects.toThrow('Subject not found');
+
+    expect(db.insert).not.toHaveBeenCalled();
+  });
 });
 
 describe('deleteTeachingPreference', () => {
@@ -1075,6 +1092,40 @@ describe('setAnalogyDomain', () => {
     const result = await setAnalogyDomain(db, profileId, subjectId, null);
     expect(result).toBeNull();
     expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('rejects writes for subjects outside the caller scope', async () => {
+    setupScopedRepo({ subjectFindFirst: null as unknown });
+    const db = createMockDb();
+
+    await expect(
+      setAnalogyDomain(db, profileId, subjectId, 'sports')
+    ).rejects.toThrow('Subject not found');
+
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('setNativeLanguage', () => {
+  it('upserts native language for an owned subject', async () => {
+    setupScopedRepo();
+    const db = createMockDb();
+
+    const result = await setNativeLanguage(db, profileId, subjectId, 'en');
+
+    expect(result).toBe('en');
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('rejects writes for subjects outside the caller scope', async () => {
+    setupScopedRepo({ subjectFindFirst: null as unknown });
+    const db = createMockDb();
+
+    await expect(
+      setNativeLanguage(db, profileId, subjectId, 'en')
+    ).rejects.toThrow('Subject not found');
+
+    expect(db.insert).not.toHaveBeenCalled();
   });
 });
 
@@ -1216,6 +1267,9 @@ describe('updateRetentionFromSession', () => {
     });
 
     const db = createMockDb({ retentionCardFindFirstQuery: newCard });
+    (db.query.retentionCards.findFirst as jest.Mock)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValue(newCard);
 
     await updateRetentionFromSession(db, profileId, topicId, 4);
 
@@ -1297,25 +1351,32 @@ describe('updateRetentionFromSession', () => {
 // ---------------------------------------------------------------------------
 
 describe('ensureRetentionCard', () => {
-  it('is idempotent — ON CONFLICT DO NOTHING', async () => {
+  it('is idempotent — returns existing card without inserting', async () => {
     const existingCard = mockRetentionCardRow();
     const db = createMockDb({ retentionCardFindFirstQuery: existingCard });
 
     const result = await ensureRetentionCard(db, profileId, topicId);
 
-    expect(db.insert).toHaveBeenCalled();
-    expect(result.topicId).toBe(topicId);
-    expect(result.profileId).toBe(profileId);
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(result.card.topicId).toBe(topicId);
+    expect(result.card.profileId).toBe(profileId);
+    expect(result.isNew).toBe(false);
   });
 
   it('returns the card after insertion', async () => {
     const newCard = mockRetentionCardRow({ xpStatus: 'pending' });
+    Object.assign(newCard, { repetitions: 0 });
     const db = createMockDb({ retentionCardFindFirstQuery: newCard });
+    (db.query.retentionCards.findFirst as jest.Mock)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValue(newCard);
 
     const result = await ensureRetentionCard(db, profileId, topicId);
 
     expect(result).toBeDefined();
-    expect(result.topicId).toBe(topicId);
+    expect(result.card.topicId).toBe(topicId);
+    expect(result.isNew).toBe(true);
+    expect(db.insert).toHaveBeenCalled();
   });
 });
 

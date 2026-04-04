@@ -115,61 +115,72 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
     [activeProfile?.id, getToken]
   );
 
-  const runOcr = useCallback(async (uri: string, isRetry: boolean) => {
-    setStatus('processing');
-    setError(null);
-    if (!isRetry) {
-      setText(null);
-      setFailCount(0);
-    }
-
-    if (!isTextRecognitionAvailable()) {
-      console.error(
-        '[OCR] ML Kit TextRecognition native module is not linked. ' +
-          'Rebuild the app with EAS to include @react-native-ml-kit/text-recognition.'
-      );
-      if (await tryServerFallback(uri)) {
-        return;
+  const runOcr = useCallback(
+    async (uri: string, isRetry: boolean) => {
+      setStatus('processing');
+      setError(null);
+      if (!isRetry) {
+        setText(null);
+        setFailCount(0);
       }
-      setFailCount((prev) => prev + 1);
-      setError(
-        Platform.OS === 'android'
-          ? 'Text recognition is not available in this build. A new app build is required.'
-          : 'Text recognition is not available. Please rebuild the app.'
-      );
-      setStatus('error');
-      return;
-    }
 
-    try {
-      const recognized = await recognizeText(uri);
-      if (!recognized) {
+      if (!isTextRecognitionAvailable()) {
+        console.error(
+          '[OCR] ML Kit TextRecognition native module is not linked. ' +
+            'Rebuild the app with EAS to include @react-native-ml-kit/text-recognition.'
+        );
         if (await tryServerFallback(uri)) {
           return;
         }
         setFailCount((prev) => prev + 1);
-        setError("Couldn't read any text from the image");
+        setError(
+          Platform.OS === 'android'
+            ? 'Text recognition is not available in this build. A new app build is required.'
+            : 'Text recognition is not available. Please rebuild the app.'
+        );
         setStatus('error');
         return;
       }
-      setText(recognized);
-      setStatus('done');
-    } catch (err) {
-      console.error('[OCR] Text recognition failed:', err);
-      if (await tryServerFallback(uri)) {
-        return;
+
+      try {
+        const recognized = await recognizeText(uri);
+        if (!recognized) {
+          if (await tryServerFallback(uri)) {
+            return;
+          }
+          setFailCount((prev) => prev + 1);
+          setError("Couldn't read any text from the image");
+          setStatus('error');
+          return;
+        }
+        setText(recognized);
+        setStatus('done');
+      } catch (err) {
+        console.error('[OCR] Text recognition failed:', err);
+        if (await tryServerFallback(uri)) {
+          return;
+        }
+        setFailCount((prev) => prev + 1);
+        setError(
+          "We couldn't read that clearly. Try taking the photo again with better lighting."
+        );
+        setStatus('error');
       }
-      setFailCount((prev) => prev + 1);
-      setError(
-        "We couldn't read that clearly. Try taking the photo again with better lighting."
-      );
-      setStatus('error');
-    }
-  }, [tryServerFallback]);
+    },
+    [tryServerFallback]
+  );
 
   const process = useCallback(
     async (uri: string) => {
-      const stableUri = await copyToCache(uri);
+      // M-03: wrap copyToCache in try/catch so failures set error state
+      let stableUri: string;
+      try {
+        stableUri = await copyToCache(uri);
+      } catch (e) {
+        setStatus('error');
+        setError(e instanceof Error ? e.message : 'Failed to cache image');
+        return;
+      }
       currentUriRef.current = stableUri;
       await runOcr(stableUri, false);
     },

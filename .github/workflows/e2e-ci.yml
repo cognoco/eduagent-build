@@ -251,7 +251,9 @@ jobs:
       # secret bindings from .dev.vars in the project directory.
       - name: Write wrangler .dev.vars for API
         run: |
-          printf "DATABASE_URL=%s\nNODE_ENV=test\nTEST_SEED_SECRET=test-secret\n" "$DATABASE_URL" > apps/api/.dev.vars
+          printf "DATABASE_URL=%s\nNODE_ENV=test\nTEST_SEED_SECRET=%s\n" "$DATABASE_URL" "$TEST_SEED_SECRET" > apps/api/.dev.vars
+        env:
+          TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
 
       # Start API server in background (NODE_ENV=test enables __test/* routes)
       - name: Start API server (background)
@@ -286,7 +288,7 @@ jobs:
             ~/.gradle/wrapper
             apps/mobile/android/.gradle
             apps/mobile/android/app/build
-          key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/gradle/wrapper/gradle-wrapper.properties', 'apps/mobile/package.json') }}
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/gradle/wrapper/gradle-wrapper.properties', 'apps/mobile/package.json', 'apps/mobile/android/build.gradle', 'apps/mobile/android/app/build.gradle', 'apps/mobile/android/settings.gradle') }}
           restore-keys: |
             gradle-${{ runner.os }}-
 

@@ -23,9 +23,12 @@ FILE_COUNT=$(echo "$STAGED_TS_FILES" | wc -l | tr -d ' ')
 echo "pre-commit-tests: $FILE_COUNT TypeScript file(s) staged"
 
 # Bulk refactors — fall back to nx affected (excluding mobile for speed)
-if [ "$FILE_COUNT" -gt 20 ]; then
-  echo "pre-commit-tests: >20 files staged, falling back to nx affected --exclude=mobile"
-  NX_DAEMON=false pnpm exec nx affected -t test --base=HEAD~1 --exclude=mobile
+# Threshold raised from 20→50→100: @nx/expo plugin stack overflow on Windows
+# prevents nx affected from running reliably (see project_nx_expo_plugin_bug).
+# Surgical jest --findRelatedTests works fine at any count; prefer it.
+if [ "$FILE_COUNT" -gt 100 ]; then
+  echo "pre-commit-tests: >100 files staged, falling back to nx affected --exclude=mobile"
+  NX_DAEMON=false pnpm exec nx affected -t test --base=HEAD --exclude=mobile
   exit $?
 fi
 
@@ -73,7 +76,7 @@ run_jest() {
   # shellcheck disable=SC2086
   # --passWithNoTests: files like route screens or CSS may have no related tests;
   # without this flag, jest exits 1 and blocks the commit unnecessarily.
-  if ! (cd "$WORKSPACE_ROOT/$project_dir" && pnpm exec jest --findRelatedTests $abs_files --no-coverage --bail --passWithNoTests); then
+  if ! (cd "$WORKSPACE_ROOT/$project_dir" && pnpm exec jest --findRelatedTests $abs_files --no-coverage --bail --passWithNoTests --forceExit); then
     FAILED=1
   fi
 }

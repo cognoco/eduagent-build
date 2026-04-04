@@ -1,0 +1,311 @@
+# Mock Fix Plan
+
+> Date: 2026-04-04
+> Goal: map where tests replace real implementation with mocks, explain why, and identify the highest-leverage path to real-code coverage.
+> Audit scope: `tests/integration`, `apps/api/src`, `apps/mobile/src`, `packages/database/src`
+> Method: searched `jest.mock()` across the test tree, then inspected representative files that use hand-rolled fakes such as `createMockDb`, fake fetch clients, mock JWT helpers, and mock providers.
+
+## Snapshot
+
+- 215 test/setup files scanned.
+- 147 files use `jest.mock()`.
+- 653 `jest.mock()` calls total.
+- 540 mock calls target our own code (`@eduagent/*` or relative app modules).
+- 113 mock calls target third-party or platform code.
+- No HTTP-level mock harness like `msw`, `nock`, or Axios `MockAdapter` is present.
+- `@eduagent/database` is the single most replaced seam (57 `jest.mock()` calls).
+- The next repeated seams are auth/account/profile/billing/session/llm on the API side and `api-client`/`profile`/navigation on the mobile side.
+
+## What counts as a problem for this cleanup
+
+High priority to remove:
+
+- Mocks of our own services, middleware, routes, repositories, and DB package in tests that claim to be integration or route coverage.
+- Hand-built fake Drizzle chains in persistence-heavy service tests where query shape, transactions, row mapping, or race behavior matter.
+- Screen tests that replace most hooks and only assert rendering against invented hook state.
+
+Lower priority, often still reasonable:
+
+- Native/platform shims required for Jest to render Expo or React Native code at all.
+- Wrapper tests around third-party SDKs where the wrapper itself is the unit under test.
+- Deterministic edge helpers such as mocking UUID/time at an adapter boundary.
+
+## Area Summary
+
+| Area | Files scanned | Files with `jest.mock()` | Mock calls | What is mostly being replaced |
+| --- | ---: | ---: | ---: | --- |
+| `tests/integration` | 16 | 16 | 154 | Entire API composition, DB, JWT, Inngest, and feature services |
+| `apps/api/src/routes` | 27 | 25 | 152 | Auth/db/profile stack plus the route-specific service |
+| `apps/api/src/services` | 54 | 27 | 51 | Collaborator services and DB adapters; many more manual fake DBs than `jest.mock()` shows |
+| `apps/api/src/inngest/functions` | 9 | 8 | 36 | Step helpers plus all downstream services in a chain |
+| `apps/api/src/middleware` | 11 | 7 | 15 | JWT, DB, account/profile services, env config |
+| `apps/mobile/src/app` | 30 | 27 | 143 | Navigation, hooks, profile/api clients, native adapters, child components |
+| `apps/mobile/src/hooks` | 23 | 21 | 53 | `api-client`, profile, auth, native SDKs |
+| `apps/mobile/src/components` | 26 | 10 | 32 | Theme, hooks, icons, native wrappers |
+| `apps/mobile/src/lib` | 10 | 4 | 5 | Native SDK wrappers |
+| `apps/mobile/src/test-setup.ts` | 1 | 1 | 11 | Global Expo/React Native Jest shims |
+| `packages/database/src` | 4 | 1 | 1 | Deterministic helper (`uuid`) |
+
+## Root Causes
+
+- `apps/api/src/index.ts` builds the full app eagerly. Importing `app` pulls in auth, DB, account, profile, consent, metering, LLM, Inngest, and all routes. That is why even `/v1/health` tests end up mocking unrelated modules.
+- `tests/integration/mocks.ts` makes full-module mocking easy with `jest.createMockFromModule()`, so suites drift toward mocking whole internal layers instead of stopping at the external boundary.
+- `tests/integration/setup.ts` registers a mock LLM provider globally, but most integration suites still mock `services/llm` entirely, so they do not even exercise the real router/provider selection code.
+- Mobile screens depend directly on hooks, navigation, and native adapters, so tests replace those hooks instead of exercising real data flow.
+- Persistence-heavy services mix branching logic and DB calls. Fake Drizzle builders are easier to stand up than a real Postgres-backed harness, so tests picked the fake path.
+
+## Biggest Confidence Gap
+
+- `tests/integration/setup.ts` says integration tests use a real PostgreSQL DB, but every file under `tests/integration` uses `jest.mock('@eduagent/database', ...)`.
+- `tests/integration/health-cors.integration.test.ts` says "Only external dependencies are mocked", but it also mocks `services/account`, `services/billing`, `services/settings`, `services/session`, and `services/llm`.
+
+Today the `tests/integration` folder is closer to "composed handler tests" than true integration.
+
+## Top Internal Mock Seams
+
+- `@eduagent/database` - 57 calls
+- account/profile/auth/billing/session/llm/inngest - repeated throughout API route and integration suites
+- `../lib/api-client` and `../lib/profile` - repeated throughout mobile hook and screen suites
+
+## Map: `tests/integration`
+
+In the table below, "base app chain" means the recurring bundle of mocks for `middleware/jwt`, `@eduagent/database`, `inngest/client`, `services/account`, `services/billing`, `services/settings`, `services/session`, and `services/llm`, plus `services/profile` where ownership resolution is needed.
+
+| Suite | Internal implementation mocked instead of real code | Why it is mocked today | Real-test target |
+| --- | --- | --- | --- |
+| `tests/integration/account-deletion.integration.test.ts` | base app chain + `services/deletion`, `services/export` | Route contract and auth flow without real deletion/export work or DB | Real app + test DB; fake only Clerk/JWKS, email/export delivery, and Inngest transport |
+| `tests/integration/auth-chain.integration.test.ts` | base app chain | Wants auth middleware branch coverage without real JWKS, DB, or downstream app deps | Real app + test DB + test JWT/JWKS helper; internal services stay real |
+| `tests/integration/billing-lifecycle.integration.test.ts` | base app chain + `services/billing`, `services/stripe`, `services/kv`, `services/metering` | Route behavior only; avoids real subscription, Stripe, and quota logic | Real app + test DB; fake only Stripe and KV adapters |
+| `tests/integration/health-cors.integration.test.ts` | base app chain | Wants CORS and health assertions without booting the full dependency graph | Either a smaller real app factory for public routes, or the full real app with test env and no internal service mocks |
+| `tests/integration/homework.integration.test.ts` | base app chain + `services/session`, `services/ocr`, `services/profile` | Route payload coverage without real homework/session/OCR behavior | Real app + test DB; fake only OCR/LLM boundary and Clerk/JWKS |
+| `tests/integration/inngest-quota-reset.integration.test.ts` | `inngest/client`, `inngest/helpers`, `services/billing` | Captures handler and asserts step order/counts only | Real Inngest function + test DB; fake only clock and any external notifications |
+| `tests/integration/inngest-trial-expiry.integration.test.ts` | `inngest/client`, `inngest/helpers`, `services/billing`, `services/notifications`, `services/profile`, `services/subscription`, `services/trial` | Cron orchestration without real DB state transitions or notification delivery | Real function + test DB; fake only push/email delivery |
+| `tests/integration/learning-session.integration.test.ts` | base app chain + `services/session`, `services/interleaved`, `services/recall-bridge`, `services/profile` | Session route contract without real session storage, retrieval, or bridge generation | Real app + test DB; fake only LLM boundary and Clerk/JWKS |
+| `tests/integration/onboarding.integration.test.ts` | base app chain + `services/profile`, `services/session` | Onboarding path assertions without real profile/session persistence | Real app + test DB; fake only LLM boundary and Clerk/JWKS |
+| `tests/integration/parent-dashboard.integration.test.ts` | base app chain + `services/dashboard`, `services/profile` | Dashboard route shape without running real aggregation queries | Real app + test DB with seeded child activity data |
+| `tests/integration/profile-isolation.integration.test.ts` | base app chain + `services/profile`, `services/subject` | Ownership/profile-scope assertions without real scoped reads | Real app + test DB seeded with multiple profiles; keep subject/profile services real |
+| `tests/integration/retention-lifecycle.integration.test.ts` | base app chain + `services/profile`, `services/retention-data` | Retention route shape without real SM-2 or retention-card persistence | Real app + test DB; fake only LLM boundary if needed |
+| `tests/integration/session-completed-chain.integration.test.ts` | `@eduagent/database`, `inngest/client`, `services/retention-data`, `summaries`, `coaching-cards`, `streaks`, `xp`, `homework-summary`, `embeddings`, `settings`, `verification-completion`, `celebrations`, `language-curriculum`, `vocabulary-extract`, `vocabulary`, `sentry` | Pure orchestration assertions for the post-session pipeline | Keep a small orchestration unit test, but add a real chain integration with test DB and fake only external APIs like embeddings/Sentry |
+| `tests/integration/stripe-webhook.integration.test.ts` | base app chain + `services/stripe`, `services/billing`, `services/subscription`, `services/kv` | Webhook route shape without real signature verification or billing writes | Real route + test DB; fake only Stripe signature verification and KV adapter |
+| `tests/integration/subject-management.integration.test.ts` | base app chain + `services/subject`, `services/profile` | Subject CRUD route coverage without real subject persistence | Real app + test DB with seeded profiles |
+| `tests/integration/test-seed.integration.test.ts` | base app chain + `services/test-seed` | Route contract without running real seed/reset logic | Real app + dedicated disposable test DB; fake only Clerk API if test users are involved |
+
+### Priority callout
+
+The first hard rule for this cleanup should be:
+
+- No `jest.mock('@eduagent/database')` inside `tests/integration`.
+
+Until that changes, the folder name overstates what the suite proves.
+
+## Map: API Route Tests
+
+Pattern:
+
+- 25 of 27 route test files use `jest.mock()`.
+- Most route tests mock `../middleware/jwt`, `@eduagent/database`, `../services/account`, `../services/profile`, and the route-specific service under test.
+- These tests mostly prove request validation, response shape, and handler wiring against invented service outputs.
+
+Representative hotspots:
+
+| File | Real implementation replaced | Why it is mocked today | What should replace it |
+| --- | --- | --- | --- |
+| `apps/api/src/routes/sessions.test.ts` | auth/db/account/profile/billing/session/settings/interleaved/recall-bridge/Inngest | Large route surface, wants status/body coverage without real persistence or LLM work | Real app + test DB for end-to-end session flows; keep thin schema-only tests here |
+| `apps/api/src/routes/books.test.ts` | auth/db/account/profile/curriculum/book-generation/Inngest | Tests route wiring only | Real app + test DB; fake only LLM boundary |
+| `apps/api/src/routes/billing.test.ts` | auth/db/account/billing/kv/stripe | Avoids Stripe, KV, and real quota state | Real app + test DB; fake only Stripe/KV adapters |
+| `apps/api/src/routes/dashboard.test.ts` | auth/db/account/profile/dashboard | Avoids real aggregation queries | Seeded DB-backed route integration |
+| `apps/api/src/routes/homework.test.ts` | auth/db/account/profile/session/ocr/Inngest | Avoids session persistence and OCR | Real route + test DB; fake only OCR/LLM boundary |
+| `apps/api/src/routes/subjects.test.ts` | auth/db/account/profile/subject-resolve/subject | Avoids subject persistence and subject resolution | Real route + test DB; fake only LLM subject resolution if needed |
+
+Recommendation:
+
+- Keep route unit tests only for cheap schema and branch coverage.
+- Move behavior that depends on real middleware, DB state, transactions, or event dispatch into real app integration tests.
+
+## Map: API Service Tests
+
+Pattern:
+
+- 54 service test files exist; 27 use `jest.mock()`, and many others use hand-rolled DB fakes instead.
+- The biggest risk is not the `jest.mock()` count. It is the amount of fake Drizzle behavior created in helper functions such as `createMockDb()`, fake select chains, and fake transaction builders.
+
+Highest-value service files to convert:
+
+| File | Real implementation replaced | Why it is mocked today | What real coverage is missing |
+| --- | --- | --- | --- |
+| `apps/api/src/services/session.test.ts` | `createScopedRepository`, `exchanges`, `escalation`, `summaries`, `subject`, `prior-learning`, `retention-data`, `retention`, `memory`, `settings`, plus a fake DB | Huge branch surface; easier to fake than seed real data | Real query shape, transaction behavior, row mapping, concurrency/race behavior |
+| `apps/api/src/services/billing.test.ts` | Large fake DB/query-builder surface | Complex quota and subscription branches are easier to unit-test against invented rows | Real atomic updates, cycle resets, webhook ordering, and DB constraints |
+| `apps/api/src/services/curriculum.test.ts` | Fake DB chains and transaction behavior | Wants curriculum branching without real DB state | Real `sortOrder`, transaction, and row-mapping semantics |
+| `apps/api/src/services/coaching-cards.test.ts` | `@eduagent/database` and fake DB queries | Fast card-generation branching tests | Real cache reads/writes and retention-card interaction |
+| `apps/api/src/services/consent.test.ts` | `./notifications` plus fake DB chains | Business rules without mail side effects | Real consent row upserts/conflict handling |
+| `apps/api/src/services/dashboard.test.ts` | `@eduagent/database`, `./progress` | Aggregation logic in isolation | Real joins, counts, and per-child data access |
+| `apps/api/src/services/account.test.ts` | `./billing`, `./trial`, `./subscription` | Avoids cross-service side effects | Real account creation + downstream subscription/trial wiring |
+
+Good split going forward:
+
+- Keep pure logic unit tests where the real DB adds no value.
+- Add DB-backed service tests for persistence-heavy services: `session`, `billing`, `retention-data`, `curriculum`, `dashboard`, `coaching-cards`, `consent`.
+
+## Map: API Inngest Function Tests
+
+Pattern:
+
+- 8 of 9 Inngest function tests use `jest.mock()`.
+- The tests usually capture the function handler from `inngest.createFunction()` and then replace every downstream service call.
+
+What this gives us:
+
+- Good step-order and error-isolation coverage.
+
+What it does not give us:
+
+- Confidence that the real chain works with real DB state, real repositories, or real event payloads.
+
+Representative files:
+
+- `apps/api/src/inngest/functions/session-completed.test.ts`
+- `apps/api/src/inngest/functions/trial-expiry.test.ts`
+- `apps/api/src/inngest/functions/quota-reset.test.ts`
+- `apps/api/src/inngest/functions/account-deletion.test.ts`
+
+Recommended direction:
+
+- Keep one small orchestration-focused unit test per function if it is cheap.
+- Add at least one DB-backed integration per critical chain: `session-completed`, `trial-expiry`, `quota-reset`, and `account-deletion`.
+
+## Map: Mobile Screen and Hook Tests
+
+Pattern:
+
+- `apps/mobile/src/app`: 27 of 30 files use `jest.mock()` and there are 143 mock calls.
+- `apps/mobile/src/hooks`: 21 of 23 files use `jest.mock()` and there are 53 mock calls.
+- The common move is to replace `useApiClient`, `useProfile`, navigation, and route-specific hooks so the screen renders against invented state rather than real data flow.
+
+Biggest screen hotspots:
+
+| File | What is mocked instead of real behavior | Why it is mocked today | What should replace it |
+| --- | --- | --- | --- |
+| `apps/mobile/src/app/(learner)/session/index.test.tsx` | 18 mocks: session hooks, subject classification, progress, curriculum, network status, settings, celebration, milestone tracker, recovery, api client, profile, navigation, child components | Tests a very large screen in isolation | Break into smaller units, then add real-hook screen tests and Maestro coverage for end-to-end session behavior |
+| `apps/mobile/src/app/(learner)/library.test.tsx` | subjects/progress/books/curriculum hooks, `react-query`, progress/common components, theme, api client, profile, navigation | Wants screen-state rendering without real queries | Real hooks + real `QueryClientProvider`; stub only `fetch` at the HTTP boundary |
+| `apps/mobile/src/app/(learner)/_layout.test.tsx` | auth/profile/theme/revenuecat/sentry/navigation | Layout contract only | Keep some adapter mocks, but use real providers where possible |
+| `apps/mobile/src/app/session-summary/[sessionId].test.tsx` | session/settings/rating-prompt hooks, theme, sentry, navigation | UI-only assertions | Real hooks for app-owned data; keep native adapter mocks |
+
+Biggest hook hotspots:
+
+| File | What is mocked instead of real behavior | Why it is mocked today | What should replace it |
+| --- | --- | --- | --- |
+| `apps/mobile/src/hooks/use-dashboard.test.ts` | `../lib/api-client`, `../lib/profile` | Easy way to fake RPC responses | Real `useApiClient` with stubbed `fetch` |
+| `apps/mobile/src/hooks/use-curriculum.test.ts` | `../lib/api-client`, `../lib/profile` | Same pattern | Real `useApiClient` with stubbed `fetch` |
+| `apps/mobile/src/hooks/use-subjects.test.ts` | `../lib/api-client`, `../lib/profile` | Same pattern | Real `useApiClient` with stubbed `fetch` |
+| `apps/mobile/src/hooks/use-settings.test.ts` | `../lib/api-client`, `../lib/profile` | Same pattern | Real `useApiClient` with stubbed `fetch` |
+| `apps/mobile/src/hooks/use-interview.test.ts` | `api-client`, auth, `api`, SSE, profile | Avoids auth/network/streaming runtime | Real app-owned hook code plus stubbed fetch/SSE boundary |
+| `apps/mobile/src/hooks/use-homework-ocr.test.ts` | auth/profile/api plus native ML Kit/image/file APIs | Mixed business logic and native adapter behavior | Keep native adapter mocks, but move app-owned OCR fallback logic to tests that use a real hook and stub only the native boundary |
+
+## Mobile Mocks That Should Probably Stay
+
+These are not the first targets because they mostly cover platform gaps rather than hiding app business logic:
+
+- `apps/mobile/src/test-setup.ts`
+  - Global Expo/React Native shims for icons, reanimated, svg, Clerk, notifications, secure store, and purchases.
+- `apps/mobile/src/lib/revenuecat.test.ts`
+  - Wrapper-level test around `react-native-purchases`.
+- `apps/mobile/src/lib/sentry.test.ts`
+  - Wrapper-level test around Sentry SDK behavior.
+- `apps/mobile/src/lib/haptics.test.ts`
+  - Wrapper-level test around `expo-haptics`.
+- `apps/mobile/src/hooks/use-text-to-speech.test.ts`
+  - Native SDK seam (`expo-speech`).
+
+## API Mocks That Should Probably Stay
+
+- `apps/api/src/services/stripe.test.ts`
+  - This is a wrapper test around the Stripe SDK. Mocking Stripe itself here is appropriate.
+- `apps/api/src/middleware/jwt.test.ts`
+  - Mocking `fetch` and `crypto.subtle` at this boundary is acceptable for unit coverage, as long as separate end-to-end auth coverage exists elsewhere.
+- `packages/database/src/queries/embeddings.test.ts`
+  - Mocking UUID generation for deterministic SQL is low-risk.
+
+## Important Hand-Rolled Fakes Not Captured by `jest.mock()` Counts
+
+- `apps/api/src/services/session.test.ts`
+  - `createMockDb()`, fake select/update chains, fake scoped repository.
+- `apps/api/src/services/billing.test.ts`
+  - Extensive fake Drizzle builder chains and transaction behavior.
+- `apps/api/src/services/curriculum.test.ts`
+  - Fake transaction/query behavior.
+- `apps/api/src/services/consent.test.ts`, `assessments.test.ts`, `coaching-cards.test.ts`
+  - Same pattern: fake DB rows and builder chains instead of real Postgres behavior.
+- `apps/mobile/src/hooks/*`
+  - Many tests mock `useApiClient()` and then fake `fetch` responses behind it, which still skips the real API client wiring.
+
+These matter because even after `jest.mock()` count drops, we can still have fake-only coverage if the DB or transport layer is being reimplemented in test helpers.
+
+## Recommended Conversion Order
+
+### Phase 0: Stop the false confidence
+
+- Either rename `tests/integration` to something like `tests/composition` until it is real, or convert suites in place and update the folder comments immediately.
+- Fix misleading comments in:
+  - `tests/integration/setup.ts`
+  - `tests/integration/health-cors.integration.test.ts`
+
+### Phase 1: Build one real API integration harness
+
+- Use a real test Postgres database via `DATABASE_URL`.
+- Stop mocking `@eduagent/database`.
+- Keep internal services real.
+- Fake only true external boundaries:
+  - Clerk/JWKS
+  - LLM provider HTTP
+  - Stripe/RevenueCat
+  - email/push providers
+  - Inngest transport where dispatch itself is not under test
+
+### Phase 2: Convert the highest-value API flows first
+
+Start here:
+
+- `tests/integration/auth-chain.integration.test.ts`
+- `tests/integration/health-cors.integration.test.ts`
+- `tests/integration/subject-management.integration.test.ts`
+- `tests/integration/learning-session.integration.test.ts`
+- `tests/integration/stripe-webhook.integration.test.ts`
+- `tests/integration/session-completed-chain.integration.test.ts`
+
+Why these first:
+
+- They cover the app boot path, auth, session lifecycle, billing/webhooks, and the biggest post-session orchestration chain.
+
+### Phase 3: Add DB-backed service tests where mocks are currently hiding the most risk
+
+Start here:
+
+- `apps/api/src/services/session.test.ts`
+- `apps/api/src/services/billing.test.ts`
+- `apps/api/src/services/retention-data.test.ts`
+- `apps/api/src/services/curriculum.test.ts`
+- `apps/api/src/services/dashboard.test.ts`
+- `apps/api/src/services/coaching-cards.test.ts`
+
+### Phase 4: Rebalance route tests
+
+- Keep light route-unit coverage for schema validation and simple branch handling.
+- Delete or shrink route tests once a real app+DB integration test covers the same path.
+
+### Phase 5: Mobile
+
+- Replace mocked-hook screen tests with:
+  - real hooks
+  - real `QueryClientProvider`
+  - real `useApiClient`
+  - stubbed `fetch` at the HTTP boundary
+- Keep platform/native shims in Jest where necessary.
+- Move full navigation/native happy paths to Maestro or equivalent E2E coverage.
+
+## Success Criteria
+
+- No `jest.mock('@eduagent/database')` under `tests/integration`.
+- Converted integration suites do not mock app-owned services under test.
+- `session` and `billing` each have at least one DB-backed service/integration suite.
+- New mobile screen tests stop mocking `../lib/api-client` by default.
+- Platform shims remain only at true native/runtime boundaries, not around app business logic.

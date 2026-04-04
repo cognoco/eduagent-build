@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
   withSequence,
   withDelay,
+  cancelAnimation,
   Easing,
 } from 'react-native-reanimated';
 
@@ -75,23 +76,30 @@ export function BookPageFlipAnimation({
     page1.value = buildFlipSequence(0) as number;
     page2.value = buildFlipSequence(STAGGER_MS) as number;
     page3.value = buildFlipSequence(STAGGER_MS * 2) as number;
+
+    // BR-01: cancel animations on unmount to prevent leaked UI-thread work
+    return () => {
+      cancelAnimation(page1);
+      cancelAnimation(page2);
+      cancelAnimation(page3);
+    };
   }, [reduceMotion, page1, page2, page3]);
 
   // transformOrigin 'left center' pivots the scaleX around the left (spine) edge,
   // matching the original SVG translate-scale-translate trick.
   const page1Style = useAnimatedStyle(() => ({
     transform: [{ scaleX: page1.value }],
-    transformOrigin: 'left center',
+    transformOrigin: ['0%', '50%', 0],
   }));
 
   const page2Style = useAnimatedStyle(() => ({
     transform: [{ scaleX: page2.value }],
-    transformOrigin: 'left center',
+    transformOrigin: ['0%', '50%', 0],
   }));
 
   const page3Style = useAnimatedStyle(() => ({
     transform: [{ scaleX: page3.value }],
-    transformOrigin: 'left center',
+    transformOrigin: ['0%', '50%', 0],
   }));
 
   // Proportional layout — all values relative to the logical 120×120 viewbox

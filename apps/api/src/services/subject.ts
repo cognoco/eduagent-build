@@ -244,13 +244,16 @@ export async function archiveInactiveSubjects(
     .where(sql`${learningSessions.lastActivityAt} >= ${cutoffDate}`)
     .groupBy(learningSessions.subjectId);
 
-  // Archive all active subjects NOT in the recently-active set
+  // Archive all active subjects NOT in the recently-active set.
+  // C-02: exclude subjects created after the cutoff — newly created subjects
+  // with zero sessions should not be archived immediately.
   const result = await db
     .update(subjects)
     .set({ status: 'archived', updatedAt: now })
     .where(
       and(
         eq(subjects.status, 'active'),
+        sql`${subjects.createdAt} <= ${cutoffDate}`,
         notInArray(subjects.id, recentlyActiveSubjectIds)
       )
     )

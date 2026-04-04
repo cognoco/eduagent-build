@@ -24,15 +24,15 @@ export type CurriculumTopicSource = z.infer<typeof curriculumTopicSourceSchema>;
 // Subject schemas
 
 export const subjectCreateSchema = z.object({
-  name: z.string().min(1).max(200),
-  rawInput: z.string().min(1).max(200).optional(),
+  name: z.string().trim().min(1).max(200),
+  rawInput: z.string().trim().min(1).max(200).optional(),
   pedagogyMode: pedagogyModeSchema.optional(),
   languageCode: languageCodeSchema.optional(),
 });
 export type SubjectCreateInput = z.infer<typeof subjectCreateSchema>;
 
 export const subjectUpdateSchema = z.object({
-  name: z.string().min(1).max(200).optional(),
+  name: z.string().trim().min(1).max(200).optional(),
   status: subjectStatusSchema.optional(),
   pedagogyMode: pedagogyModeSchema.optional(),
   languageCode: languageCodeSchema.nullable().optional(),

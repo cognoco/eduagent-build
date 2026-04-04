@@ -77,8 +77,19 @@ testSeedRoutes.use('/__test/*', async (c, next) => {
   }
 
   if (secret) {
-    const headerSecret = c.req.header('X-Test-Secret');
-    if (headerSecret !== secret) {
+    const headerSecret = c.req.header('X-Test-Secret') ?? '';
+    // CI-06: constant-time comparison to prevent timing attacks.
+    // XOR-fold both strings to fixed-length digest before comparing.
+    const encoder = new TextEncoder();
+    const aBytes = encoder.encode(headerSecret);
+    const bBytes = encoder.encode(secret);
+    const hash = new Uint8Array(32);
+    for (let i = 0; i < aBytes.length; i++) hash[i % 32]! ^= aBytes[i]!;
+    const hashB = new Uint8Array(32);
+    for (let i = 0; i < bBytes.length; i++) hashB[i % 32]! ^= bBytes[i]!;
+    let diff = aBytes.length ^ bBytes.length;
+    for (let i = 0; i < 32; i++) diff |= hash[i]! ^ hashB[i]!;
+    if (diff !== 0) {
       return c.json(
         {
           code: ERROR_CODES.FORBIDDEN,

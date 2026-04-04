@@ -31,6 +31,7 @@ describe('validateProductionKeys', () => {
 
     expect(missing).toContain('CLERK_SECRET_KEY');
     expect(missing).toContain('CLERK_JWKS_URL');
+    expect(missing).toContain('CLERK_AUDIENCE');
     expect(missing).toContain('GEMINI_API_KEY');
     expect(missing).toContain('VOYAGE_API_KEY');
     expect(missing).toContain('RESEND_API_KEY');
@@ -40,7 +41,7 @@ describe('validateProductionKeys', () => {
     expect(missing).not.toContain('STRIPE_WEBHOOK_SECRET');
     // OPENAI_API_KEY is optional — alternative to GEMINI_API_KEY
     expect(missing).not.toContain('OPENAI_API_KEY');
-    expect(missing).toHaveLength(6);
+    expect(missing).toHaveLength(7);
   });
 
   it('returns empty array for production with all required secrets present', () => {
@@ -49,6 +50,7 @@ describe('validateProductionKeys', () => {
       ENVIRONMENT: 'production',
       CLERK_SECRET_KEY: 'sk_live_xxx',
       CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
+      CLERK_AUDIENCE: 'eduagent-api',
       GEMINI_API_KEY: 'gemini-key',
       VOYAGE_API_KEY: 'voyage-key',
       RESEND_API_KEY: 're_xxx',
@@ -65,12 +67,13 @@ describe('validateProductionKeys', () => {
       ENVIRONMENT: 'production',
       CLERK_SECRET_KEY: 'sk_live_xxx',
       CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
+      // Missing: CLERK_AUDIENCE, VOYAGE_API_KEY, RESEND_API_KEY, REVENUECAT_WEBHOOK_SECRET
       GEMINI_API_KEY: 'gemini-key',
-      // Missing: VOYAGE_API_KEY, RESEND_API_KEY, REVENUECAT_WEBHOOK_SECRET
       // Stripe keys are optional — not in production required list
     });
 
     expect(missing).toEqual([
+      'CLERK_AUDIENCE',
       'VOYAGE_API_KEY',
       'RESEND_API_KEY',
       'REVENUECAT_WEBHOOK_SECRET',
@@ -114,6 +117,7 @@ describe('validateEnv', () => {
       DATABASE_URL: 'postgresql://prod/db',
       CLERK_SECRET_KEY: 'sk_live_xxx',
       CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
+      CLERK_AUDIENCE: 'eduagent-api',
       GEMINI_API_KEY: 'gemini-key',
       OPENAI_API_KEY: 'openai-key',
       VOYAGE_API_KEY: 'voyage-key',

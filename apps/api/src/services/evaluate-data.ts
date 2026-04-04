@@ -4,11 +4,12 @@
 // FR128-133: Devil's Advocate verification
 // ---------------------------------------------------------------------------
 
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import {
   retentionCards,
   curriculumTopics,
   learningSessions,
+  sessionEvents,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
@@ -17,20 +18,9 @@ import {
   handleEvaluateFailure,
   type EvaluateFailureAction,
 } from './evaluate';
+import type { EvaluateEligibility } from '@eduagent/schemas';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export interface EvaluateEligibility {
-  eligible: boolean;
-  topicId: string;
-  topicTitle: string;
-  currentRung: 1 | 2 | 3 | 4;
-  easeFactor: number;
-  repetitions: number;
-  reason?: string;
-}
+export type { EvaluateEligibility };
 
 export interface EvaluateSessionState {
   sessionId: string;
@@ -111,12 +101,10 @@ export async function advanceEvaluateRung(
   profileId: string,
   topicId: string
 ): Promise<1 | 2 | 3 | 4> {
-  const card = await db.query.retentionCards.findFirst({
-    where: and(
-      eq(retentionCards.topicId, topicId),
-      eq(retentionCards.profileId, profileId)
-    ),
-  });
+  const repo = createScopedRepository(db, profileId);
+  const card = await repo.retentionCards.findFirst(
+    eq(retentionCards.topicId, topicId)
+  );
 
   if (!card) return 1;
 
@@ -151,12 +139,10 @@ export async function processEvaluateFailureEscalation(
   topicId: string,
   consecutiveFailures: number
 ): Promise<EvaluateFailureAction> {
-  const card = await db.query.retentionCards.findFirst({
-    where: and(
-      eq(retentionCards.topicId, topicId),
-      eq(retentionCards.profileId, profileId)
-    ),
-  });
+  const repo = createScopedRepository(db, profileId);
+  const card = await repo.retentionCards.findFirst(
+    eq(retentionCards.topicId, topicId)
+  );
 
   const currentRung = (card?.evaluateDifficultyRung ?? 1) as 1 | 2 | 3 | 4;
   const action = handleEvaluateFailure(consecutiveFailures, currentRung);
@@ -210,18 +196,30 @@ export async function getEvaluateSessionState(
   }
 
   // Get the retention card for difficulty rung
-  const card = await db.query.retentionCards.findFirst({
+  const card = await repo.retentionCards.findFirst(
+    eq(retentionCards.topicId, session.topicId)
+  );
+
+  // C-01: compute actual consecutiveFailures from session events
+  const evalEvents = await db.query.sessionEvents.findMany({
     where: and(
-      eq(retentionCards.topicId, session.topicId),
-      eq(retentionCards.profileId, profileId)
+      eq(sessionEvents.sessionId, sessionId),
+      eq(sessionEvents.eventType, 'evaluate_challenge')
     ),
+    orderBy: [desc(sessionEvents.createdAt)],
   });
+  let consecutiveFailures = 0;
+  for (const evt of evalEvents) {
+    const meta = evt.metadata as Record<string, unknown> | null;
+    if (meta?.passed === true) break;
+    consecutiveFailures++;
+  }
 
   return {
     sessionId,
     topicId: session.topicId,
     difficultyRung: (card?.evaluateDifficultyRung ?? 1) as 1 | 2 | 3 | 4,
-    consecutiveFailures: 0, // Reset per session — tracked in session context
+    consecutiveFailures,
     lastFailureAction: null,
   };
 }

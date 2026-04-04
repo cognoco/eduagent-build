@@ -307,4 +307,25 @@ describe('createPendingConsentState', () => {
     expect(result.status).toBe('PENDING');
     expect(result.consentType).toBe('COPPA');
   });
+
+  it('clears stale approval metadata when resetting an existing row to PENDING', async () => {
+    const row = mockConsentRow({ status: 'PENDING', parentEmail: null });
+    const db = createMockDb({ insertReturning: [row] });
+
+    await createPendingConsentState(
+      db,
+      '550e8400-e29b-41d4-a716-446655440000',
+      'GDPR'
+    );
+
+    const onConflictArgs = (db.insert as jest.Mock).mock.results[0].value.values
+      .mock.results[0].value.onConflictDoUpdate.mock.calls[0][0];
+
+    expect(onConflictArgs.set).toMatchObject({
+      status: 'PENDING',
+      respondedAt: null,
+      parentEmail: null,
+      consentToken: null,
+    });
+  });
 });

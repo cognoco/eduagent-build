@@ -108,10 +108,13 @@ export function useChildConsentStatus(
   return useQuery({
     queryKey: ['consent', 'child', childProfileId],
     queryFn: async ({ signal: querySignal }): Promise<ChildConsentData> => {
+      if (!childProfileId) {
+        throw new Error('childProfileId is required to fetch consent status');
+      }
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client.consent[':childProfileId'].status.$get({
-          param: { childProfileId: childProfileId! },
+          param: { childProfileId },
           init: { signal },
         } as never);
         await assertOk(res);
@@ -141,8 +144,11 @@ export function useRevokeConsent(
 
   return useMutation({
     mutationFn: async (): Promise<RevokeConsentResult> => {
+      if (!childProfileId) {
+        throw new Error('childProfileId is required to revoke consent');
+      }
       const res = await client.consent[':childProfileId'].revoke.$put({
-        param: { childProfileId: childProfileId! },
+        param: { childProfileId },
       });
       await assertOk(res);
       return (await res.json()) as RevokeConsentResult;
@@ -194,8 +200,11 @@ export function useRestoreConsent(
 
   return useMutation({
     mutationFn: async (): Promise<RestoreConsentResult> => {
+      if (!childProfileId) {
+        throw new Error('childProfileId is required to restore consent');
+      }
       const res = await client.consent[':childProfileId'].restore.$put({
-        param: { childProfileId: childProfileId! },
+        param: { childProfileId },
       });
       await assertOk(res);
       return (await res.json()) as RestoreConsentResult;

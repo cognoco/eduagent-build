@@ -44,9 +44,12 @@ export function QueryGuard<T>({
   empty,
   error,
 }: QueryGuardProps<T>): ReactNode {
-  const { data, isLoading, isError, error: queryError, refetch } = query;
+  const { data, isPending, isError, error: queryError, refetch } = query;
 
-  if (isLoading) {
+  // BM-04: isPending (not isLoading) covers disabled queries where data is
+  // undefined. isLoading = isPending && isFetching, which is false for
+  // enabled:false queries, letting undefined data fall through to children.
+  if (isPending) {
     return (
       loading ?? (
         <View

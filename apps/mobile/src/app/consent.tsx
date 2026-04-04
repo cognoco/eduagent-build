@@ -48,6 +48,7 @@ export default function ConsentScreen() {
   const [parentEmail, setParentEmail] = useState('');
   const [error, setError] = useState('');
   const [resending, setResending] = useState(false);
+  const [resendError, setResendError] = useState('');
   const [deliveryState, setDeliveryState] = useState<DeliveryState>('sent');
   const [isTransitioning, setIsTransitioning] = useState(false);
   const isTransitioningRef = useRef(false);
@@ -120,6 +121,7 @@ export default function ConsentScreen() {
     if (!profileId || resending) return;
 
     setResending(true);
+    setResendError('');
     try {
       const result = await mutateAsync({
         childProfileId: profileId,
@@ -127,8 +129,8 @@ export default function ConsentScreen() {
         consentType,
       });
       setDeliveryState(result.emailStatus);
-    } catch {
-      // Silently ignore resend errors — the user already has a success state
+    } catch (err: unknown) {
+      setResendError(formatApiError(err));
     } finally {
       setResending(false);
     }
@@ -269,6 +271,11 @@ export default function ConsentScreen() {
                 }
                 testID="consent-done"
               />
+              {resendError ? (
+                <Text className="text-sm text-red-400 text-center mt-4 mb-1">
+                  {resendError}
+                </Text>
+              ) : null}
               <View className="flex-row justify-center mt-4">
                 <Button
                   variant="tertiary"

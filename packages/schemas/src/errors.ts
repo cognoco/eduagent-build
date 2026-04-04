@@ -18,6 +18,7 @@ export const ERROR_CODES = {
   CONFLICT: 'CONFLICT',
   GONE: 'GONE',
   NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
+  ENV_VALIDATION_ERROR: 'ENV_VALIDATION_ERROR',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

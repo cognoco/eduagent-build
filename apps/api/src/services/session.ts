@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, desc, inArray, lt, isNotNull } from 'drizzle-orm';
+import { eq, and, asc, desc, inArray, lt, isNotNull, sql } from 'drizzle-orm';
 import {
   learningSessions,
   sessionEvents,
@@ -373,6 +373,26 @@ export async function startSession(
   // Enforce subject lifecycle — only active subjects may start sessions
   if (subject.status !== 'active') {
     throw new SubjectInactiveError(subject.status as 'paused' | 'archived');
+  }
+
+  // BS-04: verify topicId belongs to this subject's curriculum before use.
+  // Without this check, a user who guesses a topicId from another subject
+  // could start a session with a foreign topic.
+  if (input.topicId) {
+    const [topic] = await db
+      .select({ id: curriculumTopics.id })
+      .from(curriculumTopics)
+      .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+      .where(
+        and(
+          eq(curriculumTopics.id, input.topicId),
+          eq(curricula.subjectId, subjectId)
+        )
+      )
+      .limit(1);
+    if (!topic) {
+      throw new Error('Topic not found in this subject');
+    }
   }
 
   const [row] = await db
@@ -848,13 +868,13 @@ async function persistExchangeResult(
     });
   }
 
-  // Update session state
-  const newExchangeCount = session.exchangeCount + 1;
+  // D-03: atomic conditional increment — prevents concurrent requests from
+  // both passing the exchange-limit check and double-incrementing past the cap.
   const now = new Date();
-  await db
+  const [updated] = await db
     .update(learningSessions)
     .set({
-      exchangeCount: newExchangeCount,
+      exchangeCount: sql`${learningSessions.exchangeCount} + 1`,
       escalationRung: effectiveRung,
       lastActivityAt: now,
       updatedAt: now,
@@ -862,12 +882,18 @@ async function persistExchangeResult(
     .where(
       and(
         eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
+        eq(learningSessions.profileId, profileId),
+        lt(learningSessions.exchangeCount, MAX_EXCHANGES_PER_SESSION)
       )
-    );
+    )
+    .returning({ exchangeCount: learningSessions.exchangeCount });
+
+  if (!updated) {
+    throw new SessionExchangeLimitError(session.exchangeCount);
+  }
 
   return {
-    exchangeCount: newExchangeCount,
+    exchangeCount: updated.exchangeCount,
     aiEventId: insertedEvents.find((event) => event.eventType === 'ai_response')
       ?.id,
   };
@@ -1602,7 +1628,8 @@ export async function syncHomeworkState(
     await db.insert(sessionEvents).values(eventsToInsert);
   }
 
-  return { metadata: input.metadata };
+  // BD-04: return enriched metadata with accumulated tracking IDs, not raw input
+  return { metadata: nextHomeworkMetadata };
 }
 
 export async function flagContent(

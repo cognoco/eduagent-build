@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react';
 import { useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
@@ -28,8 +29,26 @@ import Animated, {
 } from 'react-native-reanimated';
 import { tokens } from '../lib/design-tokens';
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const AnimatedPath = Animated.createAnimatedComponent(Path);
+// Wrap in try-catch: on some Android release builds (Hermes + Fabric),
+// Reanimated's native module can fail to initialize, causing
+// createAnimatedComponent to throw. A module-level crash here kills the
+// entire root layout import chain — no error boundary can catch it.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let AnimatedCircle: ComponentType<any>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let AnimatedPath: ComponentType<any>;
+let _splashAnimationAvailable = true;
+try {
+  AnimatedCircle = Animated.createAnimatedComponent(Circle);
+  AnimatedPath = Animated.createAnimatedComponent(Path);
+} catch (e) {
+  _splashAnimationAvailable = false;
+  // Assign plain SVG components as fallback so the rest of the module
+  // evaluates without errors. The component will bail out immediately.
+  AnimatedCircle = Circle as never;
+  AnimatedPath = Path as never;
+  console.error('[AnimatedSplash] createAnimatedComponent failed:', e);
+}
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const ICON_SIZE = Math.min(SCREEN_W * 0.44, 180);
@@ -140,6 +159,14 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
         '[Splash] choreography useEffect fired, reduceMotion=',
         reduceMotion
       );
+
+    // If Reanimated native init failed, skip animation entirely.
+    if (!_splashAnimationAvailable) {
+      if (__DEV__)
+        console.warn('[Splash] Animation unavailable — completing immediately');
+      done();
+      return;
+    }
 
     // Accessibility: skip animation for users who prefer reduced motion
     if (reduceMotion) {

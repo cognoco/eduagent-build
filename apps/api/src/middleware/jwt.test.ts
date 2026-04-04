@@ -148,13 +148,54 @@ describe('verifyJWT', () => {
     e: 'AQAB',
   };
 
+  beforeEach(() => {
+    jest
+      .spyOn(globalThis.crypto.subtle, 'importKey')
+      .mockResolvedValue({} as CryptoKey);
+    jest.spyOn(globalThis.crypto.subtle, 'verify').mockResolvedValue(true);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('throws on token with wrong number of segments', async () => {
     await expect(verifyJWT('only.two', MOCK_JWK)).rejects.toThrow(
       'expected 3 segments'
     );
   });
 
-  // TODO: Full signature verification tests require Web Crypto API mocking
-  // (crypto.subtle.importKey + crypto.subtle.verify). These are best covered
-  // in integration tests running on the Cloudflare Workers runtime.
+  it('rejects tokens missing aud when audience validation is configured', async () => {
+    const token = buildFakeToken(
+      { alg: 'RS256', kid: 'key-1' },
+      {
+        sub: 'user-1',
+        iss: 'https://clerk.dev',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      }
+    );
+
+    await expect(
+      verifyJWT(token, MOCK_JWK, { audience: 'eduagent-api' })
+    ).rejects.toThrow('missing audience claim');
+  });
+
+  it('accepts tokens whose aud matches the configured audience', async () => {
+    const token = buildFakeToken(
+      { alg: 'RS256', kid: 'key-1' },
+      {
+        sub: 'user-1',
+        iss: 'https://clerk.dev',
+        aud: ['eduagent-web', 'eduagent-api'],
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      }
+    );
+
+    await expect(
+      verifyJWT(token, MOCK_JWK, { audience: 'eduagent-api' })
+    ).resolves.toMatchObject({
+      sub: 'user-1',
+      aud: ['eduagent-web', 'eduagent-api'],
+    });
+  });
 });

@@ -67,32 +67,36 @@ export async function addParkingLotItem(
   question: string,
   topicId?: string
 ): Promise<ReturnType<typeof mapRow> | null> {
-  const existing = await db.query.parkingLotItems.findMany({
-    where:
-      topicId != null
-        ? and(
-            eq(parkingLotItems.topicId, topicId),
-            eq(parkingLotItems.profileId, profileId)
-          )
-        : and(
-            eq(parkingLotItems.sessionId, sessionId),
-            eq(parkingLotItems.profileId, profileId)
-          ),
-  });
+  // D-04: wrap count check + insert in a transaction to prevent concurrent
+  // POSTs from exceeding the per-topic limit (TOCTOU race).
+  return db.transaction(async (tx) => {
+    const existing = await tx.query.parkingLotItems.findMany({
+      where:
+        topicId != null
+          ? and(
+              eq(parkingLotItems.topicId, topicId),
+              eq(parkingLotItems.profileId, profileId)
+            )
+          : and(
+              eq(parkingLotItems.sessionId, sessionId),
+              eq(parkingLotItems.profileId, profileId)
+            ),
+    });
 
-  if (existing.length >= MAX_ITEMS_PER_TOPIC) {
-    return null;
-  }
+    if (existing.length >= MAX_ITEMS_PER_TOPIC) {
+      return null;
+    }
 
-  const [row] = await db
-    .insert(parkingLotItems)
-    .values({
-      sessionId,
-      profileId,
-      topicId: topicId ?? null,
-      question,
-    })
-    .returning();
+    const [row] = await tx
+      .insert(parkingLotItems)
+      .values({
+        sessionId,
+        profileId,
+        topicId: topicId ?? null,
+        question,
+      })
+      .returning();
 
-  return mapRow(row!);
+    return mapRow(row!);
+  }) as Promise<ReturnType<typeof mapRow> | null>;
 }

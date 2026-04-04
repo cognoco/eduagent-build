@@ -613,7 +613,6 @@ export default function LearnerLayout() {
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
   const {
-    profiles,
     activeProfile,
     isLoading: isProfileLoading,
     profileWasRemoved,
@@ -675,16 +674,10 @@ export default function LearnerLayout() {
   // No profile exists — show gate that pushes to profile creation modal
   if (!activeProfile) return <CreateProfileGate />;
 
-  // Redirect parent accounts (account owners with linked child profiles) to
-  // the parent dashboard. Without this layout-level guard, deep links or
-  // programmatic navigation into /(learner)/library, /session, etc. would
-  // bypass the home-screen ParentGateway check.
-  if (
-    activeProfile.isOwner &&
-    profiles.some((p) => p.id !== activeProfile.id && !p.isOwner)
-  ) {
-    return <Redirect href="/(parent)/dashboard" />;
-  }
+  // Linked-parent accounts intentionally enter through /(learner)/home now.
+  // home.tsx renders ParentGateway for owners with child profiles and routes
+  // them to /(parent)/dashboard only when they explicitly choose progress
+  // management. That keeps the adaptive home flow reachable.
 
   // Gate: block app access when parental consent is pending (COPPA/GDPR)
   if (

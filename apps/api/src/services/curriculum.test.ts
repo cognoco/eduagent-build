@@ -407,7 +407,8 @@ describe('addCurriculumTopic', () => {
     const insertedValues = (db.insert as jest.Mock).mock.results[0].value.values
       .mock.calls[0][0];
     expect(insertedValues.source).toBe('user');
-    expect(insertedValues.sortOrder).toBe(5);
+    // BD-08: sortOrder is now a SQL expression (atomic COALESCE), not a JS number
+    expect(insertedValues.sortOrder).toBeDefined();
   });
 
   it('throws when subject not found', async () => {

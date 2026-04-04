@@ -1569,7 +1569,15 @@ export async function activateSubscriptionFromRevenuecat(
 ): Promise<SubscriptionRow> {
   const existing = await getSubscriptionByAccountId(db, accountId);
   const tierConfig = getTierConfig(tier);
-  const status = options?.isTrial ? 'trial' : 'active';
+  const isTrial = options?.isTrial ?? false;
+  const trialEndsAt = options?.trialEndsAt;
+
+  // BD-03: enforce trialEndsAt when isTrial is true
+  if (isTrial && !trialEndsAt) {
+    throw new Error('trialEndsAt is required when isTrial is true');
+  }
+
+  const status = isTrial ? 'trial' : 'active';
 
   if (!existing) {
     // Create new subscription + quota pool
@@ -1627,9 +1635,8 @@ export async function activateSubscriptionFromRevenuecat(
   if (options?.currentPeriodEnd) {
     setValues.currentPeriodEnd = new Date(options.currentPeriodEnd);
   }
-  if (options?.trialEndsAt) {
-    setValues.trialEndsAt = new Date(options.trialEndsAt);
-  }
+  // BD-02: explicitly clear trialEndsAt on non-trial re-activation
+  setValues.trialEndsAt = isTrial && trialEndsAt ? new Date(trialEndsAt) : null;
 
   const [updated] = await db
     .update(subscriptions)

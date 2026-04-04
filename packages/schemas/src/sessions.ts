@@ -111,7 +111,7 @@ export const homeworkSessionMetadataSchema = z
     problems: z.array(homeworkProblemSchema),
     ocrText: z.string().optional(),
   })
-  .passthrough();
+  .strip();
 export type HomeworkSessionMetadata = z.infer<
   typeof homeworkSessionMetadataSchema
 >;
@@ -132,7 +132,7 @@ export const sessionMetadataSchema = z
     homework: homeworkSessionMetadataSchema.optional(),
     homeworkSummary: homeworkSummarySchema.optional(),
   })
-  .passthrough();
+  .strip();
 export type SessionMetadata = z.infer<typeof sessionMetadataSchema>;
 
 export const sessionStartSchema = z.object({

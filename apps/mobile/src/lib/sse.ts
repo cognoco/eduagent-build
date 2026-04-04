@@ -26,6 +26,18 @@ export interface StreamDoneEvent {
 
 export type StreamEvent = StreamChunkEvent | StreamDoneEvent;
 
+/** BC-07: runtime validation for SSE events — verifies required fields exist
+ * before casting, preventing malformed events from corrupting accumulated text. */
+function isValidStreamEvent(obj: Record<string, unknown>): boolean {
+  if (obj.type === 'chunk') return typeof obj.content === 'string';
+  if (obj.type === 'done')
+    return (
+      typeof obj.exchangeCount === 'number' &&
+      typeof obj.escalationRung === 'number'
+    );
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // ReadableStream-based parser (Node.js / browsers / tests)
 // ---------------------------------------------------------------------------
@@ -70,7 +82,8 @@ export async function* parseSSEStream(
           if (
             typeof parsed === 'object' &&
             parsed !== null &&
-            'type' in parsed
+            'type' in parsed &&
+            isValidStreamEvent(parsed as Record<string, unknown>)
           ) {
             yield parsed as StreamEvent;
           }
@@ -110,7 +123,12 @@ function parseSSEBuffer(
 
     try {
       const parsed: unknown = JSON.parse(data);
-      if (typeof parsed === 'object' && parsed !== null && 'type' in parsed) {
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        'type' in parsed &&
+        isValidStreamEvent(parsed as Record<string, unknown>)
+      ) {
         queue.push(parsed as StreamEvent);
       }
     } catch {

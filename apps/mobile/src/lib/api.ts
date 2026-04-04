@@ -29,5 +29,6 @@ export function getApiUrl(): string {
     }) as string;
   }
 
-  return 'https://api-stg.mentomate.com';
+  // BS-08: fail fast in production instead of silently hitting staging
+  throw new Error('EXPO_PUBLIC_API_URL is required in production builds');
 }

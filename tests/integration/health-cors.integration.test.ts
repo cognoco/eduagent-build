@@ -120,7 +120,7 @@ describe('Integration: CORS middleware', () => {
         },
       });
 
-      expect(res.headers.get('Access-Control-Allow-Origin')).not.toBe(origin);
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
     });
 
     it('returns all required Allow-Methods', async () => {

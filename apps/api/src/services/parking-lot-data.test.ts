@@ -35,7 +35,7 @@ function mockParkingLotRow(
 }
 
 function createMockDb(): Database {
-  return {
+  const db = {
     query: {
       parkingLotItems: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -46,7 +46,12 @@ function createMockDb(): Database {
         returning: jest.fn().mockResolvedValue([mockParkingLotRow()]),
       }),
     }),
+    // D-04: addParkingLotItem now wraps count+insert in a transaction
+    transaction: jest
+      .fn()
+      .mockImplementation((cb: (tx: unknown) => unknown) => cb(db)),
   } as unknown as Database;
+  return db;
 }
 
 beforeEach(() => {
@@ -219,7 +224,10 @@ describe('addParkingLotItem', () => {
 
   it('enforces the limit per topic when topicId is provided', async () => {
     const existingRows = Array.from({ length: 10 }, (_, i) => ({
-      ...mockParkingLotRow({ id: `topic-item-${i}`, question: `Question ${i}` }),
+      ...mockParkingLotRow({
+        id: `topic-item-${i}`,
+        question: `Question ${i}`,
+      }),
       topicId,
     }));
 

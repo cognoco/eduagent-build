@@ -21,7 +21,7 @@ const profileCreateFields = z.object({
   displayName: z.string().min(1).max(50),
   birthDate: z.string().date().optional(),
   birthYear: birthYearSchema.optional(),
-  personaType: personaTypeSchema.default('LEARNER'),
+  personaType: personaTypeSchema.optional(),
   avatarUrl: z.string().url().optional(),
   location: locationSchema.optional(),
 });

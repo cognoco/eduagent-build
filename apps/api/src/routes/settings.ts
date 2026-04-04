@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import {
   notificationPrefsSchema,
@@ -27,6 +28,7 @@ import {
   setAnalogyDomain,
   setNativeLanguage,
 } from '../services/retention-data';
+import { notFound, NotFoundError } from '../errors';
 
 type SettingsRouteEnv = {
   Bindings: {
@@ -42,6 +44,10 @@ type SettingsRouteEnv = {
     profileId: string | undefined;
   };
 };
+
+const subjectParamSchema = z.object({
+  subjectId: z.string().uuid(),
+});
 
 export const settingsRoutes = new Hono<SettingsRouteEnv>()
   // Get notification preferences
@@ -139,53 +145,79 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
   })
 
   // Get analogy domain preference for a subject (FR134-137)
-  .get('/settings/subjects/:subjectId/analogy-domain', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const subjectId = c.req.param('subjectId');
-    const analogyDomain = await getAnalogyDomain(db, profileId, subjectId);
-    return c.json({ analogyDomain });
-  })
+  .get(
+    '/settings/subjects/:subjectId/analogy-domain',
+    zValidator('param', subjectParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId } = c.req.valid('param');
+      const analogyDomain = await getAnalogyDomain(db, profileId, subjectId);
+      return c.json({ analogyDomain });
+    }
+  )
 
   // Update analogy domain preference for a subject (FR134-137)
   .put(
     '/settings/subjects/:subjectId/analogy-domain',
+    zValidator('param', subjectParamSchema),
     zValidator('json', analogyDomainUpdateSchema),
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const subjectId = c.req.param('subjectId');
+      const { subjectId } = c.req.valid('param');
       const body = c.req.valid('json');
-      const analogyDomain = await setAnalogyDomain(
-        db,
-        profileId,
-        subjectId,
-        body.analogyDomain
-      );
-      return c.json({ analogyDomain });
+
+      try {
+        const analogyDomain = await setAnalogyDomain(
+          db,
+          profileId,
+          subjectId,
+          body.analogyDomain
+        );
+        return c.json({ analogyDomain });
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
+        }
+        throw error;
+      }
     }
   )
-  .get('/settings/subjects/:subjectId/native-language', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const subjectId = c.req.param('subjectId');
-    const nativeLanguage = await getNativeLanguage(db, profileId, subjectId);
-    return c.json({ nativeLanguage });
-  })
+  .get(
+    '/settings/subjects/:subjectId/native-language',
+    zValidator('param', subjectParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId } = c.req.valid('param');
+      const nativeLanguage = await getNativeLanguage(db, profileId, subjectId);
+      return c.json({ nativeLanguage });
+    }
+  )
   .put(
     '/settings/subjects/:subjectId/native-language',
+    zValidator('param', subjectParamSchema),
     zValidator('json', nativeLanguageUpdateSchema),
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const subjectId = c.req.param('subjectId');
+      const { subjectId } = c.req.valid('param');
       const body = c.req.valid('json');
-      const nativeLanguage = await setNativeLanguage(
-        db,
-        profileId,
-        subjectId,
-        body.nativeLanguage
-      );
-      return c.json({ nativeLanguage });
+
+      try {
+        const nativeLanguage = await setNativeLanguage(
+          db,
+          profileId,
+          subjectId,
+          body.nativeLanguage
+        );
+        return c.json({ nativeLanguage });
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
+        }
+        throw error;
+      }
     }
   );

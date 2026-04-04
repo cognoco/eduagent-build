@@ -167,7 +167,11 @@ export const sessionCompleted = inngest.createFunction(
     const verificationCompletionOutcome = await step.run(
       'process-verification-completion',
       async () => {
-        const vType = verificationType as string | null | undefined;
+        // C-05: validate verificationType at runtime instead of unsafe cast.
+        // If a new verification type is added, this explicitly skips it
+        // rather than silently passing through.
+        const vType =
+          typeof verificationType === 'string' ? verificationType : null;
         if (!vType || (vType !== 'evaluate' && vType !== 'teach_back')) {
           return {
             step: 'process-verification-completion',
@@ -522,7 +526,8 @@ export const sessionCompleted = inngest.createFunction(
           const db = getStepDatabase();
           const quality = completionQualityRating;
           const currentTopicId = topicId as string | null | undefined;
-          const currentVerification = verificationType as string | undefined;
+          const currentVerification =
+            typeof verificationType === 'string' ? verificationType : undefined;
 
           if (currentVerification === 'evaluate' && (quality ?? 0) >= 4) {
             await queueCelebration(

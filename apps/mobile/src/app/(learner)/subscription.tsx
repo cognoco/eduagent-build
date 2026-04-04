@@ -15,7 +15,6 @@ import * as SecureStore from 'expo-secure-store';
 import { migrateSecureStoreKey } from '../../lib/migrate-secure-store-key';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import Purchases from 'react-native-purchases';
 import type {
   PurchasesPackage,
   PurchasesOffering,
@@ -604,9 +603,12 @@ export default function SubscriptionScreen() {
       return;
     }
 
+    // BC-02: use the usePurchase() hook instead of direct SDK call so that
+    // TanStack Query loading/error state is managed and customerInfo cache
+    // is automatically invalidated on success.
     setTopUpPurchasing(true);
     try {
-      await Purchases.purchasePackage(topUpPkg);
+      await purchase.mutateAsync(topUpPkg);
     } catch (error: unknown) {
       setTopUpPurchasing(false);
       if (isPurchaseCancelledError(error)) return;

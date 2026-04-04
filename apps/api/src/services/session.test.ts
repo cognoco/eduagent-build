@@ -162,10 +162,15 @@ function mockSelectChain(result: unknown[] = []): {
   const whereReturn = Object.assign(Promise.resolve(result), {
     limit: jest.fn().mockResolvedValue(result),
   });
+  const whereObj = {
+    where: jest.fn().mockReturnValue(whereReturn),
+  };
+  // Support both from().where() and from().innerJoin().where() chains
+  const fromReturn = Object.assign(whereObj, {
+    innerJoin: jest.fn().mockReturnValue(whereObj),
+  });
   return {
-    from: jest.fn().mockReturnValue({
-      where: jest.fn().mockReturnValue(whereReturn),
-    }),
+    from: jest.fn().mockReturnValue(fromReturn),
   };
 }
 
@@ -182,6 +187,9 @@ function createMockDb({
   }>,
   selectResults = [] as unknown[][],
   learningSessionFindFirst = mockSessionRow(),
+  updateReturning = [
+    { exchangeCount: (learningSessionFindFirst?.exchangeCount ?? 0) + 1 },
+  ],
 } = {}): Database {
   const selectMock = jest.fn();
   for (const result of selectResults) {
@@ -198,7 +206,9 @@ function createMockDb({
     }),
     update: jest.fn().mockReturnValue({
       set: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(undefined),
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue(updateReturning),
+        }),
       }),
     }),
     select: selectMock,
@@ -398,7 +408,11 @@ describe('startSession', () => {
   it('uses topicId from input when provided', async () => {
     const topicId = '770e8400-e29b-41d4-a716-446655440000';
     const row = mockSessionRow({ topicId });
-    const db = createMockDb({ insertReturning: [row] });
+    const db = createMockDb({
+      insertReturning: [row],
+      // BS-04: topicId validation does a select to verify topic belongs to subject
+      selectResults: [[{ id: topicId }]],
+    });
     const result = await startSession(db, profileId, subjectId, {
       subjectId,
       topicId,
@@ -694,7 +708,9 @@ describe('processMessage', () => {
     setupScopedRepo({
       sessionFindFirst: mockSessionRow({ exchangeCount: 3 }),
     });
-    const db = createMockDb();
+    const db = createMockDb({
+      updateReturning: [{ exchangeCount: 4 }],
+    });
     const result = await processMessage(db, profileId, sessionId, {
       message: 'Continue',
     });

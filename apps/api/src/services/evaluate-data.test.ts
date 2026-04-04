@@ -52,6 +52,11 @@ function createMockDb(overrides?: {
           .fn()
           .mockResolvedValue(overrides?.queryResults?.topic ?? null),
       },
+      sessionEvents: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue(overrides?.queryResults?.sessionEvents ?? []),
+      },
     },
     update: updateMock,
   } as unknown as Database;
@@ -188,34 +193,34 @@ describe('advanceEvaluateRung', () => {
   });
 
   it('advances rung from 1 to 2', async () => {
-    const db = createMockDb({
-      queryResults: {
-        retentionCard: {
-          id: 'card-1',
-          topicId,
-          profileId,
-          evaluateDifficultyRung: 1,
-        },
+    createMockRepo({
+      retentionCard: {
+        id: 'card-1',
+        topicId,
+        profileId,
+        evaluateDifficultyRung: 1,
       },
     });
+    const db = createMockDb();
 
     const result = await advanceEvaluateRung(db, profileId, topicId);
 
     expect(result).toBe(2);
+    expect(createScopedRepository).toHaveBeenCalledWith(db, profileId);
     expect(db.update).toHaveBeenCalled();
+    expect(db.query.retentionCards.findFirst).not.toHaveBeenCalled();
   });
 
   it('caps rung at 4', async () => {
-    const db = createMockDb({
-      queryResults: {
-        retentionCard: {
-          id: 'card-1',
-          topicId,
-          profileId,
-          evaluateDifficultyRung: 4,
-        },
+    createMockRepo({
+      retentionCard: {
+        id: 'card-1',
+        topicId,
+        profileId,
+        evaluateDifficultyRung: 4,
       },
     });
+    const db = createMockDb();
 
     const result = await advanceEvaluateRung(db, profileId, topicId);
 
@@ -223,6 +228,7 @@ describe('advanceEvaluateRung', () => {
   });
 
   it('returns 1 when no card exists', async () => {
+    createMockRepo({ retentionCard: null });
     const db = createMockDb();
 
     const result = await advanceEvaluateRung(db, profileId, topicId);
@@ -242,16 +248,15 @@ describe('processEvaluateFailureEscalation', () => {
   });
 
   it('reveals flaw on first failure', async () => {
-    const db = createMockDb({
-      queryResults: {
-        retentionCard: {
-          id: 'card-1',
-          topicId,
-          profileId,
-          evaluateDifficultyRung: 3,
-        },
+    createMockRepo({
+      retentionCard: {
+        id: 'card-1',
+        topicId,
+        profileId,
+        evaluateDifficultyRung: 3,
       },
     });
+    const db = createMockDb();
     (handleEvaluateFailure as jest.Mock).mockReturnValue({
       action: 'reveal_flaw',
       message: 'Let me show you the flaw.',
@@ -269,16 +274,15 @@ describe('processEvaluateFailureEscalation', () => {
   });
 
   it('lowers difficulty rung on second failure', async () => {
-    const db = createMockDb({
-      queryResults: {
-        retentionCard: {
-          id: 'card-1',
-          topicId,
-          profileId,
-          evaluateDifficultyRung: 3,
-        },
+    createMockRepo({
+      retentionCard: {
+        id: 'card-1',
+        topicId,
+        profileId,
+        evaluateDifficultyRung: 3,
       },
     });
+    const db = createMockDb();
     (handleEvaluateFailure as jest.Mock).mockReturnValue({
       action: 'lower_difficulty',
       message: 'Lowering difficulty.',
@@ -299,16 +303,15 @@ describe('processEvaluateFailureEscalation', () => {
   });
 
   it('resets rung to 1 on exit_to_standard', async () => {
-    const db = createMockDb({
-      queryResults: {
-        retentionCard: {
-          id: 'card-1',
-          topicId,
-          profileId,
-          evaluateDifficultyRung: 3,
-        },
+    createMockRepo({
+      retentionCard: {
+        id: 'card-1',
+        topicId,
+        profileId,
+        evaluateDifficultyRung: 3,
       },
     });
+    const db = createMockDb();
     (handleEvaluateFailure as jest.Mock).mockReturnValue({
       action: 'exit_to_standard',
       message: 'Exit to standard review.',
@@ -320,6 +323,7 @@ describe('processEvaluateFailureEscalation', () => {
   });
 
   it('handles missing retention card gracefully', async () => {
+    createMockRepo({ retentionCard: null });
     const db = createMockDb();
     (handleEvaluateFailure as jest.Mock).mockReturnValue({
       action: 'reveal_flaw',
@@ -373,22 +377,19 @@ describe('getEvaluateSessionState', () => {
 
   it('returns evaluate state for evaluate session', async () => {
     createMockRepo({
+      retentionCard: {
+        id: 'card-1',
+        topicId,
+        profileId,
+        evaluateDifficultyRung: 3,
+      },
       session: {
         id: sessionId,
         verificationType: 'evaluate',
         topicId,
       },
     });
-    const db = createMockDb({
-      queryResults: {
-        retentionCard: {
-          id: 'card-1',
-          topicId,
-          profileId,
-          evaluateDifficultyRung: 3,
-        },
-      },
-    });
+    const db = createMockDb();
 
     const result = await getEvaluateSessionState(db, profileId, sessionId);
 
@@ -403,22 +404,19 @@ describe('getEvaluateSessionState', () => {
 
   it('defaults difficulty rung to 1 when null on card', async () => {
     createMockRepo({
+      retentionCard: {
+        id: 'card-1',
+        topicId,
+        profileId,
+        evaluateDifficultyRung: null,
+      },
       session: {
         id: sessionId,
         verificationType: 'evaluate',
         topicId,
       },
     });
-    const db = createMockDb({
-      queryResults: {
-        retentionCard: {
-          id: 'card-1',
-          topicId,
-          profileId,
-          evaluateDifficultyRung: null,
-        },
-      },
-    });
+    const db = createMockDb();
 
     const result = await getEvaluateSessionState(db, profileId, sessionId);
 
