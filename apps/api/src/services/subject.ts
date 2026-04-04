@@ -77,6 +77,9 @@ export interface CreatedSubjectWithStructure {
   subject: Subject;
   structureType: SubjectStructureType;
   bookCount?: number;
+  topicCount?: number;
+  /** True when LLM classification failed and we fell back to narrow */
+  classificationFailed?: boolean;
 }
 
 export async function createSubjectWithStructure(
@@ -117,6 +120,7 @@ export async function createSubjectWithStructure(
     return {
       subject,
       structureType: 'narrow',
+      topicCount: structure.topics.length,
     };
   } catch (error) {
     console.warn(
@@ -128,6 +132,7 @@ export async function createSubjectWithStructure(
   return {
     subject,
     structureType: 'narrow',
+    classificationFailed: true,
   };
 }
 

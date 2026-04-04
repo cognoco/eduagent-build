@@ -88,8 +88,27 @@ export async function processEvaluateCompletion(
   // Handle three-strike escalation for failures
   let newRung = currentRung;
   if (!assessment.challengePassed) {
-    // Count consecutive EVALUATE failures from session events
-    const failureAction = handleEvaluateFailure(1, currentRung);
+    // Count consecutive EVALUATE failures from prior events in this session.
+    // events[0] is the most recent (current); walk backward counting failures.
+    let consecutiveFailures = 1; // Current failure counts as 1
+    for (let i = 1; i < events.length; i++) {
+      const evt = events[i];
+      if (!evt) break;
+      const sa = evt.structuredAssessment as
+        | Record<string, unknown>
+        | null
+        | undefined;
+      if (sa && sa.type === 'evaluate' && sa.challengePassed === false) {
+        consecutiveFailures++;
+      } else {
+        break; // Stop at first non-failure (consecutive = unbroken)
+      }
+    }
+
+    const failureAction = handleEvaluateFailure(
+      consecutiveFailures,
+      currentRung
+    );
 
     if (
       failureAction.action === 'lower_difficulty' &&

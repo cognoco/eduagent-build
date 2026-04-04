@@ -13,6 +13,8 @@ import {
   getAssessment,
   updateAssessment,
 } from '../services/assessments';
+import { updateRetentionFromSession } from '../services/retention-data';
+import { insertSessionXpEntry } from '../services/xp';
 import { getSession } from '../services/session';
 import { notFound } from '../errors';
 
@@ -97,6 +99,28 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
         qualityRating: evaluation.qualityRating,
         exchangeHistory: updatedHistory,
       });
+
+      // Wire passed standalone assessments into the retention lifecycle (Epic 3)
+      // Ensures assessment-only topics get SM-2 retention cards + XP tracking.
+      if (
+        newStatus === 'passed' &&
+        evaluation.qualityRating != null &&
+        assessment.topicId &&
+        assessment.subjectId
+      ) {
+        await updateRetentionFromSession(
+          db,
+          profileId,
+          assessment.topicId,
+          evaluation.qualityRating
+        );
+        await insertSessionXpEntry(
+          db,
+          profileId,
+          assessment.topicId,
+          assessment.subjectId
+        );
+      }
 
       return c.json({ evaluation });
     }

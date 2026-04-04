@@ -6,7 +6,7 @@
 
 ## Story
 
-**As** an account owner, **I want** to enable email-based two-factor authentication and change my password from the settings screen, **so that** my account is protected and I can manage my credentials.
+**As** an account owner, **I want** to enable email verification on sign-in and change my password from the settings screen, **so that** my account is protected and I can manage my credentials.
 
 ## Scope
 
@@ -17,15 +17,15 @@
 
 ### In Scope
 
-- Email-based 2FA toggle (enable/disable)
+- Email verification toggle on sign-in (enable/disable) — note: this is Clerk's email verification step, not a true 2FA method
 - Password change form (current + new + confirm)
 - "Forgot your password?" escape hatch (signs out, redirects to reset flow)
 - SSO detection and appropriate messaging
 
 ### Out of Scope
 
-- TOTP / authenticator app 2FA
-- SMS / phone-based 2FA
+- True 2FA via TOTP / authenticator app (Clerk supports this but deferred — parents unlikely to have authenticator apps)
+- True 2FA via SMS / phone-based OTP (Clerk supports this but deferred)
 - Backup code management
 - Server-side audit logging of 2FA events
 - Adding a password for SSO-only users (`user.createPassword()` — future enhancement)
@@ -150,14 +150,16 @@ No new dependencies needed. Everything uses existing Clerk SDK + existing UI com
 
 ## Acceptance Criteria
 
-### Email 2FA
+### Email Verification on Sign-In
+
+> **Important:** Clerk does not support email as a true 2FA method. The toggle below controls Clerk's email verification step on sign-in — an additional verification prompt, not a second authentication factor. The UI labels this "Email Verification" (not "2FA") to avoid misleading users.
 
 - [ ] AC-1: Account Security section only visible when current profile is the account owner
-- [ ] AC-2: Toggle shows current 2FA status (ON/OFF) based on Clerk user state
-- [ ] AC-3: Toggle OFF → ON: sends email verification code, user enters code, 2FA activates
-- [ ] AC-4: Canceling mid-enable keeps 2FA OFF
-- [ ] AC-5: Toggle ON → OFF: confirmation dialog, confirm disables 2FA
-- [ ] AC-6: Canceling disable dialog keeps 2FA ON
+- [ ] AC-2: Toggle shows current email verification status (ON/OFF) based on Clerk user state
+- [ ] AC-3: Toggle OFF → ON: initiates Clerk's email verification enrollment flow (prepareEmailAddressVerification + attemptEmailAddressVerification), user enters code, email verification activates on sign-in
+- [ ] AC-4: Canceling mid-enable keeps email verification OFF
+- [ ] AC-5: Toggle ON → OFF: confirmation dialog ("Turn off email verification? You'll only need your password to sign in."), confirm disables email verification
+- [ ] AC-6: Canceling disable dialog keeps email verification ON
 
 ### Password Change
 
@@ -197,4 +199,4 @@ No new dependencies needed. Everything uses existing Clerk SDK + existing UI com
 | No verification to disable 2FA | User requested simple toggle; email fallback exists for recovery |
 | "Forgot password?" signs out | Only way to access Clerk's password reset is from the sign-in screen |
 | SSO users see info message only | SSO security is managed by the OAuth provider, not our app |
-| Email 2FA over TOTP | Target audience (parents) may not have authenticator apps; email is universal |
+| Email verification over TOTP | Target audience (parents) may not have authenticator apps; email is universal. Note: this is Clerk's email verification on sign-in, not a true 2FA method |

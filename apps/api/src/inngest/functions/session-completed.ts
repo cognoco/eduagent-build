@@ -268,7 +268,8 @@ export const sessionCompleted = inngest.createFunction(
     );
 
     // Step 3: Update dashboard — streaks + XP
-    // Capture streak result to avoid re-querying in the celebrations step (race condition fix)
+    // FR86: Only count toward Honest Streak when recall quality >= 3 (pass)
+    // XP insertion still runs for any completed session.
     let updatedStreak: { currentStreak: number; longestStreak: number } | null =
       null;
     outcomes.push(
@@ -282,7 +283,13 @@ export const sessionCompleted = inngest.createFunction(
               ? new Date(timestamp).toISOString().slice(0, 10)
               : new Date().toISOString().slice(0, 10);
 
-            updatedStreak = await recordSessionActivity(db, profileId, today);
+            // Gate: Only increment streak on recall-pass (quality >= 3)
+            if (
+              completionQualityRating != null &&
+              completionQualityRating >= 3
+            ) {
+              updatedStreak = await recordSessionActivity(db, profileId, today);
+            }
 
             await insertSessionXpEntry(
               db,

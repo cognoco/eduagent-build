@@ -88,6 +88,7 @@ jest.mock('../services/curriculum', () => ({
   getBooks: jest.fn().mockResolvedValue([]),
   getBookWithTopics: jest.fn().mockResolvedValue(null),
   persistBookTopics: jest.fn().mockResolvedValue(mockBookWithTopics),
+  claimBookForGeneration: jest.fn().mockResolvedValue(null),
 }));
 
 jest.mock('../services/book-generation', () => ({
@@ -121,12 +122,18 @@ jest.mock('../inngest/client', () => ({
 // ---------------------------------------------------------------------------
 
 import { app } from '../index';
-import { getBooks, getBookWithTopics } from '../services/curriculum';
+import {
+  getBooks,
+  getBookWithTopics,
+  claimBookForGeneration,
+} from '../services/curriculum';
 
 const mockGetBooks = getBooks as jest.MockedFunction<typeof getBooks>;
 const mockGetBookWithTopics = getBookWithTopics as jest.MockedFunction<
   typeof getBookWithTopics
 >;
+const mockClaimBookForGeneration =
+  claimBookForGeneration as jest.MockedFunction<typeof claimBookForGeneration>;
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
@@ -252,7 +259,11 @@ describe('book routes', () => {
 
   describe('POST /v1/subjects/:subjectId/books/:bookId/generate-topics', () => {
     it('generates topics for an unbuilt book', async () => {
-      mockGetBooks.mockResolvedValueOnce([mockBook as never]);
+      mockClaimBookForGeneration.mockResolvedValueOnce({
+        id: BOOK_ID,
+        title: 'Ancient Egypt',
+        description: 'Explore pyramids and pharaohs',
+      });
 
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
@@ -271,8 +282,8 @@ describe('book routes', () => {
     });
 
     it('returns existing topics for already-generated book', async () => {
-      const generatedBook = { ...mockBook, topicsGenerated: true };
-      mockGetBooks.mockResolvedValueOnce([generatedBook as never]);
+      // CAS returns null — another request already claimed it
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
       mockGetBookWithTopics.mockResolvedValueOnce(mockBookWithTopics as never);
 
       const res = await app.request(
@@ -291,7 +302,11 @@ describe('book routes', () => {
     });
 
     it('passes prior knowledge to generation', async () => {
-      mockGetBooks.mockResolvedValueOnce([mockBook as never]);
+      mockClaimBookForGeneration.mockResolvedValueOnce({
+        id: BOOK_ID,
+        title: 'Ancient Egypt',
+        description: 'Explore pyramids and pharaohs',
+      });
 
       const { generateBookTopics } = jest.requireMock(
         '../services/book-generation'
@@ -319,7 +334,9 @@ describe('book routes', () => {
     });
 
     it('returns 404 when book not found in subject', async () => {
-      mockGetBooks.mockResolvedValueOnce([]);
+      // CAS returns null (no matching row), getBookWithTopics also returns null
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockGetBookWithTopics.mockResolvedValueOnce(null);
 
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,

@@ -346,10 +346,7 @@ export function useSessionTranscript(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const transcriptClient = (
-          client.sessions[':sessionId'] as Record<string, any>
-        )['transcript'];
-        const res = await transcriptClient.$get({
+        const res = await client.sessions[':sessionId'].transcript.$get({
           param: { sessionId },
           init: { signal },
         } as never);
@@ -380,10 +377,7 @@ export function useRecordSystemPrompt(
       content: string;
       metadata?: Record<string, unknown>;
     }) => {
-      const systemPromptClient = (
-        client.sessions[':sessionId'] as Record<string, any>
-      )['system-prompt'];
-      const res = await systemPromptClient.$post({
+      const res = await client.sessions[':sessionId']['system-prompt'].$post({
         param: { sessionId },
         json: { content, metadata },
       });
@@ -400,10 +394,7 @@ export function useRecordSessionEvent(
 
   return useMutation({
     mutationFn: async (input: SessionAnalyticsEventInput) => {
-      const eventClient = (
-        client.sessions[':sessionId'] as Record<string, any>
-      )['events'];
-      const res = await eventClient.$post({
+      const res = await client.sessions[':sessionId'].events.$post({
         param: { sessionId },
         json: input,
       });
@@ -441,13 +432,10 @@ export function useParkingLot(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const parkingLotClient = (
-          client.sessions[':sessionId'] as Record<string, any>
-        )['parking-lot'];
-        const res = await parkingLotClient.$get({
+        const res = await client.sessions[':sessionId']['parking-lot'].$get({
           param: { sessionId },
           init: { signal },
-        });
+        } as never);
         await assertOk(res);
         const data = (await res.json()) as { items: ParkingLotItem[] };
         return data.items;
@@ -471,15 +459,12 @@ export function useTopicParkingLot(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const subjectClient = client.subjects[':subjectId'] as Record<
-          string,
-          any
-        >;
-        const topicClient = subjectClient.topics[':topicId']['parking-lot'];
-        const res = await topicClient.$get({
+        const res = await client.subjects[':subjectId'].topics[':topicId'][
+          'parking-lot'
+        ].$get({
           param: { subjectId, topicId },
           init: { signal },
-        });
+        } as never);
         await assertOk(res);
         const data = (await res.json()) as { items: ParkingLotItem[] };
         return data.items;
@@ -499,10 +484,7 @@ export function useAddParkingLotItem(
 
   return useMutation({
     mutationFn: async (input: { question: string }) => {
-      const parkingLotClient = (
-        client.sessions[':sessionId'] as Record<string, any>
-      )['parking-lot'];
-      const res = await parkingLotClient.$post({
+      const res = await client.sessions[':sessionId']['parking-lot'].$post({
         param: { sessionId },
         json: input,
       });
@@ -574,10 +556,7 @@ export function useSkipSummary(
 
   return useMutation({
     mutationFn: async () => {
-      const summaryClient = (
-        client.sessions[':sessionId'] as Record<string, any>
-      )['summary'];
-      const res = await summaryClient.skip.$post({
+      const res = await client.sessions[':sessionId'].summary.skip.$post({
         param: { sessionId },
       });
       await assertOk(res);
@@ -598,10 +577,7 @@ export function useRecallBridge(
 
   return useMutation({
     mutationFn: async (): Promise<RecallBridgeResult> => {
-      const recallBridgeClient = (
-        client.sessions[':sessionId'] as Record<string, any>
-      )['recall-bridge'];
-      const res = await recallBridgeClient.$post({
+      const res = await client.sessions[':sessionId']['recall-bridge'].$post({
         param: { sessionId },
       });
       await assertOk(res);

@@ -10,6 +10,7 @@ import {
   getBooks,
   getBookWithTopics,
   persistBookTopics,
+  claimBookForGeneration,
 } from '../services/curriculum';
 import { generateBookTopics } from '../services/book-generation';
 import { getProfileAge } from '../services/profile';
@@ -86,13 +87,17 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
       const { priorKnowledge } = c.req.valid('json');
 
       try {
-        const books = await getBooks(db, profileId, subjectId);
-        const book = books.find((entry) => entry.id === bookId);
-        if (!book) {
-          return notFound(c, 'Book not found');
-        }
+        // Atomic CAS: only one concurrent request wins the right to generate.
+        // claimBookForGeneration sets topicsGenerated = true WHERE it's still false.
+        const claimed = await claimBookForGeneration(
+          db,
+          profileId,
+          subjectId,
+          bookId
+        );
 
-        if (book.topicsGenerated) {
+        if (!claimed) {
+          // Another request already claimed this book — return existing topics
           const existing = await getBookWithTopics(
             db,
             profileId,
@@ -108,8 +113,8 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
         const learnerAge = await getProfileAge(db, profileId);
 
         const generated = await generateBookTopics(
-          book.title,
-          book.description ?? '',
+          claimed.title,
+          claimed.description ?? '',
           learnerAge,
           priorKnowledge
         );

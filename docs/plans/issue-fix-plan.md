@@ -4,7 +4,7 @@
 
 **Goal:** Fix 27 open bugs surfaced from closed-PR code reviews — covering API data integrity, CI/CD security, SSE error handling, home-cards cache corruption, mobile logic gaps, and type safety.
 
-**Status:** COMPLETE — 17 fixed, 3 false positives, 3 no-change-needed, 4 deferred. Branch `fix/pr-review-bugfixes` (4 commits).
+**Status:** ALL RESOLVED — 21 fixed, 3 false positives, 3 no-change-needed. Previously deferred bugs #1, #14, #25, #27 now fixed on branch `diverse`.
 
 **Architecture:** Fixes grouped into 12 tasks by subsystem. Tasks 1-7 (first batch) and Tasks 8-12 (home-cards batch) are independent groups. All fixes are backward-compatible — no new tables, no new API routes, no breaking changes.
 
@@ -27,7 +27,7 @@ These are not code bugs but ongoing quality gaps flagged in prior review rounds:
 
 | # | Sev | Bug | Task | Status |
 |---|-----|-----|------|--------|
-| 1 | Must fix | No migration for UNIQUE constraint on teaching_preferences | Deferred | - [ ] |
+| 1 | Must fix | No migration for UNIQUE constraint on teaching_preferences | 0007 migration | - [x] |
 | 2 | Must fix | Race condition in setTeachingPreference (non-atomic read-back) | 1 | - [x] |
 | 3 | Should fix | syncXpLedgerStatus failure aborts recall test response | 1 | - [x] |
 | 4 | Should fix | Silent no-op in syncXpLedgerStatus (no logging/return) | 1 | - [x] |
@@ -38,7 +38,7 @@ These are not code bugs but ongoing quality gaps flagged in prior review rounds:
 | 11 | Risk | Non-JS assets silently stale on APK cache hit | 7 | - [x] |
 | 12 | High | Homework + 5-skip warning blocks recall bridge | 5 | - [x] |
 | 13 | Medium | Double DB round-trip on skip (5-9 range) | 4 | - [x] |
-| 14 | Medium | `Record<string, any>` casts erase Hono RPC type safety (×11) | Deferred | - [ ] |
+| 14 | Medium | `Record<string, any>` casts erase Hono RPC type safety (×11) | RPC cleanup | - [x] |
 | 15 | Must fix | N+1 updates with no transaction in curriculum reorder | 2 | - [x] |
 | 16 | Must fix | Interview SSE — no error event on post-stream failure | 3 | - [x] |
 | 17 | Should fix | Unconditional abort in useStreamInterviewMessage finally | 5 | - [x] |
@@ -47,9 +47,9 @@ These are not code bugs but ongoing quality gaps flagged in prior review rounds:
 | 22 | Must fix | Cache bust on every interaction (rankedHomeCards: []) | 9 | N/A — verified correct (spread preserves cards) |
 | 23 | Should fix | isHomeworkWindow uses UTC, not user local time | 10 | - [x] |
 | 24 | Should fix | Double DB read on every cache miss | 10 | - [x] |
-| 25 | Should fix | Read-modify-write race in mergeHomeSurfaceCacheData | Deferred | - [ ] |
+| 25 | Should fix | Read-modify-write race in mergeHomeSurfaceCacheData | TX + FOR UPDATE | - [x] |
 | 26 | Should fix | invalidateQueries on every tap causes card reordering | 11 | - [x] |
-| 27 | Type safety | use-home-cards.ts bypasses Hono RPC inference | Deferred | - [ ] |
+| 27 | Type safety | use-home-cards.ts bypasses Hono RPC inference | RPC cleanup | - [x] |
 | 28 | Type safety | home.tsx cast as HomeCardModel[] | 11 | - [x] (comment added) |
 | 29 | Correctness | Skipped test for fully-implemented interactions route | 12 | N/A — test infra can't resolve profileId; comment clarified |
 | 30 | Correctness | Wrong-subject chip test references undeclared QuickChipId | 12 | N/A — wrong_subject already in QuickChipId union |
@@ -1168,14 +1168,14 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Deferred Items (separate PRs)
+## Previously Deferred Items (now resolved)
 
-| # | Bug | Reason |
-|---|-----|--------|
-| 1 | No migration for UNIQUE constraint on teaching_preferences | Requires `drizzle-kit generate` + deduplication SQL. Separate DB migration PR. |
-| 14 | `Record<string, any>` casts ×11 across 3 hook files | Systemic Hono RPC limitation with hyphenated routes. Needs typed accessor utility or route rename. Separate refactor PR. |
-| 25 | Read-modify-write race in mergeHomeSurfaceCacheData | Documented as acceptable for MVP (single-device mobile). Needs DB-level atomic counter increment for multi-device. Phase 2. |
-| 27 | use-home-cards.ts bypasses Hono RPC inference | Same root cause as #14. Bundled into the Hono RPC refactor. |
+| # | Bug | Resolution |
+|---|-----|-----------|
+| 1 | No migration for UNIQUE constraint on teaching_preferences | Migration `0007_teaching_preferences_unique.sql` — dedup + ADD CONSTRAINT. |
+| 14 | `Record<string, any>` casts ×11 across 3 hook files | Removed all 14 casts (11 `Record<string, any>` + 3 `as any`). Bracket notation preserves types; casts were cargo-culted. |
+| 25 | Read-modify-write race in mergeHomeSurfaceCacheData | Wrapped in `db.transaction()` with INSERT ON CONFLICT DO NOTHING + SELECT FOR UPDATE + UPDATE. |
+| 27 | use-home-cards.ts bypasses Hono RPC inference | Fixed alongside #14 — bracket notation with `as never` arg hint. |
 
 ---
 
@@ -1199,3 +1199,4 @@ After all tasks: `pnpm exec tsc --noEmit` and `pnpm exec nx run api:lint` for fi
 
 - 2026-04-04: Full rewrite. Old completed items removed. 27 open bugs added from PR review triage across 6 subsystems, organized into 12 tasks + 4 deferred items.
 - 2026-04-04: All 12 tasks executed. 17 bugs fixed, 3 verified as false positives (#20, #22, #30), 2 verified as infra-only (#29) or already present (#28 — comment added). 4 remain deferred (#1, #14, #25, #27). Branch: `fix/pr-review-bugfixes`.
+- 2026-04-04: All 4 deferred items resolved on branch `diverse`. Bug #1: migration 0007. Bugs #14+#27: removed all 14 type casts. Bug #25: transaction with SELECT FOR UPDATE.

@@ -38,6 +38,7 @@ interface SubjectRetentionTopic {
   topicTitle?: string;
   easeFactor: number;
   repetitions: number;
+  nextReviewAt?: string | null;
   lastReviewedAt: string | null;
   xpStatus: 'pending' | 'verified' | 'decayed';
   failureCount: number;
@@ -76,7 +77,14 @@ function getTopicRetention(topic: SubjectRetentionTopic): RetentionStatus {
   if (topic.failureCount >= 3 || topic.xpStatus === 'decayed')
     return 'forgotten';
   if (topic.repetitions === 0) return 'weak';
-  return topic.easeFactor >= 2.5 ? 'strong' : 'fading';
+  // Use server-computed SM-2 schedule (matches computeRetentionStatus)
+  if (!topic.nextReviewAt) return 'weak';
+  const now = Date.now();
+  const reviewAt = new Date(topic.nextReviewAt).getTime();
+  const daysUntilReview = (reviewAt - now) / (1000 * 60 * 60 * 24);
+  if (daysUntilReview > 3) return 'strong';
+  if (daysUntilReview > 0) return 'fading';
+  return 'weak';
 }
 
 function findSuggestedNext(topics: CurriculumTopic[]): string | undefined {
@@ -302,6 +310,7 @@ export default function LibraryScreen() {
     retentionQueries.forEach((query) => void query.refetch());
     void booksQuery.refetch();
     void bookQuery.refetch();
+    void curriculumQuery.refetch();
   };
 
   const handleBack = (): void => {
@@ -440,7 +449,9 @@ export default function LibraryScreen() {
       subjectsQuery.isError ||
       progressQuery.isError ||
       booksQuery.isError ||
-      bookQuery.isError
+      bookQuery.isError ||
+      curriculumQuery.isError ||
+      generateBookTopics.isError
     ) {
       return (
         <View
@@ -527,6 +538,7 @@ export default function LibraryScreen() {
                     topicCount: activeBook.topics.filter(
                       (topic) => !topic.skipped
                     ).length,
+                    completedCount: activeBook.completedTopicCount ?? 0,
                   },
                 }
               : undefined

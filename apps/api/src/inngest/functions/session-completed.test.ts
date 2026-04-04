@@ -444,8 +444,8 @@ describe('sessionCompleted', () => {
   });
 
   describe('update-dashboard step', () => {
-    it('calls recordSessionActivity with correct date', async () => {
-      await executeSteps(createEventData());
+    it('calls recordSessionActivity when quality >= 3 (recall pass)', async () => {
+      await executeSteps(createEventData({ qualityRating: 3 }));
 
       expect(mockRecordSessionActivity).toHaveBeenCalledWith(
         expect.anything(), // db
@@ -454,9 +454,23 @@ describe('sessionCompleted', () => {
       );
     });
 
+    it('does NOT call recordSessionActivity when no qualityRating (FR86)', async () => {
+      await executeSteps(createEventData());
+
+      expect(mockRecordSessionActivity).not.toHaveBeenCalled();
+    });
+
+    it('does NOT call recordSessionActivity when quality < 3 (recall fail, FR86)', async () => {
+      await executeSteps(createEventData({ qualityRating: 2 }));
+
+      expect(mockRecordSessionActivity).not.toHaveBeenCalled();
+    });
+
     it('uses current date when no timestamp provided', async () => {
       const today = new Date().toISOString().slice(0, 10);
-      await executeSteps(createEventData({ timestamp: undefined }));
+      await executeSteps(
+        createEventData({ timestamp: undefined, qualityRating: 4 })
+      );
 
       expect(mockRecordSessionActivity).toHaveBeenCalledWith(
         expect.anything(),
@@ -465,7 +479,7 @@ describe('sessionCompleted', () => {
       );
     });
 
-    it('calls insertSessionXpEntry with correct args', async () => {
+    it('still calls insertSessionXpEntry even without qualityRating', async () => {
       await executeSteps(createEventData());
 
       expect(mockInsertSessionXpEntry).toHaveBeenCalledWith(
@@ -613,7 +627,7 @@ describe('sessionCompleted', () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       const { result } = (await executeSteps(
-        createEventData({ verificationType: 'teach_back' })
+        createEventData({ verificationType: 'teach_back', qualityRating: 4 })
       )) as any;
 
       const outcome = result.outcomes.find(
@@ -720,7 +734,9 @@ describe('sessionCompleted', () => {
       );
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      const { result } = (await executeSteps(createEventData())) as any;
+      const { result } = (await executeSteps(
+        createEventData({ qualityRating: 4 })
+      )) as any;
 
       // Steps after coaching card still ran
       expect(mockRecordSessionActivity).toHaveBeenCalled();

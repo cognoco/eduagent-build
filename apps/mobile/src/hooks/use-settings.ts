@@ -86,10 +86,7 @@ export function useCelebrationLevel(): UseQueryResult<CelebrationLevel> {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const celebrationLevelClient = (client.settings as Record<string, any>)[
-          'celebration-level'
-        ];
-        const res = await celebrationLevelClient.$get({
+        const res = await client.settings['celebration-level'].$get({
           init: { signal },
         } as never);
         await assertOk(res);
@@ -168,10 +165,7 @@ export function useUpdateCelebrationLevel(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (celebrationLevel: CelebrationLevel) => {
-      const celebrationLevelClient = (client.settings as Record<string, any>)[
-        'celebration-level'
-      ];
-      const res = await celebrationLevelClient.$put({
+      const res = await client.settings['celebration-level'].$put({
         json: { celebrationLevel },
       });
       await assertOk(res);

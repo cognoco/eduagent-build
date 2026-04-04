@@ -85,6 +85,18 @@ jest.mock('../services/assessments', () => ({
   updateAssessment: jest.fn().mockResolvedValue(undefined),
 }));
 
+const mockUpdateRetentionFromSession = jest.fn().mockResolvedValue(undefined);
+jest.mock('../services/retention-data', () => ({
+  updateRetentionFromSession: (...args: unknown[]) =>
+    mockUpdateRetentionFromSession(...args),
+}));
+
+const mockInsertSessionXpEntry = jest.fn().mockResolvedValue(undefined);
+jest.mock('../services/xp', () => ({
+  insertSessionXpEntry: (...args: unknown[]) =>
+    mockInsertSessionXpEntry(...args),
+}));
+
 jest.mock('../services/session', () => ({
   getSession: jest.fn().mockResolvedValue({
     id: '880e8400-e29b-41d4-a716-446655440000',
@@ -126,6 +138,9 @@ const ASSESSMENT_ID = '770e8400-e29b-41d4-a716-446655440000';
 const SESSION_ID = '880e8400-e29b-41d4-a716-446655440000';
 
 describe('assessment routes', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
   // -------------------------------------------------------------------------
   // POST /v1/subjects/:subjectId/topics/:topicId/assessments
   // -------------------------------------------------------------------------
@@ -242,6 +257,78 @@ describe('assessment routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+
+    it('calls updateRetentionFromSession when assessment passes (Epic 3 lifecycle)', async () => {
+      // evaluateAssessmentAnswer mock returns passed: true, shouldEscalateDepth: false → newStatus = 'passed'
+      const res = await app.request(
+        `/v1/assessments/${ASSESSMENT_ID}/answer`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            answer: 'Photosynthesis converts light energy.',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledTimes(1);
+      const [, profileArg, topicArg, qualityArg] =
+        mockUpdateRetentionFromSession.mock.calls[0];
+      expect(profileArg).toBe('test-profile-id');
+      expect(topicArg).toBe(TOPIC_ID);
+      expect(qualityArg).toBe(4);
+    });
+
+    it('calls insertSessionXpEntry when assessment passes', async () => {
+      const res = await app.request(
+        `/v1/assessments/${ASSESSMENT_ID}/answer`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            answer: 'Photosynthesis converts light energy.',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockInsertSessionXpEntry).toHaveBeenCalledTimes(1);
+      const [, profileArg, topicArg, subjectArg] =
+        mockInsertSessionXpEntry.mock.calls[0];
+      expect(profileArg).toBe('test-profile-id');
+      expect(topicArg).toBe(TOPIC_ID);
+      expect(subjectArg).toBe(SUBJECT_ID);
+    });
+
+    it('does NOT call retention/xp when assessment is still in_progress', async () => {
+      const { evaluateAssessmentAnswer } = jest.requireMock(
+        '../services/assessments'
+      );
+      evaluateAssessmentAnswer.mockResolvedValueOnce({
+        feedback: 'Keep going!',
+        passed: true,
+        shouldEscalateDepth: true, // escalating → status stays 'in_progress'
+        masteryScore: 0.3,
+        qualityRating: 3,
+      });
+
+      const res = await app.request(
+        `/v1/assessments/${ASSESSMENT_ID}/answer`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ answer: 'Some partial answer.' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockUpdateRetentionFromSession).not.toHaveBeenCalled();
+      expect(mockInsertSessionXpEntry).not.toHaveBeenCalled();
     });
   });
 

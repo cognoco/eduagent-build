@@ -19,7 +19,7 @@ function createMockDb(pendingCelebrations: unknown[] = []) {
         }
       : null;
 
-  return {
+  const db: Record<string, unknown> = {
     query: {
       coachingCardCache: {
         findFirst: jest.fn().mockResolvedValue(row),
@@ -28,6 +28,14 @@ function createMockDb(pendingCelebrations: unknown[] = []) {
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
         onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),
+        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+      }),
+    }),
+    select: jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          for: jest.fn().mockResolvedValue([row]),
+        }),
       }),
     }),
     update: jest.fn().mockReturnValue({
@@ -35,7 +43,11 @@ function createMockDb(pendingCelebrations: unknown[] = []) {
         where: jest.fn().mockResolvedValue(undefined),
       }),
     }),
-  } as unknown as Database;
+  };
+  db.transaction = jest
+    .fn()
+    .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
+  return db as unknown as Database;
 }
 
 describe('filterCelebrationsByLevel', () => {

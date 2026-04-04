@@ -191,6 +191,123 @@ describe('processEvaluateCompletion', () => {
     );
   });
 
+  it('counts consecutive EVALUATE failures from prior events (2nd failure)', async () => {
+    const assessment = {
+      challengePassed: false,
+      quality: 1,
+    };
+    (parseEvaluateAssessment as jest.Mock).mockReturnValue(assessment);
+    (mapEvaluateQualityToSm2 as jest.Mock).mockReturnValue(2);
+    (handleEvaluateFailure as jest.Mock).mockReturnValue({
+      action: 'lower_difficulty',
+      message: 'Lowering difficulty',
+      newDifficultyRung: 1,
+    });
+
+    const db = createMockDb({
+      selectResults: [
+        // ai_response events — most recent first (desc createdAt)
+        // event-1 is current (failed), event-2 is prior (also failed)
+        [
+          {
+            id: 'event-1',
+            content: '{"challengePassed": false, "quality": 1}',
+            createdAt: new Date('2026-01-01T10:02:00Z'),
+            structuredAssessment: {
+              type: 'evaluate',
+              challengePassed: false,
+            },
+          },
+          {
+            id: 'event-2',
+            content: '{"challengePassed": false, "quality": 1}',
+            createdAt: new Date('2026-01-01T10:01:00Z'),
+            structuredAssessment: {
+              type: 'evaluate',
+              challengePassed: false,
+            },
+          },
+        ],
+        // retention card
+        [
+          {
+            id: 'card-1',
+            topicId,
+            profileId,
+            evaluateDifficultyRung: 3,
+          },
+        ],
+      ],
+    });
+
+    await processEvaluateCompletion(db, profileId, sessionId, topicId);
+
+    // handleEvaluateFailure should be called with 2 (not hardcoded 1)
+    expect(handleEvaluateFailure).toHaveBeenCalledWith(2, 3);
+  });
+
+  it('counts consecutive EVALUATE failures — stops at first non-failure', async () => {
+    const assessment = {
+      challengePassed: false,
+      quality: 1,
+    };
+    (parseEvaluateAssessment as jest.Mock).mockReturnValue(assessment);
+    (mapEvaluateQualityToSm2 as jest.Mock).mockReturnValue(2);
+    (handleEvaluateFailure as jest.Mock).mockReturnValue({
+      action: 'reveal_flaw',
+      message: 'Reveal flaw',
+    });
+
+    const db = createMockDb({
+      selectResults: [
+        // events: current failed, prior succeeded, older failed
+        [
+          {
+            id: 'event-1',
+            content: '{"challengePassed": false}',
+            createdAt: new Date('2026-01-01T10:03:00Z'),
+            structuredAssessment: {
+              type: 'evaluate',
+              challengePassed: false,
+            },
+          },
+          {
+            id: 'event-2',
+            content: '{"challengePassed": true}',
+            createdAt: new Date('2026-01-01T10:02:00Z'),
+            structuredAssessment: {
+              type: 'evaluate',
+              challengePassed: true,
+            },
+          },
+          {
+            id: 'event-3',
+            content: '{"challengePassed": false}',
+            createdAt: new Date('2026-01-01T10:01:00Z'),
+            structuredAssessment: {
+              type: 'evaluate',
+              challengePassed: false,
+            },
+          },
+        ],
+        // retention card
+        [
+          {
+            id: 'card-1',
+            topicId,
+            profileId,
+            evaluateDifficultyRung: 2,
+          },
+        ],
+      ],
+    });
+
+    await processEvaluateCompletion(db, profileId, sessionId, topicId);
+
+    // Only 1 consecutive failure (the current one) because event-2 passed
+    expect(handleEvaluateFailure).toHaveBeenCalledWith(1, 2);
+  });
+
   it('resets to rung 1 on exit_to_standard action', async () => {
     const assessment = {
       challengePassed: false,

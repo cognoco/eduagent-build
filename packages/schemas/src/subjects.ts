@@ -132,6 +132,7 @@ export const bookWithTopicsSchema = z.object({
   topics: z.array(curriculumTopicSchema),
   connections: z.array(topicConnectionSchema),
   status: bookProgressStatusSchema,
+  completedTopicCount: z.number().int().optional(),
 });
 export type BookWithTopics = z.infer<typeof bookWithTopicsSchema>;
 

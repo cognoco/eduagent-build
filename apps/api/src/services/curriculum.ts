@@ -209,13 +209,18 @@ export async function ensureCurriculum(
   return row!;
 }
 
+interface BookProgress {
+  status: BookProgressStatus;
+  completedTopicCount: number;
+}
+
 async function computeBookStatus(
   db: Database,
   profileId: string,
   topicIds: string[]
-): Promise<BookProgressStatus> {
+): Promise<BookProgress> {
   if (topicIds.length === 0) {
-    return 'NOT_STARTED';
+    return { status: 'NOT_STARTED', completedTopicCount: 0 };
   }
 
   const sessionRows = await db
@@ -242,11 +247,14 @@ async function computeBookStatus(
   );
 
   if (completedTopicIds.size === 0) {
-    return 'NOT_STARTED';
+    return { status: 'NOT_STARTED', completedTopicCount: 0 };
   }
 
   if (completedTopicIds.size < topicIds.length) {
-    return 'IN_PROGRESS';
+    return {
+      status: 'IN_PROGRESS',
+      completedTopicCount: completedTopicIds.size,
+    };
   }
 
   const now = Date.now();
@@ -267,7 +275,10 @@ async function computeBookStatus(
     (row) => row.nextReviewAt && row.nextReviewAt.getTime() <= now
   );
 
-  return hasReviewDue ? 'REVIEW_DUE' : 'COMPLETED';
+  return {
+    status: hasReviewDue ? 'REVIEW_DUE' : 'COMPLETED',
+    completedTopicCount: completedTopicIds.size,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -368,6 +379,44 @@ export async function persistNarrowTopics(
   );
 }
 
+/**
+ * Atomic compare-and-swap: claims a book for topic generation by setting
+ * topicsGenerated = true WHERE it's currently false. Returns the book row
+ * if the caller won the race, or null if another request already claimed it
+ * (or the book doesn't exist).
+ */
+export async function claimBookForGeneration(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  bookId: string
+): Promise<{ id: string; title: string; description: string | null } | null> {
+  // Verify subject ownership
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
+  if (!subject) {
+    throw new NotFoundError('Subject');
+  }
+
+  const updated = await db
+    .update(curriculumBooks)
+    .set({ topicsGenerated: true, updatedAt: new Date() })
+    .where(
+      and(
+        eq(curriculumBooks.id, bookId),
+        eq(curriculumBooks.subjectId, subjectId),
+        eq(curriculumBooks.topicsGenerated, false)
+      )
+    )
+    .returning({
+      id: curriculumBooks.id,
+      title: curriculumBooks.title,
+      description: curriculumBooks.description,
+    });
+
+  return updated[0] ?? null;
+}
+
 export async function getBooks(
   db: Database,
   profileId: string,
@@ -434,7 +483,7 @@ export async function getBookWithTopics(
           )
       : [];
 
-  const status = await computeBookStatus(
+  const progress = await computeBookStatus(
     db,
     profileId,
     topicRows.filter((topic) => !topic.skipped).map((topic) => topic.id)
@@ -448,7 +497,8 @@ export async function getBookWithTopics(
       topicAId: connection.topicAId,
       topicBId: connection.topicBId,
     })),
-    status,
+    status: progress.status,
+    completedTopicCount: progress.completedTopicCount,
   };
 }
 
@@ -535,15 +585,26 @@ export async function persistBookTopics(
       orderBy: asc(curriculumTopics.sortOrder),
     });
 
-    const topicIdByTitle = new Map(
-      insertedTopicRows.map((topic) => [topic.title, topic.id])
+    // Map DB rows by sortOrder for stable resolution (titles may collide)
+    const topicIdBySortOrder = new Map(
+      insertedTopicRows.map((topic) => [topic.sortOrder, topic.id])
     );
+    // Map LLM-generated titles to their sortOrder (first occurrence wins)
+    const sortOrderByTitle = new Map<string, number>();
+    for (const topic of topics) {
+      if (!sortOrderByTitle.has(topic.title)) {
+        sortOrderByTitle.set(topic.title, topic.sortOrder);
+      }
+    }
     const seenConnectionKeys = new Set<string>();
     const connectionValues: Array<typeof topicConnections.$inferInsert> = [];
 
     for (const connection of connections) {
-      const topicAId = topicIdByTitle.get(connection.topicA);
-      const topicBId = topicIdByTitle.get(connection.topicB);
+      const sortOrderA = sortOrderByTitle.get(connection.topicA);
+      const sortOrderB = sortOrderByTitle.get(connection.topicB);
+      if (sortOrderA == null || sortOrderB == null) continue;
+      const topicAId = topicIdBySortOrder.get(sortOrderA);
+      const topicBId = topicIdBySortOrder.get(sortOrderB);
       if (!topicAId || !topicBId || topicAId === topicBId) {
         continue;
       }
