@@ -5,6 +5,7 @@ import {
   subjectUpdateSchema,
   subjectResolveInputSchema,
   subjectClassifyInputSchema,
+  languageSetupSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -13,6 +14,7 @@ import { requireProfileId } from '../middleware/profile-scope';
 import {
   listSubjects,
   createSubjectWithStructure,
+  configureLanguageSubject,
   getSubject,
   updateSubject,
 } from '../services/subject';
@@ -41,7 +43,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       } catch {
         return apiError(
           c,
-          502,
+          500,
           ERROR_CODES.INTERNAL_ERROR,
           'Subject name resolution failed — please try again'
         );
@@ -61,7 +63,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       } catch {
         return apiError(
           c,
-          502,
+          500,
           ERROR_CODES.INTERNAL_ERROR,
           'Subject classification failed'
         );
@@ -79,9 +81,47 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     const db = c.get('db');
     const input = c.req.valid('json');
     const profileId = requireProfileId(c.get('profileId'));
-    const result = await createSubjectWithStructure(db, profileId, input);
-    return c.json(result, 201);
+    try {
+      const result = await createSubjectWithStructure(db, profileId, input);
+      return c.json(result, 201);
+    } catch (err) {
+      console.error('[POST /subjects] Unhandled error:', err);
+      return apiError(
+        c,
+        500,
+        ERROR_CODES.INTERNAL_ERROR,
+        'Subject creation failed — please try again'
+      );
+    }
   })
+  .put(
+    '/subjects/:id/language-setup',
+    zValidator('json', languageSetupSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      try {
+        const subject = await configureLanguageSubject(
+          db,
+          profileId,
+          c.req.param('id'),
+          c.req.valid('json')
+        );
+        return c.json({ subject });
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Subject not found') {
+          return notFound(c, 'Subject not found');
+        }
+        if (
+          err instanceof Error &&
+          err.message === 'Subject is not configured for language learning'
+        ) {
+          return apiError(c, 422, ERROR_CODES.VALIDATION_ERROR, err.message);
+        }
+        throw err;
+      }
+    }
+  )
   .get('/subjects/:id', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));

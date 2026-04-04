@@ -12,6 +12,11 @@ import {
 import { profiles } from './profiles';
 import { generateUUIDv7 } from '../utils/uuid';
 
+export const pedagogyModeEnum = pgEnum('pedagogy_mode', [
+  'socratic',
+  'four_strands',
+]);
+
 export const subjectStatusEnum = pgEnum('subject_status', [
   'active',
   'paused',
@@ -42,6 +47,10 @@ export const subjects = pgTable(
     name: text('name').notNull(),
     rawInput: text('raw_input'),
     status: subjectStatusEnum('status').notNull().default('active'),
+    pedagogyMode: pedagogyModeEnum('pedagogy_mode')
+      .notNull()
+      .default('socratic'),
+    languageCode: text('language_code'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -123,6 +132,10 @@ export const curriculumTopics = pgTable('curriculum_topics', {
   }),
   chapter: text('chapter'),
   skipped: boolean('skipped').notNull().default(false),
+  cefrLevel: text('cefr_level'),
+  cefrSublevel: text('cefr_sublevel'),
+  targetWordCount: integer('target_word_count'),
+  targetChunkCount: integer('target_chunk_count'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

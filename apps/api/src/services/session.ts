@@ -13,6 +13,7 @@ import {
   curriculumTopics,
   profiles,
   retentionCards,
+  vocabulary,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
@@ -547,6 +548,20 @@ async function prepareExchangeContext(
     );
   }
   const retentionCard = retentionRows[0];
+  const knownVocabularyRows =
+    subject?.pedagogyMode === 'four_strands'
+      ? await db
+          .select({ term: vocabulary.term })
+          .from(vocabulary)
+          .where(
+            and(
+              eq(vocabulary.profileId, profileId),
+              eq(vocabulary.subjectId, session.subjectId),
+              eq(vocabulary.mastered, true)
+            )
+          )
+          .orderBy(desc(vocabulary.updatedAt))
+      : [];
 
   // Determine verification type: explicit from session, or auto-select from retention card
   let verificationType: 'standard' | 'evaluate' | 'teach_back' | undefined;
@@ -742,6 +757,10 @@ async function prepareExchangeContext(
     priorLearningContext: priorLearning.contextText || undefined,
     learningHistoryContext,
     embeddingMemoryContext: memory.context || undefined,
+    pedagogyMode: subject?.pedagogyMode ?? 'socratic',
+    nativeLanguage: teachingPref?.nativeLanguage ?? undefined,
+    languageCode: subject?.languageCode ?? undefined,
+    knownVocabulary: knownVocabularyRows.map((row) => row.term).slice(0, 60),
     teachingPreference: teachingPref?.method,
     analogyDomain: teachingPref?.analogyDomain ?? undefined,
     interleavedTopics,

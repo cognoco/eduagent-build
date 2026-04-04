@@ -6,6 +6,7 @@ import {
   pushTokenRegisterSchema,
   analogyDomainUpdateSchema,
   celebrationLevelUpdateSchema,
+  nativeLanguageUpdateSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -20,7 +21,12 @@ import {
   registerPushToken,
 } from '../services/settings';
 import { notifyParentToSubscribe } from '../services/notifications';
-import { getAnalogyDomain, setAnalogyDomain } from '../services/retention-data';
+import {
+  getAnalogyDomain,
+  getNativeLanguage,
+  setAnalogyDomain,
+  setNativeLanguage,
+} from '../services/retention-data';
 
 type SettingsRouteEnv = {
   Bindings: {
@@ -157,5 +163,29 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         body.analogyDomain
       );
       return c.json({ analogyDomain });
+    }
+  )
+  .get('/settings/subjects/:subjectId/native-language', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const subjectId = c.req.param('subjectId');
+    const nativeLanguage = await getNativeLanguage(db, profileId, subjectId);
+    return c.json({ nativeLanguage });
+  })
+  .put(
+    '/settings/subjects/:subjectId/native-language',
+    zValidator('json', nativeLanguageUpdateSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const subjectId = c.req.param('subjectId');
+      const body = c.req.valid('json');
+      const nativeLanguage = await setNativeLanguage(
+        db,
+        profileId,
+        subjectId,
+        body.nativeLanguage
+      );
+      return c.json({ nativeLanguage });
     }
   );

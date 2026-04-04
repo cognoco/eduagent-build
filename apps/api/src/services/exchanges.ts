@@ -16,6 +16,7 @@ import {
   type LearningMode,
   type HomeworkMode,
 } from '@eduagent/schemas';
+import { buildFourStrandsPrompt } from './language-prompts';
 
 // ---------------------------------------------------------------------------
 // Core Exchange Processing Pipeline — Story 2.1
@@ -52,6 +53,14 @@ export interface ExchangeContext {
   verificationType?: 'standard' | 'evaluate' | 'teach_back';
   /** Preferred analogy domain for explanations (FR134-137) */
   analogyDomain?: string;
+  /** Pedagogy mode for the subject */
+  pedagogyMode?: 'socratic' | 'four_strands';
+  /** Learner's native language for direct grammar explanation */
+  nativeLanguage?: string;
+  /** Target language code for language-learning sessions */
+  languageCode?: string;
+  /** Known vocabulary to bias comprehensible input */
+  knownVocabulary?: string[];
   /** EVALUATE difficulty rung 1-4 (FR128-133) */
   evaluateDifficultyRung?: 1 | 2 | 3 | 4;
   /** Learning mode: 'serious' (default) or 'casual' — affects tutoring tone */
@@ -160,13 +169,20 @@ export function estimateExpectedResponseMinutes(
 /** Builds the full system prompt from exchange context */
 export function buildSystemPrompt(context: ExchangeContext): string {
   const sections: string[] = [];
+  const isLanguageMode = context.pedagogyMode === 'four_strands';
 
   // Role and identity
-  sections.push(
-    'You are MentoMate, a personalised learning mate. ' +
-      'A mate does not lecture — a mate asks the right question at the right time so the learner discovers the answer themselves. ' +
-      'Example: instead of "The mitochondria is the powerhouse of the cell," ask "What part of the cell do you think handles energy production, and why?"'
-  );
+  if (isLanguageMode) {
+    sections.push(
+      `You are MentoMate, a personalised language tutor for ${context.subjectName}. Teach directly, clearly, and with lots of useful target-language practice.`
+    );
+  } else {
+    sections.push(
+      'You are MentoMate, a personalised learning mate. ' +
+        'A mate does not lecture — a mate asks the right question at the right time so the learner discovers the answer themselves. ' +
+        'Example: instead of "The mitochondria is the powerhouse of the cell," ask "What part of the cell do you think handles energy production, and why?"'
+    );
+  }
 
   // Safety — crisis redirect (GDPR-K / safeguarding)
   sections.push(
@@ -214,18 +230,32 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   sections.push(`Subject: ${context.subjectName}`);
 
   // Session type
-  sections.push(
-    getSessionTypeGuidance(
-      context.sessionType,
-      context.homeworkMode,
-      ageBracket
-    )
-  );
+  if (isLanguageMode) {
+    sections.push(
+      [
+        'Session type: LANGUAGE LEARNING',
+        'Use direct teaching instead of the normal Socratic escalation ladder.',
+        'Balance input, output, explicit language study, and fluency work within the session.',
+      ].join('\n')
+    );
+  } else {
+    sections.push(
+      getSessionTypeGuidance(
+        context.sessionType,
+        context.homeworkMode,
+        ageBracket
+      )
+    );
+  }
 
   // Escalation state and guidance
-  sections.push(
-    getEscalationPromptGuidance(context.escalationRung, context.sessionType)
-  );
+  if (!isLanguageMode) {
+    sections.push(
+      getEscalationPromptGuidance(context.escalationRung, context.sessionType)
+    );
+  } else {
+    sections.push(...buildFourStrandsPrompt(context));
+  }
 
   // Prior learning context
   if (context.priorLearningContext) {
@@ -292,7 +322,7 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   );
 
   // Worked example level
-  if (context.workedExampleLevel) {
+  if (!isLanguageMode && context.workedExampleLevel) {
     sections.push(getWorkedExampleGuidance(context.workedExampleLevel));
   }
 
@@ -369,13 +399,15 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   );
 
   // "Not Yet" framing
-  sections.push(
-    'Feedback framing:\n' +
-      '- NEVER use words like "wrong", "incorrect", or "mistake".\n' +
-      '- Use "Not yet" framing — the learner hasn\'t got it *yet*, and that is perfectly fine.\n' +
-      '- Acknowledge effort and partial correctness before guiding further.\n' +
-      '- When a learner repeats a question they asked before, answer it fresh. Do not reference that they "already asked this."'
-  );
+  if (!isLanguageMode) {
+    sections.push(
+      'Feedback framing:\n' +
+        '- NEVER use words like "wrong", "incorrect", or "mistake".\n' +
+        '- Use "Not yet" framing — the learner hasn\'t got it *yet*, and that is perfectly fine.\n' +
+        '- Acknowledge effort and partial correctness before guiding further.\n' +
+        '- When a learner repeats a question they asked before, answer it fresh. Do not reference that they "already asked this."'
+    );
+  }
 
   return sections.join('\n\n');
 }

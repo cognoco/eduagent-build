@@ -29,5 +29,5 @@ export function getApiUrl(): string {
     }) as string;
   }
 
-  return 'https://mentomate-api-stg.zwizzly.workers.dev';
+  return 'https://api-stg.mentomate.com';
 }

@@ -5,3 +5,4 @@ export * from './assessments';
 export * from './progress';
 export * from './billing';
 export * from './embeddings';
+export * from './language';

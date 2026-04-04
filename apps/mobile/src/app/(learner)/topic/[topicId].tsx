@@ -21,14 +21,24 @@ function deriveRetentionStatus(
         easeFactor: number;
         repetitions: number;
         xpStatus: string;
+        nextReviewAt?: string | null;
+        failureCount?: number;
       }
     | null
     | undefined
 ): RetentionStatus {
   if (!card) return 'weak';
-  if (card.xpStatus === 'decayed') return 'forgotten';
+  if ((card.failureCount ?? 0) >= 3 || card.xpStatus === 'decayed')
+    return 'forgotten';
   if (card.repetitions === 0) return 'weak';
-  return card.easeFactor >= 2.5 ? 'strong' : 'fading';
+  // Use server-computed SM-2 schedule (matches computeRetentionStatus)
+  if (!card.nextReviewAt) return 'weak';
+  const now = Date.now();
+  const reviewAt = new Date(card.nextReviewAt).getTime();
+  const daysUntilReview = (reviewAt - now) / (1000 * 60 * 60 * 24);
+  if (daysUntilReview > 3) return 'strong';
+  if (daysUntilReview > 0) return 'fading';
+  return 'weak';
 }
 
 const COMPLETION_LABELS: Record<string, string> = {
@@ -79,8 +89,7 @@ export default function TopicDetailScreen() {
   const masteryPercent = topicProgress?.masteryScore
     ? Math.round(topicProgress.masteryScore * 100)
     : null;
-  const failureCount =
-    (retentionCard as { failureCount?: number } | null)?.failureCount ?? 0;
+  const failureCount = retentionCard?.failureCount ?? 0;
   const showRelearn =
     failureCount >= 3 || topicProgress?.struggleStatus === 'needs_deepening';
 

@@ -83,10 +83,16 @@ jest.mock('../services/settings', () => ({
 
 jest.mock('../services/retention-data', () => ({
   getAnalogyDomain: jest.fn().mockResolvedValue(null),
+  getNativeLanguage: jest.fn().mockResolvedValue(null),
   setAnalogyDomain: jest
     .fn()
     .mockImplementation((_db, _profileId, _subjectId, domain) =>
       Promise.resolve(domain)
+    ),
+  setNativeLanguage: jest
+    .fn()
+    .mockImplementation((_db, _profileId, _subjectId, nativeLanguage) =>
+      Promise.resolve(nativeLanguage)
     ),
 }));
 
@@ -99,7 +105,12 @@ import {
   getCelebrationLevel,
   upsertCelebrationLevel,
 } from '../services/settings';
-import { getAnalogyDomain, setAnalogyDomain } from '../services/retention-data';
+import {
+  getAnalogyDomain,
+  getNativeLanguage,
+  setAnalogyDomain,
+  setNativeLanguage,
+} from '../services/retention-data';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
@@ -579,6 +590,146 @@ describe('settings routes', () => {
           method: 'PUT',
           body: JSON.stringify({ analogyDomain: 'cooking' }),
           headers: { 'Content-Type': 'application/json' },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /v1/settings/subjects/:subjectId/native-language
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/settings/subjects/:subjectId/native-language', () => {
+    const subjectId = '550e8400-e29b-41d4-a716-446655440000';
+
+    it('returns 200 with null when no native language is set', async () => {
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/native-language`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.nativeLanguage).toBeNull();
+    });
+
+    it('returns 200 with a stored native language', async () => {
+      (getNativeLanguage as jest.Mock).mockResolvedValueOnce('fr');
+
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/native-language`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.nativeLanguage).toBe('fr');
+    });
+
+    it('calls getNativeLanguage service', async () => {
+      await app.request(
+        `/v1/settings/subjects/${subjectId}/native-language`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(getNativeLanguage).toHaveBeenCalled();
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/native-language`,
+        {},
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // PUT /v1/settings/subjects/:subjectId/native-language
+  // -------------------------------------------------------------------------
+
+  describe('PUT /v1/settings/subjects/:subjectId/native-language', () => {
+    const subjectId = '550e8400-e29b-41d4-a716-446655440000';
+
+    it('returns 200 with valid native language', async () => {
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/native-language`,
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ nativeLanguage: 'en' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.nativeLanguage).toBe('en');
+    });
+
+    it('returns 200 when clearing native language', async () => {
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/native-language`,
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ nativeLanguage: null }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.nativeLanguage).toBeNull();
+    });
+
+    it('calls setNativeLanguage service', async () => {
+      await app.request(
+        `/v1/settings/subjects/${subjectId}/native-language`,
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ nativeLanguage: 'de' }),
+        },
+        TEST_ENV
+      );
+
+      expect(setNativeLanguage).toHaveBeenCalled();
+    });
+
+    it('returns 400 with invalid native language', async () => {
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/native-language`,
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ nativeLanguage: '' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/native-language`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nativeLanguage: 'en' }),
         },
         TEST_ENV
       );

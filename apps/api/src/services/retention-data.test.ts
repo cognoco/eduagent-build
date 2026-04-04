@@ -897,6 +897,7 @@ describe('getTeachingPreference', () => {
       subjectId,
       method: 'visual_diagrams',
       analogyDomain: null,
+      nativeLanguage: null,
     });
   });
 });
@@ -914,6 +915,7 @@ describe('setTeachingPreference', () => {
       subjectId,
       method: 'step_by_step',
       analogyDomain: null,
+      nativeLanguage: null,
     });
     // Uses atomic upsert, not separate findFirst + insert/update
     expect(db.insert).toHaveBeenCalled();
@@ -945,6 +947,7 @@ describe('setTeachingPreference', () => {
       subjectId,
       method: 'step_by_step',
       analogyDomain: 'cooking',
+      nativeLanguage: null,
     });
   });
 
@@ -971,6 +974,7 @@ describe('setTeachingPreference', () => {
       subjectId,
       method: 'visual_diagrams',
       analogyDomain: null,
+      nativeLanguage: null,
     });
   });
 
@@ -999,6 +1003,7 @@ describe('setTeachingPreference', () => {
       subjectId,
       method: 'step_by_step',
       analogyDomain: 'sports',
+      nativeLanguage: null,
     });
   });
 });

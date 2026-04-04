@@ -11,6 +11,7 @@ export function buildSubject(overrides?: Partial<Subject>): Subject {
     profileId: uuidv7(),
     name: `Test Subject ${counter}`,
     status: 'active',
+    pedagogyMode: 'socratic' as const,
     createdAt: now,
     updatedAt: now,
     ...overrides,

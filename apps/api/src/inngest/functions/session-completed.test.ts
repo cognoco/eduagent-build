@@ -9,14 +9,19 @@ jest.mock('@eduagent/database', () => {
       const chainable = () => ({
         from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
       });
-      return {
+      const db: Record<string, unknown> = {
         query: {
           sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
           curriculumTopics: { findFirst: jest.fn().mockResolvedValue(null) },
+          subjects: { findFirst: jest.fn().mockResolvedValue(null) },
           streaks: { findFirst: jest.fn().mockResolvedValue(null) },
         },
         select: chainable,
       };
+      db.transaction = jest
+        .fn()
+        .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
+      return db;
     }),
     sessionEvents: {
       sessionId: col('sessionId'),
@@ -29,6 +34,7 @@ jest.mock('@eduagent/database', () => {
       repetitions: col('repetitions'),
     },
     curriculumTopics: { id: col('id'), title: col('title') },
+    subjects: { id: col('id'), profileId: col('profileId') },
     streaks: { profileId: col('profileId') },
   };
 });
@@ -53,6 +59,27 @@ jest.mock('../../services/retention-data', () => ({
     mockUpdateRetentionFromSession(...args),
   updateNeedsDeepeningProgress: (...args: unknown[]) =>
     mockUpdateNeedsDeepeningProgress(...args),
+}));
+
+const mockGetCurrentLanguageProgress = jest.fn().mockResolvedValue(null);
+
+jest.mock('../../services/language-curriculum', () => ({
+  getCurrentLanguageProgress: (...args: unknown[]) =>
+    mockGetCurrentLanguageProgress(...args),
+}));
+
+const mockExtractVocabularyFromTranscript = jest.fn().mockResolvedValue([]);
+
+jest.mock('../../services/vocabulary-extract', () => ({
+  extractVocabularyFromTranscript: (...args: unknown[]) =>
+    mockExtractVocabularyFromTranscript(...args),
+}));
+
+const mockUpsertExtractedVocabulary = jest.fn().mockResolvedValue([]);
+
+jest.mock('../../services/vocabulary', () => ({
+  upsertExtractedVocabulary: (...args: unknown[]) =>
+    mockUpsertExtractedVocabulary(...args),
 }));
 
 const mockCreatePendingSessionSummary = jest.fn().mockResolvedValue(undefined);
@@ -237,7 +264,9 @@ describe('sessionCompleted', () => {
     expect(stepNames).toEqual([
       'process-verification-completion',
       'update-retention',
+      'update-vocabulary-retention',
       'update-needs-deepening',
+      'check-milestone-completion',
       'write-coaching-card',
       'update-dashboard',
       'generate-embeddings',
@@ -255,7 +284,18 @@ describe('sessionCompleted', () => {
     const statuses = result.outcomes
       .filter((o: any) => o.status !== 'skipped')
       .map((o: any) => o.status);
-    expect(statuses).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok']);
+    expect(statuses).toEqual([
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+    ]);
     // verification-completion step should be skipped for standard sessions
     const verificationOutcome = result.outcomes.find(
       (o: any) => o.step === 'process-verification-completion'
@@ -444,8 +484,8 @@ describe('sessionCompleted', () => {
   });
 
   describe('update-dashboard step', () => {
-    it('calls recordSessionActivity with correct date', async () => {
-      await executeSteps(createEventData());
+    it('calls recordSessionActivity when quality >= 3 (recall pass)', async () => {
+      await executeSteps(createEventData({ qualityRating: 3 }));
 
       expect(mockRecordSessionActivity).toHaveBeenCalledWith(
         expect.anything(), // db
@@ -454,9 +494,23 @@ describe('sessionCompleted', () => {
       );
     });
 
+    it('does NOT call recordSessionActivity when no qualityRating (FR86)', async () => {
+      await executeSteps(createEventData());
+
+      expect(mockRecordSessionActivity).not.toHaveBeenCalled();
+    });
+
+    it('does NOT call recordSessionActivity when quality < 3 (recall fail, FR86)', async () => {
+      await executeSteps(createEventData({ qualityRating: 2 }));
+
+      expect(mockRecordSessionActivity).not.toHaveBeenCalled();
+    });
+
     it('uses current date when no timestamp provided', async () => {
       const today = new Date().toISOString().slice(0, 10);
-      await executeSteps(createEventData({ timestamp: undefined }));
+      await executeSteps(
+        createEventData({ timestamp: undefined, qualityRating: 4 })
+      );
 
       expect(mockRecordSessionActivity).toHaveBeenCalledWith(
         expect.anything(),
@@ -465,7 +519,7 @@ describe('sessionCompleted', () => {
       );
     });
 
-    it('calls insertSessionXpEntry with correct args', async () => {
+    it('still calls insertSessionXpEntry even without qualityRating', async () => {
       await executeSteps(createEventData());
 
       expect(mockInsertSessionXpEntry).toHaveBeenCalledWith(
@@ -613,7 +667,7 @@ describe('sessionCompleted', () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       const { result } = (await executeSteps(
-        createEventData({ verificationType: 'teach_back' })
+        createEventData({ verificationType: 'teach_back', qualityRating: 4 })
       )) as any;
 
       const outcome = result.outcomes.find(
@@ -720,7 +774,9 @@ describe('sessionCompleted', () => {
       );
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      const { result } = (await executeSteps(createEventData())) as any;
+      const { result } = (await executeSteps(
+        createEventData({ qualityRating: 4 })
+      )) as any;
 
       // Steps after coaching card still ran
       expect(mockRecordSessionActivity).toHaveBeenCalled();

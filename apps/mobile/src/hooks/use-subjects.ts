@@ -5,7 +5,7 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import type { Subject, SubjectStatus } from '@eduagent/schemas';
+import type { CefrLevel, Subject, SubjectStatus } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
@@ -66,6 +66,7 @@ export function useCreateSubject(): UseMutationResult<
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      void queryClient.invalidateQueries({ queryKey: ['curriculum'] });
     },
   });
 }
@@ -97,6 +98,33 @@ export function useUpdateSubject(): UseMutationResult<
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['subjects'] });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
+    },
+  });
+}
+
+export function useConfigureLanguageSubject(): UseMutationResult<
+  { subject: Subject },
+  Error,
+  {
+    subjectId: string;
+    nativeLanguage: string;
+    startingLevel: CefrLevel;
+  }
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ subjectId, ...input }) => {
+      const res = await client.subjects[':id']['language-setup'].$put({
+        param: { id: subjectId },
+        json: input,
+      });
+      await assertOk(res);
+      return (await res.json()) as { subject: Subject };
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['subjects'] });
     },
   });
 }

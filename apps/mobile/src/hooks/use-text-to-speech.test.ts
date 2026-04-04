@@ -71,6 +71,19 @@ describe('useTextToSpeech', () => {
     );
   });
 
+  it('passes configured language to Speech.speak', () => {
+    const { result } = renderHook(() => useTextToSpeech({ language: 'es-ES' }));
+
+    act(() => {
+      result.current.speak('Hola');
+    });
+
+    expect(mockSpeak).toHaveBeenCalledWith(
+      'Hola',
+      expect.objectContaining({ language: 'es-ES' })
+    );
+  });
+
   it('stops any ongoing speech before starting new', () => {
     const { result } = renderHook(() => useTextToSpeech());
 

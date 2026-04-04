@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useClerk } from '@clerk/clerk-expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../lib/profile';
-import { useTheme, useThemeColors, useTokenVars } from '../../lib/theme';
+import { useThemeColors, useTokenVars } from '../../lib/theme';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
 import { useRevenueCatIdentity } from '../../hooks/use-revenuecat';
 
@@ -114,11 +114,15 @@ function ConsentWithdrawnGate(): React.ReactElement {
 
 export default function ParentLayout() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { persona } = useTheme();
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
-  const { activeProfile, isLoading: isProfileLoading } = useProfile();
+  const { profiles, activeProfile, isLoading: isProfileLoading } = useProfile();
+  const hasLinkedChildren =
+    activeProfile?.isOwner === true &&
+    profiles.some(
+      (profile) => profile.id !== activeProfile.id && !profile.isOwner
+    );
 
   // Register push token on app launch (runs once, guarded internally)
   usePushTokenRegistration();
@@ -128,7 +132,6 @@ export default function ParentLayout() {
 
   if (!isLoaded) return null;
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
-  if (persona !== 'parent') return <Redirect href="/(learner)/home" />;
 
   // Show a centered spinner while profiles load
   if (isProfileLoading)
@@ -143,6 +146,8 @@ export default function ParentLayout() {
 
   // No profile exists — show gate that pushes to profile creation modal
   if (!activeProfile) return <CreateProfileGate />;
+
+  if (!hasLinkedChildren) return <Redirect href="/(learner)/home" />;
 
   // Gate: block app access when consent is pending (defense-in-depth — unlikely for adults)
   if (

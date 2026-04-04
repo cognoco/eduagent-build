@@ -12,6 +12,7 @@ import {
 } from '@eduagent/database';
 import { getProfileAge } from './profile';
 import type {
+  LanguageSetupInput,
   SubjectCreateInput,
   SubjectUpdateInput,
   Subject,
@@ -22,6 +23,12 @@ import {
   ensureCurriculum,
   persistNarrowTopics,
 } from './curriculum';
+import { detectLanguageSubject } from './language-detect';
+import {
+  generateLanguageCurriculum,
+  regenerateLanguageCurriculum,
+} from './language-curriculum';
+import { setNativeLanguage } from './retention-data';
 
 // ---------------------------------------------------------------------------
 // Mapper — Drizzle Date → API ISO string
@@ -34,6 +41,8 @@ function mapSubjectRow(row: typeof subjects.$inferSelect): Subject {
     name: row.name,
     rawInput: row.rawInput ?? null,
     status: row.status,
+    pedagogyMode: row.pedagogyMode,
+    languageCode: row.languageCode ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -61,6 +70,14 @@ export async function createSubject(
   profileId: string,
   input: SubjectCreateInput
 ): Promise<Subject> {
+  const detectedLanguage =
+    input.pedagogyMode === 'four_strands' && input.languageCode
+      ? {
+          pedagogyMode: input.pedagogyMode,
+          code: input.languageCode,
+        }
+      : await detectLanguageSubject(input.rawInput ?? input.name);
+
   const [row] = await db
     .insert(subjects)
     .values({
@@ -68,6 +85,9 @@ export async function createSubject(
       name: input.name,
       rawInput: input.rawInput ?? null,
       status: 'active',
+      pedagogyMode:
+        detectedLanguage?.pedagogyMode ?? input.pedagogyMode ?? 'socratic',
+      languageCode: detectedLanguage?.code ?? input.languageCode ?? null,
     })
     .returning();
   return mapSubjectRow(row!);
@@ -77,6 +97,9 @@ export interface CreatedSubjectWithStructure {
   subject: Subject;
   structureType: SubjectStructureType;
   bookCount?: number;
+  topicCount?: number;
+  /** True when LLM classification failed and we fell back to narrow */
+  classificationFailed?: boolean;
 }
 
 export async function createSubjectWithStructure(
@@ -85,6 +108,21 @@ export async function createSubjectWithStructure(
   input: SubjectCreateInput
 ): Promise<CreatedSubjectWithStructure> {
   const subject = await createSubject(db, profileId, input);
+
+  if (subject.pedagogyMode === 'four_strands' && subject.languageCode) {
+    const milestones = generateLanguageCurriculum(subject.languageCode, 'A1');
+    await regenerateLanguageCurriculum(
+      db,
+      subject.id,
+      subject.languageCode,
+      'A1'
+    );
+    return {
+      subject,
+      structureType: 'narrow',
+      topicCount: milestones.length,
+    };
+  }
 
   try {
     const learnerAge = await getProfileAge(db, profileId);
@@ -117,6 +155,7 @@ export async function createSubjectWithStructure(
     return {
       subject,
       structureType: 'narrow',
+      topicCount: structure.topics.length,
     };
   } catch (error) {
     console.warn(
@@ -128,6 +167,7 @@ export async function createSubjectWithStructure(
   return {
     subject,
     structureType: 'narrow',
+    classificationFailed: true,
   };
 }
 
@@ -139,6 +179,31 @@ export async function getSubject(
   const repo = createScopedRepository(db, profileId);
   const row = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   return row ? mapSubjectRow(row) : null;
+}
+
+export async function configureLanguageSubject(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  input: LanguageSetupInput
+): Promise<Subject> {
+  const subject = await getSubject(db, profileId, subjectId);
+  if (!subject) {
+    throw new Error('Subject not found');
+  }
+  if (subject.pedagogyMode !== 'four_strands' || !subject.languageCode) {
+    throw new Error('Subject is not configured for language learning');
+  }
+
+  await setNativeLanguage(db, profileId, subjectId, input.nativeLanguage);
+  await regenerateLanguageCurriculum(
+    db,
+    subjectId,
+    subject.languageCode,
+    input.startingLevel
+  );
+
+  return subject;
 }
 
 export async function updateSubject(

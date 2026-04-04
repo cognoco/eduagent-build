@@ -25,10 +25,7 @@ export function usePendingCelebrations(options?: {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const celebrationsClient = (client as Record<string, any>)[
-          'celebrations'
-        ];
-        const res = await celebrationsClient.pending.$get({
+        const res = await client.celebrations.pending.$get({
           query: { viewer },
           init: {
             signal,
@@ -65,15 +62,12 @@ export function useMarkCelebrationsSeen(): UseMutationResult<
       viewer: 'child' | 'parent';
       profileId?: string;
     }) => {
-      const celebrationsClient = (client as Record<string, any>)[
-        'celebrations'
-      ];
-      const res = await celebrationsClient.seen.$post({
+      const res = await client.celebrations.seen.$post({
         json: { viewer },
         init: {
           headers: profileId ? { 'X-Profile-Id': profileId } : undefined,
         },
-      });
+      } as never);
       await assertOk(res);
       return (await res.json()) as { ok: boolean };
     },

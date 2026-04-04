@@ -27,11 +27,10 @@ export function useBooks(
       if (!subjectId) throw new Error('subjectId is required');
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- books route WIP, RPC type not yet inferred
-        const res = await (client.subjects[':subjectId'] as any).books.$get({
+        const res = await client.subjects[':subjectId'].books.$get({
           param: { subjectId },
           init: { signal },
-        });
+        } as never);
         await assertOk(res);
         const data = (await res.json()) as { books: CurriculumBook[] };
         return data.books;
@@ -57,13 +56,10 @@ export function useBookWithTopics(
         throw new Error('subjectId and bookId are required');
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- books route WIP, RPC type not yet inferred
-        const res = await (client.subjects[':subjectId'] as any).books[
-          ':bookId'
-        ].$get({
+        const res = await client.subjects[':subjectId'].books[':bookId'].$get({
           param: { subjectId, bookId },
           init: { signal },
-        });
+        } as never);
         await assertOk(res);
         return (await res.json()) as BookWithTopics;
       } finally {
@@ -94,13 +90,12 @@ export function useGenerateBookTopics(
           'Cannot generate topics: subjectId and bookId are required'
         );
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- books route WIP, RPC type not yet inferred
-      const res = await (client.subjects[':subjectId'] as any).books[':bookId'][
+      const res = await client.subjects[':subjectId'].books[':bookId'][
         'generate-topics'
       ].$post({
         param: { subjectId, bookId },
         json: input ?? {},
-      });
+      } as never);
       await assertOk(res);
       return (await res.json()) as BookWithTopics;
     },

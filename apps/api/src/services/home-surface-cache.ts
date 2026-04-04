@@ -107,15 +107,14 @@ export function buildFallbackHomeSurfaceCard(profileId: string): CoachingCard {
   return {
     id: generateUUIDv7(),
     profileId,
-    type: 'challenge',
-    title: 'Ready for a challenge?',
-    body: 'Keep building momentum.',
+    type: 'streak',
+    title: 'Ready to start?',
+    body: 'Begin a session to start building momentum.',
     priority: 3,
     expiresAt: new Date(now.getTime() + HOME_SURFACE_TTL_MS).toISOString(),
     createdAt: now.toISOString(),
-    topicId: generateUUIDv7(), // placeholder — no real topic for fallback card
-    difficulty: 'easy',
-    xpReward: 10,
+    currentStreak: 0,
+    graceRemaining: 0,
   };
 }
 
@@ -166,11 +165,16 @@ export async function readHomeSurfaceCacheData(
   };
 }
 
-// NOTE: read-modify-write is non-atomic. Two concurrent requests for the same
-// profile can race, silently dropping one update (e.g., lost interaction
-// counter increments). Acceptable for single-device mobile use at MVP.
-// If multi-device or parent+child concurrency becomes real, wrap in a
-// pg advisory lock or use a JSON-merge SQL expression.
+/**
+ * Atomically read-modify-write the home surface cache for a profile.
+ *
+ * Wraps the operation in a transaction with SELECT FOR UPDATE to prevent
+ * concurrent requests from silently overwriting each other's updates
+ * (e.g., lost interaction counter increments). Bug #25.
+ *
+ * For the first-write case (no row yet), an idempotent INSERT … ON CONFLICT
+ * DO NOTHING ensures a row exists before locking.
+ */
 export async function mergeHomeSurfaceCacheData(
   db: Database,
   profileId: string,
@@ -180,43 +184,55 @@ export async function mergeHomeSurfaceCacheData(
     expiresAt?: Date;
   }
 ): Promise<HomeSurfaceCacheData> {
-  const existing = await readHomeSurfaceCacheData(db, profileId);
-  const now = new Date();
-  const current =
-    existing?.data ?? normalizeHomeSurfaceCacheData(undefined, profileId);
-  const next: HomeSurfaceCacheData = {
-    ...merge(current),
-    kind: HOME_SURFACE_CACHE_KIND,
-    cachedAt: now.toISOString(),
-  };
-  const expiresAt =
-    options?.expiresAt ?? new Date(now.getTime() + HOME_SURFACE_TTL_MS);
+  return db.transaction(async (tx) => {
+    // Ensure a row exists so SELECT FOR UPDATE has something to lock.
+    // ON CONFLICT DO NOTHING is idempotent for concurrent first-writes.
+    const defaultData = normalizeHomeSurfaceCacheData(undefined, profileId);
+    await tx
+      .insert(coachingCardCache)
+      .values({
+        profileId,
+        cardData: defaultData,
+        pendingCelebrations: [] as PendingCelebration[],
+        expiresAt: new Date(Date.now() + HOME_SURFACE_TTL_MS),
+      })
+      .onConflictDoNothing({ target: coachingCardCache.profileId });
 
-  await db
-    .insert(coachingCardCache)
-    .values({
-      profileId,
-      cardData: next,
-      pendingCelebrations:
-        options?.pendingCelebrations ??
-        existing?.row.pendingCelebrations ??
-        ([] as PendingCelebration[]),
-      expiresAt,
-    })
-    .onConflictDoUpdate({
-      target: coachingCardCache.profileId,
-      set: {
+    // Acquire row-level lock — blocks concurrent merges for this profile
+    // until this transaction commits.
+    const [lockedRow] = await tx
+      .select()
+      .from(coachingCardCache)
+      .where(eq(coachingCardCache.profileId, profileId))
+      .for('update');
+
+    const now = new Date();
+    const current = lockedRow
+      ? normalizeHomeSurfaceCacheData(lockedRow.cardData, profileId)
+      : defaultData;
+    const next: HomeSurfaceCacheData = {
+      ...merge(current),
+      kind: HOME_SURFACE_CACHE_KIND,
+      cachedAt: now.toISOString(),
+    };
+    const expiresAt =
+      options?.expiresAt ?? new Date(now.getTime() + HOME_SURFACE_TTL_MS);
+
+    await tx
+      .update(coachingCardCache)
+      .set({
         cardData: next,
         pendingCelebrations:
           options?.pendingCelebrations ??
-          existing?.row.pendingCelebrations ??
+          lockedRow?.pendingCelebrations ??
           ([] as PendingCelebration[]),
         expiresAt,
         updatedAt: now,
-      },
-    });
+      })
+      .where(eq(coachingCardCache.profileId, profileId));
 
-  return next;
+    return next;
+  });
 }
 
 export async function recordHomeCardInteraction(

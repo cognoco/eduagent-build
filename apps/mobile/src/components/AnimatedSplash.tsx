@@ -91,10 +91,14 @@ type AnimatedSplashProps = {
  * Tap anywhere to skip.
  */
 export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
+  if (__DEV__) console.log('[Splash] AnimatedSplash MOUNTED');
+
   const systemScheme = useColorScheme();
   const isDark = systemScheme === 'dark';
   const C = useSplashColors(isDark);
   const reduceMotion = useReducedMotion();
+  if (__DEV__)
+    console.log('[Splash] reduceMotion=', reduceMotion, 'isDark=', isDark);
 
   // --- Shared values ---
   const pathDraw = useSharedValue(0);
@@ -116,7 +120,11 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
   // without re-triggering the animation choreography on prop identity changes.
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
-  const done = useCallback(() => onCompleteRef.current(), []);
+  const done = useCallback(() => {
+    if (__DEV__)
+      console.log('[Splash] done() called — animation completed normally');
+    onCompleteRef.current();
+  }, []);
 
   // Tap to skip
   const skip = useCallback(() => {
@@ -127,8 +135,16 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
 
   // --- Choreography ---
   useEffect(() => {
+    if (__DEV__)
+      console.log(
+        '[Splash] choreography useEffect fired, reduceMotion=',
+        reduceMotion
+      );
+
     // Accessibility: skip animation for users who prefer reduced motion
     if (reduceMotion) {
+      if (__DEV__)
+        console.warn('[Splash] reduceMotion=true — skipping animation');
       fade.value = withTiming(0, { duration: 200 }, (finished) => {
         if (finished) runOnJS(done)();
       });

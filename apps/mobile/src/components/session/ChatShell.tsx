@@ -50,6 +50,8 @@ interface ChatShellProps {
   initialVoiceEnabled?: boolean;
   inputMode?: 'text' | 'voice';
   onInputModeChange?: (mode: 'text' | 'voice') => void;
+  speechRecognitionLanguage?: string;
+  textToSpeechLanguage?: string;
   /** Optional testID for the message scroll area (used by E2E flows). */
   messagesTestID?: string;
 }
@@ -113,6 +115,8 @@ export function ChatShell({
   initialVoiceEnabled,
   inputMode,
   onInputModeChange,
+  speechRecognitionLanguage,
+  textToSpeechLanguage,
   messagesTestID,
 }: ChatShellProps) {
   const router = useRouter();
@@ -137,7 +141,7 @@ export function ChatShell({
     startListening,
     stopListening,
     clearTranscript,
-  } = useSpeechRecognition();
+  } = useSpeechRecognition({ lang: speechRecognitionLanguage });
 
   // TTS hook
   const {
@@ -150,7 +154,7 @@ export function ChatShell({
     isPaused: ttsPaused,
     rate,
     setRate,
-  } = useTextToSpeech();
+  } = useTextToSpeech({ language: textToSpeechLanguage });
 
   // Track whether we have a transcript ready for preview
   const [pendingTranscript, setPendingTranscript] = useState('');

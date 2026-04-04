@@ -1,6 +1,7 @@
 import type { SubjectResolveResult } from '@eduagent/schemas';
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
+import { detectLanguageHint } from '../data/languages';
 
 // ---------------------------------------------------------------------------
 // Subject Name Resolution — classify user input before subject creation
@@ -65,6 +66,9 @@ export async function resolveSubjectName(
       const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
       const status = parseStatus(parsed.status);
       const suggestions = parseSuggestions(parsed.suggestions);
+      const detectedLanguage = detectLanguageHint(
+        String(parsed.resolvedName ?? rawInput)
+      );
       return {
         status,
         resolvedName:
@@ -73,6 +77,9 @@ export async function resolveSubjectName(
             : String(parsed.resolvedName ?? rawInput),
         suggestions,
         displayMessage: String(parsed.displayMessage ?? ''),
+        isLanguageLearning: detectedLanguage != null,
+        detectedLanguageCode: detectedLanguage?.code ?? null,
+        detectedLanguageName: detectedLanguage?.names[0] ?? null,
       };
     }
   } catch {
@@ -80,11 +87,15 @@ export async function resolveSubjectName(
   }
 
   // Fallback: if LLM response is unparseable, treat as direct match
+  const fallbackLanguage = detectLanguageHint(rawInput);
   return {
     status: 'direct_match',
     resolvedName: rawInput,
     suggestions: [{ name: rawInput, description: '' }],
     displayMessage: '',
+    isLanguageLearning: fallbackLanguage != null,
+    detectedLanguageCode: fallbackLanguage?.code ?? null,
+    detectedLanguageName: fallbackLanguage?.names[0] ?? null,
   };
 }
 

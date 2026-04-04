@@ -24,7 +24,7 @@ export function useHomeCards(): UseQueryResult<HomeCardsResponse> {
       try {
         const res = await client['home-cards'].$get({
           init: { signal },
-        });
+        } as never);
         await assertOk(res);
         return (await res.json()) as HomeCardsResponse;
       } finally {

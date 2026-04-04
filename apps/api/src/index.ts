@@ -41,6 +41,8 @@ import { retentionRoutes } from './routes/retention';
 import { progressRoutes } from './routes/progress';
 import { streakRoutes } from './routes/streaks';
 import { settingsRoutes } from './routes/settings';
+import { vocabularyRoutes } from './routes/vocabulary';
+import { languageProgressRoutes } from './routes/language-progress';
 import { coachingCardRoutes } from './routes/coaching-card';
 import { homeCardRoutes } from './routes/home-cards';
 import { celebrationRoutes } from './routes/celebrations';
@@ -181,6 +183,8 @@ const routes = api
   .route('/', progressRoutes)
   .route('/', streakRoutes)
   .route('/', settingsRoutes)
+  .route('/', vocabularyRoutes)
+  .route('/', languageProgressRoutes)
   .route('/', coachingCardRoutes)
   .route('/', homeCardRoutes)
   .route('/', celebrationRoutes)

@@ -65,7 +65,7 @@ function mockRetentionCardRow(
 }
 
 function createMockDb(): Database {
-  return {
+  const db: Record<string, unknown> = {
     query: {
       streaks: {
         findFirst: jest.fn().mockResolvedValue(null),
@@ -77,15 +77,28 @@ function createMockDb(): Database {
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
         onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),
+        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
         returning: jest.fn().mockResolvedValue([]),
       }),
     }),
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue([]),
+        where: jest.fn().mockReturnValue({
+          for: jest.fn().mockResolvedValue([]),
+        }),
       }),
     }),
-  } as unknown as Database;
+    update: jest.fn().mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
+      }),
+    }),
+  };
+  // transaction passes itself as tx so the same mock chains work inside
+  db.transaction = jest
+    .fn()
+    .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
+  return db as unknown as Database;
 }
 
 function setupScopedRepo({
@@ -303,7 +316,7 @@ describe('precomputeCoachingCard', () => {
 // ---------------------------------------------------------------------------
 
 describe('writeCoachingCardCache', () => {
-  it('upserts card to coaching_card_cache table', async () => {
+  it('writes card to coaching_card_cache via transaction', async () => {
     const db = createMockDb();
     const card: CoachingCard = {
       id: 'mock-uuid-v7',
@@ -321,11 +334,13 @@ describe('writeCoachingCardCache', () => {
 
     await writeCoachingCardCache(db, profileId, card);
 
+    // mergeHomeSurfaceCacheData now uses a transaction with:
+    // 1. insert().values().onConflictDoNothing() — ensure row exists
+    // 2. select().from().where().for('update') — lock row
+    // 3. update().set().where() — write merged data
+    expect(db.transaction).toHaveBeenCalled();
     expect(db.insert).toHaveBeenCalled();
-    const valuesCall = (db.insert as jest.Mock).mock.results[0].value.values;
-    expect(valuesCall).toHaveBeenCalled();
-    const onConflictCall = valuesCall.mock.results[0].value.onConflictDoUpdate;
-    expect(onConflictCall).toHaveBeenCalled();
+    expect(db.update).toHaveBeenCalled();
   });
 
   it('sets expiresAt to 24 hours from now on write', async () => {
@@ -346,9 +361,10 @@ describe('writeCoachingCardCache', () => {
 
     await writeCoachingCardCache(db, profileId, card);
 
-    const valuesCall = (db.insert as jest.Mock).mock.results[0].value.values;
-    const insertedValues = valuesCall.mock.calls[0][0];
-    const expiresAt = insertedValues.expiresAt as Date;
+    // expiresAt is now passed to update().set() instead of insert().values()
+    const setCall = (db.update as jest.Mock).mock.results[0].value.set;
+    const setValues = setCall.mock.calls[0][0];
+    const expiresAt = setValues.expiresAt as Date;
     const expected = new Date(NOW.getTime() + 24 * 60 * 60 * 1000);
     expect(expiresAt.getTime()).toBe(expected.getTime());
   });
@@ -440,9 +456,15 @@ describe('readCoachingCardCache', () => {
 
 describe('getCoachingCardForProfile', () => {
   function setupSessionCount(db: Database, count: number): void {
+    // select() is used for both session-count queries and FOR UPDATE locks.
+    // The mock must support both: .where() resolves to [{count}] for counts,
+    // and .where().for('update') resolves to [] for the cache lock.
+    const whereResult = Object.assign(Promise.resolve([{ count }]), {
+      for: jest.fn().mockResolvedValue([]),
+    });
     (db.select as jest.Mock).mockReturnValue({
       from: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue([{ count }]),
+        where: jest.fn().mockReturnValue(whereResult),
       }),
     });
   }

@@ -1,6 +1,9 @@
 import { and, eq } from 'drizzle-orm';
 import {
   assessments,
+  curriculumTopics,
+  curricula,
+  subjects,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
@@ -278,6 +281,29 @@ function mapAssessmentRow(
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+export async function loadTopicTitle(
+  db: Database,
+  topicId: string,
+  profileId?: string
+): Promise<string> {
+  const query = db
+    .select({ title: curriculumTopics.title })
+    .from(curriculumTopics)
+    .innerJoin(curricula, eq(curriculumTopics.curriculumId, curricula.id))
+    .innerJoin(subjects, eq(curricula.subjectId, subjects.id))
+    .where(
+      profileId
+        ? and(
+            eq(curriculumTopics.id, topicId),
+            eq(subjects.profileId, profileId)
+          )
+        : eq(curriculumTopics.id, topicId)
+    )
+    .limit(1);
+  const [topic] = await query;
+  return topic?.title ?? topicId;
 }
 
 export async function createAssessment(

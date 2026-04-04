@@ -4,6 +4,9 @@ import {
   updateRetentionFromSession,
   updateNeedsDeepeningProgress,
 } from '../../services/retention-data';
+import { getCurrentLanguageProgress } from '../../services/language-curriculum';
+import { extractVocabularyFromTranscript } from '../../services/vocabulary-extract';
+import { upsertExtractedVocabulary } from '../../services/vocabulary';
 import { createPendingSessionSummary } from '../../services/summaries';
 import { recordSessionActivity } from '../../services/streaks';
 import {
@@ -31,7 +34,9 @@ import {
   curriculumTopics,
   retentionCards,
   sessionEvents,
+  subjects,
 } from '@eduagent/database';
+import type { Database } from '@eduagent/database';
 import { and, asc, eq } from 'drizzle-orm';
 
 // ---------------------------------------------------------------------------
@@ -50,11 +55,16 @@ interface StepOutcome {
 async function runIsolated(
   name: string,
   profileId: string,
-  fn: () => Promise<void>
+  fn: () => Promise<number | undefined | void>
 ): Promise<StepOutcome> {
   try {
-    await fn();
-    return { step: name, status: 'ok' };
+    const result = await fn();
+    return {
+      step: name,
+      status: 'ok',
+      // Propagate numeric return values (e.g. sm2Quality from verification)
+      ...(typeof result === 'number' ? { qualityRating: result } : {}),
+    };
   } catch (err) {
     captureException(err, { profileId });
     console.error(`[session-completed] step "${name}" failed:`, err);
@@ -83,6 +93,12 @@ export const sessionCompleted = inngest.createFunction(
     } = event.data;
 
     const outcomes: StepOutcome[] = [];
+    let previousLanguageProgress: Awaited<
+      ReturnType<typeof getCurrentLanguageProgress>
+    > | null = null;
+    let nextLanguageProgress: Awaited<
+      ReturnType<typeof getCurrentLanguageProgress>
+    > | null = null;
 
     const loadTopicTitle = async (
       db: ReturnType<typeof getStepDatabase>,
@@ -170,14 +186,14 @@ export const sessionCompleted = inngest.createFunction(
           async () => {
             const db = getStepDatabase();
             if (vType === 'evaluate') {
-              await processEvaluateCompletion(
+              return processEvaluateCompletion(
                 db,
                 profileId,
                 sessionId,
                 topicId
               );
             } else {
-              await processTeachBackCompletion(
+              return processTeachBackCompletion(
                 db,
                 profileId,
                 sessionId,
@@ -225,6 +241,96 @@ export const sessionCompleted = inngest.createFunction(
       })
     );
 
+    outcomes.push(
+      await step.run('update-vocabulary-retention', async () => {
+        if (!subjectId) {
+          return {
+            step: 'update-vocabulary-retention',
+            status: 'skipped' as const,
+          };
+        }
+
+        return runIsolated(
+          'update-vocabulary-retention',
+          profileId,
+          async () => {
+            const db = getStepDatabase();
+            const subject = await db.query.subjects.findFirst({
+              where: eq(subjects.id, subjectId),
+            });
+            if (
+              !subject ||
+              subject.pedagogyMode !== 'four_strands' ||
+              !subject.languageCode
+            ) {
+              return;
+            }
+
+            previousLanguageProgress = await getCurrentLanguageProgress(
+              db,
+              profileId,
+              subjectId
+            );
+
+            const events = await db.query.sessionEvents.findMany({
+              where: and(
+                eq(sessionEvents.sessionId, sessionId),
+                eq(sessionEvents.profileId, profileId)
+              ),
+              orderBy: asc(sessionEvents.createdAt),
+            });
+
+            const transcript = events
+              .filter(
+                (entry) =>
+                  entry.eventType === 'user_message' ||
+                  entry.eventType === 'ai_response'
+              )
+              .map((entry) => ({
+                role:
+                  entry.eventType === 'user_message'
+                    ? ('user' as const)
+                    : ('assistant' as const),
+                content: entry.content,
+              }));
+
+            const extractedVocabulary = await extractVocabularyFromTranscript(
+              transcript,
+              subject.languageCode
+            );
+
+            if (extractedVocabulary.length === 0) {
+              nextLanguageProgress = previousLanguageProgress;
+              return;
+            }
+
+            const quality = Math.max(
+              0,
+              Math.min(5, completionQualityRating ?? 3)
+            );
+            await upsertExtractedVocabulary(
+              db,
+              profileId,
+              subjectId,
+              extractedVocabulary.map((item) => ({
+                ...item,
+                milestoneId:
+                  previousLanguageProgress?.currentMilestone?.milestoneId ??
+                  undefined,
+                quality,
+              }))
+            );
+
+            nextLanguageProgress = await getCurrentLanguageProgress(
+              db,
+              profileId,
+              subjectId
+            );
+          }
+        );
+      })
+    );
+
     // Step 1c: Update needs-deepening progress (FR63)
     outcomes.push(
       await step.run('update-needs-deepening', async () => {
@@ -245,6 +351,35 @@ export const sessionCompleted = inngest.createFunction(
           }
         });
       })
+    );
+
+    outcomes.push(
+      await step.run('check-milestone-completion', async () =>
+        runIsolated('check-milestone-completion', profileId, async () => {
+          const db = getStepDatabase();
+          const previousMilestoneId =
+            previousLanguageProgress?.currentMilestone?.milestoneId;
+          const nextMilestoneId =
+            nextLanguageProgress?.currentMilestone?.milestoneId;
+
+          if (
+            !previousMilestoneId ||
+            !nextLanguageProgress ||
+            previousMilestoneId === nextMilestoneId
+          ) {
+            return;
+          }
+
+          await queueCelebration(
+            db,
+            profileId,
+            'comet',
+            'topic_mastered',
+            previousLanguageProgress?.currentMilestone?.milestoneTitle ??
+              previousMilestoneId
+          );
+        })
+      )
     );
 
     // Step 2: Write coaching card / session summary
@@ -268,7 +403,8 @@ export const sessionCompleted = inngest.createFunction(
     );
 
     // Step 3: Update dashboard — streaks + XP
-    // Capture streak result to avoid re-querying in the celebrations step (race condition fix)
+    // FR86: Only count toward Honest Streak when recall quality >= 3 (pass)
+    // XP insertion still runs for any completed session.
     let updatedStreak: { currentStreak: number; longestStreak: number } | null =
       null;
     outcomes.push(
@@ -282,14 +418,27 @@ export const sessionCompleted = inngest.createFunction(
               ? new Date(timestamp).toISOString().slice(0, 10)
               : new Date().toISOString().slice(0, 10);
 
-            updatedStreak = await recordSessionActivity(db, profileId, today);
+            await db.transaction(async (tx) => {
+              const txDb = tx as unknown as Database;
+              // Gate: Only increment streak on recall-pass (quality >= 3)
+              if (
+                completionQualityRating != null &&
+                completionQualityRating >= 3
+              ) {
+                updatedStreak = await recordSessionActivity(
+                  txDb,
+                  profileId,
+                  today
+                );
+              }
 
-            await insertSessionXpEntry(
-              db,
-              profileId,
-              topicId ?? null,
-              subjectId
-            );
+              await insertSessionXpEntry(
+                txDb,
+                profileId,
+                topicId ?? null,
+                subjectId
+              );
+            });
           }
         );
         return result;
