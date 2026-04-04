@@ -110,6 +110,20 @@ jest.mock('@eduagent/database', () => databaseMock());
 jest.mock('../../apps/api/src/inngest/client', () => inngestClientMock());
 jest.mock('../../apps/api/src/services/settings', () => settingsMock());
 jest.mock('../../apps/api/src/services/billing', () => billingMock(ACCOUNT_ID));
+jest.mock('../../apps/api/src/services/profile', () => ({
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+  findOwnerProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+}));
 
 // Mock session service for smoke test — custom return shapes needed
 jest.mock('../../apps/api/src/services/session', () => ({
@@ -204,6 +218,7 @@ const TEST_ENV = {
 const AUTH_HEADERS = {
   Authorization: 'Bearer valid.jwt.token',
   'Content-Type': 'application/json',
+  'X-Profile-Id': 'test-profile-id',
 };
 
 // ---------------------------------------------------------------------------
