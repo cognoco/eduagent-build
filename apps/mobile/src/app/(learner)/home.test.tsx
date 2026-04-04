@@ -91,12 +91,13 @@ describe('HomeScreen intent router', () => {
     expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 
-  it('renders LearnerScreen when profiles are still loading', () => {
+  it('renders loading placeholder when profiles are still loading', () => {
     mockProfiles = [];
     mockActiveProfile = null;
 
     render(<HomeScreen />);
 
-    expect(screen.getByTestId('learner-screen')).toBeTruthy();
+    expect(screen.queryByTestId('learner-screen')).toBeNull();
+    expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 });

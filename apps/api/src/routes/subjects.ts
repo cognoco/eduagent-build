@@ -41,7 +41,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       } catch {
         return apiError(
           c,
-          502,
+          500,
           ERROR_CODES.INTERNAL_ERROR,
           'Subject name resolution failed — please try again'
         );
@@ -61,7 +61,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       } catch {
         return apiError(
           c,
-          502,
+          500,
           ERROR_CODES.INTERNAL_ERROR,
           'Subject classification failed'
         );

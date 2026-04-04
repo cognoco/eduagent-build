@@ -308,7 +308,8 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
   });
 
   it('calls streak and XP services in update-dashboard step', async () => {
-    await executeChain(createEventData());
+    // qualityRating >= 3 required for streak (FR86 honest streak gate)
+    await executeChain(createEventData({ qualityRating: 4 }));
 
     expect(mockRecordSessionActivity).toHaveBeenCalledWith(
       expect.anything(),
@@ -316,6 +317,18 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
       '2026-02-23' // date portion of timestamp
     );
 
+    expect(mockInsertSessionXpEntry).toHaveBeenCalledWith(
+      expect.anything(),
+      'profile-int-001',
+      'topic-int-001',
+      'subject-int-001'
+    );
+  });
+
+  it('skips streak but still records XP when qualityRating < 3 (FR86)', async () => {
+    await executeChain(createEventData({ qualityRating: 2 }));
+
+    expect(mockRecordSessionActivity).not.toHaveBeenCalled();
     expect(mockInsertSessionXpEntry).toHaveBeenCalledWith(
       expect.anything(),
       'profile-int-001',

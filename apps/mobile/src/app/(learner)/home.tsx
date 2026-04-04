@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { ParentGateway, LearnerScreen } from '../../components/home';
 import { useCelebration } from '../../hooks/use-celebration';
 import {
@@ -33,6 +33,16 @@ export default function HomeScreen(): React.ReactElement {
       void markCelebrationsSeen.mutateAsync({ viewer: 'child' });
     },
   });
+
+  // Neutral placeholder while profiles load — prevents flash of wrong content
+  // (e.g. parent briefly seeing LearnerScreen before ParentGateway renders).
+  if (profiles.length === 0 && activeProfile === null) {
+    return (
+      <View className="flex-1 bg-background items-center justify-center">
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1">

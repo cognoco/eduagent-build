@@ -146,15 +146,15 @@ jobs:
       - name: Build API
         run: pnpm exec nx run api:build
 
-      - name: Sync database schema
+      - name: Run database migrations
         working-directory: packages/database
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
-          echo "Pushing schema to ${DEPLOY_ENV} database..."
-          npx drizzle-kit push --force
-          echo "✓ Database schema is in sync"
+          echo "Running migrations on ${DEPLOY_ENV} database..."
+          npx drizzle-kit migrate
+          echo "✓ Database migrations applied"
 
       - name: Deploy to Cloudflare Workers
         working-directory: apps/api

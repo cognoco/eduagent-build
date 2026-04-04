@@ -14,9 +14,16 @@ jest.mock('../middleware/jwt', () => ({
   }),
 }));
 
-jest.mock('@eduagent/database', () => ({
-  createDatabase: jest.fn().mockReturnValue({}),
-}));
+jest.mock('@eduagent/database', () => {
+  const mockDb = {
+    transaction: jest
+      .fn()
+      .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(mockDb)),
+  };
+  return {
+    createDatabase: jest.fn().mockReturnValue(mockDb),
+  };
+});
 
 jest.mock('../services/account', () => ({
   findOrCreateAccount: jest.fn().mockResolvedValue({
@@ -125,6 +132,7 @@ import { app } from '../index';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  DATABASE_URL: 'postgresql://test:test@localhost/test',
 };
 
 const AUTH_HEADERS = {
