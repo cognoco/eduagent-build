@@ -34,7 +34,7 @@ function createMockDb(pendingCelebrations: unknown[] = []) {
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({
         where: jest.fn().mockReturnValue({
-          for: jest.fn().mockResolvedValue([row]),
+          for: jest.fn().mockResolvedValue(row ? [row] : []),
         }),
       }),
     }),

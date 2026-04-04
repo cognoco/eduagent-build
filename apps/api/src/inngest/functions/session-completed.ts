@@ -36,6 +36,7 @@ import {
   sessionEvents,
   subjects,
 } from '@eduagent/database';
+import type { Database } from '@eduagent/database';
 import { and, asc, eq } from 'drizzle-orm';
 
 // ---------------------------------------------------------------------------
@@ -417,20 +418,27 @@ export const sessionCompleted = inngest.createFunction(
               ? new Date(timestamp).toISOString().slice(0, 10)
               : new Date().toISOString().slice(0, 10);
 
-            // Gate: Only increment streak on recall-pass (quality >= 3)
-            if (
-              completionQualityRating != null &&
-              completionQualityRating >= 3
-            ) {
-              updatedStreak = await recordSessionActivity(db, profileId, today);
-            }
+            await db.transaction(async (tx) => {
+              const txDb = tx as unknown as Database;
+              // Gate: Only increment streak on recall-pass (quality >= 3)
+              if (
+                completionQualityRating != null &&
+                completionQualityRating >= 3
+              ) {
+                updatedStreak = await recordSessionActivity(
+                  txDb,
+                  profileId,
+                  today
+                );
+              }
 
-            await insertSessionXpEntry(
-              db,
-              profileId,
-              topicId ?? null,
-              subjectId
-            );
+              await insertSessionXpEntry(
+                txDb,
+                profileId,
+                topicId ?? null,
+                subjectId
+              );
+            });
           }
         );
         return result;

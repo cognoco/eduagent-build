@@ -108,7 +108,7 @@ routes = [
 
 [env.staging.vars]
 ENVIRONMENT = "staging"
-APP_URL = "https://api-stg.mentomate.com"
+APP_URL = "https://app.mentomate.com"
 LOG_LEVEL = "debug"
 EMAIL_FROM = "staging-noreply@mentomate.com"
 

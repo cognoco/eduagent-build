@@ -14,14 +14,6 @@ jest.mock('../common', () => ({
   ProfileSwitcher: () => null,
 }));
 
-jest.mock('../../lib/profile', () => ({
-  useProfile: () => ({
-    profiles: [{ id: 'p1', displayName: 'Alex', isOwner: true }],
-    activeProfile: { id: 'p1', displayName: 'Alex', isOwner: true },
-    switchProfile: jest.fn(),
-  }),
-}));
-
 jest.mock('../../lib/theme', () => ({
   useThemeColors: () => ({ textPrimary: '#ffffff' }),
 }));
@@ -41,6 +33,12 @@ jest.mock('../../hooks/use-subjects', () => ({
 
 const { LearnerScreen } = require('./LearnerScreen');
 
+const defaultProps = {
+  profiles: [{ id: 'p1', displayName: 'Alex', isOwner: true }],
+  activeProfile: { id: 'p1', displayName: 'Alex', isOwner: true },
+  switchProfile: jest.fn(),
+};
+
 describe('LearnerScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -48,7 +46,7 @@ describe('LearnerScreen', () => {
   });
 
   it('renders greeting with profile name', () => {
-    render(<LearnerScreen />);
+    render(<LearnerScreen {...defaultProps} />);
 
     expect(screen.getByText('Good morning, Alex!')).toBeTruthy();
     expect(screen.getByText('Fresh mind, fresh start')).toBeTruthy();
@@ -56,14 +54,14 @@ describe('LearnerScreen', () => {
 
   describe('empty library', () => {
     it('shows "Learn something new!" and "Help with assignment?"', () => {
-      render(<LearnerScreen />);
+      render(<LearnerScreen {...defaultProps} />);
 
       expect(screen.getByText('Learn something new!')).toBeTruthy();
       expect(screen.getByText('Help with assignment?')).toBeTruthy();
     });
 
     it('hides "Repeat & review"', () => {
-      render(<LearnerScreen />);
+      render(<LearnerScreen {...defaultProps} />);
 
       expect(screen.queryByText('Repeat & review')).toBeNull();
     });
@@ -75,7 +73,7 @@ describe('LearnerScreen', () => {
     });
 
     it('shows all three intent cards', () => {
-      render(<LearnerScreen />);
+      render(<LearnerScreen {...defaultProps} />);
 
       expect(screen.getByText('Learn something new!')).toBeTruthy();
       expect(screen.getByText('Help with assignment?')).toBeTruthy();
@@ -87,7 +85,7 @@ describe('LearnerScreen', () => {
     it('hides "Repeat & review" when all subjects are archived', () => {
       mockSubjects = [{ id: 's1', name: 'Math', status: 'archived' }];
 
-      render(<LearnerScreen />);
+      render(<LearnerScreen {...defaultProps} />);
 
       expect(screen.queryByText('Repeat & review')).toBeNull();
     });
@@ -95,14 +93,14 @@ describe('LearnerScreen', () => {
 
   describe('navigation', () => {
     it('navigates to learn-new on "Learn something new!"', () => {
-      render(<LearnerScreen />);
+      render(<LearnerScreen {...defaultProps} />);
 
       fireEvent.press(screen.getByTestId('intent-learn-new'));
       expect(mockPush).toHaveBeenCalledWith('/(learner)/learn-new');
     });
 
     it('navigates to homework camera on "Help with assignment?"', () => {
-      render(<LearnerScreen />);
+      render(<LearnerScreen {...defaultProps} />);
 
       fireEvent.press(screen.getByTestId('intent-homework'));
       expect(mockPush).toHaveBeenCalledWith('/(learner)/homework/camera');
@@ -111,7 +109,7 @@ describe('LearnerScreen', () => {
     it('navigates to library on "Repeat & review"', () => {
       mockSubjects = [{ id: 's1', name: 'Math', status: 'active' }];
 
-      render(<LearnerScreen />);
+      render(<LearnerScreen {...defaultProps} />);
 
       fireEvent.press(screen.getByTestId('intent-review'));
       expect(mockPush).toHaveBeenCalledWith('/(learner)/library');
@@ -122,14 +120,14 @@ describe('LearnerScreen', () => {
     it('shows back button when onBack provided', () => {
       const onBack = jest.fn();
 
-      render(<LearnerScreen onBack={onBack} />);
+      render(<LearnerScreen {...defaultProps} onBack={onBack} />);
 
       fireEvent.press(screen.getByTestId('learner-back'));
       expect(onBack).toHaveBeenCalledTimes(1);
     });
 
     it('hides back button when onBack not provided', () => {
-      render(<LearnerScreen />);
+      render(<LearnerScreen {...defaultProps} />);
 
       expect(screen.queryByTestId('learner-back')).toBeNull();
     });

@@ -93,9 +93,8 @@ describe('LearnNewScreen', () => {
 
     render(<LearnNewScreen />);
 
-    await waitFor(() => {
-      fireEvent.press(screen.getByTestId('intent-resume'));
-    });
+    const resumeCta = await screen.findByTestId('intent-resume');
+    fireEvent.press(resumeCta);
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(learner)/session',

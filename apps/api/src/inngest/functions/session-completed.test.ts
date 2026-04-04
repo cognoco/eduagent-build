@@ -9,7 +9,7 @@ jest.mock('@eduagent/database', () => {
       const chainable = () => ({
         from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
       });
-      return {
+      const db: Record<string, unknown> = {
         query: {
           sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
           curriculumTopics: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -18,6 +18,10 @@ jest.mock('@eduagent/database', () => {
         },
         select: chainable,
       };
+      db.transaction = jest
+        .fn()
+        .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
+      return db;
     }),
     sessionEvents: {
       sessionId: col('sessionId'),

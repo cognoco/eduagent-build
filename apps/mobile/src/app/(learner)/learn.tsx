@@ -1,8 +1,17 @@
 import { useRouter } from 'expo-router';
 import { LearnerScreen } from '../../components/home';
+import { useProfile } from '../../lib/profile';
 
 export default function LearnRoute(): React.ReactElement {
   const router = useRouter();
+  const { profiles, activeProfile, switchProfile } = useProfile();
 
-  return <LearnerScreen onBack={() => router.back()} />;
+  return (
+    <LearnerScreen
+      profiles={profiles}
+      activeProfile={activeProfile}
+      switchProfile={switchProfile}
+      onBack={() => router.back()}
+    />
+  );
 }

@@ -21,22 +21,25 @@ function hasLinkedChildren(
 }
 
 export default function HomeScreen(): React.ReactElement {
-  const { profiles, activeProfile } = useProfile();
+  const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const { data: pendingCelebrations } = usePendingCelebrations();
   const markCelebrationsSeen = useMarkCelebrationsSeen();
+  const isOwner = activeProfile?.isOwner === true;
   const { CelebrationOverlay } = useCelebration({
     queue: pendingCelebrations ?? [],
     celebrationLevel,
-    audience: activeProfile?.isOwner ? 'adult' : 'child',
+    audience: isOwner ? 'adult' : 'child',
     onAllComplete: () => {
-      void markCelebrationsSeen.mutateAsync({ viewer: 'child' });
+      void markCelebrationsSeen.mutateAsync({
+        viewer: isOwner ? 'parent' : 'child',
+      });
     },
   });
 
   // Neutral placeholder while profiles load — prevents flash of wrong content
   // (e.g. parent briefly seeing LearnerScreen before ParentGateway renders).
-  if (profiles.length === 0 && activeProfile === null) {
+  if (isLoading) {
     return (
       <View className="flex-1 bg-background items-center justify-center">
         <ActivityIndicator size="large" />
@@ -47,9 +50,17 @@ export default function HomeScreen(): React.ReactElement {
   return (
     <View className="flex-1">
       {hasLinkedChildren(activeProfile, profiles) ? (
-        <ParentGateway />
+        <ParentGateway
+          profiles={profiles}
+          activeProfile={activeProfile}
+          switchProfile={switchProfile}
+        />
       ) : (
-        <LearnerScreen />
+        <LearnerScreen
+          profiles={profiles}
+          activeProfile={activeProfile}
+          switchProfile={switchProfile}
+        />
       )}
       {CelebrationOverlay}
     </View>

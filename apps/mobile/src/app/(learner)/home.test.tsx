@@ -10,12 +10,14 @@ let mockActiveProfile: {
   displayName: string;
   isOwner: boolean;
 } | null = null;
+let mockIsLoading = false;
 
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
     profiles: mockProfiles,
     activeProfile: mockActiveProfile,
     switchProfile: jest.fn(),
+    isLoading: mockIsLoading,
   }),
 }));
 
@@ -53,6 +55,7 @@ const HomeScreen = require('./home').default;
 describe('HomeScreen intent router', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsLoading = false;
   });
 
   it('renders LearnerScreen for solo learner (owner, no children)', () => {
@@ -94,6 +97,7 @@ describe('HomeScreen intent router', () => {
   it('renders loading placeholder when profiles are still loading', () => {
     mockProfiles = [];
     mockActiveProfile = null;
+    mockIsLoading = true;
 
     render(<HomeScreen />);
 

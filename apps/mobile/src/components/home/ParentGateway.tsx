@@ -1,10 +1,9 @@
 import { ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { DashboardData } from '@eduagent/schemas';
+import type { DashboardData, Profile } from '@eduagent/schemas';
 import { ProfileSwitcher } from '../common';
 import { useDashboard } from '../../hooks/use-dashboard';
-import { useProfile } from '../../lib/profile';
 import { getGreeting } from '../../lib/greeting';
 import { IntentCard } from './IntentCard';
 
@@ -29,10 +28,19 @@ function getChildHighlight(dashboard: DashboardData | undefined): string {
   return 'No activity today';
 }
 
-export function ParentGateway(): React.ReactElement {
+export interface ParentGatewayProps {
+  profiles: Profile[];
+  activeProfile: Profile | null;
+  switchProfile: (profileId: string) => Promise<void>;
+}
+
+export function ParentGateway({
+  profiles,
+  activeProfile,
+  switchProfile,
+}: ParentGatewayProps): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { profiles, activeProfile, switchProfile } = useProfile();
   const { data: dashboard } = useDashboard();
   const { title, subtitle } = getGreeting(activeProfile?.displayName ?? '');
 

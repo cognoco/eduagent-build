@@ -26,8 +26,10 @@ export default function LearnNewScreen(): React.ReactElement {
     async function loadRecoveryMarker(): Promise<void> {
       try {
         const marker = await readSessionRecoveryMarker(activeProfile?.id);
-        if (!cancelled && marker && isRecoveryMarkerFresh(marker)) {
-          setRecoveryMarker(marker);
+        if (!cancelled) {
+          setRecoveryMarker(
+            marker && isRecoveryMarkerFresh(marker) ? marker : null
+          );
         }
       } catch {
         if (!cancelled) {

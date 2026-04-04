@@ -88,7 +88,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       console.error('[POST /subjects] Unhandled error:', err);
       return apiError(
         c,
-        502,
+        500,
         ERROR_CODES.INTERNAL_ERROR,
         'Subject creation failed — please try again'
       );

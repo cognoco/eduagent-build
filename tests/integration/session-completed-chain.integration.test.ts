@@ -26,7 +26,11 @@ jest.mock('@eduagent/database', () => {
     chain.query = {
       sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
       streaks: { findFirst: jest.fn().mockResolvedValue(null) },
+      subjects: { findFirst: jest.fn().mockResolvedValue(null) },
     };
+    chain.transaction = jest
+      .fn()
+      .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(chain));
     return chain;
   };
   return {
@@ -44,6 +48,12 @@ jest.mock('@eduagent/database', () => {
       createdAt: 'createdAt',
     },
     streaks: { profileId: 'profileId' },
+    subjects: {
+      id: 'id',
+      profileId: 'profileId',
+      pedagogyMode: 'pedagogyMode',
+      languageCode: 'languageCode',
+    },
   };
 });
 
@@ -149,6 +159,27 @@ jest.mock('../../apps/api/src/services/celebrations', () => ({
   queueCelebration: (...args: unknown[]) => mockQueueCelebration(...args),
 }));
 
+const mockGetCurrentLanguageProgress = jest.fn().mockResolvedValue(null);
+
+jest.mock('../../apps/api/src/services/language-curriculum', () => ({
+  getCurrentLanguageProgress: (...args: unknown[]) =>
+    mockGetCurrentLanguageProgress(...args),
+}));
+
+const mockExtractVocabularyFromTranscript = jest.fn().mockResolvedValue([]);
+
+jest.mock('../../apps/api/src/services/vocabulary-extract', () => ({
+  extractVocabularyFromTranscript: (...args: unknown[]) =>
+    mockExtractVocabularyFromTranscript(...args),
+}));
+
+const mockUpsertExtractedVocabulary = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../../apps/api/src/services/vocabulary', () => ({
+  upsertExtractedVocabulary: (...args: unknown[]) =>
+    mockUpsertExtractedVocabulary(...args),
+}));
+
 const mockCaptureException = jest.fn();
 
 jest.mock('../../apps/api/src/services/sentry', () => ({
@@ -228,21 +259,23 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
   });
 
   // -----------------------------------------------------------------------
-  // Happy path — all 8 steps execute successfully
+  // Happy path — all 12 steps execute successfully
   // -----------------------------------------------------------------------
 
-  it('executes all 10 steps and returns completed status', async () => {
+  it('executes all 12 steps and returns completed status', async () => {
     const result = await executeChain(createEventData());
 
     expect(result.status).toBe('completed');
     expect(result.sessionId).toBe('session-int-001');
-    expect(result.outcomes).toHaveLength(10);
+    expect(result.outcomes).toHaveLength(12);
 
     const stepNames = result.outcomes.map((o) => o.step);
     expect(stepNames).toEqual([
       'process-verification-completion',
       'update-retention',
+      'update-vocabulary-retention',
       'update-needs-deepening',
+      'check-milestone-completion',
       'write-coaching-card',
       'update-dashboard',
       'generate-embeddings',

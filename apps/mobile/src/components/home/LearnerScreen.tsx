@@ -2,24 +2,29 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { Profile } from '@eduagent/schemas';
 import { ProfileSwitcher } from '../common';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
-import { useProfile } from '../../lib/profile';
 import { useThemeColors } from '../../lib/theme';
 import { IntentCard } from './IntentCard';
 
-interface LearnerScreenProps {
+export interface LearnerScreenProps {
+  profiles: Profile[];
+  activeProfile: Profile | null;
+  switchProfile: (profileId: string) => Promise<void>;
   onBack?: () => void;
 }
 
 export function LearnerScreen({
+  profiles,
+  activeProfile,
+  switchProfile,
   onBack,
 }: LearnerScreenProps): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { profiles, activeProfile, switchProfile } = useProfile();
   const { data: subjects } = useSubjects();
   const activeSubjects =
     subjects?.filter((subject) => subject.status === 'active') ?? [];

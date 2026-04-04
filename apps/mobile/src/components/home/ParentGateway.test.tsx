@@ -14,17 +14,6 @@ jest.mock('../common', () => ({
   ProfileSwitcher: () => null,
 }));
 
-jest.mock('../../lib/profile', () => ({
-  useProfile: () => ({
-    profiles: [
-      { id: 'p1', displayName: 'Maria', isOwner: true },
-      { id: 'c1', displayName: 'Emma', isOwner: false },
-    ],
-    activeProfile: { id: 'p1', displayName: 'Maria', isOwner: true },
-    switchProfile: jest.fn(),
-  }),
-}));
-
 let mockDashboardData:
   | {
       children: Array<{
@@ -48,6 +37,15 @@ jest.mock('../../lib/greeting', () => ({
 
 const { ParentGateway } = require('./ParentGateway');
 
+const defaultProps = {
+  profiles: [
+    { id: 'p1', displayName: 'Maria', isOwner: true },
+    { id: 'c1', displayName: 'Emma', isOwner: false },
+  ],
+  activeProfile: { id: 'p1', displayName: 'Maria', isOwner: true },
+  switchProfile: jest.fn(),
+};
+
 describe('ParentGateway', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -59,21 +57,21 @@ describe('ParentGateway', () => {
   });
 
   it('renders greeting with active profile name', () => {
-    render(<ParentGateway />);
+    render(<ParentGateway {...defaultProps} />);
 
     expect(screen.getByText('Good morning, Maria!')).toBeTruthy();
     expect(screen.getByText('Fresh mind, fresh start')).toBeTruthy();
   });
 
   it('renders both intent cards', () => {
-    render(<ParentGateway />);
+    render(<ParentGateway {...defaultProps} />);
 
     expect(screen.getByText("Check child's progress")).toBeTruthy();
     expect(screen.getByText('Learn something')).toBeTruthy();
   });
 
   it('shows child activity highlight with time', () => {
-    render(<ParentGateway />);
+    render(<ParentGateway {...defaultProps} />);
 
     expect(screen.getByText('Emma practiced 12 min this week')).toBeTruthy();
   });
@@ -85,7 +83,7 @@ describe('ParentGateway', () => {
       ],
     };
 
-    render(<ParentGateway />);
+    render(<ParentGateway {...defaultProps} />);
 
     expect(screen.getByText('No activity today')).toBeTruthy();
   });
@@ -93,7 +91,7 @@ describe('ParentGateway', () => {
   it('shows fallback highlight when dashboard not loaded', () => {
     mockDashboardData = undefined;
 
-    render(<ParentGateway />);
+    render(<ParentGateway {...defaultProps} />);
 
     expect(screen.getByText("See how they're doing")).toBeTruthy();
   });
@@ -106,20 +104,20 @@ describe('ParentGateway', () => {
       ],
     };
 
-    render(<ParentGateway />);
+    render(<ParentGateway {...defaultProps} />);
 
     expect(screen.getByText('Tomas practiced 15 min this week')).toBeTruthy();
   });
 
   it('navigates to parent dashboard on "Check child\'s progress"', () => {
-    render(<ParentGateway />);
+    render(<ParentGateway {...defaultProps} />);
 
     fireEvent.press(screen.getByTestId('gateway-check-progress'));
     expect(mockPush).toHaveBeenCalledWith('/(parent)/dashboard');
   });
 
   it('navigates to learn route on "Learn something"', () => {
-    render(<ParentGateway />);
+    render(<ParentGateway {...defaultProps} />);
 
     fireEvent.press(screen.getByTestId('gateway-learn'));
     expect(mockPush).toHaveBeenCalledWith('/(learner)/learn');
