@@ -20,7 +20,7 @@ import {
   addCurriculumTopic,
   adaptCurriculumFromPerformance,
 } from '../services/curriculum';
-import { notFound, unauthorized, apiError } from '../errors';
+import { notFound, apiError } from '../errors';
 
 type CurriculumRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -47,11 +47,6 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      if (!profileId)
-        return unauthorized(
-          c,
-          'Profile selection required (X-Profile-Id header)'
-        );
       const subjectId = c.req.param('subjectId');
       const { topicId } = c.req.valid('json');
       try {
@@ -77,11 +72,6 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      if (!profileId)
-        return unauthorized(
-          c,
-          'Profile selection required (X-Profile-Id header)'
-        );
       const subjectId = c.req.param('subjectId');
       const { topicId } = c.req.valid('json');
       try {
@@ -114,11 +104,6 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      if (!profileId)
-        return unauthorized(
-          c,
-          'Profile selection required (X-Profile-Id header)'
-        );
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
       try {
@@ -146,11 +131,6 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      if (!profileId)
-        return unauthorized(
-          c,
-          'Profile selection required (X-Profile-Id header)'
-        );
       const subjectId = c.req.param('subjectId');
       const { feedback } = c.req.valid('json');
       try {
@@ -176,11 +156,6 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      if (!profileId)
-        return unauthorized(
-          c,
-          'Profile selection required (X-Profile-Id header)'
-        );
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
 

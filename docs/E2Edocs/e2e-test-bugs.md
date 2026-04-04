@@ -663,7 +663,7 @@ java.lang.ClassCastException: java.lang.String cannot be cast to...
 
 **Files:** `apps/mobile/src/components/common/BookPageFlipAnimation.tsx` (source), `BookPageFlipAnimation.test.tsx` (test), `apps/mobile/src/app/(learner)/library.tsx` (consumer), `apps/mobile/src/components/common/index.ts` (barrel export).
 
-**E2E workaround (temporary):** Flows that navigate to Library will fail at the tab switch. Home screen assertions (subjects, retention strip) remain testable. Skip Library tab assertions until BUG-33 is fixed.
+**E2E workaround:** No longer needed — BUG-33 was fixed (2026-03-11) by replacing animated SVG `<G>` transform with pure Reanimated `<Animated.View>` scaleX. Library tab flows should now work.
 
 **Parent routing fix (commit `93e5646`):** BUG-33 also manifested as a parent routing mismatch — parent scenarios create a PARENT owner profile, so the app routes to `(parent)/dashboard` (testID: `dashboard-scroll`), not `(learner)/home` (testID: `home-scroll-view`). Fixed in `seed-and-sign-in.yaml` (accepts both landing screens) and 6 parent flow YAMLs (replaced `switch-to-parent.yaml` with direct `dashboard-scroll` wait). The SVG crash on Library tab remains open.
 

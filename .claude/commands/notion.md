@@ -47,7 +47,7 @@ Need to interact with Notion?
 
 ```bash
 # 1. Get the API key from Doppler (machine-neutral, no hardcoded paths)
-export NOTION_API_KEY="$(C:/Tools/doppler/doppler.exe secrets get NOTION_API_KEY --plain --config dev 2>/dev/null || grep NOTION_API_KEY .env.development.local 2>/dev/null | cut -d= -f2)"
+export NOTION_API_KEY="$(doppler secrets get NOTION_API_KEY --plain --config dev 2>/dev/null || grep NOTION_API_KEY .env.development.local 2>/dev/null | cut -d= -f2)"
 
 # 2. Query with pagination (Windows: use file-based JSON to avoid bash escaping)
 # Write the filter to a temp file, then curl with --data @file

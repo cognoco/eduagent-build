@@ -51,7 +51,7 @@ export type ProfileScopeEnv = {
  */
 export function requireProfileId(profileId: string | undefined): string {
   if (!profileId) {
-    throw new HTTPException(401, {
+    throw new HTTPException(400, {
       message: 'Profile required — no profile resolved for this request',
     });
   }

@@ -148,6 +148,22 @@ describe('settings routes', () => {
       expect(getNotificationPrefs).toHaveBeenCalled();
     });
 
+    it('returns 400 when authenticated but missing X-Profile-Id header', async () => {
+      const res = await app.request(
+        '/v1/settings/notifications',
+        {
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'Content-Type': 'application/json',
+          },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+      expect(getNotificationPrefs).not.toHaveBeenCalled();
+    });
+
     it('returns 401 without auth header', async () => {
       const res = await app.request('/v1/settings/notifications', {}, TEST_ENV);
 

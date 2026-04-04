@@ -67,6 +67,10 @@ const PROFILE_ID = '770e8400-e29b-41d4-a716-446655440000';
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 describe('dashboard routes', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   // -------------------------------------------------------------------------
   // GET /v1/dashboard
   // -------------------------------------------------------------------------
@@ -84,6 +88,22 @@ describe('dashboard routes', () => {
       const body = await res.json();
       expect(body.children).toEqual([]);
       expect(body.demoMode).toBe(false);
+    });
+
+    it('returns 400 when authenticated but missing X-Profile-Id header', async () => {
+      const res = await app.request(
+        '/v1/dashboard',
+        {
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'Content-Type': 'application/json',
+          },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+      expect(mockGetChildrenForParent).not.toHaveBeenCalled();
     });
 
     it('returns 401 without auth header', async () => {
