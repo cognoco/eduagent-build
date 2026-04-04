@@ -12,6 +12,7 @@ import {
   createAssessment,
   getAssessment,
   updateAssessment,
+  loadTopicTitle,
 } from '../services/assessments';
 import { updateRetentionFromSession } from '../services/retention-data';
 import { insertSessionXpEntry } from '../services/xp';
@@ -70,9 +71,11 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
       const assessment = await getAssessment(db, profileId, assessmentId);
       if (!assessment) return notFound(c, 'Assessment not found');
 
+      const topicTitle = await loadTopicTitle(db, assessment.topicId);
+
       const evaluation = await evaluateAssessmentAnswer(
         {
-          topicTitle: assessment.topicId, // In real use would load topic title
+          topicTitle,
           topicDescription: '',
           currentDepth: assessment.verificationDepth,
           exchangeHistory: assessment.exchangeHistory,
@@ -150,10 +153,14 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
       const session = await getSession(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');
 
-      // Evaluate the quick check answer
+      // Load topic title for LLM context
+      const topicTitle = session.topicId
+        ? await loadTopicTitle(db, session.topicId)
+        : 'General';
+
       const evaluation = await evaluateAssessmentAnswer(
         {
-          topicTitle: session.topicId ?? 'General',
+          topicTitle,
           topicDescription: '',
           currentDepth: 'recall',
           exchangeHistory: [],

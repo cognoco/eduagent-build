@@ -89,8 +89,7 @@ export default function TopicDetailScreen() {
   const masteryPercent = topicProgress?.masteryScore
     ? Math.round(topicProgress.masteryScore * 100)
     : null;
-  const failureCount =
-    (retentionCard as { failureCount?: number } | null)?.failureCount ?? 0;
+  const failureCount = retentionCard?.failureCount ?? 0;
   const showRelearn =
     failureCount >= 3 || topicProgress?.struggleStatus === 'needs_deepening';
 

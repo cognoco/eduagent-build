@@ -50,11 +50,16 @@ interface StepOutcome {
 async function runIsolated(
   name: string,
   profileId: string,
-  fn: () => Promise<void>
+  fn: () => Promise<number | undefined | void>
 ): Promise<StepOutcome> {
   try {
-    await fn();
-    return { step: name, status: 'ok' };
+    const result = await fn();
+    return {
+      step: name,
+      status: 'ok',
+      // Propagate numeric return values (e.g. sm2Quality from verification)
+      ...(typeof result === 'number' ? { qualityRating: result } : {}),
+    };
   } catch (err) {
     captureException(err, { profileId });
     console.error(`[session-completed] step "${name}" failed:`, err);
@@ -170,14 +175,14 @@ export const sessionCompleted = inngest.createFunction(
           async () => {
             const db = getStepDatabase();
             if (vType === 'evaluate') {
-              await processEvaluateCompletion(
+              return processEvaluateCompletion(
                 db,
                 profileId,
                 sessionId,
                 topicId
               );
             } else {
-              await processTeachBackCompletion(
+              return processTeachBackCompletion(
                 db,
                 profileId,
                 sessionId,

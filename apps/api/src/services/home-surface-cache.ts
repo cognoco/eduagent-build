@@ -107,15 +107,14 @@ export function buildFallbackHomeSurfaceCard(profileId: string): CoachingCard {
   return {
     id: generateUUIDv7(),
     profileId,
-    type: 'challenge',
-    title: 'Ready for a challenge?',
-    body: 'Keep building momentum.',
+    type: 'streak',
+    title: 'Ready to start?',
+    body: 'Begin a session to start building momentum.',
     priority: 3,
     expiresAt: new Date(now.getTime() + HOME_SURFACE_TTL_MS).toISOString(),
     createdAt: now.toISOString(),
-    topicId: generateUUIDv7(), // placeholder — no real topic for fallback card
-    difficulty: 'easy',
-    xpReward: 10,
+    currentStreak: 0,
+    graceRemaining: 0,
   };
 }
 

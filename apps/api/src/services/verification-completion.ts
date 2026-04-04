@@ -90,15 +90,14 @@ export async function processEvaluateCompletion(
   if (!assessment.challengePassed) {
     // Count consecutive EVALUATE failures from prior events in this session.
     // events[0] is the most recent (current); walk backward counting failures.
+    // Parse from event content (not structuredAssessment column) because
+    // the column is only written at the end of this function for events[0].
     let consecutiveFailures = 1; // Current failure counts as 1
     for (let i = 1; i < events.length; i++) {
       const evt = events[i];
       if (!evt) break;
-      const sa = evt.structuredAssessment as
-        | Record<string, unknown>
-        | null
-        | undefined;
-      if (sa && sa.type === 'evaluate' && sa.challengePassed === false) {
+      const priorAssessment = parseEvaluateAssessment(evt.content);
+      if (priorAssessment && !priorAssessment.challengePassed) {
         consecutiveFailures++;
       } else {
         break; // Stop at first non-failure (consecutive = unbroken)

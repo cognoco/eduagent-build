@@ -52,6 +52,7 @@ jest.mock('../services/assessments', () => ({
     masteryScore: 0.45,
     qualityRating: 4,
   }),
+  loadTopicTitle: jest.fn().mockResolvedValue('Photosynthesis'),
   getNextVerificationDepth: jest.fn().mockReturnValue(null),
   calculateMasteryScore: jest.fn().mockReturnValue(0.45),
   createAssessment: jest.fn().mockResolvedValue({

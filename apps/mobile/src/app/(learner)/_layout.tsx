@@ -57,6 +57,35 @@ const PENDING_CONSENT_STATUSES = new Set([
 ]);
 
 /**
+ * Whether the "Switch profile" button should appear inside consent gates.
+ *
+ * Rules (consent-bypass fix):
+ * - Hidden for anyone under 18 — prevents children from escaping the gate
+ *   by switching to an un-gated profile.
+ * - Hidden for adults (18+) with no linked minor profiles — no legitimate
+ *   reason to switch from a consent gate.
+ * - Shown ONLY for adults (18+) who share the account with at least one minor
+ *   profile (proxy for family links), so a parent viewing their child's
+ *   pending/withdrawn consent screen can switch back to their own profile.
+ */
+function canSwitchFromConsentGate(
+  activeProfile: { id: string; birthYear?: number | null } | null,
+  profiles: ReadonlyArray<{ id: string; birthYear?: number | null }>
+): boolean {
+  if (!activeProfile?.birthYear) return false;
+  const currentYear = new Date().getFullYear();
+  const age = currentYear - activeProfile.birthYear;
+  if (age < 18) return false;
+  // Must have at least one OTHER profile that belongs to a minor
+  return profiles.some(
+    (p) =>
+      p.id !== activeProfile.id &&
+      p.birthYear != null &&
+      currentYear - p.birthYear < 18
+  );
+}
+
+/**
  * Checks whether the post-approval landing screen should be shown.
  * Returns [shouldShow, dismiss] — call dismiss() when user taps "Let's Go".
  */
@@ -365,10 +394,10 @@ function ConsentWithdrawnGate(): React.ReactElement {
         {copy.help}
       </Text>
 
-      {profiles.length > 1 && activeProfile && (
+      {canSwitchFromConsentGate(activeProfile, profiles) && (
         <Pressable
           onPress={() => {
-            const other = profiles.find((p) => p.id !== activeProfile.id);
+            const other = profiles.find((p) => p.id !== activeProfile!.id);
             if (other) void switchProfile(other.id);
           }}
           className="bg-surface rounded-button py-3.5 px-8 items-center mb-3 w-full"
@@ -548,10 +577,10 @@ function ConsentPendingGate(): React.ReactElement {
         </Pressable>
       </View>
 
-      {profiles.length > 1 && activeProfile && (
+      {canSwitchFromConsentGate(activeProfile, profiles) && (
         <Pressable
           onPress={() => {
-            const other = profiles.find((p) => p.id !== activeProfile.id);
+            const other = profiles.find((p) => p.id !== activeProfile!.id);
             if (other) void switchProfile(other.id);
           }}
           className="py-3.5 px-8 items-center mb-3 w-full"

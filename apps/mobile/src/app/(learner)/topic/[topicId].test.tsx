@@ -133,7 +133,9 @@ describe('TopicDetailScreen', () => {
         easeFactor: 2.7,
         intervalDays: 14,
         repetitions: 5,
-        nextReviewAt: '2026-03-01T00:00:00Z',
+        nextReviewAt: new Date(
+          Date.now() + 7 * 24 * 60 * 60 * 1000
+        ).toISOString(),
         xpStatus: 'verified',
         failureCount: 0,
       },

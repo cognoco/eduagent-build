@@ -247,11 +247,11 @@ describe('processEvaluateCompletion', () => {
   });
 
   it('counts consecutive EVALUATE failures — stops at first non-failure', async () => {
-    const assessment = {
-      challengePassed: false,
-      quality: 1,
-    };
-    (parseEvaluateAssessment as jest.Mock).mockReturnValue(assessment);
+    // Per-call mocks: events[0] = current failure, events[1] = prior success, events[2] = older failure
+    (parseEvaluateAssessment as jest.Mock)
+      .mockReturnValueOnce({ challengePassed: false, quality: 1 }) // events[0]: current assessment
+      .mockReturnValueOnce({ challengePassed: true, quality: 4 }) // events[1]: backward walk — success breaks chain
+      .mockReturnValueOnce({ challengePassed: false, quality: 1 }); // events[2]: never reached
     (mapEvaluateQualityToSm2 as jest.Mock).mockReturnValue(2);
     (handleEvaluateFailure as jest.Mock).mockReturnValue({
       action: 'reveal_flaw',

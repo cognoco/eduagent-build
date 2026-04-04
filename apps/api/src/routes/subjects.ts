@@ -79,8 +79,18 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     const db = c.get('db');
     const input = c.req.valid('json');
     const profileId = requireProfileId(c.get('profileId'));
-    const result = await createSubjectWithStructure(db, profileId, input);
-    return c.json(result, 201);
+    try {
+      const result = await createSubjectWithStructure(db, profileId, input);
+      return c.json(result, 201);
+    } catch (err) {
+      console.error('[POST /subjects] Unhandled error:', err);
+      return apiError(
+        c,
+        502,
+        ERROR_CODES.INTERNAL_ERROR,
+        'Subject creation failed — please try again'
+      );
+    }
   })
   .get('/subjects/:id', async (c) => {
     const db = c.get('db');
