@@ -231,7 +231,7 @@ exec maestro test -e "EMAIL=${SEED_EMAIL}" -e "PASSWORD=${SEED_PASSWORD}" ... "$
 
 **Priority order:**
 1. `testID` props (most stable): `id: "sign-in-button"`
-2. `tabBarAccessibilityLabel` for tab navigation: `tapOn: "Learning Book Tab"` — maps to Android `contentDescription`, bypasses dev-client tab truncation (BUG-10) and position shifting
+2. `tabBarAccessibilityLabel` for tab navigation: `tapOn: "Library Tab"` — maps to Android `contentDescription`, bypasses dev-client tab truncation (BUG-10) and position shifting
 3. Accessibility labels: `label: "Sign in"`
 4. Text content (fallback): `text: "Welcome back"`
 
@@ -239,7 +239,7 @@ exec maestro test -e "EMAIL=${SEED_EMAIL}" -e "PASSWORD=${SEED_PASSWORD}" ... "$
 Dev-client builds show hidden Expo Router tabs (BUG-10), causing label truncation and position shifts. **Never use point-tap or text matching for tabs.** Instead:
 ```yaml
 # GOOD — matches contentDescription, works regardless of tab count
-- tapOn: "Learning Book Tab"
+- tapOn: "Library Tab"
 - tapOn: "Home Tab"
 - tapOn: "More Tab"
 
@@ -247,7 +247,7 @@ Dev-client builds show hidden Expo Router tabs (BUG-10), causing label truncatio
 - tapOn:
     point: "50%,97%"
 - tapOn:
-    text: "Learning Book"
+    text: "Library"
 ```
 These labels are set via `tabBarAccessibilityLabel` in `(learner)/_layout.tsx` and `(parent)/_layout.tsx`.
 
@@ -267,7 +267,7 @@ These labels are set via `tabBarAccessibilityLabel` in `(learner)/_layout.tsx` a
 | Session Summary | `summary-score`, `summary-topics`, `summary-next`, `summary-close` | `session-summary/[sessionId].tsx` |
 | Coaching Card | `coaching-card-primary`, `coaching-card-secondary` | `BaseCoachingCard.tsx` |
 | Curriculum Review | `curriculum-topic-*`, `curriculum-start-button`, `curriculum-skip` | `onboarding/curriculum-review.tsx` |
-| Learning Book | `book-topic-list`, `book-filter-tabs`, `subject-filter-tabs` | `(learner)/book.tsx` (flattened from `book/index.tsx` — directory routes break tab bar labels in dev-client) |
+| Library | `library-topic-list`, `library-filter-tabs`, `subject-filter-tabs` | `(learner)/library.tsx` (flattened from `library/index.tsx` — directory routes break tab bar labels in dev-client) |
 | Topic Detail | `retention-card`, `start-learning-button`, `continue-learning-button`, `start-review-button`, `request-retest-button`, `relearn-button`, `topic-detail-back` | `(learner)/topic/[topicId].tsx` |
 | Relearn | `relearn-method-same`, `relearn-method-different`, `relearn-start`, `relearn-explain` | `(learner)/topic/relearn.tsx` |
 | Homework Camera | Multiple camera testIDs (24 total) | `(learner)/homework/camera.tsx` |
@@ -474,7 +474,7 @@ Steps (high-level):
 Steps (high-level):
 1. Sign in with user who has 3+ recall failures on a topic
 2. Topic shows "Blocked" or "Needs relearning" status
-3. Navigate to Learning Book → topic detail
+3. Navigate to Library → topic detail
 4. See previous scores, "Your Words" summary, decay status
 5. Choose "Relearn Topic"
 6. Choose "Different method" (id: relearn-method-different)
@@ -543,7 +543,7 @@ Steps (high-level):
 Steps (high-level):
 1. Sign in with user who has 3 subjects
 2. Home shows active subjects with progress
-3. Navigate to Learning Book
+3. Navigate to Library
 4. Subject filter tabs visible (id: subject-filter-tabs)
 5. Switch between subjects
 6. Navigate to More → find subject management
@@ -611,7 +611,7 @@ Steps (high-level):
 4. AI switches to direct instruction (no more Socratic)
 5. AI explains with examples
 6. Session close marks topic as "Needs Deepening"
-7. Navigate to Learning Book → verify "Needs Deepening" section
+7. Navigate to Library → verify "Needs Deepening" section
 8. Verify topic appears in Needs Deepening filter
 ```
 

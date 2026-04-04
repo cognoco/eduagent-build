@@ -49,7 +49,7 @@ The following P0/P1 risks should appear as epic-level quality gates:
 | Epic 1 | P0-002 (first session) passing | Yes |
 | Epic 2 | P1-001 (homework) + P1-006 (SSE streaming) passing | No (P1) |
 | Epic 3 | P0-003 (recall + SM-2) + P0-008 (session-completed chain) passing | Yes |
-| Epic 4 | P1-003 (parent dashboard) + P1-004 (multi-subject) + P1-008 (Learning Book) passing | No (P1) |
+| Epic 4 | P1-003 (parent dashboard) + P1-004 (multi-subject) + P1-008 (Library) passing | No (P1) |
 | Epic 5 | P0-007 (Stripe webhook) + P1-005 (subscription flow) passing | Partial (P0-007 blocks) |
 
 ## Story-Level Integration Guidance
@@ -73,12 +73,12 @@ The following test scenarios MUST be reflected as acceptance criteria in their c
 
 **Epic 3 Stories:**
 - Recall story AC: "After recall test, SM-2 calculates next review date and updates topic_schedules" (P0-003)
-- Failed recall story AC: "After 3+ failed recalls, user redirected to Learning Book with 'Relearn Topic' option" (P1-002)
+- Failed recall story AC: "After 3+ failed recalls, user redirected to Library with 'Relearn Topic' option" (P1-002)
 - Session chain story AC: "session.completed event triggers SM-2 update, coaching card refresh, and XP entry" (P0-008)
 
 **Epic 4 Stories:**
 - Parent dashboard story AC: "Parent can view all children's session counts and retention signals" (P1-003)
-- Learning Book story AC: "Topics display retention status (Strong/Fading/Weak/Forgotten) with decay bars" (P1-008)
+- Library story AC: "Topics display retention status (Strong/Fading/Weak/Forgotten) with decay bars" (P1-008)
 
 **Epic 5 Stories:**
 - Webhook story AC: "Stripe webhook updates local subscription state within 1 minute" (P0-007)
@@ -96,7 +96,7 @@ The following `testID` attributes are required for Maestro E2E flows:
 | Subject creation | `subject-name-input`, `start-interview-button` | P0-002 |
 | Chat | `chat-input`, `send-button`, `message-bubble`, `streaming-indicator` | P0-002, P1-006 |
 | Recall test | `recall-answer-input`, `submit-recall-button`, `recall-result` | P0-003 |
-| Learning Book | `learning-book-topic-list`, `topic-retention-bar`, `topic-status` | P1-008 |
+| Library | `library-topic-list`, `topic-retention-bar`, `topic-status` | P1-008 |
 | Parent dashboard | `child-card`, `session-count`, `retention-signal` | P1-003 |
 | Camera | `camera-view`, `capture-button`, `ocr-result` | P1-001 |
 | Subscription | `trial-badge`, `upgrade-button`, `quota-remaining` | P1-005 |

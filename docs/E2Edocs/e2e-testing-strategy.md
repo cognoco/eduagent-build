@@ -61,7 +61,7 @@ Maestro locates elements via `testID` props (React Native) or accessibility labe
 | `{screen}-{action}` | `sign-in-button`, `sign-out-button` | Auth screens |
 | `{screen}-{element}` | `create-subject-cancel`, `delete-account-confirm` | Action screens |
 | `{component}-{part}` | `profile-switcher-chip`, `profile-switcher-menu` | Shared components |
-| `{feature}-{state}` | `learning-book-loading`, `learning-book-empty` | Loading/empty states |
+| `{feature}-{state}` | `library-loading`, `library-empty` | Loading/empty states |
 | `{element-type}` | `chat-input`, `send-button`, `camera-view` | Inline elements |
 
 **Rules:**
@@ -69,8 +69,8 @@ Maestro locates elements via `testID` props (React Native) or accessibility labe
 - Use `accessibilityLabel` when the same string serves both a11y and E2E targeting (preferred for text-bearing elements).
 - Prefer `testID` for non-text elements (containers, loading indicators) where an accessibility label would be meaningless.
 - In Maestro YAML, reference via `id:` (maps to `testID`) or `tapOn:` (matches visible text / `accessibilityLabel` / `contentDescription`).
-- **Tab bar navigation:** Use `tabBarAccessibilityLabel` on `Tabs.Screen` options (maps to Android `contentDescription`). Maestro matches these via `tapOn: "Learning Book Tab"`. This is the ONLY reliable tab navigation method in dev-client builds — point-tap and text matching both break due to BUG-10 (extra hidden tabs). See `e2e-test-bugs.md` BUG-10/BUG-30.
-- **Directory vs file routes:** Expo Router directory routes (`book/index.tsx`) expose raw path segments (`book/index`) in the tab bar, ignoring configured `title` and `tabBarAccessibilityLabel`. Always use file routes (`book.tsx`) for tab screens.
+- **Tab bar navigation:** Use `tabBarAccessibilityLabel` on `Tabs.Screen` options (maps to Android `contentDescription`). Maestro matches these via `tapOn: "Library Tab"`. This is the ONLY reliable tab navigation method in dev-client builds — point-tap and text matching both break due to BUG-10 (extra hidden tabs). See `e2e-test-bugs.md` BUG-10/BUG-30.
+- **Directory vs file routes:** Expo Router directory routes (`library/index.tsx`) expose raw path segments (`library/index`) in the tab bar, ignoring configured `title` and `tabBarAccessibilityLabel`. Always use file routes (`library.tsx`) for tab screens.
 
 ### Nx Integration
 
@@ -308,11 +308,11 @@ CI always uploads screenshots as artifacts (`if: always()`), not just on failure
 | Flow | Steps | Tags |
 |------|-------|------|
 | **Assessment Cycle** | Recall test -> explain reasoning -> transfer question -> XP awarded (pending) -> delayed recall -> XP verified | `full, assessment` |
-| **Failed Recall** | 3x failed recall -> Learning Book redirect -> "Relearn Topic" -> different method -> re-test after 24h | `full, remediation` |
+| **Failed Recall** | 3x failed recall -> Library redirect -> "Relearn Topic" -> different method -> re-test after 24h | `full, remediation` |
 | **Homework Help** | Camera capture -> OCR -> homework chat -> Socratic guidance (no direct answers) -> session marked "guided" | `full, homework` |
 | **Parent Dashboard** | Switch to parent persona -> view child progress -> see retention bars -> update notification prefs | `full, parent` |
 | **Multi-Subject** | Add second subject -> switch subjects -> pause first -> auto-archive check -> restore | `full, subjects` |
-| **Learning Book Navigation** | Start freeform session -> verify in-session book link -> end session -> verify summary book link -> navigate to Learning Book (Stories 4.12, 4.13) | `nightly, learning` |
+| **Library Navigation** | Start freeform session -> verify in-session book link -> end session -> verify summary book link -> navigate to Library (Stories 4.12, 4.13) | `nightly, learning` |
 | **Topic Detail Adaptive Buttons** | Navigate to topic detail -> verify adaptive buttons match completionStatus (not_started/in_progress/completed) (Story 4.14) | `nightly, retention` |
 | **Practice Subject Picker** | Tap "Practice for a test" with 2+ active subjects -> picker appears -> select subject -> practice session starts (Story 10.23) | `nightly, subjects` |
 | **Subscription** | Start trial -> trial expiry warning -> upgrade to Plus -> quota visible -> top-up purchase | `full, billing` |
@@ -327,7 +327,7 @@ CI always uploads screenshots as artifacts (`if: always()`), not just on failure
 | Epic 1 | First Session | — | 1 |
 | Epic 2 | Core Learning | Homework Help | 2 |
 | Epic 3 | Retention | Assessment, Failed Recall, Adaptive | 4 |
-| Epic 4 | — | Parent Dashboard, Multi-Subject, Learning Book Navigation, Topic Detail Buttons | 4 |
+| Epic 4 | — | Parent Dashboard, Multi-Subject, Library Navigation, Topic Detail Buttons | 4 |
 | Epic 5 | — | Subscription | 1 |
 
 ---
@@ -484,7 +484,7 @@ On Android with Fabric (New Architecture), combining `KeyboardAvoidingView behav
 
 ### react-native-svg + Fabric Crash (BUG-33 — Known Blocker)
 
-`react-native-svg` 15.12.1 with `newArchEnabled=true` (Fabric) crashes with `ClassCastException` in `RNSVGGroupManagerDelegate` when SVG components (particularly `G`) receive animated props from `react-native-reanimated`. This blocks the Learning Book tab. See `e2e-test-bugs.md` BUG-33.
+`react-native-svg` 15.12.1 with `newArchEnabled=true` (Fabric) crashes with `ClassCastException` in `RNSVGGroupManagerDelegate` when SVG components (particularly `G`) receive animated props from `react-native-reanimated`. This blocks the Library tab. See `e2e-test-bugs.md` BUG-33.
 
 ### Isolation Between Parallel CI Runs
 
@@ -573,7 +573,7 @@ Progress as of 2026-03-12:
 5. **Smoke suite buildout** — **DONE.** All planned smoke and nightly flows written. 51 flows confirmed passing on Android emulator (as of Session 18). 1 pre-auth flow PARTIAL (sign-up-flow, BUG-55 — intentionally tests sign-up UI). 1 skipped (ExpoGo-only).
 6. **Seed infrastructure** — **DONE.** `seed-and-run.sh` (shell wrapper: curl + node JSON parsing + ADB automation + Maestro `-e` flags). `test-seed.ts` service with 16 scenarios (onboarding-complete, onboarding-no-subject, learning-active, retention-due, failed-recall-3x, parent-with-children, trial-active, trial-expired, multi-subject, homework-ready, trial-expired-child, consent-withdrawn, consent-withdrawn-solo, parent-solo, pre-profile, consent-pending). Bypasses Maestro's broken GraalJS `runScript` (Issue 13).
 7. **BUG-25 fix: profileScope middleware** — **DONE** (commit `35ef433`). `profileScopeMiddleware` now auto-resolves to owner profile when `X-Profile-Id` header is absent. This was the root cause of seeded subjects/streaks/coaching-cards being invisible on the home screen — blocked ~30 E2E flows.
-8. **BUG-10/BUG-30 fix: tab navigation** — **DONE**. Flattened `book/index.tsx` → `book.tsx` (directory routes break tab bar labels in dev-client). Added `tabBarAccessibilityLabel` to all 3 visible tabs in both learner and parent layouts. Updated 7 E2E flow YAML files to use `tapOn: "Learning Book Tab"`. Also fixed BUG-24 (KeyboardAvoidingView), BUG-29 (dashboard loading), BUG-32 (More tab scroll).
+8. **BUG-10/BUG-30 fix: tab navigation** — **DONE**. Flattened `library/index.tsx` → `library.tsx` (directory routes break tab bar labels in dev-client). Added `tabBarAccessibilityLabel` to all 3 visible tabs in both learner and parent layouts. Updated 7 E2E flow YAML files to use `tapOn: "Library Tab"`. Also fixed BUG-24 (KeyboardAvoidingView), BUG-29 (dashboard loading), BUG-32 (More tab scroll).
 9. **Nightly full suite** — **NEAR COMPLETE.** All 54 flows written. **51 flows passing (94%)** (Session 18). 1 pre-auth flow PARTIAL (sign-up-flow — tests sign-up UI, Clerk verification inherent). 1 deferred (recall-review). 1 skipped (ExpoGo-only). Session 18: BUG-55 bypassed via `pre-profile` + `consent-pending` seed scenarios (3 flows promoted from PARTIAL to PASS).
 10. **Session 9 findings** — `seed-and-run.sh` fixed (3 bugs: pipefail crash, dev-tools Close button tap, grep pipeline). BUG-31 verified fixed via Maestro. BUG-34 fixed (PR #72: subjects added to `onboarding-complete`, `trial-active`, `trial-expired` seed scenarios). BUG-35 workaround applied (PR #72: all ChatShell flows use `pressKey: Enter` instead of tapping obscured `send-button`). BUG-33 fixed (Session 11). BUG-48 fixed (Session 14: parent-redirect timing race).
 11. **Session 14 sweep (2026-03-12)** — 26 flows run: 18 PASS, 1 PARTIAL, 11 FAIL. BUG-48 discovered and fixed (parent-redirect timing in `seed-and-sign-in.yaml`). All parent flows now stable.

@@ -399,7 +399,7 @@ So that I can understand their progress and where they need support.
 **Then** an LLM extraction step (homework sessions only) reads the conversation and produces: problem count, topics/skills practiced, which problems were independent vs needed guidance, brief parent-facing summary
 **And** extraction stored in `learningSessions.metadata.homeworkSummary` (JSONB, no schema migration)
 **And** parent dashboard shows: "Math Homework — 5 problems, practiced linear equations" with scaffolding summary
-**And** Learning Book shows homework sessions with topics practiced
+**And** Library shows homework sessions with topics practiced
 **And** sessions without `homeworkSummary` (old sessions, extraction failure) gracefully show current display ("Homework — X min")
 
 **FRs:** FR229

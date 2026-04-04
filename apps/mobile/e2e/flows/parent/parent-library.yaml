@@ -1,25 +1,25 @@
-# Flow: Parent Learning Book Tab — Navigate to Learning Book and view topics
-# Validates: parent user can tap Learning Book tab, see subject filter tabs,
+# Flow: Parent Library Tab — Navigate to Library and view topics
+# Validates: parent user can tap Library tab, see subject filter tabs,
 # and view topic list (or empty state if no topics for parent's children).
 # Tags: nightly, parent
 #
-# Journey: UX Journey 4 (Parent Oversight — Learning Book)
+# Journey: UX Journey 4 (Parent Oversight — Library)
 # Epics: Epic 5
 # Prerequisite: Seeded parent with linked children who have subjects
 #               (scenario: parent-with-children — child has "Mathematics" subject)
 #
 # testIDs verified against:
-#   - apps/mobile/src/app/(parent)/_layout.tsx (tab-book, tab-home)
+#   - apps/mobile/src/app/(parent)/_layout.tsx (tab-library, tab-home)
 #   - apps/mobile/src/app/(parent)/dashboard.tsx (dashboard-scroll)
-#   - apps/mobile/src/app/(parent)/book.tsx (re-exports learner book)
-#   - apps/mobile/src/app/(learner)/book/index.tsx (subject-filter-tabs,
-#     learning-book-loading, learning-book-empty, topic-row-*)
+#   - apps/mobile/src/app/(parent)/library.tsx (re-exports learner library)
+#   - apps/mobile/src/app/(learner)/library/index.tsx (subject-filter-tabs,
+#     library-loading, library-empty, topic-row-*)
 #
-# NOTE: The parent's Learning Book tab re-exports the learner book component.
+# NOTE: The parent's Library tab re-exports the learner library component.
 # It will show topics for the parent's own profile (which has none), or the
 # child's profile depending on which profile is active. The subject-filter-tabs
 # testID only appears when there are 2+ subjects. With 1 or 0 subjects, the
-# filter tabs are hidden and we fall back to checking for "Learning Book" heading.
+# filter tabs are hidden and we fall back to checking for "Library" heading.
 appId: com.mentomate.app
 tags:
   - nightly
@@ -45,15 +45,15 @@ tags:
     text: "Home"
 
 # 4. Screenshot: parent dashboard before navigating
-- takeScreenshot: parent-learning-book-01-dashboard
+- takeScreenshot: parent-library-01-dashboard
 
-# 5. Tap Learning Book tab (BUG-10: use accessibility label, not truncated text)
-- tapOn: "Learning Book Tab"
+# 5. Tap Library tab (BUG-10: use accessibility label, not truncated text)
+- tapOn: "Library Tab"
 
-# 6. Wait for Learning Book heading to render
+# 6. Wait for Library heading to render
 - extendedWaitUntil:
     visible:
-      text: "Learning Book"
+      text: "Library"
     timeout: 10000
 
 # 7. Check if subject filter tabs are visible (only when 2+ subjects)
@@ -63,7 +63,7 @@ tags:
 
 # 8. Check for loading state (may have already resolved)
 - assertVisible:
-    id: "learning-book-loading"
+    id: "library-loading"
     optional: true
 
 # 9. Wait for either topics or empty state to appear
@@ -75,11 +75,11 @@ tags:
 
 # 10. Check for empty state if no topics loaded
 - assertVisible:
-    id: "learning-book-empty"
+    id: "library-empty"
     optional: true
 
-# 11. Screenshot: Learning Book content
-- takeScreenshot: parent-learning-book-02-content
+# 11. Screenshot: Library content
+- takeScreenshot: parent-library-02-content
 
 # 12. Navigate back to Home tab (use accessibility label to avoid matching heading)
 - tapOn: "Home Tab"
@@ -91,4 +91,4 @@ tags:
     timeout: 10000
 
 # 14. Final screenshot
-- takeScreenshot: parent-learning-book-03-back-to-home
+- takeScreenshot: parent-library-03-back-to-home

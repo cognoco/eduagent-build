@@ -69,7 +69,7 @@
 | 10.8 (session summary) | Partial | ✅ DONE | `SessionCloseSummary` component with headline, takeaways, next check-in |
 | 10.10 (consent handoff animation) | Partial | ⚠️ **PARTIAL** | Flow works functionally. Transitions are instant state changes, no animated transition. |
 | 10.14 (privacyPolicyUrl) | Partial | ✅ DONE | `app.json` line 104: `"privacyPolicyUrl": "https://mentomate.com/privacy-policy"` |
-| 10.15 (Learning Book empty state) | Partial | ✅ DONE | Multiple contextual empty states in `book.tsx` |
+| 10.15 (Library empty state) | Partial | ✅ DONE | Multiple contextual empty states in `library.tsx` |
 | 10.17 (email delivery feedback) | "Not built" | ✅ DONE | API returns `emailStatus: 'sent' | 'failed'`, mobile shows conditional messaging + resend |
 | 10.18 (rating prompt) | Partial | ✅ DONE | `useRatingPrompt` hook with 5+ recalls, 7+ days, 90-day cooldown, wired to `expo-store-review` |
 | 10.22 (ambiguous subject picker) | Partial | ✅ DONE | Disambiguation flow in session screen with candidate buttons |

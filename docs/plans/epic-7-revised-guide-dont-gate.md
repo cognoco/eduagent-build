@@ -48,7 +48,7 @@ The original Epic 7 spec used **hard topic locking** (REQUIRED prerequisites blo
 ### FR119 (Revised): Prerequisite-Aware Session Ordering — Advisory, Not Blocking
 
 - **FR119.1:** When coaching card recommends the next topic, check prerequisite completion first. If prerequisites are incomplete, **recommend the prerequisite topic first** — but do not hide or lock the dependent topic.
-- **FR119.2:** Learning Book and curriculum screens show all topics. Topics with incomplete prerequisites display a subtle indicator (e.g., "Builds on: Fractions") — not a lock icon.
+- **FR119.2:** Library and curriculum screens show all topics. Topics with incomplete prerequisites display a subtle indicator (e.g., "Builds on: Fractions") — not a lock icon.
 - **FR119.3:** If the student taps a topic with incomplete prerequisites, show a brief advisory: "This topic builds on [prerequisite]. Want to review [prerequisite] first, or dive right in?" Two options: [Review Prerequisite] / [Start Anyway].
 - **FR119.4:** "Start Anyway" is not punished. The session proceeds normally. The LLM receives prerequisite context (FR125) to bridge gaps.
 
@@ -73,7 +73,7 @@ The original Epic 7 spec used **hard topic locking** (REQUIRED prerequisites blo
 - **FR121.4:** Tap a topic node → inline card: topic name, retention status, prerequisites (with status), dependents, "Start Session" CTA. No locked state — every topic has a CTA.
 - **FR121.5:** Rendering: native `react-native-svg`. No WebView. Max ~50 nodes per subject; larger curricula collapse to section-level grouping.
 - **FR121.6:** Accessibility: nodes have `accessibilityLabel` with topic name + retention status. Navigable via sequential swipe (topological order).
-- **FR121.7:** Access: "Concept Map" toggle/tab in Learning Book. If no prerequisite data (pre-Epic 7 curricula), hide the tab.
+- **FR121.7:** Access: "Concept Map" toggle/tab in Library. If no prerequisite data (pre-Epic 7 curricula), hide the tab.
 
 ### FR122 (Revised): Prerequisite Edge Generation — LLM with Human Feedback Loop
 
@@ -107,7 +107,7 @@ The original Epic 7 spec used **hard topic locking** (REQUIRED prerequisites blo
 
 - **FR126.1:** Default topic ordering uses topological sort of the prerequisite graph, with ties broken by retention urgency (most urgent first).
 - **FR126.2:** Fallback: if no prerequisite data, display topics in `sortOrder` as before.
-- **FR126.3:** Learning Book shows topics in prerequisite order with subtle dependency indicators ("Builds on: X").
+- **FR126.3:** Library shows topics in prerequisite order with subtle dependency indicators ("Builds on: X").
 
 ### FR127 (Revised): Prerequisite Override — Self-Service, Not Parent-Only
 
@@ -238,7 +238,7 @@ So that curriculum topics can express advisory dependency relationships.
 
 ---
 
-### Story 7.2: Advisory Prerequisite Ordering + Learning Book Indicators
+### Story 7.2: Advisory Prerequisite Ordering + Library Indicators
 
 As a learner,
 I want my learning path to suggest prerequisite order without blocking me,
@@ -250,7 +250,7 @@ So that I can follow recommendations or forge my own path.
 **When** the coaching card recommends the next topic
 **Then** topics with incomplete prerequisites are deprioritized but NOT hidden
 **And** default ordering uses topological sort (prerequisite depth), ties broken by retention urgency
-**And** Learning Book shows subtle "Builds on: [prerequisite]" indicators on topics with incomplete prerequisites
+**And** Library shows subtle "Builds on: [prerequisite]" indicators on topics with incomplete prerequisites
 **And** tapping a topic with incomplete prerequisites shows advisory dialog: "This builds on [prerequisite]. Review first, or dive right in?" with [Review Prerequisite] / [Start Anyway]
 **And** "Start Anyway" proceeds normally with no penalty
 

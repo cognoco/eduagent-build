@@ -37,6 +37,25 @@ jest.mock('../services/account', () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Mock profile service — middleware auto-resolves owner profile
+// ---------------------------------------------------------------------------
+
+jest.mock('../services/profile', () => ({
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+  findOwnerProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+}));
+
+// ---------------------------------------------------------------------------
 // Mock billing service — metering middleware calls these on LLM routes
 // ---------------------------------------------------------------------------
 
@@ -334,6 +353,7 @@ const TEST_ENV = {
 const AUTH_HEADERS = {
   Authorization: 'Bearer valid.jwt.token',
   'Content-Type': 'application/json',
+  'X-Profile-Id': 'test-profile-id',
 };
 
 describe('session routes', () => {

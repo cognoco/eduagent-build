@@ -10,7 +10,7 @@ interface RemediationCardProps {
   onRelearnTopic: () => void;
   /** Persona-aware — caller passes this from layout/route context. */
   isLearner: boolean;
-  /** Navigation callback for Learning Book link during cooldown. */
+  /** Navigation callback for Library link during cooldown. */
   onBookPress?: () => void;
 }
 
@@ -190,11 +190,11 @@ export function RemediationCard({
           onPress={onBookPress}
           className="mt-2 py-2 items-center"
           testID="remediation-book-link"
-          accessibilityLabel="Check out your Learning Book"
+          accessibilityLabel="Check out your Library"
           accessibilityRole="link"
         >
           <Text className="text-body-sm text-primary">
-            While you wait, check out your Learning Book
+            While you wait, check out your Library
           </Text>
         </Pressable>
       )}

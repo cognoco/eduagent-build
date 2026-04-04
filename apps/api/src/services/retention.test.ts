@@ -86,12 +86,12 @@ describe('processRecallResult', () => {
     expect(result.failureAction).toBe('feedback_only');
   });
 
-  it('returns redirect_to_learning_book on third failure', () => {
+  it('returns redirect_to_library on third failure', () => {
     const state = createTestState({ failureCount: 2 });
 
     const result = processRecallResult(state, 1);
 
-    expect(result.failureAction).toBe('redirect_to_learning_book');
+    expect(result.failureAction).toBe('redirect_to_library');
   });
 
   it('transitions XP to verified on delayed recall success', () => {

@@ -30,18 +30,18 @@ tags:
 - assertVisible:
     id: "tab-home"
 - assertVisible:
-    id: "tab-book"
+    id: "tab-library"
 - assertVisible:
     id: "tab-more"
 
-# Tap Learning Book tab → verify it navigates
+# Tap Library tab → verify it navigates
 - tapOn:
-    id: "tab-book"
+    id: "tab-library"
 - extendedWaitUntil:
     visible:
-      id: "learning-book-scroll"
+      id: "library-scroll"
     timeout: 5000
-    # learning-book-scroll may not exist if no topics yet — fallback to tab highlight
+    # library-scroll may not exist if no topics yet — fallback to tab highlight
     optional: true
 
 # Tap More tab → verify it navigates
@@ -195,7 +195,7 @@ tags:
 # After returning from a full session, the tab bar must remain functional.
 # BUG M05 found tabs hidden behind system buttons — this catches it.
 - tapOn:
-    id: "tab-book"
+    id: "tab-library"
     optional: true
 - tapOn:
     id: "tab-home"

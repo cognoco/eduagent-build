@@ -125,8 +125,18 @@ export function useSetSessionInputMode(
 
   return useMutation({
     mutationFn: async (input: { inputMode: 'text' | 'voice' }) => {
+      // Hono RPC cannot index hyphenated path segments as JS identifiers.
+      // Narrow cast to preserve type intent — update if the API route changes.
+      // Route ref: apps/api/src/routes/sessions.ts POST /sessions/:sessionId/input-mode
       const inputModeClient = (
-        client.sessions[':sessionId'] as Record<string, any>
+        client.sessions[':sessionId'] as unknown as {
+          'input-mode': {
+            $post: (args: {
+              param: { sessionId: string };
+              json: { inputMode: 'text' | 'voice' };
+            }) => Promise<Response>;
+          };
+        }
       )['input-mode'];
       const res = await inputModeClient.$post({
         param: { sessionId },

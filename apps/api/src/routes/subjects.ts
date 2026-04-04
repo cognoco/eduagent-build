@@ -9,7 +9,7 @@ import {
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
-import type { Account } from '../services/account';
+import { requireProfileId } from '../middleware/profile-scope';
 import {
   listSubjects,
   createSubject,
@@ -25,8 +25,7 @@ type SubjectRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
-    account: Account;
-    profileId: string;
+    profileId: string | undefined;
   };
 };
 
@@ -55,7 +54,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     async (c) => {
       const { text } = c.req.valid('json');
       const db = c.get('db');
-      const profileId = c.get('profileId');
+      const profileId = requireProfileId(c.get('profileId'));
       try {
         const result = await classifySubject(db, profileId, text);
         return c.json(result);
@@ -71,25 +70,21 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
   )
   .get('/subjects', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    // Use profileId from profile-scope middleware, fallback to account.id
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const includeInactive = c.req.query('includeInactive') === 'true';
     const subjects = await listSubjects(db, profileId, { includeInactive });
     return c.json({ subjects });
   })
   .post('/subjects', zValidator('json', subjectCreateSchema), async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
     const input = c.req.valid('json');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const subject = await createSubject(db, profileId, input);
     return c.json({ subject }, 201);
   })
   .get('/subjects/:id', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const subject = await getSubject(db, profileId, c.req.param('id'));
     if (!subject) return notFound(c, 'Subject not found');
     return c.json({ subject });
@@ -99,9 +94,8 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     zValidator('json', subjectUpdateSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
       const input = c.req.valid('json');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = requireProfileId(c.get('profileId'));
       const subject = await updateSubject(
         db,
         profileId,

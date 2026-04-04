@@ -36,32 +36,32 @@ tags:
 # text no longer exists in the home screen implementation. Home screen shows
 # coaching card content directly without this static heading.
 
-# REMOVED (Rule 3): Tab bar text assertions ("Home", "Learning Book", "More")
+# REMOVED (Rule 3): Tab bar text assertions ("Home", "Library", "More")
 # dropped — BUG-10 causes dev-client to show ~9 tabs with truncated labels
-# (e.g. "Ho...", "boo..."). Tab text matching is unreliable in dev-client builds.
+# (e.g. "Ho...", "lib..."). Tab text matching is unreliable in dev-client builds.
 # Tab navigation is validated via accessibility labels instead (steps 6, 9).
 
 # 5. Screenshot: home screen with subjects
 - takeScreenshot: view-curriculum-01-home
 
-# 6. Navigate to Learning Book tab (BUG-10: use accessibility label)
-- tapOn: "Learning Book Tab"
+# 6. Navigate to Library tab (BUG-10: use accessibility label)
+- tapOn: "Library Tab"
 
-# 7. Wait for Learning Book heading
+# 7. Wait for Library heading
 - extendedWaitUntil:
     visible:
-      text: "Learning Book"
+      text: "Library"
     timeout: 10000
 
-# 8. Verify filter tabs are present on Learning Book
+# 8. Verify filter tabs are present on Library
 # optional: true — filter tabs only render when multiple subjects exist;
 # learning-active seed may have only one subject
 - assertVisible:
     id: "subject-filter-tabs"
     optional: true
 
-# 9. Screenshot: Learning Book content
-- takeScreenshot: view-curriculum-02-learning-book
+# 9. Screenshot: Library content
+- takeScreenshot: view-curriculum-02-library
 
 # 10. Navigate back to Home tab (use accessibility label)
 - tapOn: "Home Tab"

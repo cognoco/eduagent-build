@@ -20,7 +20,7 @@ import {
   getOpeningMessage,
   SessionTimer,
   QuestionCounter,
-  LearningBookPrompt,
+  LibraryPrompt,
   SessionInputModeToggle,
   type ChatMessage,
 } from '../../../components/session';
@@ -920,7 +920,7 @@ export default function SessionScreen() {
         );
       } catch (err: unknown) {
         animationCleanupRef.current = animateResponse(
-          'Lost connection to your session. Tap send to reconnect.',
+          'Lost connection to your session. Tap to reconnect.',
           setMessages,
           setIsStreaming
         );
@@ -1842,7 +1842,7 @@ export default function SessionScreen() {
             {modeConfig.showQuestionCount && (
               <QuestionCounter count={userMessageCount} />
             )}
-            {showBookLink && <LearningBookPrompt />}
+            {showBookLink && <LibraryPrompt />}
           </>
         }
       />

@@ -3,6 +3,7 @@ import {
   screen,
   fireEvent,
   waitFor,
+  act,
 } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -45,13 +46,22 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 const ConsentScreen = require('./consent').default;
 
+/** Drain all pending timers (fade-out + fade-in animations). */
+function flushFadeAnimation(): void {
+  act(() => {
+    jest.runAllTimers();
+  });
+}
+
 describe('ConsentScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
   });
 
   afterEach(() => {
     queryClient.clear();
+    jest.useRealTimers();
   });
 
   // ── Phase 1: Child view ──────────────────────────────────────────
@@ -82,6 +92,7 @@ describe('ConsentScreen', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
+    flushFadeAnimation();
 
     expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
     expect(screen.queryByTestId('consent-child-view')).toBeNull();
@@ -91,6 +102,7 @@ describe('ConsentScreen', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
+    flushFadeAnimation();
 
     expect(screen.getByTestId('consent-email')).toBeTruthy();
     expect(screen.getByTestId('consent-submit')).toBeTruthy();
@@ -106,6 +118,7 @@ describe('ConsentScreen', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
+    flushFadeAnimation();
 
     // Default variant says "parental consent" not "grown-up"
     expect(
@@ -119,6 +132,7 @@ describe('ConsentScreen', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
+    flushFadeAnimation();
 
     const button = screen.getByTestId('consent-submit');
     expect(
@@ -130,6 +144,7 @@ describe('ConsentScreen', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
+    flushFadeAnimation();
     fireEvent.changeText(screen.getByTestId('consent-email'), 'not-an-email');
 
     const button = screen.getByTestId('consent-submit');
@@ -142,6 +157,7 @@ describe('ConsentScreen', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
+    flushFadeAnimation();
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
       'parent@example.com'
@@ -166,6 +182,7 @@ describe('ConsentScreen', () => {
 
     // Go to parent view
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
+    flushFadeAnimation();
 
     // Fill email and submit
     fireEvent.changeText(
@@ -181,6 +198,9 @@ describe('ConsentScreen', () => {
         consentType: 'GDPR',
       });
     });
+
+    // Flush the parent → success fade animation
+    flushFadeAnimation();
 
     await waitFor(() => {
       expect(screen.getByTestId('consent-success')).toBeTruthy();
@@ -200,12 +220,14 @@ describe('ConsentScreen', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
+    flushFadeAnimation();
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
       'parent@example.com'
     );
     fireEvent.press(screen.getByTestId('consent-submit'));
 
+    flushFadeAnimation();
     await waitFor(() => {
       expect(screen.getByTestId('consent-success')).toBeTruthy();
     });
@@ -226,12 +248,14 @@ describe('ConsentScreen', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
+    flushFadeAnimation();
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
       'parent@example.com'
     );
     fireEvent.press(screen.getByTestId('consent-submit'));
 
+    flushFadeAnimation();
     await waitFor(() => {
       expect(screen.getByTestId('consent-done')).toBeTruthy();
     });
@@ -248,6 +272,7 @@ describe('ConsentScreen', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
+    flushFadeAnimation();
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
       'parent@example.com'
@@ -273,24 +298,25 @@ describe('ConsentScreen', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
+    flushFadeAnimation();
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
       'parent@example.com'
     );
     fireEvent.press(screen.getByTestId('consent-submit'));
 
+    flushFadeAnimation();
     await waitFor(() => {
       expect(screen.getByTestId('consent-success')).toBeTruthy();
     });
 
-    expect(
-      screen.getByText("We couldn't confirm delivery yet")
-    ).toBeTruthy();
+    expect(screen.getByText("We couldn't confirm delivery yet")).toBeTruthy();
     expect(
       screen.getByText(/could not confirm that the consent email reached/i)
     ).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('consent-done'));
+    flushFadeAnimation();
     expect(mockBack).not.toHaveBeenCalled();
     expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
   });

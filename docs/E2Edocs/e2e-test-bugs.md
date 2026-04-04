@@ -133,16 +133,16 @@ The JSX `Already have an account?{' '}` renders with a trailing space that becom
 **Severity:** Medium (E2E testing only)
 **Affects:** All post-auth flows in dev-client builds
 
-Expo Router tabs with `href: null` (hidden from tab bar) still render as visible tabs in dev-client builds. All tab labels truncate: "Home" → "Ho...", "Learning Book" → "boo...", "More" stays readable. Hidden screens like onboarding, session, topic show as "onb...", "ses..." etc.
+Expo Router tabs with `href: null` (hidden from tab bar) still render as visible tabs in dev-client builds. All tab labels truncate: "Home" → "Ho...", "Library" → "boo...", "More" stays readable. Hidden screens like onboarding, session, topic show as "onb...", "ses..." etc.
 
 **Root cause:** Dev-client builds may not apply the same tab filtering as production builds. Extra tabs shift positions and make point-based and text-based tab navigation unreliable. CSS approaches (`tabBarItemStyle: { display: 'none' }`, `tabBarButton: () => null`) do not hide tabs in dev-client.
 
 **Workaround (applied 2026-03-10):** Added `tabBarAccessibilityLabel` to all 3 visible tabs in both `(learner)/_layout.tsx` and `(parent)/_layout.tsx`:
 - `tabBarAccessibilityLabel: 'Home Tab'`
-- `tabBarAccessibilityLabel: 'Learning Book Tab'`
+- `tabBarAccessibilityLabel: 'Library Tab'`
 - `tabBarAccessibilityLabel: 'More Tab'`
 
-Maestro matches these via Android `contentDescription`, bypassing visual label truncation and position shifting. All E2E flows updated to use `tapOn: "Learning Book Tab"` (and similar) instead of point-tap or truncated text matching.
+Maestro matches these via Android `contentDescription`, bypassing visual label truncation and position shifting. All E2E flows updated to use `tapOn: "Library Tab"` (and similar) instead of point-tap or truncated text matching.
 
 **Note:** Production builds correctly hide tabs with `href: null`. The accessibility labels are a durable fix that works in both dev-client and production.
 
@@ -206,7 +206,7 @@ When no dev tools sheet is present after the "Continue" overlay, `pressKey: back
 
 **Applied in:** 12 flow files across account, billing, onboarding, parent, subjects categories.
 
-**Note (updated 2026-03-10):** The `tabBarAccessibilityLabel` approach (BUG-10/BUG-30 fix) is now the preferred navigation method. All flows that previously used point-tap or text matching for Learning Book have been migrated to `tapOn: "Learning Book Tab"` (matching `contentDescription`). This is more reliable than both text matching and testID on Android.
+**Note (updated 2026-03-10):** The `tabBarAccessibilityLabel` approach (BUG-10/BUG-30 fix) is now the preferred navigation method. All flows that previously used point-tap or text matching for Library have been migrated to `tapOn: "Library Tab"` (matching `contentDescription`). This is more reliable than both text matching and testID on Android.
 
 ---
 
@@ -333,7 +333,7 @@ Android 13+ (API 33+) requires explicit `POST_NOTIFICATIONS` permission. The app
 **Severity:** Medium — visual glitch, does not block functionality
 **Affects:** All screens in `(learner)` route group
 
-The bottom tab bar shows ~9 tabs instead of the intended 3 (Home, Learning Book, More). Extra tabs appear with broken icons (missing character rectangle glyphs ▯) and truncated labels like "sub…". The `subject/` directory inside `(learner)/` is auto-discovered by Expo Router as a visible tab because it lacks a `<Tabs.Screen>` declaration with `href: null`.
+The bottom tab bar shows ~9 tabs instead of the intended 3 (Home, Library, More). Extra tabs appear with broken icons (missing character rectangle glyphs ▯) and truncated labels like "sub…". The `subject/` directory inside `(learner)/` is auto-discovered by Expo Router as a visible tab because it lacks a `<Tabs.Screen>` declaration with `href: null`.
 
 **Root cause:** Expo Router's file-system routing automatically creates a tab for every file/directory inside a `Tabs` layout group. Routes that should be hidden (navigated to programmatically, not via tab bar) need an explicit `<Tabs.Screen name="..." options={{ href: null }} />`. The `subject/` route is missing this declaration — likely dropped during a previous commit (`08abeaa`, E2E flows/testIDs).
 
@@ -508,7 +508,7 @@ The `onboarding-complete` scenario creates an **owner** profile (not a child), s
 
 The `parent-solo` seed scenario successfully signs in, switches to parent persona, and lands on the parent dashboard. The dashboard shows "Home", "How your children are doing", "No children linked yet", and "Switch to Teen view (demo)". However, the `demo-banner` testID is not found.
 
-**Screenshot evidence:** Parent dashboard renders with correct content but no demo banner overlay. The tab bar shows 4 tabs (Home, Learning Book, More, child/[profilel...) — the extra tab is BUG-10 in the parent layout.
+**Screenshot evidence:** Parent dashboard renders with correct content but no demo banner overlay. The tab bar shows 4 tabs (Home, Library, More, child/[profilel...) — the extra tab is BUG-10 in the parent layout.
 
 **Root cause (confirmed via code review):** The `demo-banner` testID exists in `dashboard.tsx` (line 38) and the `useDashboard()` hook correctly falls back to `GET /v1/dashboard/demo` when `children.length === 0`. However, after persona switch, `activeProfile` (from `useProfile()`) is briefly `null`, which disables the TanStack Query (`enabled: !!activeProfile`). When the query is disabled, `isLoading` is `false` (TanStack Query v5: `isLoading = isPending && isFetching`, disabled query never fetches). The component skips the skeleton and renders "No children linked yet" immediately — before the demo data ever loads.
 
@@ -518,38 +518,38 @@ The subtitle "How your children are doing" (non-demo text) confirms `dashboard` 
 
 ---
 
-## BUG-30: Learning Book Tab Unreachable via Point-Tap — BUG-10 Escalation (2026-03-10)
+## BUG-30: Library Tab Unreachable via Point-Tap — BUG-10 Escalation (2026-03-10)
 
 **Status:** Fixed (accessibility labels + book route flattening)
-**Severity:** High — blocks 5+ E2E flows that navigate to Learning Book
-**Affects:** `subjects/multi-subject.yaml`, `retention/topic-detail.yaml`, `retention/learning-book.yaml`, `retention/recall-review.yaml`, `retention/retention-review.yaml`, and any flow using `tapOn: point: "50%,97%"` for tab navigation
+**Severity:** High — blocks 5+ E2E flows that navigate to Library
+**Affects:** `subjects/multi-subject.yaml`, `retention/topic-detail.yaml`, `retention/library.yaml`, `retention/recall-review.yaml`, `retention/retention-review.yaml`, and any flow using `tapOn: point: "50%,97%"` for tab navigation
 
-The point-tap workaround at `(50%, 97%)` for navigating to the Learning Book tab hits the **wrong tab** due to BUG-10 (hidden routes visible in dev-client tab bar). In dev-client builds, the tab bar shows ~9 tabs instead of 3, shifting all tab positions. The 50% horizontal position lands on the 4th-5th tab (a hidden route like `topic/` or `homework/`) instead of the 2nd tab (Learning Book).
+The point-tap workaround at `(50%, 97%)` for navigating to the Library tab hits the **wrong tab** due to BUG-10 (hidden routes visible in dev-client tab bar). In dev-client builds, the tab bar shows ~9 tabs instead of 3, shifting all tab positions. The 50% horizontal position lands on the 4th-5th tab (a hidden route like `topic/` or `homework/`) instead of the 2nd tab (Library).
 
-**Root cause:** BUG-10 (dev-client exposes hidden tabs) + Expo Router directory route behavior. The `book/index.tsx` directory route caused Expo Router to render `content-desc="⏷, book/index"` instead of the configured `tabBarAccessibilityLabel`. This meant Maestro couldn't find the tab by any reliable selector.
+**Root cause:** BUG-10 (dev-client exposes hidden tabs) + Expo Router directory route behavior. The `library/index.tsx` directory route caused Expo Router to render `content-desc="⏷, library/index"` instead of the configured `tabBarAccessibilityLabel`. This meant Maestro couldn't find the tab by any reliable selector.
 
 **Fix (applied 2026-03-10, 3 parts):**
 
-1. **Flattened `book/` directory to `book.tsx` file route:**
-   - Moved `(learner)/book/index.tsx` → `(learner)/book.tsx` (updated all 6 import paths from `../../../` to `../../`)
-   - Moved `(learner)/book/index.test.tsx` → `(learner)/book.test.tsx` (updated 3 mock paths + require path)
-   - Updated `(parent)/book.tsx` re-export from `'../(learner)/book/index'` → `'../(learner)/book'`
-   - **Why:** Expo Router treats directory routes differently — `book/index.tsx` exposes the raw path `book/index` in the tab bar, ignoring configured `title` and `tabBarAccessibilityLabel`. File routes (`book.tsx`) correctly use the configured options.
+1. **Flattened `library/` directory to `library.tsx` file route:**
+   - Moved `(learner)/library/index.tsx` → `(learner)/library.tsx` (updated all 6 import paths from `../../../` to `../../`)
+   - Moved `(learner)/library/index.test.tsx` → `(learner)/library.test.tsx` (updated 3 mock paths + require path)
+   - Updated `(parent)/library.tsx` re-export from `'../(learner)/library/index'` → `'../(learner)/library'`
+   - **Why:** Expo Router treats directory routes differently — `library/index.tsx` exposes the raw path `library/index` in the tab bar, ignoring configured `title` and `tabBarAccessibilityLabel`. File routes (`library.tsx`) correctly use the configured options.
 
 2. **Added `tabBarAccessibilityLabel` to all visible tabs** (both layouts):
-   - `tabBarAccessibilityLabel: 'Home Tab'`, `'Learning Book Tab'`, `'More Tab'`
+   - `tabBarAccessibilityLabel: 'Home Tab'`, `'Library Tab'`, `'More Tab'`
    - Maestro matches these via Android `contentDescription`, bypassing visual truncation
 
-3. **Updated 7 E2E flow YAML files** to use `tapOn: "Learning Book Tab"`:
+3. **Updated 7 E2E flow YAML files** to use `tapOn: "Library Tab"`:
    - `flows/subjects/multi-subject.yaml` (was `point: "50%,97%"`)
    - `flows/retention/topic-detail.yaml` (was `point: "50%,97%"`)
-   - `flows/retention/learning-book.yaml` (was `tapOn: "Learning Book"`)
-   - `flows/retention/relearn-flow.yaml` (was `tapOn: "Learning Book"`)
-   - `flows/onboarding/view-curriculum.yaml` (was `tapOn: "Learning Book"`)
-   - `flows/parent/parent-tabs.yaml` (was `tapOn: text: "Learning Book"`)
-   - `flows/parent/parent-learning-book.yaml` (was `tapOn: text: "Learning Book"`)
+   - `flows/retention/library.yaml` (was `tapOn: "Library"`)
+   - `flows/retention/relearn-flow.yaml` (was `tapOn: "Library"`)
+   - `flows/onboarding/view-curriculum.yaml` (was `tapOn: "Library"`)
+   - `flows/parent/parent-tabs.yaml` (was `tapOn: text: "Library"`)
+   - `flows/parent/parent-library.yaml` (was `tapOn: text: "Library"`)
 
-**Verified on emulator:** `Tap on "Learning Book Tab"... COMPLETED` — Learning Book screen loads correctly with header, subtitle, and tab highlighted. TypeScript passes, unit tests pass.
+**Verified on emulator:** `Tap on "Library Tab"... COMPLETED` — Library screen loads correctly with header, subtitle, and tab highlighted. TypeScript passes, unit tests pass.
 
 ---
 
@@ -622,13 +622,13 @@ After navigating to the Delete Account screen and tapping `delete-account-cancel
 
 ---
 
-## BUG-33: Learning Book Tab Crash — react-native-svg ClassCastException on Fabric (2026-03-10)
+## BUG-33: Library Tab Crash — react-native-svg ClassCastException on Fabric (2026-03-10)
 
 **Status:** FIXED (2026-03-11) — replaced animated SVG `<G>` transform with pure Reanimated `<Animated.View>` scaleX (no SVG dependency). Tests pass (14 suites, 137 tests).
-**Severity:** High — blocks ALL flows that navigate to the Learning Book tab
-**Affects:** `subjects/multi-subject.yaml`, `onboarding/view-curriculum.yaml`, `retention/learning-book.yaml`, `retention/topic-detail.yaml`, and any flow navigating to the Learning Book tab
+**Severity:** High — blocks ALL flows that navigate to the Library tab
+**Affects:** `subjects/multi-subject.yaml`, `onboarding/view-curriculum.yaml`, `retention/library.yaml`, `retention/topic-detail.yaml`, and any flow navigating to the Library tab
 
-After tapping "Learning Book Tab", the app crashes with a red error screen:
+After tapping "Library Tab", the app crashes with a red error screen:
 
 ```
 There was a problem loading the project.
@@ -647,9 +647,9 @@ java.lang.ClassCastException: java.lang.String cannot be cast to...
 - `react-native-reanimated` animated SVG transforms
 - The crash is **100% reproducible** — confirmed in both `multi-subject` and `view-curriculum` flows
 
-**Why it crashes on Learning Book but not Home:**
+**Why it crashes on Library but not Home:**
 - Home screen: `PenWritingAnimation` (also SVG) shows only during `coachingCard.isLoading` — likely resolves before render on the test's fast API
-- Learning Book: `BookPageFlipAnimation` renders during `isLoading` (subjects + retention queries) — the loading state lasts long enough for SVG to mount and crash
+- Library: `BookPageFlipAnimation` renders during `isLoading` (subjects + retention queries) — the loading state lasts long enough for SVG to mount and crash
 
 **This is NOT a test issue — it's a genuine app bug.** Per CLAUDE.md Rule 4: "The implemented app code is the source of truth... It is forbidden to modify app code to make a test pass." The animation component needs a proper fix.
 
@@ -661,11 +661,11 @@ java.lang.ClassCastException: java.lang.String cannot be cast to...
 
 **Confirmed fix approach (2026-03-11 code review):** The crash is in `BookPageFlipAnimation.tsx` which uses `Animated.createAnimatedComponent(G)` and passes `transform` as a string via `useAnimatedProps()`. The `RNSVGGroupManagerDelegate` on Fabric (New Architecture) expects a typed transform object, not a string. **This is fixable without the emulator** — replace the animated SVG `<G>` transform with a reanimated `<Animated.View>` wrapper using standard `style.transform`, or replace the entire component with a simple `ActivityIndicator`. The component is only used during loading states.
 
-**Files:** `apps/mobile/src/components/common/BookPageFlipAnimation.tsx` (source), `BookPageFlipAnimation.test.tsx` (test), `apps/mobile/src/app/(learner)/book.tsx` (consumer), `apps/mobile/src/components/common/index.ts` (barrel export).
+**Files:** `apps/mobile/src/components/common/BookPageFlipAnimation.tsx` (source), `BookPageFlipAnimation.test.tsx` (test), `apps/mobile/src/app/(learner)/library.tsx` (consumer), `apps/mobile/src/components/common/index.ts` (barrel export).
 
-**E2E workaround (temporary):** Flows that navigate to Learning Book will fail at the tab switch. Home screen assertions (subjects, retention strip) remain testable. Skip Learning Book tab assertions until BUG-33 is fixed.
+**E2E workaround (temporary):** Flows that navigate to Library will fail at the tab switch. Home screen assertions (subjects, retention strip) remain testable. Skip Library tab assertions until BUG-33 is fixed.
 
-**Parent routing fix (commit `93e5646`):** BUG-33 also manifested as a parent routing mismatch — parent scenarios create a PARENT owner profile, so the app routes to `(parent)/dashboard` (testID: `dashboard-scroll`), not `(learner)/home` (testID: `home-scroll-view`). Fixed in `seed-and-sign-in.yaml` (accepts both landing screens) and 6 parent flow YAMLs (replaced `switch-to-parent.yaml` with direct `dashboard-scroll` wait). The SVG crash on Learning Book tab remains open.
+**Parent routing fix (commit `93e5646`):** BUG-33 also manifested as a parent routing mismatch — parent scenarios create a PARENT owner profile, so the app routes to `(parent)/dashboard` (testID: `dashboard-scroll`), not `(learner)/home` (testID: `home-scroll-view`). Fixed in `seed-and-sign-in.yaml` (accepts both landing screens) and 6 parent flow YAMLs (replaced `switch-to-parent.yaml` with direct `dashboard-scroll` wait). The SVG crash on Library tab remains open.
 
 ---
 
@@ -833,11 +833,11 @@ Both flows asserted `id: recall-test-screen` after tapping the coaching card, bu
 
 ---
 
-## BUG-41: Learning Book SVG Crash (= BUG-33) — RNSVGGroupManagerDelegate ClassCastException (2026-03-11)
+## BUG-41: Library SVG Crash (= BUG-33) — RNSVGGroupManagerDelegate ClassCastException (2026-03-11)
 
 **Status:** FIXED (2026-03-11) — resolved by BUG-33 fix (BookPageFlipAnimation rewritten without SVG).
 **Severity:** HIGH — blocks 5 flows
-**Affects:** `retention/learning-book.yaml`, `retention/topic-detail.yaml`, `retention/relearn-flow.yaml`, `subjects/multi-subject.yaml` (at LB step), any future flow navigating to Learning Book tab
+**Affects:** `retention/library.yaml`, `retention/topic-detail.yaml`, `retention/relearn-flow.yaml`, `subjects/multi-subject.yaml` (at LB step), any future flow navigating to Library tab
 
 Same `ClassCastException: java.lang.String cannot be cast` in `com.facebook.react.viewmanagers.RNSVGGroupManagerDelegate` as BUG-33. Confirmed reproducible in Session 10 across multiple scenarios (retention-due, failed-recall-3x, multi-subject).
 
@@ -966,7 +966,7 @@ During Session 12 (and previously in Sessions 10-11), the Gemini LLM API (`gemin
 
 **Status:** FIXED (2026-03-12) — created `return-to-home-safe.yaml` with dual-guard logic
 **Severity:** HIGH — blocks all parent flows that use `seed-and-sign-in.yaml`
-**Affects:** `parent/parent-dashboard.yaml`, `parent/parent-learning-book.yaml`, and any parent scenario using `seed-and-sign-in.yaml` with `return-to-home.yaml`
+**Affects:** `parent/parent-dashboard.yaml`, `parent/parent-library.yaml`, and any parent scenario using `seed-and-sign-in.yaml` with `return-to-home.yaml`
 
 After sign-in with a parent scenario, the app briefly shows `home-scroll-view` (learner layout) then redirects to `dashboard-scroll` (parent layout). The existing `return-to-home.yaml` conditional (`when: notVisible: id: home-scroll-view`) evaluates **after** the redirect has occurred, so `home-scroll-view` is indeed not visible (because the parent dashboard is showing). This causes it to incorrectly press Back, navigating away from the dashboard.
 
@@ -1064,7 +1064,7 @@ The `trial-expired-child` seed creates a parent-owned account with a parent prof
 **Severity:** Medium (visual only — navigation labels still visible)
 **Status:** FIXED (Session 19 — added `...Ionicons.font` to `useFonts()` in root `_layout.tsx`)
 
-Tab bar icons render as empty squares with X marks (broken font glyphs) instead of Ionicons. Affects all tabs: Home, Learning Book, More, and the hidden dev-only route tabs (session, topic, homework, subject). The text labels ("Ho...", "Lea...", "More") are visible and truncated but functional.
+Tab bar icons render as empty squares with X marks (broken font glyphs) instead of Ionicons. Affects all tabs: Home, Library, More, and the hidden dev-only route tabs (session, topic, homework, subject). The text labels ("Ho...", "Lea...", "More") are visible and truncated but functional.
 
 **Root cause hypothesis:** Ionicons vector font not loaded in the dev-client APK. Expo's `@expo/vector-icons` bundles Ionicons as a font asset. On debug builds served by Metro, the font may not be pre-loaded before the tab bar renders. Alternatively, the font asset path may be broken on the WHPX emulator.
 
@@ -1202,9 +1202,9 @@ The failure occurs at:
 **Severity:** High — visual defect on EVERY screen in the app (learner + parent layouts)
 **Affects:** All flows — the tab bar is visible on every screen except fullscreen (session, homework, onboarding)
 
-**Observed behavior:** The bottom tab bar shows 9 tabs instead of 3. The 6 hidden routes (`onboarding`, `session`, `topic`, `subscription`, `homework`, `subject`) render as visible tab buttons with truncated labels ("ses...", "topi...", "ho...", "sub...") and placeholder rectangle icons (no `tabBarIcon` defined for hidden routes). The 3 real tabs (Home, Learning Book, More) are squeezed to accommodate the extra buttons.
+**Observed behavior:** The bottom tab bar shows 9 tabs instead of 3. The 6 hidden routes (`onboarding`, `session`, `topic`, `subscription`, `homework`, `subject`) render as visible tab buttons with truncated labels ("ses...", "topi...", "ho...", "sub...") and placeholder rectangle icons (no `tabBarIcon` defined for hidden routes). The 3 real tabs (Home, Library, More) are squeezed to accommodate the extra buttons.
 
-**Screenshot evidence:** Learning Book screen shows tab bar with: `Ho... Lea... More ses... topi... ho... topi... sub... topi...`
+**Screenshot evidence:** Library screen shows tab bar with: `Ho... Lea... More ses... topi... ho... topi... sub... topi...`
 
 **Root cause:** In Expo Router's `<Tabs>`, `href: null` prevents a tab from being a **navigation target** (no deep linking, no programmatic navigation from tab bar), but does NOT remove the tab **button** from the visual layout. The underlying `@react-navigation/bottom-tabs` still allocates space and renders the button.
 
@@ -1223,7 +1223,7 @@ The failure occurs at:
 
 `apps/mobile/src/app/(parent)/_layout.tsx` — Added `tabBarItemStyle: { display: 'none' }` to the hidden `child` tab (line 101).
 
-**Verification:** No direct unit tests for layout files. Fix is purely additive CSS. Needs visual verification after rebuild — tab bar should show exactly 3 tabs (Home, Learning Book, More) with correct icons and full labels.
+**Verification:** No direct unit tests for layout files. Fix is purely additive CSS. Needs visual verification after rebuild — tab bar should show exactly 3 tabs (Home, Library, More) with correct icons and full labels.
 
 ---
 
@@ -1377,7 +1377,7 @@ Same pattern as BUG-54 (session close endpoint), which was fixed in Session 16.
 
 **What happens:** The `child/[profileId]` dynamic route renders as a 4th visible tab in the parent tab bar with a broken icon (box with X) and truncated label "child/[profileI...". This should be hidden.
 
-**Why Maestro passed:** Maestro navigates by accessibility labels ("Home Tab", "Learning Book Tab", "More Tab"), bypassing visual tab position and count.
+**Why Maestro passed:** Maestro navigates by accessibility labels ("Home Tab", "Library Tab", "More Tab"), bypassing visual tab position and count.
 
 **Root cause (confirmed 2026-03-25):** The `Tabs.Screen` declaration used `name="child"` but Expo Router auto-discovers the route as `child/[profileId]` (because the directory structure is `child/[profileId]/_layout.tsx`). Since `name="child"` didn't match the auto-discovered route `child/[profileId]`, Expo Router ignored the declaration and created an additional visible tab for the unmatched route with default options (raw path as label, no icon).
 
@@ -1387,23 +1387,23 @@ Same pattern as BUG-54 (session close endpoint), which was fixed in Session 16.
 
 ---
 
-## BUG-68: Parent Learning Book Tab Routes to Wrong Screen (2026-03-23)
+## BUG-68: Parent Library Tab Routes to Wrong Screen (2026-03-23)
 
 **Status:** RESOLVED (2026-03-25) — not reproducible. Resolved as side-effect of BUG-34 (subjects added to seeds).
 **Severity:** High — parent cannot access curriculum overview
-**Affects:** Parent layout, Learning Book tab
+**Affects:** Parent layout, Library tab
 **Type:** App bug (routing — Maestro may pass but shows wrong content)
 **Found by:** Session 23 visual review (V-008)
 
-**What happens:** When a parent taps the "Learning Book Tab", the screen shows the learner's "New subject" creation form (with keyboard open and subject name input) instead of the parent's curriculum overview. Screenshot `parent-tabs-02-learning-book` clearly shows the wrong screen.
+**What happens:** When a parent taps the "Library Tab", the screen shows the learner's "New subject" creation form (with keyboard open and subject name input) instead of the parent's curriculum overview. Screenshot `parent-tabs-02-library` clearly shows the wrong screen.
 
-**Why Maestro partially passed:** The flow took the screenshot after tapping Learning Book Tab, but failed at the next step (tapping "More") because the unexpected screen broke navigation flow.
+**Why Maestro partially passed:** The flow took the screenshot after tapping Library Tab, but failed at the next step (tapping "More") because the unexpected screen broke navigation flow.
 
-**Root cause (confirmed 2026-03-25):** Navigation state leak from the learner route group. The original Session 23 test used `onboarding-complete` seed (which at the time had NO subjects), causing `home.tsx` to auto-redirect to `/create-subject`. When switching to parent persona, the stale create-subject screen in the learner group's navigation stack leaked into the parent's book tab (which re-exports the learner book component via `(parent)/book.tsx`).
+**Root cause (confirmed 2026-03-25):** Navigation state leak from the learner route group. The original Session 23 test used `onboarding-complete` seed (which at the time had NO subjects), causing `home.tsx` to auto-redirect to `/create-subject`. When switching to parent persona, the stale create-subject screen in the learner group's navigation stack leaked into the parent's library tab (which re-exports the learner library component via `(parent)/library.tsx`).
 
 **Resolution:** BUG-34 added subjects to the `onboarding-complete` seed, eliminating the `home.tsx` → `/create-subject` auto-redirect. Without the redirect, no stale navigation state exists to leak.
 
-**Verification (Session 25):** Ran `parent-tabs.yaml` and `parent-learning-book.yaml` with `parent-with-children` seed — Learning Book tab correctly shows empty state ("No topics yet — add a subject to get started"). Both flows PASS. `(parent)/book.tsx` re-export is correct.
+**Verification (Session 25):** Ran `parent-tabs.yaml` and `parent-library.yaml` with `parent-with-children` seed — Library tab correctly shows empty state ("No topics yet — add a subject to get started"). Both flows PASS. `(parent)/library.tsx` re-export is correct.
 
 ---
 

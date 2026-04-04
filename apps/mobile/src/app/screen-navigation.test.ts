@@ -27,11 +27,11 @@ const EXEMPT_SCREENS: string[] = [
   'index.tsx',
   // Tab screens — bottom tab navigation provides navigation
   '(learner)/home.tsx',
-  '(learner)/book.tsx',
+  '(learner)/library.tsx',
   '(learner)/more.tsx',
   '(parent)/dashboard.tsx',
   '(parent)/more.tsx',
-  '(parent)/book.tsx',
+  '(parent)/library.tsx',
   // Sign-in is the auth entry point — no "back" since there's nowhere
   // to go when unauthenticated. Has links to sign-up and forgot-password.
   '(auth)/sign-in.tsx',

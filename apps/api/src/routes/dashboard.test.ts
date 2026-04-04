@@ -28,6 +28,16 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
+jest.mock('../services/profile', () => ({
+  findOwnerProfile: jest.fn().mockResolvedValue(null),
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+}));
+
 const mockGetChildrenForParent = jest.fn().mockResolvedValue([]);
 const mockGetChildDetail = jest.fn().mockResolvedValue(null);
 const mockGetChildSubjectTopics = jest.fn().mockResolvedValue([]);
@@ -50,6 +60,7 @@ const TEST_ENV = {
 const AUTH_HEADERS = {
   Authorization: 'Bearer valid.jwt.token',
   'Content-Type': 'application/json',
+  'X-Profile-Id': 'test-profile-id',
 };
 
 const PROFILE_ID = '770e8400-e29b-41d4-a716-446655440000';

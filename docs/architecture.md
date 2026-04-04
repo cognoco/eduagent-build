@@ -41,7 +41,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | Learning Verification | FR43-FR51 | Epic 3 | High — SM-2 spaced repetition, mastery scoring, delayed recall scheduling |
 | Failed Recall Remediation | FR52-FR58 | Epic 3 | Medium — guided relearning, adaptive method selection |
 | Adaptive Teaching | FR59-FR66 | Epic 3 | Medium — three-strike rule, teaching method preferences, "Needs Deepening" scheduling |
-| Progress Tracking | FR67-FR76 | Epic 4 | Medium — Learning Book, knowledge decay visualization, topic review |
+| Progress Tracking | FR67-FR76 | Epic 4 | Medium — Library, knowledge decay visualization, topic review |
 | Multi-Subject Learning | FR77-FR85 | Epic 4 | Medium — subject management, archive/pause, auto-archive |
 | Engagement & Motivation | FR86-FR95 | Epic 4 | Medium — honest streak, retention XP, interleaved retrieval |
 | Language Learning (v1.1) | FR96-FR107 | Epic 6 | Deferred — Four Strands, CEFR tracking, vocabulary spaced repetition |
@@ -136,7 +136,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | **Event-driven lifecycle** | **Direct queue dispatch via Inngest.** `session.completed` → 4-5 known consumers (SM-2 recalculation → coaching card precomputation → parent dashboard update). Inngest step functions for multi-step chains. Fire-and-forget with retry — no full event sourcing at MVP. Lifecycle events (`session.started`, `session.completed`, `session.timed_out`) stored as special event types in the same append-only session event log — replay capability without a full event store. Ordering: per-session/per-profile natural ordering. Overlapping sessions (unlikely): last-write-wins on SM-2 row, recalculation is idempotent. | Backend |
 | **Retention & spaced repetition** | SM-2 as **library/module** (~50 lines pure math). Takes `{ previous_interval, previous_ease_factor, quality_score }` → returns `{ next_interval, next_ease_factor, next_review_date }`. Writes to `topic_schedules` table. Consumers are all readers: coaching card ("which topics due/overdue"), notification scheduler ("when is next review"), parent dashboard ("how many topics fading"). Library is the writer, everything else is a reader. Clean interface enables future service extraction. Called through event-driven lifecycle. **EVALUATE scoring (Epic 3 extension):** EVALUATE results feed into SM-2 as a new input source, but the math is unchanged. Modified scoring floor: EVALUATE failure = quality 2-3 (not 0-1) — missing a subtle flaw does not equal not knowing the concept. Prevents score tanking on topics the student actually knows. `evaluateDifficultyRung` (integer 1-4) stored alongside SM-2 state on the retention card; persists across sessions, default null (= never evaluated). | Backend |
 | **Data privacy & compliance** | **Consent state machine**: `PENDING → PARENTAL_CONSENT_REQUESTED → CONSENTED → WITHDRAWN`, enforced at repository layer (no data access without CONSENTED). **Deletion orchestrator**: knows every table and external system, anonymizes immediately, full deletion within 30 days, idempotent/retryable steps. | Full stack |
-| **Error boundaries & graceful degradation** | Per-dependency circuit breakers with specific thresholds: **LLM providers** — trip after 3 consecutive 5xx/timeouts within 30-second window, half-open after 60s (one probe request). Tight window intentional — 30s wait is already bad UX in tutoring. **OCR** — no circuit breaker; single-request 5s timeout, immediate text input fallback (failures are per-image, not systemic). **Stripe** — no circuit breaker; webhook delays are normal. Check subscription from local DB (webhook-synced), never call Stripe during learning session. 3-day grace period per PRD. **Neon** — if DB is down, almost nothing works. Cache coaching card + Learning Book on client after each successful load, show with "limited mode" banner. Don't build elaborate fallbacks — invest in Neon reliability instead. | Full stack |
+| **Error boundaries & graceful degradation** | Per-dependency circuit breakers with specific thresholds: **LLM providers** — trip after 3 consecutive 5xx/timeouts within 30-second window, half-open after 60s (one probe request). Tight window intentional — 30s wait is already bad UX in tutoring. **OCR** — no circuit breaker; single-request 5s timeout, immediate text input fallback (failures are per-image, not systemic). **Stripe** — no circuit breaker; webhook delays are normal. Check subscription from local DB (webhook-synced), never call Stripe during learning session. 3-day grace period per PRD. **Neon** — if DB is down, almost nothing works. Cache coaching card + Library on client after each successful load, show with "limited mode" banner. Don't build elaborate fallbacks — invest in Neon reliability instead. | Full stack |
 | **Observability** | Structured logging with **correlation IDs** (request → LLM call → background job chain). Every LLM call logged: model, tokens in/out, latency, context hash, routing decision, cost. SM-2 decisions logged: card, interval, ease factor, grade. OpenTelemetry recommended. | Backend |
 | **i18n** | MVP: English + German UI. Backend: English only. Learning languages: any (via LLM). Framework: react-i18next. RTL deferred. | Frontend |
 
@@ -341,7 +341,7 @@ Research noted pnpm symlink issues with Expo in some Nx setups. If encountered d
 - Schema definitions in `packages/database/`, migration artifacts generated by `drizzle-kit`
 
 **Pagination:**
-- **Learning Book**: Full fetch per subject, filter/sort client-side with TanStack Query. Ceiling is a few hundred topics per power user — single query, under 10ms. Cursor pagination adds unnecessary client complexity for a dataset that fits in one response.
+- **Library**: Full fetch per subject, filter/sort client-side with TanStack Query. Ceiling is a few hundred topics per power user — single query, under 10ms. Cursor pagination adds unnecessary client complexity for a dataset that fits in one response.
 - **Session history**: Cursor-based (`WHERE (created_at, id) < ($cursor_time, $cursor_id) ORDER BY created_at DESC, id DESC LIMIT $n`). Grows unbounded, pagination justified.
 
 **Prerequisite Graph (Epic 7, v1.1):**
@@ -383,7 +383,7 @@ const ApiErrorSchema = z.object({
 One mobile client, one error handling path. RFC 7807 overengineered for this. Both API and mobile import the same type.
 
 **Pagination:**
-- **Learning Book**: Full fetch per subject (few hundred topics max, single response)
+- **Library**: Full fetch per subject (few hundred topics max, single response)
 - **Session history**: Cursor-based (`WHERE (created_at, id) < ($cursor_time, $cursor_id)`)
 
 **Route structure:**
@@ -395,7 +395,7 @@ One mobile client, one error handling path. RFC 7807 overengineered for this. Bo
 /v1/assessments/*       # Quizzes, recall tests, mastery scores
 /v1/billing/*           # Billing, quota, top-ups
 /v1/subjects/*          # Subject management
-/v1/progress/*          # Progress tracking, coaching card, Learning Book
+/v1/progress/*          # Progress tracking, coaching card, Library
 /v1/homework/*          # Homework photo processing (includes OCR endpoint)
 /v1/dashboard/*         # Parent dashboard
 /v1/settings/*          # User settings
@@ -432,14 +432,14 @@ src/app/
 │   ├── home.tsx
 │   ├── more.tsx
 │   ├── subscription.tsx
-│   ├── book/                  # Learning Book (coaching cards)
+│   ├── library/                # Library (coaching cards)
 │   ├── onboarding/            # Subject creation → interview → curriculum
 │   ├── session/               # Active learning/homework session
 │   └── topic/[topicId].tsx
 ├── (parent)/                  # Parent persona routes
 │   ├── _layout.tsx            # Parent nav + dashboard
 │   ├── dashboard.tsx
-│   ├── book.tsx
+│   ├── library.tsx
 │   └── more.tsx
 ├── assessment/                # Standalone assessment flow
 ├── session-summary/[sessionId].tsx
@@ -764,7 +764,7 @@ Functional error response helpers with typed codes (no class hierarchy). All res
 
 **Error handling (mobile):** TanStack Query `onError` callbacks per query/mutation. Global error boundary at root layout for unhandled crashes. Persona-appropriate error messages (coaching voice for learners, direct for parents).
 
-**Loading states (mobile):** TanStack Query's built-in `isLoading`, `isFetching`, `isError`. No custom loading state management. Skeleton screens for initial loads (coaching card, Learning Book). Inline spinners for mutations (submit answer, save summary).
+**Loading states (mobile):** TanStack Query's built-in `isLoading`, `isFetching`, `isError`. No custom loading state management. Skeleton screens for initial loads (coaching card, Library). Inline spinners for mutations (submit answer, save summary).
 
 **Validation timing:**
 - **Client**: Zod validation before sending (shared schema from `packages/schemas/`)
@@ -832,14 +832,14 @@ eduagent/
 │   │   │   │   │   │   └── curriculum-review.tsx  # AI-generated path review + customization
 │   │   │   │   │   ├── session/
 │   │   │   │   │   │   └── index.tsx     # Active learning session
-│   │   │   │   │   ├── book/
-│   │   │   │   │   │   └── index.tsx     # Learning Book — all subjects
+│   │   │   │   │   ├── library/
+│   │   │   │   │   │   └── index.tsx     # Library — all subjects
 │   │   │   │   │   └── topic/
 │   │   │   │   │       └── [topicId].tsx # Topic detail + practice
 │   │   │   │   ├── (parent)/
 │   │   │   │   │   ├── _layout.tsx       # Parent nav + dashboard
 │   │   │   │   │   ├── dashboard.tsx     # Aggregated child progress
-│   │   │   │   │   ├── book.tsx          # Parent view of Learning Book
+│   │   │   │   │   ├── library.tsx        # Parent view of Library
 │   │   │   │   │   └── more.tsx          # Parent settings/account
 │   │   │   │   ├── assessment/
 │   │   │   │   │   └── index.tsx
@@ -910,7 +910,7 @@ eduagent/
 │       │   │   ├── subjects.ts      # /v1/subjects/* — subject management
 │       │   │   ├── assessments.ts   # /v1/assessments/* — quizzes, recall, mastery
 │       │   │   ├── billing.ts       # /v1/billing/* — billing, quota, top-ups
-│       │   │   ├── progress.ts      # /v1/progress/* — progress tracking, coaching card, Learning Book
+│       │   │   ├── progress.ts      # /v1/progress/* — progress tracking, coaching card, Library
 │       │   │   ├── homework.ts      # /v1/homework/* — homework processing (includes OCR endpoint)
 │       │   │   ├── dashboard.ts     # /v1/dashboard/* — parent dashboard
 │       │   │   ├── settings.ts      # /v1/settings/* — user settings
@@ -947,7 +947,7 @@ eduagent/
 │       │   │   ├── billing.ts       # Billing logic + quota pool/trial queries for Inngest
 │       │   │   ├── trial.ts         # Trial management
 │       │   │   ├── xp.ts            # XP/engagement tracking
-│       │   │   ├── progress.ts      # Progress tracking, coaching card, Learning Book
+│       │   │   ├── progress.ts      # Progress tracking, coaching card, Library
 │       │   │   ├── dashboard.ts     # Parent dashboard data
 │       │   │   ├── profile.ts       # Profile management logic
 │       │   │   ├── account.ts       # Account management
@@ -1199,7 +1199,7 @@ Different concerns: rate limiting protects infrastructure, quota metering enforc
 | `/v1/curriculum/*` | Curriculum generation, topic management | LLM providers (via orchestrator) | Clerk JWT |
 | `/v1/assessments/*` | Quiz generation, recall scoring, mastery | LLM providers (via orchestrator) | Clerk JWT |
 | `/v1/billing/*` | Subscription state, quota reads | Stripe (webhook-synced) | Clerk JWT |
-| `/v1/progress/*` | Progress tracking, coaching card, Learning Book | Workers KV (cache reads) | Clerk JWT |
+| `/v1/progress/*` | Progress tracking, coaching card, Library | Workers KV (cache reads) | Clerk JWT |
 | `/v1/homework/*` | Homework processing, OCR text extraction | OCR provider (server-side fallback) | Clerk JWT |
 | `/v1/dashboard/*` | Parent dashboard data | — | Clerk JWT |
 | `/v1/account/*` | Account management | — | Clerk JWT |
@@ -1228,7 +1228,7 @@ Root Layout (_layout.tsx)
 │   ├── onboarding/ → interview + curriculum review (first-run only, then router.replace to home)
 │   ├── session/[id].tsx → reads/writes: session state (SSE stream + POST exchanges)
 │   ├── homework/camera.tsx → uses: ML Kit OCR (on-device), falls back to /v1/homework/ocr
-│   └── book/ → reads: Learning Book (full fetch, TanStack Query → /v1/progress)
+│   └── library/ → reads: Library (full fetch, TanStack Query → /v1/progress)
 │
 └── (parent)/ — Requires authenticated profile with parent persona
     ├── dashboard.tsx → reads: aggregated child data (/v1/profiles/*/progress)
@@ -1446,7 +1446,7 @@ No contradictory decisions found. The Workers → Railway/Fly fallback path is c
 | Epic 1: Onboarding & Interview | LLM orchestration for curriculum gen, `(learner)/onboarding/` route split (interview + curriculum review), curricula schema | Full |
 | Epic 2: Learning Experience | SSE streaming, session state hybrid model, exchange processing, LLM routing by escalation rung, OCR pipeline (ML Kit + server fallback), homework integrity via prompt design | Full |
 | Epic 3: Assessment & Retention | SM-2 library, Inngest lifecycle chain, mastery scoring in schema, delayed recall scheduling, "Needs Deepening" topic flagging, analogy domain injection in system prompt, TEACH_BACK verification (Feynman stage) with on-device STT/TTS | Full |
-| Epic 4: Progress & Motivation | Learning Book (full fetch), coaching card (KV cache), decay visualization, honest streak, notifications service | Full |
+| Epic 4: Progress & Motivation | Library (full fetch), coaching card (KV cache), decay visualization, honest streak, notifications service | Full |
 | Epic 5: Subscription | Stripe webhook-synced, `decrement_quota` PostgreSQL function, KV-cached subscription status, family pool with row-level locking | Full |
 | Epic 6: Language Learning (v1.1) | Deferred. Route/service/schema/component extension points documented. No blocking architectural debt. | Deferred by design |
 | Epic 7: Concept Map (v1.1) | `topic_prerequisites` join table, DAG cycle detection service, graph-aware coaching card precomputation, `prerequisiteContext` JSONB on adaptations | Planned (v1.1) |
@@ -1476,7 +1476,7 @@ All 121 MVP functional requirements have architectural support. The architecture
 **Offline Boundary:**
 
 MVP offline behavior is **read-only cached data, no offline writes**:
-- **Available offline**: Last-fetched coaching card, Learning Book topics, and profile data — cached by TanStack Query in `lib/storage.ts` (AsyncStorage persistence). Stale but useful.
+- **Available offline**: Last-fetched coaching card, Library topics, and profile data — cached by TanStack Query in `lib/storage.ts` (AsyncStorage persistence). Stale but useful.
 - **Not available offline**: Active learning sessions, assessments, new exchanges, subscription changes — all require server roundtrip.
 - **Behavior**: When offline, show cached data with a subtle "offline" indicator. Disable actions that require the server (start session, submit answer, take assessment). No offline queue or sync protocol.
 - **Why this boundary**: Offline sessions would require local LLM inference or request queuing with conflict resolution — fundamentally different architecture. Defining this now prevents scope creep. Full offline is deferred to v2.0.

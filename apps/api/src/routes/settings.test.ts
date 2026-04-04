@@ -28,6 +28,16 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
+jest.mock('../services/profile', () => ({
+  findOwnerProfile: jest.fn().mockResolvedValue(null),
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+}));
+
 // Mock services imported transitively via sessions routes
 jest.mock('../services/interleaved', () => ({
   startInterleavedSession: jest.fn().mockResolvedValue({
@@ -98,6 +108,7 @@ const TEST_ENV = {
 const AUTH_HEADERS = {
   Authorization: 'Bearer valid.jwt.token',
   'Content-Type': 'application/json',
+  'X-Profile-Id': 'test-profile-id',
 };
 
 describe('settings routes', () => {

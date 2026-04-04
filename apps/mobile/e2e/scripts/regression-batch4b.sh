@@ -17,7 +17,7 @@ run_seeded "failed-recall-3x" "flows/retention/relearn-flow.yaml"
 # Parent flows
 run_seeded "parent-with-children" "flows/parent/parent-tabs.yaml"
 run_seeded "parent-with-children" "flows/parent/parent-dashboard.yaml"
-run_seeded "parent-with-children" "flows/parent/parent-learning-book.yaml"
+run_seeded "parent-with-children" "flows/parent/parent-library.yaml"
 run_seeded "parent-with-children" "flows/parent/child-drill-down.yaml"
 run_seeded "parent-with-children" "flows/parent/consent-management.yaml"
 run_seeded "parent-solo"          "flows/parent/demo-dashboard.yaml"

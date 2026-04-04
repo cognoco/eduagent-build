@@ -28,6 +28,21 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
+jest.mock('../services/profile', () => ({
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+  findOwnerProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+}));
+
 jest.mock('../services/parking-lot-data', () => ({
   getParkingLotItems: jest.fn().mockResolvedValue({ items: [], count: 0 }),
   getParkingLotItemsForTopic: jest.fn().mockResolvedValue({
@@ -64,6 +79,7 @@ const TEST_ENV = {
 const AUTH_HEADERS = {
   Authorization: 'Bearer valid.jwt.token',
   'Content-Type': 'application/json',
+  'X-Profile-Id': 'test-profile-id',
 };
 
 const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
@@ -110,7 +126,7 @@ describe('parking lot routes', () => {
 
       expect(getParkingLotItems).toHaveBeenCalledWith(
         undefined, // db — not set in test env (no DATABASE_URL binding)
-        'test-account-id', // profileId falls back to account.id
+        'test-profile-id', // profileId from middleware auto-resolution
         SESSION_ID
       );
     });
@@ -190,7 +206,7 @@ describe('parking lot routes', () => {
 
       expect(addParkingLotItem).toHaveBeenCalledWith(
         undefined, // db — not set in test env (no DATABASE_URL binding)
-        'test-account-id', // profileId falls back to account.id
+        'test-profile-id', // profileId from middleware auto-resolution
         SESSION_ID,
         'Test question',
         '770e8400-e29b-41d4-a716-446655440000'
@@ -270,7 +286,7 @@ describe('parking lot routes', () => {
       expect(body.items[0].question).toBe('Why does factoring help here?');
       expect(getParkingLotItemsForTopic).toHaveBeenCalledWith(
         undefined,
-        'test-account-id',
+        'test-profile-id',
         'topic-1'
       );
     });

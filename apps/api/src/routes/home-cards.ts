@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { homeCardInteractionSchema, ERROR_CODES } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
-import type { Account } from '../services/account';
+import { requireProfileId } from '../middleware/profile-scope';
 import {
   getHomeCardsForProfile,
   trackHomeCardInteraction,
@@ -14,27 +14,14 @@ type HomeCardRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
-    account: Account;
-    profileId: string;
+    profileId: string | undefined;
   };
 };
 
 export const homeCardRoutes = new Hono<HomeCardRouteEnv>()
   .get('/home-cards', async (c) => {
     const db = c.get('db');
-    const profileId = c.get('profileId');
-
-    if (!profileId) {
-      return c.json(
-        {
-          error: {
-            code: ERROR_CODES.NOT_FOUND,
-            message: 'Active profile required',
-          },
-        },
-        400
-      );
-    }
+    const profileId = requireProfileId(c.get('profileId'));
 
     const result = await getHomeCardsForProfile(db, profileId);
     return c.json(result);
@@ -44,7 +31,7 @@ export const homeCardRoutes = new Hono<HomeCardRouteEnv>()
     zValidator('json', homeCardInteractionSchema),
     async (c) => {
       const db = c.get('db');
-      const profileId = c.get('profileId');
+      const profileId = requireProfileId(c.get('profileId'));
 
       if (!profileId) {
         return c.json(

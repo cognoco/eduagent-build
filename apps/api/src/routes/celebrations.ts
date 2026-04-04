@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { celebrationSeenSchema } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
-import type { Account } from '../services/account';
+import { requireProfileId } from '../middleware/profile-scope';
 import { getCelebrationLevel } from '../services/settings';
 import {
   filterCelebrationsByLevel,
@@ -16,16 +16,14 @@ type CelebrationRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
-    account: Account;
-    profileId: string;
+    profileId: string | undefined;
   };
 };
 
 export const celebrationRoutes = new Hono<CelebrationRouteEnv>()
   .get('/celebrations/pending', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const viewer = c.req.query('viewer') === 'parent' ? 'parent' : 'child';
     const celebrations = await getPendingCelebrations(db, profileId, viewer);
 
@@ -47,8 +45,7 @@ export const celebrationRoutes = new Hono<CelebrationRouteEnv>()
     zValidator('json', celebrationSeenSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = requireProfileId(c.get('profileId'));
       const body = c.req.valid('json');
 
       await markCelebrationsSeen(db, profileId, body.viewer);

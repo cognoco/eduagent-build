@@ -136,7 +136,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 | **Onboarding** | Subject selection (any topic), conversational interview, dynamic curriculum generation, homework help quick entry |
 | **Learning Experience** | Real-time AI chat, prior knowledge context, adaptive explanations, mandatory user summaries, homework integrity mode |
 | **Assessments** | In-lesson quizzes, topic completion tests, re-testing from summaries |
-| **Progress** | Learning Book (review past topics), mastery tracking, knowledge decay visualization |
+| **Progress** | Library (review past topics), mastery tracking, knowledge decay visualization |
 | **Gamification** | Honest streak (recall-based), retention XP (verified after delayed recall), decay bars |
 | **Language Learning** | Four Strands methodology (explicit instruction + input + output + fluency), vocabulary tracking, CEFR progress |
 | **Subscription** | Free tier + 14-day Plus trial + reverse trial, tiered pricing (Free/Plus/Family/Pro), shared question pools, top-up credits, payment gateway integration, BYOK waitlist |
@@ -203,7 +203,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
    - Lesson completes, progress saved
 
 5. **Post-First-Lesson**
-   - Sees progress in Learning Book
+   - Sees progress in Library
    - Views personalized curriculum path
    - Receives notification reminder for next lesson
 
@@ -271,7 +271,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
    - Full access to child's learning history (no separate dashboard)
 
 2. **Progress Review**
-   - Views Learning Book with all topics
+   - Views Library with all topics
    - Sees retention scores and decay indicators
    - Reviews "Problems worked through" section
    - Verifies homework sessions show guidance, not answers given
@@ -321,7 +321,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 4. **Solution Discovery**
    - Student arrives at solution through own reasoning
    - AI confirms correctness
-   - Session marked as "🎯 Guided problem-solving" in Learning Book
+   - Session marked as "🎯 Guided problem-solving" in Library
 
 5. **Parent Visibility**
    - Parent can review session
@@ -606,12 +606,12 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 
 **User choice (Focused Practice):**
 - User can select "Practice only [current topic]" after completing a lesson
-- Or from Learning Book: "Practice this topic only"
+- Or from Library: "Practice this topic only"
 - Useful for struggling learners who need reinforcement before mixing
 
 **UI flow:**
 - After completing a topic: "Ready for review?" → [Mixed Practice (Recommended)] or [Just This Topic]
-- Learning Book: Each topic has "Practice" button with dropdown for Mixed/Focused
+- Library: Each topic has "Practice" button with dropdown for Mixed/Focused
 
 **Not interleaved:**
 - Cross-subject mixing (Spanish + Calculus) is NOT interleaving - topics must be related/confusable
@@ -661,7 +661,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 
 **Implementation:**
 - AI summarizes patterns after 3+ related examples shown
-- Patterns saved to topic notes in Learning Book
+- Patterns saved to topic notes in Library
 - User can ask "What patterns should I notice?" for any topic
 - Visual highlighting in text where applicable (bold key patterns)
 
@@ -693,10 +693,10 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 2. Guides through solution: "What do you think the first step is?"
 3. Student explains thinking, AI prompts next step
 4. AI never provides final answers directly
-5. Session marked as "Guided problem-solving" in Learning Book
+5. Session marked as "Guided problem-solving" in Library
 
 **Parent Visibility:**
-- All homework sessions flagged in Learning Book
+- All homework sessions flagged in Library
 - Parent can see: AI guidance provided / Student found solution / No answers given
 - Full conversation history available for review
 
@@ -715,7 +715,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
   - Don't count toward curriculum progress percentage
   - Get recall tests sooner (1 week instead of 2 weeks)
   - No XP awarded until verified via recall OR user writes summary later
-- User can return to topic anytime from Learning Book to "Add summary" and convert to Verified status
+- User can return to topic anytime from Library to "Add summary" and convert to Verified status
 
 **Repeated Skipping Escalation:**
 - After **5 consecutive skips**: Warning "Summaries help you remember. Your recent topics are unverified."
@@ -749,12 +749,12 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
    - Shows worked solution
    - Rephrases original question
 3. **After AI explanation:**
-   - If user answers correctly → Topic saved to Learning Book (normal)
-   - If user still struggles → Topic saved to Learning Book "Needs Deepening" section
+   - If user answers correctly → Topic saved to Library (normal)
+   - If user still struggles → Topic saved to Library "Needs Deepening" section
 
 **"Needs Deepening" Topics:**
 - Automatically scheduled for more frequent review
-- Flagged in Learning Book with ⚠️ indicator
+- Flagged in Library with ⚠️ indicator
 - When eventually mastered (3+ successful recalls) → moves to normal section
 
 ### Adaptive Teaching (Subject-Level)
@@ -787,21 +787,21 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
   - Topic stays in "Pending Verification" status
   - XP remains unverified (shown as "pending XP")
   - Decay visualization shows "?" instead of decay bar
-- User can take test anytime from Learning Book
+- User can take test anytime from Library
 - Gamification naturally incentivizes testing (verified XP, honest streak)
 
 ### Perpetual Failure Escalation
 
 **When All Methods Exhausted:**
 - After **3 different teaching methods** all fail for same topic:
-  - Topic marked as "Blocked" in Learning Book
+  - Topic marked as "Blocked" in Library
   - AI suggests: "This topic might need prerequisite knowledge. Would you like to review [suggested prerequisite]?"
   - User can choose:
     - Review prerequisite topic
     - Skip topic entirely
     - Try again later
-- If user skips: Topic removed from active curriculum, preserved in Learning Book as "Skipped - Blocked"
-- User can always revisit skipped topics later from Learning Book
+- If user skips: Topic removed from active curriculum, preserved in Library as "Skipped - Blocked"
+- User can always revisit skipped topics later from Library
 
 ### Needs Deepening Limits
 
@@ -814,7 +814,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 - Bulk action available: "Clear all to Weak" if user wants to reset
 
 **Delete Struggling Topic:**
-- User can delete any topic from Learning Book (including Needs Deepening)
+- User can delete any topic from Library (including Needs Deepening)
 - Confirmation required: "Delete [topic]? This removes all progress and summaries."
 - Deleted topics:
   - Removed from curriculum entirely
@@ -860,7 +860,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 **Session Recovery:**
 - Session state auto-saved after each AI exchange (not just at session end)
 - On reconnection: Show "Welcome back! Continue where you left off?" with last message displayed
-- If disconnected >30 minutes: Session marked as "paused", can resume from Learning Book
+- If disconnected >30 minutes: Session marked as "paused", can resume from Library
 - If disconnected >24 hours: Session auto-closes, partial progress saved as "incomplete topic"
 
 **AI/LLM Integration:**
@@ -1035,7 +1035,7 @@ See also FR134-FR137 (Analogy Domain Preferences) for subject-level learning sty
 - FR30: Users can choose between "Learn something new" and "Get help with homework" modes
 - FR31: (Revised by FR228, Epic 14) Homework help uses direct explanation and verification — AI explains approaches, shows similar worked examples, and verifies student answers. Two modes per problem: "Check my answer" (brief verification) and "Help me solve it" (explain + similar example). AI never provides the final answer to the actual homework problem. Learning sessions retain Socratic guidance.
 - FR32: Users can photograph homework problems for AI analysis (v1.1)
-- FR33: Users can see sessions marked as "guided problem-solving" in Learning Book
+- FR33: Users can see sessions marked as "guided problem-solving" in Library
 
 **Session Timeout Handling:**
 - After **5 minutes** inactivity: First soft prompt "Still there?"
@@ -1069,7 +1069,7 @@ See also FR134-FR137 (Analogy Domain Preferences) for subject-level learning sty
 - User can switch modes anytime by saying "Help me with homework" or "Teach me this concept"
 - AI acknowledges: "Switching to homework help mode" or "Switching to teaching mode"
 - Session history preserved; mode change logged
-- Learning Book shows session with mixed modes: "Teaching + Homework help"
+- Library shows session with mixed modes: "Teaching + Homework help"
 
 **Tiered Tangent Handling:**
 
@@ -1085,7 +1085,7 @@ AI maintains lesson focus while respecting learner curiosity through tiered resp
 **Implementation:**
 - AI tracks invisible session objective (user doesn't see)
 - Tangent classification happens automatically based on topic relevance
-- Parked questions appear in Learning Book for later exploration
+- Parked questions appear in Library for later exploration
 - No penalty for tangents; natural curiosity is welcome
 - After lesson completes: "You had 3 parked questions. Want to explore any now?"
 
@@ -1147,25 +1147,25 @@ AI uses different assessment types based on subject and skill being verified:
 **Remediation Refusal Handling:**
 - Relearning is optional; user can dismiss remediation prompts
 - If user dismisses remediation **3 times** for same topic:
-  - Topic stays in "Failed" status in Learning Book
+  - Topic stays in "Failed" status in Library
   - XP for that topic set to 0 (fully decayed)
   - Topic no longer scheduled for recall tests
-  - User can manually "Restart topic" anytime from Learning Book
+  - User can manually "Restart topic" anytime from Library
 - No forced relearning; natural consequences instead
 
 **XP Floor and Forgotten Topics:**
 - XP can decay to **0** (no artificial floor)
-- Topic at 0 XP shows "Forgotten" status in Learning Book
+- Topic at 0 XP shows "Forgotten" status in Library
 - "Forgotten" topics:
   - Removed from active recall schedule
-  - Shown in separate "Forgotten" section in Learning Book
+  - Shown in separate "Forgotten" section in Library
   - User can "Relearn" to restart from beginning
 - Total profile XP has floor of 0 (can't go negative)
 - Rationale: Honest system; forgotten knowledge is forgotten
 
 ### Failed Recall Remediation
 
-- FR52: Users who fail recall tests (3+ times) are guided to Learning Book for that topic
+- FR52: Users who fail recall tests (3+ times) are guided to Library for that topic
 - FR53: Users can see their previous scores, "Your Words" summary, and decay status
 - FR54: Users can choose "Review & Re-test" (re-test available after 24+ hours)
 - FR55: Users can choose "Relearn Topic" to restart learning
@@ -1192,7 +1192,7 @@ See also FR138-FR143 (Feynman Stage) for teach-back verification via voice.
 
 ### Progress Tracking
 
-- FR67: Users can view Learning Book with all past topics
+- FR67: Users can view Library with all past topics
 - FR68: Users can browse topic summaries with "Your Words" (user's own writing)
 - FR69: Users can see retention scores and knowledge decay bars
 - FR70: Users can see topic retention status (Strong/Fading/Weak/Forgotten) and struggle status (Normal/Needs Deepening/Blocked) as separate indicators
@@ -1207,17 +1207,17 @@ See also FR138-FR143 (Feynman Stage) for teach-back verification via voice.
 
 - FR77: Users can create multiple curricula (subjects) under one profile
 - FR78: Users can view all active subjects on Home Screen with progress summary
-- FR79: Users can switch between subjects from Home Screen or Learning Book
-- FR80: Users can pause a subject (hidden from Home, accessible in Learning Book)
+- FR79: Users can switch between subjects from Home Screen or Library
+- FR80: Users can pause a subject (hidden from Home, accessible in Library)
 - FR81: Users can resume a paused subject
-- FR82: Users can archive a subject (removes from active view, Learning Book entries preserved)
+- FR82: Users can archive a subject (removes from active view, Library entries preserved)
 - FR83: Users can restore archived subjects from Settings
 - FR84: Users can see subjects auto-archived after 30 days of inactivity
-- FR85: Learning Book organizes topics by subject with subject switcher
+- FR85: Library organizes topics by subject with subject switcher
 
-**Learning Book Structure:**
+**Library Structure:**
 - Home Screen = subject switcher (all active/paused paths visible)
-- Learning Book = per-subject topic list with status indicators
+- Library = per-subject topic list with status indicators
 - Each subject shows: progress %, last studied, topics completed/total
 - Topics within subject show: title, retention status, struggle indicator (if applicable), actions
 
@@ -1278,7 +1278,7 @@ Topics have TWO independent status types that can combine:
   - If archived: Pending tests are **suspended** (not deleted)
   - When subject restored: Suspended tests resume from where they were
 - Archived subjects don't send recall notifications
-- Learning Book entries preserved; just not actively scheduled
+- Library entries preserved; just not actively scheduled
 
 **Archive Behavior with Needs Deepening Topics:**
 - When archiving subject with Needs Deepening topics:
@@ -1480,7 +1480,7 @@ The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) 
 - Unlimited onboarding (interview + curriculum generation)
 - 50 questions/month with first-week boost (10/day for days 1-7)
 - Full feature access (no feature gating, only usage limits)
-- Progress tracking and Learning Book (progress saved forever)
+- Progress tracking and Library (progress saved forever)
 - Top-ups not available (must upgrade)
 - Purpose: Ensure "aha moment" before friction, create upgrade pressure
 - Est. LLM cost: ~€0.25/month per free user
@@ -1520,7 +1520,7 @@ The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) 
 
 **Downgrade Policy:**
 - All progress preserved when downgrading tiers (Pro → Family → Plus → Free)
-- Learning Book, curricula, XP, summaries remain fully accessible
+- Library, curricula, XP, summaries remain fully accessible
 - Only usage limits change (questions/month)
 - No data archived or deleted on downgrade
 - Unused top-ups remain valid until expiration (can be used after re-upgrade)

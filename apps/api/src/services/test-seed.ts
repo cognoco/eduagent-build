@@ -1156,7 +1156,7 @@ async function seedTrialExpiredChild(
     respondedAt: new Date(),
   });
 
-  // Give child a subject with topics so "Browse Learning Book" has content
+  // Give child a subject with topics so "Browse Library" has content
   const { subjectId } = await createSubjectWithCurriculum(
     db,
     childProfileId,

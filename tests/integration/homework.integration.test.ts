@@ -64,6 +64,20 @@ jest.mock('../../apps/api/src/services/account', () => accountMock());
 jest.mock('../../apps/api/src/services/billing', () => billingMock());
 jest.mock('../../apps/api/src/services/settings', () => settingsMock());
 jest.mock('../../apps/api/src/services/llm', () => llmMock());
+jest.mock('../../apps/api/src/services/profile', () => ({
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+  findOwnerProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+}));
 
 import { app } from '../../apps/api/src/index';
 
@@ -107,6 +121,7 @@ describe('Integration: POST /v1/subjects/:subjectId/homework', () => {
         headers: {
           Authorization: 'Bearer test-token',
           'Content-Type': 'application/json',
+          'X-Profile-Id': 'test-profile-id',
         },
       },
       TEST_ENV
@@ -140,6 +155,7 @@ describe('Integration: POST /v1/subjects/:subjectId/homework', () => {
         headers: {
           Authorization: 'Bearer test-token',
           'Content-Type': 'application/json',
+          'X-Profile-Id': 'test-profile-id',
         },
       },
       TEST_ENV
@@ -190,7 +206,10 @@ describe('Integration: POST /v1/ocr', () => {
       '/v1/ocr',
       {
         method: 'POST',
-        headers: { Authorization: 'Bearer test-token' },
+        headers: {
+          Authorization: 'Bearer test-token',
+          'X-Profile-Id': 'test-profile-id',
+        },
         body: formData,
       },
       TEST_ENV
@@ -211,7 +230,10 @@ describe('Integration: POST /v1/ocr', () => {
       '/v1/ocr',
       {
         method: 'POST',
-        headers: { Authorization: 'Bearer test-token' },
+        headers: {
+          Authorization: 'Bearer test-token',
+          'X-Profile-Id': 'test-profile-id',
+        },
         body: formData,
       },
       TEST_ENV
@@ -231,7 +253,10 @@ describe('Integration: POST /v1/ocr', () => {
       '/v1/ocr',
       {
         method: 'POST',
-        headers: { Authorization: 'Bearer test-token' },
+        headers: {
+          Authorization: 'Bearer test-token',
+          'X-Profile-Id': 'test-profile-id',
+        },
         body: formData,
       },
       TEST_ENV

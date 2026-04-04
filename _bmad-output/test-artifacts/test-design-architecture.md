@@ -370,7 +370,7 @@ These were discovered by a structured code audit (3 parallel agents, 46+ source 
 4. **Wire anti-cramming:** Call `canRetestTopic()` in the recall-test route handler before allowing a re-test. The function already exists and is well-implemented — it just needs one import and one call.
 5. **Fix needs-deepening quality:** Pass actual quality score from the recall test result instead of defaulting to 3. Current default means FR63 auto-promotion fires too easily.
 6. **Validate full chain:** recall test answer → `processRecallTest()` → SM-2 calculation → `topic_schedules` update → coaching card refresh
-7. **Test edge cases:** quality score 0 (complete failure, 3+ failures → redirect to Learning Book), quality score 5 (perfect recall), interleaved session quality per-topic
+7. **Test edge cases:** quality score 0 (complete failure, 3+ failures → redirect to Library), quality score 5 (perfect recall), interleaved session quality per-topic
 
 **Owner:** Backend Dev
 **Timeline:** ~~AUDIT-004 and AUDIT-005 = immediate.~~ **Both resolved.** Double-counting and anti-cramming = implementation phase.

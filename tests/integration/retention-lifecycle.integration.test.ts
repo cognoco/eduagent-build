@@ -55,6 +55,20 @@ jest.mock('../../apps/api/src/services/llm', () => llmMock());
 jest.mock('../../apps/api/src/services/session', () =>
   jest.createMockFromModule('../../apps/api/src/services/session')
 );
+jest.mock('../../apps/api/src/services/profile', () => ({
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+  findOwnerProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+}));
 
 // Retention-data service — all functions controllable
 const mockGetSubjectRetention = jest.fn();
@@ -96,6 +110,7 @@ const TEST_ENV = {
 const AUTH_HEADERS = {
   Authorization: 'Bearer valid.jwt.token',
   'Content-Type': 'application/json',
+  'X-Profile-Id': 'test-profile-id',
 };
 
 // ---------------------------------------------------------------------------
@@ -300,9 +315,9 @@ describe('Integration: Retention Lifecycle', () => {
         xpChange: '0 XP',
         nextReviewAt: '2026-02-26T10:00:00.000Z',
         failureCount: 3,
-        failureAction: 'redirect_to_learning_book',
+        failureAction: 'redirect_to_library',
         remediation: {
-          action: 'redirect_to_learning_book',
+          action: 'redirect_to_library',
           topicId: TOPIC_ID,
           topicTitle: 'Introduction to Calculus',
           retentionStatus: 'fading',
@@ -327,7 +342,7 @@ describe('Integration: Retention Lifecycle', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.result.failureAction).toBe('redirect_to_learning_book');
+      expect(body.result.failureAction).toBe('redirect_to_library');
       expect(body.result.remediation).toBeDefined();
       expect(body.result.remediation.options).toContain('relearn_topic');
     });
@@ -616,7 +631,7 @@ describe('Integration: Retention Lifecycle', () => {
       expect(body.topics).toHaveLength(0);
       expect(mockGetStableTopics).toHaveBeenCalledWith(
         undefined, // db
-        ACCOUNT_ID, // profileId
+        'test-profile-id', // profileId from middleware
         SUBJECT_ID // subjectId from query
       );
     });
@@ -633,7 +648,7 @@ describe('Integration: Retention Lifecycle', () => {
       expect(res.status).toBe(200);
       expect(mockGetStableTopics).toHaveBeenCalledWith(
         undefined, // db
-        ACCOUNT_ID, // profileId
+        'test-profile-id', // profileId from middleware
         undefined // no subjectId
       );
     });

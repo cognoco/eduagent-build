@@ -9,7 +9,7 @@ import {
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
-import type { Account } from '../services/account';
+import { requireProfileId } from '../middleware/profile-scope';
 import {
   getNotificationPrefs,
   upsertNotificationPrefs,
@@ -33,8 +33,7 @@ type SettingsRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
-    account: Account;
-    profileId: string;
+    profileId: string | undefined;
   };
 };
 
@@ -42,8 +41,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
   // Get notification preferences
   .get('/settings/notifications', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const preferences = await getNotificationPrefs(db, profileId);
     return c.json({ preferences });
   })
@@ -54,8 +52,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     zValidator('json', notificationPrefsSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = requireProfileId(c.get('profileId'));
       const body = c.req.valid('json');
       const preferences = await upsertNotificationPrefs(db, profileId, body);
       return c.json({ preferences });
@@ -65,8 +62,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
   // Get learning mode
   .get('/settings/learning-mode', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const result = await getLearningMode(db, profileId);
     return c.json({ mode: result.mode });
   })
@@ -77,8 +73,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     zValidator('json', learningModeUpdateSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = requireProfileId(c.get('profileId'));
       const body = c.req.valid('json');
       const result = await upsertLearningMode(db, profileId, body.mode);
       return c.json({ mode: result.mode });
@@ -87,8 +82,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
 
   .get('/settings/celebration-level', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const celebrationLevel = await getCelebrationLevel(db, profileId);
     return c.json({ celebrationLevel });
   })
@@ -98,8 +92,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     zValidator('json', celebrationLevelUpdateSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = requireProfileId(c.get('profileId'));
       const body = c.req.valid('json');
       const result = await upsertCelebrationLevel(
         db,
@@ -116,8 +109,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     zValidator('json', pushTokenRegisterSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = requireProfileId(c.get('profileId'));
       const body = c.req.valid('json');
       await registerPushToken(db, profileId, body.token);
       return c.json({ registered: true });
@@ -127,8 +119,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
   // Notify parent to subscribe (child-friendly paywall)
   .post('/settings/notify-parent-subscribe', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const result = await notifyParentToSubscribe(
       db,
       profileId,
@@ -144,8 +135,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
   // Get analogy domain preference for a subject (FR134-137)
   .get('/settings/subjects/:subjectId/analogy-domain', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const subjectId = c.req.param('subjectId');
     const analogyDomain = await getAnalogyDomain(db, profileId, subjectId);
     return c.json({ analogyDomain });
@@ -157,8 +147,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     zValidator('json', analogyDomainUpdateSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
       const body = c.req.valid('json');
       const analogyDomain = await setAnalogyDomain(

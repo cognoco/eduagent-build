@@ -7,7 +7,7 @@ import {
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
-import type { Account } from '../services/account';
+import { requireProfileId } from '../middleware/profile-scope';
 import {
   getSubjectRetention,
   getTopicRetention,
@@ -26,8 +26,7 @@ type RetentionRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
-    account: Account;
-    profileId: string;
+    profileId: string | undefined;
   };
 };
 
@@ -35,8 +34,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
   // Get retention status for all topics in subject
   .get('/subjects/:subjectId/retention', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const subjectId = c.req.param('subjectId');
 
     const result = await getSubjectRetention(db, profileId, subjectId);
@@ -46,8 +44,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
   // Get retention card for single topic
   .get('/topics/:topicId/retention', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const topicId = c.req.param('topicId');
 
     const card = await getTopicRetention(db, profileId, topicId);
@@ -60,8 +57,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     zValidator('json', recallTestSubmitSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = requireProfileId(c.get('profileId'));
       const input = c.req.valid('json');
 
       const result = await processRecallTest(db, profileId, input);
@@ -75,8 +71,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     zValidator('json', relearnTopicSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = requireProfileId(c.get('profileId'));
       const input = c.req.valid('json');
 
       const result = await startRelearn(db, profileId, input);
@@ -87,8 +82,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
   // Get topics needing extra review
   .get('/subjects/:subjectId/needs-deepening', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const subjectId = c.req.param('subjectId');
 
     const result = await getSubjectNeedsDeepening(db, profileId, subjectId);
@@ -98,8 +92,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
   // Get teaching method preference
   .get('/subjects/:subjectId/teaching-preference', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const subjectId = c.req.param('subjectId');
 
     const preference = await getTeachingPreference(db, profileId, subjectId);
@@ -112,8 +105,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     zValidator('json', teachingPreferenceSchema),
     async (c) => {
       const db = c.get('db');
-      const account = c.get('account');
-      const profileId = c.get('profileId') ?? account.id;
+      const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
       const { method, analogyDomain } = c.req.valid('json');
 
@@ -131,8 +123,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
   // Reset teaching preference (FR66)
   .delete('/subjects/:subjectId/teaching-preference', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const subjectId = c.req.param('subjectId');
 
     await deleteTeachingPreference(db, profileId, subjectId);
@@ -142,8 +133,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
   // Get topic stability status (FR93)
   .get('/retention/stability', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const subjectId = c.req.query('subjectId');
 
     const topics = await getStableTopics(db, profileId, subjectId || undefined);
@@ -153,8 +143,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
   // Check EVALUATE eligibility for a topic (FR128-129)
   .get('/topics/:topicId/evaluate-eligibility', async (c) => {
     const db = c.get('db');
-    const account = c.get('account');
-    const profileId = c.get('profileId') ?? account.id;
+    const profileId = requireProfileId(c.get('profileId'));
     const topicId = c.req.param('topicId');
 
     const eligibility = await checkEvaluateEligibility(db, profileId, topicId);

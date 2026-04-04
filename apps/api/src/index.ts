@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { HTTPException } from 'hono/http-exception';
 import * as Sentry from '@sentry/cloudflare';
 
 import { ERROR_CODES } from '@eduagent/schemas';
@@ -198,6 +199,12 @@ app.route('/', routes);
 
 // Global error handler — catches unhandled exceptions and returns ApiErrorSchema envelope
 app.onError((err, c) => {
+  // HTTPException is Hono's standard mechanism for non-500 errors thrown from
+  // middleware/routes (e.g. requireProfileId → 401). Forward its response as-is.
+  if (err instanceof HTTPException) {
+    return err.getResponse();
+  }
+
   // Report to Sentry with user/request context (primary observability channel)
   captureException(err, {
     userId: c.get('user')?.userId,

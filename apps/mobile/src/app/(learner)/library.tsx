@@ -103,7 +103,7 @@ function SubjectStatusPill({
   );
 }
 
-export default function LearningBookScreen() {
+export default function LibraryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
@@ -233,7 +233,8 @@ export default function LearningBookScreen() {
     !hasBlockingError &&
     filteredTopics.length === 0 &&
     subjectCount > 0 &&
-    !topicsLoading;
+    !topicsLoading &&
+    !showCurriculumCompleteBanner;
 
   const handleRetry = (): void => {
     void refetchSubjects();
@@ -270,9 +271,7 @@ export default function LearningBookScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-start justify-between">
         <View className="flex-1 me-3">
-          <Text className="text-h1 font-bold text-text-primary">
-            Learning Book
-          </Text>
+          <Text className="text-h1 font-bold text-text-primary">Library</Text>
           <Text className="text-body-sm text-text-secondary mt-1">
             {isInitialLoading
               ? 'Loading your subjects...'
@@ -373,7 +372,7 @@ export default function LearningBookScreen() {
             testID="book-error"
           >
             <Text className="text-body text-text-secondary text-center mb-4">
-              Unable to load your learning book. Please try again.
+              Unable to load your library. Please try again.
             </Text>
             <Pressable
               onPress={handleRetry}
@@ -397,10 +396,10 @@ export default function LearningBookScreen() {
             </Pressable>
           </View>
         ) : isInitialLoading ? (
-          <View className="py-8 items-center" testID="learning-book-loading">
+          <View className="py-8 items-center" testID="library-loading">
             <ActivityIndicator size="large" color={themeColors.accent} />
             <Text className="text-body-sm text-text-secondary mt-3">
-              Loading your learning book...
+              Loading your library...
             </Text>
           </View>
         ) : (
@@ -408,7 +407,7 @@ export default function LearningBookScreen() {
             {topicsError && (
               <View
                 className="bg-warning/10 rounded-card px-4 py-4 mb-3"
-                testID="learning-book-topic-warning"
+                testID="library-topic-warning"
               >
                 <Text className="text-body-sm font-semibold text-warning">
                   Some topic details could not be loaded yet.
@@ -434,7 +433,7 @@ export default function LearningBookScreen() {
             {showCurriculumCompleteBanner ? (
               <View
                 className="bg-surface rounded-card px-4 py-5 mb-3"
-                testID="learning-book-curriculum-complete"
+                testID="library-curriculum-complete"
               >
                 <View className="flex-row items-start">
                   <View className="me-3 mt-1">
@@ -455,7 +454,7 @@ export default function LearningBookScreen() {
                 <Pressable
                   onPress={() => router.push('/create-subject')}
                   className="bg-primary rounded-button py-3 mt-4 items-center"
-                  testID="learning-book-add-subject"
+                  testID="library-add-subject"
                   accessibilityRole="button"
                   accessibilityLabel="Add another subject"
                 >
@@ -517,11 +516,11 @@ export default function LearningBookScreen() {
             ) : showTopicLoadingState ? (
               <View
                 className="bg-surface rounded-card px-4 py-6 items-center"
-                testID="learning-book-topic-loading"
+                testID="library-topic-loading"
               >
                 <ActivityIndicator size="small" color={themeColors.accent} />
                 <Text className="text-body text-text-primary text-center mt-3">
-                  Building your book pages...
+                  Building your library...
                 </Text>
                 <Text className="text-body-sm text-text-secondary text-center mt-1">
                   Your subjects are ready. Topic history is still loading.
@@ -530,17 +529,17 @@ export default function LearningBookScreen() {
             ) : showTopicOverview ? (
               <View
                 className="bg-surface rounded-card px-4 py-5"
-                testID="learning-book-subject-overview"
+                testID="library-subject-overview"
               >
                 <Text className="text-body font-semibold text-text-primary">
                   {selectedSubject
                     ? `${selectedSubject.name} is ready`
-                    : 'Your learning book is ready'}
+                    : 'Your library is ready'}
                 </Text>
                 <Text className="text-body-sm text-text-secondary mt-2">
                   {selectedSubject
-                    ? 'This subject has not built out any topic history yet. Start a session and your book will begin filling in here.'
-                    : 'Your subjects are connected. Start a session and topic pages will begin filling in here as you learn and review.'}
+                    ? 'This subject has not built out any topic history yet. Start a session and your library will begin filling in here.'
+                    : 'Your subjects are connected. Start a session and topics will begin filling in here as you learn and review.'}
                 </Text>
 
                 <View className="mt-4">
@@ -571,11 +570,13 @@ export default function LearningBookScreen() {
             ) : (
               <View
                 className="bg-surface rounded-card px-4 py-6 items-center"
-                testID="learning-book-empty"
+                testID="library-empty"
               >
                 <Text className="text-body text-text-secondary text-center">
-                  {selectedSubjectId
-                    ? 'No topics in this subject yet.'
+                  {showCurriculumCompleteBanner
+                    ? 'All topics reviewed — great work! Keep revisiting to make it stick.'
+                    : selectedSubjectId
+                    ? 'No topics in this subject yet. Start a session to begin building your library.'
                     : 'No topics yet — add a subject to get started'}
                 </Text>
               </View>

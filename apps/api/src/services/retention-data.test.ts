@@ -437,7 +437,7 @@ describe('processRecallTest', () => {
     expect(result.hint).toContain("That's okay");
   });
 
-  it('returns redirect_to_learning_book with remediation on 3+ failures', async () => {
+  it('returns redirect_to_library with remediation on 3+ failures', async () => {
     const card = mockRetentionCardRow();
     setupScopedRepo({ retentionCardFindFirst: card });
 
@@ -455,7 +455,7 @@ describe('processRecallTest', () => {
         lastReviewedAt: NOW.toISOString(),
       },
       xpChange: 'decayed',
-      failureAction: 'redirect_to_learning_book',
+      failureAction: 'redirect_to_library',
     });
 
     (getRetentionStatus as jest.Mock).mockReturnValue('weak');
@@ -468,9 +468,9 @@ describe('processRecallTest', () => {
 
     expect(result.passed).toBe(false);
     expect(result.failureCount).toBe(3);
-    expect(result.failureAction).toBe('redirect_to_learning_book');
+    expect(result.failureAction).toBe('redirect_to_library');
     expect(result.remediation).toBeDefined();
-    expect(result.remediation!.action).toBe('redirect_to_learning_book');
+    expect(result.remediation!.action).toBe('redirect_to_library');
     expect(result.remediation!.topicId).toBe(topicId);
     expect(result.remediation!.topicTitle).toBe('Topic 1');
     expect(result.remediation!.retentionStatus).toBe('weak');
@@ -539,7 +539,7 @@ describe('processRecallTest', () => {
         lastReviewedAt: NOW.toISOString(),
       },
       xpChange: 'decayed',
-      failureAction: 'redirect_to_learning_book',
+      failureAction: 'redirect_to_library',
     });
 
     (getRetentionStatus as jest.Mock).mockReturnValue('forgotten');
@@ -553,7 +553,7 @@ describe('processRecallTest', () => {
     expect(result.remediation).toBeDefined();
     expect(result.remediation!.topicId).toBe(topicId);
     expect(result.remediation!.topicTitle).toBe('Topic 1');
-    expect(result.remediation!.action).toBe('redirect_to_learning_book');
+    expect(result.remediation!.action).toBe('redirect_to_library');
     expect(result.remediation!.retentionStatus).toBe('forgotten');
     expect(result.remediation!.failureCount).toBe(4);
   });

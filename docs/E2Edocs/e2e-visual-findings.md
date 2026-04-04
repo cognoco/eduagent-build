@@ -193,7 +193,7 @@ New profile form renders cleanly. Auto-persona detection based on birthdate: "Ba
 `create-subject-name` testID found by assertVisible but tap failed immediately after (re-render timing). Screen renders correctly visually.
 
 ### Flow 16: `onboarding/view-curriculum.yaml` — PASS / V-007 INFO
-Home screen renders correctly. Learning Book shows "0 topics across 0 subjects" empty state — inconsistent with home showing "World History" with "Thriving" badge. Likely `learning-active` seed creates retention data but no curriculum topics.
+Home screen renders correctly. Library shows "0 topics across 0 subjects" empty state — inconsistent with home showing "World History" with "Thriving" badge. Likely `learning-active` seed creates retention data but no curriculum topics.
 
 ### Flow 17: `onboarding/analogy-preference-flow.yaml` — PASS / CLEAN
 7 analogy domain options render with clear selection states (purple border + "Active" label). ScrollView works for options below fold. Curriculum review appears after selection.
@@ -207,7 +207,7 @@ LLM didn't produce structured curriculum response in time. Known issue from Sess
 
 - **subscription.yaml** — More tab accessible, subscription area reachable
 - **subscription-details.yaml** — Trial banner, usage, restore-purchases, BYOK section
-- **child-paywall.yaml** — Excellent child-friendly paywall: "Nice work so far!", "Parent notified" (disabled after tap), 24h reminder cooldown, "Browse Learning Book" escape hatch
+- **child-paywall.yaml** — Excellent child-friendly paywall: "Nice work so far!", "Parent notified" (disabled after tap), 24h reminder cooldown, "Browse Library" escape hatch
 
 ---
 
@@ -236,10 +236,10 @@ Same infrastructure issue as delete-account and parent-dashboard. Not an app bug
 ## Group 7: Parent Flows — 6/8 PASS
 
 ### Flow: `parent/parent-tabs.yaml` — FAIL / V-008 MAJOR
-**V-008:** Parent's Learning Book tab shows **"New subject" creation screen** instead of parent curriculum overview. Screenshot `parent-tabs-02-learning-book` clearly shows a learner's create-subject form with keyboard. This is a routing/navigation bug — parent layout routes Learning Book to the wrong component.
+**V-008:** Parent's Library tab shows **"New subject" creation screen** instead of parent curriculum overview. Screenshot `parent-tabs-02-library` clearly shows a learner's create-subject form with keyboard. This is a routing/navigation bug — parent layout routes Library to the wrong component.
 
 ### Other parent flows — All PASS / CLEAN
-parent-learning-book, child-drill-down, consent-management, demo-dashboard, multi-child-dashboard, add-child-profile all pass with clean visuals.
+parent-library, child-drill-down, consent-management, demo-dashboard, multi-child-dashboard, add-child-profile all pass with clean visuals.
 
 ---
 
@@ -273,17 +273,17 @@ parent-learning-book, child-drill-down, consent-management, demo-dashboard, mult
 - **Impact:** Visual clutter in parent tab bar. Could confuse users.
 - **Status:** FIXED (2026-03-25, BUG-67) — root cause was `Tabs.Screen name="child"` not matching the auto-discovered route `child/[profileId]`. Changed to `name="child/[profileId]"`. Verified in Session 25 E2E run (consent-management test shows 3 tabs).
 
-### V-007: Learning Book empty state inconsistent with home (INFO)
-- **Screen:** Learning Book (after `learning-active` seed)
+### V-007: Library empty state inconsistent with home (INFO)
+- **Screen:** Library (after `learning-active` seed)
 - **What:** Shows "0 topics across 0 subjects" when home screen shows "World History" with "Thriving" retention badge
-- **Impact:** Low — may confuse users who see a subject on home but empty Learning Book
+- **Impact:** Low — may confuse users who see a subject on home but empty Library
 - **Likely cause:** `learning-active` seed creates subject + retention data but no curriculum topics
 
-### V-008: Parent Learning Book shows wrong screen (MAJOR) — RESOLVED
-- **Screen:** Parent Learning Book tab
-- **What:** Tapping "Learning Book Tab" in parent layout shows the learner's "New subject" creation screen with keyboard, instead of the parent's curriculum overview
+### V-008: Parent Library shows wrong screen (MAJOR) — RESOLVED
+- **Screen:** Parent Library tab
+- **What:** Tapping "Library Tab" in parent layout shows the learner's "New subject" creation screen with keyboard, instead of the parent's curriculum overview
 - **Impact:** HIGH — parents cannot access curriculum overview via tab navigation
-- **Status:** RESOLVED (2026-03-25, BUG-68) — navigation state leak from learner group. Resolved as side-effect of BUG-34 (subjects added to seeds eliminated the create-subject auto-redirect). Verified in Session 25: Learning Book shows correct empty state.
+- **Status:** RESOLVED (2026-03-25, BUG-68) — navigation state leak from learner group. Resolved as side-effect of BUG-34 (subjects added to seeds eliminated the create-subject auto-redirect). Verified in Session 25: Library shows correct empty state.
 
 ### V-009: Consent-withdrawn low contrast text (INFO)
 - **Screen:** Consent-withdrawn gate
@@ -306,4 +306,4 @@ parent-learning-book, child-drill-down, consent-management, demo-dashboard, mult
 1. V-004: Subscription screen perpetual spinner (Maestro found testID, screen was blank)
 2. V-005: Parent dashboard empty cards (Maestro found heading text, cards had no content)
 3. V-006: 4th tab leak in parent layout (Maestro navigated by accessibility label, didn't see extra tab)
-4. V-008: Parent Learning Book shows wrong screen (Maestro tapped tab successfully, wrong content loaded)
+4. V-008: Parent Library shows wrong screen (Maestro tapped tab successfully, wrong content loaded)

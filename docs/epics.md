@@ -60,7 +60,7 @@ This document provides the complete epic and story breakdown for EduAgent, decom
 - FR30: Users can choose between "Learn something new" and "Get help with homework" modes
 - FR31: (Revised by FR228) Homework help uses direct explanation and verification — AI explains approaches, shows similar worked examples, and verifies student answers. Never provides the final answer to the actual homework problem. Two modes per problem: "Check my answer" (brief verification) and "Help me solve it" (explain + similar example). Learning sessions retain Socratic guidance. See Epic 14 FR228.
 - FR32: Users can photograph homework problems for AI analysis (moved to MVP from v1.1 per UX spec)
-- FR33: Users can see sessions marked as "guided problem-solving" in Learning Book
+- FR33: Users can see sessions marked as "guided problem-solving" in Library
 
 **Knowledge Retention (FR34-FR42) — Epic 2 (session-scoped retention):**
 
@@ -90,7 +90,7 @@ _These FRs happen within or at the close of a learning session. Distinct from Ep
 
 **Failed Recall Remediation (FR52-FR58) — Epic 3:**
 
-- FR52: Users who fail recall tests (3+ times) are guided to Learning Book for that topic
+- FR52: Users who fail recall tests (3+ times) are guided to Library for that topic
 - FR53: Users can see their previous scores, "Your Words" summary, and decay status
 - FR54: Users can choose "Review & Re-test" (re-test available after 24+ hours)
 - FR55: Users can choose "Relearn Topic" to restart learning
@@ -136,7 +136,7 @@ _These FRs happen within or at the close of a learning session. Distinct from Ep
 
 **Progress Tracking (FR67-FR76) — Epic 4:**
 
-- FR67: Users can view Learning Book with all past topics
+- FR67: Users can view Library with all past topics
 - FR68: Users can browse topic summaries with "Your Words" (user's own writing)
 - FR69: Users can see retention scores and knowledge decay bars
 - FR70: Users can see topic retention status (Strong/Fading/Weak/Forgotten) and struggle status (Normal/Needs Deepening/Blocked) as separate indicators
@@ -151,13 +151,13 @@ _These FRs happen within or at the close of a learning session. Distinct from Ep
 
 - FR77: Users can create multiple curricula (subjects) under one profile
 - FR78: Users can view all active subjects on Home Screen with progress summary
-- FR79: Users can switch between subjects from Home Screen or Learning Book
-- FR80: Users can pause a subject (hidden from Home, accessible in Learning Book)
+- FR79: Users can switch between subjects from Home Screen or Library
+- FR80: Users can pause a subject (hidden from Home, accessible in Library)
 - FR81: Users can resume a paused subject
-- FR82: Users can archive a subject (removes from active view, Learning Book entries preserved)
+- FR82: Users can archive a subject (removes from active view, Library entries preserved)
 - FR83: Users can restore archived subjects from Settings
 - FR84: Users can see subjects auto-archived after 30 days of inactivity
-- FR85: Learning Book organizes topics by subject with subject switcher
+- FR85: Library organizes topics by subject with subject switcher
 
 **Engagement & Motivation (FR86-FR95) — Epic 4:**
 
@@ -295,7 +295,7 @@ _Note: FR146 (Language SPEAK/LISTEN voice integration) is mapped to Epic 6 (Lang
 
 **Offline Behavior:**
 
-- NFR45: Read-only cached data available offline (coaching card, Learning Book, profile data)
+- NFR45: Read-only cached data available offline (coaching card, Library, profile data)
 - NFR46: No offline writes or active sessions at MVP
 - NFR47: Subtle "offline" indicator when disconnected; disable server-dependent actions
 
@@ -512,7 +512,7 @@ Users can take assessments with verified understanding, have knowledge tracked v
 - pgvector embedding generation uses provider/model decided in Epic 2's ARCH-16 spike
 - Workers KV coaching cards: write-rare/read-often, 24h TTL safety net, overwritten on recompute (ARCH-11)
 - Three-strike adaptive teaching rule (FR59-60) with "Needs Deepening" topic management
-- Failed recall remediation flow: 3+ failures → Learning Book → Review & Re-test (24h cooldown) or Relearn Topic
+- Failed recall remediation flow: 3+ failures → Library → Review & Re-test (24h cooldown) or Relearn Topic
 - EVALUATE verification (Devil's Advocate): AI presents flawed reasoning for strong-retention topics, student identifies errors. Uses escalation rung system for difficulty calibration, modified SM-2 scoring floor.
 - Multiverse of Analogies (FR134-FR137): per-subject analogy domain preference (6 curated domains), injected into LLM system prompt with softer wording ("prefer analogies... use naturally... don't force").
 - Feynman Stage (FR138-FR143): TEACH_BACK verification type — AI plays "confused student" for Bloom L6 mastery. On-device STT/TTS via `expo-speech-recognition` and `expo-speech`. Structured assessment rubric (completeness/accuracy/clarity) with two-output pattern. Session-level voice toggle.
@@ -524,7 +524,7 @@ Users can take assessments with verified understanding, have knowledge tracked v
 
 ### Epic 4: Progress, Motivation & Parent Dashboard
 
-Users can track progress via Learning Book, earn Honest Streak and Retention XP, manage multiple subjects, and parents can monitor children's learning via a 5-second-glance dashboard with traffic lights, temporal comparison, and drill-down.
+Users can track progress via Library, earn Honest Streak and Retention XP, manage multiple subjects, and parents can monitor children's learning via a 5-second-glance dashboard with traffic lights, temporal comparison, and drill-down.
 
 **FRs covered:** FR67-FR95 (29 FRs)
 **ARCH requirements:** ARCH-11 (coaching card KV reads), ARCH-18 (centralized push notifications via Expo Push SDK)
@@ -532,7 +532,7 @@ Users can track progress via Learning Book, earn Honest Streak and Retention XP,
 
 **Implementation notes:**
 - **Naturally parallel feature clusters** — less concerned about size:
-  - Learning Book & Progress (FR67-76): topic summaries, retention scores, decay bars, "Your Words"
+  - Library & Progress (FR67-76): topic summaries, retention scores, decay bars, "Your Words"
   - Multi-Subject Management (FR77-85): subject CRUD, pause/resume/archive, auto-archive 30d
   - Engagement & Motivation (FR86-95): Honest Streak, Retention XP, interleaved retrieval, Serious/Casual modes
   - Parent Dashboard (UX-13): one-sentence summary, traffic lights, temporal comparison, drill-down/drill-across
@@ -541,7 +541,7 @@ Users can track progress via Learning Book, earn Honest Streak and Retention XP,
 - Profile switch: instant theme crossfade (100ms), content skeleton if data fetch needed (UX-14)
 - Push notifications for review reminders (FR91, FR95) via `services/notifications.ts` (ARCH-18)
 
-**Dependencies:** Epic 2 (session data), Epic 3 (retention/mastery data for dashboard and Learning Book)
+**Dependencies:** Epic 2 (session data), Epic 3 (retention/mastery data for dashboard and Library)
 **Enables:** Full learning loop visible to users and parents
 
 ---
@@ -847,7 +847,7 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 - 14.9: Problem card preview + OCR correction (client-side heuristic split → editable cards per problem)
 - 14.10: "Help me" vs "Check my answer" per problem (**no Socratic questioning in homework** — explain, verify, be brief)
 - 14.11: Multi-problem session flow (one session per homework sitting, "Next problem" chip, in-session camera)
-- 14.12: Homework learning extraction (LLM reads conversation → topics practiced, scaffolding level → parent dashboard + Learning Book)
+- 14.12: Homework learning extraction (LLM reads conversation → topics practiced, scaffolding level → parent dashboard + Library)
 
 **Phase C — Session Agency (Post-Launch):**
 - 14.5: Per-message feedback ("Not helpful" / "That's incorrect" → system message to LLM)
@@ -866,7 +866,7 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 
 **Parallelization opportunities:**
 - Epic 5 can start after Epic 0, running in parallel with Epics 1-4
-- Epic 4's feature clusters (Learning Book, Multi-Subject, Engagement, Parent Dashboard) can be staffed in parallel
+- Epic 4's feature clusters (Library, Multi-Subject, Engagement, Parent Dashboard) can be staffed in parallel
 - Epic 2 potential split (if >15 stories): Core Learning Sessions and Homework Help can parallelize after initial session infrastructure
 - Epic 9 can start once Epic 5 infrastructure is understood — it adds the mobile IAP path while preserving metering/quota logic
 
@@ -1568,7 +1568,7 @@ So that I can get guided help without typing complex problems.
 
 **Given** learner completes a homework help session
 **When** session ends
-**Then** session is marked as "guided problem-solving" in Learning Book (FR33)
+**Then** session is marked as "guided problem-solving" in Library (FR33)
 **And** homework sessions use distinct `session_type` enum value in data model
 **And** camera uses Expo Image (SDK 54) — no additional library
 
@@ -1664,7 +1664,7 @@ So that I actively consolidate what I learned.
 **Then** summary is skipped but topic status becomes "pending verification" — no XP awarded (FR37)
 **And** skipped summaries tracked: after 5 consecutive skips → warning; after 10 → prompt to switch to Casual Explorer mode (cross-ref: FR94, Epic 4 — actual mode switching implemented there; this story stores the user's response as a flag)
 
-**And** summary stored as "Your Words" in Learning Book, linked to topic and session
+**And** summary stored as "Your Words" in Library, linked to topic and session
 
 **Given** summary is accepted (or skipped)
 **When** session close triggers
@@ -1917,12 +1917,12 @@ So that my knowledge is verified over time and my XP reflects genuine retention.
 **And** initial intervals are 2 weeks (first review) and 6 weeks (second review) as SM-2 starting points only — SM-2 dynamically adjusts all subsequent intervals based on ease factor and performance. If learner scores poorly, SM-2 may schedule the next review in days, not weeks. The fixed 2w/6w values are seeds, not constraints. (FR49)
 **And** XP transitions from "pending" to "verified" only after passing delayed recall (FR50)
 **And** if recall test fails, XP decays proportionally to mastery score drop (FR51)
-**And** learners can request re-tests on any previously completed topic from their Learning Book at any time (FR47)
+**And** learners can request re-tests on any previously completed topic from their Library at any time (FR47)
 
 **Display layer (merged from verification feedback):**
 **And** RetentionSignal component renders dual-state: pending (outline badge) vs verified (filled badge)
 **And** topic detail view shows verification history: date, depth achieved, mastery score per attempt
-**And** Learning Book topic list shows "X verified / Y completed" summary count
+**And** Library topic list shows "X verified / Y completed" summary count
 
 **FRs:** FR47, FR49, FR50, FR51
 **ARCH:** ARCH-10 (SM-2 intervals)
@@ -1958,7 +1958,7 @@ So that SM-2 recalculation, coaching cards, dashboard data, and embeddings stay 
 
 _Cluster B depends on Story 3.3 (delayed recall tests must exist to fail)._
 
-### Story 3.5: Failed Recall Flow & Learning Book Redirect
+### Story 3.5: Failed Recall Flow & Library Redirect
 
 As a learner who struggles to recall a topic,
 I want targeted guidance based on how many times I've failed,
@@ -1968,12 +1968,12 @@ So that I get appropriate support without being prematurely redirected.
 
 **Given** a learner fails a recall test for the first or second time
 **When** the result is shown
-**Then** AI provides targeted feedback identifying specific knowledge gaps and suggests focused review strategies, but does NOT redirect to Learning Book yet (failure 1-2 experience)
+**Then** AI provides targeted feedback identifying specific knowledge gaps and suggests focused review strategies, but does NOT redirect to Library yet (failure 1-2 experience)
 
 **Given** a learner has failed recall for a topic 3+ times (FR52)
 **When** the third failure occurs
-**Then** the learner is guided to Learning Book for that topic
-**And** Learning Book shows: previous mastery scores, the learner's "Your Words" summary, and current decay status (FR53)
+**Then** the learner is guided to Library for that topic
+**And** Library shows: previous mastery scores, the learner's "Your Words" summary, and current decay status (FR53)
 **And** the learner can choose "Review & Re-test" — re-test is available only after 24+ hours (anti-cramming cooldown) (FR54)
 **And** the learner can choose "Relearn Topic" to restart the learning sequence (FR55)
 **And** failure count is tracked per-topic in the retention data model
@@ -1981,12 +1981,12 @@ So that I get appropriate support without being prematurely redirected.
 **FRs:** FR52, FR53, FR54, FR55
 
 ✅ **Implementation status:** Completed.
-- API: `processRecallTest()` tracks failure count per-topic, returns `failureAction: redirect_to_learning_book` after 3+ failures with remediation data (cooldown, retention status, suggestions)
+- API: `processRecallTest()` tracks failure count per-topic, returns `failureAction: redirect_to_library` after 3+ failures with remediation data (cooldown, retention status, suggestions)
 - API: 24h anti-cramming cooldown (FR54) enforced in `processRecallTest()`
 - Mobile: `recall-test.tsx` screen — ChatShell-based recall check with animated AI feedback
 - Mobile: `RemediationCard` component — cooldown timer, "Review & Re-test" / "Relearn Topic" buttons
 - Mobile: Topic detail (`[topicId].tsx`) — failure count display, rewired buttons to recall-test and relearn screens
-- Mobile: Learning Book (`book/index.tsx`) — "Needs attention" indicator on topics with 3+ failures
+- Mobile: Library (`library/index.tsx`) — "Needs attention" indicator on topics with 3+ failures
 - Mobile: `useSubmitRecallTest()` mutation hook invalidates retention + progress queries
 
 ---
@@ -2343,9 +2343,9 @@ Cluster G: 3.16 → 3.17 → 3.18 (after 3.2 — needs retention status)
 
 > **Sprint planning note:** This epic averages ~3 FRs per story, denser than previous epics. Most FRs are read-side display concerns (show X, render Y), which are simpler than write-side logic. However, Stories 4.1 (7 FRs), 4.10 (3 UX requirements with complex variant logic), and 4.11 (dashboard + drill-down + demo-mode) may each implement like 2-3 stories in practice. Size honestly during sprint planning — split if estimates exceed single-agent capacity.
 
-### Cluster A: Learning Book & Progress
+### Cluster A: Library & Progress
 
-### Story 4.1: Learning Book & Topic Browser
+### Story 4.1: Library & Topic Browser
 
 As a learner,
 I want to browse all past topics organized by subject with progress and retention status,
@@ -2353,7 +2353,7 @@ So that I can review what I've learned, track my progress, and continue where I 
 
 **Acceptance Criteria:**
 
-**Given** a learner navigates to Learning Book
+**Given** a learner navigates to Library
 **When** the screen loads
 **Then** all past topics are displayed organized by subject with a subject switcher (FR67, FR85)
 **And** each topic shows the learner's "Your Words" summary excerpt (FR68)
@@ -2375,7 +2375,7 @@ So that I know exactly where my knowledge is strong and where it's fading.
 
 **Acceptance Criteria:**
 
-**Given** a learner taps a topic in Learning Book
+**Given** a learner taps a topic in Library
 **When** the topic detail view loads
 **Then** topic review shows: key concepts, worked examples, the learner's "Your Words" summary, and AI teacher notes (FR73)
 **And** retention score per topic displayed as a visual decay bar (progress bar fading over time) (FR69, FR90)
@@ -2403,7 +2403,7 @@ So that I can organize my learning across different areas.
 **When** the Home Screen loads
 **Then** all active subjects are displayed with progress summary per subject (FR78)
 **And** learners can create new curricula (subjects) under their profile (FR77) — triggers Epic 1 onboarding flow for the new subject
-**And** learners can switch between subjects from Home Screen or from within Learning Book (FR79)
+**And** learners can switch between subjects from Home Screen or from within Library (FR79)
 **And** SubjectRetentionStrip component renders horizontal scrollable subject chips with retention status (Strong/Fading/Weak) per the UX spec
 **And** subject with most urgent retention need is highlighted (pulsing or accent border per UX spec)
 **And** urgency ranking algorithm: weighted score combining (1) count of overdue recall tests past SM-2 due date (heaviest weight — most time-sensitive), (2) count of topics in Weak/Forgotten retention status, (3) days since last session in that subject. Ties broken by subject with more total topics (larger investment at risk). Algorithm implemented server-side, returned as sort order in the subjects API response.
@@ -2422,9 +2422,9 @@ So that I can manage my learning load without losing progress.
 
 **Given** a learner wants to temporarily stop studying a subject
 **When** they pause the subject
-**Then** the subject is hidden from Home Screen but remains accessible in Learning Book (FR80)
+**Then** the subject is hidden from Home Screen but remains accessible in Library (FR80)
 **And** learners can resume a paused subject, returning it to the Home Screen (FR81)
-**And** learners can archive a subject (removes from active view entirely, but all Learning Book entries are preserved) (FR82)
+**And** learners can archive a subject (removes from active view entirely, but all Library entries are preserved) (FR82)
 **And** archived subjects can be restored from Settings (FR83)
 **And** subjects with no activity for 30 days are auto-archived with a notification before auto-archive (FR84)
 **And** auto-archived subjects can be restored the same way as manually archived ones
@@ -2474,7 +2474,7 @@ So that I build durable cross-topic understanding and can see my strongest knowl
 **And** results feed back into SM-2 interval calculations per topic
 **And** "consecutive successful retrievals" counts equally regardless of session type — interleaved passes count the same as focused recall tests. Interleaved retrieval is a desirable difficulty (higher cognitive demand due to context-switching), which produces stronger long-term retention. The key qualifier is "successful retrieval" — meaning the learner demonstrated recall at the depth level established in their last assessment (Story 3.2), not just answered a surface-level question.
 **And** topics that achieve 5+ consecutive successful retrievals across any session type are marked "Stable" (FR93)
-**And** "Stable" status is visible in Learning Book and on the subject retention strip
+**And** "Stable" status is visible in Library and on the subject retention strip
 **And** stable topics are still included in interleaved sessions at reduced frequency (SM-2 handles this naturally via extended intervals)
 
 **FRs:** FR92, FR93
@@ -2544,7 +2544,7 @@ So that each profile feels like a tailored experience.
 **And** profile switch triggers instant theme crossfade (100ms transition), with content skeleton if data fetch is needed (UX-14)
 **And** the full theme token set includes: primary/secondary/accent colors, surface/background colors, text-primary/text-secondary/text-muted, border colors, input/card/overlay surface variants, and the 12 retention signal tokens (4 signals × fg/bg/on-bg). Full token spec defined in `docs/ux-design-specification.md` (semantic tokens: `bg-surface`, `text-primary`, `border-accent`, etc.). This story implements the complete token set per the UX spec — no ad-hoc token invention.
 **And** all contrast ratios pass WCAG AA (4.5:1 text, 3:1 large text) across all three themes
-**And** theme is "who am I?" not "whose data am I looking at?" — parent viewing child's Learning Book stays in parent theme
+**And** theme is "who am I?" not "whose data am I looking at?" — parent viewing child's Library stays in parent theme
 
 **FRs:** (UX requirements)
 **UX:** UX-6, UX-14
@@ -2607,36 +2607,36 @@ So that I can verify the app is working without switching into child profiles.
 
 ---
 
-### Cluster E: Learning Book Cross-Navigation
+### Cluster E: Library Cross-Navigation
 
-### Story 4.12: Post-Session Learning Book Navigation
+### Story 4.12: Post-Session Library Navigation
 
 _Priority: Should-ship. Scope: LEARNER-ONLY._
 
 As a learner who has just finished a session,
-I want to navigate directly to the Learning Book from the session summary,
+I want to navigate directly to the Library from the session summary,
 So that I can see my learning progress and historical summaries without having to discover the tab on my own.
 
 **Acceptance Criteria:**
 
 **Given** a learner is on the session summary screen after submitting a summary (or skipping)
 **When** the "Continue" / "Skip for now" actions are visible
-**Then** a secondary action link "See your Learning Book" is displayed below the primary continue button
+**Then** a secondary action link "See your Library" is displayed below the primary continue button
 
-**Given** the learner taps "See your Learning Book"
+**Given** the learner taps "See your Library"
 **When** the session included a specific `topicId`
 **Then** the learner navigates to the topic detail screen with the correct `subjectId` and `topicId` params
 
-**Given** the learner taps "See your Learning Book"
+**Given** the learner taps "See your Library"
 **When** the session did NOT have a specific `topicId` (freeform)
-**Then** the learner navigates to the Learning Book tab
+**Then** the learner navigates to the Library tab
 
 **Given** the navigation occurs
 **Then** the session summary screen is replaced (not pushed) to avoid back-stack accumulation
-**And** a `testID="go-to-learning-book"` is present on the link
+**And** a `testID="go-to-library"` is present on the link
 
 **Implementation notes:**
-- Modify `session-summary/[sessionId].tsx` — add `subjectId` and `topicId` to `useLocalSearchParams`, add "See your Learning Book" Pressable
+- Modify `session-summary/[sessionId].tsx` — add `subjectId` and `topicId` to `useLocalSearchParams`, add "See your Library" Pressable
 - Modify `session/index.tsx` — pass `subjectId` and `topicId` as params in the `router.replace` call to session-summary (currently only passes `subjectName`, `exchangeCount`, `escalationRung`)
 - No new API needed — all data already available via route params
 
@@ -2644,35 +2644,35 @@ So that I can see my learning progress and historical summaries without having t
 
 ---
 
-### Story 4.13: In-Session Learning Book Link
+### Story 4.13: In-Session Library Link
 
 _Priority: Should-ship. Scope: LEARNER-ONLY._
 
 As a learner in an active chat session,
-I want to see a non-intrusive link to my Learning Book,
+I want to see a non-intrusive link to my Library,
 So that I can review previous lessons while learning.
 
 **Acceptance Criteria:**
 
 **Given** a learner has at least 1 completed topic in any subject
 **When** the session screen loads and the opening message renders
-**Then** a subtle footer element shows: "Want to see your previous lessons? Go to the Learning Book" as a tappable link
+**Then** a subtle footer element shows: "Want to see your previous lessons? Go to the Library" as a tappable link
 
-**Given** the learner taps the Learning Book link
-**Then** the learner navigates to the Learning Book tab
+**Given** the learner taps the Library link
+**Then** the learner navigates to the Library tab
 
 **Given** the learner has zero completed topics
 **When** the session loads
-**Then** no Learning Book link is shown
+**Then** no Library link is shown
 
 **And** the link does NOT appear in homework mode (homework is task-focused, avoid distraction)
-**And** a `testID="session-learning-book-link"` is present
+**And** a `testID="session-library-link"` is present
 **And** the link uses text-secondary color, caption size — visually subtle, not competing with chat
 
 **Implementation notes:**
 - `ChatShell` already accepts a `footer` prop — compose with existing `QuestionCounter` if both need to render
 - Use existing `useOverallProgress` hook to check if learner has topics (already cached from home screen)
-- New component: `LearningBookPrompt.tsx` — small, non-intrusive link
+- New component: `LibraryPrompt.tsx` — small, non-intrusive link
 
 **FRs:** FR67
 
@@ -2682,7 +2682,7 @@ So that I can review previous lessons while learning.
 
 _Priority: Should-ship. Scope: LEARNER-ONLY._
 
-As a learner viewing a topic in the Learning Book,
+As a learner viewing a topic in the Library,
 I want to see a summary of what I learned and have a "Continue Learning" button,
 So that I can review my knowledge and resume learning on that topic seamlessly.
 
@@ -2802,7 +2802,7 @@ So that I can access the right level of learning capacity.
 **And** annual billing available with ~25-26% discount (FR115)
 **And** Stripe Checkout handles payment flow — no custom payment form
 **And** context-aware upgrade prompts shown at natural moments: Free→Plus at 50/month cap, Plus→Family when adding family member, Plus→Family when 3+ top-ups purchased, Family→Pro when needing 5-6 users
-**And** downgrade preserves all progress (Learning Book, curricula, XP, summaries). Only usage limits change. No data archived or deleted.
+**And** downgrade preserves all progress (Library, curricula, XP, summaries). Only usage limits change. No data archived or deleted.
 **And** top-up credits purchasable anytime: €10/500 (Plus), €5/500 (Family/Pro). Not available on Free tier.
 **And** top-up usage: monthly quota consumed first, then top-ups in FIFO order. Monthly quota does NOT roll over; top-ups DO (12-month expiry).
 **And** top-up expiry reminders at month 6, 8, 10, and 12
@@ -3007,7 +3007,7 @@ So that curriculum topics can express advisory dependency relationships.
 
 ---
 
-### Story 7.2: Advisory Prerequisite Ordering + Learning Book Indicators
+### Story 7.2: Advisory Prerequisite Ordering + Library Indicators
 
 As a learner,
 I want my learning path to suggest prerequisite order without blocking me,
@@ -3019,7 +3019,7 @@ So that I can follow recommendations or forge my own path.
 **When** the coaching card recommends the next topic
 **Then** topics with incomplete prerequisites are deprioritized but NOT hidden
 **And** default ordering uses topological sort (prerequisite depth), ties broken by retention urgency
-**And** Learning Book shows subtle "Builds on: [prerequisite]" indicators on topics with incomplete prerequisites
+**And** Library shows subtle "Builds on: [prerequisite]" indicators on topics with incomplete prerequisites
 **And** tapping a topic with incomplete prerequisites shows advisory dialog: "This builds on [prerequisite]. Review first, or dive right in?" with [Review Prerequisite] / [Start Anyway]
 **And** "Start Anyway" proceeds normally with no penalty
 
@@ -3572,7 +3572,7 @@ The original architecture (docs/architecture.md) specified "Payments | Stripe" w
 | 10.12 — Subject raw input audit trail | ✅ Built | 455 API + 33 schema + 5 hooks pass, E2E written (not run) |
 | 10.13 — Guided label tooltip | ✅ Built | 7 pass (all new), E2E written (not run) |
 | 10.14 — App Store compliance + age-gated Sentry | ✅ Built | Age-gated Sentry, privacy manifests, privacy policy copy, and `privacyPolicyUrl` config are in place |
-| 10.15 — Curriculum completion celebration | ✅ Built | Completion milestone now appears on the ranked home surface and in Learning Book |
+| 10.15 — Curriculum completion celebration | ✅ Built | Completion milestone now appears on the ranked home surface and in Library |
 | 10.16 — Offline action gating | ✅ Built | Button disabling on consent + session screens |
 | **10.17 — Parent email delivery feedback** | **✅ Built** | API returns email delivery status and consent UI handles resend/failure states |
 | 10.18 — App Store rating prompt | ✅ Built | Rating hook is integrated into session-summary close flow after successful recall sessions |
@@ -3847,7 +3847,7 @@ As a young learner answering questions in an interview or learning session,
 I want to see a book visually filling up with pages each time I contribute,
 So that I feel a sense of progress and accomplishment instead of wondering "when does this end?"
 
-**Background:** The interview has no progress indicator. Its length is LLM-decided (2-8 exchanges), so a progress bar is impossible without lying. A "3 of 5" bar that actually goes to 7 destroys trust. The insight: flip the framing from "how much is left" (unknowable) to "look what you've built" (always known). The app already has a "Learning Book" concept — extend that metaphor into a visible, growing animation.
+**Background:** The interview has no progress indicator. Its length is LLM-decided (2-8 exchanges), so a progress bar is impossible without lying. A "3 of 5" bar that actually goes to 7 destroys trust. The insight: flip the framing from "how much is left" (unknowable) to "look what you've built" (always known). The app already has a "Library" concept — extend that metaphor into a visible, growing animation.
 
 The book metaphor works as a **unified celebration system** across multiple screens, not just the interview.
 
@@ -4021,14 +4021,14 @@ The tone is encouraging ("Don't worry — that's completely normal!") but the st
 
 **Given** cooldown is active (for both personas)
 **When** the primary action is disabled
-**Then** the screen still offers something to do: "While you wait, check out your Learning Book" (link to book screen)
+**Then** the screen still offers something to do: "While you wait, check out your Library" (link to book screen)
 
 **Implementation notes:**
 - All changes in `apps/mobile/src/app/(learner)/topic/recall-test.tsx` — string changes + minor layout adjustment (single button vs two for learner persona).
 - Persona available via `useTheme()` → `persona`.
 - No API or schema changes. The cooldown logic stays identical — only the display text changes.
 - **Trust principle:** Never use vague optimism ("come back soon!") when the actual wait is hours. A kid who returns in 30 minutes and finds a locked button feels lied to. Honest framing ("come back tomorrow") sets correct expectations and preserves trust even when the news isn't great.
-- The "Learning Book" link during cooldown is a new `router.push` — trivial addition.
+- The "Library" link during cooldown is a new `router.push` — trivial addition.
 - Tests: component tests verifying correct copy per persona, cooldown state rendering.
 
 **FRs:** FR56 (improves recall remediation UX)
@@ -4250,19 +4250,19 @@ Implementation: `initSentry()` in root `_layout.tsx` currently runs unconditiona
 
 ### Story 10.15: Curriculum Completion Celebration & Next Steps ✅
 
-**Priority:** Should-ship (retention risk — child finishes everything and hits dead end). **Status: Implemented** — completion now surfaces both on the ranked home-card flow and in Learning Book.
+**Priority:** Should-ship (retention risk — child finishes everything and hits dead end). **Status: Implemented** — completion now surfaces both on the ranked home-card flow and in Library.
 **Scope:** LEARNER + TEEN (all kids)
 
 **What:**
 When a learner has completed all topics in a subject's curriculum, show a celebration and prompt to continue learning instead of the current broken empty state.
 
-**Current state:** Learning Book shows "No topics yet — add a subject to get started" even when topics exist but are all completed. Coaching card service falls back to generic "challenge" card. No celebration, no "add new subject" prompt. `CelebrationAnimation` component exists (used on session summary) but is not wired to curriculum completion.
+**Current state:** Library shows "No topics yet — add a subject to get started" even when topics exist but are all completed. Coaching card service falls back to generic "challenge" card. No celebration, no "add new subject" prompt. `CelebrationAnimation` component exists (used on session summary) but is not wired to curriculum completion.
 
 **Changes:**
 
-1. **Learning Book empty state fix** (`book.tsx`): When `filteredTopics.length === 0` but subjects exist, distinguish between "no curriculum yet" vs "all topics completed/verified":
+1. **Library empty state fix** (`library.tsx`): When `filteredTopics.length === 0` but subjects exist, distinguish between "no curriculum yet" vs "all topics completed/verified":
    - No curriculum: current message ("No topics yet — add a subject to get started")
-   - All completed: "You've covered everything! 🎉" + "Add another subject" button + "Keep reviewing" link (routes to Learning Book's review-due filter)
+   - All completed: "You've covered everything! 🎉" + "Add another subject" button + "Keep reviewing" link (routes to Library's review-due filter)
 
 2. **Coaching card — new `curriculum_complete` type** (`services/coaching-cards.ts`): When all topics for the profile's active subjects have retention status `verified` or `stable`:
    - Card type: `curriculum_complete`
@@ -4279,7 +4279,7 @@ When a learner has completed all topics in a subject's curriculum, show a celebr
 
 **FRs:** (UX improvement — retention, completion state)
 
-**Dependencies:** None. Coaching card service and Learning Book exist.
+**Dependencies:** None. Coaching card service and Library exist.
 
 ---
 
@@ -4584,7 +4584,7 @@ _Priority: Must-ship. Scope: LEARNER-ONLY. **Status: Done** — auto-classifies 
 
 As a learner who tapped "Just ask something" without a specific subject context,
 I want the AI to figure out what subject I'm asking about from my first message,
-So that my session gets connected to the right subject and shows up in my Learning Book.
+So that my session gets connected to the right subject and shows up in my Library.
 
 **Acceptance Criteria:**
 
@@ -4877,7 +4877,7 @@ User testing identified 15 UX gaps across the app. The first nine (10.1–10.9) 
 - [ ] `precomputeHomeCards(profileId)` service replaces `precomputeCoachingCard()` — returns 2-3 ranked cards with type, title, subtitle, and action
 - [ ] `GET /v1/home-cards` route replaces `GET /v1/coaching-card` — returns ranked card array
 - [ ] Home screen renders cards in ranked layout (primary large, secondary small)
-- [ ] Card taps navigate to the appropriate flow (camera for homework, session for study, Learning Book for review, dashboard for family)
+- [ ] Card taps navigate to the appropriate flow (camera for homework, session for study, Library for review, dashboard for family)
 - [ ] Card tap events tracked for ranking improvement (`sessionEvents` with `eventType: 'home_card_tap'`)
 - [ ] Family card only appears when `familyLinks` exist for the profile as a parent (not as a child)
 - [ ] Resume session card (Epic 13) takes highest priority when present
@@ -5303,7 +5303,7 @@ So that I can understand their progress and where they need support.
 **Then** an LLM extraction step (homework sessions only) reads the conversation and produces: problem count, topics/skills practiced, which problems were independent vs needed guidance, brief parent-facing summary
 **And** extraction stored in `learningSessions.metadata.homeworkSummary` (JSONB, no schema migration)
 **And** parent dashboard shows: "Math Homework — 5 problems, practiced linear equations" with scaffolding summary
-**And** Learning Book shows homework sessions with topics practiced
+**And** Library shows homework sessions with topics practiced
 **And** sessions without `homeworkSummary` (old sessions, extraction failure) gracefully show current display ("Homework — X min")
 
 **FRs:** FR229

@@ -71,14 +71,14 @@ run_s "onboarding-complete" "flows/assessment/assessment-cycle.yaml"
 
 # Retention
 run_s "retention-due"    "flows/retention/topic-detail.yaml"
-run_s "retention-due"    "flows/retention/learning-book.yaml"
+run_s "retention-due"    "flows/retention/library.yaml"
 run_s "retention-due"    "flows/retention/retention-review.yaml"
 run_s "retention-due"    "flows/retention/recall-review.yaml"
 run_s "failed-recall-3x" "flows/retention/failed-recall.yaml"
 run_s "failed-recall-3x" "flows/retention/relearn-flow.yaml"
 
 # Parent (all with switch-to-parent fix)
-run_s "parent-with-children" "flows/parent/parent-learning-book.yaml"
+run_s "parent-with-children" "flows/parent/parent-library.yaml"
 run_s "parent-with-children" "flows/parent/child-drill-down.yaml"
 run_s "parent-with-children" "flows/parent/consent-management.yaml"
 run_s "parent-solo"          "flows/parent/demo-dashboard.yaml"

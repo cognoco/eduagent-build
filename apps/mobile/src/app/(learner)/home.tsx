@@ -281,11 +281,11 @@ export default function HomeScreen() {
       return {
         title: 'Pick your next step',
         subtitle:
-          'Practice, review your Learning Book, or jump back into a question.',
+          'Practice, review your Library, or jump back into a question.',
         primaryLabel: 'Practice now',
         onPrimary: () => handlePracticePress(),
-        secondaryLabel: 'Open Learning Book',
-        onSecondary: () => router.push('/(learner)/book' as never),
+        secondaryLabel: 'Open Library',
+        onSecondary: () => router.push('/(learner)/library' as never),
       };
     }
 
@@ -293,9 +293,9 @@ export default function HomeScreen() {
       return {
         title: 'Bring a subject back',
         subtitle:
-          'Your saved subjects are still here. Restore one from your Learning Book to continue.',
-        primaryLabel: 'Open Learning Book',
-        onPrimary: () => router.push('/(learner)/book' as never),
+          'Your saved subjects are still here. Restore one from your Library to continue.',
+        primaryLabel: 'Open Library',
+        onPrimary: () => router.push('/(learner)/library' as never),
       };
     }
 
@@ -353,7 +353,7 @@ export default function HomeScreen() {
           router.push(`/session-summary/${recoveryCard.sessionId}` as never);
           return;
         case 'restore_subjects':
-          router.push('/(learner)/book' as never);
+          router.push('/(learner)/library' as never);
           return;
         case 'curriculum_complete':
           router.push('/create-subject' as never);
@@ -361,12 +361,12 @@ export default function HomeScreen() {
         case 'review':
           if (card.subjectId) {
             router.push({
-              pathname: '/(learner)/book',
+              pathname: '/(learner)/library',
               params: { subjectId: card.subjectId },
             } as never);
             return;
           }
-          router.push('/(learner)/book' as never);
+          router.push('/(learner)/library' as never);
           return;
         case 'study':
           if (card.subjectId && card.topicId) {
@@ -426,7 +426,7 @@ export default function HomeScreen() {
   const handleHomeCardSecondary = useCallback(
     async (card: HomeCardModel) => {
       if (card.id === 'curriculum_complete') {
-        router.push('/(learner)/book' as never);
+        router.push('/(learner)/library' as never);
         return;
       }
 
@@ -601,7 +601,7 @@ export default function HomeScreen() {
                       key={subject.id}
                       onPress={() =>
                         router.push({
-                          pathname: '/(learner)/book',
+                          pathname: '/(learner)/library',
                           params: { subjectId: subject.id },
                         } as never)
                       }
@@ -732,13 +732,13 @@ export default function HomeScreen() {
               <View className="bg-surface rounded-card px-4 py-6 items-center">
                 <Text className="text-body text-text-secondary text-center">
                   Your subjects are paused or archived. Restore one from the
-                  Learning Book to jump back in.
+                  Library to jump back in.
                 </Text>
                 <Pressable
-                  onPress={() => router.push('/(learner)/book' as never)}
+                  onPress={() => router.push('/(learner)/library' as never)}
                   className="bg-primary rounded-button py-3 mt-4 items-center w-full"
                   testID="manage-inactive-subjects-button"
-                  accessibilityLabel="Manage subjects in Learning Book"
+                  accessibilityLabel="Manage subjects in Library"
                   accessibilityRole="button"
                 >
                   <Text className="text-text-inverse text-body font-semibold">

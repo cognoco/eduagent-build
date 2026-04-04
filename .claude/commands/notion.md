@@ -46,10 +46,8 @@ Need to interact with Notion?
 ### REST API Access Pattern
 
 ```bash
-# 1. Get the API key from the local env file
-#    Located at: c:\Dev\Projects\Products\Apps\eduagent-build\.env.development.local
-#    Look for the NOTION_API_KEY variable
-source .env.development.local 2>/dev/null || export NOTION_API_KEY="$(grep NOTION_API_KEY .env.development.local | cut -d= -f2)"
+# 1. Get the API key from Doppler (machine-neutral, no hardcoded paths)
+export NOTION_API_KEY="$(C:/Tools/doppler/doppler.exe secrets get NOTION_API_KEY --plain --config dev 2>/dev/null || grep NOTION_API_KEY .env.development.local 2>/dev/null | cut -d= -f2)"
 
 # 2. Query with pagination (Windows: use file-based JSON to avoid bash escaping)
 # Write the filter to a temp file, then curl with --data @file

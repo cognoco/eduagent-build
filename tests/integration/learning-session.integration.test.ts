@@ -109,6 +109,20 @@ jest.mock('../../apps/api/src/services/billing', () => ({
   ...billingMock(ACCOUNT_ID),
   incrementQuota: (...args: unknown[]) => mockIncrementQuota(...args),
 }));
+jest.mock('../../apps/api/src/services/profile', () => ({
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+  findOwnerProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  }),
+}));
 
 // ---------------------------------------------------------------------------
 // App import (after all mocks)
@@ -123,6 +137,7 @@ const TEST_ENV = {
 const AUTH_HEADERS = {
   Authorization: 'Bearer valid.jwt.token',
   'Content-Type': 'application/json',
+  'X-Profile-Id': 'test-profile-id',
 };
 
 // ---------------------------------------------------------------------------
@@ -233,7 +248,7 @@ describe('Integration: Learning Session Lifecycle', () => {
       expect(body.session.sessionType).toBe('learning');
       expect(mockStartSession).toHaveBeenCalledWith(
         undefined, // db (mocked createDatabase returns empty object, middleware yields undefined)
-        ACCOUNT_ID, // profileId (falls back to account.id when no X-Profile-Id header)
+        'test-profile-id', // profileId from middleware
         SUBJECT_ID,
         expect.objectContaining({ subjectId: SUBJECT_ID })
       );

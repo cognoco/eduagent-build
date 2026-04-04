@@ -96,7 +96,7 @@ cat > "$OUTPUT" <<EOF
 For each screenshot below, verify:
 
 - [ ] **Text readability** — All text fully rendered, no clipping or overflow
-- [ ] **Tab bar** — All 3 tabs visible with icons (Home, Learning Book, More)
+- [ ] **Tab bar** — All 3 tabs visible with icons (Home, Library, More)
 - [ ] **Keyboard avoidance** — If keyboard is open, input field is visible above it
 - [ ] **Counter consistency** — Any displayed numbers match visible content
 - [ ] **Theme consistency** — Colors match the active persona theme

@@ -420,7 +420,7 @@ The tutor adapts based on learner age:
 | **Big tech makes tutoring free** | Already happening | CRITICAL | Focus on features free AI lacks: persistent curriculum, verification, family accounts, GDPR compliance |
 | **Users won't pay €19-49 when free exists** | HIGH | CRITICAL | Beta validation required; reverse trial + first-week boost to demonstrate value |
 | **Market window closes (6-12 months)** | HIGH | CRITICAL | Speed to market imperative: 8-12 week MVP launch |
-| **ChatGPT adds structured curricula** | MEDIUM | HIGH | Build data moat via user-created content (Learning Book summaries) |
+| **ChatGPT adds structured curricula** | MEDIUM | HIGH | Build data moat via user-created content (Library summaries) |
 | **LLM costs don't decrease** | LOW | MEDIUM | Multi-model routing (10-40x cost range between models); costs already negligible at €0.001-0.005/question |
 | **Low trial → paid conversion** | MEDIUM | HIGH | A/B test paywalls, pricing tiers post-MVP |
 
@@ -445,7 +445,7 @@ The tutor adapts based on learner age:
 | Moat Type | Implementation | Switching Cost |
 |-----------|----------------|----------------|
 | **Data/personalization** | Learning history, mastery scores, style preferences | HIGH |
-| **User-created content** | Learning Book with user summaries | HIGH |
+| **User-created content** | Library with user summaries | HIGH |
 | **Curriculum investment** | Custom syllabus, bookmarked topics | MEDIUM |
 | **Relationship** | Tutor "knows" struggles, goals | MEDIUM |
 
@@ -531,7 +531,7 @@ We offer **a teacher who grows with you—grounded in real teaching science, at 
 **Homework Integrity Mode (Killer Feature for Parents):**
 - AI guides through problems, NEVER gives final answers
 - Socratic questioning: "What do you think the first step is?"
-- Sessions marked as "guided problem-solving" in Learning Book
+- Sessions marked as "guided problem-solving" in Library
 - Parent visibility: proof child did the thinking
 
 **Progress & Retention:**

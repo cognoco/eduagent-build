@@ -130,7 +130,7 @@ describe('RecallTestScreen', () => {
       {
         passed: false,
         failureCount: 3,
-        failureAction: 'redirect_to_learning_book',
+        failureAction: 'redirect_to_library',
         remediation: {
           cooldownEndsAt: '2026-03-30T18:30:00.000Z',
           suggestionText: 'Review the topic again.',
@@ -176,7 +176,7 @@ describe('RecallTestScreen', () => {
       {
         passed: false,
         failureCount: 3,
-        failureAction: 'redirect_to_learning_book',
+        failureAction: 'redirect_to_library',
         remediation: {
           cooldownEndsAt: '2026-03-30T18:30:00.000Z',
           retentionStatus: 'forgotten',

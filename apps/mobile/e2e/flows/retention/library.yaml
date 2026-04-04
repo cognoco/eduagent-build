@@ -1,5 +1,5 @@
-# Flow N11: Learning Book — Navigation and Retention Indicators
-# Validates: user can view the Learning Book with subject filter tabs,
+# Flow N11: Library — Navigation and Retention Indicators
+# Validates: user can view the Library with subject filter tabs,
 # topic rows with retention indicators, and navigate via the retention
 # strip on the home screen.
 # Tags: nightly, retention
@@ -13,12 +13,12 @@
 #   - retention-strip             -> horizontal retention strip on home
 #   - retention-chip-{subjectId}  -> per-subject retention chip
 #
-# testID mapping (book/index.tsx):
+# testID mapping (library/index.tsx):
 #   - subject-filter-tabs         -> subject filter tab strip
 #   - filter-all                  -> "All" filter tab
 #   - filter-{subjectId}          -> per-subject filter tab
-#   - learning-book-loading       -> loading spinner
-#   - learning-book-empty         -> empty state
+#   - library-loading             -> loading spinner
+#   - library-empty               -> empty state
 #   - topic-row-{topicId}         -> individual topic row with retention signal
 appId: com.mentomate.app
 tags:
@@ -45,19 +45,19 @@ tags:
 # 4. Screenshot of home screen with retention strip
 - takeScreenshot: home-retention-strip
 
-# 5. Navigate to Learning Book via tab (BUG-10: use accessibility label, not truncated text)
-- tapOn: "Learning Book Tab"
+# 5. Navigate to Library via tab (BUG-10: use accessibility label, not truncated text)
+- tapOn: "Library Tab"
 
-# 6. Wait for Learning Book screen header
+# 6. Wait for Library screen header
 - extendedWaitUntil:
     visible:
-      text: "Learning Book"
+      text: "Library"
     timeout: 10000
 
 # 7. Wait for topic data to finish loading
 - extendedWaitUntil:
     notVisible:
-      id: "learning-book-loading"
+      id: "library-loading"
     timeout: 10000
     optional: true
 
@@ -78,11 +78,11 @@ tags:
 
 # 11. Verify topic rows are present (not empty)
 - assertNotVisible:
-    id: "learning-book-empty"
+    id: "library-empty"
     optional: true
 
-# 12. Screenshot of Learning Book with topic rows
-- takeScreenshot: learning-book-topics
+# 12. Screenshot of Library with topic rows
+- takeScreenshot: library-topics
 
 # 13. Tap a subject filter tab to test filtering (optional — requires >1 subject)
 - tapOn:
@@ -90,24 +90,24 @@ tags:
     optional: true
 
 # 14. Screenshot after filtering
-- takeScreenshot: learning-book-filtered
+- takeScreenshot: library-filtered
 
 # 15. Return to home screen (use accessibility label to avoid matching heading)
 - tapOn:
     text: "Home Tab"
     optional: true
 
-# 16. Navigate to Learning Book via retention strip chip
+# 16. Navigate to Library via retention strip chip
 - tapOn:
     id: "retention-strip"
     optional: true
 
-# 17. Verify Learning Book loads again (from retention chip navigation)
+# 17. Verify Library loads again (from retention chip navigation)
 - extendedWaitUntil:
     visible:
-      text: "Learning Book"
+      text: "Library"
     timeout: 10000
     optional: true
 
 # 18. Final screenshot
-- takeScreenshot: learning-book-from-retention-strip
+- takeScreenshot: library-from-retention-strip

@@ -115,7 +115,7 @@ status: 'pending-epics-phase'
 **Primary Actors:** Learners tracking progress and maintaining engagement
 
 **Core Capabilities:**
-- Learning Book for reviewing past topics
+- Library for reviewing past topics
 - Honest streak (recall-based, not app opens)
 - Retention XP (verified after delayed recall)
 - Knowledge decay visualization

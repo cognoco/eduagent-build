@@ -281,7 +281,7 @@ export default function SessionSummaryScreen() {
     router.replace('/(learner)/home');
   };
 
-  const handleGoToLearningBook = (): void => {
+  const handleGoToLibrary = (): void => {
     if (topicId && subjectId) {
       router.replace({
         pathname: '/(learner)/topic/[topicId]',
@@ -296,7 +296,7 @@ export default function SessionSummaryScreen() {
         },
       } as never);
     } else {
-      router.replace('/(learner)/book');
+      router.replace('/(learner)/library');
     }
   };
 
@@ -616,16 +616,16 @@ export default function SessionSummaryScreen() {
           </Pressable>
         )}
 
-        {/* Story 4.12: Post-session Learning Book navigation */}
+        {/* Story 4.12: Post-session Library navigation */}
         <Pressable
-          onPress={handleGoToLearningBook}
+          onPress={handleGoToLibrary}
           className="py-3 items-center mt-1"
-          testID="go-to-learning-book"
-          accessibilityLabel="See your Learning Book"
+          testID="go-to-library"
+          accessibilityLabel="See your Library"
           accessibilityRole="link"
         >
           <Text className="text-caption text-text-secondary">
-            See your Learning Book
+            See your Library
           </Text>
         </Pressable>
       </ScrollView>

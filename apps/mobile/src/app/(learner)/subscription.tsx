@@ -72,7 +72,7 @@ const TIER_FEATURES: Array<{
       '50 questions per month',
       'All subjects',
       'Spaced repetition',
-      'Learning Book',
+      'Library',
     ],
   },
   {
@@ -439,19 +439,19 @@ function ChildPaywall(): React.ReactElement {
         )}
 
         <Text className="text-body-sm text-text-secondary text-center mb-6">
-          While you wait, you can still browse your Learning Book and see your
+          While you wait, you can still browse your Library and see your
           progress.
         </Text>
 
         <Pressable
-          onPress={() => router.push('/(learner)/book')}
+          onPress={() => router.push('/(learner)/library')}
           className="bg-surface rounded-button py-3.5 px-8 items-center w-full"
-          testID="browse-book-button"
+          testID="browse-library-button"
           accessibilityRole="button"
-          accessibilityLabel="Browse Learning Book"
+          accessibilityLabel="Browse Library"
         >
           <Text className="text-body font-semibold text-primary">
-            Browse Learning Book
+            Browse Library
           </Text>
         </Pressable>
       </View>
