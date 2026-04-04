@@ -65,6 +65,20 @@ jest.mock('../services/subject', () => ({
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   })),
+  createSubjectWithStructure: jest
+    .fn()
+    .mockImplementation((_db, profileId, input) => ({
+      subject: {
+        id: 'test-subject-id',
+        profileId,
+        name: input.name,
+        rawInput: input.rawInput ?? null,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      structureType: 'narrow',
+    })),
   getSubject: jest.fn().mockResolvedValue({
     id: 'test-subject-id',
     profileId: 'test-account-id',

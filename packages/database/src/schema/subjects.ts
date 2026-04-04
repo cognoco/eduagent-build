@@ -70,6 +70,26 @@ export const curricula = pgTable('curricula', {
     .defaultNow(),
 });
 
+export const curriculumBooks = pgTable('curriculum_books', {
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
+  subjectId: uuid('subject_id')
+    .notNull()
+    .references(() => subjects.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  emoji: text('emoji'),
+  sortOrder: integer('sort_order').notNull(),
+  topicsGenerated: boolean('topics_generated').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const curriculumTopics = pgTable('curriculum_topics', {
   id: uuid('id')
     .primaryKey()
@@ -83,11 +103,30 @@ export const curriculumTopics = pgTable('curriculum_topics', {
   relevance: topicRelevanceEnum('relevance').notNull().default('core'),
   source: curriculumTopicSourceEnum('source').notNull().default('generated'),
   estimatedMinutes: integer('estimated_minutes').notNull(),
+  bookId: uuid('book_id').references(() => curriculumBooks.id, {
+    onDelete: 'cascade',
+  }),
+  chapter: text('chapter'),
   skipped: boolean('skipped').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const topicConnections = pgTable('topic_connections', {
+  id: uuid('id')
+    .primaryKey()
+    .$defaultFn(() => generateUUIDv7()),
+  topicAId: uuid('topic_a_id')
+    .notNull()
+    .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
+  topicBId: uuid('topic_b_id')
+    .notNull()
+    .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
 });

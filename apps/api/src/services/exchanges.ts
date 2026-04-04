@@ -37,6 +37,7 @@ export interface ExchangeContext {
   }>;
   birthYear?: number | null;
   priorLearningContext?: string;
+  learningHistoryContext?: string;
   embeddingMemoryContext?: string;
   workedExampleLevel?: 'full' | 'fading' | 'problem_first';
   /** Teaching method preference for adaptive teaching (FR58) */
@@ -229,6 +230,10 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // Prior learning context
   if (context.priorLearningContext) {
     sections.push(context.priorLearningContext);
+  }
+
+  if (context.learningHistoryContext) {
+    sections.push(context.learningHistoryContext);
   }
 
   // Embedding memory context (pgvector semantic retrieval)

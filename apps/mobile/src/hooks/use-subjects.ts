@@ -15,6 +15,12 @@ interface UseSubjectsOptions {
   includeInactive?: boolean;
 }
 
+export interface CreateSubjectResponse {
+  subject: Subject;
+  structureType?: 'broad' | 'narrow';
+  bookCount?: number;
+}
+
 export function useSubjects(
   options: UseSubjectsOptions = {}
 ): UseQueryResult<Subject[]> {
@@ -45,7 +51,7 @@ export function useSubjects(
 }
 
 export function useCreateSubject(): UseMutationResult<
-  { subject: Subject },
+  CreateSubjectResponse,
   Error,
   { name: string; rawInput?: string }
 > {
@@ -56,7 +62,7 @@ export function useCreateSubject(): UseMutationResult<
     mutationFn: async (input: { name: string; rawInput?: string }) => {
       const res = await client.subjects.$post({ json: input });
       await assertOk(res);
-      return (await res.json()) as { subject: Subject };
+      return (await res.json()) as CreateSubjectResponse;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['subjects'] });

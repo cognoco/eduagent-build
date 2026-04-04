@@ -326,7 +326,10 @@ describe('getCurriculum', () => {
       sortOrder: 3,
       relevance: 'recommended',
       estimatedMinutes: 45,
+      bookId: null,
+      chapter: null,
       skipped: true,
+      source: undefined,
     });
   });
 });

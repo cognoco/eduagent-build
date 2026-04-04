@@ -5,6 +5,7 @@
 
 import { eq, and, notInArray, sql } from 'drizzle-orm';
 import {
+  profiles,
   subjects,
   learningSessions,
   createScopedRepository,
@@ -14,7 +15,10 @@ import type {
   SubjectCreateInput,
   SubjectUpdateInput,
   Subject,
+  SubjectStructureType,
 } from '@eduagent/schemas';
+import { detectSubjectType } from './book-generation';
+import { createBooks, ensureCurriculum } from './curriculum';
 
 // ---------------------------------------------------------------------------
 // Mapper — Drizzle Date → API ISO string
@@ -64,6 +68,53 @@ export async function createSubject(
     })
     .returning();
   return mapSubjectRow(row!);
+}
+
+export interface CreatedSubjectWithStructure {
+  subject: Subject;
+  structureType: SubjectStructureType;
+  bookCount?: number;
+}
+
+export async function createSubjectWithStructure(
+  db: Database,
+  profileId: string,
+  input: SubjectCreateInput
+): Promise<CreatedSubjectWithStructure> {
+  const subject = await createSubject(db, profileId, input);
+
+  try {
+    const profile = await db.query.profiles.findFirst({
+      where: eq(profiles.id, profileId),
+    });
+
+    const currentYear = new Date().getUTCFullYear();
+    const learnerAge = profile?.birthYear
+      ? Math.max(5, currentYear - profile.birthYear)
+      : 12;
+
+    const structure = await detectSubjectType(subject.name, learnerAge);
+
+    if (structure.type === 'broad') {
+      await ensureCurriculum(db, subject.id);
+      const books = await createBooks(db, subject.id, structure.books);
+      return {
+        subject,
+        structureType: 'broad',
+        ...(books.length > 0 ? { bookCount: books.length } : {}),
+      };
+    }
+  } catch (error) {
+    console.warn(
+      '[createSubjectWithStructure] Falling back to narrow subject flow:',
+      error
+    );
+  }
+
+  return {
+    subject,
+    structureType: 'narrow',
+  };
 }
 
 export async function getSubject(

@@ -12,7 +12,7 @@ import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import {
   listSubjects,
-  createSubject,
+  createSubjectWithStructure,
   getSubject,
   updateSubject,
 } from '../services/subject';
@@ -79,8 +79,8 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     const db = c.get('db');
     const input = c.req.valid('json');
     const profileId = requireProfileId(c.get('profileId'));
-    const subject = await createSubject(db, profileId, input);
-    return c.json({ subject }, 201);
+    const result = await createSubjectWithStructure(db, profileId, input);
+    return c.json(result, 201);
   })
   .get('/subjects/:id', async (c) => {
     const db = c.get('db');

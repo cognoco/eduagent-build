@@ -32,6 +32,7 @@ import { inngestRoute } from './routes/inngest';
 import { subjectRoutes } from './routes/subjects';
 import { interviewRoutes } from './routes/interview';
 import { curriculumRoutes } from './routes/curriculum';
+import { bookRoutes } from './routes/books';
 import { sessionRoutes } from './routes/sessions';
 import { parkingLotRoutes } from './routes/parking-lot';
 import { homeworkRoutes } from './routes/homework';
@@ -171,6 +172,7 @@ const routes = api
   .route('/', subjectRoutes)
   .route('/', interviewRoutes)
   .route('/', curriculumRoutes)
+  .route('/', bookRoutes)
   .route('/', sessionRoutes)
   .route('/', parkingLotRoutes)
   .route('/', homeworkRoutes)

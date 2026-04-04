@@ -1,8 +1,14 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockPush = jest.fn();
+const mockUseSubjects = jest.fn();
+const mockUseOverallProgress = jest.fn();
+const mockUseBooks = jest.fn();
+const mockUseBookWithTopics = jest.fn();
+const mockUseGenerateBookTopics = jest.fn();
+const mockUseCurriculum = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -13,44 +19,38 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-const mockUseSubjects = jest.fn();
 jest.mock('../../hooks/use-subjects', () => ({
   useSubjects: () => mockUseSubjects(),
-  useUpdateSubject: () => ({
-    mutateAsync: jest.fn(),
-  }),
+  useUpdateSubject: () => ({ mutateAsync: jest.fn() }),
 }));
 
-const mockUseOverallProgress = jest.fn();
 jest.mock('../../hooks/use-progress', () => ({
   useOverallProgress: () => mockUseOverallProgress(),
 }));
 
+jest.mock('../../hooks/use-books', () => ({
+  useBooks: () => mockUseBooks(),
+  useBookWithTopics: () => mockUseBookWithTopics(),
+  useGenerateBookTopics: () => mockUseGenerateBookTopics(),
+}));
+
+jest.mock('../../hooks/use-curriculum', () => ({
+  useCurriculum: () => mockUseCurriculum(),
+}));
+
 jest.mock('@tanstack/react-query', () => {
   const actual = jest.requireActual('@tanstack/react-query');
-  return {
-    ...actual,
-    useQueries: jest.fn(),
-  };
+  return { ...actual, useQueries: jest.fn() };
 });
 
 jest.mock('../../components/progress', () => ({
   RetentionSignal: ({ status }: { status: string }) => {
     const { Text } = require('react-native');
-    const label =
-      status === 'strong'
-        ? 'Thriving'
-        : status === 'fading'
-        ? 'Fading'
-        : status === 'forgotten'
-        ? 'Forgotten'
-        : 'Weak';
-    return <Text>{label}</Text>;
+    return <Text>{status}</Text>;
   },
 }));
 
 jest.mock('../../components/common', () => ({
-  BookPageFlipAnimation: () => null,
   BrandCelebration: () => null,
 }));
 
@@ -83,10 +83,8 @@ function createWrapper() {
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return React.createElement(
-      QueryClientProvider,
-      { client: queryClient },
-      children
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
   };
 }
@@ -97,6 +95,14 @@ describe('LibraryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseQueries.mockReturnValue([]);
+    mockUseBooks.mockReturnValue({ data: [], isLoading: false });
+    mockUseBookWithTopics.mockReturnValue({ data: null, isLoading: false });
+    mockUseGenerateBookTopics.mockReturnValue({
+      data: null,
+      isPending: false,
+      mutate: jest.fn(),
+    });
+    mockUseCurriculum.mockReturnValue({ data: null, isLoading: false });
   });
 
   it('shows loading state', () => {
@@ -109,10 +115,9 @@ describe('LibraryScreen', () => {
     render(<LibraryScreen />, { wrapper: createWrapper() });
 
     expect(screen.getByTestId('library-loading')).toBeTruthy();
-    expect(screen.getByText('Loading your subjects...')).toBeTruthy();
   });
 
-  it('shows empty state when no topics', () => {
+  it('shows empty state when there are no subjects', () => {
     mockUseSubjects.mockReturnValue({ data: [], isLoading: false });
     mockUseOverallProgress.mockReturnValue({
       data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
@@ -127,194 +132,9 @@ describe('LibraryScreen', () => {
     ).toBeTruthy();
   });
 
-  it('renders topics with retention signals', () => {
+  it('renders subject cards as shelves by default', () => {
     mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: {
-        subjects: [
-          { subjectId: 'sub-1', name: 'Math', retentionStatus: 'fading' },
-        ],
-        totalTopicsCompleted: 1,
-        totalTopicsVerified: 0,
-      },
-      isLoading: false,
-    });
-    mockUseQueries.mockReturnValue([
-      {
-        data: {
-          topics: [
-            {
-              topicId: 'topic-1',
-              topicTitle: 'topic-1',
-              easeFactor: 2.5,
-              intervalDays: 7,
-              repetitions: 3,
-              nextReviewAt: '2026-02-25T00:00:00Z',
-              lastReviewedAt: null,
-              xpStatus: 'verified',
-              failureCount: 0,
-            },
-          ],
-          reviewDueCount: 0,
-        },
-        isLoading: false,
-      },
-    ]);
-
-    render(<LibraryScreen />, { wrapper: createWrapper() });
-
-    expect(screen.getByTestId('topic-row-topic-1')).toBeTruthy();
-    expect(screen.getByText('Math')).toBeTruthy();
-    expect(screen.getByText('Thriving')).toBeTruthy();
-  });
-
-  it('navigates to topic detail on topic press', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
-    });
-    mockUseQueries.mockReturnValue([
-      {
-        data: {
-          topics: [
-            {
-              topicId: 'topic-1',
-              topicTitle: 'topic-1',
-              easeFactor: 1.5,
-              intervalDays: 1,
-              repetitions: 1,
-              nextReviewAt: null,
-              lastReviewedAt: null,
-              xpStatus: 'pending',
-              failureCount: 0,
-            },
-          ],
-          reviewDueCount: 0,
-        },
-        isLoading: false,
-      },
-    ]);
-
-    render(<LibraryScreen />, { wrapper: createWrapper() });
-
-    fireEvent.press(screen.getByTestId('topic-row-topic-1'));
-
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(learner)/topic/topic-1',
-      params: { subjectId: 'sub-1' },
-    });
-  });
-
-  it('shows subject filter tabs when multiple subjects exist', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [
-        { id: 'sub-1', name: 'Math', status: 'active' },
-        { id: 'sub-2', name: 'Science', status: 'active' },
-      ],
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
-    });
-
-    render(<LibraryScreen />, { wrapper: createWrapper() });
-
-    expect(screen.getByTestId('subject-filter-tabs')).toBeTruthy();
-    expect(screen.getByTestId('filter-all')).toBeTruthy();
-    expect(screen.getByTestId('filter-sub-1')).toBeTruthy();
-    expect(screen.getByTestId('filter-sub-2')).toBeTruthy();
-  });
-
-  it('shows a subject overview while topic history is still loading', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: {
-        subjects: [
-          { subjectId: 'sub-1', name: 'Math', retentionStatus: 'fading' },
-        ],
-        totalTopicsCompleted: 0,
-        totalTopicsVerified: 0,
-      },
-      isLoading: false,
-    });
-    mockUseQueries.mockReturnValue([
-      {
-        data: undefined,
-        isLoading: true,
-        isError: false,
-      },
-    ]);
-
-    render(<LibraryScreen />, { wrapper: createWrapper() });
-
-    expect(screen.getByTestId('library-topic-loading')).toBeTruthy();
-    expect(screen.getByText('Building your library...')).toBeTruthy();
-    expect(screen.queryByTestId('library-loading')).toBeNull();
-  });
-
-  it('filters topics when subject tab is pressed', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [
-        { id: 'sub-1', name: 'Math', status: 'active' },
-        { id: 'sub-2', name: 'Science', status: 'active' },
-      ],
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
-    });
-    mockUseQueries.mockReturnValue([
-      {
-        data: {
-          topics: [
-            {
-              topicId: 'topic-1',
-              topicTitle: 'topic-1',
-              easeFactor: 2.5,
-              intervalDays: 7,
-              repetitions: 3,
-              nextReviewAt: null,
-              lastReviewedAt: null,
-              xpStatus: 'verified',
-              failureCount: 0,
-            },
-          ],
-          reviewDueCount: 0,
-        },
-        isLoading: false,
-      },
-      {
-        data: { topics: [], reviewDueCount: 0 },
-        isLoading: false,
-      },
-    ]);
-
-    render(<LibraryScreen />, { wrapper: createWrapper() });
-
-    // Initially shows all topics
-    expect(screen.getByTestId('topic-row-topic-1')).toBeTruthy();
-
-    // Press Science filter — topic-1 belongs to Math (sub-1), should be filtered out
-    fireEvent.press(screen.getByTestId('filter-sub-2'));
-
-    expect(screen.queryByTestId('topic-row-topic-1')).toBeNull();
-  });
-
-  it('shows a curriculum-complete banner when visible subjects are fully verified', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      data: [{ id: 'sub-1', name: 'History', status: 'active' }],
       isLoading: false,
     });
     mockUseOverallProgress.mockReturnValue({
@@ -322,18 +142,35 @@ describe('LibraryScreen', () => {
         subjects: [
           {
             subjectId: 'sub-1',
-            name: 'Math',
-            topicsTotal: 3,
+            name: 'History',
+            topicsTotal: 12,
             topicsCompleted: 3,
-            topicsVerified: 3,
+            topicsVerified: 1,
             urgencyScore: 0,
-            retentionStatus: 'strong',
+            retentionStatus: 'fading',
             lastSessionAt: null,
           },
         ],
         totalTopicsCompleted: 3,
-        totalTopicsVerified: 3,
+        totalTopicsVerified: 1,
       },
+      isLoading: false,
+    });
+
+    render(<LibraryScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('subject-card-sub-1')).toBeTruthy();
+    expect(screen.getByText('History')).toBeTruthy();
+    expect(screen.getByText('3/12 topics')).toBeTruthy();
+  });
+
+  it('shows all topics view when the toggle is pressed', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      isLoading: false,
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
       isLoading: false,
     });
     mockUseQueries.mockReturnValue([
@@ -343,11 +180,9 @@ describe('LibraryScreen', () => {
             {
               topicId: 'topic-1',
               topicTitle: 'Fractions',
-              easeFactor: 2.6,
-              intervalDays: 21,
-              repetitions: 5,
-              nextReviewAt: '2026-05-25T00:00:00Z',
-              lastReviewedAt: '2026-04-01T00:00:00Z',
+              easeFactor: 2.5,
+              repetitions: 2,
+              lastReviewedAt: null,
               xpStatus: 'verified',
               failureCount: 0,
             },
@@ -360,8 +195,54 @@ describe('LibraryScreen', () => {
 
     render(<LibraryScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('library-curriculum-complete')).toBeTruthy();
-    expect(screen.getByText("You've covered everything here!")).toBeTruthy();
-    expect(screen.getByText('Add another subject')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('library-view-all-topics'));
+
+    expect(screen.getByTestId('topic-row-topic-1')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('topic-row-topic-1'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(learner)/session',
+      params: {
+        mode: 'learning',
+        subjectId: 'sub-1',
+        topicId: 'topic-1',
+      },
+    });
+  });
+
+  it('opens a shelf view when a subject with books is pressed', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [{ id: 'sub-1', name: 'History', status: 'active' }],
+      isLoading: false,
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+      isLoading: false,
+    });
+    mockUseBooks.mockReturnValue({
+      data: [
+        {
+          id: 'book-1',
+          subjectId: 'sub-1',
+          title: 'Ancient Egypt',
+          description: 'Pyramids and pharaohs',
+          emoji: '🏛️',
+          sortOrder: 1,
+          topicsGenerated: false,
+          createdAt: '2026-04-04T00:00:00.000Z',
+          updatedAt: '2026-04-04T00:00:00.000Z',
+        },
+      ],
+      isLoading: false,
+    });
+
+    render(<LibraryScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('subject-card-sub-1'));
+
+    expect(screen.getByTestId('shelf-view')).toBeTruthy();
+    expect(screen.getByTestId('book-card-book-1')).toBeTruthy();
+    expect(screen.getByText('Ancient Egypt')).toBeTruthy();
   });
 });
