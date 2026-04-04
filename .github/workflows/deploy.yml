@@ -146,6 +146,12 @@ jobs:
       - name: Build API
         run: pnpm exec nx run api:build
 
+      - name: Baseline migration journal (push→migrate transition)
+        working-directory: packages/database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/baseline-migrations.mjs
+
       - name: Run database migrations
         working-directory: packages/database
         env:
