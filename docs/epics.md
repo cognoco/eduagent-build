@@ -741,7 +741,7 @@ Epic 7 (pre-launch, v3)      ← no deps (independent). Replaces v2 prerequisite
 | **Role** (parent features) | `familyLinks` existence | Derived at runtime | When links added/removed |
 | **Intent** (session mode) | Home screen card taps | Not stored as setting | Every app open — per-session |
 
-**Intent-as-cards model:** The home screen shows 2-3 prioritized action cards (homework, study, review, family). The AI ranks cards based on time-of-day patterns, recent sessions, reviews due, and `familyLinks`. The user "picks" intent by tapping a card. No picker, no settings, no "What brings you here?" question. The app learns from tap patterns.
+**Intent-as-cards model (revised):** Three small screens replace the monolithic home screen. `home.tsx` detects linked children (parent gateway vs direct learner). `learn.tsx` shows 2-3 intent cards based on library state. `learn-new.tsx` offers subject creation, freeform, and crash recovery. State-driven (not AI-ranked) — no server computation, no tap-pattern learning. Maximum 2 taps from app open to any activity.
 
 - The primary card (biggest) is the AI's best bet for what the user wants right now.
 - Secondary cards (smaller) are the alternatives — always visible, one tap.
@@ -757,7 +757,7 @@ Epic 7 (pre-launch, v3)      ← no deps (independent). Replaces v2 prerequisite
 - 12.4: Remove `personaType` from database and Zod schemas (DB migration — zero-user: skip backwards-compat window, skip down migration)
 - 12.5: Remove profile-based persona routing — no `persona` concept in mobile code
 - 12.6: Analytics, event schema, consent pipeline, Sentry age-gating, and test infrastructure migration (FR206.1-206.8) — update Sentry tags + age-gating function, consent service + middleware + consent-web deep links, test factory + test-seed, Inngest payloads, RevenueCat metadata
-- 12.7: **Prioritized home cards** — replace single coaching card with ranked multi-card home screen (the intent surface)
+- 12.7: **Adaptive home screen** — replace monolithic home.tsx with three intent-driven screens (gateway → learn → learn-new), state-driven cards, no AI ranking
 
 **Dependency order:**
 ```
@@ -5091,55 +5091,77 @@ User testing identified 15 UX gaps across the app. The first nine (10.1–10.9) 
 
 **Tests:** Verify Inngest event schemas still validate. Sentry tag tests updated. Consent tests verify under-16/over-16 with `birthYear`. Factory-based test suite green.
 
-### Story 12.7: Prioritized home cards — the intent surface
+### Story 12.7: Adaptive Home Screen — Intent-First Navigation
 
-**Scope:** Replace the single coaching card (`AdaptiveEntryCard`) with a ranked multi-card home screen. The AI computes 2-3 cards per profile, ranked by behavioral signals. This is the primary intent-expression mechanism — users declare what they want to do by tapping a card.
+**Scope:** Replace the monolithic `home.tsx` (883 lines) with three small, state-driven screens. No AI ranking, no server-computed cards — just state detection (has linked children? has library content? has recovery marker?) driving 2-3 clear choices per screen.
 
-**FRs:** FR207 (prioritized home cards — NEW)
+**FRs:** FR207 (prioritized home cards — NEW, revised: static state-driven cards replace AI-ranked cards)
 
-**Co-design with:** Epic 14 Story 14.1 (card dismissal feeds ranking algorithm)
-**Integrates:** Epic 13 FR211 (crash recovery "unfinished session" card — highest priority, displaces normal ranking)
+**Design principles:**
+1. **State-driven, not persona-driven.** Adapts based on what the user has, not who they are.
+2. **Intent-first navigation.** Each screen asks one question: "why are you here?" with 2-3 clear choices.
+3. **Universal learner screen.** Once any user chooses to learn, same experience for all.
+4. **Minimal depth.** Maximum 2 taps from app open to starting an activity.
 
-**Card types:**
-
-| Card | Appears when | Content |
-|------|-------------|---------|
-| **Homework** | Default for students | "Check my homework — Tap to open camera. Last: Maths" |
-| **Study / Continue** | Active subjects exist | "Continue Biology — Chapter 4: Photosynthesis" |
-| **Review** | SM-2 reviews due | "3 topics ready to review — Biology, Maths, Czech" |
-| **Family** | `familyLinks` exist (as parent) | "Emma: 45min today, finished Maths homework" — real data |
-| **Resume session** | Crash recovery (Epic 13 FR211) | "You have an unfinished session" — highest priority |
-| **Link child** | Adult answered "yes" at signup, no `familyLinks` yet | "Link your child to get started" |
-
-**Ranking signals (simple heuristic, no ML):**
+**Architecture: Gateway + Universal Learner Screen**
 
 ```
-1. Time pattern    — "6pm weekday = homework (4/5 times)" → homework card primary
-2. Reviews due     — if ≥3 reviews overdue, review card gets boosted
-3. Last session    — recency of each mode
-4. familyLinks     — if parent + evening → family card boosted
-5. Dismissal data  — cards dismissed 3+ times deprioritized (Epic 14 FR221)
+home.tsx (intent router)
+├── hasLinkedChildren → Parent Gateway (rendered inline)
+│   ├── "Check child's progress" → /(parent)/dashboard
+│   └── "Learn something" → learn.tsx
+│
+└── no linked children → learn.tsx (directly)
+
+learn.tsx (universal learner screen)
+├── "Learn something new!" → learn-new.tsx
+├── "Help with assignment?" → homework session flow
+└── "Repeat & review" (only if library has content) → Library
+
+learn-new.tsx (learning fork)
+├── "Pick a subject" → /create-subject
+├── "Just ask anything" → freeform session
+└── "Continue where you left off" (only if recovery marker) → resume session
 ```
 
-**Layout rules:**
-- Primary card: large, occupies full width. AI's best bet.
-- Secondary cards: smaller, side-by-side (2 cards) or stacked. Alternatives.
-- Cold start (no history): all cards equal-sized, labeled "What would you like to do?"
-- After 2-3 sessions: cards start ranking by usage patterns.
-- Minimum: always show at least 2 cards (primary + one alternative). Never reduce to a single forced option.
+**State detection (two booleans + one marker):**
+
+| Signal | Source | Used by |
+|--------|--------|---------|
+| `hasLinkedChildren` | `GET /v1/family-links` → `children.length > 0` | `home.tsx` — gateway vs direct learner |
+| `hasLibraryContent` | `useSubjects()` → `activeSubjects.length > 0` | `learn.tsx` — show/hide "Repeat & review" |
+| `hasRecoveryMarker` | SecureStore crash recovery marker | `learn-new.tsx` — show/hide "Continue where you left off" |
+
+**Parent Gateway UI:**
+- Time-aware greeting header + profile switcher
+- Two large cards: "Check child's progress" (with latest child activity summary) + "Learn something"
+- Size target: ~50-100 lines
+
+**Greetings:** Pure client-side, time-of-day + day-of-week. `getGreeting(name)` returns `{ title, subtitle }`. Morning/afternoon/evening/night greetings with day overrides (Monday: "Fresh week ahead!", Friday: "Happy Friday!", weekends: "Weekend learning? Nice!").
+
+**What moves:**
+- Greeting, profile switcher, homework entry → `learn.tsx`
+- Resume session, subject creation, freeform session → `learn-new.tsx`
+- Parent dashboard access → parent gateway card in `home.tsx`
+
+**What is removed from home entry point:**
+- Server-ranked coaching cards (move deeper or remove)
+- Subject list / retention strip (lives in Library)
+- "Add your first subject" empty state
 
 **Acceptance criteria:**
-- [ ] `precomputeHomeCards(profileId)` service replaces `precomputeCoachingCard()` — returns 2-3 ranked cards with type, title, subtitle, and action
-- [ ] `GET /v1/home-cards` route replaces `GET /v1/coaching-card` — returns ranked card array
-- [ ] Home screen renders cards in ranked layout (primary large, secondary small)
-- [ ] Card taps navigate to the appropriate flow (camera for homework, session for study, Library for review, dashboard for family)
-- [ ] Card tap events tracked for ranking improvement (`sessionEvents` with `eventType: 'home_card_tap'`)
-- [ ] Family card only appears when `familyLinks` exist for the profile as a parent (not as a child)
-- [ ] Resume session card (Epic 13) takes highest priority when present
-- [ ] Cold start: equal-sized cards with welcome text
-- [ ] Each card has dismiss affordance (× button) — co-designed with Epic 14 FR221
+- [ ] `home.tsx` detects linked children and renders parent gateway or learn screen (~50-100 lines)
+- [ ] Parent gateway shows two cards + latest child activity summary
+- [ ] `learn.tsx` shows 2-3 intent cards based on library state
+- [ ] `learn-new.tsx` shows learning options including crash recovery when marker exists
+- [ ] Time-aware greeting on both parent gateway and learner screen
+- [ ] Maximum 2 taps from app open to starting any activity
+- [ ] No persona checks, no age checks — purely state-driven
+- [ ] Back navigation: gateway → learn → learn-new chain works correctly
 
-**Tests:** Unit tests for `precomputeHomeCards()` with various profile/history fixtures. Integration test for card ranking with time-of-day mocking. E2E: open app → see ranked cards → tap homework → camera opens. E2E: parent sees Family card with child data.
+**Out of scope:** Usage-pattern-aware greetings, coaching card integration into new screens, persona/age branching.
+
+**Tests:** Unit tests for `getGreeting()` with time/day mocking. Component tests for state-conditional card rendering. E2E: parent sees gateway → taps "Learn something" → sees learner screen. E2E: new user sees "Learn something new!" + "Help with assignment?" (no "Repeat & review").
 
 ### Epic 12 Dependency Order
 
