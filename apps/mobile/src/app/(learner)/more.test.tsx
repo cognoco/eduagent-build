@@ -22,7 +22,7 @@ jest.mock('../../lib/theme', () => ({
 
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
-    activeProfile: { id: 'profile-1', displayName: 'Alex' },
+    activeProfile: { id: 'profile-1', displayName: 'Alex', isOwner: true },
   }),
 }));
 
@@ -224,5 +224,13 @@ describe('MoreScreen — Learning Mode', () => {
     fireEvent.press(screen.getByTestId('celebration-level-big-only'));
 
     expect(mockCelebrationLevelMutate).toHaveBeenCalledWith('big_only');
+  });
+});
+
+describe('MoreScreen — Account Security', () => {
+  it('renders Account Security section', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByText('Account Security')).toBeTruthy();
   });
 });

@@ -8,7 +8,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
-import { notFound, forbidden } from '../errors';
+import { notFound, forbidden, validationError } from '../errors';
 import {
   listProfiles,
   createProfile,
@@ -35,8 +35,29 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const input = c.req.valid('json');
     const isFirstProfile = (await listProfiles(db, account.id)).length === 0;
 
-    const profile = await createProfile(db, account.id, input, isFirstProfile);
-    return c.json({ profile }, 201);
+    try {
+      const profile = await createProfile(
+        db,
+        account.id,
+        input,
+        isFirstProfile
+      );
+      return c.json({ profile }, 201);
+    } catch (err) {
+      if (err instanceof Error) {
+        const msg = err.message;
+        if (msg.includes('at least 11 years old')) {
+          return validationError(c, { birthYear: [msg] });
+        }
+        if (msg.includes('age 18 or older')) {
+          return validationError(c, { personaType: [msg] });
+        }
+        if (msg.includes('birthYear or birthDate is required')) {
+          return validationError(c, { birthYear: [msg] });
+        }
+      }
+      throw err;
+    }
   })
   .get('/profiles/:id', async (c) => {
     const db = c.get('db');

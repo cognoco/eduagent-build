@@ -8,6 +8,7 @@ import type { LearningMode } from '@eduagent/schemas';
 // import { AccentPicker } from '../../components/common';
 import { useProfile } from '../../lib/profile';
 import { useExportData } from '../../hooks/use-account';
+import { AccountSecurity } from '../../components/account-security';
 import {
   useNotificationSettings,
   useUpdateNotificationSettings,
@@ -321,6 +322,8 @@ export default function MoreScreen() {
           label="Delete account"
           onPress={() => router.push('/delete-account')}
         />
+
+        <AccountSecurity />
 
         <Pressable
           onPress={async () => {
