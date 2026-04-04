@@ -47,7 +47,13 @@ learn-new.tsx (learning fork)
 **Logic:**
 - Fetch family links for the active profile (existing API: `GET /v1/family-links`)
 - If `linkedChildren.length > 0` → render Parent Gateway inline
-- Otherwise → render `learn.tsx` content directly (no intermediate navigation; `home.tsx` simply renders the learner screen component)
+- Otherwise → render `<LearnerScreen />` component directly (no navigation, no stack push — the learner UI IS the home tab)
+
+**Component reuse pattern:** The learner UI is extracted into a shared `<LearnerScreen />` component (e.g., `components/home/LearnerScreen.tsx`). This component is rendered in two places:
+- Inline inside `home.tsx` for non-parent users (home tab = learner screen, no back button)
+- As the content of the `/learn` route for parent users who tap "Learn something" (pushed onto stack, back button returns to gateway)
+
+This avoids the dual-identity problem where a single route file is both inline and navigated-to. React Navigation stack stays clean: non-parents have no extra stack entry, parents get a natural push/pop.
 
 **Parent Gateway UI:**
 - Time-aware greeting header (see Greetings section below)
@@ -55,12 +61,12 @@ learn-new.tsx (learning fork)
 - Two large cards/buttons, vertically stacked:
   - **"Check child's progress"** → navigates to `/(parent)/dashboard`
     - Includes a single-line highlight beneath the button: latest child activity summary (e.g., "Emma practiced 12 min today", "No activity today"). Source: `GET /v1/dashboard` → most recent child's `totalTimeThisWeek` or today's session data. If multiple children, show the most recently active child. If no activity data yet, show "See how they're doing".
-  - **"Learn something"** → navigates to learner screen (`learn.tsx`)
+  - **"Learn something"** → navigates to `/learn` route (which renders `<LearnerScreen />`)
 - No other elements beyond these two cards + highlight. Intentionally minimal.
 
 **Size target:** ~50-100 lines (down from current 883).
 
-### Screen 2: `learn.tsx` — Universal Learner Screen
+### Screen 2: `<LearnerScreen />` component + `/learn` route — Universal Learner Screen
 
 **Purpose:** "What do you want to do right now?" — the core entry point for all learners.
 
@@ -148,10 +154,10 @@ Day-of-week flavour replaces the subtitle (not the main greeting) when applicabl
 - The parent gateway **is** what the Home tab renders for users with linked children
 - Bottom nav stays unchanged: Home, Library, More
 - Back behaviour:
-  - **Parent gateway → "Learn something" → learn.tsx:** Back returns to parent gateway
-  - **Direct learner (no linked children) → learn.tsx:** No back (this is the root)
-  - **learn.tsx → learn-new.tsx:** Back returns to learn.tsx
-  - **learn.tsx → Library:** Back returns to learn.tsx
+  - **Parent gateway → "Learn something" → `/learn` route:** Back pops stack, returns to parent gateway (home tab)
+  - **Direct learner (no linked children) → `<LearnerScreen />` inline in home.tsx:** No back (this is the root — no stack entry)
+  - **`<LearnerScreen />` → learn-new.tsx:** Back returns to learner screen
+  - **`<LearnerScreen />` → Library:** Back returns to learner screen
 
 ## State Detection Summary
 
