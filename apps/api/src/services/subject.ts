@@ -17,7 +17,6 @@ import type {
   Subject,
   SubjectStructureType,
 } from '@eduagent/schemas';
-import { detectSubjectType } from './book-generation';
 import { createBooks, ensureCurriculum } from './curriculum';
 
 // ---------------------------------------------------------------------------
@@ -93,6 +92,9 @@ export async function createSubjectWithStructure(
       ? Math.max(5, currentYear - profile.birthYear)
       : 12;
 
+    // Dynamic import — book-generation depends on LLM infra which may not
+    // initialize in all environments (integration tests without API keys).
+    const { detectSubjectType } = await import('./book-generation');
     const structure = await detectSubjectType(subject.name, learnerAge);
 
     if (structure.type === 'broad') {
