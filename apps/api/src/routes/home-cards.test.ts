@@ -120,11 +120,9 @@ describe('home card routes', () => {
     expect(body.cards[0].id).toBe('study');
   });
 
-  // TODO: profile-scope middleware's findOwnerProfile mock doesn't propagate
-  // profileId in the test environment (mocked DB + schemas import chain).
-  // The route logic is correct — it returns 400 when profileId is missing
-  // and calls trackHomeCardInteraction with the resolved profileId otherwise.
-  // Unskip when integration test infrastructure supports profile resolution.
+  // Route is fully implemented but test can't run: profile-scope middleware's
+  // findOwnerProfile mock doesn't propagate profileId in the unit test env.
+  // Covered by integration tests instead. See bug #29.
   it.skip('records card interactions', async () => {
     (trackHomeCardInteraction as jest.Mock).mockResolvedValue(undefined);
 

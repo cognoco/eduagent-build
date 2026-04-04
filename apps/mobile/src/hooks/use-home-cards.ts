@@ -1,7 +1,6 @@
 import {
   useMutation,
   useQuery,
-  useQueryClient,
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
@@ -42,8 +41,6 @@ export function useTrackHomeCardInteraction(): UseMutationResult<
   HomeCardInteractionInput
 > {
   const client = useApiClient();
-  const queryClient = useQueryClient();
-  const { activeProfile } = useProfile();
 
   return useMutation({
     mutationFn: async (input: HomeCardInteractionInput) => {
@@ -53,10 +50,7 @@ export function useTrackHomeCardInteraction(): UseMutationResult<
       await assertOk(res);
       return (await res.json()) as { ok: boolean };
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ['home-cards', activeProfile?.id],
-      });
-    },
+    // No invalidation on tap/dismiss — prevents visible card reordering (#26).
+    // Server re-ranks on the next foreground focus via query staleTime.
   });
 }
