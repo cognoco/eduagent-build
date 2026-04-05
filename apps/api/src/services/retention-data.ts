@@ -31,7 +31,11 @@ import {
   canRetestTopic,
   type RetentionState,
 } from './retention';
-import { canExitNeedsDeepening } from './adaptive-teaching';
+import {
+  canExitNeedsDeepening,
+  checkNeedsDeepeningCapacity,
+} from './adaptive-teaching';
+import { calculateMasteryScore } from './assessments';
 import { syncXpLedgerStatus } from './xp';
 import { routeAndCall, type ChatMessage } from './llm';
 import { NotFoundError } from '../errors';
@@ -326,6 +330,7 @@ export async function processRecallTest(
     attemptMode === 'dont_remember'
       ? 0
       : await evaluateRecallQuality(input.answer ?? '', topicTitle);
+  const masteryScore = calculateMasteryScore('recall', quality / 5);
   // state was already computed above for cooldown check — reuse it
   const result = processRecallResult(state, quality);
 
@@ -394,7 +399,7 @@ export async function processRecallTest(
 
   const response: RecallTestResponse = {
     passed: result.passed,
-    masteryScore: result.passed ? 0.75 : 0.4,
+    masteryScore,
     xpChange: result.xpChange,
     nextReviewAt: result.newState.nextReviewAt ?? new Date().toISOString(),
     failureCount: result.newState.failureCount,
@@ -463,6 +468,34 @@ export async function startRelearn(
   const active = existing.find((d) => d.status === 'active');
 
   if (!active && subjectId) {
+    const activeForSubject = await repo.needsDeepeningTopics.findMany(
+      and(
+        eq(needsDeepeningTopics.subjectId, subjectId),
+        eq(needsDeepeningTopics.status, 'active')
+      )
+    );
+    const capacity = checkNeedsDeepeningCapacity(activeForSubject.length);
+
+    if (capacity.atCapacity && capacity.shouldPromote) {
+      const promotable = [...activeForSubject].sort(
+        (a, b) => b.consecutiveSuccessCount - a.consecutiveSuccessCount
+      )[0];
+      if (promotable) {
+        await db
+          .update(needsDeepeningTopics)
+          .set({
+            status: 'resolved',
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(needsDeepeningTopics.id, promotable.id),
+              eq(needsDeepeningTopics.profileId, profileId)
+            )
+          );
+      }
+    }
+
     await db.insert(needsDeepeningTopics).values({
       profileId,
       subjectId,
@@ -537,9 +570,11 @@ export async function getSubjectNeedsDeepening(
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subject) return { topics: [], count: 0 };
 
-  const allDeepening = await repo.needsDeepeningTopics.findMany();
-  const subjectDeepening = allDeepening.filter(
-    (d) => d.subjectId === subjectId && d.status === 'active'
+  const subjectDeepening = await repo.needsDeepeningTopics.findMany(
+    and(
+      eq(needsDeepeningTopics.subjectId, subjectId),
+      eq(needsDeepeningTopics.status, 'active')
+    )
   );
 
   const topics: NeedsDeepeningStatus[] = subjectDeepening.map((d) => ({

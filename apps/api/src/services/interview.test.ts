@@ -701,4 +701,36 @@ describe('persistCurriculum', () => {
     // Only curriculum insert, no topic insert
     expect(db.insert).toHaveBeenCalledTimes(1);
   });
+
+  it('throws when subject does not belong to profile (IDOR guard) [CR-1B.1]', async () => {
+    const draft: OnboardingDraft = {
+      id: 'draft-1',
+      profileId,
+      subjectId,
+      exchangeHistory: [{ role: 'user', content: 'Hello' }],
+      extractedSignals: {},
+      status: 'completed',
+      expiresAt: null,
+      createdAt: NOW.toISOString(),
+      updatedAt: NOW.toISOString(),
+    };
+
+    const db = createMockDb();
+    // Override the subjects.findFirst mock to return null (ownership check fails)
+    (
+      db.query.subjects.findFirst as jest.Mock
+    ).mockResolvedValueOnce(null);
+
+    const attackerProfileId = 'attacker-profile-id';
+
+    await expect(
+      persistCurriculum(db, attackerProfileId, subjectId, 'Mathematics', draft)
+    ).rejects.toThrow(
+      `Subject ${subjectId} does not belong to profile ${attackerProfileId}`
+    );
+
+    // Verify no curriculum was inserted
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(generateCurriculum).not.toHaveBeenCalled();
+  });
 });

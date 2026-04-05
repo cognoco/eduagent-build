@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, inArray } from 'drizzle-orm';
+import { eq, and, asc, desc, inArray } from 'drizzle-orm';
 import {
   subjects,
   curricula,
@@ -251,6 +251,11 @@ export async function getTopicProgress(
     retentionCard && retentionCard.failureCount >= 3
       ? 'forgotten'
       : retentionStatus;
+  const struggleStatus: TopicProgress['struggleStatus'] = activeDeepening
+    ? retentionCard && retentionCard.failureCount >= 3
+      ? 'blocked'
+      : 'needs_deepening'
+    : 'normal';
 
   return {
     topicId: topic.id,
@@ -258,7 +263,7 @@ export async function getTopicProgress(
     description: topic.description,
     completionStatus,
     retentionStatus: extendedRetentionStatus,
-    struggleStatus: activeDeepening ? 'needs_deepening' : 'normal',
+    struggleStatus,
     masteryScore: latestAssessment?.masteryScore
       ? Number(latestAssessment.masteryScore)
       : null,
@@ -452,45 +457,81 @@ export async function getContinueSuggestion(
   topicTitle: string;
 } | null> {
   const repo = createScopedRepository(db, profileId);
-  const allSubjects = await repo.subjects.findMany();
+  const activeSubjects = (await repo.subjects.findMany()).filter(
+    (subject) => subject.status === 'active'
+  );
+  if (activeSubjects.length === 0) return null;
 
-  for (const subject of allSubjects) {
-    if (subject.status !== 'active') continue;
+  const subjectIds = activeSubjects.map((subject) => subject.id);
+  const curriculumRows = await db
+    .select({
+      id: curricula.id,
+      subjectId: curricula.subjectId,
+      version: curricula.version,
+    })
+    .from(curricula)
+    .where(inArray(curricula.subjectId, subjectIds))
+    .orderBy(desc(curricula.version));
 
-    // Find curriculum
-    const curriculum = await db.query.curricula.findFirst({
-      where: eq(curricula.subjectId, subject.id),
-    });
-    if (!curriculum) continue;
+  const latestCurriculumBySubject = new Map<string, string>();
+  for (const curriculum of curriculumRows) {
+    if (!latestCurriculumBySubject.has(curriculum.subjectId)) {
+      latestCurriculumBySubject.set(curriculum.subjectId, curriculum.id);
+    }
+  }
 
-    // Get topics in order
-    const topics = await db.query.curriculumTopics.findMany({
-      where: and(
-        eq(curriculumTopics.curriculumId, curriculum.id),
-        eq(curriculumTopics.skipped, false)
-      ),
-      orderBy: asc(curriculumTopics.sortOrder),
-    });
+  const curriculumIds = [...new Set(latestCurriculumBySubject.values())];
+  if (curriculumIds.length === 0) return null;
 
-    // Find first topic that is not completed
-    for (const topic of topics) {
-      const card = await repo.retentionCards.findFirst(
-        eq(retentionCards.topicId, topic.id)
-      );
-      const topicAssessments = await repo.assessments.findMany(
-        eq(assessments.topicId, topic.id)
-      );
-      const passed = topicAssessments.some((a) => a.status === 'passed');
-      const verified = card?.xpStatus === 'verified';
+  const topics = await db.query.curriculumTopics.findMany({
+    where: and(
+      inArray(curriculumTopics.curriculumId, curriculumIds),
+      eq(curriculumTopics.skipped, false)
+    ),
+    orderBy: asc(curriculumTopics.sortOrder),
+  });
+  if (topics.length === 0) return null;
 
-      if (!passed && !verified) {
-        return {
-          subjectId: subject.id,
-          subjectName: subject.name,
-          topicId: topic.id,
-          topicTitle: topic.title,
-        };
-      }
+  const topicIds = topics.map((topic) => topic.id);
+  const [cards, topicAssessments] = await Promise.all([
+    repo.retentionCards.findMany(inArray(retentionCards.topicId, topicIds)),
+    repo.assessments.findMany(inArray(assessments.topicId, topicIds)),
+  ]);
+
+  const verifiedTopicIds = new Set(
+    cards
+      .filter((card) => card.xpStatus === 'verified')
+      .map((card) => card.topicId)
+  );
+  const passedTopicIds = new Set(
+    topicAssessments
+      .filter((assessment) => assessment.status === 'passed')
+      .map((assessment) => assessment.topicId)
+  );
+
+  const topicsByCurriculum = new Map<string, typeof topics>();
+  for (const topic of topics) {
+    const list = topicsByCurriculum.get(topic.curriculumId) ?? [];
+    list.push(topic);
+    topicsByCurriculum.set(topic.curriculumId, list);
+  }
+
+  for (const subject of activeSubjects) {
+    const curriculumId = latestCurriculumBySubject.get(subject.id);
+    if (!curriculumId) continue;
+
+    const nextTopic = (topicsByCurriculum.get(curriculumId) ?? []).find(
+      (topic) =>
+        !passedTopicIds.has(topic.id) && !verifiedTopicIds.has(topic.id)
+    );
+
+    if (nextTopic) {
+      return {
+        subjectId: subject.id,
+        subjectName: subject.name,
+        topicId: nextTopic.id,
+        topicTitle: nextTopic.title,
+      };
     }
   }
 

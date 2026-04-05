@@ -581,6 +581,7 @@ async function prepareExchangeContext(
             )
           )
           .orderBy(desc(vocabulary.updatedAt))
+          .limit(60)
       : [];
 
   // Determine verification type: explicit from session, or auto-select from retention card
@@ -1061,13 +1062,6 @@ export async function closeSession(
     throw new Error('Session not found');
   }
 
-  const rawSession = await db.query.learningSessions.findFirst({
-    where: and(
-      eq(learningSessions.id, sessionId),
-      eq(learningSessions.profileId, profileId)
-    ),
-  });
-
   const now = new Date();
   const sessionStartedAt = new Date(session.startedAt);
   const wallClockSeconds = Math.max(
@@ -1106,7 +1100,7 @@ export async function closeSession(
       durationSeconds,
       wallClockSeconds,
       metadata: {
-        ...(((rawSession?.metadata as Record<string, unknown> | undefined) ??
+        ...(((session.metadata as Record<string, unknown> | undefined) ??
           {}) as Record<string, unknown>),
         milestonesReached: input.milestonesReached ?? [],
       },
@@ -1286,6 +1280,9 @@ export async function closeStaleSessions(
     escalationRungs?: number[];
   }>
 > {
+  // Intentional cross-profile batch query: this cron scans all active sessions
+  // and closes only those stale beyond the cutoff, so scoped-repo access does
+  // not apply here.
   const staleSessions = await db.query.learningSessions.findMany({
     where: and(
       eq(learningSessions.status, 'active'),

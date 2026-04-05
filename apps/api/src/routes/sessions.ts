@@ -111,7 +111,12 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         return c.json(result);
       } catch (err) {
         if (err instanceof SessionExchangeLimitError) {
-          return apiError(c, 429, ERROR_CODES.VALIDATION_ERROR, err.message);
+          return apiError(
+            c,
+            429,
+            ERROR_CODES.EXCHANGE_LIMIT_EXCEEDED,
+            err.message
+          );
         }
         // Refund quota on LLM failure — user should not be charged for a failed exchange
         if (subscriptionId) {
@@ -178,6 +183,14 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           });
         });
       } catch (err) {
+        if (err instanceof SessionExchangeLimitError) {
+          return apiError(
+            c,
+            429,
+            ERROR_CODES.EXCHANGE_LIMIT_EXCEEDED,
+            err.message
+          );
+        }
         // Refund quota on LLM failure — user should not be charged for a failed exchange
         if (subscriptionId) {
           await incrementQuota(db, subscriptionId);
