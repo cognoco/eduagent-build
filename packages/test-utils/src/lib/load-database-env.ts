@@ -33,18 +33,26 @@ export function loadDatabaseEnv(workspaceRoot: string): void {
 
   // Otherwise, load from .env file (local development)
   const env = process.env.NODE_ENV || 'development';
-  const envFile = `.env.${env}.local`;
-  const envPath = resolve(workspaceRoot, envFile);
+  const envFiles =
+    env === 'test'
+      ? ['.env.test.local', '.env.development.local']
+      : [`.env.${env}.local`];
 
-  if (!existsSync(envPath)) {
-    console.warn(
-      `⚠️  ${envFile} not found — DATABASE_URL is unset.\n` +
-        `   Tests requiring a real database connection will fail.\n` +
-        `   See .env.example for required variables.`
-    );
+  for (const envFile of envFiles) {
+    const envPath = resolve(workspaceRoot, envFile);
+    if (!existsSync(envPath)) {
+      continue;
+    }
+
+    config({ path: envPath });
+    console.log(`✅ Loaded environment variables from: ${envFile}`);
     return;
   }
 
-  config({ path: envPath });
-  console.log(`✅ Loaded environment variables from: ${envFile}`);
+  const attemptedFiles = envFiles.join(', ');
+  console.warn(
+    `⚠️  ${attemptedFiles} not found — DATABASE_URL is unset.\n` +
+      `   Tests requiring a real database connection will fail.\n` +
+      `   See .env.example for required variables.`
+  );
 }

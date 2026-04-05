@@ -2,7 +2,7 @@
  * Integration: Auth middleware chain
  *
  * Exercises the real auth middleware via Hono's app.request().
- * JWT verification is mocked with controllable behavior per test.
+ * JWT verification is the only mocked boundary in this suite.
  *
  * Validates:
  * 1. Public paths (/v1/health, /v1/inngest, /v1/auth/*, /v1/stripe/*, /v1/consent/respond) skip auth
@@ -17,41 +17,25 @@
 
 import {
   jwtMock,
-  databaseMock,
-  inngestClientMock,
-  accountMock,
-  billingMock,
-  settingsMock,
-  sessionMock,
-  llmMock,
   configureValidJWT as configureValidJWTHelper,
   configureInvalidJWT as configureInvalidJWTHelper,
 } from './mocks';
+import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 
 const jwtMocks = jwtMock();
 jest.mock('../../apps/api/src/middleware/jwt', () => jwtMocks);
 
-// --- Base mocks ---
-
-jest.mock('@eduagent/database', () => databaseMock());
-jest.mock('../../apps/api/src/inngest/client', () => inngestClientMock());
-jest.mock('../../apps/api/src/services/account', () => accountMock());
-jest.mock('../../apps/api/src/services/billing', () => billingMock());
-jest.mock('../../apps/api/src/services/settings', () => settingsMock());
-jest.mock('../../apps/api/src/services/session', () => sessionMock());
-jest.mock('../../apps/api/src/services/llm', () => llmMock());
-
 import { app } from '../../apps/api/src/index';
 
-const TEST_ENV = {
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
-};
+const AUTH_CLERK_USER_ID = 'integration-auth-user';
+const AUTH_EMAIL = 'integration-auth@integration.test';
+const TEST_ENV = buildIntegrationEnv();
 
 // Helper: configure JWT mock to return a valid payload
 function configureValidJWT(): void {
   configureValidJWTHelper(jwtMocks, {
-    sub: 'user_auth_test',
-    email: 'auth@test.com',
+    sub: AUTH_CLERK_USER_ID,
+    email: AUTH_EMAIL,
   });
 }
 
@@ -100,8 +84,19 @@ describe('Integration: Auth chain — public paths', () => {
 // ---------------------------------------------------------------------------
 
 describe('Integration: Auth chain — protected paths', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
+    await cleanupAccounts({
+      emails: [AUTH_EMAIL],
+      clerkUserIds: [AUTH_CLERK_USER_ID],
+    });
+  });
+
+  afterAll(async () => {
+    await cleanupAccounts({
+      emails: [AUTH_EMAIL],
+      clerkUserIds: [AUTH_CLERK_USER_ID],
+    });
   });
 
   it('returns 401 without Authorization header', async () => {
@@ -161,8 +156,10 @@ describe('Integration: Auth chain — protected paths', () => {
     );
 
     // Auth middleware passed — downstream may return any status, but NOT 401
-    expect(res.status).not.toBe(401);
+    expect(res.status).toBe(200);
     expect(jwtMocks.verifyJWT).toHaveBeenCalled();
+    const body = await res.json();
+    expect(Array.isArray(body.profiles)).toBe(true);
   });
 
   it('returns 401 when CLERK_JWKS_URL is missing', async () => {
@@ -175,7 +172,7 @@ describe('Integration: Auth chain — protected paths', () => {
         method: 'GET',
         headers: { Authorization: 'Bearer valid.jwt.token' },
       },
-      {} // empty env — no CLERK_JWKS_URL
+      buildIntegrationEnv({ CLERK_JWKS_URL: '' })
     );
 
     expect(res.status).toBe(401);
