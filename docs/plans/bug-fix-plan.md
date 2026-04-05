@@ -119,6 +119,7 @@
 - **Severity:** Medium / Data Integrity
 - **Description:** `top_up_credits.remaining` can go negative, `quota_pools.usedThisMonth` can go negative, `retention_cards.intervalDays` can be 0 or negative. No CHECK constraints exist anywhere in the schema.
 - **Fix:** Add CHECK constraints: `remaining BETWEEN 0 AND amount`, `usedThisMonth >= 0`, `intervalDays >= 1`, etc.
+- **Status (2026-04-05):** ✅ Fixed in current branch. CHECK constraints added: `remaining >= 0` on top_up_credits, `usedThisMonth >= 0` on quota_pools, `intervalDays >= 1` on retention_cards.
 
 ### D-06: family_links missing integrity constraints
 
@@ -127,6 +128,7 @@
 - **Severity:** Medium / Data Integrity
 - **Description:** No unique constraint on `(parent_profile_id, child_profile_id)` to prevent duplicates. No CHECK constraint to prevent self-links (`parent != child`). Can create inconsistent relationship graphs.
 - **Fix:** Add unique composite index and self-link check constraint.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Added unique composite index on `(parent_profile_id, child_profile_id)` and CHECK constraint preventing self-links.
 
 ### D-07: Test-seed `external_id_prefix` is not a valid Clerk API parameter
 
@@ -135,6 +137,7 @@
 - **Severity:** High / Correctness
 - **Description:** `GET /v1/users?external_id_prefix=...` is not a valid Clerk Backend API parameter. Clerk silently ignores unknown params and returns up to 100 **unfiltered** users. The `/__test/reset` endpoint could delete the wrong users in a shared tenant.
 - **Fix:** Use a valid Clerk filter (e.g., list all users and filter client-side by `externalId` prefix), or use `external_id` for exact match per user.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Replaced invalid `external_id_prefix` with paginated user listing + client-side `externalId.startsWith()` filtering.
 
 ---
 
@@ -234,6 +237,7 @@
 - **Severity:** Medium / Performance
 - **Description:** While subject N+1 was fixed, the `for (const link of links)` loop still fires individual DB queries per child for: `profiles.findFirst`, `getOverallProgress`, `learningSessions.findMany`, `countGuidedMetrics`. For a parent with N children, this is O(N*M) round-trips.
 - **Fix:** Batch child profile lookups and aggregate queries.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Batched child profile + session lookups; parallel `Promise.all` for progress/metrics. O(N×4) → O(3+2N) DB calls.
 
 ---
 
@@ -320,7 +324,7 @@
 - **Severity:** Medium / CI
 - **Description:** `expo/expo-github-action@v8` is configured with `packager: npm` while the project uses pnpm. EAS may use npm for lifecycle hooks and workspace resolution, diverging from `pnpm-lock.yaml`.
 - **Fix:** Change to `packager: pnpm` or remove the setting if the action auto-detects.
-- **Status (2026-04-05):** ⚠️ NOT FIXED — `deploy.yml` line 216 still uses `packager: npm`. Previous status was incorrect.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Changed `packager: npm` to `packager: pnpm` in deploy.yml.
 
 ### CI-05: Hardcoded TEST_SEED_SECRET in e2e-ci.yml
 
@@ -346,6 +350,7 @@
 - **Severity:** Low / CI Portability
 - **Description:** Hardcoded paths to one developer's Windows machine (`C:\AndroidSdk`, specific JDK version, `C:\tools\maestro`). Other contributors and CI get silent path errors.
 - **Fix:** Use environment variable fallbacks with auto-detection, or document required env vars.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Hardcoded paths replaced with `${VAR:-default}` environment variable fallbacks.
 
 ### CI-08: E2E flows with overly optional assertions
 
@@ -356,6 +361,7 @@
 - **Severity:** Medium / Test Quality
 - **Description:** Critical UI assertions (camera capture, remediation buttons, session summary) are marked `optional: true`. The flows acknowledge this in comments ("per E2E integrity rules — optional on mandatory UI is prohibited") but still have the markers. Flows can pass while core features are broken.
 - **Fix:** Remove `optional: true` from mandatory UI assertions. For hardware-dependent flows (camera), split into separate flows or skip the entire flow on CI.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Removed `optional: true` from mandatory UI assertions; kept only for hardware-dependent (camera) steps.
 
 ### CI-09: Time-sensitive DOB in consent E2E flow
 
@@ -364,7 +370,7 @@
 - **Severity:** Medium / Test Reliability
 - **Description:** Hardcoded DOB `2010-01-01` is now age 16 (as of 2026-04-04). The under-16 GDPR consent trigger no longer fires. All consent-specific steps are `optional: true` as a workaround, making the test a no-op.
 - **Fix:** Use a dynamically computed DOB (e.g., `today - 10 years`) or update to a more recent year.
-- **Status (2026-04-05):** ✅ Mitigated in current branch. Updated YAML header comments to document the time-sensitivity issue and added TODO for dynamic DOB via seed scenario.
+- **Status (2026-04-05):** ✅ Fixed in current branch. DOB updated to `2018-01-01` (age 8 as of 2026) with comment noting update schedule.
 
 ### CI-10: CORS blocked-origin assertion too weak
 
@@ -488,7 +494,7 @@ The following Critical/High findings were addressed and merged:
   ```yaml
   DATABASE_URL: ${{ github.event_name == 'push' && secrets.DATABASE_URL_STAGING || secrets.DATABASE_URL_PRODUCTION }}
   ```
-- **Status (2026-04-05):** ⚠️ NOT FIXED — `deploy.yml` lines 152/158 still use generic `${{ secrets.DATABASE_URL }}` for both staging and production. Previous status was incorrect.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Split `DATABASE_URL` into `DATABASE_URL_STAGING` / `DATABASE_URL_PRODUCTION` selected by `github.event_name`.
 
 #### PR109-02: CLAUDE.md stripped of engineering guidance
 
@@ -578,7 +584,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Critical / Compliance
 - **Description:** `beforeSend` only intercepts JS-layer events. `@sentry/react-native` native SDK writes crash envelopes directly to disk and flushes on next launch, bypassing `beforeSend`. For under-13 users without CONSENTED status, device identifiers and stack traces can still reach Sentry.
 - **Fix:** Use `Sentry.getClient()?.close()` to shut down the native transport entirely for underage users, or use `beforeEnvelope` hook.
-- **Status (2026-04-05):** ✅ Fixed in current branch. `disableSentry()` now calls `client.close(0)` and resets `sentryEverInitialized`, shutting down the native transport for underage users.
+- **Status (2026-04-05):** ✅ Already fixed in current branch. `disableSentry()` calls `Sentry.getClient()?.close(0)` to shut down native transport.
 
 #### BS-07: `disableSentry()` doesn't clear full scope (COPPA/GDPR)
 
@@ -627,6 +633,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** High / Data Integrity
 - **Description:** `lastRevenuecatEventId` stores only the most recent event ID. If RevenueCat retries event A after events B and C have been processed, A's check returns `false` and A is re-processed, potentially overwriting current subscription state with stale data.
 - **Fix:** Store a set of processed event IDs (or use event timestamps for ordering), not just the last one.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Added timestamp-based ordering via `lastRevenuecatEventTimestampMs` column; stale retries with older timestamps are rejected. Migration 0011 adds the column.
 
 #### BD-02: trialEndsAt not cleared on non-trial re-activation
 
@@ -662,6 +669,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** High / Data Integrity
 - **Description:** `closeAutoCloseSessions` reads active sessions, then loops and calls `closeSession` per session. Between the read and write, the learner could resume. The `closeSession` update doesn't re-check `status = 'active'` and `lastActivityAt < cutoff` atomically.
 - **Fix:** Add `WHERE status = 'active' AND lastActivityAt < cutoff` to the close update.
+- **Status (2026-04-05):** ✅ Fixed in current branch. `closeSession` UPDATE now includes `WHERE status = 'active'` guard; resumed sessions won't be stale-closed.
 
 #### BD-06: birthDate/birthYear inconsistency allowed
 
@@ -670,6 +678,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Medium / Data Integrity
 - **Description:** If both `birthDate` and `birthYear` are sent and disagree, consent/persona are computed from `birthYear` but `birthDate` is persisted as-is. Can be created under one age and read back under another.
 - **Fix:** Validate consistency or derive `birthYear` from `birthDate` exclusively when both are present.
+- **Status (2026-04-05):** ✅ Fixed in current branch. When `birthDate` is present, `birthYear` is derived exclusively from it; inconsistent pairs resolved at the source.
 
 #### BD-07: `dont_remember` uses up the retest window
 
@@ -687,7 +696,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Medium / Data Integrity
 - **Description:** Read-then-write pattern: reads max `sortOrder`, computes `max + 1`, inserts. Concurrent add-topic calls get the same max and insert duplicate sort orders.
 - **Fix:** Use `INSERT ... SELECT MAX(sortOrder) + 1` or wrap in a transaction with `SELECT FOR UPDATE`.
-- **Status (2026-04-05):** ✅ Fixed in current branch. `addCurriculumTopic` uses `INSERT ... VALUES (COALESCE(SELECT MAX(sortOrder) + 1, 0))` for atomic allocation.
+- **Status (2026-04-05):** ✅ Already fixed in current branch. Uses SQL subquery `COALESCE(MAX(sortOrder)+1, 0)` for atomic allocation.
 
 #### BD-09: Inngest send failure silently drops session-completed pipeline
 
@@ -696,6 +705,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** High / Data Integrity
 - **Description:** `inngest.send()` failure is caught, logged to Sentry, then swallowed. The client gets a success response. Retention updates, celebrations, XP, streaks, and embeddings are permanently lost with no retry mechanism.
 - **Fix:** Return an error status to the client, or implement a dead-letter queue / retry mechanism.
+- **Status (2026-04-05):** ✅ Fixed in current branch. `dispatchSessionCompletedEvent()` returns `{ pipelineQueued: boolean }`; client receives degraded success on Inngest failure.
 
 #### BD-10: Billing reads bypass scoped repository
 
@@ -725,6 +735,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Medium / Correctness
 - **Description:** `Purchases.purchasePackage(topUpPkg)` is called directly, bypassing `usePurchase()`. No TanStack Query loading/error state for the top-up, no automatic `customerInfo` invalidation on success, and the SDK import leaks into the screen layer.
 - **Fix:** Use `purchase.mutateAsync(topUpPkg)` via the `usePurchase()` hook.
+- **Status (2026-04-05):** ✅ Already fixed in current branch. Uses `purchase.mutateAsync(topUpPkg)` via `usePurchase()` hook.
 
 #### BC-03: `computeAgeBracket()` off by up to one year
 
@@ -733,6 +744,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Medium / Correctness
 - **Description:** Uses only `currentYear - birthYear`, so a child born in December computes as one year older than they actually are before their birthday. This drives persona inference and consent gating — could classify still-underage users as adults months early.
 - **Fix:** Accept month/day when available, or document the accepted ±1 year tolerance.
+- **Status (2026-04-05):** ✅ Fixed in current branch. `computeAgeBracket()` now accepts optional `birthDate` for exact month/day age computation; all safety-critical callers updated.
 
 #### BC-04: Zod `.default('LEARNER')` makes age-based persona inference dead code
 
@@ -741,6 +753,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Medium / Correctness
 - **Description:** `personaType: personaTypeSchema.default('LEARNER')` means Zod materializes the default during parsing. The service-level `input.personaType ?? inferLegacyPersonaType(birthYear)` fallback never fires because `personaType` is always present.
 - **Fix:** Remove the `.default('LEARNER')` from the schema and let the service handle the fallback.
+- **Status (2026-04-05):** ✅ Already fixed in current branch. `.default('LEARNER')` already removed; `personaType` is `.optional()`.
 
 #### BC-05: Stale homework metadata return breaks dedup permanently
 
@@ -838,6 +851,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** High / Runtime crash
 - **Description:** `switchProfile` throws on non-OK response. Some callers (e.g., props passed to `ProfileSwitcher`) may not wrap in try/catch. Unhandled throws crash the component tree.
 - **Fix:** Add try/catch at all call sites, or make `switchProfile` return an error result instead of throwing.
+- **Status (2026-04-05):** ✅ Fixed in current branch. `switchProfile` returns `{ success, error? }` instead of throwing; all call sites updated.
 
 #### BM-06: WCAG AA contrast regression in dark theme (muted text)
 
@@ -855,6 +869,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Medium / Data Integrity
 - **Description:** Migration and restore effects both depend on `[profileId]` and fire concurrently. Migration is fire-and-forget (`void`). The restore effect can read the new key before migration finishes writing it, finding nothing. Migrated value is lost on first launch after upgrade.
 - **Fix:** Await migration before restore, or chain them in a single effect.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Migration + restore effects combined into single sequential effect with cancellation guard.
 
 #### BM-08: Stale accent state race on profile switch
 
@@ -863,6 +878,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Low / UX
 - **Description:** On profile switch, the previous profile's `accentPresetId` stays live until SecureStore resolves. An uncancelled slower lookup for profile A can overwrite profile B's selection.
 - **Fix:** Reset accent state to default immediately on profile switch, before async load.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Accent state reset to null immediately on profile switch; stale async results ignored via cleanup flag.
 
 ---
 
@@ -875,6 +891,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Low / CI
 - **Description:** When Doppler download fails during `postinstall`, `process.exit(0)` is called, making `pnpm install` report success while no secrets were synced. (Exits 1 for manual `pnpm env:sync`; only the postinstall path is affected.)
 - **Fix:** Consider exiting non-zero even in postinstall, or at minimum print a visible warning.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Doppler download failure now exits with code 1 instead of 0.
 
 ---
 

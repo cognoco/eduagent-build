@@ -1,7 +1,5 @@
--- Bug #1: The schema declares a UNIQUE(profile_id, subject_id) constraint on
--- teaching_preferences, but the initial migration (0000) never created it.
--- This means .onConflictDoUpdate() in setTeachingPreference may have silently
--- inserted duplicate rows. Deduplicate first, then add the constraint.
+-- Idempotency retrofit: DELETE with WHERE is already idempotent,
+-- ADD CONSTRAINT wrapped in exception handler
 
 -- Step 1: Delete duplicate rows, keeping only the most recently updated row
 -- per (profile_id, subject_id) pair.
@@ -14,6 +12,9 @@ WHERE "id" NOT IN (
 --> statement-breakpoint
 
 -- Step 2: Add the unique constraint that the schema already declares.
-ALTER TABLE "teaching_preferences"
-  ADD CONSTRAINT "teaching_preferences_profile_subject_unique"
-  UNIQUE ("profile_id", "subject_id");
+DO $$ BEGIN
+  ALTER TABLE "teaching_preferences"
+    ADD CONSTRAINT "teaching_preferences_profile_subject_unique"
+    UNIQUE ("profile_id", "subject_id");
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
+END $$;

@@ -78,6 +78,13 @@
       "when": 1775779200000,
       "tag": "0010_missing_schema_catchup",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1775379412072,
+      "tag": "0011_good_harrier",
+      "breakpoints": true
     }
   ]
 }
