@@ -25,6 +25,13 @@ import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
 import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
 import { MentomateLogo } from '../../components/MentomateLogo';
+import {
+  markSessionActivated,
+  isWithinTransitionWindow,
+  clearTransitionState,
+  getTransitionElapsed,
+  SESSION_TRANSITION_MS,
+} from '../../lib/auth-transition';
 
 // Use physical screen height (not window) so the content container always
 // overflows the ScrollView after adjustResize shrinks it for the keyboard.
@@ -37,20 +44,9 @@ const SCREEN_HEIGHT =
 
 const HAS_SIGNED_IN_KEY = 'hasSignedInBefore';
 
-/**
- * Module-level timestamp — survives component remounts caused by redirect
- * bouncing.  After setActive() succeeds the auth layout fires a redirect to
- * /(learner)/home.  If the learner layout bounces back (e.g. isSignedIn not
- * yet propagated, or stale-token 401 → signOut) the sign-in screen remounts
- * with fresh state.  This flag ensures we show a "Signing you in…" spinner
- * instead of a confusing empty form.
- */
-let _sessionActivatedAt: number | null = null;
-const SESSION_TRANSITION_MS = 8_000;
-
 /** @internal Reset transitioning state between tests. */
 export function _resetTransitionState(): void {
-  _sessionActivatedAt = null;
+  clearTransitionState();
 }
 
 type VerificationStage = 'first_factor' | 'second_factor';
@@ -150,16 +146,9 @@ export default function SignInScreen() {
     'oauth' | 'password' | 'verification' | null
   >(null);
   // Survives remounts: if setActive() just fired, show spinner not empty form
-  const [isTransitioning, setIsTransitioning] = useState(() => {
-    if (
-      _sessionActivatedAt &&
-      Date.now() - _sessionActivatedAt < SESSION_TRANSITION_MS
-    ) {
-      return true;
-    }
-    _sessionActivatedAt = null;
-    return false;
-  });
+  const [isTransitioning, setIsTransitioning] = useState(
+    isWithinTransitionWindow
+  );
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
   const {
     scrollRef: verifyScrollRef,
@@ -183,13 +172,15 @@ export default function SignInScreen() {
   // instead of showing a spinner forever.
   useEffect(() => {
     if (!isTransitioning) return;
-    const elapsed = _sessionActivatedAt ? Date.now() - _sessionActivatedAt : 0;
-    const remaining = Math.max(100, SESSION_TRANSITION_MS - elapsed);
+    const remaining = Math.max(
+      100,
+      SESSION_TRANSITION_MS - getTransitionElapsed()
+    );
     const timer = setTimeout(() => {
       console.warn(
         `[AUTH-DEBUG] transitioning TIMEOUT after ${SESSION_TRANSITION_MS}ms — falling back to sign-in form`
       );
-      _sessionActivatedAt = null;
+      clearTransitionState();
       setIsTransitioning(false);
       setError(
         'Sign-in is taking longer than expected. Please try signing in again.'
@@ -289,7 +280,7 @@ export default function SignInScreen() {
       // state, so the user never sees a flash of the empty sign-in form.
       // The module-level timestamp lets this survive component remounts
       // if the redirect briefly bounces back.
-      _sessionActivatedAt = Date.now();
+      markSessionActivated();
       setIsTransitioning(true);
 
       setPendingSessionActivationId(null);

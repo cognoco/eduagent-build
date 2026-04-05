@@ -23,6 +23,7 @@ import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
 import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
 import { MentomateLogo } from '../../components/MentomateLogo';
+import { markSessionActivated } from '../../lib/auth-transition';
 
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.
@@ -88,6 +89,7 @@ export default function SignUpScreen() {
 
       try {
         await setActive({ session: sessionId });
+        markSessionActivated();
         clearActivationFailure();
         return true;
       } catch {
