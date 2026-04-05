@@ -24,6 +24,7 @@ import {
   getConsentWithdrawnCopy,
 } from '../../lib/consent-copy';
 import { evaluateSentryForProfile } from '../../lib/sentry';
+import { formatApiError } from '../../lib/format-api-error';
 
 const iconMap: Record<
   string,
@@ -443,6 +444,11 @@ function ConsentPendingGate(): React.ReactElement {
   >(null);
   const [changingEmail, setChangingEmail] = React.useState(false);
   const [newParentEmail, setNewParentEmail] = React.useState('');
+  const [changeEmailError, setChangeEmailError] = React.useState('');
+  const [resendFeedback, setResendFeedback] = React.useState<
+    'sent' | 'error' | null
+  >(null);
+  const [resendErrorMsg, setResendErrorMsg] = React.useState('');
 
   // Consent email was sent when status is PARENTAL_CONSENT_REQUESTED
   // (parentEmail alone is not reliable — use the canonical profile status)
@@ -461,11 +467,24 @@ function ConsentPendingGate(): React.ReactElement {
   const onResend = () => {
     if (!activeProfile || !consentData?.parentEmail || !consentData.consentType)
       return;
-    resendMutation.mutate({
-      childProfileId: activeProfile.id,
-      parentEmail: consentData.parentEmail,
-      consentType: consentData.consentType,
-    });
+    setResendFeedback(null);
+    setResendErrorMsg('');
+    resendMutation.mutate(
+      {
+        childProfileId: activeProfile.id,
+        parentEmail: consentData.parentEmail,
+        consentType: consentData.consentType,
+      },
+      {
+        onSuccess: () => {
+          setResendFeedback('sent');
+        },
+        onError: (err) => {
+          setResendFeedback('error');
+          setResendErrorMsg(formatApiError(err));
+        },
+      }
+    );
   };
 
   const parentEmail = consentData?.parentEmail;
@@ -485,6 +504,7 @@ function ConsentPendingGate(): React.ReactElement {
 
   const onSubmitNewEmail = () => {
     if (!activeProfile || !canSubmitNewEmail) return;
+    setChangeEmailError('');
     resendMutation.mutate(
       {
         childProfileId: activeProfile.id,
@@ -493,11 +513,20 @@ function ConsentPendingGate(): React.ReactElement {
       },
       {
         onSuccess: () => {
+          const sentTo = newParentEmail.trim();
           setChangingEmail(false);
           setNewParentEmail('');
+          setResendFeedback('sent');
           void queryClient.invalidateQueries({
             queryKey: ['consent-status'],
           });
+          Alert.alert(
+            'Link sent!',
+            `We sent a consent link to ${sentTo}. Check their inbox (and spam folder).`
+          );
+        },
+        onError: (err) => {
+          setChangeEmailError(formatApiError(err));
         },
       }
     );
@@ -645,9 +674,36 @@ function ConsentPendingGate(): React.ReactElement {
         </Pressable>
       )}
 
+      {resendFeedback === 'sent' && !changingEmail && (
+        <Text
+          className="text-body-sm text-primary text-center mb-3"
+          testID="consent-resend-success"
+          accessibilityRole="alert"
+        >
+          Email sent! Check the inbox (and spam folder).
+        </Text>
+      )}
+      {resendFeedback === 'error' && !changingEmail && (
+        <View
+          className="bg-danger/10 rounded-card px-4 py-3 mb-3 w-full"
+          accessibilityRole="alert"
+        >
+          <Text
+            className="text-danger text-body-sm"
+            testID="consent-resend-error"
+          >
+            {resendErrorMsg || 'Something went wrong. Please try again.'}
+          </Text>
+        </View>
+      )}
+
       {consentData?.consentType && !changingEmail && (
         <Pressable
-          onPress={() => setChangingEmail(true)}
+          onPress={() => {
+            setChangingEmail(true);
+            setResendFeedback(null);
+            setChangeEmailError('');
+          }}
           className="py-3.5 px-8 items-center mb-3 w-full"
           testID="consent-change-email"
           accessibilityRole="button"
@@ -684,6 +740,19 @@ function ConsentPendingGate(): React.ReactElement {
             >
               {copy.sameEmailWarning}
             </Text>
+          )}
+          {changeEmailError !== '' && (
+            <View
+              className="bg-danger/10 rounded-card px-4 py-3 mb-2"
+              accessibilityRole="alert"
+            >
+              <Text
+                className="text-danger text-body-sm"
+                testID="consent-change-email-error"
+              >
+                {changeEmailError}
+              </Text>
+            </View>
           )}
           <Pressable
             onPress={onSubmitNewEmail}

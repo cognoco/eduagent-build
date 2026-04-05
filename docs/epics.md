@@ -439,7 +439,7 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 
 Users can register, authenticate, create family accounts with multiple profiles, and manage GDPR/COPPA consent. Foundation infrastructure (monorepo, CI/CD, database, auth) is established as part of delivering this user value.
 
-**FRs covered:** FR1-FR12 (12 FRs)
+**FRs covered:** FR1-FR12 (12 FRs) | **Stories:** 7
 **ARCH requirements:** ARCH-1 (starter template fork), ARCH-2 (Nx monorepo), ARCH-3 (CI/CD), ARCH-4 (commit quality), ARCH-5 (Neon branching), ARCH-6 (typed config), ARCH-7 (scoped repository), ARCH-15 (Hono RPC), ARCH-19 (enforcement rules), ARCH-20 (error envelope), ARCH-21 (co-located tests), ARCH-22 (test factory), ARCH-23 (shared mocks), ARCH-26 (observability)
 **NFRs addressed:** NFR13-20 (Security), NFR21-27 (Privacy/Compliance), NFR28 (Scalability MVP tier), NFR40-44 (Monitoring)
 
@@ -962,7 +962,7 @@ Phase 7 — Language learning:                                         ❌ NOT S
 ## Epic 0: Project Foundation & User Registration — Stories
 
 **Goal:** Users can register, authenticate, create family accounts with multiple profiles, and manage GDPR/COPPA consent. Foundation infrastructure established as part of delivering this user value.
-**FRs:** FR1-FR12 (12 FRs) | **Stories:** 6
+**FRs:** FR1-FR12 (12 FRs) | **Stories:** 7
 
 ### Story 0.1: Email Registration & Account Activation
 
@@ -1168,6 +1168,120 @@ So that I can exercise my privacy rights under GDPR.
 **And** deletion is handled as Inngest background job (survives request lifecycle, ARCH-13)
 
 **FRs:** FR11, FR12
+
+---
+
+### Story 0.7: Consent Pending Gate — Waiting Screen & Email Management
+
+_Priority: Must-ship (launch blocker). Scope: LEARNER layout gate + API. **Status: Implemented** — waiting UI, resend, change-email, preview mode, post-approval landing, and consent-withdrawn gate are live._
+
+As a young learner waiting for parental consent,
+I want to see clear status, resend the email, or change the parent email address,
+So that I'm not stuck on a dead-end screen while waiting for my parent to approve.
+
+**Background:** After the consent request is sent (Story 0.5 + Story 10.10), the learner's app is blocked by a full-screen gate in `(learner)/_layout.tsx`. This gate replaces the tab shell and must handle multiple states: email sent (waiting), email not yet sent (PENDING), consent withdrawn, and post-approval celebration. The gate also provides a preview mode so children have something to do while waiting.
+
+**Acceptance Criteria:**
+
+**Consent requested — waiting state (PARENTAL_CONSENT_REQUESTED):**
+
+**Given** the learner's consent status is `PARENTAL_CONSENT_REQUESTED`
+**When** the gate renders
+**Then** it shows: "Hang tight!" title, description with the parent email address ("We've asked your parent — they just need to check their email at [email]"), "Once they say yes, you can start exploring!" subtext, a "Check again" primary button, a "Resend email" secondary button, and a "Send to another email" tertiary link
+
+**Given** the learner taps "Check again"
+**When** the profiles query is invalidated
+**Then** a loading spinner replaces the button text while checking
+**And** if consent is now granted, the gate dismisses and the post-approval landing appears
+
+**Given** the learner taps "Resend email"
+**When** the mutation fires
+**Then** a loading spinner shows on the button during the request
+**And** on success: inline confirmation text appears ("Email sent! Check the inbox (and spam folder).")
+**And** on failure: inline error message appears with the specific error
+
+**Change parent email:**
+
+**Given** the learner taps "Send to another email"
+**When** the change-email form expands
+**Then** it shows: email label, text input (auto-focused), "Send link" submit button, and "Cancel" link
+
+**Given** the learner enters a valid email different from their own
+**When** they tap "Send link"
+**Then** a loading spinner shows during the request
+**And** on success: an alert confirms "Link sent! We sent a consent link to [email].", the form closes, and the displayed parent email updates
+**And** on failure: inline error appears inside the form card
+
+**Given** the learner enters their own email address
+**When** the validation runs
+**Then** inline warning appears: "That's your own email! Enter your parent or guardian's email instead."
+**And** the submit button is disabled (reduced opacity)
+
+**No email sent yet (PENDING):**
+
+**Given** the learner's consent status is `PENDING` (no parent email on record)
+**When** the gate renders
+**Then** it shows: "One more step!" title, description explaining a parent needs to approve, and a "Get parent consent" button that navigates to the consent interstitial (Story 10.10)
+
+**Preview mode (while waiting):**
+
+**Given** the learner is on the waiting screen
+**When** they scroll down
+**Then** a "While you wait" section appears with two preview cards: "Browse subjects" and "Sample coaching"
+
+**Given** the learner taps "Browse subjects"
+**When** the preview renders
+**Then** a static list of sample subjects (Mathematics, Science, Languages, History) with example topics is shown, with a "Back" button to return to the waiting screen
+
+**Given** the learner taps "Sample coaching"
+**When** the preview renders
+**Then** a read-only coaching preview is shown explaining how the AI coach works, with a "Back" button
+
+**Post-approval landing:**
+
+**Given** the parent approves consent
+**When** the learner checks again (or the status updates)
+**Then** a one-time celebration screen appears: "You're approved!" with a "Let's Go" button
+**And** this screen is only shown once per profile (persisted via SecureStore)
+
+**Consent withdrawn gate:**
+
+**Given** the parent withdraws consent
+**When** the gate renders
+**Then** it shows: "Your account is being closed" title, explanation that data will be removed in 7 days, and guidance to ask the parent to restore consent
+**And** a "Sign out" button is always visible
+
+**Profile switching guard (consent-bypass prevention):**
+
+**Given** the learner is under 18
+**When** the consent gate renders
+**Then** no "Switch profile" button is shown (prevents bypassing the gate)
+
+**Given** the user is 18+ with linked minor profiles (parent viewing child's gate)
+**When** the consent gate renders
+**Then** a "Switch profile" button IS shown so the parent can switch back to their own profile
+
+**Failure Modes:**
+
+| State | Trigger | User sees | Recovery |
+|-------|---------|-----------|----------|
+| Resend fails | Network error / API error | Inline error with message | Tap "Resend email" again |
+| Change email fails | Invalid email / server error | Inline error in form card | Fix email and retry, or Cancel |
+| Consent status query fails | Network error | Stale data shown | "Check again" retries |
+| Email delivered to wrong address | Typo in parent email | Waiting screen persists | "Send to another email" to correct |
+| Preview mode data stale | N/A (static content) | Static preview always works | N/A |
+
+**Implementation notes:**
+- The gate is rendered inline in `(learner)/_layout.tsx`, NOT a separate route — it replaces the entire tab shell.
+- `ConsentPendingGate`, `ConsentWithdrawnGate`, `PostApprovalLanding`, `PreviewSubjectBrowser`, and `PreviewSampleCoaching` are all local components within the layout file.
+- Uses the same `useRequestConsent` mutation as `consent.tsx` but with inline feedback (no phase transitions).
+- Profile switch guard (`canSwitchFromConsentGate`) uses age + family-link heuristic to prevent consent bypass.
+- Post-approval flag uses SecureStore key `postApprovalSeen_{profileId}`.
+- Preview subjects are hardcoded (not from curriculum API) since the child has no curriculum yet.
+
+**FRs:** FR7, FR9 (consent waiting UX), FR10 (withdrawn gate)
+
+**Dependencies:** Story 0.5 (consent backend), Story 10.10 (consent interstitial), Story 10.19 (consent unification)
 
 ---
 

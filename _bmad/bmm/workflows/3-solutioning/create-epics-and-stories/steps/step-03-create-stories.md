@@ -169,6 +169,20 @@ For each story in the epic:
 - Each AC should be independently testable
 - Include edge cases and error conditions
 - Reference specific requirements when applicable
+- **MUST include failure/error acceptance criteria** — not just happy path. For every screen: what happens when the API fails? When the user is offline? When the resource is deleted?
+
+**🚨 FAILURE MODE REQUIREMENT:**
+Every story that introduces a screen or flow MUST include a Failure Modes section in its acceptance criteria or dev notes:
+
+```
+| State | Trigger | User Sees | Recovery |
+|-------|---------|-----------|----------|
+| API error | Server 4xx/5xx | Specific error message | Retry + Go Back |
+| Offline | No network | Proactive warning | Disable actions |
+| Empty | No data | Guidance + CTA | Link to create |
+```
+
+If the "Recovery" column is empty, the story is not ready for development.
 
 #### D. Collaborative Review
 

@@ -35,6 +35,11 @@ validation-rules:
 - [ ] **Acceptance Criteria Satisfaction:** Implementation satisfies EVERY Acceptance Criterion in the story
 - [ ] **No Ambiguous Implementation:** Clear, unambiguous implementation that meets story requirements
 - [ ] **Edge Cases Handled:** Error conditions and edge cases appropriately addressed
+- [ ] **UX Dead-End Audit:** Every screen state has at least one interactive element — no blank screens, no non-tappable error text, no loading without timeout/cancel
+- [ ] **Mutation Error Feedback:** Every `mutateAsync`/mutation catch block shows user-visible feedback (no bare `catch {}`)
+- [ ] **Error Specificity:** Server errors surface specific reason to user, not generic "connection error"
+- [ ] **Navigation Guards:** `router.back()`/`router.replace()` only executes after API success, not unconditionally
+- [ ] **Failure Modes Complete:** Story's Failure Modes table has no empty Recovery column
 - [ ] **Dependencies Within Scope:** Only uses dependencies specified in story or project-context.md
 
 ## 🧪 Testing & Quality Assurance
