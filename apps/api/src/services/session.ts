@@ -8,6 +8,7 @@ import {
   learningSessions,
   sessionEvents,
   sessionSummaries,
+  subjects,
   curricula,
   curriculumBooks,
   curriculumTopics,
@@ -90,6 +91,13 @@ interface SessionStaticContextCacheEntry {
 
 const SESSION_STATIC_CONTEXT_TTL_MS = 5 * 60 * 1000;
 const MAX_SESSION_STATIC_CONTEXT_ENTRIES = 200;
+
+// Process-local cache — each API replica holds an independent copy.
+// Acceptable because: (1) cached data is profile name + subject metadata, not
+// authorization decisions; (2) 5-min TTL bounds staleness; (3) cache misses
+// fall through to DB reads; (4) current deployment is single-instance (CF
+// Worker). If multi-instance deployment is introduced, evaluate whether stale
+// display names for up to 5 minutes are acceptable or replace with KV.
 const sessionStaticContextCache = new Map<
   string,
   SessionStaticContextCacheEntry
@@ -546,17 +554,21 @@ export async function startSession(
   }
 
   // BS-04: verify topicId belongs to this subject's curriculum before use.
-  // Without this check, a user who guesses a topicId from another subject
-  // could start a session with a foreign topic.
+  // Full ownership chain: profileId → subject (verified via getSubject/scoped
+  // repo above) → curriculum → topic. The subjects join + profileId filter
+  // below is defense-in-depth so the query is self-contained even if the
+  // getSubject guard is ever refactored away.
   if (input.topicId) {
     const [topic] = await db
       .select({ id: curriculumTopics.id })
       .from(curriculumTopics)
       .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+      .innerJoin(subjects, eq(subjects.id, curricula.subjectId))
       .where(
         and(
           eq(curriculumTopics.id, input.topicId),
-          eq(curricula.subjectId, subjectId)
+          eq(curricula.subjectId, subjectId),
+          eq(subjects.profileId, profileId)
         )
       )
       .limit(1);

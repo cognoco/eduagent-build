@@ -197,7 +197,25 @@ export async function updateSubscriptionFromWebhook(
   if (updates.tier !== undefined) {
     setValues.tier = updates.tier;
   }
-  if (updates.status !== undefined) {
+  if (updates.status !== undefined && updates.status !== existing.status) {
+    if (!isValidTransition(existing.status, updates.status)) {
+      console.error(
+        `[billing] Invalid Stripe subscription transition: ${existing.status} -> ${updates.status} (sub: ${existing.id})`
+      );
+      captureException(
+        new Error(
+          `Invalid Stripe subscription transition: ${existing.status} -> ${updates.status}`
+        ),
+        {
+          extra: {
+            subscriptionId: existing.id,
+            fromStatus: existing.status,
+            toStatus: updates.status,
+          },
+        }
+      );
+      return mapSubscriptionRow(existing);
+    }
     setValues.status = updates.status;
   }
   if (updates.currentPeriodStart !== undefined) {

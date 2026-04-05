@@ -215,6 +215,7 @@ function errorHasCode(error: unknown, code: string): boolean {
 }
 
 function isReconnectableSessionError(error: unknown): boolean {
+  // Known fatal API errors — never reconnectable
   if (
     errorHasCode(error, 'EXCHANGE_LIMIT_EXCEEDED') ||
     errorHasCode(error, 'SUBJECT_INACTIVE') ||
@@ -227,8 +228,16 @@ function isReconnectableSessionError(error: unknown): boolean {
     return false;
   }
 
-  // Check the raw error message — this must run BEFORE formatApiError
-  // transforms the message into user-facing copy that strips these keywords.
+  // Structured type checks first — fetch throws TypeError for network failures
+  // (DNS, offline, refused) and DOMException with name 'AbortError' for
+  // aborted requests. These are stable across JS engines (Hermes, JSC, V8).
+  if (error.name === 'TypeError' || error.name === 'AbortError') {
+    return true;
+  }
+
+  // Fallback: message matching for network errors that don't use standard
+  // error types (e.g. React Native polyfills, SSE wrappers). Must run BEFORE
+  // formatApiError transforms the message into user-facing copy.
   const message = error.message.toLowerCase();
   return (
     message.includes('network') ||
@@ -734,8 +743,7 @@ export default function SessionScreen() {
             topicId: topicId ?? undefined,
             sessionType,
             inputMode,
-            ...(effectiveMode === 'homework' &&
-            homeworkProblemsState.length > 0
+            ...(effectiveMode === 'homework' && homeworkProblemsState.length > 0
               ? {
                   metadata: {
                     inputMode,
@@ -1101,9 +1109,7 @@ export default function SessionScreen() {
           errorIndex > 0 && prev[errorIndex - 1]?.role === 'user'
             ? errorIndex - 1
             : -1;
-        return prev.filter(
-          (_, i) => i !== errorIndex && i !== userIndex
-        );
+        return prev.filter((_, i) => i !== errorIndex && i !== userIndex);
       });
       await continueWithMessage(retryPayload.text, retryPayload.options);
     },
@@ -1389,7 +1395,9 @@ export default function SessionScreen() {
             setIsClosing(false);
             Alert.alert(
               'Could not end this session cleanly',
-              `${formatApiError(err)} You can keep trying, or go home now and come back later.`,
+              `${formatApiError(
+                err
+              )} You can keep trying, or go home now and come back later.`,
               [
                 { text: 'Keep trying', style: 'cancel' },
                 {
@@ -2033,8 +2041,8 @@ export default function SessionScreen() {
                   Session expired
                 </Text>
                 <Text className="text-body-sm text-text-secondary mb-3">
-                  This session is no longer available. Start a new one from
-                  home or your library.
+                  This session is no longer available. Start a new one from home
+                  or your library.
                 </Text>
                 <Pressable
                   onPress={() => router.replace('/(learner)/home' as never)}

@@ -53,16 +53,23 @@ export type Env = z.infer<typeof envSchema>;
 const PRODUCTION_REQUIRED_KEYS: readonly (keyof Env)[] = [
   'CLERK_SECRET_KEY',
   'CLERK_JWKS_URL',
-  'CLERK_AUDIENCE',
   'GEMINI_API_KEY',
   'VOYAGE_API_KEY',
   'RESEND_API_KEY',
   'REVENUECAT_WEBHOOK_SECRET',
 ] as const;
 
+// Keys that will become required in a future release. Missing keys log a
+// warning at startup but don't block the deploy, giving operators time to
+// add them to Doppler before they become hard failures.
+const PRODUCTION_WARNED_KEYS: readonly (keyof Env)[] = [
+  'CLERK_AUDIENCE',
+] as const;
+
 /**
  * Validates that all production-critical keys are present.
  * Returns an array of missing key names (empty if all present).
+ * Logs warnings for keys in the grace-period list.
  */
 export function validateProductionKeys(env: Env): string[] {
   if (env.ENVIRONMENT !== 'production') {
@@ -75,6 +82,17 @@ export function validateProductionKeys(env: Env): string[] {
       missing.push(key);
     }
   }
+
+  for (const key of PRODUCTION_WARNED_KEYS) {
+    if (!env[key]) {
+      console.warn(
+        `[config] Production warning: ${key} is not set. ` +
+          `JWT audience validation is disabled. ` +
+          `Add this key to Doppler before the next major release.`
+      );
+    }
+  }
+
   return missing;
 }
 

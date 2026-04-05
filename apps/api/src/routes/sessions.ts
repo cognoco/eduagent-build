@@ -171,16 +171,34 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             });
           }
 
-          const result = await onComplete(fullResponse);
-          await sseStream.writeSSE({
-            data: JSON.stringify({
-              type: 'done',
-              exchangeCount: result.exchangeCount,
-              escalationRung: result.escalationRung,
-              expectedResponseMinutes: result.expectedResponseMinutes,
-              aiEventId: result.aiEventId,
-            }),
-          });
+          try {
+            const result = await onComplete(fullResponse);
+            await sseStream.writeSSE({
+              data: JSON.stringify({
+                type: 'done',
+                exchangeCount: result.exchangeCount,
+                escalationRung: result.escalationRung,
+                expectedResponseMinutes: result.expectedResponseMinutes,
+                aiEventId: result.aiEventId,
+              }),
+            });
+          } catch (err) {
+            console.error(
+              '[sessions/stream] Post-stream processing failed:',
+              err
+            );
+            captureException(err, { profileId, extra: { sessionId } });
+            // Refund quota — user should not be charged for a failed exchange
+            if (subscriptionId) {
+              await incrementQuota(db, subscriptionId);
+            }
+            await sseStream.writeSSE({
+              data: JSON.stringify({
+                type: 'error',
+                message: 'Failed to save session progress. Please try again.',
+              }),
+            });
+          }
         });
       } catch (err) {
         if (err instanceof SessionExchangeLimitError) {

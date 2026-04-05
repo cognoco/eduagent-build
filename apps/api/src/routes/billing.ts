@@ -233,13 +233,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       { cancel_at_period_end: true }
     );
 
-    // Use subscription-level current_period_end (Stripe types vary by version)
-    const raw = updated as unknown as Record<string, unknown>;
-    const periodEndTs = raw.current_period_end;
-    const currentPeriodEnd =
-      typeof periodEndTs === 'number'
-        ? new Date(periodEndTs * 1000).toISOString()
-        : new Date().toISOString();
+    // Stripe SDK v20 (basil): current_period_end moved to SubscriptionItem
+    const periodEnd = updated.items.data[0]?.current_period_end;
+    const currentPeriodEnd = periodEnd
+      ? new Date(periodEnd * 1000).toISOString()
+      : new Date().toISOString();
 
     // Mark local DB row so cancelAtPeriodEnd is reflected immediately
     await markSubscriptionCancelled(db, subscription.id);
@@ -582,8 +580,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
   // Join BYOK waitlist
   .post('/byok-waitlist', zValidator('json', byokWaitlistSchema), async (c) => {
-    const { email } = c.req.valid('json');
     const db = c.get('db');
+    const account = c.get('account');
+    // Use the authenticated account's email — never trust caller-supplied email
+    const email = account.email;
 
     await addToByokWaitlist(db, email);
 
