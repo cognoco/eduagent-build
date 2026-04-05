@@ -35,8 +35,11 @@ export function configureRevenueCat(): void {
   const apiKey = getRevenueCatApiKey();
 
   if (!apiKey) {
-    // No API key — running on web or keys not yet configured.
-    // Silently skip; RevenueCat features will be unavailable.
+    if (__DEV__) {
+      console.warn(
+        `[RevenueCat] API key not configured for ${Platform.OS}; purchases are disabled in this build`
+      );
+    }
     return;
   }
 

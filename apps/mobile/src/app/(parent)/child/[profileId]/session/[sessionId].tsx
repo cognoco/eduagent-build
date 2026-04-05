@@ -152,10 +152,13 @@ export default function SessionTranscriptScreen() {
           })
         ) : (
           <View className="py-8 items-center">
-            <Text className="text-body text-text-secondary">
+            <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+              {transcript === null ? 'Session not found' : 'No messages yet'}
+            </Text>
+            <Text className="text-body text-text-secondary text-center">
               {transcript === null
-                ? 'Session not found'
-                : 'No messages in this session'}
+                ? 'This session may have expired or been removed.'
+                : 'This session did not capture any transcript messages.'}
             </Text>
           </View>
         )}

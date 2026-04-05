@@ -261,10 +261,26 @@ function getLegacyNotifyStorageKey(profileId: string): string {
   return `child-paywall-notified-at:${profileId}`;
 }
 
-function computeHoursRemaining(notifiedAtMs: number): number {
+function computeCooldownMsRemaining(notifiedAtMs: number): number {
   const elapsed = Date.now() - notifiedAtMs;
-  const remaining = NOTIFY_COOLDOWN_MS - elapsed;
-  return remaining > 0 ? Math.ceil(remaining / (60 * 60 * 1000)) : 0;
+  return Math.max(0, NOTIFY_COOLDOWN_MS - elapsed);
+}
+
+function formatCooldownLabel(msRemaining: number): string {
+  if (msRemaining <= 0) return '0 seconds';
+
+  if (msRemaining >= 60 * 60 * 1000) {
+    const hours = Math.ceil(msRemaining / (60 * 60 * 1000));
+    return hours === 1 ? '1 hour' : `${hours} hours`;
+  }
+
+  if (msRemaining >= 60_000) {
+    const minutes = Math.ceil(msRemaining / 60_000);
+    return minutes === 1 ? '1 minute' : `${minutes} minutes`;
+  }
+
+  const seconds = Math.ceil(msRemaining / 1000);
+  return seconds === 1 ? '1 second' : `${seconds} seconds`;
 }
 
 function ChildPaywall(): React.ReactElement {
@@ -276,8 +292,8 @@ function ChildPaywall(): React.ReactElement {
   const { data: xpSummary } = useXpSummary();
 
   const [notifiedAt, setNotifiedAt] = useState<number | null>(null);
-  const [hoursRemaining, setHoursRemaining] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [cooldownMsRemaining, setCooldownMsRemaining] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const profileId = activeProfile?.id ?? '';
 
@@ -302,10 +318,10 @@ function ChildPaywall(): React.ReactElement {
       if (!value) return;
       const ts = Number(value);
       if (Number.isNaN(ts)) return;
-      const hours = computeHoursRemaining(ts);
-      if (hours > 0) {
+      const remaining = computeCooldownMsRemaining(ts);
+      if (remaining > 0) {
         setNotifiedAt(ts);
-        setHoursRemaining(hours);
+        setCooldownMsRemaining(remaining);
       }
     })();
     return () => {
@@ -313,25 +329,31 @@ function ChildPaywall(): React.ReactElement {
     };
   }, [profileId]);
 
-  // Update countdown every minute while rate-limited
+  // Update countdown more frequently near expiry so the button re-enables on time.
   useEffect(() => {
     if (notifiedAt === null) return;
+
     const update = () => {
-      const hours = computeHoursRemaining(notifiedAt);
-      setHoursRemaining(hours);
-      if (hours <= 0) {
+      const remaining = computeCooldownMsRemaining(notifiedAt);
+      setCooldownMsRemaining(remaining);
+      if (remaining <= 0) {
         setNotifiedAt(null);
-        if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = null;
+        return;
       }
+
+      const nextTick = remaining <= 60_000 ? 1000 : 60_000;
+      timerRef.current = setTimeout(update, nextTick);
     };
+
     update();
-    timerRef.current = setInterval(update, 60_000);
+
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [notifiedAt]);
 
-  const isNotified = notifiedAt !== null && hoursRemaining > 0;
+  const isNotified = notifiedAt !== null && cooldownMsRemaining > 0;
 
   const handleNotify = useCallback(async () => {
     try {
@@ -438,7 +460,7 @@ function ChildPaywall(): React.ReactElement {
             testID="notify-countdown"
           >
             You can remind them again in{' '}
-            {hoursRemaining === 1 ? '1 hour' : `${hoursRemaining} hours`}.
+            {formatCooldownLabel(cooldownMsRemaining)}.
           </Text>
         )}
 
@@ -511,7 +533,12 @@ export default function SubscriptionScreen() {
   }, []);
 
   // RevenueCat hooks
-  const { data: offerings, isLoading: offeringsLoading } = useOfferings();
+  const {
+    data: offerings,
+    isLoading: offeringsLoading,
+    isError: offeringsError,
+    refetch: refetchOfferings,
+  } = useOfferings();
   const { data: customerInfo, isLoading: customerInfoLoading } =
     useCustomerInfo();
   const purchase = usePurchase();
@@ -666,10 +693,32 @@ export default function SubscriptionScreen() {
     } else {
       Alert.alert(
         'Processing',
-        'Your purchase is being processed. Credits will appear shortly.'
+        'Your purchase is being processed. Credits will appear shortly.',
+        [
+          {
+            text: 'Check your usage',
+            onPress: () => {
+              void refetchUsage();
+            },
+          },
+          { text: 'OK', style: 'cancel' },
+        ]
       );
     }
-  }, [offerings, usage, queryClient, activeProfile?.id]);
+  }, [offerings, usage, queryClient, activeProfile?.id, refetchUsage]);
+
+  const handleContactSupport = useCallback(async () => {
+    try {
+      await Linking.openURL(
+        'mailto:support@mentomate.app?subject=Subscription%20Help'
+      );
+    } catch {
+      Alert.alert(
+        'Contact support',
+        'Email support@mentomate.app for help with subscriptions.'
+      );
+    }
+  }, []);
 
   // ---------------------------------------------------------------------------
   // BYOK waitlist handler
@@ -932,7 +981,9 @@ export default function SubscriptionScreen() {
               </Text>
               <View className="bg-surface rounded-card px-4 py-3.5 mb-3">
                 <Text className="text-body-sm text-text-secondary">
-                  Subscription plans will be available soon.{' '}
+                  {offeringsError
+                    ? 'We could not load purchase options right now. '
+                    : 'Subscription plans will be available soon. '}
                   {isTrial
                     ? `You're currently on the Free trial with ${TIER_LIMITS.free}.`
                     : `You're on the ${TIER_LABELS[tier]} plan with ${TIER_LIMITS[tier]}.`}
@@ -968,6 +1019,32 @@ export default function SubscriptionScreen() {
                   ))}
                 </View>
               ))}
+              {offeringsError && (
+                <View className="flex-row gap-3 mt-3">
+                  <Pressable
+                    onPress={() => void refetchOfferings()}
+                    className="flex-1 bg-primary rounded-button px-4 py-3 min-h-[48px] items-center justify-center"
+                    accessibilityRole="button"
+                    accessibilityLabel="Retry loading subscription offerings"
+                    testID="offerings-retry-button"
+                  >
+                    <Text className="text-body font-semibold text-text-inverse">
+                      Retry
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => void handleContactSupport()}
+                    className="flex-1 bg-surface-elevated rounded-button px-4 py-3 min-h-[48px] items-center justify-center"
+                    accessibilityRole="button"
+                    accessibilityLabel="Contact support"
+                    testID="offerings-contact-support"
+                  >
+                    <Text className="text-body font-semibold text-text-primary">
+                      Contact support
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
           )}
 

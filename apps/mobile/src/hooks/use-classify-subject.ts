@@ -1,6 +1,7 @@
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import type { SubjectClassifyResult } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
+import { assertOk } from '../lib/assert-ok';
 
 export function useClassifySubject(): UseMutationResult<
   SubjectClassifyResult,
@@ -12,6 +13,7 @@ export function useClassifySubject(): UseMutationResult<
   return useMutation({
     mutationFn: async (input: { text: string }) => {
       const res = await client.subjects.classify.$post({ json: input });
+      await assertOk(res);
       return (await res.json()) as SubjectClassifyResult;
     },
   });

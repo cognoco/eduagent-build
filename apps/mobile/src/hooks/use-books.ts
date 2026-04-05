@@ -100,7 +100,11 @@ export function useGenerateBookTopics(
       return (await res.json()) as BookWithTopics;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['books', subjectId] });
+      // Scope invalidation to the affected subject to avoid re-fetching every
+      // book/curriculum query across all subjects (over-invalidation).
+      void queryClient.invalidateQueries({
+        queryKey: ['books', subjectId],
+      });
       void queryClient.invalidateQueries({
         queryKey: ['book', subjectId, bookId],
       });
