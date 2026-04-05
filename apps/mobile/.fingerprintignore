@@ -1,0 +1,6 @@
+# pnpm virtual store layout differs between local (Windows) and EAS (Linux).
+# Both environments install from the same lockfile, so the actual packages
+# are identical — only the .pnpm directory structure varies.
+# Without this ignore, the fingerprint runtime version diverges and
+# EAS rejects the build with "Configure expo-updates" errors.
+**/.pnpm/**

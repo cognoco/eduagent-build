@@ -99,7 +99,7 @@
       }
     },
     "runtimeVersion": {
-      "policy": "fingerprint"
+      "policy": "appVersion"
     },
     "privacyPolicyUrl": "https://mentomate.com/privacy-policy",
     "updates": {
