@@ -82,7 +82,7 @@ function useSplashColors(isDark: boolean) {
         sparkPink: '#f9a8d4',
         sparkViolet: '#c4b5fd',
         sparkMint: '#99f6e4',
-        text: '#f1f5f9', // "ment" — near-white
+        text: '#faf5ee', // "ment" — cream (light-mode bg as text)
         textViolet: '#a78bfa', // circle-O
         textTeal: '#5eead4', // "mate" — light teal
       };
@@ -100,7 +100,7 @@ function useSplashColors(isDark: boolean) {
       sparkPink: '#f472b6',
       sparkViolet: '#a78bfa',
       sparkMint: '#5eead4',
-      text: '#1c1917', // "ment" — near-black
+      text: '#1a1a3e', // "ment" — dark navy (dark-mode bg as text)
       textViolet: '#8b5cf6', // circle-O
       textTeal: '#0d9488', // "mate" — teal
     };

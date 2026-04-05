@@ -26,12 +26,12 @@ type MentomateLogoProps = {
  */
 const BRAND = {
   light: {
-    ment: '#1c1917', // near-black
+    ment: '#1a1a3e', // dark navy (dark-mode bg flipped as text)
     circle: '#8b5cf6', // violet
     mate: '#0d9488', // teal
   },
   dark: {
-    ment: '#f1f5f9', // near-white
+    ment: '#faf5ee', // cream (light-mode bg flipped as text)
     circle: '#a78bfa', // light violet
     mate: '#5eead4', // light teal
   },
