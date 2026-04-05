@@ -23,6 +23,7 @@ import {
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
 import { getTierConfig } from '../services/subscription';
+import { captureException } from '../services/sentry';
 import { EXTENDED_TRIAL_MONTHLY_EQUIVALENT } from '../services/trial';
 import { inngest } from '../inngest/client';
 import type { Database } from '@eduagent/database';
@@ -602,8 +603,20 @@ export const revenuecatWebhookRoute = new Hono<{
   // Resolve account — reject if the app_user_id cannot be mapped to an account
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) {
-    console.warn(
+    console.error(
       `[revenuecat-webhook] Unresolvable app_user_id: ${event.app_user_id}, event: ${event.type}/${event.id}`
+    );
+    captureException(
+      new Error(
+        `Unresolvable RevenueCat app_user_id: ${event.app_user_id}`
+      ),
+      {
+        extra: {
+          eventType: event.type,
+          eventId: event.id,
+          appUserId: event.app_user_id,
+        },
+      }
     );
     return c.json({ received: true, error: 'Unknown app_user_id' }, 200);
   }

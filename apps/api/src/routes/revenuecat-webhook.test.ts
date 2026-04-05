@@ -58,6 +58,12 @@ jest.mock('../inngest/client', () => ({
   },
 }));
 
+const mockCaptureException = jest.fn();
+
+jest.mock('../services/sentry', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
 import { Hono } from 'hono';
 import { revenuecatWebhookRoute } from './revenuecat-webhook';
 import { writeSubscriptionStatus } from '../services/kv';
@@ -396,11 +402,29 @@ describe('INITIAL_PURCHASE', () => {
 
   it('handles unknown clerk user gracefully', async () => {
     (findAccountByClerkId as jest.Mock).mockResolvedValue(null);
+    mockCaptureException.mockClear();
 
     const res = await makeRequest(makeWebhookPayload('INITIAL_PURCHASE'));
     expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body).toEqual({ received: true, error: 'Unknown app_user_id' });
+
     // Unknown user — can't resolve account
     expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
+
+    // Must report to Sentry so the event drop is alertable [1B.3]
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('Unresolvable RevenueCat app_user_id'),
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          eventType: 'INITIAL_PURCHASE',
+          appUserId: expect.any(String),
+        }),
+      })
+    );
   });
 
   it('sets trial status when period_type is TRIAL', async () => {

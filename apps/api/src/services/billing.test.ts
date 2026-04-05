@@ -3,6 +3,13 @@
 // ---------------------------------------------------------------------------
 
 import type { Database } from '@eduagent/database';
+
+const mockCaptureException = jest.fn();
+
+jest.mock('./sentry', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
 import {
   getSubscriptionByAccountId,
   createSubscription,
@@ -33,11 +40,17 @@ import {
   removeProfileFromSubscription,
   downgradeAllFamilyProfiles,
   getFamilyPoolStatus,
+  activateSubscriptionFromRevenuecat,
+  updateSubscriptionFromRevenuecatWebhook,
 } from './billing';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 const accountId = 'acc-550e8400-e29b-41d4-a716-446655440000';
 const subscriptionId = 'sub-660e8400-e29b-41d4-a716-446655440000';
+
+beforeEach(() => {
+  mockCaptureException.mockClear();
+});
 
 // ---------------------------------------------------------------------------
 // Row builders
@@ -56,6 +69,8 @@ function mockSubscriptionRow(
     currentPeriodEnd: Date | null;
     cancelledAt: Date | null;
     lastStripeEventTimestamp: Date | null;
+    lastRevenuecatEventId: string | null;
+    lastRevenuecatEventTimestampMs: string | null;
   }>
 ) {
   return {
@@ -69,6 +84,9 @@ function mockSubscriptionRow(
     currentPeriodStart: overrides?.currentPeriodStart ?? null,
     currentPeriodEnd: overrides?.currentPeriodEnd ?? null,
     cancelledAt: overrides?.cancelledAt ?? null,
+    lastRevenuecatEventId: overrides?.lastRevenuecatEventId ?? null,
+    lastRevenuecatEventTimestampMs:
+      overrides?.lastRevenuecatEventTimestampMs ?? null,
     lastStripeEventTimestamp: overrides?.lastStripeEventTimestamp ?? null,
     createdAt: NOW,
     updatedAt: NOW,
@@ -1820,5 +1838,133 @@ describe('getFamilyPoolStatus', () => {
 
     expect(result).not.toBeNull();
     expect(result!.remainingQuestions).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [1C.9] decrementQuota — free-tier daily limit
+// ---------------------------------------------------------------------------
+
+describe('decrementQuota — free-tier daily limit', () => {
+  it('rejects when daily limit is exceeded (free tier)', async () => {
+    // Free tier: dailyLimit: 10, usedToday: 10 — daily cap hit
+    const pool = mockQuotaPoolRow({
+      dailyLimit: 10,
+      usedToday: 10,
+      monthlyLimit: 100,
+      usedThisMonth: 50,
+    });
+
+    // Atomic UPDATE returns empty (daily guard prevents increment)
+    const updateReturningFn = jest.fn().mockResolvedValueOnce([]);
+    const updateWhere = jest
+      .fn()
+      .mockReturnValue({ returning: updateReturningFn });
+    const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+
+    const db = {
+      query: {
+        subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        quotaPools: { findFirst: jest.fn().mockResolvedValue(pool) },
+        topUpCredits: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
+      },
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+      update: jest.fn().mockReturnValue({ set: updateSet }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    } as unknown as Database;
+
+    const result = await decrementQuota(db, subscriptionId);
+
+    expect(result.success).toBe(false);
+    expect(result.source).toBe('daily_exceeded');
+    expect(result.remainingDaily).toBe(0);
+    expect(result.remainingMonthly).toBe(50);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [1C.3] updateSubscriptionFromRevenuecatWebhook — invalid transition alerting
+// ---------------------------------------------------------------------------
+
+describe('updateSubscriptionFromRevenuecatWebhook — invalid transition', () => {
+  it('calls captureException on rejected state transition', async () => {
+    const existing = mockSubscriptionRow({
+      status: 'expired',
+      lastRevenuecatEventId: 'old-event',
+      lastRevenuecatEventTimestampMs: null,
+    });
+    const db = createMockDb({ subscriptionFindFirst: existing });
+
+    const result = await updateSubscriptionFromRevenuecatWebhook(
+      db,
+      accountId,
+      {
+        status: 'active', // expired -> active is invalid
+        eventId: 'new-event',
+      }
+    );
+
+    // Should return existing subscription without updating
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe('expired');
+    expect(db.update).not.toHaveBeenCalled();
+
+    // [1C.3] captureException must fire on rejected transition
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    const [err, ctx] = mockCaptureException.mock.calls[0];
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toMatch(/Invalid subscription transition/);
+    expect(ctx.extra.subscriptionId).toBe(subscriptionId);
+    expect(ctx.extra.fromStatus).toBe('expired');
+    expect(ctx.extra.toStatus).toBe('active');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [1C.5] activateSubscriptionFromRevenuecat — trial-to-non-trial fallback alerting
+// ---------------------------------------------------------------------------
+
+describe('activateSubscriptionFromRevenuecat — trial fallback', () => {
+  it('calls captureException when isTrial is true but trialEndsAt is missing', async () => {
+    // No existing subscription — first-time activation
+    const newSubRow = mockSubscriptionRow({
+      tier: 'plus',
+      status: 'active', // falls back to non-trial
+    });
+    const newQuotaPool = mockQuotaPoolRow({ monthlyLimit: 500 });
+    const db = createMockDb({
+      subscriptionFindFirst: undefined,
+      insertReturning: [newSubRow],
+    });
+
+    const result = await activateSubscriptionFromRevenuecat(
+      db,
+      accountId,
+      'plus',
+      'evt-1',
+      {
+        isTrial: true,
+        // trialEndsAt deliberately omitted — corrupted data
+      }
+    );
+
+    expect(result).not.toBeNull();
+    // [1C.5] captureException must fire before fallback
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    const [err, ctx] = mockCaptureException.mock.calls[0];
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toMatch(/trialEndsAt/);
+    expect(ctx.extra.accountId).toBe(accountId);
+    expect(ctx.extra.tier).toBe('plus');
+    expect(ctx.extra.eventId).toBe('evt-1');
   });
 });

@@ -208,8 +208,14 @@ export function getTrialWarningMessage(daysRemaining: number): string | null {
   if (daysRemaining === 1) {
     return '1 day left of your trial';
   }
+  if (daysRemaining === 2) {
+    return '2 days left of your trial';
+  }
   if (daysRemaining === 3) {
     return '3 days left of your trial';
+  }
+  if (daysRemaining === 7) {
+    return '7 days left of your trial';
   }
   return null;
 }

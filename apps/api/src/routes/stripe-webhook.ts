@@ -324,6 +324,7 @@ async function handlePaymentSucceeded(
 export const stripeWebhookRoute = new Hono<{
   Bindings: {
     STRIPE_WEBHOOK_SECRET?: string;
+    STRIPE_SECRET_KEY?: string;
     SUBSCRIPTION_KV?: KVNamespace;
   };
   Variables: {
@@ -355,7 +356,12 @@ export const stripeWebhookRoute = new Hono<{
 
   let event: Stripe.Event;
   try {
-    event = await verifyWebhookSignature(rawBody, signature, webhookSecret);
+    event = await verifyWebhookSignature(
+      rawBody,
+      signature,
+      webhookSecret,
+      c.env.STRIPE_SECRET_KEY ?? 'sk_webhook_verification_only'
+    );
   } catch {
     return apiError(
       c,

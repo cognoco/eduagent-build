@@ -15,6 +15,7 @@ import {
 } from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig, isValidTransition } from './subscription';
+import { captureException } from './sentry';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -757,41 +758,36 @@ export async function resetExpiredQuotaCycles(
   db: Database,
   now: Date
 ): Promise<number> {
-  const dueForReset = await db.query.quotaPools.findMany({
-    where: lte(quotaPools.cycleResetAt, now),
-  });
+  const free = getTierConfig('free');
+  const plus = getTierConfig('plus');
+  const family = getTierConfig('family');
+  const pro = getTierConfig('pro');
 
-  let count = 0;
+  const result = await db.execute(sql`
+    UPDATE quota_pools AS qp
+    SET
+      used_this_month = 0,
+      used_today = 0,
+      monthly_limit = CASE s.tier
+        WHEN 'plus' THEN ${plus.monthlyQuota}
+        WHEN 'family' THEN ${family.monthlyQuota}
+        WHEN 'pro' THEN ${pro.monthlyQuota}
+        ELSE ${free.monthlyQuota}
+      END,
+      daily_limit = CASE s.tier
+        WHEN 'plus' THEN ${plus.dailyLimit}
+        WHEN 'family' THEN ${family.dailyLimit}
+        WHEN 'pro' THEN ${pro.dailyLimit}
+        ELSE ${free.dailyLimit}
+      END,
+      cycle_reset_at = qp.cycle_reset_at + INTERVAL '1 month',
+      updated_at = ${now}
+    FROM subscriptions AS s
+    WHERE qp.subscription_id = s.id
+      AND qp.cycle_reset_at <= ${now}
+  `);
 
-  for (const pool of dueForReset) {
-    const sub = await db.query.subscriptions.findFirst({
-      where: eq(subscriptions.id, pool.subscriptionId),
-    });
-
-    const tierConfig = getTierConfig(
-      (sub?.tier as 'free' | 'plus' | 'family' | 'pro') ?? 'free'
-    );
-
-    // Advance from the pool's own cycle date to maintain billing cadence
-    const nextReset = new Date(pool.cycleResetAt);
-    nextReset.setMonth(nextReset.getMonth() + 1);
-
-    await db
-      .update(quotaPools)
-      .set({
-        usedThisMonth: 0,
-        usedToday: 0,
-        monthlyLimit: tierConfig.monthlyQuota,
-        dailyLimit: tierConfig.dailyLimit,
-        cycleResetAt: nextReset,
-        updatedAt: now,
-      })
-      .where(eq(quotaPools.id, pool.id));
-
-    count++;
-  }
-
-  return count;
+  return result.rowCount ?? 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -1580,8 +1576,20 @@ export async function updateSubscriptionFromRevenuecatWebhook(
   }
   if (updates.status !== undefined && updates.status !== existing.status) {
     if (!isValidTransition(existing.status, updates.status)) {
-      console.warn(
+      console.error(
         `[billing] Invalid subscription transition: ${existing.status} -> ${updates.status} (sub: ${existing.id})`
+      );
+      captureException(
+        new Error(
+          `Invalid subscription transition: ${existing.status} -> ${updates.status}`
+        ),
+        {
+          extra: {
+            subscriptionId: existing.id,
+            fromStatus: existing.status,
+            toStatus: updates.status,
+          },
+        }
       );
       return mapSubscriptionRow(existing);
     }
@@ -1644,6 +1652,12 @@ export async function activateSubscriptionFromRevenuecat(
   if (isTrial && !trialEndsAt) {
     console.error(
       `[billing] trialEndsAt is required when isTrial is true (account: ${accountId})`
+    );
+    captureException(
+      new Error(
+        'Trial activation missing trialEndsAt — falling back to non-trial'
+      ),
+      { extra: { accountId, tier, eventId } }
     );
     // Gracefully fall back to non-trial activation rather than crashing the webhook
     return activateSubscriptionFromRevenuecat(db, accountId, tier, eventId, {
