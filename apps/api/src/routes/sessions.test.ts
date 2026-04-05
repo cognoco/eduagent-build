@@ -98,6 +98,7 @@ jest.mock('../services/billing', () => ({
     remainingTopUp: 0,
     remainingDaily: null,
   }),
+  getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
   incrementQuota: (...args: unknown[]) => mockIncrementQuota(...args),
   createSubscription: jest.fn(),
 }));

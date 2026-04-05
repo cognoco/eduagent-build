@@ -34,7 +34,6 @@ import {
 import {
   birthDateFromBirthYear,
   birthYearFromDateLike,
-  computeAgeBracket,
 } from '@eduagent/schemas';
 import { listSubjects } from './subject';
 import { getTierConfig } from './subscription';
@@ -332,24 +331,15 @@ async function createBaseProfile(
     birthYear: number;
     isOwner?: boolean;
     birthDate?: Date;
-    personaType?: 'TEEN' | 'LEARNER' | 'PARENT';
   }
 ): Promise<string> {
   const profileId = generateUUIDv7();
-  const resolvedPersonaType =
-    opts.personaType ??
-    (() => {
-      const ageBracket = computeAgeBracket(opts.birthYear, opts.birthDate);
-      if (ageBracket === 'child') return 'TEEN' as const;
-      return 'LEARNER' as const;
-    })();
 
   await db.insert(profiles).values({
     id: profileId,
     accountId,
     displayName: opts.displayName,
     birthYear: opts.birthYear,
-    personaType: resolvedPersonaType,
     isOwner: opts.isOwner ?? true,
     birthDate: opts.birthDate ?? birthDateFromBirthYear(opts.birthYear),
   });
@@ -693,7 +683,6 @@ async function seedParentWithChildren(
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Parent',
     birthYear: 1990,
-    personaType: 'PARENT',
     isOwner: true,
   });
 
@@ -762,7 +751,6 @@ async function seedParentMultiChild(
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Parent',
     birthYear: 1990,
-    personaType: 'PARENT',
     isOwner: true,
   });
 
@@ -1151,7 +1139,6 @@ async function seedTrialExpiredChild(
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Paywall Parent',
     birthYear: 1990,
-    personaType: 'PARENT',
     isOwner: true,
   });
 
@@ -1210,7 +1197,6 @@ async function seedConsentWithdrawn(
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Withdrawn Parent',
     birthYear: 1990,
-    personaType: 'PARENT',
     isOwner: true,
   });
 
@@ -1294,7 +1280,6 @@ async function seedParentSolo(
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Solo Parent',
     birthYear: 1990,
-    personaType: 'PARENT',
     isOwner: true,
   });
 

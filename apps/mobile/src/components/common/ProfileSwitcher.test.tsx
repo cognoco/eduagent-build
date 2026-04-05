@@ -8,7 +8,7 @@ const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
   displayName: 'Alex',
   avatarUrl: null,
   birthDate: null,
-  personaType: 'LEARNER',
+  birthYear: 2010,
   location: null,
   isOwner: true,
   consentStatus: null,
@@ -21,12 +21,12 @@ const profiles: Profile[] = [
   makeProfile({
     id: 'p1',
     displayName: 'Alex',
-    personaType: 'LEARNER',
+    birthYear: 2010,
   }),
   makeProfile({
     id: 'p2',
     displayName: 'Sam Jones',
-    personaType: 'PARENT',
+    birthYear: 1990,
     isOwner: false,
   }),
 ];

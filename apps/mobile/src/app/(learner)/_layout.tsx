@@ -333,6 +333,7 @@ function PreviewSampleCoaching({
 function CreateProfileGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { signOut } = useClerk();
 
   return (
     <View
@@ -356,6 +357,17 @@ function CreateProfileGate(): React.ReactElement {
       >
         <Text className="text-body font-semibold text-text-inverse">
           Get started
+        </Text>
+      </Pressable>
+      <Pressable
+        onPress={() => signOut()}
+        className="mt-6 py-2"
+        testID="create-profile-gate-signout"
+        accessibilityRole="button"
+        accessibilityLabel="Sign out and use a different account"
+      >
+        <Text className="text-caption text-text-muted text-center underline">
+          Sign out
         </Text>
       </Pressable>
     </View>

@@ -76,6 +76,25 @@ export async function findOrCreateAccount(
   const existing = await findAccountByClerkId(db, clerkUserId);
   if (existing) return existing;
 
+  // Check if an account with this email already exists but is tied to a
+  // different (stale) Clerk user. This happens when a user deletes their
+  // Clerk account and re-registers with the same email — Clerk assigns a new
+  // clerkUserId but our DB still holds the old row. Reclaim it by updating
+  // the clerkUserId so the user keeps their data (profiles, history, etc.).
+  const existingByEmail = await db.query.accounts.findFirst({
+    where: eq(accounts.email, email),
+  });
+
+  if (existingByEmail && existingByEmail.clerkUserId !== clerkUserId) {
+    const [updated] = await db
+      .update(accounts)
+      .set({ clerkUserId, updatedAt: new Date() })
+      .where(eq(accounts.id, existingByEmail.id))
+      .returning();
+    if (!updated) throw new Error('Account reclaim failed — row disappeared');
+    return mapAccountRow(updated);
+  }
+
   // onConflictDoNothing guards against the TOCTOU race where two concurrent
   // requests both pass the findFirst check and attempt to insert. The unique
   // constraint on accounts.clerkUserId ensures only one row is created.

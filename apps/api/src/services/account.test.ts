@@ -304,4 +304,49 @@ describe('findOrCreateAccount', () => {
     expect(result.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(result.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
+
+  it('reclaims account when email exists with a different clerkUserId', async () => {
+    const staleRow = mockAccountRow({
+      id: 'acc-existing',
+      clerkUserId: 'clerk_old_deleted',
+      email: 'returning@example.com',
+    });
+    const updatedRow = {
+      ...staleRow,
+      clerkUserId: 'clerk_new_reregistered',
+      updatedAt: new Date(),
+    };
+
+    const mockFindFirst = jest
+      .fn()
+      // 1st call: findAccountByClerkId → not found (new clerkUserId)
+      .mockResolvedValueOnce(undefined)
+      // 2nd call: email lookup → found stale row
+      .mockResolvedValueOnce(staleRow);
+
+    const mockReturning = jest.fn().mockResolvedValue([updatedRow]);
+    const mockWhere = jest.fn().mockReturnValue({ returning: mockReturning });
+    const mockSet = jest.fn().mockReturnValue({ where: mockWhere });
+
+    const db = {
+      query: { accounts: { findFirst: mockFindFirst } },
+      insert: jest.fn(),
+      update: jest.fn().mockReturnValue({ set: mockSet }),
+    } as unknown as Database;
+
+    const result = await findOrCreateAccount(
+      db,
+      'clerk_new_reregistered',
+      'returning@example.com'
+    );
+
+    expect(result.id).toBe('acc-existing');
+    expect(result.clerkUserId).toBe('clerk_new_reregistered');
+    expect(result.email).toBe('returning@example.com');
+    // Should update, not insert
+    expect(db.update).toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
+    // Should NOT create a new trial subscription — the account already has one
+    expect(mockCreateSubscription).not.toHaveBeenCalled();
+  });
 });

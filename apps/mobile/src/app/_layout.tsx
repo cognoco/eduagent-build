@@ -29,7 +29,11 @@ import {
 import { useAuth } from '@clerk/clerk-expo';
 import { ThemeContext, useTokenVars, type Persona } from '../lib/theme';
 import type { ColorScheme } from '../lib/design-tokens';
-import { ProfileProvider, useProfile } from '../lib/profile';
+import {
+  ProfileProvider,
+  useProfile,
+  personaFromBirthYear,
+} from '../lib/profile';
 import { setOnAuthExpired, clearOnAuthExpired } from '../lib/api-client';
 import { ErrorBoundary, OfflineBanner } from '../components/common';
 import { useNetworkStatus } from '../hooks/use-network-status';
@@ -111,20 +115,14 @@ function ThemedApp() {
   // When true, system color scheme changes are ignored (Bug #1 fix).
   const userExplicitChoice = useRef(false);
 
-  // Derive persona + color scheme from active profile's personaType.
+  // Derive persona + color scheme from active profile's birthYear.
   // Must set both together — raw setPersona without setColorScheme leaves
   // the parent persona stuck in dark mode (themeKey mismatch).
   useEffect(() => {
     if (activeProfile) {
-      const candidate = activeProfile.personaType.toLowerCase();
-      if (
-        candidate === 'teen' ||
-        candidate === 'learner' ||
-        candidate === 'parent'
-      ) {
-        setPersona(candidate);
-        setColorScheme(schemeForPersona(candidate as Persona));
-      }
+      const candidate = personaFromBirthYear(activeProfile.birthYear);
+      setPersona(candidate);
+      setColorScheme(schemeForPersona(candidate));
     }
   }, [activeProfile]);
 
@@ -254,49 +252,49 @@ function ThemedContent({ colorScheme }: { colorScheme: ColorScheme }) {
         <Stack.Screen
           name="profiles"
           options={{
-            presentation: 'modal',
+            presentation: 'fullScreenModal',
             animation: 'slide_from_bottom',
           }}
         />
         <Stack.Screen
           name="create-profile"
           options={{
-            presentation: 'modal',
+            presentation: 'fullScreenModal',
             animation: 'slide_from_bottom',
           }}
         />
         <Stack.Screen
           name="consent"
           options={{
-            presentation: 'modal',
+            presentation: 'fullScreenModal',
             animation: 'slide_from_bottom',
           }}
         />
         <Stack.Screen
           name="delete-account"
           options={{
-            presentation: 'modal',
+            presentation: 'fullScreenModal',
             animation: 'slide_from_bottom',
           }}
         />
         <Stack.Screen
           name="create-subject"
           options={{
-            presentation: 'modal',
+            presentation: 'fullScreenModal',
             animation: 'slide_from_bottom',
           }}
         />
         <Stack.Screen
           name="privacy"
           options={{
-            presentation: 'modal',
+            presentation: 'fullScreenModal',
             animation: 'slide_from_bottom',
           }}
         />
         <Stack.Screen
           name="terms"
           options={{
-            presentation: 'modal',
+            presentation: 'fullScreenModal',
             animation: 'slide_from_bottom',
           }}
         />

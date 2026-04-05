@@ -795,7 +795,14 @@ export default function SignInScreen() {
             variant="tertiary"
             size="small"
             label="Sign up"
-            onPress={() => router.push('/(auth)/sign-up')}
+            onPress={() =>
+              router.push({
+                pathname: '/(auth)/sign-up',
+                params: emailAddress.trim()
+                  ? { email: emailAddress.trim() }
+                  : undefined,
+              })
+            }
             testID="sign-up-link"
           />
         </View>

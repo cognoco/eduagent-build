@@ -46,6 +46,8 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
 
   // Server-side OCR endpoint (fallback for ML Kit)
   .post('/ocr', async (c) => {
+    requireProfileId(c.get('profileId'));
+
     const body = await c.req.parseBody();
     const file = body['image'];
 

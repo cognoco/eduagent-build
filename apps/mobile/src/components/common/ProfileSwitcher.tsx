@@ -1,14 +1,14 @@
 import { useState, useCallback, type ReactNode } from 'react';
 import { View, Text, Pressable, Platform } from 'react-native';
 import type { Profile } from '@eduagent/schemas';
+import { personaFromBirthYear } from '../../lib/profile';
 
-/** User-facing role labels — "Teen" and "Learner" both show as "Student"
+/** Derive a user-facing role label from birthYear.
+ * "Teen" and "Learner" both show as "Student"
  * to avoid the confusing teen/learner distinction in the UI. */
-const ROLE_LABELS: Record<string, string> = {
-  TEEN: 'Student',
-  LEARNER: 'Student',
-  PARENT: 'Parent',
-};
+function roleLabel(birthYear: number | null | undefined): string {
+  return personaFromBirthYear(birthYear) === 'parent' ? 'Parent' : 'Student';
+}
 
 interface ProfileSwitcherProps {
   profiles: Profile[];
@@ -136,9 +136,9 @@ export function ProfileSwitcher({
                     isActive ? 'bg-primary-soft' : ''
                   } ${switching ? 'opacity-50' : ''}`}
                   accessibilityRole="menuitem"
-                  accessibilityLabel={`${profile.displayName}, ${
-                    ROLE_LABELS[profile.personaType] ?? profile.personaType
-                  }${isActive ? ', active' : ''}`}
+                  accessibilityLabel={`${profile.displayName}, ${roleLabel(
+                    profile.birthYear
+                  )}${isActive ? ', active' : ''}`}
                   accessibilityState={{ selected: isActive }}
                   testID={`profile-option-${profile.id}`}
                 >
@@ -169,7 +169,7 @@ export function ProfileSwitcher({
                       {profile.displayName}
                     </Text>
                     <Text className="text-caption text-text-secondary">
-                      {ROLE_LABELS[profile.personaType] ?? profile.personaType}
+                      {roleLabel(profile.birthYear)}
                     </Text>
                   </View>
                   {isActive && (

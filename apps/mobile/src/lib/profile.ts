@@ -32,6 +32,21 @@ const storage = {
 
 export type { Profile };
 
+/**
+ * Derive a persona string from the profile's birthYear.
+ * age < 13 → 'teen', age < 18 → 'learner', else 'parent'.
+ * Falls back to 'learner' when birthYear is null/undefined.
+ */
+export function personaFromBirthYear(
+  birthYear: number | null | undefined
+): 'teen' | 'learner' | 'parent' {
+  if (birthYear == null) return 'learner';
+  const age = new Date().getFullYear() - birthYear;
+  if (age < 13) return 'teen';
+  if (age < 18) return 'learner';
+  return 'parent';
+}
+
 export interface SwitchProfileResult {
   success: boolean;
   error?: string;

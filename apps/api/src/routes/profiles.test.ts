@@ -205,25 +205,6 @@ describe('profile routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({
             displayName: 'Test User',
-            personaType: 'LEARNER',
-          }),
-        },
-        TEST_ENV
-      );
-
-      expect(res.status).toBe(400);
-    });
-
-    it('returns 400 for invalid personaType', async () => {
-      const res = await app.request(
-        '/v1/profiles',
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-          body: JSON.stringify({
-            displayName: 'Test',
-            personaType: 'INVALID',
-            birthDate: '2008-06-15',
           }),
         },
         TEST_ENV

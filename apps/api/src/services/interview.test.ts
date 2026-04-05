@@ -115,6 +115,9 @@ function createMockDb({
       onboardingDrafts: {
         findFirst: jest.fn().mockResolvedValue(findFirstResult),
       },
+      subjects: {
+        findFirst: jest.fn().mockResolvedValue({ id: subjectId }),
+      },
     },
     insert: insertMock,
     update: jest.fn().mockReturnValue({
@@ -623,7 +626,7 @@ describe('persistCurriculum', () => {
     };
 
     const db = createMockDb();
-    await persistCurriculum(db, subjectId, 'Mathematics', draft);
+    await persistCurriculum(db, profileId, subjectId, 'Mathematics', draft);
 
     expect(generateCurriculum).toHaveBeenCalledWith({
       subjectName: 'Mathematics',
@@ -647,7 +650,7 @@ describe('persistCurriculum', () => {
     };
 
     const db = createMockDb();
-    await persistCurriculum(db, subjectId, 'Mathematics', draft);
+    await persistCurriculum(db, profileId, subjectId, 'Mathematics', draft);
 
     // Should insert curriculum + topics (2 insert calls)
     expect(db.insert).toHaveBeenCalledTimes(2);
@@ -667,7 +670,7 @@ describe('persistCurriculum', () => {
     };
 
     const db = createMockDb();
-    await persistCurriculum(db, subjectId, 'Science', draft);
+    await persistCurriculum(db, profileId, subjectId, 'Science', draft);
 
     expect(generateCurriculum).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -693,7 +696,7 @@ describe('persistCurriculum', () => {
     };
 
     const db = createMockDb();
-    await persistCurriculum(db, subjectId, 'Art', draft);
+    await persistCurriculum(db, profileId, subjectId, 'Art', draft);
 
     // Only curriculum insert, no topic insert
     expect(db.insert).toHaveBeenCalledTimes(1);

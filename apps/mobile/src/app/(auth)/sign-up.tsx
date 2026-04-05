@@ -9,7 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useSignUp, useSSO } from '@clerk/clerk-expo';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useWebBrowserWarmup } from '../../hooks/use-web-browser-warmup';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,10 +34,11 @@ const SCREEN_HEIGHT =
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
   const router = useRouter();
+  const { email: emailParam } = useLocalSearchParams<{ email?: string }>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
 
-  const [emailAddress, setEmailAddress] = useState('');
+  const [emailAddress, setEmailAddress] = useState(emailParam ?? '');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [pendingVerification, setPendingVerification] = useState(false);

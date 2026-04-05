@@ -42,11 +42,15 @@ import type { SubscriptionStatus } from '@eduagent/schemas';
  *
  * Uses SubtleCrypto (available in Cloudflare Workers) for proper HMAC.
  */
-async function constantTimeCompare(a: string, b: string): Promise<boolean> {
+async function constantTimeCompare(
+  a: string,
+  b: string,
+  secret: string
+): Promise<boolean> {
   const encoder = new TextEncoder();
   const hmacKey = await crypto.subtle.importKey(
     'raw',
-    encoder.encode('webhook-compare'),
+    encoder.encode(secret),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign']
@@ -568,7 +572,7 @@ export const revenuecatWebhookRoute = new Hono<{
     );
   }
 
-  if (!(await constantTimeCompare(token, webhookSecret))) {
+  if (!(await constantTimeCompare(token, webhookSecret, webhookSecret))) {
     return apiError(
       c,
       401,
@@ -595,22 +599,28 @@ export const revenuecatWebhookRoute = new Hono<{
   const db = c.get('db');
   const kv = c.env.SUBSCRIPTION_KV;
 
-  // Idempotency: skip already-processed events (BD-01: timestamp-based ordering)
+  // Resolve account — reject if the app_user_id cannot be mapped to an account
   const accountId = await resolveAccountId(db, event.app_user_id);
-  if (accountId) {
-    const alreadyProcessed = await isRevenuecatEventProcessed(
-      db,
-      accountId,
-      event.id,
-      event.event_timestamp_ms
+  if (!accountId) {
+    console.warn(
+      `[revenuecat-webhook] Unresolvable app_user_id: ${event.app_user_id}, event: ${event.type}/${event.id}`
     );
-    if (alreadyProcessed) {
-      return c.json({ received: true, skipped: true });
-    }
-
-    // Ensure free subscription exists for the account (auto-provisioning)
-    await ensureFreeSubscription(db, accountId);
+    return c.json({ received: true, error: 'Unknown app_user_id' }, 200);
   }
+
+  // Idempotency: skip already-processed events (BD-01: timestamp-based ordering)
+  const alreadyProcessed = await isRevenuecatEventProcessed(
+    db,
+    accountId,
+    event.id,
+    event.event_timestamp_ms
+  );
+  if (alreadyProcessed) {
+    return c.json({ received: true, skipped: true });
+  }
+
+  // Ensure free subscription exists for the account (auto-provisioning)
+  await ensureFreeSubscription(db, accountId);
 
   // Dispatch to event-specific handler
   switch (event.type) {

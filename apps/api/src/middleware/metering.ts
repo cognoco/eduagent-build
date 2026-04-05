@@ -23,6 +23,7 @@ import {
   ensureFreeSubscription,
   getQuotaPool,
   decrementQuota,
+  getTopUpCreditsRemaining,
 } from '../services/billing';
 import { getTierConfig } from '../services/subscription';
 import { checkQuota } from '../services/metering';
@@ -183,16 +184,47 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       }
     }
 
-    // 2. Check quota using pure business logic (checks both daily + monthly)
+    // 2. Query actual top-up credits for accurate quota check
+    const topUpCreditsRemaining = await getTopUpCreditsRemaining(
+      db,
+      subscriptionId
+    );
+
+    // 3. Check quota using pure business logic (checks both daily + monthly)
     const result = checkQuota({
       monthlyLimit,
       usedThisMonth,
-      topUpCreditsRemaining: 0, // will be checked by decrementQuota FIFO fallback
+      topUpCreditsRemaining,
       dailyLimit,
       usedToday,
     });
 
-    // 3. Attempt to decrement quota (atomic, handles top-up FIFO fallback + daily guard)
+    // Fast-path rejection: skip atomic decrement if quota is clearly exhausted
+    if (!result.allowed) {
+      const isDailyExceeded =
+        result.dailyRemaining !== null && result.dailyRemaining <= 0;
+      return c.json(
+        {
+          code: ERROR_CODES.QUOTA_EXCEEDED,
+          message: isDailyExceeded
+            ? "You've reached your daily question limit. Come back tomorrow for more!"
+            : 'Monthly quota exceeded. Upgrade your plan or purchase top-up credits.',
+          details: {
+            tier,
+            reason: isDailyExceeded ? ('daily' as const) : ('monthly' as const),
+            monthlyLimit,
+            usedThisMonth,
+            dailyLimit,
+            usedToday,
+            topUpCreditsRemaining,
+            upgradeOptions: buildUpgradeOptions(tier),
+          },
+        },
+        402
+      );
+    }
+
+    // 4. Attempt to decrement quota (atomic, handles top-up FIFO fallback + daily guard)
     const decrement = await decrementQuota(db, subscriptionId);
 
     if (!decrement.success) {
@@ -210,7 +242,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
             usedThisMonth,
             dailyLimit,
             usedToday,
-            topUpCreditsRemaining: 0,
+            topUpCreditsRemaining,
             upgradeOptions: buildUpgradeOptions(tier),
           },
         },
@@ -222,6 +254,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     c.set('subscriptionId', subscriptionId);
 
     // I7 fix: Update KV cache after decrement so next request sees fresh count
+    // Awaited to prevent stale reads on concurrent requests
     if (kv) {
       await safeWriteKV(kv, account.id, {
         subscriptionId,

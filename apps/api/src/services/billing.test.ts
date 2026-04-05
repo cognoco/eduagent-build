@@ -81,6 +81,8 @@ function mockQuotaPoolRow(
     subscriptionId: string;
     monthlyLimit: number;
     usedThisMonth: number;
+    dailyLimit: number | null;
+    usedToday: number;
     cycleResetAt: Date;
   }>
 ) {
@@ -89,6 +91,8 @@ function mockQuotaPoolRow(
     subscriptionId: overrides?.subscriptionId ?? subscriptionId,
     monthlyLimit: overrides?.monthlyLimit ?? 500,
     usedThisMonth: overrides?.usedThisMonth ?? 42,
+    dailyLimit: overrides?.dailyLimit ?? null,
+    usedToday: overrides?.usedToday ?? 0,
     cycleResetAt:
       overrides?.cycleResetAt ?? new Date('2025-02-15T10:00:00.000Z'),
     createdAt: NOW,

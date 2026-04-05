@@ -16,22 +16,25 @@ interface ButtonProps {
 
 const variantClasses: Record<
   ButtonVariant,
-  { base: string; disabled: string; text: string }
+  { base: string; disabled: string; text: string; disabledText: string }
 > = {
   primary: {
     base: 'bg-primary',
-    disabled: 'bg-primary',
+    disabled: 'bg-surface-elevated',
     text: 'text-text-inverse',
+    disabledText: 'text-muted',
   },
   secondary: {
     base: 'bg-surface-elevated',
     disabled: 'bg-surface-elevated',
     text: 'text-text-primary',
+    disabledText: 'text-muted',
   },
   tertiary: {
     base: 'bg-transparent',
     disabled: 'bg-transparent',
     text: 'text-primary',
+    disabledText: 'text-muted',
   },
 };
 
@@ -62,7 +65,7 @@ export function Button({
       disabled={isDisabled}
       className={`rounded-button items-center ${s.container} ${bgClass}`}
       style={({ pressed }) => ({
-        opacity: isDisabled ? 0.4 : pressed ? 0.8 : 1,
+        opacity: pressed && !isDisabled ? 0.8 : 1,
       })}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -74,7 +77,11 @@ export function Button({
           color={variant === 'primary' ? colors.textInverse : colors.primary}
         />
       ) : (
-        <Text className={`font-sans-semibold ${s.text} ${v.text}`}>
+        <Text
+          className={`font-sans-semibold ${s.text} ${
+            isDisabled ? v.disabledText : v.text
+          }`}
+        >
           {label}
         </Text>
       )}

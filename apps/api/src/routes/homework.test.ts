@@ -256,7 +256,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -282,7 +285,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -302,7 +308,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -318,7 +327,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -340,7 +352,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -365,7 +380,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -393,7 +411,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -419,7 +440,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -446,7 +470,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV

@@ -59,7 +59,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
           extractedSignals: result.extractedSignals ?? draft.extractedSignals,
           status: 'completed',
         });
-        await persistCurriculum(db, subjectId, subject.name, {
+        await persistCurriculum(db, profileId, subjectId, subject.name, {
           ...draft,
           exchangeHistory: updatedHistory,
           extractedSignals: result.extractedSignals ?? draft.extractedSignals,
@@ -124,7 +124,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
               extractedSignals:
                 result.extractedSignals ?? draft.extractedSignals,
             });
-            await persistCurriculum(db, subjectId, subject.name, {
+            await persistCurriculum(db, profileId, subjectId, subject.name, {
               ...draft,
               exchangeHistory: updatedHistory,
               extractedSignals:

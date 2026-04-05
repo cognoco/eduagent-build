@@ -14,7 +14,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
-import { getTierConfig } from './subscription';
+import { getTierConfig, isValidTransition } from './subscription';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1319,6 +1319,12 @@ export async function addProfileToSubscription(
     return null;
   }
 
+  // Enforce per-tier maxProfiles limit
+  const allowed = await canAddProfile(db, subscriptionId);
+  if (!allowed) {
+    return null;
+  }
+
   const count = await getProfileCountForSubscription(db, subscriptionId);
   return { profileCount: count };
 }
@@ -1532,9 +1538,10 @@ export async function isRevenuecatEventProcessed(
   if (sub.lastRevenuecatEventId === eventId) return true;
 
   // BD-01: Stale retry — event timestamp is older than last processed
+  // Column is text; coerce to number for numeric comparison (NaN-safe)
   if (eventTimestampMs != null && sub.lastRevenuecatEventTimestampMs != null) {
     const lastTs = Number(sub.lastRevenuecatEventTimestampMs);
-    if (eventTimestampMs < lastTs) return true;
+    if (!Number.isNaN(lastTs) && eventTimestampMs < lastTs) return true;
   }
 
   return false;
@@ -1571,7 +1578,13 @@ export async function updateSubscriptionFromRevenuecatWebhook(
   if (updates.tier !== undefined) {
     setValues.tier = updates.tier;
   }
-  if (updates.status !== undefined) {
+  if (updates.status !== undefined && updates.status !== existing.status) {
+    if (!isValidTransition(existing.status, updates.status)) {
+      console.warn(
+        `[billing] Invalid subscription transition: ${existing.status} -> ${updates.status} (sub: ${existing.id})`
+      );
+      return mapSubscriptionRow(existing);
+    }
     setValues.status = updates.status;
   }
   if (updates.currentPeriodStart !== undefined) {
@@ -1629,7 +1642,14 @@ export async function activateSubscriptionFromRevenuecat(
 
   // BD-03: enforce trialEndsAt when isTrial is true
   if (isTrial && !trialEndsAt) {
-    throw new Error('trialEndsAt is required when isTrial is true');
+    console.error(
+      `[billing] trialEndsAt is required when isTrial is true (account: ${accountId})`
+    );
+    // Gracefully fall back to non-trial activation rather than crashing the webhook
+    return activateSubscriptionFromRevenuecat(db, accountId, tier, eventId, {
+      ...options,
+      isTrial: false,
+    });
   }
 
   const status = isTrial ? 'trial' : 'active';
