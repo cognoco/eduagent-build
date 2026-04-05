@@ -96,4 +96,57 @@ describe('LearnerLayout', () => {
     expect(screen.getByTestId('tabs')).toBeTruthy();
     expect(screen.queryByTestId('redirect')).toBeNull();
   });
+
+  // ---------------------------------------------------------------------------
+  // Auth guard — redirects unauthenticated users to sign-in.
+  //
+  // This is the guard that caused the navigation race condition: after
+  // setActive(), if router.replace('/(learner)/home') fired before Clerk's
+  // React state propagated, this guard saw isSignedIn: false and bounced
+  // the user back to an empty sign-in screen.  The fix removed explicit
+  // navigation from auth screens — the auth layout guard now handles it
+  // reactively.  These tests verify the learner-side guard still works.
+  // ---------------------------------------------------------------------------
+
+  it('redirects to sign-in when user is not authenticated', () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+    });
+
+    render(<LearnerLayout />);
+
+    const redirect = screen.getByTestId('redirect');
+    expect(redirect.props.children).toBe('/(auth)/sign-in');
+    expect(screen.queryByTestId('tabs')).toBeNull();
+  });
+
+  it('renders nothing while Clerk auth is still loading', () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: false,
+      isSignedIn: undefined,
+    });
+
+    render(<LearnerLayout />);
+
+    // Should render nothing — no redirect, no tabs, no flash
+    expect(screen.queryByTestId('redirect')).toBeNull();
+    expect(screen.queryByTestId('tabs')).toBeNull();
+  });
+
+  it('shows profile loading spinner while profiles load after auth', () => {
+    mockUseProfile.mockReturnValue({
+      profiles: [],
+      activeProfile: null,
+      isLoading: true,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+    });
+
+    render(<LearnerLayout />);
+
+    expect(screen.getByTestId('profile-loading')).toBeTruthy();
+    expect(screen.queryByTestId('tabs')).toBeNull();
+    expect(screen.queryByTestId('redirect')).toBeNull();
+  });
 });
