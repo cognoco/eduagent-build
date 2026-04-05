@@ -16,7 +16,7 @@ export interface SessionRecoveryMarker {
 }
 
 function getRecoveryKey(profileId?: string | null): string {
-  return profileId ? `${RECOVERY_KEY}:${profileId}` : RECOVERY_KEY;
+  return profileId ? `${RECOVERY_KEY}-${profileId}` : RECOVERY_KEY;
 }
 
 export async function writeSessionRecoveryMarker(

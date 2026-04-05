@@ -3,7 +3,7 @@ import type { CurriculumTopic } from '@eduagent/schemas';
 
 interface ChapterTopicListProps {
   topics: CurriculumTopic[];
-  onTopicPress: (topicId: string) => void;
+  onTopicPress: (topicId: string, topicName: string) => void;
   suggestedNextId?: string;
 }
 
@@ -58,7 +58,7 @@ export function ChapterTopicList({
               return (
                 <Pressable
                   key={topic.id}
-                  onPress={() => onTopicPress(topic.id)}
+                  onPress={() => onTopicPress(topic.id, topic.title)}
                   className={`px-4 py-3 border-b border-border ${
                     isSuggested ? 'bg-primary/5' : ''
                   } ${topic.skipped ? 'opacity-50' : ''}`}

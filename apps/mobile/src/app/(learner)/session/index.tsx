@@ -271,6 +271,7 @@ export default function SessionScreen() {
     subjectName,
     sessionId: routeSessionId,
     topicId,
+    topicName,
     problemText,
     homeworkProblems,
     ocrText,
@@ -280,6 +281,7 @@ export default function SessionScreen() {
     subjectName?: string;
     sessionId?: string;
     topicId?: string;
+    topicName?: string;
     problemText?: string;
     homeworkProblems?: string;
     ocrText?: string;
@@ -309,7 +311,8 @@ export default function SessionScreen() {
   const openingContent = getOpeningMessage(
     effectiveMode,
     sessionExperience,
-    initialProblemText
+    initialProblemText,
+    topicName ?? undefined
   );
 
   const { isOffline } = useNetworkStatus();

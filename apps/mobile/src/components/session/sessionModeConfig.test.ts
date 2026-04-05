@@ -71,6 +71,39 @@ describe('getOpeningMessage', () => {
     });
   });
 
+  describe('topic-aware opening (topicName provided)', () => {
+    it('includes topic name for first session', () => {
+      const msg = getOpeningMessage('learning', 0, undefined, 'The Nile River');
+      expect(msg).toContain('The Nile River');
+    });
+
+    it('includes topic name for early session', () => {
+      const msg = getOpeningMessage('learning', 1, undefined, 'The Nile River');
+      expect(msg).toContain('The Nile River');
+    });
+
+    it('includes topic name for experienced session', () => {
+      const msg = getOpeningMessage(
+        'learning',
+        10,
+        undefined,
+        'The Nile River'
+      );
+      expect(msg).toContain('The Nile River');
+    });
+
+    it('problemText takes priority over topicName', () => {
+      const msg = getOpeningMessage(
+        'homework',
+        0,
+        'Solve 2+2',
+        'The Nile River'
+      );
+      expect(msg).not.toContain('The Nile River');
+      expect(msg).toContain('work through this together');
+    });
+  });
+
   it('produces distinct messages across all tiers for each mode', () => {
     for (const mode of modes) {
       const tiers = [
