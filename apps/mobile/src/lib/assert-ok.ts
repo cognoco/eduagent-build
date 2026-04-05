@@ -16,11 +16,9 @@ export async function assertOk(res: Response): Promise<void> {
   let message = `Request failed (${res.status})`;
   let code: string | undefined;
   let details: unknown;
-  let bodyText: string | undefined;
-
   // Read body as text first — Response body is a single-use stream, so calling
   // res.json() then res.text() in a catch would return empty on most runtimes.
-  bodyText = await res.text().catch(() => undefined);
+  const bodyText = await res.text().catch(() => undefined);
 
   if (bodyText) {
     try {
@@ -28,7 +26,9 @@ export async function assertOk(res: Response): Promise<void> {
       if (typeof (body?.error as Record<string, unknown>)?.code === 'string') {
         code = (body.error as Record<string, unknown>).code as string;
       }
-      if (typeof (body?.error as Record<string, unknown>)?.message === 'string') {
+      if (
+        typeof (body?.error as Record<string, unknown>)?.message === 'string'
+      ) {
         message = (body.error as Record<string, unknown>).message as string;
       }
       if ((body?.error as Record<string, unknown>)?.details !== undefined) {
