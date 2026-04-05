@@ -1,274 +1,286 @@
 /**
- * Integration: Inngest Trial Expiry Function
+ * Integration: Inngest trial-expiry function
  *
- * Tests the trial-expiry cron function directly (not via HTTP routes).
- * The function runs daily and processes:
+ * Exercises the real trial-expiry function against a real database.
+ * Trial transitions, quota updates, and owner-profile lookup stay real.
  *
- * 1. Step 1 — Transition expired trials to extended trial (soft landing)
- * 2. Step 2 — Downgrade extended trials (day 28+) to free tier
- * 3. Step 3 — Send warning notifications for trials ending soon
- * 4. Step 4 — Send soft-landing messages for recently expired trials
- * 5. Returns complete result with all counts
- * 6. Handles no trials gracefully
+ * Mocked boundary:
+ * - Push delivery transport
  */
 
-// --- Capture the handler from inngest.createFunction ---
+import { eq } from 'drizzle-orm';
+import {
+  accounts,
+  profiles,
+  quotaPools,
+  subscriptions,
+} from '@eduagent/database';
 
-let capturedHandler: any;
-
-jest.mock('../../apps/api/src/inngest/client', () => ({
-  inngest: {
-    createFunction: jest
-      .fn()
-      .mockImplementation((_config: any, _trigger: any, handler: any) => {
-        capturedHandler = handler;
-        const fn = jest.fn();
-        (fn as any).getConfig = () => [
-          {
-            id: 'trial-expiry-check',
-            name: 'trial-expiry-check',
-            triggers: [],
-            steps: {},
-          },
-        ];
-        return fn;
-      }),
-    send: jest.fn().mockResolvedValue({ ids: [] }),
-  },
-}));
-
-// --- Step database mock ---
-
-const mockGetStepDatabase = jest.fn().mockReturnValue({});
-jest.mock('../../apps/api/src/inngest/helpers', () => ({
-  getStepDatabase: mockGetStepDatabase,
-}));
-
-// --- Billing service mocks ---
-
-const mockFindExpiredTrials = jest.fn();
-const mockTransitionToExtendedTrial = jest.fn();
-const mockFindExpiredTrialsByDaysSinceEnd = jest.fn();
-const mockDowngradeQuotaPool = jest.fn();
-const mockFindSubscriptionsByTrialDateRange = jest.fn();
-
-jest.mock('../../apps/api/src/services/billing', () => ({
-  findExpiredTrials: mockFindExpiredTrials,
-  transitionToExtendedTrial: mockTransitionToExtendedTrial,
-  findExpiredTrialsByDaysSinceEnd: mockFindExpiredTrialsByDaysSinceEnd,
-  downgradeQuotaPool: mockDowngradeQuotaPool,
-  findSubscriptionsByTrialDateRange: mockFindSubscriptionsByTrialDateRange,
-}));
-
-// --- Notifications mock ---
+import { cleanupAccounts, createIntegrationDb } from './helpers';
+import { trialExpiry } from '../../apps/api/src/inngest/functions/trial-expiry';
+import { getTierConfig } from '../../apps/api/src/services/subscription';
+import { EXTENDED_TRIAL_MONTHLY_EQUIVALENT } from '../../apps/api/src/services/trial';
 
 const mockSendPushNotification = jest.fn();
+
 jest.mock('../../apps/api/src/services/notifications', () => ({
-  sendPushNotification: mockSendPushNotification,
+  sendPushNotification: (...args: unknown[]) =>
+    mockSendPushNotification(...args),
 }));
 
-// --- Profile lookup mock ---
+const JUST_EXPIRED_USER_ID = 'integration-trial-expired-now';
+const JUST_EXPIRED_EMAIL = 'integration-trial-expired-now@integration.test';
+const EXTENDED_USER_ID = 'integration-trial-extended';
+const EXTENDED_EMAIL = 'integration-trial-extended@integration.test';
+const WARNING_USER_ID = 'integration-trial-warning';
+const WARNING_EMAIL = 'integration-trial-warning@integration.test';
 
-const mockFindOwnerProfile = jest.fn();
-jest.mock('../../apps/api/src/services/profile', () => ({
-  findOwnerProfile: mockFindOwnerProfile,
-}));
+async function seedAccountWithOwnerProfile(input: {
+  clerkUserId: string;
+  email: string;
+  displayName: string;
+}) {
+  const db = createIntegrationDb();
+  const [account] = await db
+    .insert(accounts)
+    .values({
+      clerkUserId: input.clerkUserId,
+      email: input.email,
+    })
+    .returning();
 
-// --- Subscription config mock ---
+  const [profile] = await db
+    .insert(profiles)
+    .values({
+      accountId: account!.id,
+      displayName: input.displayName,
+      birthYear: 1990,
+      isOwner: true,
+    })
+    .returning();
 
-jest.mock('../../apps/api/src/services/subscription', () => ({
-  getTierConfig: jest
-    .fn()
-    .mockReturnValue({ monthlyQuota: 100, dailyLimit: 10 }),
-}));
-
-// --- Trial constants mock ---
-
-jest.mock('../../apps/api/src/services/trial', () => ({
-  getTrialWarningMessage: jest
-    .fn()
-    .mockImplementation((days: number) =>
-      days === 3
-        ? 'Trial ends in 3 days'
-        : days === 1
-        ? 'Trial ends tomorrow'
-        : days === 0
-        ? 'Last day of trial'
-        : null
-    ),
-  getSoftLandingMessage: jest
-    .fn()
-    .mockImplementation(
-      (days: number) => `Your trial ended ${days} day(s) ago`
-    ),
-  EXTENDED_TRIAL_MONTHLY_EQUIVALENT: 450,
-  TRIAL_EXTENDED_DAYS: 14,
-}));
-
-// --- Import the module to trigger createFunction ---
-
-import '../../apps/api/src/inngest/functions/trial-expiry';
-
-// --- Mock step runner ---
-
-function createMockStep(): {
-  run: jest.Mock;
-} {
   return {
-    run: jest
-      .fn()
-      .mockImplementation(async (_name: string, fn: () => Promise<any>) =>
-        fn()
-      ),
+    account: account!,
+    profile: profile!,
   };
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+async function seedSubscriptionWithQuota(input: {
+  accountId: string;
+  tier: 'free' | 'plus' | 'family' | 'pro';
+  status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+  trialEndsAt: Date;
+  monthlyLimit: number;
+  usedThisMonth: number;
+  dailyLimit: number | null;
+  usedToday: number;
+}) {
+  const db = createIntegrationDb();
+  const [subscription] = await db
+    .insert(subscriptions)
+    .values({
+      accountId: input.accountId,
+      tier: input.tier,
+      status: input.status,
+      trialEndsAt: input.trialEndsAt,
+      currentPeriodStart: new Date('2026-04-01T00:00:00.000Z'),
+      currentPeriodEnd: new Date('2026-05-01T00:00:00.000Z'),
+    })
+    .returning();
 
-describe('Integration: Inngest trial-expiry function', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockFindOwnerProfile.mockResolvedValue({
-      id: 'profile-owner',
+  const [quotaPool] = await db
+    .insert(quotaPools)
+    .values({
+      subscriptionId: subscription!.id,
+      monthlyLimit: input.monthlyLimit,
+      usedThisMonth: input.usedThisMonth,
+      dailyLimit: input.dailyLimit,
+      usedToday: input.usedToday,
+      cycleResetAt: new Date('2026-05-01T00:00:00.000Z'),
+    })
+    .returning();
+
+  return {
+    subscription: subscription!,
+    quotaPool: quotaPool!,
+  };
+}
+
+async function loadSubscription(id: string) {
+  const db = createIntegrationDb();
+  return db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, id),
+  });
+}
+
+async function loadQuotaPool(id: string) {
+  const db = createIntegrationDb();
+  return db.query.quotaPools.findFirst({
+    where: eq(quotaPools.id, id),
+  });
+}
+
+async function executeTrialExpiry() {
+  const executionOrder: string[] = [];
+  const step = {
+    run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
+      executionOrder.push(name);
+      return fn();
+    }),
+  };
+
+  const result = await (
+    trialExpiry as { fn: (input: unknown) => Promise<any> }
+  ).fn({ step });
+
+  return {
+    result,
+    executionOrder,
+  };
+}
+
+function dateAtUtcNoon(offsetDays: number): Date {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  date.setUTCHours(12, 0, 0, 0);
+  return date;
+}
+
+beforeEach(async () => {
+  jest.clearAllMocks();
+  mockSendPushNotification.mockResolvedValue({ sent: true });
+
+  await cleanupAccounts({
+    emails: [JUST_EXPIRED_EMAIL, EXTENDED_EMAIL, WARNING_EMAIL],
+    clerkUserIds: [JUST_EXPIRED_USER_ID, EXTENDED_USER_ID, WARNING_USER_ID],
+  });
+});
+
+afterAll(async () => {
+  await cleanupAccounts({
+    emails: [JUST_EXPIRED_EMAIL, EXTENDED_EMAIL, WARNING_EMAIL],
+    clerkUserIds: [JUST_EXPIRED_USER_ID, EXTENDED_USER_ID, WARNING_USER_ID],
+  });
+});
+
+describe('Integration: trial-expiry Inngest function', () => {
+  it('processes real subscription transitions and sends owner notifications', async () => {
+    const freeTier = getTierConfig('free');
+    const plusTier = getTierConfig('plus');
+
+    const justExpired = await seedAccountWithOwnerProfile({
+      clerkUserId: JUST_EXPIRED_USER_ID,
+      email: JUST_EXPIRED_EMAIL,
+      displayName: 'Just Expired Owner',
     });
-  });
+    const extended = await seedAccountWithOwnerProfile({
+      clerkUserId: EXTENDED_USER_ID,
+      email: EXTENDED_EMAIL,
+      displayName: 'Extended Owner',
+    });
+    const warning = await seedAccountWithOwnerProfile({
+      clerkUserId: WARNING_USER_ID,
+      email: WARNING_EMAIL,
+      displayName: 'Warning Owner',
+    });
 
-  it('captures the function handler from createFunction', () => {
-    expect(capturedHandler).toBeDefined();
-    expect(typeof capturedHandler).toBe('function');
-  });
+    const justExpiredSeed = await seedSubscriptionWithQuota({
+      accountId: justExpired.account.id,
+      tier: 'plus',
+      status: 'trial',
+      trialEndsAt: dateAtUtcNoon(-1),
+      monthlyLimit: plusTier.monthlyQuota,
+      usedThisMonth: 25,
+      dailyLimit: null,
+      usedToday: 5,
+    });
 
-  it('Step 1: transitions expired trials to extended trial', async () => {
-    const mockStep = createMockStep();
-    const expiredTrial = { id: 'sub-1', accountId: 'acct-1' };
+    const extendedSeed = await seedSubscriptionWithQuota({
+      accountId: extended.account.id,
+      tier: 'free',
+      status: 'expired',
+      trialEndsAt: dateAtUtcNoon(-14),
+      monthlyLimit: EXTENDED_TRIAL_MONTHLY_EQUIVALENT,
+      usedThisMonth: 12,
+      dailyLimit: freeTier.dailyLimit,
+      usedToday: 2,
+    });
 
-    mockFindExpiredTrials.mockResolvedValue([expiredTrial]);
-    mockTransitionToExtendedTrial.mockResolvedValue(undefined);
-    mockFindExpiredTrialsByDaysSinceEnd.mockResolvedValue([]);
-    mockFindSubscriptionsByTrialDateRange.mockResolvedValue([]);
-    mockSendPushNotification.mockResolvedValue({ sent: false });
+    await seedSubscriptionWithQuota({
+      accountId: warning.account.id,
+      tier: 'plus',
+      status: 'trial',
+      trialEndsAt: dateAtUtcNoon(3),
+      monthlyLimit: plusTier.monthlyQuota,
+      usedThisMonth: 10,
+      dailyLimit: null,
+      usedToday: 1,
+    });
 
-    const result = await capturedHandler({ step: mockStep });
+    const { result, executionOrder } = await executeTrialExpiry();
 
-    expect(mockFindExpiredTrials).toHaveBeenCalled();
-    expect(mockTransitionToExtendedTrial).toHaveBeenCalledWith(
-      expect.anything(),
-      'sub-1',
-      450 // EXTENDED_TRIAL_MONTHLY_EQUIVALENT
-    );
-    expect(result.expiredCount).toBe(1);
-  });
-
-  it('Step 2: downgrades extended trials to free tier', async () => {
-    const mockStep = createMockStep();
-    const extendedTrial = { id: 'sub-2', accountId: 'acct-2' };
-
-    mockFindExpiredTrials.mockResolvedValue([]);
-    mockFindExpiredTrialsByDaysSinceEnd.mockResolvedValue([extendedTrial]);
-    mockDowngradeQuotaPool.mockResolvedValue(undefined);
-    mockFindSubscriptionsByTrialDateRange.mockResolvedValue([]);
-    mockSendPushNotification.mockResolvedValue({ sent: false });
-
-    const result = await capturedHandler({ step: mockStep });
-
-    expect(mockFindExpiredTrialsByDaysSinceEnd).toHaveBeenCalled();
-    expect(mockDowngradeQuotaPool).toHaveBeenCalledWith(
-      expect.anything(),
-      'sub-2',
-      100, // free tier monthlyQuota (dual-cap)
-      10 // free tier dailyLimit
-    );
-    expect(result.extendedExpiredCount).toBe(1);
-  });
-
-  it('Step 3: sends warning notifications for trials ending soon', async () => {
-    const mockStep = createMockStep();
-    const trialToWarn = { id: 'sub-3', accountId: 'acct-3' };
-
-    mockFindExpiredTrials.mockResolvedValue([]);
-    mockFindExpiredTrialsByDaysSinceEnd.mockResolvedValue([]);
-    // Return a trial for each warning window (3 days, 1 day, 0 days)
-    mockFindSubscriptionsByTrialDateRange.mockImplementation(
-      async (_db: any, status: string) => {
-        if (status === 'trial') return [trialToWarn];
-        return [];
-      }
-    );
-    mockSendPushNotification.mockResolvedValue({ sent: true });
-
-    const result = await capturedHandler({ step: mockStep });
-
-    expect(mockSendPushNotification).toHaveBeenCalled();
-    expect(result.warningsSent).toBeGreaterThanOrEqual(1);
-  });
-
-  it('Step 4: sends soft-landing messages for recently expired trials', async () => {
-    const mockStep = createMockStep();
-    const expiredTrial = { id: 'sub-4', accountId: 'acct-4' };
-
-    mockFindExpiredTrials.mockResolvedValue([]);
-    mockFindExpiredTrialsByDaysSinceEnd.mockResolvedValue([]);
-    mockFindSubscriptionsByTrialDateRange.mockImplementation(
-      async (_db: any, status: string) => {
-        if (status === 'expired') return [expiredTrial];
-        return [];
-      }
-    );
-    mockSendPushNotification.mockResolvedValue({ sent: true });
-
-    const result = await capturedHandler({ step: mockStep });
-
-    // Soft-landing for days 1, 7, 14
-    expect(mockSendPushNotification).toHaveBeenCalled();
-    expect(result.softLandingSent).toBeGreaterThanOrEqual(1);
-  });
-
-  it('returns complete result with all counts', async () => {
-    const mockStep = createMockStep();
-
-    mockFindExpiredTrials.mockResolvedValue([
-      { id: 'sub-a', accountId: 'acct-a' },
+    expect(executionOrder).toEqual([
+      'process-expired-trials',
+      'process-extended-trial-expiry',
+      'send-trial-warnings',
+      'send-soft-landing-messages',
     ]);
-    mockTransitionToExtendedTrial.mockResolvedValue(undefined);
-    mockFindExpiredTrialsByDaysSinceEnd.mockResolvedValue([
-      { id: 'sub-b', accountId: 'acct-b' },
-    ]);
-    mockDowngradeQuotaPool.mockResolvedValue(undefined);
-    mockFindSubscriptionsByTrialDateRange.mockResolvedValue([]);
-    mockSendPushNotification.mockResolvedValue({ sent: false });
-
-    const result = await capturedHandler({ step: mockStep });
-
     expect(result).toEqual(
       expect.objectContaining({
         status: 'completed',
         date: expect.any(String),
         expiredCount: 1,
         extendedExpiredCount: 1,
-        warningsSent: expect.any(Number),
-        softLandingSent: expect.any(Number),
+        warningsSent: 1,
+        softLandingSent: 2,
       })
     );
-  });
 
-  it('handles no trials gracefully', async () => {
-    const mockStep = createMockStep();
+    const updatedExpiredSubscription = await loadSubscription(
+      justExpiredSeed.subscription.id
+    );
+    expect(updatedExpiredSubscription!.status).toBe('expired');
+    expect(updatedExpiredSubscription!.tier).toBe('free');
 
-    mockFindExpiredTrials.mockResolvedValue([]);
-    mockFindExpiredTrialsByDaysSinceEnd.mockResolvedValue([]);
-    mockFindSubscriptionsByTrialDateRange.mockResolvedValue([]);
+    const updatedExpiredQuota = await loadQuotaPool(
+      justExpiredSeed.quotaPool.id
+    );
+    expect(updatedExpiredQuota!.monthlyLimit).toBe(
+      EXTENDED_TRIAL_MONTHLY_EQUIVALENT
+    );
+    expect(updatedExpiredQuota!.usedThisMonth).toBe(0);
+    expect(updatedExpiredQuota!.usedToday).toBe(0);
+    expect(updatedExpiredQuota!.dailyLimit).toBe(freeTier.dailyLimit);
 
-    const result = await capturedHandler({ step: mockStep });
+    const updatedExtendedQuota = await loadQuotaPool(extendedSeed.quotaPool.id);
+    expect(updatedExtendedQuota!.monthlyLimit).toBe(freeTier.monthlyQuota);
+    expect(updatedExtendedQuota!.usedThisMonth).toBe(0);
+    expect(updatedExtendedQuota!.usedToday).toBe(0);
 
-    expect(result.status).toBe('completed');
-    expect(result.expiredCount).toBe(0);
-    expect(result.extendedExpiredCount).toBe(0);
-    expect(result.warningsSent).toBe(0);
-    expect(result.softLandingSent).toBe(0);
-    expect(mockTransitionToExtendedTrial).not.toHaveBeenCalled();
-    expect(mockDowngradeQuotaPool).not.toHaveBeenCalled();
-    expect(mockSendPushNotification).not.toHaveBeenCalled();
+    expect(mockSendPushNotification).toHaveBeenCalledTimes(3);
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        profileId: warning.profile.id,
+        title: 'Trial ending soon',
+        type: 'trial_expiry',
+      })
+    );
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        profileId: justExpired.profile.id,
+        title: 'Your trial has ended',
+        type: 'trial_expiry',
+      })
+    );
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        profileId: extended.profile.id,
+        title: 'Your trial has ended',
+        type: 'trial_expiry',
+      })
+    );
   });
 });

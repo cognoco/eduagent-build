@@ -1,192 +1,186 @@
 /**
- * Integration: Inngest Quota Reset Function (Daily + Monthly)
+ * Integration: Inngest quota-reset function
  *
- * Tests the quota-reset cron function directly (not via HTTP routes).
- * The function runs daily at 01:00 UTC and performs two steps:
- *
- * 1. Step 1 — Reset daily question counters for ALL quota pools (usedToday → 0)
- * 2. Step 2 — Reset monthly quotas for subscriptions whose billing cycle elapsed
- * 3. Returns combined result with dailyResetCount + monthlyResetCount
- * 4. Steps execute in order: daily reset before monthly reset
- * 5. Handles zero pools gracefully
+ * Exercises the real quota-reset function against a real database.
+ * Daily and monthly reset logic stays real.
  */
 
-// --- Capture the handler from inngest.createFunction ---
+import { eq } from 'drizzle-orm';
+import { accounts, quotaPools, subscriptions } from '@eduagent/database';
 
-let capturedHandler: any;
+import { cleanupAccounts, createIntegrationDb } from './helpers';
+import { quotaReset } from '../../apps/api/src/inngest/functions/quota-reset';
+import { getTierConfig } from '../../apps/api/src/services/subscription';
 
-jest.mock('../../apps/api/src/inngest/client', () => ({
-  inngest: {
-    createFunction: jest
-      .fn()
-      .mockImplementation((_config: any, _trigger: any, handler: any) => {
-        capturedHandler = handler;
-        const fn = jest.fn();
-        (fn as any).getConfig = () => [
-          {
-            id: 'quota-reset',
-            name: 'quota-reset',
-            triggers: [],
-            steps: {},
-          },
-        ];
-        return fn;
-      }),
-    send: jest.fn().mockResolvedValue({ ids: [] }),
-  },
-}));
+const FREE_USER_ID = 'integration-quota-reset-free';
+const FREE_EMAIL = 'integration-quota-reset-free@integration.test';
+const PLUS_USER_ID = 'integration-quota-reset-plus';
+const PLUS_EMAIL = 'integration-quota-reset-plus@integration.test';
+const FAMILY_USER_ID = 'integration-quota-reset-family';
+const FAMILY_EMAIL = 'integration-quota-reset-family@integration.test';
 
-// --- Step database mock ---
+async function seedAccount(clerkUserId: string, email: string) {
+  const db = createIntegrationDb();
+  const [account] = await db
+    .insert(accounts)
+    .values({ clerkUserId, email })
+    .returning();
 
-const mockGetStepDatabase = jest.fn().mockReturnValue({});
-jest.mock('../../apps/api/src/inngest/helpers', () => ({
-  getStepDatabase: mockGetStepDatabase,
-}));
+  return account!;
+}
 
-// --- Billing service mocks ---
+async function seedSubscriptionWithQuota(input: {
+  accountId: string;
+  tier: 'free' | 'plus' | 'family' | 'pro';
+  monthlyLimit: number;
+  usedThisMonth: number;
+  dailyLimit: number | null;
+  usedToday: number;
+  cycleResetAt: Date;
+}) {
+  const db = createIntegrationDb();
+  const [subscription] = await db
+    .insert(subscriptions)
+    .values({
+      accountId: input.accountId,
+      tier: input.tier,
+      status: 'active',
+      currentPeriodStart: new Date('2026-04-01T00:00:00.000Z'),
+      currentPeriodEnd: new Date('2026-05-01T00:00:00.000Z'),
+    })
+    .returning();
 
-const mockResetDailyQuotas = jest.fn();
-const mockResetExpiredQuotaCycles = jest.fn();
+  const [quotaPool] = await db
+    .insert(quotaPools)
+    .values({
+      subscriptionId: subscription!.id,
+      monthlyLimit: input.monthlyLimit,
+      usedThisMonth: input.usedThisMonth,
+      dailyLimit: input.dailyLimit,
+      usedToday: input.usedToday,
+      cycleResetAt: input.cycleResetAt,
+    })
+    .returning();
 
-jest.mock('../../apps/api/src/services/billing', () => ({
-  resetDailyQuotas: mockResetDailyQuotas,
-  resetExpiredQuotaCycles: mockResetExpiredQuotaCycles,
-}));
-
-// --- Import the module to trigger createFunction ---
-
-import '../../apps/api/src/inngest/functions/quota-reset';
-
-// --- Mock step runner (records step names in execution order) ---
-
-function createMockStep(): {
-  run: jest.Mock;
-  executionOrder: string[];
-} {
-  const executionOrder: string[] = [];
   return {
-    executionOrder,
-    run: jest
-      .fn()
-      .mockImplementation(async (name: string, fn: () => Promise<any>) => {
-        executionOrder.push(name);
-        return fn();
-      }),
+    subscription: subscription!,
+    quotaPool: quotaPool!,
   };
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-describe('Integration: Inngest quota-reset function', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+async function loadQuotaPool(id: string) {
+  const db = createIntegrationDb();
+  return db.query.quotaPools.findFirst({
+    where: eq(quotaPools.id, id),
   });
+}
 
-  it('captures the function handler from createFunction', () => {
-    expect(capturedHandler).toBeDefined();
-    expect(typeof capturedHandler).toBe('function');
+async function executeQuotaReset() {
+  const executionOrder: string[] = [];
+  const step = {
+    run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
+      executionOrder.push(name);
+      return fn();
+    }),
+  };
+
+  const result = await (
+    quotaReset as { fn: (input: unknown) => Promise<any> }
+  ).fn({ step });
+
+  return {
+    result,
+    executionOrder,
+  };
+}
+
+beforeEach(async () => {
+  jest.clearAllMocks();
+  await cleanupAccounts({
+    emails: [FREE_EMAIL, PLUS_EMAIL, FAMILY_EMAIL],
+    clerkUserIds: [FREE_USER_ID, PLUS_USER_ID, FAMILY_USER_ID],
   });
+});
 
-  it('Step 1: resets daily quotas for all pools with usage', async () => {
-    const mockStep = createMockStep();
-
-    mockResetDailyQuotas.mockResolvedValue(5);
-    mockResetExpiredQuotaCycles.mockResolvedValue(0);
-
-    const result = await capturedHandler({ step: mockStep });
-
-    expect(mockResetDailyQuotas).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.any(Date)
-    );
-    expect(result.dailyResetCount).toBe(5);
+afterAll(async () => {
+  await cleanupAccounts({
+    emails: [FREE_EMAIL, PLUS_EMAIL, FAMILY_EMAIL],
+    clerkUserIds: [FREE_USER_ID, PLUS_USER_ID, FAMILY_USER_ID],
   });
+});
 
-  it('Step 2: resets monthly quotas for expired billing cycles', async () => {
-    const mockStep = createMockStep();
+describe('Integration: quota-reset Inngest function', () => {
+  it('resets daily counters and expired monthly cycles against the real database', async () => {
+    const freeTier = getTierConfig('free');
+    const plusTier = getTierConfig('plus');
+    const familyTier = getTierConfig('family');
 
-    mockResetDailyQuotas.mockResolvedValue(0);
-    mockResetExpiredQuotaCycles.mockResolvedValue(3);
+    const freeAccount = await seedAccount(FREE_USER_ID, FREE_EMAIL);
+    const plusAccount = await seedAccount(PLUS_USER_ID, PLUS_EMAIL);
+    const familyAccount = await seedAccount(FAMILY_USER_ID, FAMILY_EMAIL);
 
-    const result = await capturedHandler({ step: mockStep });
+    const freePool = await seedSubscriptionWithQuota({
+      accountId: freeAccount.id,
+      tier: 'free',
+      monthlyLimit: freeTier.monthlyQuota,
+      usedThisMonth: 20,
+      dailyLimit: freeTier.dailyLimit,
+      usedToday: 4,
+      cycleResetAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
 
-    expect(mockResetExpiredQuotaCycles).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.any(Date)
-    );
-    expect(result.monthlyResetCount).toBe(3);
-  });
+    const plusPool = await seedSubscriptionWithQuota({
+      accountId: plusAccount.id,
+      tier: 'plus',
+      monthlyLimit: 123,
+      usedThisMonth: 120,
+      dailyLimit: null,
+      usedToday: 6,
+      cycleResetAt: new Date(Date.now() - 60 * 60 * 1000),
+    });
 
-  it('executes daily reset before monthly reset', async () => {
-    const mockStep = createMockStep();
+    const familyPool = await seedSubscriptionWithQuota({
+      accountId: familyAccount.id,
+      tier: 'family',
+      monthlyLimit: familyTier.monthlyQuota,
+      usedThisMonth: 33,
+      dailyLimit: null,
+      usedToday: 0,
+      cycleResetAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+    });
 
-    mockResetDailyQuotas.mockResolvedValue(0);
-    mockResetExpiredQuotaCycles.mockResolvedValue(0);
+    const { result, executionOrder } = await executeQuotaReset();
 
-    await capturedHandler({ step: mockStep });
-
-    expect(mockStep.executionOrder).toEqual([
+    expect(executionOrder).toEqual([
       'reset-daily-quotas',
       'reset-expired-cycles',
     ]);
-  });
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'completed',
+        dailyResetCount: 2,
+        monthlyResetCount: 1,
+        timestamp: expect.any(String),
+      })
+    );
 
-  it('returns complete result with both counts and timestamp', async () => {
-    const mockStep = createMockStep();
+    const reloadedFreePool = await loadQuotaPool(freePool.quotaPool.id);
+    expect(reloadedFreePool!.usedToday).toBe(0);
+    expect(reloadedFreePool!.usedThisMonth).toBe(20);
+    expect(reloadedFreePool!.monthlyLimit).toBe(freeTier.monthlyQuota);
 
-    mockResetDailyQuotas.mockResolvedValue(12);
-    mockResetExpiredQuotaCycles.mockResolvedValue(2);
+    const reloadedPlusPool = await loadQuotaPool(plusPool.quotaPool.id);
+    expect(reloadedPlusPool!.usedToday).toBe(0);
+    expect(reloadedPlusPool!.usedThisMonth).toBe(0);
+    expect(reloadedPlusPool!.monthlyLimit).toBe(plusTier.monthlyQuota);
+    expect(reloadedPlusPool!.dailyLimit).toBeNull();
+    expect(reloadedPlusPool!.cycleResetAt.getTime()).toBeGreaterThan(
+      plusPool.quotaPool.cycleResetAt.getTime()
+    );
 
-    const result = await capturedHandler({ step: mockStep });
-
-    expect(result).toEqual({
-      status: 'completed',
-      dailyResetCount: 12,
-      monthlyResetCount: 2,
-      timestamp: expect.any(String),
-    });
-    // Timestamp should be valid ISO
-    expect(() => new Date(result.timestamp)).not.toThrow();
-  });
-
-  it('handles zero pools gracefully', async () => {
-    const mockStep = createMockStep();
-
-    mockResetDailyQuotas.mockResolvedValue(0);
-    mockResetExpiredQuotaCycles.mockResolvedValue(0);
-
-    const result = await capturedHandler({ step: mockStep });
-
-    expect(result.status).toBe('completed');
-    expect(result.dailyResetCount).toBe(0);
-    expect(result.monthlyResetCount).toBe(0);
-  });
-
-  it('calls getStepDatabase for each step independently', async () => {
-    const mockStep = createMockStep();
-
-    mockResetDailyQuotas.mockResolvedValue(1);
-    mockResetExpiredQuotaCycles.mockResolvedValue(1);
-
-    await capturedHandler({ step: mockStep });
-
-    // Each step calls getStepDatabase() independently
-    expect(mockGetStepDatabase).toHaveBeenCalledTimes(2);
-  });
-
-  it('daily and monthly resets operate on separate pools', async () => {
-    const mockStep = createMockStep();
-
-    // Simulate: 50 pools had daily usage, 3 pools had expired monthly cycles
-    mockResetDailyQuotas.mockResolvedValue(50);
-    mockResetExpiredQuotaCycles.mockResolvedValue(3);
-
-    const result = await capturedHandler({ step: mockStep });
-
-    // Counts are independent
-    expect(result.dailyResetCount).toBe(50);
-    expect(result.monthlyResetCount).toBe(3);
+    const reloadedFamilyPool = await loadQuotaPool(familyPool.quotaPool.id);
+    expect(reloadedFamilyPool!.usedToday).toBe(0);
+    expect(reloadedFamilyPool!.usedThisMonth).toBe(33);
+    expect(reloadedFamilyPool!.monthlyLimit).toBe(familyTier.monthlyQuota);
   });
 });

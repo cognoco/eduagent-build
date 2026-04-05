@@ -1,92 +1,131 @@
 /**
  * Integration: Test Seed Endpoints
  *
- * Exercises /__test/seed, /__test/reset, and /__test/scenarios routes
- * via Hono's app.request(). Validates:
+ * Exercises the real /__test/seed, /__test/reset, and /__test/scenarios routes
+ * against the real database.
  *
- * 1. POST /__test/seed returns 201 with valid scenario data
- * 2. POST /__test/seed rejects invalid scenarios (Zod validation → 400)
- * 3. POST /__test/reset returns 200 with success message
- * 4. GET  /__test/scenarios returns all valid scenario names
- * 5. All endpoints return 403 when ENVIRONMENT=production
- * 6. All endpoints skip authentication (public paths)
- *
- * These endpoints are the foundation for all E2E/Maestro tests.
+ * No auth is supplied in this suite on purpose: `/__test/*` is a public path.
  */
 
-// --- Mock seedScenario/resetDatabase to avoid real DB ---
-const mockSeedScenario = jest.fn();
-const mockResetDatabase = jest.fn();
-
-jest.mock('../../apps/api/src/services/test-seed', () => ({
-  seedScenario: mockSeedScenario,
-  resetDatabase: mockResetDatabase,
-  VALID_SCENARIOS: [
-    'onboarding-complete',
-    'learning-active',
-    'retention-due',
-    'failed-recall-3x',
-    'parent-with-children',
-    'trial-active',
-    'trial-expired',
-    'multi-subject',
-    'homework-ready',
-  ],
-}));
-
-// --- Base mocks (middleware chain requires these) ---
+import { eq } from 'drizzle-orm';
+import { accounts, learningSessions, profiles } from '@eduagent/database';
 
 import {
-  jwtMock,
-  databaseMock,
-  inngestClientMock,
-  accountMock,
-  billingMock,
-  settingsMock,
-  sessionMock,
-  llmMock,
-} from './mocks';
-
-jest.mock('../../apps/api/src/middleware/jwt', () => jwtMock());
-jest.mock('@eduagent/database', () => databaseMock());
-jest.mock('../../apps/api/src/inngest/client', () => inngestClientMock());
-jest.mock('../../apps/api/src/services/account', () => accountMock());
-jest.mock('../../apps/api/src/services/billing', () => billingMock());
-jest.mock('../../apps/api/src/services/settings', () => settingsMock());
-jest.mock('../../apps/api/src/services/session', () => sessionMock());
-jest.mock('../../apps/api/src/services/llm', () => llmMock());
-
+  buildIntegrationEnv,
+  cleanupAccounts,
+  createIntegrationDb,
+} from './helpers';
 import { app } from '../../apps/api/src/index';
+import { VALID_SCENARIOS } from '../../apps/api/src/services/test-seed';
 
-const TEST_ENV = {
-  ENVIRONMENT: 'development',
-  DATABASE_URL: 'postgresql://test:test@localhost/test',
-};
+const DEV_ENV = buildIntegrationEnv({ ENVIRONMENT: 'development' });
+const PROD_ENV = buildIntegrationEnv({ ENVIRONMENT: 'production' });
 
-const PRODUCTION_ENV = {
-  ENVIRONMENT: 'production',
-  DATABASE_URL: 'postgresql://test:test@localhost/test',
-};
+const LEARNING_EMAIL = 'integration-seed-learning@integration.test';
+const RESET_A_EMAIL = 'integration-seed-reset-a@integration.test';
+const RESET_B_EMAIL = 'integration-seed-reset-b@integration.test';
+const MANUAL_EMAIL = 'integration-seed-manual@integration.test';
 
-// ---------------------------------------------------------------------------
-// Seed endpoint
-// ---------------------------------------------------------------------------
+async function findAccountByEmail(email: string) {
+  const db = createIntegrationDb();
+  return db.query.accounts.findFirst({
+    where: eq(accounts.email, email),
+  });
+}
 
-describe('Integration: POST /__test/seed', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+async function findProfile(id: string) {
+  const db = createIntegrationDb();
+  return db.query.profiles.findFirst({
+    where: eq(profiles.id, id),
+  });
+}
+
+async function findSession(id: string) {
+  const db = createIntegrationDb();
+  return db.query.learningSessions.findFirst({
+    where: eq(learningSessions.id, id),
+  });
+}
+
+async function seedManualNonSeedAccount() {
+  const db = createIntegrationDb();
+  const [account] = await db
+    .insert(accounts)
+    .values({
+      clerkUserId: 'manual_non_seed_account',
+      email: MANUAL_EMAIL,
+    })
+    .returning();
+
+  return account!;
+}
+
+beforeEach(async () => {
+  await cleanupAccounts({
+    emails: [LEARNING_EMAIL, RESET_A_EMAIL, RESET_B_EMAIL, MANUAL_EMAIL],
+  });
+});
+
+afterAll(async () => {
+  await cleanupAccounts({
+    emails: [LEARNING_EMAIL, RESET_A_EMAIL, RESET_B_EMAIL, MANUAL_EMAIL],
+  });
+});
+
+describe('Integration: test-seed routes', () => {
+  it('seeds a real scenario and persists the returned account/profile/session chain', async () => {
+    const res = await app.request(
+      '/v1/__test/seed',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenario: 'learning-active',
+          email: LEARNING_EMAIL,
+        }),
+      },
+      DEV_ENV
+    );
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.scenario).toBe('learning-active');
+    expect(body.email).toBe(LEARNING_EMAIL);
+    expect(body.accountId).toBeDefined();
+    expect(body.profileId).toBeDefined();
+    expect(body.password).toBeDefined();
+    expect(body.ids.subjectId).toBeDefined();
+    expect(body.ids.sessionId).toBeDefined();
+
+    const account = await findAccountByEmail(LEARNING_EMAIL);
+    expect(account).toBeDefined();
+    expect(account!.id).toBe(body.accountId);
+    expect(account!.clerkUserId.startsWith('clerk_seed_')).toBe(true);
+
+    const profile = await findProfile(body.profileId as string);
+    expect(profile).toBeDefined();
+    expect(profile!.accountId).toBe(body.accountId);
+
+    const session = await findSession(body.ids.sessionId as string);
+    expect(session).toBeDefined();
+    expect(session!.status).toBe('active');
   });
 
-  it('returns 201 with seeded scenario data', async () => {
-    const mockResult = {
-      scenario: 'onboarding-complete',
-      accountId: 'acc-123',
-      profileId: 'prof-456',
-      email: 'test-e2e@example.com',
-      ids: {},
-    };
-    mockSeedScenario.mockResolvedValue(mockResult);
+  it('rejects invalid scenarios with 400', async () => {
+    const res = await app.request(
+      '/v1/__test/seed',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scenario: 'not-a-real-scenario' }),
+      },
+      DEV_ENV
+    );
 
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 403 for seed routes in production', async () => {
     const res = await app.request(
       '/v1/__test/seed',
       {
@@ -94,237 +133,73 @@ describe('Integration: POST /__test/seed', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           scenario: 'onboarding-complete',
-          email: 'test-e2e@example.com',
+          email: LEARNING_EMAIL,
         }),
       },
-      TEST_ENV
-    );
-
-    expect(res.status).toBe(201);
-    const body = await res.json();
-    expect(body.scenario).toBe('onboarding-complete');
-    expect(body.accountId).toBe('acc-123');
-    expect(body.profileId).toBe('prof-456');
-    expect(body.email).toBe('test-e2e@example.com');
-    expect(mockSeedScenario).toHaveBeenCalledWith(
-      expect.anything(),
-      'onboarding-complete',
-      'test-e2e@example.com',
-      expect.objectContaining({})
-    );
-  });
-
-  it('uses default email when not provided', async () => {
-    mockSeedScenario.mockResolvedValue({
-      scenario: 'learning-active',
-      accountId: 'acc-789',
-      profileId: 'prof-012',
-      email: 'test-e2e@example.com',
-      ids: { subjectId: 'sub-1' },
-    });
-
-    const res = await app.request(
-      '/v1/__test/seed',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario: 'learning-active' }),
-      },
-      TEST_ENV
-    );
-
-    expect(res.status).toBe(201);
-    expect(mockSeedScenario).toHaveBeenCalledWith(
-      expect.anything(),
-      'learning-active',
-      'test-e2e@example.com', // default
-      expect.objectContaining({})
-    );
-  });
-
-  it('rejects invalid scenario name with 400', async () => {
-    const res = await app.request(
-      '/v1/__test/seed',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario: 'nonexistent-scenario' }),
-      },
-      TEST_ENV
-    );
-
-    expect(res.status).toBe(400);
-    expect(mockSeedScenario).not.toHaveBeenCalled();
-  });
-
-  it('returns 403 in production environment', async () => {
-    const res = await app.request(
-      '/v1/__test/seed',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario: 'onboarding-complete' }),
-      },
-      PRODUCTION_ENV
+      PROD_ENV
     );
 
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.code).toBe('FORBIDDEN');
-    expect(mockSeedScenario).not.toHaveBeenCalled();
   });
 
-  it('skips authentication (public path)', async () => {
-    mockSeedScenario.mockResolvedValue({
-      scenario: 'trial-active',
-      accountId: 'acc-x',
-      profileId: 'prof-x',
-      email: 'test@example.com',
-      ids: { subscriptionId: 'sub-x' },
-    });
-
-    // No Authorization header — should still work
+  it('lists the real valid scenario names', async () => {
     const res = await app.request(
-      '/v1/__test/seed',
+      '/v1/__test/scenarios',
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario: 'trial-active' }),
+        method: 'GET',
       },
-      TEST_ENV
-    );
-
-    expect(res.status).toBe(201);
-  });
-
-  it.each([
-    'onboarding-complete',
-    'learning-active',
-    'retention-due',
-    'failed-recall-3x',
-    'parent-with-children',
-    'trial-active',
-    'trial-expired',
-    'multi-subject',
-    'homework-ready',
-  ] as const)('accepts scenario: %s', async (scenario) => {
-    mockSeedScenario.mockResolvedValue({
-      scenario,
-      accountId: `acc-${scenario}`,
-      profileId: `prof-${scenario}`,
-      email: 'test-e2e@example.com',
-      ids: {},
-    });
-
-    const res = await app.request(
-      '/v1/__test/seed',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario }),
-      },
-      TEST_ENV
-    );
-
-    expect(res.status).toBe(201);
-    const body = await res.json();
-    expect(body.scenario).toBe(scenario);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Reset endpoint
-// ---------------------------------------------------------------------------
-
-describe('Integration: POST /__test/reset', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('returns 200 with success message and deletedCount', async () => {
-    mockResetDatabase.mockResolvedValue({
-      deletedCount: 3,
-      clerkUsersDeleted: 0,
-    });
-
-    const res = await app.request(
-      '/v1/__test/reset',
-      { method: 'POST' },
-      TEST_ENV
+      DEV_ENV
     );
 
     expect(res.status).toBe(200);
     const body = await res.json();
+    expect(body.scenarios).toEqual(VALID_SCENARIOS);
+  });
+
+  it('resets seeded accounts while leaving non-seed accounts alone', async () => {
+    await app.request(
+      '/v1/__test/seed',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenario: 'onboarding-complete',
+          email: RESET_A_EMAIL,
+        }),
+      },
+      DEV_ENV
+    );
+    await app.request(
+      '/v1/__test/seed',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenario: 'trial-active',
+          email: RESET_B_EMAIL,
+        }),
+      },
+      DEV_ENV
+    );
+    await seedManualNonSeedAccount();
+
+    const resetRes = await app.request(
+      '/v1/__test/reset',
+      {
+        method: 'POST',
+      },
+      DEV_ENV
+    );
+
+    expect(resetRes.status).toBe(200);
+    const body = await resetRes.json();
     expect(body.message).toBe('Database reset complete');
-    expect(body.deletedCount).toBe(3);
-    expect(mockResetDatabase).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({})
-    );
-  });
+    expect(body.deletedCount).toBeGreaterThanOrEqual(2);
 
-  it('returns 403 in production environment', async () => {
-    const res = await app.request(
-      '/v1/__test/reset',
-      { method: 'POST' },
-      PRODUCTION_ENV
-    );
-
-    expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body.code).toBe('FORBIDDEN');
-    expect(mockResetDatabase).not.toHaveBeenCalled();
-  });
-
-  it('skips authentication (public path)', async () => {
-    mockResetDatabase.mockResolvedValue({ deletedCount: 0 });
-
-    const res = await app.request(
-      '/v1/__test/reset',
-      { method: 'POST' },
-      TEST_ENV
-    );
-
-    expect(res.status).toBe(200);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Scenarios endpoint
-// ---------------------------------------------------------------------------
-
-describe('Integration: GET /__test/scenarios', () => {
-  it('returns all valid scenario names', async () => {
-    const res = await app.request(
-      '/v1/__test/scenarios',
-      { method: 'GET' },
-      TEST_ENV
-    );
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.scenarios).toEqual([
-      'onboarding-complete',
-      'learning-active',
-      'retention-due',
-      'failed-recall-3x',
-      'parent-with-children',
-      'trial-active',
-      'trial-expired',
-      'multi-subject',
-      'homework-ready',
-    ]);
-  });
-
-  it('returns 403 in production environment', async () => {
-    const res = await app.request(
-      '/v1/__test/scenarios',
-      { method: 'GET' },
-      PRODUCTION_ENV
-    );
-
-    expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body.code).toBe('FORBIDDEN');
+    expect(await findAccountByEmail(RESET_A_EMAIL)).toBeUndefined();
+    expect(await findAccountByEmail(RESET_B_EMAIL)).toBeUndefined();
+    expect(await findAccountByEmail(MANUAL_EMAIL)).toBeDefined();
   });
 });
