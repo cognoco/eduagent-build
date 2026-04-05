@@ -139,10 +139,9 @@ export function useStreamInterviewMessage(subjectId: string): {
             accumulated += event.content;
             onChunk(accumulated);
           } else if (event.type === 'done') {
-            const doneEvent = event as unknown as InterviewStreamDoneResult;
             onDone({
-              isComplete: doneEvent.isComplete,
-              exchangeCount: doneEvent.exchangeCount,
+              isComplete: event.isComplete ?? false,
+              exchangeCount: event.exchangeCount,
             });
           }
         }

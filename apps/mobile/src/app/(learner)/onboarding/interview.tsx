@@ -73,7 +73,9 @@ export default function InterviewScreen() {
         (exchange, index): ChatMessage => ({
           id: `draft-${index}`,
           role: exchange.role === 'assistant' ? 'ai' : 'user',
-          content: exchange.content,
+          content: exchange.content
+            .replace(/\[INTERVIEW_COMPLETE\]/g, '')
+            .trimEnd(),
         })
       ) ?? [];
 
@@ -150,16 +152,28 @@ export default function InterviewScreen() {
         await streamInterview(
           text,
           (accumulated) => {
+            // Strip the [INTERVIEW_COMPLETE] marker so it never appears in the UI
+            const clean = accumulated
+              .replace(/\[INTERVIEW_COMPLETE\]/g, '')
+              .trimEnd();
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === streamMsgId ? { ...m, content: accumulated } : m
+                m.id === streamMsgId ? { ...m, content: clean } : m
               )
             );
           },
           (result) => {
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === streamMsgId ? { ...m, streaming: false } : m
+                m.id === streamMsgId
+                  ? {
+                      ...m,
+                      content: m.content
+                        .replace(/\[INTERVIEW_COMPLETE\]/g, '')
+                        .trimEnd(),
+                      streaming: false,
+                    }
+                  : m
               )
             );
             if (result.isComplete) {
@@ -195,16 +209,26 @@ export default function InterviewScreen() {
           exchangeCount={exchangeCount}
           isComplete={interviewComplete}
           persona="learner"
+          onPress={
+            interviewComplete
+              ? () =>
+                  router.replace({
+                    pathname: '/(learner)/onboarding/analogy-preference',
+                    params: { subjectId },
+                  } as never)
+              : undefined
+          }
         />
       }
       footer={
         interviewComplete ? (
           <View className="bg-coaching-card rounded-card p-4 mt-2 mb-4">
             <Text className="text-body font-semibold text-text-primary mb-2">
-              Your book is ready!
+              Ready to start learning!
             </Text>
             <Text className="text-body-sm text-text-secondary mb-3">
-              Your personalized curriculum is ready.
+              I've built a personalized curriculum just for you. Let's set up
+              how you like to learn, then jump right in.
             </Text>
             <Pressable
               onPress={() =>
@@ -215,11 +239,11 @@ export default function InterviewScreen() {
               }
               className="bg-primary rounded-button py-3 items-center"
               testID="view-curriculum-button"
-              accessibilityLabel="View curriculum"
+              accessibilityLabel="Start learning"
               accessibilityRole="button"
             >
               <Text className="text-text-inverse text-body font-semibold">
-                View Curriculum
+                Let's Go
               </Text>
             </Pressable>
           </View>

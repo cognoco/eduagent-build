@@ -310,7 +310,7 @@ export function useStreamMessage(sessionId: string): {
           } else if (event.type === 'done') {
             onDone({
               exchangeCount: event.exchangeCount,
-              escalationRung: event.escalationRung,
+              escalationRung: event.escalationRung ?? 0,
               expectedResponseMinutes: (
                 event as { expectedResponseMinutes?: number }
               ).expectedResponseMinutes,

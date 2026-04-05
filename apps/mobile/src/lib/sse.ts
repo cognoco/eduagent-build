@@ -21,20 +21,21 @@ export interface StreamChunkEvent {
 export interface StreamDoneEvent {
   type: 'done';
   exchangeCount: number;
-  escalationRung: number;
+  /** Present on learning sessions; absent on interview done events. */
+  escalationRung?: number;
+  /** Present on interview done events; absent on learning sessions. */
+  isComplete?: boolean;
 }
 
 export type StreamEvent = StreamChunkEvent | StreamDoneEvent;
 
 /** BC-07: runtime validation for SSE events — verifies required fields exist
- * before casting, preventing malformed events from corrupting accumulated text. */
+ * before casting, preventing malformed events from corrupting accumulated text.
+ * Note: `escalationRung` is only present on learning-session done events;
+ * interview done events carry `isComplete` instead. Both are valid. */
 function isValidStreamEvent(obj: Record<string, unknown>): boolean {
   if (obj.type === 'chunk') return typeof obj.content === 'string';
-  if (obj.type === 'done')
-    return (
-      typeof obj.exchangeCount === 'number' &&
-      typeof obj.escalationRung === 'number'
-    );
+  if (obj.type === 'done') return typeof obj.exchangeCount === 'number';
   return false;
 }
 
@@ -222,9 +223,14 @@ export function streamSSEViaXHR(
     // If headers-received handler already flagged an error, enrich it with the
     // full response body (now available) and extract any structured error code.
     if (streamError && xhr.status >= 400) {
-      const apiError = streamError as Error & { status?: number; code?: string };
+      const apiError = streamError as Error & {
+        status?: number;
+        code?: string;
+      };
       // Overwrite with full body now that it's available
-      apiError.message = `API error ${xhr.status}: ${xhr.responseText || xhr.statusText}`;
+      apiError.message = `API error ${xhr.status}: ${
+        xhr.responseText || xhr.statusText
+      }`;
       try {
         const parsed = JSON.parse(xhr.responseText || '{}') as {
           error?: { code?: string };
@@ -289,7 +295,9 @@ export function streamSSEViaXHR(
   // 30s timeout — prevents indefinite hangs if server stalls mid-stream
   xhr.timeout = 30_000;
   xhr.ontimeout = () => {
-    streamError = new Error('The connection timed out while waiting for a reply');
+    streamError = new Error(
+      'The connection timed out while waiting for a reply'
+    );
     done = true;
     const r = resolve;
     resolve = null;

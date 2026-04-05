@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -19,6 +19,8 @@ interface LivingBookProps {
   isComplete: boolean;
   /** Controls animation expressiveness and sparkle visibility. */
   persona: Persona;
+  /** Optional press handler — makes the book tappable (e.g. navigate on completion). */
+  onPress?: () => void;
 }
 
 /**
@@ -32,6 +34,7 @@ export function LivingBook({
   exchangeCount,
   isComplete,
   persona,
+  onPress,
 }: LivingBookProps): React.ReactElement {
   const colors = useThemeColors();
   const prevCount = useRef(exchangeCount);
@@ -132,14 +135,29 @@ export function LivingBook({
     borderColor: colors.primary,
   }));
 
+  const Wrapper = onPress ? Pressable : View;
+  const wrapperProps = onPress
+    ? {
+        onPress,
+        accessibilityRole: 'button' as const,
+        accessibilityLabel: isComplete
+          ? 'Your book is ready — tap to continue'
+          : `Book progress: ${exchangeCount} ${
+              exchangeCount === 1 ? 'page' : 'pages'
+            }`,
+      }
+    : {
+        accessibilityRole: 'image' as const,
+        accessibilityLabel: `Book progress: ${exchangeCount} ${
+          exchangeCount === 1 ? 'page' : 'pages'
+        }`,
+      };
+
   return (
-    <View
+    <Wrapper
       className="items-center me-2"
       testID="living-book"
-      accessibilityLabel={`Book progress: ${exchangeCount} ${
-        exchangeCount === 1 ? 'page' : 'pages'
-      }`}
-      accessibilityRole="image"
+      {...wrapperProps}
     >
       <Animated.View style={bookAnimatedStyle}>
         <View style={{ position: 'relative' }}>
@@ -175,6 +193,6 @@ export function LivingBook({
           ? ''
           : `${exchangeCount} ${exchangeCount === 1 ? 'page' : 'pages'}`}
       </Text>
-    </View>
+    </Wrapper>
   );
 }
