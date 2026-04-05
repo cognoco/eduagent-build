@@ -7,6 +7,7 @@ import {
   Platform,
   ScrollView,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
@@ -35,6 +36,22 @@ const SCREEN_HEIGHT =
     : Dimensions.get('screen').height;
 
 const HAS_SIGNED_IN_KEY = 'hasSignedInBefore';
+
+/**
+ * Module-level timestamp — survives component remounts caused by redirect
+ * bouncing.  After setActive() succeeds the auth layout fires a redirect to
+ * /(learner)/home.  If the learner layout bounces back (e.g. isSignedIn not
+ * yet propagated, or stale-token 401 → signOut) the sign-in screen remounts
+ * with fresh state.  This flag ensures we show a "Signing you in…" spinner
+ * instead of a confusing empty form.
+ */
+let _sessionActivatedAt: number | null = null;
+const SESSION_TRANSITION_MS = 8_000;
+
+/** @internal Reset transitioning state between tests. */
+export function _resetTransitionState(): void {
+  _sessionActivatedAt = null;
+}
 
 type VerificationStage = 'first_factor' | 'second_factor';
 
@@ -132,6 +149,17 @@ export default function SignInScreen() {
   const [activationFailureContext, setActivationFailureContext] = useState<
     'oauth' | 'password' | 'verification' | null
   >(null);
+  // Survives remounts: if setActive() just fired, show spinner not empty form
+  const [isTransitioning, setIsTransitioning] = useState(() => {
+    if (
+      _sessionActivatedAt &&
+      Date.now() - _sessionActivatedAt < SESSION_TRANSITION_MS
+    ) {
+      return true;
+    }
+    _sessionActivatedAt = null;
+    return false;
+  });
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
   const {
     scrollRef: verifyScrollRef,
@@ -149,6 +177,26 @@ export default function SignInScreen() {
       }
     })();
   }, []);
+
+  // Safety timeout: if the auth layout guard never redirects (e.g. stale
+  // token → signOut → remount), fall back to the sign-in form with an error
+  // instead of showing a spinner forever.
+  useEffect(() => {
+    if (!isTransitioning) return;
+    const elapsed = _sessionActivatedAt ? Date.now() - _sessionActivatedAt : 0;
+    const remaining = Math.max(100, SESSION_TRANSITION_MS - elapsed);
+    const timer = setTimeout(() => {
+      console.warn(
+        `[AUTH-DEBUG] transitioning TIMEOUT after ${SESSION_TRANSITION_MS}ms — falling back to sign-in form`
+      );
+      _sessionActivatedAt = null;
+      setIsTransitioning(false);
+      setError(
+        'Sign-in is taking longer than expected. Please try signing in again.'
+      );
+    }, remaining);
+    return () => clearTimeout(timer);
+  }, [isTransitioning]);
 
   const { startSSOFlow } = useSSO();
   const openAIStrategy = getOpenAISSOStrategy();
@@ -221,13 +269,28 @@ export default function SignInScreen() {
       }
 
       try {
+        if (__DEV__)
+          console.log(
+            `[AUTH-DEBUG] activateSession → calling setActive(${sessionId}) context=${context}`
+          );
         await setActive({ session: sessionId });
-      } catch {
+        if (__DEV__)
+          console.log('[AUTH-DEBUG] activateSession → setActive resolved OK');
+      } catch (e) {
+        if (__DEV__)
+          console.warn('[AUTH-DEBUG] activateSession → setActive THREW', e);
         setPendingSessionActivationId(sessionId);
         setActivationFailureContext(context);
         setError('Could not activate your session. Please try again.');
         return false;
       }
+
+      // Show "Signing you in…" spinner immediately — before clearing form
+      // state, so the user never sees a flash of the empty sign-in form.
+      // The module-level timestamp lets this survive component remounts
+      // if the redirect briefly bounces back.
+      _sessionActivatedAt = Date.now();
+      setIsTransitioning(true);
 
       setPendingSessionActivationId(null);
       setActivationFailureContext(null);
@@ -368,6 +431,16 @@ export default function SignInScreen() {
   const handleIncompleteSignIn = useCallback(
     async (attempt: SignInAttemptLike) => {
       const nextVerificationStep = getVerificationStep(attempt);
+      if (__DEV__)
+        console.log(
+          `[AUTH-DEBUG] handleIncompleteSignIn → status=${
+            attempt.status
+          } | nextStep=${
+            nextVerificationStep
+              ? `${nextVerificationStep.stage}/${nextVerificationStep.strategy}`
+              : 'null'
+          }`
+        );
       if (nextVerificationStep) {
         // Auto-send the verification code instead of showing the passive
         // "Additional verification available" banner.  Client Trust in Clerk
@@ -422,6 +495,19 @@ export default function SignInScreen() {
         password,
       });
 
+      if (__DEV__)
+        console.log(
+          `[AUTH-DEBUG] signIn.create → status=${
+            signInAttempt.status
+          } | sessionId=${
+            signInAttempt.createdSessionId ?? 'null'
+          } | firstFactors=${JSON.stringify(
+            (signInAttempt.supportedFirstFactors ?? []).map(
+              (f: Record<string, unknown>) => f.strategy
+            )
+          )}`
+        );
+
       if (signInAttempt.status === 'complete') {
         await activateSession(signInAttempt.createdSessionId, 'password');
       } else {
@@ -471,6 +557,10 @@ export default function SignInScreen() {
     setLoading(true);
 
     try {
+      if (__DEV__)
+        console.log(
+          `[AUTH-DEBUG] onVerifyPress → attempting ${pendingVerification.stage} / ${pendingVerification.strategy}`
+        );
       const result =
         pendingVerification.stage === 'first_factor'
           ? await signIn.attemptFirstFactor({
@@ -484,12 +574,24 @@ export default function SignInScreen() {
               code,
             });
 
+      if (__DEV__)
+        console.log(
+          `[AUTH-DEBUG] onVerifyPress → result.status=${
+            result.status
+          } | sessionId=${result.createdSessionId ?? 'null'}`
+        );
+
       if (result.status === 'complete') {
         await activateSession(result.createdSessionId, 'verification');
       } else {
+        if (__DEV__)
+          console.warn(
+            `[AUTH-DEBUG] onVerifyPress → NOT complete, calling handleIncompleteSignIn`
+          );
         await handleIncompleteSignIn(result);
       }
     } catch (err: unknown) {
+      if (__DEV__) console.warn('[AUTH-DEBUG] onVerifyPress → THREW', err);
       setError(
         extractClerkError(err, 'Invalid verification code. Please try again.')
       );
@@ -543,6 +645,23 @@ export default function SignInScreen() {
   const onBackFromVerification = useCallback(() => {
     clearVerificationFlow(true);
   }, [clearVerificationFlow]);
+
+  // After setActive() succeeds, show a spinner until the auth layout guard
+  // redirects to /(learner)/home.  This prevents the user from ever seeing
+  // a flash of the empty sign-in form during the Clerk state propagation.
+  if (isTransitioning) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        testID="sign-in-transitioning"
+      >
+        <ActivityIndicator size="large" />
+        <Text className="text-body text-text-secondary mt-4">
+          Signing you in…
+        </Text>
+      </View>
+    );
+  }
 
   if (pendingVerification) {
     return (

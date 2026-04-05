@@ -18,7 +18,8 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-const SignInScreen = require('./sign-in').default;
+const signInModule = require('./sign-in');
+const SignInScreen = signInModule.default;
 
 describe('SignInScreen', () => {
   const mockCreate = jest.fn();
@@ -31,6 +32,7 @@ describe('SignInScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    signInModule._resetTransitionState();
     delete process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY;
     (useSignIn as jest.Mock).mockReturnValue({
       isLoaded: true,

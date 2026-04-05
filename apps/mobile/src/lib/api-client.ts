@@ -94,7 +94,17 @@ export function useApiClient(): ApiClient {
         // was sent, this is a timing issue — let TanStack Query retry
         // instead of signing the user out.
         if (res.status === 401) {
+          console.warn(
+            `[AUTH-DEBUG] 401 received | token=${
+              token ? 'present' : 'null'
+            } | onAuthExpired=${!!_onAuthExpired} | alreadyFiring=${_authExpiredFiring} | url=${
+              typeof input === 'string' ? input : (input as Request).url
+            }`
+          );
           if (token && _onAuthExpired && !_authExpiredFiring) {
+            console.warn(
+              '[AUTH-DEBUG] >>> FIRING onAuthExpired — will sign out'
+            );
             _authExpiredFiring = true;
             _onAuthExpired();
           }

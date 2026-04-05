@@ -924,8 +924,17 @@ export default function LearnerLayout() {
     activeProfile?.consentStatus
   );
 
+  if (__DEV__)
+    console.log(
+      `[AUTH-DEBUG] (learner) layout | isLoaded=${isLoaded} | isSignedIn=${isSignedIn}`
+    );
   if (!isLoaded) return null;
-  if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
+  if (!isSignedIn) {
+    console.warn(
+      '[AUTH-DEBUG] (learner) layout → NOT signed in, bouncing to sign-in'
+    );
+    return <Redirect href="/(auth)/sign-in" />;
+  }
 
   // Show a centered spinner while profiles load — never return null (blank
   // screen) because the loading state also fires after switchProfile resets

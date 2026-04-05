@@ -160,6 +160,9 @@ function ThemedApp() {
   // unmounting authenticated UI and redirecting to sign-in via layout guards.
   useEffect(() => {
     setOnAuthExpired(() => {
+      console.warn(
+        '[AUTH-DEBUG] onAuthExpired FIRED — clearing queries + signing out'
+      );
       // BM-03: clear cached query data before sign-out to prevent the next
       // user from seeing stale data from the previous session.
       queryClient.clear();
