@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useQueries } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,6 +29,7 @@ import { useApiClient } from '../../lib/api-client';
 import { useProfile } from '../../lib/profile';
 import { combinedSignal } from '../../lib/query-timeout';
 import { assertOk } from '../../lib/assert-ok';
+import { formatApiError } from '../../lib/format-api-error';
 
 interface SubjectRetentionTopic {
   topicId: string;
@@ -199,6 +200,9 @@ export default function LibraryScreen() {
   const [showAllTopics, setShowAllTopics] = useState(false);
   const [showManageSubjects, setShowManageSubjects] = useState(false);
   const [pendingSubjectId, setPendingSubjectId] = useState<string | null>(null);
+  const [bookGenerationState, setBookGenerationState] = useState<
+    'idle' | 'slow' | 'timed_out'
+  >('idle');
 
   const subjectsQuery = useSubjects({ includeInactive: true });
   const progressQuery = useOverallProgress();
@@ -229,7 +233,49 @@ export default function LibraryScreen() {
     if (book && !book.topicsGenerated && !generateBookTopics.isPending) {
       generateBookTopics.mutate({});
     }
-  }, [selectedSubjectId, selectedBookId, booksQuery.data]);
+  }, [
+    selectedSubjectId,
+    selectedBookId,
+    booksQuery.data,
+    generateBookTopics,
+    generateBookTopics.isPending,
+  ]);
+
+  // Guard against stale generateBookTopics data from a previously selected book
+  const generatedBook =
+    generateBookTopics.data?.book.id === selectedBookId
+      ? generateBookTopics.data
+      : null;
+  const activeBook = bookQuery.data ?? generatedBook ?? null;
+
+  useEffect(() => {
+    const waitingForBookTopics =
+      !!selectedBookId &&
+      (generateBookTopics.isPending || (bookQuery.isLoading && !activeBook));
+    if (!waitingForBookTopics) {
+      setBookGenerationState('idle');
+      return undefined;
+    }
+
+    const slowTimer = setTimeout(() => {
+      setBookGenerationState((current) =>
+        current === 'idle' ? 'slow' : current
+      );
+    }, 60_000);
+    const timeoutTimer = setTimeout(() => {
+      setBookGenerationState('timed_out');
+    }, 90_000);
+
+    return () => {
+      clearTimeout(slowTimer);
+      clearTimeout(timeoutTimer);
+    };
+  }, [
+    activeBook,
+    bookQuery.isLoading,
+    generateBookTopics.isPending,
+    selectedBookId,
+  ]);
 
   const retentionQueries = useQueries({
     queries: (subjectsQuery.data ?? []).map((subject) => ({
@@ -282,12 +328,6 @@ export default function LibraryScreen() {
     null;
   const selectedBook =
     booksQuery.data?.find((book) => book.id === selectedBookId) ?? null;
-  // Guard against stale generateBookTopics data from a previously selected book
-  const generatedBook =
-    generateBookTopics.data?.book.id === selectedBookId
-      ? generateBookTopics.data
-      : null;
-  const activeBook = bookQuery.data ?? generatedBook ?? null;
   const flatSubjectTopics =
     curriculumQuery.data?.topics
       ?.filter((topic) => !topic.bookId)
@@ -330,9 +370,22 @@ export default function LibraryScreen() {
     setPendingSubjectId(subject.id);
     try {
       await updateSubject.mutateAsync({ subjectId: subject.id, status });
+    } catch (err: unknown) {
+      Alert.alert('Could not update subject', formatApiError(err));
     } finally {
       setPendingSubjectId(null);
     }
+  };
+
+  const retryBookGeneration = (): void => {
+    generateBookTopics.reset();
+    setBookGenerationState('idle');
+    generateBookTopics.mutate({});
+  };
+
+  const cancelBookGeneration = (): void => {
+    setBookGenerationState('idle');
+    setSelectedBookId(null);
   };
 
   const openTopic = (topicId: string, subjectId: string): void => {
@@ -443,12 +496,50 @@ export default function LibraryScreen() {
     }
 
     if (
+      selectedBookId &&
+      (generateBookTopics.isError || bookGenerationState === 'timed_out')
+    ) {
+      return (
+        <View
+          className="bg-surface rounded-card px-4 py-8 items-center"
+          testID="book-generation-error"
+        >
+          <Text className="text-body font-semibold text-text-primary text-center mb-2">
+            We couldn&apos;t finish that book right now
+          </Text>
+          <Text className="text-body-sm text-text-secondary text-center mb-5">
+            {generateBookTopics.isError
+              ? formatApiError(generateBookTopics.error)
+              : 'The topic generator took too long. Try again or go back to your shelf.'}
+          </Text>
+          <Pressable
+            onPress={retryBookGeneration}
+            className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
+            testID="book-generation-retry"
+          >
+            <Text className="text-text-inverse text-body font-semibold">
+              Retry
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={cancelBookGeneration}
+            className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+            testID="book-generation-cancel"
+          >
+            <Text className="text-text-primary text-body font-semibold">
+              Cancel
+            </Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    if (
       subjectsQuery.isError ||
       progressQuery.isError ||
       booksQuery.isError ||
       bookQuery.isError ||
-      curriculumQuery.isError ||
-      generateBookTopics.isError
+      curriculumQuery.isError
     ) {
       return (
         <View
@@ -489,6 +580,33 @@ export default function LibraryScreen() {
               {selectedBook.description}
             </Text>
           )}
+          {bookGenerationState === 'slow' && (
+            <Text className="text-body-sm text-text-secondary text-center mt-3">
+              This is taking a little longer than usual.
+            </Text>
+          )}
+          <View className="flex-row gap-3 mt-5">
+            <Pressable
+              onPress={cancelBookGeneration}
+              className="bg-surface-elevated rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
+              testID="book-generation-cancel-button"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Cancel
+              </Text>
+            </Pressable>
+            {bookGenerationState === 'slow' && (
+              <Pressable
+                onPress={handleRetry}
+                className="bg-primary rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
+                testID="book-generation-refresh-button"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  Check again
+                </Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       );
     }
@@ -549,6 +667,28 @@ export default function LibraryScreen() {
           suggestedNextId={findSuggestedNext(flatSubjectTopics)}
           onTopicPress={(topicId) => openTopic(topicId, selectedSubjectId)}
         />
+      );
+    }
+
+    if (
+      selectedSubjectId &&
+      booksQuery.data &&
+      booksQuery.data.length === 0 &&
+      flatSubjectTopics.length === 0
+    ) {
+      return (
+        <View
+          className="bg-surface rounded-card px-4 py-6 items-center"
+          testID="library-shelf-empty"
+        >
+          <Text className="text-body font-semibold text-text-primary text-center mb-2">
+            No topics on this shelf yet
+          </Text>
+          <Text className="text-body-sm text-text-secondary text-center">
+            We haven&apos;t added any lessons here yet. Try another shelf or
+            come back after your curriculum is ready.
+          </Text>
+        </View>
       );
     }
 

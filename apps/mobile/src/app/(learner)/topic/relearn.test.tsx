@@ -1,4 +1,9 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -171,6 +176,32 @@ describe('RelearnScreen', () => {
         )
       ).toBeTruthy();
       expect(screen.queryByText('Try Something New')).toBeNull();
+    });
+  });
+
+  it('shows an error when starting relearn fails', async () => {
+    mockMutate.mockImplementation(
+      (
+        _input: unknown,
+        callbacks?: {
+          onError?: (error: Error) => void;
+          onSettled?: () => void;
+        }
+      ) => {
+        callbacks?.onError?.(new Error('Could not start relearn right now'));
+        callbacks?.onSettled?.();
+      }
+    );
+
+    render(<RelearnScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('relearn-same-method'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('relearn-error')).toBeTruthy();
+      expect(
+        screen.getByText('Could not start relearn right now')
+      ).toBeTruthy();
     });
   });
 });

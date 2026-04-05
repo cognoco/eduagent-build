@@ -19,6 +19,8 @@ export default function LearnNewScreen(): React.ReactElement {
   const { activeProfile } = useProfile();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
+  const [expiredRecoveryMarker, setExpiredRecoveryMarker] =
+    useState<SessionRecoveryMarker | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,13 +29,17 @@ export default function LearnNewScreen(): React.ReactElement {
       try {
         const marker = await readSessionRecoveryMarker(activeProfile?.id);
         if (!cancelled) {
-          setRecoveryMarker(
-            marker && isRecoveryMarkerFresh(marker) ? marker : null
+          const freshMarker =
+            marker && isRecoveryMarkerFresh(marker) ? marker : null;
+          setRecoveryMarker(freshMarker);
+          setExpiredRecoveryMarker(
+            marker && !isRecoveryMarkerFresh(marker) ? marker : null
           );
         }
       } catch {
         if (!cancelled) {
           setRecoveryMarker(null);
+          setExpiredRecoveryMarker(null);
         }
       }
     }
@@ -95,6 +101,21 @@ export default function LearnNewScreen(): React.ReactElement {
             }
             testID="intent-resume"
           />
+        ) : null}
+        {expiredRecoveryMarker ? (
+          <View
+            className="bg-surface rounded-card px-4 py-4"
+            testID="intent-expired-recovery"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              Your last session timed out
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-2">
+              {expiredRecoveryMarker.subjectName
+                ? `Your recovery window for ${expiredRecoveryMarker.subjectName} expired after 30 minutes, but you can start a new session anytime.`
+                : 'Your recovery window expired after 30 minutes, but you can start a new session anytime.'}
+            </Text>
+          </View>
         ) : null}
       </View>
     </ScrollView>
