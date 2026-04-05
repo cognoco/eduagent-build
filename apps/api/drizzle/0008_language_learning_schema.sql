@@ -127,14 +127,14 @@ END $$;
 -- Step 8: Add indexes and unique constraints (idempotent)
 DO $$ BEGIN
   ALTER TABLE "vocabulary" ADD CONSTRAINT "vocabulary_profile_subject_term_unique" UNIQUE("profile_id", "subject_id", "term_normalized");
-EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
 END $$;
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "vocabulary_profile_subject_idx" ON "vocabulary" USING btree ("profile_id", "subject_id");
 --> statement-breakpoint
 DO $$ BEGIN
   ALTER TABLE "vocabulary_retention_cards" ADD CONSTRAINT "vocab_retention_cards_vocabulary_unique" UNIQUE("vocabulary_id");
-EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
 END $$;
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "vocab_retention_cards_review_idx" ON "vocabulary_retention_cards" USING btree ("profile_id", "next_review_at");
