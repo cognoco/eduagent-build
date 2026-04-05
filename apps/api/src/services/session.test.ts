@@ -59,7 +59,7 @@ jest.mock('./settings', () => ({
 }));
 
 import type { Database } from '@eduagent/database';
-import { createScopedRepository } from '@eduagent/database';
+import { createScopedRepository, profiles } from '@eduagent/database';
 import {
   startSession,
   SubjectInactiveError,
@@ -75,6 +75,7 @@ import {
   skipSummary,
   submitSummary,
   computeActiveSeconds,
+  resetSessionStaticContextCache,
 } from './session';
 import { processExchange } from './exchanges';
 import { evaluateEscalation } from './escalation';
@@ -162,10 +163,15 @@ function mockSelectChain(result: unknown[] = []): {
   const whereReturn = Object.assign(Promise.resolve(result), {
     limit: jest.fn().mockResolvedValue(result),
   });
+  const whereObj = {
+    where: jest.fn().mockReturnValue(whereReturn),
+  };
+  // Support both from().where() and from().innerJoin().where() chains
+  const fromReturn = Object.assign(whereObj, {
+    innerJoin: jest.fn().mockReturnValue(whereObj),
+  });
   return {
-    from: jest.fn().mockReturnValue({
-      where: jest.fn().mockReturnValue(whereReturn),
-    }),
+    from: jest.fn().mockReturnValue(fromReturn),
   };
 }
 
@@ -181,14 +187,22 @@ function createMockDb({
     metadata?: Record<string, unknown>;
   }>,
   selectResults = [] as unknown[][],
+  profileSelectResults = [] as unknown[],
   learningSessionFindFirst = mockSessionRow(),
+  updateReturning = [
+    { exchangeCount: (learningSessionFindFirst?.exchangeCount ?? 0) + 1 },
+  ],
 } = {}): Database {
-  const selectMock = jest.fn();
-  for (const result of selectResults) {
-    selectMock.mockReturnValueOnce(mockSelectChain(result));
-  }
-  // Fallback for any additional select calls
-  selectMock.mockReturnValue(mockSelectChain([]));
+  const pendingSelectResults = [...selectResults];
+  const selectMock = jest.fn().mockImplementation(() => ({
+    from: jest.fn().mockImplementation((table) => {
+      const result =
+        table === profiles
+          ? profileSelectResults
+          : pendingSelectResults.shift() ?? [];
+      return mockSelectChain(result).from();
+    }),
+  }));
 
   return {
     insert: jest.fn().mockReturnValue({
@@ -198,7 +212,9 @@ function createMockDb({
     }),
     update: jest.fn().mockReturnValue({
       set: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(undefined),
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue(updateReturning),
+        }),
       }),
     }),
     select: selectMock,
@@ -225,7 +241,10 @@ function createCloseSessionDb(
   db: Database;
   setMock: jest.Mock;
 } {
-  const whereMock = jest.fn().mockResolvedValue(undefined);
+  const returningMock = jest.fn().mockResolvedValue([{ id: 'session-1' }]);
+  const whereMock = jest.fn().mockReturnValue({
+    returning: returningMock,
+  });
   const setMock = jest.fn().mockReturnValue({
     where: whereMock,
   });
@@ -265,6 +284,7 @@ function setupScopedRepo({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetSessionStaticContextCache();
   mockCreatePendingSessionSummary.mockResolvedValue(
     mockSummaryRow({ status: 'pending' })
   );
@@ -398,7 +418,11 @@ describe('startSession', () => {
   it('uses topicId from input when provided', async () => {
     const topicId = '770e8400-e29b-41d4-a716-446655440000';
     const row = mockSessionRow({ topicId });
-    const db = createMockDb({ insertReturning: [row] });
+    const db = createMockDb({
+      insertReturning: [row],
+      // BS-04: topicId validation does a select to verify topic belongs to subject
+      selectResults: [[{ id: topicId }]],
+    });
     const result = await startSession(db, profileId, subjectId, {
       subjectId,
       topicId,
@@ -572,6 +596,42 @@ describe('startSession', () => {
 
     expect(db.insert).not.toHaveBeenCalled();
   });
+
+  it('BS-04: throws when topicId does not belong to the subject', async () => {
+    const foreignTopicId = '880e8400-e29b-41d4-a716-446655440000';
+    const db = createMockDb({
+      insertReturning: [mockSessionRow({ topicId: foreignTopicId })],
+      // BS-04: select returns empty — topic not found in this subject's curriculum
+      selectResults: [[]],
+    });
+
+    await expect(
+      startSession(db, profileId, subjectId, {
+        subjectId,
+        topicId: foreignTopicId,
+      })
+    ).rejects.toThrow('Topic not found in this subject');
+
+    // Session insert should not have been called
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('BS-04: allows topicId that belongs to the subject', async () => {
+    const validTopicId = '770e8400-e29b-41d4-a716-446655440000';
+    const row = mockSessionRow({ topicId: validTopicId });
+    const db = createMockDb({
+      insertReturning: [row],
+      // BS-04: select returns the topic — it belongs to this subject
+      selectResults: [[{ id: validTopicId }]],
+    });
+
+    const result = await startSession(db, profileId, subjectId, {
+      subjectId,
+      topicId: validTopicId,
+    });
+
+    expect(result.topicId).toBe(validTopicId);
+  });
 });
 
 describe('getSession', () => {
@@ -694,7 +754,9 @@ describe('processMessage', () => {
     setupScopedRepo({
       sessionFindFirst: mockSessionRow({ exchangeCount: 3 }),
     });
-    const db = createMockDb();
+    const db = createMockDb({
+      updateReturning: [{ exchangeCount: 4 }],
+    });
     const result = await processMessage(db, profileId, sessionId, {
       message: 'Continue',
     });
@@ -790,9 +852,10 @@ describe('processMessage', () => {
     setupScopedRepo({
       sessionFindFirst: mockSessionRow({ topicId: null }),
     });
-    // No topicId → no topic select → first select is profile query
     const db = createMockDb({
-      selectResults: [[{ birthDate: new Date('2014-06-15T00:00:00.000Z') }]],
+      profileSelectResults: [
+        { birthDate: new Date('2014-06-15T00:00:00.000Z') },
+      ],
     });
     await processMessage(db, profileId, sessionId, {
       message: 'Hey there',
@@ -839,11 +902,9 @@ describe('processMessage', () => {
       setupScopedRepo({
         sessionFindFirst: mockSessionRow({ topicId }),
       });
-      // selectResults order: [topic, profile, retentionCard]
       const db = createMockDb({
         selectResults: [
           [{ title: 'Algebra', description: 'Basic algebra' }],
-          [{ personaType: 'LEARNER' }],
           [{ repetitions: reps }],
         ],
       });
@@ -868,7 +929,6 @@ describe('processMessage', () => {
     const db = createMockDb({
       selectResults: [
         [{ title: 'Algebra', description: 'Desc' }],
-        [{ personaType: 'LEARNER' }],
         [], // no retention card
       ],
     });
@@ -896,11 +956,9 @@ describe('processMessage', () => {
       selectResults: [
         // 1. topic query (first topic from session.topicId)
         [{ title: 'Algebra Basics', description: 'Linear equations' }],
-        // 2. profile
-        [{ personaType: 'LEARNER' }],
-        // 3. retention card
+        // 2. retention card
         [{ repetitions: 2 }],
-        // 4. metadata query (interleaved session metadata)
+        // 3. metadata query (interleaved session metadata)
         [
           {
             metadata: {
@@ -924,7 +982,7 @@ describe('processMessage', () => {
             },
           },
         ],
-        // 5. inArray topic details query (after Promise.all)
+        // 4. inArray topic details query (after Promise.all)
         [
           {
             id: 'topic-001',
@@ -988,6 +1046,40 @@ describe('processMessage', () => {
       }),
       'Normal learning'
     );
+  });
+
+  it('D-03: throws SessionExchangeLimitError when atomic increment returns 0 rows', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ exchangeCount: 49 }),
+    });
+    const db = createMockDb({
+      // Atomic update returns empty array (0 rows updated = limit reached)
+      updateReturning: [],
+    });
+
+    // The processMessage call should throw because the atomic
+    // WHERE exchangeCount < 50 matched 0 rows
+    const { SessionExchangeLimitError } = await import('./session');
+    await expect(
+      processMessage(db, profileId, sessionId, {
+        message: 'One more message',
+      })
+    ).rejects.toThrow(SessionExchangeLimitError);
+  });
+
+  it('D-03: succeeds when atomic increment returns a row (under limit)', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ exchangeCount: 10 }),
+    });
+    const db = createMockDb({
+      updateReturning: [{ exchangeCount: 11 }],
+    });
+    const result = await processMessage(db, profileId, sessionId, {
+      message: 'Hello tutor',
+    });
+
+    expect(result.exchangeCount).toBe(11);
+    expect(result.response).toBe('Great question! Let me explain...');
   });
 });
 

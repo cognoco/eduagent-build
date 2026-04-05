@@ -1,215 +1,75 @@
 /**
  * Integration: Session-Completed Chain (P0-008)
  *
- * Tests the Inngest session-completed function end-to-end by directly
- * invoking the handler with a mock step runner. Validates:
+ * Exercises the real Inngest session-completed function against a real DB.
+ * The orchestration, DB writes, retention logic, streaks, summaries, and
+ * coaching-card cache stay real.
  *
- * 1. Happy path: all 10 steps execute and return correct outcomes
- * 2. Error isolation: one step failing does not block others
- * 3. Skip logic: no topicId → retention/deepening steps skip
- * 4. Summary tracking: skipped → increment, submitted → reset
- * 5. FR92 interleaved topics: interleavedTopicIds updates all topics
- * 6. Return value structure (status, sessionId, outcomes)
- *
- * This complements the co-located unit test with cross-cutting chain
- * validation from the integration test suite.
+ * Mocked boundaries:
+ * - Voyage embedding storage transport
+ * - Sentry reporting
  */
 
-jest.mock('@eduagent/database', () => {
-  const chainable = () => {
-    const chain: Record<string, any> = {};
-    chain.select = jest.fn().mockReturnValue(chain);
-    chain.from = jest.fn().mockReturnValue(chain);
-    chain.where = jest.fn().mockReturnValue(chain);
-    chain.limit = jest.fn().mockResolvedValue([]);
-    chain.orderBy = jest.fn().mockReturnValue(chain);
-    chain.query = {
-      sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
-      streaks: { findFirst: jest.fn().mockResolvedValue(null) },
-      subjects: { findFirst: jest.fn().mockResolvedValue(null) },
-    };
-    chain.transaction = jest
-      .fn()
-      .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(chain));
-    return chain;
-  };
-  return {
-    createDatabase: jest.fn(chainable),
-    // Re-export ORM helpers so they resolve without errors
-    retentionCards: {
-      repetitions: 'repetitions',
-      profileId: 'profileId',
-      topicId: 'topicId',
-    },
-    curriculumTopics: { id: 'id', title: 'title' },
-    sessionEvents: {
-      sessionId: 'sessionId',
-      profileId: 'profileId',
-      createdAt: 'createdAt',
-    },
-    streaks: { profileId: 'profileId' },
-    subjects: {
-      id: 'id',
-      profileId: 'profileId',
-      pedagogyMode: 'pedagogyMode',
-      languageCode: 'languageCode',
-    },
-  };
-});
+import { eq, and } from 'drizzle-orm';
+import {
+  accounts,
+  profiles,
+  subjects,
+  curricula,
+  curriculumTopics,
+  learningSessions,
+  sessionEvents,
+  sessionSummaries,
+  retentionCards,
+  assessments,
+  streaks,
+  learningModes,
+  coachingCardCache,
+  xpLedger,
+} from '@eduagent/database';
 
-const mockUpdateRetentionFromSession = jest.fn().mockResolvedValue(undefined);
-const mockUpdateNeedsDeepeningProgress = jest.fn().mockResolvedValue(undefined);
+import { cleanupAccounts, createIntegrationDb } from './helpers';
 
-jest.mock('../../apps/api/src/services/retention-data', () => ({
-  updateRetentionFromSession: (...args: unknown[]) =>
-    mockUpdateRetentionFromSession(...args),
-  updateNeedsDeepeningProgress: (...args: unknown[]) =>
-    mockUpdateNeedsDeepeningProgress(...args),
-}));
-
-const mockCreatePendingSessionSummary = jest.fn().mockResolvedValue(undefined);
-
-jest.mock('../../apps/api/src/services/summaries', () => ({
-  createPendingSessionSummary: (...args: unknown[]) =>
-    mockCreatePendingSessionSummary(...args),
-}));
-
-const mockPrecomputeCoachingCard = jest.fn().mockResolvedValue({
-  id: 'card-1',
-  profileId: 'profile-001',
-  type: 'challenge',
-  title: 'Keep going!',
-  body: 'Continue learning.',
-  priority: 3,
-  expiresAt: '2026-02-24T10:00:00.000Z',
-  createdAt: '2026-02-23T10:00:00.000Z',
-});
-const mockWriteCoachingCardCache = jest.fn().mockResolvedValue(undefined);
-
-jest.mock('../../apps/api/src/services/coaching-cards', () => ({
-  precomputeCoachingCard: (...args: unknown[]) =>
-    mockPrecomputeCoachingCard(...args),
-  writeCoachingCardCache: (...args: unknown[]) =>
-    mockWriteCoachingCardCache(...args),
-}));
-
-const mockRecordSessionActivity = jest.fn().mockResolvedValue(undefined);
-
-jest.mock('../../apps/api/src/services/streaks', () => ({
-  recordSessionActivity: (...args: unknown[]) =>
-    mockRecordSessionActivity(...args),
-}));
-
-const mockInsertSessionXpEntry = jest.fn().mockResolvedValue(undefined);
-
-jest.mock('../../apps/api/src/services/xp', () => ({
-  insertSessionXpEntry: (...args: unknown[]) =>
-    mockInsertSessionXpEntry(...args),
-}));
-
-const mockExtractAndStoreHomeworkSummary = jest
-  .fn()
-  .mockResolvedValue(undefined);
-
-jest.mock('../../apps/api/src/services/homework-summary', () => ({
-  extractAndStoreHomeworkSummary: (...args: unknown[]) =>
-    mockExtractAndStoreHomeworkSummary(...args),
-}));
-
-const mockExtractSessionContent = jest
-  .fn()
-  .mockResolvedValue(
-    'User: What is photosynthesis?\n\nAI: Photosynthesis is...'
-  );
-const mockStoreSessionEmbedding = jest.fn().mockResolvedValue(undefined);
-
-jest.mock('../../apps/api/src/services/embeddings', () => ({
-  extractSessionContent: (...args: unknown[]) =>
-    mockExtractSessionContent(...args),
-  storeSessionEmbedding: (...args: unknown[]) =>
-    mockStoreSessionEmbedding(...args),
-}));
-
-const mockIncrementSummarySkips = jest.fn().mockResolvedValue(1);
-const mockResetSummarySkips = jest.fn().mockResolvedValue(undefined);
-
-const mockUpdateMedianResponseSeconds = jest.fn().mockResolvedValue(undefined);
-
-jest.mock('../../apps/api/src/services/settings', () => ({
-  incrementSummarySkips: (...args: unknown[]) =>
-    mockIncrementSummarySkips(...args),
-  resetSummarySkips: (...args: unknown[]) => mockResetSummarySkips(...args),
-  updateMedianResponseSeconds: (...args: unknown[]) =>
-    mockUpdateMedianResponseSeconds(...args),
-}));
-
-const mockProcessEvaluateCompletion = jest.fn().mockResolvedValue(undefined);
-const mockProcessTeachBackCompletion = jest.fn().mockResolvedValue(undefined);
-
-jest.mock('../../apps/api/src/services/verification-completion', () => ({
-  processEvaluateCompletion: (...args: unknown[]) =>
-    mockProcessEvaluateCompletion(...args),
-  processTeachBackCompletion: (...args: unknown[]) =>
-    mockProcessTeachBackCompletion(...args),
-}));
-
-const mockQueueCelebration = jest.fn().mockResolvedValue(undefined);
-
-jest.mock('../../apps/api/src/services/celebrations', () => ({
-  queueCelebration: (...args: unknown[]) => mockQueueCelebration(...args),
-}));
-
-const mockGetCurrentLanguageProgress = jest.fn().mockResolvedValue(null);
-
-jest.mock('../../apps/api/src/services/language-curriculum', () => ({
-  getCurrentLanguageProgress: (...args: unknown[]) =>
-    mockGetCurrentLanguageProgress(...args),
-}));
-
-const mockExtractVocabularyFromTranscript = jest.fn().mockResolvedValue([]);
-
-jest.mock('../../apps/api/src/services/vocabulary-extract', () => ({
-  extractVocabularyFromTranscript: (...args: unknown[]) =>
-    mockExtractVocabularyFromTranscript(...args),
-}));
-
-const mockUpsertExtractedVocabulary = jest.fn().mockResolvedValue(undefined);
-
-jest.mock('../../apps/api/src/services/vocabulary', () => ({
-  upsertExtractedVocabulary: (...args: unknown[]) =>
-    mockUpsertExtractedVocabulary(...args),
-}));
-
+const mockStoreSessionEmbedding = jest.fn();
 const mockCaptureException = jest.fn();
+
+jest.mock('../../apps/api/src/services/embeddings', () => {
+  const actual = jest.requireActual(
+    '../../apps/api/src/services/embeddings'
+  ) as Record<string, unknown>;
+
+  return {
+    ...actual,
+    storeSessionEmbedding: (...args: unknown[]) =>
+      mockStoreSessionEmbedding(...args),
+  };
+});
 
 jest.mock('../../apps/api/src/services/sentry', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
-// Inngest client mock — needs createFunction to return a function with .fn
-jest.mock('../../apps/api/src/inngest/client', () => {
-  const { Inngest } = require('inngest');
-  return {
-    inngest: new Inngest({ id: 'test' }),
-  };
-});
-
 import { sessionCompleted } from '../../apps/api/src/inngest/functions/session-completed';
 
-// ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
+const AUTH_USER_ID = 'integration-session-completed-user';
+const AUTH_EMAIL = 'integration-session-completed@integration.test';
+const SESSION_TIMESTAMP = '2026-02-23T10:00:00.000Z';
 
-interface StepOutcome {
-  step: string;
-  status: 'ok' | 'skipped' | 'failed';
-  error?: string;
+interface Scenario {
+  profileId: string;
+  subjectId: string;
+  topicId: string | null;
+  sessionId: string;
 }
 
 interface ChainResult {
   status: 'completed' | 'completed-with-errors';
   sessionId: string;
-  outcomes: StepOutcome[];
+  outcomes: Array<{
+    step: string;
+    status: 'ok' | 'skipped' | 'failed';
+    error?: string;
+  }>;
 }
 
 async function executeChain(
@@ -227,305 +87,410 @@ async function executeChain(
   });
 }
 
-function createEventData(
-  overrides: Record<string, unknown> = {}
-): Record<string, unknown> {
+async function seedScenario(options?: {
+  includeTopic?: boolean;
+  initialSummarySkips?: number;
+}): Promise<Scenario> {
+  const db = createIntegrationDb();
+  const includeTopic = options?.includeTopic ?? true;
+
+  const [account] = await db
+    .insert(accounts)
+    .values({
+      clerkUserId: AUTH_USER_ID,
+      email: AUTH_EMAIL,
+    })
+    .returning();
+
+  const [profile] = await db
+    .insert(profiles)
+    .values({
+      accountId: account!.id,
+      displayName: 'Integration Learner',
+      birthYear: 2000,
+      isOwner: true,
+    })
+    .returning();
+
+  const [subject] = await db
+    .insert(subjects)
+    .values({
+      profileId: profile!.id,
+      name: 'Biology',
+      status: 'active',
+      pedagogyMode: 'socratic',
+    })
+    .returning();
+
+  let topicId: string | null = null;
+
+  if (includeTopic) {
+    const [curriculum] = await db
+      .insert(curricula)
+      .values({
+        subjectId: subject!.id,
+        version: 1,
+      })
+      .returning();
+
+    const [topic] = await db
+      .insert(curriculumTopics)
+      .values({
+        curriculumId: curriculum!.id,
+        title: 'Photosynthesis',
+        description: 'How plants convert light into energy',
+        sortOrder: 1,
+        estimatedMinutes: 15,
+      })
+      .returning();
+
+    topicId = topic!.id;
+  }
+
+  const [session] = await db
+    .insert(learningSessions)
+    .values({
+      profileId: profile!.id,
+      subjectId: subject!.id,
+      topicId,
+      sessionType: 'learning',
+      status: 'completed',
+      escalationRung: 2,
+      exchangeCount: 2,
+      startedAt: new Date('2026-02-23T09:58:00.000Z'),
+      lastActivityAt: new Date('2026-02-23T10:00:30.000Z'),
+    })
+    .returning();
+
+  await db.insert(sessionEvents).values([
+    {
+      sessionId: session!.id,
+      profileId: profile!.id,
+      subjectId: subject!.id,
+      topicId: topicId ?? undefined,
+      eventType: 'user_message',
+      content: 'What is photosynthesis?',
+      createdAt: new Date('2026-02-23T10:00:00.000Z'),
+    },
+    {
+      sessionId: session!.id,
+      profileId: profile!.id,
+      subjectId: subject!.id,
+      topicId: topicId ?? undefined,
+      eventType: 'ai_response',
+      content: 'Photosynthesis is how plants make food from sunlight.',
+      createdAt: new Date('2026-02-23T10:00:10.000Z'),
+    },
+    {
+      sessionId: session!.id,
+      profileId: profile!.id,
+      subjectId: subject!.id,
+      topicId: topicId ?? undefined,
+      eventType: 'user_message',
+      content: 'So they use light, water, and carbon dioxide?',
+      createdAt: new Date('2026-02-23T10:00:40.000Z'),
+    },
+  ]);
+
+  if (topicId) {
+    await db.insert(retentionCards).values({
+      profileId: profile!.id,
+      topicId,
+      easeFactor: '2.50',
+      intervalDays: 3,
+      repetitions: 3,
+      lastReviewedAt: new Date('2026-02-20T10:00:00.000Z'),
+      nextReviewAt: new Date('2026-02-22T10:00:00.000Z'),
+      consecutiveSuccesses: 2,
+      xpStatus: 'pending',
+      createdAt: new Date('2026-02-20T10:00:00.000Z'),
+      updatedAt: new Date('2026-02-20T10:00:00.000Z'),
+    });
+
+    await db.insert(assessments).values({
+      profileId: profile!.id,
+      subjectId: subject!.id,
+      topicId,
+      sessionId: session!.id,
+      verificationDepth: 'recall',
+      status: 'passed',
+      masteryScore: '0.80',
+      qualityRating: 4,
+    });
+  }
+
+  if (options?.initialSummarySkips != null) {
+    await db.insert(learningModes).values({
+      profileId: profile!.id,
+      mode: 'serious',
+      consecutiveSummarySkips: options.initialSummarySkips,
+      celebrationLevel: 'all',
+    });
+  }
+
   return {
-    profileId: 'profile-int-001',
-    sessionId: 'session-int-001',
-    topicId: 'topic-int-001',
-    subjectId: 'subject-int-001',
-    summaryStatus: 'pending',
-    sessionType: 'learning',
-    timestamp: '2026-02-23T10:00:00.000Z',
-    ...overrides,
+    profileId: profile!.id,
+    subjectId: subject!.id,
+    topicId,
+    sessionId: session!.id,
   };
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+async function loadRetentionCard(profileId: string, topicId: string) {
+  const db = createIntegrationDb();
+  return db.query.retentionCards.findFirst({
+    where: and(
+      eq(retentionCards.profileId, profileId),
+      eq(retentionCards.topicId, topicId)
+    ),
+  });
+}
+
+async function loadSummary(sessionId: string) {
+  const db = createIntegrationDb();
+  return db.query.sessionSummaries.findFirst({
+    where: eq(sessionSummaries.sessionId, sessionId),
+  });
+}
+
+async function loadStreak(profileId: string) {
+  const db = createIntegrationDb();
+  return db.query.streaks.findFirst({
+    where: eq(streaks.profileId, profileId),
+  });
+}
+
+async function loadLearningMode(profileId: string) {
+  const db = createIntegrationDb();
+  return db.query.learningModes.findFirst({
+    where: eq(learningModes.profileId, profileId),
+  });
+}
+
+async function loadCoachingCache(profileId: string) {
+  const db = createIntegrationDb();
+  return db.query.coachingCardCache.findFirst({
+    where: eq(coachingCardCache.profileId, profileId),
+  });
+}
+
+async function loadXpEntry(profileId: string, topicId: string) {
+  const db = createIntegrationDb();
+  return db.query.xpLedger.findFirst({
+    where: and(
+      eq(xpLedger.profileId, profileId),
+      eq(xpLedger.topicId, topicId)
+    ),
+  });
+}
+
+beforeEach(async () => {
+  mockStoreSessionEmbedding.mockReset();
+  mockStoreSessionEmbedding.mockResolvedValue(undefined);
+  mockCaptureException.mockReset();
+  process.env['VOYAGE_API_KEY'] = 'voyage-test-key';
+
+  await cleanupAccounts({
+    emails: [AUTH_EMAIL],
+    clerkUserIds: [AUTH_USER_ID],
+  });
+});
+
+afterEach(() => {
+  delete process.env['VOYAGE_API_KEY'];
+});
+
+afterAll(async () => {
+  await cleanupAccounts({
+    emails: [AUTH_EMAIL],
+    clerkUserIds: [AUTH_USER_ID],
+  });
+});
 
 describe('Integration: Session-Completed Chain (P0-008)', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
-    process.env['VOYAGE_API_KEY'] = 'pa-test-key-123';
-  });
+  it('runs the real chain and persists post-session side effects', async () => {
+    const scenario = await seedScenario();
 
-  afterEach(() => {
-    delete process.env['DATABASE_URL'];
-    delete process.env['VOYAGE_API_KEY'];
-  });
-
-  // -----------------------------------------------------------------------
-  // Happy path — all 12 steps execute successfully
-  // -----------------------------------------------------------------------
-
-  it('executes all 12 steps and returns completed status', async () => {
-    const result = await executeChain(createEventData());
+    const result = await executeChain({
+      profileId: scenario.profileId,
+      sessionId: scenario.sessionId,
+      topicId: scenario.topicId,
+      subjectId: scenario.subjectId,
+      summaryStatus: 'pending',
+      sessionType: 'learning',
+      qualityRating: 4,
+      timestamp: SESSION_TIMESTAMP,
+    });
 
     expect(result.status).toBe('completed');
-    expect(result.sessionId).toBe('session-int-001');
+    expect(result.sessionId).toBe(scenario.sessionId);
     expect(result.outcomes).toHaveLength(12);
 
-    const stepNames = result.outcomes.map((o) => o.step);
-    expect(stepNames).toEqual([
-      'process-verification-completion',
-      'update-retention',
-      'update-vocabulary-retention',
-      'update-needs-deepening',
-      'check-milestone-completion',
-      'write-coaching-card',
-      'update-dashboard',
-      'generate-embeddings',
-      'extract-homework-summary',
-      'track-summary-skips',
-      'update-pace-baseline',
-      'queue-celebrations',
-    ]);
-
-    // All steps should be 'ok' or 'skipped' (verification skipped when no verificationType)
-    for (const outcome of result.outcomes) {
-      expect(['ok', 'skipped']).toContain(outcome.status);
-    }
-  });
-
-  it('calls retention service with correct profileId and topicId', async () => {
-    await executeChain(createEventData({ qualityRating: 4 }));
-
-    expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
-      expect.anything(), // db
-      'profile-int-001',
-      'topic-int-001',
-      4, // qualityRating
-      '2026-02-23T10:00:00.000Z' // timestamp
+    const retentionCard = await loadRetentionCard(
+      scenario.profileId,
+      scenario.topicId!
     );
-  });
+    expect(retentionCard).not.toBeNull();
+    expect(retentionCard!.repetitions).toBeGreaterThanOrEqual(4);
+    expect(retentionCard!.lastReviewedAt).not.toBeNull();
 
-  it('skips retention update when qualityRating not provided (Issue #19)', async () => {
-    const result = await executeChain(
-      createEventData({ qualityRating: undefined })
-    );
+    const summary = await loadSummary(scenario.sessionId);
+    expect(summary).not.toBeNull();
+    expect(summary!.status).toBe('pending');
 
-    // With Issue #19, missing qualityRating skips retention entirely
-    // rather than defaulting to 3 (which inflated metrics)
-    expect(mockUpdateRetentionFromSession).not.toHaveBeenCalled();
-    const retentionOutcome = result.outcomes.find(
-      (o: StepOutcome) => o.step === 'update-retention'
-    );
-    expect(retentionOutcome?.status).toBe('skipped');
-  });
+    const streak = await loadStreak(scenario.profileId);
+    expect(streak).not.toBeNull();
+    expect(streak!.currentStreak).toBe(1);
+    expect(streak!.lastActivityDate).toBe('2026-02-23');
 
-  it('calls coaching card precompute and cache', async () => {
-    await executeChain(createEventData());
+    const learningMode = await loadLearningMode(scenario.profileId);
+    expect(learningMode).not.toBeNull();
+    expect(learningMode!.medianResponseSeconds).toBe(30);
+    expect(learningMode!.consecutiveSummarySkips).toBe(0);
 
-    expect(mockCreatePendingSessionSummary).toHaveBeenCalledWith(
-      expect.anything(), // db
-      'session-int-001',
-      'profile-int-001',
-      'topic-int-001',
-      'pending'
-    );
+    const coachingCache = await loadCoachingCache(scenario.profileId);
+    expect(coachingCache).not.toBeNull();
+    expect(coachingCache!.cardData).toMatchObject({
+      kind: 'home_surface_cache_v1',
+      legacyCoachingCard: expect.objectContaining({
+        profileId: scenario.profileId,
+      }),
+    });
 
-    expect(mockPrecomputeCoachingCard).toHaveBeenCalledWith(
-      expect.anything(),
-      'profile-int-001'
-    );
-
-    expect(mockWriteCoachingCardCache).toHaveBeenCalledWith(
-      expect.anything(),
-      'profile-int-001',
-      expect.objectContaining({ type: 'challenge' })
-    );
-  });
-
-  it('calls streak and XP services in update-dashboard step', async () => {
-    // qualityRating >= 3 required for streak (FR86 honest streak gate)
-    await executeChain(createEventData({ qualityRating: 4 }));
-
-    expect(mockRecordSessionActivity).toHaveBeenCalledWith(
-      expect.anything(),
-      'profile-int-001',
-      '2026-02-23' // date portion of timestamp
-    );
-
-    expect(mockInsertSessionXpEntry).toHaveBeenCalledWith(
-      expect.anything(),
-      'profile-int-001',
-      'topic-int-001',
-      'subject-int-001'
-    );
-  });
-
-  it('skips streak but still records XP when qualityRating < 3 (FR86)', async () => {
-    await executeChain(createEventData({ qualityRating: 2 }));
-
-    expect(mockRecordSessionActivity).not.toHaveBeenCalled();
-    expect(mockInsertSessionXpEntry).toHaveBeenCalledWith(
-      expect.anything(),
-      'profile-int-001',
-      'topic-int-001',
-      'subject-int-001'
-    );
-  });
-
-  it('calls embedding services in generate-embeddings step', async () => {
-    await executeChain(createEventData());
-
-    expect(mockExtractSessionContent).toHaveBeenCalledWith(
-      expect.anything(),
-      'session-int-001',
-      'profile-int-001'
-    );
+    const xpEntry = await loadXpEntry(scenario.profileId, scenario.topicId!);
+    expect(xpEntry).not.toBeNull();
+    expect(xpEntry!.subjectId).toBe(scenario.subjectId);
+    expect(xpEntry!.status).toBe('pending');
 
     expect(mockStoreSessionEmbedding).toHaveBeenCalledWith(
       expect.anything(),
-      'session-int-001',
-      'profile-int-001',
-      'topic-int-001',
-      expect.stringContaining('photosynthesis'), // extracted content
-      'pa-test-key-123' // Voyage API key
+      scenario.sessionId,
+      scenario.profileId,
+      scenario.topicId,
+      expect.stringContaining('What is photosynthesis?'),
+      'voyage-test-key'
     );
   });
 
-  it('extracts homework summaries only for homework sessions', async () => {
-    await executeChain(createEventData({ sessionType: 'homework' }));
+  it('skips topic-bound retention work when the event has no topicId', async () => {
+    const scenario = await seedScenario({ includeTopic: false });
 
-    expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalledWith(
-      expect.anything(),
-      'profile-int-001',
-      'session-int-001'
-    );
-  });
-
-  // -----------------------------------------------------------------------
-  // Skip logic — no topicId → retention/deepening steps skip
-  // -----------------------------------------------------------------------
-
-  it('skips retention and deepening steps when topicId is absent', async () => {
-    const result = await executeChain(createEventData({ topicId: undefined }));
+    const result = await executeChain({
+      profileId: scenario.profileId,
+      sessionId: scenario.sessionId,
+      topicId: null,
+      subjectId: scenario.subjectId,
+      summaryStatus: 'pending',
+      sessionType: 'learning',
+      qualityRating: 4,
+      timestamp: SESSION_TIMESTAMP,
+    });
 
     expect(result.status).toBe('completed');
+    expect(
+      result.outcomes.find((outcome) => outcome.step === 'update-retention')
+        ?.status
+    ).toBe('skipped');
+    expect(
+      result.outcomes.find(
+        (outcome) => outcome.step === 'update-needs-deepening'
+      )?.status
+    ).toBe('skipped');
 
-    const retentionOutcome = result.outcomes.find(
-      (o) => o.step === 'update-retention'
+    const summary = await loadSummary(scenario.sessionId);
+    expect(summary).not.toBeNull();
+    expect(summary!.topicId).toBeNull();
+
+    const streak = await loadStreak(scenario.profileId);
+    expect(streak).not.toBeNull();
+    expect(mockStoreSessionEmbedding).toHaveBeenCalledWith(
+      expect.anything(),
+      scenario.sessionId,
+      scenario.profileId,
+      null,
+      expect.any(String),
+      'voyage-test-key'
     );
-    const deepeningOutcome = result.outcomes.find(
-      (o) => o.step === 'update-needs-deepening'
-    );
-
-    expect(retentionOutcome?.status).toBe('skipped');
-    expect(deepeningOutcome?.status).toBe('skipped');
-
-    // Service functions should NOT have been called
-    expect(mockUpdateRetentionFromSession).not.toHaveBeenCalled();
-    expect(mockUpdateNeedsDeepeningProgress).not.toHaveBeenCalled();
   });
 
-  // -----------------------------------------------------------------------
-  // Error isolation — one step failing does NOT block others
-  // -----------------------------------------------------------------------
+  it('tracks skipped and accepted summaries through the real learning_modes row', async () => {
+    const skippedScenario = await seedScenario();
 
-  it('continues chain when one step fails (error isolation)', async () => {
-    // Make embedding step throw
-    mockExtractSessionContent.mockRejectedValueOnce(
+    await executeChain({
+      profileId: skippedScenario.profileId,
+      sessionId: skippedScenario.sessionId,
+      topicId: skippedScenario.topicId,
+      subjectId: skippedScenario.subjectId,
+      summaryStatus: 'skipped',
+      sessionType: 'learning',
+      qualityRating: 4,
+      timestamp: SESSION_TIMESTAMP,
+    });
+
+    const skippedMode = await loadLearningMode(skippedScenario.profileId);
+    expect(skippedMode).not.toBeNull();
+    expect(skippedMode!.consecutiveSummarySkips).toBe(1);
+
+    await cleanupAccounts({
+      emails: [AUTH_EMAIL],
+      clerkUserIds: [AUTH_USER_ID],
+    });
+
+    const acceptedScenario = await seedScenario({ initialSummarySkips: 3 });
+
+    await executeChain({
+      profileId: acceptedScenario.profileId,
+      sessionId: acceptedScenario.sessionId,
+      topicId: acceptedScenario.topicId,
+      subjectId: acceptedScenario.subjectId,
+      summaryStatus: 'accepted',
+      sessionType: 'learning',
+      qualityRating: 4,
+      timestamp: SESSION_TIMESTAMP,
+    });
+
+    const acceptedMode = await loadLearningMode(acceptedScenario.profileId);
+    expect(acceptedMode).not.toBeNull();
+    expect(acceptedMode!.consecutiveSummarySkips).toBe(0);
+  });
+
+  it('isolates embedding failures without blocking the rest of the chain', async () => {
+    const scenario = await seedScenario();
+    mockStoreSessionEmbedding.mockRejectedValueOnce(
       new Error('Voyage AI unavailable')
     );
 
-    const result = await executeChain(createEventData());
+    const result = await executeChain({
+      profileId: scenario.profileId,
+      sessionId: scenario.sessionId,
+      topicId: scenario.topicId,
+      subjectId: scenario.subjectId,
+      summaryStatus: 'pending',
+      sessionType: 'learning',
+      qualityRating: 4,
+      timestamp: SESSION_TIMESTAMP,
+    });
 
     expect(result.status).toBe('completed-with-errors');
+    expect(
+      result.outcomes.find((outcome) => outcome.step === 'generate-embeddings')
+    ).toMatchObject({
+      status: 'failed',
+      error: expect.stringContaining('Voyage AI unavailable'),
+    });
 
-    const embeddingOutcome = result.outcomes.find(
-      (o) => o.step === 'generate-embeddings'
-    );
-    expect(embeddingOutcome?.status).toBe('failed');
-    expect(embeddingOutcome?.error).toContain('Voyage AI unavailable');
-
-    // Other steps should still be 'ok' or 'skipped'
-    const otherSteps = result.outcomes.filter(
-      (o) => o.step !== 'generate-embeddings'
-    );
-    for (const step of otherSteps) {
-      expect(['ok', 'skipped']).toContain(step.status);
-    }
-
-    // Sentry should have captured the error
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'Voyage AI unavailable' }),
-      expect.objectContaining({ profileId: 'profile-int-001' })
-    );
-  });
-
-  // -----------------------------------------------------------------------
-  // Summary tracking — skipped vs submitted
-  // -----------------------------------------------------------------------
-
-  it('increments summary skips when summaryStatus is skipped', async () => {
-    await executeChain(createEventData({ summaryStatus: 'skipped' }));
-
-    expect(mockIncrementSummarySkips).toHaveBeenCalledWith(
-      expect.anything(),
-      'profile-int-001'
-    );
-    expect(mockResetSummarySkips).not.toHaveBeenCalled();
-  });
-
-  it('resets summary skips when summaryStatus is submitted', async () => {
-    await executeChain(createEventData({ summaryStatus: 'submitted' }));
-
-    expect(mockResetSummarySkips).toHaveBeenCalledWith(
-      expect.anything(),
-      'profile-int-001'
-    );
-    expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
-  });
-
-  it('resets summary skips when summaryStatus is accepted', async () => {
-    await executeChain(createEventData({ summaryStatus: 'accepted' }));
-
-    expect(mockResetSummarySkips).toHaveBeenCalledWith(
-      expect.anything(),
-      'profile-int-001'
-    );
-    expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
-  });
-
-  it('does not call skip/reset when summaryStatus is pending', async () => {
-    await executeChain(createEventData({ summaryStatus: 'pending' }));
-
-    expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
-    expect(mockResetSummarySkips).not.toHaveBeenCalled();
-  });
-
-  // -----------------------------------------------------------------------
-  // FR92 — interleaved topic IDs
-  // -----------------------------------------------------------------------
-
-  it('updates retention for all interleaved topic IDs (FR92)', async () => {
-    const interleavedTopicIds = ['topic-a', 'topic-b', 'topic-c'];
-
-    await executeChain(
-      createEventData({
-        interleavedTopicIds,
-        topicId: 'topic-int-001', // ignored when interleavedTopicIds present
-        qualityRating: 4,
-      })
+      expect.objectContaining({ profileId: scenario.profileId })
     );
 
-    // Should call retention for each topic
-    expect(mockUpdateRetentionFromSession).toHaveBeenCalledTimes(3);
-    expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledTimes(3);
+    const summary = await loadSummary(scenario.sessionId);
+    expect(summary).not.toBeNull();
 
-    for (const tid of interleavedTopicIds) {
-      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
-        expect.anything(),
-        'profile-int-001',
-        tid,
-        4,
-        '2026-02-23T10:00:00.000Z' // timestamp
-      );
-    }
+    const streak = await loadStreak(scenario.profileId);
+    expect(streak).not.toBeNull();
+
+    const coachingCache = await loadCoachingCache(scenario.profileId);
+    expect(coachingCache).not.toBeNull();
   });
 });

@@ -130,9 +130,21 @@ function createMockDb({
     | { id: string; subjectId: string }
     | undefined,
   curriculaFindMany = [] as Array<{ id: string; subjectId: string }>,
+  curriculumSelectRows = [] as Array<{
+    id: string;
+    subjectId: string;
+    version: number;
+  }>,
   topicsFindMany = [] as ReturnType<typeof mockTopicRow>[],
 } = {}): Database {
   return {
+    select: jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          orderBy: jest.fn().mockResolvedValue(curriculumSelectRows),
+        }),
+      }),
+    }),
     query: {
       curricula: {
         findFirst: jest.fn().mockResolvedValue(curriculumFindFirst),
@@ -503,32 +515,10 @@ describe('getContinueSuggestion', () => {
       retentionCardsFindMany: [],
       assessmentsFindMany: [],
     });
-
-    // Mock repo.retentionCards.findFirst to return null (no cards for any topic)
-    (createScopedRepository as jest.Mock).mockReturnValue({
-      subjects: {
-        findMany: jest.fn().mockResolvedValue([subject]),
-      },
-      retentionCards: {
-        findFirst: jest.fn().mockResolvedValue(null),
-      },
-      assessments: {
-        findMany: jest.fn().mockResolvedValue([]),
-      },
+    const db = createMockDb({
+      curriculumSelectRows: [{ id: curriculumId, subjectId, version: 1 }],
+      topicsFindMany: [topic1, topic2],
     });
-
-    const db = {
-      query: {
-        curricula: {
-          findFirst: jest
-            .fn()
-            .mockResolvedValue({ id: curriculumId, subjectId }),
-        },
-        curriculumTopics: {
-          findMany: jest.fn().mockResolvedValue([topic1, topic2]),
-        },
-      },
-    } as unknown as Database;
 
     const result = await getContinueSuggestion(db, profileId);
 

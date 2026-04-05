@@ -84,6 +84,49 @@ describe('getConsentPendingCopy', () => {
       parent.descriptionWithEmail('x@y.com')
     );
   });
+
+  // ── noEmailSent fields (PENDING state — no parent email submitted) ──
+
+  it('returns child-friendly no-email-sent text for learner', () => {
+    const copy = getConsentPendingCopy('learner');
+    expect(copy.noEmailSentTitle).toBe('One more step!');
+    expect(copy.noEmailSentDescription).toContain(
+      'parent or guardian needs to say'
+    );
+    expect(copy.noEmailSentSubtext).toContain('Hand your phone');
+    expect(copy.sendToParentButton).toBe('Get parent consent');
+  });
+
+  it('returns change-email copy for learner', () => {
+    const copy = getConsentPendingCopy('learner');
+    expect(copy.changeEmailButton).toBe('Send to another email');
+    expect(copy.changeEmailLabel).toBe("Parent or guardian's email");
+    expect(copy.changeEmailSubmit).toBe('Send link');
+    expect(copy.sameEmailWarning).toContain('your own email');
+  });
+
+  it.each<Persona>(['teen', 'parent'])(
+    'returns default no-email-sent text for %s persona',
+    (persona) => {
+      const copy = getConsentPendingCopy(persona);
+      expect(copy.noEmailSentTitle).toBe('Parental consent needed');
+      expect(copy.noEmailSentDescription).toContain(
+        'parent or guardian must give consent'
+      );
+      expect(copy.sendToParentButton).toBe('Get parent consent');
+    }
+  );
+
+  it.each<Persona>(['teen', 'parent'])(
+    'returns default change-email copy for %s persona',
+    (persona) => {
+      const copy = getConsentPendingCopy(persona);
+      expect(copy.changeEmailButton).toBe('Send to a different email');
+      expect(copy.changeEmailLabel).toBe('New parent email address');
+      expect(copy.changeEmailSubmit).toBe('Send consent link');
+      expect(copy.sameEmailWarning).toContain('your own email');
+    }
+  );
 });
 
 // ── getConsentWithdrawnCopy ────────────────────────────────────────────

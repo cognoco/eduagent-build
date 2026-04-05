@@ -14,7 +14,8 @@ import {
   type Database,
 } from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
-import { getTierConfig } from './subscription';
+import { getTierConfig, isValidTransition } from './subscription';
+import { captureException } from './sentry';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -757,41 +758,36 @@ export async function resetExpiredQuotaCycles(
   db: Database,
   now: Date
 ): Promise<number> {
-  const dueForReset = await db.query.quotaPools.findMany({
-    where: lte(quotaPools.cycleResetAt, now),
-  });
+  const free = getTierConfig('free');
+  const plus = getTierConfig('plus');
+  const family = getTierConfig('family');
+  const pro = getTierConfig('pro');
 
-  let count = 0;
+  const result = await db.execute(sql`
+    UPDATE quota_pools AS qp
+    SET
+      used_this_month = 0,
+      used_today = 0,
+      monthly_limit = CASE s.tier
+        WHEN 'plus' THEN ${plus.monthlyQuota}
+        WHEN 'family' THEN ${family.monthlyQuota}
+        WHEN 'pro' THEN ${pro.monthlyQuota}
+        ELSE ${free.monthlyQuota}
+      END,
+      daily_limit = CASE s.tier
+        WHEN 'plus' THEN ${plus.dailyLimit}
+        WHEN 'family' THEN ${family.dailyLimit}
+        WHEN 'pro' THEN ${pro.dailyLimit}
+        ELSE ${free.dailyLimit}
+      END,
+      cycle_reset_at = qp.cycle_reset_at + INTERVAL '1 month',
+      updated_at = ${now}
+    FROM subscriptions AS s
+    WHERE qp.subscription_id = s.id
+      AND qp.cycle_reset_at <= ${now}
+  `);
 
-  for (const pool of dueForReset) {
-    const sub = await db.query.subscriptions.findFirst({
-      where: eq(subscriptions.id, pool.subscriptionId),
-    });
-
-    const tierConfig = getTierConfig(
-      (sub?.tier as 'free' | 'plus' | 'family' | 'pro') ?? 'free'
-    );
-
-    // Advance from the pool's own cycle date to maintain billing cadence
-    const nextReset = new Date(pool.cycleResetAt);
-    nextReset.setMonth(nextReset.getMonth() + 1);
-
-    await db
-      .update(quotaPools)
-      .set({
-        usedThisMonth: 0,
-        usedToday: 0,
-        monthlyLimit: tierConfig.monthlyQuota,
-        dailyLimit: tierConfig.dailyLimit,
-        cycleResetAt: nextReset,
-        updatedAt: now,
-      })
-      .where(eq(quotaPools.id, pool.id));
-
-    count++;
-  }
-
-  return count;
+  return result.rowCount ?? 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -972,7 +968,10 @@ export async function isTopUpAlreadyGranted(
  * Only paid tiers (plus, family, pro) can purchase top-ups.
  * Returns null if the subscription's tier is not eligible.
  *
- * Accepts an optional `transactionId` for RevenueCat IAP idempotency tracking.
+ * BS-02: Uses INSERT ... ON CONFLICT DO NOTHING on the unique
+ * `revenuecatTransactionId` index to prevent double-granting credits
+ * from concurrent webhook retries. Returns null when the insert is
+ * a no-op (duplicate transaction).
  */
 export async function purchaseTopUpCredits(
   db: Database,
@@ -993,6 +992,33 @@ export async function purchaseTopUpCredits(
   const expiresAt = new Date(now);
   expiresAt.setMonth(expiresAt.getMonth() + TOP_UP_EXPIRY_MONTHS);
 
+  // When transactionId is provided, use onConflictDoNothing to atomically
+  // prevent duplicate grants. If the row already exists (duplicate txn),
+  // the INSERT returns no rows and we return null.
+  if (transactionId) {
+    const rows = await db
+      .insert(topUpCredits)
+      .values({
+        subscriptionId,
+        amount,
+        remaining: amount,
+        purchasedAt: now,
+        expiresAt,
+        revenuecatTransactionId: transactionId,
+      })
+      .onConflictDoNothing({
+        target: topUpCredits.revenuecatTransactionId,
+      })
+      .returning();
+
+    if (rows.length === 0) {
+      // Duplicate transaction — credit already granted
+      return null;
+    }
+    return mapTopUpCreditRow(rows[0]!);
+  }
+
+  // No transactionId — plain insert (internal/test usage)
   const [row] = await db
     .insert(topUpCredits)
     .values({
@@ -1001,7 +1027,7 @@ export async function purchaseTopUpCredits(
       remaining: amount,
       purchasedAt: now,
       expiresAt,
-      revenuecatTransactionId: transactionId ?? null,
+      revenuecatTransactionId: null,
     })
     .returning();
 
@@ -1289,6 +1315,12 @@ export async function addProfileToSubscription(
     return null;
   }
 
+  // Enforce per-tier maxProfiles limit
+  const allowed = await canAddProfile(db, subscriptionId);
+  if (!allowed) {
+    return null;
+  }
+
   const count = await getProfileCountForSubscription(db, subscriptionId);
   return { profileCount: count };
 }
@@ -1480,29 +1512,49 @@ export interface RevenuecatWebhookUpdate {
 }
 
 /**
- * Checks whether a RevenueCat event has already been processed.
- * Uses `lastRevenuecatEventId` on the subscription row for idempotency.
+ * Checks whether a RevenueCat event should be skipped.
+ * BD-01: Uses timestamp-based ordering instead of last-event-ID-only check.
+ * An event is considered "already processed" when:
+ *   (a) its event ID matches the last-processed ID (exact duplicate), OR
+ *   (b) its timestamp is older than the last-processed timestamp (stale retry).
+ * This prevents older webhook retries from overwriting current subscription state.
  */
 export async function isRevenuecatEventProcessed(
   db: Database,
   accountId: string,
-  eventId: string
+  eventId: string,
+  eventTimestampMs?: number
 ): Promise<boolean> {
   const sub = await db.query.subscriptions.findFirst({
     where: eq(subscriptions.accountId, accountId),
   });
   if (!sub) return false;
-  return sub.lastRevenuecatEventId === eventId;
+
+  // Exact duplicate — same event ID
+  if (sub.lastRevenuecatEventId === eventId) return true;
+
+  // BD-01: Stale retry — event timestamp is older than last processed
+  // Column is text; coerce to number for numeric comparison (NaN-safe)
+  if (eventTimestampMs != null && sub.lastRevenuecatEventTimestampMs != null) {
+    const lastTs = Number(sub.lastRevenuecatEventTimestampMs);
+    if (!Number.isNaN(lastTs) && eventTimestampMs < lastTs) return true;
+  }
+
+  return false;
 }
 
 /**
  * Updates a subscription from a RevenueCat webhook event.
- * Writes `lastRevenuecatEventId` for idempotency.
+ * Writes `lastRevenuecatEventId` and `lastRevenuecatEventTimestampMs` for
+ * timestamp-based idempotency (BD-01).
  */
 export async function updateSubscriptionFromRevenuecatWebhook(
   db: Database,
   accountId: string,
-  updates: RevenuecatWebhookUpdate & { eventId: string }
+  updates: RevenuecatWebhookUpdate & {
+    eventId: string;
+    eventTimestampMs?: number;
+  }
 ): Promise<SubscriptionRow | null> {
   const existing = await db.query.subscriptions.findFirst({
     where: eq(subscriptions.accountId, accountId),
@@ -1515,10 +1567,32 @@ export async function updateSubscriptionFromRevenuecatWebhook(
     updatedAt: new Date(),
   };
 
+  if (updates.eventTimestampMs != null) {
+    setValues.lastRevenuecatEventTimestampMs = String(updates.eventTimestampMs);
+  }
+
   if (updates.tier !== undefined) {
     setValues.tier = updates.tier;
   }
-  if (updates.status !== undefined) {
+  if (updates.status !== undefined && updates.status !== existing.status) {
+    if (!isValidTransition(existing.status, updates.status)) {
+      console.error(
+        `[billing] Invalid subscription transition: ${existing.status} -> ${updates.status} (sub: ${existing.id})`
+      );
+      captureException(
+        new Error(
+          `Invalid subscription transition: ${existing.status} -> ${updates.status}`
+        ),
+        {
+          extra: {
+            subscriptionId: existing.id,
+            fromStatus: existing.status,
+            toStatus: updates.status,
+          },
+        }
+      );
+      return mapSubscriptionRow(existing);
+    }
     setValues.status = updates.status;
   }
   if (updates.currentPeriodStart !== undefined) {
@@ -1565,11 +1639,34 @@ export async function activateSubscriptionFromRevenuecat(
     isTrial?: boolean;
     /** ISO 8601 trial end date. Required when isTrial is true. */
     trialEndsAt?: string;
+    /** BD-01: Event timestamp for ordering-based idempotency. */
+    eventTimestampMs?: number;
   }
 ): Promise<SubscriptionRow> {
   const existing = await getSubscriptionByAccountId(db, accountId);
   const tierConfig = getTierConfig(tier);
-  const status = options?.isTrial ? 'trial' : 'active';
+  const isTrial = options?.isTrial ?? false;
+  const trialEndsAt = options?.trialEndsAt;
+
+  // BD-03: enforce trialEndsAt when isTrial is true
+  if (isTrial && !trialEndsAt) {
+    console.error(
+      `[billing] trialEndsAt is required when isTrial is true (account: ${accountId})`
+    );
+    captureException(
+      new Error(
+        'Trial activation missing trialEndsAt — falling back to non-trial'
+      ),
+      { extra: { accountId, tier, eventId } }
+    );
+    // Gracefully fall back to non-trial activation rather than crashing the webhook
+    return activateSubscriptionFromRevenuecat(db, accountId, tier, eventId, {
+      ...options,
+      isTrial: false,
+    });
+  }
+
+  const status = isTrial ? 'trial' : 'active';
 
   if (!existing) {
     // Create new subscription + quota pool
@@ -1580,6 +1677,10 @@ export async function activateSubscriptionFromRevenuecat(
         tier,
         status,
         lastRevenuecatEventId: eventId,
+        lastRevenuecatEventTimestampMs:
+          options?.eventTimestampMs != null
+            ? String(options.eventTimestampMs)
+            : null,
         revenuecatOriginalAppUserId:
           options?.revenuecatOriginalAppUserId ?? null,
         currentPeriodStart: options?.currentPeriodStart
@@ -1618,6 +1719,10 @@ export async function activateSubscriptionFromRevenuecat(
     updatedAt: new Date(),
   };
 
+  if (options?.eventTimestampMs != null) {
+    setValues.lastRevenuecatEventTimestampMs = String(options.eventTimestampMs);
+  }
+
   if (options?.revenuecatOriginalAppUserId) {
     setValues.revenuecatOriginalAppUserId = options.revenuecatOriginalAppUserId;
   }
@@ -1627,9 +1732,8 @@ export async function activateSubscriptionFromRevenuecat(
   if (options?.currentPeriodEnd) {
     setValues.currentPeriodEnd = new Date(options.currentPeriodEnd);
   }
-  if (options?.trialEndsAt) {
-    setValues.trialEndsAt = new Date(options.trialEndsAt);
-  }
+  // BD-02: explicitly clear trialEndsAt on non-trial re-activation
+  setValues.trialEndsAt = isTrial && trialEndsAt ? new Date(trialEndsAt) : null;
 
   const [updated] = await db
     .update(subscriptions)

@@ -99,6 +99,7 @@ jest.mock('../services/consent', () => {
   return {
     // Preserve real error classes so instanceof checks work in route handlers
     ConsentResendLimitError: actual.ConsentResendLimitError,
+    EmailDeliveryError: actual.EmailDeliveryError,
     ConsentTokenNotFoundError: actual.ConsentTokenNotFoundError,
     ConsentAlreadyProcessedError: actual.ConsentAlreadyProcessedError,
     ConsentTokenExpiredError: actual.ConsentTokenExpiredError,
@@ -198,22 +199,17 @@ describe('consent routes', () => {
       expect(body.emailStatus).toBe('sent');
     });
 
-    it('returns emailStatus failed when delivery was not confirmed', async () => {
+    it('returns 502 when email delivery fails', async () => {
       const { requestConsent: mockRequestConsent } = jest.requireMock(
         '../services/consent'
       ) as { requestConsent: jest.Mock };
-      mockRequestConsent.mockResolvedValueOnce({
-        consentState: {
-          id: 'consent-1',
-          profileId: '550e8400-e29b-41d4-a716-446655440000',
-          consentType: 'GDPR',
-          status: 'PARENTAL_CONSENT_REQUESTED',
-          parentEmail: 'parent@example.com',
-          requestedAt: new Date().toISOString(),
-          respondedAt: null,
-        },
-        emailDelivered: false,
-      });
+      const { EmailDeliveryError: EmailDeliveryErrorClass } =
+        jest.requireActual('../services/consent') as {
+          EmailDeliveryError: new (reason?: string) => Error;
+        };
+      mockRequestConsent.mockRejectedValueOnce(
+        new EmailDeliveryErrorClass('no_api_key')
+      );
 
       const res = await app.request(
         '/v1/consent/request',
@@ -229,10 +225,11 @@ describe('consent routes', () => {
         TEST_ENV
       );
 
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(502);
 
       const body = await res.json();
-      expect(body.emailStatus).toBe('failed');
+      expect(body.code).toBe('INTERNAL_ERROR');
+      expect(body.message).toContain('could not be delivered');
     });
 
     it('returns 400 for invalid consent type', async () => {

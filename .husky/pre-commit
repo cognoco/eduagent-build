@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+set -e
 pnpm exec lint-staged
 
 # Full project-reference type-check (incremental via composite tsconfig).

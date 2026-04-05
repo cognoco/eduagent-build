@@ -155,7 +155,7 @@ jobs:
       - name: Run database migrations
         working-directory: packages/database
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ github.event_name == 'push' && secrets.DATABASE_URL_STAGING || secrets.DATABASE_URL_PRODUCTION }}
         run: |
           DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
           echo "Running migrations on ${DEPLOY_ENV} database..."
@@ -170,6 +170,23 @@ jobs:
           DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
           echo "Deploying API to ${DEPLOY_ENV}"
           pnpm exec wrangler deploy --env "${DEPLOY_ENV}"
+
+      - name: Sync secrets from Doppler to Worker
+        if: ${{ secrets.DOPPLER_TOKEN != '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
+          # Map wrangler env names to Doppler config short names
+          case "$DEPLOY_ENV" in
+            staging)    SYNC_TARGET="stg" ;;
+            production) SYNC_TARGET="prd" ;;
+            *)          SYNC_TARGET="dev" ;;
+          esac
+          echo "Syncing Doppler secrets (${SYNC_TARGET}) → Worker (${DEPLOY_ENV})"
+          curl -sL https://cli.doppler.com/install.sh | sh
+          pnpm secrets:sync "$SYNC_TARGET"
 
   # ---------------------------------------------------------------------------
   # Mobile: EAS Build deployment
@@ -213,7 +230,7 @@ jobs:
         uses: expo/expo-github-action@v8
         with:
           eas-version: 18.x
-          packager: npm
+          packager: pnpm
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build with EAS

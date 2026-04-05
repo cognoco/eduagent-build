@@ -121,7 +121,7 @@ Secrets come from **three sources**:
 
 2. **Sensitive secrets** — synced from Doppler `stg` config to Cloudflare Workers via `pnpm secrets:sync stg`. Stored as Workers Secrets on the `mentomate-api-stg` worker.
 
-3. **GitHub Actions secret** — only `CLOUDFLARE_API_TOKEN` is needed to authenticate `wrangler deploy`.
+3. **GitHub Actions secrets** — `CLOUDFLARE_API_TOKEN` authenticates `wrangler deploy`, and `DATABASE_URL_STAGING` is used for staging migrations in `deploy.yml`.
 
 ### Approval gate
 
@@ -185,6 +185,7 @@ Same pattern as staging:
 
 - **`[env.production.vars]`** in `wrangler.toml`: `APP_URL=https://app.mentomate.com`, `LOG_LEVEL=info`, `EMAIL_FROM=noreply@mentomate.com`
 - **Workers Secrets**: synced from Doppler `prd` config via `pnpm secrets:sync prd`
+- **GitHub Actions secret**: `DATABASE_URL_PRODUCTION` is used for production migrations in `deploy.yml`
 
 ### Runtime safety net
 
@@ -492,6 +493,8 @@ GitHub Actions secrets (set in GitHub, not Doppler):
 | Secret | Used By |
 |--------|---------|
 | `CLOUDFLARE_API_TOKEN` | `deploy.yml` — authenticates `wrangler deploy` |
+| `DATABASE_URL_STAGING` | `deploy.yml` — staging Neon migrations before staging deploys |
+| `DATABASE_URL_PRODUCTION` | `deploy.yml` — production Neon migrations before production deploys |
 | `EXPO_TOKEN` | `deploy.yml`, `mobile-ci.yml` — authenticates EAS CLI |
 | `CLAUDE_CODE_OAUTH_TOKEN` | `claude.yml`, `claude-code-review.yml` — AI review |
 | `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` | `e2e-ci.yml` — Clerk auth in E2E tests |

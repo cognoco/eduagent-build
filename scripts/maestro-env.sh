@@ -5,12 +5,13 @@
 # Uses directory junctions to avoid non-ASCII characters in user path.
 # Junctions: C:\AndroidSdk → SDK, C:\AndroidHome\.android → .android
 
-export JAVA_HOME="/c/Program Files/Eclipse Adoptium/jdk-17.0.18.8-hotspot"
-export ANDROID_HOME="/c/AndroidSdk"
-export ANDROID_SDK_ROOT="/c/AndroidSdk"
-export ANDROID_SDK_HOME="/c/AndroidHome"
-export PATH="$JAVA_HOME/bin:/c/AndroidSdk/platform-tools:/c/tools/maestro/bin:$PATH"
-export MAESTRO_OPTS="-Djava.io.tmpdir=C:/tools/temp"
+export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-17}"
+export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
+export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+export ANDROID_SDK_HOME="${ANDROID_SDK_HOME:-$HOME/.android}"
+export MAESTRO_HOME="${MAESTRO_HOME:-$HOME/.maestro}"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$MAESTRO_HOME/bin:$PATH"
+export MAESTRO_OPTS="${MAESTRO_OPTS:--Djava.io.tmpdir=/tmp}"
 export MAESTRO_CLI_NO_ANALYTICS=1
 export MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED=true
 

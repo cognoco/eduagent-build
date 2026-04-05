@@ -72,6 +72,11 @@ jest.mock('../../hooks/use-text-to-speech', () => ({
   }),
 }));
 
+// Stub animated SVG component to avoid reanimated timer leaks in tests
+jest.mock('../common', () => ({
+  PenWritingAnimation: () => null,
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -98,6 +103,7 @@ function renderChatShell(
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
+  jest.useFakeTimers();
   jest.clearAllMocks();
   mockSttState = {
     status: 'idle',
@@ -105,6 +111,10 @@ beforeEach(() => {
     error: null,
     isListening: false,
   };
+});
+
+afterEach(() => {
+  jest.useRealTimers();
 });
 
 describe('ChatShell', () => {

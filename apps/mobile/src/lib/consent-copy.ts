@@ -88,10 +88,21 @@ export function getConsentRequestCopy(persona: Persona): ConsentRequestCopy {
 // ── Consent Pending Gate ───────────────────────────────────────────────
 
 export interface ConsentPendingCopy {
+  /** Shown when consent email WAS sent (PARENTAL_CONSENT_REQUESTED) */
   title: string;
   descriptionWithEmail: (email: string) => string;
   descriptionWithoutEmail: string;
   subtext: string;
+  /** Shown when consent email was NOT yet sent (PENDING — no parentEmail) */
+  noEmailSentTitle: string;
+  noEmailSentDescription: string;
+  noEmailSentSubtext: string;
+  sendToParentButton: string;
+  /** Change parent email flow (shown on PARENTAL_CONSENT_REQUESTED screen) */
+  changeEmailButton: string;
+  changeEmailLabel: string;
+  changeEmailSubmit: string;
+  sameEmailWarning: string;
 }
 
 const defaultConsentPending: ConsentPendingCopy = {
@@ -99,6 +110,17 @@ const defaultConsentPending: ConsentPendingCopy = {
   descriptionWithEmail: (email: string) => `We sent an email to ${email}.`,
   descriptionWithoutEmail: 'We sent an email to your parent or guardian.',
   subtext: "Once they approve, you'll have full access.",
+  noEmailSentTitle: 'Parental consent needed',
+  noEmailSentDescription:
+    'A parent or guardian must give consent before this account can be used.',
+  noEmailSentSubtext:
+    'Complete the consent process to send a verification email to your parent.',
+  sendToParentButton: 'Get parent consent',
+  changeEmailButton: 'Send to a different email',
+  changeEmailLabel: 'New parent email address',
+  changeEmailSubmit: 'Send consent link',
+  sameEmailWarning:
+    'This is your own email. Please enter a parent or guardian email.',
 };
 
 const learnerConsentPending: ConsentPendingCopy = {
@@ -108,6 +130,17 @@ const learnerConsentPending: ConsentPendingCopy = {
   descriptionWithoutEmail:
     "We've asked your parent or guardian \u2014 they just need to check their email.",
   subtext: 'Once they say yes, you can start exploring!',
+  noEmailSentTitle: 'One more step!',
+  noEmailSentDescription:
+    "A parent or guardian needs to say it's OK before you can start learning.",
+  noEmailSentSubtext:
+    "Hand your phone to them so they can enter their email. We'll send them a quick link!",
+  sendToParentButton: 'Get parent consent',
+  changeEmailButton: 'Send to another email',
+  changeEmailLabel: "Parent or guardian's email",
+  changeEmailSubmit: 'Send link',
+  sameEmailWarning:
+    "That's your own email! Enter your parent or guardian's email instead.",
 };
 
 export function getConsentPendingCopy(persona: Persona): ConsentPendingCopy {

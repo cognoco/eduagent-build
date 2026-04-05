@@ -109,13 +109,20 @@ export function useSpeechRecognition(
         const resultEvent = event as {
           results?: Array<{ transcript?: string }>;
         };
+        if (!Array.isArray(resultEvent.results)) {
+          console.warn('[SpeechRecognition] Malformed result event:', event);
+          return;
+        }
         const nextTranscript = (resultEvent.results ?? [])
           .map((result) => result.transcript?.trim() ?? '')
           .filter(Boolean)
           .join(' ')
           .trim();
 
-        if (!nextTranscript) return;
+        if (!nextTranscript) {
+          console.warn('[SpeechRecognition] Empty transcript event:', event);
+          return;
+        }
         setTranscript(nextTranscript);
         setError(null);
       });

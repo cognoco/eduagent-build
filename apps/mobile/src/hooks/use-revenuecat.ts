@@ -125,8 +125,10 @@ export function useOfferings(): UseQueryResult<PurchasesOfferings | null> {
  * entitlement. Returns `null` on web or when RevenueCat is not configured.
  */
 export function useCustomerInfo(): UseQueryResult<CustomerInfo | null> {
+  // BC-01: scope query cache by userId to prevent entitlement leakage
+  const { userId } = useAuth();
   return useQuery({
-    queryKey: ['revenuecat', 'customerInfo'],
+    queryKey: ['revenuecat', 'customerInfo', userId],
     queryFn: async ({ signal: querySignal }): Promise<CustomerInfo | null> => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {

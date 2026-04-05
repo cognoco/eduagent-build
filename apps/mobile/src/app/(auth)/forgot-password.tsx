@@ -89,7 +89,7 @@ export default function ForgotPasswordScreen() {
           );
           return;
         }
-        router.replace('/(learner)/home');
+        // Auth layout guard handles navigation once isSignedIn propagates.
       } else {
         setError('Password reset could not be completed. Please try again.');
       }
@@ -98,7 +98,7 @@ export default function ForgotPasswordScreen() {
     } finally {
       setLoading(false);
     }
-  }, [isLoaded, canSubmitReset, signIn, setActive, router, code, newPassword]);
+  }, [isLoaded, canSubmitReset, signIn, setActive, code, newPassword]);
 
   const onResendCode = useCallback(async () => {
     if (!isLoaded || resending) return;

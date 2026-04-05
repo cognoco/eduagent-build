@@ -316,7 +316,7 @@ _Note: FR146 (Language SPEAK/LISTEN voice integration) is mapped to Epic 6 (Lang
 - ARCH-8: LLM orchestration module (`routeAndCall()`) — all LLM calls must go through this. No direct provider API calls.
 - ARCH-9: Model routing by conversation state (escalation rung): Gemini Flash for rung 1-2, reasoning models for rung 3+.
 - ARCH-10: SM-2 as pure math library in `packages/retention/` (~50 lines, zero deps)
-- ARCH-11: Workers KV for coaching cards (write on Inngest precompute, read on app open) and subscription status (write on Stripe webhook, read on metering)
+- ARCH-11: ~~Workers KV~~ DB-backed cache (`home_surface_cache` table) for coaching cards (write on Inngest precompute, read on app open) and subscription status (write on Stripe/RevenueCat webhook, read on metering). _Original spec said Workers KV; implementation uses DB table as conscious adaptation — acceptable at current scale._
 - ARCH-12: SSE streaming for LLM responses via Hono `streamSSE()`. Design handler behind interface for potential Durable Objects migration.
 - ARCH-13: Inngest for all async work that survives request lifecycle. Event naming: `app/{domain}.{action}`, payloads always include `profileId` + `timestamp`.
 - ARCH-14: ML Kit on-device OCR primary, server-side fallback behind interface at `/v1/ocr`
@@ -347,7 +347,7 @@ _Note: FR146 (Language SPEAK/LISTEN voice integration) is mapped to Epic 6 (Lang
 - UX-7: BaseCoachingCard component hierarchy with 4 variants (CoachingCard, AdaptiveEntryCard, ParentDashboardSummary, SessionCloseSummary)
 - UX-8: Adaptive entry for child profiles (context-aware opening based on time, retention, patterns). Cold start (sessions 1-5) uses coaching-voiced three-button fallback.
 - UX-9: Parent simulated dashboard during onboarding (trust demo with sample data)
-- UX-10: Session maximum length: teen nudge 15min/cap 20min, eager learner nudge 25min/cap 30min
+- UX-10: ~~Session maximum length: teen nudge 15min/cap 20min, eager learner nudge 25min/cap 30min~~ **Superseded by Epic 13 Story 13.2 (FR213).** Hard caps and nudges removed. Session timer is display-only. Adaptive silence detection (UX-12) is the active session-end mechanism.
 - UX-11: "Not Yet" feedback system — universal across all personas. Never "wrong" or "incorrect."
 - UX-12: Silence & re-engagement: 3min gentle prompt (once), 30min auto-save to coaching card
 - UX-13: Parent dashboard: 5-second glance design with one-sentence summary, traffic lights, temporal comparison, drill-down/drill-across
@@ -439,7 +439,7 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 
 Users can register, authenticate, create family accounts with multiple profiles, and manage GDPR/COPPA consent. Foundation infrastructure (monorepo, CI/CD, database, auth) is established as part of delivering this user value.
 
-**FRs covered:** FR1-FR12 (12 FRs)
+**FRs covered:** FR1-FR12 (12 FRs) | **Stories:** 7
 **ARCH requirements:** ARCH-1 (starter template fork), ARCH-2 (Nx monorepo), ARCH-3 (CI/CD), ARCH-4 (commit quality), ARCH-5 (Neon branching), ARCH-6 (typed config), ARCH-7 (scoped repository), ARCH-15 (Hono RPC), ARCH-19 (enforcement rules), ARCH-20 (error envelope), ARCH-21 (co-located tests), ARCH-22 (test factory), ARCH-23 (shared mocks), ARCH-26 (observability)
 **NFRs addressed:** NFR13-20 (Security), NFR21-27 (Privacy/Compliance), NFR28 (Scalability MVP tier), NFR40-44 (Monitoring)
 
@@ -962,7 +962,7 @@ Phase 7 — Language learning:                                         ❌ NOT S
 ## Epic 0: Project Foundation & User Registration — Stories
 
 **Goal:** Users can register, authenticate, create family accounts with multiple profiles, and manage GDPR/COPPA consent. Foundation infrastructure established as part of delivering this user value.
-**FRs:** FR1-FR12 (12 FRs) | **Stories:** 6
+**FRs:** FR1-FR12 (12 FRs) | **Stories:** 7
 
 ### Story 0.1: Email Registration & Account Activation
 
@@ -1168,6 +1168,120 @@ So that I can exercise my privacy rights under GDPR.
 **And** deletion is handled as Inngest background job (survives request lifecycle, ARCH-13)
 
 **FRs:** FR11, FR12
+
+---
+
+### Story 0.7: Consent Pending Gate — Waiting Screen & Email Management
+
+_Priority: Must-ship (launch blocker). Scope: LEARNER layout gate + API. **Status: Implemented** — waiting UI, resend, change-email, preview mode, post-approval landing, and consent-withdrawn gate are live._
+
+As a young learner waiting for parental consent,
+I want to see clear status, resend the email, or change the parent email address,
+So that I'm not stuck on a dead-end screen while waiting for my parent to approve.
+
+**Background:** After the consent request is sent (Story 0.5 + Story 10.10), the learner's app is blocked by a full-screen gate in `(learner)/_layout.tsx`. This gate replaces the tab shell and must handle multiple states: email sent (waiting), email not yet sent (PENDING), consent withdrawn, and post-approval celebration. The gate also provides a preview mode so children have something to do while waiting.
+
+**Acceptance Criteria:**
+
+**Consent requested — waiting state (PARENTAL_CONSENT_REQUESTED):**
+
+**Given** the learner's consent status is `PARENTAL_CONSENT_REQUESTED`
+**When** the gate renders
+**Then** it shows: "Hang tight!" title, description with the parent email address ("We've asked your parent — they just need to check their email at [email]"), "Once they say yes, you can start exploring!" subtext, a "Check again" primary button, a "Resend email" secondary button, and a "Send to another email" tertiary link
+
+**Given** the learner taps "Check again"
+**When** the profiles query is invalidated
+**Then** a loading spinner replaces the button text while checking
+**And** if consent is now granted, the gate dismisses and the post-approval landing appears
+
+**Given** the learner taps "Resend email"
+**When** the mutation fires
+**Then** a loading spinner shows on the button during the request
+**And** on success: inline confirmation text appears ("Email sent! Check the inbox (and spam folder).")
+**And** on failure: inline error message appears with the specific error
+
+**Change parent email:**
+
+**Given** the learner taps "Send to another email"
+**When** the change-email form expands
+**Then** it shows: email label, text input (auto-focused), "Send link" submit button, and "Cancel" link
+
+**Given** the learner enters a valid email different from their own
+**When** they tap "Send link"
+**Then** a loading spinner shows during the request
+**And** on success: an alert confirms "Link sent! We sent a consent link to [email].", the form closes, and the displayed parent email updates
+**And** on failure: inline error appears inside the form card
+
+**Given** the learner enters their own email address
+**When** the validation runs
+**Then** inline warning appears: "That's your own email! Enter your parent or guardian's email instead."
+**And** the submit button is disabled (reduced opacity)
+
+**No email sent yet (PENDING):**
+
+**Given** the learner's consent status is `PENDING` (no parent email on record)
+**When** the gate renders
+**Then** it shows: "One more step!" title, description explaining a parent needs to approve, and a "Get parent consent" button that navigates to the consent interstitial (Story 10.10)
+
+**Preview mode (while waiting):**
+
+**Given** the learner is on the waiting screen
+**When** they scroll down
+**Then** a "While you wait" section appears with two preview cards: "Browse subjects" and "Sample coaching"
+
+**Given** the learner taps "Browse subjects"
+**When** the preview renders
+**Then** a static list of sample subjects (Mathematics, Science, Languages, History) with example topics is shown, with a "Back" button to return to the waiting screen
+
+**Given** the learner taps "Sample coaching"
+**When** the preview renders
+**Then** a read-only coaching preview is shown explaining how the AI coach works, with a "Back" button
+
+**Post-approval landing:**
+
+**Given** the parent approves consent
+**When** the learner checks again (or the status updates)
+**Then** a one-time celebration screen appears: "You're approved!" with a "Let's Go" button
+**And** this screen is only shown once per profile (persisted via SecureStore)
+
+**Consent withdrawn gate:**
+
+**Given** the parent withdraws consent
+**When** the gate renders
+**Then** it shows: "Your account is being closed" title, explanation that data will be removed in 7 days, and guidance to ask the parent to restore consent
+**And** a "Sign out" button is always visible
+
+**Profile switching guard (consent-bypass prevention):**
+
+**Given** the learner is under 18
+**When** the consent gate renders
+**Then** no "Switch profile" button is shown (prevents bypassing the gate)
+
+**Given** the user is 18+ with linked minor profiles (parent viewing child's gate)
+**When** the consent gate renders
+**Then** a "Switch profile" button IS shown so the parent can switch back to their own profile
+
+**Failure Modes:**
+
+| State | Trigger | User sees | Recovery |
+|-------|---------|-----------|----------|
+| Resend fails | Network error / API error | Inline error with message | Tap "Resend email" again |
+| Change email fails | Invalid email / server error | Inline error in form card | Fix email and retry, or Cancel |
+| Consent status query fails | Network error | Stale data shown | "Check again" retries |
+| Email delivered to wrong address | Typo in parent email | Waiting screen persists | "Send to another email" to correct |
+| Preview mode data stale | N/A (static content) | Static preview always works | N/A |
+
+**Implementation notes:**
+- The gate is rendered inline in `(learner)/_layout.tsx`, NOT a separate route — it replaces the entire tab shell.
+- `ConsentPendingGate`, `ConsentWithdrawnGate`, `PostApprovalLanding`, `PreviewSubjectBrowser`, and `PreviewSampleCoaching` are all local components within the layout file.
+- Uses the same `useRequestConsent` mutation as `consent.tsx` but with inline feedback (no phase transitions).
+- Profile switch guard (`canSwitchFromConsentGate`) uses age + family-link heuristic to prevent consent bypass.
+- Post-approval flag uses SecureStore key `postApprovalSeen_{profileId}`.
+- Preview subjects are hardcoded (not from curriculum API) since the child has no curriculum yet.
+
+**FRs:** FR7, FR9 (consent waiting UX), FR10 (withdrawn gate)
+
+**Dependencies:** Story 0.5 (consent backend), Story 10.10 (consent interstitial), Story 10.19 (consent unification)
 
 ---
 
@@ -1479,13 +1593,15 @@ So that my learning is sustainable and effective.
 **Then** understanding check is presented (FR41)
 **And** all negative feedback uses "Not Yet" framing — never "wrong" or "incorrect" (UX-11)
 
-**Given** teen profile
-**When** session reaches 15min
-**Then** gentle nudge shown; hard cap at 20min (UX-10)
+~~**Given** teen profile~~
+~~**When** session reaches 15min~~
+~~**Then** gentle nudge shown; hard cap at 20min (UX-10)~~
 
-**Given** eager learner profile
-**When** session reaches 25min
-**Then** gentle nudge shown; hard cap at 30min (UX-10)
+~~**Given** eager learner profile~~
+~~**When** session reaches 25min~~
+~~**Then** gentle nudge shown; hard cap at 30min (UX-10)~~
+
+_**Superseded:** Hard caps and nudges removed by Epic 13 Story 13.2 (FR213). SessionTimer is display-only. Adaptive silence detection (UX-12) handles session endings._
 
 **Given** learner is silent for 3 minutes
 **When** timeout fires
@@ -1677,9 +1793,10 @@ So that I actively consolidate what I learned.
 **And** `app/session.completed` Inngest event dispatched with payload: `{ profileId, sessionId, topicId, subjectId, summaryStatus, escalationRungs, timestamp }` (ARCH-13)
 **And** this event is the entry point for Epic 3's Inngest lifecycle chain (SM-2 → coaching card KV → dashboard update → embedding generation). Chain doesn't execute yet (Epic 3), but event contract is established and tested — fire event, verify received by Inngest in test mode.
 
-**Given** session ends via hard cap (UX-10) or 30-min silence auto-save (UX-12)
+**Given** session ends via 30-min silence auto-save (UX-12)
 **When** session close triggers without summary
 **Then** same close flow fires with `summaryStatus: 'auto_closed'`
+_Note: Hard cap removed by Epic 13 Story 13.2. Silence auto-save is the only automatic close trigger._
 
 **FRs:** FR34, FR35, FR36, FR37
 
@@ -2784,7 +2901,7 @@ So that I can discover the app's value before committing to a subscription.
 **And** trial expires at end of day (midnight user's timezone), not mid-session
 **And** user timezone captured during registration (inferred from device via `Intl.DateTimeFormat().resolvedOptions().timeZone`) and stored on the account record. Dependency on Epic 0 Story 0.1: add `timezone` text field to accounts table, populated at registration, updatable from Settings. Fallback to UTC if missing.
 **And** if user is mid-session when trial ends, session completes fully — next period limits apply after
-**And** reverse trial soft landing: Days 15-28 = extended trial (15 questions/day). Day 29+ = Free tier (50/month).
+**And** reverse trial soft landing: Days 15-28 = extended trial (15 questions/day). Day 29+ = Free tier (10/day + 100/month dual cap).
 **And** soft landing messaging: Day 15 ("giving you 15/day for 2 more weeks"), Day 21 ("1 week left"), Day 28 ("tomorrow you move to Free")
 **And** trial state tracked via Stripe subscription with trial period, synced to local DB via Story 5.1 webhook
 
@@ -2805,7 +2922,7 @@ So that I can access the right level of learning capacity.
 **Then** they can choose Plus (€18.99/mo), Family (€28.99/mo), or Pro (€48.99/mo) (FR111)
 **And** annual billing available with ~25-26% discount (FR115)
 **And** Stripe Checkout handles payment flow — no custom payment form
-**And** context-aware upgrade prompts shown at natural moments: Free→Plus at 50/month cap, Plus→Family when adding family member, Plus→Family when 3+ top-ups purchased, Family→Pro when needing 5-6 users
+**And** context-aware upgrade prompts shown at natural moments: Free→Plus at daily/monthly cap hit, Plus→Family when adding family member, Plus→Family when 3+ top-ups purchased, Family→Pro when needing 5-6 users
 **And** downgrade preserves all progress (Library, curricula, XP, summaries). Only usage limits change. No data archived or deleted.
 **And** top-up credits purchasable anytime: €10/500 (Plus), €5/500 (Family/Pro). Not available on Free tier.
 **And** top-up usage: monthly quota consumed first, then top-ups in FIFO order. Monthly quota does NOT roll over; top-ups DO (12-month expiry).

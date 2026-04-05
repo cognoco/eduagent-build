@@ -34,7 +34,6 @@ import {
 import {
   birthDateFromBirthYear,
   birthYearFromDateLike,
-  computeAgeBracket,
 } from '@eduagent/schemas';
 import { listSubjects } from './subject';
 import { getTierConfig } from './subscription';
@@ -112,6 +111,7 @@ export interface ResetResult {
 interface ClerkUser {
   id: string;
   email_addresses: Array<{ email_address: string }>;
+  external_id: string | null;
 }
 
 /**
@@ -222,29 +222,51 @@ async function findClerkUserByEmail(
  * Deletes all Clerk users that were created by the seed service.
  * Identifies seed users by external_id prefix `clerk_seed_`.
  * Returns the Clerk user IDs that were deleted (for DB cleanup).
+ *
+ * D-07: `external_id_prefix` is not a valid Clerk Backend API parameter —
+ * Clerk silently ignores it and returns unfiltered users. We now paginate
+ * through all users and filter client-side by `external_id` prefix.
  */
 async function deleteClerkTestUsers(
   env: SeedEnv
 ): Promise<{ count: number; clerkUserIds: string[] }> {
   if (!env.CLERK_SECRET_KEY) return { count: 0, clerkUserIds: [] };
 
-  // List users with our seed prefix in external_id
-  const listRes = await fetch(
-    `${CLERK_API_BASE}/users?external_id_prefix=${encodeURIComponent(
-      SEED_CLERK_PREFIX
-    )}&limit=100`,
-    {
-      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+  // Paginate through Clerk users and filter client-side by external_id prefix.
+  // Clerk's list users API supports `limit` and `offset` for pagination.
+  const seedUsers: ClerkUser[] = [];
+  let offset = 0;
+  const pageSize = 100;
+
+  while (true) {
+    const listRes = await fetch(
+      `${CLERK_API_BASE}/users?limit=${pageSize}&offset=${offset}&order_by=-created_at`,
+      {
+        headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+      }
+    );
+
+    if (!listRes.ok) break;
+
+    const users = (await listRes.json()) as ClerkUser[];
+    if (users.length === 0) break;
+
+    // Client-side filter: only keep users whose external_id starts with our seed prefix
+    for (const user of users) {
+      if (user.external_id?.startsWith(SEED_CLERK_PREFIX)) {
+        seedUsers.push(user);
+      }
     }
-  );
 
-  if (!listRes.ok) return { count: 0, clerkUserIds: [] };
+    // If we got fewer than pageSize, we've reached the end
+    if (users.length < pageSize) break;
+    offset += pageSize;
+  }
 
-  const users = (await listRes.json()) as ClerkUser[];
   let deleted = 0;
   const deletedIds: string[] = [];
 
-  for (const user of users) {
+  for (const user of seedUsers) {
     // Revert bypass_client_trust before deleting — belt-and-suspenders in case
     // the delete fails, so the user doesn't retain elevated CAPTCHA-bypass perms.
     await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
@@ -309,24 +331,15 @@ async function createBaseProfile(
     birthYear: number;
     isOwner?: boolean;
     birthDate?: Date;
-    personaType?: 'TEEN' | 'LEARNER' | 'PARENT';
   }
 ): Promise<string> {
   const profileId = generateUUIDv7();
-  const resolvedPersonaType =
-    opts.personaType ??
-    (() => {
-      const ageBracket = computeAgeBracket(opts.birthYear);
-      if (ageBracket === 'child') return 'TEEN' as const;
-      return 'LEARNER' as const;
-    })();
 
   await db.insert(profiles).values({
     id: profileId,
     accountId,
     displayName: opts.displayName,
     birthYear: opts.birthYear,
-    personaType: resolvedPersonaType,
     isOwner: opts.isOwner ?? true,
     birthDate: opts.birthDate ?? birthDateFromBirthYear(opts.birthYear),
   });
@@ -670,7 +683,6 @@ async function seedParentWithChildren(
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Parent',
     birthYear: 1990,
-    personaType: 'PARENT',
     isOwner: true,
   });
 
@@ -739,7 +751,6 @@ async function seedParentMultiChild(
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Parent',
     birthYear: 1990,
-    personaType: 'PARENT',
     isOwner: true,
   });
 
@@ -1128,7 +1139,6 @@ async function seedTrialExpiredChild(
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Paywall Parent',
     birthYear: 1990,
-    personaType: 'PARENT',
     isOwner: true,
   });
 
@@ -1187,7 +1197,6 @@ async function seedConsentWithdrawn(
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Withdrawn Parent',
     birthYear: 1990,
-    personaType: 'PARENT',
     isOwner: true,
   });
 
@@ -1271,7 +1280,6 @@ async function seedParentSolo(
   const parentProfileId = await createBaseProfile(db, accountId, {
     displayName: 'Solo Parent',
     birthYear: 1990,
-    personaType: 'PARENT',
     isOwner: true,
   });
 

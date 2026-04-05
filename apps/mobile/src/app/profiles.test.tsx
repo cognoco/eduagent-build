@@ -25,7 +25,7 @@ const ownerProfile: Profile = {
   displayName: 'Parent',
   avatarUrl: null,
   birthDate: null,
-  personaType: 'PARENT',
+  birthYear: 1990,
   location: null,
   isOwner: true,
   consentStatus: null,
@@ -39,7 +39,7 @@ const childProfile: Profile = {
   displayName: 'Alex',
   avatarUrl: null,
   birthDate: '2012-05-15',
-  personaType: 'TEEN',
+  birthYear: 2012,
   location: null,
   isOwner: false,
   consentStatus: null,
@@ -48,6 +48,7 @@ const childProfile: Profile = {
 };
 
 jest.mock('../lib/profile', () => ({
+  ...jest.requireActual('../lib/profile'),
   useProfile: jest.fn().mockReturnValue({
     profiles: [],
     activeProfile: null,

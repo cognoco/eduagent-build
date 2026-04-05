@@ -109,7 +109,7 @@ routes = [
 [env.staging.vars]
 ENVIRONMENT = "staging"
 APP_URL = "https://app.mentomate.com"
-LOG_LEVEL = "debug"
+LOG_LEVEL = "warn"
 EMAIL_FROM = "staging-noreply@mentomate.com"
 
 [[env.staging.kv_namespaces]]

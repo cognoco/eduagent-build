@@ -64,11 +64,27 @@ export async function classifySubject(
 
   const subjectList = subjects.map((s) => `- ${s.name}`).join('\n');
 
+  // BS-10: sanitize user input before LLM interpolation — strip control
+  // characters and limit length to reduce prompt-injection surface area
+  const sanitizedText = text
+    .split('')
+    .filter((ch) => {
+      const code = ch.charCodeAt(0);
+      // Allow tab (9), LF (10), CR (13); strip other C0 controls + DEL
+      if (code <= 0x08) return false;
+      if (code === 0x0b || code === 0x0c) return false;
+      if (code >= 0x0e && code <= 0x1f) return false;
+      if (code === 0x7f) return false;
+      return true;
+    })
+    .join('')
+    .slice(0, 500);
+
   const messages: ChatMessage[] = [
     { role: 'system', content: CLASSIFY_SYSTEM_PROMPT },
     {
       role: 'user',
-      content: `Student's enrolled subjects:\n${subjectList}\n\nText to classify:\n${text}`,
+      content: `Student's enrolled subjects:\n${subjectList}\n\nText to classify:\n${sanitizedText}`,
     },
   ];
 

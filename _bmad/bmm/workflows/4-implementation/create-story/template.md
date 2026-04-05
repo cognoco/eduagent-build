@@ -21,6 +21,19 @@ so that {{benefit}}.
 - [ ] Task 2 (AC: #)
   - [ ] Subtask 2.1
 
+## Failure Modes
+
+<!-- REQUIRED for any screen/flow. Enumerate every non-happy-path state.
+     If the "Recovery" column is empty, the design is incomplete. -->
+
+| State | Trigger | User Sees | Recovery |
+|-------|---------|-----------|----------|
+| Loading timeout | Slow network / API down | Spinner > 15s | Cancel button, "Go Home" link |
+| API error | Server 4xx/5xx | Error message | Retry + "Go Back" |
+| Empty data | No records exist | Empty state | Guidance text + CTA |
+| Offline | No network | Proactive banner | Disable actions, show warning |
+| Expired/Gone | Stale link or deleted resource | "Not found" message | "Go Back" button |
+
 ## Dev Notes
 
 - Relevant architecture patterns and constraints

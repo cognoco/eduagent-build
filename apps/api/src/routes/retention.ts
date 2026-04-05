@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import {
   recallTestSubmitSchema,
@@ -20,6 +21,7 @@ import {
   getStableTopics,
 } from '../services/retention-data';
 import { checkEvaluateEligibility } from '../services/evaluate-data';
+import { notFound, NotFoundError } from '../errors';
 
 type RetentionRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -30,26 +32,42 @@ type RetentionRouteEnv = {
   };
 };
 
+const subjectParamSchema = z.object({
+  subjectId: z.string().uuid(),
+});
+
+const topicParamSchema = z.object({
+  topicId: z.string().uuid(),
+});
+
 export const retentionRoutes = new Hono<RetentionRouteEnv>()
   // Get retention status for all topics in subject
-  .get('/subjects/:subjectId/retention', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const subjectId = c.req.param('subjectId');
+  .get(
+    '/subjects/:subjectId/retention',
+    zValidator('param', subjectParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId } = c.req.valid('param');
 
-    const result = await getSubjectRetention(db, profileId, subjectId);
-    return c.json(result);
-  })
+      const result = await getSubjectRetention(db, profileId, subjectId);
+      return c.json(result);
+    }
+  )
 
   // Get retention card for single topic
-  .get('/topics/:topicId/retention', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const topicId = c.req.param('topicId');
+  .get(
+    '/topics/:topicId/retention',
+    zValidator('param', topicParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { topicId } = c.req.valid('param');
 
-    const card = await getTopicRetention(db, profileId, topicId);
-    return c.json({ card });
-  })
+      const card = await getTopicRetention(db, profileId, topicId);
+      return c.json({ card });
+    }
+  )
 
   // Submit a delayed recall test
   .post(
@@ -80,55 +98,75 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
   )
 
   // Get topics needing extra review
-  .get('/subjects/:subjectId/needs-deepening', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const subjectId = c.req.param('subjectId');
-
-    const result = await getSubjectNeedsDeepening(db, profileId, subjectId);
-    return c.json(result);
-  })
-
-  // Get teaching method preference
-  .get('/subjects/:subjectId/teaching-preference', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const subjectId = c.req.param('subjectId');
-
-    const preference = await getTeachingPreference(db, profileId, subjectId);
-    return c.json({ preference });
-  })
-
-  // Set teaching method preference (with optional analogy domain)
-  .put(
-    '/subjects/:subjectId/teaching-preference',
-    zValidator('json', teachingPreferenceSchema),
+  .get(
+    '/subjects/:subjectId/needs-deepening',
+    zValidator('param', subjectParamSchema),
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const subjectId = c.req.param('subjectId');
-      const { method, analogyDomain } = c.req.valid('json');
+      const { subjectId } = c.req.valid('param');
 
-      const preference = await setTeachingPreference(
-        db,
-        profileId,
-        subjectId,
-        method,
-        analogyDomain
-      );
+      const result = await getSubjectNeedsDeepening(db, profileId, subjectId);
+      return c.json(result);
+    }
+  )
+
+  // Get teaching method preference
+  .get(
+    '/subjects/:subjectId/teaching-preference',
+    zValidator('param', subjectParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId } = c.req.valid('param');
+
+      const preference = await getTeachingPreference(db, profileId, subjectId);
       return c.json({ preference });
     }
   )
 
-  // Reset teaching preference (FR66)
-  .delete('/subjects/:subjectId/teaching-preference', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const subjectId = c.req.param('subjectId');
+  // Set teaching method preference (with optional analogy domain)
+  .put(
+    '/subjects/:subjectId/teaching-preference',
+    zValidator('param', subjectParamSchema),
+    zValidator('json', teachingPreferenceSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId } = c.req.valid('param');
+      const { method, analogyDomain } = c.req.valid('json');
 
-    await deleteTeachingPreference(db, profileId, subjectId);
-    return c.json({ message: 'Teaching preference reset' });
-  })
+      try {
+        const preference = await setTeachingPreference(
+          db,
+          profileId,
+          subjectId,
+          method,
+          analogyDomain
+        );
+        return c.json({ preference });
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
+        }
+        throw error;
+      }
+    }
+  )
+
+  // Reset teaching preference (FR66)
+  .delete(
+    '/subjects/:subjectId/teaching-preference',
+    zValidator('param', subjectParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId } = c.req.valid('param');
+
+      await deleteTeachingPreference(db, profileId, subjectId);
+      return c.json({ message: 'Teaching preference reset' });
+    }
+  )
 
   // Get topic stability status (FR93)
   .get('/retention/stability', async (c) => {
@@ -141,11 +179,19 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
   })
 
   // Check EVALUATE eligibility for a topic (FR128-129)
-  .get('/topics/:topicId/evaluate-eligibility', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const topicId = c.req.param('topicId');
+  .get(
+    '/topics/:topicId/evaluate-eligibility',
+    zValidator('param', topicParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { topicId } = c.req.valid('param');
 
-    const eligibility = await checkEvaluateEligibility(db, profileId, topicId);
-    return c.json(eligibility);
-  });
+      const eligibility = await checkEvaluateEligibility(
+        db,
+        profileId,
+        topicId
+      );
+      return c.json(eligibility);
+    }
+  );

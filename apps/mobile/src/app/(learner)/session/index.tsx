@@ -185,6 +185,63 @@ const QUICK_CHIP_CONFIG: Record<
   },
 };
 
+const RECONNECT_PROMPT =
+  'Lost connection to your session. Tap reconnect to try again.';
+
+function errorHasStatus(error: unknown, status: number): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    (error as { status?: unknown }).status === status
+  );
+}
+
+function errorHasCode(error: unknown, code: string): boolean {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === code
+  ) {
+    return true;
+  }
+
+  if (error instanceof Error) {
+    return error.message.includes(`"code":"${code}"`);
+  }
+
+  return false;
+}
+
+function isReconnectableSessionError(error: unknown): boolean {
+  if (
+    errorHasCode(error, 'EXCHANGE_LIMIT_EXCEEDED') ||
+    errorHasCode(error, 'SUBJECT_INACTIVE') ||
+    errorHasStatus(error, 404)
+  ) {
+    return false;
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  // Check the raw error message — this must run BEFORE formatApiError
+  // transforms the message into user-facing copy that strips these keywords.
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('network') ||
+    message.includes('offline') ||
+    message.includes('timed out') ||
+    message.includes('server unreachable') ||
+    message.includes('connection failed') ||
+    message.includes('connection timed out') ||
+    message.includes('sse connection failed') ||
+    message.includes('abort')
+  );
+}
+
 function getContextualQuickChips(
   message: ChatMessage | undefined
 ): ContextualQuickChipId[] {
@@ -305,6 +362,13 @@ export default function SessionScreen() {
   const hasHydratedRecoveryRef = useRef(false);
   const queuedProblemTextRef = useRef<string | null>(null);
   const localMessageIdRef = useRef(0);
+  const lastRetryPayloadRef = useRef<{
+    text: string;
+    options?: {
+      sessionSubjectId?: string;
+      sessionSubjectName?: string;
+    };
+  } | null>(null);
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
   const recordSystemPrompt = useRecordSystemPrompt(activeSessionId ?? '');
@@ -416,6 +480,8 @@ export default function SessionScreen() {
   const closeSession = useCloseSession(activeSessionId ?? '');
   const { stream: streamMessage } = useStreamMessage(activeSessionId ?? '');
   const activeHomeworkProblem = homeworkProblemsState[currentProblemIndex];
+  const sessionExpired =
+    !!routeSessionId && errorHasStatus(transcript.error, 404);
 
   const showConfirmation = useCallback((message: string) => {
     setConfirmationToast(message);
@@ -490,6 +556,21 @@ export default function SessionScreen() {
     setActiveSessionId(routeSessionId);
     setResumedBanner(true);
   }, [openingContent, routeSessionId, transcript.data]);
+
+  useEffect(() => {
+    if (!sessionExpired) return;
+
+    setMessages([
+      {
+        id: 'session-expired',
+        role: 'ai',
+        content: 'Session expired. Start a new one to keep going.',
+        isSystemPrompt: true,
+        kind: 'session_expired',
+      },
+    ]);
+    setResumedBanner(false);
+  }, [sessionExpired]);
 
   useEffect(() => {
     if (!routeSessionId || hasHydratedRecoveryRef.current) return;
@@ -640,43 +721,21 @@ export default function SessionScreen() {
           ? ('homework' as const)
           : ('learning' as const);
 
-      try {
-        let newId: string;
-        if (overrideSubjectId) {
-          // Use API client directly — useStartSession's URL param may be
-          // stale when called in the same render cycle as setClassifiedSubject.
-          const res = await apiClient.subjects[':subjectId'].sessions.$post({
-            param: { subjectId: overrideSubjectId },
-            json: {
-              subjectId: overrideSubjectId,
-              topicId: topicId ?? undefined,
-              sessionType,
-              inputMode,
-              ...(effectiveMode === 'homework' &&
-              homeworkProblemsState.length > 0
-                ? {
-                    metadata: {
-                      inputMode,
-                      homework: buildHomeworkSessionMetadata(
-                        homeworkProblemsState,
-                        currentProblemIndex,
-                        Array.isArray(ocrText) ? ocrText[0] : ocrText
-                      ),
-                    },
-                  }
-                : {}),
-            },
-          });
-          if (!res.ok) throw new Error(`Session start failed: ${res.status}`);
-          const data = (await res.json()) as { session: { id: string } };
-          newId = data.session.id;
-        } else {
-          const result = await startSession.mutateAsync({
-            subjectId: sid,
+      // Errors propagate to continueWithMessage's catch block, which handles
+      // them with proper user-facing UI (error messages, reconnect prompts).
+      let newId: string;
+      if (overrideSubjectId) {
+        // Use API client directly — useStartSession's URL param may be
+        // stale when called in the same render cycle as setClassifiedSubject.
+        const res = await apiClient.subjects[':subjectId'].sessions.$post({
+          param: { subjectId: overrideSubjectId },
+          json: {
+            subjectId: overrideSubjectId,
             topicId: topicId ?? undefined,
             sessionType,
             inputMode,
-            ...(effectiveMode === 'homework' && homeworkProblemsState.length > 0
+            ...(effectiveMode === 'homework' &&
+            homeworkProblemsState.length > 0
               ? {
                   metadata: {
                     inputMode,
@@ -688,25 +747,48 @@ export default function SessionScreen() {
                   },
                 }
               : {}),
-          });
-          newId = result.session.id;
+          },
+        });
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          throw new Error(`API error ${res.status}: ${body || res.statusText}`);
         }
-        setActiveSessionId(newId);
-        if (effectiveMode === 'homework' && homeworkProblemsState.length > 0) {
-          try {
-            await syncHomeworkMetadata(
-              newId,
-              homeworkProblemsState,
-              currentProblemIndex
-            );
-          } catch {
-            // Keep the session alive even if homework metadata sync fails.
-          }
-        }
-        return newId;
-      } catch {
-        return null;
+        const data = (await res.json()) as { session: { id: string } };
+        newId = data.session.id;
+      } else {
+        const result = await startSession.mutateAsync({
+          subjectId: sid,
+          topicId: topicId ?? undefined,
+          sessionType,
+          inputMode,
+          ...(effectiveMode === 'homework' && homeworkProblemsState.length > 0
+            ? {
+                metadata: {
+                  inputMode,
+                  homework: buildHomeworkSessionMetadata(
+                    homeworkProblemsState,
+                    currentProblemIndex,
+                    Array.isArray(ocrText) ? ocrText[0] : ocrText
+                  ),
+                },
+              }
+            : {}),
+        });
+        newId = result.session.id;
       }
+      setActiveSessionId(newId);
+      if (effectiveMode === 'homework' && homeworkProblemsState.length > 0) {
+        try {
+          await syncHomeworkMetadata(
+            newId,
+            homeworkProblemsState,
+            currentProblemIndex
+          );
+        } catch {
+          // Keep the session alive even if homework metadata sync fails.
+        }
+      }
+      return newId;
     },
     [
       activeSessionId,
@@ -727,6 +809,7 @@ export default function SessionScreen() {
 
   const handleInputModeChange = useCallback(
     (nextInputMode: 'text' | 'voice') => {
+      const previousInputMode = inputMode;
       setInputMode(nextInputMode);
       if (!activeSessionId) {
         return;
@@ -734,10 +817,11 @@ export default function SessionScreen() {
       void setSessionInputMode
         .mutateAsync({ inputMode: nextInputMode })
         .catch(() => {
+          setInputMode(previousInputMode);
           showConfirmation("Couldn't save that mode just now.");
         });
     },
-    [activeSessionId, setSessionInputMode, showConfirmation]
+    [activeSessionId, inputMode, setSessionInputMode, showConfirmation]
   );
 
   const openSubjectResolution = useCallback(
@@ -781,6 +865,7 @@ export default function SessionScreen() {
         sessionSubjectName?: string;
       }
     ) => {
+      let streamId: string | null = null;
       try {
         const sessionSubjectId = options?.sessionSubjectId;
         const sessionSubjectName = options?.sessionSubjectName;
@@ -817,6 +902,11 @@ export default function SessionScreen() {
           return;
         }
 
+        lastRetryPayloadRef.current = {
+          text,
+          options,
+        };
+
         await writeSessionRecoveryMarker(
           {
             sessionId: sid,
@@ -844,11 +934,11 @@ export default function SessionScreen() {
           }
         }
 
-        const streamId = createLocalMessageId('ai');
+        streamId = createLocalMessageId('ai');
         const previousAiAt = lastAiAtRef.current;
         setMessages((prev) => [
           ...prev,
-          { id: streamId, role: 'ai', content: '', streaming: true },
+          { id: streamId!, role: 'ai', content: '', streaming: true },
         ]);
         setIsStreaming(true);
 
@@ -927,11 +1017,45 @@ export default function SessionScreen() {
             : undefined
         );
       } catch (err: unknown) {
-        animationCleanupRef.current = animateResponse(
-          'Lost connection to your session. Tap to reconnect.',
-          setMessages,
-          setIsStreaming
-        );
+        const reconnectable = isReconnectableSessionError(err);
+        const formattedError = formatApiError(err);
+        const errorMessage =
+          reconnectable &&
+          (formattedError.toLowerCase().includes('reconnect') ||
+            formattedError.toLowerCase().includes('timed out'))
+            ? formattedError
+            : reconnectable
+            ? RECONNECT_PROMPT
+            : formattedError;
+
+        setIsStreaming(false);
+        if (streamId) {
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === streamId
+                ? {
+                    ...message,
+                    content: errorMessage,
+                    streaming: false,
+                    kind: reconnectable ? 'reconnect_prompt' : undefined,
+                    isSystemPrompt: reconnectable,
+                  }
+                : message
+            )
+          );
+          return;
+        }
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: createLocalMessageId('ai'),
+            role: 'ai',
+            content: errorMessage,
+            isSystemPrompt: reconnectable,
+            kind: reconnectable ? 'reconnect_prompt' : undefined,
+          },
+        ]);
       }
     },
     [
@@ -954,7 +1078,36 @@ export default function SessionScreen() {
       trackExchange,
       trackerState,
       trigger,
+      createLocalMessageId,
     ]
+  );
+
+  const handleReconnect = useCallback(
+    async (messageId: string) => {
+      if (!lastRetryPayloadRef.current || isStreaming || sessionExpired) {
+        return;
+      }
+
+      const retryPayload = lastRetryPayloadRef.current;
+      // Remove both the error message AND the user's preceding message to
+      // prevent the AI from seeing a duplicate exchange (the replay via
+      // continueWithMessage re-adds the user message to the transcript).
+      setMessages((prev) => {
+        const errorIndex = prev.findIndex((m) => m.id === messageId);
+        if (errorIndex < 0) return prev;
+        // The user message that triggered the failed stream is immediately
+        // before the error AI message.
+        const userIndex =
+          errorIndex > 0 && prev[errorIndex - 1]?.role === 'user'
+            ? errorIndex - 1
+            : -1;
+        return prev.filter(
+          (_, i) => i !== errorIndex && i !== userIndex
+        );
+      });
+      await continueWithMessage(retryPayload.text, retryPayload.options);
+    },
+    [continueWithMessage, isStreaming, sessionExpired]
   );
 
   const handleResolveSubject = useCallback(
@@ -1234,7 +1387,19 @@ export default function SessionScreen() {
             } as never);
           } catch (err: unknown) {
             setIsClosing(false);
-            Alert.alert('Error', formatApiError(err));
+            Alert.alert(
+              'Could not end this session cleanly',
+              `${formatApiError(err)} You can keep trying, or go home now and come back later.`,
+              [
+                { text: 'Keep trying', style: 'cancel' },
+                {
+                  text: 'Go Home',
+                  onPress: () => {
+                    router.replace('/(learner)/home' as never);
+                  },
+                },
+              ]
+            );
           }
         },
       },
@@ -1530,6 +1695,8 @@ export default function SessionScreen() {
     ? 'Figuring out what this is about...'
     : classifyError
     ? classifyError
+    : sessionExpired
+    ? 'Session expired - start a new one.'
     : resumedBanner
     ? 'Welcome back - your session is ready.'
     : apiChecked && !isApiReachable
@@ -1696,6 +1863,20 @@ export default function SessionScreen() {
 
   const renderMessageActions = (message: ChatMessage): React.ReactNode => {
     if (message.role !== 'ai' || message.streaming || message.isSystemPrompt) {
+      if (message.kind === 'reconnect_prompt') {
+        return (
+          <Pressable
+            onPress={() => void handleReconnect(message.id)}
+            disabled={isStreaming}
+            className="rounded-full bg-primary/15 px-3 py-1.5 self-start"
+            testID={`session-reconnect-${message.id}`}
+          >
+            <Text className="text-caption font-semibold text-primary">
+              Reconnect
+            </Text>
+          </Pressable>
+        );
+      }
       return null;
     }
 
@@ -1827,7 +2008,10 @@ export default function SessionScreen() {
         onSend={handleSend}
         isStreaming={isStreaming}
         inputDisabled={
-          isOffline || pendingClassification || !!pendingSubjectResolution
+          isOffline ||
+          pendingClassification ||
+          !!pendingSubjectResolution ||
+          sessionExpired
         }
         verificationType={
           transcript.data?.session.verificationType ?? undefined
@@ -1843,6 +2027,28 @@ export default function SessionScreen() {
         textToSpeechLanguage={languageVoiceLocale}
         footer={
           <>
+            {sessionExpired && (
+              <View className="bg-surface rounded-card p-4 mt-2 mb-4">
+                <Text className="text-body font-semibold text-text-primary mb-2">
+                  Session expired
+                </Text>
+                <Text className="text-body-sm text-text-secondary mb-3">
+                  This session is no longer available. Start a new one from
+                  home or your library.
+                </Text>
+                <Pressable
+                  onPress={() => router.replace('/(learner)/home' as never)}
+                  className="bg-primary rounded-button py-3 items-center"
+                  testID="session-expired-go-home"
+                  accessibilityRole="button"
+                  accessibilityLabel="Go home"
+                >
+                  <Text className="text-text-inverse text-body font-semibold">
+                    Go Home
+                  </Text>
+                </Pressable>
+              </View>
+            )}
             {exchangeCount === 0 && (
               <SessionInputModeToggle
                 mode={inputMode}

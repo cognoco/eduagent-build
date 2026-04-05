@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { StyleSheet, View, useColorScheme } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import Animated, {
@@ -7,6 +7,7 @@ import Animated, {
   useAnimatedStyle,
   withRepeat,
   withTiming,
+  cancelAnimation,
   Easing,
   useReducedMotion,
 } from 'react-native-reanimated';
@@ -46,6 +47,8 @@ export function ShimmerSkeleton({
   shimmerColor,
   testID,
 }: ShimmerSkeletonProps): ReactNode {
+  // BM-01: unique gradient ID per instance to avoid SVG ID collision
+  const gradientId = useId();
   const reduceMotion = useReducedMotion();
   const scheme = useColorScheme();
   const resolvedColor =
@@ -68,6 +71,11 @@ export function ShimmerSkeleton({
       -1,
       false
     );
+
+    // BR-01: cancel animation on unmount to prevent leaked UI-thread work
+    return () => {
+      cancelAnimation(translateX);
+    };
   }, [reduceMotion, containerWidth, bandWidth, duration, translateX]);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -100,7 +108,7 @@ export function ShimmerSkeleton({
         >
           <Svg width={bandWidth} height="100%">
             <Defs>
-              <LinearGradient id="shimmerGrad" x1="0" y1="0" x2="1" y2="0">
+              <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
                 <Stop offset="0" stopColor={resolvedColor} stopOpacity="0" />
                 <Stop
                   offset="0.5"
@@ -115,7 +123,7 @@ export function ShimmerSkeleton({
               y="0"
               width={String(bandWidth)}
               height="100%"
-              fill="url(#shimmerGrad)"
+              fill={`url(#${gradientId})`}
             />
           </Svg>
         </Animated.View>

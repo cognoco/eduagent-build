@@ -3,6 +3,7 @@ import {
   onboardingDrafts,
   curricula,
   curriculumTopics,
+  subjects,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
@@ -372,10 +373,22 @@ export async function updateDraft(
 
 export async function persistCurriculum(
   db: Database,
+  profileId: string,
   subjectId: string,
   subjectName: string,
   draft: OnboardingDraft
 ): Promise<void> {
+  // Verify the subject belongs to this profile before inserting curriculum
+  const subject = await db.query.subjects.findFirst({
+    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+    columns: { id: true },
+  });
+  if (!subject) {
+    throw new Error(
+      `Subject ${subjectId} does not belong to profile ${profileId}`
+    );
+  }
+
   const summary = draft.exchangeHistory.map((e) => e.content).join('\n');
   const signals = draft.extractedSignals as {
     goals?: string[];

@@ -73,14 +73,17 @@ export function mapTeachBackRubricToSm2(
 export function parseTeachBackAssessment(
   llmResponse: string
 ): TeachBackAssessment | null {
-  // Look for JSON block containing the assessment fields
+  // Extract the first JSON object containing assessment fields (key-order independent)
   const jsonMatch = llmResponse.match(
-    /\{[\s\S]*?"completeness"[\s\S]*?"accuracy"[\s\S]*?\}/
+    /\{[^{}]*(?:"completeness"|"accuracy")[^{}]*\}/
   );
   if (!jsonMatch) return null;
 
   try {
     const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+    // Verify both required rubric fields are present
+    if (parsed.completeness === undefined || parsed.accuracy === undefined)
+      return null;
 
     const clamp = (val: unknown, fallback: number): number => {
       if (typeof val !== 'number') return fallback;

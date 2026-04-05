@@ -20,7 +20,6 @@ jest.mock('../services/billing', () => ({
   activateSubscriptionFromRevenuecat: jest.fn(),
   updateQuotaPoolLimit: jest.fn().mockResolvedValue(undefined),
   transitionToExtendedTrial: jest.fn().mockResolvedValue(undefined),
-  isTopUpAlreadyGranted: jest.fn().mockResolvedValue(false),
   purchaseTopUpCredits: jest.fn().mockResolvedValue({
     id: 'topup-1',
     subscriptionId: 'sub-internal-1',
@@ -59,6 +58,12 @@ jest.mock('../inngest/client', () => ({
   },
 }));
 
+const mockCaptureException = jest.fn();
+
+jest.mock('../services/sentry', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
 import { Hono } from 'hono';
 import { revenuecatWebhookRoute } from './revenuecat-webhook';
 import { writeSubscriptionStatus } from '../services/kv';
@@ -71,7 +76,6 @@ import {
   activateSubscriptionFromRevenuecat,
   updateQuotaPoolLimit,
   transitionToExtendedTrial,
-  isTopUpAlreadyGranted,
   purchaseTopUpCredits,
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
@@ -182,7 +186,6 @@ beforeEach(() => {
   (ensureFreeSubscription as jest.Mock).mockResolvedValue(
     mockSubscriptionRow({ tier: 'free' })
   );
-  (isTopUpAlreadyGranted as jest.Mock).mockResolvedValue(false);
   (purchaseTopUpCredits as jest.Mock).mockResolvedValue({
     id: 'topup-1',
     subscriptionId: 'sub-internal-1',
@@ -259,6 +262,43 @@ describe('auth validation', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.received).toBe(true);
+  });
+
+  it('rejects tokens of different length (BS-01: no length leak via timing)', async () => {
+    // A shorter token should be rejected without leaking length info
+    const res = await app.request(
+      '/revenuecat/webhook',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer short',
+        },
+        body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects tokens of same length but wrong value (BS-01)', async () => {
+    // Same length as secret but different content
+    const sameLength = 'x'.repeat(TEST_ENV.REVENUECAT_WEBHOOK_SECRET.length);
+    const res = await app.request(
+      '/revenuecat/webhook',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sameLength}`,
+        },
+        body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(401);
   });
 });
 
@@ -362,11 +402,29 @@ describe('INITIAL_PURCHASE', () => {
 
   it('handles unknown clerk user gracefully', async () => {
     (findAccountByClerkId as jest.Mock).mockResolvedValue(null);
+    mockCaptureException.mockClear();
 
     const res = await makeRequest(makeWebhookPayload('INITIAL_PURCHASE'));
     expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body).toEqual({ received: true, error: 'Unknown app_user_id' });
+
     // Unknown user — can't resolve account
     expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
+
+    // Must report to Sentry so the event drop is alertable [1B.3]
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('Unresolvable RevenueCat app_user_id'),
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          eventType: 'INITIAL_PURCHASE',
+          appUserId: expect.any(String),
+        }),
+      })
+    );
   });
 
   it('sets trial status when period_type is TRIAL', async () => {
@@ -850,8 +908,9 @@ describe('NON_RENEWING_PURCHASE', () => {
     expect(purchaseTopUpCredits).not.toHaveBeenCalled();
   });
 
-  it('is idempotent — duplicate transaction ID does not double-grant', async () => {
-    (isTopUpAlreadyGranted as jest.Mock).mockResolvedValue(true);
+  it('is idempotent — duplicate transaction ID does not double-grant (BS-02)', async () => {
+    // purchaseTopUpCredits returns null when ON CONFLICT DO NOTHING triggers
+    (purchaseTopUpCredits as jest.Mock).mockResolvedValue(null);
 
     const payload = makeWebhookPayload('NON_RENEWING_PURCHASE', {
       product_id: 'com.eduagent.topup.500',
@@ -860,7 +919,8 @@ describe('NON_RENEWING_PURCHASE', () => {
 
     const res = await makeRequest(payload);
     expect(res.status).toBe(200);
-    expect(purchaseTopUpCredits).not.toHaveBeenCalled();
+    // purchaseTopUpCredits IS called, but returns null (duplicate detected atomically)
+    expect(purchaseTopUpCredits).toHaveBeenCalled();
   });
 
   it('refreshes KV cache after top-up', async () => {

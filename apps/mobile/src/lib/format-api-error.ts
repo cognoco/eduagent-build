@@ -22,10 +22,15 @@ const SERVER_MESSAGE =
 
 const DEFAULT_MESSAGE = 'Something unexpected happened. Please try again.';
 
-/** Checks whether an error message looks like a raw API error from customFetch. */
-function parseApiStatus(message: string): number | null {
-  const match = /^API error (\d{3}):/.exec(message);
-  return match ? Number(match[1]) : null;
+function isGenericServerMessage(message: string): boolean {
+  const normalized = message.trim().toLowerCase().replace(/\.+$/, '');
+  return (
+    normalized === 'internal server error' ||
+    normalized === 'bad gateway' ||
+    normalized === 'service unavailable' ||
+    normalized === 'gateway timeout' ||
+    normalized === 'server error'
+  );
 }
 
 /** Checks if message contains network-related keywords. */
@@ -38,6 +43,41 @@ function isNetworkRelated(msg: string): boolean {
     msg.includes('ECONNREFUSED') ||
     msg.includes('ENOTFOUND')
   );
+}
+
+function parseApiBody(message: string): {
+  status: number;
+  code?: string;
+  apiMessage?: string;
+} | null {
+  const match = /^API error (\d{3}):\s*(.*)$/s.exec(message);
+  if (!match) {
+    return null;
+  }
+
+  const status = Number(match[1]);
+  const body = match[2]?.trim() ?? '';
+  if (!body) {
+    return { status };
+  }
+
+  try {
+    const parsed = JSON.parse(body) as {
+      message?: string;
+      code?: string;
+      error?: { code?: string; message?: string };
+    };
+    return {
+      status,
+      code: parsed.error?.code ?? parsed.code,
+      apiMessage: parsed.error?.message ?? parsed.message,
+    };
+  } catch {
+    return {
+      status,
+      apiMessage: body.length < 200 ? body : undefined,
+    };
+  }
 }
 
 /**
@@ -59,43 +99,63 @@ export function formatApiError(error: unknown): string {
   if (error instanceof Error) {
     const msg = error.message;
     const msgLower = msg.toLowerCase();
+    const apiErrorLike = error as Error & {
+      status?: number;
+      code?: string;
+      details?: unknown;
+    };
+
+    if (apiErrorLike.code === 'EXCHANGE_LIMIT_EXCEEDED') {
+      return 'Session limit reached. Start a new session to keep going.';
+    }
+
+    if (apiErrorLike.code === 'SUBJECT_INACTIVE') {
+      return msg;
+    }
 
     // 2a. QuotaExceededError — pass through its message
     if (error.name === 'QuotaExceededError') {
       return msg;
     }
 
+    if (msgLower.includes('timed out while waiting for a reply')) {
+      return 'That reply took too long. Tap reconnect to try again.';
+    }
+
     // 2b. Parse 'API error {status}: {body}' from customFetch
-    const status = parseApiStatus(msg);
-    if (status !== null) {
-      if (status >= 500) {
+    const parsedApiBody = parseApiBody(msg);
+    if (parsedApiBody) {
+      if (parsedApiBody.code === 'EXCHANGE_LIMIT_EXCEEDED') {
+        return 'Session limit reached. Start a new session to keep going.';
+      }
+      if (parsedApiBody.code === 'SUBJECT_INACTIVE') {
+        return (
+          parsedApiBody.apiMessage ??
+          'This subject is paused or archived. Resume it before starting a session.'
+        );
+      }
+      if (parsedApiBody.status >= 500) {
+        if (
+          parsedApiBody.apiMessage &&
+          parsedApiBody.apiMessage.length < 200 &&
+          !isGenericServerMessage(parsedApiBody.apiMessage)
+        ) {
+          return parsedApiBody.apiMessage;
+        }
         return SERVER_MESSAGE;
       }
-      // For 4xx, try to extract the body message after "API error NNN: "
-      const bodyStart = msg.indexOf(': ') + 2;
-      const body = msg.slice(bodyStart).trim();
-      // Try to parse JSON body for a message field
-      try {
-        const parsed: unknown = JSON.parse(body);
-        if (
-          typeof parsed === 'object' &&
-          parsed !== null &&
-          'message' in parsed &&
-          typeof (parsed as { message: unknown }).message === 'string'
-        ) {
-          const apiMessage = (parsed as { message: string }).message;
-          if (apiMessage.length < 200) {
-            return apiMessage;
-          }
-        }
-      } catch {
-        // Body is not JSON — use it directly if it's short and readable
-        if (body.length > 0 && body.length < 200 && !body.includes('{')) {
-          return body;
-        }
+      if (
+        parsedApiBody.apiMessage &&
+        parsedApiBody.apiMessage.length < 200
+      ) {
+        return parsedApiBody.apiMessage;
       }
       return "That didn't work. Please check your input and try again.";
     }
+
+    // Note: parseApiStatus was removed here — it matched the exact same
+    // "API error (\d{3}):" regex as parseApiBody, so if parseApiBody returned
+    // null the status fallback was also unreachable (dead code).
 
     // 2c. Network-related error messages
     if (isNetworkRelated(msgLower)) {

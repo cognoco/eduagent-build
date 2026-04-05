@@ -77,8 +77,29 @@ testSeedRoutes.use('/__test/*', async (c, next) => {
   }
 
   if (secret) {
-    const headerSecret = c.req.header('X-Test-Secret');
-    if (headerSecret !== secret) {
+    const headerSecret = c.req.header('X-Test-Secret') ?? '';
+    // CI-06: HMAC-based constant-time comparison to prevent timing attacks.
+    // Both inputs are hashed to fixed-length SHA-256 digests before XOR
+    // comparison, eliminating the length-leak side-channel.
+    const encoder = new TextEncoder();
+    const hmacKey = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode('test-seed-compare'),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const [digestA, digestB] = await Promise.all([
+      crypto.subtle.sign('HMAC', hmacKey, encoder.encode(headerSecret)),
+      crypto.subtle.sign('HMAC', hmacKey, encoder.encode(secret)),
+    ]);
+    const hashA = new Uint8Array(digestA);
+    const hashB = new Uint8Array(digestB);
+    let diff = 0;
+    for (let i = 0; i < hashA.length; i++) {
+      diff |= hashA[i]! ^ hashB[i]!;
+    }
+    if (diff !== 0) {
       return c.json(
         {
           code: ERROR_CODES.FORBIDDEN,

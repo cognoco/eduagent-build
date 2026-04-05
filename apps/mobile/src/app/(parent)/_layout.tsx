@@ -76,6 +76,49 @@ function CreateProfileGate(): React.ReactElement {
   );
 }
 
+function NoChildrenGate(): React.ReactElement {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  return (
+    <View
+      className="flex-1 bg-background items-center justify-center px-6"
+      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      testID="no-children-gate"
+    >
+      <Text className="text-h1 font-bold text-text-primary mb-3 text-center">
+        Add a child to get started
+      </Text>
+      <Text className="text-body text-text-secondary text-center mb-8">
+        Create or link a child profile to see learning progress here. You can
+        still open More to manage your account.
+      </Text>
+      <Pressable
+        onPress={() => router.push('/create-profile')}
+        className="bg-primary rounded-button py-3.5 px-8 items-center w-full mb-3"
+        style={{ minHeight: 48 }}
+        testID="add-child-cta"
+        accessibilityRole="button"
+        accessibilityLabel="Add a child profile"
+      >
+        <Text className="text-body font-semibold text-text-inverse">
+          Add a child
+        </Text>
+      </Pressable>
+      <Pressable
+        onPress={() => router.replace('/(parent)/more')}
+        className="py-3.5 px-8 items-center w-full"
+        style={{ minHeight: 48 }}
+        testID="open-parent-more"
+        accessibilityRole="button"
+        accessibilityLabel="Open parent settings"
+      >
+        <Text className="text-body font-semibold text-primary">Open More</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 /**
  * Gate shown when consent has been withdrawn (defense-in-depth for parent profiles).
  */
@@ -147,7 +190,7 @@ export default function ParentLayout() {
   // No profile exists — show gate that pushes to profile creation modal
   if (!activeProfile) return <CreateProfileGate />;
 
-  if (!hasLinkedChildren) return <Redirect href="/(learner)/home" />;
+  if (!hasLinkedChildren) return <NoChildrenGate />;
 
   // Gate: block app access when consent is pending (defense-in-depth — unlikely for adults)
   if (

@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, inArray } from 'drizzle-orm';
+import { eq, and, desc, asc, inArray, sql } from 'drizzle-orm';
 import {
   curricula,
   curriculumBooks,
@@ -677,20 +677,15 @@ export async function addCurriculumTopic(
     };
   }
 
-  const existingTopics = await db.query.curriculumTopics.findMany({
-    where: eq(curriculumTopics.curriculumId, curriculum.id),
-    orderBy: desc(curriculumTopics.sortOrder),
-  });
-  const nextSortOrder =
-    existingTopics.length > 0 ? existingTopics[0]!.sortOrder + 1 : 0;
-
+  // BD-08: atomic sortOrder allocation — uses INSERT ... SELECT COALESCE(MAX + 1, 0)
+  // to prevent concurrent add-topic calls from getting duplicate sort orders.
   const [createdTopic] = await db
     .insert(curriculumTopics)
     .values({
       curriculumId: curriculum.id,
       title: input.title.trim(),
       description: input.description.trim(),
-      sortOrder: nextSortOrder,
+      sortOrder: sql`COALESCE((SELECT MAX(${curriculumTopics.sortOrder}) + 1 FROM ${curriculumTopics} WHERE ${curriculumTopics.curriculumId} = ${curriculum.id}), 0)`,
       relevance: 'recommended',
       source: 'user',
       estimatedMinutes: input.estimatedMinutes,

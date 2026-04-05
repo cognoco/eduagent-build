@@ -203,6 +203,10 @@ export default function CreateSubjectScreen() {
   const isNoMatch = showSuggestion && resolveState.result.status === 'no_match';
   const allowUseMyWords = isNoMatch || resolveRounds >= 2;
   const exactWords = (clarificationInput || originalInput || name).trim();
+  const subjectLimitGuidance =
+    /subject limit|max subjects|too many subjects/i.test(error)
+      ? ' Delete an old subject first to make room.'
+      : '';
 
   return (
     <KeyboardAvoidingView
@@ -246,6 +250,7 @@ export default function CreateSubjectScreen() {
               testID="create-subject-error"
             >
               {error}
+              {subjectLimitGuidance}
             </Text>
           </View>
         )}
@@ -376,7 +381,7 @@ export default function CreateSubjectScreen() {
             {allowUseMyWords && exactWords !== '' && (
               <Pressable
                 onPress={onUseMyWords}
-                className="mt-3 py-2 items-center"
+                className="mt-3 py-3 min-h-[44px] items-center justify-center"
                 testID="subject-use-my-words"
                 accessibilityRole="button"
                 accessibilityLabel={`Just use ${exactWords} as my subject`}

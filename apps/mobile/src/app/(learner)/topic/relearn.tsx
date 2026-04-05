@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStartRelearn } from '../../../hooks/use-retention';
 // Persona-conditional copy — documented exception, same pattern as (learner)/home.tsx
 import { useTheme } from '../../../lib/theme';
+import { formatApiError } from '../../../lib/format-api-error';
 
 const TEACHING_METHODS = [
   {
@@ -96,9 +97,11 @@ export default function RelearnScreen() {
 
   const [phase, setPhase] = useState<'choice' | 'method'>('choice');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSameMethod = useCallback(() => {
     if (!topicId) return;
+    setError(null);
     setIsSubmitting(true);
     startRelearn.mutate(
       { topicId, method: 'same' },
@@ -114,6 +117,9 @@ export default function RelearnScreen() {
             },
           });
         },
+        onError: (err: unknown) => {
+          setError(formatApiError(err));
+        },
         onSettled: () => setIsSubmitting(false),
       }
     );
@@ -122,6 +128,7 @@ export default function RelearnScreen() {
   const handleSelectMethod = useCallback(
     (preferredMethod: string) => {
       if (!topicId) return;
+      setError(null);
       setIsSubmitting(true);
       startRelearn.mutate(
         { topicId, method: 'different', preferredMethod },
@@ -136,6 +143,9 @@ export default function RelearnScreen() {
                 mode: 'relearn',
               },
             });
+          },
+          onError: (err: unknown) => {
+            setError(formatApiError(err));
           },
           onSettled: () => setIsSubmitting(false),
         }
@@ -187,6 +197,14 @@ export default function RelearnScreen() {
           className="flex-1 px-5"
           contentContainerStyle={{ paddingBottom: 40 }}
         >
+          {error && (
+            <View
+              className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+              testID="relearn-error"
+            >
+              <Text className="text-body-sm text-danger">{error}</Text>
+            </View>
+          )}
           <Text className="text-body text-text-secondary mb-6">
             {copy.phase1Intro}
           </Text>
@@ -226,6 +244,14 @@ export default function RelearnScreen() {
           className="flex-1 px-5"
           contentContainerStyle={{ paddingBottom: 40 }}
         >
+          {error && (
+            <View
+              className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+              testID="relearn-error"
+            >
+              <Text className="text-body-sm text-danger">{error}</Text>
+            </View>
+          )}
           <Text className="text-body text-text-secondary mb-6">
             {copy.phase2Intro}
           </Text>

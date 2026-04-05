@@ -111,7 +111,12 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         return c.json(result);
       } catch (err) {
         if (err instanceof SessionExchangeLimitError) {
-          return apiError(c, 429, ERROR_CODES.VALIDATION_ERROR, err.message);
+          return apiError(
+            c,
+            429,
+            ERROR_CODES.EXCHANGE_LIMIT_EXCEEDED,
+            err.message
+          );
         }
         // Refund quota on LLM failure — user should not be charged for a failed exchange
         if (subscriptionId) {
@@ -178,6 +183,14 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           });
         });
       } catch (err) {
+        if (err instanceof SessionExchangeLimitError) {
+          return apiError(
+            c,
+            429,
+            ERROR_CODES.EXCHANGE_LIMIT_EXCEEDED,
+            err.message
+          );
+        }
         // Refund quota on LLM failure — user should not be charged for a failed exchange
         if (subscriptionId) {
           await incrementQuota(db, subscriptionId);
@@ -205,11 +218,20 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const shouldDispatchCompletionEvent =
         result.summaryStatus !== 'pending' &&
         result.summaryStatus !== 'submitted';
+
+      // BD-09: Surface pipeline status so client knows if post-processing was queued
+      let pipelineQueued = true;
       if (shouldDispatchCompletionEvent) {
-        await dispatchSessionCompletedEvent(db, profileId, result.sessionId, {
-          summaryStatus: result.summaryStatus,
-          summaryTrackingHandled: result.summaryStatus === 'skipped',
-        });
+        const dispatch = await dispatchSessionCompletedEvent(
+          db,
+          profileId,
+          result.sessionId,
+          {
+            summaryStatus: result.summaryStatus,
+            summaryTrackingHandled: result.summaryStatus === 'skipped',
+          }
+        );
+        pipelineQueued = dispatch.pipelineQueued;
       }
 
       // Check if we should prompt the learner to switch to Casual Explorer
@@ -218,6 +240,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       return c.json({
         ...result,
         shouldPromptCasualSwitch: promptCasualSwitch,
+        pipelineQueued,
       });
     }
   )
@@ -327,12 +350,15 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       c.req.param('sessionId')
     );
     const result = await skipSummary(db, profileId, c.req.param('sessionId'));
+
+    // BD-09: Surface pipeline status so client knows if post-processing was queued
+    let pipelineQueued = true;
     if (
       !previousSummary ||
       previousSummary.status === 'pending' ||
       previousSummary.status === 'auto_closed'
     ) {
-      await dispatchSessionCompletedEvent(
+      const dispatch = await dispatchSessionCompletedEvent(
         db,
         profileId,
         c.req.param('sessionId'),
@@ -341,6 +367,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           summaryTrackingHandled: true,
         }
       );
+      pipelineQueued = dispatch.pipelineQueued;
     }
     const {
       shouldPromptCasualSwitch: promptCasualSwitch,
@@ -350,6 +377,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       ...result,
       shouldPromptCasualSwitch: promptCasualSwitch,
       shouldWarnSummarySkip: warnSummarySkip,
+      pipelineQueued,
     });
   })
 
@@ -371,12 +399,14 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         c.req.param('sessionId'),
         c.req.valid('json')
       );
+      // BD-09: Surface pipeline status so client knows if post-processing was queued
+      let pipelineQueued = true;
       if (
         !previousSummary ||
         previousSummary.status === 'pending' ||
         previousSummary.status === 'auto_closed'
       ) {
-        await dispatchSessionCompletedEvent(
+        const dispatch = await dispatchSessionCompletedEvent(
           db,
           profileId,
           c.req.param('sessionId'),
@@ -388,8 +418,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             summaryTrackingHandled: true,
           }
         );
+        pipelineQueued = dispatch.pipelineQueued;
       }
-      return c.json(result);
+      return c.json({ ...result, pipelineQueued });
     }
   )
 
@@ -445,6 +476,11 @@ function qualityRatingFromSummaryStatus(
   return status === 'accepted' ? 4 : 2;
 }
 
+/**
+ * BD-09: Returns whether the pipeline was successfully queued.
+ * Callers surface `pipelineQueued: false` in the response so the client
+ * knows post-processing (retention, XP, streaks, embeddings) may be delayed.
+ */
 async function dispatchSessionCompletedEvent(
   db: Database,
   profileId: string,
@@ -459,7 +495,7 @@ async function dispatchSessionCompletedEvent(
     qualityRating?: number;
     summaryTrackingHandled?: boolean;
   }
-): Promise<void> {
+): Promise<{ pipelineQueued: boolean }> {
   try {
     const completion = await getSessionCompletionContext(
       db,
@@ -488,6 +524,8 @@ async function dispatchSessionCompletedEvent(
         timestamp: new Date().toISOString(),
       },
     });
+
+    return { pipelineQueued: true };
   } catch (err) {
     captureException(err, {
       profileId,
@@ -498,5 +536,6 @@ async function dispatchSessionCompletedEvent(
         err instanceof Error ? err.message : String(err)
       }`
     );
+    return { pipelineQueued: false };
   }
 }

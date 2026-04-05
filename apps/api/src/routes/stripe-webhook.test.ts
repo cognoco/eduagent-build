@@ -23,7 +23,7 @@ jest.mock('../services/subscription', () => ({
   getTierConfig: jest.fn((tier: string) =>
     tier === 'free'
       ? {
-          monthlyQuota: 50,
+          monthlyQuota: 100,
           dailyLimit: 10,
           maxProfiles: 1,
           priceMonthly: 0,
@@ -467,7 +467,7 @@ describe('customer.subscription.deleted', () => {
     expect(updateQuotaPoolLimit).toHaveBeenCalledWith(
       mockDb,
       'sub-internal-1',
-      50,
+      100,
       10
     );
   });

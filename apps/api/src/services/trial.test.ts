@@ -68,8 +68,16 @@ describe('getTrialPhase', () => {
 // ---------------------------------------------------------------------------
 
 describe('getTrialWarningMessage', () => {
+  it('returns warning at 7 days remaining', () => {
+    expect(getTrialWarningMessage(7)).toBe('7 days left of your trial');
+  });
+
   it('returns warning at 3 days remaining', () => {
     expect(getTrialWarningMessage(3)).toBe('3 days left of your trial');
+  });
+
+  it('returns warning at 2 days remaining', () => {
+    expect(getTrialWarningMessage(2)).toBe('2 days left of your trial');
   });
 
   it('returns warning at 1 day remaining', () => {
@@ -84,8 +92,8 @@ describe('getTrialWarningMessage', () => {
     expect(getTrialWarningMessage(10)).toBeNull();
   });
 
-  it('returns null when no warning needed (e.g. 2 days)', () => {
-    expect(getTrialWarningMessage(2)).toBeNull();
+  it('returns null when no warning needed (e.g. 4 days)', () => {
+    expect(getTrialWarningMessage(4)).toBeNull();
   });
 });
 

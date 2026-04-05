@@ -286,7 +286,7 @@ function mapAssessmentRow(
 export async function loadTopicTitle(
   db: Database,
   topicId: string,
-  profileId?: string
+  profileId: string
 ): Promise<string> {
   const query = db
     .select({ title: curriculumTopics.title })
@@ -294,12 +294,7 @@ export async function loadTopicTitle(
     .innerJoin(curricula, eq(curriculumTopics.curriculumId, curricula.id))
     .innerJoin(subjects, eq(curricula.subjectId, subjects.id))
     .where(
-      profileId
-        ? and(
-            eq(curriculumTopics.id, topicId),
-            eq(subjects.profileId, profileId)
-          )
-        : eq(curriculumTopics.id, topicId)
+      and(eq(curriculumTopics.id, topicId), eq(subjects.profileId, profileId))
     )
     .limit(1);
   const [topic] = await query;

@@ -27,6 +27,9 @@ jest.mock('@eduagent/retention', () => ({
 
 jest.mock('./adaptive-teaching', () => ({
   canExitNeedsDeepening: jest.fn(),
+  checkNeedsDeepeningCapacity: jest
+    .fn()
+    .mockReturnValue({ atCapacity: false, shouldPromote: false }),
 }));
 
 jest.mock('./xp', () => ({
@@ -36,7 +39,10 @@ jest.mock('./xp', () => ({
 import type { Database } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';
 import { processRecallResult, getRetentionStatus } from './retention';
-import { canExitNeedsDeepening } from './adaptive-teaching';
+import {
+  canExitNeedsDeepening,
+  checkNeedsDeepeningCapacity,
+} from './adaptive-teaching';
 import { syncXpLedgerStatus } from './xp';
 import {
   registerProvider,
@@ -56,6 +62,7 @@ import {
   deleteTeachingPreference,
   getAnalogyDomain,
   setAnalogyDomain,
+  setNativeLanguage,
   updateNeedsDeepeningProgress,
   updateRetentionFromSession,
   evaluateRecallQuality,
@@ -184,6 +191,11 @@ function setupScopedRepo({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  setupScopedRepo();
+  (checkNeedsDeepeningCapacity as jest.Mock).mockReturnValue({
+    atCapacity: false,
+    shouldPromote: false,
+  });
   // Register a default gemini mock that returns quality '4' for recall tests
   registerProvider(createMockProvider('gemini'));
 });
@@ -271,6 +283,10 @@ describe('processRecallTest', () => {
     });
 
     const db = createMockDb({ retentionCardFindFirstQuery: newCard });
+    // ensureRetentionCard now checks findFirst before inserting
+    (db.query.retentionCards.findFirst as jest.Mock)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValue(newCard);
 
     (processRecallResult as jest.Mock).mockReturnValue({
       passed: true,
@@ -690,6 +706,85 @@ describe('processRecallTest', () => {
 
     expect(syncXpLedgerStatus).not.toHaveBeenCalled();
   });
+
+  it('D-02: returns cooldown response when atomic guard rejects update (0 rows)', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.6,
+        intervalDays: 10,
+        repetitions: 4,
+        failureCount: 0,
+        consecutiveSuccesses: 3,
+        xpStatus: 'verified',
+        nextReviewAt: '2026-02-25T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+
+    const db = createMockDb();
+    // Simulate atomic guard returning 0 rows (concurrent request already claimed)
+    const whereMock = jest.fn().mockImplementation(() => {
+      const p = Promise.resolve(undefined);
+      (p as Record<string, unknown>).returning = jest
+        .fn()
+        .mockResolvedValue([]); // empty = 0 rows updated
+      return p;
+    });
+    (db.update as jest.Mock).mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: whereMock,
+      }),
+    });
+
+    const result = await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'A detailed answer',
+    });
+
+    expect(result.cooldownActive).toBe(true);
+    expect(result.cooldownEndsAt).toBeDefined();
+    expect(result.passed).toBe(false);
+    expect(result.xpChange).toBe('none');
+  });
+
+  it('D-02: atomic guard allows update when lastReviewedAt is null (first review)', async () => {
+    const card = mockRetentionCardRow();
+    // First review — lastReviewedAt is null
+    Object.assign(card, { lastReviewedAt: null });
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.6,
+        intervalDays: 6,
+        repetitions: 1,
+        failureCount: 0,
+        consecutiveSuccesses: 1,
+        xpStatus: 'verified',
+        nextReviewAt: '2026-02-21T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+
+    const db = createMockDb();
+    const result = await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'A detailed answer about the topic',
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.cooldownActive).toBeUndefined();
+    expect(db.update).toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1006,6 +1101,17 @@ describe('setTeachingPreference', () => {
       nativeLanguage: null,
     });
   });
+
+  it('rejects writes for subjects outside the caller scope', async () => {
+    setupScopedRepo({ subjectFindFirst: null as unknown });
+    const db = createMockDb();
+
+    await expect(
+      setTeachingPreference(db, profileId, subjectId, 'step_by_step')
+    ).rejects.toThrow('Subject not found');
+
+    expect(db.insert).not.toHaveBeenCalled();
+  });
 });
 
 describe('deleteTeachingPreference', () => {
@@ -1075,6 +1181,40 @@ describe('setAnalogyDomain', () => {
     const result = await setAnalogyDomain(db, profileId, subjectId, null);
     expect(result).toBeNull();
     expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('rejects writes for subjects outside the caller scope', async () => {
+    setupScopedRepo({ subjectFindFirst: null as unknown });
+    const db = createMockDb();
+
+    await expect(
+      setAnalogyDomain(db, profileId, subjectId, 'sports')
+    ).rejects.toThrow('Subject not found');
+
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('setNativeLanguage', () => {
+  it('upserts native language for an owned subject', async () => {
+    setupScopedRepo();
+    const db = createMockDb();
+
+    const result = await setNativeLanguage(db, profileId, subjectId, 'en');
+
+    expect(result).toBe('en');
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('rejects writes for subjects outside the caller scope', async () => {
+    setupScopedRepo({ subjectFindFirst: null as unknown });
+    const db = createMockDb();
+
+    await expect(
+      setNativeLanguage(db, profileId, subjectId, 'en')
+    ).rejects.toThrow('Subject not found');
+
+    expect(db.insert).not.toHaveBeenCalled();
   });
 });
 
@@ -1216,6 +1356,9 @@ describe('updateRetentionFromSession', () => {
     });
 
     const db = createMockDb({ retentionCardFindFirstQuery: newCard });
+    (db.query.retentionCards.findFirst as jest.Mock)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValue(newCard);
 
     await updateRetentionFromSession(db, profileId, topicId, 4);
 
@@ -1297,25 +1440,32 @@ describe('updateRetentionFromSession', () => {
 // ---------------------------------------------------------------------------
 
 describe('ensureRetentionCard', () => {
-  it('is idempotent — ON CONFLICT DO NOTHING', async () => {
+  it('is idempotent — returns existing card without inserting', async () => {
     const existingCard = mockRetentionCardRow();
     const db = createMockDb({ retentionCardFindFirstQuery: existingCard });
 
     const result = await ensureRetentionCard(db, profileId, topicId);
 
-    expect(db.insert).toHaveBeenCalled();
-    expect(result.topicId).toBe(topicId);
-    expect(result.profileId).toBe(profileId);
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(result.card.topicId).toBe(topicId);
+    expect(result.card.profileId).toBe(profileId);
+    expect(result.isNew).toBe(false);
   });
 
   it('returns the card after insertion', async () => {
     const newCard = mockRetentionCardRow({ xpStatus: 'pending' });
+    Object.assign(newCard, { repetitions: 0 });
     const db = createMockDb({ retentionCardFindFirstQuery: newCard });
+    (db.query.retentionCards.findFirst as jest.Mock)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValue(newCard);
 
     const result = await ensureRetentionCard(db, profileId, topicId);
 
     expect(result).toBeDefined();
-    expect(result.topicId).toBe(topicId);
+    expect(result.card.topicId).toBe(topicId);
+    expect(result.isNew).toBe(true);
+    expect(db.insert).toHaveBeenCalled();
   });
 });
 

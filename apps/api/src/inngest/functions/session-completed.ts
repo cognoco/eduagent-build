@@ -36,8 +36,8 @@ import {
   sessionEvents,
   subjects,
 } from '@eduagent/database';
-import type { Database } from '@eduagent/database';
 import { and, asc, eq } from 'drizzle-orm';
+import { verificationTypeSchema } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Step error isolation — each step catches its own errors so that a failure
@@ -167,8 +167,26 @@ export const sessionCompleted = inngest.createFunction(
     const verificationCompletionOutcome = await step.run(
       'process-verification-completion',
       async () => {
-        const vType = verificationType as string | null | undefined;
-        if (!vType || (vType !== 'evaluate' && vType !== 'teach_back')) {
+        // C-05: validate verificationType at runtime using Zod schema
+        // from @eduagent/schemas. If the value is invalid or a new type is
+        // added without a handler, we log a warning rather than silently
+        // skipping.
+        const parsed = verificationTypeSchema.safeParse(verificationType);
+        if (!parsed.success) {
+          if (verificationType != null) {
+            console.warn(
+              `[session-completed] Unknown verificationType: ${String(
+                verificationType
+              )}`
+            );
+          }
+          return {
+            step: 'process-verification-completion',
+            status: 'skipped' as const,
+          };
+        }
+        const vType = parsed.data;
+        if (vType !== 'evaluate' && vType !== 'teach_back') {
           return {
             step: 'process-verification-completion',
             status: 'skipped' as const,
@@ -418,27 +436,23 @@ export const sessionCompleted = inngest.createFunction(
               ? new Date(timestamp).toISOString().slice(0, 10)
               : new Date().toISOString().slice(0, 10);
 
-            await db.transaction(async (tx) => {
-              const txDb = tx as unknown as Database;
-              // Gate: Only increment streak on recall-pass (quality >= 3)
-              if (
-                completionQualityRating != null &&
-                completionQualityRating >= 3
-              ) {
-                updatedStreak = await recordSessionActivity(
-                  txDb,
-                  profileId,
-                  today
-                );
-              }
+            // Streak and XP are independent writes — no transaction needed.
+            // The neon-http driver does not support multi-statement transactions;
+            // wrapping these in db.transaction() would either fail outright or
+            // fall back to non-atomic execution via the client.ts shim.
+            if (
+              completionQualityRating != null &&
+              completionQualityRating >= 3
+            ) {
+              updatedStreak = await recordSessionActivity(db, profileId, today);
+            }
 
-              await insertSessionXpEntry(
-                txDb,
-                profileId,
-                topicId ?? null,
-                subjectId
-              );
-            });
+            await insertSessionXpEntry(
+              db,
+              profileId,
+              topicId ?? null,
+              subjectId
+            );
           }
         );
         return result;
@@ -522,7 +536,11 @@ export const sessionCompleted = inngest.createFunction(
           const db = getStepDatabase();
           const quality = completionQualityRating;
           const currentTopicId = topicId as string | null | undefined;
-          const currentVerification = verificationType as string | undefined;
+          // C-05: Zod runtime validation for verification type
+          const vParsed = verificationTypeSchema.safeParse(verificationType);
+          const currentVerification = vParsed.success
+            ? vParsed.data
+            : undefined;
 
           if (currentVerification === 'evaluate' && (quality ?? 0) >= 4) {
             await queueCelebration(

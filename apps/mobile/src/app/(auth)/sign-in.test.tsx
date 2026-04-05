@@ -96,7 +96,7 @@ describe('SignInScreen', () => {
     ).toBeTruthy();
   });
 
-  it('calls signIn.create on submit and navigates on success', async () => {
+  it('calls signIn.create on submit and activates session on success', async () => {
     mockCreate.mockResolvedValue({
       status: 'complete',
       createdSessionId: 'sess_123',
@@ -126,9 +126,8 @@ describe('SignInScreen', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
-    });
+    // Auth layout guard handles navigation — no explicit router.replace
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('displays error message on sign-in failure', async () => {
@@ -242,9 +241,8 @@ describe('SignInScreen', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
-    });
+    // Auth layout guard handles navigation — no explicit router.replace
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('falls back to manual verification banner when auto-send fails', async () => {
@@ -352,9 +350,8 @@ describe('SignInScreen', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
-    });
+    // Auth layout guard handles navigation — no explicit router.replace
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   // ---------------------------------------------------------------------------
@@ -439,9 +436,8 @@ describe('SignInScreen', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
-    });
+    // Auth layout guard handles navigation — no explicit router.replace
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('prefers TOTP over email_code when both are available as second factor', async () => {
@@ -503,7 +499,7 @@ describe('SignInScreen', () => {
   // SSO sign-in
   // ---------------------------------------------------------------------------
 
-  it('calls startSSOFlow for Google and navigates on success', async () => {
+  it('calls startSSOFlow for Google and activates session on success', async () => {
     mockStartSSOFlow.mockResolvedValue({
       createdSessionId: 'sess_google_123',
     });
@@ -524,9 +520,8 @@ describe('SignInScreen', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
-    });
+    // Auth layout guard handles navigation — no explicit router.replace
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('calls startSSOFlow for Apple and navigates on success', async () => {
@@ -600,6 +595,207 @@ describe('SignInScreen', () => {
       expect(mockSetActive).toHaveBeenCalledWith({
         session: 'sess_openai_123',
       });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Navigation contract — regression guard for sign-in bounce-back bug.
+  //
+  // BUG (2026-04-05): After successful verification, router.replace() fired
+  // before Clerk's React state propagated.  The learner layout guard saw
+  // isSignedIn: false and bounced the user to an empty sign-in screen.
+  //
+  // FIX: Auth screens must NEVER call router.replace() or router.push()
+  // after setActive().  The (auth)/_layout guard reactively redirects to
+  // /(learner)/home when useAuth().isSignedIn becomes true.
+  //
+  // These tests verify that contract holds for EVERY auth completion path.
+  // If you add a new sign-in method, add a test here proving it does NOT
+  // navigate after setActive().
+  // ---------------------------------------------------------------------------
+
+  describe('navigation contract: never navigate after setActive()', () => {
+    // Helper: complete the password + first-factor verification flow
+    async function completeFirstFactorVerification() {
+      mockCreate.mockResolvedValue({
+        status: 'needs_first_factor',
+        createdSessionId: null,
+        supportedFirstFactors: [
+          {
+            strategy: 'email_code',
+            emailAddressId: 'email_nav',
+            safeIdentifier: 'u***@test.com',
+          },
+        ],
+      });
+      mockPrepareFirstFactor.mockResolvedValue(undefined);
+      mockAttemptFirstFactor.mockResolvedValue({
+        status: 'complete',
+        createdSessionId: 'sess_nav_first',
+      });
+      mockSetActive.mockResolvedValue(undefined);
+
+      render(<SignInScreen />);
+
+      fireEvent.changeText(screen.getByTestId('sign-in-email'), 'u@test.com');
+      fireEvent.changeText(screen.getByTestId('sign-in-password'), 'pw');
+      fireEvent.press(screen.getByTestId('sign-in-button'));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy()
+      );
+
+      fireEvent.changeText(screen.getByTestId('sign-in-verify-code'), '111111');
+      fireEvent.press(screen.getByTestId('sign-in-verify-button'));
+
+      await waitFor(() =>
+        expect(mockSetActive).toHaveBeenCalledWith({
+          session: 'sess_nav_first',
+        })
+      );
+    }
+
+    it('password sign-in: no navigation after setActive()', async () => {
+      mockCreate.mockResolvedValue({
+        status: 'complete',
+        createdSessionId: 'sess_pw',
+      });
+      mockSetActive.mockResolvedValue(undefined);
+
+      render(<SignInScreen />);
+
+      fireEvent.changeText(screen.getByTestId('sign-in-email'), 'a@b.com');
+      fireEvent.changeText(screen.getByTestId('sign-in-password'), 'pw');
+      fireEvent.press(screen.getByTestId('sign-in-button'));
+
+      await waitFor(() =>
+        expect(mockSetActive).toHaveBeenCalledWith({ session: 'sess_pw' })
+      );
+
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('first-factor verification: no navigation after setActive()', async () => {
+      await completeFirstFactorVerification();
+
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('second-factor verification: no navigation after setActive()', async () => {
+      mockCreate.mockResolvedValue({
+        status: 'needs_second_factor',
+        createdSessionId: null,
+        supportedSecondFactors: [
+          {
+            strategy: 'email_code',
+            emailAddressId: 'email_2fa',
+            safeIdentifier: 'x***@test.com',
+          },
+        ],
+      });
+      mockPrepareSecondFactor.mockResolvedValue(undefined);
+      mockAttemptSecondFactor.mockResolvedValue({
+        status: 'complete',
+        createdSessionId: 'sess_nav_second',
+      });
+      mockSetActive.mockResolvedValue(undefined);
+
+      render(<SignInScreen />);
+
+      fireEvent.changeText(screen.getByTestId('sign-in-email'), 'x@test.com');
+      fireEvent.changeText(screen.getByTestId('sign-in-password'), 'pw');
+      fireEvent.press(screen.getByTestId('sign-in-button'));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy()
+      );
+
+      fireEvent.changeText(screen.getByTestId('sign-in-verify-code'), '222222');
+      fireEvent.press(screen.getByTestId('sign-in-verify-button'));
+
+      await waitFor(() =>
+        expect(mockSetActive).toHaveBeenCalledWith({
+          session: 'sess_nav_second',
+        })
+      );
+
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('TOTP verification: no navigation after setActive()', async () => {
+      mockCreate.mockResolvedValue({
+        status: 'needs_second_factor',
+        createdSessionId: null,
+        supportedSecondFactors: [{ strategy: 'totp' }],
+      });
+      mockAttemptSecondFactor.mockResolvedValue({
+        status: 'complete',
+        createdSessionId: 'sess_nav_totp',
+      });
+      mockSetActive.mockResolvedValue(undefined);
+
+      render(<SignInScreen />);
+
+      fireEvent.changeText(screen.getByTestId('sign-in-email'), 'y@test.com');
+      fireEvent.changeText(screen.getByTestId('sign-in-password'), 'pw');
+      fireEvent.press(screen.getByTestId('sign-in-button'));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy()
+      );
+
+      fireEvent.changeText(screen.getByTestId('sign-in-verify-code'), '333333');
+      fireEvent.press(screen.getByTestId('sign-in-verify-button'));
+
+      await waitFor(() =>
+        expect(mockSetActive).toHaveBeenCalledWith({
+          session: 'sess_nav_totp',
+        })
+      );
+
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('Google SSO: no navigation after setActive()', async () => {
+      mockStartSSOFlow.mockResolvedValue({
+        createdSessionId: 'sess_nav_google',
+      });
+      mockSetActive.mockResolvedValue(undefined);
+
+      render(<SignInScreen />);
+      fireEvent.press(screen.getByTestId('google-sso-button'));
+
+      await waitFor(() =>
+        expect(mockSetActive).toHaveBeenCalledWith({
+          session: 'sess_nav_google',
+        })
+      );
+
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('Apple SSO: no navigation after setActive()', async () => {
+      mockStartSSOFlow.mockResolvedValue({
+        createdSessionId: 'sess_nav_apple',
+      });
+      mockSetActive.mockResolvedValue(undefined);
+
+      render(<SignInScreen />);
+      fireEvent.press(screen.getByTestId('apple-sso-button'));
+
+      await waitFor(() =>
+        expect(mockSetActive).toHaveBeenCalledWith({
+          session: 'sess_nav_apple',
+        })
+      );
+
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
     });
   });
 });

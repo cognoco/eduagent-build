@@ -111,6 +111,7 @@ import {
   setAnalogyDomain,
   setNativeLanguage,
 } from '../services/retention-data';
+import { NotFoundError } from '../errors';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
@@ -583,6 +584,39 @@ describe('settings routes', () => {
       expect(res.status).toBe(400);
     });
 
+    it('returns 400 with invalid subjectId', async () => {
+      const res = await app.request(
+        '/v1/settings/subjects/not-a-uuid/analogy-domain',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ analogyDomain: 'sports' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+      expect(setAnalogyDomain).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when the subject is not owned by the caller', async () => {
+      (setAnalogyDomain as jest.Mock).mockRejectedValueOnce(
+        new NotFoundError('Subject')
+      );
+
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/analogy-domain`,
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ analogyDomain: 'sports' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+    });
+
     it('returns 401 without auth header', async () => {
       const res = await app.request(
         `/v1/settings/subjects/${subjectId}/analogy-domain`,
@@ -721,6 +755,39 @@ describe('settings routes', () => {
       );
 
       expect(res.status).toBe(400);
+    });
+
+    it('returns 400 with invalid subjectId', async () => {
+      const res = await app.request(
+        '/v1/settings/subjects/not-a-uuid/native-language',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ nativeLanguage: 'en' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+      expect(setNativeLanguage).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when the subject is not owned by the caller', async () => {
+      (setNativeLanguage as jest.Mock).mockRejectedValueOnce(
+        new NotFoundError('Subject')
+      );
+
+      const res = await app.request(
+        `/v1/settings/subjects/${subjectId}/native-language`,
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ nativeLanguage: 'en' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
     });
 
     it('returns 401 without auth header', async () => {

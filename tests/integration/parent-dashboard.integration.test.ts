@@ -1,128 +1,245 @@
 /**
  * Integration: Parent Dashboard Endpoints
  *
- * Exercises the parent dashboard routes via Hono's app.request(). Validates:
+ * Exercises the parent dashboard routes via the real app + real database.
+ * JWT verification is the only mocked boundary.
  *
- * 1. GET /v1/dashboard — returns children list for parent
- * 2. GET /v1/dashboard/children/:profileId — returns child detail
- * 3. GET /v1/dashboard/children/:profileId/sessions — returns child sessions
- * 4. GET /v1/dashboard/children/:profileId/sessions/:sessionId/transcript — returns transcript
- * 5. GET /v1/dashboard/demo — returns hardcoded demo data
- * 6. GET /v1/dashboard — 401 without auth
- * 7. GET /v1/dashboard/children/:profileId/sessions — 401 without auth
+ * Validates:
+ * 1. GET /v1/dashboard — returns children list for parent with real aggregation
+ * 2. GET /v1/dashboard — returns empty when no family links exist
+ * 3. GET /v1/dashboard/children/:profileId — returns child detail
+ * 4. GET /v1/dashboard/children/:profileId/sessions — returns child sessions
+ * 5. GET /v1/dashboard/children/:profileId/sessions/:sessionId/transcript — returns transcript
+ * 6. GET /v1/dashboard/demo — returns hardcoded demo data
+ * 7. GET /v1/dashboard — 401 without auth
  */
 
-// --- Dashboard service mocks ---
-
-const mockGetChildrenForParent = jest.fn();
-const mockGetChildDetail = jest.fn();
-const mockGetChildSessions = jest.fn();
-const mockGetChildSessionTranscript = jest.fn();
-const mockGetChildSubjectTopics = jest.fn();
-
-jest.mock('../../apps/api/src/services/dashboard', () => ({
-  getChildrenForParent: mockGetChildrenForParent,
-  getChildDetail: mockGetChildDetail,
-  getChildSubjectTopics: mockGetChildSubjectTopics,
-  getChildSessions: mockGetChildSessions,
-  getChildSessionTranscript: mockGetChildSessionTranscript,
-}));
-
-// --- Base mocks (middleware chain requires these) ---
-
 import {
-  jwtMock,
-  databaseMock,
-  inngestClientMock,
-  accountMock,
-  billingMock,
-  settingsMock,
-  sessionMock,
-  llmMock,
-  configureValidJWT,
-  configureInvalidJWT,
-} from './mocks';
+  familyLinks,
+  learningSessions,
+  sessionEvents,
+  subjects,
+} from '@eduagent/database';
+
+import { jwtMock, configureValidJWT, configureInvalidJWT } from './mocks';
+import {
+  buildIntegrationEnv,
+  cleanupAccounts,
+  createIntegrationDb,
+} from './helpers';
 
 const jwt = jwtMock();
 jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
-jest.mock('@eduagent/database', () => databaseMock());
-jest.mock('../../apps/api/src/inngest/client', () => inngestClientMock());
-jest.mock('../../apps/api/src/services/account', () => accountMock());
-jest.mock('../../apps/api/src/services/billing', () => billingMock());
-jest.mock('../../apps/api/src/services/settings', () => settingsMock());
-jest.mock('../../apps/api/src/services/session', () => sessionMock());
-jest.mock('../../apps/api/src/services/llm', () => llmMock());
-jest.mock('../../apps/api/src/services/profile', () => ({
-  getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: null,
-    location: null,
-    consentStatus: 'CONSENTED',
-  }),
-  findOwnerProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: null,
-    location: null,
-    consentStatus: 'CONSENTED',
-  }),
-}));
 
 import { app } from '../../apps/api/src/index';
 
-const TEST_ENV = {
-  ENVIRONMENT: 'development',
-  DATABASE_URL: 'postgresql://test:test@localhost/test',
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
-};
+const TEST_ENV = buildIntegrationEnv();
 
-const CHILD_PROFILE_ID = '00000000-0000-4000-8000-000000000020';
-const SESSION_ID = '00000000-0000-4000-8000-000000000021';
+const PARENT_USER_ID = 'integration-dashboard-parent';
+const PARENT_EMAIL = 'integration-dashboard-parent@integration.test';
+const CHILD_USER_ID = 'integration-dashboard-child';
+const CHILD_EMAIL = 'integration-dashboard-child@integration.test';
 
-const AUTH_HEADERS = {
-  Authorization: 'Bearer test-token',
-  'X-Profile-Id': 'test-profile-id',
-};
+function buildAuthHeaders(profileId?: string): HeadersInit {
+  return {
+    Authorization: 'Bearer valid.jwt.token',
+    'Content-Type': 'application/json',
+    ...(profileId ? { 'X-Profile-Id': profileId } : {}),
+  };
+}
+
+async function createProfile(
+  userId: string,
+  email: string,
+  displayName: string,
+  birthYear: number
+): Promise<string> {
+  configureValidJWT(jwt, { sub: userId, email });
+
+  const res = await app.request(
+    '/v1/profiles',
+    {
+      method: 'POST',
+      headers: buildAuthHeaders(),
+      body: JSON.stringify({ displayName, birthYear }),
+    },
+    TEST_ENV
+  );
+
+  expect(res.status).toBe(201);
+  const body = await res.json();
+  return body.profile.id as string;
+}
+
+async function createSubjectForProfile(
+  userId: string,
+  email: string,
+  profileId: string,
+  subjectName: string
+): Promise<string> {
+  configureValidJWT(jwt, { sub: userId, email });
+
+  const res = await app.request(
+    '/v1/subjects',
+    {
+      method: 'POST',
+      headers: buildAuthHeaders(profileId),
+      body: JSON.stringify({ name: subjectName }),
+    },
+    TEST_ENV
+  );
+
+  expect(res.status).toBe(201);
+  const body = await res.json();
+  return body.subject.id as string;
+}
+
+beforeEach(async () => {
+  jest.clearAllMocks();
+  await cleanupAccounts({
+    emails: [PARENT_EMAIL, CHILD_EMAIL],
+    clerkUserIds: [PARENT_USER_ID, CHILD_USER_ID],
+  });
+});
+
+afterAll(async () => {
+  await cleanupAccounts({
+    emails: [PARENT_EMAIL, CHILD_EMAIL],
+    clerkUserIds: [PARENT_USER_ID, CHILD_USER_ID],
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Helpers: seed family link + sessions via direct DB
+// ---------------------------------------------------------------------------
+
+async function seedFamilyLink(
+  parentProfileId: string,
+  childProfileId: string
+): Promise<void> {
+  const db = createIntegrationDb();
+  await db
+    .insert(familyLinks)
+    .values({ parentProfileId, childProfileId })
+    .onConflictDoNothing();
+}
+
+async function seedSession(
+  profileId: string,
+  subjectId: string,
+  overrides: Partial<typeof learningSessions.$inferInsert> = {}
+): Promise<string> {
+  const db = createIntegrationDb();
+  const [row] = await db
+    .insert(learningSessions)
+    .values({
+      profileId,
+      subjectId,
+      sessionType: 'learning',
+      status: 'completed',
+      exchangeCount: 5,
+      escalationRung: 2,
+      wallClockSeconds: 1200,
+      durationSeconds: 900,
+      startedAt: new Date(),
+      lastActivityAt: new Date(),
+      endedAt: new Date(),
+      ...overrides,
+    })
+    .returning({ id: learningSessions.id });
+  return row!.id;
+}
+
+async function seedSessionEvent(
+  sessionId: string,
+  profileId: string,
+  subjectId: string,
+  eventType: 'user_message' | 'ai_response',
+  content: string,
+  metadata: Record<string, unknown> = {}
+): Promise<void> {
+  const db = createIntegrationDb();
+  await db.insert(sessionEvents).values({
+    sessionId,
+    profileId,
+    subjectId,
+    eventType,
+    content,
+    metadata,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Dashboard routes
 // ---------------------------------------------------------------------------
 
 describe('Integration: GET /v1/dashboard', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    configureValidJWT(jwt);
-  });
+  it('returns 200 with children list when family link exists', async () => {
+    const parentProfileId = await createProfile(
+      PARENT_USER_ID,
+      PARENT_EMAIL,
+      'Test Parent',
+      1985
+    );
+    // birthYear 2004 avoids GDPR consent block (age 22) while still
+    // being a valid "child" in the family-link sense.
+    const childProfileId = await createProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      'Test Child',
+      2004
+    );
+    await seedFamilyLink(parentProfileId, childProfileId);
 
-  it('returns 200 with children list', async () => {
-    const mockChildren = [
-      {
-        profileId: CHILD_PROFILE_ID,
-        displayName: 'Test Child',
-        sessionsThisWeek: 3,
-        sessionsLastWeek: 2,
-        totalTimeThisWeek: 120,
-        totalTimeLastWeek: 90,
-        trend: 'up',
-        subjects: [{ name: 'Mathematics', retentionStatus: 'strong' }],
-      },
-    ];
-    mockGetChildrenForParent.mockResolvedValue(mockChildren);
+    // Create a subject for the child so dashboard has data
+    const subjectId = await createSubjectForProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      childProfileId,
+      'Mathematics'
+    );
 
+    // Seed a session so session counts are non-zero
+    await seedSession(childProfileId, subjectId);
+
+    // Now request dashboard as parent
+    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
       '/v1/dashboard',
-      { method: 'GET', headers: AUTH_HEADERS },
+      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
       TEST_ENV
     );
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.children).toHaveLength(1);
-    expect(body.children[0].displayName).toBe('Test Child');
     expect(body.demoMode).toBe(false);
-    expect(mockGetChildrenForParent).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.any(String)
+    expect(body.children).toHaveLength(1);
+    expect(body.children[0].profileId).toBe(childProfileId);
+    expect(body.children[0].displayName).toBe('Test Child');
+    expect(body.children[0]).toHaveProperty('sessionsThisWeek');
+    expect(body.children[0]).toHaveProperty('trend');
+    expect(body.children[0]).toHaveProperty('subjects');
+  });
+
+  it('returns empty children when no family links exist', async () => {
+    const parentProfileId = await createProfile(
+      PARENT_USER_ID,
+      PARENT_EMAIL,
+      'Lonely Parent',
+      1985
     );
+
+    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
+    const res = await app.request(
+      '/v1/dashboard',
+      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.children).toHaveLength(0);
+    expect(body.demoMode).toBe(false);
   });
 
   it('returns 401 without auth', async () => {
@@ -135,88 +252,139 @@ describe('Integration: GET /v1/dashboard', () => {
 });
 
 describe('Integration: GET /v1/dashboard/children/:profileId', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    configureValidJWT(jwt);
-  });
-
   it('returns 200 with child detail', async () => {
-    const mockChild = {
-      profileId: CHILD_PROFILE_ID,
-      displayName: 'Test Child',
-      subjects: [
-        {
-          id: 'sub-1',
-          name: 'Mathematics',
-          topicCount: 5,
-          retentionStatus: 'strong',
-        },
-      ],
-      totalSessions: 12,
-      totalTimeMinutes: 360,
-    };
-    mockGetChildDetail.mockResolvedValue(mockChild);
+    const parentProfileId = await createProfile(
+      PARENT_USER_ID,
+      PARENT_EMAIL,
+      'Test Parent',
+      1985
+    );
+    const childProfileId = await createProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      'Test Child',
+      2004
+    );
+    await seedFamilyLink(parentProfileId, childProfileId);
 
+    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
-      `/v1/dashboard/children/${CHILD_PROFILE_ID}`,
-      { method: 'GET', headers: AUTH_HEADERS },
+      `/v1/dashboard/children/${childProfileId}`,
+      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
       TEST_ENV
     );
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.child).toBeDefined();
-    expect(body.child.profileId).toBe(CHILD_PROFILE_ID);
+    expect(body.child.profileId).toBe(childProfileId);
     expect(body.child.displayName).toBe('Test Child');
-    expect(mockGetChildDetail).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.any(String), // parentProfileId
-      CHILD_PROFILE_ID
+  });
+
+  it('returns null child when no family link exists', async () => {
+    const parentProfileId = await createProfile(
+      PARENT_USER_ID,
+      PARENT_EMAIL,
+      'Test Parent',
+      1985
     );
+    const childProfileId = await createProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      'Test Child',
+      2004
+    );
+    // No family link!
+
+    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
+    const res = await app.request(
+      `/v1/dashboard/children/${childProfileId}`,
+      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.child).toBeNull();
   });
 });
 
 describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    configureValidJWT(jwt);
-  });
-
   it('returns 200 with sessions list', async () => {
-    const mockSessions = [
-      {
-        id: SESSION_ID,
-        subjectName: 'Mathematics',
-        sessionType: 'learning',
-        startedAt: '2025-01-15T10:00:00.000Z',
-        durationSeconds: 1800,
-        exchangeCount: 8,
-      },
-    ];
-    mockGetChildSessions.mockResolvedValue(mockSessions);
+    const parentProfileId = await createProfile(
+      PARENT_USER_ID,
+      PARENT_EMAIL,
+      'Test Parent',
+      1985
+    );
+    const childProfileId = await createProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      'Test Child',
+      2004
+    );
+    await seedFamilyLink(parentProfileId, childProfileId);
 
+    const subjectId = await createSubjectForProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      childProfileId,
+      'Science'
+    );
+
+    const sessionId = await seedSession(childProfileId, subjectId, {
+      exchangeCount: 8,
+      wallClockSeconds: 1800,
+    });
+
+    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
-      `/v1/dashboard/children/${CHILD_PROFILE_ID}/sessions`,
-      { method: 'GET', headers: AUTH_HEADERS },
+      `/v1/dashboard/children/${childProfileId}/sessions`,
+      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
       TEST_ENV
     );
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.sessions).toHaveLength(1);
-    expect(body.sessions[0].id).toBe(SESSION_ID);
-    expect(mockGetChildSessions).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.any(String), // parentProfileId
-      CHILD_PROFILE_ID
+    expect(body.sessions[0].sessionId).toBe(sessionId);
+    expect(body.sessions[0].sessionType).toBe('learning');
+    expect(body.sessions[0].exchangeCount).toBe(8);
+    expect(body.sessions[0].wallClockSeconds).toBe(1800);
+  });
+
+  it('returns empty sessions when no family link exists', async () => {
+    const parentProfileId = await createProfile(
+      PARENT_USER_ID,
+      PARENT_EMAIL,
+      'Test Parent',
+      1985
     );
+    const childProfileId = await createProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      'Test Child',
+      2004
+    );
+    // No family link
+
+    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
+    const res = await app.request(
+      `/v1/dashboard/children/${childProfileId}/sessions`,
+      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.sessions).toHaveLength(0);
   });
 
   it('returns 401 without auth', async () => {
     configureInvalidJWT(jwt);
 
     const res = await app.request(
-      `/v1/dashboard/children/${CHILD_PROFILE_ID}/sessions`,
+      '/v1/dashboard/children/00000000-0000-4000-8000-000000000020/sessions',
       { method: 'GET' },
       TEST_ENV
     );
@@ -226,55 +394,108 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
 });
 
 describe('Integration: GET /v1/dashboard/children/:profileId/sessions/:sessionId/transcript', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    configureValidJWT(jwt);
-  });
+  it('returns 200 with transcript exchanges', async () => {
+    const parentProfileId = await createProfile(
+      PARENT_USER_ID,
+      PARENT_EMAIL,
+      'Test Parent',
+      1985
+    );
+    const childProfileId = await createProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      'Test Child',
+      2004
+    );
+    await seedFamilyLink(parentProfileId, childProfileId);
 
-  it('returns 200 with transcript', async () => {
-    const mockTranscript = {
-      sessionId: SESSION_ID,
-      exchanges: [
-        { role: 'assistant', content: 'What would you like to learn?' },
-        { role: 'user', content: 'How does photosynthesis work?' },
-        {
-          role: 'assistant',
-          content: 'Great question! Let me guide you through it.',
-        },
-      ],
-    };
-    mockGetChildSessionTranscript.mockResolvedValue(mockTranscript);
+    const subjectId = await createSubjectForProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      childProfileId,
+      'Science'
+    );
 
+    const sessionId = await seedSession(childProfileId, subjectId, {
+      exchangeCount: 2,
+    });
+
+    // Seed transcript events
+    await seedSessionEvent(
+      sessionId,
+      childProfileId,
+      subjectId,
+      'user_message',
+      'How does photosynthesis work?'
+    );
+    await seedSessionEvent(
+      sessionId,
+      childProfileId,
+      subjectId,
+      'ai_response',
+      'Great question! Photosynthesis is the process plants use to convert sunlight into energy.',
+      { escalationRung: 1 }
+    );
+
+    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
-      `/v1/dashboard/children/${CHILD_PROFILE_ID}/sessions/${SESSION_ID}/transcript`,
-      { method: 'GET', headers: AUTH_HEADERS },
+      `/v1/dashboard/children/${childProfileId}/sessions/${sessionId}/transcript`,
+      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
       TEST_ENV
     );
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.transcript).toBeDefined();
-    expect(body.transcript.sessionId).toBe(SESSION_ID);
-    expect(body.transcript.exchanges).toHaveLength(3);
-    expect(mockGetChildSessionTranscript).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.any(String), // parentProfileId
-      CHILD_PROFILE_ID,
-      SESSION_ID
+    expect(body.transcript.session.sessionId).toBe(sessionId);
+    expect(body.transcript.exchanges).toHaveLength(2);
+    expect(body.transcript.exchanges[0].role).toBe('user');
+    expect(body.transcript.exchanges[0].content).toContain('photosynthesis');
+    expect(body.transcript.exchanges[1].role).toBe('assistant');
+    expect(body.transcript.exchanges[1].escalationRung).toBe(1);
+  });
+
+  it('returns null when session does not belong to child', async () => {
+    const parentProfileId = await createProfile(
+      PARENT_USER_ID,
+      PARENT_EMAIL,
+      'Test Parent',
+      1985
     );
+    const childProfileId = await createProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      'Test Child',
+      2004
+    );
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
+    const res = await app.request(
+      `/v1/dashboard/children/${childProfileId}/sessions/00000000-0000-4000-8000-999999999999/transcript`,
+      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.transcript).toBeNull();
   });
 });
 
 describe('Integration: GET /v1/dashboard/demo', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    configureValidJWT(jwt);
-  });
-
   it('returns 200 with demo data', async () => {
+    const parentProfileId = await createProfile(
+      PARENT_USER_ID,
+      PARENT_EMAIL,
+      'Test Parent',
+      1985
+    );
+
+    configureValidJWT(jwt, { sub: PARENT_USER_ID, email: PARENT_EMAIL });
     const res = await app.request(
       '/v1/dashboard/demo',
-      { method: 'GET', headers: AUTH_HEADERS },
+      { method: 'GET', headers: buildAuthHeaders(parentProfileId) },
       TEST_ENV
     );
 

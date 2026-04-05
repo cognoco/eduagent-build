@@ -6,7 +6,7 @@
 //   Day 1-14:  full Plus access (status: 'trial', tier: 'plus')
 //   Day 15-28: extended trial / soft landing (status: 'expired', tier: 'free',
 //              quota: 15/day ≈ 450/month)
-//   Day 29+:   free tier (status: 'expired', tier: 'free', quota: 50/month)
+//   Day 29+:   free tier (status: 'expired', tier: 'free', quota: 10/day + 100/month)
 // ---------------------------------------------------------------------------
 
 import { inngest } from '../client';

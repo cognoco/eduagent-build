@@ -57,6 +57,41 @@
       "when": 1775433600000,
       "tag": "0007_teaching_preferences_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1775606400000,
+      "tag": "0008_language_learning_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1775692800000,
+      "tag": "0009_backfill_owner_profiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1775779200000,
+      "tag": "0010_missing_schema_catchup",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1775379412072,
+      "tag": "0011_good_harrier",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1775389406040,
+      "tag": "0012_tan_exodus",
+      "breakpoints": true
     }
   ]
 }

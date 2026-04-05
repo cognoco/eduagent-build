@@ -1,162 +1,176 @@
 /**
  * Integration: Homework & OCR Endpoints
  *
- * Exercises the homework session start and server-side OCR fallback routes
- * via Hono's app.request(). Validates:
+ * Exercises the real homework routes through the full app + real DB.
  *
- * 1. POST /v1/subjects/:subjectId/homework — starts homework session (201)
- * 2. POST /v1/subjects/:subjectId/homework — 403 when subject is inactive
- * 3. POST /v1/subjects/:subjectId/homework — 401 without auth token
- * 4. POST /v1/ocr — 200 with valid image multipart
- * 5. POST /v1/ocr — 400 missing image field
- * 6. POST /v1/ocr — 400 unsupported mime type
- * 7. POST /v1/ocr — 401 without auth token
+ * Mocked boundaries:
+ * - JWT verification
+ * - OCR provider extraction via service DI
  */
 
-// --- Service mocks (declared before jest.mock for hoisting) ---
+import { eq } from 'drizzle-orm';
+import { subjects, learningSessions, sessionEvents } from '@eduagent/database';
 
-const mockStartSession = jest.fn();
-const mockSubjectInactiveError = class extends Error {
-  constructor(msg: string) {
-    super(msg);
-  }
-};
-
-jest.mock('../../apps/api/src/services/session', () => ({
-  ...jest.createMockFromModule<Record<string, jest.Mock>>(
-    '../../apps/api/src/services/session'
-  ),
-  startSession: mockStartSession,
-  syncHomeworkState: jest.fn().mockResolvedValue({
-    metadata: {
-      problemCount: 2,
-      currentProblemIndex: 1,
-      problems: [],
-    },
-  }),
-  SubjectInactiveError: mockSubjectInactiveError,
-}));
-
-const mockExtractText = jest.fn();
-jest.mock('../../apps/api/src/services/ocr', () => ({
-  getOcrProvider: jest.fn().mockReturnValue({ extractText: mockExtractText }),
-}));
-
-// --- Base mocks (middleware chain requires these) ---
-
+import { jwtMock, configureValidJWT, configureInvalidJWT } from './mocks';
 import {
-  jwtMock,
-  databaseMock,
-  inngestClientMock,
-  accountMock,
-  billingMock,
-  settingsMock,
-  llmMock,
-  configureValidJWT,
-  configureInvalidJWT,
-} from './mocks';
+  buildIntegrationEnv,
+  cleanupAccounts,
+  createIntegrationDb,
+} from './helpers';
+import {
+  resetOcrProvider,
+  setOcrProvider,
+} from '../../apps/api/src/services/ocr';
 
 const jwt = jwtMock();
+const mockExtractText = jest.fn();
+
 jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
-jest.mock('@eduagent/database', () => databaseMock());
-jest.mock('../../apps/api/src/inngest/client', () => inngestClientMock());
-jest.mock('../../apps/api/src/services/account', () => accountMock());
-jest.mock('../../apps/api/src/services/billing', () => billingMock());
-jest.mock('../../apps/api/src/services/settings', () => settingsMock());
-jest.mock('../../apps/api/src/services/llm', () => llmMock());
-jest.mock('../../apps/api/src/services/profile', () => ({
-  getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: null,
-    location: null,
-    consentStatus: 'CONSENTED',
-  }),
-  findOwnerProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: null,
-    location: null,
-    consentStatus: 'CONSENTED',
-  }),
-}));
 
 import { app } from '../../apps/api/src/index';
 
-const TEST_ENV = {
-  ENVIRONMENT: 'development',
-  DATABASE_URL: 'postgresql://test:test@localhost/test',
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
-};
+const TEST_ENV = buildIntegrationEnv();
+const HOMEWORK_USER_ID = 'integration-homework-user';
+const HOMEWORK_EMAIL = 'integration-homework@integration.test';
+const UNKNOWN_ID = '00000000-0000-4000-8000-000000000099';
 
-const SUBJECT_ID = '00000000-0000-4000-8000-000000000010';
-const SESSION_ID = '00000000-0000-4000-8000-000000000011';
+function buildAuthHeaders(profileId?: string): HeadersInit {
+  return {
+    Authorization: 'Bearer valid.jwt.token',
+    'Content-Type': 'application/json',
+    ...(profileId ? { 'X-Profile-Id': profileId } : {}),
+  };
+}
 
-// ---------------------------------------------------------------------------
-// Homework session
-// ---------------------------------------------------------------------------
+function setValidAuth(): void {
+  configureValidJWT(jwt, {
+    sub: HOMEWORK_USER_ID,
+    email: HOMEWORK_EMAIL,
+  });
+}
+
+async function createOwnerProfile(): Promise<string> {
+  setValidAuth();
+
+  const res = await app.request(
+    '/v1/profiles',
+    {
+      method: 'POST',
+      headers: buildAuthHeaders(),
+      body: JSON.stringify({
+        displayName: 'Homework Learner',
+        birthYear: 2000,
+      }),
+    },
+    TEST_ENV
+  );
+
+  expect(res.status).toBe(201);
+  const body = await res.json();
+  return body.profile.id as string;
+}
+
+async function seedSubject(input: {
+  profileId: string;
+  name?: string;
+  status?: 'active' | 'paused' | 'archived';
+}) {
+  const db = createIntegrationDb();
+  const [subject] = await db
+    .insert(subjects)
+    .values({
+      profileId: input.profileId,
+      name: input.name ?? 'Mathematics',
+      status: input.status ?? 'active',
+      pedagogyMode: 'socratic',
+    })
+    .returning();
+
+  return subject!;
+}
+
+async function loadSession(sessionId: string) {
+  const db = createIntegrationDb();
+  return db.query.learningSessions.findFirst({
+    where: eq(learningSessions.id, sessionId),
+  });
+}
+
+async function loadSessionEvents(sessionId: string) {
+  const db = createIntegrationDb();
+  return db.query.sessionEvents.findMany({
+    where: eq(sessionEvents.sessionId, sessionId),
+  });
+}
+
+beforeEach(async () => {
+  jest.clearAllMocks();
+  setValidAuth();
+  resetOcrProvider();
+  setOcrProvider({
+    extractText: mockExtractText,
+  });
+  mockExtractText.mockResolvedValue({
+    text: 'Extracted math problem',
+    confidence: 0.95,
+    regions: [],
+  });
+  await cleanupAccounts({
+    emails: [HOMEWORK_EMAIL],
+    clerkUserIds: [HOMEWORK_USER_ID],
+  });
+});
+
+afterAll(async () => {
+  resetOcrProvider();
+  await cleanupAccounts({
+    emails: [HOMEWORK_EMAIL],
+    clerkUserIds: [HOMEWORK_USER_ID],
+  });
+});
 
 describe('Integration: POST /v1/subjects/:subjectId/homework', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    configureValidJWT(jwt);
-  });
-
-  it('returns 201 with valid subjectId', async () => {
-    mockStartSession.mockResolvedValue({
-      id: SESSION_ID,
-      subjectId: SUBJECT_ID,
-      sessionType: 'homework',
-      status: 'active',
-      escalationRung: 1,
-      exchangeCount: 0,
-      startedAt: new Date().toISOString(),
-      lastActivityAt: new Date().toISOString(),
-      endedAt: null,
-      durationSeconds: null,
-    });
+  it('starts a real homework session and records the session_start event', async () => {
+    const profileId = await createOwnerProfile();
+    const subject = await seedSubject({ profileId });
 
     const res = await app.request(
-      `/v1/subjects/${SUBJECT_ID}/homework`,
+      `/v1/subjects/${subject.id}/homework`,
       {
         method: 'POST',
-        headers: {
-          Authorization: 'Bearer test-token',
-          'Content-Type': 'application/json',
-          'X-Profile-Id': 'test-profile-id',
-        },
+        headers: buildAuthHeaders(profileId),
       },
       TEST_ENV
     );
 
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.session).toBeDefined();
-    expect(body.session.id).toBe(SESSION_ID);
+    expect(body.session.subjectId).toBe(subject.id);
     expect(body.session.sessionType).toBe('homework');
-    expect(mockStartSession).toHaveBeenCalledWith(
-      expect.anything(), // db
-      expect.any(String), // profileId
-      SUBJECT_ID,
-      expect.objectContaining({
-        subjectId: SUBJECT_ID,
-        sessionType: 'homework',
-      })
-    );
+    expect(body.session.status).toBe('active');
+
+    const session = await loadSession(body.session.id);
+    expect(session).not.toBeNull();
+    expect(session!.profileId).toBe(profileId);
+    expect(session!.subjectId).toBe(subject.id);
+    expect(session!.sessionType).toBe('homework');
+
+    const events = await loadSessionEvents(body.session.id);
+    expect(events.map((event) => event.eventType)).toContain('session_start');
   });
 
-  it('returns 403 when subject is inactive', async () => {
-    mockStartSession.mockRejectedValue(
-      new mockSubjectInactiveError('Subject is inactive')
-    );
+  it('returns 403 when the subject is inactive', async () => {
+    const profileId = await createOwnerProfile();
+    const subject = await seedSubject({
+      profileId,
+      status: 'paused',
+    });
 
     const res = await app.request(
-      `/v1/subjects/${SUBJECT_ID}/homework`,
+      `/v1/subjects/${subject.id}/homework`,
       {
         method: 'POST',
-        headers: {
-          Authorization: 'Bearer test-token',
-          'Content-Type': 'application/json',
-          'X-Profile-Id': 'test-profile-id',
-        },
+        headers: buildAuthHeaders(profileId),
       },
       TEST_ENV
     );
@@ -170,7 +184,7 @@ describe('Integration: POST /v1/subjects/:subjectId/homework', () => {
     configureInvalidJWT(jwt);
 
     const res = await app.request(
-      `/v1/subjects/${SUBJECT_ID}/homework`,
+      `/v1/subjects/${UNKNOWN_ID}/homework`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -182,21 +196,9 @@ describe('Integration: POST /v1/subjects/:subjectId/homework', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// OCR endpoint
-// ---------------------------------------------------------------------------
-
 describe('Integration: POST /v1/ocr', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    configureValidJWT(jwt);
-  });
-
-  it('returns 200 with valid image', async () => {
-    mockExtractText.mockResolvedValue({
-      text: 'Extracted math problem',
-      confidence: 0.95,
-    });
+  it('returns 200 with a valid image payload', async () => {
+    const profileId = await createOwnerProfile();
 
     const formData = new FormData();
     const imageBlob = new Blob(['fake-image-data'], { type: 'image/jpeg' });
@@ -207,8 +209,8 @@ describe('Integration: POST /v1/ocr', () => {
       {
         method: 'POST',
         headers: {
-          Authorization: 'Bearer test-token',
-          'X-Profile-Id': 'test-profile-id',
+          Authorization: 'Bearer valid.jwt.token',
+          'X-Profile-Id': profileId,
         },
         body: formData,
       },
@@ -217,12 +219,16 @@ describe('Integration: POST /v1/ocr', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.text).toBe('Extracted math problem');
-    expect(body.confidence).toBe(0.95);
-    expect(mockExtractText).toHaveBeenCalled();
+    expect(body).toMatchObject({
+      text: 'Extracted math problem',
+      confidence: 0.95,
+    });
+    expect(mockExtractText).toHaveBeenCalledTimes(1);
   });
 
-  it('returns 400 when image field is missing', async () => {
+  it('returns 400 when the image field is missing', async () => {
+    const profileId = await createOwnerProfile();
+
     const formData = new FormData();
     formData.append('notimage', 'some-data');
 
@@ -231,8 +237,8 @@ describe('Integration: POST /v1/ocr', () => {
       {
         method: 'POST',
         headers: {
-          Authorization: 'Bearer test-token',
-          'X-Profile-Id': 'test-profile-id',
+          Authorization: 'Bearer valid.jwt.token',
+          'X-Profile-Id': profileId,
         },
         body: formData,
       },
@@ -242,9 +248,12 @@ describe('Integration: POST /v1/ocr', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.code).toBe('VALIDATION_ERROR');
+    expect(mockExtractText).not.toHaveBeenCalled();
   });
 
-  it('returns 400 for unsupported mime type', async () => {
+  it('returns 400 for unsupported mime types', async () => {
+    const profileId = await createOwnerProfile();
+
     const formData = new FormData();
     const pdfBlob = new Blob(['fake-pdf-data'], { type: 'application/pdf' });
     formData.append('image', pdfBlob, 'homework.pdf');
@@ -254,8 +263,8 @@ describe('Integration: POST /v1/ocr', () => {
       {
         method: 'POST',
         headers: {
-          Authorization: 'Bearer test-token',
-          'X-Profile-Id': 'test-profile-id',
+          Authorization: 'Bearer valid.jwt.token',
+          'X-Profile-Id': profileId,
         },
         body: formData,
       },

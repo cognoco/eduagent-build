@@ -233,7 +233,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       { cancel_at_period_end: true }
     );
 
-    const periodEndTs = updated.items?.data?.[0]?.current_period_end;
+    // Use subscription-level current_period_end (Stripe types vary by version)
+    const raw = updated as unknown as Record<string, unknown>;
+    const periodEndTs = raw.current_period_end;
     const currentPeriodEnd =
       typeof periodEndTs === 'number'
         ? new Date(periodEndTs * 1000).toISOString()

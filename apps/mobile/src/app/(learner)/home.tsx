@@ -1,5 +1,6 @@
 import { View, ActivityIndicator } from 'react-native';
-import { ParentGateway, LearnerScreen } from '../../components/home';
+// import { ParentGateway } from '../../components/home'; // commented out — unreachable while _layout.tsx redirects parents (PR109-03)
+import { LearnerScreen } from '../../components/home';
 import { useCelebration } from '../../hooks/use-celebration';
 import {
   useMarkCelebrationsSeen,
@@ -8,17 +9,20 @@ import {
 import { useCelebrationLevel } from '../../hooks/use-settings';
 import { useProfile } from '../../lib/profile';
 
-function hasLinkedChildren(
-  activeProfile: { id: string; isOwner: boolean } | null,
-  profiles: ReadonlyArray<{ id: string; isOwner: boolean }>
-): boolean {
-  return (
-    activeProfile?.isOwner === true &&
-    profiles.some(
-      (profile) => profile.id !== activeProfile.id && !profile.isOwner
-    )
-  );
-}
+// ParentGateway routing — commented out while _layout.tsx redirects all parents
+// to /(parent)/dashboard before this screen renders (PR109-03).
+// Uncomment when the adaptive home screen is re-enabled for parent accounts.
+// function hasLinkedChildren(
+//   activeProfile: { id: string; isOwner: boolean } | null,
+//   profiles: ReadonlyArray<{ id: string; isOwner: boolean }>
+// ): boolean {
+//   return (
+//     activeProfile?.isOwner === true &&
+//     profiles.some(
+//       (profile) => profile.id !== activeProfile.id && !profile.isOwner
+//     )
+//   );
+// }
 
 export default function HomeScreen(): React.ReactElement {
   const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
@@ -49,19 +53,12 @@ export default function HomeScreen(): React.ReactElement {
 
   return (
     <View className="flex-1">
-      {hasLinkedChildren(activeProfile, profiles) ? (
-        <ParentGateway
-          profiles={profiles}
-          activeProfile={activeProfile}
-          switchProfile={switchProfile}
-        />
-      ) : (
-        <LearnerScreen
-          profiles={profiles}
-          activeProfile={activeProfile}
-          switchProfile={switchProfile}
-        />
-      )}
+      {/* ParentGateway branch commented out — see PR109-03 */}
+      <LearnerScreen
+        profiles={profiles}
+        activeProfile={activeProfile}
+        switchProfile={switchProfile}
+      />
       {CelebrationOverlay}
     </View>
   );

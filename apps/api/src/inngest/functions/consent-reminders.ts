@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm';
 import { inngest } from '../client';
 import {
   getStepDatabase,
@@ -14,6 +13,7 @@ import {
   formatConsentReminderEmail,
   type EmailOptions,
 } from '../../services/notifications';
+import { deleteProfileIfNoConsent } from '../../services/deletion';
 
 export const consentReminder = inngest.createFunction(
   { id: 'consent-reminder', name: 'Send consent reminder' },
@@ -89,18 +89,12 @@ export const consentReminder = inngest.createFunction(
       // Fast guard: bail out if consent was already granted/withdrawn.
       const status = await getConsentStatus(db, profileId);
       if (!status || status === 'CONSENTED' || status === 'WITHDRAWN') return;
+      // CI-11: Use service function instead of raw SQL.
       // Atomic delete — only deletes if no CONSENTED/WITHDRAWN consent exists.
       // This eliminates the TOCTOU race where a parent approves consent between
       // the status check above and the delete below.
       // FK cascades remove all child records (subjects, sessions, consent_states, etc.).
-      await db.execute(sql`
-        DELETE FROM profiles WHERE id = ${profileId}
-        AND NOT EXISTS (
-          SELECT 1 FROM consent_states
-          WHERE consent_states.profile_id = ${profileId}
-          AND consent_states.status IN ('CONSENTED', 'WITHDRAWN')
-        )
-      `);
+      await deleteProfileIfNoConsent(db, profileId);
     });
   }
 );

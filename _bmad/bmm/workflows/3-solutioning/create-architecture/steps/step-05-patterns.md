@@ -93,6 +93,7 @@ Based on the chosen technology stack and decisions, identify where AI agents cou
 - Retry implementation approaches
 - Authentication flow patterns
 - Validation timing and methods
+- **UX resilience: dead-end state prevention** (see UX Resilience Patterns below)
 
 ### 2. Facilitate Pattern Decisions
 
@@ -205,6 +206,35 @@ Which approach makes the most sense for our project?"
 - Global vs local loading states
 - Loading state persistence
 - Loading UI patterns
+
+#### UX Resilience Patterns (Mandatory)
+
+**These patterns prevent dead-end states where users get stuck with no action available. Every architecture document MUST address these:**
+
+**Typed Error Hierarchy:**
+- Define a shared error class hierarchy (e.g., `QuotaExhaustedError`, `ResourceGoneError`, `ForbiddenError`) in the shared schema package
+- API client middleware classifies HTTP responses into typed errors ONCE — screens never parse status codes
+- Every screen can switch on error type to show specific, actionable messages
+
+**Screen State Machine Rule:**
+- Every screen must enumerate ALL states: idle, loading, error, empty, success, offline, expired/gone
+- Every state must have at least one interactive element (no blank screens, no "Tap to X" as plain text)
+- Error states always include: primary action (Retry) + secondary action (Go Back / Go Home)
+
+**Standard Components:**
+- Architecture must specify an `ErrorFallback` component (error + retry + go-back)
+- Architecture must specify a `TimeoutLoader` component (spinner + cancel after N seconds)
+- These are design system primitives, not per-screen ad-hoc implementations
+
+**Mutation Error Feedback:**
+- Every `mutateAsync` / mutation call MUST show user-visible feedback on failure
+- Bare `catch {}` is an architecture violation
+- Navigation after mutations (`router.back()`, `router.replace()`) must be guarded by API success
+
+**End-to-End Feature Tracing:**
+- For every event handler, cron function, or background job: verify something dispatches the event
+- For every wired-but-optional feature: verify the trigger path exists in production code
+- Dead code that LOOKS wired but has no trigger is worse than dead code that's obviously dead
 
 ### 4. Generate Patterns Content
 

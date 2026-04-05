@@ -46,7 +46,7 @@ function mockProfileRow(
     displayName: string;
     avatarUrl: string | null;
     birthDate: Date | null;
-    personaType: 'TEEN' | 'LEARNER' | 'PARENT';
+    birthYear: number | null;
     location: 'EU' | 'US' | 'OTHER' | null;
     isOwner: boolean;
   }>
@@ -57,7 +57,7 @@ function mockProfileRow(
     displayName: overrides?.displayName ?? 'Test User',
     avatarUrl: overrides?.avatarUrl ?? null,
     birthDate: overrides?.birthDate ?? null,
-    personaType: overrides?.personaType ?? 'LEARNER',
+    birthYear: overrides?.birthYear ?? null,
     location: overrides?.location ?? null,
     isOwner: overrides?.isOwner ?? false,
     createdAt: NOW,
@@ -139,7 +139,6 @@ describe('createProfile', () => {
     const db = createMockDb({ insertReturning: [row] });
     const result = await createProfile(db, 'account-123', {
       displayName: 'Test User',
-      personaType: 'LEARNER',
       birthYear: 2008,
     });
 
@@ -149,19 +148,18 @@ describe('createProfile', () => {
     expect(result).toHaveProperty('avatarUrl');
     expect(result).toHaveProperty('birthDate');
     expect(result).toHaveProperty('birthYear');
-    expect(result).toHaveProperty('personaType');
     expect(result).toHaveProperty('isOwner');
     expect(result).toHaveProperty('createdAt');
     expect(result).toHaveProperty('updatedAt');
   });
 
   it('sets isOwner when specified', async () => {
-    const row = mockProfileRow({ isOwner: true, personaType: 'PARENT' });
+    const row = mockProfileRow({ isOwner: true });
     const db = createMockDb({ insertReturning: [row] });
     const result = await createProfile(
       db,
       'account-123',
-      { displayName: 'Owner', personaType: 'PARENT', birthYear: 1990 },
+      { displayName: 'Owner', birthYear: 1990 },
       true
     );
 
@@ -173,30 +171,17 @@ describe('createProfile', () => {
     const db = createMockDb({ insertReturning: [row] });
     const result = await createProfile(db, 'account-123', {
       displayName: 'Non-owner',
-      personaType: 'LEARNER',
       birthYear: 2008,
     });
 
     expect(result.isOwner).toBe(false);
   });
 
-  it('defaults personaType to LEARNER when not specified', async () => {
-    const row = mockProfileRow({ personaType: 'LEARNER' });
-    const db = createMockDb({ insertReturning: [row] });
-    const result = await createProfile(db, 'account-123', {
-      displayName: 'Default Persona',
-      birthYear: 2008,
-    });
-
-    expect(result.personaType).toBe('LEARNER');
-  });
-
   it('returns ISO 8601 timestamps', async () => {
-    const row = mockProfileRow({ personaType: 'TEEN' });
+    const row = mockProfileRow();
     const db = createMockDb({ insertReturning: [row] });
     const result = await createProfile(db, 'account-123', {
       displayName: 'Timestamp Test',
-      personaType: 'TEEN',
       birthYear: 2014,
     });
 
@@ -208,20 +193,17 @@ describe('createProfile', () => {
     const row = mockProfileRow({
       accountId: 'acct-1',
       displayName: 'Custom Name',
-      personaType: 'PARENT',
       avatarUrl: 'https://example.com/avatar.png',
       birthDate: BIRTH,
     });
     const db = createMockDb({ insertReturning: [row] });
     const result = await createProfile(db, 'acct-1', {
       displayName: 'Custom Name',
-      personaType: 'PARENT',
       avatarUrl: 'https://example.com/avatar.png',
       birthDate: '1990-01-15',
     });
 
     expect(result.displayName).toBe('Custom Name');
-    expect(result.personaType).toBe('PARENT');
     expect(result.avatarUrl).toBe('https://example.com/avatar.png');
     expect(result.birthDate).toBe('1990-01-15');
     expect(result.birthYear).toBe(1990);
@@ -266,60 +248,6 @@ describe('createProfile', () => {
 
     expect(createPendingConsentState).not.toHaveBeenCalled();
     expect(result.consentStatus).toBeNull();
-  });
-
-  it('rejects PARENT persona for users under 18', async () => {
-    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
-      required: true,
-      consentType: 'GDPR',
-      age: 14,
-    });
-    const row = mockProfileRow();
-    const db = createMockDb({ insertReturning: [row] });
-
-    await expect(
-      createProfile(db, 'account-123', {
-        displayName: 'Teen',
-        personaType: 'PARENT',
-        birthYear: 2011,
-      })
-    ).rejects.toThrow('Parent profile requires age 18 or older');
-  });
-
-  it('allows PARENT persona for users 18 or older', async () => {
-    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
-      required: false,
-      consentType: null,
-      age: 35,
-    });
-    const row = mockProfileRow({ personaType: 'PARENT' });
-    const db = createMockDb({ insertReturning: [row] });
-
-    const result = await createProfile(db, 'account-123', {
-      displayName: 'Adult',
-      personaType: 'PARENT',
-      birthYear: 1990,
-    });
-
-    expect(result.personaType).toBe('PARENT');
-  });
-
-  it('allows TEEN persona for users under 18', async () => {
-    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
-      required: true,
-      consentType: 'GDPR',
-      age: 12,
-    });
-    const row = mockProfileRow({ personaType: 'TEEN' });
-    const db = createMockDb({ insertReturning: [row] });
-
-    const result = await createProfile(db, 'account-123', {
-      displayName: 'Young Learner',
-      personaType: 'TEEN',
-      birthYear: 2013,
-    });
-
-    expect(result.personaType).toBe('TEEN');
   });
 
   it('stores a derived legacy birthDate for birthYear-only input', async () => {

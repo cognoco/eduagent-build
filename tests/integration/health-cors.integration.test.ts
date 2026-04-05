@@ -1,8 +1,8 @@
 /**
  * Integration: Health endpoint + CORS middleware
  *
- * Exercises the real middleware chain (CORS → requestLogger → auth → DB → ...)
- * via Hono's app.request(). Only external dependencies are mocked.
+ * Exercises the real middleware chain via Hono's app.request().
+ * No app-owned modules are mocked in this suite.
  *
  * Validates:
  * 1. Health returns 200 with correct body shape
@@ -12,29 +12,11 @@
  * 5. CORS runs before auth — OPTIONS works without a token
  */
 
-// --- Mocks (must be before imports) ---
-
-import {
-  jwtMock,
-  databaseMock,
-  inngestClientMock,
-  accountMock,
-  billingMock,
-  settingsMock,
-  sessionMock,
-  llmMock,
-} from './mocks';
-
-jest.mock('../../apps/api/src/middleware/jwt', () => jwtMock());
-jest.mock('@eduagent/database', () => databaseMock());
-jest.mock('../../apps/api/src/inngest/client', () => inngestClientMock());
-jest.mock('../../apps/api/src/services/account', () => accountMock());
-jest.mock('../../apps/api/src/services/billing', () => billingMock());
-jest.mock('../../apps/api/src/services/settings', () => settingsMock());
-jest.mock('../../apps/api/src/services/session', () => sessionMock());
-jest.mock('../../apps/api/src/services/llm', () => llmMock());
-
 import { app } from '../../apps/api/src/index';
+
+const TEST_ENV = {
+  ENVIRONMENT: 'test',
+};
 
 // ---------------------------------------------------------------------------
 // Health endpoint
@@ -42,7 +24,7 @@ import { app } from '../../apps/api/src/index';
 
 describe('Integration: Health endpoint', () => {
   it('returns 200 with status ok and timestamp', async () => {
-    const res = await app.request('/v1/health');
+    const res = await app.request('/v1/health', {}, TEST_ENV);
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -53,7 +35,7 @@ describe('Integration: Health endpoint', () => {
 
   it('requires no authentication', async () => {
     // No Authorization header at all
-    const res = await app.request('/v1/health');
+    const res = await app.request('/v1/health', {}, TEST_ENV);
     expect(res.status).toBe(200);
   });
 });
@@ -84,53 +66,69 @@ describe('Integration: CORS middleware', () => {
 
   describe('preflight OPTIONS', () => {
     it.each(LOCALHOST_ORIGINS)('accepts preflight from %s', async (origin) => {
-      const res = await app.request('/v1/health', {
-        method: 'OPTIONS',
-        headers: {
-          Origin: origin,
-          'Access-Control-Request-Method': 'POST',
-          'Access-Control-Request-Headers': 'Authorization, Content-Type',
+      const res = await app.request(
+        '/v1/health',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: origin,
+            'Access-Control-Request-Method': 'POST',
+            'Access-Control-Request-Headers': 'Authorization, Content-Type',
+          },
         },
-      });
+        TEST_ENV
+      );
 
       expect(res.status).toBeLessThan(400);
       expect(res.headers.get('Access-Control-Allow-Origin')).toBe(origin);
     });
 
     it.each(PRODUCTION_ORIGINS)('accepts preflight from %s', async (origin) => {
-      const res = await app.request('/v1/health', {
-        method: 'OPTIONS',
-        headers: {
-          Origin: origin,
-          'Access-Control-Request-Method': 'POST',
-          'Access-Control-Request-Headers': 'Authorization',
+      const res = await app.request(
+        '/v1/health',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: origin,
+            'Access-Control-Request-Method': 'POST',
+            'Access-Control-Request-Headers': 'Authorization',
+          },
         },
-      });
+        TEST_ENV
+      );
 
       expect(res.status).toBeLessThan(400);
       expect(res.headers.get('Access-Control-Allow-Origin')).toBe(origin);
     });
 
     it.each(BLOCKED_ORIGINS)('rejects preflight from %s', async (origin) => {
-      const res = await app.request('/v1/health', {
-        method: 'OPTIONS',
-        headers: {
-          Origin: origin,
-          'Access-Control-Request-Method': 'POST',
+      const res = await app.request(
+        '/v1/health',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: origin,
+            'Access-Control-Request-Method': 'POST',
+          },
         },
-      });
+        TEST_ENV
+      );
 
-      expect(res.headers.get('Access-Control-Allow-Origin')).not.toBe(origin);
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
     });
 
     it('returns all required Allow-Methods', async () => {
-      const res = await app.request('/v1/health', {
-        method: 'OPTIONS',
-        headers: {
-          Origin: 'http://localhost:8081',
-          'Access-Control-Request-Method': 'POST',
+      const res = await app.request(
+        '/v1/health',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: 'http://localhost:8081',
+            'Access-Control-Request-Method': 'POST',
+          },
         },
-      });
+        TEST_ENV
+      );
 
       const methods = res.headers.get('Access-Control-Allow-Methods') ?? '';
       for (const m of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
@@ -139,15 +137,19 @@ describe('Integration: CORS middleware', () => {
     });
 
     it('returns all required Allow-Headers', async () => {
-      const res = await app.request('/v1/health', {
-        method: 'OPTIONS',
-        headers: {
-          Origin: 'http://localhost:8081',
-          'Access-Control-Request-Method': 'POST',
-          'Access-Control-Request-Headers':
-            'Authorization, Content-Type, X-Profile-Id',
+      const res = await app.request(
+        '/v1/health',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: 'http://localhost:8081',
+            'Access-Control-Request-Method': 'POST',
+            'Access-Control-Request-Headers':
+              'Authorization, Content-Type, X-Profile-Id',
+          },
         },
-      });
+        TEST_ENV
+      );
 
       const allowed = (
         res.headers.get('Access-Control-Allow-Headers') ?? ''
@@ -158,13 +160,17 @@ describe('Integration: CORS middleware', () => {
     });
 
     it('includes Access-Control-Allow-Credentials', async () => {
-      const res = await app.request('/v1/health', {
-        method: 'OPTIONS',
-        headers: {
-          Origin: 'http://localhost:8081',
-          'Access-Control-Request-Method': 'POST',
+      const res = await app.request(
+        '/v1/health',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: 'http://localhost:8081',
+            'Access-Control-Request-Method': 'POST',
+          },
         },
-      });
+        TEST_ENV
+      );
 
       expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
     });
@@ -173,14 +179,18 @@ describe('Integration: CORS middleware', () => {
   describe('middleware ordering (CORS before auth)', () => {
     it('OPTIONS on protected path succeeds without Authorization', async () => {
       // CORS preflight must succeed even for protected routes — no Bearer token
-      const res = await app.request('/v1/profiles', {
-        method: 'OPTIONS',
-        headers: {
-          Origin: 'http://localhost:8081',
-          'Access-Control-Request-Method': 'POST',
-          'Access-Control-Request-Headers': 'Authorization, Content-Type',
+      const res = await app.request(
+        '/v1/profiles',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: 'http://localhost:8081',
+            'Access-Control-Request-Method': 'POST',
+            'Access-Control-Request-Headers': 'Authorization, Content-Type',
+          },
         },
-      });
+        TEST_ENV
+      );
 
       expect(res.status).toBeLessThan(400);
       expect(res.headers.get('Access-Control-Allow-Origin')).toBe(
@@ -191,9 +201,13 @@ describe('Integration: CORS middleware', () => {
 
   describe('actual cross-origin requests', () => {
     it('includes CORS headers on GET /v1/health', async () => {
-      const res = await app.request('/v1/health', {
-        headers: { Origin: 'http://localhost:8081' },
-      });
+      const res = await app.request(
+        '/v1/health',
+        {
+          headers: { Origin: 'http://localhost:8081' },
+        },
+        TEST_ENV
+      );
 
       expect(res.status).toBe(200);
       expect(res.headers.get('Access-Control-Allow-Origin')).toBe(

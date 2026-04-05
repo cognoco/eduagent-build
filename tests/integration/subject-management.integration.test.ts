@@ -1,7 +1,10 @@
 /**
  * Integration: Subject Management Endpoints
  *
- * Exercises the subject CRUD routes via Hono's app.request(). Validates:
+ * Exercises the subject CRUD routes via the real app + real database.
+ * JWT verification is the only mocked boundary.
+ *
+ * Validates:
  *
  * 1. GET /v1/subjects — 200 returns subjects list
  * 2. GET /v1/subjects?includeInactive=true — passes flag to service
@@ -14,139 +17,143 @@
  * 9. GET /v1/subjects — 401 without auth
  */
 
-// --- Subject service mocks ---
-
-const mockListSubjects = jest.fn();
-const mockCreateSubjectWithStructure = jest.fn();
-const mockGetSubject = jest.fn();
-const mockUpdateSubject = jest.fn();
-
-jest.mock('../../apps/api/src/services/subject', () => ({
-  listSubjects: mockListSubjects,
-  createSubjectWithStructure: mockCreateSubjectWithStructure,
-  getSubject: mockGetSubject,
-  updateSubject: mockUpdateSubject,
-}));
-
-// --- Base mocks (middleware chain requires these) ---
-
-import {
-  jwtMock,
-  databaseMock,
-  inngestClientMock,
-  accountMock,
-  billingMock,
-  settingsMock,
-  sessionMock,
-  llmMock,
-  configureValidJWT,
-  configureInvalidJWT,
-} from './mocks';
+import { jwtMock, configureValidJWT } from './mocks';
+import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 
 const jwt = jwtMock();
 jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
-jest.mock('@eduagent/database', () => databaseMock());
-jest.mock('../../apps/api/src/inngest/client', () => inngestClientMock());
-jest.mock('../../apps/api/src/services/account', () => accountMock());
-jest.mock('../../apps/api/src/services/billing', () => billingMock());
-jest.mock('../../apps/api/src/services/settings', () => settingsMock());
-jest.mock('../../apps/api/src/services/session', () => sessionMock());
-jest.mock('../../apps/api/src/services/llm', () => llmMock());
-jest.mock('../../apps/api/src/services/profile', () => ({
-  getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: null,
-    location: null,
-    consentStatus: 'CONSENTED',
-  }),
-  findOwnerProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: null,
-    location: null,
-    consentStatus: 'CONSENTED',
-  }),
-}));
 
 import { app } from '../../apps/api/src/index';
 
-const TEST_ENV = {
-  ENVIRONMENT: 'development',
-  DATABASE_URL: 'postgresql://test:test@localhost/test',
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
-};
+const TEST_ENV = buildIntegrationEnv();
+const SUBJECT_AUTH_USER_ID = 'integration-subject-user';
+const SUBJECT_AUTH_EMAIL = 'integration-subjects@integration.test';
 
 const SUBJECT_ID = '00000000-0000-4000-8000-000000000040';
 
-const AUTH_HEADERS = {
-  Authorization: 'Bearer test-token',
-  'Content-Type': 'application/json',
-  'X-Profile-Id': 'test-profile-id',
-};
+function buildAuthHeaders(profileId?: string): HeadersInit {
+  return {
+    Authorization: 'Bearer test-token',
+    'Content-Type': 'application/json',
+    ...(profileId ? { 'X-Profile-Id': profileId } : {}),
+  };
+}
 
-const MOCK_SUBJECT = {
-  id: SUBJECT_ID,
-  name: 'Mathematics',
-  status: 'active',
-  profileId: '00000000-0000-4000-8000-000000000001',
-  createdAt: '2025-01-01T00:00:00.000Z',
-  updatedAt: '2025-01-01T00:00:00.000Z',
-};
+async function createOwnerProfile(): Promise<string> {
+  configureValidJWT(jwt, {
+    sub: SUBJECT_AUTH_USER_ID,
+    email: SUBJECT_AUTH_EMAIL,
+  });
+
+  const res = await app.request(
+    '/v1/profiles',
+    {
+      method: 'POST',
+      headers: buildAuthHeaders(),
+      body: JSON.stringify({
+        displayName: 'Integration Learner',
+        birthYear: 2000,
+      }),
+    },
+    TEST_ENV
+  );
+
+  expect(res.status).toBe(201);
+  const body = await res.json();
+  return body.profile.id as string;
+}
+
+async function createSubject(
+  profileId: string,
+  name: string
+): Promise<{
+  id: string;
+  name: string;
+}> {
+  const res = await app.request(
+    '/v1/subjects',
+    {
+      method: 'POST',
+      headers: buildAuthHeaders(profileId),
+      body: JSON.stringify({ name }),
+    },
+    TEST_ENV
+  );
+
+  expect(res.status).toBe(201);
+  const body = await res.json();
+  expect(body.subject).toBeDefined();
+  return body.subject as { id: string; name: string };
+}
+
+beforeEach(async () => {
+  jest.clearAllMocks();
+  await cleanupAccounts({
+    emails: [SUBJECT_AUTH_EMAIL],
+    clerkUserIds: [SUBJECT_AUTH_USER_ID],
+  });
+});
+
+afterAll(async () => {
+  await cleanupAccounts({
+    emails: [SUBJECT_AUTH_EMAIL],
+    clerkUserIds: [SUBJECT_AUTH_USER_ID],
+  });
+});
 
 // ---------------------------------------------------------------------------
 // GET /v1/subjects
 // ---------------------------------------------------------------------------
 
 describe('Integration: GET /v1/subjects', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    configureValidJWT(jwt);
-  });
-
   it('returns 200 with subjects list', async () => {
-    mockListSubjects.mockResolvedValue([MOCK_SUBJECT]);
+    const profileId = await createOwnerProfile();
+    const subject = await createSubject(profileId, 'Mathematics');
 
     const res = await app.request(
       '/v1/subjects',
-      { method: 'GET', headers: AUTH_HEADERS },
+      { method: 'GET', headers: buildAuthHeaders(profileId) },
       TEST_ENV
     );
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.subjects).toHaveLength(1);
+    expect(body.subjects[0].id).toBe(subject.id);
     expect(body.subjects[0].name).toBe('Mathematics');
-    expect(mockListSubjects).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.any(String),
-      { includeInactive: false }
-    );
   });
 
   it('passes includeInactive=true to service', async () => {
-    mockListSubjects.mockResolvedValue([
-      MOCK_SUBJECT,
-      { ...MOCK_SUBJECT, id: 'sub-2', name: 'History', status: 'archived' },
-    ]);
+    const profileId = await createOwnerProfile();
+    const active = await createSubject(profileId, 'Mathematics');
+    const archived = await createSubject(profileId, 'History');
+
+    const archiveRes = await app.request(
+      `/v1/subjects/${archived.id}`,
+      {
+        method: 'PATCH',
+        headers: buildAuthHeaders(profileId),
+        body: JSON.stringify({ status: 'archived' }),
+      },
+      TEST_ENV
+    );
+    expect(archiveRes.status).toBe(200);
 
     const res = await app.request(
       '/v1/subjects?includeInactive=true',
-      { method: 'GET', headers: AUTH_HEADERS },
+      { method: 'GET', headers: buildAuthHeaders(profileId) },
       TEST_ENV
     );
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.subjects).toHaveLength(2);
-    expect(mockListSubjects).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.any(String),
-      { includeInactive: true }
+    expect(body.subjects.map((row: { id: string }) => row.id)).toEqual(
+      expect.arrayContaining([active.id, archived.id])
     );
   });
 
   it('returns 401 without auth', async () => {
-    configureInvalidJWT(jwt);
-
     const res = await app.request('/v1/subjects', { method: 'GET' }, TEST_ENV);
 
     expect(res.status).toBe(401);
@@ -158,22 +165,14 @@ describe('Integration: GET /v1/subjects', () => {
 // ---------------------------------------------------------------------------
 
 describe('Integration: POST /v1/subjects', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    configureValidJWT(jwt);
-  });
-
   it('returns 201 when creating subject', async () => {
-    mockCreateSubjectWithStructure.mockResolvedValue({
-      subject: MOCK_SUBJECT,
-      structureType: 'narrow',
-    });
+    const profileId = await createOwnerProfile();
 
     const res = await app.request(
       '/v1/subjects',
       {
         method: 'POST',
-        headers: AUTH_HEADERS,
+        headers: buildAuthHeaders(profileId),
         body: JSON.stringify({ name: 'Mathematics' }),
       },
       TEST_ENV
@@ -184,26 +183,22 @@ describe('Integration: POST /v1/subjects', () => {
     expect(body.subject).toBeDefined();
     expect(body.subject.name).toBe('Mathematics');
     expect(body.structureType).toBe('narrow');
-    expect(mockCreateSubjectWithStructure).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.any(String),
-      { name: 'Mathematics' }
-    );
   });
 
   it('returns 400 with invalid body (empty name)', async () => {
+    const profileId = await createOwnerProfile();
+
     const res = await app.request(
       '/v1/subjects',
       {
         method: 'POST',
-        headers: AUTH_HEADERS,
+        headers: buildAuthHeaders(profileId),
         body: JSON.stringify({ name: '' }),
       },
       TEST_ENV
     );
 
     expect(res.status).toBe(400);
-    expect(mockCreateSubjectWithStructure).not.toHaveBeenCalled();
   });
 });
 
@@ -212,37 +207,29 @@ describe('Integration: POST /v1/subjects', () => {
 // ---------------------------------------------------------------------------
 
 describe('Integration: GET /v1/subjects/:id', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    configureValidJWT(jwt);
-  });
-
   it('returns 200 with subject', async () => {
-    mockGetSubject.mockResolvedValue(MOCK_SUBJECT);
+    const profileId = await createOwnerProfile();
+    const subject = await createSubject(profileId, 'Mathematics');
 
     const res = await app.request(
-      `/v1/subjects/${SUBJECT_ID}`,
-      { method: 'GET', headers: AUTH_HEADERS },
+      `/v1/subjects/${subject.id}`,
+      { method: 'GET', headers: buildAuthHeaders(profileId) },
       TEST_ENV
     );
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.subject).toBeDefined();
-    expect(body.subject.id).toBe(SUBJECT_ID);
-    expect(mockGetSubject).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.any(String),
-      SUBJECT_ID
-    );
+    expect(body.subject.id).toBe(subject.id);
+    expect(body.subject.name).toBe('Mathematics');
   });
 
   it('returns 404 when not found', async () => {
-    mockGetSubject.mockResolvedValue(null);
+    const profileId = await createOwnerProfile();
 
     const res = await app.request(
       `/v1/subjects/${SUBJECT_ID}`,
-      { method: 'GET', headers: AUTH_HEADERS },
+      { method: 'GET', headers: buildAuthHeaders(profileId) },
       TEST_ENV
     );
 
@@ -257,20 +244,15 @@ describe('Integration: GET /v1/subjects/:id', () => {
 // ---------------------------------------------------------------------------
 
 describe('Integration: PATCH /v1/subjects/:id', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    configureValidJWT(jwt);
-  });
-
   it('returns 200 when updating subject', async () => {
-    const updatedSubject = { ...MOCK_SUBJECT, name: 'Advanced Mathematics' };
-    mockUpdateSubject.mockResolvedValue(updatedSubject);
+    const profileId = await createOwnerProfile();
+    const subject = await createSubject(profileId, 'Mathematics');
 
     const res = await app.request(
-      `/v1/subjects/${SUBJECT_ID}`,
+      `/v1/subjects/${subject.id}`,
       {
         method: 'PATCH',
-        headers: AUTH_HEADERS,
+        headers: buildAuthHeaders(profileId),
         body: JSON.stringify({ name: 'Advanced Mathematics' }),
       },
       TEST_ENV
@@ -280,22 +262,16 @@ describe('Integration: PATCH /v1/subjects/:id', () => {
     const body = await res.json();
     expect(body.subject).toBeDefined();
     expect(body.subject.name).toBe('Advanced Mathematics');
-    expect(mockUpdateSubject).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.any(String),
-      SUBJECT_ID,
-      { name: 'Advanced Mathematics' }
-    );
   });
 
   it('returns 404 when not found', async () => {
-    mockUpdateSubject.mockResolvedValue(null);
+    const profileId = await createOwnerProfile();
 
     const res = await app.request(
       `/v1/subjects/${SUBJECT_ID}`,
       {
         method: 'PATCH',
-        headers: AUTH_HEADERS,
+        headers: buildAuthHeaders(profileId),
         body: JSON.stringify({ name: 'Updated Name' }),
       },
       TEST_ENV

@@ -13,6 +13,12 @@
 - [ ] Tests identified and mapped to ACs; gaps noted
 - [ ] Code quality review performed on changed files
 - [ ] Security review performed on changed files and dependencies
+- [ ] UX dead-end audit: every screen state has at least one user action
+- [ ] UX error handling: every mutateAsync has visible error feedback (no bare catch {})
+- [ ] UX error specificity: server errors surface specific reason, not generic "connection error"
+- [ ] UX navigation guards: router.back()/replace() only runs after API success, not unconditionally
+- [ ] UX loading states: long operations (LLM, streaming) have timeout or cancel option
+- [ ] UX failure modes table in story file is complete (no empty Recovery column)
 - [ ] Outcome decided (Approve/Changes Requested/Blocked)
 - [ ] Review notes appended under "Senior Developer Review (AI)"
 - [ ] Change Log updated with review entry

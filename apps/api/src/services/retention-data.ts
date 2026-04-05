@@ -4,7 +4,7 @@
 // services/retention.ts (pure SM-2 logic).
 // ---------------------------------------------------------------------------
 
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, or, isNull, lt, inArray, sql } from 'drizzle-orm';
 import {
   subjects,
   curricula,
@@ -31,9 +31,14 @@ import {
   canRetestTopic,
   type RetentionState,
 } from './retention';
-import { canExitNeedsDeepening } from './adaptive-teaching';
+import {
+  canExitNeedsDeepening,
+  checkNeedsDeepeningCapacity,
+} from './adaptive-teaching';
+import { calculateMasteryScore } from './assessments';
 import { syncXpLedgerStatus } from './xp';
 import { routeAndCall, type ChatMessage } from './llm';
+import { NotFoundError } from '../errors';
 
 // ---------------------------------------------------------------------------
 // Mappers
@@ -136,7 +141,15 @@ export async function ensureRetentionCard(
   db: Database,
   profileId: string,
   topicId: string
-): Promise<typeof retentionCards.$inferSelect> {
+): Promise<{ card: typeof retentionCards.$inferSelect; isNew: boolean }> {
+  const existingCard = await db.query.retentionCards.findFirst({
+    where: and(
+      eq(retentionCards.profileId, profileId),
+      eq(retentionCards.topicId, topicId)
+    ),
+  });
+  if (existingCard) return { card: existingCard, isNew: false };
+
   await db
     .insert(retentionCards)
     .values({
@@ -168,7 +181,7 @@ export async function ensureRetentionCard(
     );
   }
 
-  return card;
+  return { card, isNew: card.repetitions === 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +296,7 @@ export async function processRecallTest(
 
   // Auto-create retention card on first encounter
   const effectiveCard =
-    card ?? (await ensureRetentionCard(db, profileId, input.topicId));
+    card ?? (await ensureRetentionCard(db, profileId, input.topicId)).card;
 
   // FR54: Anti-cramming cooldown — 24-hour minimum between recall tests
   const state = rowToRetentionState(effectiveCard);
@@ -317,11 +330,15 @@ export async function processRecallTest(
     attemptMode === 'dont_remember'
       ? 0
       : await evaluateRecallQuality(input.answer ?? '', topicTitle);
+  const masteryScore = calculateMasteryScore('recall', quality / 5);
   // state was already computed above for cooldown check — reuse it
   const result = processRecallResult(state, quality);
 
-  // Persist updated retention card
-  await db
+  // D-02: atomic cooldown enforcement — the WHERE clause includes the cooldown
+  // threshold so two concurrent requests cannot both pass the cooldown check
+  // and both write lastReviewedAt within the same 24-hour window.
+  const cooldownThreshold = new Date(Date.now() - RETEST_COOLDOWN_MS);
+  const [persisted] = await db
     .update(retentionCards)
     .set({
       easeFactor: String(result.newState.easeFactor),
@@ -333,15 +350,42 @@ export async function processRecallTest(
       nextReviewAt: result.newState.nextReviewAt
         ? new Date(result.newState.nextReviewAt)
         : null,
-      lastReviewedAt: new Date(),
       updatedAt: new Date(),
+      ...(attemptMode !== 'dont_remember'
+        ? { lastReviewedAt: new Date() }
+        : {}),
     })
     .where(
       and(
         eq(retentionCards.id, effectiveCard.id),
-        eq(retentionCards.profileId, profileId)
+        eq(retentionCards.profileId, profileId),
+        // Atomic cooldown guard: only update if lastReviewedAt is null or older
+        // than the cooldown threshold (or dont_remember which skips cooldown write)
+        attemptMode === 'dont_remember'
+          ? sql`true`
+          : or(
+              isNull(retentionCards.lastReviewedAt),
+              lt(retentionCards.lastReviewedAt, cooldownThreshold)
+            )
       )
-    );
+    )
+    .returning({ id: retentionCards.id });
+
+  // If the atomic guard rejected the update, another request already
+  // claimed this cooldown window — return the cooldown response.
+  if (!persisted && attemptMode !== 'dont_remember') {
+    return {
+      passed: false,
+      masteryScore: 0,
+      xpChange: 'none',
+      nextReviewAt:
+        effectiveCard.nextReviewAt?.toISOString() ?? new Date().toISOString(),
+      failureCount: effectiveCard.failureCount,
+      failureAction: 'feedback_only',
+      cooldownActive: true,
+      cooldownEndsAt: new Date(Date.now() + RETEST_COOLDOWN_MS).toISOString(),
+    };
+  }
 
   // Sync xp_ledger to match the retention card's new xpStatus (best-effort —
   // XP bookkeeping should not abort the recall test response)
@@ -355,7 +399,7 @@ export async function processRecallTest(
 
   const response: RecallTestResponse = {
     passed: result.passed,
-    masteryScore: result.passed ? 0.75 : 0.4,
+    masteryScore,
     xpChange: result.xpChange,
     nextReviewAt: result.newState.nextReviewAt ?? new Date().toISOString(),
     failureCount: result.newState.failureCount,
@@ -424,6 +468,34 @@ export async function startRelearn(
   const active = existing.find((d) => d.status === 'active');
 
   if (!active && subjectId) {
+    const activeForSubject = await repo.needsDeepeningTopics.findMany(
+      and(
+        eq(needsDeepeningTopics.subjectId, subjectId),
+        eq(needsDeepeningTopics.status, 'active')
+      )
+    );
+    const capacity = checkNeedsDeepeningCapacity(activeForSubject.length);
+
+    if (capacity.atCapacity && capacity.shouldPromote) {
+      const promotable = [...activeForSubject].sort(
+        (a, b) => b.consecutiveSuccessCount - a.consecutiveSuccessCount
+      )[0];
+      if (promotable) {
+        await db
+          .update(needsDeepeningTopics)
+          .set({
+            status: 'resolved',
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(needsDeepeningTopics.id, promotable.id),
+              eq(needsDeepeningTopics.profileId, profileId)
+            )
+          );
+      }
+    }
+
     await db.insert(needsDeepeningTopics).values({
       profileId,
       subjectId,
@@ -498,9 +570,11 @@ export async function getSubjectNeedsDeepening(
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subject) return { topics: [], count: 0 };
 
-  const allDeepening = await repo.needsDeepeningTopics.findMany();
-  const subjectDeepening = allDeepening.filter(
-    (d) => d.subjectId === subjectId && d.status === 'active'
+  const subjectDeepening = await repo.needsDeepeningTopics.findMany(
+    and(
+      eq(needsDeepeningTopics.subjectId, subjectId),
+      eq(needsDeepeningTopics.status, 'active')
+    )
   );
 
   const topics: NeedsDeepeningStatus[] = subjectDeepening.map((d) => ({
@@ -542,6 +616,19 @@ type TeachingMethod = (typeof teachingPreferences.$inferInsert)['method'];
 type AnalogyDomainColumn =
   (typeof teachingPreferences.$inferInsert)['analogyDomain'];
 
+async function assertOwnedSubject(
+  db: Database,
+  profileId: string,
+  subjectId: string
+): Promise<void> {
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
+
+  if (!subject) {
+    throw new NotFoundError('Subject');
+  }
+}
+
 export async function setTeachingPreference(
   db: Database,
   profileId: string,
@@ -554,6 +641,8 @@ export async function setTeachingPreference(
   analogyDomain: string | null;
   nativeLanguage: string | null;
 }> {
+  await assertOwnedSubject(db, profileId, subjectId);
+
   const values: typeof teachingPreferences.$inferInsert = {
     profileId,
     subjectId,
@@ -640,6 +729,8 @@ export async function setAnalogyDomain(
   subjectId: string,
   analogyDomain: string | null
 ): Promise<string | null> {
+  await assertOwnedSubject(db, profileId, subjectId);
+
   const domainValue = (analogyDomain as AnalogyDomainColumn) ?? null;
 
   await db
@@ -686,6 +777,8 @@ export async function setNativeLanguage(
   subjectId: string,
   nativeLanguage: string | null
 ): Promise<string | null> {
+  await assertOwnedSubject(db, profileId, subjectId);
+
   await db
     .insert(teachingPreferences)
     .values({
@@ -775,11 +868,14 @@ export async function updateRetentionFromSession(
   );
 
   // Auto-create retention card on first encounter
-  const card = existing ?? (await ensureRetentionCard(db, profileId, topicId));
+  const ensured = existing
+    ? { card: existing, isNew: false }
+    : await ensureRetentionCard(db, profileId, topicId);
+  const card = ensured.card;
 
-  // Double-counting guard: if the card was already updated after the session
-  // started (e.g. by processRecallTest), skip the async SM-2 recalculation.
+  // D-01: skip double-counting guard for newly created cards
   if (
+    !ensured.isNew &&
     sessionTimestamp &&
     card.updatedAt &&
     card.updatedAt.getTime() >= new Date(sessionTimestamp).getTime()

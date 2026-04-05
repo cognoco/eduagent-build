@@ -14,6 +14,7 @@ import {
 import { useTopicProgress } from '../../../hooks/use-progress';
 import { useTopicRetention } from '../../../hooks/use-retention';
 import { useTopicParkingLot } from '../../../hooks/use-sessions';
+import { useThemeColors } from '../../../lib/theme';
 
 function deriveRetentionStatus(
   card:
@@ -58,17 +59,24 @@ const STRUGGLE_LABELS: Record<string, string> = {
 export default function TopicDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const { subjectId, topicId } = useLocalSearchParams<{
     subjectId: string;
     topicId: string;
   }>();
 
-  const { data: topicProgress, isLoading: progressLoading } = useTopicProgress(
-    subjectId ?? '',
-    topicId ?? ''
-  );
-  const { data: retentionCard, isLoading: retentionLoading } =
-    useTopicRetention(topicId ?? '');
+  const {
+    data: topicProgress,
+    isLoading: progressLoading,
+    isError: progressError,
+    refetch: refetchProgress,
+  } = useTopicProgress(subjectId ?? '', topicId ?? '');
+  const {
+    data: retentionCard,
+    isLoading: retentionLoading,
+    isError: retentionError,
+    refetch: refetchRetention,
+  } = useTopicRetention(topicId ?? '');
   const { data: parkedQuestions, isLoading: parkingLotLoading } =
     useTopicParkingLot(subjectId ?? '', topicId ?? '');
 
@@ -77,7 +85,45 @@ export default function TopicDetailScreen() {
   if (!subjectId || !topicId) {
     return (
       <View className="flex-1 bg-background items-center justify-center">
-        <ActivityIndicator size="large" color="#71717a" />
+        <ActivityIndicator size="large" color={colors.muted} />
+      </View>
+    );
+  }
+
+  if ((progressError || retentionError) && !isLoading) {
+    return (
+      <View className="flex-1 bg-background items-center justify-center px-8">
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+          We couldn't load this topic
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-6">
+          Please try again, or go back to your library.
+        </Text>
+        <Pressable
+          onPress={() => {
+            void refetchProgress();
+            void refetchRetention();
+          }}
+          className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading topic"
+          testID="topic-detail-retry"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            Retry
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.back()}
+          className="bg-surface rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          testID="topic-detail-go-back"
+        >
+          <Text className="text-body font-semibold text-text-primary">
+            Go back
+          </Text>
+        </Pressable>
       </View>
     );
   }
@@ -119,7 +165,7 @@ export default function TopicDetailScreen() {
           className="flex-1 items-center justify-center"
           testID="topic-detail-loading"
         >
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" color={colors.muted} />
           <Text className="text-text-secondary mt-2">Loading topic...</Text>
         </View>
       ) : !topicProgress ? (
@@ -133,6 +179,17 @@ export default function TopicDetailScreen() {
           <Text className="text-body text-text-secondary text-center">
             This topic may have been removed from your curriculum.
           </Text>
+          <Pressable
+            onPress={() => router.back()}
+            className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mt-6"
+            testID="topic-detail-empty-back"
+            accessibilityRole="button"
+            accessibilityLabel="Back to previous screen"
+          >
+            <Text className="text-body font-semibold text-text-inverse">
+              Go back
+            </Text>
+          </Pressable>
         </View>
       ) : (
         <ScrollView

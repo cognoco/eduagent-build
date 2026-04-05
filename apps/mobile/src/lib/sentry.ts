@@ -57,7 +57,17 @@ export function enableSentry(): void {
 export function disableSentry(): void {
   if (!sentryActive) return;
   sentryActive = false;
+  // BS-07: clear full scope (breadcrumbs, tags, extras) for COPPA/GDPR compliance
+  Sentry.getCurrentScope().clear();
   Sentry.setUser(null);
+  // BS-06: close the native transport to prevent native crash envelopes
+  // (which bypass beforeSend) from reaching Sentry for underage users.
+  // The SDK stays closeable — re-enabling calls init() again if needed.
+  const client = Sentry.getClient();
+  if (client) {
+    void client.close(0);
+    sentryEverInitialized = false;
+  }
 }
 
 /** Returns whether Sentry is currently active. */

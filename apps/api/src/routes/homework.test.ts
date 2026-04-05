@@ -256,7 +256,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -282,7 +285,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -302,7 +308,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -318,7 +327,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -340,7 +352,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -365,7 +380,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -393,7 +411,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -419,7 +440,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -446,7 +470,10 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer valid.jwt.token' },
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            'X-Profile-Id': 'test-profile-id',
+          },
           body: formData,
         },
         TEST_ENV
@@ -478,6 +505,31 @@ describe('homework routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+
+    it('returns 400 when profile cannot be resolved for OCR [CR-1B.5]', async () => {
+      // findOwnerProfile returns null (default mock), so without X-Profile-Id
+      // the profileId context variable stays undefined and requireProfileId throws 400.
+      const formData = new FormData();
+      formData.append(
+        'image',
+        new File([new ArrayBuffer(100)], 'test.jpg', { type: 'image/jpeg' })
+      );
+
+      const res = await app.request(
+        '/v1/ocr',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer valid.jwt.token',
+            // No X-Profile-Id header — profileId will be undefined
+          },
+          body: formData,
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
     });
   });
 });

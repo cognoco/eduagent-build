@@ -60,6 +60,7 @@ import {
   setTeachingPreference,
   deleteTeachingPreference,
 } from '../services/retention-data';
+import { NotFoundError } from '../errors';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
@@ -137,6 +138,19 @@ describe('retention routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('GET /v1/topics/:topicId/retention', () => {
+    it('returns 400 with invalid topicId', async () => {
+      const res = await app.request(
+        '/v1/topics/not-a-uuid/retention',
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+      expect(getTopicRetention).not.toHaveBeenCalled();
     });
   });
 
@@ -498,6 +512,45 @@ describe('retention routes', () => {
       );
 
       expect(res.status).toBe(400);
+    });
+
+    it('returns 400 with invalid subjectId', async () => {
+      const res = await app.request(
+        '/v1/subjects/not-a-uuid/teaching-preference',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            subjectId: SUBJECT_ID,
+            method: 'visual_diagrams',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+      expect(setTeachingPreference).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when the subject is not owned by the caller', async () => {
+      (setTeachingPreference as jest.Mock).mockRejectedValueOnce(
+        new NotFoundError('Subject')
+      );
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/teaching-preference`,
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            subjectId: SUBJECT_ID,
+            method: 'visual_diagrams',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
     });
 
     it('returns 401 without auth header', async () => {

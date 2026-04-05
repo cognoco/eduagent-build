@@ -81,6 +81,7 @@ interface CircuitBreaker {
   state: CircuitState;
   consecutiveFailures: number;
   lastFailureAt: number;
+  probeInFlight: boolean; // R-01: single-probe control for HALF_OPEN
 }
 
 const CIRCUIT_FAILURE_THRESHOLD = 3;
@@ -96,7 +97,12 @@ const circuits = new Map<string, CircuitBreaker>();
 function getCircuit(providerId: string): CircuitBreaker {
   let cb = circuits.get(providerId);
   if (!cb) {
-    cb = { state: 'CLOSED', consecutiveFailures: 0, lastFailureAt: 0 };
+    cb = {
+      state: 'CLOSED',
+      consecutiveFailures: 0,
+      lastFailureAt: 0,
+      probeInFlight: false,
+    };
     circuits.set(providerId, cb);
   }
   return cb;
@@ -106,15 +112,33 @@ function recordSuccess(providerId: string): void {
   const cb = getCircuit(providerId);
   cb.state = 'CLOSED';
   cb.consecutiveFailures = 0;
+  cb.probeInFlight = false;
 }
 
 function recordFailure(providerId: string): void {
   const cb = getCircuit(providerId);
+  cb.probeInFlight = false;
   cb.consecutiveFailures++;
   cb.lastFailureAt = Date.now();
   if (cb.consecutiveFailures >= CIRCUIT_FAILURE_THRESHOLD) {
     cb.state = 'OPEN';
   }
+}
+
+// R-02: only transient errors should trip the circuit
+function isTransientError(err: unknown): boolean {
+  const status =
+    (err as { status?: number }).status ??
+    (err as { statusCode?: number }).statusCode;
+  if (status != null) {
+    // 429 (rate limit) is transient; other 4xx are client errors
+    if (status === 429) return true;
+    if (status >= 400 && status < 500) return false;
+    // 5xx is transient
+    return true;
+  }
+  // Network errors, timeouts, unknown — treat as transient
+  return true;
 }
 
 function canAttempt(providerId: string): boolean {
@@ -124,11 +148,14 @@ function canAttempt(providerId: string): boolean {
     // Check if recovery period has elapsed → transition to HALF_OPEN
     if (Date.now() - cb.lastFailureAt >= CIRCUIT_RECOVERY_MS) {
       cb.state = 'HALF_OPEN';
+      cb.probeInFlight = true; // R-01: first probe
       return true;
     }
     return false;
   }
-  // HALF_OPEN: allow one trial request
+  // R-01: HALF_OPEN — allow only one probe at a time
+  if (cb.probeInFlight) return false;
+  cb.probeInFlight = true;
   return true;
 }
 
@@ -217,7 +244,12 @@ export async function routeAndCall(
         latencyMs: Date.now() - start,
       };
     } catch (err) {
-      recordFailure(config.provider);
+      // R-02: only count transient errors toward circuit trips
+      if (isTransientError(err)) {
+        recordFailure(config.provider);
+      } else {
+        getCircuit(config.provider).probeInFlight = false;
+      }
       // Fall through to fallback
       const fallbackConfig = getFallbackConfig(config, rung);
       if (!fallbackConfig) throw err;
@@ -272,7 +304,11 @@ async function attemptProvider(
       latencyMs: Date.now() - start,
     };
   } catch (err) {
-    recordFailure(config.provider);
+    if (isTransientError(err)) {
+      recordFailure(config.provider);
+    } else {
+      getCircuit(config.provider).probeInFlight = false;
+    }
     throw err;
   }
 }
@@ -309,7 +345,11 @@ async function* wrapStreamWithCircuitBreaker(
     }
     recordSuccess(providerId);
   } catch (err) {
-    recordFailure(providerId);
+    if (isTransientError(err)) {
+      recordFailure(providerId);
+    } else {
+      getCircuit(providerId).probeInFlight = false;
+    }
 
     // Pre-first-byte failure with available fallback → try fallback stream
     if (chunksYielded === 0 && fallbackConfig) {

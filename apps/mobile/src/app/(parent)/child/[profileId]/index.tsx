@@ -69,9 +69,18 @@ export default function ChildDetailScreen() {
   // the generic says `string`. Make the type honest so hooks receive the real
   // runtime type and their `enabled` guards prevent API calls with undefined.
   const profileId = rawProfileId as string | undefined;
-  const { data: child, isLoading } = useChildDetail(profileId);
-  const { data: sessions, isLoading: sessionsLoading } =
-    useChildSessions(profileId);
+  const {
+    data: child,
+    isLoading,
+    isError,
+    refetch,
+  } = useChildDetail(profileId);
+  const {
+    data: sessions,
+    isLoading: sessionsLoading,
+    isError: sessionsError,
+    refetch: refetchSessions,
+  } = useChildSessions(profileId);
   const pendingCelebrations = usePendingCelebrations({
     profileId,
     viewer: 'parent',
@@ -135,6 +144,35 @@ export default function ChildDetailScreen() {
         <Text className="text-text-secondary text-body text-center">
           Unable to load child details.
         </Text>
+      </View>
+    );
+  }
+
+  if ((!isLoading && child === null) || isError) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center px-6"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        testID="child-profile-unavailable"
+      >
+        <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+          Profile no longer available
+        </Text>
+        <Text className="text-body text-text-secondary text-center mb-6">
+          This child profile may have been removed or you may no longer have
+          access to it.
+        </Text>
+        <Pressable
+          onPress={() => router.replace('/(parent)/dashboard' as never)}
+          className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Back to parent dashboard"
+          testID="child-profile-back"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            Back to dashboard
+          </Text>
+        </Pressable>
       </View>
     );
   }
@@ -236,6 +274,23 @@ export default function ChildDetailScreen() {
             <SubjectSkeleton />
             <SubjectSkeleton />
           </>
+        ) : sessionsError ? (
+          <View className="py-4 items-center">
+            <Text className="text-body text-text-secondary text-center mb-3">
+              We couldn't load recent sessions right now.
+            </Text>
+            <Pressable
+              onPress={() => void refetchSessions()}
+              className="bg-surface rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
+              accessibilityRole="button"
+              accessibilityLabel="Refresh child profile"
+              testID="child-profile-refresh"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Refresh
+              </Text>
+            </Pressable>
+          </View>
         ) : sessions && sessions.length > 0 ? (
           sessions.map((session) => (
             <Pressable
@@ -330,6 +385,19 @@ export default function ChildDetailScreen() {
                       {restoreConsent.isPending
                         ? 'Cancelling...'
                         : 'Cancel Deletion'}
+                    </Text>
+                  </Pressable>
+                )}
+                {daysRemaining === 0 && (
+                  <Pressable
+                    onPress={() => void refetch()}
+                    className="bg-surface rounded-lg py-3 items-center"
+                    accessibilityLabel="Refresh deletion status"
+                    accessibilityRole="button"
+                    testID="refresh-grace-period-button"
+                  >
+                    <Text className="text-body font-semibold text-text-primary">
+                      Refresh status
                     </Text>
                   </Pressable>
                 )}

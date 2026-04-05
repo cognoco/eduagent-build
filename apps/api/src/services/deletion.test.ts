@@ -5,6 +5,7 @@ import {
   isDeletionCancelled,
   executeDeletion,
   getProfileIdsForAccount,
+  deleteProfileIfNoConsent,
 } from './deletion';
 
 function createMockDb({
@@ -141,5 +142,48 @@ describe('executeDeletion', () => {
     const db = createMockDb();
     await executeDeletion(db, 'account-1');
     expect(db.delete).toHaveBeenCalled();
+  });
+});
+
+describe('deleteProfileIfNoConsent (CI-11)', () => {
+  it('returns true when profile was deleted (rowCount > 0)', async () => {
+    const db = {
+      ...createMockDb(),
+      execute: jest.fn().mockResolvedValue({ rowCount: 1 }),
+    } as unknown as Database;
+
+    const result = await deleteProfileIfNoConsent(db, 'profile-1');
+    expect(result).toBe(true);
+    expect(db.execute).toHaveBeenCalled();
+  });
+
+  it('returns false when profile was retained (consent exists, rowCount 0)', async () => {
+    const db = {
+      ...createMockDb(),
+      execute: jest.fn().mockResolvedValue({ rowCount: 0 }),
+    } as unknown as Database;
+
+    const result = await deleteProfileIfNoConsent(db, 'profile-1');
+    expect(result).toBe(false);
+  });
+
+  it('returns false when profile was already deleted (rowCount 0)', async () => {
+    const db = {
+      ...createMockDb(),
+      execute: jest.fn().mockResolvedValue({ rowCount: 0 }),
+    } as unknown as Database;
+
+    const result = await deleteProfileIfNoConsent(db, 'nonexistent-profile');
+    expect(result).toBe(false);
+  });
+
+  it('handles undefined rowCount gracefully', async () => {
+    const db = {
+      ...createMockDb(),
+      execute: jest.fn().mockResolvedValue({}),
+    } as unknown as Database;
+
+    const result = await deleteProfileIfNoConsent(db, 'profile-1');
+    expect(result).toBe(false);
   });
 });

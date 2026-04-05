@@ -168,42 +168,46 @@ export function BrandCelebration({
   }, [done, reduceMotion]);
 
   // --- Animated props ---
-  // Android SVG fix: bundling `opacity` alongside `r` forces native re-renders
-  // when starting from r=0. Without this, circles stay invisible on Android.
+  // Android SVG fix: Android's native SVG renderer permanently discards circles
+  // created with r=0. Ensure r is never zero via Math.max with a sub-pixel floor,
+  // and hold opacity at 0 until the animation begins moving.
+  const R_FLOOR = 0.01;
+  const OP_THRESH = 0.1;
+
   const pathProps = useAnimatedProps(() => ({
     strokeDashoffset: PATH_LEN * (1 - pathDraw.value),
     opacity: Math.min(pathDraw.value * 10, 1),
   }));
 
   const studentOutProps = useAnimatedProps(() => ({
-    r: studentR.value * happyBounce.value,
-    opacity: Math.min(studentR.value / 2, 1),
+    r: Math.max(studentR.value * happyBounce.value, R_FLOOR),
+    opacity: studentR.value < OP_THRESH ? 0 : Math.min(studentR.value / 2, 1),
   }));
   const studentInProps = useAnimatedProps(() => ({
-    r: studentInR.value * happyBounce.value,
-    opacity: Math.min(studentInR.value / 1, 1),
+    r: Math.max(studentInR.value * happyBounce.value, R_FLOOR),
+    opacity: studentInR.value < OP_THRESH ? 0 : Math.min(studentInR.value, 1),
   }));
   const mentorOutProps = useAnimatedProps(() => ({
-    r: mentorR.value * happyBounce.value,
-    opacity: Math.min(mentorR.value / 2, 1),
+    r: Math.max(mentorR.value * happyBounce.value, R_FLOOR),
+    opacity: mentorR.value < OP_THRESH ? 0 : Math.min(mentorR.value / 2, 1),
   }));
   const mentorInProps = useAnimatedProps(() => ({
-    r: mentorInR.value * happyBounce.value,
-    opacity: Math.min(mentorInR.value / 1, 1),
+    r: Math.max(mentorInR.value * happyBounce.value, R_FLOOR),
+    opacity: mentorInR.value < OP_THRESH ? 0 : Math.min(mentorInR.value, 1),
   }));
   const ringProps = useAnimatedProps(() => ({ opacity: ringOp.value }));
 
   const dot1Props = useAnimatedProps(() => ({
-    r: dot1R.value,
-    opacity: Math.min(dot1R.value / 4, 1) * 0.6,
+    r: Math.max(dot1R.value, R_FLOOR),
+    opacity: dot1R.value < OP_THRESH ? 0 : Math.min(dot1R.value / 4, 1) * 0.6,
   }));
   const dot2Props = useAnimatedProps(() => ({
-    r: dot2R.value,
-    opacity: Math.min(dot2R.value / 5, 1) * 0.65,
+    r: Math.max(dot2R.value, R_FLOOR),
+    opacity: dot2R.value < OP_THRESH ? 0 : Math.min(dot2R.value / 5, 1) * 0.65,
   }));
   const dot3Props = useAnimatedProps(() => ({
-    r: dot3R.value,
-    opacity: Math.min(dot3R.value / 6, 1) * 0.7,
+    r: Math.max(dot3R.value, R_FLOOR),
+    opacity: dot3R.value < OP_THRESH ? 0 : Math.min(dot3R.value / 6, 1) * 0.7,
   }));
 
   // --- Spark particles (3 per dot, varied directions) ---

@@ -63,12 +63,15 @@ jest.mock('../services/profile', () => ({
 const mockEnsureFreeSubscription = jest.fn();
 const mockGetQuotaPool = jest.fn();
 const mockDecrementQuota = jest.fn();
+const mockGetTopUpCreditsRemaining = jest.fn().mockResolvedValue(0);
 
 jest.mock('../services/billing', () => ({
   ensureFreeSubscription: (...args: unknown[]) =>
     mockEnsureFreeSubscription(...args),
   getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
   decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
+  getTopUpCreditsRemaining: (...args: unknown[]) =>
+    mockGetTopUpCreditsRemaining(...args),
   createSubscription: jest.fn(),
   getSubscriptionByAccountId: jest.fn(),
   linkStripeCustomer: jest.fn(),
@@ -146,6 +149,7 @@ beforeEach(() => {
     remainingTopUp: 0,
     remainingDaily: null,
   });
+  mockGetTopUpCreditsRemaining.mockResolvedValue(0);
   mockReadSubscriptionStatus.mockResolvedValue(null);
   mockWriteSubscriptionStatus.mockResolvedValue(undefined);
 });
@@ -632,6 +636,7 @@ describe('metering middleware', () => {
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({ usedThisMonth: 500, monthlyLimit: 500 })
       );
+      mockGetTopUpCreditsRemaining.mockResolvedValue(500);
       mockDecrementQuota.mockResolvedValue({
         success: true,
         source: 'top_up',
@@ -672,13 +677,6 @@ describe('metering middleware', () => {
           usedToday: 5,
         })
       );
-      mockDecrementQuota.mockResolvedValue({
-        success: false,
-        source: 'none',
-        remainingMonthly: 0,
-        remainingTopUp: 0,
-        remainingDaily: 5,
-      });
 
       const res = await app.request(
         '/v1/sessions/session-1/stream',
@@ -690,21 +688,18 @@ describe('metering middleware', () => {
         TEST_ENV
       );
 
+      // Fast-path rejection: checkQuota sees monthly exhausted (no top-ups)
       expect(res.status).toBe(402);
-      expect(mockDecrementQuota).toHaveBeenCalled();
     });
 
     it('matches stream endpoint with trailing slash (I6 fix)', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(
         mockSubscription({ tier: 'free' })
       );
-      mockDecrementQuota.mockResolvedValue({
-        success: false,
-        source: 'none',
-        remainingMonthly: 0,
-        remainingTopUp: 0,
-        remainingDaily: null,
-      });
+      // Set exhausted quota so metering rejects
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({ usedThisMonth: 100, monthlyLimit: 100 })
+      );
 
       const res = await app.request(
         '/v1/sessions/session-1/messages/',
@@ -717,7 +712,7 @@ describe('metering middleware', () => {
       );
 
       // Should be caught by metering (402) not pass through unmetered
-      expect(mockDecrementQuota).toHaveBeenCalled();
+      expect(res.status).toBe(402);
     });
   });
 });

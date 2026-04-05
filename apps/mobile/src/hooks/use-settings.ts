@@ -277,9 +277,9 @@ export function useUpdateAnalogyDomain(
       ].$put({
         param: { subjectId },
         json: { analogyDomain },
-      });
+      } as never);
       await assertOk(res);
-      const data = await res.json();
+      const data = (await res.json()) as { analogyDomain: string | null };
       return data.analogyDomain as AnalogyDomain | null;
     },
     onSuccess: () => {
@@ -332,9 +332,9 @@ export function useUpdateNativeLanguage(
       ].$put({
         param: { subjectId },
         json: { nativeLanguage },
-      });
+      } as never);
       await assertOk(res);
-      const data = await res.json();
+      const data = (await res.json()) as { nativeLanguage: string | null };
       return data.nativeLanguage as LanguageCode | null;
     },
     onSuccess: () => {

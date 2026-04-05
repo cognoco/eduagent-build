@@ -327,7 +327,14 @@ export default function MoreScreen() {
 
         <Pressable
           onPress={async () => {
-            await signOut();
+            try {
+              await signOut();
+            } catch {
+              Alert.alert(
+                'Could not sign out',
+                'Please try again in a moment.'
+              );
+            }
           }}
           className="bg-surface rounded-card px-4 py-3.5 mt-6 items-center"
           testID="sign-out-button"

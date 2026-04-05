@@ -63,7 +63,6 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 }
 
 const CreateProfileScreen = require('./create-profile').default;
-const { detectPersona } = require('./create-profile');
 
 describe('CreateProfileScreen', () => {
   beforeEach(() => {
@@ -248,25 +247,5 @@ describe('CreateProfileScreen', () => {
     fireEvent.press(screen.getByTestId('create-profile-cancel'));
 
     expect(mockBack).toHaveBeenCalled();
-  });
-});
-
-describe('detectPersona', () => {
-  it('returns TEEN for age < 13', () => {
-    const tenYearsAgo = new Date();
-    tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
-    expect(detectPersona(tenYearsAgo)).toBe('TEEN');
-  });
-
-  it('returns LEARNER for age 13-17', () => {
-    const fifteenYearsAgo = new Date();
-    fifteenYearsAgo.setFullYear(fifteenYearsAgo.getFullYear() - 15);
-    expect(detectPersona(fifteenYearsAgo)).toBe('LEARNER');
-  });
-
-  it('returns PARENT for age >= 18', () => {
-    const twentyFiveYearsAgo = new Date();
-    twentyFiveYearsAgo.setFullYear(twentyFiveYearsAgo.getFullYear() - 25);
-    expect(detectPersona(twentyFiveYearsAgo)).toBe('PARENT');
   });
 });

@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { accounts, profiles, type Database } from '@eduagent/database';
 
 const GRACE_PERIOD_DAYS = 7;
@@ -74,4 +74,32 @@ export async function deleteProfile(
   // FK cascades handle all child records (subjects, sessions, consent_states, etc.).
   // Idempotent — no-op if already deleted.
   await db.delete(profiles).where(eq(profiles.id, profileId));
+}
+
+/**
+ * CI-11: Atomically deletes a profile only if no CONSENTED or WITHDRAWN
+ * consent state exists. Used by the consent-reminder Inngest function
+ * for GDPR auto-delete after the 30-day window.
+ *
+ * The atomic WHERE + NOT EXISTS eliminates the TOCTOU race where a parent
+ * could approve consent between a status check and the deletion.
+ * FK cascades remove all child records (subjects, sessions, consent_states, etc.).
+ *
+ * Returns true if the profile was deleted, false if it was retained
+ * (consent was granted or profile already removed).
+ */
+export async function deleteProfileIfNoConsent(
+  db: Database,
+  profileId: string
+): Promise<boolean> {
+  const result = await db.execute(sql`
+    DELETE FROM profiles WHERE id = ${profileId}
+    AND NOT EXISTS (
+      SELECT 1 FROM consent_states
+      WHERE consent_states.profile_id = ${profileId}
+      AND consent_states.status IN ('CONSENTED', 'WITHDRAWN')
+    )
+  `);
+  // Drizzle returns rowCount for DELETE operations
+  return (result.rowCount ?? 0) > 0;
 }

@@ -6,7 +6,10 @@ import {
   timestamp,
   pgEnum,
   index,
+  uniqueIndex,
+  check,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { accounts } from './profiles';
 import { generateUUIDv7 } from '../utils/uuid';
 
@@ -48,6 +51,7 @@ export const subscriptions = pgTable('subscriptions', {
   }),
   revenuecatOriginalAppUserId: text('revenuecat_original_app_user_id'),
   lastRevenuecatEventId: text('last_revenuecat_event_id'),
+  lastRevenuecatEventTimestampMs: text('last_revenuecat_event_timestamp_ms'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -56,26 +60,35 @@ export const subscriptions = pgTable('subscriptions', {
     .defaultNow(),
 });
 
-export const quotaPools = pgTable('quota_pools', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  subscriptionId: uuid('subscription_id')
-    .notNull()
-    .unique()
-    .references(() => subscriptions.id, { onDelete: 'cascade' }),
-  monthlyLimit: integer('monthly_limit').notNull().default(100),
-  usedThisMonth: integer('used_this_month').notNull().default(0),
-  dailyLimit: integer('daily_limit'),
-  usedToday: integer('used_today').notNull().default(0),
-  cycleResetAt: timestamp('cycle_reset_at', { withTimezone: true }).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const quotaPools = pgTable(
+  'quota_pools',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    subscriptionId: uuid('subscription_id')
+      .notNull()
+      .unique()
+      .references(() => subscriptions.id, { onDelete: 'cascade' }),
+    monthlyLimit: integer('monthly_limit').notNull().default(100),
+    usedThisMonth: integer('used_this_month').notNull().default(0),
+    dailyLimit: integer('daily_limit'),
+    usedToday: integer('used_today').notNull().default(0),
+    cycleResetAt: timestamp('cycle_reset_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check(
+      'quota_pools_used_this_month_non_negative',
+      sql`${table.usedThisMonth} >= 0`
+    ),
+  ]
+);
 
 export const topUpCredits = pgTable(
   'top_up_credits',
@@ -99,6 +112,13 @@ export const topUpCredits = pgTable(
   },
   (table) => [
     index('top_up_credits_subscription_id_idx').on(table.subscriptionId),
+    uniqueIndex('top_up_credits_rc_txn_id_idx').on(
+      table.revenuecatTransactionId
+    ),
+    check(
+      'top_up_credits_remaining_non_negative',
+      sql`${table.remaining} >= 0`
+    ),
   ]
 );
 

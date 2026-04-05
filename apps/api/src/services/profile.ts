@@ -13,13 +13,11 @@ import type {
 import {
   birthDateFromBirthYear,
   birthYearFromDateLike,
-  computeAgeBracket,
 } from '@eduagent/schemas';
 
 export type ProfileValidationCode =
   | 'BIRTH_YEAR_REQUIRED'
-  | 'CHILD_AGE_VIOLATION'
-  | 'PARENT_AGE_VIOLATION';
+  | 'CHILD_AGE_VIOLATION';
 
 export class ProfileValidationError extends Error {
   code: ProfileValidationCode;
@@ -55,7 +53,6 @@ function mapProfileRow(
       ? row.birthDate.toISOString().split('T')[0]!
       : null,
     birthYear: row.birthYear ?? birthYearFromDateLike(row.birthDate),
-    personaType: row.personaType,
     location: row.location ?? null,
     isOwner: row.isOwner,
     consentStatus,
@@ -85,15 +82,6 @@ export async function listProfiles(
     })
   );
   return mapped;
-}
-
-function inferLegacyPersonaType(
-  birthYear: number
-): 'TEEN' | 'LEARNER' | 'PARENT' {
-  const ageBracket = computeAgeBracket(birthYear);
-  if (ageBracket === 'child') return 'TEEN';
-  // Adults default to LEARNER — PARENT is only assigned via explicit input.personaType
-  return 'LEARNER';
 }
 
 /**
@@ -148,7 +136,12 @@ export async function createProfile(
   input: ProfileCreateInput,
   isOwner?: boolean
 ): Promise<Profile> {
-  const birthYear = input.birthYear ?? birthYearFromDateLike(input.birthDate);
+  // BD-06: When birthDate is present, it is the single source of truth for birthYear.
+  // This prevents a mismatch where consent/persona are computed from one value
+  // but a different value is persisted.
+  const birthYear = input.birthDate
+    ? birthYearFromDateLike(input.birthDate)!
+    : input.birthYear ?? null;
   if (birthYear == null) {
     throw new ProfileValidationError(
       'BIRTH_YEAR_REQUIRED',
@@ -169,18 +162,6 @@ export async function createProfile(
     );
   }
 
-  // Prevent minors from selecting PARENT persona (access control gate)
-  if (consentCheck && consentCheck.age < 18 && input.personaType === 'PARENT') {
-    throw new ProfileValidationError(
-      'PARENT_AGE_VIOLATION',
-      'personaType',
-      'Parent profile requires age 18 or older'
-    );
-  }
-
-  const legacyPersonaType =
-    input.personaType ?? inferLegacyPersonaType(birthYear);
-
   const [row] = await db
     .insert(profiles)
     .values({
@@ -191,7 +172,6 @@ export async function createProfile(
       birthDate: input.birthDate
         ? new Date(input.birthDate)
         : birthDateFromBirthYear(birthYear),
-      personaType: legacyPersonaType,
       location: input.location ?? null,
       isOwner: isOwner ?? false,
     })

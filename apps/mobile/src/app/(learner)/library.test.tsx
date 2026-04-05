@@ -51,7 +51,9 @@ jest.mock('../../components/progress', () => ({
 }));
 
 jest.mock('../../components/common', () => ({
+  BookPageFlipAnimation: () => null,
   BrandCelebration: () => null,
+  PenWritingAnimation: () => null,
 }));
 
 jest.mock('../../lib/theme', () => ({
@@ -244,5 +246,31 @@ describe('LibraryScreen', () => {
     expect(screen.getByTestId('shelf-view')).toBeTruthy();
     expect(screen.getByTestId('book-card-book-1')).toBeTruthy();
     expect(screen.getByText('Ancient Egypt')).toBeTruthy();
+  });
+
+  it('shows an empty shelf message when a selected subject has no topics yet', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [{ id: 'sub-1', name: 'History', status: 'active' }],
+      isLoading: false,
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+      isLoading: false,
+    });
+    mockUseBooks.mockReturnValue({
+      data: [],
+      isLoading: false,
+    });
+    mockUseCurriculum.mockReturnValue({
+      data: { topics: [] },
+      isLoading: false,
+    });
+
+    render(<LibraryScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('subject-card-sub-1'));
+
+    expect(screen.getByTestId('library-shelf-empty')).toBeTruthy();
+    expect(screen.getByText('No topics on this shelf yet')).toBeTruthy();
   });
 });

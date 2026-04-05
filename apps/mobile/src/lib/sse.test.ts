@@ -110,4 +110,100 @@ describe('parseSSEStream', () => {
     expect(events).toHaveLength(1);
     expect(events[0]).toEqual({ type: 'chunk', content: 'ok' });
   });
+
+  // BC-07: malformed events with valid JSON but missing required fields
+  // must be skipped — not silently cast to StreamEvent
+  it('skips chunk events missing content field (BC-07)', async () => {
+    const stream = createMockStream([
+      'data: {"type":"chunk"}\n\n',
+      'data: {"type":"chunk","content":"valid"}\n\n',
+    ]);
+
+    const events: StreamEvent[] = [];
+    for await (const event of parseSSEStream(mockResponse(stream))) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({ type: 'chunk', content: 'valid' });
+  });
+
+  it('skips done events missing exchangeCount (BC-07)', async () => {
+    const stream = createMockStream([
+      'data: {"type":"done","escalationRung":1}\n\n',
+      'data: {"type":"chunk","content":"ok"}\n\n',
+    ]);
+
+    const events: StreamEvent[] = [];
+    for await (const event of parseSSEStream(mockResponse(stream))) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({ type: 'chunk', content: 'ok' });
+  });
+
+  it('skips done events missing escalationRung (BC-07)', async () => {
+    const stream = createMockStream([
+      'data: {"type":"done","exchangeCount":5}\n\n',
+      'data: {"type":"done","exchangeCount":3,"escalationRung":2}\n\n',
+    ]);
+
+    const events: StreamEvent[] = [];
+    for await (const event of parseSSEStream(mockResponse(stream))) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({
+      type: 'done',
+      exchangeCount: 3,
+      escalationRung: 2,
+    });
+  });
+
+  it('skips events with unknown type (BC-07)', async () => {
+    const stream = createMockStream([
+      'data: {"type":"unknown","foo":"bar"}\n\n',
+      'data: {"type":"chunk","content":"real"}\n\n',
+    ]);
+
+    const events: StreamEvent[] = [];
+    for await (const event of parseSSEStream(mockResponse(stream))) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({ type: 'chunk', content: 'real' });
+  });
+
+  it('skips events where content is not a string (BC-07)', async () => {
+    const stream = createMockStream([
+      'data: {"type":"chunk","content":42}\n\n',
+      'data: {"type":"chunk","content":"ok"}\n\n',
+    ]);
+
+    const events: StreamEvent[] = [];
+    for await (const event of parseSSEStream(mockResponse(stream))) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({ type: 'chunk', content: 'ok' });
+  });
+
+  it('skips events that are arrays instead of objects (BC-07)', async () => {
+    const stream = createMockStream([
+      'data: [1,2,3]\n\n',
+      'data: {"type":"chunk","content":"ok"}\n\n',
+    ]);
+
+    const events: StreamEvent[] = [];
+    for await (const event of parseSSEStream(mockResponse(stream))) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({ type: 'chunk', content: 'ok' });
+  });
 });

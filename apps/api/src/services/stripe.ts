@@ -20,15 +20,6 @@ export function createStripeClient(secretKey: string): Stripe {
   });
 }
 
-let webhookStripeClient: Stripe | null = null;
-
-function getWebhookStripeClient(): Stripe {
-  if (!webhookStripeClient) {
-    webhookStripeClient = createStripeClient('unused');
-  }
-  return webhookStripeClient;
-}
-
 /**
  * Verifies a Stripe webhook signature and returns the parsed event.
  * Wraps `stripe.webhooks.constructEventAsync` for the Workers runtime
@@ -37,9 +28,10 @@ function getWebhookStripeClient(): Stripe {
 export async function verifyWebhookSignature(
   payload: string,
   signature: string,
-  secret: string
+  secret: string,
+  stripeSecretKey: string
 ): Promise<Stripe.Event> {
-  const stripe = getWebhookStripeClient();
+  const stripe = createStripeClient(stripeSecretKey);
   return await stripe.webhooks.constructEventAsync(
     payload,
     signature,

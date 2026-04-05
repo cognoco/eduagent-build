@@ -500,11 +500,42 @@ export async function streamExchange(
   );
 
   return {
-    stream: result.stream,
+    stream: stripMarkersFromStream(result.stream),
     newEscalationRung: context.escalationRung,
     provider: result.provider,
     model: result.model,
   };
+}
+
+// BS-05: strip internal control markers from streamed responses
+const MARKERS = ['[NEEDS_DEEPENING]', '[PARTIAL_PROGRESS]'] as const;
+const MAX_MARKER_LEN = Math.max(...MARKERS.map((m) => m.length));
+
+async function* stripMarkersFromStream(
+  source: AsyncIterable<string>
+): AsyncGenerator<string> {
+  let buffer = '';
+  for await (const chunk of source) {
+    buffer += chunk;
+    // Keep a trailing window long enough to detect markers straddling chunks
+    if (buffer.length > MAX_MARKER_LEN) {
+      const release = buffer.slice(0, buffer.length - MAX_MARKER_LEN);
+      let clean = release;
+      for (const marker of MARKERS) {
+        clean = clean.replaceAll(marker, '');
+      }
+      if (clean) yield clean;
+      buffer = buffer.slice(buffer.length - MAX_MARKER_LEN);
+    }
+  }
+  // Flush remaining buffer
+  if (buffer) {
+    let clean = buffer;
+    for (const marker of MARKERS) {
+      clean = clean.replaceAll(marker, '');
+    }
+    if (clean) yield clean;
+  }
 }
 
 // ---------------------------------------------------------------------------

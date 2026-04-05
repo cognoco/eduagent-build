@@ -276,7 +276,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
              <p>${escapeHtml(
                childName
              )}'s account is now active. They can start learning right away.</p>
-             <a href="mentomate://parent/dashboard" class="btn btn-primary">
+             <a href="mentomate://home" class="btn btn-primary">
                See ${escapeHtml(childName)}'s Progress
              </a>
              <a href="mentomate://onboarding" class="btn btn-secondary">

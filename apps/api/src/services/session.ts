@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, desc, inArray, lt, isNotNull } from 'drizzle-orm';
+import { eq, and, asc, desc, inArray, lt, isNotNull, sql } from 'drizzle-orm';
 import {
   learningSessions,
   sessionEvents,
@@ -70,6 +70,176 @@ interface TimedEvent {
   createdAt: Date;
   metadata?: unknown;
   eventType?: string;
+}
+
+type CachedProfileRow = typeof profiles.$inferSelect | null;
+type CachedSubject = Awaited<ReturnType<typeof getSubject>>;
+
+interface SessionStaticContextCacheEntry {
+  profileId: string;
+  sessionId: string;
+  subjectId: string;
+  topicId: string | null;
+  expiresAt: number;
+  profile: CachedProfileRow;
+  subject: CachedSubject;
+  homeworkLibraryContextLoaded: boolean;
+  homeworkLibraryContext?: string;
+  bookLearningHistoryContexts: Map<string, string | undefined>;
+}
+
+const SESSION_STATIC_CONTEXT_TTL_MS = 5 * 60 * 1000;
+const MAX_SESSION_STATIC_CONTEXT_ENTRIES = 200;
+const sessionStaticContextCache = new Map<
+  string,
+  SessionStaticContextCacheEntry
+>();
+
+function getSessionStaticContextCacheKey(
+  profileId: string,
+  sessionId: string
+): string {
+  return `${profileId}:${sessionId}`;
+}
+
+function pruneSessionStaticContextCache(now = Date.now()): void {
+  for (const [key, entry] of sessionStaticContextCache.entries()) {
+    if (entry.expiresAt <= now) {
+      sessionStaticContextCache.delete(key);
+    }
+  }
+
+  while (sessionStaticContextCache.size > MAX_SESSION_STATIC_CONTEXT_ENTRIES) {
+    const oldestKey = sessionStaticContextCache.keys().next().value;
+    if (!oldestKey) {
+      break;
+    }
+    sessionStaticContextCache.delete(oldestKey);
+  }
+}
+
+function touchSessionStaticContextCacheEntry(
+  key: string,
+  entry: SessionStaticContextCacheEntry
+): SessionStaticContextCacheEntry {
+  entry.expiresAt = Date.now() + SESSION_STATIC_CONTEXT_TTL_MS;
+  sessionStaticContextCache.delete(key);
+  sessionStaticContextCache.set(key, entry);
+  pruneSessionStaticContextCache();
+  return entry;
+}
+
+async function getSessionStaticContext(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  session: LearningSession
+): Promise<SessionStaticContextCacheEntry> {
+  const key = getSessionStaticContextCacheKey(profileId, sessionId);
+  const now = Date.now();
+
+  pruneSessionStaticContextCache(now);
+
+  const cached = sessionStaticContextCache.get(key);
+  if (
+    cached &&
+    cached.subjectId === session.subjectId &&
+    cached.topicId === (session.topicId ?? null) &&
+    cached.expiresAt > now
+  ) {
+    return touchSessionStaticContextCacheEntry(key, cached);
+  }
+
+  const [subject, profileRows] = await Promise.all([
+    getSubject(db, profileId, session.subjectId),
+    db.select().from(profiles).where(eq(profiles.id, profileId)).limit(1),
+  ]);
+
+  const entry: SessionStaticContextCacheEntry = {
+    profileId,
+    sessionId,
+    subjectId: session.subjectId,
+    topicId: session.topicId ?? null,
+    expiresAt: now + SESSION_STATIC_CONTEXT_TTL_MS,
+    profile: profileRows[0] ?? null,
+    subject,
+    homeworkLibraryContextLoaded: false,
+    homeworkLibraryContext: undefined,
+    bookLearningHistoryContexts: new Map(),
+  };
+
+  sessionStaticContextCache.set(key, entry);
+  pruneSessionStaticContextCache(now);
+  return entry;
+}
+
+async function getCachedHomeworkLibraryContext(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  session: LearningSession
+): Promise<string | undefined> {
+  const key = getSessionStaticContextCacheKey(profileId, sessionId);
+  const entry = await getSessionStaticContext(
+    db,
+    profileId,
+    sessionId,
+    session
+  );
+
+  if (entry.homeworkLibraryContextLoaded) {
+    return entry.homeworkLibraryContext;
+  }
+
+  entry.homeworkLibraryContext = await buildHomeworkLibraryContext(
+    db,
+    session.subjectId
+  );
+  entry.homeworkLibraryContextLoaded = true;
+  touchSessionStaticContextCacheEntry(key, entry);
+  return entry.homeworkLibraryContext;
+}
+
+async function getCachedBookLearningHistoryContext(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  session: LearningSession,
+  currentTopicId: string,
+  bookId: string
+): Promise<string | undefined> {
+  const key = getSessionStaticContextCacheKey(profileId, sessionId);
+  const entry = await getSessionStaticContext(
+    db,
+    profileId,
+    sessionId,
+    session
+  );
+  const historyKey = `${bookId}:${currentTopicId}`;
+
+  if (entry.bookLearningHistoryContexts.has(historyKey)) {
+    return entry.bookLearningHistoryContexts.get(historyKey);
+  }
+
+  const context = await buildBookLearningHistoryContext(
+    db,
+    profileId,
+    currentTopicId,
+    bookId
+  );
+  entry.bookLearningHistoryContexts.set(historyKey, context);
+  touchSessionStaticContextCacheEntry(key, entry);
+  return context;
+}
+
+function clearSessionStaticContext(profileId: string, sessionId: string): void {
+  sessionStaticContextCache.delete(
+    getSessionStaticContextCacheKey(profileId, sessionId)
+  );
+}
+
+export function resetSessionStaticContextCache(): void {
+  sessionStaticContextCache.clear();
 }
 
 /** Compute active learning seconds from session event timestamps.
@@ -375,6 +545,26 @@ export async function startSession(
     throw new SubjectInactiveError(subject.status as 'paused' | 'archived');
   }
 
+  // BS-04: verify topicId belongs to this subject's curriculum before use.
+  // Without this check, a user who guesses a topicId from another subject
+  // could start a session with a foreign topic.
+  if (input.topicId) {
+    const [topic] = await db
+      .select({ id: curriculumTopics.id })
+      .from(curriculumTopics)
+      .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+      .where(
+        and(
+          eq(curriculumTopics.id, input.topicId),
+          eq(curricula.subjectId, subjectId)
+        )
+      )
+      .limit(1);
+    if (!topic) {
+      throw new Error('Topic not found in this subject');
+    }
+  }
+
   const [row] = await db
     .insert(learningSessions)
     .values({
@@ -477,6 +667,12 @@ async function prepareExchangeContext(
   }
 
   const isInterleaved = session.sessionType === 'interleaved';
+  const staticContext = await getSessionStaticContext(
+    db,
+    profileId,
+    sessionId,
+    session
+  );
 
   // 2. Load all supplementary data in parallel (all independent after session load)
   const [
@@ -491,7 +687,7 @@ async function prepareExchangeContext(
     metadataRows,
     learningModeRecord,
   ] = await Promise.all([
-    getSubject(db, profileId, session.subjectId),
+    Promise.resolve(staticContext.subject),
     session.topicId
       ? db
           .select()
@@ -499,7 +695,7 @@ async function prepareExchangeContext(
           .where(eq(curriculumTopics.id, session.topicId))
           .limit(1)
       : Promise.resolve([]),
-    db.select().from(profiles).where(eq(profiles.id, profileId)).limit(1),
+    Promise.resolve(staticContext.profile ? [staticContext.profile] : []),
     session.topicId
       ? db
           .select()
@@ -561,6 +757,7 @@ async function prepareExchangeContext(
             )
           )
           .orderBy(desc(vocabulary.updatedAt))
+          .limit(60)
       : [];
 
   // Determine verification type: explicit from session, or auto-select from retention card
@@ -723,16 +920,18 @@ async function prepareExchangeContext(
   // 5. Build prior learning context (FR40 — bridge FR)
   const priorLearning = buildPriorLearningContext(priorTopics);
   const learningHistoryParts = [
-    topic?.bookId
-      ? await buildBookLearningHistoryContext(
+    topic?.bookId && topic?.id
+      ? await getCachedBookLearningHistoryContext(
           db,
           profileId,
+          sessionId,
+          session,
           topic.id,
           topic.bookId
         )
       : undefined,
     session.sessionType === 'homework'
-      ? await buildHomeworkLibraryContext(db, session.subjectId)
+      ? await getCachedHomeworkLibraryContext(db, profileId, sessionId, session)
       : undefined,
   ].filter((part): part is string => Boolean(part));
   const learningHistoryContext =
@@ -848,13 +1047,13 @@ async function persistExchangeResult(
     });
   }
 
-  // Update session state
-  const newExchangeCount = session.exchangeCount + 1;
+  // D-03: atomic conditional increment — prevents concurrent requests from
+  // both passing the exchange-limit check and double-incrementing past the cap.
   const now = new Date();
-  await db
+  const [updated] = await db
     .update(learningSessions)
     .set({
-      exchangeCount: newExchangeCount,
+      exchangeCount: sql`${learningSessions.exchangeCount} + 1`,
       escalationRung: effectiveRung,
       lastActivityAt: now,
       updatedAt: now,
@@ -862,12 +1061,18 @@ async function persistExchangeResult(
     .where(
       and(
         eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
+        eq(learningSessions.profileId, profileId),
+        lt(learningSessions.exchangeCount, MAX_EXCHANGES_PER_SESSION)
       )
-    );
+    )
+    .returning({ exchangeCount: learningSessions.exchangeCount });
+
+  if (!updated) {
+    throw new SessionExchangeLimitError(session.exchangeCount);
+  }
 
   return {
-    exchangeCount: newExchangeCount,
+    exchangeCount: updated.exchangeCount,
     aiEventId: insertedEvents.find((event) => event.eventType === 'ai_response')
       ?.id,
   };
@@ -1035,13 +1240,6 @@ export async function closeSession(
     throw new Error('Session not found');
   }
 
-  const rawSession = await db.query.learningSessions.findFirst({
-    where: and(
-      eq(learningSessions.id, sessionId),
-      eq(learningSessions.profileId, profileId)
-    ),
-  });
-
   const now = new Date();
   const sessionStartedAt = new Date(session.startedAt);
   const wallClockSeconds = Math.max(
@@ -1068,7 +1266,11 @@ export async function closeSession(
       ? 'auto_closed'
       : 'completed';
 
-  await db
+  // BD-05: Compare-and-swap — only close if the session is still active.
+  // Between the initial read and this write, the learner could resume the
+  // session, so we guard the UPDATE with `status = 'active'` to prevent
+  // closing a session that has already been resumed or closed.
+  const [updated] = await db
     .update(learningSessions)
     .set({
       status: nextStatus,
@@ -1076,7 +1278,7 @@ export async function closeSession(
       durationSeconds,
       wallClockSeconds,
       metadata: {
-        ...(((rawSession?.metadata as Record<string, unknown> | undefined) ??
+        ...(((session.metadata as Record<string, unknown> | undefined) ??
           {}) as Record<string, unknown>),
         milestonesReached: input.milestonesReached ?? [],
       },
@@ -1085,9 +1287,29 @@ export async function closeSession(
     .where(
       and(
         eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
+        eq(learningSessions.profileId, profileId),
+        eq(learningSessions.status, 'active')
       )
-    );
+    )
+    .returning({ id: learningSessions.id });
+
+  // Session was already closed or resumed — skip side-effects
+  if (!updated) {
+    return {
+      message: 'Session already closed or resumed',
+      sessionId,
+      topicId: session.topicId ?? null,
+      subjectId: session.subjectId,
+      sessionType: session.sessionType,
+      verificationType: session.verificationType ?? null,
+      wallClockSeconds,
+      summaryStatus: effectiveSummaryStatus,
+      interleavedTopicIds: undefined,
+      escalationRungs: undefined,
+    };
+  }
+
+  clearSessionStaticContext(profileId, sessionId);
 
   await createPendingSessionSummary(
     db,
@@ -1238,6 +1460,9 @@ export async function closeStaleSessions(
     escalationRungs?: number[];
   }>
 > {
+  // Intentional cross-profile batch query: this cron scans all active sessions
+  // and closes only those stale beyond the cutoff, so scoped-repo access does
+  // not apply here.
   const staleSessions = await db.query.learningSessions.findMany({
     where: and(
       eq(learningSessions.status, 'active'),
@@ -1273,6 +1498,11 @@ export async function closeStaleSessions(
         summaryStatus: 'auto_closed',
       }
     );
+
+    // BD-05: Skip sessions that were resumed between read and write
+    if (result.message === 'Session already closed or resumed') {
+      continue;
+    }
 
     results.push({
       profileId: staleSession.profileId,
@@ -1602,7 +1832,8 @@ export async function syncHomeworkState(
     await db.insert(sessionEvents).values(eventsToInsert);
   }
 
-  return { metadata: input.metadata };
+  // BD-04: return enriched metadata with accumulated tracking IDs, not raw input
+  return { metadata: nextHomeworkMetadata };
 }
 
 export async function flagContent(

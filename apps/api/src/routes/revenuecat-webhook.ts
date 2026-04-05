@@ -19,11 +19,11 @@ import {
   activateSubscriptionFromRevenuecat,
   updateQuotaPoolLimit,
   transitionToExtendedTrial,
-  isTopUpAlreadyGranted,
   purchaseTopUpCredits,
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
 import { getTierConfig } from '../services/subscription';
+import { captureException } from '../services/sentry';
 import { EXTENDED_TRIAL_MONTHLY_EQUIVALENT } from '../services/trial';
 import { inngest } from '../inngest/client';
 import type { Database } from '@eduagent/database';
@@ -34,13 +34,43 @@ import type { SubscriptionStatus } from '@eduagent/schemas';
 // Timing-safe string comparison (prevents timing attacks on webhook secret)
 // ---------------------------------------------------------------------------
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  const aBytes = new TextEncoder().encode(a);
-  const bBytes = new TextEncoder().encode(b);
-  let result = 0;
-  for (let i = 0; i < aBytes.length; i++) result |= aBytes[i]! ^ bBytes[i]!;
-  return result === 0;
+/**
+ * BS-01: HMAC-based constant-time comparison.
+ * Both inputs are hashed with SHA-256 HMAC (using a static key) before
+ * comparison, producing fixed-length 32-byte digests regardless of input
+ * length. This eliminates the length-leak timing side-channel that exists
+ * when comparing raw strings of different lengths.
+ *
+ * Uses SubtleCrypto (available in Cloudflare Workers) for proper HMAC.
+ */
+async function constantTimeCompare(
+  a: string,
+  b: string,
+  secret: string
+): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const hmacKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  const [digestA, digestB] = await Promise.all([
+    crypto.subtle.sign('HMAC', hmacKey, encoder.encode(a)),
+    crypto.subtle.sign('HMAC', hmacKey, encoder.encode(b)),
+  ]);
+
+  const hashA = new Uint8Array(digestA);
+  const hashB = new Uint8Array(digestB);
+
+  // Fixed-length XOR comparison — always 32 bytes, constant time
+  let diff = 0;
+  for (let i = 0; i < hashA.length; i++) {
+    diff |= hashA[i]! ^ hashB[i]!;
+  }
+  return diff === 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -69,6 +99,8 @@ const revenuecatWebhookSchema = z.object({
     grace_period_expiration_at_ms: z.number().optional(),
     transaction_id: z.string().optional(),
     store_transaction_id: z.string().optional(),
+    /** BD-01: Event timestamp for ordering-based idempotency. */
+    event_timestamp_ms: z.number().optional(),
   }),
 });
 
@@ -220,6 +252,7 @@ async function handleInitialPurchase(
         isTrial && event.expiration_at_ms
           ? new Date(event.expiration_at_ms).toISOString()
           : undefined,
+      eventTimestampMs: event.event_timestamp_ms,
     }
   );
 
@@ -240,6 +273,7 @@ async function handleRenewal(
   // This handles both trial-to-paid conversion and regular renewal.
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
     status: 'active',
     tier: tier ?? undefined,
     currentPeriodStart: event.purchased_at_ms
@@ -277,6 +311,7 @@ async function handleCancellation(
 
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
     // Keep the entitlement active until period end so mobile can render the
     // correct "Cancelling" state from cancelledAt + active status.
     status: 'active' as SubscriptionStatus,
@@ -317,6 +352,7 @@ async function handleExpiration(
     // Record the event for idempotency
     await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
       eventId: event.id,
+      eventTimestampMs: event.event_timestamp_ms,
       // transitionToExtendedTrial already set status to 'expired' and tier to 'free'
       // but we need to record the eventId without overwriting those values
     });
@@ -328,6 +364,7 @@ async function handleExpiration(
   // Non-trial expiration: downgrade to free tier immediately
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
     status: 'expired',
     tier: 'free',
     cancelledAt: new Date().toISOString(),
@@ -355,6 +392,7 @@ async function handleBillingIssue(
 
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
     status: 'past_due',
   });
 
@@ -401,6 +439,7 @@ async function handleProductChange(
 
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
     tier: newTier,
     status: 'active',
   });
@@ -445,12 +484,6 @@ async function handleNonRenewingPurchase(
     };
   }
 
-  // Idempotency: check if this transaction has already been granted
-  const alreadyGranted = await isTopUpAlreadyGranted(db, transactionId);
-  if (alreadyGranted) {
-    return null; // silently skip — already granted
-  }
-
   // Look up the account's subscription to verify tier eligibility
   const sub = await getSubscriptionByAccountId(db, accountId);
   if (!sub || sub.tier === 'free') {
@@ -463,14 +496,20 @@ async function handleNonRenewingPurchase(
     };
   }
 
-  // Grant credits via the shared pool (family accounts share the same subscription)
-  await purchaseTopUpCredits(
+  // BS-02: Atomic idempotent credit grant — purchaseTopUpCredits uses
+  // INSERT ... ON CONFLICT DO NOTHING on the unique revenuecatTransactionId
+  // index. Returns null when credit was already granted (duplicate txn).
+  const granted = await purchaseTopUpCredits(
     db,
     sub.id,
     credits,
     new Date(),
-    transactionId ?? undefined
+    transactionId
   );
+
+  if (!granted) {
+    return null; // duplicate transaction — already granted, silently skip
+  }
 
   await refreshKvCache(kv, db, accountId);
 
@@ -487,6 +526,7 @@ async function handleUncancellation(
 
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
     status: 'active',
     cancelledAt: null,
   });
@@ -533,7 +573,7 @@ export const revenuecatWebhookRoute = new Hono<{
     );
   }
 
-  if (!timingSafeEqual(token, webhookSecret)) {
+  if (!(await constantTimeCompare(token, webhookSecret, webhookSecret))) {
     return apiError(
       c,
       401,
@@ -560,21 +600,40 @@ export const revenuecatWebhookRoute = new Hono<{
   const db = c.get('db');
   const kv = c.env.SUBSCRIPTION_KV;
 
-  // Idempotency: skip already-processed events
+  // Resolve account — reject if the app_user_id cannot be mapped to an account
   const accountId = await resolveAccountId(db, event.app_user_id);
-  if (accountId) {
-    const alreadyProcessed = await isRevenuecatEventProcessed(
-      db,
-      accountId,
-      event.id
+  if (!accountId) {
+    console.error(
+      `[revenuecat-webhook] Unresolvable app_user_id: ${event.app_user_id}, event: ${event.type}/${event.id}`
     );
-    if (alreadyProcessed) {
-      return c.json({ received: true, skipped: true });
-    }
-
-    // Ensure free subscription exists for the account (auto-provisioning)
-    await ensureFreeSubscription(db, accountId);
+    captureException(
+      new Error(
+        `Unresolvable RevenueCat app_user_id: ${event.app_user_id}`
+      ),
+      {
+        extra: {
+          eventType: event.type,
+          eventId: event.id,
+          appUserId: event.app_user_id,
+        },
+      }
+    );
+    return c.json({ received: true, error: 'Unknown app_user_id' }, 200);
   }
+
+  // Idempotency: skip already-processed events (BD-01: timestamp-based ordering)
+  const alreadyProcessed = await isRevenuecatEventProcessed(
+    db,
+    accountId,
+    event.id,
+    event.event_timestamp_ms
+  );
+  if (alreadyProcessed) {
+    return c.json({ received: true, skipped: true });
+  }
+
+  // Ensure free subscription exists for the account (auto-provisioning)
+  await ensureFreeSubscription(db, accountId);
 
   // Dispatch to event-specific handler
   switch (event.type) {

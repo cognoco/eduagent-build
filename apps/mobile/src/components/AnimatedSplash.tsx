@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react';
 import { useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
@@ -28,50 +29,80 @@ import Animated, {
 } from 'react-native-reanimated';
 import { tokens } from '../lib/design-tokens';
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const AnimatedPath = Animated.createAnimatedComponent(Path);
+// Wrap in try-catch: on some Android release builds (Hermes + Fabric),
+// Reanimated's native module can fail to initialize, causing
+// createAnimatedComponent to throw. A module-level crash here kills the
+// entire root layout import chain — no error boundary can catch it.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let AnimatedCircle: ComponentType<any>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let AnimatedPath: ComponentType<any>;
+let _splashAnimationAvailable = true;
+try {
+  AnimatedCircle = Animated.createAnimatedComponent(Circle);
+  AnimatedPath = Animated.createAnimatedComponent(Path);
+} catch (e) {
+  _splashAnimationAvailable = false;
+  // Assign plain SVG components as fallback so the rest of the module
+  // evaluates without errors. The component will bail out immediately.
+  AnimatedCircle = Circle as never;
+  AnimatedPath = Path as never;
+  console.error('[AnimatedSplash] createAnimatedComponent failed:', e);
+}
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const ICON_SIZE = Math.min(SCREEN_W * 0.44, 180);
 const PATH_LEN = 150; // approximate bezier arc length
 
 /**
- * Derive splash colors from the design token system.
+ * Brand-accurate splash colors.
  *
- * Note: AnimatedSplash renders outside the ThemeContext provider (see _layout.tsx),
- * so we cannot use useThemeColors(). Instead we read tokens directly using the
- * system color scheme and the default persona ('teen').
+ * These are hardcoded to match the canonical brand SVGs (docs/logo.svg,
+ * logo-icon-light.svg, logo-icon-dark.svg) rather than derived from theme
+ * tokens, because the splash is a fixed brand-identity moment that should
+ * not shift with accent presets.
  *
- * Accent colors (violet/teal nodes, gradient stops, spark particles) derive
- * from the teen persona tokens. Decorative pastel variants are computed from
- * the accent/secondary tokens with lightened counterparts for visual contrast.
+ * Background is the only value taken from tokens so the splash blends
+ * seamlessly into the app surface that follows.
  */
 function useSplashColors(isDark: boolean) {
   return useMemo(() => {
-    const scheme = isDark ? 'dark' : 'light';
-    const c = tokens.teen[scheme].colors;
+    const bg = tokens.teen[isDark ? 'dark' : 'light'].colors.background;
+
+    if (isDark) {
+      return {
+        bg,
+        violet: '#8b5cf6', // student node — same in both modes
+        teal: '#14b8a6', // mentor node (brand teal, brighter for dark)
+        pink: '#f9a8d4', // dot 1 — pastel pink for dark
+        ltViolet: '#c4b5fd', // dot 2 — light violet for dark
+        mint: '#99f6e4', // dot 3 — pastel mint for dark
+        lavender: '#f3e8ff', // student inner fill
+        ltMint: '#ccfbf1', // mentor inner fill
+        sparkPink: '#f9a8d4',
+        sparkViolet: '#c4b5fd',
+        sparkMint: '#99f6e4',
+        text: '#f1f5f9', // "ment" — near-white
+        textViolet: '#a78bfa', // circle-O
+        textTeal: '#5eead4', // "mate" — light teal
+      };
+    }
 
     return {
-      bg: c.background,
-      // Primary accent for student node and wordmark "ment"
-      violet: c.accent,
-      // Secondary color for mentor node and wordmark "mate"
-      teal: c.secondary,
-      // Decorative stepping-stone dots — use primary, accent, secondary
-      pink: c.primary,
-      ltViolet: c.accent,
-      mint: c.secondary,
-      // Inner fills for student/mentor nodes — lighter variants
-      lavender: c.primarySoft,
-      ltMint: c.primarySoft,
-      // Spark particle colors — subtle decorative elements
-      sparkPink: c.primarySoft,
-      sparkViolet: c.primarySoft,
-      sparkMint: c.primarySoft,
-      // Wordmark text colors
-      text: c.accent,
-      textViolet: c.accent,
-      textTeal: c.secondary,
+      bg,
+      violet: '#8b5cf6', // student node
+      teal: '#0d9488', // mentor node (brand teal)
+      pink: '#f472b6', // dot 1 — pink
+      ltViolet: '#a78bfa', // dot 2 — light violet
+      mint: '#5eead4', // dot 3 — mint
+      lavender: '#f3e8ff', // student inner fill
+      ltMint: '#ccfbf1', // mentor inner fill
+      sparkPink: '#f472b6',
+      sparkViolet: '#a78bfa',
+      sparkMint: '#5eead4',
+      text: '#1c1917', // "ment" — near-black
+      textViolet: '#8b5cf6', // circle-O
+      textTeal: '#0d9488', // "mate" — teal
     };
   }, [isDark]);
 }
@@ -140,6 +171,14 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
         '[Splash] choreography useEffect fired, reduceMotion=',
         reduceMotion
       );
+
+    // If Reanimated native init failed, skip animation entirely.
+    if (!_splashAnimationAvailable) {
+      if (__DEV__)
+        console.warn('[Splash] Animation unavailable — completing immediately');
+      done();
+      return;
+    }
 
     // Accessibility: skip animation for users who prefer reduced motion
     if (reduceMotion) {
@@ -214,44 +253,50 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
   }, [done, reduceMotion]);
 
   // --- Animated props for SVG elements ---
-  // Android SVG fix: animating only `r` via useAnimatedProps can fail to trigger
-  // native re-renders when starting from r=0. Bundling `opacity` alongside `r`
-  // forces the native view update, matching how the dots (which already work) are
-  // structured. Without this, student/mentor/path stay invisible on Android APKs.
+  // Android SVG fix: Android's native SVG renderer permanently discards circles
+  // created with r=0, ignoring all subsequent prop updates. The prior fix of
+  // bundling `opacity` alongside `r` was insufficient — the element was already
+  // pruned from the render tree. Fix: ensure r is never zero (Math.max with a
+  // sub-pixel floor) and hold opacity at 0 until the animation begins moving,
+  // so the circle exists in the native tree from the first frame but is invisible
+  // until the spring fires.
+  const R_FLOOR = 0.01; // sub-pixel: always present in native tree, never visible
+  const OP_THRESH = 0.1; // opacity stays 0 until r exceeds this
+
   const pathProps = useAnimatedProps(() => ({
     strokeDashoffset: PATH_LEN * (1 - pathDraw.value),
     opacity: Math.min(pathDraw.value * 10, 1),
   }));
 
   const studentOutProps = useAnimatedProps(() => ({
-    r: studentR.value,
-    opacity: Math.min(studentR.value / 2, 1),
+    r: Math.max(studentR.value, R_FLOOR),
+    opacity: studentR.value < OP_THRESH ? 0 : Math.min(studentR.value / 2, 1),
   }));
   const studentInProps = useAnimatedProps(() => ({
-    r: studentInR.value,
-    opacity: Math.min(studentInR.value / 1, 1),
+    r: Math.max(studentInR.value, R_FLOOR),
+    opacity: studentInR.value < OP_THRESH ? 0 : Math.min(studentInR.value, 1),
   }));
   const mentorOutProps = useAnimatedProps(() => ({
-    r: mentorR.value,
-    opacity: Math.min(mentorR.value / 2, 1),
+    r: Math.max(mentorR.value, R_FLOOR),
+    opacity: mentorR.value < OP_THRESH ? 0 : Math.min(mentorR.value / 2, 1),
   }));
   const mentorInProps = useAnimatedProps(() => ({
-    r: mentorInR.value,
-    opacity: Math.min(mentorInR.value / 1, 1),
+    r: Math.max(mentorInR.value, R_FLOOR),
+    opacity: mentorInR.value < OP_THRESH ? 0 : Math.min(mentorInR.value, 1),
   }));
   const ringProps = useAnimatedProps(() => ({ opacity: ringOp.value }));
 
   const dot1Props = useAnimatedProps(() => ({
-    r: dot1R.value,
-    opacity: Math.min(dot1R.value / 4, 1) * 0.6,
+    r: Math.max(dot1R.value, R_FLOOR),
+    opacity: dot1R.value < OP_THRESH ? 0 : Math.min(dot1R.value / 4, 1) * 0.6,
   }));
   const dot2Props = useAnimatedProps(() => ({
-    r: dot2R.value,
-    opacity: Math.min(dot2R.value / 5, 1) * 0.65,
+    r: Math.max(dot2R.value, R_FLOOR),
+    opacity: dot2R.value < OP_THRESH ? 0 : Math.min(dot2R.value / 5, 1) * 0.65,
   }));
   const dot3Props = useAnimatedProps(() => ({
-    r: dot3R.value,
-    opacity: Math.min(dot3R.value / 6, 1) * 0.7,
+    r: Math.max(dot3R.value, R_FLOOR),
+    opacity: dot3R.value < OP_THRESH ? 0 : Math.min(dot3R.value / 6, 1) * 0.7,
   }));
 
   // Spark particles — 2 per dot, fly outward and fade

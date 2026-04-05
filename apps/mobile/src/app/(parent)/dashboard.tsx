@@ -170,6 +170,30 @@ export default function DashboardScreen() {
                 </Text>
               )}
             </Pressable>
+            <View className="flex-row gap-3 mt-3">
+              <Pressable
+                onPress={() => router.replace('/(parent)/library' as never)}
+                className="bg-surface rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Open parent library"
+                testID="dashboard-library-fallback"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  Library
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => router.replace('/(parent)/more' as never)}
+                className="bg-surface rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Open parent settings"
+                testID="dashboard-more-fallback"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  More
+                </Text>
+              </Pressable>
+            </View>
           </View>
         ) : dashboard?.children && dashboard.children.length > 0 ? (
           <>

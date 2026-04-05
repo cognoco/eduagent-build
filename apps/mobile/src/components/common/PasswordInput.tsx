@@ -44,6 +44,9 @@ export function PasswordInput({
           editable={editable}
           autoCapitalize="none"
           autoComplete="password"
+          autoCorrect={false}
+          spellCheck={false}
+          textContentType="password"
           returnKeyType={onSubmitEditing ? 'go' : 'default'}
           onSubmitEditing={onSubmitEditing}
           testID={testID}
