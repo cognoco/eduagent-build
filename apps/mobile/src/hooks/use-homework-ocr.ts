@@ -74,8 +74,8 @@ async function recognizeTextServerSide(
     body: formData,
   });
 
-  if (!response.ok) {
-    throw new Error(`Server OCR failed (${response.status})`);
+  if (!response || !response.ok) {
+    throw new Error(`Server OCR failed (${response?.status ?? 'unknown'})`);
   }
 
   const payload = (await response.json()) as { text?: string | null };
