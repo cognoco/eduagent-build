@@ -27,6 +27,9 @@ jest.mock('@eduagent/retention', () => ({
 
 jest.mock('./adaptive-teaching', () => ({
   canExitNeedsDeepening: jest.fn(),
+  checkNeedsDeepeningCapacity: jest
+    .fn()
+    .mockReturnValue({ atCapacity: false, shouldPromote: false }),
 }));
 
 jest.mock('./xp', () => ({
@@ -36,7 +39,10 @@ jest.mock('./xp', () => ({
 import type { Database } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';
 import { processRecallResult, getRetentionStatus } from './retention';
-import { canExitNeedsDeepening } from './adaptive-teaching';
+import {
+  canExitNeedsDeepening,
+  checkNeedsDeepeningCapacity,
+} from './adaptive-teaching';
 import { syncXpLedgerStatus } from './xp';
 import {
   registerProvider,
@@ -186,6 +192,10 @@ function setupScopedRepo({
 beforeEach(() => {
   jest.clearAllMocks();
   setupScopedRepo();
+  (checkNeedsDeepeningCapacity as jest.Mock).mockReturnValue({
+    atCapacity: false,
+    shouldPromote: false,
+  });
   // Register a default gemini mock that returns quality '4' for recall tests
   registerProvider(createMockProvider('gemini'));
 });

@@ -59,7 +59,7 @@ jest.mock('./settings', () => ({
 }));
 
 import type { Database } from '@eduagent/database';
-import { createScopedRepository } from '@eduagent/database';
+import { createScopedRepository, profiles } from '@eduagent/database';
 import {
   startSession,
   SubjectInactiveError,
@@ -75,6 +75,7 @@ import {
   skipSummary,
   submitSummary,
   computeActiveSeconds,
+  resetSessionStaticContextCache,
 } from './session';
 import { processExchange } from './exchanges';
 import { evaluateEscalation } from './escalation';
@@ -186,17 +187,22 @@ function createMockDb({
     metadata?: Record<string, unknown>;
   }>,
   selectResults = [] as unknown[][],
+  profileSelectResults = [] as unknown[],
   learningSessionFindFirst = mockSessionRow(),
   updateReturning = [
     { exchangeCount: (learningSessionFindFirst?.exchangeCount ?? 0) + 1 },
   ],
 } = {}): Database {
-  const selectMock = jest.fn();
-  for (const result of selectResults) {
-    selectMock.mockReturnValueOnce(mockSelectChain(result));
-  }
-  // Fallback for any additional select calls
-  selectMock.mockReturnValue(mockSelectChain([]));
+  const pendingSelectResults = [...selectResults];
+  const selectMock = jest.fn().mockImplementation(() => ({
+    from: jest.fn().mockImplementation((table) => {
+      const result =
+        table === profiles
+          ? profileSelectResults
+          : pendingSelectResults.shift() ?? [];
+      return mockSelectChain(result).from();
+    }),
+  }));
 
   return {
     insert: jest.fn().mockReturnValue({
@@ -278,6 +284,7 @@ function setupScopedRepo({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetSessionStaticContextCache();
   mockCreatePendingSessionSummary.mockResolvedValue(
     mockSummaryRow({ status: 'pending' })
   );
@@ -845,9 +852,10 @@ describe('processMessage', () => {
     setupScopedRepo({
       sessionFindFirst: mockSessionRow({ topicId: null }),
     });
-    // No topicId → no topic select → first select is profile query
     const db = createMockDb({
-      selectResults: [[{ birthDate: new Date('2014-06-15T00:00:00.000Z') }]],
+      profileSelectResults: [
+        { birthDate: new Date('2014-06-15T00:00:00.000Z') },
+      ],
     });
     await processMessage(db, profileId, sessionId, {
       message: 'Hey there',
@@ -894,11 +902,9 @@ describe('processMessage', () => {
       setupScopedRepo({
         sessionFindFirst: mockSessionRow({ topicId }),
       });
-      // selectResults order: [topic, profile, retentionCard]
       const db = createMockDb({
         selectResults: [
           [{ title: 'Algebra', description: 'Basic algebra' }],
-          [{ personaType: 'LEARNER' }],
           [{ repetitions: reps }],
         ],
       });
@@ -923,7 +929,6 @@ describe('processMessage', () => {
     const db = createMockDb({
       selectResults: [
         [{ title: 'Algebra', description: 'Desc' }],
-        [{ personaType: 'LEARNER' }],
         [], // no retention card
       ],
     });
@@ -951,11 +956,9 @@ describe('processMessage', () => {
       selectResults: [
         // 1. topic query (first topic from session.topicId)
         [{ title: 'Algebra Basics', description: 'Linear equations' }],
-        // 2. profile
-        [{ personaType: 'LEARNER' }],
-        // 3. retention card
+        // 2. retention card
         [{ repetitions: 2 }],
-        // 4. metadata query (interleaved session metadata)
+        // 3. metadata query (interleaved session metadata)
         [
           {
             metadata: {
@@ -979,7 +982,7 @@ describe('processMessage', () => {
             },
           },
         ],
-        // 5. inArray topic details query (after Promise.all)
+        // 4. inArray topic details query (after Promise.all)
         [
           {
             id: 'topic-001',

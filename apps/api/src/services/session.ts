@@ -72,6 +72,176 @@ interface TimedEvent {
   eventType?: string;
 }
 
+type CachedProfileRow = typeof profiles.$inferSelect | null;
+type CachedSubject = Awaited<ReturnType<typeof getSubject>>;
+
+interface SessionStaticContextCacheEntry {
+  profileId: string;
+  sessionId: string;
+  subjectId: string;
+  topicId: string | null;
+  expiresAt: number;
+  profile: CachedProfileRow;
+  subject: CachedSubject;
+  homeworkLibraryContextLoaded: boolean;
+  homeworkLibraryContext?: string;
+  bookLearningHistoryContexts: Map<string, string | undefined>;
+}
+
+const SESSION_STATIC_CONTEXT_TTL_MS = 5 * 60 * 1000;
+const MAX_SESSION_STATIC_CONTEXT_ENTRIES = 200;
+const sessionStaticContextCache = new Map<
+  string,
+  SessionStaticContextCacheEntry
+>();
+
+function getSessionStaticContextCacheKey(
+  profileId: string,
+  sessionId: string
+): string {
+  return `${profileId}:${sessionId}`;
+}
+
+function pruneSessionStaticContextCache(now = Date.now()): void {
+  for (const [key, entry] of sessionStaticContextCache.entries()) {
+    if (entry.expiresAt <= now) {
+      sessionStaticContextCache.delete(key);
+    }
+  }
+
+  while (sessionStaticContextCache.size > MAX_SESSION_STATIC_CONTEXT_ENTRIES) {
+    const oldestKey = sessionStaticContextCache.keys().next().value;
+    if (!oldestKey) {
+      break;
+    }
+    sessionStaticContextCache.delete(oldestKey);
+  }
+}
+
+function touchSessionStaticContextCacheEntry(
+  key: string,
+  entry: SessionStaticContextCacheEntry
+): SessionStaticContextCacheEntry {
+  entry.expiresAt = Date.now() + SESSION_STATIC_CONTEXT_TTL_MS;
+  sessionStaticContextCache.delete(key);
+  sessionStaticContextCache.set(key, entry);
+  pruneSessionStaticContextCache();
+  return entry;
+}
+
+async function getSessionStaticContext(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  session: LearningSession
+): Promise<SessionStaticContextCacheEntry> {
+  const key = getSessionStaticContextCacheKey(profileId, sessionId);
+  const now = Date.now();
+
+  pruneSessionStaticContextCache(now);
+
+  const cached = sessionStaticContextCache.get(key);
+  if (
+    cached &&
+    cached.subjectId === session.subjectId &&
+    cached.topicId === (session.topicId ?? null) &&
+    cached.expiresAt > now
+  ) {
+    return touchSessionStaticContextCacheEntry(key, cached);
+  }
+
+  const [subject, profileRows] = await Promise.all([
+    getSubject(db, profileId, session.subjectId),
+    db.select().from(profiles).where(eq(profiles.id, profileId)).limit(1),
+  ]);
+
+  const entry: SessionStaticContextCacheEntry = {
+    profileId,
+    sessionId,
+    subjectId: session.subjectId,
+    topicId: session.topicId ?? null,
+    expiresAt: now + SESSION_STATIC_CONTEXT_TTL_MS,
+    profile: profileRows[0] ?? null,
+    subject,
+    homeworkLibraryContextLoaded: false,
+    homeworkLibraryContext: undefined,
+    bookLearningHistoryContexts: new Map(),
+  };
+
+  sessionStaticContextCache.set(key, entry);
+  pruneSessionStaticContextCache(now);
+  return entry;
+}
+
+async function getCachedHomeworkLibraryContext(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  session: LearningSession
+): Promise<string | undefined> {
+  const key = getSessionStaticContextCacheKey(profileId, sessionId);
+  const entry = await getSessionStaticContext(
+    db,
+    profileId,
+    sessionId,
+    session
+  );
+
+  if (entry.homeworkLibraryContextLoaded) {
+    return entry.homeworkLibraryContext;
+  }
+
+  entry.homeworkLibraryContext = await buildHomeworkLibraryContext(
+    db,
+    session.subjectId
+  );
+  entry.homeworkLibraryContextLoaded = true;
+  touchSessionStaticContextCacheEntry(key, entry);
+  return entry.homeworkLibraryContext;
+}
+
+async function getCachedBookLearningHistoryContext(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  session: LearningSession,
+  currentTopicId: string,
+  bookId: string
+): Promise<string | undefined> {
+  const key = getSessionStaticContextCacheKey(profileId, sessionId);
+  const entry = await getSessionStaticContext(
+    db,
+    profileId,
+    sessionId,
+    session
+  );
+  const historyKey = `${bookId}:${currentTopicId}`;
+
+  if (entry.bookLearningHistoryContexts.has(historyKey)) {
+    return entry.bookLearningHistoryContexts.get(historyKey);
+  }
+
+  const context = await buildBookLearningHistoryContext(
+    db,
+    profileId,
+    currentTopicId,
+    bookId
+  );
+  entry.bookLearningHistoryContexts.set(historyKey, context);
+  touchSessionStaticContextCacheEntry(key, entry);
+  return context;
+}
+
+function clearSessionStaticContext(profileId: string, sessionId: string): void {
+  sessionStaticContextCache.delete(
+    getSessionStaticContextCacheKey(profileId, sessionId)
+  );
+}
+
+export function resetSessionStaticContextCache(): void {
+  sessionStaticContextCache.clear();
+}
+
 /** Compute active learning seconds from session event timestamps.
  *  Each inter-event gap is capped at the LLM-estimated expected response time
  *  (from the later event's metadata) × pace buffer. Falls back to 10 min. */
@@ -497,6 +667,12 @@ async function prepareExchangeContext(
   }
 
   const isInterleaved = session.sessionType === 'interleaved';
+  const staticContext = await getSessionStaticContext(
+    db,
+    profileId,
+    sessionId,
+    session
+  );
 
   // 2. Load all supplementary data in parallel (all independent after session load)
   const [
@@ -511,7 +687,7 @@ async function prepareExchangeContext(
     metadataRows,
     learningModeRecord,
   ] = await Promise.all([
-    getSubject(db, profileId, session.subjectId),
+    Promise.resolve(staticContext.subject),
     session.topicId
       ? db
           .select()
@@ -519,7 +695,7 @@ async function prepareExchangeContext(
           .where(eq(curriculumTopics.id, session.topicId))
           .limit(1)
       : Promise.resolve([]),
-    db.select().from(profiles).where(eq(profiles.id, profileId)).limit(1),
+    Promise.resolve(staticContext.profile ? [staticContext.profile] : []),
     session.topicId
       ? db
           .select()
@@ -744,16 +920,18 @@ async function prepareExchangeContext(
   // 5. Build prior learning context (FR40 — bridge FR)
   const priorLearning = buildPriorLearningContext(priorTopics);
   const learningHistoryParts = [
-    topic?.bookId
-      ? await buildBookLearningHistoryContext(
+    topic?.bookId && topic?.id
+      ? await getCachedBookLearningHistoryContext(
           db,
           profileId,
+          sessionId,
+          session,
           topic.id,
           topic.bookId
         )
       : undefined,
     session.sessionType === 'homework'
-      ? await buildHomeworkLibraryContext(db, session.subjectId)
+      ? await getCachedHomeworkLibraryContext(db, profileId, sessionId, session)
       : undefined,
   ].filter((part): part is string => Boolean(part));
   const learningHistoryContext =
@@ -1130,6 +1308,8 @@ export async function closeSession(
       escalationRungs: undefined,
     };
   }
+
+  clearSessionStaticContext(profileId, sessionId);
 
   await createPendingSessionSummary(
     db,
