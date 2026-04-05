@@ -119,6 +119,25 @@ export default function CameraScreen(): React.ReactNode {
             subjectId: c.subjectId,
             subjectName: c.subjectName,
           });
+        } else if (
+          result.suggestedSubjectName &&
+          result.candidates.length === 0
+        ) {
+          // LLM suggested a subject but the user has none enrolled yet —
+          // auto-create it so the user sees "Looks like [Subject]" + "Let's go"
+          try {
+            const created = await createSubject.mutateAsync({
+              name: result.suggestedSubjectName,
+              rawInput: result.suggestedSubjectName,
+            });
+            setAutoDetectedSubject({
+              subjectId: created.subject.id,
+              subjectName: created.subject.name,
+            });
+          } catch {
+            // Subject creation failed — fall back to manual picker
+            setShowSubjectPicker(true);
+          }
         } else {
           setShowSubjectPicker(true);
         }
