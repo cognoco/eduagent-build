@@ -126,6 +126,12 @@ export default function SignInScreen() {
     useState<VerificationState | null>(null);
   const [code, setCode] = useState('');
   const [resending, setResending] = useState(false);
+  const [pendingSessionActivationId, setPendingSessionActivationId] = useState<
+    string | null
+  >(null);
+  const [activationFailureContext, setActivationFailureContext] = useState<
+    'oauth' | 'password' | 'verification' | null
+  >(null);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
   const {
     scrollRef: verifyScrollRef,
@@ -157,6 +163,8 @@ export default function SignInScreen() {
       setVerificationOffer(null);
       setPendingVerification(null);
       setCode('');
+      setPendingSessionActivationId(null);
+      setActivationFailureContext(null);
       if (clearError) {
         setError('');
       }
@@ -179,12 +187,8 @@ export default function SignInScreen() {
         });
 
         if (createdSessionId && setActive) {
-          try {
-            await setActive({ session: createdSessionId });
-          } catch {
-            setError(
-              'Could not activate your session. Please try signing in again.'
-            );
+          const activated = await activateSession(createdSessionId, 'oauth');
+          if (!activated) {
             return;
           }
           void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
@@ -199,29 +203,34 @@ export default function SignInScreen() {
         setOauthLoading(null);
       }
     },
-    [clearVerificationFlow, router, setActive, startSSOFlow]
+    [clearVerificationFlow, setActive, startSSOFlow]
   );
 
   const activateSession = useCallback(
-    async (sessionId: string | null) => {
+    async (
+      sessionId: string | null,
+      context: 'oauth' | 'password' | 'verification'
+    ): Promise<boolean> => {
       if (!sessionId) {
         setError('No session was created. Please try again.');
-        return;
+        return false;
       }
       if (!setActive) {
         setError('Authentication not loaded. Please try again.');
-        return;
+        return false;
       }
 
       try {
         await setActive({ session: sessionId });
       } catch {
-        setError(
-          'Could not activate your session. Please try signing in again.'
-        );
-        return;
+        setPendingSessionActivationId(sessionId);
+        setActivationFailureContext(context);
+        setError('Could not activate your session. Please try again.');
+        return false;
       }
 
+      setPendingSessionActivationId(null);
+      setActivationFailureContext(null);
       setPendingVerification(null);
       setVerificationOffer(null);
       setCode('');
@@ -231,9 +240,37 @@ export default function SignInScreen() {
       // isSignedIn: true.  Calling router.replace() here races with Clerk's
       // React state update: the learner layout renders before isSignedIn
       // flips, sees !isSignedIn, and bounces back to sign-in.
+      return true;
     },
     [setActive]
   );
+
+  const retrySessionActivation = useCallback(async () => {
+    if (!pendingSessionActivationId || !activationFailureContext) {
+      return;
+    }
+    if (!isLoaded || !setActive) {
+      setError('Authentication not ready. Please reload and try again.');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+    try {
+      await activateSession(
+        pendingSessionActivationId,
+        activationFailureContext
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    activateSession,
+    activationFailureContext,
+    isLoaded,
+    pendingSessionActivationId,
+    setActive,
+  ]);
 
   const getVerificationStep = useCallback(
     (attempt: SignInAttemptLike) => {
@@ -386,7 +423,7 @@ export default function SignInScreen() {
       });
 
       if (signInAttempt.status === 'complete') {
-        await activateSession(signInAttempt.createdSessionId);
+        await activateSession(signInAttempt.createdSessionId, 'password');
       } else {
         await handleIncompleteSignIn(signInAttempt);
       }
@@ -448,7 +485,7 @@ export default function SignInScreen() {
             });
 
       if (result.status === 'complete') {
-        await activateSession(result.createdSessionId);
+        await activateSession(result.createdSessionId, 'verification');
       } else {
         await handleIncompleteSignIn(result);
       }
@@ -583,6 +620,20 @@ export default function SignInScreen() {
             testID="sign-in-verify-button"
           />
 
+          {activationFailureContext === 'verification' &&
+          pendingSessionActivationId ? (
+            <View className="flex-row justify-center mt-3">
+              <Button
+                variant="secondary"
+                size="small"
+                label="Try Again"
+                onPress={() => void retrySessionActivation()}
+                disabled={loading}
+                testID="sign-in-retry-activation"
+              />
+            </View>
+          ) : null}
+
           {pendingVerification.strategy !== 'totp' && (
             <View className="flex-row justify-center mt-4">
               <Button
@@ -654,6 +705,18 @@ export default function SignInScreen() {
             <Text className="text-danger text-body-sm">{error}</Text>
           </View>
         )}
+
+        {activationFailureContext === 'oauth' && pendingSessionActivationId ? (
+          <View className="mb-6">
+            <Button
+              variant="secondary"
+              label="Try Again"
+              onPress={() => void retrySessionActivation()}
+              disabled={loading || oauthLoading !== null}
+              testID="sign-in-oauth-retry"
+            />
+          </View>
+        ) : null}
 
         <View className="mb-3">
           <Button

@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   Pressable,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -31,16 +32,6 @@ const SCREEN_HEIGHT =
     ? Math.min(Dimensions.get('screen').height, 812)
     : Dimensions.get('screen').height;
 
-type PersonaType = 'TEEN' | 'LEARNER' | 'PARENT';
-
-// Persona picker hidden — auto-detected from birth date (UX simplification).
-// Kept for potential future use if manual override is needed.
-// const PERSONA_OPTIONS: { value: PersonaType; label: string }[] = [
-//   { value: 'TEEN', label: 'Teen' },
-//   { value: 'LEARNER', label: 'Learner' },
-//   { value: 'PARENT', label: 'Parent' },
-// ];
-
 function formatDateForDisplay(date: Date): string {
   return date.toLocaleDateString(undefined, {
     year: 'numeric',
@@ -54,21 +45,6 @@ function formatDateForApi(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
-}
-
-export function detectPersona(birthDate: Date): PersonaType {
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (
-    monthDiff < 0 ||
-    (monthDiff === 0 && today.getDate() < birthDate.getDate())
-  ) {
-    age--;
-  }
-  if (age < 13) return 'TEEN';
-  if (age < 18) return 'LEARNER';
-  return 'PARENT';
 }
 
 const MAX_DATE = new Date();
@@ -89,8 +65,6 @@ export default function CreateProfileScreen() {
   const [displayName, setDisplayName] = useState('');
   const [birthDate, setBirthDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [personaType, setPersonaType] = useState<PersonaType>('LEARNER');
-  const [_personaAutoDetected, setPersonaAutoDetected] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
@@ -106,9 +80,6 @@ export default function CreateProfileScreen() {
       }
       if (selectedDate) {
         setBirthDate(selectedDate);
-        const detected = detectPersona(selectedDate);
-        setPersonaType(detected);
-        setPersonaAutoDetected(true);
       }
     },
     []
@@ -132,7 +103,6 @@ export default function CreateProfileScreen() {
     try {
       const body = {
         displayName: trimmedName,
-        personaType,
         birthYear: birthYear ?? undefined,
         birthDate: formatDateForApi(birthDate),
       };
@@ -152,7 +122,14 @@ export default function CreateProfileScreen() {
         router.back();
       }
 
-      await switchProfile(result.profile.id);
+      const switchResult = await switchProfile(result.profile.id);
+      if (switchResult?.success === false) {
+        Alert.alert(
+          'Profile created',
+          switchResult.error ??
+            'We created the profile, but could not switch to it automatically. You can switch from the Profiles screen.'
+        );
+      }
     } catch (err: unknown) {
       setError(formatApiError(err));
     } finally {
@@ -162,7 +139,6 @@ export default function CreateProfileScreen() {
     canSubmit,
     displayName,
     birthDate,
-    personaType,
     consentRequired,
     client,
     queryClient,
@@ -318,60 +294,6 @@ export default function CreateProfileScreen() {
 
         {/* Spacer before submit — persona is auto-detected from birth date */}
         <View className="h-6" />
-
-        {/* Persona picker hidden — auto-detected from birth date.
-        {personaAutoDetected && birthDate && (
-          <Text
-            className="text-body-sm text-text-secondary mb-4"
-            testID="persona-auto-hint"
-          >
-            Based on your age, we set your profile type to{' '}
-            {personaType === 'TEEN'
-              ? 'Teen'
-              : personaType === 'LEARNER'
-              ? 'Learner'
-              : 'Parent'}
-            .
-          </Text>
-        )}
-
-        <Text className="text-body-sm font-semibold text-text-secondary mb-2">
-          Profile type
-        </Text>
-        <View className="flex-row mb-8">
-          {PERSONA_OPTIONS.filter(
-            (option) =>
-              option.value !== 'PARENT' ||
-              !birthDate ||
-              detectPersona(birthDate) === 'PARENT'
-          ).map((option) => {
-            const isSelected = personaType === option.value;
-            return (
-              <Pressable
-                key={option.value}
-                onPress={() => {
-                  setPersonaType(option.value);
-                  setPersonaAutoDetected(false);
-                }}
-                className={`flex-1 py-3 items-center rounded-button me-2 last:me-0 ${
-                  isSelected ? 'bg-primary' : 'bg-surface'
-                }`}
-                disabled={loading}
-                accessibilityLabel={`Select ${option.label} profile type`}
-                testID={`persona-${option.value.toLowerCase()}`}
-              >
-                <Text
-                  className={`text-body-sm font-semibold ${
-                    isSelected ? 'text-text-inverse' : 'text-text-primary'
-                  }`}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        */}
 
         <Button
           variant="primary"

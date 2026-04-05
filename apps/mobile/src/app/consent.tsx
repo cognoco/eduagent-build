@@ -12,6 +12,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useUser } from '@clerk/clerk-expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useReducedMotion } from 'react-native-reanimated';
 import { useRequestConsent } from '../hooks/use-consent';
 import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
@@ -45,6 +46,7 @@ export default function ConsentScreen() {
   const { user } = useUser();
   const { mutateAsync, isPending } = useRequestConsent();
   const { isOffline } = useNetworkStatus();
+  const reduceMotion = useReducedMotion();
 
   const [phase, setPhase] = useState<Phase>('child');
   const [parentEmail, setParentEmail] = useState('');
@@ -59,26 +61,36 @@ export default function ConsentScreen() {
   // BUG-26: Fade animation for phase transitions (child → parent → success)
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  const transitionToPhase = useCallback((newPhase: Phase) => {
-    if (isTransitioningRef.current) return;
-    isTransitioningRef.current = true;
-    setIsTransitioning(true);
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setPhase(newPhase);
+  const transitionToPhase = useCallback(
+    (newPhase: Phase) => {
+      if (isTransitioningRef.current) return;
+      isTransitioningRef.current = true;
+      if (reduceMotion) {
+        fadeAnim.setValue(1);
+        setPhase(newPhase);
+        isTransitioningRef.current = false;
+        setIsTransitioning(false);
+        return;
+      }
+      setIsTransitioning(true);
       Animated.timing(fadeAnim, {
-        toValue: 1,
+        toValue: 0,
         duration: 300,
         useNativeDriver: true,
       }).start(() => {
-        isTransitioningRef.current = false;
-        setIsTransitioning(false);
+        setPhase(newPhase);
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => {
+          isTransitioningRef.current = false;
+          setIsTransitioning(false);
+        });
       });
-    });
-  }, []);
+    },
+    [fadeAnim, reduceMotion]
+  );
 
   // Hand-off copy uses learner variant (consent screen is always shown to children).
   const copy = getConsentHandOffCopy('learner');
@@ -229,6 +241,7 @@ export default function ConsentScreen() {
                   <Text
                     className="text-danger text-body-sm mb-1"
                     testID="consent-same-email-warning"
+                    accessibilityRole="alert"
                   >
                     This is your own email. Please enter a parent or
                     guardian&apos;s email address.

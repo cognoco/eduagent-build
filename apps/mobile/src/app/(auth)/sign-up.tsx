@@ -46,6 +46,12 @@ export default function SignUpScreen() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+  const [pendingSessionActivationId, setPendingSessionActivationId] = useState<
+    string | null
+  >(null);
+  const [activationFailureContext, setActivationFailureContext] = useState<
+    'oauth' | 'verification' | null
+  >(null);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
   const {
     scrollRef: verifyScrollRef,
@@ -62,8 +68,65 @@ export default function SignUpScreen() {
     emailAddress.trim() !== '' && password.length >= 8 && !loading;
   const canSubmitCode = code.trim() !== '' && !loading;
 
+  const clearActivationFailure = useCallback(() => {
+    setPendingSessionActivationId(null);
+    setActivationFailureContext(null);
+  }, []);
+
+  const activateCreatedSession = useCallback(
+    async (
+      sessionId: string | null,
+      context: 'oauth' | 'verification'
+    ): Promise<boolean> => {
+      if (!sessionId || !setActive) {
+        setError('No session was created. Please try again.');
+        return false;
+      }
+
+      try {
+        await setActive({ session: sessionId });
+        clearActivationFailure();
+        return true;
+      } catch {
+        setPendingSessionActivationId(sessionId);
+        setActivationFailureContext(context);
+        setError('Could not activate your session. Please try again.');
+        return false;
+      }
+    },
+    [clearActivationFailure, setActive]
+  );
+
+  const retrySessionActivation = useCallback(async () => {
+    if (!pendingSessionActivationId || !activationFailureContext) {
+      return;
+    }
+    if (!isLoaded || !setActive) {
+      setError('Authentication not ready. Please reload and try again.');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+    try {
+      await activateCreatedSession(
+        pendingSessionActivationId,
+        activationFailureContext
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    activateCreatedSession,
+    activationFailureContext,
+    isLoaded,
+    pendingSessionActivationId,
+    setActive,
+  ]);
+
   const onSSOPress = useCallback(
     async (strategy: SupportedSSOStrategy) => {
+      clearActivationFailure();
       setError('');
       setOauthLoading(strategy);
 
@@ -76,12 +139,11 @@ export default function SignUpScreen() {
         });
 
         if (createdSessionId && setActive) {
-          try {
-            await setActive({ session: createdSessionId });
-          } catch {
-            setError(
-              'Could not activate your session. Please try signing in again.'
-            );
+          const activated = await activateCreatedSession(
+            createdSessionId,
+            'oauth'
+          );
+          if (!activated) {
             return;
           }
           // Auth layout guard handles navigation once isSignedIn propagates.
@@ -95,12 +157,13 @@ export default function SignUpScreen() {
         setOauthLoading(null);
       }
     },
-    [setActive, startSSOFlow]
+    [activateCreatedSession, clearActivationFailure, setActive, startSSOFlow]
   );
 
   const onSignUpPress = useCallback(async () => {
     if (!isLoaded || !canSubmitSignUp) return;
 
+    clearActivationFailure();
     setError('');
     setLoading(true);
 
@@ -113,7 +176,14 @@ export default function SignUpScreen() {
     } finally {
       setLoading(false);
     }
-  }, [isLoaded, canSubmitSignUp, signUp, emailAddress, password]);
+  }, [
+    clearActivationFailure,
+    isLoaded,
+    canSubmitSignUp,
+    signUp,
+    emailAddress,
+    password,
+  ]);
 
   const onVerifyPress = useCallback(async () => {
     if (!isLoaded || !canSubmitCode) return;
@@ -127,12 +197,11 @@ export default function SignUpScreen() {
       });
 
       if (signUpAttempt.status === 'complete') {
-        try {
-          await setActive({ session: signUpAttempt.createdSessionId });
-        } catch {
-          setError(
-            'Could not activate your session. Please try signing in again.'
-          );
+        const activated = await activateCreatedSession(
+          signUpAttempt.createdSessionId,
+          'verification'
+        );
+        if (!activated) {
           return;
         }
         // Auth layout guard handles navigation once isSignedIn propagates.
@@ -146,7 +215,7 @@ export default function SignUpScreen() {
     } finally {
       setLoading(false);
     }
-  }, [isLoaded, canSubmitCode, signUp, setActive, router, code]);
+  }, [activateCreatedSession, isLoaded, canSubmitCode, signUp, router, code]);
 
   const onResendCode = useCallback(async () => {
     if (!isLoaded || resending) return;
@@ -167,7 +236,8 @@ export default function SignUpScreen() {
     setPendingVerification(false);
     setCode('');
     setError('');
-  }, []);
+    clearActivationFailure();
+  }, [clearActivationFailure]);
 
   if (pendingVerification) {
     return (
@@ -237,6 +307,20 @@ export default function SignUpScreen() {
             loading={loading}
             testID="sign-up-verify-button"
           />
+
+          {activationFailureContext === 'verification' &&
+          pendingSessionActivationId ? (
+            <View className="flex-row justify-center mt-3">
+              <Button
+                variant="secondary"
+                size="small"
+                label="Try Again"
+                onPress={() => void retrySessionActivation()}
+                disabled={loading}
+                testID="sign-up-retry-activation"
+              />
+            </View>
+          ) : null}
 
           <View className="flex-row justify-center mt-4">
             <Button
@@ -314,6 +398,31 @@ export default function SignUpScreen() {
             <Text className="text-danger text-body-sm">{error}</Text>
           </View>
         )}
+
+        {activationFailureContext === 'oauth' && pendingSessionActivationId ? (
+          <>
+            <View className="mb-3">
+              <Button
+                variant="secondary"
+                label="Try Again"
+                onPress={() => void retrySessionActivation()}
+                disabled={loading || oauthLoading !== null}
+                testID="sign-up-oauth-retry"
+              />
+            </View>
+            <View className="mb-6">
+              <Button
+                variant="tertiary"
+                label="Try another method"
+                onPress={() => {
+                  clearActivationFailure();
+                  setError('');
+                }}
+                testID="sign-up-oauth-clear"
+              />
+            </View>
+          </>
+        ) : null}
 
         <View className="mb-3">
           <Button

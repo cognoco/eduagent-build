@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ChatShell,
@@ -34,6 +34,7 @@ export default function InterviewScreen() {
   const isStreaming = isStreamingSSE;
   const [interviewComplete, setInterviewComplete] = useState(false);
   const [restartRequired, setRestartRequired] = useState(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
   const seededDraftRef = useRef(false);
 
   // Count user messages for the Living Book page counter
@@ -47,6 +48,7 @@ export default function InterviewScreen() {
     setMessages([{ id: 'opening', role: 'ai', content: OPENING_MESSAGE }]);
     setInterviewComplete(false);
     setRestartRequired(false);
+    setStreamError(null);
   }, [subjectId]);
 
   useEffect(() => {
@@ -119,18 +121,24 @@ export default function InterviewScreen() {
   }, [interviewState.data, interviewState.isLoading]);
 
   const handleRestartInterview = useCallback(() => {
-    abortStream();
-    setMessages([{ id: 'opening', role: 'ai', content: OPENING_MESSAGE }]);
-    setInterviewComplete(false);
-    setRestartRequired(false);
-    seededDraftRef.current = true;
+    try {
+      abortStream();
+      setMessages([{ id: 'opening', role: 'ai', content: OPENING_MESSAGE }]);
+      setInterviewComplete(false);
+      setRestartRequired(false);
+      setStreamError(null);
+      seededDraftRef.current = true;
+    } catch (err: unknown) {
+      Alert.alert('Could not restart interview', formatApiError(err));
+    }
   }, [abortStream]);
 
   const handleSend = useCallback(
     async (text: string) => {
-      if (isStreaming || !subjectId || restartRequired) return;
+      if (isStreaming || !subjectId || restartRequired || streamError) return;
 
       const streamMsgId = `ai-${Date.now()}`;
+      setStreamError(null);
 
       setMessages((prev) => [
         ...prev,
@@ -160,17 +168,19 @@ export default function InterviewScreen() {
           }
         );
       } catch (err: unknown) {
+        const formattedError = formatApiError(err);
+        setStreamError(formattedError);
         // On stream error, replace the streaming placeholder with error text
         setMessages((prev) =>
           prev.map((m) =>
             m.id === streamMsgId
-              ? { ...m, content: formatApiError(err), streaming: false }
+              ? { ...m, content: formattedError, streaming: false }
               : m
           )
         );
       }
     },
-    [isStreaming, restartRequired, subjectId, streamInterview]
+    [isStreaming, restartRequired, streamError, subjectId, streamInterview]
   );
 
   return (
@@ -179,7 +189,7 @@ export default function InterviewScreen() {
       messages={messages}
       onSend={handleSend}
       isStreaming={isStreaming}
-      inputDisabled={interviewComplete || restartRequired}
+      inputDisabled={interviewComplete || restartRequired || !!streamError}
       rightAction={
         <LivingBook
           exchangeCount={exchangeCount}
@@ -210,6 +220,29 @@ export default function InterviewScreen() {
             >
               <Text className="text-text-inverse text-body font-semibold">
                 View Curriculum
+              </Text>
+            </Pressable>
+          </View>
+        ) : streamError ? (
+          <View
+            className="bg-danger/10 rounded-card p-4 mt-2 mb-4"
+            testID="interview-stream-error"
+          >
+            <Text className="text-body font-semibold text-text-primary mb-2">
+              We hit a problem
+            </Text>
+            <Text className="text-body-sm text-text-secondary mb-3">
+              {streamError}
+            </Text>
+            <Pressable
+              onPress={() => setStreamError(null)}
+              className="bg-primary rounded-button py-3 items-center"
+              testID="interview-try-again-button"
+              accessibilityLabel="Try the interview again"
+              accessibilityRole="button"
+            >
+              <Text className="text-text-inverse text-body font-semibold">
+                Try Again
               </Text>
             </Pressable>
           </View>

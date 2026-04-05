@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import {
   View,
   Text,
   Pressable,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,14 +15,27 @@ export default function ProfilesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
+  const [isSwitching, setIsSwitching] = useState(false);
 
   const handleSwitch = async (profileId: string) => {
-    // Close modal FIRST — prevents crash from tree remount (themeKey change)
-    // destroying the navigation state while the modal is still open.
-    router.back();
-    // BM-05: switchProfile returns a result instead of throwing, so
-    // callers no longer need try/catch to avoid crashes.
-    await switchProfile(profileId);
+    if (isSwitching) return;
+    setIsSwitching(true);
+    try {
+      const result = await switchProfile(profileId);
+      if (result?.success === false) {
+        Alert.alert(
+          'Could not switch profiles',
+          result.error ?? 'Please try again.'
+        );
+        return;
+      }
+
+      // Close modal AFTER a successful switch to avoid dismissing the screen
+      // when the profile change did not actually complete.
+      router.back();
+    } finally {
+      setIsSwitching(false);
+    }
   };
 
   return (
@@ -79,7 +94,9 @@ export default function ProfilesScreen() {
               <Pressable
                 key={profile.id}
                 onPress={() => handleSwitch(profile.id)}
+                disabled={isSwitching}
                 className="flex-row items-center bg-surface rounded-card px-4 py-3.5 mb-2"
+                style={isSwitching ? { opacity: 0.6 } : undefined}
                 testID={`profile-row-${profile.id}`}
               >
                 <View className="w-10 h-10 rounded-full bg-primary items-center justify-center me-3">
