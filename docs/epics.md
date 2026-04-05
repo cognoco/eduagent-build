@@ -316,7 +316,7 @@ _Note: FR146 (Language SPEAK/LISTEN voice integration) is mapped to Epic 6 (Lang
 - ARCH-8: LLM orchestration module (`routeAndCall()`) — all LLM calls must go through this. No direct provider API calls.
 - ARCH-9: Model routing by conversation state (escalation rung): Gemini Flash for rung 1-2, reasoning models for rung 3+.
 - ARCH-10: SM-2 as pure math library in `packages/retention/` (~50 lines, zero deps)
-- ARCH-11: Workers KV for coaching cards (write on Inngest precompute, read on app open) and subscription status (write on Stripe webhook, read on metering)
+- ARCH-11: ~~Workers KV~~ DB-backed cache (`home_surface_cache` table) for coaching cards (write on Inngest precompute, read on app open) and subscription status (write on Stripe/RevenueCat webhook, read on metering). _Original spec said Workers KV; implementation uses DB table as conscious adaptation — acceptable at current scale._
 - ARCH-12: SSE streaming for LLM responses via Hono `streamSSE()`. Design handler behind interface for potential Durable Objects migration.
 - ARCH-13: Inngest for all async work that survives request lifecycle. Event naming: `app/{domain}.{action}`, payloads always include `profileId` + `timestamp`.
 - ARCH-14: ML Kit on-device OCR primary, server-side fallback behind interface at `/v1/ocr`
@@ -347,7 +347,7 @@ _Note: FR146 (Language SPEAK/LISTEN voice integration) is mapped to Epic 6 (Lang
 - UX-7: BaseCoachingCard component hierarchy with 4 variants (CoachingCard, AdaptiveEntryCard, ParentDashboardSummary, SessionCloseSummary)
 - UX-8: Adaptive entry for child profiles (context-aware opening based on time, retention, patterns). Cold start (sessions 1-5) uses coaching-voiced three-button fallback.
 - UX-9: Parent simulated dashboard during onboarding (trust demo with sample data)
-- UX-10: Session maximum length: teen nudge 15min/cap 20min, eager learner nudge 25min/cap 30min
+- UX-10: ~~Session maximum length: teen nudge 15min/cap 20min, eager learner nudge 25min/cap 30min~~ **Superseded by Epic 13 Story 13.2 (FR213).** Hard caps and nudges removed. Session timer is display-only. Adaptive silence detection (UX-12) is the active session-end mechanism.
 - UX-11: "Not Yet" feedback system — universal across all personas. Never "wrong" or "incorrect."
 - UX-12: Silence & re-engagement: 3min gentle prompt (once), 30min auto-save to coaching card
 - UX-13: Parent dashboard: 5-second glance design with one-sentence summary, traffic lights, temporal comparison, drill-down/drill-across
@@ -1479,13 +1479,15 @@ So that my learning is sustainable and effective.
 **Then** understanding check is presented (FR41)
 **And** all negative feedback uses "Not Yet" framing — never "wrong" or "incorrect" (UX-11)
 
-**Given** teen profile
-**When** session reaches 15min
-**Then** gentle nudge shown; hard cap at 20min (UX-10)
+~~**Given** teen profile~~
+~~**When** session reaches 15min~~
+~~**Then** gentle nudge shown; hard cap at 20min (UX-10)~~
 
-**Given** eager learner profile
-**When** session reaches 25min
-**Then** gentle nudge shown; hard cap at 30min (UX-10)
+~~**Given** eager learner profile~~
+~~**When** session reaches 25min~~
+~~**Then** gentle nudge shown; hard cap at 30min (UX-10)~~
+
+_**Superseded:** Hard caps and nudges removed by Epic 13 Story 13.2 (FR213). SessionTimer is display-only. Adaptive silence detection (UX-12) handles session endings._
 
 **Given** learner is silent for 3 minutes
 **When** timeout fires
@@ -1677,9 +1679,10 @@ So that I actively consolidate what I learned.
 **And** `app/session.completed` Inngest event dispatched with payload: `{ profileId, sessionId, topicId, subjectId, summaryStatus, escalationRungs, timestamp }` (ARCH-13)
 **And** this event is the entry point for Epic 3's Inngest lifecycle chain (SM-2 → coaching card KV → dashboard update → embedding generation). Chain doesn't execute yet (Epic 3), but event contract is established and tested — fire event, verify received by Inngest in test mode.
 
-**Given** session ends via hard cap (UX-10) or 30-min silence auto-save (UX-12)
+**Given** session ends via 30-min silence auto-save (UX-12)
 **When** session close triggers without summary
 **Then** same close flow fires with `summaryStatus: 'auto_closed'`
+_Note: Hard cap removed by Epic 13 Story 13.2. Silence auto-save is the only automatic close trigger._
 
 **FRs:** FR34, FR35, FR36, FR37
 
@@ -2784,7 +2787,7 @@ So that I can discover the app's value before committing to a subscription.
 **And** trial expires at end of day (midnight user's timezone), not mid-session
 **And** user timezone captured during registration (inferred from device via `Intl.DateTimeFormat().resolvedOptions().timeZone`) and stored on the account record. Dependency on Epic 0 Story 0.1: add `timezone` text field to accounts table, populated at registration, updatable from Settings. Fallback to UTC if missing.
 **And** if user is mid-session when trial ends, session completes fully — next period limits apply after
-**And** reverse trial soft landing: Days 15-28 = extended trial (15 questions/day). Day 29+ = Free tier (50/month).
+**And** reverse trial soft landing: Days 15-28 = extended trial (15 questions/day). Day 29+ = Free tier (10/day + 100/month dual cap).
 **And** soft landing messaging: Day 15 ("giving you 15/day for 2 more weeks"), Day 21 ("1 week left"), Day 28 ("tomorrow you move to Free")
 **And** trial state tracked via Stripe subscription with trial period, synced to local DB via Story 5.1 webhook
 
@@ -2805,7 +2808,7 @@ So that I can access the right level of learning capacity.
 **Then** they can choose Plus (€18.99/mo), Family (€28.99/mo), or Pro (€48.99/mo) (FR111)
 **And** annual billing available with ~25-26% discount (FR115)
 **And** Stripe Checkout handles payment flow — no custom payment form
-**And** context-aware upgrade prompts shown at natural moments: Free→Plus at 50/month cap, Plus→Family when adding family member, Plus→Family when 3+ top-ups purchased, Family→Pro when needing 5-6 users
+**And** context-aware upgrade prompts shown at natural moments: Free→Plus at daily/monthly cap hit, Plus→Family when adding family member, Plus→Family when 3+ top-ups purchased, Family→Pro when needing 5-6 users
 **And** downgrade preserves all progress (Library, curricula, XP, summaries). Only usage limits change. No data archived or deleted.
 **And** top-up credits purchasable anytime: €10/500 (Plus), €5/500 (Family/Pro). Not available on Free tier.
 **And** top-up usage: monthly quota consumed first, then top-ups in FIFO order. Monthly quota does NOT roll over; top-ups DO (12-month expiry).

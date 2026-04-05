@@ -3,13 +3,14 @@ import { Tabs, Redirect, useRouter } from 'expo-router';
 import {
   View,
   Text,
+  TextInput,
   Pressable,
   ActivityIndicator,
   ScrollView,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth, useClerk } from '@clerk/clerk-expo';
+import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
@@ -427,17 +428,26 @@ function ConsentWithdrawnGate(): React.ReactElement {
 function ConsentPendingGate(): React.ReactElement {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
   const { profiles, activeProfile, switchProfile } = useProfile();
   const { data: consentData } = useConsentStatus();
   const resendMutation = useRequestConsent();
+  const { user } = useUser();
   const { persona } = useTheme();
   const copy = getConsentPendingCopy(persona);
   const [checking, setChecking] = React.useState(false);
   const [previewMode, setPreviewMode] = React.useState<
     'subjects' | 'coaching' | null
   >(null);
+  const [changingEmail, setChangingEmail] = React.useState(false);
+  const [newParentEmail, setNewParentEmail] = React.useState('');
+
+  // Consent email was sent when status is PARENTAL_CONSENT_REQUESTED
+  // (parentEmail alone is not reliable — use the canonical profile status)
+  const emailWasSent =
+    activeProfile?.consentStatus === 'PARENTAL_CONSENT_REQUESTED';
 
   const onCheckAgain = async () => {
     setChecking(true);
@@ -460,6 +470,39 @@ function ConsentPendingGate(): React.ReactElement {
 
   const parentEmail = consentData?.parentEmail;
 
+  // ── Change-email validation ──────────────────────────────────────────
+  const isValidNewEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newParentEmail);
+  const childEmail = user?.primaryEmailAddress?.emailAddress;
+  const isSameAsChild =
+    isValidNewEmail &&
+    !!childEmail &&
+    newParentEmail.trim().toLowerCase() === childEmail.toLowerCase();
+  const canSubmitNewEmail =
+    isValidNewEmail &&
+    !isSameAsChild &&
+    !resendMutation.isPending &&
+    !!consentData?.consentType;
+
+  const onSubmitNewEmail = () => {
+    if (!activeProfile || !canSubmitNewEmail) return;
+    resendMutation.mutate(
+      {
+        childProfileId: activeProfile.id,
+        parentEmail: newParentEmail.trim(),
+        consentType: consentData!.consentType!,
+      },
+      {
+        onSuccess: () => {
+          setChangingEmail(false);
+          setNewParentEmail('');
+          void queryClient.invalidateQueries({
+            queryKey: ['consent-status'],
+          });
+        },
+      }
+    );
+  };
+
   // Preview screens replace the gate when active
   if (previewMode === 'subjects') {
     return <PreviewSubjectBrowser onDismiss={() => setPreviewMode(null)} />;
@@ -468,6 +511,79 @@ function ConsentPendingGate(): React.ReactElement {
     return <PreviewSampleCoaching onDismiss={() => setPreviewMode(null)} />;
   }
 
+  // ── No email sent yet (PENDING) — show "send to parent" flow ──────
+  if (!emailWasSent) {
+    return (
+      <ScrollView
+        className="flex-1 bg-background"
+        contentContainerStyle={{
+          flexGrow: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: 24,
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+        }}
+        testID="consent-pending-gate"
+      >
+        <Text className="text-h1 font-bold text-text-primary mb-4 text-center">
+          {copy.noEmailSentTitle}
+        </Text>
+        <Text className="text-body text-text-secondary mb-2 text-center">
+          {copy.noEmailSentDescription}
+        </Text>
+        <Text className="text-body text-text-secondary mb-8 text-center">
+          {copy.noEmailSentSubtext}
+        </Text>
+
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: '/consent',
+              params: { profileId: activeProfile!.id },
+            })
+          }
+          className="bg-primary rounded-button py-3.5 px-8 items-center mb-3 w-full"
+          testID="consent-send-to-parent"
+          accessibilityRole="button"
+          accessibilityLabel={copy.sendToParentButton}
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            {copy.sendToParentButton}
+          </Text>
+        </Pressable>
+
+        {canSwitchFromConsentGate(activeProfile, profiles) && (
+          <Pressable
+            onPress={() => {
+              const other = profiles.find((p) => p.id !== activeProfile?.id);
+              if (other) void switchProfile(other.id);
+            }}
+            className="py-3.5 px-8 items-center mb-3 w-full"
+            testID="consent-switch-profile"
+            accessibilityRole="button"
+            accessibilityLabel="Switch profile"
+          >
+            <Text className="text-body font-semibold text-text-secondary">
+              Switch profile
+            </Text>
+          </Pressable>
+        )}
+
+        <Pressable
+          onPress={() => signOut()}
+          className="py-3.5 px-8 items-center w-full"
+          testID="consent-sign-out"
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+        >
+          <Text className="text-body font-semibold text-primary">Sign out</Text>
+        </Pressable>
+      </ScrollView>
+    );
+  }
+
+  // ── Email was sent (PARENTAL_CONSENT_REQUESTED) — waiting UI ──────
   return (
     <ScrollView
       className="flex-1 bg-background"
@@ -510,7 +626,7 @@ function ConsentPendingGate(): React.ReactElement {
         )}
       </Pressable>
 
-      {parentEmail && consentData?.consentType && (
+      {parentEmail && consentData?.consentType && !changingEmail && (
         <Pressable
           onPress={onResend}
           disabled={resendMutation.isPending}
@@ -527,6 +643,79 @@ function ConsentPendingGate(): React.ReactElement {
             </Text>
           )}
         </Pressable>
+      )}
+
+      {consentData?.consentType && !changingEmail && (
+        <Pressable
+          onPress={() => setChangingEmail(true)}
+          className="py-3.5 px-8 items-center mb-3 w-full"
+          testID="consent-change-email"
+          accessibilityRole="button"
+          accessibilityLabel={copy.changeEmailButton}
+        >
+          <Text className="text-body font-semibold text-primary">
+            {copy.changeEmailButton}
+          </Text>
+        </Pressable>
+      )}
+
+      {changingEmail && (
+        <View className="bg-surface rounded-card px-4 py-4 mb-3 w-full">
+          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+            {copy.changeEmailLabel}
+          </Text>
+          <TextInput
+            className="bg-background text-text-primary text-body rounded-input px-4 py-3 mb-2"
+            placeholder="parent@example.com"
+            placeholderTextColor={colors.muted}
+            value={newParentEmail}
+            onChangeText={setNewParentEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            autoFocus
+            editable={!resendMutation.isPending}
+            testID="consent-new-email-input"
+          />
+          {isSameAsChild && (
+            <Text
+              className="text-danger text-body-sm mb-1"
+              testID="consent-change-same-email-warning"
+            >
+              {copy.sameEmailWarning}
+            </Text>
+          )}
+          <Pressable
+            onPress={onSubmitNewEmail}
+            disabled={!canSubmitNewEmail}
+            className={`rounded-button py-3.5 items-center mb-2 ${
+              canSubmitNewEmail ? 'bg-primary' : 'bg-primary/40'
+            }`}
+            testID="consent-change-email-submit"
+            accessibilityRole="button"
+            accessibilityLabel={copy.changeEmailSubmit}
+          >
+            {resendMutation.isPending ? (
+              <ActivityIndicator color={colors.textInverse} />
+            ) : (
+              <Text className="text-body font-semibold text-text-inverse">
+                {copy.changeEmailSubmit}
+              </Text>
+            )}
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              setChangingEmail(false);
+              setNewParentEmail('');
+            }}
+            className="py-2 items-center"
+            testID="consent-change-email-cancel"
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+          >
+            <Text className="text-body-sm text-text-secondary">Cancel</Text>
+          </Pressable>
+        </View>
       )}
 
       {/* Preview section */}

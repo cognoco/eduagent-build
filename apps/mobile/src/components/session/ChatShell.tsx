@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   AccessibilityInfo,
   View,
@@ -19,6 +19,7 @@ import { VoicePlaybackBar } from './VoicePlaybackBar';
 import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
 import { useTextToSpeech } from '../../hooks/use-text-to-speech';
 import { useThemeColors } from '../../lib/theme';
+import { PenWritingAnimation } from '../common';
 
 export interface ChatMessage {
   id: string;
@@ -315,6 +316,27 @@ export function ChatShell({
     ]
   );
 
+  // --- Idle "pen writing" animation ---
+  // Show a gentle pen animation after 20s of silence when the AI has finished
+  // speaking and the student hasn't responded yet. Resets on any user input.
+  const IDLE_TIMEOUT_MS = 20_000;
+  const [showIdleAnim, setShowIdleAnim] = useState(false);
+
+  const lastMessageIsAi = useMemo(() => {
+    const last = messages[messages.length - 1];
+    return last?.role === 'ai' && !last.streaming;
+  }, [messages]);
+
+  useEffect(() => {
+    // Only start idle timer when AI finished and user hasn't typed anything
+    if (!lastMessageIsAi || isStreaming || input.trim()) {
+      setShowIdleAnim(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowIdleAnim(true), IDLE_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [lastMessageIsAi, isStreaming, input, messages.length]);
+
   const headerRightContent = (
     <View className="flex-row items-center">
       <VoiceToggle
@@ -376,6 +398,11 @@ export function ChatShell({
             actions={renderMessageActions?.(msg)}
           />
         ))}
+        {showIdleAnim && (
+          <View className="items-center py-4" testID="idle-pen-animation">
+            <PenWritingAnimation size={48} color={colors.muted} />
+          </View>
+        )}
         {footer}
       </ScrollView>
 

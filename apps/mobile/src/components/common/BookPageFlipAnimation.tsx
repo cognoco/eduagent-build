@@ -16,7 +16,7 @@ import Animated, {
 interface BookPageFlipAnimationProps {
   /** Overall size in pixels (default: 120) */
   size?: number;
-  /** Primary color for covers and spine (default: accent #a855f7) */
+  /** Primary color for covers and spine (default: brand violet #8b5cf6) */
   color?: string;
   testID?: string;
 }
@@ -38,7 +38,7 @@ const SPINE_OPACITY = 0.5;
  */
 export function BookPageFlipAnimation({
   size = 120,
-  color = '#a855f7',
+  color = '#8b5cf6',
   testID,
 }: BookPageFlipAnimationProps): ReactNode {
   const reduceMotion = useReducedMotion();

@@ -1,12 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useQueries } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +9,11 @@ import {
   RetentionSignal,
   type RetentionStatus,
 } from '../../components/progress';
-import { BrandCelebration } from '../../components/common';
+import {
+  BookPageFlipAnimation,
+  BrandCelebration,
+  PenWritingAnimation,
+} from '../../components/common';
 import { ShelfView } from '../../components/library/ShelfView';
 import { ChapterTopicList } from '../../components/library/ChapterTopicList';
 import { useThemeColors } from '../../lib/theme';
@@ -437,7 +434,7 @@ export default function LibraryScreen() {
     if (subjectsQuery.isLoading || progressQuery.isLoading) {
       return (
         <View className="py-8 items-center" testID="library-loading">
-          <ActivityIndicator size="large" color={themeColors.accent} />
+          <BookPageFlipAnimation size={80} color={themeColors.accent} />
           <Text className="text-body-sm text-text-secondary mt-3">
             Loading your subjects...
           </Text>
@@ -483,20 +480,15 @@ export default function LibraryScreen() {
           className="bg-surface rounded-card px-4 py-8 items-center"
           testID="book-building"
         >
-          <Text className="text-5xl mb-4">{selectedBook?.emoji ?? '📘'}</Text>
-          <Text className="text-body font-semibold text-text-primary text-center">
-            Building your {selectedBook?.title ?? 'book'}...
+          <PenWritingAnimation size={80} color={themeColors.accent} />
+          <Text className="text-body font-semibold text-text-primary text-center mt-4">
+            Writing your {selectedBook?.title ?? 'book'}...
           </Text>
           {!!selectedBook?.description && (
             <Text className="text-body-sm text-text-secondary text-center mt-2">
               {selectedBook.description}
             </Text>
           )}
-          <ActivityIndicator
-            size="small"
-            color={themeColors.accent}
-            style={{ marginTop: 16 }}
-          />
         </View>
       );
     }
@@ -514,7 +506,7 @@ export default function LibraryScreen() {
     if (selectedSubjectId && booksQuery.isLoading) {
       return (
         <View className="py-8 items-center" testID="library-topic-loading">
-          <ActivityIndicator size="large" color={themeColors.accent} />
+          <BookPageFlipAnimation size={80} color={themeColors.accent} />
           <Text className="text-body-sm text-text-secondary mt-3">
             Loading this shelf...
           </Text>

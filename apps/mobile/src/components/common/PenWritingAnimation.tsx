@@ -19,7 +19,7 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 interface PenWritingAnimationProps {
   /** Overall size in pixels (default: 120) */
   size?: number;
-  /** Stroke color — defaults to theme accent (#a855f7) */
+  /** Stroke color — defaults to brand violet (#8b5cf6) */
   color?: string;
   /** Line thickness (default: 2.5) */
   strokeWidth?: number;
@@ -55,7 +55,7 @@ const RESET_MS = 300;
  */
 export function PenWritingAnimation({
   size = 120,
-  color = '#a855f7',
+  color = '#8b5cf6',
   strokeWidth = 2.5,
   testID,
 }: PenWritingAnimationProps): ReactNode {

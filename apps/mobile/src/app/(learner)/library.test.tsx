@@ -51,7 +51,9 @@ jest.mock('../../components/progress', () => ({
 }));
 
 jest.mock('../../components/common', () => ({
+  BookPageFlipAnimation: () => null,
   BrandCelebration: () => null,
+  PenWritingAnimation: () => null,
 }));
 
 jest.mock('../../lib/theme', () => ({
