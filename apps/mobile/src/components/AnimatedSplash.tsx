@@ -55,42 +55,54 @@ const ICON_SIZE = Math.min(SCREEN_W * 0.44, 180);
 const PATH_LEN = 150; // approximate bezier arc length
 
 /**
- * Derive splash colors from the design token system.
+ * Brand-accurate splash colors.
  *
- * Note: AnimatedSplash renders outside the ThemeContext provider (see _layout.tsx),
- * so we cannot use useThemeColors(). Instead we read tokens directly using the
- * system color scheme and the default persona ('teen').
+ * These are hardcoded to match the canonical brand SVGs (docs/logo.svg,
+ * logo-icon-light.svg, logo-icon-dark.svg) rather than derived from theme
+ * tokens, because the splash is a fixed brand-identity moment that should
+ * not shift with accent presets.
  *
- * Accent colors (violet/teal nodes, gradient stops, spark particles) derive
- * from the teen persona tokens. Decorative pastel variants are computed from
- * the accent/secondary tokens with lightened counterparts for visual contrast.
+ * Background is the only value taken from tokens so the splash blends
+ * seamlessly into the app surface that follows.
  */
 function useSplashColors(isDark: boolean) {
   return useMemo(() => {
-    const scheme = isDark ? 'dark' : 'light';
-    const c = tokens.teen[scheme].colors;
+    const bg = tokens.teen[isDark ? 'dark' : 'light'].colors.background;
+
+    if (isDark) {
+      return {
+        bg,
+        violet: '#8b5cf6', // student node — same in both modes
+        teal: '#14b8a6', // mentor node (brand teal, brighter for dark)
+        pink: '#f9a8d4', // dot 1 — pastel pink for dark
+        ltViolet: '#c4b5fd', // dot 2 — light violet for dark
+        mint: '#99f6e4', // dot 3 — pastel mint for dark
+        lavender: '#f3e8ff', // student inner fill
+        ltMint: '#ccfbf1', // mentor inner fill
+        sparkPink: '#f9a8d4',
+        sparkViolet: '#c4b5fd',
+        sparkMint: '#99f6e4',
+        text: '#f1f5f9', // "ment" — near-white
+        textViolet: '#a78bfa', // circle-O
+        textTeal: '#5eead4', // "mate" — light teal
+      };
+    }
 
     return {
-      bg: c.background,
-      // Primary accent for student node and wordmark "ment"
-      violet: c.accent,
-      // Secondary color for mentor node and wordmark "mate"
-      teal: c.secondary,
-      // Decorative stepping-stone dots — use primary, accent, secondary
-      pink: c.primary,
-      ltViolet: c.accent,
-      mint: c.secondary,
-      // Inner fills for student/mentor nodes — lighter variants
-      lavender: c.primarySoft,
-      ltMint: c.primarySoft,
-      // Spark particle colors — subtle decorative elements
-      sparkPink: c.primarySoft,
-      sparkViolet: c.primarySoft,
-      sparkMint: c.primarySoft,
-      // Wordmark text colors
-      text: c.accent,
-      textViolet: c.accent,
-      textTeal: c.secondary,
+      bg,
+      violet: '#8b5cf6', // student node
+      teal: '#0d9488', // mentor node (brand teal)
+      pink: '#f472b6', // dot 1 — pink
+      ltViolet: '#a78bfa', // dot 2 — light violet
+      mint: '#5eead4', // dot 3 — mint
+      lavender: '#f3e8ff', // student inner fill
+      ltMint: '#ccfbf1', // mentor inner fill
+      sparkPink: '#f472b6',
+      sparkViolet: '#a78bfa',
+      sparkMint: '#5eead4',
+      text: '#1c1917', // "ment" — near-black
+      textViolet: '#8b5cf6', // circle-O
+      textTeal: '#0d9488', // "mate" — teal
     };
   }, [isDark]);
 }

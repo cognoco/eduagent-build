@@ -188,9 +188,7 @@ export default function SignInScreen() {
             return;
           }
           void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
-          // Two-step redirect: always land in (learner), then layout guard
-          // checks persona and bounces parent users to /(parent)/dashboard.
-          router.replace('/(learner)/home');
+          // Auth layout guard handles navigation once isSignedIn propagates.
           return;
         }
 
@@ -228,9 +226,13 @@ export default function SignInScreen() {
       setVerificationOffer(null);
       setCode('');
       void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true');
-      router.replace('/(learner)/home');
+      // Don't navigate explicitly — the auth layout guard redirects to
+      // /(learner)/home once Clerk's useAuth() state propagates with
+      // isSignedIn: true.  Calling router.replace() here races with Clerk's
+      // React state update: the learner layout renders before isSignedIn
+      // flips, sees !isSignedIn, and bounces back to sign-in.
     },
-    [setActive, router]
+    [setActive]
   );
 
   const getVerificationStep = useCallback(

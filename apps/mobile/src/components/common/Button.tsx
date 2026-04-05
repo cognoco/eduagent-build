@@ -20,17 +20,17 @@ const variantClasses: Record<
 > = {
   primary: {
     base: 'bg-primary',
-    disabled: 'bg-surface-elevated',
+    disabled: 'bg-primary',
     text: 'text-text-inverse',
   },
   secondary: {
     base: 'bg-surface-elevated',
-    disabled: 'bg-surface-elevated opacity-50',
+    disabled: 'bg-surface-elevated',
     text: 'text-text-primary',
   },
   tertiary: {
     base: 'bg-transparent',
-    disabled: 'bg-transparent opacity-50',
+    disabled: 'bg-transparent',
     text: 'text-primary',
   },
 };
@@ -61,7 +61,9 @@ export function Button({
       onPress={onPress}
       disabled={isDisabled}
       className={`rounded-button items-center ${s.container} ${bgClass}`}
-      style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+      style={({ pressed }) => ({
+        opacity: isDisabled ? 0.4 : pressed ? 0.8 : 1,
+      })}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: isDisabled }}

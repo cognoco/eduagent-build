@@ -96,7 +96,7 @@ describe('SignInScreen', () => {
     ).toBeTruthy();
   });
 
-  it('calls signIn.create on submit and navigates on success', async () => {
+  it('calls signIn.create on submit and activates session on success', async () => {
     mockCreate.mockResolvedValue({
       status: 'complete',
       createdSessionId: 'sess_123',
@@ -126,9 +126,8 @@ describe('SignInScreen', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
-    });
+    // Auth layout guard handles navigation — no explicit router.replace
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('displays error message on sign-in failure', async () => {
@@ -242,9 +241,8 @@ describe('SignInScreen', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
-    });
+    // Auth layout guard handles navigation — no explicit router.replace
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('falls back to manual verification banner when auto-send fails', async () => {
@@ -352,9 +350,8 @@ describe('SignInScreen', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
-    });
+    // Auth layout guard handles navigation — no explicit router.replace
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   // ---------------------------------------------------------------------------
@@ -439,9 +436,8 @@ describe('SignInScreen', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
-    });
+    // Auth layout guard handles navigation — no explicit router.replace
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('prefers TOTP over email_code when both are available as second factor', async () => {
@@ -503,7 +499,7 @@ describe('SignInScreen', () => {
   // SSO sign-in
   // ---------------------------------------------------------------------------
 
-  it('calls startSSOFlow for Google and navigates on success', async () => {
+  it('calls startSSOFlow for Google and activates session on success', async () => {
     mockStartSSOFlow.mockResolvedValue({
       createdSessionId: 'sess_google_123',
     });
@@ -524,9 +520,8 @@ describe('SignInScreen', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
-    });
+    // Auth layout guard handles navigation — no explicit router.replace
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('calls startSSOFlow for Apple and navigates on success', async () => {

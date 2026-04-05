@@ -82,9 +82,8 @@ describe('SignUpScreen', () => {
       expect(mockSetActive).toHaveBeenCalledWith({ session: 'sess_google' });
     });
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
-    });
+    // Auth layout guard handles navigation — no explicit router.replace
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('transitions to verification phase after sign-up', async () => {
@@ -158,9 +157,8 @@ describe('SignUpScreen', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
-    });
+    // Auth layout guard handles navigation — no explicit router.replace
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('displays error on sign-up failure', async () => {

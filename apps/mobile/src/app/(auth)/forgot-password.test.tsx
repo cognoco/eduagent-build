@@ -130,9 +130,8 @@ describe('ForgotPasswordScreen', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(learner)/home');
-    });
+    // Auth layout guard handles navigation — no explicit router.replace
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('displays error on send code failure', async () => {

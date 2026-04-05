@@ -62,6 +62,212 @@
 - **Severity:** High / Security (defense-in-depth)
 - **Description:** Every table has `isRLSEnabled: false`. No Postgres RLS policies exist for multi-tenant data (profiles, sessions, consent, billing). The application-layer profile scoping is the only barrier.
 - **Fix:** Enable RLS on key tenant-data tables and create policies for `profileId`-scoped access. This is a defense-in-depth measure — not blocking launch if application-layer scoping is verified correct, but should be a near-term priority.
+- **Status (2026-04-05):** 🔧 Implementation plan below.
+
+#### S-06 Implementation Plan: Row-Level Security (RLS)
+
+##### Context & Constraints
+
+- **Driver:** `neon-http` — stateless HTTP-based SQL. No persistent connections, no session state between statements.
+- **Runtime:** Cloudflare Workers — no long-lived connections. Each request is independent.
+- **Transaction support:** Neon HTTP supports batched transactions via `sql.transaction([...])`. Drizzle's neon-http adapter wraps this. However, the current `client.ts` has a fallback that logs a warning and runs without atomicity.
+- **Existing scoping:** `createScopedRepository(db, profileId)` adds `WHERE profileId = ?` at the application layer. 18 entity types are covered; `vocabulary`, `vocabularyRetentionCards` are not.
+- **Tables to protect:** 21 profile-scoped tables, 5 account-scoped tables (see inventory below).
+
+##### Why neon-http Complicates RLS
+
+Traditional RLS uses `SET LOCAL app.current_profile_id = '...'` at the start of a transaction, and policies reference `current_setting('app.current_profile_id')`. This requires the SET and subsequent queries to share the same connection/transaction.
+
+With neon-http, each SQL statement is an independent HTTP request unless explicitly batched in a transaction. The `SET LOCAL` value is lost between statements.
+
+**Solution:** Use Neon's HTTP transaction batching. Wrap every profile-scoped operation in a transaction where the first statement is `SET LOCAL`, and all subsequent queries inherit the setting.
+
+##### Phased Rollout
+
+###### Phase 0: Prerequisite — Fix Transaction Support (1 day)
+
+The current `client.ts` transaction fallback silently drops atomicity. Fix this first:
+
+1. **Verify Drizzle neon-http transactions work** — the `@neondatabase/serverless` HTTP driver does support `fetchConnectionCache: true` and transaction batching. Confirm the current fallback is unnecessary or document when it's needed.
+2. **Create `withProfileScope(db, profileId, fn)` wrapper** — a utility that:
+   ```typescript
+   async function withProfileScope<T>(
+     db: Database,
+     profileId: string,
+     fn: (scopedDb: Database) => Promise<T>
+   ): Promise<T> {
+     return db.transaction(async (tx) => {
+       await tx.execute(sql`SET LOCAL app.current_profile_id = ${profileId}`);
+       return fn(tx);
+     });
+   }
+   ```
+3. **Integrate into Hono middleware** — after JWT auth extracts `profileId`, call `withProfileScope` and attach the scoped DB to the request context.
+
+**Validation:** Write integration test that confirms `current_setting('app.current_profile_id')` is readable within the transaction and absent outside it.
+
+###### Phase 1: Create Postgres Role & Enable RLS (1 day)
+
+**Migration 0012:**
+
+```sql
+-- 1. Create app_user role (the role the application connects as)
+DO $$ BEGIN
+  CREATE ROLE app_user NOLOGIN;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- 2. Grant app_user access to the public schema
+GRANT USAGE ON SCHEMA public TO app_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;
+
+-- 3. Enable RLS on all 21 profile-scoped tables
+ALTER TABLE assessments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE retention_cards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE needs_deepening_topics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE teaching_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE consent_states ENABLE ROW LEVEL SECURITY;
+ALTER TABLE subjects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE curriculum_adaptations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE learning_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE session_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE session_summaries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE parking_lot_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE onboarding_drafts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE streaks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE xp_ledger ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE learning_modes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE coaching_card_cache ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vocabulary ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vocabulary_retention_cards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE session_embeddings ENABLE ROW LEVEL SECURITY;
+
+-- 4. Create PERMISSIVE "audit" policies (allow all, log violations)
+--    These let everything through initially — Phase 2 adds restrictive policies.
+--    The owner role (neondb_owner) bypasses RLS, so no impact yet.
+```
+
+**Key detail:** RLS policies only apply to non-owner roles. Since the app currently connects as the database owner (`neondb_owner`), enabling RLS has **zero production impact** until we switch to `app_user`. This makes Phase 1 safe to deploy immediately.
+
+###### Phase 2: Create Restrictive Policies (1 day)
+
+**Migration 0013:** Add policies for the `app_user` role.
+
+```sql
+-- Profile-scoped policy template (apply to all 21 tables):
+CREATE POLICY profile_isolation ON assessments
+  FOR ALL
+  TO app_user
+  USING (profile_id = current_setting('app.current_profile_id', true)::uuid)
+  WITH CHECK (profile_id = current_setting('app.current_profile_id', true)::uuid);
+
+-- Repeat for all 21 tables...
+```
+
+**Special cases:**
+- **`family_links`**: Policy must allow access when EITHER `parent_profile_id` or `child_profile_id` matches the current profile. A parent must see their children's links.
+  ```sql
+  CREATE POLICY family_access ON family_links
+    FOR ALL TO app_user
+    USING (
+      parent_profile_id = current_setting('app.current_profile_id', true)::uuid
+      OR child_profile_id = current_setting('app.current_profile_id', true)::uuid
+    );
+  ```
+- **`consent_states`**: Parents need to read/update their children's consent. Policy should allow access via `family_links` join.
+- **Account-scoped tables** (`subscriptions`, `quota_pools`, `top_up_credits`): Use a separate `app.current_account_id` setting. Set alongside `app.current_profile_id` in the middleware.
+- **`profiles`**: The profile table itself needs a policy allowing access to own profile + linked child profiles.
+
+**`current_setting(..., true)`**: The `true` parameter returns NULL instead of erroring when the setting is unset. Combined with `::uuid`, this makes unset-context queries return no rows (fail-closed).
+
+###### Phase 3: Switch Connection Role (1 day)
+
+1. **Create a `app_user` login role in Neon** with a separate password
+2. **Update Doppler** — add `DATABASE_URL_APP` using the `app_user` role credentials
+3. **Modify `client.ts`** — connect as `app_user` for request-scoped operations
+4. **Keep owner connection** for migrations and background jobs (Inngest functions that operate across profiles, e.g., `closeAutoCloseSessions`, `consentReminders`)
+
+```typescript
+// client.ts
+const ownerDb = drizzle(neon(config.DATABASE_URL));        // migrations, cron, admin
+const appDb = drizzle(neon(config.DATABASE_URL_APP));       // request-scoped
+```
+
+5. **Update Inngest functions** — functions that operate across profiles (e.g., `closeAutoCloseSessions`, `consentReminders`) must use `ownerDb` since they intentionally query multiple profiles.
+
+###### Phase 4: Audit & Harden (1 day)
+
+1. **Remove the permissive fallback** — delete any "allow all" audit policies from Phase 1
+2. **Add `vocabulary` and `vocabularyRetentionCards` to `createScopedRepository`** — currently missing
+3. **Audit billing service** — 31+ direct `db.query.*` calls (BD-10). Determine which need `app.current_account_id` scoping vs. owner-role access
+4. **Integration tests** — for each protected table, verify:
+   - ✅ Correct profileId → data returned
+   - ✅ Wrong profileId → empty result (not error)
+   - ✅ No profileId set → empty result (fail-closed)
+   - ✅ Owner role → all data accessible (for migrations/cron)
+5. **Load test** — measure latency impact of transaction-wrapped queries vs. current direct queries
+
+##### Table Inventory
+
+| # | Table | Scope | Policy Type |
+|---|-------|-------|-------------|
+| 1 | assessments | profileId | Standard |
+| 2 | retention_cards | profileId | Standard |
+| 3 | needs_deepening_topics | profileId | Standard |
+| 4 | teaching_preferences | profileId | Standard |
+| 5 | consent_states | profileId | Special (parent access) |
+| 6 | subjects | profileId | Standard |
+| 7 | curriculum_adaptations | profileId | Standard |
+| 8 | learning_sessions | profileId | Standard |
+| 9 | session_events | profileId | Standard |
+| 10 | session_summaries | profileId | Standard |
+| 11 | parking_lot_items | profileId | Standard |
+| 12 | onboarding_drafts | profileId | Standard |
+| 13 | streaks | profileId | Standard |
+| 14 | xp_ledger | profileId | Standard |
+| 15 | notification_preferences | profileId | Standard |
+| 16 | notification_log | profileId | Standard |
+| 17 | learning_modes | profileId | Standard |
+| 18 | coaching_card_cache | profileId | Standard |
+| 19 | vocabulary | profileId | Standard |
+| 20 | vocabulary_retention_cards | profileId | Standard |
+| 21 | session_embeddings | profileId | Standard |
+| 22 | profiles | accountId | Special (own + children) |
+| 23 | subscriptions | accountId | Account-scoped |
+| 24 | quota_pools | subscriptionId | Account-scoped (via join) |
+| 25 | top_up_credits | subscriptionId | Account-scoped (via join) |
+| 26 | family_links | both profileIds | Special (bidirectional) |
+
+##### Risks & Mitigations
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Transaction overhead on every request | +5-15ms latency | Benchmark in Phase 0; neon-http batching is efficient |
+| Inngest jobs break (cross-profile queries) | Background jobs fail | Use owner role for Inngest; explicit allowlist |
+| `SET LOCAL` not persisted across HTTP calls | RLS silently bypassed | Integration test validates context propagation |
+| Billing service (31+ unscoped queries) | BD-10 breaks under app_user | Audit in Phase 4; billing may need owner role |
+| `current_setting` returns NULL on missing context | Fail-closed (empty results) | Correct behavior — better than data leak |
+
+##### Estimated Effort
+
+| Phase | Effort | Risk | Can Deploy Independently |
+|-------|--------|------|--------------------------|
+| Phase 0: Fix transactions | 1 day | Medium | Yes |
+| Phase 1: Enable RLS + role | 1 day | Low (no behavior change) | Yes |
+| Phase 2: Create policies | 1 day | Low (not enforced yet) | Yes |
+| Phase 3: Switch role | 1 day | High (enforces RLS) | Yes, with rollback plan |
+| Phase 4: Audit & harden | 1 day | Low | Yes |
+| **Total** | **~5 days** | | Each phase is independently deployable |
+
+##### Rollback Plan
+
+If Phase 3 causes issues in production:
+1. **Immediate:** Revert `DATABASE_URL_APP` to owner credentials in Doppler → RLS policies are bypassed by owner role
+2. **No migration rollback needed** — RLS policies and `ENABLE ROW LEVEL SECURITY` are harmless when connecting as owner
 
 ### S-07: Debug log level in staging
 

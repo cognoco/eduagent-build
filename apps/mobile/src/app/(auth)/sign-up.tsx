@@ -83,7 +83,7 @@ export default function SignUpScreen() {
             );
             return;
           }
-          router.replace('/(learner)/home');
+          // Auth layout guard handles navigation once isSignedIn propagates.
           return;
         }
 
@@ -94,7 +94,7 @@ export default function SignUpScreen() {
         setOauthLoading(null);
       }
     },
-    [router, setActive, startSSOFlow]
+    [setActive, startSSOFlow]
   );
 
   const onSignUpPress = useCallback(async () => {
@@ -134,9 +134,7 @@ export default function SignUpScreen() {
           );
           return;
         }
-        // Two-step redirect: always land in (learner), then layout guard
-        // checks persona and bounces parent users to /(parent)/dashboard.
-        router.replace('/(learner)/home');
+        // Auth layout guard handles navigation once isSignedIn propagates.
       } else {
         setError('Verification could not be completed. Please try again.');
       }
