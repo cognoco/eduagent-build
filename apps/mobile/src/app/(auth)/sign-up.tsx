@@ -34,7 +34,10 @@ const SCREEN_HEIGHT =
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
   const router = useRouter();
-  const { email: emailParam } = useLocalSearchParams<{ email?: string }>();
+  const { email: emailParam, fromSignIn } = useLocalSearchParams<{
+    email?: string;
+    fromSignIn?: string;
+  }>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
 
@@ -389,6 +392,18 @@ export default function SignUpScreen() {
         <Text className="text-body-sm text-text-secondary mb-6">
           Start your learning journey
         </Text>
+
+        {fromSignIn === '1' && (
+          <View
+            className="bg-primary/10 rounded-card px-4 py-3 mb-4"
+            accessibilityRole="alert"
+          >
+            <Text className="text-body-sm text-text-primary">
+              We couldn't find an account with that email. Create one below to
+              get started.
+            </Text>
+          </View>
+        )}
 
         {error !== '' && (
           <View

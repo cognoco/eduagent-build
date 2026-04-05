@@ -514,6 +514,15 @@ export default function SignInScreen() {
         await handleIncompleteSignIn(signInAttempt);
       }
     } catch (err: unknown) {
+      const clerkErrors = (err as { errors?: { code?: string }[] }).errors;
+      if (clerkErrors?.[0]?.code === 'form_identifier_not_found') {
+        // Account doesn't exist — redirect to sign-up with email pre-filled
+        router.push({
+          pathname: '/(auth)/sign-up',
+          params: { email: emailAddress.trim(), fromSignIn: '1' },
+        });
+        return;
+      }
       setError(extractClerkError(err));
     } finally {
       setLoading(false);
@@ -527,6 +536,7 @@ export default function SignInScreen() {
     handleIncompleteSignIn,
     emailAddress,
     password,
+    router,
   ]);
 
   const onStartVerificationPress = useCallback(async () => {
