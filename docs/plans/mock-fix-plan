@@ -147,12 +147,12 @@ Lower priority, often still reasonable:
 - Mobile screens depend directly on hooks, navigation, and native adapters, so tests replace those hooks instead of exercising real data flow.
 - Persistence-heavy services mix branching logic and DB calls. Fake Drizzle builders are easier to stand up than a real Postgres-backed harness, so tests picked the fake path.
 
-## Biggest Confidence Gap
+## Biggest Confidence Gap (original — partially addressed)
 
-- `tests/integration/setup.ts` says integration tests use a real PostgreSQL DB, but every file under `tests/integration` uses `jest.mock('@eduagent/database', ...)`.
-- `tests/integration/health-cors.integration.test.ts` says "Only external dependencies are mocked", but it also mocks `services/account`, `services/billing`, `services/settings`, `services/session`, and `services/llm`.
+- ~~`tests/integration/setup.ts` says integration tests use a real PostgreSQL DB, but every file under `tests/integration` uses `jest.mock('@eduagent/database', ...)`~~ — 11 of 16 suites now use a real DB. The 5 unconverted suites still mock `@eduagent/database`.
+- ~~`tests/integration/health-cors.integration.test.ts` says "Only external dependencies are mocked", but it also mocks internal services~~ — fixed; health-cors now runs with JWT as the only mock.
 
-Today the `tests/integration` folder is closer to "composed handler tests" than true integration.
+The unconverted suites (`onboarding`, `billing-lifecycle`, `inngest-quota-reset`, `inngest-trial-expiry`, `test-seed`) are still closer to "composed handler tests" than true integration.
 
 ## Top Internal Mock Seams
 
@@ -167,21 +167,21 @@ In the table below, "base app chain" means the recurring bundle of mocks for `mi
 | Suite | Internal implementation mocked instead of real code | Why it is mocked today | Real-test target |
 | --- | --- | --- | --- |
 | `tests/integration/account-deletion.integration.test.ts` | JWT + Inngest transport only | Converted: real deletion scheduling, cancellation, and data export against real DB. 8 tests. | Keep real route coverage; extend later with cascade-deletion verification if needed |
-| `tests/integration/auth-chain.integration.test.ts` | base app chain | Wants auth middleware branch coverage without real JWKS, DB, or downstream app deps | Real app + test DB + test JWT/JWKS helper; internal services stay real |
+| `tests/integration/auth-chain.integration.test.ts` | JWT only | Converted: real auth middleware + real DB; internal services stay real | Extend later with JWKS rotation and token expiry edge cases |
 | `tests/integration/billing-lifecycle.integration.test.ts` | base app chain + `services/billing`, `services/stripe`, `services/kv`, `services/metering` | Route behavior only; avoids real subscription, Stripe, and quota logic | For current mobile launch, deprioritize behind RevenueCat coverage; if kept, real app + test DB with only payment-provider/KV adapters faked |
-| `tests/integration/health-cors.integration.test.ts` | base app chain | Wants CORS and health assertions without booting the full dependency graph | Either a smaller real app factory for public routes, or the full real app with test env and no internal service mocks |
+| `tests/integration/health-cors.integration.test.ts` | JWT only | Converted: real app with full dependency graph, CORS + health assertions against real middleware chain | Keep as smoke test baseline |
 | `tests/integration/homework.integration.test.ts` | JWT auth seam + OCR provider DI seam only | Converted: homework session creation and persistence now run through the real app + real DB; OCR extraction remains the only faked boundary | Keep real route coverage; optionally add a dedicated OCR-misconfiguration case later |
 | `tests/integration/inngest-quota-reset.integration.test.ts` | `inngest/client`, `inngest/helpers`, `services/billing` | Captures handler and asserts step order/counts only | Real Inngest function + test DB; fake only clock and any external notifications |
 | `tests/integration/inngest-trial-expiry.integration.test.ts` | `inngest/client`, `inngest/helpers`, `services/billing`, `services/notifications`, `services/profile`, `services/subscription`, `services/trial` | Cron orchestration without real DB state transitions or notification delivery | Real function + test DB; fake only push/email delivery |
-| `tests/integration/learning-session.integration.test.ts` | base app chain + `services/session`, `services/interleaved`, `services/recall-bridge`, `services/profile` | Session route contract without real session storage, retrieval, or bridge generation | Real app + test DB; fake only LLM boundary and Clerk/JWKS |
+| `tests/integration/learning-session.integration.test.ts` | JWT + Inngest transport (LLM via mock provider) | Converted: real session lifecycle, metering/quota, summary persistence, interleaved topic selection, recall-bridge generation | Extend later with real LLM streaming or Inngest dispatch verification |
 | `tests/integration/onboarding.integration.test.ts` | base app chain + `services/profile`, `services/session` | Onboarding path assertions without real profile/session persistence | Real app + test DB; fake only LLM boundary and Clerk/JWKS |
 | `tests/integration/parent-dashboard.integration.test.ts` | JWT only | Converted: real dashboard aggregation (family links, sessions, transcripts, guided metrics) against real DB with seeded data. 11 tests. | Extend later with curriculum/retention-enriched child summaries |
 | `tests/integration/profile-isolation.integration.test.ts` | JWT auth seam only | Converted: ownership checks, owner auto-resolution, and scoped subject reads now use the real middleware + real DB | Extend later with consent/parent-child profile edge cases if needed |
 | `tests/integration/revenuecat-webhook.integration.test.ts` | Not present yet; route currently covered only by route-level mocks | Launch-critical mobile billing path currently lacks a real app + real DB integration suite | Add real route + test DB coverage; fake only RevenueCat authorization header input and Inngest/KV transport edges as needed |
 | `tests/integration/retention-lifecycle.integration.test.ts` | JWT only (LLM via mock provider in setup.ts) | Converted: real SM-2 retention flow — recall tests with length-heuristic fallback, relearn with DB-verified card reset, teaching preferences, stability. 18 tests. | Extend later with real LLM evaluation or language/vocabulary branches |
 | `tests/integration/session-completed-chain.integration.test.ts` | Voyage embedding transport + Sentry reporting only | Converted: the chain now runs against a real DB and real downstream services for retention, summaries, streaks, XP, learning modes, and home-surface cache writes | Keep the small orchestration unit test and the new DB-backed chain test together; extend later for language/vocabulary and homework-summary branches |
-| `tests/integration/stripe-webhook.integration.test.ts` | base app chain + `services/stripe`, `services/billing`, `services/subscription`, `services/kv` | Webhook route shape without real signature verification or billing writes | Now converted to real route + test DB. Keep as dormant/non-launch-critical coverage until direct Stripe billing is actually enabled |
-| `tests/integration/subject-management.integration.test.ts` | base app chain + `services/subject`, `services/profile` | Subject CRUD route coverage without real subject persistence | Real app + test DB with seeded profiles |
+| `tests/integration/stripe-webhook.integration.test.ts` | Stripe signature verification + Inngest transport | Converted: real billing writes, quota updates, KV-refresh against real DB. Dormant until direct Stripe billing is enabled | Keep as future web/direct-billing coverage |
+| `tests/integration/subject-management.integration.test.ts` | JWT only | Converted: real subject CRUD with real DB persistence, including archive/includeInactive filtering | Keep as foundational CRUD coverage |
 | `tests/integration/test-seed.integration.test.ts` | base app chain + `services/test-seed` | Route contract without running real seed/reset logic | Real app + dedicated disposable test DB; fake only Clerk API if test users are involved |
 
 ### Priority callout

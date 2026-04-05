@@ -10,6 +10,7 @@ import {
   Animated,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useUser } from '@clerk/clerk-expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRequestConsent } from '../hooks/use-consent';
 import { useThemeColors } from '../lib/theme';
@@ -41,6 +42,7 @@ export default function ConsentScreen() {
   }>();
   const consentType = 'GDPR' as const;
 
+  const { user } = useUser();
   const { mutateAsync, isPending } = useRequestConsent();
   const { isOffline } = useNetworkStatus();
 
@@ -86,8 +88,14 @@ export default function ConsentScreen() {
   const regulationText = regulationCopy.regulation;
 
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail);
+  const childEmail = user?.primaryEmailAddress?.emailAddress;
+  const isSameAsChild =
+    isValidEmail &&
+    !!childEmail &&
+    parentEmail.trim().toLowerCase() === childEmail.toLowerCase();
   const canSubmit =
     isValidEmail &&
+    !isSameAsChild &&
     !isPending &&
     !isTransitioning &&
     phase === 'parent' &&
@@ -217,6 +225,15 @@ export default function ConsentScreen() {
                   testID="consent-email"
                   onFocus={onFieldFocus('email')}
                 />
+                {isSameAsChild && (
+                  <Text
+                    className="text-danger text-body-sm mb-1"
+                    testID="consent-same-email-warning"
+                  >
+                    This is your own email. Please enter a parent or
+                    guardian&apos;s email address.
+                  </Text>
+                )}
                 <Text className="text-body-sm text-text-secondary mb-6">
                   {copy.spamWarning}
                 </Text>

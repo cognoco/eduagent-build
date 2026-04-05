@@ -253,44 +253,50 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
   }, [done, reduceMotion]);
 
   // --- Animated props for SVG elements ---
-  // Android SVG fix: animating only `r` via useAnimatedProps can fail to trigger
-  // native re-renders when starting from r=0. Bundling `opacity` alongside `r`
-  // forces the native view update, matching how the dots (which already work) are
-  // structured. Without this, student/mentor/path stay invisible on Android APKs.
+  // Android SVG fix: Android's native SVG renderer permanently discards circles
+  // created with r=0, ignoring all subsequent prop updates. The prior fix of
+  // bundling `opacity` alongside `r` was insufficient — the element was already
+  // pruned from the render tree. Fix: ensure r is never zero (Math.max with a
+  // sub-pixel floor) and hold opacity at 0 until the animation begins moving,
+  // so the circle exists in the native tree from the first frame but is invisible
+  // until the spring fires.
+  const R_FLOOR = 0.01; // sub-pixel: always present in native tree, never visible
+  const OP_THRESH = 0.1; // opacity stays 0 until r exceeds this
+
   const pathProps = useAnimatedProps(() => ({
     strokeDashoffset: PATH_LEN * (1 - pathDraw.value),
     opacity: Math.min(pathDraw.value * 10, 1),
   }));
 
   const studentOutProps = useAnimatedProps(() => ({
-    r: studentR.value,
-    opacity: Math.min(studentR.value / 2, 1),
+    r: Math.max(studentR.value, R_FLOOR),
+    opacity: studentR.value < OP_THRESH ? 0 : Math.min(studentR.value / 2, 1),
   }));
   const studentInProps = useAnimatedProps(() => ({
-    r: studentInR.value,
-    opacity: Math.min(studentInR.value / 1, 1),
+    r: Math.max(studentInR.value, R_FLOOR),
+    opacity: studentInR.value < OP_THRESH ? 0 : Math.min(studentInR.value, 1),
   }));
   const mentorOutProps = useAnimatedProps(() => ({
-    r: mentorR.value,
-    opacity: Math.min(mentorR.value / 2, 1),
+    r: Math.max(mentorR.value, R_FLOOR),
+    opacity: mentorR.value < OP_THRESH ? 0 : Math.min(mentorR.value / 2, 1),
   }));
   const mentorInProps = useAnimatedProps(() => ({
-    r: mentorInR.value,
-    opacity: Math.min(mentorInR.value / 1, 1),
+    r: Math.max(mentorInR.value, R_FLOOR),
+    opacity: mentorInR.value < OP_THRESH ? 0 : Math.min(mentorInR.value, 1),
   }));
   const ringProps = useAnimatedProps(() => ({ opacity: ringOp.value }));
 
   const dot1Props = useAnimatedProps(() => ({
-    r: dot1R.value,
-    opacity: Math.min(dot1R.value / 4, 1) * 0.6,
+    r: Math.max(dot1R.value, R_FLOOR),
+    opacity: dot1R.value < OP_THRESH ? 0 : Math.min(dot1R.value / 4, 1) * 0.6,
   }));
   const dot2Props = useAnimatedProps(() => ({
-    r: dot2R.value,
-    opacity: Math.min(dot2R.value / 5, 1) * 0.65,
+    r: Math.max(dot2R.value, R_FLOOR),
+    opacity: dot2R.value < OP_THRESH ? 0 : Math.min(dot2R.value / 5, 1) * 0.65,
   }));
   const dot3Props = useAnimatedProps(() => ({
-    r: dot3R.value,
-    opacity: Math.min(dot3R.value / 6, 1) * 0.7,
+    r: Math.max(dot3R.value, R_FLOOR),
+    opacity: dot3R.value < OP_THRESH ? 0 : Math.min(dot3R.value / 6, 1) * 0.7,
   }));
 
   // Spark particles — 2 per dot, fly outward and fade

@@ -63,6 +63,18 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         );
       }
 
+      // Guard: child cannot send consent email to their own account email
+      if (
+        account.email.toLowerCase() === input.parentEmail.trim().toLowerCase()
+      ) {
+        return apiError(
+          c,
+          400,
+          ERROR_CODES.VALIDATION_ERROR,
+          'Parent email must be different from your account email'
+        );
+      }
+
       const appUrl = c.env.APP_URL ?? 'https://app.mentomate.com';
       let result;
       try {
