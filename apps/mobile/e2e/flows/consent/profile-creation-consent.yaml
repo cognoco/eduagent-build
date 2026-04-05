@@ -10,10 +10,10 @@
 # Prerequisite: Seeded user with pre-profile scenario (Clerk user + account, no profile).
 # Usage: ./scripts/seed-and-run.sh pre-profile flows/consent/profile-creation-consent.yaml
 #
-# CI-09: The native date picker defaults to a date ~16 years ago. GDPR consent
-# requires age < 16 for EU location. Since the default DOB ages past 16 over
-# time, this flow may stop testing the consent trigger. Maestro cannot reliably
-# manipulate the native date picker, so consent-specific steps (18+) are optional.
+# CI-09: GDPR consent requires age < 16 for EU location. The native date picker
+# cannot be reliably manipulated by Maestro, so the seed scenario should set
+# the profile DOB to 2018-01-01 (age 8 as of 2026) to give several years of
+# headroom. Update year if test stops triggering consent (child must be under 16).
 # TODO: Pass a dynamic DOB via seed scenario (e.g., today - 10 years) so the
 # under-16 consent path is always exercised regardless of current date.
 appId: com.mentomate.app
@@ -136,7 +136,8 @@ tags:
     optional: true
 
 # 12b. Android: Dismiss native DatePickerDialog by tapping "OK" button.
-#      CI-09: Default date ages over time. See header NOTE for workaround plan.
+#      CI-09: DOB should be 2018-01-01 via seed scenario.
+#      Update year if test stops triggering consent (child must be under 16).
 - tapOn:
     text: "OK"
     # Optional: only present on Android native date picker dialog
@@ -149,9 +150,9 @@ tags:
     timeout: 5000
     optional: true
 
-# 14. Verify persona was auto-detected (should be TEEN for age ~16)
+# 14. Verify persona was auto-detected (should be KID for DOB 2018-01-01)
 - assertVisible:
-    text: "Teen"
+    text: "Kid"
     optional: true
 
 # 15. Wait for region selector

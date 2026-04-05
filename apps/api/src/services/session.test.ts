@@ -235,7 +235,10 @@ function createCloseSessionDb(
   db: Database;
   setMock: jest.Mock;
 } {
-  const whereMock = jest.fn().mockResolvedValue(undefined);
+  const returningMock = jest.fn().mockResolvedValue([{ id: 'session-1' }]);
+  const whereMock = jest.fn().mockReturnValue({
+    returning: returningMock,
+  });
   const setMock = jest.fn().mockReturnValue({
     where: whereMock,
   });

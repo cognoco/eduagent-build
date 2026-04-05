@@ -9,7 +9,9 @@ import {
   pgEnum,
   unique,
   index,
+  check,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { profiles } from './profiles';
 import { subjects, curriculumTopics } from './subjects';
 import { learningSessions } from './sessions';
@@ -112,6 +114,10 @@ export const retentionCards = pgTable(
       table.topicId
     ),
     index('retention_cards_review_idx').on(table.profileId, table.nextReviewAt),
+    check(
+      'retention_cards_interval_days_positive',
+      sql`${table.intervalDays} >= 1`
+    ),
   ]
 );
 

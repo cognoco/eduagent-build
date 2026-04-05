@@ -94,6 +94,8 @@ const revenuecatWebhookSchema = z.object({
     grace_period_expiration_at_ms: z.number().optional(),
     transaction_id: z.string().optional(),
     store_transaction_id: z.string().optional(),
+    /** BD-01: Event timestamp for ordering-based idempotency. */
+    event_timestamp_ms: z.number().optional(),
   }),
 });
 
@@ -245,6 +247,7 @@ async function handleInitialPurchase(
         isTrial && event.expiration_at_ms
           ? new Date(event.expiration_at_ms).toISOString()
           : undefined,
+      eventTimestampMs: event.event_timestamp_ms,
     }
   );
 
@@ -265,6 +268,7 @@ async function handleRenewal(
   // This handles both trial-to-paid conversion and regular renewal.
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
     status: 'active',
     tier: tier ?? undefined,
     currentPeriodStart: event.purchased_at_ms
@@ -302,6 +306,7 @@ async function handleCancellation(
 
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
     // Keep the entitlement active until period end so mobile can render the
     // correct "Cancelling" state from cancelledAt + active status.
     status: 'active' as SubscriptionStatus,
@@ -342,6 +347,7 @@ async function handleExpiration(
     // Record the event for idempotency
     await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
       eventId: event.id,
+      eventTimestampMs: event.event_timestamp_ms,
       // transitionToExtendedTrial already set status to 'expired' and tier to 'free'
       // but we need to record the eventId without overwriting those values
     });
@@ -353,6 +359,7 @@ async function handleExpiration(
   // Non-trial expiration: downgrade to free tier immediately
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
     status: 'expired',
     tier: 'free',
     cancelledAt: new Date().toISOString(),
@@ -380,6 +387,7 @@ async function handleBillingIssue(
 
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
     status: 'past_due',
   });
 
@@ -426,6 +434,7 @@ async function handleProductChange(
 
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
     tier: newTier,
     status: 'active',
   });
@@ -512,6 +521,7 @@ async function handleUncancellation(
 
   const updated = await updateSubscriptionFromRevenuecatWebhook(db, accountId, {
     eventId: event.id,
+    eventTimestampMs: event.event_timestamp_ms,
     status: 'active',
     cancelledAt: null,
   });
@@ -585,13 +595,14 @@ export const revenuecatWebhookRoute = new Hono<{
   const db = c.get('db');
   const kv = c.env.SUBSCRIPTION_KV;
 
-  // Idempotency: skip already-processed events
+  // Idempotency: skip already-processed events (BD-01: timestamp-based ordering)
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (accountId) {
     const alreadyProcessed = await isRevenuecatEventProcessed(
       db,
       accountId,
-      event.id
+      event.id,
+      event.event_timestamp_ms
     );
     if (alreadyProcessed) {
       return c.json({ received: true, skipped: true });

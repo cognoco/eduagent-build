@@ -1,10 +1,42 @@
 export type AgeBracket = 'child' | 'adolescent' | 'adult';
 
+/**
+ * Computes an age bracket for consent gating, persona inference, and voice tone.
+ *
+ * When `birthDate` is provided, exact age is computed using month/day comparison.
+ * When only `birthYear` is available, age is approximated as `currentYear - birthYear`,
+ * which can overestimate by up to 11 months (±1 year tolerance). Callers that need
+ * conservative safety gating (consent, minimum-age checks) should use `<=` thresholds
+ * to compensate for the approximation.
+ */
 export function computeAgeBracket(
   birthYear: number,
-  currentYear = new Date().getFullYear()
+  birthDateOrCurrentYear?: string | Date | number
 ): AgeBracket {
-  const age = currentYear - birthYear;
+  let age: number;
+
+  if (
+    birthDateOrCurrentYear != null &&
+    typeof birthDateOrCurrentYear !== 'number'
+  ) {
+    // Exact age from full birth date
+    const now = new Date();
+    const bd = new Date(birthDateOrCurrentYear);
+    age = now.getFullYear() - bd.getFullYear();
+    if (
+      now.getMonth() < bd.getMonth() ||
+      (now.getMonth() === bd.getMonth() && now.getDate() < bd.getDate())
+    ) {
+      age--;
+    }
+  } else {
+    // Year-only approximation (±1 year tolerance)
+    const currentYear =
+      typeof birthDateOrCurrentYear === 'number'
+        ? birthDateOrCurrentYear
+        : new Date().getFullYear();
+    age = currentYear - birthYear;
+  }
 
   if (age < 13) return 'child';
   if (age < 18) return 'adolescent';

@@ -31,7 +31,9 @@ function getChildHighlight(dashboard: DashboardData | undefined): string {
 export interface ParentGatewayProps {
   profiles: Profile[];
   activeProfile: Profile | null;
-  switchProfile: (profileId: string) => Promise<void>;
+  switchProfile: (
+    profileId: string
+  ) => Promise<{ success: boolean; error?: string }>;
 }
 
 export function ParentGateway({

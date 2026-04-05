@@ -8,7 +8,9 @@ import {
   pgEnum,
   unique,
   index,
+  check,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { generateUUIDv7 } from '../utils/uuid';
 
 export const personaTypeEnum = pgEnum('persona_type', [
@@ -90,6 +92,14 @@ export const familyLinks = pgTable(
   },
   (table) => [
     index('family_links_child_profile_id_idx').on(table.childProfileId),
+    unique('family_links_parent_child_unique').on(
+      table.parentProfileId,
+      table.childProfileId
+    ),
+    check(
+      'family_links_no_self_link',
+      sql`${table.parentProfileId} != ${table.childProfileId}`
+    ),
   ]
 );
 

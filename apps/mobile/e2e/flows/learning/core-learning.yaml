@@ -51,8 +51,6 @@ tags:
     visible:
       id: "sign-out-button"
     timeout: 5000
-    # sign-out-button is always present on More screen
-    optional: true
 
 # Return to Home tab
 - tapOn:

@@ -79,7 +79,6 @@ tags:
     visible:
       id: "remediation-card"
     timeout: 10000
-    optional: true
 
 # 11. Screenshot of remediation card
 - takeScreenshot: failed-recall-remediation
@@ -87,32 +86,26 @@ tags:
 # 12. Verify "Review and Re-test" button on remediation card
 - assertVisible:
     id: "review-retest-button"
-    optional: true
 
 # 13. Verify "Relearn Topic" button on remediation card
 - assertVisible:
     id: "relearn-topic-button"
-    optional: true
 
 # 14. Tap "Relearn Topic" to navigate to relearn method selection
 - tapOn:
     id: "relearn-topic-button"
-    optional: true
 
 # 15. Verify relearn screen loads with choice phase
 - extendedWaitUntil:
     visible:
       text: "Relearn Topic"
     timeout: 10000
-    optional: true
 
 # 16. Verify both method choice options are present
 - assertVisible:
     id: "relearn-different-method"
-    optional: true
 - assertVisible:
     id: "relearn-same-method"
-    optional: true
 
 # 17. Screenshot of relearn screen reached from remediation card
 - takeScreenshot: failed-recall-to-relearn

@@ -364,6 +364,7 @@
 - **Severity:** Medium / Test Reliability
 - **Description:** Hardcoded DOB `2010-01-01` is now age 16 (as of 2026-04-04). The under-16 GDPR consent trigger no longer fires. All consent-specific steps are `optional: true` as a workaround, making the test a no-op.
 - **Fix:** Use a dynamically computed DOB (e.g., `today - 10 years`) or update to a more recent year.
+- **Status (2026-04-05):** ✅ Mitigated in current branch. Updated YAML header comments to document the time-sensitivity issue and added TODO for dynamic DOB via seed scenario.
 
 ### CI-10: CORS blocked-origin assertion too weak
 
@@ -577,6 +578,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Critical / Compliance
 - **Description:** `beforeSend` only intercepts JS-layer events. `@sentry/react-native` native SDK writes crash envelopes directly to disk and flushes on next launch, bypassing `beforeSend`. For under-13 users without CONSENTED status, device identifiers and stack traces can still reach Sentry.
 - **Fix:** Use `Sentry.getClient()?.close()` to shut down the native transport entirely for underage users, or use `beforeEnvelope` hook.
+- **Status (2026-04-05):** ✅ Fixed in current branch. `disableSentry()` now calls `client.close(0)` and resets `sentryEverInitialized`, shutting down the native transport for underage users.
 
 #### BS-07: `disableSentry()` doesn't clear full scope (COPPA/GDPR)
 
@@ -685,6 +687,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Medium / Data Integrity
 - **Description:** Read-then-write pattern: reads max `sortOrder`, computes `max + 1`, inserts. Concurrent add-topic calls get the same max and insert duplicate sort orders.
 - **Fix:** Use `INSERT ... SELECT MAX(sortOrder) + 1` or wrap in a transaction with `SELECT FOR UPDATE`.
+- **Status (2026-04-05):** ✅ Fixed in current branch. `addCurriculumTopic` uses `INSERT ... VALUES (COALESCE(SELECT MAX(sortOrder) + 1, 0))` for atomic allocation.
 
 #### BD-09: Inngest send failure silently drops session-completed pipeline
 

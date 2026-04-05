@@ -1510,29 +1510,48 @@ export interface RevenuecatWebhookUpdate {
 }
 
 /**
- * Checks whether a RevenueCat event has already been processed.
- * Uses `lastRevenuecatEventId` on the subscription row for idempotency.
+ * Checks whether a RevenueCat event should be skipped.
+ * BD-01: Uses timestamp-based ordering instead of last-event-ID-only check.
+ * An event is considered "already processed" when:
+ *   (a) its event ID matches the last-processed ID (exact duplicate), OR
+ *   (b) its timestamp is older than the last-processed timestamp (stale retry).
+ * This prevents older webhook retries from overwriting current subscription state.
  */
 export async function isRevenuecatEventProcessed(
   db: Database,
   accountId: string,
-  eventId: string
+  eventId: string,
+  eventTimestampMs?: number
 ): Promise<boolean> {
   const sub = await db.query.subscriptions.findFirst({
     where: eq(subscriptions.accountId, accountId),
   });
   if (!sub) return false;
-  return sub.lastRevenuecatEventId === eventId;
+
+  // Exact duplicate — same event ID
+  if (sub.lastRevenuecatEventId === eventId) return true;
+
+  // BD-01: Stale retry — event timestamp is older than last processed
+  if (eventTimestampMs != null && sub.lastRevenuecatEventTimestampMs != null) {
+    const lastTs = Number(sub.lastRevenuecatEventTimestampMs);
+    if (eventTimestampMs < lastTs) return true;
+  }
+
+  return false;
 }
 
 /**
  * Updates a subscription from a RevenueCat webhook event.
- * Writes `lastRevenuecatEventId` for idempotency.
+ * Writes `lastRevenuecatEventId` and `lastRevenuecatEventTimestampMs` for
+ * timestamp-based idempotency (BD-01).
  */
 export async function updateSubscriptionFromRevenuecatWebhook(
   db: Database,
   accountId: string,
-  updates: RevenuecatWebhookUpdate & { eventId: string }
+  updates: RevenuecatWebhookUpdate & {
+    eventId: string;
+    eventTimestampMs?: number;
+  }
 ): Promise<SubscriptionRow | null> {
   const existing = await db.query.subscriptions.findFirst({
     where: eq(subscriptions.accountId, accountId),
@@ -1544,6 +1563,10 @@ export async function updateSubscriptionFromRevenuecatWebhook(
     lastRevenuecatEventId: updates.eventId,
     updatedAt: new Date(),
   };
+
+  if (updates.eventTimestampMs != null) {
+    setValues.lastRevenuecatEventTimestampMs = String(updates.eventTimestampMs);
+  }
 
   if (updates.tier !== undefined) {
     setValues.tier = updates.tier;
@@ -1595,6 +1618,8 @@ export async function activateSubscriptionFromRevenuecat(
     isTrial?: boolean;
     /** ISO 8601 trial end date. Required when isTrial is true. */
     trialEndsAt?: string;
+    /** BD-01: Event timestamp for ordering-based idempotency. */
+    eventTimestampMs?: number;
   }
 ): Promise<SubscriptionRow> {
   const existing = await getSubscriptionByAccountId(db, accountId);
@@ -1618,6 +1643,10 @@ export async function activateSubscriptionFromRevenuecat(
         tier,
         status,
         lastRevenuecatEventId: eventId,
+        lastRevenuecatEventTimestampMs:
+          options?.eventTimestampMs != null
+            ? String(options.eventTimestampMs)
+            : null,
         revenuecatOriginalAppUserId:
           options?.revenuecatOriginalAppUserId ?? null,
         currentPeriodStart: options?.currentPeriodStart
@@ -1655,6 +1684,10 @@ export async function activateSubscriptionFromRevenuecat(
     lastRevenuecatEventId: eventId,
     updatedAt: new Date(),
   };
+
+  if (options?.eventTimestampMs != null) {
+    setValues.lastRevenuecatEventTimestampMs = String(options.eventTimestampMs);
+  }
 
   if (options?.revenuecatOriginalAppUserId) {
     setValues.revenuecatOriginalAppUserId = options.revenuecatOriginalAppUserId;

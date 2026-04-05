@@ -13,7 +13,7 @@ const ROLE_LABELS: Record<string, string> = {
 interface ProfileSwitcherProps {
   profiles: Profile[];
   activeProfileId: string;
-  onSwitch: (profileId: string) => void;
+  onSwitch: (profileId: string) => Promise<{ success: boolean }> | void;
 }
 
 export function ProfileSwitcher({
@@ -43,11 +43,13 @@ export function ProfileSwitcher({
       if (switching) return;
       setSwitching(true);
       try {
-        await onSwitch(profileId);
-        setIsOpen(false); // Only close on success
-      } catch {
+        const result = await onSwitch(profileId);
+        // BM-05: switchProfile now returns a result object instead of
+        // throwing, so check success to decide whether to close.
+        if (!result || result.success) {
+          setIsOpen(false);
+        }
         // Switch failed — keep dropdown open so user can retry.
-        // The error will be surfaced by the profile context.
       } finally {
         setSwitching(false);
       }

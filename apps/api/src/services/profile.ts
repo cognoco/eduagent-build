@@ -88,9 +88,10 @@ export async function listProfiles(
 }
 
 function inferLegacyPersonaType(
-  birthYear: number
+  birthYear: number,
+  birthDate?: string
 ): 'TEEN' | 'LEARNER' | 'PARENT' {
-  const ageBracket = computeAgeBracket(birthYear);
+  const ageBracket = computeAgeBracket(birthYear, birthDate);
   if (ageBracket === 'child') return 'TEEN';
   // Adults default to LEARNER — PARENT is only assigned via explicit input.personaType
   return 'LEARNER';
@@ -148,7 +149,12 @@ export async function createProfile(
   input: ProfileCreateInput,
   isOwner?: boolean
 ): Promise<Profile> {
-  const birthYear = input.birthYear ?? birthYearFromDateLike(input.birthDate);
+  // BD-06: When birthDate is present, it is the single source of truth for birthYear.
+  // This prevents a mismatch where consent/persona are computed from one value
+  // but a different value is persisted.
+  const birthYear = input.birthDate
+    ? birthYearFromDateLike(input.birthDate)!
+    : input.birthYear ?? null;
   if (birthYear == null) {
     throw new ProfileValidationError(
       'BIRTH_YEAR_REQUIRED',
@@ -179,7 +185,7 @@ export async function createProfile(
   }
 
   const legacyPersonaType =
-    input.personaType ?? inferLegacyPersonaType(birthYear);
+    input.personaType ?? inferLegacyPersonaType(birthYear, input.birthDate);
 
   const [row] = await db
     .insert(profiles)

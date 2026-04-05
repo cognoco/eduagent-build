@@ -5,6 +5,7 @@
 const mockFamilyLinksFindMany = jest.fn();
 const mockFamilyLinksFindFirst = jest.fn();
 const mockProfilesFindFirst = jest.fn();
+const mockProfilesFindMany = jest.fn();
 const mockSessionsFindMany = jest.fn();
 const mockSessionsFindFirst = jest.fn();
 const mockSessionEventsFindMany = jest.fn();
@@ -233,6 +234,7 @@ function createMockDb() {
       },
       profiles: {
         findFirst: mockProfilesFindFirst,
+        findMany: mockProfilesFindMany,
       },
       learningSessions: {
         findMany: mockSessionsFindMany,
@@ -290,6 +292,9 @@ describe('getChildrenForParent', () => {
       { parentProfileId: PARENT_ID, childProfileId: CHILD_ID },
     ]);
 
+    mockProfilesFindMany.mockResolvedValue([
+      { id: CHILD_ID, displayName: 'Alex' },
+    ]);
     mockProfilesFindFirst.mockResolvedValue({
       id: CHILD_ID,
       displayName: 'Alex',
@@ -316,18 +321,21 @@ describe('getChildrenForParent', () => {
 
     mockSessionsFindMany.mockResolvedValue([
       {
+        profileId: CHILD_ID,
         startedAt: thisWeekDate,
         durationSeconds: 600,
         wallClockSeconds: 720,
         exchangeCount: 10,
       },
       {
+        profileId: CHILD_ID,
         startedAt: thisWeekDate,
         durationSeconds: 900,
         wallClockSeconds: 1080,
         exchangeCount: 12,
       },
       {
+        profileId: CHILD_ID,
         startedAt: lastWeekDate,
         durationSeconds: 300,
         wallClockSeconds: 360,
@@ -379,7 +387,10 @@ describe('getChildrenForParent', () => {
       { parentProfileId: PARENT_ID, childProfileId: CHILD_ID },
     ]);
 
-    mockProfilesFindFirst.mockResolvedValue(null);
+    // R-03: Batch lookup — profiles.findMany returns empty, so child is skipped
+    mockProfilesFindMany.mockResolvedValue([]);
+    mockSubjectsFindMany.mockResolvedValue([]);
+    mockSessionsFindMany.mockResolvedValue([]);
 
     const result = await getChildrenForParent(db as never, PARENT_ID);
 
@@ -459,6 +470,9 @@ describe('getChildDetail', () => {
     // getChildDetail delegates to getChildrenForParent internally
     mockFamilyLinksFindMany.mockResolvedValue([
       { parentProfileId: PARENT_ID, childProfileId: CHILD_ID },
+    ]);
+    mockProfilesFindMany.mockResolvedValue([
+      { id: CHILD_ID, displayName: 'Alex' },
     ]);
     mockProfilesFindFirst.mockResolvedValue({
       id: CHILD_ID,

@@ -281,22 +281,24 @@ function ChildPaywall(): React.ReactElement {
 
   const profileId = activeProfile?.id ?? '';
 
-  // One-time migration from old colon-delimited SecureStore key
+  // BM-07: migration and restore must run sequentially — the restore reads
+  // the new key that migration writes.  A single effect chains them to avoid
+  // a race where restore fires before migration finishes writing.
   useEffect(() => {
     if (!profileId) return;
-    void migrateSecureStoreKey(
-      getLegacyNotifyStorageKey(profileId),
-      getNotifyStorageKey(profileId)
-    );
-  }, [profileId]);
-
-  // Restore persisted notified timestamp on mount
-  useEffect(() => {
-    if (!profileId) return;
+    let cancelled = false;
     (async () => {
+      // Step 1: migrate legacy key → new key (no-ops if already migrated)
+      await migrateSecureStoreKey(
+        getLegacyNotifyStorageKey(profileId),
+        getNotifyStorageKey(profileId)
+      );
+      if (cancelled) return;
+      // Step 2: restore persisted notified timestamp
       const value = await SecureStore.getItemAsync(
         getNotifyStorageKey(profileId)
       );
+      if (cancelled) return;
       if (!value) return;
       const ts = Number(value);
       if (Number.isNaN(ts)) return;
@@ -306,6 +308,9 @@ function ChildPaywall(): React.ReactElement {
         setHoursRemaining(hours);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [profileId]);
 
   // Update countdown every minute while rate-limited

@@ -149,13 +149,13 @@ jobs:
       - name: Baseline migration journal (push→migrate transition)
         working-directory: packages/database
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ github.event_name == 'push' && secrets.DATABASE_URL_STAGING || secrets.DATABASE_URL_PRODUCTION }}
         run: node scripts/baseline-migrations.mjs
 
       - name: Run database migrations
         working-directory: packages/database
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ github.event_name == 'push' && secrets.DATABASE_URL_STAGING || secrets.DATABASE_URL_PRODUCTION }}
         run: |
           DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
           echo "Running migrations on ${DEPLOY_ENV} database..."
@@ -213,7 +213,7 @@ jobs:
         uses: expo/expo-github-action@v8
         with:
           eas-version: 18.x
-          packager: npm
+          packager: pnpm
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build with EAS

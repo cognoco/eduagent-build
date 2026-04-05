@@ -137,18 +137,27 @@ function ThemedApp() {
     }
   }, [systemColorScheme]);
 
-  // Load accent preset from SecureStore when profile changes
+  // BM-08: Load accent preset from SecureStore when profile changes.
+  // Reset to null immediately on switch to prevent the previous profile's
+  // accent from staying visible while the async load resolves.  The cleanup
+  // function cancels stale lookups so a slower profile-A read can't overwrite
+  // profile-B's selection.
   useEffect(() => {
     if (!activeProfile?.id) return;
+    let cancelled = false;
+    setAccentPresetIdState(null); // reset immediately
     const key = `${ACCENT_STORE_PREFIX}${activeProfile.id}`;
     (async () => {
       try {
         const stored = await SecureStore.getItemAsync(key);
-        setAccentPresetIdState(stored);
+        if (!cancelled) setAccentPresetIdState(stored);
       } catch {
-        setAccentPresetIdState(null);
+        if (!cancelled) setAccentPresetIdState(null);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [activeProfile?.id]);
 
   // Register 401 handler: when a Clerk token expires mid-session the API

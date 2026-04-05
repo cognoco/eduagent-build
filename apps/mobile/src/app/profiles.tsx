@@ -18,11 +18,9 @@ export default function ProfilesScreen() {
     // Close modal FIRST — prevents crash from tree remount (themeKey change)
     // destroying the navigation state while the modal is still open.
     router.back();
-    try {
-      await switchProfile(profileId);
-    } catch {
-      // Profile switch failed — user is already back on previous screen
-    }
+    // BM-05: switchProfile returns a result instead of throwing, so
+    // callers no longer need try/catch to avoid crashes.
+    await switchProfile(profileId);
   };
 
   return (

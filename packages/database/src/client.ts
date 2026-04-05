@@ -26,6 +26,10 @@ export function createDatabase(databaseUrl: string) {
         if (isUnsupportedTransactionError(error) && typeof fn === 'function') {
           // Neon HTTP lacks transactions — pass base DB cast as PgTransaction
           // so service functions that accept Database | PgTransaction still work.
+          // Statements execute individually; no atomicity or rollback.
+          console.warn(
+            '[db] neon-http transaction fallback — running without atomicity'
+          );
           return fn(db as unknown as Parameters<typeof fn>[0]);
         }
         throw error;

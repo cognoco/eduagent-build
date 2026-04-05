@@ -235,32 +235,56 @@ export async function getChildrenForParent(
     profileMap.set(s.id, s.rawInput ?? null);
   }
 
+  // R-03: Batch queries to avoid N+1 per child profile.
+  // Fetch all child profiles in a single query instead of one per loop iteration.
+  const allChildProfiles = await db.query.profiles.findMany({
+    where: inArray(profiles.id, childProfileIds),
+  });
+  const profilesById = new Map(allChildProfiles.map((p) => [p.id, p]));
+
+  // Batch recent sessions for all children in one query
+  const now = new Date();
+  const startOfThisWeek = getStartOfWeek(now);
+  const startOfLastWeek = new Date(startOfThisWeek);
+  startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+
+  const allRecentSessions = await db.query.learningSessions.findMany({
+    where: and(
+      inArray(learningSessions.profileId, childProfileIds),
+      gte(learningSessions.startedAt, startOfLastWeek)
+    ),
+  });
+  const sessionsByProfile = new Map<string, typeof allRecentSessions>();
+  for (const s of allRecentSessions) {
+    let arr = sessionsByProfile.get(s.profileId);
+    if (!arr) {
+      arr = [];
+      sessionsByProfile.set(s.profileId, arr);
+    }
+    arr.push(s);
+  }
+
+  // Batch guided metrics and progress in parallel per child (still parallelized)
+  const validLinks = links.filter((l) => profilesById.has(l.childProfileId));
+  const [progressResults, guidedMetricsResults] = await Promise.all([
+    Promise.all(
+      validLinks.map((l) => getOverallProgress(db, l.childProfileId))
+    ),
+    Promise.all(
+      validLinks.map((l) =>
+        countGuidedMetrics(db, l.childProfileId, startOfLastWeek)
+      )
+    ),
+  ]);
+
   const children: DashboardChild[] = [];
 
-  for (const link of links) {
-    const childProfileId = link.childProfileId;
-
-    // 2. Get child's display name
-    const profile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, childProfileId),
-    });
-    if (!profile) continue;
-
-    // 3. Get subject progress (includes retention status per subject)
-    const progress = await getOverallProgress(db, childProfileId);
-
-    // 4. Count sessions this week and last week
-    const now = new Date();
-    const startOfThisWeek = getStartOfWeek(now);
-    const startOfLastWeek = new Date(startOfThisWeek);
-    startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
-
-    const recentSessions = await db.query.learningSessions.findMany({
-      where: and(
-        eq(learningSessions.profileId, childProfileId),
-        gte(learningSessions.startedAt, startOfLastWeek)
-      ),
-    });
+  for (let i = 0; i < validLinks.length; i++) {
+    const childProfileId = validLinks[i]!.childProfileId;
+    const profile = profilesById.get(childProfileId)!;
+    const progress = progressResults[i]!;
+    const guidedMetrics = guidedMetricsResults[i]!;
+    const recentSessions = sessionsByProfile.get(childProfileId) ?? [];
 
     const sessionsThisWeek = recentSessions.filter(
       (s) => s.startedAt >= startOfThisWeek
@@ -269,7 +293,6 @@ export async function getChildrenForParent(
       (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
     ).length;
 
-    // 5. Sum user-facing duration for time tracking (seconds -> minutes)
     // Prefer wall-clock time with active-time fallback for legacy sessions.
     const getDisplaySeconds = (session: {
       wallClockSeconds: number | null;
@@ -285,7 +308,7 @@ export async function getChildrenForParent(
       )
       .reduce((sum, s) => sum + getDisplaySeconds(s), 0);
 
-    // 6. Sum exchange counts (FR215.4: "X minutes, Y exchanges")
+    // FR215.4: "X minutes, Y exchanges"
     const exchangesThisWeek = recentSessions
       .filter((s) => s.startedAt >= startOfThisWeek)
       .reduce((sum, s) => sum + s.exchangeCount, 0);
@@ -295,17 +318,10 @@ export async function getChildrenForParent(
       )
       .reduce((sum, s) => sum + s.exchangeCount, 0);
 
-    // 7. Count guided metrics from session events
-    const guidedMetrics = await countGuidedMetrics(
-      db,
-      childProfileId,
-      startOfLastWeek
-    );
-
-    // 7. Look up rawInput from pre-fetched subjects (keyed by subjectId)
+    // Look up rawInput from pre-fetched subjects (keyed by subjectId)
     const rawInputMap = subjectsByProfile.get(childProfileId) ?? new Map();
 
-    // 8. Build DashboardInput for summary generation
+    // Build DashboardInput for summary generation
     const subjectRetentionData = progress.subjects.map((s) => ({
       name: s.name,
       status: s.retentionStatus,

@@ -32,10 +32,15 @@ const storage = {
 
 export type { Profile };
 
+export interface SwitchProfileResult {
+  success: boolean;
+  error?: string;
+}
+
 export interface ProfileContextValue {
   profiles: Profile[];
   activeProfile: Profile | null;
-  switchProfile: (profileId: string) => Promise<void>;
+  switchProfile: (profileId: string) => Promise<SwitchProfileResult>;
   isLoading: boolean;
   /** Set when a saved profile was removed server-side and we fell back to owner */
   profileWasRemoved: boolean;
@@ -48,8 +53,7 @@ const ACTIVE_PROFILE_KEY = 'mentomate_active_profile_id';
 export const ProfileContext = createContext<ProfileContextValue>({
   profiles: [],
   activeProfile: null,
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  switchProfile: async () => {},
+  switchProfile: async () => ({ success: true }),
   isLoading: true,
   profileWasRemoved: false,
   // eslint-disable-next-line @typescript-eslint/no-empty-function
@@ -108,10 +112,19 @@ export function ProfileProvider({
   );
 
   const switchProfile = useCallback(
-    async (profileId: string) => {
-      const res = await client.profiles.switch.$post({ json: { profileId } });
-      if (!res.ok) {
-        throw new Error('Failed to switch profile');
+    async (profileId: string): Promise<SwitchProfileResult> => {
+      try {
+        const res = await client.profiles.switch.$post({
+          json: { profileId },
+        });
+        if (!res.ok) {
+          return { success: false, error: 'Failed to switch profile' };
+        }
+      } catch {
+        return {
+          success: false,
+          error: 'Network error while switching profile',
+        };
       }
       await storage.setItem(ACTIVE_PROFILE_KEY, profileId);
       // State update LAST — triggers re-renders that change themeKey and
@@ -149,6 +162,7 @@ export function ProfileProvider({
         predicate: (query) =>
           PROFILE_SCOPED_KEYS.includes(String(query.queryKey[0])),
       });
+      return { success: true };
     },
     [client, queryClient]
   );

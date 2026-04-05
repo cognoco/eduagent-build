@@ -1094,7 +1094,11 @@ export async function closeSession(
       ? 'auto_closed'
       : 'completed';
 
-  await db
+  // BD-05: Compare-and-swap — only close if the session is still active.
+  // Between the initial read and this write, the learner could resume the
+  // session, so we guard the UPDATE with `status = 'active'` to prevent
+  // closing a session that has already been resumed or closed.
+  const [updated] = await db
     .update(learningSessions)
     .set({
       status: nextStatus,
@@ -1111,9 +1115,27 @@ export async function closeSession(
     .where(
       and(
         eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
+        eq(learningSessions.profileId, profileId),
+        eq(learningSessions.status, 'active')
       )
-    );
+    )
+    .returning({ id: learningSessions.id });
+
+  // Session was already closed or resumed — skip side-effects
+  if (!updated) {
+    return {
+      message: 'Session already closed or resumed',
+      sessionId,
+      topicId: session.topicId ?? null,
+      subjectId: session.subjectId,
+      sessionType: session.sessionType,
+      verificationType: session.verificationType ?? null,
+      wallClockSeconds,
+      summaryStatus: effectiveSummaryStatus,
+      interleavedTopicIds: undefined,
+      escalationRungs: undefined,
+    };
+  }
 
   await createPendingSessionSummary(
     db,
@@ -1299,6 +1321,11 @@ export async function closeStaleSessions(
         summaryStatus: 'auto_closed',
       }
     );
+
+    // BD-05: Skip sessions that were resumed between read and write
+    if (result.message === 'Session already closed or resumed') {
+      continue;
+    }
 
     results.push({
       profileId: staleSession.profileId,

@@ -12,7 +12,9 @@ import { IntentCard } from './IntentCard';
 export interface LearnerScreenProps {
   profiles: Profile[];
   activeProfile: Profile | null;
-  switchProfile: (profileId: string) => Promise<void>;
+  switchProfile: (
+    profileId: string
+  ) => Promise<{ success: boolean; error?: string }>;
   onBack?: () => void;
 }
 
