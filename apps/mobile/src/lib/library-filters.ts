@@ -88,6 +88,25 @@ export interface TopicsFilters {
 }
 
 // ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+export function formatLastPracticed(iso: string | null): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  const diffDays = Math.floor(
+    (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
@@ -206,7 +225,8 @@ export function searchBooks(
   return items.filter(
     (item) =>
       item.book.title.toLowerCase().includes(q) ||
-      (item.book.description ?? '').toLowerCase().includes(q)
+      (item.book.description ?? '').toLowerCase().includes(q) ||
+      item.subjectName.toLowerCase().includes(q)
   );
 }
 
@@ -274,7 +294,11 @@ export function searchTopics(
 ): EnrichedTopic[] {
   const q = query.trim().toLowerCase();
   if (!q) return items;
-  return items.filter((item) => item.name.toLowerCase().includes(q));
+  return items.filter(
+    (item) =>
+      item.name.toLowerCase().includes(q) ||
+      item.subjectName.toLowerCase().includes(q)
+  );
 }
 
 export function filterTopics(

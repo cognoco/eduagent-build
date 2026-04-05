@@ -364,6 +364,12 @@ describe('searchBooks', () => {
     expect(searchBooks(items, 'chemistry')).toHaveLength(0);
   });
 
+  it('matches on subject name', () => {
+    const items = [makeBook({ subjectName: 'Mathematics' })];
+    expect(searchBooks(items, 'math')).toHaveLength(1);
+    expect(searchBooks(items, 'MATH')).toHaveLength(1);
+  });
+
   it('handles null description gracefully', () => {
     const items = [
       makeBook({ book: { ...makeBook().book, description: null } }),
@@ -565,6 +571,14 @@ describe('searchTopics', () => {
     const items = [makeTopic({ name: 'Quadratic Equations' })];
     expect(searchTopics(items, 'quadratic')).toHaveLength(1);
     expect(searchTopics(items, 'QUADRATIC')).toHaveLength(1);
+  });
+
+  it('matches on subject name', () => {
+    const items = [
+      makeTopic({ name: 'Fractions', subjectName: 'Mathematics' }),
+    ];
+    expect(searchTopics(items, 'math')).toHaveLength(1);
+    expect(searchTopics(items, 'MATH')).toHaveLength(1);
   });
 
   it('returns empty for no match', () => {
