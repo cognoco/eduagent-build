@@ -55,51 +55,57 @@ Phase 4: Test Coverage & Validation
 
 ---
 
-## Phase 1: Shared Contracts & Security Hardening
+## Phase 1: Shared Contracts & Security Hardening ✅ COMPLETE (2026-04-05)
 
 > **Goal:** Fix the schema foundation and close all security/data-integrity gaps before any feature work.
 > **Estimated scope:** ~18 items. Phase 1A is sequential; 1B and 1C are fully parallel with each other and with 1A's later steps.
+> **Result:** All 18 items done. API tests: 1891 pass. Lint: clean. Typecheck: only expected Phase 2D persona cascade errors remain.
 
-### Stream 1A — Epic 12 Persona Removal Cascade (SEQUENTIAL)
+### Stream 1A — Epic 12 Persona Removal Cascade ✅
 
-This is the only true sequential chain in the entire plan. Each layer depends on the previous one.
+| Step | Severity | Status | Fix |
+|------|----------|--------|-----|
+| 1A.1 | CRITICAL | ✅ DONE | Migration `0012_tan_exodus.sql` drops `personaType` column + `persona_type` enum. |
+| 1A.2 | CRITICAL | ✅ DONE | Removed `personaTypeSchema`, `PersonaType` type, and `personaType` fields from `profileCreateSchema` + `profileSchema`. |
+| 1A.3 | CRITICAL | ✅ DONE | Removed `personaType: 'LEARNER'` from `buildProfile()` + updated factory test. |
 
-| Step | Severity | File | Fix |
-|------|----------|------|-----|
-| 1A.1 | CRITICAL | `packages/database/src/schema/profiles.ts:16,64` | Create migration to drop `personaTypeEnum` and `personaType` column. Run `db:generate` + commit migration SQL. |
-| 1A.2 | CRITICAL | `packages/schemas/src/profiles.ts:4,24,77` | Remove `personaTypeSchema` export (line 4), `personaType` from `profileCreateSchema` (line 24), `personaType` from `profileSchema` (line 77). |
-| 1A.3 | CRITICAL | `packages/factory/src/profiles.ts:11` | Remove `personaType: 'LEARNER'` default from `buildProfile()`. |
+**After 1A completes:** Streams 2D and 3D are now unblocked. Expected TS errors in `profile.ts`, `export.ts`, `test-seed.ts` until 2D is done.
 
-**After 1A completes:** Streams 2D and 3D become unblocked.
+### Stream 1B — Security & Data-Integrity Fixes ✅
 
-### Stream 1B — Security & Data-Integrity Fixes (PARALLEL)
+| ID | Severity | Status | Fix Applied |
+|----|----------|--------|-------------|
+| 1B.1 | HIGH | ✅ DONE | `persistCurriculum` now takes `profileId`, verifies subject ownership via `db.query.subjects.findFirst`. Both route callers updated. |
+| 1B.2 | HIGH | ✅ DONE | `addProfileToSubscription` calls `canAddProfile(db, subscriptionId)` before returning. Returns null when limit reached. |
+| 1B.3 | CRITICAL | ✅ DONE | Null `accountId` now returns early with `{ received: true, error: 'Unknown app_user_id' }` + `console.warn`. HTTP 200 to avoid webhook retries. |
+| 1B.4 | MED | ✅ DONE | `constantTimeCompare` takes `secret` parameter; caller passes `webhookSecret`. No more hardcoded `'webhook-compare'`. |
+| 1B.5 | LOW | ✅ DONE | `requireProfileId(c.get('profileId'))` added at top of OCR endpoint. Updated 10 test requests with `X-Profile-Id` header. |
+| 1B.6 | LOW | ✅ DONE | `loadTopicTitle` `profileId` parameter changed from optional to required. All callers already passed it. |
 
-All items are independent — different files, no shared state.
+### Stream 1C — Billing & Metering Correctness ✅
 
-| ID | Epic | Severity | File | Fix |
-|----|------|----------|------|-----|
-| 1B.1 | 1 | HIGH | `apps/api/src/services/interview.ts:373` | Add ownership check: verify `subjectId` belongs to `profileId` inside `persistCurriculum` before insert. |
-| 1B.2 | 5 | HIGH | `apps/api/src/services/billing.ts:1294-1323` | Add `canAddProfile()` call to enforce `maxProfiles` limit before adding profile to subscription. |
-| 1B.3 | 9 | CRITICAL | `apps/api/src/routes/revenuecat-webhook.ts:598-613` | Handle null `accountId` from `resolveAccountId()` — reject webhook or create account before proceeding. Null accountId currently skips idempotency check silently. |
-| 1B.4 | 5 | MED | `apps/api/src/routes/revenuecat-webhook.ts:47` | Replace hardcoded HMAC key `'webhook-compare'` in `constantTimeCompare` with actual webhook secret from config. |
-| 1B.5 | 2 | LOW | `apps/api/src/routes/homework.ts:48-89` | Add `requireProfileId()` check to OCR endpoint. Currently authenticated but not profile-scoped. |
-| 1B.6 | 3 | LOW | `apps/api/src/services/assessments.ts:286-307` | Add profileId requirement to `loadTopicTitle` — remove optional profileId path to prevent future unscoped access. |
+| ID | Severity | Status | Fix Applied |
+|----|----------|--------|-------------|
+| 1C.1 | MED | ✅ DONE | `checkQuota` now receives real `topUpCreditsRemaining` from `getTopUpCreditsRemaining(db, subscriptionId)`. Added fast-path rejection via `result.allowed` before `decrementQuota`. |
+| 1C.2 | MED | ✅ DONE | Both 402 responses (fast-path + decrement-failure) include actual `topUpCreditsRemaining`. |
+| 1C.3 | MED | ✅ DONE | `isValidTransition()` wired into `updateSubscriptionFromRevenuecatWebhook`. Invalid transitions log a warning and return existing subscription unchanged. |
+| 1C.4 | HIGH | ✅ NO-OP | KV write was already `await`-ed. Added clarifying comment. |
+| 1C.5 | HIGH | ✅ DONE | `isTrial && !trialEndsAt` now logs error and falls back to non-trial activation instead of throwing. |
+| 1C.6 | MED | ✅ DONE | Added `Number.isNaN(lastTs)` guard before timestamp comparison. |
+| 1C.7 | MED | ✅ NO-OP | Both webhook files already call `refreshKvCache` after every `cancelledAt` update. No change needed. |
+| 1C.8 | LOW | ✅ DONE | `periodEndTs` now reads subscription-level `current_period_end` via safe cast, falling back to item-level. |
+| 1C.9 | LOW | ✅ DONE | `mockQuotaPoolRow` now includes `dailyLimit: null` and `usedToday: 0` defaults. |
 
-### Stream 1C — Billing & Metering Correctness (PARALLEL)
+### Tests updated alongside Phase 1
 
-These fix data correctness in the billing pipeline. All independent.
-
-| ID | Epic | Severity | File | Fix |
-|----|------|----------|------|-----|
-| 1C.1 | 5 | MED | `apps/api/src/middleware/metering.ts:187-193` | Fix `checkQuota` dead code: either check `result.allowed` before `decrementQuota`, or remove the call. Currently passing `topUpCreditsRemaining: 0` makes result wrong for top-up users. |
-| 1C.2 | 5 | MED | `apps/api/src/middleware/metering.ts:210-214` | Query `getTopUpCreditsRemaining()` for 402 response instead of hardcoding `topUpCreditsRemaining: 0`. |
-| 1C.3 | 5 | MED | `apps/api/src/services/subscription.ts:97-98` | Wire `isValidTransition()` into webhook subscription update logic, or delete if deliberately unused. State machine exists only in tests. |
-| 1C.4 | 9 | HIGH | `apps/api/src/middleware/metering.ts:225-235` | Await KV cache write after `decrementQuota` before sending response. Current fire-and-forget allows stale reads on concurrent requests. |
-| 1C.5 | 9 | HIGH | `apps/api/src/services/billing.ts:1631-1633` | Move `isTrial + trialEndsAt` validation to before function call (or return graceful error), not throw inside webhook handler. |
-| 1C.6 | 9 | MED | `apps/api/src/services/billing.ts:1535-1541` | Fix type inconsistency: `lastRevenuecatEventTimestampMs` is text column but compared as number. Ensure consistent coercion. |
-| 1C.7 | 9 | MED | `apps/api/src/routes/stripe-webhook.ts` + `revenuecat-webhook.ts` | Sync KV cache immediately after `cancelledAt` updates in cancellation handlers. |
-| 1C.8 | 5 | LOW | `apps/api/src/routes/billing.ts:236-239` | Fix `periodEndTs` fallback — Stripe SDK v20 may not populate `current_period_end` on cancel response. Use subscription object directly. |
-| 1C.9 | 5 | LOW | `apps/api/src/services/billing.test.ts:78-97` | Add `dailyLimit` and `usedToday` fields to `mockQuotaPoolRow`. Tests get `undefined` for daily fields. |
+| Test File | What Changed |
+|-----------|-------------|
+| `factory/src/profiles.test.ts` | Removed `personaType: 'LEARNER'` from expected output |
+| `routes/homework.test.ts` | Added `X-Profile-Id` header to all OCR test requests |
+| `routes/profiles.test.ts` | Removed "invalid personaType" test, removed `personaType` from age-validation test body |
+| `routes/sessions.test.ts` | Added `getTopUpCreditsRemaining` mock to billing mock |
+| `middleware/metering.test.ts` | Added `getTopUpCreditsRemaining` mock, updated top-up/streaming tests for fast-path rejection |
+| `services/interview.test.ts` | Updated `persistCurriculum` calls to pass `profileId`, added `subjects.findFirst` to mock DB |
 
 ---
 
