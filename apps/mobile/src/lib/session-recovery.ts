@@ -32,17 +32,31 @@ export async function writeSessionRecoveryMarker(
 export async function readSessionRecoveryMarker(
   profileId?: string | null
 ): Promise<SessionRecoveryMarker | null> {
-  const raw =
-    (await SecureStore.getItemAsync(getRecoveryKey(profileId))) ??
-    (profileId ? await SecureStore.getItemAsync(RECOVERY_KEY) : null);
-  if (!raw) return null;
+  const raw = await SecureStore.getItemAsync(getRecoveryKey(profileId));
+
+  // Legacy fallback: if no marker found under the profileId-scoped key,
+  // check the old unscoped key for pre-migration markers.
+  const effectiveRaw =
+    raw ??
+    (profileId
+      ? await SecureStore.getItemAsync(RECOVERY_KEY).catch(() => null)
+      : null);
+  if (!effectiveRaw) return null;
 
   try {
-    const parsed = JSON.parse(raw) as SessionRecoveryMarker;
+    const parsed = JSON.parse(effectiveRaw) as SessionRecoveryMarker;
     if (!parsed.sessionId || !parsed.updatedAt) return null;
     if (profileId && parsed.profileId && parsed.profileId !== profileId) {
       return null;
     }
+
+    // Migrate: if we read from the legacy key, rewrite under the scoped key
+    // and clean up the old one so this fallback only fires once.
+    if (!raw && profileId) {
+      await writeSessionRecoveryMarker(parsed, profileId).catch(() => {});
+      await SecureStore.deleteItemAsync(RECOVERY_KEY).catch(() => {});
+    }
+
     return parsed;
   } catch {
     return null;
@@ -52,10 +66,11 @@ export async function readSessionRecoveryMarker(
 export async function clearSessionRecoveryMarker(
   profileId?: string | null
 ): Promise<void> {
-  await Promise.all([
-    SecureStore.deleteItemAsync(getRecoveryKey(profileId)),
-    ...(profileId ? [SecureStore.deleteItemAsync(RECOVERY_KEY)] : []),
-  ]);
+  await SecureStore.deleteItemAsync(getRecoveryKey(profileId));
+  // Also clean up the legacy unscoped key if it exists, preventing orphaned entries.
+  if (profileId) {
+    await SecureStore.deleteItemAsync(RECOVERY_KEY).catch(() => {});
+  }
 }
 
 export function isRecoveryMarkerFresh(

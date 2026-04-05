@@ -26,6 +26,7 @@ export interface ChatMessage {
   role: 'ai' | 'user';
   content: string;
   streaming?: boolean;
+  kind?: 'reconnect_prompt' | 'session_expired';
   escalationRung?: number;
   verificationBadge?: VerificationBadge;
   eventId?: string;

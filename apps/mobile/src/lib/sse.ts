@@ -176,10 +176,14 @@ export function streamSSEViaXHR(
     }
   }
 
-  // Detect HTTP errors early (before streaming begins)
+  // Detect HTTP errors as soon as headers arrive (readyState 2) — prevents
+  // onprogress from parsing error response bodies as SSE data.
   xhr.onreadystatechange = () => {
     if (xhr.readyState === 2 && xhr.status >= 400) {
-      streamError = new Error(`API error ${xhr.status}: ${xhr.statusText}`);
+      streamError = new Error(
+        `API error ${xhr.status}: ${xhr.statusText || 'request failed'}`
+      ) as Error & { status?: number };
+      (streamError as Error & { status?: number }).status = xhr.status;
       done = true;
       const r = resolve;
       resolve = null;
@@ -215,8 +219,52 @@ export function streamSSEViaXHR(
   };
 
   xhr.onloadend = () => {
-    // Skip if already errored — avoid parsing error response bodies as SSE
+    // If headers-received handler already flagged an error, enrich it with the
+    // full response body (now available) and extract any structured error code.
+    if (streamError && xhr.status >= 400) {
+      const apiError = streamError as Error & { status?: number; code?: string };
+      // Overwrite with full body now that it's available
+      apiError.message = `API error ${xhr.status}: ${xhr.responseText || xhr.statusText}`;
+      try {
+        const parsed = JSON.parse(xhr.responseText || '{}') as {
+          error?: { code?: string };
+        };
+        if (typeof parsed.error?.code === 'string') {
+          apiError.code = parsed.error.code;
+        }
+      } catch {
+        // Ignore malformed error bodies — formatApiError handles plain text.
+      }
+      done = true;
+      const r = resolve;
+      resolve = null;
+      r?.();
+      return;
+    }
+    // Skip if already errored for non-HTTP reasons (timeout, network)
     if (streamError) {
+      done = true;
+      const r = resolve;
+      resolve = null;
+      r?.();
+      return;
+    }
+    if (xhr.status >= 400) {
+      const apiError = new Error(
+        `API error ${xhr.status}: ${xhr.responseText || xhr.statusText}`
+      ) as Error & { status?: number; code?: string };
+      apiError.status = xhr.status;
+      try {
+        const parsed = JSON.parse(xhr.responseText || '{}') as {
+          error?: { code?: string };
+        };
+        if (typeof parsed.error?.code === 'string') {
+          apiError.code = parsed.error.code;
+        }
+      } catch {
+        // Ignore malformed error bodies here — formatApiError handles plain text.
+      }
+      streamError = apiError;
       done = true;
       const r = resolve;
       resolve = null;
@@ -241,7 +289,7 @@ export function streamSSEViaXHR(
   // 30s timeout — prevents indefinite hangs if server stalls mid-stream
   xhr.timeout = 30_000;
   xhr.ontimeout = () => {
-    streamError = new Error('SSE stream timed out after 30s');
+    streamError = new Error('The connection timed out while waiting for a reply');
     done = true;
     const r = resolve;
     resolve = null;
