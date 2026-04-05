@@ -80,7 +80,10 @@ interface InterviewStreamDoneResult {
   exchangeCount: number;
 }
 
-export function useStreamInterviewMessage(subjectId: string): {
+export function useStreamInterviewMessage(
+  subjectId: string,
+  bookId?: string
+): {
   stream: (
     message: string,
     onChunk: (accumulated: string) => void,
@@ -100,9 +103,11 @@ export function useStreamInterviewMessage(subjectId: string): {
   const getTokenRef = useRef(getToken);
   const profileIdRef = useRef(activeProfile?.id);
   const subjectIdRef = useRef(subjectId);
+  const bookIdRef = useRef(bookId);
   getTokenRef.current = getToken;
   profileIdRef.current = activeProfile?.id;
   subjectIdRef.current = subjectId;
+  bookIdRef.current = bookId;
 
   const stream = useCallback(
     async (
@@ -125,7 +130,9 @@ export function useStreamInterviewMessage(subjectId: string): {
         if (profileIdRef.current)
           headers['X-Profile-Id'] = profileIdRef.current;
 
-        const url = `${getApiUrl()}/v1/subjects/${effectiveSubjectId}/interview/stream`;
+        const url = `${getApiUrl()}/v1/subjects/${effectiveSubjectId}/interview/stream${
+          bookIdRef.current ? `?bookId=${bookIdRef.current}` : ''
+        }`;
         const { events, abort } = streamSSEViaXHR(url, {
           method: 'POST',
           headers,

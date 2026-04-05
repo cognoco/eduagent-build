@@ -36,6 +36,7 @@ export type InterviewState = z.infer<typeof interviewStateSchema>;
 export const interviewContextSchema = z.object({
   subjectName: z.string(),
   exchangeHistory: z.array(chatExchangeSchema),
+  bookTitle: z.string().optional(),
 });
 export type InterviewContext = z.infer<typeof interviewContextSchema>;
 

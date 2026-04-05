@@ -16,9 +16,11 @@ const OPENING_MESSAGE =
   "Hi! I'm your learning mate. I'd like to get to know you a bit before we start. What made you interested in learning this subject?";
 
 export default function InterviewScreen() {
-  const { subjectId, subjectName } = useLocalSearchParams<{
+  const { subjectId, subjectName, bookId, bookTitle } = useLocalSearchParams<{
     subjectId?: string;
     subjectName?: string;
+    bookId?: string;
+    bookTitle?: string;
   }>();
   const router = useRouter();
   const interviewState = useInterviewState(subjectId ?? '');
@@ -26,10 +28,14 @@ export default function InterviewScreen() {
     stream: streamInterview,
     abort: abortStream,
     isStreaming: isStreamingSSE,
-  } = useStreamInterviewMessage(subjectId ?? '');
+  } = useStreamInterviewMessage(subjectId ?? '', bookId);
+
+  const openingMessage = bookTitle
+    ? `Hi! I'm your learning mate. Let's talk about ${bookTitle}! What do you already know about it, and what are you most curious to learn?`
+    : OPENING_MESSAGE;
 
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'opening', role: 'ai', content: OPENING_MESSAGE },
+    { id: 'opening', role: 'ai', content: openingMessage },
   ]);
   const isStreaming = isStreamingSSE;
   const [interviewComplete, setInterviewComplete] = useState(false);
@@ -45,11 +51,11 @@ export default function InterviewScreen() {
 
   useEffect(() => {
     seededDraftRef.current = false;
-    setMessages([{ id: 'opening', role: 'ai', content: OPENING_MESSAGE }]);
+    setMessages([{ id: 'opening', role: 'ai', content: openingMessage }]);
     setInterviewComplete(false);
     setRestartRequired(false);
     setStreamError(null);
-  }, [subjectId]);
+  }, [subjectId, openingMessage]);
 
   useEffect(() => {
     return () => {
@@ -83,7 +89,7 @@ export default function InterviewScreen() {
       setMessages(
         mappedHistory.length > 0
           ? mappedHistory
-          : [{ id: 'opening', role: 'ai', content: OPENING_MESSAGE }]
+          : [{ id: 'opening', role: 'ai', content: openingMessage }]
       );
       setInterviewComplete(true);
       seededDraftRef.current = true;
@@ -125,7 +131,7 @@ export default function InterviewScreen() {
   const handleRestartInterview = useCallback(() => {
     try {
       abortStream();
-      setMessages([{ id: 'opening', role: 'ai', content: OPENING_MESSAGE }]);
+      setMessages([{ id: 'opening', role: 'ai', content: openingMessage }]);
       setInterviewComplete(false);
       setRestartRequired(false);
       setStreamError(null);
@@ -133,7 +139,7 @@ export default function InterviewScreen() {
     } catch (err: unknown) {
       Alert.alert('Could not restart interview', formatApiError(err));
     }
-  }, [abortStream]);
+  }, [abortStream, openingMessage]);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -199,7 +205,11 @@ export default function InterviewScreen() {
 
   return (
     <ChatShell
-      title={`Interview: ${subjectName ?? 'New Subject'}`}
+      title={
+        bookTitle
+          ? `Interview: ${bookTitle}`
+          : `Interview: ${subjectName ?? 'New Subject'}`
+      }
       messages={messages}
       onSend={handleSend}
       isStreaming={isStreaming}
@@ -214,7 +224,10 @@ export default function InterviewScreen() {
               ? () =>
                   router.replace({
                     pathname: '/(learner)/onboarding/analogy-preference',
-                    params: { subjectId },
+                    params: {
+                      subjectId,
+                      ...(bookId ? { bookId } : {}),
+                    },
                   } as never)
               : undefined
           }
@@ -234,7 +247,10 @@ export default function InterviewScreen() {
               onPress={() =>
                 router.replace({
                   pathname: '/(learner)/onboarding/analogy-preference',
-                  params: { subjectId },
+                  params: {
+                    subjectId,
+                    ...(bookId ? { bookId } : {}),
+                  },
                 } as never)
               }
               className="bg-primary rounded-button py-3 items-center"

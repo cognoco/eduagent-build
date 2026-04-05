@@ -6,6 +6,7 @@
 import { eq, and, notInArray, sql } from 'drizzle-orm';
 import {
   subjects,
+  curriculumBooks,
   learningSessions,
   createScopedRepository,
   type Database,
@@ -96,10 +97,27 @@ export async function createSubject(
 export interface CreatedSubjectWithStructure {
   subject: Subject;
   structureType: SubjectStructureType;
+  bookId?: string;
+  bookTitle?: string;
   bookCount?: number;
   topicCount?: number;
   /** True when LLM classification failed and we fell back to narrow */
   classificationFailed?: boolean;
+}
+
+async function findExistingSubjectByName(
+  db: Database,
+  profileId: string,
+  name: string
+): Promise<Subject | null> {
+  const repo = createScopedRepository(db, profileId);
+  const rows = await repo.subjects.findMany(
+    and(
+      sql`LOWER(${subjects.name}) = LOWER(${name})`,
+      eq(subjects.status, 'active')
+    )
+  );
+  return rows.length > 0 ? mapSubjectRow(rows[0]!) : null;
 }
 
 export async function createSubjectWithStructure(
@@ -107,6 +125,69 @@ export async function createSubjectWithStructure(
   profileId: string,
   input: SubjectCreateInput
 ): Promise<CreatedSubjectWithStructure> {
+  // Focused book path: input combines a broad subject with a specific focus area
+  if (input.focus) {
+    const existingSubject = await findExistingSubjectByName(
+      db,
+      profileId,
+      input.name
+    );
+    const targetSubject =
+      existingSubject ??
+      (await createSubject(db, profileId, {
+        name: input.name,
+        rawInput: input.rawInput,
+      }));
+
+    await ensureCurriculum(db, targetSubject.id);
+
+    // Check if a book with this focus already exists on the subject
+    const existingBook = await db.query.curriculumBooks.findFirst({
+      where: and(
+        eq(curriculumBooks.subjectId, targetSubject.id),
+        sql`LOWER(${curriculumBooks.title}) = LOWER(${input.focus})`
+      ),
+    });
+    if (existingBook) {
+      return {
+        subject: targetSubject,
+        structureType: 'focused_book' as SubjectStructureType,
+        bookId: existingBook.id,
+        bookTitle: existingBook.title,
+        bookCount: 1,
+      };
+    }
+
+    // Create the focused book
+    const maxOrderResult = await db
+      .select({
+        maxOrder: sql<number>`COALESCE(MAX(${curriculumBooks.sortOrder}), 0)`,
+      })
+      .from(curriculumBooks)
+      .where(eq(curriculumBooks.subjectId, targetSubject.id));
+    const nextOrder = (maxOrderResult[0]?.maxOrder ?? 0) + 1;
+
+    const [bookRow] = await db
+      .insert(curriculumBooks)
+      .values({
+        subjectId: targetSubject.id,
+        title: input.focus,
+        description: input.focusDescription ?? null,
+        emoji: null,
+        sortOrder: nextOrder,
+        topicsGenerated: false,
+      })
+      .returning();
+
+    return {
+      subject: targetSubject,
+      structureType: 'focused_book',
+      bookId: bookRow!.id,
+      bookTitle: input.focus,
+      bookCount: 1,
+    };
+  }
+
   const subject = await createSubject(db, profileId, input);
 
   if (subject.pedagogyMode === 'four_strands' && subject.languageCode) {

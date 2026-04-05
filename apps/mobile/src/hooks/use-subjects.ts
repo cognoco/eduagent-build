@@ -17,7 +17,9 @@ interface UseSubjectsOptions {
 
 export interface CreateSubjectResponse {
   subject: Subject;
-  structureType: 'broad' | 'narrow';
+  structureType: 'broad' | 'narrow' | 'focused_book';
+  bookId?: string;
+  bookTitle?: string;
   bookCount?: number;
 }
 
@@ -53,13 +55,23 @@ export function useSubjects(
 export function useCreateSubject(): UseMutationResult<
   CreateSubjectResponse,
   Error,
-  { name: string; rawInput?: string }
+  {
+    name: string;
+    rawInput?: string;
+    focus?: string;
+    focusDescription?: string;
+  }
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { name: string; rawInput?: string }) => {
+    mutationFn: async (input: {
+      name: string;
+      rawInput?: string;
+      focus?: string;
+      focusDescription?: string;
+    }) => {
       const res = await client.subjects.$post({ json: input });
       await assertOk(res);
       return (await res.json()) as CreateSubjectResponse;

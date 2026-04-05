@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
+import { and, eq } from 'drizzle-orm';
 import { interviewMessageSchema } from '@eduagent/schemas';
-import type { Database } from '@eduagent/database';
+import { curriculumBooks, type Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { getSubject } from '../services/subject';
@@ -36,16 +37,31 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
       const { message } = c.req.valid('json');
+      const bookId = c.req.query('bookId');
 
       const subject = await getSubject(db, profileId, subjectId);
       if (!subject) return notFound(c, 'Subject not found');
 
+      let bookTitle: string | undefined;
+      if (bookId) {
+        const bookRow = await db.query.curriculumBooks.findFirst({
+          where: and(
+            eq(curriculumBooks.id, bookId),
+            eq(curriculumBooks.subjectId, subjectId)
+          ),
+        });
+        bookTitle = bookRow?.title;
+      }
+
       const draft = await getOrCreateDraft(db, profileId, subjectId);
 
-      const result = await processInterviewExchange(
-        { subjectName: subject.name, exchangeHistory: draft.exchangeHistory },
-        message
-      );
+      const context = {
+        subjectName: subject.name,
+        exchangeHistory: draft.exchangeHistory,
+        ...(bookTitle ? { bookTitle } : {}),
+      };
+
+      const result = await processInterviewExchange(context, message);
 
       const updatedHistory = [
         ...draft.exchangeHistory,
@@ -60,11 +76,19 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
           exchangeHistory: updatedHistory,
           extractedSignals: result.extractedSignals ?? draft.extractedSignals,
         });
-        await persistCurriculum(db, profileId, subjectId, subject.name, {
-          ...draft,
-          exchangeHistory: updatedHistory,
-          extractedSignals: result.extractedSignals ?? draft.extractedSignals,
-        });
+        await persistCurriculum(
+          db,
+          profileId,
+          subjectId,
+          subject.name,
+          {
+            ...draft,
+            exchangeHistory: updatedHistory,
+            extractedSignals: result.extractedSignals ?? draft.extractedSignals,
+          },
+          bookId,
+          bookTitle
+        );
         // Only mark complete after curriculum is persisted.
         await updateDraft(db, profileId, draft.id, {
           status: 'completed',
@@ -91,14 +115,32 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
       const { message } = c.req.valid('json');
+      const bookId = c.req.query('bookId');
 
       const subject = await getSubject(db, profileId, subjectId);
       if (!subject) return notFound(c, 'Subject not found');
 
+      let bookTitle: string | undefined;
+      if (bookId) {
+        const bookRow = await db.query.curriculumBooks.findFirst({
+          where: and(
+            eq(curriculumBooks.id, bookId),
+            eq(curriculumBooks.subjectId, subjectId)
+          ),
+        });
+        bookTitle = bookRow?.title;
+      }
+
       const draft = await getOrCreateDraft(db, profileId, subjectId);
 
+      const context = {
+        subjectName: subject.name,
+        exchangeHistory: draft.exchangeHistory,
+        ...(bookTitle ? { bookTitle } : {}),
+      };
+
       const { stream, onComplete } = await streamInterviewExchange(
-        { subjectName: subject.name, exchangeHistory: draft.exchangeHistory },
+        context,
         message
       );
 
@@ -129,12 +171,20 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
               extractedSignals:
                 result.extractedSignals ?? draft.extractedSignals,
             });
-            await persistCurriculum(db, profileId, subjectId, subject.name, {
-              ...draft,
-              exchangeHistory: updatedHistory,
-              extractedSignals:
-                result.extractedSignals ?? draft.extractedSignals,
-            });
+            await persistCurriculum(
+              db,
+              profileId,
+              subjectId,
+              subject.name,
+              {
+                ...draft,
+                exchangeHistory: updatedHistory,
+                extractedSignals:
+                  result.extractedSignals ?? draft.extractedSignals,
+              },
+              bookId,
+              bookTitle
+            );
             // Only mark complete after curriculum is persisted
             await updateDraft(db, profileId, draft.id, {
               status: 'completed',
