@@ -145,10 +145,16 @@ export async function extractHomeworkSummary(
     throw new Error('Session not found');
   }
 
+  // BC-08: scope subjects query by profileId for defense-in-depth
   const [subjectRow] = await db
     .select({ name: subjects.name })
     .from(subjects)
-    .where(eq(subjects.id, sessionRow.subjectId))
+    .where(
+      and(
+        eq(subjects.id, sessionRow.subjectId),
+        eq(subjects.profileId, profileId)
+      )
+    )
     .limit(1);
 
   const subjectName = subjectRow?.name ?? 'Homework';

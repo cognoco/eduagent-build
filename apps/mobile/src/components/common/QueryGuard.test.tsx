@@ -111,4 +111,63 @@ describe('QueryGuard', () => {
     );
     expect(getByTestId('query-guard-empty')).toBeTruthy();
   });
+
+  // BM-04: disabled queries have isPending=true but isLoading=false.
+  // Using isLoading would let undefined data fall through to children.
+  it('shows loading for disabled query where isPending=true but isLoading=false (BM-04)', () => {
+    const query = makeQuery<string[]>({
+      isPending: true,
+      isLoading: false,
+      isFetching: false,
+      fetchStatus: 'idle',
+      status: 'pending',
+      isSuccess: false,
+    });
+    const { getByTestId, queryByText } = render(
+      <QueryGuard query={query}>
+        {(data: string[]) => <Text>Count: {data.length}</Text>}
+      </QueryGuard>
+    );
+    // Should show loading spinner, NOT crash by passing undefined to children
+    expect(getByTestId('query-guard-loading')).toBeTruthy();
+    expect(queryByText(/Count/)).toBeNull();
+  });
+
+  it('renders custom loading UI when provided', () => {
+    const query = makeQuery<string[]>({
+      isPending: true,
+      isLoading: true,
+      status: 'pending',
+    });
+    const { getByText } = render(
+      <QueryGuard query={query} loading={<Text>Custom loading...</Text>}>
+        {(data: string[]) => <Text>{data.length}</Text>}
+      </QueryGuard>
+    );
+    expect(getByText('Custom loading...')).toBeTruthy();
+  });
+
+  it('renders custom error UI when provided', () => {
+    const query = makeQuery<string[]>({
+      isError: true,
+      error: new Error('fail'),
+      status: 'error',
+    });
+    const { getByText } = render(
+      <QueryGuard query={query} error={<Text>Custom error</Text>}>
+        {(data: string[]) => <Text>{data.length}</Text>}
+      </QueryGuard>
+    );
+    expect(getByText('Custom error')).toBeTruthy();
+  });
+
+  it('renders custom empty UI when provided', () => {
+    const query = makeQuery<string[]>({ data: [] });
+    const { getByText } = render(
+      <QueryGuard query={query} empty={<Text>Custom empty</Text>}>
+        {(data: string[]) => <Text>{data.length}</Text>}
+      </QueryGuard>
+    );
+    expect(getByText('Custom empty')).toBeTruthy();
+  });
 });

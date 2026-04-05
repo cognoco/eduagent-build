@@ -586,6 +586,42 @@ describe('startSession', () => {
 
     expect(db.insert).not.toHaveBeenCalled();
   });
+
+  it('BS-04: throws when topicId does not belong to the subject', async () => {
+    const foreignTopicId = '880e8400-e29b-41d4-a716-446655440000';
+    const db = createMockDb({
+      insertReturning: [mockSessionRow({ topicId: foreignTopicId })],
+      // BS-04: select returns empty — topic not found in this subject's curriculum
+      selectResults: [[]],
+    });
+
+    await expect(
+      startSession(db, profileId, subjectId, {
+        subjectId,
+        topicId: foreignTopicId,
+      })
+    ).rejects.toThrow('Topic not found in this subject');
+
+    // Session insert should not have been called
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('BS-04: allows topicId that belongs to the subject', async () => {
+    const validTopicId = '770e8400-e29b-41d4-a716-446655440000';
+    const row = mockSessionRow({ topicId: validTopicId });
+    const db = createMockDb({
+      insertReturning: [row],
+      // BS-04: select returns the topic — it belongs to this subject
+      selectResults: [[{ id: validTopicId }]],
+    });
+
+    const result = await startSession(db, profileId, subjectId, {
+      subjectId,
+      topicId: validTopicId,
+    });
+
+    expect(result.topicId).toBe(validTopicId);
+  });
 });
 
 describe('getSession', () => {
@@ -1004,6 +1040,40 @@ describe('processMessage', () => {
       }),
       'Normal learning'
     );
+  });
+
+  it('D-03: throws SessionExchangeLimitError when atomic increment returns 0 rows', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ exchangeCount: 49 }),
+    });
+    const db = createMockDb({
+      // Atomic update returns empty array (0 rows updated = limit reached)
+      updateReturning: [],
+    });
+
+    // The processMessage call should throw because the atomic
+    // WHERE exchangeCount < 50 matched 0 rows
+    const { SessionExchangeLimitError } = await import('./session');
+    await expect(
+      processMessage(db, profileId, sessionId, {
+        message: 'One more message',
+      })
+    ).rejects.toThrow(SessionExchangeLimitError);
+  });
+
+  it('D-03: succeeds when atomic increment returns a row (under limit)', async () => {
+    setupScopedRepo({
+      sessionFindFirst: mockSessionRow({ exchangeCount: 10 }),
+    });
+    const db = createMockDb({
+      updateReturning: [{ exchangeCount: 11 }],
+    });
+    const result = await processMessage(db, profileId, sessionId, {
+      message: 'Hello tutor',
+    });
+
+    expect(result.exchangeCount).toBe(11);
+    expect(result.response).toBe('Great question! Let me explain...');
   });
 });
 

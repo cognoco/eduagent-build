@@ -696,6 +696,85 @@ describe('processRecallTest', () => {
 
     expect(syncXpLedgerStatus).not.toHaveBeenCalled();
   });
+
+  it('D-02: returns cooldown response when atomic guard rejects update (0 rows)', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.6,
+        intervalDays: 10,
+        repetitions: 4,
+        failureCount: 0,
+        consecutiveSuccesses: 3,
+        xpStatus: 'verified',
+        nextReviewAt: '2026-02-25T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+
+    const db = createMockDb();
+    // Simulate atomic guard returning 0 rows (concurrent request already claimed)
+    const whereMock = jest.fn().mockImplementation(() => {
+      const p = Promise.resolve(undefined);
+      (p as Record<string, unknown>).returning = jest
+        .fn()
+        .mockResolvedValue([]); // empty = 0 rows updated
+      return p;
+    });
+    (db.update as jest.Mock).mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: whereMock,
+      }),
+    });
+
+    const result = await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'A detailed answer',
+    });
+
+    expect(result.cooldownActive).toBe(true);
+    expect(result.cooldownEndsAt).toBeDefined();
+    expect(result.passed).toBe(false);
+    expect(result.xpChange).toBe('none');
+  });
+
+  it('D-02: atomic guard allows update when lastReviewedAt is null (first review)', async () => {
+    const card = mockRetentionCardRow();
+    // First review — lastReviewedAt is null
+    Object.assign(card, { lastReviewedAt: null });
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.6,
+        intervalDays: 6,
+        repetitions: 1,
+        failureCount: 0,
+        consecutiveSuccesses: 1,
+        xpStatus: 'verified',
+        nextReviewAt: '2026-02-21T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+
+    const db = createMockDb();
+    const result = await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'A detailed answer about the topic',
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.cooldownActive).toBeUndefined();
+    expect(db.update).toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------

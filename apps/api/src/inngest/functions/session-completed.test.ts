@@ -660,6 +660,46 @@ describe('sessionCompleted', () => {
       expect(outcome.status).toBe('skipped');
     });
 
+    it('skips and warns for unknown verificationType (C-05)', async () => {
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      const { result } = (await executeSteps(
+        createEventData({ verificationType: 'unknown_future_type' })
+      )) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'process-verification-completion'
+      );
+      expect(outcome.status).toBe('skipped');
+      expect(mockProcessEvaluateCompletion).not.toHaveBeenCalled();
+      expect(mockProcessTeachBackCompletion).not.toHaveBeenCalled();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Unknown verificationType')
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('skips silently when verificationType is null (C-05)', async () => {
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      const { result } = (await executeSteps(
+        createEventData({ verificationType: null })
+      )) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'process-verification-completion'
+      );
+      expect(outcome.status).toBe('skipped');
+      // null is expected — no "Unknown verificationType" warning should be logged
+      const verificationWarnings = consoleSpy.mock.calls.filter((call) =>
+        String(call[0]).includes('Unknown verificationType')
+      );
+      expect(verificationWarnings).toHaveLength(0);
+
+      consoleSpy.mockRestore();
+    });
+
     it('isolates errors without blocking other steps', async () => {
       mockProcessTeachBackCompletion.mockRejectedValueOnce(
         new Error('Assessment parse error')

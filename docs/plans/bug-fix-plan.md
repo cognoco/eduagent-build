@@ -92,6 +92,7 @@
 - **Severity:** High / Data Integrity
 - **Description:** The cooldown read (`effectiveCard.lastReviewedAt`) and the write (`lastReviewedAt = now()`) are separate queries. Two concurrent recall-test requests can both pass the cooldown check and both commit within the same 24-hour window, allowing double-testing.
 - **Fix:** Use an atomic `UPDATE ... WHERE lastReviewedAt < cooldown_threshold` (compare-and-swap) to enforce the cooldown at the DB level.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Atomic `UPDATE ... WHERE` guard rejects concurrent cooldown violations; regression tests cover both rejection and first-review paths.
 
 ### D-03: Session exchange-limit enforcement is racy
 
@@ -100,6 +101,7 @@
 - **Severity:** High / Data Integrity
 - **Description:** `checkExchangeLimit` reads `exchangeCount` as a snapshot before the LLM call. Concurrent requests can both read `exchangeCount = 49`, both pass the `< 50` check, both complete LLM work, and both increment — exceeding the cap.
 - **Fix:** Use an atomic conditional update: `UPDATE sessions SET exchangeCount = exchangeCount + 1 WHERE exchangeCount < limit RETURNING exchangeCount`.
+- **Status (2026-04-05):** ✅ Fixed in current branch. `persistExchangeResult` uses atomic `SET exchangeCount = exchangeCount + 1 WHERE exchangeCount < MAX` with regression tests.
 
 ### D-04: Parking lot TOCTOU race
 
@@ -108,6 +110,7 @@
 - **Severity:** Medium / Data Integrity
 - **Description:** The count check (`existing.length >= MAX_ITEMS_PER_TOPIC`) and insert are separate queries with no transaction. Concurrent POSTs can exceed the per-session limit.
 - **Fix:** Wrap in a transaction or use a DB-level constraint.
+- **Status (2026-04-05):** ✅ Fixed in current branch. `addParkingLotItem` wraps count check + insert in `db.transaction()`; regression tests verify transactional behavior.
 
 ### D-05: No DB-level CHECK constraints for numeric fields
 
@@ -181,6 +184,7 @@
 - **Severity:** Medium / Type Safety
 - **Description:** `verificationType as string | null | undefined` casts on raw Inngest event data without runtime validation. If a new verification type is added, the downstream `if/else` silently skips it.
 - **Fix:** Add `verificationType` to the Inngest event schema definition and use Zod runtime validation.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Replaced `as` cast with `verificationTypeSchema.safeParse()` from `@eduagent/schemas`; unknown types log a warning instead of silently skipping. Tests cover unknown and null cases.
 
 ### C-06: Missing Zod validation on topicId path parameter
 
@@ -316,7 +320,7 @@
 - **Severity:** Medium / CI
 - **Description:** `expo/expo-github-action@v8` is configured with `packager: npm` while the project uses pnpm. EAS may use npm for lifecycle hooks and workspace resolution, diverging from `pnpm-lock.yaml`.
 - **Fix:** Change to `packager: pnpm` or remove the setting if the action auto-detects.
-- **Status (2026-04-04):** ✅ Fixed in current branch. `deploy.yml` now uses `packager: pnpm`.
+- **Status (2026-04-05):** ⚠️ NOT FIXED — `deploy.yml` line 216 still uses `packager: npm`. Previous status was incorrect.
 
 ### CI-05: Hardcoded TEST_SEED_SECRET in e2e-ci.yml
 
@@ -333,6 +337,7 @@
 - **Severity:** Low / Security Hygiene
 - **Description:** `if (headerSecret !== secret)` uses direct string equality instead of `timingSafeEqual`. Severity is low since this only protects test-seed routes in non-production.
 - **Fix:** Use `crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b))`.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Replaced direct `!==` with HMAC-SHA256 constant-time comparison (matching BS-01 approach).
 
 ### CI-07: Maestro hardcoded machine-specific paths
 
@@ -376,6 +381,7 @@
 - **Severity:** Low / Architecture
 - **Description:** The auto-delete step uses raw `db.execute(sql\`DELETE FROM profiles...\`)` instead of a service function, bypassing audit logging and cascade logic (Clerk user deletion, Inngest events).
 - **Fix:** Extract into a `deleteProfileIfNoConsent` service function.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Extracted `deleteProfileIfNoConsent()` into `services/deletion.ts`; consent-reminders now calls the service function. 4 unit tests cover deletion, retention, already-deleted, and edge cases.
 
 ---
 
@@ -481,7 +487,7 @@ The following Critical/High findings were addressed and merged:
   ```yaml
   DATABASE_URL: ${{ github.event_name == 'push' && secrets.DATABASE_URL_STAGING || secrets.DATABASE_URL_PRODUCTION }}
   ```
-- **Status (2026-04-04):** ✅ Fixed in current branch. `deploy.yml` now selects `DATABASE_URL_STAGING` for pushes/staging dispatches and `DATABASE_URL_PRODUCTION` for production dispatches.
+- **Status (2026-04-05):** ⚠️ NOT FIXED — `deploy.yml` lines 152/158 still use generic `${{ secrets.DATABASE_URL }}` for both staging and production. Previous status was incorrect.
 
 #### PR109-02: CLAUDE.md stripped of engineering guidance
 
@@ -524,6 +530,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Critical / Security
 - **Description:** The `timingSafeEqual` helper was added (fixing the original `===` comparison), but it still does an early-return on `a.length !== b.length`. This leaks the byte-length of `REVENUECAT_WEBHOOK_SECRET` via timing side-channel. An attacker can determine the secret length by submitting tokens of increasing lengths.
 - **Fix:** Pad both inputs to equal length before XOR comparison, or hash both values with HMAC before comparing.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Replaced XOR-fold with HMAC-SHA256 constant-time comparison using SubtleCrypto; input length no longer leaks. 2 tests added.
 
 #### BS-02: Top-up credit idempotency race (check-then-insert, no unique constraint)
 
@@ -533,6 +540,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Critical / Security + Data Integrity
 - **Description:** `isTopUpAlreadyGranted` (SELECT) and `purchaseTopUpCredits` (INSERT) are separate steps with no transaction and no DB unique constraint on `revenuecatTransactionId`. Concurrent webhook retries can pass the check simultaneously and double-grant credits.
 - **Fix:** Add a `UNIQUE` constraint on `revenuecatTransactionId` and use `INSERT ... ON CONFLICT DO NOTHING`.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Added `uniqueIndex` on `revenuecatTransactionId` in billing schema; `purchaseTopUpCredits` uses `.onConflictDoNothing()` and returns `null` for duplicates. Removed separate `isTopUpAlreadyGranted` check-then-insert pattern.
 
 #### BS-03: Over-broad auth/consent bypass for `/v1/revenuecat/*`
 
@@ -551,6 +559,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** High / Security
 - **Description:** `startSession()` accepts `input.topicId` and stores it without verifying the topic belongs to the verified subject's curriculum. It checks subject ownership but not that the topic belongs to that subject. A user with a valid subjectId who guesses a topicId from another subject could start a session with it.
 - **Fix:** Verify `topicId` exists in the subject's curriculum before proceeding.
+- **Status (2026-04-05):** ✅ Fixed in current branch. `startSession` verifies `topicId` belongs to the subject's curriculum via inner join before proceeding; regression tests cover mismatched and valid topic-subject pairs.
 
 #### BS-05: [NEEDS_DEEPENING] marker leaked in streamed responses
 
@@ -754,6 +763,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Medium / Type Safety
 - **Description:** `JSON.parse(data)` is cast as `StreamEvent` with only a minimal `typeof === 'object'` check. No validation that required fields (`content`, `exchangeCount`, `escalationRung`) exist. A malformed SSE message passes the guard and silently corrupts accumulated text.
 - **Fix:** Add runtime validation for expected fields before casting.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Runtime field validation added after `JSON.parse`; malformed events are skipped. 6 tests cover missing fields, wrong types, unknown event types.
 
 #### BC-08: Missing profileId scope on subjects query in homework-summary
 
@@ -762,6 +772,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Low / Defense-in-depth
 - **Description:** Subject is fetched by `id` alone without `profileId` filter. The session itself is already scoped, so practical risk is low, but the defense-in-depth gap exists.
 - **Fix:** Add `profileId` filter to the subjects query.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Added `eq(subjects.profileId, profileId)` to the WHERE clause; tests verify profileId scoping and graceful fallback.
 
 ---
 
@@ -775,6 +786,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Medium / Reliability
 - **Description:** Both components start `withRepeat` animations but have no cleanup function in their `useEffect`. Shared values keep animating on the Reanimated UI thread after unmount, wasting resources and potentially causing state-update-on-unmounted warnings.
 - **Fix:** Return `() => { cancelAnimation(sharedValue); }` from the effect.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Both components return `cancelAnimation()` cleanup from their animation effects; tests verify cleanup on unmount.
 
 ---
 
@@ -796,6 +808,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Critical / Runtime crash
 - **Description:** `transformOrigin: 'left center'` string syntax crashes in Reanimated 3.x+ / New Architecture. Throws `HostFunction` error.
 - **Fix:** Use array syntax: `transformOrigin: ['0%', '50%', 0]`.
+- **Status (2026-04-05):** ✅ Fixed in current branch. All `transformOrigin` values use array syntax; test verifies no string-based values exist.
 
 #### BM-03: No QueryClient clear on auth expiration (data leakage)
 
@@ -804,6 +817,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** Critical / Security
 - **Description:** Auth expiration handler only calls `signOut()`. Cached data from the previous user remains in the QueryClient, which persists at module scope. The next user who signs in could see stale data from the previous session.
 - **Fix:** Call `queryClient.clear()` in the auth expiration handler.
+- **Status (2026-04-05):** ✅ Fixed in current branch. `queryClient.clear()` called before `signOut()` in auth expiration handler.
 
 #### BM-04: QueryGuard uses `isLoading` instead of `isPending`
 
@@ -812,6 +826,7 @@ The following Critical/High findings were addressed and merged:
 - **Severity:** High / Runtime crash
 - **Description:** In TanStack Query v5, `isLoading = isPending && isFetching`. For disabled queries (`enabled: false`), `isLoading` is false but `data` is undefined. The guard falls through to `children(data as T)` with `undefined`, causing crashes.
 - **Fix:** Use `isPending` instead of `isLoading`.
+- **Status (2026-04-05):** ✅ Fixed in current branch. Guard uses `isPending` instead of `isLoading`; 4 tests cover disabled query scenario and custom render props.
 
 #### BM-05: `switchProfile` throws without all call sites protected
 

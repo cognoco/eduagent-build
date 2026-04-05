@@ -5,6 +5,79 @@
 > Audit scope: `tests/integration`, `apps/api/src`, `apps/mobile/src`, `packages/database/src`
 > Method: searched `jest.mock()` across the test tree, then inspected representative files that use hand-rolled fakes such as `createMockDb`, fake fetch clients, mock JWT helpers, and mock providers.
 
+## Progress Update
+
+### 2026-04-05
+
+Launch billing direction update:
+
+- Mobile launch path is Apple App Store + Google Play billing first, via RevenueCat.
+- Existing Stripe code and the converted Stripe webhook coverage remain useful as dormant coverage for a future web / direct-billing path, but Stripe is not the primary launch-critical billing track.
+- Billing-related integration priority should therefore shift from Stripe-first to RevenueCat-first.
+
+Completed in this pass:
+
+- Updated `tests/integration/setup.ts` to load `DATABASE_URL` for real integration runs and clarified that the suite should keep app/database code real by default.
+- Added `tests/integration/helpers.ts` to centralize integration env setup and DB cleanup for seeded test accounts.
+- Updated `packages/test-utils/src/lib/load-database-env.ts` so integration runs fall back from `.env.test.local` to `.env.development.local` in local development.
+- Converted these suites to use the real app path with app-owned internals left real:
+  - `tests/integration/health-cors.integration.test.ts`
+  - `tests/integration/auth-chain.integration.test.ts`
+  - `tests/integration/subject-management.integration.test.ts`
+- Verified the converted suites with:
+  - `pnpm exec jest --config tests/integration/jest.config.cjs --runInBand tests/integration/health-cors.integration.test.ts tests/integration/auth-chain.integration.test.ts tests/integration/subject-management.integration.test.ts`
+
+Completed in a follow-up pass:
+
+- Converted `tests/integration/stripe-webhook.integration.test.ts` to use the real public webhook route, real billing writes, real quota updates, and real KV payload generation.
+- Converted `tests/integration/learning-session.integration.test.ts` to use the real session lifecycle, real metering/quota decrement, real summary persistence, real interleaved topic selection, and real recall-bridge generation.
+- Reduced the remaining mocked seams in these converted suites to external boundaries only:
+  - Stripe signature verification
+  - Inngest transport bootstrapping / send
+  - JWT verification for authenticated session coverage
+- Corrected a stale mock-only expectation in the old learning-session suite:
+  - `POST /v1/sessions/interleaved` returns `{ sessionId, topics }`, not `body.session`
+- Verified the additional converted suites with:
+  - `pnpm exec jest --config tests/integration/jest.config.cjs --runInBand tests/integration/stripe-webhook.integration.test.ts tests/integration/learning-session.integration.test.ts`
+
+Completed in the latest pass:
+
+- Converted `tests/integration/profile-isolation.integration.test.ts` to real profile-scope middleware + real DB ownership checks with JWT as the only mocked seam.
+- Converted `tests/integration/homework.integration.test.ts` to real homework session creation + real DB persistence, with OCR faked only through the OCR provider DI seam.
+- Converted `tests/integration/session-completed-chain.integration.test.ts` to a DB-backed Inngest chain test with real retention, summaries, streaks, XP, learning-mode updates, and coaching-card cache writes.
+- Reduced the remaining mocked seams in the new chain coverage to true external boundaries only:
+  - Voyage embedding transport
+  - Sentry reporting
+- Verified the new conversions with:
+  - `pnpm exec jest --config tests/integration/jest.config.cjs --runInBand tests/integration/profile-isolation.integration.test.ts tests/integration/homework.integration.test.ts tests/integration/session-completed-chain.integration.test.ts`
+
+Second real issue surfaced by the conversion:
+
+- The session-completed chain was calling `db.transaction(...)` through the `neon-http` Drizzle client returned by `createDatabase()`.
+- In real execution, that caused the `write-coaching-card`, `update-dashboard`, and `queue-celebrations` steps to fail with `No transactions support in neon-http driver`.
+- Production fix applied: `packages/database/src/client.ts` now falls back to executing the transaction callback directly when the driver does not support multi-statement transactions, so these steps degrade gracefully instead of failing outright.
+- Important nuance: this is a pragmatic compatibility fix, not full transactional semantics. It restores the broken path on the current driver, but true row-locking/atomicity still depends on using a transaction-capable driver.
+
+Additional non-breaking observation:
+
+- `POST /v1/profiles` still logs `[findOwnerProfile] No owner profile ... falling back to oldest profile` on first-profile creation.
+- This is middleware noise, not a failing flow: profile-scope runs before the first profile exists, then the route creates that owner profile successfully.
+
+First real issue surfaced by the conversion:
+
+- Local/dev database schema drift. The real subject-management flow initially failed because the database was missing the `subjects.pedagogy_mode` column expected by the current Drizzle schema.
+- Local fix applied: `pnpm run db:push:dev`
+- Important nuance: this fixed the local/dev database used for verification. Production/staging are only fixed if their database schema has the same change applied.
+
+Plan impact:
+
+- Phase 0 is partially complete: misleading comments/harness expectations were corrected in the converted integration path.
+- Phase 1 is now established for the first converted suites: real DB, real middleware, real routes, with mocks limited to true external seams.
+- Phase 2 is materially advanced:
+  - Converted: `auth-chain`, `health-cors`, `subject-management`, `stripe-webhook`, `learning-session`, `profile-isolation`, `homework`, `session-completed-chain`
+  - `revenuecat-webhook` remains the next launch-critical billing target once RevenueCat setup is available
+  - Immediate non-billing follow-ups now shift to the remaining route-heavy suites such as `onboarding`, `retention-lifecycle`, and `parent-dashboard`
+
 ## Snapshot
 
 - 215 test/setup files scanned.
@@ -75,18 +148,19 @@ In the table below, "base app chain" means the recurring bundle of mocks for `mi
 | --- | --- | --- | --- |
 | `tests/integration/account-deletion.integration.test.ts` | base app chain + `services/deletion`, `services/export` | Route contract and auth flow without real deletion/export work or DB | Real app + test DB; fake only Clerk/JWKS, email/export delivery, and Inngest transport |
 | `tests/integration/auth-chain.integration.test.ts` | base app chain | Wants auth middleware branch coverage without real JWKS, DB, or downstream app deps | Real app + test DB + test JWT/JWKS helper; internal services stay real |
-| `tests/integration/billing-lifecycle.integration.test.ts` | base app chain + `services/billing`, `services/stripe`, `services/kv`, `services/metering` | Route behavior only; avoids real subscription, Stripe, and quota logic | Real app + test DB; fake only Stripe and KV adapters |
+| `tests/integration/billing-lifecycle.integration.test.ts` | base app chain + `services/billing`, `services/stripe`, `services/kv`, `services/metering` | Route behavior only; avoids real subscription, Stripe, and quota logic | For current mobile launch, deprioritize behind RevenueCat coverage; if kept, real app + test DB with only payment-provider/KV adapters faked |
 | `tests/integration/health-cors.integration.test.ts` | base app chain | Wants CORS and health assertions without booting the full dependency graph | Either a smaller real app factory for public routes, or the full real app with test env and no internal service mocks |
-| `tests/integration/homework.integration.test.ts` | base app chain + `services/session`, `services/ocr`, `services/profile` | Route payload coverage without real homework/session/OCR behavior | Real app + test DB; fake only OCR/LLM boundary and Clerk/JWKS |
+| `tests/integration/homework.integration.test.ts` | JWT auth seam + OCR provider DI seam only | Converted: homework session creation and persistence now run through the real app + real DB; OCR extraction remains the only faked boundary | Keep real route coverage; optionally add a dedicated OCR-misconfiguration case later |
 | `tests/integration/inngest-quota-reset.integration.test.ts` | `inngest/client`, `inngest/helpers`, `services/billing` | Captures handler and asserts step order/counts only | Real Inngest function + test DB; fake only clock and any external notifications |
 | `tests/integration/inngest-trial-expiry.integration.test.ts` | `inngest/client`, `inngest/helpers`, `services/billing`, `services/notifications`, `services/profile`, `services/subscription`, `services/trial` | Cron orchestration without real DB state transitions or notification delivery | Real function + test DB; fake only push/email delivery |
 | `tests/integration/learning-session.integration.test.ts` | base app chain + `services/session`, `services/interleaved`, `services/recall-bridge`, `services/profile` | Session route contract without real session storage, retrieval, or bridge generation | Real app + test DB; fake only LLM boundary and Clerk/JWKS |
 | `tests/integration/onboarding.integration.test.ts` | base app chain + `services/profile`, `services/session` | Onboarding path assertions without real profile/session persistence | Real app + test DB; fake only LLM boundary and Clerk/JWKS |
 | `tests/integration/parent-dashboard.integration.test.ts` | base app chain + `services/dashboard`, `services/profile` | Dashboard route shape without running real aggregation queries | Real app + test DB with seeded child activity data |
-| `tests/integration/profile-isolation.integration.test.ts` | base app chain + `services/profile`, `services/subject` | Ownership/profile-scope assertions without real scoped reads | Real app + test DB seeded with multiple profiles; keep subject/profile services real |
+| `tests/integration/profile-isolation.integration.test.ts` | JWT auth seam only | Converted: ownership checks, owner auto-resolution, and scoped subject reads now use the real middleware + real DB | Extend later with consent/parent-child profile edge cases if needed |
+| `tests/integration/revenuecat-webhook.integration.test.ts` | Not present yet; route currently covered only by route-level mocks | Launch-critical mobile billing path currently lacks a real app + real DB integration suite | Add real route + test DB coverage; fake only RevenueCat authorization header input and Inngest/KV transport edges as needed |
 | `tests/integration/retention-lifecycle.integration.test.ts` | base app chain + `services/profile`, `services/retention-data` | Retention route shape without real SM-2 or retention-card persistence | Real app + test DB; fake only LLM boundary if needed |
-| `tests/integration/session-completed-chain.integration.test.ts` | `@eduagent/database`, `inngest/client`, `services/retention-data`, `summaries`, `coaching-cards`, `streaks`, `xp`, `homework-summary`, `embeddings`, `settings`, `verification-completion`, `celebrations`, `language-curriculum`, `vocabulary-extract`, `vocabulary`, `sentry` | Pure orchestration assertions for the post-session pipeline | Keep a small orchestration unit test, but add a real chain integration with test DB and fake only external APIs like embeddings/Sentry |
-| `tests/integration/stripe-webhook.integration.test.ts` | base app chain + `services/stripe`, `services/billing`, `services/subscription`, `services/kv` | Webhook route shape without real signature verification or billing writes | Real route + test DB; fake only Stripe signature verification and KV adapter |
+| `tests/integration/session-completed-chain.integration.test.ts` | Voyage embedding transport + Sentry reporting only | Converted: the chain now runs against a real DB and real downstream services for retention, summaries, streaks, XP, learning modes, and home-surface cache writes | Keep the small orchestration unit test and the new DB-backed chain test together; extend later for language/vocabulary and homework-summary branches |
+| `tests/integration/stripe-webhook.integration.test.ts` | base app chain + `services/stripe`, `services/billing`, `services/subscription`, `services/kv` | Webhook route shape without real signature verification or billing writes | Now converted to real route + test DB. Keep as dormant/non-launch-critical coverage until direct Stripe billing is actually enabled |
 | `tests/integration/subject-management.integration.test.ts` | base app chain + `services/subject`, `services/profile` | Subject CRUD route coverage without real subject persistence | Real app + test DB with seeded profiles |
 | `tests/integration/test-seed.integration.test.ts` | base app chain + `services/test-seed` | Route contract without running real seed/reset logic | Real app + dedicated disposable test DB; fake only Clerk API if test users are involved |
 
@@ -265,16 +339,22 @@ These matter because even after `jest.mock()` count drops, we can still have fak
 
 Start here:
 
-- `tests/integration/auth-chain.integration.test.ts`
-- `tests/integration/health-cors.integration.test.ts`
-- `tests/integration/subject-management.integration.test.ts`
-- `tests/integration/learning-session.integration.test.ts`
-- `tests/integration/stripe-webhook.integration.test.ts`
-- `tests/integration/session-completed-chain.integration.test.ts`
+- Remaining launch-critical / high-leverage integrations:
+- `tests/integration/revenuecat-webhook.integration.test.ts` (blocked until RevenueCat setup is available)
+- `tests/integration/onboarding.integration.test.ts`
+- `tests/integration/retention-lifecycle.integration.test.ts`
+- `tests/integration/parent-dashboard.integration.test.ts`
+- `tests/integration/account-deletion.integration.test.ts`
 
 Why these first:
 
-- They cover the app boot path, auth, session lifecycle, billing/webhooks, and the biggest post-session orchestration chain.
+- The already-converted suites now cover the app boot path, auth, subject CRUD, session lifecycle, homework, profile scoping, dormant Stripe coverage, and the biggest post-session orchestration chain.
+- The remaining list focuses on launch-critical mobile billing once unblocked, plus the next largest DB- and middleware-heavy routes still leaning on internal mocks.
+
+Secondary billing coverage:
+
+- `tests/integration/stripe-webhook.integration.test.ts`
+  - Keep, but treat as future web/direct-billing coverage rather than launch-critical mobile coverage.
 
 ### Phase 3: Add DB-backed service tests where mocks are currently hiding the most risk
 

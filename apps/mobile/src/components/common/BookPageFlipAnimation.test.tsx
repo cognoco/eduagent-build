@@ -37,4 +37,32 @@ describe('BookPageFlipAnimation', () => {
       render(<BookPageFlipAnimation />);
     }).not.toThrow();
   });
+
+  // BM-02: transformOrigin must use array syntax, not string syntax.
+  // String syntax like 'left center' crashes in Reanimated 3.x+ / New Architecture.
+  it('uses array syntax for transformOrigin (BM-02)', () => {
+    // We verify the source module does not contain string-based transformOrigin.
+    // The animated styles are constructed via useAnimatedStyle which returns
+    // worklet closures, so we validate the source directly.
+    const sourceModule = require('./BookPageFlipAnimation');
+    const sourceText = sourceModule.BookPageFlipAnimation.toString();
+    // The component function string should NOT contain 'left center' or 'right center'
+    // string-based transformOrigin values. Array syntax is ['0%', '50%', 0].
+    expect(sourceText).not.toContain("'left center'");
+    expect(sourceText).not.toContain("'right center'");
+    expect(sourceText).not.toContain("'center center'");
+  });
+
+  // BR-01: animations must be cancelled on unmount to prevent leaked UI-thread work
+  it('cancels animations on unmount (BR-01)', () => {
+    const reanimated = require('react-native-reanimated');
+    const cancelSpy = jest.spyOn(reanimated, 'cancelAnimation');
+
+    const { unmount } = render(<BookPageFlipAnimation testID="book" />);
+    unmount();
+
+    // Three page shared values should each be cancelled
+    expect(cancelSpy).toHaveBeenCalledTimes(3);
+    cancelSpy.mockRestore();
+  });
 });

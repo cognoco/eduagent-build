@@ -262,6 +262,50 @@ describe('addParkingLotItem', () => {
     expect(db.insert).not.toHaveBeenCalled();
   });
 
+  it('D-04: wraps count check and insert in a transaction', async () => {
+    const newRow = mockParkingLotRow({
+      id: 'tx-item',
+      question: 'Transaction test',
+    });
+    const db = createMockDb();
+    (db.insert as jest.Mock).mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([newRow]),
+      }),
+    });
+
+    await addParkingLotItem(db, profileId, sessionId, 'Transaction test');
+
+    // db.transaction should be called, proving the operation is wrapped
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(db.transaction).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it('D-04: performs count check inside the transaction context', async () => {
+    const existingRows = Array.from({ length: 10 }, (_, i) =>
+      mockParkingLotRow({ id: `item-${i}`, question: `Question ${i}` })
+    );
+
+    const db = createMockDb();
+    (db.query.parkingLotItems.findMany as jest.Mock).mockResolvedValue(
+      existingRows
+    );
+
+    const result = await addParkingLotItem(
+      db,
+      profileId,
+      sessionId,
+      'Should be rejected'
+    );
+
+    // Count check happened inside the transaction
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    // And the result is null (limit reached)
+    expect(result).toBeNull();
+    // Insert was not called because we're over the limit
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
   it('allows insert when count is below limit', async () => {
     const existingRows = Array.from({ length: 9 }, (_, i) =>
       mockParkingLotRow({ id: `item-${i}`, question: `Question ${i}` })

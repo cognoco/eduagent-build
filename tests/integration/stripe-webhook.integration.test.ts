@@ -1,115 +1,240 @@
 /**
- * Integration: Stripe Webhook (P0-007)
+ * Integration: Stripe Webhook
  *
- * Exercises POST /v1/stripe/webhook via Hono's app.request().
- * Validates the full webhook handling pipeline:
+ * Exercises the public Stripe webhook route via the real app + real database.
+ * Billing, quota, and KV-refresh behavior stay real.
  *
- * 1. Missing stripe-signature header → 400
- * 2. Invalid signature (verifyWebhookSignature throws) → 400
- * 3. Stale event (>48h old) → 400
- * 4. checkout.session.completed → activates subscription
- * 5. customer.subscription.updated → updates subscription state
- * 6. customer.subscription.deleted → marks subscription expired
- * 7. invoice.payment_failed → sets past_due, emits Inngest event
- * 8. invoice.payment_succeeded → sets active
- *
- * The webhook route is a public path (skips Clerk auth) and uses
- * Stripe signature verification instead.
+ * Mocked boundaries:
+ * - Stripe signature verification
+ * - Inngest transport bootstrapping / send
  */
 
-// --- Stripe signature mock ---
+import { eq } from 'drizzle-orm';
+import { accounts, subscriptions, quotaPools } from '@eduagent/database';
+
+import {
+  buildIntegrationEnv,
+  cleanupAccounts,
+  createIntegrationDb,
+} from './helpers';
+
 const mockVerifyWebhookSignature = jest.fn();
+const mockInngestSend = jest.fn();
+const mockInngestCreateFunction = jest.fn().mockImplementation((config) => {
+  const id = config?.id ?? 'mock-inngest-function';
+  const fn = jest.fn();
+  (fn as { getConfig: () => unknown[] }).getConfig = () => [
+    { id, name: id, triggers: [], steps: {} },
+  ];
+  return fn;
+});
 
 jest.mock('../../apps/api/src/services/stripe', () => ({
   verifyWebhookSignature: mockVerifyWebhookSignature,
 }));
 
-// --- Billing service mock (extended for webhook handlers) ---
-
-import {
-  jwtMock,
-  databaseMock,
-  inngestClientMock,
-  accountMock,
-  billingMock,
-  settingsMock,
-  sessionMock,
-  llmMock,
-} from './mocks';
-
-const mockUpdateSubscriptionFromWebhook = jest.fn();
-const mockActivateSubscriptionFromCheckout = jest.fn();
-const mockGetSubscriptionByAccountId = jest.fn();
-const mockUpdateQuotaPoolLimit = jest.fn();
-
-jest.mock('../../apps/api/src/services/billing', () => ({
-  ...billingMock(),
-  updateSubscriptionFromWebhook: mockUpdateSubscriptionFromWebhook,
-  activateSubscriptionFromCheckout: mockActivateSubscriptionFromCheckout,
-  getSubscriptionByAccountId: mockGetSubscriptionByAccountId,
-  updateQuotaPoolLimit: mockUpdateQuotaPoolLimit,
+jest.mock('../../apps/api/src/inngest/client', () => ({
+  inngest: {
+    send: mockInngestSend,
+    createFunction: mockInngestCreateFunction,
+  },
 }));
-
-// --- Subscription service mock ---
-jest.mock('../../apps/api/src/services/subscription', () => ({
-  getTierConfig: jest
-    .fn()
-    .mockReturnValue({ monthlyQuota: 500, dailyLimit: null }),
-}));
-
-// --- KV service mock ---
-jest.mock('../../apps/api/src/services/kv', () => ({
-  writeSubscriptionStatus: jest.fn().mockResolvedValue(undefined),
-}));
-
-// --- Base mocks (middleware chain requires these) ---
-
-const mockInngestSend = jest.fn().mockResolvedValue({ ids: [] });
-
-jest.mock('../../apps/api/src/middleware/jwt', () => jwtMock());
-jest.mock('@eduagent/database', () => databaseMock());
-jest.mock('../../apps/api/src/inngest/client', () =>
-  inngestClientMock(mockInngestSend)
-);
-jest.mock('../../apps/api/src/services/account', () => accountMock());
-jest.mock('../../apps/api/src/services/settings', () => settingsMock());
-jest.mock('../../apps/api/src/services/session', () => sessionMock());
-jest.mock('../../apps/api/src/services/llm', () => llmMock());
 
 import { app } from '../../apps/api/src/index';
+import { getTierConfig } from '../../apps/api/src/services/subscription';
+
+const mockKvPut = jest.fn().mockResolvedValue(undefined);
+const mockKvGet = jest.fn().mockResolvedValue(null);
+const mockKv = {
+  put: mockKvPut,
+  get: mockKvGet,
+} as unknown as KVNamespace;
 
 const TEST_ENV = {
-  ENVIRONMENT: 'development',
+  ...buildIntegrationEnv(),
   STRIPE_WEBHOOK_SECRET: 'whsec_test_secret',
-  DATABASE_URL: 'postgresql://test:test@localhost/test',
+  SUBSCRIPTION_KV: mockKv,
 };
 
-const MOCK_ACCOUNT_ID = 'acc-webhook-test';
-const MOCK_SUB_ID = 'sub_stripe_123';
+const seededEmails = new Set<string>();
+const seededClerkUserIds = new Set<string>();
+let seedCounter = 0;
 
-/** Build a Stripe-like event with sensible defaults. */
+function nextSeed(prefix: string) {
+  seedCounter += 1;
+  const suffix = `${prefix}-${seedCounter}`;
+  const email = `integration-${suffix}@integration.test`;
+  const clerkUserId = `integration-${suffix}`;
+
+  seededEmails.add(email);
+  seededClerkUserIds.add(clerkUserId);
+
+  return {
+    email,
+    clerkUserId,
+    stripeSubscriptionId: `sub_${suffix}`,
+  };
+}
+
+async function cleanupSeededAccounts(): Promise<void> {
+  if (seededEmails.size === 0 && seededClerkUserIds.size === 0) {
+    return;
+  }
+
+  await cleanupAccounts({
+    emails: [...seededEmails],
+    clerkUserIds: [...seededClerkUserIds],
+  });
+
+  seededEmails.clear();
+  seededClerkUserIds.clear();
+}
+
+async function seedAccount(prefix: string) {
+  const db = createIntegrationDb();
+  const identity = nextSeed(prefix);
+
+  const [account] = await db
+    .insert(accounts)
+    .values({
+      clerkUserId: identity.clerkUserId,
+      email: identity.email,
+    })
+    .returning();
+
+  return {
+    db,
+    account: account!,
+    ...identity,
+  };
+}
+
+async function seedSubscriptionState(input: {
+  prefix: string;
+  tier?: 'free' | 'plus' | 'family' | 'pro';
+  status?: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+  stripeSubscriptionId?: string;
+  usedThisMonth?: number;
+  usedToday?: number;
+  lastStripeEventTimestamp?: string | null;
+}) {
+  const {
+    db,
+    account,
+    stripeSubscriptionId: generatedStripeSubscriptionId,
+  } = await seedAccount(input.prefix);
+  const tier = input.tier ?? 'plus';
+  const status = input.status ?? 'active';
+  const tierConfig = getTierConfig(tier);
+
+  const [subscription] = await db
+    .insert(subscriptions)
+    .values({
+      accountId: account.id,
+      stripeSubscriptionId:
+        input.stripeSubscriptionId ?? generatedStripeSubscriptionId,
+      tier,
+      status,
+      lastStripeEventTimestamp:
+        input.lastStripeEventTimestamp === undefined
+          ? null
+          : input.lastStripeEventTimestamp
+          ? new Date(input.lastStripeEventTimestamp)
+          : null,
+    })
+    .returning();
+
+  const [quotaPool] = await db
+    .insert(quotaPools)
+    .values({
+      subscriptionId: subscription!.id,
+      monthlyLimit: tierConfig.monthlyQuota,
+      usedThisMonth: input.usedThisMonth ?? 0,
+      dailyLimit: tierConfig.dailyLimit,
+      usedToday: input.usedToday ?? 0,
+      cycleResetAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    })
+    .returning();
+
+  return {
+    db,
+    account,
+    subscription: subscription!,
+    quotaPool: quotaPool!,
+  };
+}
+
 function buildStripeEvent(
   type: string,
   dataObject: Record<string, unknown>,
   overrides?: { created?: number }
-): Record<string, unknown> {
+) {
   return {
-    id: `evt_${Date.now()}`,
+    id: `evt_${type.replace(/\W+/g, '_')}_${Date.now()}`,
     type,
     created: overrides?.created ?? Math.floor(Date.now() / 1000),
     data: { object: dataObject },
   };
 }
 
-// ---------------------------------------------------------------------------
-// Signature & staleness guards
-// ---------------------------------------------------------------------------
+function buildWebhookRequest(event: Record<string, unknown>) {
+  return {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'stripe-signature': 'sig_test',
+    },
+    body: JSON.stringify(event),
+  };
+}
 
-describe('Integration: Stripe Webhook — guards', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+async function loadSubscription(accountId: string) {
+  const db = createIntegrationDb();
+  return db.query.subscriptions.findFirst({
+    where: eq(subscriptions.accountId, accountId),
   });
+}
 
+async function loadQuotaPool(subscriptionId: string) {
+  const db = createIntegrationDb();
+  return db.query.quotaPools.findFirst({
+    where: eq(quotaPools.subscriptionId, subscriptionId),
+  });
+}
+
+function readKvPayload() {
+  expect(mockKvPut).toHaveBeenCalled();
+
+  const [key, raw, options] = mockKvPut.mock.calls.at(-1)!;
+  return {
+    key,
+    value: JSON.parse(raw as string) as {
+      subscriptionId: string;
+      tier: string;
+      status: string;
+      monthlyLimit: number;
+      usedThisMonth: number;
+      dailyLimit: number | null;
+      usedToday: number;
+    },
+    options,
+  };
+}
+
+beforeEach(async () => {
+  mockVerifyWebhookSignature.mockReset();
+  mockInngestSend.mockReset();
+  mockInngestSend.mockResolvedValue({ ids: [] });
+  mockKvPut.mockClear();
+  mockKvGet.mockClear();
+  await cleanupSeededAccounts();
+});
+
+afterAll(async () => {
+  await cleanupSeededAccounts();
+});
+
+describe('Integration: Stripe Webhook guards', () => {
   it('returns 400 when stripe-signature header is missing', async () => {
     const res = await app.request(
       '/v1/stripe/webhook',
@@ -130,15 +255,8 @@ describe('Integration: Stripe Webhook — guards', () => {
   it('returns 500 when STRIPE_WEBHOOK_SECRET is not configured', async () => {
     const res = await app.request(
       '/v1/stripe/webhook',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'stripe-signature': 'sig_test',
-        },
-        body: JSON.stringify({}),
-      },
-      { DATABASE_URL: 'postgresql://test:test@localhost/test' } // no webhook secret
+      buildWebhookRequest({}),
+      buildIntegrationEnv()
     );
 
     expect(res.status).toBe(500);
@@ -146,21 +264,14 @@ describe('Integration: Stripe Webhook — guards', () => {
     expect(body.code).toBe('INTERNAL_ERROR');
   });
 
-  it('returns 400 when webhook signature is invalid', async () => {
-    mockVerifyWebhookSignature.mockRejectedValue(
+  it('returns 400 when webhook signature verification fails', async () => {
+    mockVerifyWebhookSignature.mockRejectedValueOnce(
       new Error('Invalid signature')
     );
 
     const res = await app.request(
       '/v1/stripe/webhook',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'stripe-signature': 'sig_invalid',
-        },
-        body: JSON.stringify({}),
-      },
+      buildWebhookRequest({ invalid: true }),
       TEST_ENV
     );
 
@@ -170,279 +281,291 @@ describe('Integration: Stripe Webhook — guards', () => {
   });
 
   it('rejects stale events older than 48 hours', async () => {
-    const staleTimestamp = Math.floor(Date.now() / 1000) - 49 * 60 * 60;
     const staleEvent = buildStripeEvent(
       'customer.subscription.updated',
-      { id: MOCK_SUB_ID, status: 'active', metadata: {} },
-      { created: staleTimestamp }
+      {
+        id: 'sub_stale',
+        status: 'active',
+        metadata: {},
+        items: {
+          data: [{ current_period_start: 1700000000, current_period_end: 1 }],
+        },
+      },
+      { created: Math.floor(Date.now() / 1000) - 49 * 60 * 60 }
     );
 
-    mockVerifyWebhookSignature.mockResolvedValue(staleEvent);
+    mockVerifyWebhookSignature.mockResolvedValueOnce(staleEvent);
 
     const res = await app.request(
       '/v1/stripe/webhook',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'stripe-signature': 'sig_test',
-        },
-        body: JSON.stringify(staleEvent),
-      },
+      buildWebhookRequest(staleEvent),
       TEST_ENV
     );
 
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.code).toBe('STALE_EVENT');
+    expect(mockKvPut).not.toHaveBeenCalled();
   });
 });
 
-// ---------------------------------------------------------------------------
-// Event handling — checkout, subscription, invoice
-// ---------------------------------------------------------------------------
+describe('Integration: Stripe Webhook event handling', () => {
+  it('checkout.session.completed creates and activates a paid subscription', async () => {
+    const { account, stripeSubscriptionId } = await seedAccount(
+      'stripe-checkout'
+    );
 
-describe('Integration: Stripe Webhook — event handling', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('checkout.session.completed → activates subscription', async () => {
     const event = buildStripeEvent('checkout.session.completed', {
-      id: 'cs_123',
-      subscription: MOCK_SUB_ID,
-      metadata: { accountId: MOCK_ACCOUNT_ID, tier: 'plus' },
+      id: 'cs_checkout_completed',
+      subscription: stripeSubscriptionId,
+      metadata: { accountId: account.id, tier: 'plus' },
     });
 
-    mockVerifyWebhookSignature.mockResolvedValue(event);
-    mockActivateSubscriptionFromCheckout.mockResolvedValue({
-      id: 'sub-internal-123',
-      accountId: MOCK_ACCOUNT_ID,
-      tier: 'plus',
-      status: 'active',
-    });
+    mockVerifyWebhookSignature.mockResolvedValueOnce(event);
 
     const res = await app.request(
       '/v1/stripe/webhook',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'stripe-signature': 'sig_test',
-        },
-        body: JSON.stringify(event),
-      },
+      buildWebhookRequest(event),
       TEST_ENV
     );
 
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.received).toBe(true);
+    expect(await res.json()).toEqual({ received: true });
 
-    expect(mockActivateSubscriptionFromCheckout).toHaveBeenCalledWith(
-      expect.anything(), // db
-      MOCK_ACCOUNT_ID,
-      MOCK_SUB_ID,
-      'plus',
-      expect.any(String) // eventTimestamp
-    );
+    const subscription = await loadSubscription(account.id);
+    expect(subscription).not.toBeNull();
+    expect(subscription!.stripeSubscriptionId).toBe(stripeSubscriptionId);
+    expect(subscription!.tier).toBe('plus');
+    expect(subscription!.status).toBe('active');
+
+    const quotaPool = await loadQuotaPool(subscription!.id);
+    expect(quotaPool).not.toBeNull();
+    expect(quotaPool!.monthlyLimit).toBe(getTierConfig('plus').monthlyQuota);
+    expect(quotaPool!.dailyLimit).toBeNull();
+
+    const kvWrite = readKvPayload();
+    expect(kvWrite.key).toBe(`sub:${account.id}`);
+    expect(kvWrite.value).toMatchObject({
+      subscriptionId: subscription!.id,
+      tier: 'plus',
+      status: 'active',
+      monthlyLimit: getTierConfig('plus').monthlyQuota,
+      usedThisMonth: 0,
+      dailyLimit: null,
+      usedToday: 0,
+    });
+    expect(kvWrite.options).toEqual({ expirationTtl: 86400 });
   });
 
-  it('customer.subscription.updated → updates subscription state', async () => {
-    const now = Math.floor(Date.now() / 1000);
+  it('customer.subscription.updated applies real tier and quota changes', async () => {
+    const { account, subscription } = await seedSubscriptionState({
+      prefix: 'stripe-updated',
+      tier: 'plus',
+      status: 'active',
+      usedThisMonth: 42,
+      usedToday: 3,
+    });
+
+    const periodStart = Math.floor(Date.now() / 1000) - 3600;
+    const periodEnd = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
     const event = buildStripeEvent('customer.subscription.updated', {
-      id: MOCK_SUB_ID,
+      id: subscription.stripeSubscriptionId,
       status: 'active',
-      metadata: { tier: 'plus' },
-      current_period_start: now - 86400,
-      current_period_end: now + 30 * 86400,
+      metadata: { tier: 'family' },
       canceled_at: null,
+      items: {
+        data: [
+          {
+            current_period_start: periodStart,
+            current_period_end: periodEnd,
+          },
+        ],
+      },
     });
 
-    mockVerifyWebhookSignature.mockResolvedValue(event);
-    mockUpdateSubscriptionFromWebhook.mockResolvedValue({
-      id: 'sub-internal-123',
-      accountId: MOCK_ACCOUNT_ID,
-      tier: 'plus',
-      status: 'active',
-    });
+    mockVerifyWebhookSignature.mockResolvedValueOnce(event);
 
     const res = await app.request(
       '/v1/stripe/webhook',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'stripe-signature': 'sig_test',
-        },
-        body: JSON.stringify(event),
-      },
+      buildWebhookRequest(event),
       TEST_ENV
     );
 
     expect(res.status).toBe(200);
-    expect(mockUpdateSubscriptionFromWebhook).toHaveBeenCalledWith(
-      expect.anything(),
-      MOCK_SUB_ID,
-      expect.objectContaining({
-        status: 'active',
-        tier: 'plus',
-      })
+
+    const updatedSubscription = await loadSubscription(account.id);
+    expect(updatedSubscription).not.toBeNull();
+    expect(updatedSubscription!.tier).toBe('family');
+    expect(updatedSubscription!.status).toBe('active');
+    expect(updatedSubscription!.currentPeriodStart?.toISOString()).toBe(
+      new Date(periodStart * 1000).toISOString()
     );
+    expect(updatedSubscription!.currentPeriodEnd?.toISOString()).toBe(
+      new Date(periodEnd * 1000).toISOString()
+    );
+
+    const quotaPool = await loadQuotaPool(subscription.id);
+    expect(quotaPool).not.toBeNull();
+    expect(quotaPool!.monthlyLimit).toBe(getTierConfig('family').monthlyQuota);
+    expect(quotaPool!.dailyLimit).toBeNull();
+    expect(quotaPool!.usedThisMonth).toBe(42);
+    expect(quotaPool!.usedToday).toBe(3);
+
+    const kvWrite = readKvPayload();
+    expect(kvWrite.value).toMatchObject({
+      subscriptionId: subscription.id,
+      tier: 'family',
+      status: 'active',
+      monthlyLimit: getTierConfig('family').monthlyQuota,
+      usedThisMonth: 42,
+      dailyLimit: null,
+      usedToday: 3,
+    });
   });
 
-  it('customer.subscription.deleted → marks subscription expired', async () => {
+  it('customer.subscription.deleted downgrades the subscription to free tier', async () => {
+    const { account, subscription } = await seedSubscriptionState({
+      prefix: 'stripe-deleted',
+      tier: 'family',
+      status: 'active',
+      usedThisMonth: 17,
+      usedToday: 4,
+    });
+
     const event = buildStripeEvent('customer.subscription.deleted', {
-      id: MOCK_SUB_ID,
+      id: subscription.stripeSubscriptionId,
       status: 'canceled',
       metadata: {},
+      items: { data: [] },
     });
 
-    mockVerifyWebhookSignature.mockResolvedValue(event);
-    mockUpdateSubscriptionFromWebhook.mockResolvedValue({
-      id: 'sub-internal-123',
-      accountId: MOCK_ACCOUNT_ID,
+    mockVerifyWebhookSignature.mockResolvedValueOnce(event);
+
+    const res = await app.request(
+      '/v1/stripe/webhook',
+      buildWebhookRequest(event),
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+
+    const updatedSubscription = await loadSubscription(account.id);
+    expect(updatedSubscription).not.toBeNull();
+    expect(updatedSubscription!.tier).toBe('free');
+    expect(updatedSubscription!.status).toBe('expired');
+    expect(updatedSubscription!.cancelledAt).not.toBeNull();
+
+    const quotaPool = await loadQuotaPool(subscription.id);
+    expect(quotaPool).not.toBeNull();
+    expect(quotaPool!.monthlyLimit).toBe(getTierConfig('free').monthlyQuota);
+    expect(quotaPool!.dailyLimit).toBe(getTierConfig('free').dailyLimit);
+    expect(quotaPool!.usedThisMonth).toBe(17);
+    expect(quotaPool!.usedToday).toBe(4);
+
+    const kvWrite = readKvPayload();
+    expect(kvWrite.value).toMatchObject({
+      subscriptionId: subscription.id,
       tier: 'free',
       status: 'expired',
+      monthlyLimit: getTierConfig('free').monthlyQuota,
+      usedThisMonth: 17,
+      dailyLimit: getTierConfig('free').dailyLimit,
+      usedToday: 4,
     });
-
-    const res = await app.request(
-      '/v1/stripe/webhook',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'stripe-signature': 'sig_test',
-        },
-        body: JSON.stringify(event),
-      },
-      TEST_ENV
-    );
-
-    expect(res.status).toBe(200);
-    expect(mockUpdateSubscriptionFromWebhook).toHaveBeenCalledWith(
-      expect.anything(),
-      MOCK_SUB_ID,
-      expect.objectContaining({
-        status: 'expired',
-      })
-    );
   });
 
-  it('invoice.payment_failed → sets past_due and emits Inngest event', async () => {
-    const event = buildStripeEvent('invoice.payment_failed', {
-      id: 'in_failed_123',
-      parent: {
-        subscription_details: { subscription: MOCK_SUB_ID },
-      },
-      attempt_count: 2,
+  it('invoice.payment_failed marks the subscription past_due and emits an Inngest event', async () => {
+    const { account, subscription } = await seedSubscriptionState({
+      prefix: 'stripe-payment-failed',
+      tier: 'plus',
+      status: 'active',
+      usedThisMonth: 5,
     });
 
-    mockVerifyWebhookSignature.mockResolvedValue(event);
-    mockUpdateSubscriptionFromWebhook.mockResolvedValue({
-      id: 'sub-internal-123',
-      accountId: MOCK_ACCOUNT_ID,
-      stripeSubscriptionId: MOCK_SUB_ID,
-      tier: 'plus',
-      status: 'past_due',
+    const event = buildStripeEvent('invoice.payment_failed', {
+      id: 'in_payment_failed',
+      attempt_count: 2,
+      parent: {
+        subscription_details: {
+          subscription: subscription.stripeSubscriptionId,
+        },
+      },
     });
+
+    mockVerifyWebhookSignature.mockResolvedValueOnce(event);
 
     const res = await app.request(
       '/v1/stripe/webhook',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'stripe-signature': 'sig_test',
-        },
-        body: JSON.stringify(event),
-      },
+      buildWebhookRequest(event),
       TEST_ENV
     );
 
     expect(res.status).toBe(200);
 
-    // Verify subscription updated to past_due
-    expect(mockUpdateSubscriptionFromWebhook).toHaveBeenCalledWith(
-      expect.anything(),
-      MOCK_SUB_ID,
-      expect.objectContaining({ status: 'past_due' })
-    );
+    const updatedSubscription = await loadSubscription(account.id);
+    expect(updatedSubscription).not.toBeNull();
+    expect(updatedSubscription!.status).toBe('past_due');
 
-    // Verify Inngest event emitted for payment retry flow
+    const kvWrite = readKvPayload();
+    expect(kvWrite.value).toMatchObject({
+      subscriptionId: subscription.id,
+      tier: 'plus',
+      status: 'past_due',
+      monthlyLimit: getTierConfig('plus').monthlyQuota,
+      usedThisMonth: 5,
+    });
+
     expect(mockInngestSend).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'app/payment.failed',
         data: expect.objectContaining({
-          stripeSubscriptionId: MOCK_SUB_ID,
-          accountId: MOCK_ACCOUNT_ID,
+          subscriptionId: subscription.id,
+          stripeSubscriptionId: subscription.stripeSubscriptionId,
+          accountId: account.id,
           attempt: 2,
         }),
       })
     );
   });
 
-  it('invoice.payment_succeeded → sets active', async () => {
+  it('invoice.payment_succeeded restores the subscription to active', async () => {
+    const { account, subscription } = await seedSubscriptionState({
+      prefix: 'stripe-payment-succeeded',
+      tier: 'plus',
+      status: 'past_due',
+      usedThisMonth: 8,
+    });
+
     const event = buildStripeEvent('invoice.payment_succeeded', {
-      id: 'in_success_123',
+      id: 'in_payment_succeeded',
       parent: {
-        subscription_details: { subscription: MOCK_SUB_ID },
+        subscription_details: {
+          subscription: subscription.stripeSubscriptionId,
+        },
       },
     });
 
-    mockVerifyWebhookSignature.mockResolvedValue(event);
-    mockUpdateSubscriptionFromWebhook.mockResolvedValue({
-      id: 'sub-internal-123',
-      accountId: MOCK_ACCOUNT_ID,
+    mockVerifyWebhookSignature.mockResolvedValueOnce(event);
+
+    const res = await app.request(
+      '/v1/stripe/webhook',
+      buildWebhookRequest(event),
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+
+    const updatedSubscription = await loadSubscription(account.id);
+    expect(updatedSubscription).not.toBeNull();
+    expect(updatedSubscription!.status).toBe('active');
+
+    const kvWrite = readKvPayload();
+    expect(kvWrite.value).toMatchObject({
+      subscriptionId: subscription.id,
       tier: 'plus',
       status: 'active',
+      monthlyLimit: getTierConfig('plus').monthlyQuota,
+      usedThisMonth: 8,
     });
-
-    const res = await app.request(
-      '/v1/stripe/webhook',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'stripe-signature': 'sig_test',
-        },
-        body: JSON.stringify(event),
-      },
-      TEST_ENV
-    );
-
-    expect(res.status).toBe(200);
-    expect(mockUpdateSubscriptionFromWebhook).toHaveBeenCalledWith(
-      expect.anything(),
-      MOCK_SUB_ID,
-      expect.objectContaining({ status: 'active' })
-    );
-  });
-
-  it('skips auth (public path via /v1/stripe/)', async () => {
-    const event = buildStripeEvent('checkout.session.completed', {
-      id: 'cs_noauth',
-      subscription: 'sub_noauth',
-      metadata: { accountId: 'acc-noauth', tier: 'plus' },
-    });
-
-    mockVerifyWebhookSignature.mockResolvedValue(event);
-    mockActivateSubscriptionFromCheckout.mockResolvedValue(null);
-
-    // No Authorization header — should still work
-    const res = await app.request(
-      '/v1/stripe/webhook',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'stripe-signature': 'sig_test',
-        },
-        body: JSON.stringify(event),
-      },
-      TEST_ENV
-    );
-
-    expect(res.status).toBe(200);
   });
 });

@@ -972,7 +972,10 @@ export async function isTopUpAlreadyGranted(
  * Only paid tiers (plus, family, pro) can purchase top-ups.
  * Returns null if the subscription's tier is not eligible.
  *
- * Accepts an optional `transactionId` for RevenueCat IAP idempotency tracking.
+ * BS-02: Uses INSERT ... ON CONFLICT DO NOTHING on the unique
+ * `revenuecatTransactionId` index to prevent double-granting credits
+ * from concurrent webhook retries. Returns null when the insert is
+ * a no-op (duplicate transaction).
  */
 export async function purchaseTopUpCredits(
   db: Database,
@@ -993,6 +996,33 @@ export async function purchaseTopUpCredits(
   const expiresAt = new Date(now);
   expiresAt.setMonth(expiresAt.getMonth() + TOP_UP_EXPIRY_MONTHS);
 
+  // When transactionId is provided, use onConflictDoNothing to atomically
+  // prevent duplicate grants. If the row already exists (duplicate txn),
+  // the INSERT returns no rows and we return null.
+  if (transactionId) {
+    const rows = await db
+      .insert(topUpCredits)
+      .values({
+        subscriptionId,
+        amount,
+        remaining: amount,
+        purchasedAt: now,
+        expiresAt,
+        revenuecatTransactionId: transactionId,
+      })
+      .onConflictDoNothing({
+        target: topUpCredits.revenuecatTransactionId,
+      })
+      .returning();
+
+    if (rows.length === 0) {
+      // Duplicate transaction — credit already granted
+      return null;
+    }
+    return mapTopUpCreditRow(rows[0]!);
+  }
+
+  // No transactionId — plain insert (internal/test usage)
   const [row] = await db
     .insert(topUpCredits)
     .values({
@@ -1001,7 +1031,7 @@ export async function purchaseTopUpCredits(
       remaining: amount,
       purchasedAt: now,
       expiresAt,
-      revenuecatTransactionId: transactionId ?? null,
+      revenuecatTransactionId: null,
     })
     .returning();
 

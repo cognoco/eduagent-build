@@ -78,17 +78,27 @@ testSeedRoutes.use('/__test/*', async (c, next) => {
 
   if (secret) {
     const headerSecret = c.req.header('X-Test-Secret') ?? '';
-    // CI-06: constant-time comparison to prevent timing attacks.
-    // XOR-fold both strings to fixed-length digest before comparing.
+    // CI-06: HMAC-based constant-time comparison to prevent timing attacks.
+    // Both inputs are hashed to fixed-length SHA-256 digests before XOR
+    // comparison, eliminating the length-leak side-channel.
     const encoder = new TextEncoder();
-    const aBytes = encoder.encode(headerSecret);
-    const bBytes = encoder.encode(secret);
-    const hash = new Uint8Array(32);
-    for (let i = 0; i < aBytes.length; i++) hash[i % 32]! ^= aBytes[i]!;
-    const hashB = new Uint8Array(32);
-    for (let i = 0; i < bBytes.length; i++) hashB[i % 32]! ^= bBytes[i]!;
-    let diff = aBytes.length ^ bBytes.length;
-    for (let i = 0; i < 32; i++) diff |= hash[i]! ^ hashB[i]!;
+    const hmacKey = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode('test-seed-compare'),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const [digestA, digestB] = await Promise.all([
+      crypto.subtle.sign('HMAC', hmacKey, encoder.encode(headerSecret)),
+      crypto.subtle.sign('HMAC', hmacKey, encoder.encode(secret)),
+    ]);
+    const hashA = new Uint8Array(digestA);
+    const hashB = new Uint8Array(digestB);
+    let diff = 0;
+    for (let i = 0; i < hashA.length; i++) {
+      diff |= hashA[i]! ^ hashB[i]!;
+    }
     if (diff !== 0) {
       return c.json(
         {

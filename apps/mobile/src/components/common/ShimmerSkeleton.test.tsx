@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react-native';
+import { render, fireEvent } from '@testing-library/react-native';
 import { Text, View } from 'react-native';
 import { ShimmerSkeleton } from './ShimmerSkeleton';
 
@@ -57,5 +57,31 @@ describe('ShimmerSkeleton', () => {
       </ShimmerSkeleton>
     );
     expect(getByText('Fast shimmer')).toBeTruthy();
+  });
+
+  // BR-01: animation must be cancelled on unmount to prevent leaked UI-thread work.
+  // The animation only starts after onLayout fires (containerWidth > 0), so we
+  // simulate a layout event to trigger the effect, then verify cleanup runs.
+  it('cancels animation on unmount after layout (BR-01)', () => {
+    const reanimated = require('react-native-reanimated');
+    const cancelSpy = jest.spyOn(reanimated, 'cancelAnimation');
+
+    const { unmount, getByTestId } = render(
+      <ShimmerSkeleton testID="skel">
+        <View />
+      </ShimmerSkeleton>
+    );
+
+    // Simulate a layout event so containerWidth > 0, triggering the animation effect
+    const container = getByTestId('skel');
+    fireEvent(container, 'layout', {
+      nativeEvent: { layout: { width: 300, height: 40, x: 0, y: 0 } },
+    });
+
+    unmount();
+
+    // translateX shared value should be cancelled
+    expect(cancelSpy).toHaveBeenCalled();
+    cancelSpy.mockRestore();
   });
 });

@@ -20,7 +20,6 @@ jest.mock('../services/billing', () => ({
   activateSubscriptionFromRevenuecat: jest.fn(),
   updateQuotaPoolLimit: jest.fn().mockResolvedValue(undefined),
   transitionToExtendedTrial: jest.fn().mockResolvedValue(undefined),
-  isTopUpAlreadyGranted: jest.fn().mockResolvedValue(false),
   purchaseTopUpCredits: jest.fn().mockResolvedValue({
     id: 'topup-1',
     subscriptionId: 'sub-internal-1',
@@ -71,7 +70,6 @@ import {
   activateSubscriptionFromRevenuecat,
   updateQuotaPoolLimit,
   transitionToExtendedTrial,
-  isTopUpAlreadyGranted,
   purchaseTopUpCredits,
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
@@ -182,7 +180,6 @@ beforeEach(() => {
   (ensureFreeSubscription as jest.Mock).mockResolvedValue(
     mockSubscriptionRow({ tier: 'free' })
   );
-  (isTopUpAlreadyGranted as jest.Mock).mockResolvedValue(false);
   (purchaseTopUpCredits as jest.Mock).mockResolvedValue({
     id: 'topup-1',
     subscriptionId: 'sub-internal-1',
@@ -259,6 +256,43 @@ describe('auth validation', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.received).toBe(true);
+  });
+
+  it('rejects tokens of different length (BS-01: no length leak via timing)', async () => {
+    // A shorter token should be rejected without leaking length info
+    const res = await app.request(
+      '/revenuecat/webhook',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer short',
+        },
+        body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects tokens of same length but wrong value (BS-01)', async () => {
+    // Same length as secret but different content
+    const sameLength = 'x'.repeat(TEST_ENV.REVENUECAT_WEBHOOK_SECRET.length);
+    const res = await app.request(
+      '/revenuecat/webhook',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sameLength}`,
+        },
+        body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(401);
   });
 });
 
@@ -850,8 +884,9 @@ describe('NON_RENEWING_PURCHASE', () => {
     expect(purchaseTopUpCredits).not.toHaveBeenCalled();
   });
 
-  it('is idempotent — duplicate transaction ID does not double-grant', async () => {
-    (isTopUpAlreadyGranted as jest.Mock).mockResolvedValue(true);
+  it('is idempotent — duplicate transaction ID does not double-grant (BS-02)', async () => {
+    // purchaseTopUpCredits returns null when ON CONFLICT DO NOTHING triggers
+    (purchaseTopUpCredits as jest.Mock).mockResolvedValue(null);
 
     const payload = makeWebhookPayload('NON_RENEWING_PURCHASE', {
       product_id: 'com.eduagent.topup.500',
@@ -860,7 +895,8 @@ describe('NON_RENEWING_PURCHASE', () => {
 
     const res = await makeRequest(payload);
     expect(res.status).toBe(200);
-    expect(purchaseTopUpCredits).not.toHaveBeenCalled();
+    // purchaseTopUpCredits IS called, but returns null (duplicate detected atomically)
+    expect(purchaseTopUpCredits).toHaveBeenCalled();
   });
 
   it('refreshes KV cache after top-up', async () => {

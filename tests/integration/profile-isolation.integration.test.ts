@@ -1,295 +1,271 @@
 /**
  * Integration: Profile Isolation (P0-006)
  *
- * Exercises the profile-scope middleware via Hono's app.request().
- * Validates that one account cannot access another account's profiles.
+ * Exercises the real profile-scope middleware through the full app + real DB.
+ * JWT verification is the only mocked boundary in this suite.
  *
- * 1. Request with X-Profile-Id belonging to the account → 200 (subjects returned)
- * 2. Request with X-Profile-Id NOT belonging to the account → 403 FORBIDDEN
- * 3. Request without X-Profile-Id → auto-resolves to owner profile → 200
- * 4. Profile middleware passes correct profileId to downstream service
- *
- * These tests validate the first layer of profile isolation (middleware).
- * The scoped repository pattern (layer 2) is covered by unit tests.
+ * Validates:
+ * 1. X-Profile-Id for an owned profile returns that profile's scoped subjects
+ * 2. X-Profile-Id for another account's profile returns 403
+ * 3. Missing X-Profile-Id auto-resolves to the owner profile
+ * 4. Explicitly selecting a second profile routes downstream reads correctly
+ * 5. Fabricated profile IDs are rejected
  */
 
-// --- Controllable JWT mock ---
+import { subjects } from '@eduagent/database';
 
+import { jwtMock, configureValidJWT } from './mocks';
 import {
-  jwtMock,
-  databaseMock,
-  inngestClientMock,
-  accountMock,
-  billingMock,
-  settingsMock,
-  sessionMock,
-  llmMock,
-  configureValidJWT as configureValidJWTHelper,
-} from './mocks';
+  buildIntegrationEnv,
+  cleanupAccounts,
+  createIntegrationDb,
+} from './helpers';
 
-const jwtMocks = jwtMock();
-jest.mock('../../apps/api/src/middleware/jwt', () => jwtMocks);
-
-// --- Profile service mock (profile-scope middleware calls getProfile) ---
-const mockGetProfile = jest.fn();
-
-const mockFindOwnerProfile = jest.fn();
-
-jest.mock('../../apps/api/src/services/profile', () => ({
-  getProfile: mockGetProfile,
-  findOwnerProfile: mockFindOwnerProfile,
-  listProfiles: jest.fn().mockResolvedValue([]),
-  createProfile: jest.fn(),
-  updateProfile: jest.fn(),
-}));
-
-// --- Subject service mock (test exercises GET /v1/subjects) ---
-const mockListSubjects = jest.fn();
-
-jest.mock('../../apps/api/src/services/subject', () => ({
-  listSubjects: mockListSubjects,
-  createSubject: jest.fn(),
-  getSubject: jest.fn(),
-  updateSubject: jest.fn(),
-}));
-
-// --- Base mocks (middleware chain requires these) ---
-
-const MOCK_ACCOUNT_ID = '00000000-0000-4000-8000-000000000001';
-
-jest.mock('@eduagent/database', () => databaseMock());
-jest.mock('../../apps/api/src/inngest/client', () => inngestClientMock());
-jest.mock('../../apps/api/src/services/account', () =>
-  accountMock({
-    id: MOCK_ACCOUNT_ID,
-    clerkUserId: 'user_profile_test',
-    email: 'profile-test@test.com',
-  })
-);
-jest.mock('../../apps/api/src/services/billing', () =>
-  billingMock(MOCK_ACCOUNT_ID)
-);
-jest.mock('../../apps/api/src/services/settings', () => settingsMock());
-jest.mock('../../apps/api/src/services/session', () => sessionMock());
-jest.mock('../../apps/api/src/services/llm', () => llmMock());
+const jwt = jwtMock();
+jest.mock('../../apps/api/src/middleware/jwt', () => jwt);
 
 import { app } from '../../apps/api/src/index';
 
-const OWNED_PROFILE_ID = '00000000-0000-4000-8000-000000000010';
-const OTHER_PROFILE_ID = '00000000-0000-4000-8000-000000000099';
+const TEST_ENV = buildIntegrationEnv();
 
-const TEST_ENV = {
-  ENVIRONMENT: 'development',
-  CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
-  DATABASE_URL: 'postgresql://test:test@localhost/test',
-};
+const PRIMARY_USER_ID = 'integration-profile-primary';
+const PRIMARY_EMAIL = 'integration-profile-primary@integration.test';
+const SECONDARY_USER_ID = 'integration-profile-secondary';
+const SECONDARY_EMAIL = 'integration-profile-secondary@integration.test';
+const FABRICATED_PROFILE_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
-const AUTH_HEADERS = {
-  Authorization: 'Bearer valid.jwt.token',
-  'Content-Type': 'application/json',
-};
+function buildAuthHeaders(profileId?: string): HeadersInit {
+  return {
+    Authorization: 'Bearer valid.jwt.token',
+    'Content-Type': 'application/json',
+    ...(profileId ? { 'X-Profile-Id': profileId } : {}),
+  };
+}
 
-function configureValidJWT(): void {
-  configureValidJWTHelper(jwtMocks, {
-    sub: 'user_profile_test',
-    email: 'profile-test@test.com',
+function setAuthUser(userId: string, email: string): void {
+  configureValidJWT(jwt, {
+    sub: userId,
+    email,
   });
 }
 
-// ---------------------------------------------------------------------------
-// Profile isolation — middleware enforces ownership
-// ---------------------------------------------------------------------------
+async function createProfile(input: {
+  userId: string;
+  email: string;
+  displayName: string;
+  birthYear: number;
+}): Promise<{
+  id: string;
+  isOwner: boolean;
+}> {
+  setAuthUser(input.userId, input.email);
+
+  const res = await app.request(
+    '/v1/profiles',
+    {
+      method: 'POST',
+      headers: buildAuthHeaders(),
+      body: JSON.stringify({
+        displayName: input.displayName,
+        birthYear: input.birthYear,
+      }),
+    },
+    TEST_ENV
+  );
+
+  expect(res.status).toBe(201);
+  const body = await res.json();
+  return body.profile as { id: string; isOwner: boolean };
+}
+
+async function seedSubject(
+  profileId: string,
+  name: string
+): Promise<{ id: string; profileId: string; name: string }> {
+  const db = createIntegrationDb();
+  const [subject] = await db
+    .insert(subjects)
+    .values({
+      profileId,
+      name,
+      status: 'active',
+      pedagogyMode: 'socratic',
+    })
+    .returning();
+
+  return {
+    id: subject!.id,
+    profileId: subject!.profileId,
+    name: subject!.name,
+  };
+}
+
+async function listSubjectsForUser(input: {
+  userId: string;
+  email: string;
+  profileId?: string;
+}) {
+  setAuthUser(input.userId, input.email);
+  return app.request(
+    '/v1/subjects',
+    {
+      method: 'GET',
+      headers: buildAuthHeaders(input.profileId),
+    },
+    TEST_ENV
+  );
+}
+
+beforeEach(async () => {
+  jest.clearAllMocks();
+  await cleanupAccounts({
+    emails: [PRIMARY_EMAIL, SECONDARY_EMAIL],
+    clerkUserIds: [PRIMARY_USER_ID, SECONDARY_USER_ID],
+  });
+});
+
+afterAll(async () => {
+  await cleanupAccounts({
+    emails: [PRIMARY_EMAIL, SECONDARY_EMAIL],
+    clerkUserIds: [PRIMARY_USER_ID, SECONDARY_USER_ID],
+  });
+});
 
 describe('Integration: Profile Isolation (P0-006)', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    configureValidJWT();
-
-    // Default: findOwnerProfile auto-resolves to the owned profile
-    mockFindOwnerProfile.mockResolvedValue({
-      id: OWNED_PROFILE_ID,
-      birthYear: null,
-      location: null,
-      consentStatus: 'CONSENTED',
-    });
-
-    // Default: owned profile returns valid profile object
-    mockGetProfile.mockImplementation(
-      async (_db: unknown, profileId: string, accountId: string) => {
-        if (profileId === OWNED_PROFILE_ID && accountId === MOCK_ACCOUNT_ID) {
-          return {
-            id: OWNED_PROFILE_ID,
-            accountId: MOCK_ACCOUNT_ID,
-            displayName: 'Test Learner',
-            personaType: 'LEARNER',
-            isOwner: true,
-            consentStatus: null,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return null; // Not owned
-      }
-    );
-
-    // Subject service returns data when called
-    mockListSubjects.mockResolvedValue([
-      {
-        id: 'sub-001',
-        profileId: OWNED_PROFILE_ID,
-        name: 'Mathematics',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-    ]);
-  });
-
   it('returns 200 with subjects when X-Profile-Id belongs to the account', async () => {
-    const res = await app.request(
-      '/v1/subjects',
-      {
-        method: 'GET',
-        headers: {
-          ...AUTH_HEADERS,
-          'X-Profile-Id': OWNED_PROFILE_ID,
-        },
-      },
-      TEST_ENV
-    );
+    const ownerProfile = await createProfile({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      displayName: 'Primary Learner',
+      birthYear: 2000,
+    });
+    const subject = await seedSubject(ownerProfile.id, 'Mathematics');
+
+    const res = await listSubjectsForUser({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      profileId: ownerProfile.id,
+    });
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.subjects).toHaveLength(1);
-    expect(body.subjects[0].name).toBe('Mathematics');
-
-    // Verify getProfile was called with correct arguments
-    expect(mockGetProfile).toHaveBeenCalledWith(
-      expect.anything(), // db
-      OWNED_PROFILE_ID,
-      MOCK_ACCOUNT_ID
-    );
-
-    // Verify listSubjects received the profile ID from middleware
-    expect(mockListSubjects).toHaveBeenCalledWith(
-      expect.anything(), // db
-      OWNED_PROFILE_ID,
-      expect.objectContaining({ includeInactive: false })
-    );
+    expect(body.subjects[0]).toMatchObject({
+      id: subject.id,
+      profileId: ownerProfile.id,
+      name: 'Mathematics',
+    });
   });
 
-  it('returns 403 FORBIDDEN when X-Profile-Id does NOT belong to the account', async () => {
-    const res = await app.request(
-      '/v1/subjects',
-      {
-        method: 'GET',
-        headers: {
-          ...AUTH_HEADERS,
-          'X-Profile-Id': OTHER_PROFILE_ID,
-        },
-      },
-      TEST_ENV
-    );
+  it('returns 403 FORBIDDEN when X-Profile-Id does not belong to the account', async () => {
+    await createProfile({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      displayName: 'Primary Learner',
+      birthYear: 2000,
+    });
+    const foreignProfile = await createProfile({
+      userId: SECONDARY_USER_ID,
+      email: SECONDARY_EMAIL,
+      displayName: 'Secondary Learner',
+      birthYear: 2001,
+    });
+
+    const res = await listSubjectsForUser({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      profileId: foreignProfile.id,
+    });
 
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.code).toBe('FORBIDDEN');
-
-    // getProfile was called but returned null
-    expect(mockGetProfile).toHaveBeenCalledWith(
-      expect.anything(),
-      OTHER_PROFILE_ID,
-      MOCK_ACCOUNT_ID
-    );
-
-    // Subject service was NOT reached
-    expect(mockListSubjects).not.toHaveBeenCalled();
   });
 
-  it('auto-resolves to owner profile when X-Profile-Id is absent', async () => {
-    const res = await app.request(
-      '/v1/subjects',
-      {
-        method: 'GET',
-        headers: AUTH_HEADERS,
-      },
-      TEST_ENV
-    );
+  it('auto-resolves to the owner profile when X-Profile-Id is absent', async () => {
+    const ownerProfile = await createProfile({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      displayName: 'Owner Profile',
+      birthYear: 2000,
+    });
+    const secondProfile = await createProfile({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      displayName: 'Second Profile',
+      birthYear: 2012,
+    });
 
-    // Profile-scope middleware auto-resolves to owner profile via findOwnerProfile
+    expect(ownerProfile.isOwner).toBe(true);
+    expect(secondProfile.isOwner).toBe(false);
+
+    const ownerSubject = await seedSubject(ownerProfile.id, 'Owner Subject');
+    await seedSubject(secondProfile.id, 'Second Subject');
+
+    const res = await listSubjectsForUser({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+    });
+
     expect(res.status).toBe(200);
-
-    // listSubjects called with owner profile ID (auto-resolved)
-    expect(mockListSubjects).toHaveBeenCalledWith(
-      expect.anything(),
-      OWNED_PROFILE_ID,
-      expect.anything()
-    );
+    const body = await res.json();
+    expect(body.subjects).toHaveLength(1);
+    expect(body.subjects[0]).toMatchObject({
+      id: ownerSubject.id,
+      profileId: ownerProfile.id,
+      name: 'Owner Subject',
+    });
   });
 
-  it('correctly propagates profileId to downstream services', async () => {
-    // Create a second owned profile to verify the correct ID propagates
-    const SECOND_PROFILE_ID = '00000000-0000-4000-8000-000000000020';
+  it('correctly propagates a second profileId to downstream scoped reads', async () => {
+    const ownerProfile = await createProfile({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      displayName: 'Owner Profile',
+      birthYear: 2000,
+    });
+    const secondProfile = await createProfile({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      displayName: 'Teen Profile',
+      birthYear: 2001,
+    });
 
-    mockGetProfile.mockImplementation(
-      async (_db: unknown, profileId: string, accountId: string) => {
-        if (profileId === SECOND_PROFILE_ID && accountId === MOCK_ACCOUNT_ID) {
-          return {
-            id: SECOND_PROFILE_ID,
-            accountId: MOCK_ACCOUNT_ID,
-            displayName: 'Second Profile',
-            personaType: 'TEEN',
-            isOwner: false,
-            consentStatus: null,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return null;
-      }
-    );
+    await seedSubject(ownerProfile.id, 'Owner Mathematics');
+    const secondSubject = await seedSubject(secondProfile.id, 'Teen Science');
 
-    mockListSubjects.mockResolvedValue([]);
-
-    const res = await app.request(
-      '/v1/subjects',
-      {
-        method: 'GET',
-        headers: {
-          ...AUTH_HEADERS,
-          'X-Profile-Id': SECOND_PROFILE_ID,
-        },
-      },
-      TEST_ENV
-    );
+    const res = await listSubjectsForUser({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      profileId: secondProfile.id,
+    });
 
     expect(res.status).toBe(200);
-    // Verify the SECOND profile ID was passed to the service
-    expect(mockListSubjects).toHaveBeenCalledWith(
-      expect.anything(),
-      SECOND_PROFILE_ID,
-      expect.anything()
-    );
+    const body = await res.json();
+    expect(body.subjects).toHaveLength(1);
+    expect(body.subjects[0]).toMatchObject({
+      id: secondSubject.id,
+      profileId: secondProfile.id,
+      name: 'Teen Science',
+    });
   });
 
   it('prevents access with a fabricated profile ID', async () => {
-    const FAKE_PROFILE_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    await createProfile({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      displayName: 'Primary Learner',
+      birthYear: 2000,
+    });
 
-    const res = await app.request(
-      '/v1/subjects',
-      {
-        method: 'GET',
-        headers: {
-          ...AUTH_HEADERS,
-          'X-Profile-Id': FAKE_PROFILE_ID,
-        },
-      },
-      TEST_ENV
-    );
+    const res = await listSubjectsForUser({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      profileId: FABRICATED_PROFILE_ID,
+    });
 
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.code).toBe('FORBIDDEN');
-    expect(mockListSubjects).not.toHaveBeenCalled();
   });
 });

@@ -19,7 +19,6 @@ import {
   activateSubscriptionFromRevenuecat,
   updateQuotaPoolLimit,
   transitionToExtendedTrial,
-  isTopUpAlreadyGranted,
   purchaseTopUpCredits,
 } from '../services/billing';
 import { findAccountByClerkId } from '../services/account';
@@ -34,27 +33,39 @@ import type { SubscriptionStatus } from '@eduagent/schemas';
 // Timing-safe string comparison (prevents timing attacks on webhook secret)
 // ---------------------------------------------------------------------------
 
-function timingSafeEqual(a: string, b: string): boolean {
-  // BS-01: HMAC-compare prevents length-leak timing side-channel.
-  // Both inputs are hashed to fixed-length digests before XOR comparison,
-  // so the comparison time is independent of secret length.
+/**
+ * BS-01: HMAC-based constant-time comparison.
+ * Both inputs are hashed with SHA-256 HMAC (using a static key) before
+ * comparison, producing fixed-length 32-byte digests regardless of input
+ * length. This eliminates the length-leak timing side-channel that exists
+ * when comparing raw strings of different lengths.
+ *
+ * Uses SubtleCrypto (available in Cloudflare Workers) for proper HMAC.
+ */
+async function constantTimeCompare(a: string, b: string): Promise<boolean> {
   const encoder = new TextEncoder();
-  const aHash = new Uint8Array(32);
-  const bHash = new Uint8Array(32);
+  const hmacKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode('webhook-compare'),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
 
-  // Simple HMAC-like: XOR-fold with key, then compare digests.
-  // For Cloudflare Workers, use SubtleCrypto for proper HMAC.
-  const aBytes = encoder.encode(a);
-  const bBytes = encoder.encode(b);
+  const [digestA, digestB] = await Promise.all([
+    crypto.subtle.sign('HMAC', hmacKey, encoder.encode(a)),
+    crypto.subtle.sign('HMAC', hmacKey, encoder.encode(b)),
+  ]);
 
-  // Hash both to fixed-length arrays to eliminate length leakage
-  for (let i = 0; i < aBytes.length; i++) aHash[i % 32]! ^= aBytes[i]!;
-  for (let i = 0; i < bBytes.length; i++) bHash[i % 32]! ^= bBytes[i]!;
+  const hashA = new Uint8Array(digestA);
+  const hashB = new Uint8Array(digestB);
 
-  // Length mismatch is folded into the hash difference (constant-time)
-  let result = a.length ^ b.length;
-  for (let i = 0; i < 32; i++) result |= aHash[i]! ^ bHash[i]!;
-  return result === 0;
+  // Fixed-length XOR comparison — always 32 bytes, constant time
+  let diff = 0;
+  for (let i = 0; i < hashA.length; i++) {
+    diff |= hashA[i]! ^ hashB[i]!;
+  }
+  return diff === 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -459,12 +470,6 @@ async function handleNonRenewingPurchase(
     };
   }
 
-  // Idempotency: check if this transaction has already been granted
-  const alreadyGranted = await isTopUpAlreadyGranted(db, transactionId);
-  if (alreadyGranted) {
-    return null; // silently skip — already granted
-  }
-
   // Look up the account's subscription to verify tier eligibility
   const sub = await getSubscriptionByAccountId(db, accountId);
   if (!sub || sub.tier === 'free') {
@@ -477,14 +482,20 @@ async function handleNonRenewingPurchase(
     };
   }
 
-  // Grant credits via the shared pool (family accounts share the same subscription)
-  await purchaseTopUpCredits(
+  // BS-02: Atomic idempotent credit grant — purchaseTopUpCredits uses
+  // INSERT ... ON CONFLICT DO NOTHING on the unique revenuecatTransactionId
+  // index. Returns null when credit was already granted (duplicate txn).
+  const granted = await purchaseTopUpCredits(
     db,
     sub.id,
     credits,
     new Date(),
-    transactionId ?? undefined
+    transactionId
   );
+
+  if (!granted) {
+    return null; // duplicate transaction — already granted, silently skip
+  }
 
   await refreshKvCache(kv, db, accountId);
 
@@ -547,7 +558,7 @@ export const revenuecatWebhookRoute = new Hono<{
     );
   }
 
-  if (!timingSafeEqual(token, webhookSecret)) {
+  if (!(await constantTimeCompare(token, webhookSecret))) {
     return apiError(
       c,
       401,

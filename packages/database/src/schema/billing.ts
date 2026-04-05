@@ -6,6 +6,7 @@ import {
   timestamp,
   pgEnum,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { accounts } from './profiles';
 import { generateUUIDv7 } from '../utils/uuid';
@@ -99,6 +100,9 @@ export const topUpCredits = pgTable(
   },
   (table) => [
     index('top_up_credits_subscription_id_idx').on(table.subscriptionId),
+    uniqueIndex('top_up_credits_rc_txn_id_idx').on(
+      table.revenuecatTransactionId
+    ),
   ]
 );
 

@@ -38,6 +38,7 @@ import {
 } from '@eduagent/database';
 import type { Database } from '@eduagent/database';
 import { and, asc, eq } from 'drizzle-orm';
+import { verificationTypeSchema } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Step error isolation — each step catches its own errors so that a failure
@@ -167,12 +168,26 @@ export const sessionCompleted = inngest.createFunction(
     const verificationCompletionOutcome = await step.run(
       'process-verification-completion',
       async () => {
-        // C-05: validate verificationType at runtime instead of unsafe cast.
-        // If a new verification type is added, this explicitly skips it
-        // rather than silently passing through.
-        const vType =
-          typeof verificationType === 'string' ? verificationType : null;
-        if (!vType || (vType !== 'evaluate' && vType !== 'teach_back')) {
+        // C-05: validate verificationType at runtime using Zod schema
+        // from @eduagent/schemas. If the value is invalid or a new type is
+        // added without a handler, we log a warning rather than silently
+        // skipping.
+        const parsed = verificationTypeSchema.safeParse(verificationType);
+        if (!parsed.success) {
+          if (verificationType != null) {
+            console.warn(
+              `[session-completed] Unknown verificationType: ${String(
+                verificationType
+              )}`
+            );
+          }
+          return {
+            step: 'process-verification-completion',
+            status: 'skipped' as const,
+          };
+        }
+        const vType = parsed.data;
+        if (vType !== 'evaluate' && vType !== 'teach_back') {
           return {
             step: 'process-verification-completion',
             status: 'skipped' as const,
@@ -526,8 +541,11 @@ export const sessionCompleted = inngest.createFunction(
           const db = getStepDatabase();
           const quality = completionQualityRating;
           const currentTopicId = topicId as string | null | undefined;
-          const currentVerification =
-            typeof verificationType === 'string' ? verificationType : undefined;
+          // C-05: Zod runtime validation for verification type
+          const vParsed = verificationTypeSchema.safeParse(verificationType);
+          const currentVerification = vParsed.success
+            ? vParsed.data
+            : undefined;
 
           if (currentVerification === 'evaluate' && (quality ?? 0) >= 4) {
             await queueCelebration(
