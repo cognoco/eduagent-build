@@ -259,6 +259,120 @@ describe('LibraryScreen', () => {
     expect(screen.getByText('Ancient Egypt')).toBeTruthy();
   });
 
+  it('renders three tab badges with counts', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [
+        { id: 'sub-1', name: 'Math', status: 'active' },
+        { id: 'sub-2', name: 'History', status: 'active' },
+      ],
+      isLoading: false,
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [] },
+      isLoading: false,
+    });
+    mockUseQueries.mockReturnValue([
+      {
+        data: {
+          topics: [
+            {
+              topicId: 't1',
+              topicTitle: 'A',
+              easeFactor: 2.5,
+              repetitions: 1,
+              lastReviewedAt: null,
+              xpStatus: 'pending',
+              failureCount: 0,
+            },
+          ],
+          reviewDueCount: 0,
+        },
+        isLoading: false,
+      },
+      {
+        data: { topics: [], reviewDueCount: 0 },
+        isLoading: false,
+      },
+    ]);
+    mockUseAllBooks.mockReturnValue({
+      books: [
+        {
+          book: {
+            id: 'book-1',
+            subjectId: 'sub-1',
+            title: 'Algebra',
+            description: null,
+            emoji: '📐',
+            sortOrder: 1,
+            topicsGenerated: true,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          },
+          subjectId: 'sub-1',
+          subjectName: 'Math',
+          topicCount: 5,
+          completedCount: 2,
+          status: 'IN_PROGRESS',
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<LibraryScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('library-tab-shelves')).toBeTruthy();
+    expect(screen.getByTestId('library-tab-books')).toBeTruthy();
+    expect(screen.getByTestId('library-tab-topics')).toBeTruthy();
+    expect(screen.getByText('Shelves (2)')).toBeTruthy();
+    expect(screen.getByText('Books (1)')).toBeTruthy();
+    expect(screen.getByText('Topics (1)')).toBeTruthy();
+  });
+
+  it('shows books tab with all books across subjects', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      isLoading: false,
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [] },
+      isLoading: false,
+    });
+    mockUseAllBooks.mockReturnValue({
+      books: [
+        {
+          book: {
+            id: 'book-1',
+            subjectId: 'sub-1',
+            title: 'Algebra',
+            description: null,
+            emoji: '📐',
+            sortOrder: 1,
+            topicsGenerated: true,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          },
+          subjectId: 'sub-1',
+          subjectName: 'Math',
+          topicCount: 5,
+          completedCount: 2,
+          status: 'IN_PROGRESS',
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<LibraryScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('library-tab-books'));
+
+    expect(screen.getByText('Algebra')).toBeTruthy();
+    expect(screen.getByText('Math')).toBeTruthy();
+  });
+
   it('shows an empty shelf message when a selected subject has no topics yet', () => {
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'sub-1', name: 'History', status: 'active' }],
