@@ -5,10 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { Subject, CurriculumTopic } from '@eduagent/schemas';
-import {
-  RetentionSignal,
-  type RetentionStatus,
-} from '../../components/progress';
+import type { RetentionStatus } from '../../components/progress';
 import {
   BookPageFlipAnimation,
   BrandCelebration,
@@ -16,6 +13,28 @@ import {
 } from '../../components/common';
 import { ShelfView } from '../../components/library/ShelfView';
 import { ChapterTopicList } from '../../components/library/ChapterTopicList';
+import type {
+  LibraryTab,
+  ShelfItem,
+  EnrichedTopic as LibFilterEnrichedTopic,
+} from '../../lib/library-filters';
+import { LibraryTabs } from '../../components/library/LibraryTabs';
+import {
+  ShelvesTab,
+  type ShelvesTabState,
+  SHELVES_TAB_INITIAL_STATE,
+} from '../../components/library/ShelvesTab';
+import {
+  BooksTab,
+  type BooksTabState,
+  BOOKS_TAB_INITIAL_STATE,
+} from '../../components/library/BooksTab';
+import {
+  TopicsTab,
+  type TopicsTabState,
+  TOPICS_TAB_INITIAL_STATE,
+} from '../../components/library/TopicsTab';
+import { useAllBooks } from '../../hooks/use-all-books';
 import { useThemeColors } from '../../lib/theme';
 import { useSubjects, useUpdateSubject } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
@@ -45,30 +64,6 @@ interface SubjectRetentionTopic {
 interface SubjectRetentionResponse {
   topics: SubjectRetentionTopic[];
   reviewDueCount: number;
-}
-
-interface EnrichedTopic {
-  topicId: string;
-  subjectId: string;
-  name: string;
-  subjectName: string;
-  subjectStatus: Subject['status'];
-  retention: RetentionStatus;
-  lastReviewedAt: string | null;
-  repetitions: number;
-  failureCount: number;
-}
-
-function formatLastPracticed(iso: string | null): string | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  const diffDays = Math.floor(
-    (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24)
-  );
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 function getTopicRetention(topic: SubjectRetentionTopic): RetentionStatus {
@@ -118,71 +113,6 @@ function SubjectStatusPill({
   );
 }
 
-function TopicRows({
-  topics,
-  onTopicPress,
-}: {
-  topics: EnrichedTopic[];
-  onTopicPress: (topic: EnrichedTopic) => void;
-}): React.ReactElement {
-  if (topics.length === 0) {
-    return (
-      <View
-        className="bg-surface rounded-card px-4 py-6 items-center"
-        testID="library-empty"
-      >
-        <Text className="text-body text-text-secondary text-center">
-          No topics have shown up here yet.
-        </Text>
-      </View>
-    );
-  }
-
-  return (
-    <>
-      {topics.map((topic) => (
-        <Pressable
-          key={`${topic.subjectId}-${topic.topicId}`}
-          onPress={() => onTopicPress(topic)}
-          className="bg-surface rounded-card px-4 py-3 mb-2"
-          testID={`topic-row-${topic.topicId}`}
-        >
-          <View className="flex-row items-center justify-between">
-            <View className="flex-1 me-3">
-              <Text className="text-body font-medium text-text-primary">
-                {topic.name}
-              </Text>
-              <View className="flex-row items-center mt-1 gap-2">
-                <Text className="text-caption text-text-secondary">
-                  {topic.subjectName}
-                </Text>
-                <SubjectStatusPill status={topic.subjectStatus} />
-                {topic.repetitions > 0 && (
-                  <Text className="text-caption text-text-secondary">
-                    {topic.repetitions}{' '}
-                    {topic.repetitions === 1 ? 'session' : 'sessions'}
-                  </Text>
-                )}
-              </View>
-              {topic.failureCount >= 3 && (
-                <Text className="text-caption text-warning mt-0.5">
-                  Needs attention
-                </Text>
-              )}
-              {formatLastPracticed(topic.lastReviewedAt) && (
-                <Text className="text-caption text-text-tertiary mt-0.5">
-                  Last practiced: {formatLastPracticed(topic.lastReviewedAt)}
-                </Text>
-              )}
-            </View>
-            <RetentionSignal status={topic.retention} />
-          </View>
-        </Pressable>
-      ))}
-    </>
-  );
-}
-
 export default function LibraryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -197,7 +127,16 @@ export default function LibraryScreen() {
     routeSubjectId ?? null
   );
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
-  const [showAllTopics, setShowAllTopics] = useState(false);
+  const [activeTab, setActiveTab] = useState<LibraryTab>('shelves');
+  const [shelvesTabState, setShelvesTabState] = useState<ShelvesTabState>(
+    SHELVES_TAB_INITIAL_STATE
+  );
+  const [booksTabState, setBooksTabState] = useState<BooksTabState>(
+    BOOKS_TAB_INITIAL_STATE
+  );
+  const [topicsTabState, setTopicsTabState] = useState<TopicsTabState>(
+    TOPICS_TAB_INITIAL_STATE
+  );
   const [showManageSubjects, setShowManageSubjects] = useState(false);
   const [pendingSubjectId, setPendingSubjectId] = useState<string | null>(null);
   const [bookGenerationState, setBookGenerationState] = useState<
@@ -217,12 +156,12 @@ export default function LibraryScreen() {
     selectedSubjectId ?? undefined,
     selectedBookId ?? undefined
   );
+  const allBooksQuery = useAllBooks();
 
   useEffect(() => {
     if (routeSubjectId) {
       setSelectedSubjectId(routeSubjectId);
       setSelectedBookId(null);
-      setShowAllTopics(false);
     }
   }, [routeSubjectId]);
 
@@ -298,8 +237,8 @@ export default function LibraryScreen() {
     })),
   });
 
-  const allTopics = useMemo(() => {
-    if (!subjectsQuery.data) return [] as EnrichedTopic[];
+  const allTopics = useMemo<LibFilterEnrichedTopic[]>(() => {
+    if (!subjectsQuery.data) return [];
     return subjectsQuery.data.flatMap((subject, index) => {
       const data = retentionQueries[index]?.data;
       if (!data?.topics) return [];
@@ -309,6 +248,9 @@ export default function LibraryScreen() {
         name: topic.topicTitle ?? topic.topicId,
         subjectName: subject.name,
         subjectStatus: subject.status,
+        bookId: null,
+        bookTitle: null,
+        chapter: null,
         retention: getTopicRetention(topic),
         lastReviewedAt: topic.lastReviewedAt,
         repetitions: topic.repetitions,
@@ -317,12 +259,30 @@ export default function LibraryScreen() {
     });
   }, [retentionQueries, subjectsQuery.data]);
 
-  const progressBySubjectId = new Map(
-    (progressQuery.data?.subjects ?? []).map((subject) => [
-      subject.subjectId,
-      subject,
-    ])
+  const progressBySubjectId = useMemo(
+    () =>
+      new Map(
+        (progressQuery.data?.subjects ?? []).map((s) => [s.subjectId, s])
+      ),
+    [progressQuery.data?.subjects]
   );
+
+  const shelves = useMemo<ShelfItem[]>(() => {
+    return (subjectsQuery.data ?? []).map((subject) => ({
+      subject,
+      progress: progressBySubjectId.get(subject.id),
+    }));
+  }, [subjectsQuery.data, progressBySubjectId]);
+
+  const tabCounts = useMemo(
+    () => ({
+      shelves: subjectsQuery.data?.length ?? 0,
+      books: allBooksQuery.books.length,
+      topics: allTopics.length,
+    }),
+    [subjectsQuery.data?.length, allBooksQuery.books.length, allTopics.length]
+  );
+
   const selectedSubject =
     subjectsQuery.data?.find((subject) => subject.id === selectedSubjectId) ??
     null;
@@ -332,13 +292,11 @@ export default function LibraryScreen() {
     curriculumQuery.data?.topics
       ?.filter((topic) => !topic.bookId)
       .sort((a, b) => a.sortOrder - b.sortOrder) ?? [];
-  const canGoBack = showAllTopics || selectedSubjectId !== null;
+  const canGoBack = selectedSubjectId !== null;
   const headerTitle = selectedBookId
     ? activeBook?.book.title ?? selectedBook?.title ?? 'Book'
     : selectedSubjectId
     ? selectedSubject?.name ?? 'Shelf'
-    : showAllTopics
-    ? 'All Topics'
     : 'Library';
 
   const handleRetry = (): void => {
@@ -357,10 +315,18 @@ export default function LibraryScreen() {
     }
     if (selectedSubjectId) {
       setSelectedSubjectId(null);
-      setShowAllTopics(false);
       return;
     }
-    setShowAllTopics(false);
+  };
+
+  const handleTabChange = (tab: LibraryTab): void => {
+    setActiveTab(tab);
+    // Clear search on the new tab (per spec: "search text is cleared" on tab switch)
+    if (tab === 'shelves')
+      setShelvesTabState((prev) => ({ ...prev, search: '' }));
+    else if (tab === 'books')
+      setBooksTabState((prev) => ({ ...prev, search: '' }));
+    else setTopicsTabState((prev) => ({ ...prev, search: '' }));
   };
 
   const handleSubjectStatusChange = async (
@@ -394,94 +360,6 @@ export default function LibraryScreen() {
       params: { mode: 'learning', subjectId, topicId },
     } as never);
   };
-
-  const renderSubjectCards = (): React.ReactElement => (
-    <>
-      <View className="flex-row items-center mb-4 gap-2">
-        <Pressable
-          onPress={() => setShowAllTopics(false)}
-          className={`rounded-full px-4 py-2 ${
-            !showAllTopics ? 'bg-primary' : 'bg-surface-elevated'
-          }`}
-          testID="library-view-shelves"
-        >
-          <Text
-            className={`text-body-sm font-semibold ${
-              !showAllTopics ? 'text-text-inverse' : 'text-text-secondary'
-            }`}
-          >
-            Shelves
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setShowAllTopics(true)}
-          className={`rounded-full px-4 py-2 ${
-            showAllTopics ? 'bg-primary' : 'bg-surface-elevated'
-          }`}
-          testID="library-view-all-topics"
-        >
-          <Text
-            className={`text-body-sm font-semibold ${
-              showAllTopics ? 'text-text-inverse' : 'text-text-secondary'
-            }`}
-          >
-            All Topics
-          </Text>
-        </Pressable>
-      </View>
-
-      {(subjectsQuery.data ?? []).map((subject) => {
-        const progress = progressBySubjectId.get(subject.id);
-        const progressLabel =
-          progress && progress.topicsTotal > 0
-            ? `${progress.topicsCompleted}/${progress.topicsTotal} topics`
-            : 'Shelf ready to explore';
-
-        return (
-          <Pressable
-            key={subject.id}
-            onPress={() => {
-              setSelectedSubjectId(subject.id);
-              setSelectedBookId(null);
-              setShowAllTopics(false);
-            }}
-            className="bg-surface rounded-card px-4 py-4 mb-3"
-            testID={`subject-card-${subject.id}`}
-          >
-            <View className="flex-row items-start justify-between">
-              <View className="flex-1 me-3">
-                <View className="flex-row items-center mb-1">
-                  <Text className="text-body font-semibold text-text-primary">
-                    {subject.name}
-                  </Text>
-                  <View className="ms-2">
-                    <SubjectStatusPill status={subject.status} />
-                  </View>
-                </View>
-                <Text className="text-body-sm text-text-secondary">
-                  {progressLabel}
-                </Text>
-                {progress?.lastSessionAt && (
-                  <Text className="text-caption text-text-tertiary mt-2">
-                    Last session: {formatLastPracticed(progress.lastSessionAt)}
-                  </Text>
-                )}
-              </View>
-
-              <View className="items-end">
-                {progress && subject.status === 'active' && (
-                  <RetentionSignal status={progress.retentionStatus} compact />
-                )}
-                <Text className="text-caption text-primary mt-3">
-                  Open shelf
-                </Text>
-              </View>
-            </View>
-          </Pressable>
-        );
-      })}
-    </>
-  );
 
   const renderContent = (): React.ReactElement => {
     if (subjectsQuery.isLoading || progressQuery.isLoading) {
@@ -692,29 +570,61 @@ export default function LibraryScreen() {
       );
     }
 
-    if (showAllTopics) {
-      return (
-        <TopicRows
-          topics={allTopics}
-          onTopicPress={(topic) => openTopic(topic.topicId, topic.subjectId)}
+    // Top-level library view — three tabs
+    const subjectList = (subjectsQuery.data ?? []).map((s) => ({
+      id: s.id,
+      name: s.name,
+    }));
+    const bookList = allBooksQuery.books.map((b) => ({
+      id: b.book.id,
+      title: b.book.title,
+    }));
+
+    return (
+      <>
+        <LibraryTabs
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          counts={tabCounts}
         />
-      );
-    }
-
-    if ((subjectsQuery.data?.length ?? 0) === 0) {
-      return (
-        <View
-          className="bg-surface rounded-card px-4 py-6 items-center"
-          testID="library-empty"
-        >
-          <Text className="text-body text-text-secondary text-center">
-            No topics yet — add a subject to get started
-          </Text>
-        </View>
-      );
-    }
-
-    return renderSubjectCards();
+        {activeTab === 'shelves' && (
+          <ShelvesTab
+            shelves={shelves}
+            state={shelvesTabState}
+            onStateChange={setShelvesTabState}
+            onShelfPress={(subjectId) => {
+              setSelectedSubjectId(subjectId);
+              setSelectedBookId(null);
+            }}
+            onAddSubject={() => router.push('/create-subject')}
+          />
+        )}
+        {activeTab === 'books' && (
+          <BooksTab
+            books={allBooksQuery.books}
+            subjects={subjectList}
+            state={booksTabState}
+            onStateChange={setBooksTabState}
+            onBookPress={(subjectId, bookId) => {
+              setSelectedSubjectId(subjectId);
+              setSelectedBookId(bookId);
+            }}
+            onAddSubject={() => router.push('/create-subject')}
+          />
+        )}
+        {activeTab === 'topics' && (
+          <TopicsTab
+            topics={allTopics}
+            subjects={subjectList}
+            books={bookList}
+            state={topicsTabState}
+            onStateChange={setTopicsTabState}
+            onTopicPress={(topicId, subjectId) => openTopic(topicId, subjectId)}
+            onAddSubject={() => router.push('/create-subject')}
+          />
+        )}
+      </>
+    );
   };
 
   return (
@@ -750,17 +660,19 @@ export default function LibraryScreen() {
           </View>
         </View>
 
-        {(subjectsQuery.data?.length ?? 0) > 0 && !selectedBookId && (
-          <Pressable
-            onPress={() => setShowManageSubjects(true)}
-            className="rounded-full bg-surface-elevated px-4 py-2"
-            testID="manage-subjects-button"
-          >
-            <Text className="text-body-sm font-semibold text-primary">
-              Manage
-            </Text>
-          </Pressable>
-        )}
+        {(subjectsQuery.data?.length ?? 0) > 0 &&
+          !selectedSubjectId &&
+          !selectedBookId && (
+            <Pressable
+              onPress={() => setShowManageSubjects(true)}
+              className="rounded-full bg-surface-elevated px-4 py-2"
+              testID="manage-subjects-button"
+            >
+              <Text className="text-body-sm font-semibold text-primary">
+                Manage
+              </Text>
+            </Pressable>
+          )}
       </View>
 
       <ScrollView
@@ -768,7 +680,6 @@ export default function LibraryScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
       >
         {!selectedSubjectId &&
-          !showAllTopics &&
           !!progressQuery.data?.subjects.length &&
           progressQuery.data.subjects.every(
             (subject) =>

@@ -9,6 +9,7 @@ const mockUseBooks = jest.fn();
 const mockUseBookWithTopics = jest.fn();
 const mockUseGenerateBookTopics = jest.fn();
 const mockUseCurriculum = jest.fn();
+const mockUseAllBooks = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -36,6 +37,10 @@ jest.mock('../../hooks/use-books', () => ({
 
 jest.mock('../../hooks/use-curriculum', () => ({
   useCurriculum: () => mockUseCurriculum(),
+}));
+
+jest.mock('../../hooks/use-all-books', () => ({
+  useAllBooks: () => mockUseAllBooks(),
 }));
 
 jest.mock('@tanstack/react-query', () => {
@@ -105,6 +110,12 @@ describe('LibraryScreen', () => {
       mutate: jest.fn(),
     });
     mockUseCurriculum.mockReturnValue({ data: null, isLoading: false });
+    mockUseAllBooks.mockReturnValue({
+      books: [],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
   });
 
   it('shows loading state', () => {
@@ -128,9 +139,9 @@ describe('LibraryScreen', () => {
 
     render(<LibraryScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('library-empty')).toBeTruthy();
+    expect(screen.getByTestId('library-no-content')).toBeTruthy();
     expect(
-      screen.getByText('No topics yet — add a subject to get started')
+      screen.getByText('Add a subject to start building your library')
     ).toBeTruthy();
   });
 
@@ -166,7 +177,7 @@ describe('LibraryScreen', () => {
     expect(screen.getByText('3/12 topics')).toBeTruthy();
   });
 
-  it('shows all topics view when the toggle is pressed', () => {
+  it('shows all topics view when the topics tab is pressed', () => {
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       isLoading: false,
@@ -197,7 +208,7 @@ describe('LibraryScreen', () => {
 
     render(<LibraryScreen />, { wrapper: createWrapper() });
 
-    fireEvent.press(screen.getByTestId('library-view-all-topics'));
+    fireEvent.press(screen.getByTestId('library-tab-topics'));
 
     expect(screen.getByTestId('topic-row-topic-1')).toBeTruthy();
 
