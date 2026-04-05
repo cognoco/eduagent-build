@@ -86,18 +86,15 @@ const queryClient = new QueryClient({
 
 const ACCENT_STORE_PREFIX = 'accentPreset_';
 
-/** Map persona to its designed color scheme */
-function schemeForPersona(p: Persona): ColorScheme {
-  switch (p) {
-    case 'teen':
-      return 'dark';
-    case 'learner':
-      return 'dark';
-    case 'parent':
-      return 'light';
-    default:
-      return 'dark';
-  }
+function deriveThemeFromBirthYear(birthYear: number | null | undefined): {
+  persona: Persona;
+  colorScheme: ColorScheme;
+} {
+  const persona = personaFromBirthYear(birthYear);
+  return {
+    persona,
+    colorScheme: persona === 'parent' ? 'light' : 'dark',
+  };
 }
 
 function ThemedApp() {
@@ -120,9 +117,9 @@ function ThemedApp() {
   // the parent persona stuck in dark mode (themeKey mismatch).
   useEffect(() => {
     if (activeProfile) {
-      const candidate = personaFromBirthYear(activeProfile.birthYear);
-      setPersona(candidate);
-      setColorScheme(schemeForPersona(candidate));
+      const derivedTheme = deriveThemeFromBirthYear(activeProfile.birthYear);
+      setPersona(derivedTheme.persona);
+      setColorScheme(derivedTheme.colorScheme);
     }
   }, [activeProfile]);
 
@@ -190,7 +187,7 @@ function ThemedApp() {
   const setPersonaWithScheme = useCallback((p: Persona) => {
     userExplicitChoice.current = true;
     setPersona(p);
-    setColorScheme(schemeForPersona(p));
+    setColorScheme(p === 'parent' ? 'light' : 'dark');
   }, []);
 
   const themeValue = useMemo(

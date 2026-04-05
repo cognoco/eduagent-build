@@ -289,7 +289,17 @@ describe('interview routes', () => {
       const body = await res.json();
       expect(body.isComplete).toBe(true);
 
-      expect(updateDraft).toHaveBeenCalledWith(
+      expect(updateDraft).toHaveBeenNthCalledWith(
+        1,
+        undefined,
+        'test-profile-id',
+        'draft-1',
+        expect.not.objectContaining({
+          status: 'completed',
+        })
+      );
+      expect(updateDraft).toHaveBeenNthCalledWith(
+        2,
         undefined,
         'test-profile-id',
         'draft-1',

@@ -4,17 +4,11 @@
 
 const mockFindManyQuotaPools = jest.fn().mockResolvedValue([]);
 const mockFindFirstSubscription = jest.fn().mockResolvedValue(null);
+const mockDbExecute = jest.fn().mockResolvedValue({ rowCount: 0 });
 const mockDbUpdate = jest.fn().mockReturnValue({
   set: jest
     .fn()
     .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
-});
-const mockDbUpdateReturning = jest.fn().mockReturnValue({
-  set: jest.fn().mockReturnValue({
-    where: jest.fn().mockReturnValue({
-      returning: jest.fn().mockResolvedValue([]),
-    }),
-  }),
 });
 
 jest.mock('@eduagent/database', () => ({
@@ -23,6 +17,7 @@ jest.mock('@eduagent/database', () => ({
       quotaPools: { findMany: mockFindManyQuotaPools },
       subscriptions: { findFirst: mockFindFirstSubscription },
     },
+    execute: (...args: unknown[]) => mockDbExecute(...args),
     update: (...args: unknown[]) => {
       // Route to returning mock for daily reset, plain mock for monthly
       const result = mockDbUpdate(...args);
@@ -141,86 +136,32 @@ describe('quotaReset', () => {
   });
 
   it('resets quota pools whose cycle has elapsed', async () => {
-    const duePool = {
-      id: 'qp-1',
-      subscriptionId: 'sub-1',
-      monthlyLimit: 500,
-      usedThisMonth: 342,
-      cycleResetAt: new Date('2025-01-14T00:00:00.000Z'), // yesterday
-    };
-
-    mockFindManyQuotaPools.mockResolvedValue([duePool]);
-    mockFindFirstSubscription.mockResolvedValue({
-      id: 'sub-1',
-      tier: 'plus',
-    });
+    mockDbExecute.mockResolvedValueOnce({ rowCount: 1 });
 
     const { result } = await executeSteps();
 
     expect(result.monthlyResetCount).toBe(1);
-    expect(mockDbUpdate).toHaveBeenCalled();
+    expect(mockDbExecute).toHaveBeenCalledTimes(1);
   });
 
-  it('uses correct tier quota for reset', async () => {
-    const duePool = {
-      id: 'qp-2',
-      subscriptionId: 'sub-2',
-      monthlyLimit: 1500,
-      usedThisMonth: 800,
-      cycleResetAt: new Date('2025-01-14T00:00:00.000Z'),
-    };
-
-    mockFindManyQuotaPools.mockResolvedValue([duePool]);
-    mockFindFirstSubscription.mockResolvedValue({
-      id: 'sub-2',
-      tier: 'family',
-    });
+  it('uses a single batch SQL update for monthly resets', async () => {
+    mockDbExecute.mockResolvedValueOnce({ rowCount: 1 });
 
     await executeSteps();
 
-    // Verify db.update was called
-    expect(mockDbUpdate).toHaveBeenCalled();
+    expect(mockDbExecute).toHaveBeenCalledTimes(1);
   });
 
-  it('defaults to free tier when subscription not found', async () => {
-    const duePool = {
-      id: 'qp-3',
-      subscriptionId: 'sub-unknown',
-      monthlyLimit: 500,
-      usedThisMonth: 100,
-      cycleResetAt: new Date('2025-01-14T00:00:00.000Z'),
-    };
-
-    mockFindManyQuotaPools.mockResolvedValue([duePool]);
-    mockFindFirstSubscription.mockResolvedValue(null);
+  it('returns zero when no quota cycles need resetting', async () => {
+    mockDbExecute.mockResolvedValueOnce({ rowCount: 0 });
 
     const { result } = await executeSteps();
 
-    expect(result.monthlyResetCount).toBe(1);
+    expect(result.monthlyResetCount).toBe(0);
   });
 
-  it('resets multiple pools in one run', async () => {
-    const pools = [
-      {
-        id: 'qp-a',
-        subscriptionId: 'sub-a',
-        monthlyLimit: 500,
-        usedThisMonth: 400,
-        cycleResetAt: new Date('2025-01-13T00:00:00.000Z'),
-      },
-      {
-        id: 'qp-b',
-        subscriptionId: 'sub-b',
-        monthlyLimit: 3000,
-        usedThisMonth: 2500,
-        cycleResetAt: new Date('2025-01-14T00:00:00.000Z'),
-      },
-    ];
-
-    mockFindManyQuotaPools.mockResolvedValue(pools);
-    mockFindFirstSubscription
-      .mockResolvedValueOnce({ id: 'sub-a', tier: 'plus' })
-      .mockResolvedValueOnce({ id: 'sub-b', tier: 'pro' });
+  it('reports the number of pools reset by the batch update', async () => {
+    mockDbExecute.mockResolvedValueOnce({ rowCount: 2 });
 
     const { result } = await executeSteps();
 

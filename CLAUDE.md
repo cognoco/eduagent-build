@@ -41,6 +41,7 @@ Run the smallest useful verification first, then the project-level checks for th
 - Run integration tests when changing DB behavior, auth/profile scoping, Inngest flows, or cross-package contracts.
 
 Do not call work complete if related tests, lint, typecheck, or required migrations are still failing.
+- Follow the Fix Verification Rules in `~/.claude/CLAUDE.md` — every fix needs a verified-by entry, finding ID in commits, and break tests for security fixes.
 
 ## Repo-Specific Guardrails
 
