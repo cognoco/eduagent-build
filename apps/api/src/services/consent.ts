@@ -32,6 +32,17 @@ export class ConsentResendLimitError extends Error {
   }
 }
 
+export class EmailDeliveryError extends Error {
+  constructor(reason?: string) {
+    super(
+      reason
+        ? `Consent email could not be delivered (${reason}). Please check the email address and try again.`
+        : 'Consent email could not be delivered. Please check the email address and try again.'
+    );
+    this.name = 'EmailDeliveryError';
+  }
+}
+
 export class ConsentTokenNotFoundError extends Error {
   constructor() {
     super('Invalid consent token');
@@ -186,6 +197,9 @@ export async function requestConsent(
   // Atomic upsert with resend limit enforced in the UPDATE WHERE clause.
   // This avoids the TOCTOU race where two concurrent requests both read
   // resendCount=2, both pass the check, and both increment to 3.
+  //
+  // When the parent email changes, the resend counter resets to 0 — the limit
+  // is per-recipient, so switching to a different email should always be allowed.
   const [row] = await db
     .insert(consentStates)
     .values({
@@ -204,17 +218,17 @@ export async function requestConsent(
         parentEmail: input.parentEmail,
         consentToken: token,
         expiresAt,
-        resendCount: sql`${consentStates.resendCount} + 1`,
+        resendCount: sql`CASE WHEN ${consentStates.parentEmail} IS NOT DISTINCT FROM ${input.parentEmail} THEN ${consentStates.resendCount} + 1 ELSE 0 END`,
         requestedAt: sql`now()`,
         respondedAt: null,
         updatedAt: sql`now()`,
       },
-      setWhere: sql`${consentStates.resendCount} < ${MAX_CONSENT_RESENDS}`,
+      setWhere: sql`${consentStates.resendCount} < ${MAX_CONSENT_RESENDS} OR ${consentStates.parentEmail} IS DISTINCT FROM ${input.parentEmail}`,
     })
     .returning();
 
   // If no row returned, the conflict existed but the setWhere prevented the
-  // update — meaning the resend limit was reached.
+  // update — meaning the resend limit was reached for the same email.
   if (!row) {
     throw new ConsentResendLimitError();
   }
@@ -239,12 +253,30 @@ export async function requestConsent(
   );
 
   if (!emailResult.sent) {
-    console.warn('[consent] Email delivery failed:', emailResult.reason);
+    // Roll back the resend counter — don't burn attempts when email fails.
+    // Use GREATEST to avoid negative values on initial insert (resendCount=0).
+    try {
+      await db
+        .update(consentStates)
+        .set({
+          resendCount: sql`GREATEST(${consentStates.resendCount} - 1, 0)`,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(consentStates.id, row.id));
+    } catch (rollbackError) {
+      // If rollback fails we still throw the delivery error — losing one
+      // counter slot is better than silently claiming the email was sent.
+      console.warn(
+        '[consent] Failed to rollback resend counter:',
+        rollbackError
+      );
+    }
+    throw new EmailDeliveryError(emailResult.reason ?? undefined);
   }
 
   return {
     consentState: mapConsentRow(row),
-    emailDelivered: emailResult.sent,
+    emailDelivered: true,
   };
 }
 

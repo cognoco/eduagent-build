@@ -66,10 +66,19 @@ describe('formatApiError', () => {
     );
   });
 
-  it('returns server message for API error 502', () => {
+  it('returns server message for API error 502 with plain text body', () => {
     const err = new Error('API error 502: Bad Gateway');
     expect(formatApiError(err)).toBe(
       'Something went wrong on our end. Please try again in a moment.'
+    );
+  });
+
+  it('extracts JSON message from API error 502 body', () => {
+    const err = new Error(
+      'API error 502: {"code":"INTERNAL_ERROR","message":"Consent email could not be delivered. Please check the email address and try again."}'
+    );
+    expect(formatApiError(err)).toBe(
+      'Consent email could not be delivered. Please check the email address and try again.'
     );
   });
 

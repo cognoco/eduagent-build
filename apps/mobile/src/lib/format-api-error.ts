@@ -68,13 +68,11 @@ export function formatApiError(error: unknown): string {
     // 2b. Parse 'API error {status}: {body}' from customFetch
     const status = parseApiStatus(msg);
     if (status !== null) {
-      if (status >= 500) {
-        return SERVER_MESSAGE;
-      }
-      // For 4xx, try to extract the body message after "API error NNN: "
       const bodyStart = msg.indexOf(': ') + 2;
       const body = msg.slice(bodyStart).trim();
-      // Try to parse JSON body for a message field
+      // Try to parse JSON body for a message field — works for both 4xx and 5xx.
+      // The API may include a user-facing message even on server errors
+      // (e.g. email delivery failure returns 502 with a specific message).
       try {
         const parsed: unknown = JSON.parse(body);
         if (
@@ -89,10 +87,19 @@ export function formatApiError(error: unknown): string {
           }
         }
       } catch {
-        // Body is not JSON — use it directly if it's short and readable
-        if (body.length > 0 && body.length < 200 && !body.includes('{')) {
+        // Body is not JSON — for 4xx, use plain text if it's short and readable.
+        // For 5xx, fall through to the generic server message.
+        if (
+          status < 500 &&
+          body.length > 0 &&
+          body.length < 200 &&
+          !body.includes('{')
+        ) {
           return body;
         }
+      }
+      if (status >= 500) {
+        return SERVER_MESSAGE;
       }
       return "That didn't work. Please check your input and try again.";
     }

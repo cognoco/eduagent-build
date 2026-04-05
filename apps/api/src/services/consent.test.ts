@@ -19,7 +19,12 @@ import {
   requestConsent,
   processConsentResponse,
   getConsentStatus,
+  EmailDeliveryError,
 } from './consent';
+
+const { sendEmail: mockSendEmail } = jest.requireMock('./notifications') as {
+  sendEmail: jest.Mock;
+};
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 const CURRENT_YEAR = new Date().getFullYear();
@@ -172,6 +177,27 @@ describe('requestConsent', () => {
     expect(insertedValues).toHaveProperty('consentToken');
     expect(typeof insertedValues.consentToken).toBe('string');
     expect(insertedValues.consentToken.length).toBeGreaterThan(0);
+  });
+
+  it('throws EmailDeliveryError and rolls back counter when email fails', async () => {
+    mockSendEmail.mockResolvedValueOnce({ sent: false, reason: 'no_api_key' });
+    const row = mockConsentRow();
+    const db = createMockDb({ insertReturning: [row] });
+
+    await expect(
+      requestConsent(
+        db,
+        {
+          childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+          parentEmail: 'parent@example.com',
+          consentType: 'GDPR',
+        },
+        'https://test.example.com'
+      )
+    ).rejects.toThrow(EmailDeliveryError);
+
+    // Verify counter rollback was attempted
+    expect(db.update).toHaveBeenCalled();
   });
 
   it('returns consent state with correct consent type for COPPA (backward compat)', async () => {
