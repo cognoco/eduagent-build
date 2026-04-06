@@ -25,6 +25,8 @@ export interface StreamDoneEvent {
   escalationRung?: number;
   /** Present on interview done events; absent on learning sessions. */
   isComplete?: boolean;
+  /** LLM-estimated response time for adaptive silence detection. */
+  expectedResponseMinutes?: number;
 }
 
 export type StreamEvent = StreamChunkEvent | StreamDoneEvent;

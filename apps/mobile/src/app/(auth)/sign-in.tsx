@@ -172,9 +172,10 @@ export default function SignInScreen() {
       SESSION_TRANSITION_MS - getTransitionElapsed()
     );
     const timer = setTimeout(() => {
-      console.warn(
-        `[AUTH-DEBUG] transitioning TIMEOUT after ${SESSION_TRANSITION_MS}ms — falling back to sign-in form`
-      );
+      if (__DEV__)
+        console.warn(
+          `[AUTH-DEBUG] transitioning TIMEOUT after ${SESSION_TRANSITION_MS}ms — falling back to sign-in form`
+        );
       clearTransitionState();
       setIsTransitioning(false);
       setError(

@@ -59,10 +59,8 @@ export type MeteringEnv = {
 const LLM_ROUTE_PATTERNS = [
   /\/sessions\/[^/]+\/messages\/?$/,
   /\/sessions\/[^/]+\/stream\/?$/,
-  // Interview routes (/subjects/:id/interview, /interview/stream) are intentionally
-  // exempt. Interviews are bounded onboarding flows (3-5 exchanges per subject,
-  // once per subject lifetime) and use low-cost Flash-tier models. The cost is
-  // negligible compared to open-ended session exchanges.
+  /\/subjects\/[^/]+\/interview\/?$/,
+  /\/subjects\/[^/]+\/interview\/stream\/?$/,
 ];
 
 function isLlmRoute(path: string): boolean {

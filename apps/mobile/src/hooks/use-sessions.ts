@@ -311,9 +311,7 @@ export function useStreamMessage(sessionId: string): {
             onDone({
               exchangeCount: event.exchangeCount,
               escalationRung: event.escalationRung ?? 0,
-              expectedResponseMinutes: (
-                event as { expectedResponseMinutes?: number }
-              ).expectedResponseMinutes,
+              expectedResponseMinutes: event.expectedResponseMinutes,
               aiEventId: (event as { aiEventId?: string }).aiEventId,
             });
           }

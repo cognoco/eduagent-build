@@ -56,6 +56,51 @@ jest.mock('../services/profile', () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Mock billing service — metering middleware needs these for quota checks
+// ---------------------------------------------------------------------------
+
+const mockSubscription = {
+  id: 'sub-1',
+  accountId: 'test-account-id',
+  tier: 'free',
+  status: 'active',
+  stripeCustomerId: null,
+  stripeSubscriptionId: null,
+  trialEndsAt: null,
+  currentPeriodEnd: null,
+  currentPeriodStart: null,
+  cancelledAt: null,
+  lastStripeEventTimestamp: null,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
+jest.mock('../services/billing', () => ({
+  getSubscriptionByAccountId: jest.fn().mockResolvedValue(mockSubscription),
+  ensureFreeSubscription: jest.fn().mockResolvedValue(mockSubscription),
+  getQuotaPool: jest.fn().mockResolvedValue({
+    id: 'qp-1',
+    subscriptionId: 'sub-1',
+    monthlyLimit: 100,
+    usedThisMonth: 0,
+    dailyLimit: 10,
+    usedToday: 0,
+    cycleResetAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+  decrementQuota: jest.fn().mockResolvedValue({
+    success: true,
+    source: 'monthly',
+    remainingMonthly: 99,
+    remainingTopUp: 0,
+    remainingDaily: 9,
+  }),
+  getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
+  createSubscription: jest.fn(),
+}));
+
+// ---------------------------------------------------------------------------
 // Mock subject service
 // ---------------------------------------------------------------------------
 
