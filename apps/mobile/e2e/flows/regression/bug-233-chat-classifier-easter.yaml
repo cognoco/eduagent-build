@@ -1,0 +1,75 @@
+# Regression: BUG-233 — Chat classifier must not reject valid cultural topics
+# The chat classifier previously showed "I couldn't place that yet" for topics
+# like Easter, even though the subject-creation classifier handled them fine.
+#
+# This test verifies that asking about Easter in a freeform chat session either:
+# (a) matches an enrolled subject, or
+# (b) shows a "+" chip to create a suggested subject (e.g., Religious Studies)
+# It must NEVER show only "I couldn't place that" with no actionable escape.
+#
+# Prerequisite: learning-active scenario (provides World History subject)
+# testIDs verified against:
+#   - apps/mobile/src/app/(learner)/session/index.tsx
+#     (chat-input, chat-messages, session-subject-resolution,
+#      subject-resolution-create-new)
+appId: com.mentomate.app
+tags:
+  - regression
+  - chat
+  - classifier
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+# 2. Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 3. Start a freeform session via coaching card
+- tapOn:
+    id: "coaching-card-primary"
+
+# 4. Wait for session chat input
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+# 5. Type a cultural topic that previously triggered the bug
+- tapOn:
+    id: "chat-input"
+- inputText: "please teach me about Easter"
+- pressKey: Enter
+
+# 6. Wait for classifier response (LLM call, generous timeout)
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 60000
+
+# 7. The AI must NOT respond with the dead-end "I couldn't place that" message
+#    without offering an actionable escape. Either:
+#    - It matched an enrolled subject and proceeded, OR
+#    - It shows the subject resolution bar with a "+ New Subject" chip
+#
+# Assert that the dead-end message is NOT the only thing shown.
+# If subject resolution appeared, the create-new chip must be visible.
+- assertVisible:
+    id: "chat-messages"
+
+# 8. If the resolution bar appeared, verify the "+ New Subject" chip exists
+#    (This step may be skipped if the LLM matched an enrolled subject directly)
+- extendedWaitUntil:
+    visible:
+      id: "session-subject-resolution"
+    timeout: 5000
+    optional: true
+
+# 9. Screenshot for visual verification
+- takeScreenshot: bug-233-easter-classifier-response

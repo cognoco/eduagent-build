@@ -43,7 +43,7 @@ import { useNetworkStatus } from '../../../hooks/use-network-status';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
 import { useCelebrationLevel } from '../../../hooks/use-settings';
 import { useCelebration } from '../../../hooks/use-celebration';
-import { useSubjects } from '../../../hooks/use-subjects';
+import { useSubjects, useCreateSubject } from '../../../hooks/use-subjects';
 import { useCurriculum } from '../../../hooks/use-curriculum';
 import {
   celebrationForReason,
@@ -132,6 +132,8 @@ interface PendingSubjectResolution {
     subjectId: string;
     subjectName: string;
   }>;
+  /** When the classifier cannot match an enrolled subject, it suggests a new one */
+  suggestedSubjectName?: string | null;
 }
 
 const CONFIRMATION_BY_CHIP: Partial<Record<ContextualQuickChipId, string>> = {
@@ -398,6 +400,7 @@ export default function SessionScreen() {
   const parkingLot = useParkingLot(activeSessionId ?? '');
   const addParkingLotItem = useAddParkingLotItem(activeSessionId ?? '');
   const { data: availableSubjects = [] } = useSubjects();
+  const createSubject = useCreateSubject();
   const {
     milestonesReached,
     trackerState,
@@ -851,7 +854,8 @@ export default function SessionScreen() {
     (
       text: string,
       prompt: string,
-      candidates: Array<{ subjectId: string; subjectName: string }>
+      candidates: Array<{ subjectId: string; subjectName: string }>,
+      suggestedSubjectName?: string | null
     ) => {
       const dedupedCandidates = candidates.filter(
         (candidate, index, all) =>
@@ -866,6 +870,7 @@ export default function SessionScreen() {
         originalText: text,
         prompt,
         candidates: dedupedCandidates,
+        suggestedSubjectName,
       });
       setMessages((prev) => [
         ...prev,
@@ -1183,6 +1188,59 @@ export default function SessionScreen() {
     ]
   );
 
+  // BUG-233: Create a new subject from the classifier's suggestion
+  const handleCreateSuggestedSubject = useCallback(async () => {
+    if (
+      !pendingSubjectResolution?.suggestedSubjectName ||
+      isStreaming ||
+      pendingClassification
+    ) {
+      return;
+    }
+
+    const suggestedName = pendingSubjectResolution.suggestedSubjectName;
+    const originalText = pendingSubjectResolution.originalText;
+
+    setPendingSubjectResolution(null);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: createLocalMessageId('ai'),
+        role: 'ai',
+        content: `Adding ${suggestedName} and getting started...`,
+        isSystemPrompt: true,
+      },
+    ]);
+
+    try {
+      const result = await createSubject.mutateAsync({
+        name: suggestedName,
+        rawInput: originalText,
+      });
+      setClassifiedSubject({
+        subjectId: result.subject.id,
+        subjectName: result.subject.name,
+      });
+      setShowWrongSubjectChip(false);
+      await continueWithMessage(originalText, {
+        sessionSubjectId: result.subject.id,
+        sessionSubjectName: result.subject.name,
+      });
+    } catch {
+      showConfirmation(
+        `Could not create ${suggestedName}. Please try again or pick an existing subject.`
+      );
+    }
+  }, [
+    continueWithMessage,
+    createLocalMessageId,
+    createSubject,
+    isStreaming,
+    pendingClassification,
+    pendingSubjectResolution,
+    showConfirmation,
+  ]);
+
   const handleSend = useCallback(
     async (text: string) => {
       if (isStreaming || pendingClassification) return;
@@ -1239,15 +1297,34 @@ export default function SessionScreen() {
               setTopicSwitcherSubjectId(subjectCandidates[0].subjectId);
             }
             setShowWrongSubjectChip(false);
+
+            // BUG-233: When the classifier suggests a new subject and no enrolled
+            // subject matched, show the suggestion instead of a dead-end message
+            const suggested = result.suggestedSubjectName ?? null;
+            let promptMessage: string;
+            if (result.candidates.length > 1) {
+              promptMessage = `This sounds like it could be ${subjectCandidates
+                .slice(0, 3)
+                .map((candidate) => candidate.subjectName)
+                .join(' or ')}. Which one are we working on?`;
+            } else if (
+              suggested &&
+              result.candidates.length === 0
+            ) {
+              promptMessage =
+                subjectCandidates.length > 0
+                  ? `This sounds like ${suggested}. Pick a subject below, or tap "+ ${suggested}" to add it.`
+                  : `This sounds like ${suggested}. Tap below to add it and start learning.`;
+            } else {
+              promptMessage =
+                "I couldn't place that yet. Pick the closest subject and we'll get moving.";
+            }
+
             openSubjectResolution(
               text,
-              result.candidates.length > 1
-                ? `This sounds like it could be ${subjectCandidates
-                    .slice(0, 3)
-                    .map((candidate) => candidate.subjectName)
-                    .join(' or ')}. Which one are we working on?`
-                : "I couldn't place that yet. Pick the closest subject and we'll get moving.",
-              subjectCandidates
+              promptMessage,
+              subjectCandidates,
+              suggested
             );
             return;
           }
@@ -1813,6 +1890,27 @@ export default function SessionScreen() {
             </Text>
           </Pressable>
         ))}
+        {/* BUG-233: When classifier suggests a subject, offer to create it inline */}
+        {pendingSubjectResolution.suggestedSubjectName && (
+          <Pressable
+            onPress={() => void handleCreateSuggestedSubject()}
+            disabled={isStreaming || pendingClassification || createSubject.isPending}
+            className="rounded-full bg-primary/20 px-4 py-2"
+            accessibilityRole="button"
+            accessibilityLabel={`Add ${pendingSubjectResolution.suggestedSubjectName} as a new subject`}
+            accessibilityState={{
+              disabled: isStreaming || pendingClassification || createSubject.isPending,
+            }}
+            testID="subject-resolution-create-new"
+          >
+            <Text className="text-body-sm font-semibold text-primary">
+              {createSubject.isPending
+                ? 'Adding...'
+                : `+ ${pendingSubjectResolution.suggestedSubjectName}`}
+            </Text>
+          </Pressable>
+        )}
+        {/* BUG-236: Generic new-subject escape hatch — returns to chat after creation */}
         <Pressable
           onPress={() =>
             router.push({

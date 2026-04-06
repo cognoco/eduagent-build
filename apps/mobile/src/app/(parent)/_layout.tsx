@@ -265,6 +265,13 @@ export default function ParentLayout() {
             tabBarItemStyle: { display: 'none' },
           }}
         />
+        <Tabs.Screen
+          name="shelf"
+          options={{
+            href: null,
+            tabBarItemStyle: { display: 'none' },
+          }}
+        />
       </Tabs>
     </View>
   );

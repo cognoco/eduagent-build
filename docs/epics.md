@@ -18,7 +18,7 @@ This document provides the complete epic and story breakdown for EduAgent, decom
 
 ### Functional Requirements
 
-**Total: 174 FRs (121 MVP, 5 later-phase FRs now shipped via Epic 8, 23 still deferred to v1.1, 8 Epic 13 session lifecycle, 3 Epic 7 additions, 12 Epic 14 human agency, 2 Epic 7 library browsing)**
+**Total: 176 FRs (121 MVP, 5 later-phase FRs now shipped via Epic 8, 23 still deferred to v1.1, 8 Epic 13 session lifecycle, 3 Epic 7 additions, 12 Epic 14 human agency, 2 Epic 7 library browsing, 2 Epic 7 library UX refactor)**
 
 **User Management (FR1-FR12) — Epic 0:**
 
@@ -412,17 +412,19 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 | FR150-FR152 | ~~Epic 7 additions: decay quizzes, per-edge feedback, "prove it" quiz~~ — **Cut in v3** | ~~Epic 7 v2~~ | Cut |
 | FR160-FR168 | Self-Building Library: curriculum books, chapters, LLM generation, enhanced session context, coaching cards, Library navigation, visual topic map, knowledge signals | Epic 7 v3 | Pre-launch (7.1-7.4), fast-follow (7.5-7.6) |
 | FR169-FR170 | Library three-tab browsing (Shelves/Books/Topics) with search, sort & filter | Epic 7 v3 | Fast-follow (7.7) |
+| FR171 | Library Navigation Refactor: route-based Shelf/Book screens, CollapsibleChapter, bookId non-nullable, library.tsx simplified | Epic 7 v3 | Shipped 2026-04-06 (7.8) |
+| FR172 | Topic Notes: voice/text capture, mid-session trigger, post-session trigger, NoteInput/NoteDisplay components, has-notes filter | Epic 7 v3 | Shipped 2026-04-06 (7.9) |
 | FR210-FR217 | Session Lifecycle: adaptive time tracking (LLM + pace calibration), graceful close + session resumption, hard cap removal, mastery + effort milestones, adaptive silence detection, parent dashboard (wall-clock + exchanges), unified celebrations | Epic 13 | Pre-launch |
 | FR218-FR225 | Human Agency: per-message feedback, quick chips, topic switch, coaching dismiss, recall "I don't remember", escalation nudge, add topic, "something else" | Epic 14 | Pre/post-launch |
 | FR226-FR229 | Homework Overhaul: multi-problem sessions, problem card preview, explain-don't-question mode, learning extraction | Epic 14 | Pre/post-launch |
 
-**Coverage verification:** 149 original + 3 (Epic 7 additions) + 8 (Epic 13) + 12 (Epic 14) + 2 (Epic 7 library browsing) = **174 FRs.**
+**Coverage verification:** 149 original + 3 (Epic 7 additions) + 8 (Epic 13) + 12 (Epic 14) + 2 (Epic 7 library browsing) + 2 (Epic 7 library UX refactor) = **176 FRs.**
 
 ## Epic List
 
 **14 epics total: 6 MVP (Epics 0-5), 2 pre-launch (Epics 9, 10), 2 deferred (Epics 6, 7), 1 later-phase epic already shipped (Epic 8), 3 post-launch (Epics 11, 12, 13+14).**
 
-**Completion status (updated 2026-04-03):**
+**Completion status (updated 2026-04-06):**
 
 | Epic | Status | Notes |
 |------|--------|-------|
@@ -432,7 +434,7 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 | 11 (Brand Identity) | ✅ Complete | Navy bg, teal/lavender tokens, accent cascade, light mode |
 | 12 (Persona Removal) | 🔄 In progress | 12.1 complete; 12.6 compatibility slice complete; remaining cleanup + schema removal pending |
 | 13 (Session Lifecycle) | ✅ Complete (7/7) | All stories verified including Inngest wiring + celebrations |
-| 14 (Human Agency) | ❌ Not started | Phase A quick wins are next priority (Phase 2) |
+| 14 (Human Agency) | ✅ Complete (12/12) | All phases done: Phase A (14.1-14.4), Phase B homework overhaul (14.9-14.12), Phase C session agency (14.5-14.8) |
 | 6, 7 (v1.1) | ⏳ Deferred | Language, concept map |
 | 8 (Voice Mode) | ✅ Complete | Stories 8.1-8.5 shipped; 8.6 remains optional stretch work |
 
@@ -837,24 +839,25 @@ Stories 12.1 + 12.3 can be parallelized. Story 12.7 co-designs with Epic 14 Stor
 **Scope:** Phase A pre-launch, Phase B+C post-launch
 **Stories:** 14.1–14.12 (12 stories across 3 phases)
 **FRs:** FR218-FR229 (12 FRs)
+**Status:** ✅ Complete (12/12 stories implemented, 2026-04-06). Phase A (14.1-14.4), Phase B homework overhaul (14.9-14.12), and Phase C session agency (14.5-14.8) all shipped.
 **Depends on:** None (Phase A). Phase B depends on camera capture (Story 2.5). Phase C: 14.6 depends on 14.5, 14.8 depends on 14.6.
 **Co-design:** Story 14.1 co-designs with Epic 12 Story 12.7 (prioritized home cards). Card dismissal feeds into the home card ranking algorithm.
 
 **Why:** An audit of all learner-facing screens revealed that the system is well-designed at boundaries (subject creation, session start/end) but loses human agency during active interactions. The AI drives escalation, topic flow, and feedback — the student can only redirect by leaving. Additionally, the homework flow has critical gaps: Socratic questioning on routine homework is painfully slow, OCR errors go straight to the AI with no correction step, students can't work through multiple problems in one session, and parents see nothing about what was actually learned during homework.
 
-**Phase A — Low Effort, High Impact (Pre-Launch):**
+**Phase A — Low Effort, High Impact: ✅ Complete**
 - 14.1: Home card dismissal (× button on each home card, dismissal tracking feeds ranking algorithm — co-design with Epic 12 Story 12.7)
 - 14.2: "I don't remember" on recall tests (dignified failure, hint then remediation)
 - 14.3: "Add my own topic" to curriculum (text input + LLM normalization + user confirmation)
 - 14.4: "Something else" on ambiguous subject suggestions (clarification input + "Just use my words" escape)
 
-**Phase B — Homework Overhaul (High Priority):**
+**Phase B — Homework Overhaul: ✅ Complete**
 - 14.9: Problem card preview + OCR correction (client-side heuristic split → editable cards per problem)
 - 14.10: "Help me" vs "Check my answer" per problem (**no Socratic questioning in homework** — explain, verify, be brief)
 - 14.11: Multi-problem session flow (one session per homework sitting, "Next problem" chip, in-session camera)
 - 14.12: Homework learning extraction (LLM reads conversation → topics practiced, scaffolding level → parent dashboard + Library)
 
-**Phase C — Session Agency (Post-Launch):**
+**Phase C — Session Agency: ✅ Complete**
 - 14.5: Per-message feedback ("Not helpful" / "That's incorrect" → system message to LLM)
 - 14.6: Quick-action chips ("I know this", "Explain differently", "Too easy", "Too hard")
 - 14.7: Topic switch mid-session (bottom sheet picker, seamless session transition)
@@ -891,14 +894,14 @@ Phase 1 — Foundation cleanup (simplify existing code):               ✅ COMPL
   Epic 13.1     (time tracking + wallClockSeconds — backend only)     ✅
   Epic 13.2     (remove hard caps — adaptive silence replaces fixed)  ✅
 
-Phase 2 — Quick wins (independent, small changes):                   ❌ NOT STARTED
-  Epic 14 Phase A: 14.2, 14.3, 14.4  (recall, add topic, something else — all parallel)
-  Epic 14.10    (homework prompt change — one string edit in exchanges.ts, huge value)
+Phase 2 — Quick wins (independent, small changes):                   ✅ COMPLETE
+  Epic 14 Phase A: 14.2, 14.3, 14.4  (recall, add topic, something else — all parallel) ✅
+  Epic 14.10    (homework prompt change — one string edit in exchanges.ts, huge value)    ✅
 
-Phase 3 — Homework overhaul (sequential chain):                      ❌ NOT STARTED
-  Epic 14.9     (problem card preview — camera.tsx, frontend only)
-  Epic 14.11    (multi-problem session — depends on 14.9 + 14.10)
-  Epic 14.12    (learning extraction — Inngest step, depends on 14.11)
+Phase 3 — Homework overhaul (sequential chain):                      ✅ COMPLETE
+  Epic 14.9     (problem card preview — camera.tsx, frontend only)                       ✅
+  Epic 14.11    (multi-problem session — depends on 14.9 + 14.10)                        ✅
+  Epic 14.12    (learning extraction — Inngest step, depends on 14.11)                   ✅
 
 Phase 4 — Celebration system + session polish:                       ✅ COMPLETE
   Epic 13.4     (celebration library + milestones + 3-level filtering) ✅
@@ -913,12 +916,12 @@ Phase 5 — Architecture refactor:                                     🔄 IN P
                  session/profile birthYear plumbing, test-seed coverage, consent-web deep links.
                  Final analytics/schema cleanup still precedes 12.4 dropping columns.
                  Zero-user: skip backwards-compat window + reversible migration.)
-  Epic 14.1     (home card dismissal — co-designs with 12.7, must follow 12.7)
+  Epic 14.1     (home card dismissal — co-designs with 12.7)                             ✅ DONE
 
 Phase 6 — New features:                                              🔄 PARTIAL
   Epic 7        (advisory prerequisites — new data model + services + UI, needs 13.7 for celebrations)
-  Epic 14 Phase C: 14.5-14.8  (session agency — chips, feedback, topic switch, escalation)
-  Epic 8        (full voice mode — shipped 2026-04-03; extends Feynman Stage STT/TTS to all session types)
+  Epic 14 Phase C: 14.5-14.8  (session agency — chips, feedback, topic switch, escalation) ✅ DONE
+  Epic 8        (full voice mode — shipped 2026-04-03; extends Feynman Stage STT/TTS to all session types) ✅
 
 Phase 7 — Language learning:                                         ❌ NOT STARTED
   Epic 6        (Four Strands methodology — depends on Epic 8.1-8.2 for SPEAK/LISTEN voice)
@@ -927,13 +930,13 @@ Phase 7 — Language learning:                                         ❌ NOT S
 **Also complete (Epic 10 — executed in parallel with Phases 1-4):**
 - Epic 10: 23/23 story slices shipped. See Epic 10 story status table.
 
-**Phase status summary (updated 2026-04-03):**
+**Phase status summary (updated 2026-04-06):**
 - ✅ Phase 1 complete — all foundation cleanup done
-- ❌ Phase 2 NOT STARTED — Epic 14 Phase A (human agency quick wins)
-- ❌ Phase 3 NOT STARTED — Epic 14 Phase B (homework overhaul)
+- ✅ Phase 2 complete — Epic 14 Phase A all done (14.2, 14.3, 14.4, 14.10)
+- ✅ Phase 3 complete — Epic 14 Phase B homework overhaul all done (14.9, 14.11, 14.12)
 - ✅ Phase 4 complete — celebration system + session polish built (13.7 complete; home-card migration deferred to 12.7)
-- 🔄 Phase 5 in progress — Epic 12 foundation started (`12.1` complete, `12.6` compatibility slice complete)
-- 🔄 Phase 6 PARTIAL — Epic 8 complete; Epics 7 and 14C not started
+- 🔄 Phase 5 in progress — Epic 12 foundation started (`12.1` complete, `12.6` compatibility slice complete); Epic 14.1 done
+- 🔄 Phase 6 PARTIAL — Epic 8 complete; Epic 14 Phase C (14.5-14.8) complete; Epic 7 not started
 - ❌ Phase 7 NOT STARTED — Epic 6 (language learning, v1.1)
 
 **Why this order:**
@@ -3211,9 +3214,9 @@ All 12 FRs (FR96-FR107) + FR146 mapped across 6 stories. Implementation deferred
 
 ## Epic 7: The Self-Building Library (v3) — Stories
 
-**Scope:** FR160-FR170 — 11 FRs, 7 stories (4 launch + 3 fast-follow)
+**Scope:** FR160-FR172 — 13 FRs, 9 stories (4 launch + 3 fast-follow + 2 shipped post-launch)
 **Dependencies:** None
-**Revision:** v3 — "Know the Learner, Not the Graph" (2026-04-04). Full redesign replacing v2 prerequisite DAG. Story 7.7 added 2026-04-05.
+**Revision:** v3 — "Know the Learner, Not the Graph" (2026-04-04). Full redesign replacing v2 prerequisite DAG. Story 7.7 added 2026-04-05. Stories 7.8-7.9 added and shipped 2026-04-06.
 ### What Changed from v2
 
 | v2 (prerequisite DAG) | v3 (self-building library) | Why |
@@ -3554,6 +3557,165 @@ So that I can quickly find anything in my library without drilling through every
 
 ---
 
+### Story 7.8: Library Navigation Refactor — Route-Based Shelf & Book Screens ✅
+
+As a learner drilling into a subject,
+I want each level of the library to feel like a real screen I can navigate back from,
+So that opening a book feels distinct and the back button behaves predictably.
+
+**Acceptance Criteria:**
+
+**Route architecture:**
+
+**Given** a learner taps a subject shelf in the Library
+**When** navigation triggers
+**Then** they are pushed to `/shelf/[subjectId]` — a dedicated Shelf screen
+**And** the Shelf screen shows the subject header (name, progress bar, status, last session) and a list of book cards
+**And** the back button returns them to the Library
+
+**Given** a learner taps a book card on the Shelf screen
+**When** navigation triggers
+**Then** they are pushed to `/shelf/[subjectId]/book/[bookId]` — a dedicated Book screen
+**And** the Book screen shows collapsible chapters with topic rows, retention icons, and note icons
+**And** the back button returns them to the Shelf screen (or Library if entered from Books tab)
+
+**Single-book auto-skip:**
+
+**Given** a subject has exactly one book (narrow subject)
+**When** the Shelf screen loads
+**Then** it auto-navigates to the Book screen using `router.replace()` (skipping the shelf)
+**And** pressing back returns to the Library, not the single-card shelf
+
+**Book screen generation:**
+
+**Given** a learner opens a book whose topics haven't been generated yet
+**When** the Book screen loads
+**Then** generation auto-triggers immediately
+**And** a PenWritingAnimation + book description is shown while generating
+**And** "Taking a little longer…" appears at 30s; a timeout error appears at 60s with Retry/Back
+
+**Given** a learner generates topics in the background (pressed Back)
+**When** generation completes
+**Then** topics are available on next open (generation runs via Inngest, not blocked by navigation)
+
+**CollapsibleChapter:**
+
+**Given** topics are loaded on the Book screen
+**When** chapters are displayed
+**Then** the first chapter with incomplete topics is expanded by default; the rest are collapsed
+**And** tapping a chapter header toggles expand/collapse with animation
+**And** completed chapters show a checkmark and "X/Y" count on the header
+
+**Library screen simplified:**
+
+**Given** the Shelf and Book screens now own their content
+**When** library.tsx is reviewed
+**Then** all drill-down state (`selectedSubjectId`, `selectedBookId`, `bookGenerationState`) is removed
+**And** the screen is reduced to a ~300-line browsing/search hub with three tabs unchanged
+
+**bookId non-nullable:**
+
+**Given** every topic belongs to a book
+**When** a narrow subject is created
+**Then** a single book wrapper is automatically created so no topic has a NULL `bookId`
+**And** `curriculum_topics.bookId` is NOT NULL in the database schema
+
+**Failure Modes:**
+
+| State | Trigger | User sees | Recovery |
+|-------|---------|-----------|----------|
+| Shelf load error | Network/DB error | "Couldn't load this shelf" + retry | Retry or back |
+| Book load error | Network/DB error | "Couldn't load this book" + retry | Retry or back |
+| Generation timeout | LLM >60s | "Couldn't finish this book" | Retry or back |
+| Book deleted externally | Book removed | "This book no longer exists" | Back |
+| Subject archived | Subject paused | Status banner + books still visible | Back or settings |
+
+**FRs:** FR171
+
+---
+
+### Story 7.9: Topic Notes — Voice & Text Capture ✅
+
+As a learner,
+I want to capture what I've learned in my own words after a good answer,
+So that I can look back at my notes and remember what clicked for me.
+
+**Acceptance Criteria:**
+
+**Note data model:**
+
+**Given** a learner saves a note for a topic
+**When** the note is stored
+**Then** there is exactly one note per topic per learner (upsert — new content replaces or appends)
+**And** the note is profile-scoped and cascades delete when the topic or profile is deleted
+
+**Note display on Book screen:**
+
+**Given** a topic has a note
+**When** the topic row is shown
+**Then** a 📝 icon appears on the topic row
+**And** tapping the 📝 icon expands the note inline below the row with "Edit" and "Delete" buttons
+**And** a parent viewing the same screen sees the note read-only (no Edit/Delete)
+
+**NoteInput component:**
+
+**Given** the note input is triggered (from session or Book screen)
+**When** the child interacts with it
+**Then** they can type or tap the mic button to record voice
+**And** voice input is transcribed and shown as editable text before saving
+**And** "Save" and "Cancel" buttons are provided
+**And** a soft nudge appears at ~2000 characters ("Your note is getting long!")
+
+**Mid-session trigger:**
+
+**Given** a session is underway with more than 4 exchanges
+**When** the child gives a substantive correct answer (explains in their own words, not short recall)
+**Then** the tutor adds "Shall we put down this knowledge?" after responding
+**And** agreeing shows `NoteInput` inline in the chat
+**And** the saved content is sent via PUT (upsert, append=true)
+**And** this mid-session offer fires **at most once per session** (cooldown enforced client-side)
+
+**Post-session trigger:**
+
+**Given** a session wraps up naturally
+**When** the tutor's final message is shown
+**Then** it includes "Want to put down what you learned today?"
+**And** agreeing shows `NoteInput`; saved content appends to the existing note (or creates new)
+**And** a session-date separator (`--- Apr 6 ---`) is inserted when appending across different sessions
+
+**API endpoints:**
+
+**Given** the Book screen loads
+**When** notes are fetched
+**Then** `GET /subjects/:subjectId/books/:bookId/notes` returns all notes for topics in this book in one call
+
+**Given** a child saves or edits a note
+**When** the save action fires
+**Then** `PUT /subjects/:subjectId/topics/:topicId/note` upserts the note (creates or replaces/appends)
+
+**Given** a child deletes a note
+**When** the delete action fires
+**Then** `DELETE /subjects/:subjectId/topics/:topicId/note` removes it and the 📝 icon disappears
+
+**"Has notes" filter:**
+
+**Given** a learner is on the Library Topics tab
+**When** they activate the "Has notes" filter chip
+**Then** only topics that have at least one note are shown (effectively a "My Notes" view)
+
+**Failure Modes:**
+
+| State | Trigger | User sees | Recovery |
+|-------|---------|-----------|----------|
+| Save note fails | Network error | Toast "Couldn't save note" | Retry save, cancel |
+| Delete note fails | Network error | Toast "Couldn't delete note" | Retry delete |
+| Voice transcription unavailable | Permissions denied | Mic button disabled + tooltip | Type instead |
+| Session note trigger not shown | LLM misses substantive answer | Invisible (false negative) | Post-session trigger still fires |
+
+**FRs:** FR172
+
+---
+
 ### Epic 7 Execution Order
 
 **Launch scope (Stories 7.1-7.4):**
@@ -3575,9 +3737,17 @@ Stories 7.1 and 7.2 can run in parallel. Then 7.3 and 7.4 in parallel. Total for
 
 Story 7.7 depends on 7.3 (Library navigation must exist before adding search/sort/filter on top). Can run in parallel with 7.5 and 7.6.
 
+**Shipped post-launch (2026-04-06):**
+```
+7.8 ✅ (Library navigation refactor — route-based Shelf/Book screens) ─── depends on 7.3, 7.7
+7.9 ✅ (Topic Notes — voice/text capture, session triggers)           ─── depends on 7.8
+```
+
+Stories 7.8 and 7.9 were designed and shipped together. 7.9 depends on 7.8 (NoteDisplay and NoteInput live on the Book screen introduced in 7.8).
+
 ### Epic 7 FR Coverage
 
-11 FRs (FR160-FR170) mapped across 7 stories. Launch: FR160-FR163, FR165-FR166, FR168. Deferred: FR164 (knowledge signals), FR167 (visual map), FR169-FR170 (library search/sort/filter).
+13 FRs (FR160-FR172) mapped across 9 stories. Launch: FR160-FR163, FR165-FR166, FR168. Deferred: FR164 (knowledge signals), FR167 (visual map). Shipped post-launch: FR169-FR170 (7.7 search/sort/filter), FR171 (7.8 route-based navigation), FR172 (7.9 topic notes).
 
 ---
 
