@@ -75,11 +75,10 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         );
       }
 
-      // Consent page is served by this API worker — derive URL from request
-      // origin so the link always points to the correct API domain:
-      //   production → https://api.mentomate.com
-      //   staging    → https://api-stg.mentomate.com
-      //   local dev  → http://localhost:8787
+      // BUG-240: Consent page is served by THIS API worker at /v1/consent-page.
+      // Derive URL from the request origin so the link always resolves to the
+      // correct API domain (api.mentomate.com / api-stg.mentomate.com / localhost).
+      // Using c.env.APP_URL is WRONG — it points to the marketing site.
       const apiOrigin = new URL(c.req.url).origin;
       let result;
       try {

@@ -12,7 +12,6 @@ import {
 type ConsentWebEnv = {
   Bindings: {
     DATABASE_URL: string;
-    APP_URL?: string;
   };
   Variables: { db: Database };
 };

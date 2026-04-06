@@ -36,7 +36,6 @@ type SettingsRouteEnv = {
     CLERK_JWKS_URL?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
-    APP_URL?: string;
   };
   Variables: {
     user: AuthUser;
@@ -132,6 +131,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
   .post('/settings/notify-parent-subscribe', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
+    // BUG-240: Derive URL from request origin, not APP_URL (marketing site).
+    const apiOrigin = new URL(c.req.url).origin;
     const result = await notifyParentToSubscribe(
       db,
       profileId,
@@ -139,7 +140,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         resendApiKey: c.env.RESEND_API_KEY,
         emailFrom: c.env.EMAIL_FROM,
       },
-      c.env.APP_URL
+      apiOrigin
     );
     return c.json(result);
   })

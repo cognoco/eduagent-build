@@ -232,6 +232,35 @@ describe('consent routes', () => {
       expect(body.message).toContain('could not be delivered');
     });
 
+    // BUG-240: Verify the route passes request origin (API domain), not APP_URL
+    it('passes API origin (not APP_URL) to requestConsent [BUG-240]', async () => {
+      const { requestConsent: mockRequestConsent } = jest.requireMock(
+        '../services/consent'
+      ) as { requestConsent: jest.Mock };
+      mockRequestConsent.mockClear();
+
+      await app.request(
+        'https://api.mentomate.com/v1/consent/request',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+            parentEmail: 'parent@example.com',
+            consentType: 'GDPR',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(mockRequestConsent).toHaveBeenCalledTimes(1);
+      const passedAppUrl = mockRequestConsent.mock.calls[0][2] as string;
+      // Must be the API origin, not the marketing site
+      expect(passedAppUrl).toBe('https://api.mentomate.com');
+      expect(passedAppUrl).not.toContain('www.mentomate.com');
+      expect(passedAppUrl).not.toContain('app.mentomate.com');
+    });
+
     it('returns 400 for invalid consent type', async () => {
       const res = await app.request(
         '/v1/consent/request',
