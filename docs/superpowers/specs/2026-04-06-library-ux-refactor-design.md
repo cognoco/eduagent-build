@@ -38,16 +38,16 @@ The current Library screen (`library.tsx`, ~850 lines) manages all navigation le
 
 ```
 (learner)/
-  library.tsx                          ← simplified hub (3 tabs, no drill-down)
-  shelf/[subjectId].tsx                ← NEW: subject's books + header
-  book/[bookId].tsx                    ← NEW: chapters, topics, notes, generation
-  subject/[subjectId].tsx              ← unchanged (subject settings)
-  topic/[subjectId]-[topicId].tsx      ← unchanged (session entry)
+  library.tsx                                    ← simplified hub (3 tabs, no drill-down)
+  shelf/[subjectId].tsx                          ← NEW: subject's books + header
+  shelf/[subjectId]/book/[bookId].tsx            ← NEW: chapters, topics, notes, generation
+  subject/[subjectId].tsx                        ← unchanged (subject settings)
+  topic/[subjectId]-[topicId].tsx                ← unchanged (session entry)
 
 (parent)/
-  library.tsx                          ← re-exports learner (unchanged)
-  shelf/[subjectId].tsx                ← NEW: re-exports learner version
-  book/[bookId].tsx                    ← NEW: re-exports learner version
+  library.tsx                                    ← re-exports learner (unchanged)
+  shelf/[subjectId].tsx                            ← NEW: re-exports learner version
+  shelf/[subjectId]/book/[bookId].tsx              ← NEW: re-exports learner version
 ```
 
 ### Navigation Flows
@@ -55,10 +55,10 @@ The current Library screen (`library.tsx`, ~850 lines) manages all navigation le
 ```
 Home → Library (bottom tab)
   Shelves tab: tap shelf → router.push('/shelf/[subjectId]')
-  Books tab:   tap book  → router.push('/book/[bookId]') with subjectId param
+  Books tab:   tap book  → router.push('/shelf/[subjectId]/book/[bookId]')
   Topics tab:  tap topic → router.push('/topic/[subjectId]-[topicId]')
 
-Shelf screen: tap book → router.push('/book/[bookId]') with subjectId param
+Shelf screen: tap book → router.push('/shelf/[subjectId]/book/[bookId]')
               back      → router.back() (to Library)
 
 Book screen:  tap topic → router.push('/topic/[subjectId]-[topicId]')
@@ -68,7 +68,7 @@ Book screen:  tap topic → router.push('/topic/[subjectId]-[topicId]')
 ### Route Parameters
 
 - **Shelf:** `subjectId` in URL path
-- **Book:** `bookId` in URL path + `subjectId` passed as query param (needed for API calls: `/subjects/:subjectId/books/:bookId`)
+- **Book:** `subjectId` and `bookId` both in URL path — nested route `/shelf/[subjectId]/book/[bookId]`. Self-contained URL: no query params needed, deep links and bookmarks work without ambient state. Both params are available for API calls (`/subjects/:subjectId/books/:bookId`).
 
 ---
 
@@ -134,13 +134,13 @@ Every topic belongs to a book. Narrow subjects (e.g., "Fractions") produce a sin
 
 **Schema implication:** `curriculum_topics.bookId` changes from nullable to non-nullable (see Schema Changes section).
 
-**Single-book shelves (narrow subjects):** A narrow subject like "Fractions" produces one book. The Shelf screen still shows that single book card — no auto-skip to the Book screen. This keeps navigation consistent: Shelf always shows books, Book always shows chapters/topics. One extra tap is worth the predictable mental model.
+**Single-book shelves (narrow subjects):** A narrow subject like "Fractions" produces one book. When a shelf has exactly one book, the Shelf screen auto-navigates to the Book screen using `router.replace()` — so pressing back returns to the Library, not to a shelf showing a single card. This avoids a pointless extra tap while keeping the mental model intact (the child still "enters" the book). **Flag for user testing:** if the auto-skip feels disorienting, revert to always showing the Shelf screen.
 
 ---
 
 ## Book Screen
 
-**Route:** `(learner)/book/[bookId].tsx`
+**Route:** `(learner)/shelf/[subjectId]/book/[bookId].tsx`
 
 ### Layout (topics loaded)
 
@@ -185,9 +185,9 @@ Every topic belongs to a book. Narrow subjects (e.g., "Fractions") produce a sin
 | State | User sees | Recovery |
 |-------|-----------|----------|
 | Loading | BookPageFlipAnimation | Wait or back |
-| Generating topics | PenWritingAnimation + "Writing your book..." | Wait, cancel, or back |
-| Slow generation (60s) | "Taking longer than usual..." | "Check again" or cancel |
-| Timeout (90s) | "Couldn't finish this book" | Retry or back |
+| Generating topics | PenWritingAnimation + "Writing your book..." + book description visible | Wait, cancel, or back |
+| Slow generation (30s) | "Taking a little longer..." | "Check again" or cancel |
+| Timeout (60s) | "Couldn't finish this book" | Retry or back |
 | Topics loaded | Collapsible chapters + topic rows | Tap topic, expand chapters, view notes |
 | All complete | Celebration banner | Browse notes, revisit topics, back |
 | Error | "Couldn't load this book" | Retry or back |
@@ -200,11 +200,13 @@ Moved entirely from `library.tsx` to the Book screen:
 1. Navigate to Book screen immediately on tap
 2. Hero header (emoji, title, subject) shows from book record — available before generation
 3. If `topicsGenerated === false`, auto-trigger `useGenerateBookTopics` mutation
-4. Show PenWritingAnimation in content area
-5. 60s → "Taking longer than usual..." + "Check again"
-6. 90s → timeout error + Retry/Back
+4. Show PenWritingAnimation in content area + book description text (so the child has something to read)
+5. 30s → "Taking a little longer..." + "Check again"
+6. 60s → timeout error + Retry/Back
 7. Success → chapters/topics fade in
 8. Back button available throughout — generation continues in background (Inngest)
+
+**Future optimization:** Progressive generation (streaming chapters one at a time so the child can interact with the first chapter while the rest generates) is architecturally possible but out of scope for this iteration. Worth investigating if p95 generation time exceeds 15s.
 
 ### Data Fetching
 
@@ -261,9 +263,11 @@ DELETE /subjects/:subjectId/topics/:topicId/note
 4. Child types or speaks → transcribed → saved via PUT (upsert)
 5. "Got it! ✓" confirmation → session continues
 
-**After activation:** The feature stays active for the rest of the session. Each subsequent substantive correct answer triggers the offer again.
+**Cooldown:** The mid-session trigger fires **at most once per session**. After the first offer (whether accepted or declined), it does not trigger again mid-session. The post-session trigger is separate, giving a maximum of 2 note captures per session (1 mid + 1 post). This prevents nagging during productive streaks where the child gives many good answers in a row.
 
-**Implementation:** This is a system prompt instruction. The LLM evaluates "substantive" naturally — no separate classification endpoint. The app detects the note offer via a structured `notePrompt` field in the streaming response, which triggers the `NoteInput` UI.
+**LLM reliability:** The LLM judging "substantive" is inherently fuzzy. It will sometimes offer after shallow answers or miss genuinely good ones. This is acceptable — a false positive is a minor annoyance (child declines), a false negative is invisible (child still gets the post-session prompt). The once-per-session cooldown limits the damage from misjudgment.
+
+**Implementation:** This is a system prompt instruction. The LLM evaluates "substantive" naturally — no separate classification endpoint. The app detects the note offer via a structured `notePrompt` field in the streaming response, which triggers the `NoteInput` UI. The app enforces the once-per-session cooldown client-side (ignores subsequent `notePrompt` fields after the first mid-session offer).
 
 #### 2. Post-Session Trigger
 
@@ -278,9 +282,10 @@ DELETE /subjects/:subjectId/topics/:topicId/note
 
 ### Append Logic
 
-- Mid-session capture: creates note or appends to existing (newline separator only, no timestamps)
-- Post-session capture: appends with newline separator
-- Multiple captures in one session: each appends
+- Mid-session capture: creates note or appends to existing
+- Post-session capture: appends to existing note (if mid-session capture happened) or creates new
+- **Session separator:** When appending to an existing note from a previous session, insert a visual date line: `\n--- Apr 6 ---\n` before the new content. This makes the note readable as layers — the child can see which session each piece came from when editing later.
+- Within the same session, mid-session + post-session captures are separated by a single newline (no date line — they're the same session).
 - No automatic deduplication — the child controls their note content via editing on the Book screen
 
 ### NoteInput Component
@@ -332,7 +337,7 @@ Estimated reduction: ~850 lines → ~300 lines.
 ### Changed
 
 - `ShelvesTab.onShelfPress` → `router.push('/shelf/[subjectId]')`
-- `BooksTab.onBookPress` → `router.push('/book/[bookId]')` with `subjectId` param
+- `BooksTab.onBookPress` → `router.push('/shelf/[subjectId]/book/[bookId]')`
 - `TopicsTab.onTopicPress` → `router.push('/topic/[subjectId]-[topicId]')` (unchanged behavior)
 - `TopicsFilters` type: add `hasNotes: boolean` field
 - `library-filters.ts`: add `filterByHasNotes()` function
@@ -429,7 +434,7 @@ export const topicNotes = pgTable('topic_notes', {
 |-------|---------|-----------|----------|
 | Shelf load fails | Network error | "Couldn't load this shelf" | Retry or back |
 | Book load fails | Network error | "Couldn't load this book" | Retry or back |
-| Generation timeout | LLM slow (>90s) | "Couldn't finish this book" | Retry or back |
+| Generation timeout | LLM slow (>60s) | "Couldn't finish this book" | Retry or back |
 | Note save fails | Network error | Toast + content preserved | Retry save or cancel |
 | Voice transcription fails | Mic/network issue | Toast + text input fallback | Type instead |
 | Book deleted while viewing | External change | "Book no longer exists" | Back |
