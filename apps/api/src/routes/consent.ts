@@ -76,7 +76,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         );
       }
 
-      const appUrl = c.env.APP_URL ?? 'https://api.mentomate.com';
+      const appUrl = c.env.APP_URL ?? 'https://app.mentomate.com';
       let result;
       try {
         result = await requestConsent(db, input, appUrl, {

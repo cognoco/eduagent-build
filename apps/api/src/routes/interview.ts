@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
-import { and, eq } from 'drizzle-orm';
 import { interviewMessageSchema } from '@eduagent/schemas';
-import { curriculumBooks, type Database } from '@eduagent/database';
+import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { getSubject } from '../services/subject';
 import {
+  getBookTitle,
   processInterviewExchange,
   streamInterviewExchange,
   getOrCreateDraft,
@@ -42,16 +42,9 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       const subject = await getSubject(db, profileId, subjectId);
       if (!subject) return notFound(c, 'Subject not found');
 
-      let bookTitle: string | undefined;
-      if (bookId) {
-        const bookRow = await db.query.curriculumBooks.findFirst({
-          where: and(
-            eq(curriculumBooks.id, bookId),
-            eq(curriculumBooks.subjectId, subjectId)
-          ),
-        });
-        bookTitle = bookRow?.title;
-      }
+      const bookTitle = bookId
+        ? await getBookTitle(db, bookId, subjectId)
+        : undefined;
 
       const draft = await getOrCreateDraft(db, profileId, subjectId);
 
@@ -120,16 +113,9 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       const subject = await getSubject(db, profileId, subjectId);
       if (!subject) return notFound(c, 'Subject not found');
 
-      let bookTitle: string | undefined;
-      if (bookId) {
-        const bookRow = await db.query.curriculumBooks.findFirst({
-          where: and(
-            eq(curriculumBooks.id, bookId),
-            eq(curriculumBooks.subjectId, subjectId)
-          ),
-        });
-        bookTitle = bookRow?.title;
-      }
+      const bookTitle = bookId
+        ? await getBookTitle(db, bookId, subjectId)
+        : undefined;
 
       const draft = await getOrCreateDraft(db, profileId, subjectId);
 

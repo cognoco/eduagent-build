@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useProfile, personaFromBirthYear } from '../lib/profile';
+import { useProfile, isGuardianProfile } from '../lib/profile';
 
 export default function ProfilesScreen() {
   const insets = useSafeAreaInsets();
@@ -85,10 +85,9 @@ export default function ProfilesScreen() {
           {profiles.map((profile) => {
             const isActive = profile.id === activeProfile?.id;
             const initial = profile.displayName.charAt(0).toUpperCase();
-            const roleLabel =
-              personaFromBirthYear(profile.birthYear) === 'parent'
-                ? 'Parent'
-                : 'Student';
+            const roleLabel = isGuardianProfile(profile, profiles)
+              ? 'Parent'
+              : 'Student';
 
             return (
               <Pressable

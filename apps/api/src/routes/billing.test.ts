@@ -130,7 +130,7 @@ const TEST_ENV = {
   STRIPE_PRICE_FAMILY_YEARLY: 'price_family_yearly',
   STRIPE_PRICE_PRO_MONTHLY: 'price_pro_monthly',
   STRIPE_PRICE_PRO_YEARLY: 'price_pro_yearly',
-  APP_URL: 'https://api.mentomate.com',
+  APP_URL: 'https://app.mentomate.com',
 };
 
 const AUTH_HEADERS = {

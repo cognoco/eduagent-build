@@ -33,6 +33,7 @@ import {
   ProfileProvider,
   useProfile,
   personaFromBirthYear,
+  isGuardianProfile,
 } from '../lib/profile';
 import { setOnAuthExpired, clearOnAuthExpired } from '../lib/api-client';
 import { ErrorBoundary, OfflineBanner } from '../components/common';
@@ -98,7 +99,7 @@ function deriveThemeFromBirthYear(birthYear: number | null | undefined): {
 }
 
 function ThemedApp() {
-  const { activeProfile } = useProfile();
+  const { activeProfile, profiles } = useProfile();
   const { signOut } = useClerk();
   const [persona, setPersona] = useState<Persona>('teen');
   const systemColorScheme = useColorScheme();
@@ -112,16 +113,20 @@ function ThemedApp() {
   // When true, system color scheme changes are ignored (Bug #1 fix).
   const userExplicitChoice = useRef(false);
 
-  // Derive persona + color scheme from active profile's birthYear.
+  // Derive persona + color scheme from active profile.
+  // Persona uses birthYear (age-based visual theming).
+  // Color scheme uses guardian status (account owner with child profiles → light).
   // Must set both together — raw setPersona without setColorScheme leaves
   // the parent persona stuck in dark mode (themeKey mismatch).
   useEffect(() => {
     if (activeProfile) {
-      const derivedTheme = deriveThemeFromBirthYear(activeProfile.birthYear);
-      setPersona(derivedTheme.persona);
-      setColorScheme(derivedTheme.colorScheme);
+      const derived = deriveThemeFromBirthYear(activeProfile.birthYear);
+      setPersona(derived.persona);
+      setColorScheme(
+        isGuardianProfile(activeProfile, profiles) ? 'light' : 'dark'
+      );
     }
-  }, [activeProfile]);
+  }, [activeProfile, profiles]);
 
   // Sync system color scheme changes ONLY when user hasn't explicitly chosen.
   // Bug #1: Previously this unconditionally overrode the scheme, causing
@@ -160,9 +165,10 @@ function ThemedApp() {
   // unmounting authenticated UI and redirecting to sign-in via layout guards.
   useEffect(() => {
     setOnAuthExpired(() => {
-      console.warn(
-        '[AUTH-DEBUG] onAuthExpired FIRED — clearing queries + signing out'
-      );
+      if (__DEV__)
+        console.warn(
+          '[AUTH-DEBUG] onAuthExpired FIRED — clearing queries + signing out'
+        );
       // BM-03: clear cached query data before sign-out to prevent the next
       // user from seeing stale data from the previous session.
       queryClient.clear();

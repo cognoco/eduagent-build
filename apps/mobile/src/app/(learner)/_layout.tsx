@@ -930,9 +930,10 @@ export default function LearnerLayout() {
     );
   if (!isLoaded) return null;
   if (!isSignedIn) {
-    console.warn(
-      '[AUTH-DEBUG] (learner) layout → NOT signed in, bouncing to sign-in'
-    );
+    if (__DEV__)
+      console.warn(
+        '[AUTH-DEBUG] (learner) layout → NOT signed in, bouncing to sign-in'
+      );
     return <Redirect href="/(auth)/sign-in" />;
   }
 

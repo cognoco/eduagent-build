@@ -1,18 +1,12 @@
 name: Mobile CI
 
 on:
-  pull_request:
-    paths:
-      - 'apps/mobile/**'
-      - 'packages/schemas/**'
-      - '.github/workflows/mobile-ci.yml'
-  push:
-    branches:
-      - main
-    paths:
-      - 'apps/mobile/**'
-      - 'packages/schemas/**'
-      - '.github/workflows/mobile-ci.yml'
+  # Build after CI passes on main push.
+  # PR lint+test already covered by CI (nx run-many -t lint test).
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
   # Manual trigger for testing builds before merge
   workflow_dispatch:
     inputs:
@@ -47,6 +41,10 @@ permissions:
 jobs:
   # Check if mobile is actually affected by the changes
   check-affected:
+    # Skip if CI failed (workflow_run trigger only)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     outputs:
       mobile-affected: ${{ steps.check.outputs.affected }}
@@ -54,12 +52,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
-
-      - name: Fetch base branch for comparison
-        if: github.event_name == 'pull_request'
-        run: |
-          git fetch origin ${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}
 
       - name: Check if mobile affected
         id: check
@@ -70,13 +64,8 @@ jobs:
             exit 0
           fi
 
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="origin/${{ github.base_ref }}...HEAD"
-          else
-            BASE="HEAD~1 HEAD"
-          fi
-
-          changed_files=$(git diff --name-only $BASE)
+          # workflow_run on main — diff against previous commit
+          changed_files=$(git diff --name-only HEAD~1 HEAD)
           echo "Changed files:"
           echo "$changed_files"
 
@@ -97,13 +86,8 @@ jobs:
             exit 0
           fi
 
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="origin/${{ github.base_ref }}...HEAD"
-          else
-            BASE="HEAD~1 HEAD"
-          fi
-
-          changed_files=$(git diff --name-only $BASE)
+          # workflow_run on main — diff against previous commit
+          changed_files=$(git diff --name-only HEAD~1 HEAD)
           native_patterns="apps/mobile/app.json apps/mobile/package.json apps/mobile/eas.json"
 
           native_changed=false
@@ -121,12 +105,12 @@ jobs:
 
           echo "native_changed=$native_changed" >> "$GITHUB_OUTPUT"
 
-  # Lint mobile code
+  # Lint mobile code (manual dispatch only — CI already covers PR/push lint)
   lint:
     needs: check-affected
-    if: |
-      (github.event_name != 'workflow_dispatch' && needs.check-affected.outputs.mobile-affected == 'true') ||
-      (github.event_name == 'workflow_dispatch' && inputs.skip_tests != true)
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      inputs.skip_tests != true
     runs-on: ubuntu-latest
     env:
       NX_DAEMON: false
@@ -148,12 +132,12 @@ jobs:
       - name: Run mobile lint
         run: pnpm exec eslint -c apps/mobile/eslint.config.mjs apps/mobile
 
-  # Test mobile code
+  # Test mobile code (manual dispatch only — CI already covers PR/push tests)
   test:
     needs: check-affected
-    if: |
-      (github.event_name != 'workflow_dispatch' && needs.check-affected.outputs.mobile-affected == 'true') ||
-      (github.event_name == 'workflow_dispatch' && inputs.skip_tests != true)
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      inputs.skip_tests != true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -176,9 +160,11 @@ jobs:
   # JS-only changes are delivered via OTA update (ci.yml ota-update job).
   build-preview:
     needs: [check-affected, lint, test]
+    # always() needed because lint/test are skipped (not failed) on workflow_run
     if: |
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
+      always() &&
+      github.event_name == 'workflow_run' &&
+      needs.check-affected.result == 'success' &&
       needs.check-affected.outputs.mobile-affected == 'true' &&
       needs.check-affected.outputs.native-changed == 'true'
     runs-on: ubuntu-latest

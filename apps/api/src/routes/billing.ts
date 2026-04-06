@@ -176,7 +176,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         await linkStripeCustomer(db, account.id, customerId);
       }
 
-      const appUrl = c.env.APP_URL ?? 'https://api.mentomate.com';
+      const appUrl = c.env.APP_URL ?? 'https://app.mentomate.com';
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: 'subscription',
@@ -235,6 +235,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
     // Stripe SDK v20 (basil): current_period_end moved to SubscriptionItem
     const periodEnd = updated.items.data[0]?.current_period_end;
+    if (!periodEnd) {
+      console.error(
+        `[billing] Subscription ${subscription.stripeSubscriptionId} returned empty items.data — cannot determine period end. Falling back to current timestamp.`
+      );
+    }
     const currentPeriodEnd = periodEnd
       ? new Date(periodEnd * 1000).toISOString()
       : new Date().toISOString();
@@ -403,7 +408,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     }
 
     const stripe = createStripeClient(stripeKey);
-    const appUrl = c.env.APP_URL ?? 'https://api.mentomate.com';
+    const appUrl = c.env.APP_URL ?? 'https://app.mentomate.com';
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: subscription.stripeCustomerId,

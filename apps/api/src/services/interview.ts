@@ -23,6 +23,22 @@ import type {
 // Interview service — pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
+/** Look up a curriculum book's title by bookId + subjectId. */
+export async function getBookTitle(
+  db: Database,
+  bookId: string,
+  subjectId: string
+): Promise<string | undefined> {
+  const row = await db.query.curriculumBooks.findFirst({
+    where: and(
+      eq(curriculumBooks.id, bookId),
+      eq(curriculumBooks.subjectId, subjectId)
+    ),
+    columns: { title: true },
+  });
+  return row?.title;
+}
+
 const INTERVIEW_SYSTEM_PROMPT = `You are MentoMate, an AI learning mate conducting a brief assessment interview.
 Ask about the learner's goals, prior experience, and current knowledge level for the given subject.
 Keep questions conversational and brief. After 3-5 exchanges when you have enough signal,

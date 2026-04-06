@@ -9,7 +9,7 @@ describe('validateProductionKeys', () => {
   const BASE_ENV: Env = {
     ENVIRONMENT: 'development',
     DATABASE_URL: 'postgresql://localhost/test',
-    APP_URL: 'https://api.mentomate.com',
+    APP_URL: 'https://app.mentomate.com',
     LOG_LEVEL: 'info',
     EMAIL_FROM: 'noreply@mentomate.com',
   };
@@ -31,18 +31,17 @@ describe('validateProductionKeys', () => {
 
     expect(missing).toContain('CLERK_SECRET_KEY');
     expect(missing).toContain('CLERK_JWKS_URL');
+    expect(missing).toContain('CLERK_AUDIENCE');
     expect(missing).toContain('GEMINI_API_KEY');
     expect(missing).toContain('VOYAGE_API_KEY');
     expect(missing).toContain('RESEND_API_KEY');
     expect(missing).toContain('REVENUECAT_WEBHOOK_SECRET');
-    // CLERK_AUDIENCE is warned, not required (grace period)
-    expect(missing).not.toContain('CLERK_AUDIENCE');
     // Stripe secrets are optional — dormant until web client added
     expect(missing).not.toContain('STRIPE_SECRET_KEY');
     expect(missing).not.toContain('STRIPE_WEBHOOK_SECRET');
     // OPENAI_API_KEY is optional — alternative to GEMINI_API_KEY
     expect(missing).not.toContain('OPENAI_API_KEY');
-    expect(missing).toHaveLength(6);
+    expect(missing).toHaveLength(7);
   });
 
   it('returns empty array for production with all required secrets present', () => {
@@ -62,11 +61,8 @@ describe('validateProductionKeys', () => {
     expect(missing).toEqual([]);
   });
 
-  it('warns when CLERK_AUDIENCE is missing in production', () => {
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
-    validateProductionKeys({
+  it('includes CLERK_AUDIENCE when missing in production', () => {
+    const missing = validateProductionKeys({
       ...BASE_ENV,
       ENVIRONMENT: 'production',
       CLERK_SECRET_KEY: 'sk_live_xxx',
@@ -77,10 +73,7 @@ describe('validateProductionKeys', () => {
       REVENUECAT_WEBHOOK_SECRET: 'rc_webhook_secret',
     });
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('CLERK_AUDIENCE')
-    );
-    warnSpy.mockRestore();
+    expect(missing).toContain('CLERK_AUDIENCE');
   });
 
   it('returns only the specific missing keys', () => {
@@ -89,6 +82,7 @@ describe('validateProductionKeys', () => {
       ENVIRONMENT: 'production',
       CLERK_SECRET_KEY: 'sk_live_xxx',
       CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
+      CLERK_AUDIENCE: 'eduagent-api',
       // Missing: VOYAGE_API_KEY, RESEND_API_KEY, REVENUECAT_WEBHOOK_SECRET
       GEMINI_API_KEY: 'gemini-key',
       // Stripe keys are optional — not in production required list
