@@ -174,9 +174,24 @@ export default function CreateSubjectScreen() {
       focus?: string;
     }) => {
       setName(suggestion.name);
-      await doCreate(suggestion.name, undefined, suggestion.focus);
+      // [BUG-237] When the user's original input (e.g. "Easter") differs from
+      // the picked suggestion name (e.g. "World History"), the original input
+      // IS the focus topic.  Without this, the API receives only "World History"
+      // with no focus hint and bulk-generates generic books.
+      const effectiveFocus =
+        suggestion.focus ??
+        (originalInput &&
+        originalInput.toLowerCase() !== suggestion.name.toLowerCase()
+          ? originalInput
+          : undefined);
+      await doCreate(
+        suggestion.name,
+        originalInput || undefined,
+        effectiveFocus,
+        effectiveFocus ? suggestion.description : undefined
+      );
     },
-    [doCreate]
+    [doCreate, originalInput]
   );
 
   const onAcceptSuggestion = useCallback(async () => {

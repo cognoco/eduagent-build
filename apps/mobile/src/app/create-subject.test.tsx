@@ -176,6 +176,100 @@ describe('CreateSubjectScreen', () => {
     // which ensures they meet accessibility touch target requirements
   });
 
+  it('[BUG-237] picking ambiguous suggestion derives focus from original input', async () => {
+    // User types "Easter", LLM returns ambiguous suggestions WITHOUT explicit focus
+    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+      status: 'ambiguous',
+      displayMessage: '**Easter** can be studied from different angles.',
+      suggestions: [
+        { name: 'World History', description: 'History of Easter traditions' },
+        { name: 'Religious Studies', description: 'Easter in world religions' },
+      ],
+    });
+
+    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
+      subject: { id: 'subject-wh', name: 'World History' },
+      structureType: 'focused_book',
+      bookId: 'book-easter',
+      bookTitle: 'Easter',
+      bookCount: 1,
+    });
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Easter');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('subject-suggestion-option-0')).toBeTruthy();
+    });
+
+    // Pick "World History"
+    fireEvent.press(screen.getByTestId('subject-suggestion-option-0'));
+
+    await waitFor(() => {
+      expect(mockCreateSubjectMutateAsync).toHaveBeenCalledWith({
+        name: 'World History',
+        rawInput: 'Easter',
+        focus: 'Easter',
+        focusDescription: 'History of Easter traditions',
+      });
+    });
+
+    // Should navigate to interview with the focused book
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(learner)/onboarding/interview',
+      params: {
+        subjectId: 'subject-wh',
+        subjectName: 'World History',
+        bookId: 'book-easter',
+        bookTitle: 'Easter',
+      },
+    });
+  });
+
+  it('[BUG-237] picking ambiguous suggestion with explicit focus uses that focus', async () => {
+    // LLM returns suggestions WITH explicit focus fields
+    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+      status: 'ambiguous',
+      displayMessage: '**Easter** can be studied from different angles.',
+      suggestions: [
+        { name: 'World History', description: 'History of Easter', focus: 'Easter Traditions' },
+        { name: 'Religious Studies', description: 'Easter theology', focus: 'Easter in Christianity' },
+      ],
+    });
+
+    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
+      subject: { id: 'subject-wh', name: 'World History' },
+      structureType: 'focused_book',
+      bookId: 'book-easter-trad',
+      bookTitle: 'Easter Traditions',
+      bookCount: 1,
+    });
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Easter');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('subject-suggestion-option-0')).toBeTruthy();
+    });
+
+    // Pick "World History"
+    fireEvent.press(screen.getByTestId('subject-suggestion-option-0'));
+
+    await waitFor(() => {
+      // When the suggestion has an explicit focus, use that instead of deriving
+      expect(mockCreateSubjectMutateAsync).toHaveBeenCalledWith({
+        name: 'World History',
+        rawInput: 'Easter',
+        focus: 'Easter Traditions',
+        focusDescription: 'History of Easter',
+      });
+    });
+  });
+
   it('routes broad subjects straight to the library shelf', async () => {
     mockResolveSubjectMutateAsync.mockResolvedValueOnce({
       status: 'direct_match',

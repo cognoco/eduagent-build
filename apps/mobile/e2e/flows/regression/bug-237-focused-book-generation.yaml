@@ -1,0 +1,57 @@
+# Regression: BUG-237 - Subject creation with specific topic must create focused book
+# Validates: When user types a specific topic (e.g. "Easter"), picks a broad angle
+# (e.g. "World History"), the system creates ONE focused book scoped to the topic,
+# NOT 8 generic books for the broad subject.
+appId: com.mentomate.app
+tags:
+  - regression
+  - library
+  - subject-creation
+---
+# 1. Launch dev client and sign in
+- runFlow: ../../_setup/launch-devclient.yaml
+
+# 2. Navigate to create subject
+- tapOn:
+    id: "library-tab"
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 10000
+- tapOn:
+    id: "library-add-subject"
+
+# 3. Type a specific topic
+- extendedWaitUntil:
+    visible:
+      id: "create-subject-name"
+    timeout: 5000
+- inputText:
+    id: "create-subject-name"
+    text: "Easter"
+- takeScreenshot: bug237-step1-typed-easter
+
+# 4. Submit and wait for ambiguous suggestions
+- tapOn:
+    id: "create-subject-submit"
+- extendedWaitUntil:
+    visible:
+      id: "subject-suggestion-option-0"
+    timeout: 15000
+- takeScreenshot: bug237-step2-ambiguous-suggestions
+
+# 5. Pick an angle (first suggestion, e.g. World History)
+- tapOn:
+    id: "subject-suggestion-option-0"
+
+# 6. Should navigate to interview (focused book path), NOT library shelf
+# If it navigates to library with 8 books, the bug has regressed.
+- extendedWaitUntil:
+    visible:
+      id: "interview-screen"
+    timeout: 15000
+- takeScreenshot: bug237-step3-interview-focused-book
+
+# 7. Verify we did NOT end up at library shelf with many books
+- assertNotVisible:
+    id: "shelf-book-list"
