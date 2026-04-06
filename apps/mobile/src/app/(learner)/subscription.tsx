@@ -79,7 +79,7 @@ const TIER_FEATURES: Array<{
     features: [
       '500 questions per month',
       'All Free features',
-      'Priority AI responses',
+      'Premium AI coach',
       'Detailed progress analytics',
     ],
   },
@@ -97,7 +97,7 @@ const TIER_FEATURES: Array<{
     features: [
       '3,000 questions per month',
       'All Family features',
-      'Advanced coaching insights',
+      'Premium AI coach for 2 profiles',
       'Priority support',
     ],
   },
@@ -1112,6 +1112,33 @@ export default function SubscriptionScreen() {
                   </>
                 )}
               </Pressable>
+            </View>
+          )}
+
+          {/* AI Upgrade — premium model for individual profiles */}
+          {isPaidTier && (
+            <View className="mt-6" testID="ai-upgrade-section">
+              <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
+                Premium Coach
+              </Text>
+              <View className="bg-surface rounded-card px-4 py-3.5">
+                <Text className="text-body font-semibold text-text-primary mb-1">
+                  Upgrade your AI coach
+                </Text>
+                <Text className="text-body-sm text-text-secondary mb-3">
+                  Get a more advanced AI that explains things more clearly,
+                  catches misunderstandings faster, and adapts better to how you
+                  learn. Available as an add-on for individual profiles.
+                </Text>
+                <View className="bg-primary-soft rounded-card px-3 py-2">
+                  <Text className="text-body-sm font-semibold text-primary">
+                    +$15/month per profile
+                  </Text>
+                  <Text className="text-caption text-text-secondary mt-0.5">
+                    Coming soon — we'll notify you when available.
+                  </Text>
+                </View>
+              </View>
             </View>
           )}
 
