@@ -12,7 +12,7 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
-  APP_URL: z.string().url().default('https://app.mentomate.com'),
+  APP_URL: z.string().url().default('https://www.mentomate.com'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
   // Stripe — optional. Dormant until web client added; mobile uses RevenueCat IAP.
