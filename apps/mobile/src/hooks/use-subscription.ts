@@ -58,9 +58,7 @@ export function useSubscription(): UseQueryResult<SubscriptionData> {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.subscription.$get({
-          init: { signal },
-        } as never);
+        const res = await client.subscription.$get({}, { init: { signal } });
         await assertOk(res);
         const data = await res.json();
         return data.subscription;
@@ -81,9 +79,7 @@ export function useUsage(): UseQueryResult<UsageData> {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.usage.$get({
-          init: { signal },
-        } as never);
+        const res = await client.usage.$get({}, { init: { signal } });
         await assertOk(res);
         const data = await res.json();
         return data.usage;
@@ -153,9 +149,10 @@ export function useSubscriptionStatus(): UseQueryResult<SubscriptionStatusData> 
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.subscription.status.$get({
-          init: { signal },
-        } as never);
+        const res = await client.subscription.status.$get(
+          {},
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = await res.json();
         return data.status;

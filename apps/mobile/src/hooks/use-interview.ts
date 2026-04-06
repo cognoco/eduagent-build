@@ -33,10 +33,10 @@ export function useInterviewState(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.subjects[':subjectId'].interview.$get({
-          param: { subjectId },
-          init: { signal },
-        } as never);
+        const res = await client.subjects[':subjectId'].interview.$get(
+          { param: { subjectId } },
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = await res.json();
         return data.state;

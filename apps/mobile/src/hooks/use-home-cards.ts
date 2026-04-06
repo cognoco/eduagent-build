@@ -22,9 +22,7 @@ export function useHomeCards(): UseQueryResult<HomeCardsResponse> {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client['home-cards'].$get({
-          init: { signal },
-        } as never);
+        const res = await client['home-cards'].$get({}, { init: { signal } });
         await assertOk(res);
         return (await res.json()) as HomeCardsResponse;
       } finally {

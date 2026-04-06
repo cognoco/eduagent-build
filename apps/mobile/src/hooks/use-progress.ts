@@ -16,10 +16,10 @@ export function useSubjectProgress(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.subjects[':subjectId'].progress.$get({
-          param: { subjectId },
-          init: { signal },
-        } as never);
+        const res = await client.subjects[':subjectId'].progress.$get(
+          { param: { subjectId } },
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = (await res.json()) as { progress: SubjectProgress };
         return data.progress;
@@ -40,9 +40,10 @@ export function useOverallProgress() {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.progress.overview.$get({
-          init: { signal },
-        } as never);
+        const res = await client.progress.overview.$get(
+          {},
+          { init: { signal } }
+        );
         await assertOk(res);
         return await res.json();
       } finally {
@@ -62,9 +63,10 @@ export function useContinueSuggestion() {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.progress.continue.$get({
-          init: { signal },
-        } as never);
+        const res = await client.progress.continue.$get(
+          {},
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = await res.json();
         return data.suggestion;
@@ -90,10 +92,10 @@ export function useTopicProgress(
       try {
         const res = await client.subjects[':subjectId'].topics[
           ':topicId'
-        ].progress.$get({
-          param: { subjectId, topicId },
-          init: { signal },
-        } as never);
+        ].progress.$get(
+          { param: { subjectId, topicId } },
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = (await res.json()) as { topic: TopicProgress };
         return data.topic;

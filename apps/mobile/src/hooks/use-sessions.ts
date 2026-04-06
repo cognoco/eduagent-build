@@ -346,10 +346,10 @@ export function useSessionTranscript(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.sessions[':sessionId'].transcript.$get({
-          param: { sessionId },
-          init: { signal },
-        } as never);
+        const res = await client.sessions[':sessionId'].transcript.$get(
+          { param: { sessionId } },
+          { init: { signal } }
+        );
         await assertOk(res);
         return (await res.json()) as SessionTranscript;
       } finally {
@@ -432,10 +432,10 @@ export function useParkingLot(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.sessions[':sessionId']['parking-lot'].$get({
-          param: { sessionId },
-          init: { signal },
-        } as never);
+        const res = await client.sessions[':sessionId']['parking-lot'].$get(
+          { param: { sessionId } },
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = (await res.json()) as { items: ParkingLotItem[] };
         return data.items;
@@ -461,10 +461,7 @@ export function useTopicParkingLot(
       try {
         const res = await client.subjects[':subjectId'].topics[':topicId'][
           'parking-lot'
-        ].$get({
-          param: { subjectId, topicId },
-          init: { signal },
-        } as never);
+        ].$get({ param: { subjectId, topicId } }, { init: { signal } });
         await assertOk(res);
         const data = (await res.json()) as { items: ParkingLotItem[] };
         return data.items;
@@ -510,10 +507,10 @@ export function useSessionSummary(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.sessions[':sessionId'].summary.$get({
-          param: { sessionId },
-          init: { signal },
-        } as never);
+        const res = await client.sessions[':sessionId'].summary.$get(
+          { param: { sessionId } },
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = await res.json();
         return data.summary;

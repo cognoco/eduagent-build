@@ -14,9 +14,7 @@ export function useProfiles(): UseQueryResult<Profile[]> {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.profiles.$get({
-          init: { signal },
-        } as never);
+        const res = await client.profiles.$get({}, { init: { signal } });
         await assertOk(res);
         const data = await res.json();
         return data.profiles;

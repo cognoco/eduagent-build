@@ -14,9 +14,7 @@ export function useStreaks(): UseQueryResult<Streak> {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.streaks.$get({
-          init: { signal },
-        } as never);
+        const res = await client.streaks.$get({}, { init: { signal } });
         await assertOk(res);
         const data = await res.json();
         return data.streak;
@@ -37,9 +35,7 @@ export function useXpSummary(): UseQueryResult<XpSummary> {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.xp.$get({
-          init: { signal },
-        } as never);
+        const res = await client.xp.$get({}, { init: { signal } });
         await assertOk(res);
         const data = await res.json();
         return data.xp;

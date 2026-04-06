@@ -222,10 +222,10 @@ export default function LibraryScreen() {
       queryFn: async ({ signal: querySignal }: { signal?: AbortSignal }) => {
         const { signal, cleanup } = combinedSignal(querySignal);
         try {
-          const res = await apiClient.subjects[':subjectId'].retention.$get({
-            param: { subjectId: subject.id },
-            init: { signal },
-          } as never);
+          const res = await apiClient.subjects[':subjectId'].retention.$get(
+            { param: { subjectId: subject.id } },
+            { init: { signal } }
+          );
           await assertOk(res);
           return (await res.json()) as SubjectRetentionResponse;
         } finally {

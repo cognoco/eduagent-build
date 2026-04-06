@@ -18,10 +18,10 @@ export function useVocabulary(subjectId: string) {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.subjects[':subjectId'].vocabulary.$get({
-          param: { subjectId },
-          init: { signal },
-        } as never);
+        const res = await client.subjects[':subjectId'].vocabulary.$get(
+          { param: { subjectId } },
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = (await res.json()) as { vocabulary: Vocabulary[] };
         return data.vocabulary;

@@ -40,10 +40,10 @@ export function useAllBooks(): {
       queryFn: async ({ signal: querySignal }: { signal?: AbortSignal }) => {
         const { signal, cleanup } = combinedSignal(querySignal);
         try {
-          const res = await client.subjects[':subjectId'].books.$get({
-            param: { subjectId: subject.id },
-            init: { signal },
-          } as never);
+          const res = await client.subjects[':subjectId'].books.$get(
+            { param: { subjectId: subject.id } },
+            { init: { signal } }
+          );
           await assertOk(res);
           const data = (await res.json()) as { books: CurriculumBook[] };
           return { books: data.books, subjectId: subject.id };

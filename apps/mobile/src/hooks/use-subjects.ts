@@ -35,12 +35,14 @@ export function useSubjects(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.subjects.$get({
-          ...(includeInactive
-            ? { query: { includeInactive: 'true' } }
-            : undefined),
-          init: { signal },
-        } as never);
+        const res = await client.subjects.$get(
+          {
+            ...(includeInactive
+              ? { query: { includeInactive: 'true' } }
+              : undefined),
+          },
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = await res.json();
         return data.subjects;

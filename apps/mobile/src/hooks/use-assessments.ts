@@ -21,10 +21,10 @@ export function useAssessment(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.assessments[':assessmentId'].$get({
-          param: { assessmentId },
-          init: { signal },
-        } as never);
+        const res = await client.assessments[':assessmentId'].$get(
+          { param: { assessmentId } },
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = (await res.json()) as { assessment: Assessment };
         return data.assessment;
