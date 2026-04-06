@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: eduagent
           POSTGRES_PASSWORD: eduagent
@@ -87,6 +87,10 @@ jobs:
           cache: 'pnpm'
 
       - run: pnpm install
+
+      # Enable pgvector extension before schema push (embeddings table uses vector type)
+      - name: Enable pgvector extension
+        run: psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector;'
 
       # Push database schema to test postgres (Drizzle push for CI)
       - name: Apply database schema
