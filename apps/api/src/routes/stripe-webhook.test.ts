@@ -229,6 +229,81 @@ describe('signature verification', () => {
     expect(body.message).toBe('Invalid webhook signature');
   });
 
+  it('does not invoke any billing handlers when signature verification fails [4C.4]', async () => {
+    (verifyWebhookSignature as jest.Mock).mockRejectedValue(
+      new Error(
+        'Webhook signature verification failed: timestamp outside tolerance'
+      )
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'bad_sig_tampered_body' },
+        body: JSON.stringify({
+          type: 'customer.subscription.updated',
+          data: {},
+        }),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toBe('Invalid webhook signature');
+    // No billing handlers should be called
+    expect(updateSubscriptionFromWebhook).not.toHaveBeenCalled();
+    expect(activateSubscriptionFromCheckout).not.toHaveBeenCalled();
+    expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
+    expect(inngest.send).not.toHaveBeenCalled();
+  });
+
+  it('returns MISSING_SIGNATURE code when signature verification fails [4C.4]', async () => {
+    (verifyWebhookSignature as jest.Mock).mockRejectedValue(
+      new Error(
+        'No signatures found matching the expected signature for payload'
+      )
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'v1=invalid_hmac,t=1234567890' },
+        body: '{"id":"evt_fake"}',
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe('MISSING_SIGNATURE');
+    expect(body.message).toBe('Invalid webhook signature');
+  });
+
+  it('catches all error types from signature verification (generic Error) [4C.4]', async () => {
+    // verifyWebhookSignature might throw a generic Error, not just Stripe-specific errors
+    (verifyWebhookSignature as jest.Mock).mockRejectedValue(
+      new TypeError('Cannot read properties of undefined')
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'sig_crash' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+
+    // The catch block catches any error, not just Stripe signature errors
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toBe('Invalid webhook signature');
+  });
+
   it('returns 200 when signature is valid', async () => {
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
       makeStripeEvent('customer.subscription.updated', makeSubscription())

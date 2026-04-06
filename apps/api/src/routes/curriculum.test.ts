@@ -98,6 +98,11 @@ jest.mock('../services/curriculum', () => ({
   explainTopicOrdering: jest
     .fn()
     .mockResolvedValue('This topic builds on fundamentals.'),
+  adaptCurriculumFromPerformance: jest.fn().mockResolvedValue({
+    adapted: true,
+    topicOrder: ['660e8400-e29b-41d4-a716-446655440001'],
+    explanation: 'Moved topic later to give you more preparation time.',
+  }),
 }));
 
 import { app } from '../index';
@@ -423,6 +428,171 @@ describe('curriculum routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /v1/subjects/:subjectId/curriculum/adapt (FR21)
+  // -------------------------------------------------------------------------
+
+  describe('POST /v1/subjects/:subjectId/curriculum/adapt', () => {
+    beforeEach(() => {
+      const { adaptCurriculumFromPerformance } = jest.requireMock<
+        typeof import('../services/curriculum')
+      >('../services/curriculum');
+      (adaptCurriculumFromPerformance as jest.Mock).mockResolvedValue({
+        adapted: true,
+        topicOrder: [TOPIC_ID],
+        explanation: 'Moved topic later to give you more preparation time.',
+      });
+    });
+
+    it('returns 200 with adaptation result', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/curriculum/adapt`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            topicId: TOPIC_ID,
+            signal: 'struggling',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.adapted).toBe(true);
+      expect(body.topicOrder).toEqual([TOPIC_ID]);
+      expect(body.explanation).toContain('preparation time');
+    });
+
+    it('accepts optional context field', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/curriculum/adapt`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            topicId: TOPIC_ID,
+            signal: 'mastered',
+            context: 'The learner scored 100% on the quiz',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+    });
+
+    it('returns 400 with invalid signal value', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/curriculum/adapt`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            topicId: TOPIC_ID,
+            signal: 'invalid_signal',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 with invalid topicId', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/curriculum/adapt`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            topicId: 'not-a-uuid',
+            signal: 'struggling',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 when body is missing required fields', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/curriculum/adapt`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/curriculum/adapt`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            topicId: TOPIC_ID,
+            signal: 'struggling',
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 404 when service throws NotFoundError', async () => {
+      const { adaptCurriculumFromPerformance } = jest.requireMock<
+        typeof import('../services/curriculum')
+      >('../services/curriculum');
+      (adaptCurriculumFromPerformance as jest.Mock).mockRejectedValueOnce(
+        new NotFoundError('Subject')
+      );
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/curriculum/adapt`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            topicId: TOPIC_ID,
+            signal: 'struggling',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it('accepts all valid signal values', async () => {
+      for (const signal of ['struggling', 'mastered', 'too_easy', 'too_hard']) {
+        const res = await app.request(
+          `/v1/subjects/${SUBJECT_ID}/curriculum/adapt`,
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({
+              topicId: TOPIC_ID,
+              signal,
+            }),
+          },
+          TEST_ENV
+        );
+
+        expect(res.status).toBe(200);
+      }
     });
   });
 

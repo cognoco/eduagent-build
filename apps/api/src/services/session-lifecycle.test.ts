@@ -4,6 +4,7 @@ import {
   recordActivity,
   computePaceMultiplier,
   computeSilenceThresholdSeconds,
+  normalizeExpectedResponseMinutes,
 } from './session-lifecycle';
 import type { SessionTimerState } from './session-lifecycle';
 
@@ -30,6 +31,52 @@ describe('createTimerConfig', () => {
     expect(state.sessionStartedAt).toBeGreaterThanOrEqual(before);
     expect(state.sessionStartedAt).toBeLessThanOrEqual(after);
     expect(state.lastActivityAt).toBe(state.sessionStartedAt);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// normalizeExpectedResponseMinutes
+// ---------------------------------------------------------------------------
+
+describe('normalizeExpectedResponseMinutes', () => {
+  it('returns default 10 when value is null', () => {
+    expect(normalizeExpectedResponseMinutes(null)).toBe(10);
+  });
+
+  it('returns default 10 when value is undefined', () => {
+    expect(normalizeExpectedResponseMinutes(undefined)).toBe(10);
+  });
+
+  it('returns default 10 when value is NaN', () => {
+    expect(normalizeExpectedResponseMinutes(NaN)).toBe(10);
+  });
+
+  it('clamps below-minimum values to 1 (current MIN boundary)', () => {
+    // NOTE [4E.7]: The implementation clamps to 1, but the
+    // MIN_EXPECTED_RESPONSE_MINUTES constant is 2. The constant is
+    // used in computeSilenceThresholdSeconds for the post-multiplication
+    // clamp, not here. This means normalizeExpectedResponseMinutes allows
+    // 1 minute, even though silence thresholds clamp at 2 minutes.
+    expect(normalizeExpectedResponseMinutes(0)).toBe(1);
+    expect(normalizeExpectedResponseMinutes(0.4)).toBe(1);
+    expect(normalizeExpectedResponseMinutes(-5)).toBe(1);
+  });
+
+  it('clamps above-maximum values to 20', () => {
+    expect(normalizeExpectedResponseMinutes(25)).toBe(20);
+    expect(normalizeExpectedResponseMinutes(100)).toBe(20);
+  });
+
+  it('rounds to nearest integer', () => {
+    expect(normalizeExpectedResponseMinutes(5.4)).toBe(5);
+    expect(normalizeExpectedResponseMinutes(5.6)).toBe(6);
+  });
+
+  it('passes through valid integer values unchanged', () => {
+    expect(normalizeExpectedResponseMinutes(5)).toBe(5);
+    expect(normalizeExpectedResponseMinutes(10)).toBe(10);
+    expect(normalizeExpectedResponseMinutes(1)).toBe(1);
+    expect(normalizeExpectedResponseMinutes(20)).toBe(20);
   });
 });
 

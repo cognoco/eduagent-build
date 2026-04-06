@@ -624,6 +624,162 @@ describe('metering middleware', () => {
       // Should still succeed — KV is best-effort
       expect(res.status).toBe(200);
     });
+
+    it('falls back to DB path when KV backfill write fails [4C.7]', async () => {
+      // KV read returns null (cache miss), KV write throws on backfill
+      mockReadSubscriptionStatus.mockResolvedValue(null);
+      mockWriteSubscriptionStatus.mockRejectedValue(
+        new Error('KV write timeout')
+      );
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({ usedThisMonth: 50, monthlyLimit: 500 })
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 449,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
+      );
+
+      // Request succeeds — DB path is used for quota enforcement
+      expect(res.status).toBe(200);
+      // DB was queried as fallback
+      expect(mockEnsureFreeSubscription).toHaveBeenCalled();
+      expect(mockGetQuotaPool).toHaveBeenCalled();
+      // Decrement still happened against DB
+      expect(mockDecrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1'
+      );
+    });
+
+    it('falls back to DB for quota data when KV write fails after post-decrement update [4C.7]', async () => {
+      // KV read succeeds (cache hit), but KV write fails on post-decrement update
+      mockReadSubscriptionStatus.mockResolvedValue({
+        subscriptionId: 'sub-1',
+        tier: 'plus',
+        status: 'active',
+        monthlyLimit: 500,
+        usedThisMonth: 200,
+        dailyLimit: null,
+        usedToday: 0,
+      });
+      // First call is post-decrement update — it will fail
+      mockWriteSubscriptionStatus.mockRejectedValue(
+        new Error('KV network error')
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 299,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
+      );
+
+      // Request succeeds even though post-decrement KV update failed
+      expect(res.status).toBe(200);
+      expect(res.headers.get('X-Quota-Remaining')).toBe('299');
+      // KV cache hit means DB was NOT queried
+      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // [4C.2] Concurrent decrement race at middleware level
+  // -----------------------------------------------------------------------
+
+  describe('concurrent decrement race [4C.2]', () => {
+    it('returns 402 when fast-path allows but atomic decrement fails (TOCTOU race)', async () => {
+      // Fast-path check sees quota available (usedThisMonth < monthlyLimit)
+      // but atomic decrement fails because concurrent request consumed last slot
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({ usedThisMonth: 499, monthlyLimit: 500 })
+      );
+      // Fast-path says OK (1 remaining), but atomic decrement races and fails
+      mockDecrementQuota.mockResolvedValue({
+        success: false,
+        source: 'none',
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(402);
+      const body = await res.json();
+      expect(body.code).toBe('QUOTA_EXCEEDED');
+      expect(body.details.reason).toBe('monthly');
+    });
+
+    it('returns 402 with daily reason when decrement returns daily_exceeded', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(
+        mockSubscription({ tier: 'free' })
+      );
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({
+          usedThisMonth: 30,
+          monthlyLimit: 100,
+          dailyLimit: 10,
+          usedToday: 9, // Fast-path sees 1 remaining
+        })
+      );
+      // But atomic decrement finds daily now exhausted (concurrent request)
+      mockDecrementQuota.mockResolvedValue({
+        success: false,
+        source: 'daily_exceeded',
+        remainingMonthly: 70,
+        remainingTopUp: 0,
+        remainingDaily: 0,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(402);
+      const body = await res.json();
+      expect(body.code).toBe('QUOTA_EXCEEDED');
+      expect(body.details.reason).toBe('daily');
+      expect(body.message).toContain('daily');
+    });
   });
 
   // -----------------------------------------------------------------------

@@ -8,7 +8,9 @@ jest.mock('@eduagent/database', () => {
 
 jest.mock('./exchanges', () => ({
   processExchange: jest.fn(),
+  streamExchange: jest.fn(),
   detectUnderstandingCheck: jest.fn().mockReturnValue(false),
+  estimateExpectedResponseMinutes: jest.fn().mockReturnValue(2),
 }));
 
 jest.mock('./escalation', () => ({
@@ -63,8 +65,10 @@ import { createScopedRepository, profiles } from '@eduagent/database';
 import {
   startSession,
   SubjectInactiveError,
+  SessionExchangeLimitError,
   getSession,
   processMessage,
+  streamMessage,
   closeSession,
   syncHomeworkState,
   flagContent,
@@ -77,7 +81,7 @@ import {
   computeActiveSeconds,
   resetSessionStaticContextCache,
 } from './session';
-import { processExchange } from './exchanges';
+import { processExchange, streamExchange } from './exchanges';
 import { evaluateEscalation } from './escalation';
 import { evaluateSummary } from './summaries';
 import { getSubject } from './subject';
@@ -1203,6 +1207,55 @@ describe('escalation tracking', () => {
     );
   });
 
+  it('passes rich prior learning context with multiple topics through to LLM (FR40 multi-topic)', async () => {
+    setupScopedRepo({ sessionFindFirst: mockSessionRow() });
+    const priorTopics = [
+      {
+        topicId: 't1',
+        title: 'Algebra Basics',
+        summary: 'Variables and equations',
+        completedAt: '2025-01-10T00:00:00Z',
+      },
+      {
+        topicId: 't2',
+        title: 'Linear Equations',
+        summary: 'Solving for x in one-variable equations',
+        completedAt: '2025-01-12T00:00:00Z',
+      },
+      {
+        topicId: 't3',
+        title: 'Graphing Lines',
+        summary: 'Slope-intercept form and coordinate planes',
+        completedAt: '2025-01-14T00:00:00Z',
+      },
+    ];
+    (fetchPriorTopics as jest.Mock).mockResolvedValue(priorTopics);
+    (buildPriorLearningContext as jest.Mock).mockReturnValue({
+      contextText:
+        'Prior Learning Context — topics the learner has already completed:\n\n' +
+        '- Algebra Basics: Variables and equations\n' +
+        '- Linear Equations: Solving for x in one-variable equations\n' +
+        '- Graphing Lines: Slope-intercept form and coordinate planes',
+      topicsIncluded: 3,
+      truncated: false,
+    });
+
+    const db = createMockDb();
+    await processMessage(db, profileId, sessionId, {
+      message: 'Now teach me quadratic equations',
+    });
+
+    // buildPriorLearningContext receives all three topics
+    expect(buildPriorLearningContext).toHaveBeenCalledWith(priorTopics);
+
+    // processExchange receives the full multi-topic context string
+    const callArgs = (processExchange as jest.Mock).mock.calls[0];
+    const exchangeContext = callArgs[0];
+    expect(exchangeContext.priorLearningContext).toContain('Algebra Basics');
+    expect(exchangeContext.priorLearningContext).toContain('Linear Equations');
+    expect(exchangeContext.priorLearningContext).toContain('Graphing Lines');
+  });
+
   it('omits prior learning context for new learners (FR40 empty state)', async () => {
     setupScopedRepo({ sessionFindFirst: mockSessionRow() });
     // Default mock: fetchPriorTopics returns [], buildPriorLearningContext returns empty
@@ -1940,5 +1993,115 @@ describe('submitSummary', () => {
       return value;
     });
     expect(whereStr).toContain('profile_id');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// streamMessage — streaming path with onComplete callback
+// ---------------------------------------------------------------------------
+
+describe('streamMessage', () => {
+  beforeEach(() => {
+    // Reset stream-specific mocks
+    async function* fakeStream() {
+      yield 'Hello ';
+      yield 'world!';
+    }
+
+    (streamExchange as jest.Mock).mockResolvedValue({
+      stream: fakeStream(),
+      newEscalationRung: 1,
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+    });
+  });
+
+  it('returns a stream and onComplete callback', async () => {
+    const row = mockSessionRow({ exchangeCount: 2, topicId: null });
+    setupScopedRepo({ sessionFindFirst: row });
+    const db = createMockDb({
+      learningSessionFindFirst: row,
+    });
+
+    const result = await streamMessage(db, profileId, sessionId, {
+      message: 'What is algebra?',
+    });
+
+    expect(result).toHaveProperty('stream');
+    expect(result).toHaveProperty('onComplete');
+    expect(typeof result.onComplete).toBe('function');
+  });
+
+  it('stream yields chunks from streamExchange', async () => {
+    const row = mockSessionRow({ exchangeCount: 0, topicId: null });
+    setupScopedRepo({ sessionFindFirst: row });
+    const db = createMockDb({
+      learningSessionFindFirst: row,
+    });
+
+    const result = await streamMessage(db, profileId, sessionId, {
+      message: 'Explain variables',
+    });
+
+    const chunks: string[] = [];
+    for await (const chunk of result.stream) {
+      chunks.push(chunk);
+    }
+    expect(chunks.join('')).toContain('Hello');
+    expect(chunks.join('')).toContain('world');
+  });
+
+  it('onComplete persists exchange and returns metadata', async () => {
+    const row = mockSessionRow({ exchangeCount: 3, topicId: null });
+    setupScopedRepo({ sessionFindFirst: row });
+    const db = createMockDb({
+      learningSessionFindFirst: row,
+      updateReturning: [{ exchangeCount: 4 }],
+    });
+
+    const result = await streamMessage(db, profileId, sessionId, {
+      message: 'Help me understand',
+    });
+
+    // Drain stream first
+    for await (const _chunk of result.stream) {
+      // consume
+    }
+
+    const metadata = await result.onComplete(
+      'Hello world! This is the full response.'
+    );
+
+    expect(metadata).toHaveProperty('exchangeCount');
+    expect(metadata).toHaveProperty('escalationRung');
+    expect(metadata).toHaveProperty('expectedResponseMinutes');
+    expect(metadata.escalationRung).toBe(1);
+  });
+
+  it('throws when session has reached exchange limit', async () => {
+    const row = mockSessionRow({ exchangeCount: 50 });
+    setupScopedRepo({ sessionFindFirst: row });
+    const db = createMockDb({
+      learningSessionFindFirst: row,
+    });
+
+    await expect(
+      streamMessage(db, profileId, sessionId, {
+        message: 'One more question',
+      })
+    ).rejects.toThrow(/maximum/i);
+  });
+
+  it('throws when session is not found', async () => {
+    setupScopedRepo({ sessionFindFirst: undefined });
+    const db = createMockDb({
+      learningSessionFindFirst: null as any,
+    });
+
+    await expect(
+      streamMessage(db, profileId, sessionId, {
+        message: 'Hello',
+      })
+    ).rejects.toThrow(/not found/i);
   });
 });

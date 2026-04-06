@@ -74,10 +74,16 @@ beforeEach(() => {
 });
 
 describe('home card routes', () => {
-  // TODO: profile-scope middleware's findOwnerProfile mock doesn't propagate
-  // profileId in the test environment. The route returns 400 because profileId
-  // is correctly guarded (no account.id fallback). Unskip when the test
-  // infrastructure supports profile resolution through the middleware chain.
+  // SKIPPED [4E.4]: profile-scope middleware's findOwnerProfile mock doesn't
+  // propagate profileId into c.get('profileId') in the unit-test environment.
+  // The route correctly guards with requireProfileId() and returns 400.
+  //
+  // To unskip, the test infrastructure needs one of:
+  //   (a) An X-Profile-Id header that the profile-scope middleware trusts when
+  //       findOwnerProfile succeeds (similar to subjects.test.ts pattern), OR
+  //   (b) A mock of requireProfileId that injects the test profile ID.
+  //
+  // The route itself is covered by integration tests. See bug #29.
   it.skip('returns ranked home cards', async () => {
     (getHomeCardsForProfile as jest.Mock).mockResolvedValue({
       coldStart: false,
@@ -120,9 +126,12 @@ describe('home card routes', () => {
     expect(body.cards[0].id).toBe('study');
   });
 
-  // Route is fully implemented but test can't run: profile-scope middleware's
-  // findOwnerProfile mock doesn't propagate profileId in the unit test env.
-  // Covered by integration tests instead. See bug #29.
+  // SKIPPED [4E.4]: Same profile-scope middleware limitation as above.
+  // Route is fully implemented. Covered by integration tests. See bug #29.
+  //
+  // To unskip, the test needs the same middleware fix described above —
+  // specifically, the POST handler uses requireProfileId(c.get('profileId')),
+  // which returns undefined when the mock middleware chain doesn't set it.
   it.skip('records card interactions', async () => {
     (trackHomeCardInteraction as jest.Mock).mockResolvedValue(undefined);
 

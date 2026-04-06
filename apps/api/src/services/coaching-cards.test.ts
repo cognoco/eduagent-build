@@ -239,6 +239,168 @@ describe('precomputeCoachingCard', () => {
     }
   });
 
+  it('returns curriculum_complete card when all retention cards are verified (>= 3 cards)', async () => {
+    const verifiedCards = [
+      mockRetentionCardRow({
+        topicId: 'topic-1',
+        xpStatus: 'verified',
+        nextReviewAt: new Date('2026-02-25T10:00:00.000Z'),
+      }),
+      mockRetentionCardRow({
+        topicId: 'topic-2',
+        xpStatus: 'verified',
+        nextReviewAt: new Date('2026-02-25T10:00:00.000Z'),
+      }),
+      mockRetentionCardRow({
+        topicId: 'topic-3',
+        xpStatus: 'verified',
+        nextReviewAt: new Date('2026-02-25T10:00:00.000Z'),
+      }),
+    ];
+    setupScopedRepo({ retentionCardsFindMany: verifiedCards });
+    const db = createMockDb();
+
+    // No streak on grace period
+    (db.query.streaks.findFirst as jest.Mock).mockResolvedValue({
+      id: 'streak-1',
+      profileId,
+      currentStreak: 10,
+      longestStreak: 10,
+      lastActivityDate: '2026-02-15', // today
+      gracePeriodStartDate: null,
+    });
+
+    const card = await precomputeCoachingCard(db, profileId);
+
+    expect(card.type).toBe('curriculum_complete');
+    expect(card.priority).toBe(5);
+    expect(card.title).toContain('mastered');
+  });
+
+  it('does not return curriculum_complete when fewer than 3 verified cards', async () => {
+    const verifiedCards = [
+      mockRetentionCardRow({
+        topicId: 'topic-1',
+        xpStatus: 'verified',
+        nextReviewAt: new Date('2026-02-25T10:00:00.000Z'),
+      }),
+      mockRetentionCardRow({
+        topicId: 'topic-2',
+        xpStatus: 'verified',
+        nextReviewAt: new Date('2026-02-25T10:00:00.000Z'),
+      }),
+    ];
+    setupScopedRepo({ retentionCardsFindMany: verifiedCards });
+    const db = createMockDb();
+
+    // No streak on grace
+    (db.query.streaks.findFirst as jest.Mock).mockResolvedValue({
+      id: 'streak-1',
+      profileId,
+      currentStreak: 5,
+      longestStreak: 5,
+      lastActivityDate: '2026-02-15',
+      gracePeriodStartDate: null,
+    });
+
+    const card = await precomputeCoachingCard(db, profileId);
+
+    // Should fall through to insight since cards are verified but count < 3
+    expect(card.type).toBe('insight');
+    expect(card.priority).toBe(4);
+  });
+
+  it('does not return curriculum_complete when some cards are not verified', async () => {
+    const mixedCards = [
+      mockRetentionCardRow({
+        topicId: 'topic-1',
+        xpStatus: 'verified',
+        nextReviewAt: new Date('2026-02-25T10:00:00.000Z'),
+      }),
+      mockRetentionCardRow({
+        topicId: 'topic-2',
+        xpStatus: 'verified',
+        nextReviewAt: new Date('2026-02-25T10:00:00.000Z'),
+      }),
+      mockRetentionCardRow({
+        topicId: 'topic-3',
+        xpStatus: 'pending', // not verified
+        nextReviewAt: new Date('2026-02-25T10:00:00.000Z'),
+      }),
+    ];
+    setupScopedRepo({ retentionCardsFindMany: mixedCards });
+    const db = createMockDb();
+
+    (db.query.streaks.findFirst as jest.Mock).mockResolvedValue({
+      id: 'streak-1',
+      profileId,
+      currentStreak: 5,
+      longestStreak: 5,
+      lastActivityDate: '2026-02-15',
+      gracePeriodStartDate: null,
+    });
+
+    const card = await precomputeCoachingCard(db, profileId);
+
+    // Should be insight (not curriculum_complete) since not all are verified
+    expect(card.type).toBe('insight');
+    expect(card.type).not.toBe('curriculum_complete');
+  });
+
+  it('review_due priority scales: single overdue = 7, multiple increases up to 10', async () => {
+    // Single overdue card: priority should be 7
+    const singleOverdue = mockRetentionCardRow({
+      topicId: 'topic-1',
+      nextReviewAt: new Date('2026-02-10T10:00:00.000Z'),
+    });
+    setupScopedRepo({ retentionCardsFindMany: [singleOverdue] });
+    const db1 = createMockDb();
+
+    const card1 = await precomputeCoachingCard(db1, profileId);
+    expect(card1.type).toBe('review_due');
+    expect(card1.priority).toBe(7);
+
+    // Two overdue cards: priority should be 8
+    const twoOverdue = [
+      mockRetentionCardRow({
+        topicId: 'topic-1',
+        nextReviewAt: new Date('2026-02-10T10:00:00.000Z'),
+      }),
+      mockRetentionCardRow({
+        topicId: 'topic-2',
+        nextReviewAt: new Date('2026-02-12T10:00:00.000Z'),
+      }),
+    ];
+    setupScopedRepo({ retentionCardsFindMany: twoOverdue });
+    const db2 = createMockDb();
+
+    const card2 = await precomputeCoachingCard(db2, profileId);
+    expect(card2.type).toBe('review_due');
+    expect(card2.priority).toBe(8);
+  });
+
+  it('review_due picks the most overdue card (earliest nextReviewAt)', async () => {
+    const overdueCards = [
+      mockRetentionCardRow({
+        topicId: 'topic-newer',
+        nextReviewAt: new Date('2026-02-12T10:00:00.000Z'), // less overdue
+      }),
+      mockRetentionCardRow({
+        topicId: 'topic-older',
+        nextReviewAt: new Date('2026-02-08T10:00:00.000Z'), // most overdue
+      }),
+    ];
+    setupScopedRepo({ retentionCardsFindMany: overdueCards });
+    const db = createMockDb();
+
+    const card = await precomputeCoachingCard(db, profileId);
+
+    expect(card.type).toBe('review_due');
+    if (card.type === 'review_due') {
+      expect(card.topicId).toBe('topic-older');
+    }
+  });
+
   it('prefers review_due over streak even when streak is on grace', async () => {
     const overdueCard = mockRetentionCardRow({
       nextReviewAt: new Date('2026-02-10T10:00:00.000Z'),

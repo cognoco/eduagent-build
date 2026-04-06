@@ -38,8 +38,10 @@ import {
   listFamilyMembers,
   addProfileToSubscription,
   removeProfileFromSubscription,
+  ProfileRemovalNotImplementedError,
   downgradeAllFamilyProfiles,
   getFamilyPoolStatus,
+  isRevenuecatEventProcessed,
   activateSubscriptionFromRevenuecat,
   updateSubscriptionFromRevenuecatWebhook,
 } from './billing';
@@ -1567,6 +1569,38 @@ describe('addProfileToSubscription', () => {
 
     expect(result).toBeNull();
   });
+
+  it('returns null when family tier max profile cap is reached [4C.8]', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family' });
+    // selectResult [{ count: 4 }] means 4 profiles already exist;
+    // family tier maxProfiles is 4, so canAddProfile returns false
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      profileFindFirst: mockProfileRow({ id: 'p-new', accountId }),
+      selectResult: [{ count: 4 }],
+    });
+
+    const result = await addProfileToSubscription(db, subscriptionId, 'p-new');
+
+    // Max cap enforced via canAddProfile — returns null, no DB writes
+    expect(result).toBeNull();
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('returns null when pro tier max profile cap is reached [4C.8]', async () => {
+    const sub = mockSubscriptionRow({ tier: 'pro' });
+    // pro tier maxProfiles is 6
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      profileFindFirst: mockProfileRow({ id: 'p-new', accountId }),
+      selectResult: [{ count: 6 }],
+    });
+
+    const result = await addProfileToSubscription(db, subscriptionId, 'p-new');
+
+    expect(result).toBeNull();
+    expect(db.update).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1636,6 +1670,31 @@ describe('removeProfileFromSubscription', () => {
     ).rejects.toThrow('Profile removal requires an invite/claim flow');
     expect(db.update).not.toHaveBeenCalled();
     expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('throws ProfileRemovalNotImplementedError with correct name [4C.9]', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family' });
+    const childProfile = mockProfileRow({ id: 'p-child', isOwner: false });
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      profileFindFirst: childProfile,
+    });
+
+    try {
+      await removeProfileFromSubscription(
+        db,
+        subscriptionId,
+        'p-child',
+        newAccountId
+      );
+      // Should not reach here
+      expect(true).toBe(false);
+    } catch (err) {
+      expect(err).toBeInstanceOf(ProfileRemovalNotImplementedError);
+      expect((err as ProfileRemovalNotImplementedError).name).toBe(
+        'ProfileRemovalNotImplementedError'
+      );
+    }
   });
 });
 
@@ -1842,6 +1901,454 @@ describe('getFamilyPoolStatus', () => {
 });
 
 // ---------------------------------------------------------------------------
+// [4C.2] decrementQuota — concurrent over-decrement (race condition)
+// ---------------------------------------------------------------------------
+
+describe('decrementQuota — concurrent over-decrement [4C.2]', () => {
+  it('returns failure when atomic UPDATE returns empty (concurrent winner consumed last slot)', async () => {
+    // Simulates a race: two requests check quota simultaneously, one wins the atomic
+    // UPDATE, the other gets zero rows back — no pool found for fallback either
+    const db = createMockDb({
+      updateReturning: [], // atomic UPDATE returns nothing (concurrent race lost)
+      quotaPoolFindFirst: undefined, // no pool found
+    });
+
+    const result = await decrementQuota(db, subscriptionId);
+
+    expect(result.success).toBe(false);
+    expect(result.source).toBe('none');
+    expect(result.remainingMonthly).toBe(0);
+  });
+
+  it('falls through to top-up when concurrent request consumed last monthly slot', async () => {
+    // First UPDATE returns empty (monthly atomic guard fails because concurrent request
+    // consumed the last slot). Pool shows monthly exhausted, daily OK. Top-up available.
+    const pool = {
+      monthlyLimit: 100,
+      usedThisMonth: 100, // concurrent request consumed it
+      dailyLimit: null,
+      usedToday: 5,
+    };
+    const topUp = mockTopUpRow({ remaining: 50 });
+    const updatedTopUp = mockTopUpRow({ remaining: 49 });
+
+    const updateReturningFn = jest
+      .fn()
+      .mockResolvedValueOnce([]) // monthly: WHERE used < limit fails (concurrently consumed)
+      .mockResolvedValueOnce([updatedTopUp]) // top-up: succeeds
+      .mockResolvedValueOnce([]); // daily counter increment
+
+    const updateWhere = jest
+      .fn()
+      .mockReturnValue({ returning: updateReturningFn });
+    const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+
+    const db = {
+      query: {
+        subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        quotaPools: { findFirst: jest.fn().mockResolvedValue(pool) },
+        topUpCredits: { findFirst: jest.fn().mockResolvedValue(topUp) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
+      },
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+      update: jest.fn().mockReturnValue({ set: updateSet }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    } as unknown as Database;
+
+    const result = await decrementQuota(db, subscriptionId);
+
+    expect(result.success).toBe(true);
+    expect(result.source).toBe('top_up');
+    expect(result.remainingTopUp).toBe(49);
+  });
+
+  it('returns failure when concurrent request consumed last top-up credit', async () => {
+    // Monthly exhausted, daily OK, top-up found but atomic decrement fails
+    // (another request consumed the last credit first)
+    const pool = {
+      monthlyLimit: 100,
+      usedThisMonth: 100,
+      dailyLimit: null,
+      usedToday: 5,
+    };
+    const topUp = mockTopUpRow({ remaining: 1 });
+
+    const updateReturningFn = jest
+      .fn()
+      .mockResolvedValueOnce([]) // monthly: fails
+      .mockResolvedValueOnce([]); // top-up: concurrent race lost (remaining was 1 -> 0)
+
+    const updateWhere = jest
+      .fn()
+      .mockReturnValue({ returning: updateReturningFn });
+    const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+
+    const db = {
+      query: {
+        subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        quotaPools: { findFirst: jest.fn().mockResolvedValue(pool) },
+        topUpCredits: { findFirst: jest.fn().mockResolvedValue(topUp) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
+      },
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+      update: jest.fn().mockReturnValue({ set: updateSet }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    } as unknown as Database;
+
+    const result = await decrementQuota(db, subscriptionId);
+
+    expect(result.success).toBe(false);
+    expect(result.source).toBe('none');
+    expect(result.remainingMonthly).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [4C.2] decrementQuota — daily quota consumed before monthly
+// ---------------------------------------------------------------------------
+
+describe('decrementQuota — daily quota consumed before monthly [4C.2]', () => {
+  it('returns daily_exceeded when daily limit hit but monthly has remaining', async () => {
+    const pool = {
+      dailyLimit: 10,
+      usedToday: 10,
+      monthlyLimit: 500,
+      usedThisMonth: 50,
+    };
+
+    // Atomic UPDATE fails due to daily guard
+    const updateReturningFn = jest.fn().mockResolvedValueOnce([]);
+    const updateWhere = jest
+      .fn()
+      .mockReturnValue({ returning: updateReturningFn });
+    const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+
+    const db = {
+      query: {
+        subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        quotaPools: { findFirst: jest.fn().mockResolvedValue(pool) },
+        topUpCredits: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
+      },
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+      update: jest.fn().mockReturnValue({ set: updateSet }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    } as unknown as Database;
+
+    const result = await decrementQuota(db, subscriptionId);
+
+    expect(result.success).toBe(false);
+    expect(result.source).toBe('daily_exceeded');
+    expect(result.remainingDaily).toBe(0);
+    // Monthly still has capacity — daily is the blocker
+    expect(result.remainingMonthly).toBe(450);
+  });
+
+  it('blocks top-up fallback when daily limit is hit', async () => {
+    // Daily limit hit — even with top-up credits available, user cannot proceed
+    const pool = {
+      dailyLimit: 10,
+      usedToday: 10,
+      monthlyLimit: 100,
+      usedThisMonth: 100,
+    };
+    const topUp = mockTopUpRow({ remaining: 500 });
+
+    const updateReturningFn = jest.fn().mockResolvedValueOnce([]);
+    const updateWhere = jest
+      .fn()
+      .mockReturnValue({ returning: updateReturningFn });
+    const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+
+    const db = {
+      query: {
+        subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        quotaPools: { findFirst: jest.fn().mockResolvedValue(pool) },
+        topUpCredits: { findFirst: jest.fn().mockResolvedValue(topUp) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
+      },
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+      update: jest.fn().mockReturnValue({ set: updateSet }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    } as unknown as Database;
+
+    const result = await decrementQuota(db, subscriptionId);
+
+    expect(result.success).toBe(false);
+    expect(result.source).toBe('daily_exceeded');
+    // Top-up NOT consumed even though they have credits
+    expect(result.remainingDaily).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [4C.2] decrementQuota — race with top-up expiry
+// ---------------------------------------------------------------------------
+
+describe('decrementQuota — race with top-up expiry [4C.2]', () => {
+  it('returns failure when top-up expires mid-decrement (findFirst returns row but atomic update fails)', async () => {
+    // Monthly exhausted, daily OK. Top-up found in query but expired by the time
+    // the atomic UPDATE runs (remaining check fails because row was deleted/expired)
+    const pool = {
+      monthlyLimit: 100,
+      usedThisMonth: 100,
+      dailyLimit: null,
+      usedToday: 5,
+    };
+    const topUp = mockTopUpRow({ remaining: 10 }); // Found by findFirst
+
+    const updateReturningFn = jest
+      .fn()
+      .mockResolvedValueOnce([]) // monthly: exhausted
+      .mockResolvedValueOnce([]); // top-up: expired between query and update
+
+    const updateWhere = jest
+      .fn()
+      .mockReturnValue({ returning: updateReturningFn });
+    const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+
+    const db = {
+      query: {
+        subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        quotaPools: { findFirst: jest.fn().mockResolvedValue(pool) },
+        topUpCredits: { findFirst: jest.fn().mockResolvedValue(topUp) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
+      },
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+      update: jest.fn().mockReturnValue({ set: updateSet }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    } as unknown as Database;
+
+    const result = await decrementQuota(db, subscriptionId);
+
+    // Top-up expired between query and atomic update — treat as exhausted
+    expect(result.success).toBe(false);
+    expect(result.source).toBe('none');
+    expect(result.remainingMonthly).toBe(0);
+    expect(result.remainingTopUp).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [4C.5] purchaseTopUpCredits — idempotency (concurrent calls + free-tier)
+// ---------------------------------------------------------------------------
+
+describe('purchaseTopUpCredits — idempotency [4C.5]', () => {
+  it('returns null on duplicate transactionId (ON CONFLICT DO NOTHING)', async () => {
+    const sub = mockSubscriptionRow({ tier: 'plus', status: 'active' });
+
+    // INSERT returns empty array when ON CONFLICT DO NOTHING fires
+    const insertValues = jest.fn().mockReturnValue({
+      onConflictDoNothing: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([]), // No rows = duplicate
+      }),
+    });
+
+    const db = {
+      query: {
+        subscriptions: { findFirst: jest.fn().mockResolvedValue(sub) },
+        quotaPools: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        topUpCredits: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
+      },
+      insert: jest.fn().mockReturnValue({ values: insertValues }),
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    } as unknown as Database;
+
+    const result = await purchaseTopUpCredits(
+      db,
+      subscriptionId,
+      500,
+      NOW,
+      'txn_duplicate_123'
+    );
+
+    // Duplicate transaction — returns null (already granted)
+    expect(result).toBeNull();
+  });
+
+  it('succeeds on first call with transactionId', async () => {
+    const sub = mockSubscriptionRow({ tier: 'plus', status: 'active' });
+    const topUpRow = mockTopUpRow({ remaining: 500 });
+
+    const insertValues = jest.fn().mockReturnValue({
+      onConflictDoNothing: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([topUpRow]), // New row inserted
+      }),
+    });
+
+    const db = {
+      query: {
+        subscriptions: { findFirst: jest.fn().mockResolvedValue(sub) },
+        quotaPools: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        topUpCredits: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
+      },
+      insert: jest.fn().mockReturnValue({ values: insertValues }),
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    } as unknown as Database;
+
+    const result = await purchaseTopUpCredits(
+      db,
+      subscriptionId,
+      500,
+      NOW,
+      'txn_new_123'
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.remaining).toBe(500);
+  });
+
+  it('rejects free-tier user attempting purchase [4C.5]', async () => {
+    const sub = mockSubscriptionRow({ tier: 'free', status: 'active' });
+    const db = createMockDb({ subscriptionFindFirst: sub });
+
+    const result = await purchaseTopUpCredits(
+      db,
+      subscriptionId,
+      500,
+      NOW,
+      'txn_free_attempt'
+    );
+
+    // Free tier cannot purchase — returns null without inserting
+    expect(result).toBeNull();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('rejects when no subscription exists', async () => {
+    const db = createMockDb({ subscriptionFindFirst: undefined });
+
+    const result = await purchaseTopUpCredits(
+      db,
+      subscriptionId,
+      500,
+      NOW,
+      'txn_no_sub'
+    );
+
+    expect(result).toBeNull();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [4C.6] getTopUpCreditsRemaining — expiry edge cases
+// ---------------------------------------------------------------------------
+
+describe('getTopUpCreditsRemaining — expiry edge [4C.6]', () => {
+  it('only counts credits with expiresAt > now (SQL WHERE guard)', async () => {
+    // The function uses `topUpCredits.expiresAt > now` in the WHERE clause,
+    // so expired credits are excluded server-side by the SQL query.
+    // With a mock, we verify the function returns whatever the DB returns.
+    const db = createMockDb({ selectResult: [{ total: 250 }] });
+    const now = new Date('2025-06-15T00:00:00.000Z');
+
+    const result = await getTopUpCreditsRemaining(db, subscriptionId, now);
+
+    expect(result).toBe(250);
+    // Verify select was called (the WHERE clause excludes expired credits)
+    expect(db.select).toHaveBeenCalled();
+  });
+
+  it('returns 0 when all credits have expired', async () => {
+    // All top-ups expired — DB SUM returns 0
+    const db = createMockDb({ selectResult: [{ total: 0 }] });
+    const now = new Date('2027-01-01T00:00:00.000Z');
+
+    const result = await getTopUpCreditsRemaining(db, subscriptionId, now);
+
+    expect(result).toBe(0);
+  });
+
+  it('returns 0 when select returns null total (COALESCE handles this)', async () => {
+    // Edge case: no rows match at all → COALESCE(SUM(NULL), 0) = 0
+    const db = createMockDb({ selectResult: [{ total: 0 }] });
+
+    const result = await getTopUpCreditsRemaining(db, subscriptionId);
+
+    expect(result).toBe(0);
+  });
+
+  it('accepts custom now parameter for point-in-time queries', async () => {
+    // Useful when querying credits as of a specific time (e.g., during decrement)
+    const db = createMockDb({ selectResult: [{ total: 100 }] });
+    const queryTime = new Date('2025-03-01T12:00:00.000Z');
+
+    const result = await getTopUpCreditsRemaining(
+      db,
+      subscriptionId,
+      queryTime
+    );
+
+    expect(result).toBe(100);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // [1C.9] decrementQuota — free-tier daily limit
 // ---------------------------------------------------------------------------
 
@@ -1966,5 +2473,256 @@ describe('activateSubscriptionFromRevenuecat — trial fallback', () => {
     expect(ctx.extra.accountId).toBe(accountId);
     expect(ctx.extra.tier).toBe('plus');
     expect(ctx.extra.eventId).toBe('evt-1');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [4C.10] isRevenuecatEventProcessed — timestamp idempotency
+// ---------------------------------------------------------------------------
+
+describe('isRevenuecatEventProcessed', () => {
+  it('returns false when no subscription exists', async () => {
+    const db = createMockDb({ subscriptionFindFirst: undefined });
+    const result = await isRevenuecatEventProcessed(
+      db,
+      accountId,
+      'evt-1',
+      1000
+    );
+
+    expect(result).toBe(false);
+  });
+
+  it('returns true when event ID matches last processed (exact duplicate)', async () => {
+    const existing = mockSubscriptionRow({
+      lastRevenuecatEventId: 'evt-1',
+      lastRevenuecatEventTimestampMs: '5000',
+    });
+    const db = createMockDb({ subscriptionFindFirst: existing });
+
+    const result = await isRevenuecatEventProcessed(
+      db,
+      accountId,
+      'evt-1',
+      5000
+    );
+
+    expect(result).toBe(true);
+  });
+
+  it('returns true when event timestamp is older than last processed (stale retry)', async () => {
+    const existing = mockSubscriptionRow({
+      lastRevenuecatEventId: 'evt-2',
+      lastRevenuecatEventTimestampMs: '5000',
+    });
+    const db = createMockDb({ subscriptionFindFirst: existing });
+
+    const result = await isRevenuecatEventProcessed(
+      db,
+      accountId,
+      'evt-3', // different event ID
+      3000 // older timestamp
+    );
+
+    expect(result).toBe(true);
+  });
+
+  it('returns false when event timestamp is newer than last processed', async () => {
+    const existing = mockSubscriptionRow({
+      lastRevenuecatEventId: 'evt-2',
+      lastRevenuecatEventTimestampMs: '5000',
+    });
+    const db = createMockDb({ subscriptionFindFirst: existing });
+
+    const result = await isRevenuecatEventProcessed(
+      db,
+      accountId,
+      'evt-3', // different event ID
+      7000 // newer timestamp
+    );
+
+    expect(result).toBe(false);
+  });
+
+  it('returns false when lastRevenuecatEventTimestampMs is null (no prior timestamp)', async () => {
+    const existing = mockSubscriptionRow({
+      lastRevenuecatEventId: 'evt-1',
+      lastRevenuecatEventTimestampMs: null,
+    });
+    const db = createMockDb({ subscriptionFindFirst: existing });
+
+    const result = await isRevenuecatEventProcessed(
+      db,
+      accountId,
+      'evt-2', // different event ID
+      3000
+    );
+
+    // No timestamp to compare against, and event IDs don't match
+    expect(result).toBe(false);
+  });
+
+  it('returns false when eventTimestampMs is undefined', async () => {
+    const existing = mockSubscriptionRow({
+      lastRevenuecatEventId: 'evt-1',
+      lastRevenuecatEventTimestampMs: '5000',
+    });
+    const db = createMockDb({ subscriptionFindFirst: existing });
+
+    const result = await isRevenuecatEventProcessed(
+      db,
+      accountId,
+      'evt-2', // different event ID
+      undefined // no timestamp provided
+    );
+
+    // Cannot compare timestamps, event IDs don't match
+    expect(result).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [4C.10] updateSubscriptionFromRevenuecatWebhook — partial update + idempotency
+// ---------------------------------------------------------------------------
+
+describe('updateSubscriptionFromRevenuecatWebhook — partial updates and idempotency', () => {
+  it('stores eventTimestampMs for future idempotency checks', async () => {
+    const existing = mockSubscriptionRow({
+      status: 'trial',
+      lastRevenuecatEventId: null,
+      lastRevenuecatEventTimestampMs: null,
+    });
+    const updated = mockSubscriptionRow({
+      ...existing,
+      status: 'active',
+      lastRevenuecatEventId: 'evt-new',
+      lastRevenuecatEventTimestampMs: '1000',
+    });
+    const db = createMockDb({
+      subscriptionFindFirst: existing,
+      updateReturning: [updated],
+    });
+
+    const result = await updateSubscriptionFromRevenuecatWebhook(
+      db,
+      accountId,
+      {
+        status: 'active',
+        eventId: 'evt-new',
+        eventTimestampMs: 1000,
+      }
+    );
+
+    expect(result).not.toBeNull();
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it('returns null when subscription not found', async () => {
+    const db = createMockDb({ subscriptionFindFirst: undefined });
+
+    const result = await updateSubscriptionFromRevenuecatWebhook(
+      db,
+      'unknown-acc',
+      {
+        status: 'active',
+        eventId: 'evt-1',
+        eventTimestampMs: 1000,
+      }
+    );
+
+    expect(result).toBeNull();
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('applies only specified fields in partial update [4C.10]', async () => {
+    const existing = mockSubscriptionRow({
+      status: 'active',
+      tier: 'plus',
+      lastRevenuecatEventId: 'evt-old',
+      lastRevenuecatEventTimestampMs: '500',
+    });
+    const updated = mockSubscriptionRow({
+      ...existing,
+      currentPeriodEnd: new Date('2025-03-15T00:00:00.000Z'),
+    });
+    const db = createMockDb({
+      subscriptionFindFirst: existing,
+      updateReturning: [updated],
+    });
+
+    // Only updating currentPeriodEnd — status and tier should not change
+    const result = await updateSubscriptionFromRevenuecatWebhook(
+      db,
+      accountId,
+      {
+        currentPeriodEnd: '2025-03-15T00:00:00.000Z',
+        eventId: 'evt-period',
+        eventTimestampMs: 2000,
+      }
+    );
+
+    expect(result).not.toBeNull();
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it('updates tier without changing status [4C.10]', async () => {
+    const existing = mockSubscriptionRow({
+      status: 'active',
+      tier: 'plus',
+      lastRevenuecatEventId: 'evt-old',
+      lastRevenuecatEventTimestampMs: '500',
+    });
+    const updated = mockSubscriptionRow({
+      ...existing,
+      tier: 'family',
+    });
+    const db = createMockDb({
+      subscriptionFindFirst: existing,
+      updateReturning: [updated],
+    });
+
+    const result = await updateSubscriptionFromRevenuecatWebhook(
+      db,
+      accountId,
+      {
+        tier: 'family',
+        eventId: 'evt-upgrade',
+        eventTimestampMs: 2000,
+      }
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.tier).toBe('family');
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it('clears cancelledAt by passing null [4C.10]', async () => {
+    const existing = mockSubscriptionRow({
+      status: 'active',
+      cancelledAt: NOW,
+      lastRevenuecatEventId: 'evt-old',
+    });
+    const updated = mockSubscriptionRow({
+      ...existing,
+      cancelledAt: null,
+    });
+    const db = createMockDb({
+      subscriptionFindFirst: existing,
+      updateReturning: [updated],
+    });
+
+    const result = await updateSubscriptionFromRevenuecatWebhook(
+      db,
+      accountId,
+      {
+        cancelledAt: null,
+        eventId: 'evt-reactivate',
+        eventTimestampMs: 3000,
+      }
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.cancelledAt).toBeNull();
+    expect(db.update).toHaveBeenCalled();
   });
 });

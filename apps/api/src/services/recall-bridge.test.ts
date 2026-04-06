@@ -180,6 +180,71 @@ describe('generateRecallBridge', () => {
     expect(result.questions[1]).toBe('How do you solve for x?');
   });
 
+  it('includes topic title and id in successful result', async () => {
+    mockFindFirst.mockResolvedValue({
+      id: SESSION_ID,
+      profileId: PROFILE_ID,
+      subjectId: 'subject-001',
+      topicId: 'topic-001',
+      sessionType: 'homework',
+      status: 'active',
+    });
+
+    mockTopicFindFirst.mockResolvedValue({
+      id: 'topic-001',
+      title: 'Quadratic Equations',
+      description: 'Solving equations of the form ax^2 + bx + c = 0',
+    });
+
+    mockRouteAndCall.mockResolvedValue({
+      response: 'What is the discriminant?\nWhy do we use factoring?',
+      provider: 'mock',
+      model: 'mock-model',
+      latencyMs: 100,
+    });
+
+    const db = createMockDb();
+    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID);
+
+    expect(result.topicId).toBe('topic-001');
+    expect(result.topicTitle).toBe('Quadratic Equations');
+    expect(result.questions.length).toBeGreaterThan(0);
+  });
+
+  it('passes topic title and description in the system prompt', async () => {
+    mockFindFirst.mockResolvedValue({
+      id: SESSION_ID,
+      profileId: PROFILE_ID,
+      subjectId: 'subject-001',
+      topicId: 'topic-001',
+      sessionType: 'homework',
+      status: 'active',
+    });
+
+    mockTopicFindFirst.mockResolvedValue({
+      id: 'topic-001',
+      title: 'Trigonometry',
+      description: 'Angles, sine, cosine, tangent',
+    });
+
+    mockRouteAndCall.mockResolvedValue({
+      response: 'Q1?\nQ2?',
+      provider: 'mock',
+      model: 'mock-model',
+      latencyMs: 100,
+    });
+
+    const db = createMockDb();
+    await generateRecallBridge(db, PROFILE_ID, SESSION_ID);
+
+    const messages = mockRouteAndCall.mock.calls[0][0];
+    const systemMessage = messages.find(
+      (m: { role: string }) => m.role === 'system'
+    );
+    expect(systemMessage.content).toContain('Trigonometry');
+    expect(systemMessage.content).toContain('Angles, sine, cosine, tangent');
+  });
+
   it('uses rung 1 (cheapest model) for recall questions', async () => {
     mockFindFirst.mockResolvedValue({
       id: SESSION_ID,

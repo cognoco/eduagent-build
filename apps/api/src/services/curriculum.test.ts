@@ -14,10 +14,13 @@ import {
   explainTopicOrdering,
   addCurriculumTopic,
   adaptCurriculumFromPerformance,
+  persistBookTopics,
 } from './curriculum';
 import type {
   CurriculumInput,
   CurriculumAdaptRequest,
+  GeneratedBookTopic,
+  GeneratedConnection,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
@@ -943,5 +946,309 @@ describe('adaptCurriculumFromPerformance', () => {
     // Skipped TOPIC_B should not appear in topicOrder
     expect(result.topicOrder).not.toContain(TOPIC_B);
     expect(result.topicOrder).toHaveLength(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// persistBookTopics tests [4B.2]
+// ---------------------------------------------------------------------------
+
+describe('persistBookTopics', () => {
+  const BOOK_ID = 'book-1';
+
+  const sampleTopics: GeneratedBookTopic[] = [
+    {
+      title: 'Timeline',
+      description: 'How it all began',
+      chapter: 'The Story',
+      sortOrder: 1,
+      estimatedMinutes: 30,
+    },
+    {
+      title: 'Old Kingdom',
+      description: 'The age of pyramids',
+      chapter: 'The Story',
+      sortOrder: 2,
+      estimatedMinutes: 30,
+    },
+  ];
+
+  const sampleConnections: GeneratedConnection[] = [
+    { topicA: 'Timeline', topicB: 'Old Kingdom' },
+  ];
+
+  function mockBookRow(overrides?: Partial<Record<string, unknown>>) {
+    return {
+      id: overrides?.id ?? BOOK_ID,
+      subjectId: overrides?.subjectId ?? SUBJECT_ID,
+      title: overrides?.title ?? 'Ancient Egypt',
+      description: overrides?.description ?? 'Explore pyramids',
+      emoji: overrides?.emoji ?? '🏛️',
+      sortOrder: overrides?.sortOrder ?? 1,
+      topicsGenerated: overrides?.topicsGenerated ?? false,
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+  }
+
+  /**
+   * Build a mock DB that supports the full persistBookTopics call chain.
+   * The function makes many sequential DB calls; this builder provides
+   * sensible defaults with override points for each step.
+   */
+  function createPersistMockDb({
+    subjectExists = true,
+    bookExists = true,
+    curriculumExists = true,
+    existingTopicCount = 0,
+    insertedTopicRows = [] as Array<{
+      id: string;
+      sortOrder: number;
+      skipped: boolean;
+    }>,
+  } = {}): Database {
+    const subjectRow = subjectExists ? mockSubjectRow() : undefined;
+    const bookRow = bookExists ? mockBookRow() : undefined;
+    const curriculumRow = curriculumExists ? mockCurriculumRow() : undefined;
+
+    const existingTopics = Array.from({ length: existingTopicCount }, (_, i) =>
+      mockTopicRow({
+        id: `existing-topic-${i}`,
+        sortOrder: i,
+        title: `Existing Topic ${i}`,
+      })
+    );
+
+    // Build rows for the transaction's topic query
+    const insertedRows =
+      insertedTopicRows.length > 0
+        ? insertedTopicRows.map((row) => ({
+            ...mockTopicRow({
+              id: row.id,
+              sortOrder: row.sortOrder,
+            }),
+            bookId: BOOK_ID,
+            skipped: row.skipped,
+          }))
+        : sampleTopics.map((topic, i) => ({
+            ...mockTopicRow({
+              id: `inserted-topic-${i}`,
+              sortOrder: topic.sortOrder,
+              title: topic.title,
+            }),
+            bookId: BOOK_ID,
+            chapter: topic.chapter,
+            skipped: false,
+          }));
+
+    // For getBookWithTopics after persist — need a fresh set of query mocks
+    const postPersistBookRow = bookExists
+      ? { ...mockBookRow(), topicsGenerated: true }
+      : undefined;
+
+    // subjects.findFirst: first call for persist, potentially second for getBookWithTopics
+    const subjectsFindFirst = jest.fn().mockResolvedValue(subjectRow);
+
+    // curricula.findFirst: ensureCurriculum + getBookWithTopics
+    const curriculaFindFirst = jest.fn().mockResolvedValue(curriculumRow);
+
+    // curriculumBooks.findFirst: persist check + getBookWithTopics
+    const curriculumBooksFindFirst = jest
+      .fn()
+      .mockResolvedValueOnce(bookRow) // persistBookTopics ownership check
+      .mockResolvedValueOnce(postPersistBookRow); // getBookWithTopics
+
+    // curriculumTopics.findMany: existing check + transaction re-read + getBookWithTopics
+    const topicsFindMany = jest
+      .fn()
+      .mockResolvedValueOnce(existingTopics) // existing check in persistBookTopics
+      .mockResolvedValueOnce(insertedRows) // transaction re-read
+      .mockResolvedValueOnce(insertedRows); // getBookWithTopics
+
+    const db = {
+      query: {
+        subjects: { findFirst: subjectsFindFirst },
+        curricula: { findFirst: curriculaFindFirst },
+        curriculumBooks: { findFirst: curriculumBooksFindFirst },
+        curriculumTopics: {
+          findMany: topicsFindMany,
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+        onboardingDrafts: { findFirst: jest.fn().mockResolvedValue(undefined) },
+      },
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue(undefined),
+        }),
+      }),
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
+          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+        }),
+      }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+      transaction: jest
+        .fn()
+        .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+          fn(db)
+        ),
+    } as unknown as Database;
+
+    return db;
+  }
+
+  it('throws NotFoundError when subject does not belong to profile', async () => {
+    const db = createPersistMockDb({ subjectExists: false });
+
+    await expect(
+      persistBookTopics(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, sampleTopics, [])
+    ).rejects.toThrow('Subject not found');
+  });
+
+  it('throws NotFoundError when book does not exist', async () => {
+    const db = createPersistMockDb({ bookExists: false });
+
+    await expect(
+      persistBookTopics(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, sampleTopics, [])
+    ).rejects.toThrow('Book not found');
+  });
+
+  describe('idempotency', () => {
+    it('returns existing data without inserting when topics already exist', async () => {
+      const db = createPersistMockDb({ existingTopicCount: 2 });
+
+      const result = await persistBookTopics(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+        BOOK_ID,
+        sampleTopics,
+        sampleConnections
+      );
+
+      // Should NOT have entered a transaction (no new inserts)
+      expect(db.transaction).not.toHaveBeenCalled();
+
+      // Should have updated the topicsGenerated flag
+      expect(db.update).toHaveBeenCalled();
+
+      // Should return a BookWithTopics result
+      expect(result).toBeDefined();
+      expect(result.book).toBeDefined();
+    });
+
+    it('calling twice with same data does not duplicate topics', async () => {
+      // First call: no existing topics — enters the transaction path
+      const db = createPersistMockDb({ existingTopicCount: 0 });
+      await persistBookTopics(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+        BOOK_ID,
+        sampleTopics,
+        sampleConnections
+      );
+
+      // Verify transaction was called for the first persist
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+
+      // Second call: topics now exist — takes the idempotent path
+      // Reset the mock DB to simulate topics already existing
+      const db2 = createPersistMockDb({ existingTopicCount: 2 });
+      await persistBookTopics(
+        db2,
+        PROFILE_ID,
+        SUBJECT_ID,
+        BOOK_ID,
+        sampleTopics,
+        sampleConnections
+      );
+
+      // Second call should NOT have entered a transaction
+      expect(db2.transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('new topics path', () => {
+    it('inserts topics via transaction when no existing topics', async () => {
+      const db = createPersistMockDb({ existingTopicCount: 0 });
+
+      await persistBookTopics(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+        BOOK_ID,
+        sampleTopics,
+        sampleConnections
+      );
+
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+      // insert is called for topics, connections, and topicsGenerated update happens via update
+      expect(db.insert).toHaveBeenCalled();
+    });
+
+    it('skips topic insert when topics array is empty', async () => {
+      const db = createPersistMockDb({ existingTopicCount: 0 });
+
+      await persistBookTopics(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+        BOOK_ID,
+        [], // empty topics
+        []
+      );
+
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+      // update is called for topicsGenerated flag inside transaction
+      expect(db.update).toHaveBeenCalled();
+    });
+  });
+
+  describe('race condition handling', () => {
+    it('ensureCurriculum handles concurrent insert via onConflictDoNothing', async () => {
+      // Simulate: no curriculum on first query, one exists after insert race
+      const db = createPersistMockDb({ curriculumExists: false });
+      // Override curricula.findFirst to return null first, then a row
+      (db.query.curricula.findFirst as jest.Mock)
+        .mockResolvedValueOnce(undefined) // getLatestCurriculumRow first call
+        .mockResolvedValueOnce(mockCurriculumRow()) // re-read after onConflictDoNothing
+        .mockResolvedValue(mockCurriculumRow()); // subsequent calls from getBookWithTopics
+
+      await persistBookTopics(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+        BOOK_ID,
+        sampleTopics,
+        []
+      );
+
+      // Should have called insert with onConflictDoNothing for the curriculum
+      expect(db.insert).toHaveBeenCalled();
+    });
+
+    it('handles the case where getBookWithTopics returns null after persist', async () => {
+      const db = createPersistMockDb({ existingTopicCount: 0 });
+      // Override the book findFirst for getBookWithTopics:
+      // 1st call: persistBookTopics ownership check (returns book)
+      // 2nd call: getBookWithTopics book lookup (returns null — simulates deletion race)
+      (db.query.curriculumBooks.findFirst as jest.Mock)
+        .mockReset()
+        .mockResolvedValueOnce(mockBookRow()) // persistBookTopics ownership
+        .mockResolvedValueOnce(null); // getBookWithTopics returns null
+
+      // getBookWithTopics also calls subjects.findFirst via scoped repo
+      // The mock already returns the subject by default — keep it
+
+      await expect(
+        persistBookTopics(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, sampleTopics, [])
+      ).rejects.toThrow('Book not found');
+    });
   });
 });

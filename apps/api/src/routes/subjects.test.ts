@@ -416,6 +416,36 @@ describe('subject routes', () => {
       expect(res.status).toBe(400);
     });
 
+    it('returns 400 when required fields are missing', async () => {
+      const res = await app.request(
+        '/v1/subjects/test-subject-id/language-setup',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 when only nativeLanguage is provided', async () => {
+      const res = await app.request(
+        '/v1/subjects/test-subject-id/language-setup',
+        {
+          method: 'PUT',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            nativeLanguage: 'en',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
     it('returns 401 without auth header', async () => {
       const res = await app.request(
         '/v1/subjects/test-subject-id/language-setup',
