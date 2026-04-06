@@ -171,6 +171,53 @@ export async function createPendingConsentState(
   return mapConsentRow(row!);
 }
 
+/**
+ * Creates a CONSENTED consent state row immediately (no email required).
+ *
+ * Used when a parent directly creates a child profile — the parent IS the
+ * consenting adult, so consent is recorded inline. This avoids the
+ * child-initiated consent request loop (BUG-239).
+ *
+ * GDPR compliance: persists consentType, timestamp (requestedAt + respondedAt),
+ * and the consenting parent's profileId via the familyLinks row.
+ */
+export async function createGrantedConsentState(
+  db: Database,
+  profileId: string,
+  consentType: ConsentType,
+  parentProfileId: string
+): Promise<ConsentState> {
+  const now = new Date();
+  const [row] = await db
+    .insert(consentStates)
+    .values({
+      profileId,
+      consentType,
+      status: 'CONSENTED',
+      respondedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [consentStates.profileId, consentStates.consentType],
+      set: {
+        status: 'CONSENTED',
+        respondedAt: now,
+        updatedAt: sql`now()`,
+      },
+    })
+    .returning();
+
+  // Create family link so parent can manage consent (revocation, etc.)
+  await db
+    .insert(familyLinks)
+    .values({
+      parentProfileId,
+      childProfileId: profileId,
+    })
+    .onConflictDoNothing();
+
+  return mapConsentRow(row!);
+}
+
 /** Maximum number of consent resends (PRD lines 415, 420) */
 const MAX_CONSENT_RESENDS = 3;
 

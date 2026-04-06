@@ -19,7 +19,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from '../lib/api-client';
 import { useProfile, type Profile } from '../lib/profile';
-import { checkConsentRequirement } from '../hooks/use-consent';
 import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
@@ -60,7 +59,15 @@ export default function CreateProfileScreen() {
   const colors = useThemeColors();
   const queryClient = useQueryClient();
   const client = useApiClient();
-  const { switchProfile } = useProfile();
+  const { activeProfile, profiles, switchProfile } = useProfile();
+
+  // BUG-239: Detect whether the current user is a parent adding a child.
+  // When an account owner (parent) who already has a profile creates another
+  // profile, the API grants consent inline — the parent IS the consenting
+  // adult. We must NOT redirect to the child-consent-request flow or switch
+  // to the child profile afterwards.
+  const isParentAddingChild =
+    activeProfile?.isOwner === true && profiles.length > 0;
 
   const [displayName, setDisplayName] = useState('');
   const [birthDate, setBirthDate] = useState<Date | null>(null);
@@ -70,8 +77,6 @@ export default function CreateProfileScreen() {
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
 
   const birthYear = birthDate ? birthDate.getFullYear() : null;
-
-  const { required: consentRequired } = checkConsentRequirement(birthYear);
 
   const onDateChange = useCallback(
     (_event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -111,9 +116,30 @@ export default function CreateProfileScreen() {
       const result = (await res.json()) as { profile: Profile };
       await queryClient.invalidateQueries({ queryKey: ['profiles'] });
 
+      // BUG-239: When a parent adds a child, the API grants consent inline
+      // (consentStatus === 'CONSENTED'). Do NOT redirect to the child consent
+      // request screen, and do NOT switch to the child profile — keep the
+      // parent on their own profile.
+      if (isParentAddingChild) {
+        router.back();
+        // Show confirmation — parent stays on their own profile
+        Alert.alert(
+          'Profile created',
+          `${trimmedName}'s profile is ready. You can switch to it from the Profiles screen.`
+        );
+        return;
+      }
+
+      // Non-parent flow: first-time user or child self-registering.
       // Navigate FIRST — prevents crash from tree remount (themeKey change)
       // destroying the modal's navigation state during switchProfile.
-      if (consentRequired) {
+      // Only redirect to consent when the API returned a pending consent status
+      // (child self-registering who needs parental approval).
+      const needsConsentFlow =
+        result.profile.consentStatus === 'PENDING' ||
+        result.profile.consentStatus === 'PARENTAL_CONSENT_REQUESTED';
+
+      if (needsConsentFlow) {
         router.replace({
           pathname: '/consent',
           params: { profileId: result.profile.id },
@@ -139,7 +165,8 @@ export default function CreateProfileScreen() {
     canSubmit,
     displayName,
     birthDate,
-    consentRequired,
+    birthYear,
+    isParentAddingChild,
     client,
     queryClient,
     switchProfile,

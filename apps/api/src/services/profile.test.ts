@@ -16,6 +16,15 @@ jest.mock('./consent', () => ({
     requestedAt: '2025-01-15T10:00:00.000Z',
     respondedAt: null,
   }),
+  createGrantedConsentState: jest.fn().mockResolvedValue({
+    id: 'consent-1',
+    profileId: 'profile-1',
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: null,
+    requestedAt: '2025-01-15T10:00:00.000Z',
+    respondedAt: '2025-01-15T10:00:00.000Z',
+  }),
 }));
 
 import type { Database } from '@eduagent/database';
@@ -31,6 +40,7 @@ import {
   getConsentStatus,
   checkConsentRequired,
   createPendingConsentState,
+  createGrantedConsentState,
 } from './consent';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -249,6 +259,57 @@ describe('createProfile', () => {
 
     expect(createPendingConsentState).not.toHaveBeenCalled();
     expect(result.consentStatus).toBeNull();
+  });
+
+  // BUG-239: Parent adding child must get CONSENTED, not PENDING
+  it('creates CONSENTED consent state when parent adds child (parentProfileId set)', async () => {
+    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
+      required: true,
+      consentType: 'GDPR',
+      age: 13,
+    });
+    const row = mockProfileRow();
+    const db = createMockDb({ insertReturning: [row] });
+
+    const result = await createProfile(
+      db,
+      'account-123',
+      { displayName: 'Child Added By Parent', birthYear: 2013 },
+      false,
+      'parent-profile-id'
+    );
+
+    expect(createGrantedConsentState).toHaveBeenCalledWith(
+      db,
+      row.id,
+      'GDPR',
+      'parent-profile-id'
+    );
+    expect(createPendingConsentState).not.toHaveBeenCalled();
+    expect(result.consentStatus).toBe('CONSENTED');
+  });
+
+  // BUG-239: Child self-registering (no parentProfileId) still gets PENDING
+  it('creates PENDING consent state when child self-registers (no parentProfileId)', async () => {
+    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
+      required: true,
+      consentType: 'GDPR',
+      age: 13,
+    });
+    const row = mockProfileRow();
+    const db = createMockDb({ insertReturning: [row] });
+
+    const result = await createProfile(
+      db,
+      'account-123',
+      { displayName: 'Self-Registering Child', birthYear: 2013 },
+      false,
+      undefined
+    );
+
+    expect(createPendingConsentState).toHaveBeenCalledWith(db, row.id, 'GDPR');
+    expect(createGrantedConsentState).not.toHaveBeenCalled();
+    expect(result.consentStatus).toBe('PENDING');
   });
 
   it('stores a derived legacy birthDate for birthYear-only input', async () => {

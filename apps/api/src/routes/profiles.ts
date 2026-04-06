@@ -34,14 +34,27 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const db = c.get('db');
     const account = c.get('account');
     const input = c.req.valid('json');
-    const isFirstProfile = (await listProfiles(db, account.id)).length === 0;
+    const existingProfiles = await listProfiles(db, account.id);
+    const isFirstProfile = existingProfiles.length === 0;
+
+    // BUG-239: When an owner (parent) creates a non-first profile (child),
+    // pass the parent's profileId so consent can be granted immediately
+    // instead of entering the child-initiated consent request loop.
+    let parentProfileId: string | undefined;
+    if (!isFirstProfile) {
+      const ownerProfile = existingProfiles.find((p) => p.isOwner);
+      if (ownerProfile) {
+        parentProfileId = ownerProfile.id;
+      }
+    }
 
     try {
       const profile = await createProfile(
         db,
         account.id,
         input,
-        isFirstProfile
+        isFirstProfile,
+        parentProfileId
       );
       return c.json({ profile }, 201);
     } catch (err) {

@@ -49,6 +49,10 @@ const mockSwitchProfile = jest.fn().mockResolvedValue(undefined);
 jest.mock('../lib/profile', () => ({
   useProfile: () => ({
     switchProfile: mockSwitchProfile,
+    // Simulate non-owner (child self-registering or first-time user).
+    // isParentAddingChild will be false when activeProfile is null.
+    activeProfile: null,
+    profiles: [],
   }),
 }));
 
@@ -170,6 +174,7 @@ describe('CreateProfileScreen', () => {
       birthDate: '2014-06-15',
       personaType: 'TEEN',
       isOwner: false,
+      consentStatus: 'PENDING',
       createdAt: '2026-02-16T00:00:00Z',
       updatedAt: '2026-02-16T00:00:00Z',
     };
