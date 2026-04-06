@@ -9,7 +9,7 @@ describe('validateProductionKeys', () => {
   const BASE_ENV: Env = {
     ENVIRONMENT: 'development',
     DATABASE_URL: 'postgresql://localhost/test',
-    APP_URL: 'https://app.mentomate.com',
+    APP_URL: 'https://api.mentomate.com',
     LOG_LEVEL: 'info',
     EMAIL_FROM: 'noreply@mentomate.com',
   };

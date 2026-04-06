@@ -240,7 +240,7 @@ export async function requestConsent(
   });
   const childName = childProfile?.displayName ?? 'your child';
 
-  const tokenUrl = `${appUrl}/consent?token=${token}`;
+  const tokenUrl = `${appUrl}/v1/consent-page?token=${token}`;
 
   const emailResult = await sendEmail(
     formatConsentRequestEmail(

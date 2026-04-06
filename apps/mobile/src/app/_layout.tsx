@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import { View, useColorScheme } from 'react-native';
+import { Alert, View, useColorScheme } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -166,7 +166,13 @@ function ThemedApp() {
       // BM-03: clear cached query data before sign-out to prevent the next
       // user from seeing stale data from the previous session.
       queryClient.clear();
-      void signOut();
+      // Show visible feedback so the user knows WHY they're being signed out,
+      // instead of silently redirecting back to auth screens.
+      Alert.alert(
+        'Session expired',
+        'Your session has expired. Please sign in again.',
+        [{ text: 'OK', onPress: () => void signOut() }]
+      );
     });
     return () => clearOnAuthExpired();
   }, [signOut]);

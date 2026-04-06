@@ -202,6 +202,12 @@ jobs:
       - name: Publish OTA update to preview channel
         if: steps.mobile-check.outputs.mobile_changed == 'true' && steps.native-check.outputs.native_changed != 'true'
         working-directory: apps/mobile
+        env:
+          # Must match eas.json build.preview.env — eas update does NOT read
+          # the build profile env block, so we duplicate them here.
+          EXPO_PUBLIC_API_URL: "https://api-stg.mentomate.com"
+          EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_d2hvbGUtaWd1YW5hLTkuY2xlcmsuYWNjb3VudHMuZGV2JA"
+          EXPO_PUBLIC_SENTRY_DSN: "https://e9c5130b65e3f88c3ac6d738da1dc28e@o4509320773763072.ingest.de.sentry.io/4511082906452048"
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B | head -1 | tr -cd '[:print:]' | cut -c1-200)
           printf 'Publishing OTA update: %s\n' "$COMMIT_MSG"
