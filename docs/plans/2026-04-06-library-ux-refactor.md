@@ -1008,6 +1008,8 @@ cd apps/mobile && pnpm exec jest --findRelatedTests src/hooks/use-notes.test.ts 
 
 Expected: All tests pass.
 
+**Hono RPC type verification:** The mock in the test assumes the RPC client shape `client.subjects[':subjectId'].books[':bookId'].notes.$get()`. This depends on how Hono merges types when routes are mounted via `.route('/', noteRoutes)`. If the TypeScript compiler rejects the hook code, inspect the actual inferred RPC type by hovering over `client` in the IDE and adjust the property path accordingly. The test mock must match the real client shape.
+
 - [ ] **Step 5: Commit**
 
 ```bash
@@ -1874,6 +1876,14 @@ Create `apps/mobile/src/app/(parent)/shelf/[subjectId]/index.tsx`:
 export { default } from '../../../(learner)/shelf/[subjectId]/index';
 ```
 
+**Re-export path verification:** These multi-level relative paths through Expo Router group directories are fragile. After creating them, verify the app builds and the parent routes resolve:
+
+```bash
+cd apps/mobile && pnpm exec expo export --platform android --dump-sourcemap 2>&1 | head -5
+```
+
+If the re-exports fail to resolve, switch to a shared component approach: extract the screen content into `apps/mobile/src/screens/ShelfScreen.tsx` and import it from both route files directly.
+
 - [ ] **Step 4: Typecheck**
 
 Run:
@@ -2560,89 +2570,216 @@ git commit -m "refactor(mobile): simplify library.tsx, route-based navigation, h
 ## Task 10: Session — Note trigger integration
 
 **Files:**
-- Modify: session system prompt template (location depends on where system prompts are built — likely in `apps/api/src/services/` or session-related service)
-- Modify: `apps/mobile/src/app/(learner)/session/index.tsx`
+- Modify: `apps/api/src/services/exchanges.ts:393` (system prompt — add note trigger instruction)
+- Modify: `apps/api/src/services/exchanges.ts:82-96` (ExchangeResult — add notePrompt field)
+- Modify: `apps/api/src/routes/sessions.ts:185-191` (SSE done event — emit notePrompt)
+- Modify: `apps/mobile/src/lib/sse.ts:16-40` (StreamDoneEvent — add notePrompt field)
+- Modify: `apps/mobile/src/hooks/use-sessions.ts:260-328` (stream handler — pass notePrompt)
+- Modify: `apps/mobile/src/app/(learner)/session/index.tsx` (note prompt UI)
 
-This task requires careful exploration of the session system prompt builder and streaming response handler. The implementing engineer should:
+- [ ] **Step 1: Add note trigger instruction to system prompt**
 
-- [ ] **Step 1: Find the system prompt builder**
-
-Search for where session system prompts are constructed:
-
-```bash
-cd apps/api && grep -r "system.*prompt\|systemPrompt" src/services/ --include="*.ts" -l
-```
-
-Read the relevant service file. The note trigger instruction needs to be appended to the system prompt.
-
-- [ ] **Step 2: Add note trigger instruction to system prompt**
-
-In the system prompt builder, add this instruction block (after the existing pedagogical instructions):
-
-```text
-KNOWLEDGE CAPTURE RULE:
-After the learner has exchanged at least 5 messages with you, if they give a correct answer where they explain a concept in their own words (not a short factual recall like "yes" or a single word), respond naturally to their answer and then ask: "Shall we put down this knowledge?" Include a JSON annotation at the end of your response: {"notePrompt": true}
-
-Only ask this ONCE per session. After offering once (whether accepted or declined), do not offer again.
-
-At the end of the session, in your closing message, ask: "Want to put down what you learned today?" and include {"notePrompt": true, "postSession": true}.
-```
-
-- [ ] **Step 3: Add notePrompt detection in session UI**
-
-In `apps/mobile/src/app/(learner)/session/index.tsx`, add state for tracking the note prompt:
+In `apps/api/src/services/exchanges.ts`, in the `buildSystemPrompt()` function, add this block before the "Prohibitions" section (around line 393):
 
 ```typescript
-const [notePromptShown, setNotePromptShown] = useState(false);
-const [showNoteInput, setShowNoteInput] = useState(false);
-const [notePromptTopicId, setNotePromptTopicId] = useState<string | null>(null);
+  // Knowledge capture prompt (note trigger)
+  sections.push(`
+KNOWLEDGE CAPTURE:
+After the learner has exchanged at least 5 messages with you, if they give a correct answer where they explain something in their own words (not short factual recall like "yes", a number, or a single term), respond naturally to their answer and then ask: "Shall we put down this knowledge?"
+When you ask this, append a JSON block at the very end of your response on its own line: {"notePrompt": true}
+Only ask this ONCE per session. After asking once (whether the learner agrees or not), never ask again in this session.
+At the end of the session, in your final closing message, ask: "Want to put down what you learned today?" and append: {"notePrompt": true, "postSession": true}
+The JSON block will be stripped before the learner sees it — they will only see your conversational text.`);
 ```
 
-When processing streamed messages, detect the `notePrompt` JSON annotation. If detected and `notePromptShown` is false:
-- Set `notePromptShown = true`
-- Show a "Write a note" button inline in the chat below the assistant's message
-- On tap: show `NoteInput` component inline
-- On save: call `useUpsertNote` with the current topic ID and `append: true`
-- On cancel: dismiss and continue session
+This follows the same pattern as EVALUATE and TEACH_BACK modes which already use JSON annotation blocks in the LLM response (lines 351-380).
 
-The exact integration depends on the streaming message format. The engineer should:
-1. Read how `useStreamMessage()` processes chunks
-2. Find where assistant messages are rendered
-3. Add the note prompt detection inline
+- [ ] **Step 2: Add notePrompt to ExchangeResult**
 
-- [ ] **Step 4: Handle session date separators for append**
-
-When saving a note mid-session or post-session, check if a note already exists for this topic from a previous session. If so, prepend the session date separator:
+In `apps/api/src/services/exchanges.ts`, add to the `ExchangeResult` interface (line ~96):
 
 ```typescript
-const existingNote = noteMap.get(topicId);
-const isNewSession = existingNote && !sessionNoteAlreadySaved.current;
-const separator = isNewSession
-  ? `--- ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ---\n`
-  : '';
-const finalContent = `${separator}${content}`;
+  notePrompt?: boolean;
+  notePromptPostSession?: boolean;
+```
 
-upsertMutation.mutate({
-  topicId,
-  content: finalContent,
-  append: !!existingNote,
+In the response processing (inside `processExchange` or `streamExchange`), after receiving the LLM response text, extract the JSON annotation:
+
+```typescript
+// Extract notePrompt JSON annotation from LLM response (same pattern as structuredAssessment)
+const notePromptMatch = response.match(/\n?\{"notePrompt":\s*true(?:,\s*"postSession":\s*true)?\}\s*$/);
+let notePrompt = false;
+let notePromptPostSession = false;
+if (notePromptMatch) {
+  response = response.slice(0, notePromptMatch.index).trimEnd();
+  notePrompt = true;
+  notePromptPostSession = notePromptMatch[0].includes('"postSession"');
+}
+```
+
+Include in the returned result:
+
+```typescript
+return {
+  response,
+  // ...existing fields...
+  notePrompt,
+  notePromptPostSession,
+};
+```
+
+- [ ] **Step 3: Emit notePrompt in SSE done event**
+
+In `apps/api/src/routes/sessions.ts`, where the `done` SSE event is emitted (around line 185-191), add the notePrompt fields:
+
+```typescript
+// Change from:
+sendEvent('done', {
+  exchangeCount: result.exchangeCount,
+  escalationRung: result.escalationRung,
+  expectedResponseMinutes: result.expectedResponseMinutes,
+  aiEventId: result.eventId,
+});
+
+// To:
+sendEvent('done', {
+  exchangeCount: result.exchangeCount,
+  escalationRung: result.escalationRung,
+  expectedResponseMinutes: result.expectedResponseMinutes,
+  aiEventId: result.eventId,
+  notePrompt: result.notePrompt || undefined,
+  notePromptPostSession: result.notePromptPostSession || undefined,
 });
 ```
 
-- [ ] **Step 5: Typecheck and test**
+- [ ] **Step 4: Update SSE types on client**
+
+In `apps/mobile/src/lib/sse.ts`, add to the `StreamDoneEvent` interface:
+
+```typescript
+interface StreamDoneEvent {
+  type: 'done';
+  exchangeCount: number;
+  escalationRung?: number;
+  isComplete?: boolean;
+  expectedResponseMinutes?: number;
+  aiEventId?: string;
+  notePrompt?: boolean;           // NEW
+  notePromptPostSession?: boolean; // NEW
+}
+```
+
+- [ ] **Step 5: Pass notePrompt through streaming hook**
+
+In `apps/mobile/src/hooks/use-sessions.ts`, in the `useStreamMessage` hook's `onDone` callback (around line 280), pass the new fields:
+
+```typescript
+onDone({
+  exchangeCount: event.exchangeCount,
+  escalationRung: event.escalationRung ?? 0,
+  expectedResponseMinutes: event.expectedResponseMinutes,
+  aiEventId: event.aiEventId,
+  notePrompt: event.notePrompt,           // NEW
+  notePromptPostSession: event.notePromptPostSession, // NEW
+});
+```
+
+- [ ] **Step 6: Add note prompt UI to session screen**
+
+In `apps/mobile/src/app/(learner)/session/index.tsx`, add state and the note input UI:
+
+```typescript
+import { NoteInput } from '../../../components/library/NoteInput';
+import { useUpsertNote } from '../../../hooks/use-notes';
+
+// Inside the component, alongside existing state:
+const [notePromptOffered, setNotePromptOffered] = useState(false);
+const [showNoteInput, setShowNoteInput] = useState(false);
+const sessionNoteSaved = useRef(false);
+
+// Get subjectId and topicId from route params (already available)
+const upsertNote = useUpsertNote(subjectId, /* bookId not available here — pass undefined */undefined);
+```
+
+In the `onDone` handler where `streamMessage.stream()` completes:
+
+```typescript
+// After existing onDone logic:
+if (doneData.notePrompt && !notePromptOffered) {
+  setNotePromptOffered(true);
+  // Show a "Write a note" button after the AI message
+  // The button is rendered below the last message bubble
+}
+if (doneData.notePromptPostSession) {
+  // Always show for post-session, even if mid-session was shown
+  // (post-session is separate per spec)
+  setShowNoteInput(true);
+}
+```
+
+Render the note prompt below the chat messages (inside the ScrollView, after the message list):
+
+```tsx
+{notePromptOffered && !showNoteInput && !sessionNoteSaved.current && (
+  <Pressable
+    className="bg-primary/10 rounded-lg px-4 py-3 mx-4 mb-2 flex-row items-center"
+    onPress={() => setShowNoteInput(true)}
+  >
+    <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+    <Text className="text-body text-primary font-semibold ml-2">
+      Write a note
+    </Text>
+  </Pressable>
+)}
+
+{showNoteInput && (
+  <View className="px-4 mb-2">
+    <NoteInput
+      onSave={(content) => {
+        // Add session date separator if note already exists from a previous session
+        const separator = !sessionNoteSaved.current
+          ? `--- ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ---\n`
+          : '';
+        upsertNote.mutate(
+          {
+            topicId: topicId!,
+            content: `${separator}${content}`,
+            append: true,
+          },
+          {
+            onSuccess: () => {
+              sessionNoteSaved.current = true;
+              setShowNoteInput(false);
+            },
+            onError: (err) => {
+              Alert.alert("Couldn't save your note", formatApiError(err));
+            },
+          },
+        );
+      }}
+      onCancel={() => setShowNoteInput(false)}
+      saving={upsertNote.isPending}
+    />
+  </View>
+)}
+```
+
+**Note on bookId:** The session screen doesn't have `bookId` readily available (only `subjectId` and `topicId`). The `useUpsertNote` hook is called with `bookId: undefined` — this is fine because the mutation only uses `subjectId` and `topicId` for the PUT endpoint (`/subjects/:subjectId/topics/:topicId/note`). The `bookId` is only used for query invalidation; post-mutation, the Book screen's `useBookNotes` will refetch when the user navigates back.
+
+- [ ] **Step 7: Typecheck and test**
 
 Run:
 
 ```bash
-pnpm exec nx run api:typecheck && cd apps/mobile && pnpm exec tsc --noEmit
+pnpm exec nx run api:typecheck && pnpm exec nx run api:lint && cd apps/mobile && pnpm exec tsc --noEmit
 ```
 
 Expected: Clean pass.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add -A
+git add apps/api/src/services/exchanges.ts apps/api/src/routes/sessions.ts apps/mobile/src/lib/sse.ts apps/mobile/src/hooks/use-sessions.ts apps/mobile/src/app/(learner)/session/index.tsx
 git commit -m "feat(mobile,api): mid-session and post-session note triggers [7.9]"
 ```
 
