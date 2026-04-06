@@ -44,11 +44,6 @@ const SCREEN_HEIGHT =
 
 const HAS_SIGNED_IN_KEY = 'hasSignedInBefore';
 
-/** @internal Reset transitioning state between tests. */
-export function _resetTransitionState(): void {
-  clearTransitionState();
-}
-
 type VerificationStage = 'first_factor' | 'second_factor';
 
 type VerificationState =

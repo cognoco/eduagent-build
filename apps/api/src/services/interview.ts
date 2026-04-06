@@ -23,12 +23,21 @@ import type {
 // Interview service — pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-/** Look up a curriculum book's title by bookId + subjectId. */
+/** Look up a curriculum book's title, verifying ownership through the subject→profile chain. */
 export async function getBookTitle(
   db: Database,
+  profileId: string,
   bookId: string,
   subjectId: string
 ): Promise<string | undefined> {
+  // Join through subjects to verify the subject belongs to this profile,
+  // preventing IDOR where an attacker passes a bookId from another user's subject.
+  const subject = await db.query.subjects.findFirst({
+    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+    columns: { id: true },
+  });
+  if (!subject) return undefined;
+
   const row = await db.query.curriculumBooks.findFirst({
     where: and(
       eq(curriculumBooks.id, bookId),
@@ -458,7 +467,12 @@ export async function persistCurriculum(
     await db
       .update(curriculumBooks)
       .set({ topicsGenerated: true })
-      .where(eq(curriculumBooks.id, bookId));
+      .where(
+        and(
+          eq(curriculumBooks.id, bookId),
+          eq(curriculumBooks.subjectId, subjectId)
+        )
+      );
 
     return;
   }

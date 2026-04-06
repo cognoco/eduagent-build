@@ -73,23 +73,6 @@ function toAnthropicFormat(messages: ChatMessage[]): {
 }
 
 // ---------------------------------------------------------------------------
-// Content safety for minors (all users are 11-17)
-// ---------------------------------------------------------------------------
-
-const SAFETY_SYSTEM_PREAMBLE =
-  'You are an educational AI assistant for students aged 11-17. ' +
-  'You MUST refuse any request involving: harassment, bullying, or threats; ' +
-  'hate speech or discriminatory content; sexually explicit material (even mild); ' +
-  'dangerous or harmful activities; or content undermining civic integrity. ' +
-  'If a request touches these areas, politely decline and redirect to the learning topic.';
-
-function withSafetyPreamble(system: string | undefined): string {
-  return system
-    ? `${SAFETY_SYSTEM_PREAMBLE}\n\n${system}`
-    : SAFETY_SYSTEM_PREAMBLE;
-}
-
-// ---------------------------------------------------------------------------
 // Provider factory
 // ---------------------------------------------------------------------------
 
@@ -104,7 +87,7 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
       const body: AnthropicRequest = {
         model: config.model,
         max_tokens: config.maxTokens,
-        system: withSafetyPreamble(system),
+        system: system ?? '',
         messages: anthropicMessages,
       };
 
@@ -149,7 +132,7 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
       const body: AnthropicRequest = {
         model: config.model,
         max_tokens: config.maxTokens,
-        system: withSafetyPreamble(system),
+        system: system ?? '',
         messages: anthropicMessages,
         stream: true,
       };
@@ -211,7 +194,10 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
                 yield event.delta.text;
               }
             } catch {
-              // Skip malformed JSON chunks
+              // Log malformed chunks so SSE format changes are detectable
+              console.warn(
+                `[anthropic] Malformed SSE chunk: ${jsonStr.slice(0, 120)}`
+              );
             }
           }
         }

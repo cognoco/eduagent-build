@@ -20,6 +20,7 @@ jest.mock('react-native-safe-area-context', () => ({
 
 const signInModule = require('./sign-in');
 const SignInScreen = signInModule.default;
+const { clearTransitionState } = require('../../lib/auth-transition');
 
 describe('SignInScreen', () => {
   const mockCreate = jest.fn();
@@ -32,7 +33,7 @@ describe('SignInScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    signInModule._resetTransitionState();
+    clearTransitionState();
     delete process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY;
     (useSignIn as jest.Mock).mockReturnValue({
       isLoaded: true,

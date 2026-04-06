@@ -51,43 +51,6 @@ function toOpenAIMessages(messages: ChatMessage[]): OpenAIMessage[] {
 }
 
 // ---------------------------------------------------------------------------
-// Content safety for minors (all users are 11-17)
-//
-// OpenAI has no native safety-threshold API like Gemini's safetySettings.
-// We inject a system prompt preamble that instructs the model to refuse
-// harmful content. This mirrors Gemini's BLOCK_MEDIUM_AND_ABOVE /
-// BLOCK_LOW_AND_ABOVE behaviour for the same harm categories.
-// Upgrade path: add OpenAI Moderation API pre-flight check on input+output.
-// ---------------------------------------------------------------------------
-
-const SAFETY_SYSTEM_PREAMBLE =
-  'You are an educational AI assistant for students aged 11-17. ' +
-  'You MUST refuse any request involving: harassment, bullying, or threats; ' +
-  'hate speech or discriminatory content; sexually explicit material (even mild); ' +
-  'dangerous or harmful activities; or content undermining civic integrity. ' +
-  'If a request touches these areas, politely decline and redirect to the learning topic.';
-
-/**
- * Prepend the safety system preamble to the message list.
- * If a system message already exists, the preamble is prepended to its content
- * so the model sees one coherent system block. Otherwise a new system message
- * is inserted at position 0.
- */
-function withSafetyPreamble(messages: OpenAIMessage[]): OpenAIMessage[] {
-  const first = messages[0];
-  if (first?.role === 'system') {
-    return [
-      {
-        role: 'system',
-        content: `${SAFETY_SYSTEM_PREAMBLE}\n\n${first.content}`,
-      },
-      ...messages.slice(1),
-    ];
-  }
-  return [{ role: 'system', content: SAFETY_SYSTEM_PREAMBLE }, ...messages];
-}
-
-// ---------------------------------------------------------------------------
 // Map our internal model names to OpenAI equivalents
 // ---------------------------------------------------------------------------
 
@@ -120,7 +83,7 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
     async chat(messages: ChatMessage[], config: ModelConfig): Promise<string> {
       const body: OpenAIRequest = {
         model: mapModel(config),
-        messages: withSafetyPreamble(toOpenAIMessages(messages)),
+        messages: toOpenAIMessages(messages),
         max_completion_tokens: config.maxTokens,
       };
 
@@ -160,7 +123,7 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
     ): AsyncIterable<string> {
       const body: OpenAIRequest = {
         model: mapModel(config),
-        messages: withSafetyPreamble(toOpenAIMessages(messages)),
+        messages: toOpenAIMessages(messages),
         max_completion_tokens: config.maxTokens,
         stream: true,
       };

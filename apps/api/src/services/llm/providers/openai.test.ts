@@ -238,57 +238,9 @@ describe('OpenAI Provider', () => {
     });
   });
 
-  describe('safety preamble for minors', () => {
-    it('prepends safety preamble to existing system message', async () => {
-      mockFetch.mockResolvedValueOnce(createOkResponse('test'));
-      await provider.chat(TEST_MESSAGES, TEST_CONFIG);
-
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      // Still 2 messages — preamble merged into existing system message
-      expect(body.messages).toHaveLength(2);
-      expect(body.messages[0].role).toBe('system');
-      expect(body.messages[0].content).toContain(
-        'educational AI assistant for students aged 11-17'
-      );
-      // Original system content preserved after preamble
-      expect(body.messages[0].content).toContain('You are helpful.');
-    });
-
-    it('inserts safety system message when none exists', async () => {
-      mockFetch.mockResolvedValueOnce(createOkResponse('test'));
-      const noSystemMessages: ChatMessage[] = [
-        { role: 'user', content: 'Hello' },
-      ];
-      await provider.chat(noSystemMessages, TEST_CONFIG);
-
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      // Safety preamble inserted as new system message
-      expect(body.messages).toHaveLength(2);
-      expect(body.messages[0].role).toBe('system');
-      expect(body.messages[0].content).toContain(
-        'educational AI assistant for students aged 11-17'
-      );
-      expect(body.messages[1].content).toBe('Hello');
-    });
-
-    it('includes safety preamble in stream requests', async () => {
-      const body = createSseStream('data: [DONE]');
-      mockFetch.mockResolvedValueOnce({ ok: true, status: 200, body });
-
-      const chunks: string[] = [];
-      for await (const chunk of provider.chatStream(
-        TEST_MESSAGES,
-        TEST_CONFIG
-      )) {
-        chunks.push(chunk);
-      }
-
-      const reqBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(reqBody.messages[0].content).toContain(
-        'educational AI assistant for students aged 11-17'
-      );
-    });
-  });
+  // Safety preamble tests removed — preamble injection moved to the router
+  // layer (router.ts) so it applies uniformly across all providers including
+  // fallback paths. See router.test.ts for preamble coverage.
 
   describe('model mapping', () => {
     it('maps gemini-2.5-flash to gpt-4o-mini', async () => {

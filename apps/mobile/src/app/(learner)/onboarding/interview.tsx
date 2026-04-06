@@ -218,7 +218,7 @@ export default function InterviewScreen() {
         <LivingBook
           exchangeCount={exchangeCount}
           isComplete={interviewComplete}
-          persona="learner"
+          isExpressive
           onPress={
             interviewComplete
               ? () =>

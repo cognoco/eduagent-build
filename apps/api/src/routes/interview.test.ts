@@ -80,6 +80,7 @@ jest.mock('../services/subject', () => ({
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/interview', () => ({
+  getBookTitle: jest.fn().mockResolvedValue(undefined), // ownership-checked lookup
   processInterviewExchange: jest.fn().mockResolvedValue({
     response: 'Tell me about your experience.',
     isComplete: false,

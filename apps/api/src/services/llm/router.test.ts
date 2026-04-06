@@ -7,7 +7,7 @@ import {
   _resetCircuits,
 } from './router';
 import { createMockProvider } from './providers/mock';
-import type { LLMProvider } from './types';
+import type { LLMProvider, ChatMessage } from './types';
 
 /** Mock provider whose chatStream always throws (for testing stream fallback). */
 function createFailingStreamProvider(id: string): LLMProvider {
@@ -303,6 +303,68 @@ describe('LLM Router', () => {
         chunks.push(chunk);
       }
       expect(chunks.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('safety preamble for minors', () => {
+    beforeEach(() => {
+      _clearProviders();
+      _resetCircuits();
+    });
+
+    it('prepends safety preamble to messages passed to provider', async () => {
+      const receivedMessages: ChatMessage[][] = [];
+      const spy: LLMProvider = {
+        id: 'gemini',
+        async chat(messages) {
+          receivedMessages.push(messages);
+          return 'ok';
+        },
+        async *chatStream(messages) {
+          receivedMessages.push(messages);
+          yield 'ok';
+        },
+      };
+      registerProvider(spy);
+
+      await routeAndCall([{ role: 'user', content: 'Hello' }], 1);
+
+      expect(receivedMessages).toHaveLength(1);
+      const msgs = receivedMessages[0]!;
+      expect(msgs[0]!.role).toBe('system');
+      expect(msgs[0]!.content).toContain(
+        'educational AI assistant for students aged 11-17'
+      );
+      expect(msgs[1]!.content).toBe('Hello');
+    });
+
+    it('merges preamble into existing system message', async () => {
+      const receivedMessages: ChatMessage[][] = [];
+      const spy: LLMProvider = {
+        id: 'gemini',
+        async chat(messages) {
+          receivedMessages.push(messages);
+          return 'ok';
+        },
+        async *chatStream() {
+          yield 'ok';
+        },
+      };
+      registerProvider(spy);
+
+      await routeAndCall(
+        [
+          { role: 'system', content: 'You are a tutor.' },
+          { role: 'user', content: 'Hello' },
+        ],
+        1
+      );
+
+      const msgs = receivedMessages[0]!;
+      // Preamble merged into system message — still 2 messages total
+      expect(msgs).toHaveLength(2);
+      expect(msgs[0]!.content).toContain('students aged 11-17');
+      expect(msgs[0]!.content).toContain('You are a tutor.');
     });
   });
 });

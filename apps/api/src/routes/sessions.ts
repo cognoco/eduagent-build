@@ -245,8 +245,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         result.summaryStatus !== 'pending' &&
         result.summaryStatus !== 'submitted';
 
-      // BD-09: Surface pipeline status so client knows if post-processing was queued
-      let pipelineQueued = true;
+      // BD-09: Surface pipeline status so client knows if post-processing was queued.
+      // Default false — only true when dispatch actually succeeds.
+      let pipelineQueued = false;
       if (shouldDispatchCompletionEvent) {
         const dispatch = await dispatchSessionCompletedEvent(
           db,
@@ -377,8 +378,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     );
     const result = await skipSummary(db, profileId, c.req.param('sessionId'));
 
-    // BD-09: Surface pipeline status so client knows if post-processing was queued
-    let pipelineQueued = true;
+    // BD-09: Surface pipeline status so client knows if post-processing was queued.
+    // Default false — only true when dispatch actually succeeds.
+    let pipelineQueued = false;
     if (
       !previousSummary ||
       previousSummary.status === 'pending' ||
@@ -425,8 +427,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         c.req.param('sessionId'),
         c.req.valid('json')
       );
-      // BD-09: Surface pipeline status so client knows if post-processing was queued
-      let pipelineQueued = true;
+      // BD-09: Surface pipeline status so client knows if post-processing was queued.
+      // Default false — only true when dispatch actually succeeds.
+      let pipelineQueued = false;
       if (
         !previousSummary ||
         previousSummary.status === 'pending' ||

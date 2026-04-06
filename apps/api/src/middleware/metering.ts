@@ -59,6 +59,10 @@ export type MeteringEnv = {
 const LLM_ROUTE_PATTERNS = [
   /\/sessions\/[^/]+\/messages\/?$/,
   /\/sessions\/[^/]+\/stream\/?$/,
+  // Interview routes (/subjects/:id/interview, /interview/stream) are intentionally
+  // exempt. Interviews are bounded onboarding flows (3-5 exchanges per subject,
+  // once per subject lifetime) and use low-cost Flash-tier models. The cost is
+  // negligible compared to open-ended session exchanges.
 ];
 
 function isLlmRoute(path: string): boolean {
@@ -126,11 +130,15 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       return;
     }
 
-    // Must have an authenticated account
+    // Fail closed: LLM routes MUST have an authenticated account.
+    // If auth middleware failed to populate account (misconfigured route
+    // stack), reject rather than silently bypassing quota enforcement.
     const account = c.get('account');
     if (!account) {
-      await next();
-      return;
+      return c.json(
+        { code: 'UNAUTHORIZED', message: 'Authentication required' },
+        401
+      );
     }
 
     const db = c.get('db');
@@ -264,17 +272,25 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     const baseLlmTier = getTierConfig(tier).llmTier;
     c.set('llmTier', profileMeta?.hasPremiumLlm ? 'premium' : baseLlmTier);
 
-    // I7 fix: Update KV cache after decrement so next request sees fresh count
-    // Awaited to prevent stale reads on concurrent requests
+    // I7 fix: Update KV cache after decrement so next request sees fresh count.
+    // Derive from the atomic DB result (decrement.remainingMonthly/Daily) to
+    // avoid stale-read races under concurrency — two requests reading the same
+    // cached count would each write original+1, understating actual usage.
     if (kv) {
+      const atomicUsedMonth =
+        monthlyLimit - decrement.remainingMonthly - decrement.remainingTopUp;
+      const atomicUsedToday =
+        dailyLimit !== null && decrement.remainingDaily !== null
+          ? dailyLimit - decrement.remainingDaily
+          : usedToday + 1;
       await safeWriteKV(kv, account.id, {
         subscriptionId,
         tier,
         status: subscriptionStatus,
         monthlyLimit,
-        usedThisMonth: usedThisMonth + 1,
+        usedThisMonth: atomicUsedMonth,
         dailyLimit,
-        usedToday: usedToday + 1,
+        usedToday: atomicUsedToday,
       });
     }
 

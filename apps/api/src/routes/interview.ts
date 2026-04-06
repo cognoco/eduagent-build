@@ -43,7 +43,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       if (!subject) return notFound(c, 'Subject not found');
 
       const bookTitle = bookId
-        ? await getBookTitle(db, bookId, subjectId)
+        ? await getBookTitle(db, profileId, bookId, subjectId)
         : undefined;
 
       const draft = await getOrCreateDraft(db, profileId, subjectId);
@@ -114,7 +114,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       if (!subject) return notFound(c, 'Subject not found');
 
       const bookTitle = bookId
-        ? await getBookTitle(db, bookId, subjectId)
+        ? await getBookTitle(db, profileId, bookId, subjectId)
         : undefined;
 
       const draft = await getOrCreateDraft(db, profileId, subjectId);
@@ -125,10 +125,25 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         ...(bookTitle ? { bookTitle } : {}),
       };
 
-      const { stream, onComplete } = await streamInterviewExchange(
-        context,
-        message
-      );
+      let stream: AsyncIterable<string>;
+      let onComplete: (
+        fullResponse: string
+      ) => Promise<import('@eduagent/schemas').InterviewResult>;
+      try {
+        const streamResult = await streamInterviewExchange(context, message);
+        stream = streamResult.stream;
+        onComplete = streamResult.onComplete;
+      } catch (err) {
+        console.error('[interview/stream] Failed to start stream:', err);
+        return c.json(
+          {
+            code: 'LLM_UNAVAILABLE',
+            message:
+              'Interview service is temporarily unavailable. Please try again.',
+          },
+          503
+        );
+      }
 
       return streamSSE(c, async (sseStream) => {
         let fullResponse = '';
