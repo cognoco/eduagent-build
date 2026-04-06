@@ -22,3 +22,6 @@ export * from './progress.ts';
 
 // Subscription & Billing (Epic 5)
 export * from './billing.ts';
+
+// Topic Notes
+export * from './notes.ts';

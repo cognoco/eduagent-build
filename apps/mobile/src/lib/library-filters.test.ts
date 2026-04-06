@@ -108,6 +108,7 @@ function makeTopic(overrides: Partial<EnrichedTopic> = {}): EnrichedTopic {
     lastReviewedAt: '2026-03-01T10:00:00Z',
     repetitions: 5,
     failureCount: 0,
+    hasNote: false,
     ...overrides,
   };
 }
@@ -615,7 +616,7 @@ describe('filterTopics', () => {
   const topic3 = makeTopic({
     topicId: 't3',
     subjectId: 'sub-1',
-    bookId: null,
+    bookId: 'book-default',
     retention: 'forgotten',
     failureCount: 1,
     name: 'History overview',
@@ -629,6 +630,7 @@ describe('filterTopics', () => {
       bookIds: [],
       retention: [],
       needsAttention: false,
+      hasNotes: false,
     };
     expect(filterTopics(items, filters)).toHaveLength(3);
   });
@@ -639,6 +641,7 @@ describe('filterTopics', () => {
       bookIds: [],
       retention: [],
       needsAttention: false,
+      hasNotes: false,
     };
     expect(filterTopics(items, filters)).toHaveLength(2);
   });
@@ -649,6 +652,7 @@ describe('filterTopics', () => {
       bookIds: ['b1'],
       retention: [],
       needsAttention: false,
+      hasNotes: false,
     };
     const result = filterTopics(items, filters);
     expect(result).toHaveLength(1);
@@ -661,6 +665,7 @@ describe('filterTopics', () => {
       bookIds: ['b1', 'b2'],
       retention: [],
       needsAttention: false,
+      hasNotes: false,
     };
     const result = filterTopics(items, filters);
     expect(result).toHaveLength(2);
@@ -673,6 +678,7 @@ describe('filterTopics', () => {
       bookIds: [],
       retention: ['weak', 'forgotten'],
       needsAttention: false,
+      hasNotes: false,
     };
     expect(filterTopics(items, filters)).toHaveLength(2);
   });
@@ -683,6 +689,7 @@ describe('filterTopics', () => {
       bookIds: [],
       retention: [],
       needsAttention: true,
+      hasNotes: false,
     };
     const result = filterTopics(items, filters);
     expect(result).toHaveLength(1);
@@ -695,6 +702,7 @@ describe('filterTopics', () => {
       bookIds: [],
       retention: ['weak'],
       needsAttention: true,
+      hasNotes: false,
     };
     const result = filterTopics(items, filters);
     expect(result).toHaveLength(1);
@@ -707,6 +715,7 @@ describe('filterTopics', () => {
       bookIds: [],
       retention: [],
       needsAttention: true,
+      hasNotes: false,
     };
     expect(filterTopics(items, filters)).toHaveLength(0);
   });

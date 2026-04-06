@@ -38,6 +38,7 @@ import {
   streamExchange,
   detectUnderstandingCheck,
   estimateExpectedResponseMinutes,
+  extractNotePrompt,
   type ExchangeContext,
 } from './exchanges';
 import {
@@ -1185,6 +1186,8 @@ export async function streamMessage(
     escalationRung: number;
     expectedResponseMinutes: number;
     aiEventId?: string;
+    notePrompt?: boolean;
+    notePromptPostSession?: boolean;
   }>;
 }> {
   // Early exchange limit check — runs before expensive prepareExchangeContext
@@ -1207,8 +1210,12 @@ export async function streamMessage(
   return {
     stream: result.stream,
     async onComplete(fullResponse: string) {
+      // Extract and strip notePrompt JSON annotation before persisting
+      const notePromptResult = extractNotePrompt(fullResponse);
+      const cleanedResponse = notePromptResult.cleanResponse;
+
       const expectedResponseMinutes = estimateExpectedResponseMinutes(
-        fullResponse,
+        cleanedResponse,
         context
       );
       const persisted = await persistExchangeResult(
@@ -1217,10 +1224,10 @@ export async function streamMessage(
         sessionId,
         session,
         input.message,
-        fullResponse,
+        cleanedResponse,
         effectiveRung,
         {
-          isUnderstandingCheck: detectUnderstandingCheck(fullResponse),
+          isUnderstandingCheck: detectUnderstandingCheck(cleanedResponse),
           timeToAnswerMs,
           hintCountInSession: hintCount,
           expectedResponseMinutes,
@@ -1232,6 +1239,9 @@ export async function streamMessage(
         escalationRung: effectiveRung,
         expectedResponseMinutes,
         aiEventId: persisted.aiEventId,
+        notePrompt: notePromptResult.notePrompt || undefined,
+        notePromptPostSession:
+          notePromptResult.notePromptPostSession || undefined,
       };
     },
   };

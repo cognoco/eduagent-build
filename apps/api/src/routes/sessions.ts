@@ -188,6 +188,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 escalationRung: result.escalationRung,
                 expectedResponseMinutes: result.expectedResponseMinutes,
                 aiEventId: result.aiEventId,
+                notePrompt: result.notePrompt || undefined,
+                notePromptPostSession:
+                  result.notePromptPostSession || undefined,
               }),
             });
           } catch (err) {

@@ -362,20 +362,54 @@ export async function createBooks(
 }
 
 /**
- * Persists LLM-generated topics for a narrow subject (no books).
- * Creates a curriculum row if needed, then inserts the topics.
+ * Finds or creates a default book for a subject. Used by legacy flows
+ * (narrow subjects, manual topic add, curriculum regeneration) that don't
+ * go through the book-generation pipeline but still need a bookId now
+ * that curriculum_topics.book_id is NOT NULL.
+ */
+export async function ensureDefaultBook(
+  db: Database,
+  subjectId: string,
+  subjectName?: string
+): Promise<string> {
+  const existing = await db.query.curriculumBooks.findFirst({
+    where: and(
+      eq(curriculumBooks.subjectId, subjectId),
+      eq(curriculumBooks.sortOrder, 0)
+    ),
+  });
+  if (existing) return existing.id;
+
+  const [book] = await db
+    .insert(curriculumBooks)
+    .values({
+      subjectId,
+      title: subjectName ?? 'Topics',
+      sortOrder: 0,
+      topicsGenerated: true,
+    })
+    .returning();
+  return book!.id;
+}
+
+/**
+ * Persists LLM-generated topics for a narrow subject.
+ * Creates a curriculum row and a default book if needed, then inserts the topics.
  */
 export async function persistNarrowTopics(
   db: Database,
   subjectId: string,
-  topics: GeneratedTopic[]
+  topics: GeneratedTopic[],
+  subjectName?: string
 ): Promise<void> {
   if (topics.length === 0) return;
 
   const curriculum = await ensureCurriculum(db, subjectId);
+  const bookId = await ensureDefaultBook(db, subjectId, subjectName);
   await db.insert(curriculumTopics).values(
     topics.map((topic, index) => ({
       curriculumId: curriculum.id,
+      bookId,
       title: topic.title,
       description: topic.description,
       sortOrder: index,
@@ -677,12 +711,15 @@ export async function addCurriculumTopic(
     };
   }
 
+  const bookId = await ensureDefaultBook(db, subjectId, subject.name);
+
   // BD-08: atomic sortOrder allocation — uses INSERT ... SELECT COALESCE(MAX + 1, 0)
   // to prevent concurrent add-topic calls from getting duplicate sort orders.
   const [createdTopic] = await db
     .insert(curriculumTopics)
     .values({
       curriculumId: curriculum.id,
+      bookId,
       title: input.title.trim(),
       description: input.description.trim(),
       sortOrder: sql`COALESCE((SELECT MAX(${curriculumTopics.sortOrder}) + 1 FROM ${curriculumTopics} WHERE ${curriculumTopics.curriculumId} = ${curriculum.id}), 0)`,
@@ -925,10 +962,13 @@ export async function challengeCurriculum(
     })
     .returning();
 
+  const bookId = await ensureDefaultBook(db, subjectId, subject.name);
+
   if (topics.length > 0) {
     await db.insert(curriculumTopics).values(
       topics.map((t, i) => ({
         curriculumId: newCurriculum!.id,
+        bookId,
         title: t.title,
         description: t.description,
         sortOrder: i,

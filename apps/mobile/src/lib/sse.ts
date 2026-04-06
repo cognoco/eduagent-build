@@ -27,6 +27,10 @@ export interface StreamDoneEvent {
   isComplete?: boolean;
   /** LLM-estimated response time for adaptive silence detection. */
   expectedResponseMinutes?: number;
+  /** Whether the LLM offered a note prompt to the learner. */
+  notePrompt?: boolean;
+  /** Whether the note prompt is a post-session prompt. */
+  notePromptPostSession?: boolean;
 }
 
 export type StreamEvent = StreamChunkEvent | StreamDoneEvent;

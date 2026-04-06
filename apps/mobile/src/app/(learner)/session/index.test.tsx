@@ -126,6 +126,13 @@ jest.mock('../../../hooks/use-classify-subject', () => ({
   }),
 }));
 
+jest.mock('../../../hooks/use-notes', () => ({
+  useUpsertNote: () => ({
+    mutateAsync: jest.fn(),
+    isPending: false,
+  }),
+}));
+
 jest.mock('../../../hooks/use-streaks', () => ({
   useStreaks: () => ({ data: { longestStreak: 1 } }),
 }));

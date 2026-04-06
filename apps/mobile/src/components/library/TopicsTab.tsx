@@ -36,6 +36,7 @@ export const TOPICS_TAB_INITIAL_STATE: TopicsTabState = {
     bookIds: [],
     retention: [],
     needsAttention: false,
+    hasNotes: false,
   },
 };
 
@@ -47,6 +48,7 @@ interface TopicsTabProps {
   topics: EnrichedTopic[];
   subjects: Array<{ id: string; name: string }>;
   books: Array<{ id: string; title: string }>;
+  noteTopicIds: Set<string>;
   state: TopicsTabState;
   onStateChange: (state: TopicsTabState) => void;
   onTopicPress: (topicId: string, subjectId: string) => void;
@@ -73,6 +75,7 @@ export function TopicsTab({
   topics,
   subjects,
   books,
+  noteTopicIds,
   state,
   onStateChange,
   onTopicPress,
@@ -92,7 +95,8 @@ export function TopicsTab({
     state.filters.subjectIds.length +
     state.filters.bookIds.length +
     state.filters.retention.length +
-    (state.filters.needsAttention ? 1 : 0);
+    (state.filters.needsAttention ? 1 : 0) +
+    (state.filters.hasNotes ? 1 : 0);
 
   const hasSearch = state.search.length > 0;
   const hasFilters = activeFilterCount > 0;
@@ -127,6 +131,12 @@ export function TopicsTab({
       options: [{ key: 'yes', label: '3+ failures' }],
       selected: state.filters.needsAttention ? ['yes'] : [],
     },
+    {
+      key: 'notes',
+      label: 'Has notes',
+      options: [{ key: 'yes', label: 'Has notes' }],
+      selected: state.filters.hasNotes ? ['yes'] : [],
+    },
   ];
 
   // ---- Handlers -----------------------------------------------------------
@@ -155,6 +165,11 @@ export function TopicsTab({
       onStateChange({
         ...state,
         filters: { ...f, needsAttention: !f.needsAttention },
+      });
+    } else if (groupKey === 'notes') {
+      onStateChange({
+        ...state,
+        filters: { ...f, hasNotes: !f.hasNotes },
       });
     } else {
       // retention
@@ -191,6 +206,7 @@ export function TopicsTab({
               bookIds: [],
               retention: [],
               needsAttention: false,
+              hasNotes: false,
             },
           }),
       };
@@ -252,6 +268,9 @@ export function TopicsTab({
             )}
             {item.failureCount >= 3 && (
               <Text className="text-caption text-warning">Needs attention</Text>
+            )}
+            {item.hasNote && (
+              <Text className="text-caption text-primary">Has notes</Text>
             )}
             {lastPracticed != null && (
               <Text className="text-caption text-text-tertiary">

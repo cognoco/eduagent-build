@@ -230,7 +230,7 @@ export async function createSubjectWithStructure(
 
     // Narrow subject — persist the LLM-generated topics as curriculum topics
     if (structure.topics.length > 0) {
-      await persistNarrowTopics(db, subject.id, structure.topics);
+      await persistNarrowTopics(db, subject.id, structure.topics, subject.name);
     }
 
     return {

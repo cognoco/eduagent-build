@@ -9,7 +9,11 @@ import {
   type Database,
 } from '@eduagent/database';
 import { routeAndCall, routeAndStream, type ChatMessage } from './llm';
-import { generateCurriculum, ensureCurriculum } from './curriculum';
+import {
+  generateCurriculum,
+  ensureCurriculum,
+  ensureDefaultBook,
+} from './curriculum';
 import { getProfileAge } from './profile';
 import type {
   InterviewContext,
@@ -494,9 +498,11 @@ export async function persistCurriculum(
     .returning();
 
   if (topics.length > 0) {
+    const bookId = await ensureDefaultBook(db, subjectId, subjectName);
     await db.insert(curriculumTopics).values(
       topics.map((t, i) => ({
         curriculumId: curriculum!.id,
+        bookId,
         title: t.title,
         description: t.description,
         sortOrder: i,

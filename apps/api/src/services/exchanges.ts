@@ -93,6 +93,10 @@ export interface ExchangeResult {
   latencyMs: number;
   /** Structured assessment from EVALUATE or TEACH_BACK LLM output */
   structuredAssessment?: Record<string, unknown>;
+  /** Whether the LLM offered a note prompt to the learner */
+  notePrompt?: boolean;
+  /** Whether the note prompt is a post-session prompt */
+  notePromptPostSession?: boolean;
 }
 
 /** Streaming variant result */
@@ -390,6 +394,16 @@ export function buildSystemPrompt(context: ExchangeContext): string {
       '- Use concrete examples before abstract rules.'
   );
 
+  // Knowledge capture — prompts the learner to save a note mid-session or post-session
+  sections.push(
+    `KNOWLEDGE CAPTURE:\n` +
+      `After the learner has exchanged at least 5 messages with you, if they give a correct answer where they explain something in their own words (not short factual recall like "yes", a number, or a single term), respond naturally to their answer and then ask: "Shall we put down this knowledge?"\n` +
+      `When you ask this, append a JSON block at the very end of your response on its own line: {"notePrompt": true}\n` +
+      `Only ask this ONCE per session. After asking once (whether the learner agrees or not), never ask again in this session.\n` +
+      `At the end of the session, in your final closing message, ask: "Want to put down what you learned today?" and append: {"notePrompt": true, "postSession": true}\n` +
+      `The JSON block will be stripped before the learner sees it — they will only see your conversational text.`
+  );
+
   // Prohibitions
   sections.push(
     'Prohibitions:\n' +
@@ -462,6 +476,10 @@ export async function processExchange(
   }
   cleanResponse = cleanResponse.trimEnd();
 
+  // Extract note prompt annotation before returning
+  const notePromptResult = extractNotePrompt(cleanResponse);
+  cleanResponse = notePromptResult.cleanResponse;
+
   return {
     response: cleanResponse,
     newEscalationRung: context.escalationRung,
@@ -475,6 +493,8 @@ export async function processExchange(
     provider: result.provider,
     model: result.model,
     latencyMs: result.latencyMs,
+    notePrompt: notePromptResult.notePrompt || undefined,
+    notePromptPostSession: notePromptResult.notePromptPostSession || undefined,
   };
 }
 
@@ -683,6 +703,29 @@ function getLearningModeGuidance(mode: LearningMode): string {
     'Assessment: Rigorous. Verify understanding at each step before progressing.\n' +
     'Hold the learner to a high standard — do not move on until the concept is solid.'
   );
+}
+
+/** Extract and strip the notePrompt JSON annotation from a response */
+export function extractNotePrompt(response: string): {
+  cleanResponse: string;
+  notePrompt: boolean;
+  notePromptPostSession: boolean;
+} {
+  const notePromptMatch = response.match(
+    /\n?\{"notePrompt":\s*true(?:,\s*"postSession":\s*true)?\}\s*$/
+  );
+  if (!notePromptMatch) {
+    return {
+      cleanResponse: response,
+      notePrompt: false,
+      notePromptPostSession: false,
+    };
+  }
+  return {
+    cleanResponse: response.slice(0, notePromptMatch.index).trimEnd(),
+    notePrompt: true,
+    notePromptPostSession: notePromptMatch[0].includes('"postSession"'),
+  };
 }
 
 /** Detect whether the LLM response contains an understanding check */

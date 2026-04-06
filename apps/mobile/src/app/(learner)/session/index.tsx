@@ -51,8 +51,12 @@ import {
   normalizeMilestoneTrackerState,
   useMilestoneTracker,
 } from '../../../hooks/use-milestone-tracker';
+import { Ionicons } from '@expo/vector-icons';
 import { useApiClient } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
+import { useThemeColors } from '../../../lib/theme';
+import { NoteInput } from '../../../components/library/NoteInput';
+import { useUpsertNote } from '../../../hooks/use-notes';
 import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
 import { useProfile } from '../../../lib/profile';
 import {
@@ -289,6 +293,7 @@ export default function SessionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
+  const colors = useThemeColors();
 
   const effectiveMode = mode ?? 'freeform';
   const initialHomeworkProblems = useMemo(
@@ -365,7 +370,10 @@ export default function SessionScreen() {
   const [confirmationToast, setConfirmationToast] = useState<string | null>(
     null
   );
+  const [notePromptOffered, setNotePromptOffered] = useState(false);
+  const [showNoteInput, setShowNoteInput] = useState(false);
 
+  const sessionNoteSavedRef = useRef(false);
   const animationCleanupRef = useRef<(() => void) | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAiAtRef = useRef<number | null>(null);
@@ -428,6 +436,9 @@ export default function SessionScreen() {
       setConsumedQuickChipMessageId(null);
       setMessageFeedback({});
       setConfirmationToast(null);
+      setNotePromptOffered(false);
+      setShowNoteInput(false);
+      sessionNoteSavedRef.current = false;
       hasHydratedRecoveryRef.current = false;
       resetMilestones();
       setHomeworkProblemsState(initialHomeworkProblems);
@@ -488,6 +499,7 @@ export default function SessionScreen() {
 
   const apiClient = useApiClient();
   const classifySubject = useClassifySubject();
+  const upsertNote = useUpsertNote(effectiveSubjectId || undefined, undefined);
   const startSession = useStartSession(effectiveSubjectId);
   const closeSession = useCloseSession(activeSessionId ?? '');
   const { stream: streamMessage } = useStreamMessage(activeSessionId ?? '');
@@ -978,20 +990,39 @@ export default function SessionScreen() {
             });
 
             setMessages((prev) =>
-              prev.map((m) =>
-                m.id === streamId
-                  ? {
-                      ...m,
-                      streaming: false,
-                      eventId: result.aiEventId,
-                      escalationRung: result.escalationRung,
-                    }
-                  : m
-              )
+              prev.map((m) => {
+                if (m.id !== streamId) return m;
+                // Strip notePrompt JSON annotation from visible message text
+                let content = m.content;
+                if (result.notePrompt) {
+                  content = content
+                    .replace(
+                      /\n?\{"notePrompt":\s*true(?:,\s*"postSession":\s*true)?\}\s*$/,
+                      ''
+                    )
+                    .trimEnd();
+                }
+                return {
+                  ...m,
+                  content,
+                  streaming: false,
+                  eventId: result.aiEventId,
+                  escalationRung: result.escalationRung,
+                };
+              })
             );
             setIsStreaming(false);
             setExchangeCount(result.exchangeCount);
             setEscalationRung(result.escalationRung);
+
+            // Handle note prompt triggers
+            if (result.notePrompt && !notePromptOffered) {
+              setNotePromptOffered(true);
+            }
+            if (result.notePromptPostSession) {
+              setShowNoteInput(true);
+            }
+
             if (previousAiAt) {
               setResponseHistory((prev) => [
                 ...prev,
@@ -1081,6 +1112,7 @@ export default function SessionScreen() {
       ensureSession,
       homeworkMode,
       homeworkProblemsState,
+      notePromptOffered,
       scheduleSilencePrompt,
       streamMessage,
       subjectId,
@@ -2058,6 +2090,68 @@ export default function SessionScreen() {
                     Go Home
                   </Text>
                 </Pressable>
+              </View>
+            )}
+            {notePromptOffered &&
+              !showNoteInput &&
+              !sessionNoteSavedRef.current && (
+                <Pressable
+                  className="bg-primary/10 rounded-lg px-4 py-3 mx-4 mb-2 flex-row items-center"
+                  onPress={() => setShowNoteInput(true)}
+                  testID="session-note-prompt"
+                  accessibilityRole="button"
+                  accessibilityLabel="Write a note"
+                >
+                  <Ionicons
+                    name="document-text-outline"
+                    size={18}
+                    color={colors.primary}
+                  />
+                  <Text className="text-body text-primary font-semibold ml-2">
+                    Write a note
+                  </Text>
+                </Pressable>
+              )}
+            {showNoteInput && (
+              <View className="px-4 mb-2">
+                <NoteInput
+                  onSave={(content) => {
+                    if (!topicId) {
+                      Alert.alert(
+                        'Cannot save note',
+                        'No topic selected for this session.'
+                      );
+                      return;
+                    }
+                    const separator = !sessionNoteSavedRef.current
+                      ? `--- ${new Date().toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                        })} ---\n`
+                      : '';
+                    upsertNote.mutate(
+                      {
+                        topicId,
+                        content: `${separator}${content}`,
+                        append: true,
+                      },
+                      {
+                        onSuccess: () => {
+                          sessionNoteSavedRef.current = true;
+                          setShowNoteInput(false);
+                        },
+                        onError: (err) => {
+                          Alert.alert(
+                            "Couldn't save your note",
+                            formatApiError(err)
+                          );
+                        },
+                      }
+                    );
+                  }}
+                  onCancel={() => setShowNoteInput(false)}
+                  saving={upsertNote.isPending}
+                />
               </View>
             )}
             {exchangeCount === 0 && (

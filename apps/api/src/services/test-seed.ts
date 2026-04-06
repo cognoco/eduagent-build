@@ -18,6 +18,7 @@ import {
   subjects,
   curricula,
   curriculumTopics,
+  curriculumBooks,
   learningSessions,
   sessionEvents,
   retentionCards,
@@ -368,12 +369,23 @@ async function createSubjectWithCurriculum(
     version: 1,
   });
 
+  // Create a default book for the seed subject
+  const bookId = generateUUIDv7();
+  await db.insert(curriculumBooks).values({
+    id: bookId,
+    subjectId,
+    title: name,
+    sortOrder: 0,
+    topicsGenerated: true,
+  });
+
   // Batch insert all topics in a single INSERT statement
   const topicValues = Array.from({ length: topicCount }, (_, i) => {
     const topicId = generateUUIDv7();
     return {
       id: topicId,
       curriculumId,
+      bookId,
       title: `${name} Topic ${i + 1}`,
       description: `Introduction to ${name} Topic ${i + 1}`,
       sortOrder: i,

@@ -5,15 +5,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 const mockPush = jest.fn();
 const mockUseSubjects = jest.fn();
 const mockUseOverallProgress = jest.fn();
-const mockUseBooks = jest.fn();
-const mockUseBookWithTopics = jest.fn();
-const mockUseGenerateBookTopics = jest.fn();
-const mockUseCurriculum = jest.fn();
 const mockUseAllBooks = jest.fn();
+const mockUseNoteTopicIds = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
-  useLocalSearchParams: () => ({}),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -29,18 +25,12 @@ jest.mock('../../hooks/use-progress', () => ({
   useOverallProgress: () => mockUseOverallProgress(),
 }));
 
-jest.mock('../../hooks/use-books', () => ({
-  useBooks: () => mockUseBooks(),
-  useBookWithTopics: () => mockUseBookWithTopics(),
-  useGenerateBookTopics: () => mockUseGenerateBookTopics(),
-}));
-
-jest.mock('../../hooks/use-curriculum', () => ({
-  useCurriculum: () => mockUseCurriculum(),
-}));
-
 jest.mock('../../hooks/use-all-books', () => ({
   useAllBooks: () => mockUseAllBooks(),
+}));
+
+jest.mock('../../hooks/use-notes', () => ({
+  useNoteTopicIds: () => mockUseNoteTopicIds(),
 }));
 
 jest.mock('@tanstack/react-query', () => {
@@ -58,7 +48,6 @@ jest.mock('../../components/progress', () => ({
 jest.mock('../../components/common', () => ({
   BookPageFlipAnimation: () => null,
   BrandCelebration: () => null,
-  PenWritingAnimation: () => null,
 }));
 
 jest.mock('../../lib/theme', () => ({
@@ -102,19 +91,15 @@ describe('LibraryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseQueries.mockReturnValue([]);
-    mockUseBooks.mockReturnValue({ data: [], isLoading: false });
-    mockUseBookWithTopics.mockReturnValue({ data: null, isLoading: false });
-    mockUseGenerateBookTopics.mockReturnValue({
-      data: null,
-      isPending: false,
-      mutate: jest.fn(),
-    });
-    mockUseCurriculum.mockReturnValue({ data: null, isLoading: false });
     mockUseAllBooks.mockReturnValue({
       books: [],
       isLoading: false,
       isError: false,
       refetch: jest.fn(),
+    });
+    mockUseNoteTopicIds.mockReturnValue({
+      data: { topicIds: [] },
+      isLoading: false,
     });
   });
 
@@ -224,7 +209,7 @@ describe('LibraryScreen', () => {
     });
   });
 
-  it('opens a shelf view when a subject with books is pressed', () => {
+  it('navigates to shelf route when a subject is pressed', () => {
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'sub-1', name: 'History', status: 'active' }],
       isLoading: false,
@@ -233,30 +218,15 @@ describe('LibraryScreen', () => {
       data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
       isLoading: false,
     });
-    mockUseBooks.mockReturnValue({
-      data: [
-        {
-          id: 'book-1',
-          subjectId: 'sub-1',
-          title: 'Ancient Egypt',
-          description: 'Pyramids and pharaohs',
-          emoji: '🏛️',
-          sortOrder: 1,
-          topicsGenerated: false,
-          createdAt: '2026-04-04T00:00:00.000Z',
-          updatedAt: '2026-04-04T00:00:00.000Z',
-        },
-      ],
-      isLoading: false,
-    });
 
     render(<LibraryScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(screen.getByTestId('subject-card-sub-1'));
 
-    expect(screen.getByTestId('shelf-view')).toBeTruthy();
-    expect(screen.getByTestId('book-card-book-1')).toBeTruthy();
-    expect(screen.getByText('Ancient Egypt')).toBeTruthy();
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(learner)/shelf/[subjectId]',
+      params: { subjectId: 'sub-1' },
+    });
   });
 
   it('renders three tab badges with counts', () => {
@@ -302,7 +272,7 @@ describe('LibraryScreen', () => {
             subjectId: 'sub-1',
             title: 'Algebra',
             description: null,
-            emoji: '📐',
+            emoji: null,
             sortOrder: 1,
             topicsGenerated: true,
             createdAt: '2026-01-01T00:00:00Z',
@@ -347,7 +317,7 @@ describe('LibraryScreen', () => {
             subjectId: 'sub-1',
             title: 'Algebra',
             description: null,
-            emoji: '📐',
+            emoji: null,
             sortOrder: 1,
             topicsGenerated: true,
             createdAt: '2026-01-01T00:00:00Z',
@@ -373,29 +343,49 @@ describe('LibraryScreen', () => {
     expect(screen.getByText('Math')).toBeTruthy();
   });
 
-  it('shows an empty shelf message when a selected subject has no topics yet', () => {
+  it('navigates to book route when a book is pressed from books tab', () => {
     mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'History', status: 'active' }],
+      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       isLoading: false,
     });
     mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+      data: { subjects: [] },
       isLoading: false,
     });
-    mockUseBooks.mockReturnValue({
-      data: [],
+    mockUseAllBooks.mockReturnValue({
+      books: [
+        {
+          book: {
+            id: 'book-1',
+            subjectId: 'sub-1',
+            title: 'Algebra',
+            description: null,
+            emoji: null,
+            sortOrder: 1,
+            topicsGenerated: true,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          },
+          subjectId: 'sub-1',
+          subjectName: 'Math',
+          topicCount: 5,
+          completedCount: 2,
+          status: 'IN_PROGRESS',
+        },
+      ],
       isLoading: false,
-    });
-    mockUseCurriculum.mockReturnValue({
-      data: { topics: [] },
-      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
     });
 
     render(<LibraryScreen />, { wrapper: createWrapper() });
 
-    fireEvent.press(screen.getByTestId('subject-card-sub-1'));
+    fireEvent.press(screen.getByTestId('library-tab-books'));
+    fireEvent.press(screen.getByTestId('book-card-book-1'));
 
-    expect(screen.getByTestId('library-shelf-empty')).toBeTruthy();
-    expect(screen.getByText('No topics on this shelf yet')).toBeTruthy();
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(learner)/shelf/[subjectId]/book/[bookId]',
+      params: { subjectId: 'sub-1', bookId: 'book-1' },
+    });
   });
 });

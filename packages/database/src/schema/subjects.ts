@@ -127,9 +127,9 @@ export const curriculumTopics = pgTable('curriculum_topics', {
   relevance: topicRelevanceEnum('relevance').notNull().default('core'),
   source: curriculumTopicSourceEnum('source').notNull().default('generated'),
   estimatedMinutes: integer('estimated_minutes').notNull(),
-  bookId: uuid('book_id').references(() => curriculumBooks.id, {
-    onDelete: 'cascade',
-  }),
+  bookId: uuid('book_id')
+    .notNull()
+    .references(() => curriculumBooks.id, { onDelete: 'cascade' }),
   chapter: text('chapter'),
   skipped: boolean('skipped').notNull().default(false),
   cefrLevel: text('cefr_level'),

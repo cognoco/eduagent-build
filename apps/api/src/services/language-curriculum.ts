@@ -6,6 +6,7 @@ import {
   vocabulary,
   type Database,
 } from '@eduagent/database';
+import { ensureDefaultBook } from './curriculum';
 import type {
   CefrLevel,
   GeneratedTopic,
@@ -357,9 +358,12 @@ export async function regenerateLanguageCurriculum(
     return;
   }
 
+  const bookId = await ensureDefaultBook(db, subjectId, languageCode);
+
   await db.insert(curriculumTopics).values(
     topics.map((topic, index) => ({
       curriculumId: curriculum!.id,
+      bookId,
       title: topic.title,
       description: topic.description,
       sortOrder: index,

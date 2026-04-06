@@ -237,6 +237,8 @@ export function useStreamMessage(sessionId: string): {
       escalationRung: number;
       expectedResponseMinutes?: number;
       aiEventId?: string;
+      notePrompt?: boolean;
+      notePromptPostSession?: boolean;
     }) => void,
     overrideSessionId?: string,
     options?: { homeworkMode?: 'help_me' | 'check_answer' }
@@ -266,6 +268,8 @@ export function useStreamMessage(sessionId: string): {
         escalationRung: number;
         expectedResponseMinutes?: number;
         aiEventId?: string;
+        notePrompt?: boolean;
+        notePromptPostSession?: boolean;
       }) => void,
       overrideSessionId?: string,
       options?: { homeworkMode?: 'help_me' | 'check_answer' }
@@ -313,6 +317,8 @@ export function useStreamMessage(sessionId: string): {
               escalationRung: event.escalationRung ?? 0,
               expectedResponseMinutes: event.expectedResponseMinutes,
               aiEventId: (event as { aiEventId?: string }).aiEventId,
+              notePrompt: event.notePrompt,
+              notePromptPostSession: event.notePromptPostSession,
             });
           }
         }
