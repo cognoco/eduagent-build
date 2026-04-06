@@ -139,37 +139,56 @@ This produces two SQL migration files in `apps/api/drizzle/`:
 1. CREATE TABLE `topic_notes` with unique constraint
 2. ALTER `curriculum_topics.book_id` SET NOT NULL
 
-**Important:** The bookId migration requires a backfill first. Before running `drizzle-kit migrate` in staging/prod, execute this backfill SQL manually:
+**Important:** The bookId NOT NULL migration requires a backfill first. Run the backfill within a transaction before running `drizzle-kit migrate` in staging/prod. If the backfill isn't run first, the ALTER will fail on any NULL rows.
 
 ```sql
--- Backfill: create a book for each subject with orphan topics
+BEGIN;
+
+-- Step 1: Create a book for each subject that has orphan topics (bookId IS NULL)
+-- Uses gen_random_uuid() because generateUUIDv7 is app-level; DB migrations use Postgres-native UUIDs.
+-- The app uses UUIDv7 for new rows, but backfill rows only need unique valid UUIDs.
 INSERT INTO curriculum_books (id, subject_id, title, sort_order, topics_generated, created_at, updated_at)
 SELECT
   gen_random_uuid(),
-  ct.subject_id_via_curriculum,
+  c.subject_id,
   s.name,
   0,
   true,
   now(),
   now()
 FROM (
-  SELECT DISTINCT c.subject_id AS subject_id_via_curriculum
+  SELECT DISTINCT cur.subject_id
   FROM curriculum_topics ct
-  JOIN curricula c ON c.id = ct.curriculum_id
+  JOIN curricula cur ON cur.id = ct.curriculum_id
   WHERE ct.book_id IS NULL
-) ct
-JOIN subjects s ON s.id = ct.subject_id_via_curriculum;
+) c
+JOIN subjects s ON s.id = c.subject_id
+-- Don't create duplicate books if subject already has a sort_order=0 book
+WHERE NOT EXISTS (
+  SELECT 1 FROM curriculum_books cb
+  WHERE cb.subject_id = c.subject_id AND cb.sort_order = 0
+);
 
--- Assign orphan topics to their subject's new book
-UPDATE curriculum_topics ct
+-- Step 2: Assign orphan topics to their subject's backfill book
+UPDATE curriculum_topics
 SET book_id = cb.id
 FROM curricula c
 JOIN curriculum_books cb ON cb.subject_id = c.subject_id AND cb.sort_order = 0
-WHERE ct.curriculum_id = c.id
-  AND ct.book_id IS NULL;
+WHERE curriculum_topics.curriculum_id = c.id
+  AND curriculum_topics.book_id IS NULL;
+
+-- Step 3: Verify no NULLs remain before committing
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM curriculum_topics WHERE book_id IS NULL) THEN
+    RAISE EXCEPTION 'Backfill incomplete: NULL book_id rows still exist';
+  END IF;
+END $$;
+
+COMMIT;
 ```
 
-For dev, `pnpm run db:push:dev` handles everything (schema is pushed directly).
+For dev, `pnpm run db:push:dev` handles everything (schema is pushed directly, no migration needed).
 
 - [ ] **Step 5: Verify schema pushes cleanly in dev**
 
@@ -315,7 +334,7 @@ Create `apps/api/src/services/notes.ts`:
 ```typescript
 import { eq, and, inArray } from 'drizzle-orm';
 import type { Database } from '@eduagent/database';
-import { topicNotes, curriculumTopics, curriculumBooks } from '@eduagent/database';
+import { topicNotes, curriculumTopics, curriculumBooks, subjects } from '@eduagent/database';
 
 export async function getNotesForBook(
   db: Database,
@@ -323,6 +342,18 @@ export async function getNotesForBook(
   subjectId: string,
   bookId: string,
 ): Promise<Array<{ topicId: string; content: string; updatedAt: Date }>> {
+  // Verify book belongs to this subject (ownership through parent chain)
+  const [book] = await db
+    .select({ id: curriculumBooks.id })
+    .from(curriculumBooks)
+    .where(
+      and(
+        eq(curriculumBooks.id, bookId),
+        eq(curriculumBooks.subjectId, subjectId),
+      ),
+    );
+  if (!book) return [];
+
   // Get all topic IDs for this book, then fetch notes
   const topics = await db
     .select({ id: curriculumTopics.id })
@@ -357,35 +388,43 @@ export async function upsertNote(
   content: string,
   append?: boolean,
 ): Promise<{ id: string; topicId: string; content: string; updatedAt: Date }> {
-  const existing = await db
-    .select()
-    .from(topicNotes)
-    .where(
-      and(
-        eq(topicNotes.topicId, topicId),
-        eq(topicNotes.profileId, profileId),
-      ),
-    )
-    .then((rows) => rows[0] ?? null);
+  // If append mode, fetch existing content first to concatenate
+  if (append) {
+    const existing = await db
+      .select({ id: topicNotes.id, content: topicNotes.content })
+      .from(topicNotes)
+      .where(
+        and(
+          eq(topicNotes.topicId, topicId),
+          eq(topicNotes.profileId, profileId),
+        ),
+      )
+      .then((rows) => rows[0] ?? null);
 
-  if (existing) {
-    const newContent =
-      append && existing.content
-        ? `${existing.content}\n${content}`
-        : content;
-    const [updated] = await db
-      .update(topicNotes)
-      .set({ content: newContent, updatedAt: new Date() })
-      .where(eq(topicNotes.id, existing.id))
-      .returning();
-    return updated;
+    if (existing) {
+      const newContent = `${existing.content}\n${content}`;
+      const [updated] = await db
+        .update(topicNotes)
+        .set({ content: newContent, updatedAt: new Date() })
+        .where(eq(topicNotes.id, existing.id))
+        .returning();
+      return updated;
+    }
+    // No existing note — fall through to insert below
   }
 
-  const [created] = await db
+  // Atomic upsert using ON CONFLICT to avoid TOCTOU race.
+  // Two concurrent inserts for the same (topicId, profileId) won't crash —
+  // the loser updates instead of failing on the unique constraint.
+  const [result] = await db
     .insert(topicNotes)
     .values({ topicId, profileId, content })
+    .onConflictDoUpdate({
+      target: [topicNotes.topicId, topicNotes.profileId],
+      set: { content, updatedAt: new Date() },
+    })
     .returning();
-  return created;
+  return result;
 }
 
 export async function deleteNote(
@@ -499,7 +538,10 @@ export const noteRoutes = new Hono<NoteRouteEnv>()
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { topicId } = c.req.valid('param');
-      await deleteNote(db, profileId, topicId);
+      const deleted = await deleteNote(db, profileId, topicId);
+      if (!deleted) {
+        return c.json({ error: 'Note not found' }, 404);
+      }
       return c.body(null, 204);
     },
   );
@@ -561,8 +603,8 @@ jest.mock('../services/profile', () => ({
   }),
 }));
 
-// Import app AFTER mocks
-const { default: app } = await import('../index');
+// Import app AFTER mocks — uses named export, synchronous import
+import { app } from '../index';
 
 const TEST_ENV = { CLERK_JWKS_URL: 'https://example.com/.well-known/jwks.json' };
 const AUTH_HEADERS = {
@@ -1210,8 +1252,10 @@ export function CollapsibleChapter({
                   {hasNote && (
                     <Pressable
                       testID={`note-icon-${topic.id}`}
-                      onPress={(e) => {
-                        e.stopPropagation();
+                      onPress={() => {
+                        // Note: React Native Pressable doesn't support stopPropagation.
+                        // The parent Pressable won't fire because this Pressable
+                        // consumes the touch event natively (nested Pressable behavior).
                         onNotePress?.(topic.id);
                       }}
                       hitSlop={8}
@@ -1468,7 +1512,7 @@ describe('NoteInput', () => {
 Create `apps/mobile/src/components/library/NoteInput.tsx`:
 
 ```tsx
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
@@ -1492,6 +1536,7 @@ export function NoteInput({
 }: NoteInputProps): React.ReactElement {
   const [text, setText] = useState(initialValue);
   const colors = useThemeColors();
+  const wasListening = useRef(false);
   const {
     status,
     transcript,
@@ -1501,14 +1546,20 @@ export function NoteInput({
     clearTranscript,
   } = useSpeechRecognition();
 
-  // When transcription completes, append to text
+  // Append transcript to text when listening stops and final transcript arrives.
+  // This avoids the race condition of reading transcript synchronously after stopListening(),
+  // since transcription completes asynchronously via state update.
+  useEffect(() => {
+    if (wasListening.current && !isListening && transcript) {
+      setText((prev) => (prev ? `${prev} ${transcript}` : transcript));
+      clearTranscript();
+    }
+    wasListening.current = isListening;
+  }, [isListening, transcript, clearTranscript]);
+
   const handleMicPress = () => {
     if (isListening) {
       stopListening();
-      if (transcript) {
-        setText((prev) => (prev ? `${prev} ${transcript}` : transcript));
-        clearTranscript();
-      }
     } else {
       startListening();
     }
@@ -1729,8 +1780,8 @@ export default function ShelfScreen() {
     );
   }
 
-  const completedCount = subjectProgress?.completedTopicCount ?? 0;
-  const totalCount = subjectProgress?.totalTopicCount ?? 0;
+  const completedCount = subjectProgress?.topicsCompleted ?? 0;
+  const totalCount = subjectProgress?.topicsTotal ?? 0;
   const progressPercent = totalCount > 0 ? completedCount / totalCount : 0;
 
   return (
@@ -1993,11 +2044,11 @@ export default function BookScreen() {
     [noteMap],
   );
 
-  const handleTopicPress = (topicId: string, topicName: string) => {
+  const handleTopicPress = (topicId: string, _topicName: string) => {
     router.push({
-      pathname: '/(learner)/topic/[subjectId]-[topicId]',
-      params: { 'subjectId-topicId': `${subjectId}-${topicId}` },
-    });
+      pathname: '/(learner)/session',
+      params: { mode: 'learning', subjectId: subjectId!, topicId },
+    } as never);
   };
 
   const handleNoteSave = (topicId: string, content: string) => {
@@ -2364,18 +2415,68 @@ if (filters.hasNotes) {
 }
 ```
 
-Update `TOPICS_TAB_INITIAL_STATE` to include `hasNotes: false` in filters.
-
-In `library.tsx`, import `useNoteTopicIds` and pass the resulting `Set<string>` to `TopicsTab` as a prop. In `TopicsTab`, use it to populate `hasNote: boolean` on each `EnrichedTopic`:
+In `TopicsTab.tsx`, update the initial state export:
 
 ```typescript
-const noteTopicIds = useNoteTopicIds();
+// Change TOPICS_TAB_INITIAL_STATE filters from:
+export const TOPICS_TAB_INITIAL_STATE: TopicsTabState = {
+  search: '',
+  sortKey: 'name-asc',
+  filters: { subjectIds: [], bookIds: [], retention: [], needsAttention: false },
+};
+// To:
+export const TOPICS_TAB_INITIAL_STATE: TopicsTabState = {
+  search: '',
+  sortKey: 'name-asc',
+  filters: { subjectIds: [], bookIds: [], retention: [], needsAttention: false, hasNotes: false },
+};
+```
+
+In `library.tsx`, import `useNoteTopicIds` and pass the set to `TopicsTab`:
+
+```typescript
+import { useNoteTopicIds } from '../../hooks/use-notes';
+
+// Inside the component, alongside other hooks:
+const noteTopicIdsQuery = useNoteTopicIds();
 const noteIdSet = useMemo(
-  () => new Set(noteTopicIds.data?.topicIds ?? []),
-  [noteTopicIds.data],
+  () => new Set(noteTopicIdsQuery.data?.topicIds ?? []),
+  [noteTopicIdsQuery.data],
 );
-// When building EnrichedTopic objects:
-hasNote: noteIdSet.has(topic.id),
+
+// Pass to TopicsTab:
+<TopicsTab
+  // ...existing props...
+  noteTopicIds={noteIdSet}
+/>
+```
+
+In `TopicsTab.tsx`, accept the new prop and populate `hasNote` on `EnrichedTopic`:
+
+```typescript
+interface TopicsTabProps {
+  // ...existing props...
+  noteTopicIds: Set<string>;
+}
+
+// In the useMemo that builds EnrichedTopic[], add hasNote:
+const enrichedTopics = useMemo(() => {
+  return rawTopics.map((t) => ({
+    ...t,
+    hasNote: noteTopicIds.has(t.topicId),
+  }));
+}, [rawTopics, noteTopicIds]);
+```
+
+Add the "Has notes" filter chip to the filter groups in `TopicsTab.tsx`:
+
+```typescript
+// In the filter configuration array, add:
+{
+  key: 'hasNotes',
+  label: 'Has notes',
+  options: [{ value: true, label: 'Has notes' }],
+}
 ```
 
 - [ ] **Step 3: Simplify library.tsx — remove drill-down, wire routes**
@@ -2445,9 +2546,7 @@ Run:
 cd apps/mobile && pnpm exec jest --no-coverage
 ```
 
-Expected: All pass. Some existing tests for ShelfView/ChapterTopicList will fail — delete those test files too:
-- `apps/mobile/src/components/library/ShelfView.test.tsx` (if exists)
-- `apps/mobile/src/components/library/ChapterTopicList.test.tsx` (if exists)
+Expected: All pass. Verified: no test files exist for ShelfView or ChapterTopicList (confirmed via glob search), so no test cleanup is needed when deleting those components.
 
 - [ ] **Step 7: Commit**
 
