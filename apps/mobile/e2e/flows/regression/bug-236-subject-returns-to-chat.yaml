@@ -1,0 +1,84 @@
+# Regression: BUG-236 — Subject creation from chat must return to chat
+# When the classifier can't place a topic and the user creates a new subject
+# from the chat's subject resolution UI, the app must return to the chat
+# session with the new subject — not dump the user on the Library screen.
+appId: com.mentomate.app
+tags:
+  - regression
+  - chat
+  - navigation
+---
+- runFlow: ../../_setup/launch-devclient.yaml
+
+# Sign in
+- runFlow: ../../_setup/seed-and-sign-in.yaml
+
+# Navigate to Learn Something New
+- tapOn:
+    id: "intent-learn-new"
+- extendedWaitUntil:
+    visible:
+      id: "learn-new-screen"
+    timeout: 15000
+
+# Start a freeform chat session
+- tapOn:
+    id: "intent-freeform"
+- extendedWaitUntil:
+    visible:
+      id: "session-chat-input"
+    timeout: 20000
+
+- takeScreenshot: bug236-01-chat-opened
+
+# Type a topic the classifier may not place
+- tapOn:
+    id: "session-chat-input"
+- inputText: "Tell me about Easter traditions"
+- hideKeyboard
+
+# Send the message — this triggers classification
+- tapOn:
+    id: "session-send-button"
+
+# Wait for subject resolution to appear (classifier couldn't auto-match)
+- extendedWaitUntil:
+    visible:
+      id: "session-subject-resolution"
+    timeout: 30000
+
+- takeScreenshot: bug236-02-subject-resolution-shown
+
+# Tap "New subject" to create a subject from within chat
+- tapOn:
+    id: "subject-resolution-new"
+
+# Wait for create-subject screen
+- extendedWaitUntil:
+    visible:
+      id: "create-subject-name"
+    timeout: 15000
+
+- takeScreenshot: bug236-03-create-subject-screen
+
+# Type a subject name and submit
+- tapOn:
+    id: "create-subject-name"
+- inputText: "World History"
+- hideKeyboard
+- tapOn:
+    id: "create-subject-submit"
+
+# After subject creation, we should land back in the chat session —
+# NOT on the Library screen.
+- extendedWaitUntil:
+    visible:
+      id: "session-chat-input"
+    timeout: 30000
+
+- takeScreenshot: bug236-04-back-in-chat
+
+# Verify we are NOT on the library screen
+- assertNotVisible:
+    id: "library-screen"
+    timeout: 3000

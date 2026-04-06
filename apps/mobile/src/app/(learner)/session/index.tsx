@@ -1813,6 +1813,29 @@ export default function SessionScreen() {
             </Text>
           </Pressable>
         ))}
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: '/create-subject',
+              params: {
+                returnTo: 'chat',
+                chatTopic: pendingSubjectResolution.originalText,
+              },
+            } as never)
+          }
+          disabled={isStreaming || pendingClassification}
+          className="rounded-full border border-border px-4 py-2"
+          accessibilityRole="button"
+          accessibilityLabel="Create a new subject"
+          accessibilityState={{
+            disabled: isStreaming || pendingClassification,
+          }}
+          testID="subject-resolution-new"
+        >
+          <Text className="text-body-sm font-semibold text-primary">
+            + New subject
+          </Text>
+        </Pressable>
       </ScrollView>
     </View>
   ) : null;

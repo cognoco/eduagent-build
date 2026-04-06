@@ -9,9 +9,11 @@ const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCreateSubjectMutateAsync = jest.fn();
 const mockResolveSubjectMutateAsync = jest.fn();
+let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, replace: mockReplace }),
+  useLocalSearchParams: () => mockSearchParams,
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -50,6 +52,7 @@ const CreateSubjectScreen = require('./create-subject').default;
 describe('CreateSubjectScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = {};
   });
 
   it('reveals the clarify input when Something else is pressed', async () => {
@@ -298,5 +301,91 @@ describe('CreateSubjectScreen', () => {
         params: { subjectId: 'subject-history' },
       });
     });
+  });
+
+  it('[BUG-236] returns to chat session when returnTo=chat after subject creation', async () => {
+    mockSearchParams = { returnTo: 'chat', chatTopic: 'Easter' };
+
+    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+      status: 'direct_match',
+      resolvedName: 'World History',
+      suggestions: [],
+      displayMessage: 'World History works well.',
+    });
+
+    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
+      subject: {
+        id: 'subject-world-history',
+        name: 'World History',
+      },
+      structureType: 'broad',
+      bookCount: 4,
+    });
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('create-subject-name'),
+      'World History'
+    );
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(learner)/session',
+        params: {
+          mode: 'freeform',
+          subjectId: 'subject-world-history',
+          subjectName: 'World History',
+          topicName: 'Easter',
+        },
+      });
+    });
+
+    // Must NOT navigate to library — that was the bug
+    expect(mockReplace).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/(learner)/library' })
+    );
+  });
+
+  it('[BUG-236] routes to library when no returnTo param (default behavior)', async () => {
+    // No returnTo param — normal Library-originated flow
+    mockSearchParams = {};
+
+    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+      status: 'direct_match',
+      resolvedName: 'Biology',
+      suggestions: [],
+      displayMessage: 'Biology it is.',
+    });
+
+    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
+      subject: {
+        id: 'subject-biology',
+        name: 'Biology',
+      },
+      structureType: 'broad',
+      bookCount: 5,
+    });
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('create-subject-name'),
+      'Biology'
+    );
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(learner)/library',
+        params: { subjectId: 'subject-biology' },
+      });
+    });
+
+    // Must NOT navigate to session
+    expect(mockReplace).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/(learner)/session' })
+    );
   });
 });
