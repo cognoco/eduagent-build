@@ -26,6 +26,8 @@ export type CurriculumTopicSource = z.infer<typeof curriculumTopicSourceSchema>;
 export const subjectCreateSchema = z.object({
   name: z.string().trim().min(1).max(200),
   rawInput: z.string().trim().min(1).max(200).optional(),
+  focus: z.string().trim().min(1).max(200).optional(),
+  focusDescription: z.string().trim().min(1).max(500).optional(),
   pedagogyMode: pedagogyModeSchema.optional(),
   languageCode: languageCodeSchema.optional(),
 });
@@ -68,18 +70,25 @@ export const subjectResolveStatusSchema = z.enum([
 ]);
 export type SubjectResolveStatus = z.infer<typeof subjectResolveStatusSchema>;
 
-export const subjectStructureTypeSchema = z.enum(['broad', 'narrow']);
+export const subjectStructureTypeSchema = z.enum([
+  'broad',
+  'narrow',
+  'focused_book',
+]);
 export type SubjectStructureType = z.infer<typeof subjectStructureTypeSchema>;
 
 export const subjectSuggestionSchema = z.object({
   name: z.string(),
   description: z.string(),
+  focus: z.string().optional(),
 });
 export type SubjectSuggestion = z.infer<typeof subjectSuggestionSchema>;
 
 export const subjectResolveResultSchema = z.object({
   status: subjectResolveStatusSchema,
   resolvedName: z.string().nullable(),
+  focus: z.string().nullable().optional(),
+  focusDescription: z.string().nullable().optional(),
   suggestions: z.array(subjectSuggestionSchema),
   displayMessage: z.string(),
   isLanguageLearning: z.boolean().optional(),

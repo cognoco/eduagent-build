@@ -116,83 +116,112 @@ Phase 4: Test Coverage & Validation
 
 ### Stream 2A — API Bug Fixes (PARALLEL)
 
-| ID | Epic | Severity | File | Fix |
-|----|------|----------|------|-----|
-| 2A.1 | 1 | MED | `apps/api/src/routes/interview.ts:56-66` | Reorder non-streaming endpoint: call `persistCurriculum` BEFORE marking draft `completed`. Match streaming endpoint's ordering. |
-| 2A.2 | 3 | LOW | `apps/api/src/services/retention-data.ts:396-398` | Replace hardcoded `masteryScore` (0.75/0.4) in `processRecallTest` with actual computed value from SM-2 or `calculateMasteryScore`. |
-| 2A.3 | 4 | LOW | `apps/api/src/services/coaching-cards.ts:231` | Fix challenge card fallback: uses `profileId` as `topicId`. Replace with correct topic lookup. |
-| 2A.4 | 3 | LOW | `apps/api/src/services/retention-data.ts:462-527` | Add `checkNeedsDeepeningCapacity` call in `startRelearn`. Per FR61-63, max 10 active needs-deepening topics per subject. |
-| 2A.5 | 2 | LOW | `apps/api/src/services/session.ts:1064-1069` | Remove duplicate session row read in `closeSession()` — already fetched via `getSession()`. |
-| 2A.6 | 4 | MED | `apps/api/src/services/progress.ts:53-58` | Implement `'blocked'` struggle status transition (FR70). Add logic after repeated failures to transition topics from `'needs_deepening'` to `'blocked'`. |
-| 2A.7 | 5 | MED | `apps/api/src/services/trial.ts:204-215` | Extend `getTrialWarningMessage` to include 7-day and 2-day milestones (currently only 3, 1, 0). |
-| 2A.8 | 11 | HIGH | `apps/mobile/global.css:27` | Fix muted color fallback: change `#525252` to `#94a3b8` to match `tokens.teen.dark`. |
-| 2A.9 | 11 | MED | `apps/mobile/app.json:40,55` | Update splash/adaptive icon background from `#1e1b4b` to `#1a1a3e` (teen dark bg token). |
+> ⚠️ **Adversarial review (2026-04-05):** 5 of original 9 items were invalid or misclassified (>50% error rate).
+> Items sourced from the discovery doc should be re-verified against current code before implementation.
+
+| ID | Epic | Severity | File | Fix | Verified By |
+|----|------|----------|------|-----|-------------|
+| 2A.1 | 1 | ~~MED~~ | `apps/api/src/routes/interview.ts:56-71` | ❌ **INVALID — ghost bug.** Code already does: (1) save history, (2) persistCurriculum, (3) mark completed. Both endpoints have explicit comment: "Only mark complete after curriculum is persisted." Implementing this "fix" would risk regression. | `review: interview.ts:57-71 verified correct ordering` |
+| 2A.2 | 3 | ~~LOW~~ | `apps/api/src/services/retention-data.ts:333` | ❌ **INVALID — hardcoded values don't exist.** Mastery computed dynamically via `calculateMasteryScore('recall', quality / 5)`. DEPTH_CAPS in assessments.ts uses `recall: 0.5`, not 0.75/0.4. Discovery read wrong code. | `review: retention-data.ts:333, assessments.ts:33-37 verified dynamic` |
+| 2A.3 | 4 | LOW | `apps/api/src/services/coaching-cards.ts:231` | Fix challenge card fallback: uses `profileId` as `topicId`. Replace with correct topic lookup. | |
+| 2A.4 | 3 | LOW | `apps/api/src/services/retention-data.ts:462-527` | Add `checkNeedsDeepeningCapacity` call in `startRelearn`. Per FR61-63, max 10 active needs-deepening topics per subject. | |
+| 2A.5 | 2 | ~~LOW~~ | `apps/api/src/services/session.ts:1285-1306` | ❌ **INVALID — misidentified CAS guard.** The UPDATE...WHERE status='active'...RETURNING (labeled BD-05 in code) is a compare-and-swap concurrency guard, not a duplicate read. Removing it would introduce a race condition allowing double-close. | `review: session.ts:1281-1309 verified CAS pattern` |
+| 2A.6 | 4 | ~~MED~~ | `apps/api/src/services/progress.ts:254-258` | ❌ **INVALID — feature already exists.** `activeDeepening && retentionCard.failureCount >= 3 → 'blocked'` already implemented at line 254-258. | `review: progress.ts:254-258 verified blocked transition exists` |
+| 2A.7 | 5 | MED | `apps/api/src/services/trial.ts:204-215` | Extend `getTrialWarningMessage` to include 7-day and 2-day milestones (currently only 3, 1, 0). | |
+| ~~2A.8~~ | 11 | HIGH | `apps/mobile/global.css:27` | ⚠️ **RECLASSIFIED → Phase 3** (mobile file, not API). Fix muted color fallback: change `#525252` to `#94a3b8` to match `tokens.teen.dark`. | |
+| ~~2A.9~~ | 11 | MED | `apps/mobile/app.json:40,55` | ⚠️ **RECLASSIFIED → Phase 3** (mobile file, not API). Update splash/adaptive icon background from `#1e1b4b` to `#1a1a3e` (teen dark bg token). | |
 
 ### Stream 2B — N+1 & Performance Fixes (PARALLEL)
 
 All independent — different service files, no shared callers.
 
-| ID | Epic | Severity | File | Fix | Size |
-|----|------|----------|------|-----|------|
-| 2B.1 | 1 | MED | `services/curriculum.ts:1065-1077` | Batch UPDATE with CASE expression instead of per-topic loop in `adaptCurriculumFromPerformance`. | S |
-| 2B.2 | 2 | MED | `services/coaching-cards.ts:306-333` | Replace nested loop in `findContinueBookCard()` with single JOIN query (books -> topics -> sessions). | M |
-| 2B.3 | 2 | LOW | `services/session.ts:571-584` | Add `.limit(60)` to vocabulary query before JS `.slice(0, 60)`. | S |
-| 2B.4 | 3 | LOW | `services/retention-data.ts:529-552` | Move `subjectId` filter from JS to SQL WHERE in `getSubjectNeedsDeepening`. | S |
-| 2B.5 | 4 | MED | `services/progress.ts:456-498` | Batch `getContinueSuggestion`: query all subjects/curricula in one pass instead of per-subject loop. | M |
-| 2B.6 | 4 | MED | `services/dashboard.ts:378-394` | Fix `getChildDetail` to query single child profile directly instead of fetching ALL children and filtering. | M |
-| 2B.7 | 4 | MED | `services/interleaved.ts:101-122` | Replace N individual `findFirst` in `selectInterleavedTopics` with single `inArray` batch query. | M |
-| 2B.8 | 5 | MED | `services/billing.ts:756-795` | Replace N individual SELECT+UPDATE in `resetExpiredQuotaCycles` with single batch UPDATE...FROM join. | M |
-| 2B.9 | 2 | LOW | `services/session.ts:501-561` | Add session-scoped cache for static lookups (profile/subject/curriculum) in `prepareExchangeContext`. | M |
+| ID | Epic | Severity | File | Fix | Size | Verified By |
+|----|------|----------|------|-----|------|-------------|
+| 2B.1 | 1 | MED | `services/curriculum.ts:1065-1077` | Batch UPDATE with CASE expression instead of per-topic loop in `adaptCurriculumFromPerformance`. | S | |
+| 2B.2 | 2 | MED | `services/coaching-cards.ts:306-333` | Replace nested loop in `findContinueBookCard()` with single JOIN query (books -> topics -> sessions). | M | |
+| 2B.3 | 2 | ~~LOW~~ | `services/session.ts:772` | ❌ **INVALID — LIMIT already exists.** Query at line 772 already has `.limit(60)`. The `.slice(0, 60)` at line 974 is redundant but harmless. No optimization needed. | — | `review: session.ts:772 verified .limit(60) in SQL` |
+| 2B.4 | 3 | LOW | `services/retention-data.ts:529-552` | Move `subjectId` filter from JS to SQL WHERE in `getSubjectNeedsDeepening`. | S | |
+| 2B.5 | 4 | MED | `services/progress.ts:456-498` | Batch `getContinueSuggestion`: query all subjects/curricula in one pass instead of per-subject loop. | M | |
+| 2B.6 | 4 | MED | `services/dashboard.ts:378-394` | Fix `getChildDetail` to query single child profile directly instead of fetching ALL children and filtering. | M | |
+| 2B.7 | 4 | MED | `services/interleaved.ts:101-122` | Replace N individual `findFirst` in `selectInterleavedTopics` with single `inArray` batch query. | M | |
+| 2B.8 | 5 | MED | `services/billing.ts:756-795` | Replace N individual SELECT+UPDATE in `resetExpiredQuotaCycles` with single batch UPDATE...FROM join. | M | |
+| 2B.9 | 2 | LOW | `services/session.ts:501-561` | Add session-scoped cache for static lookups (profile/subject/curriculum) in `prepareExchangeContext`. | M | |
 
 ### Stream 2C — New Inngest Crons: Review Reminders & Daily Push (INTERNAL ORDERING)
 
 Items have internal dependencies: FR42 must come first, then FR95 can follow.
 
-| ID | Epic | Severity | What | Build Order | Est. Lines |
-|----|------|----------|------|-------------|------------|
-| 2C.1 | 2+4 | HIGH | **FR42/FR91: `review-due-scan` cron function.** New file. Cron scans `retentionCards` for `nextReviewAt <= now`, groups by profileId, emits `app/retention.review-due` events. | **First** | ~120 |
-| 2C.2 | 4 | HIGH | **FR95: `daily-reminder-scan` cron function.** New file. Cron scans profiles with active streaks, emits daily reminder events. Calls existing `formatDailyReminderBody()`. | **Second** (or parallel with 2C.1) | ~150 |
-| 2C.3 | 3 | LOW | **FR49: Verify SM-2 intervals.** No code change — verify that SM-2 naturally produces 14-day and 42-day intervals. If not, adjust `processRecallResult` parameters. | After 2C.1 | ~0 |
-| 2C.4 | — | — | **Register new functions.** Add `reviewDueScan` and `dailyReminderScan` to `apps/api/src/inngest/index.ts` exports. | After 2C.1+2C.2 | ~5 |
+| ID | Epic | Severity | What | Build Order | Est. Lines | Verified By |
+|----|------|----------|------|-------------|------------|-------------|
+| 2C.1 | 2+4 | HIGH | **FR42/FR91: `review-due-scan` cron function.** New file. Cron scans `retentionCards` for `nextReviewAt <= now`, groups by profileId, emits `app/retention.review-due` events. | **First** | ~120 | |
+| 2C.2 | 4 | HIGH | **FR95: `daily-reminder-scan` cron function.** New file. Cron scans profiles with active streaks, emits daily reminder events. Calls existing `formatDailyReminderBody()`. | **Second** (or parallel with 2C.1) | ~150 | |
+| 2C.3 | 3 | LOW | **FR49: Verify SM-2 intervals.** No code change — verify that SM-2 naturally produces 14-day and 42-day intervals. If not, adjust `processRecallResult` parameters. | After 2C.1 | ~0 | |
+| 2C.4 | — | — | **Register new functions.** Add `reviewDueScan` and `dailyReminderScan` to `apps/api/src/inngest/index.ts` exports. | After 2C.1+2C.2 | ~5 | |
 
 **What already exists (no changes needed):**
 - `review-reminder.ts` Inngest handler (event-triggered, complete)
 - `notifications.ts` service (push delivery, formatting, logging)
 - `settings.ts` (push token management, daily cap enforcement)
 
+#### Failure Modes — 2C.1: `review-due-scan` cron
+
+| State | Trigger | User sees | Recovery |
+|-------|---------|-----------|----------|
+| Large scan timeout | >10k retention cards due | Nothing (background) | Paginate scan with cursor-based batching; emit partial results per page. Add Inngest step timeout. |
+| Duplicate events on retry | Inngest retries after partial success | Duplicate push notifications | Make event emission idempotent: include `retentionCardId` + `scheduledDate` in event dedup key. |
+| DST double-fire | Cron fires twice in DST spring-forward window | Duplicate scan | Idempotency key on `(profileId, scanDate)` — second scan is a no-op if events already emitted for that date. |
+| No cards due | No retention cards with `nextReviewAt <= now` | Nothing | Early return, no events emitted. Log scan completion with zero-card count. |
+
+#### Failure Modes — 2C.2: `daily-reminder-scan` cron
+
+| State | Trigger | User sees | Recovery |
+|-------|---------|-----------|----------|
+| Duplicate events on retry | Inngest retries after partial emission | Duplicate daily reminders | Include `(profileId, date)` dedup key in emitted events. Notification service enforces daily cap. |
+| DST double-fire | Cron fires twice in DST transition | Duplicate scan | Same date-based idempotency as 2C.1. |
+| Profile with no active streak | Streak data is stale or zero | Nothing | Filter profiles with `currentStreak > 0` in query. Don't emit events for inactive learners. |
+| Push token expired | Profile's push token is stale | No notification delivered | Existing `notifications.ts` handles token expiry. Log failed deliveries for monitoring. |
+| Scan timeout | Large user base, slow query | Delayed/missing reminders | Paginate by accountId ranges. Add step-level timeout with alerting. |
+
 ### Stream 2D — Epic 12 API Service Cleanup (DEPENDS ON 1A)
 
 All items depend on Phase 1A (schema removal) completing first. Within this stream, items are parallel.
 
-| ID | Severity | File | Fix |
-|----|----------|------|-----|
-| 2D.1 | HIGH | `apps/api/src/routes/consent-web.ts:279` | Update hardcoded deep link `mentomate://parent/dashboard` to post-persona-removal route. |
-| 2D.2 | MED | `apps/api/src/services/profile.ts:179,188,200` | Remove persona age-gate check, remove `inferLegacyPersonaType` from input, compute from birthYear only. |
-| 2D.3 | MED | `apps/api/src/services/session.ts:775` | Simplify to `birthYearFromDateLike()` only — remove personaType-based computation. |
-| 2D.4 | MED | `apps/api/src/services/test-seed.ts:335,340,352,696,765,1154,1213,1297` | Remove 8 `personaType` references. Let personaType be auto-computed from birthYear. |
-| 2D.5 | MED | `apps/api/src/services/profile.test.ts` | Update 22 test references to use birthYear/isOwner patterns instead of personaType. |
+| ID | Severity | File | Fix | Verified By |
+|----|----------|------|-----|-------------|
+| 2D.1 | HIGH | `apps/api/src/routes/consent-web.ts:279` | Review deep link `mentomate://home` post-persona-removal. ⚠️ Discovery cited wrong URL (`mentomate://parent/dashboard` — does not exist). Actual URL is `mentomate://home`. Verify this is correct for the post-persona routing; also check `mentomate://onboarding` at line 282. | |
+| 2D.2 | MED | `apps/api/src/services/profile.ts:179,188,200` | Remove persona age-gate check, remove `inferLegacyPersonaType` from input, compute from birthYear only. | |
+| 2D.3 | MED | `apps/api/src/services/session.ts:775` | Simplify to `birthYearFromDateLike()` only — remove personaType-based computation. | |
+| 2D.4 | MED | `apps/api/src/services/test-seed.ts:335,340,352,696,765,1154,1213,1297` | Remove 8 `personaType` references. Let personaType be auto-computed from birthYear. | |
+| 2D.5 | MED | `apps/api/src/services/profile.test.ts` | Update 22 test references to use birthYear/isOwner patterns instead of personaType. | |
+| 2D.6 | MED | `apps/api/src/services/export.ts` + `export.test.ts` | **MISSING FROM ORIGINAL PLAN.** Phase 1 note explicitly says "Expected TS errors in profile.ts, **export.ts**, test-seed.ts until 2D is done" but export.ts was omitted. export.test.ts:27 still has `personaType: 'LEARNER' as const` in mock data. Clean up persona references. GDPR compliance risk if persona data leaks into exports. | |
+| 2D.7 | LOW | `apps/api/src/services/billing.test.ts:153` | **MISSING FROM ORIGINAL PLAN.** Mock profile builder includes `personaType: 'LEARNER'`. Remove after migration drops the column. | |
 
 ### Stream 2E — Architecture Violation Cleanup (PARALLEL)
 
 Low-priority consistency fixes. All independent.
 
-| ID | Epic | Severity | File | Fix |
-|----|------|----------|------|-----|
-| 2E.1 | 1 | LOW | `services/interview.ts:1` | Migrate raw ORM writes to scoped repository pattern. |
-| 2E.2 | 2 | LOW | `services/session.ts:139-176, 206-227` | Replace manual `profileId` filtering in `buildBookLearningHistoryContext` + `buildHomeworkLibraryContext` with scoped repo. |
-| 2E.3 | 2 | LOW | `services/session.ts:307-316, 418-424` | Replace direct `db.insert(sessionEvents)` with scoped repo in `insertSessionEvent`. |
-| 2E.4 | 2 | LOW | `services/session.ts:1289-1294` | Document `closeStaleSessions` as intentional cross-profile batch exception. |
-| 2E.5 | 3 | LOW | `services/assessments.ts:309-328` | Replace raw `db.insert()` in `createAssessment` with scoped repo. |
-| 2E.6 | 5 | LOW | `services/stripe.ts:23-29` | Fix module-level singleton — don't leak Stripe instance with bogus `'unused'` API key. |
-| 2E.7 | 9 | LOW | `routes/billing.ts:131-206` | Guard or remove dormant Stripe checkout endpoints (marked "for mobile" but fully implemented). |
-| 2E.8 | 9 | LOW | `mobile/src/lib/revenuecat.ts:34-46` | Add dev-mode warning when RevenueCat API key not configured (currently silent return). |
+| ID | Epic | Severity | File | Fix | Verified By |
+|----|------|----------|------|-----|-------------|
+| 2E.1 | 1 | LOW | `services/interview.ts:1` | Migrate raw ORM writes to scoped repository pattern. | |
+| 2E.2 | 2 | LOW | `services/session.ts:139-176, 206-227` | Replace manual `profileId` filtering in `buildBookLearningHistoryContext` + `buildHomeworkLibraryContext` with scoped repo. | |
+| 2E.3 | 2 | LOW | `services/session.ts:307-316, 418-424` | Replace direct `db.insert(sessionEvents)` with scoped repo in `insertSessionEvent`. | |
+| 2E.4 | 2 | LOW | `services/session.ts:1289-1294` | Document `closeStaleSessions` as intentional cross-profile batch exception. | |
+| 2E.5 | 3 | LOW | `services/assessments.ts:309-328` | Replace raw `db.insert()` in `createAssessment` with scoped repo. | |
+| 2E.6 | 5 | ~~LOW~~ | `services/stripe.ts:16-21` | ❌ **INVALID — bug doesn't exist.** Code is a clean factory function `createStripeClient(secretKey: string)` with no hardcoded key and no singleton. Discovery fabricated or referred to prior code state. | `review: stripe.ts:16-21 verified clean factory` |
+| 2E.7 | 9 | LOW | `routes/billing.ts:131-206` | Guard or remove dormant Stripe checkout endpoints (marked "for mobile" but fully implemented). | |
+| 2E.8 | 9 | LOW | `mobile/src/lib/revenuecat.ts:34-46` | Add dev-mode warning when RevenueCat API key not configured (currently silent return). | |
+| 2E.9 | — | MED | Multiple service files | **MISSING FROM ORIGINAL PLAN.** 24 direct `console.warn`/`console.error` calls across 12 service files despite `services/logger.ts` existing. Per global instructions: "Silent recovery without escalation is banned" and "console.warn alone is never sufficient." Replace with structured logger. Files: `billing.ts` (3), `llm/router.ts` (5), `notifications.ts` (3), `account.ts` (1), `consent.ts` (1), `memory.ts` (1), `profile.ts` (1), `retention-data.ts` (1), `session.ts` (1), `subject.ts` (1), `vocabulary-extract.ts` (1), `llm/providers/openai.ts` (1). | |
 
 ---
 
 ## Phase 3: Mobile — UX Dead-Ends, Persona & Missing Screens
 
 > **Goal:** Fix all user-facing dead-end states and complete persona removal on the mobile side.
-> **Estimated scope:** ~45 items. All streams are parallel except 3D (depends on 1A + 2D).
+> **Estimated scope:** ~47 items (includes 2 reclassified from 2A). All streams are parallel except 3D (depends on 1A + 2D).
+>
+> **Reclassified from Phase 2A** (mobile files, not API):
+> - ~~2A.8~~ → **3F.12** | HIGH | `apps/mobile/global.css:27` | Fix muted color fallback: change `#525252` to `#94a3b8` to match `tokens.teen.dark`.
+> - ~~2A.9~~ → **3F.13** | MED | `apps/mobile/app.json:40,55` | Update splash/adaptive icon background from `#1e1b4b` to `#1a1a3e` (teen dark bg token).
 
 ### Stream 3A — Critical UX Dead-Ends (PARALLEL)
 
@@ -412,14 +441,22 @@ The longest dependency chain determines minimum calendar time:
 
 Everything else runs in parallel alongside this chain.
 
-### Item Counts by Phase
+### Item Counts by Phase (corrected 2026-04-05)
 
-| Phase | Items | Critical | High | Med | Low |
-|-------|-------|----------|------|-----|-----|
-| Phase 1 | 18 | 4 | 4 | 7 | 3 |
-| Phase 2 | 35 | 0 | 5 | 18 | 12 |
-| Phase 3 | 45 | 10 | 14 | 18 | 3 |
-| Phase 4 | 50+ | 0 | 8 | 30+ | 12+ |
-| **Total** | **148+** | **14** | **31** | **73+** | **30+** |
+| Phase | Valid Items | Invalid/Reclassified | Critical | High | Med | Low |
+|-------|-------------|---------------------|----------|------|-----|-----|
+| Phase 1 | 18 | 0 | 4 | 4 | 7 | 3 |
+| Phase 2 | 30 | 8 (6 INVALID + 2 reclassified to P3) | 0 | 3 | 13 | 13 |
+| Phase 3 | 47 | 0 (+ 2 received from P2) | 10 | 15 | 19 | 3 |
+| Phase 4 | 50+ | 0 | 0 | 8 | 30+ | 12+ |
+| **Total** | **145+** | **8** | **14** | **30** | **69+** | **31+** |
 
-*Note: Excludes 5 FIXED/INVALID/DELIBERATE items and 15 truncated Epic 13 items.*
+*Note: Excludes 5 FIXED/INVALID/DELIBERATE items from discovery doc + 15 truncated Epic 13 items.*
+*Phase 2 originally claimed "0 Critical, 5 High, 18 Med, 12 Low = 35 items" — this was wrong. After adversarial review: 6 items INVALID, 2 reclassified to Phase 3, 3 new items added (2D.6, 2D.7, 2E.9).*
+
+### Discovery Reliability Warning
+
+> ⚠️ **Stream 2A had a >50% error rate** (5 of 9 items were invalid or misclassified). This raises
+> questions about the reliability of the discovery document that sourced these findings. Streams 2B–2E
+> were presumably sourced from the same analysis. **Recommendation:** Verify each remaining Phase 2
+> item against current code before implementation, not just after.

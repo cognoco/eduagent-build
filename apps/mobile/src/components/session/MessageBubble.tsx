@@ -89,7 +89,7 @@ function ThinkingIndicator(): React.ReactElement {
     <View
       className="flex-row gap-1.5 py-2 px-1 items-center"
       testID="thinking-indicator"
-      accessibilityLabel="Your mate is thinking"
+      accessibilityLabel="Thinking"
     >
       <PencilTapIcon />
       {[0, 1, 2].map((i) => (

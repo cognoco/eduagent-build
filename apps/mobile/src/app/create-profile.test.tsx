@@ -83,7 +83,7 @@ describe('CreateProfileScreen', () => {
     expect(screen.getByTestId('create-profile-submit')).toBeTruthy();
     // Birth date explanatory copy is visible
     expect(
-      screen.getByText(/personalise how your coach talks to you/)
+      screen.getByText(/personalise how your mentor talks to you/)
     ).toBeTruthy();
     // Persona picker buttons are hidden (auto-detected from birth date)
     expect(screen.queryByTestId('persona-teen')).toBeNull();

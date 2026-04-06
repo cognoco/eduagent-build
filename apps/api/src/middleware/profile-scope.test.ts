@@ -66,6 +66,7 @@ describe('profileScopeMiddleware', () => {
       birthYear: 2014,
       location: 'EU',
       consentStatus: 'CONSENTED',
+      hasPremiumLlm: false,
     });
   });
 
@@ -80,6 +81,7 @@ describe('profileScopeMiddleware', () => {
       birthYear: 2014,
       location: 'EU',
       consentStatus: 'CONSENTED',
+      hasPremiumLlm: false,
     });
   });
 
@@ -161,6 +163,7 @@ describe('profileScopeMiddleware', () => {
       birthYear: null,
       location: 'US',
       consentStatus: 'PENDING',
+      hasPremiumLlm: false,
     });
   });
 });

@@ -55,6 +55,7 @@ function mapProfileRow(
     birthYear: row.birthYear ?? birthYearFromDateLike(row.birthDate),
     location: row.location ?? null,
     isOwner: row.isOwner,
+    hasPremiumLlm: row.hasPremiumLlm,
     consentStatus,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

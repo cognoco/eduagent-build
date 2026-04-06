@@ -16,9 +16,11 @@ const OPENING_MESSAGE =
   "Hi! I'm your learning mate. I'd like to get to know you a bit before we start. What made you interested in learning this subject?";
 
 export default function InterviewScreen() {
-  const { subjectId, subjectName } = useLocalSearchParams<{
+  const { subjectId, subjectName, bookId, bookTitle } = useLocalSearchParams<{
     subjectId?: string;
     subjectName?: string;
+    bookId?: string;
+    bookTitle?: string;
   }>();
   const router = useRouter();
   const interviewState = useInterviewState(subjectId ?? '');
@@ -26,10 +28,14 @@ export default function InterviewScreen() {
     stream: streamInterview,
     abort: abortStream,
     isStreaming: isStreamingSSE,
-  } = useStreamInterviewMessage(subjectId ?? '');
+  } = useStreamInterviewMessage(subjectId ?? '', bookId);
+
+  const openingMessage = bookTitle
+    ? `Hi! I'm your learning mate. Let's talk about ${bookTitle}! What do you already know about it, and what are you most curious to learn?`
+    : OPENING_MESSAGE;
 
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'opening', role: 'ai', content: OPENING_MESSAGE },
+    { id: 'opening', role: 'ai', content: openingMessage },
   ]);
   const isStreaming = isStreamingSSE;
   const [interviewComplete, setInterviewComplete] = useState(false);
@@ -45,11 +51,11 @@ export default function InterviewScreen() {
 
   useEffect(() => {
     seededDraftRef.current = false;
-    setMessages([{ id: 'opening', role: 'ai', content: OPENING_MESSAGE }]);
+    setMessages([{ id: 'opening', role: 'ai', content: openingMessage }]);
     setInterviewComplete(false);
     setRestartRequired(false);
     setStreamError(null);
-  }, [subjectId]);
+  }, [subjectId, openingMessage]);
 
   useEffect(() => {
     return () => {
@@ -73,7 +79,9 @@ export default function InterviewScreen() {
         (exchange, index): ChatMessage => ({
           id: `draft-${index}`,
           role: exchange.role === 'assistant' ? 'ai' : 'user',
-          content: exchange.content,
+          content: exchange.content
+            .replace(/\[INTERVIEW_COMPLETE\]/g, '')
+            .trimEnd(),
         })
       ) ?? [];
 
@@ -81,7 +89,7 @@ export default function InterviewScreen() {
       setMessages(
         mappedHistory.length > 0
           ? mappedHistory
-          : [{ id: 'opening', role: 'ai', content: OPENING_MESSAGE }]
+          : [{ id: 'opening', role: 'ai', content: openingMessage }]
       );
       setInterviewComplete(true);
       seededDraftRef.current = true;
@@ -123,7 +131,7 @@ export default function InterviewScreen() {
   const handleRestartInterview = useCallback(() => {
     try {
       abortStream();
-      setMessages([{ id: 'opening', role: 'ai', content: OPENING_MESSAGE }]);
+      setMessages([{ id: 'opening', role: 'ai', content: openingMessage }]);
       setInterviewComplete(false);
       setRestartRequired(false);
       setStreamError(null);
@@ -131,7 +139,7 @@ export default function InterviewScreen() {
     } catch (err: unknown) {
       Alert.alert('Could not restart interview', formatApiError(err));
     }
-  }, [abortStream]);
+  }, [abortStream, openingMessage]);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -150,16 +158,28 @@ export default function InterviewScreen() {
         await streamInterview(
           text,
           (accumulated) => {
+            // Strip the [INTERVIEW_COMPLETE] marker so it never appears in the UI
+            const clean = accumulated
+              .replace(/\[INTERVIEW_COMPLETE\]/g, '')
+              .trimEnd();
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === streamMsgId ? { ...m, content: accumulated } : m
+                m.id === streamMsgId ? { ...m, content: clean } : m
               )
             );
           },
           (result) => {
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === streamMsgId ? { ...m, streaming: false } : m
+                m.id === streamMsgId
+                  ? {
+                      ...m,
+                      content: m.content
+                        .replace(/\[INTERVIEW_COMPLETE\]/g, '')
+                        .trimEnd(),
+                      streaming: false,
+                    }
+                  : m
               )
             );
             if (result.isComplete) {
@@ -185,7 +205,11 @@ export default function InterviewScreen() {
 
   return (
     <ChatShell
-      title={`Interview: ${subjectName ?? 'New Subject'}`}
+      title={
+        bookTitle
+          ? `Interview: ${bookTitle}`
+          : `Interview: ${subjectName ?? 'New Subject'}`
+      }
       messages={messages}
       onSend={handleSend}
       isStreaming={isStreaming}
@@ -194,32 +218,48 @@ export default function InterviewScreen() {
         <LivingBook
           exchangeCount={exchangeCount}
           isComplete={interviewComplete}
-          persona="learner"
+          isExpressive
+          onPress={
+            interviewComplete
+              ? () =>
+                  router.replace({
+                    pathname: '/(learner)/onboarding/analogy-preference',
+                    params: {
+                      subjectId,
+                      ...(bookId ? { bookId } : {}),
+                    },
+                  } as never)
+              : undefined
+          }
         />
       }
       footer={
         interviewComplete ? (
           <View className="bg-coaching-card rounded-card p-4 mt-2 mb-4">
             <Text className="text-body font-semibold text-text-primary mb-2">
-              Your book is ready!
+              Ready to start learning!
             </Text>
             <Text className="text-body-sm text-text-secondary mb-3">
-              Your personalized curriculum is ready.
+              I've built a personalized curriculum just for you. Let's set up
+              how you like to learn, then jump right in.
             </Text>
             <Pressable
               onPress={() =>
                 router.replace({
                   pathname: '/(learner)/onboarding/analogy-preference',
-                  params: { subjectId },
+                  params: {
+                    subjectId,
+                    ...(bookId ? { bookId } : {}),
+                  },
                 } as never)
               }
               className="bg-primary rounded-button py-3 items-center"
               testID="view-curriculum-button"
-              accessibilityLabel="View curriculum"
+              accessibilityLabel="Start learning"
               accessibilityRole="button"
             >
               <Text className="text-text-inverse text-body font-semibold">
-                View Curriculum
+                Let's Go
               </Text>
             </Pressable>
           </View>

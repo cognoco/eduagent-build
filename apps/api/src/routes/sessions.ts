@@ -37,6 +37,7 @@ import {
   syncHomeworkState,
   setSessionInputMode,
 } from '../services/session';
+import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
 import { incrementQuota } from '../services/billing';
@@ -58,6 +59,7 @@ type SessionRouteEnv = {
     db: Database;
     profileId: string | undefined;
     subscriptionId: string;
+    llmTier: LLMTier;
   };
 };
 
@@ -101,12 +103,15 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const subscriptionId = c.get('subscriptionId');
 
+      const llmTier = c.get('llmTier');
+
       try {
         const result = await processMessage(
           db,
           profileId,
           c.req.param('sessionId'),
-          c.req.valid('json')
+          c.req.valid('json'),
+          { llmTier }
         );
         return c.json(result);
       } catch (err) {
@@ -153,12 +158,15 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const session = await getSession(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');
 
+      const llmTier = c.get('llmTier');
+
       try {
         const { stream, onComplete } = await streamMessage(
           db,
           profileId,
           sessionId,
-          input
+          input,
+          { llmTier }
         );
 
         return streamSSE(c, async (sseStream) => {
@@ -171,16 +179,34 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             });
           }
 
-          const result = await onComplete(fullResponse);
-          await sseStream.writeSSE({
-            data: JSON.stringify({
-              type: 'done',
-              exchangeCount: result.exchangeCount,
-              escalationRung: result.escalationRung,
-              expectedResponseMinutes: result.expectedResponseMinutes,
-              aiEventId: result.aiEventId,
-            }),
-          });
+          try {
+            const result = await onComplete(fullResponse);
+            await sseStream.writeSSE({
+              data: JSON.stringify({
+                type: 'done',
+                exchangeCount: result.exchangeCount,
+                escalationRung: result.escalationRung,
+                expectedResponseMinutes: result.expectedResponseMinutes,
+                aiEventId: result.aiEventId,
+              }),
+            });
+          } catch (err) {
+            console.error(
+              '[sessions/stream] Post-stream processing failed:',
+              err
+            );
+            captureException(err, { profileId, extra: { sessionId } });
+            // Refund quota — user should not be charged for a failed exchange
+            if (subscriptionId) {
+              await incrementQuota(db, subscriptionId);
+            }
+            await sseStream.writeSSE({
+              data: JSON.stringify({
+                type: 'error',
+                message: 'Failed to save session progress. Please try again.',
+              }),
+            });
+          }
         });
       } catch (err) {
         if (err instanceof SessionExchangeLimitError) {
@@ -219,8 +245,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         result.summaryStatus !== 'pending' &&
         result.summaryStatus !== 'submitted';
 
-      // BD-09: Surface pipeline status so client knows if post-processing was queued
-      let pipelineQueued = true;
+      // BD-09: Surface pipeline status so client knows if post-processing was queued.
+      // Default false — only true when dispatch actually succeeds.
+      let pipelineQueued = false;
       if (shouldDispatchCompletionEvent) {
         const dispatch = await dispatchSessionCompletedEvent(
           db,
@@ -351,8 +378,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     );
     const result = await skipSummary(db, profileId, c.req.param('sessionId'));
 
-    // BD-09: Surface pipeline status so client knows if post-processing was queued
-    let pipelineQueued = true;
+    // BD-09: Surface pipeline status so client knows if post-processing was queued.
+    // Default false — only true when dispatch actually succeeds.
+    let pipelineQueued = false;
     if (
       !previousSummary ||
       previousSummary.status === 'pending' ||
@@ -399,8 +427,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         c.req.param('sessionId'),
         c.req.valid('json')
       );
-      // BD-09: Surface pipeline status so client knows if post-processing was queued
-      let pipelineQueued = true;
+      // BD-09: Surface pipeline status so client knows if post-processing was queued.
+      // Default false — only true when dispatch actually succeeds.
+      let pipelineQueued = false;
       if (
         !previousSummary ||
         previousSummary.status === 'pending' ||

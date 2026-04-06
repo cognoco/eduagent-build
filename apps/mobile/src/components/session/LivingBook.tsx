@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -10,15 +10,16 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../lib/theme';
-import type { Persona } from '../../lib/theme';
 
 interface LivingBookProps {
   /** Number of user–AI exchanges so far. */
   exchangeCount: number;
   /** True when interview/session is finished. */
   isComplete: boolean;
-  /** Controls animation expressiveness and sparkle visibility. */
-  persona: Persona;
+  /** When true, shows sparkle animations and larger icon. Callers map persona → boolean. */
+  isExpressive?: boolean;
+  /** Optional press handler — makes the book tappable (e.g. navigate on completion). */
+  onPress?: () => void;
 }
 
 /**
@@ -31,7 +32,8 @@ interface LivingBookProps {
 export function LivingBook({
   exchangeCount,
   isComplete,
-  persona,
+  isExpressive = false,
+  onPress,
 }: LivingBookProps): React.ReactElement {
   const colors = useThemeColors();
   const prevCount = useRef(exchangeCount);
@@ -41,8 +43,6 @@ export function LivingBook({
   const bookScale = useSharedValue(1);
   const sparkleOpacity = useSharedValue(0);
   const completionGlow = useSharedValue(0);
-
-  const isExpressive = persona === 'learner';
 
   // Page-flip animation on each new exchange
   useEffect(() => {
@@ -132,14 +132,29 @@ export function LivingBook({
     borderColor: colors.primary,
   }));
 
+  const Wrapper = onPress ? Pressable : View;
+  const wrapperProps = onPress
+    ? {
+        onPress,
+        accessibilityRole: 'button' as const,
+        accessibilityLabel: isComplete
+          ? 'Your book is ready — tap to continue'
+          : `Book progress: ${exchangeCount} ${
+              exchangeCount === 1 ? 'page' : 'pages'
+            }`,
+      }
+    : {
+        accessibilityRole: 'image' as const,
+        accessibilityLabel: `Book progress: ${exchangeCount} ${
+          exchangeCount === 1 ? 'page' : 'pages'
+        }`,
+      };
+
   return (
-    <View
+    <Wrapper
       className="items-center me-2"
       testID="living-book"
-      accessibilityLabel={`Book progress: ${exchangeCount} ${
-        exchangeCount === 1 ? 'page' : 'pages'
-      }`}
-      accessibilityRole="image"
+      {...wrapperProps}
     >
       <Animated.View style={bookAnimatedStyle}>
         <View style={{ position: 'relative' }}>
@@ -175,6 +190,6 @@ export function LivingBook({
           ? ''
           : `${exchangeCount} ${exchangeCount === 1 ? 'page' : 'pages'}`}
       </Text>
-    </View>
+    </Wrapper>
   );
 }

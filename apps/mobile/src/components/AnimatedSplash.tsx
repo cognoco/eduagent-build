@@ -82,7 +82,7 @@ function useSplashColors(isDark: boolean) {
         sparkPink: '#f9a8d4',
         sparkViolet: '#c4b5fd',
         sparkMint: '#99f6e4',
-        text: '#f1f5f9', // "ment" — near-white
+        text: '#faf5ee', // "ment" — cream (light-mode bg as text)
         textViolet: '#a78bfa', // circle-O
         textTeal: '#5eead4', // "mate" — light teal
       };
@@ -100,7 +100,7 @@ function useSplashColors(isDark: boolean) {
       sparkPink: '#f472b6',
       sparkViolet: '#a78bfa',
       sparkMint: '#5eead4',
-      text: '#1c1917', // "ment" — near-black
+      text: '#1a1a3e', // "ment" — dark navy (dark-mode bg as text)
       textViolet: '#8b5cf6', // circle-O
       textTeal: '#0d9488', // "mate" — teal
     };
@@ -253,50 +253,51 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
   }, [done, reduceMotion]);
 
   // --- Animated props for SVG elements ---
-  // Android SVG fix: Android's native SVG renderer permanently discards circles
-  // created with r=0, ignoring all subsequent prop updates. The prior fix of
-  // bundling `opacity` alongside `r` was insufficient — the element was already
-  // pruned from the render tree. Fix: ensure r is never zero (Math.max with a
-  // sub-pixel floor) and hold opacity at 0 until the animation begins moving,
-  // so the circle exists in the native tree from the first frame but is invisible
-  // until the spring fires.
-  const R_FLOOR = 0.01; // sub-pixel: always present in native tree, never visible
-  const OP_THRESH = 0.1; // opacity stays 0 until r exceeds this
+  // Android SVG fix (attempt 4): Android's native SVG renderer discards circles
+  // created with r=0 AND deprioritizes rendering updates for elements with
+  // opacity=0. Previous fixes addressed r=0 with R_FLOOR but re-introduced the
+  // problem by holding opacity at exactly 0 (OP_THRESH gate). Fix: NEITHER r
+  // NOR opacity may ever be exactly 0. Use sub-perceptual floors for both so
+  // the element is always "alive" in the native render tree.
+  const R_FLOOR = 0.1; // sub-pixel radius — bigger than 0.01 for Android safety
+  const OP_FLOOR = 0.001; // imperceptible opacity — keeps element in render pipeline
 
   const pathProps = useAnimatedProps(() => ({
     strokeDashoffset: PATH_LEN * (1 - pathDraw.value),
-    opacity: Math.min(pathDraw.value * 10, 1),
+    opacity: Math.max(OP_FLOOR, Math.min(pathDraw.value * 10, 1)),
   }));
 
   const studentOutProps = useAnimatedProps(() => ({
     r: Math.max(studentR.value, R_FLOOR),
-    opacity: studentR.value < OP_THRESH ? 0 : Math.min(studentR.value / 2, 1),
+    opacity: Math.max(OP_FLOOR, Math.min(studentR.value / 2, 1)),
   }));
   const studentInProps = useAnimatedProps(() => ({
     r: Math.max(studentInR.value, R_FLOOR),
-    opacity: studentInR.value < OP_THRESH ? 0 : Math.min(studentInR.value, 1),
+    opacity: Math.max(OP_FLOOR, Math.min(studentInR.value, 1)),
   }));
   const mentorOutProps = useAnimatedProps(() => ({
     r: Math.max(mentorR.value, R_FLOOR),
-    opacity: mentorR.value < OP_THRESH ? 0 : Math.min(mentorR.value / 2, 1),
+    opacity: Math.max(OP_FLOOR, Math.min(mentorR.value / 2, 1)),
   }));
   const mentorInProps = useAnimatedProps(() => ({
     r: Math.max(mentorInR.value, R_FLOOR),
-    opacity: mentorInR.value < OP_THRESH ? 0 : Math.min(mentorInR.value, 1),
+    opacity: Math.max(OP_FLOOR, Math.min(mentorInR.value, 1)),
   }));
-  const ringProps = useAnimatedProps(() => ({ opacity: ringOp.value }));
+  const ringProps = useAnimatedProps(() => ({
+    opacity: Math.max(OP_FLOOR, ringOp.value),
+  }));
 
   const dot1Props = useAnimatedProps(() => ({
     r: Math.max(dot1R.value, R_FLOOR),
-    opacity: dot1R.value < OP_THRESH ? 0 : Math.min(dot1R.value / 4, 1) * 0.6,
+    opacity: Math.max(OP_FLOOR, Math.min(dot1R.value / 4, 1) * 0.6),
   }));
   const dot2Props = useAnimatedProps(() => ({
     r: Math.max(dot2R.value, R_FLOOR),
-    opacity: dot2R.value < OP_THRESH ? 0 : Math.min(dot2R.value / 5, 1) * 0.65,
+    opacity: Math.max(OP_FLOOR, Math.min(dot2R.value / 5, 1) * 0.65),
   }));
   const dot3Props = useAnimatedProps(() => ({
     r: Math.max(dot3R.value, R_FLOOR),
-    opacity: dot3R.value < OP_THRESH ? 0 : Math.min(dot3R.value / 6, 1) * 0.7,
+    opacity: Math.max(OP_FLOOR, Math.min(dot3R.value / 6, 1) * 0.7),
   }));
 
   // Spark particles — 2 per dot, fly outward and fade

@@ -89,17 +89,32 @@ const FAMILIAR_SESSIONS: Record<string, string> = {
  *   - Sessions 4-5 (experience 3-4): familiar, casual
  *   - Session 6+ (experience >= 5): standard brief messages from config
  *
+ * When a topic name is provided (e.g. from the library), the greeting is
+ * tailored to that topic so the learner knows the session is contextual.
+ *
  * @param mode - Session mode (homework, learning, practice, freeform)
  * @param sessionExperience - longestStreak from streaks API (proxy for experience)
  * @param problemText - Optional pre-filled problem text (homework OCR)
+ * @param topicName - Optional topic title when launched from the library
  */
 export function getOpeningMessage(
   mode: string,
   sessionExperience: number,
-  problemText?: string
+  problemText?: string,
+  topicName?: string
 ): string {
   if (problemText) {
     return "Got it. Let's work through this together. I'll keep it brief and clear.";
+  }
+
+  if (topicName) {
+    if (sessionExperience <= 0) {
+      return `Today we're exploring "${topicName}". I'll walk you through the key ideas — feel free to ask questions anytime!`;
+    }
+    if (sessionExperience <= 2) {
+      return `Let's dive into "${topicName}". Ready to start, or is there something specific you'd like to focus on?`;
+    }
+    return `"${topicName}" — ready when you are. Want me to start, or do you have a preference?`;
   }
 
   if (sessionExperience <= 0) {

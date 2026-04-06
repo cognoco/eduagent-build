@@ -1,0 +1,93 @@
+import { renderHook, act } from '@testing-library/react-native';
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useClassifySubject } from './use-classify-subject';
+
+const mockFetch = jest.fn();
+jest.mock('../lib/api-client', () => ({
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
+}));
+
+let queryClient: QueryClient;
+
+function createWrapper() {
+  queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return React.createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      children
+    );
+  };
+}
+
+describe('useClassifySubject', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient?.clear();
+  });
+
+  it('calls POST /subjects/classify with text and returns classification', async () => {
+    const classifyResult = {
+      category: 'mathematics',
+      confidence: 0.95,
+      suggestedName: 'Mathematics',
+    };
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(classifyResult), { status: 200 })
+    );
+
+    const { result } = renderHook(() => useClassifySubject(), {
+      wrapper: createWrapper(),
+    });
+
+    let data: Awaited<ReturnType<typeof result.current.mutateAsync>>;
+    await act(async () => {
+      data = await result.current.mutateAsync({
+        text: 'algebra and equations',
+      });
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(data!).toEqual(classifyResult);
+  });
+
+  it('throws on non-ok response', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          error: { message: 'Server error', code: 'INTERNAL_ERROR' },
+        }),
+        { status: 500 }
+      )
+    );
+
+    const { result } = renderHook(() => useClassifySubject(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({ text: 'test' })
+      ).rejects.toThrow();
+    });
+  });
+
+  it('starts in idle state before mutation is called', () => {
+    const { result } = renderHook(() => useClassifySubject(), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.isIdle).toBe(true);
+    expect(result.current.data).toBeUndefined();
+  });
+});

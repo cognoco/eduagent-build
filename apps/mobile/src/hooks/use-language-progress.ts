@@ -14,10 +14,10 @@ export function useLanguageProgress(subjectId: string) {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.subjects[':subjectId']['cefr-progress'].$get({
-          param: { subjectId },
-          init: { signal },
-        } as never);
+        const res = await client.subjects[':subjectId']['cefr-progress'].$get(
+          { param: { subjectId } },
+          { init: { signal } }
+        );
         await assertOk(res);
         return (await res.json()) as LanguageProgress;
       } finally {

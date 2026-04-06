@@ -58,6 +58,7 @@ export const profiles = pgTable(
     birthYear: integer('birth_year'),
     location: locationTypeEnum('location'),
     isOwner: boolean('is_owner').notNull().default(false),
+    hasPremiumLlm: boolean('has_premium_llm').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

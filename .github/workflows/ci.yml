@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: eduagent
           POSTGRES_PASSWORD: eduagent
@@ -87,6 +87,10 @@ jobs:
           cache: 'pnpm'
 
       - run: pnpm install
+
+      # Enable pgvector extension before schema push (embeddings table uses vector type)
+      - name: Enable pgvector extension
+        run: psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector;'
 
       # Push database schema to test postgres (Drizzle push for CI)
       - name: Apply database schema
@@ -202,6 +206,12 @@ jobs:
       - name: Publish OTA update to preview channel
         if: steps.mobile-check.outputs.mobile_changed == 'true' && steps.native-check.outputs.native_changed != 'true'
         working-directory: apps/mobile
+        env:
+          # Must match eas.json build.preview.env — eas update does NOT read
+          # the build profile env block, so we duplicate them here.
+          EXPO_PUBLIC_API_URL: "https://api-stg.mentomate.com"
+          EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}
+          EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B | head -1 | tr -cd '[:print:]' | cut -c1-200)
           printf 'Publishing OTA update: %s\n' "$COMMIT_MSG"

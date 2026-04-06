@@ -76,6 +76,41 @@ describe('InterviewScreen', () => {
     jest.clearAllMocks();
   });
 
+  it('strips [INTERVIEW_COMPLETE] marker and shows completion footer', async () => {
+    mockStream.mockImplementation(
+      async (
+        _msg: string,
+        onChunk: (accumulated: string) => void,
+        onDone: (result: { isComplete: boolean; exchangeCount: number }) => void
+      ) => {
+        // Simulate chunks arriving with the marker
+        onChunk('Great summary of your goals!\n[INTERVIEW_COMPLETE]');
+        onDone({ isComplete: true, exchangeCount: 1 });
+      }
+    );
+
+    render(<InterviewScreen />);
+    fireEvent.press(screen.getByTestId('chat-shell-send'));
+
+    await waitFor(() => {
+      // Footer should appear with the learning invitation
+      expect(screen.getByText('Ready to start learning!')).toBeTruthy();
+      expect(screen.getByText("Let's Go")).toBeTruthy();
+      // Input should be disabled
+      expect(screen.getByTestId('chat-shell-input-disabled')).toHaveTextContent(
+        'true'
+      );
+    });
+
+    // Tapping the CTA navigates to analogy-preference
+    fireEvent.press(screen.getByTestId('view-curriculum-button'));
+    expect(mockReplace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(learner)/onboarding/analogy-preference',
+      })
+    );
+  });
+
   it('disables input after a stream error and lets the learner clear it', async () => {
     mockStream.mockRejectedValueOnce(new Error('Network request failed'));
 

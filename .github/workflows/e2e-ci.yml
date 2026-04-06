@@ -1,22 +1,11 @@
 name: E2E Tests
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'apps/api/**'
-      - 'apps/mobile/**'
-      - 'packages/schemas/**'
-      - 'packages/database/**'
-      - '.github/workflows/e2e-ci.yml'
-  pull_request:
-    paths:
-      - 'apps/api/**'
-      - 'apps/mobile/**'
-      - 'packages/schemas/**'
-      - 'packages/database/**'
-      - '.github/workflows/e2e-ci.yml'
+  # Gate behind CI: only run E2E after lint/test/typecheck pass.
+  # Saves CI minutes by skipping expensive E2E when basic checks fail.
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
   schedule:
     # Nightly run — smoke + nightly flows at 3 AM UTC
     - cron: '0 3 * * *'
@@ -25,7 +14,7 @@ on:
 # Cancel in-progress E2E runs when a new commit is pushed to the same PR.
 # Prevents wasting CI minutes on outdated commits.
 concurrency:
-  group: e2e-${{ github.event.pull_request.number || github.ref }}
+  group: e2e-${{ github.event.workflow_run.head_branch || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -35,11 +24,15 @@ permissions:
 jobs:
   # ─── Gate: classify changed files and decide which E2E suites to run ───
   #
-  # The paths: filter above is broad (any file under apps/ or packages/).
+  # workflow_run fires for every CI completion (no path filter available).
   # This job does fine-grained analysis: test files, docs, configs, and
   # test-only packages are ignored. Only runtime source changes trigger E2E.
   check-changes:
     name: Determine E2E scope
+    # Skip if CI failed (workflow_run trigger only)
+    if: >
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     outputs:
       run-api-e2e: ${{ steps.analyze.outputs.run-api-e2e }}
@@ -47,6 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
 
       - name: Analyze changed file types
@@ -60,9 +54,15 @@ jobs:
             exit 0
           fi
 
-          # Diff against PR base or previous commit
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
+          # workflow_run: diff against PR base or previous commit
+          if [ "${{ github.event.workflow_run.event }}" = "pull_request" ]; then
+            PR_BASE="${{ github.event.workflow_run.pull_requests[0].base.ref }}"
+            if [ -n "$PR_BASE" ]; then
+              git fetch origin "$PR_BASE"
+              BASE="origin/$PR_BASE"
+            else
+              BASE="HEAD~1"
+            fi
           else
             BASE="HEAD~1"
           fi
@@ -119,7 +119,7 @@ jobs:
     continue-on-error: true
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: eduagent
           POSTGRES_PASSWORD: eduagent
@@ -153,6 +153,9 @@ jobs:
 
       - run: pnpm install
 
+      - name: Enable pgvector extension
+        run: psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector;'
+
       - name: Apply database schema
         run: pnpm --filter @eduagent/database db:push
 
@@ -164,12 +167,12 @@ jobs:
     needs: check-changes
     if: needs.check-changes.outputs.run-mobile-e2e == 'true'
     runs-on: ubuntu-latest
-    # Advisory — does not block PR merge
+    # Advisory — does not block merge
     continue-on-error: true
     timeout-minutes: 45
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: eduagent
           POSTGRES_PASSWORD: eduagent
@@ -194,6 +197,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           filter: tree:0
 
       - uses: pnpm/action-setup@v4
@@ -226,6 +230,9 @@ jobs:
       # (which only supports Neon's WebSocket protocol, not plain PostgreSQL).
       # This lets drizzle-kit fall back to its built-in pg driver.
       - run: pnpm install
+
+      - name: Enable pgvector extension
+        run: psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector;'
 
       - name: Apply database schema
         run: pnpm --filter @eduagent/database db:push

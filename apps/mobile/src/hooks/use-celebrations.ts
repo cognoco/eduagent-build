@@ -25,15 +25,17 @@ export function usePendingCelebrations(options?: {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.celebrations.pending.$get({
-          query: { viewer },
-          init: {
-            signal,
-            headers: targetProfileId
-              ? { 'X-Profile-Id': targetProfileId }
-              : undefined,
-          },
-        } as never);
+        const res = await client.celebrations.pending.$get(
+          { query: { viewer } },
+          {
+            init: {
+              signal,
+              headers: targetProfileId
+                ? { 'X-Profile-Id': targetProfileId }
+                : undefined,
+            },
+          }
+        );
         await assertOk(res);
         const data = await res.json();
         return data.pendingCelebrations as PendingCelebration[];
@@ -62,12 +64,14 @@ export function useMarkCelebrationsSeen(): UseMutationResult<
       viewer: 'child' | 'parent';
       profileId?: string;
     }) => {
-      const res = await client.celebrations.seen.$post({
-        json: { viewer },
-        init: {
-          headers: profileId ? { 'X-Profile-Id': profileId } : undefined,
-        },
-      } as never);
+      const res = await client.celebrations.seen.$post(
+        { json: { viewer } },
+        {
+          init: {
+            headers: profileId ? { 'X-Profile-Id': profileId } : undefined,
+          },
+        }
+      );
       await assertOk(res);
       return (await res.json()) as { ok: boolean };
     },

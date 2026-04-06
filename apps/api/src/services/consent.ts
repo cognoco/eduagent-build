@@ -240,7 +240,7 @@ export async function requestConsent(
   });
   const childName = childProfile?.displayName ?? 'your child';
 
-  const tokenUrl = `${appUrl}/consent?token=${token}`;
+  const tokenUrl = `${appUrl}/v1/consent-page?token=${token}`;
 
   const emailResult = await sendEmail(
     formatConsentRequestEmail(
@@ -253,6 +253,15 @@ export async function requestConsent(
   );
 
   if (!emailResult.sent) {
+    // Missing API key is a config issue, not a delivery failure — return
+    // gracefully so the consent state is still created (email can be resent).
+    if (emailResult.reason === 'no_api_key') {
+      return {
+        consentState: mapConsentRow(row),
+        emailDelivered: false,
+      };
+    }
+
     // Roll back the resend counter — don't burn attempts when email fails.
     // Use GREATEST to avoid negative values on initial insert (resendCount=0).
     try {

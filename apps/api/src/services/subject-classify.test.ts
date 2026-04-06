@@ -48,8 +48,25 @@ const PROFILE_ID = 'profile-001';
 beforeEach(() => jest.clearAllMocks());
 
 describe('classifySubject', () => {
-  it('returns empty candidates when learner has no subjects', async () => {
+  it('suggests a subject name via LLM when learner has no subjects', async () => {
     mockListSubjects.mockResolvedValueOnce([]);
+    llmResponse({ suggestedSubjectName: 'Mathematics' });
+
+    const result = await classifySubject(
+      FAKE_DB,
+      PROFILE_ID,
+      'solve 2x + 5 = 15'
+    );
+
+    expect(result.candidates).toEqual([]);
+    expect(result.needsConfirmation).toBe(true);
+    expect(result.suggestedSubjectName).toBe('Mathematics');
+    expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null suggestedSubjectName when LLM fails with no subjects', async () => {
+    mockListSubjects.mockResolvedValueOnce([]);
+    mockRouteAndCall.mockRejectedValueOnce(new Error('LLM unavailable'));
 
     const result = await classifySubject(
       FAKE_DB,
@@ -60,7 +77,6 @@ describe('classifySubject', () => {
     expect(result.candidates).toEqual([]);
     expect(result.needsConfirmation).toBe(true);
     expect(result.suggestedSubjectName).toBeNull();
-    expect(mockRouteAndCall).not.toHaveBeenCalled();
   });
 
   it('auto-matches with 0.9 confidence when learner has a single subject', async () => {

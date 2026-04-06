@@ -216,7 +216,7 @@ export default function CreateProfileScreen() {
           Birth date
         </Text>
         <Text className="text-body-sm text-text-secondary mb-2">
-          We use your age to personalise how your coach talks to you and to
+          We use your age to personalise how your mentor talks to you and to
           comply with privacy laws.
         </Text>
         <Pressable

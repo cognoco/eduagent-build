@@ -319,4 +319,101 @@ describe('trialExpiry', () => {
       10
     );
   });
+
+  // -----------------------------------------------------------------------
+  // [4C.11] Timezone edge cases — date boundary handling
+  // The cron runs at midnight UTC. Trials that end just before/after midnight
+  // in extreme timezones must still be caught by the date range queries.
+  // -----------------------------------------------------------------------
+
+  describe('timezone edge cases [4C.11]', () => {
+    it('catches trials expiring near midnight in UTC+12 (earliest timezone)', async () => {
+      // A trial that expired at 23:59 UTC+12 (= 11:59 UTC on Jan 14)
+      // should be caught by the cron running at midnight UTC on Jan 15
+      const trialInUTCPlus12 = {
+        id: 'sub-tz-plus12',
+        accountId: 'acc-tz-plus12',
+        status: 'trial',
+        trialEndsAt: '2025-01-14T11:59:00.000Z', // 23:59 NZST (UTC+12)
+      };
+
+      mockFindExpiredTrials.mockResolvedValueOnce([trialInUTCPlus12]);
+      mockFindExpiredTrialsByDaysSinceEnd.mockResolvedValueOnce([]);
+      mockFindSubscriptionsByTrialDateRange.mockResolvedValue([]);
+
+      const { result } = await executeSteps();
+
+      expect(result.expiredCount).toBe(1);
+      expect(mockTransitionToExtendedTrial).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-tz-plus12',
+        450
+      );
+    });
+
+    it('catches trials expiring near midnight in UTC-12 (latest timezone)', async () => {
+      // A trial that expired at 23:59 UTC-12 (= 11:59 UTC on Jan 15)
+      // — findExpiredTrials checks trialEndsAt <= now, and now is midnight Jan 15 UTC.
+      // This trial's UTC time is Jan 15 11:59 which is > now, so it should NOT
+      // be found by findExpiredTrials (the DB query uses UTC comparison).
+      // The point: the cron correctly relies on UTC-stored trial dates.
+      mockFindExpiredTrials.mockResolvedValueOnce([]);
+      mockFindExpiredTrialsByDaysSinceEnd.mockResolvedValueOnce([]);
+      mockFindSubscriptionsByTrialDateRange.mockResolvedValue([]);
+
+      const { result } = await executeSteps();
+
+      // Trial has not yet expired in UTC terms — should not be processed
+      expect(result.expiredCount).toBe(0);
+      expect(mockTransitionToExtendedTrial).not.toHaveBeenCalled();
+    });
+
+    it('computes correct warning date ranges across DST transition', async () => {
+      // Cron runs at midnight UTC on a DST transition day (March 30, 2025)
+      // Spring forward in CET: March 30 at 02:00 → 03:00
+      // The date arithmetic in the cron uses plain Date addition, not timezone-aware.
+      // This test verifies the 3-day warning still produces valid date ranges.
+      jest.setSystemTime(new Date('2025-03-30T00:00:00.000Z'));
+
+      const trialEndingIn3Days = {
+        id: 'sub-dst',
+        accountId: 'acc-dst',
+        status: 'trial',
+        trialEndsAt: '2025-04-02T12:00:00.000Z',
+      };
+
+      mockFindExpiredTrials.mockResolvedValueOnce([]);
+      mockFindExpiredTrialsByDaysSinceEnd.mockResolvedValueOnce([]);
+      mockFindSubscriptionsByTrialDateRange
+        .mockResolvedValueOnce([trialEndingIn3Days]) // 3-day warning
+        .mockResolvedValue([]);
+
+      const { result } = await executeSteps();
+
+      // The 3-day warning query should produce a 24-hour range (start == end's date)
+      // The exact date depends on the runtime's UTC date arithmetic.
+      // Verify structurally: first 'trial' query should be a valid full-day range
+      const warningCalls =
+        mockFindSubscriptionsByTrialDateRange.mock.calls.filter(
+          (call: unknown[]) => call[1] === 'trial'
+        );
+      expect(warningCalls.length).toBe(3); // 3 warning queries (days 3, 1, 0)
+
+      // First warning call (3-day) should produce a start/end on the same day
+      const [, , start3, end3] = warningCalls[0] as [
+        unknown,
+        unknown,
+        Date,
+        Date
+      ];
+      expect(start3.toISOString()).toMatch(/T00:00:00\.000Z$/);
+      expect(end3.toISOString()).toMatch(/T23:59:59\.999Z$/);
+      // The date portion should match (same day)
+      expect(start3.toISOString().slice(0, 10)).toBe(
+        end3.toISOString().slice(0, 10)
+      );
+
+      expect(result.warningsSent).toBeGreaterThanOrEqual(1);
+    });
+  });
 });

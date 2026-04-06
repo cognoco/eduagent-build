@@ -179,8 +179,31 @@ describe('requestConsent', () => {
     expect(insertedValues.consentToken.length).toBeGreaterThan(0);
   });
 
-  it('throws EmailDeliveryError and rolls back counter when email fails', async () => {
+  it('returns emailDelivered false when API key is missing (no_api_key)', async () => {
     mockSendEmail.mockResolvedValueOnce({ sent: false, reason: 'no_api_key' });
+    const row = mockConsentRow();
+    const db = createMockDb({ insertReturning: [row] });
+
+    const result = await requestConsent(
+      db,
+      {
+        childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+      },
+      'https://test.example.com'
+    );
+
+    expect(result.emailDelivered).toBe(false);
+    // Counter should NOT be rolled back for missing config
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('throws EmailDeliveryError and rolls back counter when email delivery fails', async () => {
+    mockSendEmail.mockResolvedValueOnce({
+      sent: false,
+      reason: 'delivery_failed',
+    });
     const row = mockConsentRow();
     const db = createMockDb({ insertReturning: [row] });
 

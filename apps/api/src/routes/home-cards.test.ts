@@ -25,17 +25,13 @@ jest.mock('../services/account', () => ({
 }));
 
 jest.mock('../services/profile', () => ({
-  findOwnerProfile: jest.fn().mockResolvedValue({
+  findOwnerProfile: jest.fn().mockResolvedValue(null),
+  getProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
-    accountId: 'test-account-id',
-    isOwner: true,
-    displayName: 'Test User',
-    birthYear: 2000,
-    birthDate: null,
+    birthYear: null,
     location: null,
     consentStatus: 'CONSENTED',
   }),
-  getProfile: jest.fn(),
 }));
 
 jest.mock('../services/home-cards', () => ({
@@ -48,37 +44,24 @@ import {
   getHomeCardsForProfile,
   trackHomeCardInteraction,
 } from '../services/home-cards';
-import { findOwnerProfile } from '../services/profile';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  DATABASE_URL: 'postgresql://test:test@localhost/test',
 };
 
 const AUTH_HEADERS = {
   Authorization: 'Bearer valid.jwt.token',
   'Content-Type': 'application/json',
+  'X-Profile-Id': 'test-profile-id',
 };
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (findOwnerProfile as jest.Mock).mockResolvedValue({
-    id: 'test-profile-id',
-    accountId: 'test-account-id',
-    isOwner: true,
-    displayName: 'Test User',
-    birthYear: 2000,
-    birthDate: null,
-    location: null,
-    consentStatus: 'CONSENTED',
-  });
 });
 
 describe('home card routes', () => {
-  // TODO: profile-scope middleware's findOwnerProfile mock doesn't propagate
-  // profileId in the test environment. The route returns 400 because profileId
-  // is correctly guarded (no account.id fallback). Unskip when the test
-  // infrastructure supports profile resolution through the middleware chain.
-  it.skip('returns ranked home cards', async () => {
+  it('returns ranked home cards', async () => {
     (getHomeCardsForProfile as jest.Mock).mockResolvedValue({
       coldStart: false,
       cards: [
@@ -120,10 +103,7 @@ describe('home card routes', () => {
     expect(body.cards[0].id).toBe('study');
   });
 
-  // Route is fully implemented but test can't run: profile-scope middleware's
-  // findOwnerProfile mock doesn't propagate profileId in the unit test env.
-  // Covered by integration tests instead. See bug #29.
-  it.skip('records card interactions', async () => {
+  it('records card interactions', async () => {
     (trackHomeCardInteraction as jest.Mock).mockResolvedValue(undefined);
 
     const res = await app.request(

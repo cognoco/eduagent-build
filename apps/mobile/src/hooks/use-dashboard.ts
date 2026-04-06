@@ -22,16 +22,15 @@ export function useDashboard(): UseQueryResult<DashboardData> {
       const { signal, cleanup } = combinedSignal(querySignal);
 
       try {
-        const res = await client.dashboard.$get({
-          init: { signal },
-        } as never);
+        const res = await client.dashboard.$get({}, { init: { signal } });
         await assertOk(res);
         const data = (await res.json()) as DashboardData;
 
         if (data.children.length === 0) {
-          const demoRes = await client.dashboard.demo.$get({
-            init: { signal },
-          } as never);
+          const demoRes = await client.dashboard.demo.$get(
+            {},
+            { init: { signal } }
+          );
           await assertOk(demoRes);
           return (await demoRes.json()) as DashboardData;
         }
@@ -59,10 +58,10 @@ export function useChildDetail(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.dashboard.children[':profileId'].$get({
-          param: { profileId: childProfileId! },
-          init: { signal },
-        } as never);
+        const res = await client.dashboard.children[':profileId'].$get(
+          { param: { profileId: childProfileId! } },
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = await res.json();
         return data.child;
@@ -88,10 +87,10 @@ export function useChildSubjectTopics(
       try {
         const res = await client.dashboard.children[':profileId'].subjects[
           ':subjectId'
-        ].$get({
-          param: { profileId: childProfileId!, subjectId: subjectId! },
-          init: { signal },
-        } as never);
+        ].$get(
+          { param: { profileId: childProfileId!, subjectId: subjectId! } },
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = await res.json();
         return data.topics;
@@ -113,10 +112,8 @@ export function useChildSessions(childProfileId: string | undefined) {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client.dashboard.children[':profileId'].sessions.$get(
-          {
-            param: { profileId: childProfileId! },
-            init: { signal },
-          } as never
+          { param: { profileId: childProfileId! } },
+          { init: { signal } }
         );
         await assertOk(res);
         const data = await res.json();
@@ -150,10 +147,10 @@ export function useChildSessionTranscript(
       try {
         const res = await client.dashboard.children[':profileId'].sessions[
           ':sessionId'
-        ].transcript.$get({
-          param: { profileId: childProfileId!, sessionId: sessionId! },
-          init: { signal },
-        } as never);
+        ].transcript.$get(
+          { param: { profileId: childProfileId!, sessionId: sessionId! } },
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = await res.json();
         return data.transcript;

@@ -20,7 +20,7 @@
     <circle cx="100" cy="10" r="8.5" fill="#ccfbf1"/>
   </g>
   <!-- Wordmark centered below -->
-  <text x="82" y="112" text-anchor="end" font-family="'Inter',system-ui,sans-serif" font-size="22" font-weight="600" letter-spacing="-.5" fill="#1c1917">ment</text>
+  <text x="82" y="112" text-anchor="end" font-family="'Inter',system-ui,sans-serif" font-size="22" font-weight="600" letter-spacing="-.5" fill="#1a1a3e">ment</text>
   <circle cx="90" cy="106" r="5.5" fill="none" stroke="#8b5cf6" stroke-width="1.8"/>
   <circle cx="90" cy="106" r="2" fill="#8b5cf6"/>
   <text x="98" y="112" font-family="'Inter',system-ui,sans-serif" font-size="22" font-weight="600" letter-spacing="-.5" fill="#0d9488">mate</text>

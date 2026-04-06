@@ -40,6 +40,49 @@ export async function classifySubject(
   const subjects = await listSubjects(db, profileId);
 
   if (subjects.length === 0) {
+    // Still ask the LLM to suggest a subject name from the problem text
+    const sanitized = text
+      .split('')
+      .filter((ch) => {
+        const code = ch.charCodeAt(0);
+        if (code <= 0x08) return false;
+        if (code === 0x0b || code === 0x0c) return false;
+        if (code >= 0x0e && code <= 0x1f) return false;
+        if (code === 0x7f) return false;
+        return true;
+      })
+      .join('')
+      .slice(0, 500);
+
+    try {
+      const suggestResult = await routeAndCall(
+        [
+          {
+            role: 'system',
+            content: `You are a subject classifier for a tutoring platform. The student has no enrolled subjects yet. Given a piece of homework or study text, determine the most fitting school subject. Return ONLY a JSON object: { "suggestedSubjectName": "Subject Name" }. Use common, concise school subject names like "Mathematics", "Physics", "Computer Science", "Biology", "History", "English", etc.`,
+          },
+          { role: 'user', content: `Text to classify:\n${sanitized}` },
+        ],
+        1 // Rung 1 = Gemini Flash (fast/cheap)
+      );
+      const jsonMatch = suggestResult.response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+        if (
+          typeof parsed.suggestedSubjectName === 'string' &&
+          parsed.suggestedSubjectName.trim()
+        ) {
+          return {
+            candidates: [],
+            needsConfirmation: true,
+            suggestedSubjectName: parsed.suggestedSubjectName.trim(),
+          };
+        }
+      }
+    } catch {
+      // LLM failed — fall through to default empty result
+    }
+
     return {
       candidates: [],
       needsConfirmation: true,

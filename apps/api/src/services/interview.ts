@@ -2,13 +2,15 @@ import { eq, and, desc } from 'drizzle-orm';
 import {
   onboardingDrafts,
   curricula,
+  curriculumBooks,
   curriculumTopics,
   subjects,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
 import { routeAndCall, routeAndStream, type ChatMessage } from './llm';
-import { generateCurriculum } from './curriculum';
+import { generateCurriculum, ensureCurriculum } from './curriculum';
+import { getProfileAge } from './profile';
 import type {
   InterviewContext,
   InterviewResult,
@@ -21,10 +23,38 @@ import type {
 // Interview service — pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
+/** Look up a curriculum book's title, verifying ownership through the subject→profile chain. */
+export async function getBookTitle(
+  db: Database,
+  profileId: string,
+  bookId: string,
+  subjectId: string
+): Promise<string | undefined> {
+  // Join through subjects to verify the subject belongs to this profile,
+  // preventing IDOR where an attacker passes a bookId from another user's subject.
+  const subject = await db.query.subjects.findFirst({
+    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+    columns: { id: true },
+  });
+  if (!subject) return undefined;
+
+  const row = await db.query.curriculumBooks.findFirst({
+    where: and(
+      eq(curriculumBooks.id, bookId),
+      eq(curriculumBooks.subjectId, subjectId)
+    ),
+    columns: { title: true },
+  });
+  return row?.title;
+}
+
 const INTERVIEW_SYSTEM_PROMPT = `You are MentoMate, an AI learning mate conducting a brief assessment interview.
 Ask about the learner's goals, prior experience, and current knowledge level for the given subject.
 Keep questions conversational and brief. After 3-5 exchanges when you have enough signal,
-respond with the special marker [INTERVIEW_COMPLETE] at the end of your response.`;
+wrap up with a short, encouraging summary of what you learned and an enthusiastic invitation
+to start learning together — for example "I've got a great picture of where you are — let's dive in!"
+Then place the marker [INTERVIEW_COMPLETE] on its own line at the very end (after your message).
+The marker will be hidden from the learner, so your visible text should feel like a natural ending.`;
 
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -184,10 +214,13 @@ export async function processInterviewExchange(
   context: InterviewContext,
   userMessage: string
 ): Promise<InterviewResult> {
+  const focusLine = context.bookTitle
+    ? `\nFocus area: ${context.bookTitle}\nScope your questions to this specific focus area within the subject, not the entire subject.`
+    : '';
   const messages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: ${context.subjectName}`,
+      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: ${context.subjectName}${focusLine}`,
     },
     ...context.exchangeHistory.map((e) => ({
       role: e.role as 'user' | 'assistant',
@@ -225,10 +258,13 @@ export async function streamInterviewExchange(
   stream: AsyncIterable<string>;
   onComplete: (fullResponse: string) => Promise<InterviewResult>;
 }> {
+  const focusLine = context.bookTitle
+    ? `\nFocus area: ${context.bookTitle}\nScope your questions to this specific focus area within the subject, not the entire subject.`
+    : '';
   const messages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: ${context.subjectName}`,
+      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: ${context.subjectName}${focusLine}`,
     },
     ...context.exchangeHistory.map((e) => ({
       role: e.role as 'user' | 'assistant',
@@ -376,7 +412,9 @@ export async function persistCurriculum(
   profileId: string,
   subjectId: string,
   subjectName: string,
-  draft: OnboardingDraft
+  draft: OnboardingDraft,
+  bookId?: string,
+  bookTitle?: string
 ): Promise<void> {
   // Verify the subject belongs to this profile before inserting curriculum
   const subject = await db.query.subjects.findFirst({
@@ -393,8 +431,53 @@ export async function persistCurriculum(
   const signals = draft.extractedSignals as {
     goals?: string[];
     experienceLevel?: string;
+    currentKnowledge?: string;
   };
 
+  // Book-scoped path: generate topics for a specific book within the subject
+  if (bookId && bookTitle) {
+    const { generateBookTopics } = await import('./book-generation');
+    const learnerAge = await getProfileAge(db, profileId);
+    const priorKnowledge = signals.currentKnowledge ?? summary;
+    const result = await generateBookTopics(
+      bookTitle,
+      '',
+      learnerAge,
+      priorKnowledge
+    );
+
+    const curriculum = await ensureCurriculum(db, subjectId);
+
+    if (result.topics.length > 0) {
+      await db.insert(curriculumTopics).values(
+        result.topics.map((t, i) => ({
+          curriculumId: curriculum.id,
+          bookId,
+          title: t.title,
+          description: t.description,
+          chapter: t.chapter ?? null,
+          sortOrder: t.sortOrder ?? i,
+          relevance: 'core' as const,
+          estimatedMinutes: t.estimatedMinutes ?? 30,
+        }))
+      );
+    }
+
+    // Mark book topics as generated
+    await db
+      .update(curriculumBooks)
+      .set({ topicsGenerated: true })
+      .where(
+        and(
+          eq(curriculumBooks.id, bookId),
+          eq(curriculumBooks.subjectId, subjectId)
+        )
+      );
+
+    return;
+  }
+
+  // Full-curriculum generation flow
   const topics = await generateCurriculum({
     subjectName,
     interviewSummary: summary,

@@ -248,6 +248,7 @@ export async function generateExport(
         : null,
       location: row.location ?? null,
       isOwner: row.isOwner,
+      hasPremiumLlm: row.hasPremiumLlm,
       consentStatus: consentStatusByProfileId.get(row.id) ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

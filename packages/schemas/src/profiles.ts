@@ -72,6 +72,7 @@ export const profileSchema = z.object({
   birthYear: birthYearSchema.nullable().optional(),
   location: locationSchema.nullable(),
   isOwner: z.boolean(),
+  hasPremiumLlm: z.boolean().default(false),
   consentStatus: consentStatusSchema.nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

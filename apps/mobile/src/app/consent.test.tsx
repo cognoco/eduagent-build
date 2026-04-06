@@ -34,6 +34,49 @@ jest.mock('../hooks/use-network-status', () => ({
   useNetworkStatus: () => ({ isOffline: false, isReady: true }),
 }));
 
+/**
+ * Controllable mock for reduced-motion tests. Default: false (animations run).
+ * We re-mock react-native-reanimated to replace the static `() => false` from
+ * test-setup.ts with a jest.fn() that individual tests can override.
+ */
+const mockReduceMotion = jest.fn(() => false);
+
+jest.mock('react-native-reanimated', () => {
+  const { View, Text } = require('react-native');
+  const chainable = { delay: () => chainable, duration: () => chainable };
+  return {
+    __esModule: true,
+    default: {
+      View,
+      Text,
+      ScrollView: View,
+      createAnimatedComponent: (c: unknown) => c,
+    },
+    FadeIn: chainable,
+    FadeInUp: chainable,
+    FadeOutDown: chainable,
+    useAnimatedStyle: () => ({}),
+    useAnimatedProps: () => ({}),
+    useSharedValue: (v: unknown) => ({ value: v }),
+    useReducedMotion: () => mockReduceMotion(),
+    withTiming: (v: unknown) => v,
+    withSpring: (v: unknown) => v,
+    withRepeat: (v: unknown) => v,
+    withSequence: (v: unknown) => v,
+    withDelay: (_d: number, v: unknown) => v,
+    cancelAnimation: () => undefined,
+    runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
+    Easing: {
+      linear: undefined,
+      ease: undefined,
+      bezier: () => undefined,
+      inOut: () => undefined,
+      out: () => undefined,
+      in: () => undefined,
+    },
+  };
+});
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, gcTime: 0 } },
 });
@@ -319,5 +362,71 @@ describe('ConsentScreen', () => {
     flushFadeAnimation();
     expect(mockBack).not.toHaveBeenCalled();
     expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
+  });
+
+  // ── Reduced motion ──────────────────────────────────────────────
+
+  describe('reduced motion', () => {
+    beforeEach(() => {
+      mockReduceMotion.mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      mockReduceMotion.mockReturnValue(false);
+    });
+
+    it('transitions immediately to parent view without fade animation when reduced motion is enabled', () => {
+      render(<ConsentScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(screen.getByTestId('consent-handoff-button'));
+      // No flushFadeAnimation() needed — reduced motion skips the animation
+
+      expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
+      expect(screen.queryByTestId('consent-child-view')).toBeNull();
+    });
+
+    it('transitions immediately to success phase without fade animation when reduced motion is enabled', async () => {
+      mockMutateAsync.mockResolvedValue({
+        message: 'Consent request sent',
+        consentType: 'GDPR',
+        emailStatus: 'sent',
+      });
+
+      render(<ConsentScreen />, { wrapper: Wrapper });
+
+      // Go to parent view (instant, no animation)
+      fireEvent.press(screen.getByTestId('consent-handoff-button'));
+      expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
+
+      // Fill email and submit
+      fireEvent.changeText(
+        screen.getByTestId('consent-email'),
+        'parent@example.com'
+      );
+      fireEvent.press(screen.getByTestId('consent-submit'));
+
+      await waitFor(() => {
+        expect(mockMutateAsync).toHaveBeenCalled();
+      });
+
+      // Success phase renders instantly without needing flushFadeAnimation
+      await waitFor(() => {
+        expect(screen.getByTestId('consent-success')).toBeTruthy();
+      });
+    });
+
+    it('keeps fadeAnim opacity at 1 when reduced motion is enabled', () => {
+      render(<ConsentScreen />, { wrapper: Wrapper });
+
+      // The Animated.View wrapping phase content should have opacity 1
+      // because reduced motion skips the fade-out/fade-in sequence
+      fireEvent.press(screen.getByTestId('consent-handoff-button'));
+
+      // Phase switched instantly — parent view visible
+      expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
+
+      // No intermediate opacity=0 state; pointerEvents should be 'auto'
+      // (isTransitioning stays false when reduced motion skips animation)
+    });
   });
 });

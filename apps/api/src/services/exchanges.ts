@@ -17,6 +17,7 @@ import {
   type HomeworkMode,
 } from '@eduagent/schemas';
 import { buildFourStrandsPrompt } from './language-prompts';
+import type { LLMTier } from './subscription';
 
 // ---------------------------------------------------------------------------
 // Core Exchange Processing Pipeline — Story 2.1
@@ -73,6 +74,8 @@ export interface ExchangeContext {
   };
   /** FR228: Homework mode — "Help me solve it" or "Check my answer" */
   homeworkMode?: HomeworkMode;
+  /** Subscription-derived LLM tier — controls model routing (flash/standard/premium) */
+  llmTier?: LLMTier;
 }
 
 /** Result of processing a single exchange */
@@ -441,7 +444,8 @@ export async function processExchange(
 
   const result: RouteResult = await routeAndCall(
     messages,
-    context.escalationRung
+    context.escalationRung,
+    { llmTier: context.llmTier }
   );
 
   const isUnderstandingCheck = detectUnderstandingCheck(result.response);
@@ -496,7 +500,8 @@ export async function streamExchange(
 
   const result: StreamResult = await routeAndStream(
     messages,
-    context.escalationRung
+    context.escalationRung,
+    context.llmTier
   );
 
   return {

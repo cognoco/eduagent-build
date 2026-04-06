@@ -143,9 +143,9 @@ describe('parseSSEStream', () => {
     expect(events[0]).toEqual({ type: 'chunk', content: 'ok' });
   });
 
-  it('skips done events missing escalationRung (BC-07)', async () => {
+  it('accepts done events without escalationRung (interview done events)', async () => {
     const stream = createMockStream([
-      'data: {"type":"done","exchangeCount":5}\n\n',
+      'data: {"type":"done","exchangeCount":5,"isComplete":true}\n\n',
       'data: {"type":"done","exchangeCount":3,"escalationRung":2}\n\n',
     ]);
 
@@ -154,8 +154,13 @@ describe('parseSSEStream', () => {
       events.push(event);
     }
 
-    expect(events).toHaveLength(1);
+    expect(events).toHaveLength(2);
     expect(events[0]).toEqual({
+      type: 'done',
+      exchangeCount: 5,
+      isComplete: true,
+    });
+    expect(events[1]).toEqual({
       type: 'done',
       exchangeCount: 3,
       escalationRung: 2,

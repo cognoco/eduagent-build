@@ -282,6 +282,43 @@ describe('auth validation', () => {
     expect(res.status).toBe(401);
   });
 
+  it('returns 401 when Authorization header uses non-Bearer scheme [4C.1]', async () => {
+    const res = await app.request(
+      '/revenuecat/webhook',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Basic ${TEST_ENV.REVENUECAT_WEBHOOK_SECRET}`,
+        },
+        body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.code).toBe('UNAUTHORIZED');
+  });
+
+  it('returns 401 when Authorization header is "Bearer " with empty token [4C.1]', async () => {
+    const res = await app.request(
+      '/revenuecat/webhook',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ',
+        },
+        body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
+      },
+      TEST_ENV
+    );
+
+    // "Bearer " with empty string should fail verification
+    expect(res.status).toBe(401);
+  });
+
   it('rejects tokens of same length but wrong value (BS-01)', async () => {
     // Same length as secret but different content
     const sameLength = 'x'.repeat(TEST_ENV.REVENUECAT_WEBHOOK_SECRET.length);
@@ -345,6 +382,80 @@ describe('idempotency', () => {
     const res = await makeRequest(makeWebhookPayload('INITIAL_PURCHASE'));
     expect(res.status).toBe(200);
     expect(activateSubscriptionFromRevenuecat).toHaveBeenCalled();
+  });
+
+  it('skips out-of-order events (newer event already processed) [4C.3]', async () => {
+    // isRevenuecatEventProcessed returns true when event_timestamp_ms < last processed
+    (isRevenuecatEventProcessed as jest.Mock).mockResolvedValue(true);
+
+    const olderPayload = makeWebhookPayload('RENEWAL', {
+      event_timestamp_ms: Date.now() - 60000, // 1 minute ago
+    });
+
+    const res = await makeRequest(olderPayload);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.skipped).toBe(true);
+    expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
+  });
+
+  it('passes event_timestamp_ms to isRevenuecatEventProcessed [4C.3]', async () => {
+    const timestampMs = 1700000000000;
+    const payload = makeWebhookPayload('RENEWAL', {
+      event_timestamp_ms: timestampMs,
+    });
+
+    await makeRequest(payload);
+
+    expect(isRevenuecatEventProcessed).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.any(String),
+      timestampMs
+    );
+  });
+
+  it('handles null event_timestamp_ms gracefully [4C.3]', async () => {
+    const payload = makeWebhookPayload('RENEWAL', {
+      event_timestamp_ms: undefined, // null/missing
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+
+    // Should still pass through to isRevenuecatEventProcessed with undefined
+    expect(isRevenuecatEventProcessed).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.any(String),
+      undefined
+    );
+  });
+
+  it('rejects duplicate transaction IDs in NON_RENEWING_PURCHASE (BS-02) [4C.3]', async () => {
+    // purchaseTopUpCredits returns null when ON CONFLICT DO NOTHING triggers
+    (purchaseTopUpCredits as jest.Mock).mockResolvedValue(null);
+
+    const payload = makeWebhookPayload('NON_RENEWING_PURCHASE', {
+      product_id: 'com.eduagent.topup.500',
+      store_transaction_id: 'txn_duplicate_123',
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+
+    // purchaseTopUpCredits IS called with the transaction ID
+    expect(purchaseTopUpCredits).toHaveBeenCalledWith(
+      mockDb,
+      'sub-internal-1',
+      500,
+      expect.any(Date),
+      'txn_duplicate_123'
+    );
+
+    // KV cache should NOT be refreshed for duplicate transactions
+    expect(writeSubscriptionStatus).not.toHaveBeenCalled();
   });
 });
 

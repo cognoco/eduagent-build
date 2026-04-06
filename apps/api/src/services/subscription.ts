@@ -10,10 +10,14 @@ export interface SubscriptionState {
   currentPeriodEnd: string | null;
 }
 
+export type LLMTier = 'flash' | 'standard' | 'premium';
+
 export interface TierConfig {
   monthlyQuota: number;
   dailyLimit: number | null;
   maxProfiles: number;
+  premiumModelProfiles: number;
+  llmTier: LLMTier;
   priceMonthly: number;
   priceYearly: number;
   topUpPrice: number;
@@ -29,6 +33,8 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     monthlyQuota: 100,
     dailyLimit: 10,
     maxProfiles: 1,
+    premiumModelProfiles: 0,
+    llmTier: 'flash',
     priceMonthly: 0,
     priceYearly: 0,
     topUpPrice: 0,
@@ -38,6 +44,8 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     monthlyQuota: 500,
     dailyLimit: null,
     maxProfiles: 1,
+    premiumModelProfiles: 1,
+    llmTier: 'premium',
     priceMonthly: 18.99,
     priceYearly: 168,
     topUpPrice: 10,
@@ -47,6 +55,8 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     monthlyQuota: 1500,
     dailyLimit: null,
     maxProfiles: 4,
+    premiumModelProfiles: 0,
+    llmTier: 'standard',
     priceMonthly: 28.99,
     priceYearly: 252,
     topUpPrice: 5,
@@ -56,11 +66,27 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     monthlyQuota: 3000,
     dailyLimit: null,
     maxProfiles: 6,
+    premiumModelProfiles: 2,
+    llmTier: 'standard',
     priceMonthly: 48.99,
     priceYearly: 432,
     topUpPrice: 5,
     topUpAmount: 500,
   },
+};
+
+// ---------------------------------------------------------------------------
+// AI Upgrade Add-on — per-profile premium model upgrade
+// ---------------------------------------------------------------------------
+
+export interface AIUpgradeConfig {
+  priceMonthly: number;
+  llmTier: LLMTier;
+}
+
+export const AI_UPGRADE_ADDON: AIUpgradeConfig = {
+  priceMonthly: 15,
+  llmTier: 'premium',
 };
 
 /** Set of valid status transitions as "from->to" strings */
@@ -69,8 +95,10 @@ const VALID_TRANSITIONS = new Set([
   'trial->expired',
   'active->past_due',
   'active->cancelled',
+  'active->expired', // Stripe customer.subscription.deleted (immediate cancellation)
   'past_due->active',
   'past_due->cancelled',
+  'past_due->expired', // Stripe customer.subscription.deleted while past_due
   'cancelled->expired',
 ]);
 
@@ -88,8 +116,8 @@ export function getTierConfig(tier: SubscriptionState['tier']): TierConfig {
  *
  * Valid transitions:
  * - trial -> active, expired
- * - active -> past_due, cancelled
- * - past_due -> active, cancelled
+ * - active -> past_due, cancelled, expired
+ * - past_due -> active, cancelled, expired
  * - cancelled -> expired
  *
  * Invalid: expired -> anything, trial -> cancelled (must go through active first)

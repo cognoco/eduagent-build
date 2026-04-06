@@ -103,6 +103,7 @@
     "metro-config": "~0.83.0",
     "metro-resolver": "~0.83.0",
     "nx": "22.2.0",
+    "pg": "^8.20.0",
     "prettier": "^2.6.2",
     "react-dom": "19.1.0",
     "react-native-web": "^0.21.2",

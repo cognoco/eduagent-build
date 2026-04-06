@@ -95,7 +95,7 @@ export function useCoachingCard(defaultSubjectId?: string): CoachingCardState {
       0: {
         headline:
           "I'm still getting to know you. What are you working on today?",
-        subtext: 'Your mate is ready when you are.',
+        subtext: "I'm ready when you are.",
       },
       1: {
         headline: 'What have we got today?',
@@ -112,7 +112,7 @@ export function useCoachingCard(defaultSubjectId?: string): CoachingCardState {
     };
     const { headline, subtext } = coldStartHeadlines[sessionStreak] ?? {
       headline: 'What are you working on today?',
-      subtext: 'Your mate is ready when you are.',
+      subtext: "I'm ready when you are.",
     };
 
     return {

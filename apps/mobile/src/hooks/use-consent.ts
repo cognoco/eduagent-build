@@ -20,6 +20,7 @@ export function useRequestConsent(): UseMutationResult<
   ConsentRequest
 > {
   const client = useApiClient();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (
@@ -28,6 +29,14 @@ export function useRequestConsent(): UseMutationResult<
       const res = await client.consent.request.$post({ json: input });
       await assertOk(res);
       return (await res.json()) as ConsentRequestResult;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = String(query.queryKey[0]);
+          return key === 'profiles' || key === 'consent-status';
+        },
+      });
     },
   });
 }
@@ -52,9 +61,10 @@ export function useConsentStatus(): UseQueryResult<ConsentStatusData> {
     queryFn: async ({ signal: querySignal }): Promise<ConsentStatusData> => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.consent['my-status'].$get({
-          init: { signal },
-        } as never);
+        const res = await client.consent['my-status'].$get(
+          {},
+          { init: { signal } }
+        );
         await assertOk(res);
         return (await res.json()) as ConsentStatusData;
       } finally {
@@ -113,10 +123,10 @@ export function useChildConsentStatus(
       }
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.consent[':childProfileId'].status.$get({
-          param: { childProfileId },
-          init: { signal },
-        } as never);
+        const res = await client.consent[':childProfileId'].status.$get(
+          { param: { childProfileId } },
+          { init: { signal } }
+        );
         await assertOk(res);
         return (await res.json()) as ChildConsentData;
       } finally {

@@ -57,7 +57,12 @@ export default function CreateSubjectScreen() {
   const showSuggestion = resolveState.phase === 'suggestion';
 
   const doCreate = useCallback(
-    async (subjectName: string, rawInputOverride?: string) => {
+    async (
+      subjectName: string,
+      rawInputOverride?: string,
+      focus?: string,
+      focusDescription?: string
+    ) => {
       setResolveState({ phase: 'creating' });
       setError('');
       try {
@@ -69,7 +74,22 @@ export default function CreateSubjectScreen() {
         const result = await createSubject.mutateAsync({
           name: subjectName,
           ...(rawInput ? { rawInput } : {}),
+          ...(focus ? { focus, focusDescription } : {}),
         });
+
+        if (result.structureType === 'focused_book' && result.bookId) {
+          router.replace({
+            pathname: '/(learner)/onboarding/interview',
+            params: {
+              subjectId: result.subject.id,
+              subjectName: result.subject.name,
+              bookId: result.bookId,
+              bookTitle: result.bookTitle ?? focus,
+            },
+          } as never);
+          return;
+        }
+
         if (result.structureType === 'broad') {
           router.replace({
             pathname: '/(learner)/library',
@@ -123,7 +143,12 @@ export default function CreateSubjectScreen() {
         });
 
         if (result.status === 'direct_match') {
-          await doCreate(result.resolvedName ?? trimmedInput);
+          await doCreate(
+            result.resolvedName ?? trimmedInput,
+            undefined,
+            result.focus ?? undefined,
+            result.focusDescription ?? undefined
+          );
           return;
         }
 
@@ -143,9 +168,13 @@ export default function CreateSubjectScreen() {
   }, [canSubmit, name, resolveInput]);
 
   const onPickSuggestion = useCallback(
-    async (suggestionName: string) => {
-      setName(suggestionName);
-      await doCreate(suggestionName);
+    async (suggestion: {
+      name: string;
+      description: string;
+      focus?: string;
+    }) => {
+      setName(suggestion.name);
+      await doCreate(suggestion.name, undefined, suggestion.focus);
     },
     [doCreate]
   );
@@ -153,8 +182,10 @@ export default function CreateSubjectScreen() {
   const onAcceptSuggestion = useCallback(async () => {
     if (resolveState.phase !== 'suggestion') return;
     const resolved = resolveState.result.resolvedName ?? name.trim();
+    const focus = resolveState.result.focus ?? undefined;
+    const focusDescription = resolveState.result.focusDescription ?? undefined;
     setName(resolved);
-    await doCreate(resolved);
+    await doCreate(resolved, undefined, focus, focusDescription);
   }, [resolveState, name, doCreate]);
 
   const onEditSuggestion = useCallback(() => {
@@ -314,16 +345,19 @@ export default function CreateSubjectScreen() {
             </View>
             {resolveState.result.suggestions.map((suggestion, index) => (
               <Pressable
-                key={suggestion.name}
-                onPress={() => onPickSuggestion(suggestion.name)}
+                key={`${suggestion.name}-${suggestion.focus ?? index}`}
+                onPress={() => onPickSuggestion(suggestion)}
                 className="bg-primary-soft rounded-card px-4 py-3 mb-2 flex-row items-center min-h-[52px]"
                 testID={`subject-suggestion-option-${index}`}
                 accessibilityRole="button"
-                accessibilityLabel={`Choose ${suggestion.name}`}
+                accessibilityLabel={`Choose ${suggestion.name}${
+                  suggestion.focus ? `: ${suggestion.focus}` : ''
+                }`}
               >
                 <View className="flex-1">
                   <Text className="text-body font-semibold text-text-primary">
                     {suggestion.name}
+                    {suggestion.focus ? `: ${suggestion.focus}` : ''}
                   </Text>
                   {suggestion.description !== '' && (
                     <Text className="text-body-sm text-text-secondary mt-0.5">

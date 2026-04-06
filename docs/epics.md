@@ -18,7 +18,7 @@ This document provides the complete epic and story breakdown for EduAgent, decom
 
 ### Functional Requirements
 
-**Total: 172 FRs (121 MVP, 5 later-phase FRs now shipped via Epic 8, 23 still deferred to v1.1, 8 Epic 13 session lifecycle, 3 Epic 7 additions, 12 Epic 14 human agency)**
+**Total: 174 FRs (121 MVP, 5 later-phase FRs now shipped via Epic 8, 23 still deferred to v1.1, 8 Epic 13 session lifecycle, 3 Epic 7 additions, 12 Epic 14 human agency, 2 Epic 7 library browsing)**
 
 **User Management (FR1-FR12) — Epic 0:**
 
@@ -411,11 +411,12 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 | FR146 | Language SPEAK/LISTEN Voice | Epic 6 | v1.1 |
 | FR150-FR152 | ~~Epic 7 additions: decay quizzes, per-edge feedback, "prove it" quiz~~ — **Cut in v3** | ~~Epic 7 v2~~ | Cut |
 | FR160-FR168 | Self-Building Library: curriculum books, chapters, LLM generation, enhanced session context, coaching cards, Library navigation, visual topic map, knowledge signals | Epic 7 v3 | Pre-launch (7.1-7.4), fast-follow (7.5-7.6) |
+| FR169-FR170 | Library three-tab browsing (Shelves/Books/Topics) with search, sort & filter | Epic 7 v3 | Fast-follow (7.7) |
 | FR210-FR217 | Session Lifecycle: adaptive time tracking (LLM + pace calibration), graceful close + session resumption, hard cap removal, mastery + effort milestones, adaptive silence detection, parent dashboard (wall-clock + exchanges), unified celebrations | Epic 13 | Pre-launch |
 | FR218-FR225 | Human Agency: per-message feedback, quick chips, topic switch, coaching dismiss, recall "I don't remember", escalation nudge, add topic, "something else" | Epic 14 | Pre/post-launch |
 | FR226-FR229 | Homework Overhaul: multi-problem sessions, problem card preview, explain-don't-question mode, learning extraction | Epic 14 | Pre/post-launch |
 
-**Coverage verification:** 149 original + 3 (Epic 7 additions) + 8 (Epic 13) + 12 (Epic 14) = **172 FRs.**
+**Coverage verification:** 149 original + 3 (Epic 7 additions) + 8 (Epic 13) + 12 (Epic 14) + 2 (Epic 7 library browsing) = **174 FRs.**
 
 ## Epic List
 
@@ -3210,9 +3211,9 @@ All 12 FRs (FR96-FR107) + FR146 mapped across 6 stories. Implementation deferred
 
 ## Epic 7: The Self-Building Library (v3) — Stories
 
-**Scope:** FR160-FR168 — 9 FRs, 6 stories (4 launch + 2 deferred)
+**Scope:** FR160-FR170 — 11 FRs, 7 stories (4 launch + 3 fast-follow)
 **Dependencies:** None
-**Revision:** v3 — "Know the Learner, Not the Graph" (2026-04-04). Full redesign replacing v2 prerequisite DAG.
+**Revision:** v3 — "Know the Learner, Not the Graph" (2026-04-04). Full redesign replacing v2 prerequisite DAG. Story 7.7 added 2026-04-05.
 ### What Changed from v2
 
 | v2 (prerequisite DAG) | v3 (self-building library) | Why |
@@ -3460,6 +3461,99 @@ So that I can see which topics I've already been exposed to regardless of how I 
 
 ---
 
+### Story 7.7: Library Search, Sort & Filter — Three-Tab Browsing
+
+As a learner with a growing library,
+I want to search, sort, and filter my library by shelves, books, or topics,
+So that I can quickly find anything in my library without drilling through every subject.
+
+**Acceptance Criteria:**
+
+**Tab navigation:**
+
+**Given** a learner opens the Library
+**When** the Library screen loads
+**Then** three tabs are visible at the top: **Shelves**, **Books**, **Topics**
+**And** the Shelves tab is selected by default (preserving current default behavior)
+**And** each tab shows a count badge (e.g., "Shelves (4)", "Books (12)", "Topics (87)")
+
+**Shelves tab:**
+
+**Given** a learner is on the Shelves tab
+**When** viewing the list
+**Then** they see all subject shelves (existing shelf cards with progress, retention, status)
+**And** they can search shelves by subject name
+**And** they can sort by: name (A-Z / Z-A), last practiced (recent first / oldest first), progress (% complete), retention status
+**And** they can filter by: status (active / paused / archived), retention urgency (strong / fading / weak / forgotten)
+
+**Books tab:**
+
+**Given** a learner taps the Books tab
+**When** the tab activates
+**Then** they see a flat list of all books across all subjects
+**And** each book card shows: emoji, title, description, parent subject name, chapter count, topic progress (X/Y completed)
+**And** tapping a book navigates to the book's topic list (same as tapping from a shelf)
+
+**Given** a learner searches in the Books tab
+**When** they type in the search field
+**Then** books are filtered by title or description match (case-insensitive)
+
+**Given** a learner sorts or filters in the Books tab
+**Then** they can sort by: name (A-Z / Z-A), progress (% complete), parent subject
+**And** they can filter by: subject (multi-select dropdown), completion status (not started / in progress / completed)
+
+**Topics tab:**
+
+**Given** a learner taps the Topics tab
+**When** the tab activates
+**Then** they see a flat list of all topics across all subjects and books (replacing the current "All Topics" toggle)
+**And** each topic row shows: topic name, parent subject, parent book (if any), chapter, repetitions, retention status, last practiced
+
+**Given** a learner searches in the Topics tab
+**When** they type in the search field
+**Then** topics are filtered by name match (case-insensitive)
+
+**Given** a learner sorts or filters in the Topics tab
+**Then** they can sort by: name (A-Z / Z-A), last practiced, retention urgency, repetition count
+**And** they can filter by: subject (multi-select), book (multi-select), retention status (strong / fading / weak / forgotten), needs attention (3+ failures)
+
+**Cross-cutting:**
+
+**Given** search, sort, or filter are active on any tab
+**When** the learner switches tabs
+**Then** search text is cleared (each tab has independent search state)
+**And** sort/filter selections are preserved per-tab for the session
+
+**Given** search returns zero results on any tab
+**When** the empty state is shown
+**Then** it says "No [shelves/books/topics] match your search" with a "Clear search" button
+**And** never shows a dead-end screen with zero actions
+
+**Given** the learner has no library content
+**When** they see the Library screen
+**Then** tabs are still visible but show "(0)" counts
+**And** each tab's empty state shows "Add a subject to start building your library" with an "Add Subject" button
+
+**Technical notes:**
+- Search is client-side filtering on already-fetched data (no new API endpoints needed for launch)
+- Sort/filter state stored in component state (not persisted across app restarts)
+- Books tab requires `useBooks()` to support fetching all books across subjects (currently scoped per subject) — add an `allBooks` query variant
+- Replace the current binary "Shelves / All Topics" toggle with the three-tab `SegmentedControl` pattern
+- `testID`s: `library-tab-shelves`, `library-tab-books`, `library-tab-topics`, `library-search-input`, `library-sort-button`, `library-filter-button`
+
+**Failure Modes:**
+
+| State | Trigger | User sees | Recovery |
+|-------|---------|-----------|----------|
+| Books query fails | Network error | "Couldn't load books" + retry | Tap retry, switch to Shelves tab |
+| Filter produces zero results | Overly narrow filters | "No matches" + clear filters button | Tap "Clear all filters" |
+| Large library (100+ topics) | Power user | Potential scroll lag | Virtualized list (FlatList already used) |
+| Tab count stale after add | Subject added on another screen | Count badge outdated | Invalidate queries on Library focus |
+
+**FRs:** FR169, FR170
+
+---
+
 ### Epic 7 Execution Order
 
 **Launch scope (Stories 7.1-7.4):**
@@ -3472,15 +3566,18 @@ So that I can see which topics I've already been exposed to regardless of how I 
 
 Stories 7.1 and 7.2 can run in parallel. Then 7.3 and 7.4 in parallel. Total for launch: 4 stories, 2 phases.
 
-**Deferred (fast-follow):**
+**Post-launch (fast-follow):**
 ```
 7.5 (Visual topic map)                                     ─── depends on 7.1, 7.3
 7.6 (Unified knowledge tracking — knowledge_signals)       ─── depends on 7.2
+7.7 (Library search, sort & filter — three-tab browsing)   ─── depends on 7.3
 ```
+
+Story 7.7 depends on 7.3 (Library navigation must exist before adding search/sort/filter on top). Can run in parallel with 7.5 and 7.6.
 
 ### Epic 7 FR Coverage
 
-9 FRs (FR160-FR168) mapped across 6 stories. Launch: FR160-FR163, FR165-FR166, FR168. Deferred: FR164 (knowledge signals), FR167 (visual map).
+11 FRs (FR160-FR170) mapped across 7 stories. Launch: FR160-FR163, FR165-FR166, FR168. Deferred: FR164 (knowledge signals), FR167 (visual map), FR169-FR170 (library search/sort/filter).
 
 ---
 

@@ -23,6 +23,7 @@ import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
 import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
 import { MentomateLogo } from '../../components/MentomateLogo';
+import { markSessionActivated } from '../../lib/auth-transition';
 
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.
@@ -34,7 +35,10 @@ const SCREEN_HEIGHT =
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
   const router = useRouter();
-  const { email: emailParam } = useLocalSearchParams<{ email?: string }>();
+  const { email: emailParam, fromSignIn } = useLocalSearchParams<{
+    email?: string;
+    fromSignIn?: string;
+  }>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
 
@@ -85,6 +89,7 @@ export default function SignUpScreen() {
 
       try {
         await setActive({ session: sessionId });
+        markSessionActivated();
         clearActivationFailure();
         return true;
       } catch {
@@ -389,6 +394,18 @@ export default function SignUpScreen() {
         <Text className="text-body-sm text-text-secondary mb-6">
           Start your learning journey
         </Text>
+
+        {fromSignIn === '1' && (
+          <View
+            className="bg-primary/10 rounded-card px-4 py-3 mb-4"
+            accessibilityRole="alert"
+          >
+            <Text className="text-body-sm text-text-primary">
+              We couldn't find an account with that email. Create one below to
+              get started.
+            </Text>
+          </View>
+        )}
 
         {error !== '' && (
           <View

@@ -17,12 +17,22 @@ Categories:
 4. "resolved" — The input is natural language clearly describing ONE subject (e.g., "I want to learn calculus", "how computers work" → "Computer Science"). suggestions array has exactly 1 entry.
 5. "no_match" — The input is nonsense, gibberish, offensive, or unmappable (e.g., "jjjjj", "asdfgh"). suggestions is empty.
 
+Focus extraction:
+When the input combines a broad subject with a specific area, extract both separately:
+- "resolvedName" is the broad subject (the shelf)
+- "focus" is the specific area within it (the book)
+- "focusDescription" is an optional longer description of the focus area
+
+NEVER combine subject and focus into a single name with dashes or colons. Always separate them into "resolvedName" and "focus" fields.
+
 Return ONLY a JSON object:
 {
   "status": "direct_match" | "corrected" | "ambiguous" | "resolved" | "no_match",
   "resolvedName": "Subject Name" | null,
+  "focus": "Specific Area" | null,
+  "focusDescription": "Longer description of the focus" | null,
   "suggestions": [
-    { "name": "Subject Name", "description": "What you'll learn" }
+    { "name": "Subject Name", "description": "What you'll learn", "focus": "Specific Area or omit" }
   ],
   "displayMessage": "A friendly message for the student"
 }
@@ -30,25 +40,33 @@ Return ONLY a JSON object:
 Examples:
 
 Input: "Physics"
-{ "status": "direct_match", "resolvedName": "Physics", "suggestions": [{"name": "Physics", "description": "Forces, motion, energy and the laws of the universe"}], "displayMessage": "" }
+{ "status": "direct_match", "resolvedName": "Physics", "focus": null, "focusDescription": null, "suggestions": [{"name": "Physics", "description": "Forces, motion, energy and the laws of the universe"}], "displayMessage": "" }
 
 Input: "Phsics"
-{ "status": "corrected", "resolvedName": "Physics", "suggestions": [{"name": "Physics", "description": "Forces, motion, energy and the laws of the universe"}], "displayMessage": "Did you mean **Physics**?" }
+{ "status": "corrected", "resolvedName": "Physics", "focus": null, "focusDescription": null, "suggestions": [{"name": "Physics", "description": "Forces, motion, energy and the laws of the universe"}], "displayMessage": "Did you mean **Physics**?" }
+
+Input: "Geography of Egypt"
+{ "status": "resolved", "resolvedName": "Geography", "focus": "Egypt", "focusDescription": null, "suggestions": [{"name": "Geography", "description": "Maps, climates and landscapes of Egypt", "focus": "Egypt"}], "displayMessage": "This sounds like **Geography** focused on **Egypt** — shall we go with that?" }
+
+Input: "Egyptian rivers"
+{ "status": "resolved", "resolvedName": "Geography", "focus": "Egypt", "focusDescription": "Rivers, deserts and landscapes of Egypt", "suggestions": [{"name": "Geography", "description": "Rivers, deserts and landscapes of Egypt", "focus": "Egypt"}], "displayMessage": "This sounds like **Geography** focused on **Egypt** — shall we go with that?" }
 
 Input: "ants"
-{ "status": "ambiguous", "resolvedName": null, "suggestions": [{"name": "Biology — Entomology", "description": "Ant bodies, life cycle, species and behaviour"}, {"name": "Ecology", "description": "How ants interact with their environment and ecosystems"}, {"name": "Zoology", "description": "Ant colonies, social structure and communication"}], "displayMessage": "**Ants** can be studied from different angles — which interests you?" }
+{ "status": "ambiguous", "resolvedName": null, "focus": null, "focusDescription": null, "suggestions": [{"name": "Biology", "focus": "Entomology", "description": "Ant bodies, life cycle, species and behaviour"}, {"name": "Ecology", "focus": "Ant Ecosystems", "description": "How ants interact with their environment and ecosystems"}, {"name": "Zoology", "focus": "Social Insects", "description": "Ant colonies, social structure and communication"}], "displayMessage": "**Ants** can be studied from different angles — which interests you?" }
 
 Input: "I want to learn how computers work"
-{ "status": "resolved", "resolvedName": "Computer Science", "suggestions": [{"name": "Computer Science", "description": "How computers process, store and transmit information"}], "displayMessage": "This sounds like **Computer Science** — shall we go with that?" }
+{ "status": "resolved", "resolvedName": "Computer Science", "focus": null, "focusDescription": null, "suggestions": [{"name": "Computer Science", "description": "How computers process, store and transmit information"}], "displayMessage": "This sounds like **Computer Science** — shall we go with that?" }
 
 Input: "jjjjj"
-{ "status": "no_match", "resolvedName": null, "suggestions": [], "displayMessage": "I couldn't find a matching subject. Try a subject name like 'Physics' or describe what you'd like to learn." }
+{ "status": "no_match", "resolvedName": null, "focus": null, "focusDescription": null, "suggestions": [], "displayMessage": "I couldn't find a matching subject. Try a subject name like 'Physics' or describe what you'd like to learn." }
 
 Rules:
 - Keep descriptions short (under 15 words), child-friendly, exciting
 - For ambiguous: always give 2-4 genuinely different angles, not synonyms
+- Each ambiguous suggestion should have its own "focus" if it narrows the subject
 - resolvedName is null for ambiguous and no_match
-- displayMessage uses **bold** for the key term`;
+- displayMessage uses **bold** for the key term
+- NEVER combine subject and focus into a single name with dashes or colons`;
 
 export async function resolveSubjectName(
   rawInput: string
@@ -75,6 +93,14 @@ export async function resolveSubjectName(
           status === 'no_match' || status === 'ambiguous'
             ? null
             : String(parsed.resolvedName ?? rawInput),
+        focus:
+          typeof parsed.focus === 'string' && parsed.focus.length > 0
+            ? parsed.focus
+            : null,
+        focusDescription:
+          typeof parsed.focusDescription === 'string'
+            ? parsed.focusDescription
+            : null,
         suggestions,
         displayMessage: String(parsed.displayMessage ?? ''),
         isLanguageLearning: detectedLanguage != null,
@@ -118,15 +144,20 @@ function parseStatus(value: unknown): SubjectResolveResult['status'] {
 
 function parseSuggestions(
   value: unknown
-): Array<{ name: string; description: string }> {
+): Array<{ name: string; description: string; focus?: string }> {
   if (!Array.isArray(value)) return [];
   return value
     .filter(
-      (item): item is { name: unknown; description: unknown } =>
+      (
+        item
+      ): item is { name: unknown; description: unknown; focus?: unknown } =>
         typeof item === 'object' && item !== null && 'name' in item
     )
     .map((item) => ({
       name: String(item.name),
       description: String(item.description ?? ''),
+      ...(typeof item.focus === 'string' && item.focus.length > 0
+        ? { focus: item.focus }
+        : {}),
     }));
 }

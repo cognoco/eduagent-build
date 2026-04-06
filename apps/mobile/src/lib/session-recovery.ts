@@ -16,7 +16,7 @@ export interface SessionRecoveryMarker {
 }
 
 function getRecoveryKey(profileId?: string | null): string {
-  return profileId ? `${RECOVERY_KEY}:${profileId}` : RECOVERY_KEY;
+  return profileId ? `${RECOVERY_KEY}-${profileId}` : RECOVERY_KEY;
 }
 
 export async function writeSessionRecoveryMarker(
@@ -53,8 +53,10 @@ export async function readSessionRecoveryMarker(
     // Migrate: if we read from the legacy key, rewrite under the scoped key
     // and clean up the old one so this fallback only fires once.
     if (!raw && profileId) {
-      await writeSessionRecoveryMarker(parsed, profileId).catch(() => {});
-      await SecureStore.deleteItemAsync(RECOVERY_KEY).catch(() => {});
+      await writeSessionRecoveryMarker(parsed, profileId).catch(
+        () => undefined
+      );
+      await SecureStore.deleteItemAsync(RECOVERY_KEY).catch(() => undefined);
     }
 
     return parsed;
@@ -69,7 +71,7 @@ export async function clearSessionRecoveryMarker(
   await SecureStore.deleteItemAsync(getRecoveryKey(profileId));
   // Also clean up the legacy unscoped key if it exists, preventing orphaned entries.
   if (profileId) {
-    await SecureStore.deleteItemAsync(RECOVERY_KEY).catch(() => {});
+    await SecureStore.deleteItemAsync(RECOVERY_KEY).catch(() => undefined);
   }
 }
 

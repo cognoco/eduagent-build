@@ -45,6 +45,20 @@ export default [
   },
   {
     files: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/*.spec.ts',
+      '**/*.spec.tsx',
+    ],
+    rules: {
+      // Test files use jest.mock() with factories, which NX misinterprets as
+      // lazy-loading. This taints the library and blocks static imports in
+      // source files. Disable the rule for tests — they are not architectural.
+      '@nx/enforce-module-boundaries': 'off',
+    },
+  },
+  {
+    files: [
       '**/*.ts',
       '**/*.tsx',
       '**/*.cts',

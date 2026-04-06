@@ -14,6 +14,7 @@ import { databaseMiddleware } from './middleware/database';
 import { accountMiddleware } from './middleware/account';
 import { profileScopeMiddleware } from './middleware/profile-scope';
 import type { ProfileMeta } from './middleware/profile-scope';
+import type { LLMTier } from './services/subscription';
 import { consentMiddleware } from './middleware/consent';
 import { llmMiddleware } from './middleware/llm';
 import { meteringMiddleware } from './middleware/metering';
@@ -88,6 +89,7 @@ type Variables = {
   profileId: string;
   profileMeta: ProfileMeta;
   subscriptionId: string;
+  llmTier: LLMTier;
 };
 
 type Env = { Bindings: Bindings; Variables: Variables };

@@ -11,7 +11,8 @@ const envSchema = z.object({
   CLERK_AUDIENCE: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
-  APP_URL: z.string().url().default('https://app.mentomate.com'),
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  APP_URL: z.string().url().default('https://www.mentomate.com'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
   // Stripe — optional. Dormant until web client added; mobile uses RevenueCat IAP.
@@ -75,6 +76,7 @@ export function validateProductionKeys(env: Env): string[] {
       missing.push(key);
     }
   }
+
   return missing;
 }
 

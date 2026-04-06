@@ -1,2 +1,2 @@
-ALTER TABLE "profiles" DROP COLUMN "persona_type";--> statement-breakpoint
-DROP TYPE "public"."persona_type";
+ALTER TABLE "profiles" DROP COLUMN IF EXISTS "persona_type";--> statement-breakpoint
+DROP TYPE IF EXISTS "public"."persona_type";

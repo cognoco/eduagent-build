@@ -41,9 +41,10 @@ export function useNotificationSettings(): UseQueryResult<NotificationPrefs> {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.settings.notifications.$get({
-          init: { signal },
-        } as never);
+        const res = await client.settings.notifications.$get(
+          {},
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = await res.json();
         return data.preferences;
@@ -64,9 +65,10 @@ export function useLearningMode(): UseQueryResult<LearningMode> {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.settings['learning-mode'].$get({
-          init: { signal },
-        } as never);
+        const res = await client.settings['learning-mode'].$get(
+          {},
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = await res.json();
         return data.mode;
@@ -87,9 +89,10 @@ export function useCelebrationLevel(): UseQueryResult<CelebrationLevel> {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.settings['celebration-level'].$get({
-          init: { signal },
-        } as never);
+        const res = await client.settings['celebration-level'].$get(
+          {},
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = await res.json();
         return data.celebrationLevel as CelebrationLevel;
@@ -248,10 +251,7 @@ export function useAnalogyDomain(
       try {
         const res = await client.settings.subjects[':subjectId'][
           'analogy-domain'
-        ].$get({
-          param: { subjectId },
-          init: { signal },
-        } as never);
+        ].$get({ param: { subjectId } }, { init: { signal } });
         await assertOk(res);
         const data = await res.json();
         return data.analogyDomain as AnalogyDomain | null;
@@ -277,7 +277,7 @@ export function useUpdateAnalogyDomain(
       ].$put({
         param: { subjectId },
         json: { analogyDomain },
-      } as never);
+      });
       await assertOk(res);
       const data = (await res.json()) as { analogyDomain: string | null };
       return data.analogyDomain as AnalogyDomain | null;
@@ -303,10 +303,7 @@ export function useNativeLanguage(
       try {
         const res = await client.settings.subjects[':subjectId'][
           'native-language'
-        ].$get({
-          param: { subjectId },
-          init: { signal },
-        } as never);
+        ].$get({ param: { subjectId } }, { init: { signal } });
         await assertOk(res);
         const data = await res.json();
         return data.nativeLanguage as LanguageCode | null;
@@ -332,7 +329,7 @@ export function useUpdateNativeLanguage(
       ].$put({
         param: { subjectId },
         json: { nativeLanguage },
-      } as never);
+      });
       await assertOk(res);
       const data = (await res.json()) as { nativeLanguage: string | null };
       return data.nativeLanguage as LanguageCode | null;

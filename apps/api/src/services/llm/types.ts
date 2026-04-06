@@ -8,7 +8,7 @@ export type { EscalationRung };
 
 /** Model selection based on rung */
 export interface ModelConfig {
-  provider: 'gemini' | 'openai' | 'mock';
+  provider: 'gemini' | 'openai' | 'anthropic' | 'mock';
   model: string;
   maxTokens: number;
 }

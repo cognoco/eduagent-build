@@ -169,6 +169,7 @@ jest.mock('../../services/sentry', () => ({
 }));
 
 import { sessionCompleted } from './session-completed';
+import { createDatabase } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
 // Helpers — extract Inngest step handlers from the function
@@ -452,6 +453,300 @@ describe('sessionCompleted', () => {
         'topic-c',
         5
       );
+    });
+  });
+
+  describe('update-vocabulary-retention step', () => {
+    // getStepDatabase() caches the db instance per URL. We need to reset
+    // the cache before each test so the fresh createDatabase() mock is used.
+    // Import the reset helper from the inngest helpers module.
+    const { resetDatabaseUrl } = require('../helpers');
+
+    function setupSubjectMock(subjectData: Record<string, unknown> | null) {
+      // Reset the db cache so getStepDatabase() calls createDatabase() again
+      resetDatabaseUrl();
+      // Override the createDatabase mock to return a db with the desired subject
+      (createDatabase as jest.Mock).mockImplementationOnce(() => {
+        const chainable = () => ({
+          from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+        });
+        const db: Record<string, unknown> = {
+          query: {
+            sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
+            curriculumTopics: { findFirst: jest.fn().mockResolvedValue(null) },
+            subjects: {
+              findFirst: jest.fn().mockResolvedValue(subjectData),
+            },
+            streaks: { findFirst: jest.fn().mockResolvedValue(null) },
+          },
+          select: chainable,
+        };
+        db.transaction = jest
+          .fn()
+          .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
+        return db;
+      });
+    }
+
+    const fourStrandsSubject = {
+      id: 'subject-001',
+      profileId: 'profile-001',
+      pedagogyMode: 'four_strands',
+      languageCode: 'es',
+    };
+
+    afterEach(() => {
+      resetDatabaseUrl();
+    });
+
+    it('skips when subjectId is not provided', async () => {
+      const { result } = (await executeSteps(
+        createEventData({ subjectId: null })
+      )) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'update-vocabulary-retention'
+      );
+      expect(outcome.status).toBe('skipped');
+      expect(mockExtractVocabularyFromTranscript).not.toHaveBeenCalled();
+      expect(mockUpsertExtractedVocabulary).not.toHaveBeenCalled();
+    });
+
+    it('skips when subjectId is undefined', async () => {
+      const { result } = (await executeSteps(
+        createEventData({ subjectId: undefined })
+      )) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'update-vocabulary-retention'
+      );
+      expect(outcome.status).toBe('skipped');
+      expect(mockExtractVocabularyFromTranscript).not.toHaveBeenCalled();
+    });
+
+    it('skips when subject is not found in DB', async () => {
+      setupSubjectMock(null);
+
+      const { result } = (await executeSteps(createEventData())) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'update-vocabulary-retention'
+      );
+      expect(outcome.status).toBe('ok');
+      expect(mockExtractVocabularyFromTranscript).not.toHaveBeenCalled();
+    });
+
+    it('skips when subject pedagogyMode is not four_strands', async () => {
+      setupSubjectMock({
+        id: 'subject-001',
+        profileId: 'profile-001',
+        pedagogyMode: 'socratic',
+        languageCode: null,
+      });
+
+      const { result } = (await executeSteps(createEventData())) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'update-vocabulary-retention'
+      );
+      expect(outcome.status).toBe('ok');
+      expect(mockExtractVocabularyFromTranscript).not.toHaveBeenCalled();
+    });
+
+    it('skips when subject has no languageCode', async () => {
+      setupSubjectMock({
+        id: 'subject-001',
+        profileId: 'profile-001',
+        pedagogyMode: 'four_strands',
+        languageCode: null,
+      });
+
+      const { result } = (await executeSteps(createEventData())) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'update-vocabulary-retention'
+      );
+      expect(outcome.status).toBe('ok');
+      expect(mockExtractVocabularyFromTranscript).not.toHaveBeenCalled();
+    });
+
+    it('extracts vocabulary from session transcript', async () => {
+      setupSubjectMock(fourStrandsSubject);
+      mockExtractVocabularyFromTranscript.mockResolvedValueOnce([
+        { term: 'hola', translation: 'hello', type: 'word' },
+      ]);
+
+      await executeSteps(createEventData());
+
+      expect(mockExtractVocabularyFromTranscript).toHaveBeenCalledWith(
+        expect.any(Array), // transcript
+        'es' // languageCode
+      );
+    });
+
+    it('does not upsert when no vocabulary is extracted', async () => {
+      setupSubjectMock(fourStrandsSubject);
+      mockExtractVocabularyFromTranscript.mockResolvedValueOnce([]);
+
+      await executeSteps(createEventData());
+
+      expect(mockUpsertExtractedVocabulary).not.toHaveBeenCalled();
+    });
+
+    it('upserts extracted vocabulary with correct args', async () => {
+      setupSubjectMock(fourStrandsSubject);
+      mockExtractVocabularyFromTranscript.mockResolvedValueOnce([
+        { term: 'hola', translation: 'hello', type: 'word' },
+        { term: 'buenos días', translation: 'good morning', type: 'chunk' },
+      ]);
+      mockGetCurrentLanguageProgress.mockResolvedValue({
+        currentMilestone: { milestoneId: 'milestone-1' },
+      });
+
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      expect(mockUpsertExtractedVocabulary).toHaveBeenCalledWith(
+        expect.anything(), // db
+        'profile-001',
+        'subject-001',
+        expect.arrayContaining([
+          expect.objectContaining({
+            term: 'hola',
+            translation: 'hello',
+            type: 'word',
+            milestoneId: 'milestone-1',
+            quality: 4,
+          }),
+          expect.objectContaining({
+            term: 'buenos días',
+            translation: 'good morning',
+            type: 'chunk',
+            milestoneId: 'milestone-1',
+            quality: 4,
+          }),
+        ])
+      );
+    });
+
+    it('clamps quality rating to [0, 5] range', async () => {
+      setupSubjectMock(fourStrandsSubject);
+      mockExtractVocabularyFromTranscript.mockResolvedValueOnce([
+        { term: 'hola', translation: 'hello', type: 'word' },
+      ]);
+      mockGetCurrentLanguageProgress.mockResolvedValue(null);
+
+      await executeSteps(createEventData({ qualityRating: 10 }));
+
+      expect(mockUpsertExtractedVocabulary).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'subject-001',
+        expect.arrayContaining([expect.objectContaining({ quality: 5 })])
+      );
+    });
+
+    it('defaults quality to 3 when qualityRating is not provided', async () => {
+      setupSubjectMock(fourStrandsSubject);
+      mockExtractVocabularyFromTranscript.mockResolvedValueOnce([
+        { term: 'hola', translation: 'hello', type: 'word' },
+      ]);
+      mockGetCurrentLanguageProgress.mockResolvedValue(null);
+
+      await executeSteps(createEventData());
+
+      expect(mockUpsertExtractedVocabulary).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'subject-001',
+        expect.arrayContaining([expect.objectContaining({ quality: 3 })])
+      );
+    });
+
+    it('passes undefined milestoneId when no current milestone exists', async () => {
+      setupSubjectMock(fourStrandsSubject);
+      mockExtractVocabularyFromTranscript.mockResolvedValueOnce([
+        { term: 'hola', translation: 'hello', type: 'word' },
+      ]);
+      mockGetCurrentLanguageProgress.mockResolvedValue(null);
+
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      expect(mockUpsertExtractedVocabulary).toHaveBeenCalledWith(
+        expect.anything(),
+        'profile-001',
+        'subject-001',
+        expect.arrayContaining([
+          expect.objectContaining({ milestoneId: undefined }),
+        ])
+      );
+    });
+
+    it('fetches language progress before and after vocabulary upsert', async () => {
+      setupSubjectMock(fourStrandsSubject);
+      mockExtractVocabularyFromTranscript.mockResolvedValueOnce([
+        { term: 'hola', translation: 'hello', type: 'word' },
+      ]);
+      const mockProgress = {
+        currentMilestone: { milestoneId: 'milestone-1' },
+      };
+      mockGetCurrentLanguageProgress.mockResolvedValue(mockProgress);
+
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      // getCurrentLanguageProgress is called at least twice (before and after upsert)
+      expect(mockGetCurrentLanguageProgress).toHaveBeenCalledWith(
+        expect.anything(), // db
+        'profile-001',
+        'subject-001'
+      );
+      // Called at least twice: once for previousLanguageProgress, once for nextLanguageProgress
+      const vocabRetentionCalls =
+        mockGetCurrentLanguageProgress.mock.calls.filter(
+          (call: unknown[]) =>
+            call[1] === 'profile-001' && call[2] === 'subject-001'
+        );
+      expect(vocabRetentionCalls.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('isolates errors without blocking other steps', async () => {
+      setupSubjectMock(fourStrandsSubject);
+      mockExtractVocabularyFromTranscript.mockRejectedValueOnce(
+        new Error('LLM extraction failed')
+      );
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const { result } = (await executeSteps(
+        createEventData({ qualityRating: 4 })
+      )) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'update-vocabulary-retention'
+      );
+      expect(outcome.status).toBe('failed');
+      expect(outcome.error).toContain('LLM extraction failed');
+
+      // Other steps still ran
+      expect(mockPrecomputeCoachingCard).toHaveBeenCalled();
+      expect(mockRecordSessionActivity).toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+
+    it('reports step as ok on success', async () => {
+      setupSubjectMock(fourStrandsSubject);
+      mockExtractVocabularyFromTranscript.mockResolvedValueOnce([
+        { term: 'hola', translation: 'hello', type: 'word' },
+      ]);
+      mockGetCurrentLanguageProgress.mockResolvedValue(null);
+
+      const { result } = (await executeSteps(
+        createEventData({ qualityRating: 4 })
+      )) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'update-vocabulary-retention'
+      );
+      expect(outcome.status).toBe('ok');
     });
   });
 
@@ -767,6 +1062,87 @@ describe('sessionCompleted', () => {
 
       expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
       expect(mockResetSummarySkips).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Step-level retry simulation
+  // TODO: Migrate to InngestTestEngine when `inngest/test` is available
+  // in project dependencies. InngestTestEngine provides native step-level
+  // retry testing and Inngest-specific behaviors (ARCH-25). Currently the
+  // package only provides `inngest/hono` — `inngest/test` is not installed.
+  // -------------------------------------------------------------------------
+
+  describe('step-level retry behavior', () => {
+    it('recovers on step retry after transient embedding failure', async () => {
+      // First call fails, simulating a transient error that Inngest would retry
+      mockStoreSessionEmbedding
+        .mockRejectedValueOnce(new Error('Voyage AI rate limit'))
+        .mockResolvedValueOnce(undefined);
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      // First invocation — embedding step fails
+      const { result: result1 } = (await executeSteps(
+        createEventData({ qualityRating: 4 })
+      )) as any;
+      const embeddingOutcome1 = result1.outcomes.find(
+        (o: any) => o.step === 'generate-embeddings'
+      );
+      expect(embeddingOutcome1.status).toBe('failed');
+
+      // Second invocation (simulating Inngest retry) — embedding step succeeds
+      const { result: result2 } = (await executeSteps(
+        createEventData({ qualityRating: 4 })
+      )) as any;
+      const embeddingOutcome2 = result2.outcomes.find(
+        (o: any) => o.step === 'generate-embeddings'
+      );
+      expect(embeddingOutcome2.status).toBe('ok');
+
+      consoleSpy.mockRestore();
+    });
+
+    it('recovers on step retry after transient retention failure', async () => {
+      mockUpdateRetentionFromSession
+        .mockRejectedValueOnce(new Error('DB connection reset'))
+        .mockResolvedValueOnce(undefined);
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      // First invocation — retention step fails
+      const { result: result1 } = (await executeSteps(
+        createEventData({ qualityRating: 4 })
+      )) as any;
+      const retentionOutcome1 = result1.outcomes.find(
+        (o: any) => o.step === 'update-retention'
+      );
+      expect(retentionOutcome1.status).toBe('failed');
+
+      // Second invocation (simulating retry) — succeeds
+      const { result: result2 } = (await executeSteps(
+        createEventData({ qualityRating: 4 })
+      )) as any;
+      const retentionOutcome2 = result2.outcomes.find(
+        (o: any) => o.step === 'update-retention'
+      );
+      expect(retentionOutcome2.status).toBe('ok');
+
+      consoleSpy.mockRestore();
+    });
+
+    it('captures all errors to sentry on each step failure', async () => {
+      mockPrecomputeCoachingCard.mockRejectedValueOnce(
+        new Error('Redis timeout')
+      );
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Redis timeout' }),
+        expect.objectContaining({ profileId: 'profile-001' })
+      );
+
+      consoleSpy.mockRestore();
     });
   });
 

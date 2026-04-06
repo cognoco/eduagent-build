@@ -47,6 +47,21 @@ export function personaFromBirthYear(
   return 'parent';
 }
 
+/**
+ * Check if a profile is a guardian — account owner with linked child profiles.
+ * Uses the in-memory profile list; no DB call needed.
+ *
+ * Do NOT use `personaFromBirthYear` for this — it classifies ALL adults 18+
+ * as 'parent', but an adult self-learner with no children is not a guardian.
+ */
+export function isGuardianProfile(
+  profile: { isOwner: boolean } | null | undefined,
+  allProfiles: ReadonlyArray<{ isOwner: boolean }>
+): boolean {
+  if (!profile?.isOwner) return false;
+  return allProfiles.some((p) => !p.isOwner);
+}
+
 export interface SwitchProfileResult {
   success: boolean;
   error?: string;

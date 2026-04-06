@@ -7,6 +7,7 @@ import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { getSubject } from '../services/subject';
 import {
+  getBookTitle,
   processInterviewExchange,
   streamInterviewExchange,
   getOrCreateDraft,
@@ -36,16 +37,24 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
       const { message } = c.req.valid('json');
+      const bookId = c.req.query('bookId');
 
       const subject = await getSubject(db, profileId, subjectId);
       if (!subject) return notFound(c, 'Subject not found');
 
+      const bookTitle = bookId
+        ? await getBookTitle(db, profileId, bookId, subjectId)
+        : undefined;
+
       const draft = await getOrCreateDraft(db, profileId, subjectId);
 
-      const result = await processInterviewExchange(
-        { subjectName: subject.name, exchangeHistory: draft.exchangeHistory },
-        message
-      );
+      const context = {
+        subjectName: subject.name,
+        exchangeHistory: draft.exchangeHistory,
+        ...(bookTitle ? { bookTitle } : {}),
+      };
+
+      const result = await processInterviewExchange(context, message);
 
       const updatedHistory = [
         ...draft.exchangeHistory,
@@ -60,11 +69,19 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
           exchangeHistory: updatedHistory,
           extractedSignals: result.extractedSignals ?? draft.extractedSignals,
         });
-        await persistCurriculum(db, profileId, subjectId, subject.name, {
-          ...draft,
-          exchangeHistory: updatedHistory,
-          extractedSignals: result.extractedSignals ?? draft.extractedSignals,
-        });
+        await persistCurriculum(
+          db,
+          profileId,
+          subjectId,
+          subject.name,
+          {
+            ...draft,
+            exchangeHistory: updatedHistory,
+            extractedSignals: result.extractedSignals ?? draft.extractedSignals,
+          },
+          bookId,
+          bookTitle
+        );
         // Only mark complete after curriculum is persisted.
         await updateDraft(db, profileId, draft.id, {
           status: 'completed',
@@ -91,16 +108,42 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
       const { message } = c.req.valid('json');
+      const bookId = c.req.query('bookId');
 
       const subject = await getSubject(db, profileId, subjectId);
       if (!subject) return notFound(c, 'Subject not found');
 
+      const bookTitle = bookId
+        ? await getBookTitle(db, profileId, bookId, subjectId)
+        : undefined;
+
       const draft = await getOrCreateDraft(db, profileId, subjectId);
 
-      const { stream, onComplete } = await streamInterviewExchange(
-        { subjectName: subject.name, exchangeHistory: draft.exchangeHistory },
-        message
-      );
+      const context = {
+        subjectName: subject.name,
+        exchangeHistory: draft.exchangeHistory,
+        ...(bookTitle ? { bookTitle } : {}),
+      };
+
+      let stream: AsyncIterable<string>;
+      let onComplete: (
+        fullResponse: string
+      ) => Promise<import('@eduagent/schemas').InterviewResult>;
+      try {
+        const streamResult = await streamInterviewExchange(context, message);
+        stream = streamResult.stream;
+        onComplete = streamResult.onComplete;
+      } catch (err) {
+        console.error('[interview/stream] Failed to start stream:', err);
+        return c.json(
+          {
+            code: 'LLM_UNAVAILABLE',
+            message:
+              'Interview service is temporarily unavailable. Please try again.',
+          },
+          503
+        );
+      }
 
       return streamSSE(c, async (sseStream) => {
         let fullResponse = '';
@@ -129,12 +172,20 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
               extractedSignals:
                 result.extractedSignals ?? draft.extractedSignals,
             });
-            await persistCurriculum(db, profileId, subjectId, subject.name, {
-              ...draft,
-              exchangeHistory: updatedHistory,
-              extractedSignals:
-                result.extractedSignals ?? draft.extractedSignals,
-            });
+            await persistCurriculum(
+              db,
+              profileId,
+              subjectId,
+              subject.name,
+              {
+                ...draft,
+                exchangeHistory: updatedHistory,
+                extractedSignals:
+                  result.extractedSignals ?? draft.extractedSignals,
+              },
+              bookId,
+              bookTitle
+            );
             // Only mark complete after curriculum is persisted
             await updateDraft(db, profileId, draft.id, {
               status: 'completed',

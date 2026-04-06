@@ -197,7 +197,25 @@ export async function updateSubscriptionFromWebhook(
   if (updates.tier !== undefined) {
     setValues.tier = updates.tier;
   }
-  if (updates.status !== undefined) {
+  if (updates.status !== undefined && updates.status !== existing.status) {
+    if (!isValidTransition(existing.status, updates.status)) {
+      console.error(
+        `[billing] Invalid Stripe subscription transition: ${existing.status} -> ${updates.status} (sub: ${existing.id})`
+      );
+      captureException(
+        new Error(
+          `Invalid Stripe subscription transition: ${existing.status} -> ${updates.status}`
+        ),
+        {
+          extra: {
+            subscriptionId: existing.id,
+            fromStatus: existing.status,
+            toStatus: updates.status,
+          },
+        }
+      );
+      return mapSubscriptionRow(existing);
+    }
     setValues.status = updates.status;
   }
   if (updates.currentPeriodStart !== undefined) {
@@ -769,16 +787,16 @@ export async function resetExpiredQuotaCycles(
       used_this_month = 0,
       used_today = 0,
       monthly_limit = CASE s.tier
-        WHEN 'plus' THEN ${plus.monthlyQuota}
-        WHEN 'family' THEN ${family.monthlyQuota}
-        WHEN 'pro' THEN ${pro.monthlyQuota}
-        ELSE ${free.monthlyQuota}
+        WHEN 'plus' THEN CAST(${plus.monthlyQuota} AS integer)
+        WHEN 'family' THEN CAST(${family.monthlyQuota} AS integer)
+        WHEN 'pro' THEN CAST(${pro.monthlyQuota} AS integer)
+        ELSE CAST(${free.monthlyQuota} AS integer)
       END,
       daily_limit = CASE s.tier
-        WHEN 'plus' THEN ${plus.dailyLimit}
-        WHEN 'family' THEN ${family.dailyLimit}
-        WHEN 'pro' THEN ${pro.dailyLimit}
-        ELSE ${free.dailyLimit}
+        WHEN 'plus' THEN CAST(${plus.dailyLimit} AS integer)
+        WHEN 'family' THEN CAST(${family.dailyLimit} AS integer)
+        WHEN 'pro' THEN CAST(${pro.dailyLimit} AS integer)
+        ELSE CAST(${free.dailyLimit} AS integer)
       END,
       cycle_reset_at = qp.cycle_reset_at + INTERVAL '1 month',
       updated_at = ${now}

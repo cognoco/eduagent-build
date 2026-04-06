@@ -43,10 +43,10 @@ export function useRetentionTopics(subjectId: string) {
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.subjects[':subjectId'].retention.$get({
-          param: { subjectId },
-          init: { signal },
-        } as never);
+        const res = await client.subjects[':subjectId'].retention.$get(
+          { param: { subjectId } },
+          { init: { signal } }
+        );
         await assertOk(res);
         return await res.json();
       } finally {
@@ -68,10 +68,10 @@ export function useTopicRetention(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
-        const res = await client.topics[':topicId'].retention.$get({
-          param: { topicId },
-          init: { signal },
-        } as never);
+        const res = await client.topics[':topicId'].retention.$get(
+          { param: { topicId } },
+          { init: { signal } }
+        );
         await assertOk(res);
         const data = (await res.json()) as {
           card: RetentionCardResponse | null;

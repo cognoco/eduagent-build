@@ -6,11 +6,13 @@ import { createMiddleware } from 'hono/factory';
 import { registerProvider } from '../services/llm';
 import { createGeminiProvider } from '../services/llm/providers/gemini';
 import { createOpenAIProvider } from '../services/llm/providers/openai';
+import { createAnthropicProvider } from '../services/llm/providers/anthropic';
 
 type LLMEnv = {
   Bindings: {
     GEMINI_API_KEY?: string;
     OPENAI_API_KEY?: string;
+    ANTHROPIC_API_KEY?: string;
     ENVIRONMENT?: string;
   };
 };
@@ -30,7 +32,12 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
       registerProvider(createOpenAIProvider(openaiKey));
     }
 
-    const hasAnyProvider = geminiKey || openaiKey;
+    const anthropicKey = c.env?.ANTHROPIC_API_KEY;
+    if (anthropicKey) {
+      registerProvider(createAnthropicProvider(anthropicKey));
+    }
+
+    const hasAnyProvider = geminiKey || openaiKey || anthropicKey;
 
     if (!hasAnyProvider) {
       if (

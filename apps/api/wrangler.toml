@@ -108,7 +108,7 @@ routes = [
 
 [env.staging.vars]
 ENVIRONMENT = "staging"
-APP_URL = "https://app.mentomate.com"
+APP_URL = "https://www.mentomate.com"
 LOG_LEVEL = "warn"
 EMAIL_FROM = "staging-noreply@mentomate.com"
 
@@ -137,7 +137,7 @@ routes = [
 
 [env.production.vars]
 ENVIRONMENT = "production"
-APP_URL = "https://app.mentomate.com"
+APP_URL = "https://www.mentomate.com"
 LOG_LEVEL = "info"
 EMAIL_FROM = "noreply@mentomate.com"
 

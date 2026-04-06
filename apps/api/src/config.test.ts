@@ -9,7 +9,7 @@ describe('validateProductionKeys', () => {
   const BASE_ENV: Env = {
     ENVIRONMENT: 'development',
     DATABASE_URL: 'postgresql://localhost/test',
-    APP_URL: 'https://app.mentomate.com',
+    APP_URL: 'https://www.mentomate.com',
     LOG_LEVEL: 'info',
     EMAIL_FROM: 'noreply@mentomate.com',
   };
@@ -61,19 +61,34 @@ describe('validateProductionKeys', () => {
     expect(missing).toEqual([]);
   });
 
+  it('includes CLERK_AUDIENCE when missing in production', () => {
+    const missing = validateProductionKeys({
+      ...BASE_ENV,
+      ENVIRONMENT: 'production',
+      CLERK_SECRET_KEY: 'sk_live_xxx',
+      CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
+      GEMINI_API_KEY: 'gemini-key',
+      VOYAGE_API_KEY: 'voyage-key',
+      RESEND_API_KEY: 're_xxx',
+      REVENUECAT_WEBHOOK_SECRET: 'rc_webhook_secret',
+    });
+
+    expect(missing).toContain('CLERK_AUDIENCE');
+  });
+
   it('returns only the specific missing keys', () => {
     const missing = validateProductionKeys({
       ...BASE_ENV,
       ENVIRONMENT: 'production',
       CLERK_SECRET_KEY: 'sk_live_xxx',
       CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
-      // Missing: CLERK_AUDIENCE, VOYAGE_API_KEY, RESEND_API_KEY, REVENUECAT_WEBHOOK_SECRET
+      CLERK_AUDIENCE: 'eduagent-api',
+      // Missing: VOYAGE_API_KEY, RESEND_API_KEY, REVENUECAT_WEBHOOK_SECRET
       GEMINI_API_KEY: 'gemini-key',
       // Stripe keys are optional — not in production required list
     });
 
     expect(missing).toEqual([
-      'CLERK_AUDIENCE',
       'VOYAGE_API_KEY',
       'RESEND_API_KEY',
       'REVENUECAT_WEBHOOK_SECRET',

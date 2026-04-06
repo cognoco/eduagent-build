@@ -5,18 +5,27 @@
 -- All idempotent for databases that were synced via drizzle-kit push.
 
 -- D-05: CHECK constraint — retention_cards.interval_days must be >= 1
-ALTER TABLE "retention_cards" ADD CONSTRAINT "retention_cards_interval_days_positive"
-  CHECK ("retention_cards"."interval_days" >= 1);
+DO $$ BEGIN
+  ALTER TABLE "retention_cards" ADD CONSTRAINT "retention_cards_interval_days_positive"
+    CHECK ("retention_cards"."interval_days" >= 1);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 --> statement-breakpoint
 
 -- D-05: CHECK constraint — quota_pools.used_this_month must be >= 0
-ALTER TABLE "quota_pools" ADD CONSTRAINT "quota_pools_used_this_month_non_negative"
-  CHECK ("quota_pools"."used_this_month" >= 0);
+DO $$ BEGIN
+  ALTER TABLE "quota_pools" ADD CONSTRAINT "quota_pools_used_this_month_non_negative"
+    CHECK ("quota_pools"."used_this_month" >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 --> statement-breakpoint
 
 -- D-05: CHECK constraint — top_up_credits.remaining must be >= 0
-ALTER TABLE "top_up_credits" ADD CONSTRAINT "top_up_credits_remaining_non_negative"
-  CHECK ("top_up_credits"."remaining" >= 0);
+DO $$ BEGIN
+  ALTER TABLE "top_up_credits" ADD CONSTRAINT "top_up_credits_remaining_non_negative"
+    CHECK ("top_up_credits"."remaining" >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 --> statement-breakpoint
 
 -- D-06: Unique constraint — prevent duplicate family links
@@ -28,8 +37,11 @@ END $$;
 --> statement-breakpoint
 
 -- D-06: CHECK constraint — prevent self-links in family_links
-ALTER TABLE "family_links" ADD CONSTRAINT "family_links_no_self_link"
-  CHECK ("family_links"."parent_profile_id" != "family_links"."child_profile_id");
+DO $$ BEGIN
+  ALTER TABLE "family_links" ADD CONSTRAINT "family_links_no_self_link"
+    CHECK ("family_links"."parent_profile_id" != "family_links"."child_profile_id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 --> statement-breakpoint
 
 -- BD-01: Add timestamp column for RevenueCat event ordering

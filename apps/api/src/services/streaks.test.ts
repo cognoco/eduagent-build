@@ -12,6 +12,8 @@ import {
   recordDailyActivity,
   getStreakDisplayInfo,
   recordSessionActivity,
+  getStreakData,
+  getXpSummary,
   type StreakState,
 } from './streaks';
 
@@ -344,11 +346,133 @@ describe('recordSessionActivity', () => {
 });
 
 describe('getStreakData', () => {
-  it.todo('returns streak state with display info for profile');
-  it.todo('returns initial state when no streak record exists');
+  it('returns streak state with display info for profile', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      streaks: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'streak-1',
+          profileId: 'profile-1',
+          currentStreak: 7,
+          longestStreak: 12,
+          lastActivityDate: today,
+          gracePeriodStartDate: null,
+        }),
+      },
+    });
+    const { db } = createMockStreakDb();
+
+    const result = await getStreakData(db, 'profile-1');
+
+    expect(result.currentStreak).toBe(7);
+    expect(result.longestStreak).toBe(12);
+    expect(result.lastActivityDate).toBe(today);
+    expect(result.gracePeriodStartDate).toBeNull();
+    expect(typeof result.isOnGracePeriod).toBe('boolean');
+    expect(typeof result.graceDaysRemaining).toBe('number');
+  });
+
+  it('returns initial state when no streak record exists', async () => {
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      streaks: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+    });
+    const { db } = createMockStreakDb();
+
+    const result = await getStreakData(db, 'profile-1');
+
+    expect(result.currentStreak).toBe(0);
+    expect(result.longestStreak).toBe(0);
+    expect(result.lastActivityDate).toBeNull();
+    expect(result.gracePeriodStartDate).toBeNull();
+    expect(result.isOnGracePeriod).toBe(false);
+    expect(result.graceDaysRemaining).toBe(0);
+  });
+
+  it('shows grace period when last activity was 2 days ago', async () => {
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      streaks: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'streak-1',
+          profileId: 'profile-1',
+          currentStreak: 5,
+          longestStreak: 5,
+          lastActivityDate: twoDaysAgo,
+          gracePeriodStartDate: null,
+        }),
+      },
+    });
+    const { db } = createMockStreakDb();
+
+    const result = await getStreakData(db, 'profile-1');
+
+    expect(result.isOnGracePeriod).toBe(true);
+    expect(result.graceDaysRemaining).toBeGreaterThan(0);
+  });
 });
 
 describe('getXpSummary', () => {
-  it.todo('aggregates XP totals from ledger entries');
-  it.todo('returns zero summary when no XP entries exist');
+  it('aggregates XP totals from ledger entries', async () => {
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      xpLedger: {
+        findMany: jest.fn().mockResolvedValue([
+          { amount: 50, topicId: 'topic-1', status: 'verified' },
+          { amount: 30, topicId: 'topic-2', status: 'pending' },
+          { amount: 20, topicId: 'topic-1', status: 'decayed' },
+          { amount: 40, topicId: 'topic-3', status: 'verified' },
+        ]),
+      },
+    });
+    const { db } = createMockStreakDb();
+
+    const result = await getXpSummary(db, 'profile-1');
+
+    expect(result.totalXp).toBe(140);
+    expect(result.verifiedXp).toBe(90);
+    expect(result.pendingXp).toBe(30);
+    expect(result.decayedXp).toBe(20);
+    expect(result.topicsCompleted).toBe(3);
+    expect(result.topicsVerified).toBe(2);
+  });
+
+  it('returns zero summary when no XP entries exist', async () => {
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      xpLedger: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    });
+    const { db } = createMockStreakDb();
+
+    const result = await getXpSummary(db, 'profile-1');
+
+    expect(result.totalXp).toBe(0);
+    expect(result.verifiedXp).toBe(0);
+    expect(result.pendingXp).toBe(0);
+    expect(result.decayedXp).toBe(0);
+    expect(result.topicsCompleted).toBe(0);
+    expect(result.topicsVerified).toBe(0);
+  });
+
+  it('counts unique topics correctly with duplicate entries', async () => {
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      xpLedger: {
+        findMany: jest.fn().mockResolvedValue([
+          { amount: 50, topicId: 'topic-1', status: 'verified' },
+          { amount: 25, topicId: 'topic-1', status: 'verified' },
+          { amount: 30, topicId: 'topic-2', status: 'pending' },
+        ]),
+      },
+    });
+    const { db } = createMockStreakDb();
+
+    const result = await getXpSummary(db, 'profile-1');
+
+    expect(result.totalXp).toBe(105);
+    expect(result.topicsCompleted).toBe(2); // unique topics
+    expect(result.topicsVerified).toBe(1); // only topic-1 is verified
+  });
 });

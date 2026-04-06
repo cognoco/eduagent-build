@@ -2,7 +2,7 @@ import type React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import IconLight from '../../assets/images/logo-icon-light.svg';
 import IconDark from '../../assets/images/logo-icon-dark.svg';
-import { useTheme, useThemeColors } from '../lib/theme';
+import { useTheme } from '../lib/theme';
 
 // ── Size presets ──────────────────────────────────────────────
 const sizes = {
@@ -18,22 +18,42 @@ type MentomateLogoProps = {
 };
 
 /**
+ * Brand-fixed wordmark colors matching the canonical SVGs
+ * (logo-icon-light.svg, logo-icon-dark.svg) and AnimatedSplash.
+ *
+ * These are hardcoded so the brand identity stays consistent
+ * regardless of persona or accent preset.
+ */
+const BRAND = {
+  light: {
+    ment: '#1a1a3e', // dark navy (dark-mode bg flipped as text)
+    circle: '#8b5cf6', // violet
+    mate: '#0d9488', // teal
+  },
+  dark: {
+    ment: '#faf5ee', // cream (light-mode bg flipped as text)
+    circle: '#a78bfa', // light violet
+    mate: '#5eead4', // light teal
+  },
+} as const;
+
+/**
  * Mentomate brand logo — SVG icon + native Text wordmark.
  * Automatically picks light/dark variant based on the active theme.
- * Uses useThemeColors() for persona-aware, accent-preset-aware colors.
+ * Uses brand-fixed colors (not theme tokens) for consistent identity.
  */
 export function MentomateLogo({
   size = 'md',
 }: MentomateLogoProps): React.JSX.Element {
   const { colorScheme } = useTheme();
-  const colors = useThemeColors();
   const isDark = colorScheme === 'dark';
   const s = sizes[size];
   const Icon = isDark ? IconDark : IconLight;
 
-  const mentColor = colors.accent;
-  const mateColor = colors.secondary;
-  const circleColor = colors.accent;
+  const brand = BRAND[isDark ? 'dark' : 'light'];
+  const mentColor = brand.ment;
+  const mateColor = brand.mate;
+  const circleColor = brand.circle;
 
   return (
     <View

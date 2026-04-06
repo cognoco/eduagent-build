@@ -175,4 +175,52 @@ describe('quotaReset', () => {
 
     expect(result.monthlyResetCount).toBe(0);
   });
+
+  // -----------------------------------------------------------------------
+  // [4C.12] DST transition handling — daily quota reset at 01:00 UTC
+  // The cron runs at 01:00 UTC regardless of DST. These tests verify the
+  // reset logic works correctly around DST transitions.
+  // -----------------------------------------------------------------------
+
+  describe('DST transition handling [4C.12]', () => {
+    it('resets daily quotas during spring-forward DST transition', async () => {
+      // March 30, 2025: CET spring forward (02:00 → 03:00 CET = 01:00 UTC)
+      // The cron fires at 01:00 UTC — exactly when CET jumps from 02:00 to 03:00
+      jest.setSystemTime(new Date('2025-03-30T01:00:00.000Z'));
+
+      mockDbExecute.mockResolvedValueOnce({ rowCount: 5 });
+
+      const { result } = await executeSteps();
+
+      // Reset should still run successfully — cron uses UTC, unaffected by DST
+      expect(result.status).toBe('completed');
+      expect(result.dailyResetCount).toBeDefined();
+      expect(result.monthlyResetCount).toBe(5);
+    });
+
+    it('resets daily quotas during fall-back DST transition', async () => {
+      // October 26, 2025: CET fall back (03:00 → 02:00 CET = 01:00 UTC)
+      // Users in CET experience 02:00-02:59 twice, but the cron fires once at 01:00 UTC
+      jest.setSystemTime(new Date('2025-10-26T01:00:00.000Z'));
+
+      mockDbExecute.mockResolvedValueOnce({ rowCount: 3 });
+
+      const { result } = await executeSteps();
+
+      expect(result.status).toBe('completed');
+      expect(result.dailyResetCount).toBeDefined();
+      expect(result.monthlyResetCount).toBe(3);
+    });
+
+    it('timestamp in result reflects UTC time regardless of DST', async () => {
+      jest.setSystemTime(new Date('2025-03-30T01:00:00.000Z'));
+
+      mockDbExecute.mockResolvedValueOnce({ rowCount: 0 });
+
+      const { result } = await executeSteps();
+
+      // Verify the timestamp is a valid ISO string in UTC
+      expect(result.timestamp).toBe('2025-03-30T01:00:00.000Z');
+    });
+  });
 });

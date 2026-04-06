@@ -1,13 +1,16 @@
 import { useState, useCallback, type ReactNode } from 'react';
 import { View, Text, Pressable, Platform } from 'react-native';
 import type { Profile } from '@eduagent/schemas';
-import { personaFromBirthYear } from '../../lib/profile';
+import { isGuardianProfile } from '../../lib/profile';
 
-/** Derive a user-facing role label from birthYear.
- * "Teen" and "Learner" both show as "Student"
- * to avoid the confusing teen/learner distinction in the UI. */
-function roleLabel(birthYear: number | null | undefined): string {
-  return personaFromBirthYear(birthYear) === 'parent' ? 'Parent' : 'Student';
+/** Derive a user-facing role label from profile ownership.
+ * A guardian is an account owner with linked child profiles.
+ * Everyone else (including adult self-learners) shows as "Student". */
+function roleLabel(
+  profile: { isOwner: boolean },
+  allProfiles: ReadonlyArray<{ isOwner: boolean }>
+): string {
+  return isGuardianProfile(profile, allProfiles) ? 'Parent' : 'Student';
 }
 
 interface ProfileSwitcherProps {
@@ -137,7 +140,8 @@ export function ProfileSwitcher({
                   } ${switching ? 'opacity-50' : ''}`}
                   accessibilityRole="menuitem"
                   accessibilityLabel={`${profile.displayName}, ${roleLabel(
-                    profile.birthYear
+                    profile,
+                    profiles
                   )}${isActive ? ', active' : ''}`}
                   accessibilityState={{ selected: isActive }}
                   testID={`profile-option-${profile.id}`}
@@ -169,7 +173,7 @@ export function ProfileSwitcher({
                       {profile.displayName}
                     </Text>
                     <Text className="text-caption text-text-secondary">
-                      {roleLabel(profile.birthYear)}
+                      {roleLabel(profile, profiles)}
                     </Text>
                   </View>
                   {isActive && (
