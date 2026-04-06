@@ -145,6 +145,12 @@ jest.mock('../../../hooks/use-subjects', () => ({
   useSubjects: () => ({
     data: [{ id: 'subject-1', name: 'Math', status: 'active' }],
   }),
+  useCreateSubject: () => ({
+    mutateAsync: jest.fn().mockResolvedValue({
+      subject: { id: 'subject-new', name: 'New Subject' },
+    }),
+    isPending: false,
+  }),
 }));
 
 jest.mock('../../../hooks/use-curriculum', () => ({
@@ -598,7 +604,7 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
-  it('shows "Create new subject" when classification fails and no candidates [BUG-234]', async () => {
+  it('shows "+ New subject" escape hatch when classification fails [BUG-234]', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'freeform',
     });
@@ -610,9 +616,9 @@ describe('SessionScreen homework flow', () => {
     await flushAsyncWork();
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId('subject-resolution-create-new')
-      ).toBeTruthy();
+      // Fallback candidates from useSubjects mock (Math) are shown in ScrollView,
+      // plus a "+ New subject" chip (BUG-236 testID: subject-resolution-new)
+      expect(screen.getByTestId('subject-resolution-new')).toBeTruthy();
     });
 
     expect(mockStartSession).not.toHaveBeenCalled();
@@ -636,9 +642,7 @@ describe('SessionScreen homework flow', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('session-subject-resolution')).toBeTruthy();
-      expect(
-        screen.getByTestId('subject-resolution-create-new')
-      ).toBeTruthy();
+      expect(screen.getByTestId('subject-resolution-new')).toBeTruthy();
       expect(screen.getByText('+ New subject')).toBeTruthy();
     });
   });
