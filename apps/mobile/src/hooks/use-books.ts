@@ -95,7 +95,7 @@ export function useGenerateBookTopics(
       ].$post({
         param: { subjectId, bookId },
         json: input ?? {},
-      } as never);
+      });
       await assertOk(res);
       return (await res.json()) as BookWithTopics;
     },
