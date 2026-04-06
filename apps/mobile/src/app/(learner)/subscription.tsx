@@ -879,6 +879,14 @@ export default function SubscriptionScreen() {
                     ).toLocaleDateString()}`}
               </Text>
             )}
+            {!isPaidTier && (
+              <Text
+                className="text-body-sm text-primary font-semibold mt-2"
+                testID="free-upgrade-hint"
+              >
+                Upgrade for a smarter, more personal coach
+              </Text>
+            )}
           </View>
 
           {/* Cancellation notice */}
