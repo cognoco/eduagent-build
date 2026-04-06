@@ -1678,8 +1678,8 @@ export default function SessionScreen() {
         Alert.alert(
           agencyLabel === 'Guided' ? 'Guided mode' : 'Independent mode',
           agencyLabel === 'Guided'
-            ? 'Your mate is giving more structure right now because the conversation needed extra support.'
-            : 'Your mate is mostly letting you drive and checking in with lighter guidance.'
+            ? "I'm giving more structure right now because the conversation needed extra support."
+            : "I'm mostly letting you drive and checking in with lighter guidance."
         )
       }
       className="ms-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"

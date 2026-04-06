@@ -123,12 +123,12 @@ describe('MoreScreen — Learning Mode', () => {
 
     expect(
       screen.getByText(
-        'Push yourself further. Your coach keeps you focused. You earn points after proving you remember, and recaps help lock it in.'
+        'Push yourself further. Your mentor keeps you on track. You earn points after proving you remember, and recaps help lock it in.'
       )
     ).toBeTruthy();
     expect(
       screen.getByText(
-        'Learn at your own pace. Your coach is friendly and relaxed. You earn points right away and can skip recaps.'
+        'Learn at your own pace. Your mentor is relaxed and encouraging. You earn points right away and can skip recaps.'
       )
     ).toBeTruthy();
   });

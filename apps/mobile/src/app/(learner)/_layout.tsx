@@ -274,7 +274,7 @@ function PreviewSampleCoaching({
             Ready for homework?
           </Text>
           <Text className="text-body text-text-secondary mb-4">
-            Your coach will know what you need each day — whether it's homework
+            Your mentor will know what you need each day — whether it's homework
             help, practice, or a quick review.
           </Text>
           <View className="bg-surface rounded-button py-3 px-4 mb-2 items-center">
@@ -291,11 +291,11 @@ function PreviewSampleCoaching({
 
         <View className="bg-surface rounded-card p-4 mt-4">
           <Text className="text-body font-semibold text-text-primary mb-2">
-            How your coach helps
+            How your mentor helps
           </Text>
           <Text className="text-body-sm text-text-secondary mb-3">
-            Your AI coach guides you through problems step by step — never gives
-            away the answer. You learn by thinking, not copying.
+            Your AI mentor guides you through problems step by step — never
+            gives away the answer. You learn by thinking, not copying.
           </Text>
           <View className="flex-row items-start mb-2">
             <Text className="text-body me-2">{'\u{1F4F7}'}</Text>
@@ -306,7 +306,7 @@ function PreviewSampleCoaching({
           <View className="flex-row items-start mb-2">
             <Text className="text-body me-2">{'\u{1F9E0}'}</Text>
             <Text className="text-body-sm text-text-secondary flex-1">
-              Your coach remembers what you've learned
+              Your mentor remembers what you've learned
             </Text>
           </View>
           <View className="flex-row items-start">
@@ -345,7 +345,7 @@ function CreateProfileGate(): React.ReactElement {
         Welcome!
       </Text>
       <Text className="text-body text-text-secondary text-center mb-8">
-        Let's set up your profile so your coach can get to know you.
+        Let's set up your profile so your mentor can get to know you.
       </Text>
       <Pressable
         onPress={() => router.push('/create-profile')}
@@ -833,15 +833,15 @@ function ConsentPendingGate(): React.ReactElement {
           className="bg-surface rounded-card px-4 py-3.5 flex-row items-center"
           testID="preview-sample-coaching"
           accessibilityRole="button"
-          accessibilityLabel="Sample coaching preview"
+          accessibilityLabel="Sample mentoring preview"
         >
           <Text className="text-body me-3">{'\u{1F3AF}'}</Text>
           <View className="flex-1">
             <Text className="text-body font-semibold text-text-primary">
-              Sample coaching
+              Sample mentoring
             </Text>
             <Text className="text-caption text-text-secondary">
-              See how your coach works
+              See how your mentor works
             </Text>
           </View>
         </Pressable>

@@ -174,7 +174,7 @@ describe('useCoachingCard', () => {
     expect(result.current.headline).toBe(
       "I'm still getting to know you. What are you working on today?"
     );
-    expect(result.current.subtext).toContain('Your mate is ready');
+    expect(result.current.subtext).toContain("I'm ready when you are");
   });
 
   it('shows curriculum_complete card when defaultSubjectId provided but no suggestion', async () => {

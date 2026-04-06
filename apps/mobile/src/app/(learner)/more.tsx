@@ -76,13 +76,13 @@ const LEARNING_MODE_OPTIONS: {
     mode: 'casual',
     title: 'Explorer',
     description:
-      'Learn at your own pace. Your coach is friendly and relaxed. You earn points right away and can skip recaps.',
+      'Learn at your own pace. Your mentor is relaxed and encouraging. You earn points right away and can skip recaps.',
   },
   {
     mode: 'serious',
     title: 'Challenge mode',
     description:
-      'Push yourself further. Your coach keeps you focused. You earn points after proving you remember, and recaps help lock it in.',
+      'Push yourself further. Your mentor keeps you on track. You earn points after proving you remember, and recaps help lock it in.',
   },
 ];
 
@@ -307,7 +307,7 @@ export default function MoreScreen() {
                 Add a child
               </Text>
               <Text className="text-body-sm text-text-secondary mt-1">
-                Create a profile so your child can learn with their own coach
+                Create a profile so your child can learn with their own mentor
               </Text>
             </Pressable>
           </>

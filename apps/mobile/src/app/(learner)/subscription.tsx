@@ -79,7 +79,7 @@ const TIER_FEATURES: Array<{
     features: [
       '500 questions per month',
       'All Free features',
-      'Premium AI coach',
+      'Premium AI mentor',
       'Detailed progress analytics',
     ],
   },
@@ -97,7 +97,7 @@ const TIER_FEATURES: Array<{
     features: [
       '3,000 questions per month',
       'All Family features',
-      'Premium AI coach for 2 profiles',
+      'Premium AI mentor for 2 profiles',
       'Priority support',
     ],
   },
@@ -884,7 +884,7 @@ export default function SubscriptionScreen() {
                 className="text-body-sm text-primary font-semibold mt-2"
                 testID="free-upgrade-hint"
               >
-                Upgrade for a smarter, more personal coach
+                Upgrade for a smarter, more personal mentor
               </Text>
             )}
           </View>
@@ -1127,11 +1127,11 @@ export default function SubscriptionScreen() {
           {isPaidTier && (
             <View className="mt-6" testID="ai-upgrade-section">
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
-                Premium Coach
+                Premium Mentor
               </Text>
               <View className="bg-surface rounded-card px-4 py-3.5">
                 <Text className="text-body font-semibold text-text-primary mb-1">
-                  Upgrade your AI coach
+                  Upgrade your AI mentor
                 </Text>
                 <Text className="text-body-sm text-text-secondary mb-3">
                   Get a more advanced AI that explains things more clearly,

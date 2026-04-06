@@ -400,7 +400,7 @@ export default function SessionSummaryScreen() {
             </View>
           ))}
           <Text className="text-caption text-text-secondary mt-3">
-            Your mate will check in soon
+            I'll check in with you soon
           </Text>
         </View>
 
@@ -491,7 +491,7 @@ export default function SessionSummaryScreen() {
           </Text>
           <Text className="text-body-sm text-text-secondary mb-3">
             Write a short summary of what you learned. This helps you remember
-            and helps your mate plan next time.
+            and helps me plan what comes next.
           </Text>
 
           {!submitted ? (
