@@ -30,7 +30,6 @@ type ConsentRouteEnv = {
   Bindings: {
     DATABASE_URL: string;
     CLERK_JWKS_URL?: string;
-    APP_URL?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
   };
@@ -76,10 +75,15 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         );
       }
 
-      const appUrl = c.env.APP_URL ?? 'https://www.mentomate.com';
+      // Consent page is served by this API worker — derive URL from request
+      // origin so the link always points to the correct API domain:
+      //   production → https://api.mentomate.com
+      //   staging    → https://api-stg.mentomate.com
+      //   local dev  → http://localhost:8787
+      const apiOrigin = new URL(c.req.url).origin;
       let result;
       try {
-        result = await requestConsent(db, input, appUrl, {
+        result = await requestConsent(db, input, apiOrigin, {
           resendApiKey: c.env.RESEND_API_KEY,
           emailFrom: c.env.EMAIL_FROM,
         });
