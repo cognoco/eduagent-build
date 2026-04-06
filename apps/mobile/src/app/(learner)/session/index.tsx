@@ -1335,16 +1335,18 @@ export default function SessionScreen() {
           }));
           setShowWrongSubjectChip(false);
           setClassifyError(
-            'Could not identify the subject automatically. Pick one below and we’ll keep going.'
+            fallbackCandidates.length > 0
+              ? "Could not identify the subject automatically. Pick one below and we'll keep going."
+              : 'Could not identify the subject. Create a new subject to get started.'
           );
-          if (fallbackCandidates.length > 0) {
-            openSubjectResolution(
-              text,
-              "I couldn't place that yet. Pick the closest subject and we'll get moving.",
-              fallbackCandidates
-            );
-            return;
-          }
+          openSubjectResolution(
+            text,
+            fallbackCandidates.length > 0
+              ? "I couldn’t place that yet. Pick the closest subject and we’ll get moving."
+              : "I couldn’t figure out the subject. You can create a new one and we’ll pick up from there.",
+            fallbackCandidates
+          );
+          return;
         } finally {
           setPendingClassification(false);
         }
@@ -1859,82 +1861,109 @@ export default function SessionScreen() {
   );
 
   const subjectResolutionAccessory = pendingSubjectResolution ? (
-    <View className="bg-surface border-t border-surface-elevated px-4 py-3">
+    <View
+      className="bg-surface border-t border-surface-elevated px-4 py-3"
+      style={{ paddingBottom: pendingSubjectResolution.candidates.length === 0 ? 16 : undefined }}
+    >
       <Text className="text-body-sm font-semibold text-text-primary">
         Pick the subject
       </Text>
       <Text className="text-body-sm text-text-secondary mt-1 mb-3">
         {pendingSubjectResolution.prompt}
       </Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8 }}
-        testID="session-subject-resolution"
-      >
-        {pendingSubjectResolution.candidates.map((candidate) => (
+      {pendingSubjectResolution.candidates.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8 }}
+          testID="session-subject-resolution"
+        >
+          {pendingSubjectResolution.candidates.map((candidate) => (
+            <Pressable
+              key={candidate.subjectId}
+              onPress={() => void handleResolveSubject(candidate)}
+              disabled={isStreaming || pendingClassification}
+              className="rounded-full bg-surface-elevated px-4 py-2"
+              accessibilityRole="button"
+              accessibilityLabel={`Choose ${candidate.subjectName}`}
+              accessibilityState={{
+                disabled: isStreaming || pendingClassification,
+              }}
+              testID={`subject-resolution-${candidate.subjectId}`}
+            >
+              <Text className="text-body-sm font-semibold text-text-primary">
+                {candidate.subjectName}
+              </Text>
+            </Pressable>
+          ))}
+          {/* BUG-233: When classifier suggests a subject, offer to create it inline */}
+          {pendingSubjectResolution.suggestedSubjectName && (
+            <Pressable
+              onPress={() => void handleCreateSuggestedSubject()}
+              disabled={isStreaming || pendingClassification || createSubject.isPending}
+              className="rounded-full bg-primary/20 px-4 py-2"
+              accessibilityRole="button"
+              accessibilityLabel={`Add ${pendingSubjectResolution.suggestedSubjectName} as a new subject`}
+              accessibilityState={{
+                disabled: isStreaming || pendingClassification || createSubject.isPending,
+              }}
+              testID="subject-resolution-create-new"
+            >
+              <Text className="text-body-sm font-semibold text-primary">
+                {createSubject.isPending
+                  ? 'Adding...'
+                  : `+ ${pendingSubjectResolution.suggestedSubjectName}`}
+              </Text>
+            </Pressable>
+          )}
+          {/* BUG-236: Generic new-subject escape hatch — returns to chat after creation */}
           <Pressable
-            key={candidate.subjectId}
-            onPress={() => void handleResolveSubject(candidate)}
+            onPress={() =>
+              router.push({
+                pathname: '/create-subject',
+                params: {
+                  returnTo: 'chat',
+                  chatTopic: pendingSubjectResolution.originalText,
+                },
+              } as never)
+            }
             disabled={isStreaming || pendingClassification}
-            className="rounded-full bg-surface-elevated px-4 py-2"
+            className="rounded-full border border-border px-4 py-2"
             accessibilityRole="button"
-            accessibilityLabel={`Choose ${candidate.subjectName}`}
+            accessibilityLabel="Create a new subject"
             accessibilityState={{
               disabled: isStreaming || pendingClassification,
             }}
-            testID={`subject-resolution-${candidate.subjectId}`}
-          >
-            <Text className="text-body-sm font-semibold text-text-primary">
-              {candidate.subjectName}
-            </Text>
-          </Pressable>
-        ))}
-        {/* BUG-233: When classifier suggests a subject, offer to create it inline */}
-        {pendingSubjectResolution.suggestedSubjectName && (
-          <Pressable
-            onPress={() => void handleCreateSuggestedSubject()}
-            disabled={isStreaming || pendingClassification || createSubject.isPending}
-            className="rounded-full bg-primary/20 px-4 py-2"
-            accessibilityRole="button"
-            accessibilityLabel={`Add ${pendingSubjectResolution.suggestedSubjectName} as a new subject`}
-            accessibilityState={{
-              disabled: isStreaming || pendingClassification || createSubject.isPending,
-            }}
-            testID="subject-resolution-create-new"
+            testID="subject-resolution-new"
           >
             <Text className="text-body-sm font-semibold text-primary">
-              {createSubject.isPending
-                ? 'Adding...'
-                : `+ ${pendingSubjectResolution.suggestedSubjectName}`}
+              + New subject
             </Text>
           </Pressable>
-        )}
-        {/* BUG-236: Generic new-subject escape hatch — returns to chat after creation */}
+        </ScrollView>
+      ) : (
+        /* BUG-234: Zero-candidates fallback with BUG-236 returnTo=chat */
         <Pressable
-          onPress={() =>
+          onPress={() => {
+            setPendingSubjectResolution(null);
             router.push({
               pathname: '/create-subject',
               params: {
                 returnTo: 'chat',
                 chatTopic: pendingSubjectResolution.originalText,
               },
-            } as never)
-          }
-          disabled={isStreaming || pendingClassification}
-          className="rounded-full border border-border px-4 py-2"
+            } as never);
+          }}
+          className="rounded-button bg-primary py-3 items-center min-h-[44px] justify-center"
           accessibilityRole="button"
           accessibilityLabel="Create a new subject"
-          accessibilityState={{
-            disabled: isStreaming || pendingClassification,
-          }}
-          testID="subject-resolution-new"
+          testID="subject-resolution-create-new"
         >
-          <Text className="text-body-sm font-semibold text-primary">
-            + New subject
+          <Text className="text-body-sm font-semibold text-text-inverse">
+            Create a new subject
           </Text>
         </Pressable>
-      </ScrollView>
+      )}
     </View>
   ) : null;
 

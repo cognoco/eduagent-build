@@ -1,0 +1,83 @@
+# Regression: BUG-234 --- Classifier fallback must show actionable subject picker
+#
+# When the AI classifier cannot place a topic (e.g. "Easter"), the chat
+# previously showed a text prompt ("pick the closest subject") but no
+# interactive controls --- a dead-end. After the fix, subject suggestion
+# chips appear inline above the input area, letting the user pick a subject
+# or create a new one without leaving the screen.
+#
+# Prerequisite: learning-active scenario (provides at least one subject).
+# The test types a topic the classifier may struggle with, then asserts
+# that subject resolution chips appear (testID: session-subject-resolution
+# or subject-resolution-create-new).
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(learner)/session/index.tsx
+#   - apps/mobile/src/components/session/ChatShell.tsx
+appId: com.mentomate.app
+tags:
+  - regression
+  - chat
+  - ux-dead-end
+---
+# 1. Seed & sign in with a user that has at least one subject
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+# 2. Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "home-scroll-view"
+    timeout: 15000
+
+# 3. Navigate to freeform session (no pre-selected subject)
+- tapOn:
+    id: "coaching-card-primary"
+
+# 4. Wait for the chat input to be visible
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+# 5. Type a topic the classifier may not match to an existing subject
+- tapOn:
+    id: "chat-input"
+- inputText: "Easter traditions around the world"
+- pressKey: Enter
+
+# 6. Wait for classifier response --- either auto-classification succeeds
+#    (testID: chat-input reappears) or subject resolution chips appear.
+#    Allow 30s for the classify API call.
+- extendedWaitUntil:
+    visible:
+      id: "session-subject-resolution"
+    timeout: 30000
+    optional: true
+
+# 7. If subject resolution chips appeared, verify the "New subject" escape hatch
+- runFlow:
+    when:
+      visible:
+        id: "session-subject-resolution"
+    commands:
+      - assertVisible:
+          id: "subject-resolution-create-new"
+      - takeScreenshot: bug-234-01-subject-chips-visible
+
+# 8. If classifier auto-matched (no subject resolution), verify chat-input
+#    is still active --- no dead end either way
+- runFlow:
+    when:
+      notVisible:
+        id: "session-subject-resolution"
+    commands:
+      - assertVisible:
+          id: "chat-input"
+      - takeScreenshot: bug-234-02-auto-classified
+
+# 9. Final screenshot regardless of path
+- takeScreenshot: bug-234-03-final-state

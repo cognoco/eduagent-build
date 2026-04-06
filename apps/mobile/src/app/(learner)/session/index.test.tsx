@@ -597,4 +597,49 @@ describe('SessionScreen homework flow', () => {
       );
     });
   });
+
+  it('shows "Create new subject" when classification fails and no candidates [BUG-234]', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'freeform',
+    });
+    mockClassifySubject.mockRejectedValue(new Error('Network error'));
+
+    const screen = render(<SessionScreen />);
+
+    fireEvent.press(screen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('subject-resolution-create-new')
+      ).toBeTruthy();
+    });
+
+    expect(mockStartSession).not.toHaveBeenCalled();
+  });
+
+  it('shows "+ New subject" chip alongside candidates when classification is ambiguous [BUG-234]', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+    });
+    mockClassifySubject.mockResolvedValue({
+      candidates: [
+        { subjectId: 'subject-1', subjectName: 'Math', confidence: 0.5 },
+      ],
+      needsConfirmation: true,
+    });
+
+    const screen = render(<SessionScreen />);
+
+    fireEvent.press(screen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-subject-resolution')).toBeTruthy();
+      expect(
+        screen.getByTestId('subject-resolution-create-new')
+      ).toBeTruthy();
+      expect(screen.getByText('+ New subject')).toBeTruthy();
+    });
+  });
 });

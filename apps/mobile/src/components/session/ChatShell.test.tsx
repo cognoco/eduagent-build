@@ -449,6 +449,19 @@ describe('ChatShell', () => {
     expect(screen.queryByTestId('voice-record-button')).toBeNull();
   });
 
+  it('shows inputAccessory even when inputDisabled is true [BUG-234]', () => {
+    const { Text } = require('react-native');
+    renderChatShell({
+      inputDisabled: true,
+      inputAccessory: <Text testID="subject-chips">Pick a subject</Text>,
+    });
+
+    // The accessory must remain visible so subject resolution chips are actionable
+    expect(screen.getByTestId('subject-chips')).toBeTruthy();
+    // But the text input itself should be hidden
+    expect(screen.queryByTestId('chat-input')).toBeNull();
+  });
+
   // -----------------------------------------------------------------------
   // Header right action composition
   // -----------------------------------------------------------------------

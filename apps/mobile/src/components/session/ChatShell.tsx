@@ -432,10 +432,13 @@ export function ChatShell({
         />
       )}
 
+      {/* Input accessory — always visible so subject-resolution chips remain
+          actionable even when the text input itself is disabled (BUG-234). */}
+      {inputAccessory}
+
       {/* Input */}
       {!inputDisabled && (
         <View>
-          {inputAccessory}
           <View className="px-4 py-2 bg-surface border-t border-surface-elevated">
             <View
               className="flex-row rounded-full bg-surface-elevated p-1"
