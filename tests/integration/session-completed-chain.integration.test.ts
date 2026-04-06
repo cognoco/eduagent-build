@@ -309,7 +309,7 @@ afterAll(async () => {
 
 describe('Integration: Session-Completed Chain (P0-008)', () => {
   it('runs the real chain and persists post-session side effects', async () => {
-    const scenario = await seedScenario();
+    const scenario = await seedScenario({ initialSummarySkips: 0 });
 
     const result = await executeChain({
       profileId: scenario.profileId,

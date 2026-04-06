@@ -95,8 +95,10 @@ const VALID_TRANSITIONS = new Set([
   'trial->expired',
   'active->past_due',
   'active->cancelled',
+  'active->expired', // Stripe customer.subscription.deleted (immediate cancellation)
   'past_due->active',
   'past_due->cancelled',
+  'past_due->expired', // Stripe customer.subscription.deleted while past_due
   'cancelled->expired',
 ]);
 
@@ -114,8 +116,8 @@ export function getTierConfig(tier: SubscriptionState['tier']): TierConfig {
  *
  * Valid transitions:
  * - trial -> active, expired
- * - active -> past_due, cancelled
- * - past_due -> active, cancelled
+ * - active -> past_due, cancelled, expired
+ * - past_due -> active, cancelled, expired
  * - cancelled -> expired
  *
  * Invalid: expired -> anything, trial -> cancelled (must go through active first)
