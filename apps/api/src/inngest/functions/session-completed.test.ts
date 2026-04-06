@@ -169,6 +169,7 @@ jest.mock('../../services/sentry', () => ({
 }));
 
 import { sessionCompleted } from './session-completed';
+import { createDatabase } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
 // Helpers — extract Inngest step handlers from the function
@@ -465,7 +466,6 @@ describe('sessionCompleted', () => {
       // Reset the db cache so getStepDatabase() calls createDatabase() again
       resetDatabaseUrl();
       // Override the createDatabase mock to return a db with the desired subject
-      const { createDatabase } = require('@eduagent/database');
       (createDatabase as jest.Mock).mockImplementationOnce(() => {
         const chainable = () => ({
           from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),

@@ -37,6 +37,7 @@ import {
   syncHomeworkState,
   setSessionInputMode,
 } from '../services/session';
+import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
 import { incrementQuota } from '../services/billing';
@@ -58,6 +59,7 @@ type SessionRouteEnv = {
     db: Database;
     profileId: string | undefined;
     subscriptionId: string;
+    llmTier: LLMTier;
   };
 };
 
@@ -101,12 +103,15 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const subscriptionId = c.get('subscriptionId');
 
+      const llmTier = c.get('llmTier');
+
       try {
         const result = await processMessage(
           db,
           profileId,
           c.req.param('sessionId'),
-          c.req.valid('json')
+          c.req.valid('json'),
+          { llmTier }
         );
         return c.json(result);
       } catch (err) {
@@ -153,12 +158,15 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const session = await getSession(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');
 
+      const llmTier = c.get('llmTier');
+
       try {
         const { stream, onComplete } = await streamMessage(
           db,
           profileId,
           sessionId,
-          input
+          input,
+          { llmTier }
         );
 
         return streamSSE(c, async (sseStream) => {

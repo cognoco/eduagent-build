@@ -19,6 +19,8 @@ import type { Database } from '@eduagent/database';
 import { ERROR_CODES } from '@eduagent/schemas';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 import type { Account } from '../services/account';
+import type { LLMTier } from '../services/subscription';
+import type { ProfileMeta } from './profile-scope';
 import {
   ensureFreeSubscription,
   getQuotaPool,
@@ -42,7 +44,9 @@ export type MeteringEnv = {
   Variables: {
     db: Database;
     account: Account;
+    profileMeta: ProfileMeta;
     subscriptionId: string;
+    llmTier: LLMTier;
   };
 };
 
@@ -252,6 +256,13 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
 
     // Store subscriptionId for potential refund on LLM failure
     c.set('subscriptionId', subscriptionId);
+
+    // Expose the LLM tier so session route handlers can thread it to the LLM router.
+    // Per-profile premium flag overrides the subscription-level default — this is how
+    // pro plans (2 premium profiles out of 6) and future AI upgrade add-ons work.
+    const profileMeta = c.get('profileMeta');
+    const baseLlmTier = getTierConfig(tier).llmTier;
+    c.set('llmTier', profileMeta?.hasPremiumLlm ? 'premium' : baseLlmTier);
 
     // I7 fix: Update KV cache after decrement so next request sees fresh count
     // Awaited to prevent stale reads on concurrent requests

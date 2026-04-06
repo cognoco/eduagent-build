@@ -670,7 +670,11 @@ async function prepareExchangeContext(
   profileId: string,
   sessionId: string,
   userMessage: string,
-  options?: { voyageApiKey?: string; homeworkMode?: 'help_me' | 'check_answer' }
+  options?: {
+    voyageApiKey?: string;
+    homeworkMode?: 'help_me' | 'check_answer';
+    llmTier?: import('./subscription').LLMTier;
+  }
 ): Promise<ExchangePrep> {
   // 1. Load session
   const session = await getSession(db, profileId, sessionId);
@@ -990,6 +994,8 @@ async function prepareExchangeContext(
       : undefined,
     // FR228: Homework mode — passed from client per exchange
     homeworkMode: options?.homeworkMode,
+    // Subscription-derived LLM tier — controls model routing
+    llmTier: options?.llmTier,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };
@@ -1103,7 +1109,10 @@ export async function processMessage(
   profileId: string,
   sessionId: string,
   input: SessionMessageInput,
-  options?: { voyageApiKey?: string }
+  options?: {
+    voyageApiKey?: string;
+    llmTier?: import('./subscription').LLMTier;
+  }
 ): Promise<{
   response: string;
   escalationRung: number;
@@ -1165,7 +1174,10 @@ export async function streamMessage(
   profileId: string,
   sessionId: string,
   input: SessionMessageInput,
-  options?: { voyageApiKey?: string }
+  options?: {
+    voyageApiKey?: string;
+    llmTier?: import('./subscription').LLMTier;
+  }
 ): Promise<{
   stream: AsyncIterable<string>;
   onComplete: (fullResponse: string) => Promise<{

@@ -34,6 +34,7 @@ export interface ProfileMeta {
     | 'CONSENTED'
     | 'WITHDRAWN'
     | null;
+  hasPremiumLlm: boolean;
 }
 
 export type ProfileScopeEnv = {
@@ -85,6 +86,7 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
               birthYear: owner.birthYear ?? null,
               location: owner.location,
               consentStatus: owner.consentStatus,
+              hasPremiumLlm: owner.hasPremiumLlm ?? false,
             });
           }
         } catch (err) {
@@ -114,6 +116,7 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
       birthYear: profile.birthYear ?? null,
       location: profile.location,
       consentStatus: profile.consentStatus,
+      hasPremiumLlm: profile.hasPremiumLlm ?? false,
     });
     await next();
     return;
