@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { eq, and, asc } from 'drizzle-orm';
-import { profiles, type Database } from '@eduagent/database';
+import { profiles, familyLinks, type Database } from '@eduagent/database';
 import type {
   ProfileCreateInput,
   ProfileUpdateInput,
@@ -264,4 +264,24 @@ export async function getProfileAge(
   });
   const currentYear = new Date().getUTCFullYear();
   return profile?.birthYear ? Math.max(5, currentYear - profile.birthYear) : 12;
+}
+
+// ---------------------------------------------------------------------------
+// Role resolution (used by recall notifications + daily plan)
+// ---------------------------------------------------------------------------
+
+export type ProfileRole = 'guardian' | 'self_learner';
+
+/**
+ * Determines whether a profile is a guardian or self-learner by checking
+ * the family_links table. A profile with any child links is a guardian.
+ */
+export async function resolveProfileRole(
+  db: Database,
+  profileId: string
+): Promise<ProfileRole> {
+  const childLink = await db.query.familyLinks.findFirst({
+    where: eq(familyLinks.parentProfileId, profileId),
+  });
+  return childLink ? 'guardian' : 'self_learner';
 }

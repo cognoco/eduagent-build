@@ -25,6 +25,7 @@ import {
   getProfile,
   updateProfile,
   switchProfile,
+  resolveProfileRole,
 } from './profile';
 import {
   getConsentStatus,
@@ -336,5 +337,41 @@ describe('switchProfile', () => {
     const result = await switchProfile(db, 'profile-123', 'account-123');
 
     expect(result).toEqual({ profileId: 'profile-123' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveProfileRole
+// ---------------------------------------------------------------------------
+
+describe('resolveProfileRole', () => {
+  it('returns guardian when profile has child links', async () => {
+    const db = {
+      query: {
+        familyLinks: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'link-1',
+            parentProfileId: 'parent-1',
+            childProfileId: 'child-1',
+          }),
+        },
+      },
+    } as unknown as Database;
+
+    const result = await resolveProfileRole(db, 'parent-1');
+    expect(result).toBe('guardian');
+  });
+
+  it('returns self_learner when profile has no child links', async () => {
+    const db = {
+      query: {
+        familyLinks: {
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+      },
+    } as unknown as Database;
+
+    const result = await resolveProfileRole(db, 'user-1');
+    expect(result).toBe('self_learner');
   });
 });

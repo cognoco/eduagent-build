@@ -32,7 +32,8 @@ export interface NotificationPayload {
     | 'consent_reminder'
     | 'consent_warning'
     | 'consent_expired'
-    | 'subscribe_request';
+    | 'subscribe_request'
+    | 'recall_nudge';
 }
 
 export interface NotificationResult {
@@ -156,6 +157,39 @@ export function formatDailyReminderBody(streakDays: number): string {
     return 'Start a new streak today! A quick review goes a long way.';
   }
   return `Keep your ${streakDays}-day streak going! Quick review?`;
+}
+
+/**
+ * Formats a recall nudge notification based on the user's role.
+ * Guardians receive third-person overviews about their child;
+ * self-learners receive direct first-person challenges.
+ */
+export function formatRecallNudge(
+  fadingCount: number,
+  topTopicTitle: string,
+  role: 'guardian' | 'self_learner',
+  childName?: string
+): { title: string; body: string } {
+  if (role === 'guardian') {
+    return {
+      title: 'Review reminder',
+      body: `${childName ?? 'Your learner'} has ${fadingCount} topic${
+        fadingCount > 1 ? 's' : ''
+      } due for review today.`,
+    };
+  }
+
+  if (fadingCount === 1) {
+    return {
+      title: topTopicTitle,
+      body: "This one's starting to fade — a quick check keeps it locked in.",
+    };
+  }
+
+  return {
+    title: `${fadingCount} topics need a refresh`,
+    body: `Starting with ${topTopicTitle}. About ${fadingCount * 2} minutes.`,
+  };
 }
 
 // ---------------------------------------------------------------------------

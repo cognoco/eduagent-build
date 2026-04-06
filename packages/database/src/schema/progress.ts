@@ -103,6 +103,7 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   'consent_warning',
   'consent_expired',
   'subscribe_request',
+  'recall_nudge',
 ]);
 
 export const notificationLog = pgTable(
