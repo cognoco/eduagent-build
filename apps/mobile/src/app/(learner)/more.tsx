@@ -73,14 +73,16 @@ const LEARNING_MODE_OPTIONS: {
   description: string;
 }[] = [
   {
-    mode: 'serious',
-    title: 'Serious Learner',
-    description: 'Mastery gates, verified XP, full assessment cycle',
+    mode: 'casual',
+    title: 'Explorer',
+    description:
+      'Learn at your own pace. Your coach is friendly and relaxed. You earn points right away and can skip recaps.',
   },
   {
-    mode: 'casual',
-    title: 'Casual Explorer',
-    description: 'No gates, completion XP, skip summaries freely',
+    mode: 'serious',
+    title: 'Challenge mode',
+    description:
+      'Push yourself further. Your coach keeps you focused. You earn points after proving you remember, and recaps help lock it in.',
   },
 ];
 
@@ -288,6 +290,28 @@ export default function MoreScreen() {
             Snap a photo and get guided through it step by step
           </Text>
         </Pressable>
+
+        {activeProfile?.isOwner && (
+          <>
+            <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
+              Family
+            </Text>
+            <Pressable
+              onPress={() => router.push('/create-profile')}
+              className="bg-surface rounded-card px-4 py-3.5 mb-2"
+              accessibilityLabel="Add a child profile"
+              accessibilityRole="button"
+              testID="add-child-link"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Add a child
+              </Text>
+              <Text className="text-body-sm text-text-secondary mt-1">
+                Create a profile so your child can learn with their own coach
+              </Text>
+            </Pressable>
+          </>
+        )}
 
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
           Account

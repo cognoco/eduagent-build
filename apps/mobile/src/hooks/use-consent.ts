@@ -20,6 +20,7 @@ export function useRequestConsent(): UseMutationResult<
   ConsentRequest
 > {
   const client = useApiClient();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (
@@ -28,6 +29,14 @@ export function useRequestConsent(): UseMutationResult<
       const res = await client.consent.request.$post({ json: input });
       await assertOk(res);
       return (await res.json()) as ConsentRequestResult;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = String(query.queryKey[0]);
+          return key === 'profiles' || key === 'consent-status';
+        },
+      });
     },
   });
 }

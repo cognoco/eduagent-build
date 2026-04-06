@@ -11,6 +11,7 @@ const envSchema = z.object({
   CLERK_AUDIENCE: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
   APP_URL: z.string().url().default('https://api.mentomate.com'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 

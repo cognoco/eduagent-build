@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
+import { AccessibilityInfo } from 'react-native';
 import { ChatShell, type ChatMessage } from './ChatShell';
 
 // ---------------------------------------------------------------------------
@@ -460,5 +461,151 @@ describe('ChatShell', () => {
 
     expect(screen.getByTestId('voice-toggle')).toBeTruthy();
     expect(screen.getByTestId('custom-action')).toBeTruthy();
+  });
+
+  // -----------------------------------------------------------------------
+  // Screen-reader detection lifecycle (lines 176-196)
+  // -----------------------------------------------------------------------
+
+  describe('screen-reader detection', () => {
+    let mockRemove: jest.Mock;
+    let screenReaderChangedListener: ((enabled: boolean) => void) | undefined;
+
+    beforeEach(() => {
+      mockRemove = jest.fn();
+      screenReaderChangedListener = undefined;
+
+      jest
+        .spyOn(AccessibilityInfo, 'isScreenReaderEnabled')
+        .mockResolvedValue(false);
+
+      jest
+        .spyOn(AccessibilityInfo, 'addEventListener')
+        .mockImplementation((_event, listener) => {
+          screenReaderChangedListener = listener as unknown as (
+            enabled: boolean
+          ) => void;
+          return { remove: mockRemove } as unknown as ReturnType<
+            typeof AccessibilityInfo.addEventListener
+          >;
+        });
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('suppresses TTS for new messages after screen reader detected on mount', async () => {
+      jest
+        .spyOn(AccessibilityInfo, 'isScreenReaderEnabled')
+        .mockResolvedValue(true);
+
+      const { rerender, props } = renderChatShell({
+        verificationType: 'teach_back',
+        messages: [{ id: 'ai-1', role: 'ai', content: 'Please explain.' }],
+      });
+
+      // The first message may speak before the async screen reader check resolves.
+      // After the promise resolves, screenReaderEnabled becomes true.
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      mockSpeak.mockClear();
+
+      // Add a NEW AI message — this should NOT auto-speak because screen reader is now detected
+      rerender(
+        <ChatShell
+          {...props}
+          messages={[
+            { id: 'ai-1', role: 'ai', content: 'Please explain.' },
+            { id: 'ai-2', role: 'ai', content: 'Second message' },
+          ]}
+        />
+      );
+
+      expect(mockSpeak).not.toHaveBeenCalled();
+    });
+
+    it('suppresses TTS when screen reader becomes active mid-session', async () => {
+      renderChatShell({
+        verificationType: 'teach_back',
+        messages: [{ id: 'ai-1', role: 'ai', content: 'Hello learner!' }],
+      });
+
+      // Allow the isScreenReaderEnabled promise to resolve
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      // Initial TTS fires (screen reader was off at mount)
+      expect(mockSpeak).toHaveBeenCalledWith('Hello learner!');
+      mockSpeak.mockClear();
+
+      // Simulate screen reader turning ON
+      act(() => {
+        screenReaderChangedListener?.(true);
+      });
+
+      // Shows the manual-playback notice instead of auto-speaking
+      expect(
+        screen.getByText(
+          'Screen reader is on, so voice mode keeps manual playback only.'
+        )
+      ).toBeTruthy();
+    });
+
+    it('cleans up listener subscription on unmount', async () => {
+      const { unmount } = renderChatShell({
+        verificationType: 'teach_back',
+      });
+
+      // Allow the isScreenReaderEnabled promise to resolve
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(AccessibilityInfo.addEventListener).toHaveBeenCalledWith(
+        'screenReaderChanged',
+        expect.any(Function)
+      );
+
+      // Unmount should call subscription.remove()
+      unmount();
+
+      expect(mockRemove).toHaveBeenCalledTimes(1);
+    });
+
+    it('transitions from auto to manual TTS when screen reader detected', async () => {
+      renderChatShell({
+        verificationType: 'teach_back',
+        messages: [{ id: 'ai-1', role: 'ai', content: 'First message' }],
+      });
+
+      // Allow the isScreenReaderEnabled promise to resolve
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      // Auto-TTS fires initially
+      expect(mockSpeak).toHaveBeenCalledWith('First message');
+      mockSpeak.mockClear();
+
+      // Screen reader turns on
+      act(() => {
+        screenReaderChangedListener?.(true);
+      });
+
+      // Voice toggle still shows as enabled (manual playback mode)
+      const toggle = screen.getByTestId('voice-toggle');
+      expect(toggle.props.accessibilityState.checked).toBe(true);
+
+      // The manual-playback notice appears
+      expect(
+        screen.getByText(
+          'Screen reader is on, so voice mode keeps manual playback only.'
+        )
+      ).toBeTruthy();
+    });
   });
 });

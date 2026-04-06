@@ -114,18 +114,22 @@ describe('MoreScreen — Learning Mode', () => {
 
     expect(screen.getByTestId('learning-mode-serious')).toBeTruthy();
     expect(screen.getByTestId('learning-mode-casual')).toBeTruthy();
-    expect(screen.getByText('Serious Learner')).toBeTruthy();
-    expect(screen.getByText('Casual Explorer')).toBeTruthy();
+    expect(screen.getByText('Challenge mode')).toBeTruthy();
+    expect(screen.getByText('Explorer')).toBeTruthy();
   });
 
   it('renders descriptions for both modes', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
     expect(
-      screen.getByText('Mastery gates, verified XP, full assessment cycle')
+      screen.getByText(
+        'Push yourself further. Your coach keeps you focused. You earn points after proving you remember, and recaps help lock it in.'
+      )
     ).toBeTruthy();
     expect(
-      screen.getByText('No gates, completion XP, skip summaries freely')
+      screen.getByText(
+        'Learn at your own pace. Your coach is friendly and relaxed. You earn points right away and can skip recaps.'
+      )
     ).toBeTruthy();
   });
 

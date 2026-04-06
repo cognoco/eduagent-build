@@ -46,7 +46,7 @@ const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
 };
 
 const DEFAULT_LEARNING_MODE: LearningModeRecord = {
-  mode: 'serious',
+  mode: 'casual',
   medianResponseSeconds: null,
   celebrationLevel: 'all',
 };

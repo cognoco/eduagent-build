@@ -156,12 +156,12 @@ describe('upsertNotificationPrefs', () => {
 // ---------------------------------------------------------------------------
 
 describe('getLearningMode', () => {
-  it('returns default serious mode when no row exists', async () => {
+  it('returns default casual mode when no row exists', async () => {
     const db = createMockDb({ findFirstResult: undefined });
     const result = await getLearningMode(db, profileId);
 
     expect(result).toEqual({
-      mode: 'serious',
+      mode: 'casual',
       medianResponseSeconds: null,
       celebrationLevel: 'all',
     });

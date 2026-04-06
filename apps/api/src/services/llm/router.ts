@@ -6,17 +6,33 @@ import type {
   RouteResult,
   StreamResult,
 } from './types';
+import type { LLMTier } from '../subscription';
 
 // ---------------------------------------------------------------------------
 // Model routing configuration (ARCH-9)
 // ---------------------------------------------------------------------------
 
-function getModelConfig(rung: EscalationRung): ModelConfig {
-  // Gemini is the preferred (cheaper) provider. If it isn't registered
-  // (no GEMINI_API_KEY), route to OpenAI as primary instead.
-  const useGemini = providers.has('gemini');
+function getModelConfig(
+  rung: EscalationRung,
+  llmTier: LLMTier = 'standard'
+): ModelConfig {
+  // Premium tier: route to Anthropic Sonnet when the provider is registered.
+  // Falls through to standard routing if Anthropic keys are not configured.
+  if (llmTier === 'premium' && providers.has('anthropic')) {
+    return {
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-6',
+      maxTokens: rung <= 2 ? 4096 : 8192,
+    };
+  }
 
-  if (rung <= 2) {
+  // Flash tier: always use the cheapest model regardless of rung.
+  // Standard tier: Flash for light tasks (rung ≤ 2), Pro for heavy (rung > 2).
+  // Premium without Anthropic: same as standard (graceful degradation).
+  const useGemini = providers.has('gemini');
+  const isLight = llmTier === 'flash' || rung <= 2;
+
+  if (isLight) {
     if (useGemini) {
       return { provider: 'gemini', model: 'gemini-2.5-flash', maxTokens: 4096 };
     }
@@ -220,9 +236,9 @@ async function withRetry<T>(
 export async function routeAndCall(
   messages: ChatMessage[],
   rung: EscalationRung = 1,
-  _options?: { correlationId?: string }
+  _options?: { correlationId?: string; llmTier?: LLMTier }
 ): Promise<RouteResult> {
-  const config = getModelConfig(rung);
+  const config = getModelConfig(rung, _options?.llmTier);
   const provider = providers.get(config.provider);
   if (!provider) {
     throw new Error(`No provider registered for: ${config.provider}`);
@@ -396,9 +412,10 @@ async function* wrapStreamWithCircuitBreaker(
  */
 export async function routeAndStream(
   messages: ChatMessage[],
-  rung: EscalationRung = 1
+  rung: EscalationRung = 1,
+  llmTier?: LLMTier
 ): Promise<StreamResult> {
-  const config = getModelConfig(rung);
+  const config = getModelConfig(rung, llmTier);
   const provider = providers.get(config.provider);
   if (!provider) {
     throw new Error(`No provider registered for: ${config.provider}`);
