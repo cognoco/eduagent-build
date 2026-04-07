@@ -60,7 +60,12 @@ function createMockDb({
   findFirstResult = undefined as ReturnType<typeof mockConsentRow> | undefined,
   insertReturning = [] as ReturnType<typeof mockConsentRow>[],
 } = {}): Database {
-  const updateWhere = jest.fn().mockResolvedValue(undefined);
+  // Atomic update chain: update().set().where().returning()
+  // returning() resolves with the row (simulates 1 matched row)
+  const updateReturning = jest
+    .fn()
+    .mockResolvedValue(findFirstResult ? [findFirstResult] : []);
+  const updateWhere = jest.fn().mockReturnValue({ returning: updateReturning });
   const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
   const deleteWhere = jest.fn().mockResolvedValue(undefined);
   const deleteFn = jest.fn().mockReturnValue({ where: deleteWhere });

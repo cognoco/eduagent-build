@@ -164,11 +164,11 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
          <p>By approving, you allow us to process ${escapeHtml(
            childName
          )}'s learning data to provide personalised tutoring.</p>
-         <a href="${confirmUrl}?token=${encodeURIComponent(
-          token
-        )}&approved=true" class="btn btn-primary">
-           Approve
-         </a>
+         <form method="POST" action="${confirmUrl}" style="display:contents">
+           <input type="hidden" name="token" value="${escapeHtml(token)}" />
+           <input type="hidden" name="approved" value="true" />
+           <button type="submit" class="btn btn-primary">Approve</button>
+         </form>
          <a href="${basePath}/consent-page/deny-confirm?token=${encodeURIComponent(
           token
         )}" class="btn btn-danger">
@@ -214,9 +214,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
     }
 
     const basePath = c.req.path.replace('/consent-page/deny-confirm', '');
-    const confirmDenyUrl = `${basePath}/consent-page/confirm?token=${encodeURIComponent(
-      token
-    )}&approved=false`;
+    const confirmDenyUrl = `${basePath}/consent-page/confirm`;
     const backUrl = `${basePath}/consent-page?token=${encodeURIComponent(
       token
     )}`;
@@ -228,9 +226,11 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
          <p>${escapeHtml(
            childName
          )}'s account and all learning data will be permanently deleted. This cannot be undone.</p>
-         <a href="${confirmDenyUrl}" class="btn btn-danger">
-           Yes, deny consent
-         </a>
+         <form method="POST" action="${confirmDenyUrl}" style="display:contents">
+           <input type="hidden" name="token" value="${escapeHtml(token)}" />
+           <input type="hidden" name="approved" value="false" />
+           <button type="submit" class="btn btn-danger">Yes, deny consent</button>
+         </form>
          <a href="${backUrl}" class="btn btn-secondary">
            Go back
          </a>`
@@ -239,13 +239,17 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
   })
 
   /**
-   * GET /consent-page/confirm?token=X&approved=true|false
+   * POST /consent-page/confirm
    *
    * Processes the consent response and renders the appropriate landing page.
+   * Must be POST — this endpoint performs destructive mutations (profile deletion
+   * on denial). GET would be CSRF-vulnerable via prefetch/link-preview/img-src.
    */
-  .get('/consent-page/confirm', async (c) => {
-    const token = c.req.query('token');
-    const approvedParam = c.req.query('approved');
+  .post('/consent-page/confirm', async (c) => {
+    const body = await c.req.parseBody();
+    const token = typeof body['token'] === 'string' ? body['token'] : null;
+    const approvedParam =
+      typeof body['approved'] === 'string' ? body['approved'] : null;
 
     if (!token || !approvedParam) {
       return c.html(

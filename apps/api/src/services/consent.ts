@@ -378,11 +378,13 @@ export async function processConsentResponse(
     throw new ConsentTokenExpiredError();
   }
 
-  // 2. Update status
+  // 2. Atomic status transition — WHERE clause prevents TOCTOU race.
+  //    Two concurrent submissions both pass the in-memory guard above,
+  //    but only the first UPDATE will match the non-terminal status.
   const newStatus = approved ? 'CONSENTED' : 'WITHDRAWN';
   const now = new Date();
 
-  await db
+  const [updated] = await db
     .update(consentStates)
     .set({
       status: newStatus,
@@ -392,9 +394,15 @@ export async function processConsentResponse(
     .where(
       and(
         eq(consentStates.id, row.id),
-        eq(consentStates.profileId, row.profileId)
+        eq(consentStates.profileId, row.profileId),
+        sql`${consentStates.status} NOT IN ('CONSENTED', 'WITHDRAWN')`
       )
-    );
+    )
+    .returning();
+
+  if (!updated) {
+    throw new ConsentAlreadyProcessedError();
+  }
 
   // 3. If denied (FR10): cascade-delete the child's profile.
   //    CASCADE FKs handle all child data (subjects, sessions, etc.)

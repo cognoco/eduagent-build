@@ -11,6 +11,7 @@ import {
   accounts,
   retentionCards,
   notificationPreferences,
+  notificationLog,
 } from '@eduagent/database';
 
 export const recallNudge = inngest.createFunction(
@@ -67,7 +68,16 @@ export const recallNudge = inngest.createFunction(
             // Prevents duplicate nudges across hourly cron runs while still
             // covering half-hour timezone offsets (UTC+5:30, etc.)
             sql`(NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::time >= TIME '07:30'
-                AND (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::time < TIME '08:30'`
+                AND (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::time < TIME '08:30'`,
+            // Dedup guard: skip profiles that already received a recall_nudge today.
+            // Prevents double fan-out if Inngest retries the step or the cron
+            // fires a second run while a previous one is still in progress.
+            notExists(
+              sql`SELECT 1 FROM ${notificationLog} nl
+                  WHERE nl.profile_id = ${profiles.id}
+                    AND nl.type = 'recall_nudge'
+                    AND nl.sent_at >= (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::date`
+            )
           )
         )
         .groupBy(profiles.id);

@@ -17,6 +17,12 @@ SET "book_id" = (
   LIMIT 1
 )
 WHERE ct.book_id IS NULL;--> statement-breakpoint
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM curriculum_topics WHERE book_id IS NULL) THEN
+    RAISE EXCEPTION 'Migration aborted: curriculum_topics rows with no matching book found. Backfill required before applying NOT NULL constraint.';
+  END IF;
+END $$;--> statement-breakpoint
 ALTER TABLE "curriculum_topics" ALTER COLUMN "book_id" SET NOT NULL;--> statement-breakpoint
 ALTER TABLE "topic_notes" ADD CONSTRAINT "topic_notes_topic_id_curriculum_topics_id_fk" FOREIGN KEY ("topic_id") REFERENCES "public"."curriculum_topics"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "topic_notes" ADD CONSTRAINT "topic_notes_profile_id_profiles_id_fk" FOREIGN KEY ("profile_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;

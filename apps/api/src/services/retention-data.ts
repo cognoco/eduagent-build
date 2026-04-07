@@ -489,8 +489,21 @@ export async function startRelearn(
 
   const subjectId = curriculum?.subjectId ?? null;
 
-  // Mark topic as needs deepening if not already
+  // Verify topic belongs to one of the profile's subjects (IDOR prevention).
   const repo = createScopedRepository(db, profileId);
+  if (subjectId) {
+    const ownedSubject = await repo.subjects.findFirst(
+      eq(subjects.id, subjectId)
+    );
+    if (!ownedSubject) {
+      throw new NotFoundError('Topic');
+    }
+  } else {
+    // Topic doesn't exist or has no curriculum chain — reject
+    throw new NotFoundError('Topic');
+  }
+
+  // Mark topic as needs deepening if not already
   const existing = await repo.needsDeepeningTopics.findMany(
     eq(needsDeepeningTopics.topicId, input.topicId)
   );
