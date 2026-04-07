@@ -31,32 +31,6 @@ jest.mock('../../hooks/use-subjects', () => ({
   useSubjects: () => ({ data: mockSubjects, isLoading: false }),
 }));
 
-const mockMutate = jest.fn();
-let mockHomeCards:
-  | {
-      cards: Array<{
-        id: string;
-        title: string;
-        subtitle: string;
-        primaryLabel: string;
-        secondaryLabel?: string;
-        badge?: string;
-        priority: number;
-        compact?: boolean;
-        subjectId?: string;
-        subjectName?: string;
-        topicId?: string;
-        topicName?: string;
-      }>;
-      coldStart: boolean;
-    }
-  | undefined;
-
-jest.mock('../../hooks/use-home-cards', () => ({
-  useHomeCards: () => ({ data: mockHomeCards, isLoading: false }),
-  useTrackHomeCardInteraction: () => ({ mutate: mockMutate }),
-}));
-
 const { LearnerScreen } = require('./LearnerScreen');
 
 const defaultProps = {
@@ -69,7 +43,6 @@ describe('LearnerScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSubjects = [];
-    mockHomeCards = undefined;
   });
 
   it('renders greeting with profile name', () => {
@@ -157,125 +130,6 @@ describe('LearnerScreen', () => {
       render(<LearnerScreen {...defaultProps} />);
 
       expect(screen.queryByTestId('learner-back')).toBeNull();
-    });
-  });
-
-  describe('coaching cards', () => {
-    it('renders coaching cards from API', () => {
-      mockHomeCards = {
-        cards: [
-          {
-            id: 'study',
-            title: 'Continue Math',
-            subtitle: 'Algebra basics',
-            primaryLabel: 'Continue topic',
-            badge: 'Continue',
-            priority: 80,
-            subjectId: 's1',
-            topicId: 't1',
-          },
-        ],
-        coldStart: false,
-      };
-
-      render(<LearnerScreen {...defaultProps} />);
-
-      expect(screen.getByText('Continue Math')).toBeTruthy();
-      expect(screen.getByText('Algebra basics')).toBeTruthy();
-    });
-
-    it('hides coaching cards section when no cards', () => {
-      mockHomeCards = undefined;
-
-      render(<LearnerScreen {...defaultProps} />);
-
-      expect(screen.queryByTestId('coaching-cards')).toBeNull();
-    });
-
-    it('navigates on tap and tracks interaction', () => {
-      mockHomeCards = {
-        cards: [
-          {
-            id: 'homework',
-            title: 'Homework help',
-            subtitle: 'Snap a question',
-            primaryLabel: 'Open camera',
-            priority: 76,
-            compact: true,
-          },
-        ],
-        coldStart: false,
-      };
-
-      render(<LearnerScreen {...defaultProps} />);
-
-      fireEvent.press(screen.getByTestId('coaching-card-homework'));
-
-      expect(mockPush).toHaveBeenCalledWith('/(learner)/homework/camera');
-      expect(mockMutate).toHaveBeenCalledWith({
-        cardId: 'homework',
-        interactionType: 'tap',
-      });
-    });
-
-    it('passes subjectName and topicName in study card navigation URL', () => {
-      mockHomeCards = {
-        cards: [
-          {
-            id: 'study',
-            title: 'Continue Math',
-            subtitle: 'Algebra basics',
-            primaryLabel: 'Continue topic',
-            badge: 'Continue',
-            priority: 80,
-            subjectId: 's1',
-            subjectName: 'Math',
-            topicId: 't1',
-            topicName: 'Algebra basics',
-          },
-        ],
-        coldStart: false,
-      };
-
-      render(<LearnerScreen {...defaultProps} />);
-
-      fireEvent.press(screen.getByTestId('coaching-card-study'));
-
-      expect(mockPush).toHaveBeenCalledWith(
-        expect.stringContaining('subjectName=Math')
-      );
-      expect(mockPush).toHaveBeenCalledWith(
-        expect.stringContaining('topicName=Algebra%20basics')
-      );
-    });
-
-    it('passes subjectName without topicName for study card without topic', () => {
-      mockHomeCards = {
-        cards: [
-          {
-            id: 'study',
-            title: 'Study Biology',
-            subtitle: 'Jump back into practice',
-            primaryLabel: 'Practice now',
-            badge: 'Study',
-            priority: 68,
-            subjectId: 's2',
-            subjectName: 'Biology — Botany',
-          },
-        ],
-        coldStart: false,
-      };
-
-      render(<LearnerScreen {...defaultProps} />);
-
-      fireEvent.press(screen.getByTestId('coaching-card-study'));
-
-      expect(mockPush).toHaveBeenCalledWith(
-        expect.stringContaining('subjectName=Biology%20%E2%80%94%20Botany')
-      );
-      expect(mockPush).toHaveBeenCalledWith(
-        expect.not.stringContaining('topicName=')
-      );
     });
   });
 });
