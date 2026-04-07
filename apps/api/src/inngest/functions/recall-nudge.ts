@@ -56,9 +56,11 @@ export const recallNudge = inngest.createFunction(
           and(
             // Consent: CONSENTED or no consent record (adults)
             or(eq(consentStates.status, 'CONSENTED'), isNull(consentStates.id)),
-            // Timezone bucketing: local hour ≈ 8 AM (7-9 window)
-            // Handles half-hour offsets (UTC+5:30, etc.) and defaults to UTC
-            sql`EXTRACT(HOUR FROM (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))) BETWEEN 7 AND 9`
+            // Timezone bucketing: local time within 07:30–08:30 (single 1h window)
+            // Prevents duplicate nudges across hourly cron runs while still
+            // covering half-hour timezone offsets (UTC+5:30, etc.)
+            sql`(NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::time >= TIME '07:30'
+                AND (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::time < TIME '08:30'`
           )
         )
         .groupBy(profiles.id);
