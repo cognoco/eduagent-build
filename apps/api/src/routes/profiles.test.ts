@@ -50,10 +50,15 @@ jest.mock('../services/profile', () => ({
       this.field = field;
     }
   },
+  ProfileLimitError: class ProfileLimitError extends Error {
+    constructor() {
+      super('Profile limit exceeded');
+    }
+  },
   listProfiles: jest.fn().mockResolvedValue([]),
-  createProfile: jest
+  createProfileWithLimitCheck: jest
     .fn()
-    .mockImplementation((_db, accountId, input, isOwner) => ({
+    .mockImplementation((_db, accountId, input) => ({
       id: 'test-profile-id',
       accountId,
       displayName: input.displayName,
@@ -64,7 +69,7 @@ jest.mock('../services/profile', () => ({
         (input.birthDate ? Number(input.birthDate.slice(0, 4)) : null),
       personaType: input.personaType ?? 'LEARNER',
       location: null,
-      isOwner: isOwner ?? false,
+      isOwner: false,
       consentStatus: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

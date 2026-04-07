@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, and, asc, sql } from 'drizzle-orm';
 import { profiles, familyLinks, type Database } from '@eduagent/database';
 import type {
   ProfileCreateInput,
@@ -36,6 +36,14 @@ import {
   createPendingConsentState,
   createGrantedConsentState,
 } from './consent';
+import { getSubscriptionByAccountId, canAddProfile } from './billing';
+
+export class ProfileLimitError extends Error {
+  constructor() {
+    super('Profile limit exceeded');
+    this.name = 'ProfileLimitError';
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Mapper — Drizzle Date → API ISO string
@@ -211,6 +219,59 @@ export async function createProfile(
   }
 
   return mapProfileRow(row!, consentStatus);
+}
+
+/**
+ * Creates a profile with tier-based limit enforcement and advisory locking.
+ * Wraps createProfile in a transaction with pg_advisory_xact_lock to
+ * prevent TOCTOU races (two concurrent POSTs both reading below the limit).
+ *
+ * Throws ProfileLimitError when the account's subscription tier is at capacity.
+ */
+export async function createProfileWithLimitCheck(
+  db: Database,
+  accountId: string,
+  input: ProfileCreateInput,
+  callerProfileId: string | undefined
+): Promise<Profile> {
+  return db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+
+    // Advisory lock per account — serializes concurrent profile creations
+    // without blocking unrelated accounts. Released on commit/rollback.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${accountId}))`);
+
+    const existingProfiles = await listProfiles(txDb, accountId);
+    const isFirstProfile = existingProfiles.length === 0;
+
+    // Enforce per-tier profile limits. First profile creation is always allowed.
+    if (!isFirstProfile) {
+      const subscription = await getSubscriptionByAccountId(txDb, accountId);
+      if (!subscription || !(await canAddProfile(txDb, subscription.id))) {
+        throw new ProfileLimitError();
+      }
+    }
+
+    // BUG-239: When the owner (parent) creates a non-first profile (child),
+    // pass the parent's profileId so consent can be granted immediately
+    // instead of entering the child-initiated consent request loop.
+    // Security: verify the CALLER's active profile matches the owner profile.
+    let parentProfileId: string | undefined;
+    if (!isFirstProfile) {
+      const ownerProfile = existingProfiles.find((p) => p.isOwner);
+      if (ownerProfile && callerProfileId === ownerProfile.id) {
+        parentProfileId = ownerProfile.id;
+      }
+    }
+
+    return createProfile(
+      txDb,
+      accountId,
+      input,
+      isFirstProfile,
+      parentProfileId
+    );
+  });
 }
 
 /**

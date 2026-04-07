@@ -15,7 +15,7 @@ import { NotFoundError } from '../errors';
 
 /**
  * Verify the topic belongs to a book that belongs to a subject owned by
- * the profile. Returns the verified topic or throws NotFoundError.
+ * the profile. Single joined query prevents timing oracle and halves latency.
  * Prevents IDOR — callers cannot write/delete notes on arbitrary topics.
  */
 async function verifyTopicOwnership(
@@ -24,28 +24,31 @@ async function verifyTopicOwnership(
   subjectId: string,
   topicId: string
 ): Promise<void> {
-  const repo = createScopedRepository(db, profileId);
-  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
-  if (!subject) {
-    throw new NotFoundError('Subject');
-  }
+  // Single query: topics ⋈ books ⋈ subjects(scoped) — verifies entire chain
+  const [match] = await db
+    .select({ id: curriculumTopics.id })
+    .from(curriculumTopics)
+    .innerJoin(
+      curriculumBooks,
+      and(
+        eq(curriculumTopics.bookId, curriculumBooks.id),
+        eq(curriculumBooks.subjectId, subjectId)
+      )
+    )
+    .innerJoin(
+      subjects,
+      and(
+        eq(subjects.id, curriculumBooks.subjectId),
+        eq(subjects.profileId, profileId)
+      )
+    )
+    .where(eq(curriculumTopics.id, topicId))
+    .limit(1);
 
-  // Verify topic → book → subject chain
-  const topic = await db.query.curriculumTopics.findFirst({
-    where: eq(curriculumTopics.id, topicId),
-  });
-  if (!topic) {
+  if (!match) {
+    // Intentionally vague — don't reveal whether the topic exists but is
+    // unowned vs. does not exist at all (prevents enumeration)
     throw new NotFoundError('Topic');
-  }
-
-  const book = await db.query.curriculumBooks.findFirst({
-    where: and(
-      eq(curriculumBooks.id, topic.bookId),
-      eq(curriculumBooks.subjectId, subjectId)
-    ),
-  });
-  if (!book) {
-    throw new NotFoundError('Topic does not belong to this subject');
   }
 }
 
