@@ -54,7 +54,7 @@ const TIER_LABELS: Record<SubscriptionTier, string> = {
 };
 
 const TIER_LIMITS: Record<SubscriptionTier, string> = {
-  free: '50 questions/month',
+  free: '10 questions/day, 100/month',
   plus: '500 questions/month',
   family: '1,500 questions/month (shared)',
   pro: '3,000 questions/month',
@@ -68,7 +68,7 @@ const TIER_FEATURES: Array<{
   {
     tier: 'free',
     features: [
-      '50 questions per month',
+      '10 questions per day, 100 per month',
       'All subjects',
       'Spaced repetition',
       'Library',
@@ -77,7 +77,7 @@ const TIER_FEATURES: Array<{
   {
     tier: 'plus',
     features: [
-      '500 questions per month',
+      '500 questions per month, no daily limit',
       'All Free features',
       'Premium AI mentor',
       'Detailed progress analytics',
@@ -87,7 +87,7 @@ const TIER_FEATURES: Array<{
     tier: 'family',
     features: [
       '1,500 questions per month (shared)',
-      'All Plus features',
+      'All Free features',
       'Up to 4 child profiles',
       'Parent dashboard',
     ],
@@ -96,7 +96,7 @@ const TIER_FEATURES: Array<{
     tier: 'pro',
     features: [
       '3,000 questions per month',
-      'All Family features',
+      'Up to 6 profiles',
       'Premium AI mentor for 2 profiles',
       'Priority support',
     ],
@@ -245,7 +245,7 @@ function PackageOption({
 }
 
 // ---------------------------------------------------------------------------
-// ChildPaywall — shown when a child profile has expired trial
+// ChildPaywall — shown when a child profile's subscription has expired
 // ---------------------------------------------------------------------------
 
 const NOTIFY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -425,8 +425,8 @@ function ChildPaywall(): React.ReactElement {
             : "You've been making great progress \u2014 keep going!"}
         </Text>
         <Text className="text-body text-text-secondary mb-8 text-center">
-          Your free trial has ended. Ask your parent to continue your learning
-          journey.
+          You've used all your free questions. Ask your parent to upgrade so you
+          can keep learning.
         </Text>
 
         <Pressable
@@ -754,8 +754,7 @@ export default function SubscriptionScreen() {
   // ---------------------------------------------------------------------------
 
   const tier = subscription?.tier ?? 'free';
-  const status = subscription?.status ?? 'trial';
-  const isTrial = status === 'trial';
+  const status = subscription?.status ?? 'active';
   const isPaidTier = tier !== 'free';
   const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
 
@@ -827,20 +826,6 @@ export default function SubscriptionScreen() {
           className="flex-1 px-5"
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
         >
-          {/* Trial banner */}
-          {isTrial && subscription?.trialEndsAt && (
-            <View className="bg-primary-soft rounded-card px-4 py-3 mt-4">
-              <Text className="text-body font-semibold text-primary">
-                Trial active
-              </Text>
-              <Text className="text-caption text-text-secondary mt-0.5">
-                Your trial ends on{' '}
-                {new Date(subscription.trialEndsAt).toLocaleDateString()}.
-                Upgrade to keep learning.
-              </Text>
-            </View>
-          )}
-
           {/* Current plan */}
           <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-4">
             Current plan
@@ -859,9 +844,9 @@ export default function SubscriptionScreen() {
                     ? 'Cancelling'
                     : status === 'past_due'
                     ? 'Past due'
-                    : hasActiveSubscription
-                    ? 'Active'
-                    : status}
+                    : status === 'expired'
+                    ? 'Expired'
+                    : 'Active'}
                 </Text>
               </View>
             </View>
@@ -880,12 +865,23 @@ export default function SubscriptionScreen() {
               </Text>
             )}
             {!isPaidTier && (
-              <Text
-                className="text-body-sm text-primary font-semibold mt-2"
-                testID="free-upgrade-hint"
+              <Pressable
+                onPress={() => {
+                  if (availablePackages.length > 0) {
+                    // RevenueCat packages available — scroll handled by layout
+                  } else {
+                    void refetchOfferings();
+                  }
+                }}
+                className="bg-primary rounded-button py-2.5 px-4 mt-3 items-center"
+                testID="free-upgrade-button"
+                accessibilityLabel="Upgrade plan"
+                accessibilityRole="button"
               >
-                Upgrade for a smarter, more personal mentor
-              </Text>
+                <Text className="text-body font-semibold text-text-inverse">
+                  Upgrade
+                </Text>
+              </Pressable>
             )}
           </View>
 
@@ -992,9 +988,7 @@ export default function SubscriptionScreen() {
                   {offeringsError
                     ? 'We could not load purchase options right now. '
                     : 'Subscription plans will be available soon. '}
-                  {isTrial
-                    ? `You're currently on the Free trial with ${TIER_LIMITS.free}.`
-                    : `You're on the ${TIER_LABELS[tier]} plan with ${TIER_LIMITS[tier]}.`}
+                  {`You're on the ${TIER_LABELS[tier]} plan with ${TIER_LIMITS[tier]}.`}
                 </Text>
               </View>
               {TIER_FEATURES.map((entry) => (

@@ -113,12 +113,12 @@ describe('useSubscription', () => {
         JSON.stringify({
           subscription: {
             tier: 'free',
-            status: 'trial',
+            status: 'active',
             trialEndsAt: null,
             currentPeriodEnd: null,
-            monthlyLimit: 50,
+            monthlyLimit: 100,
             usedThisMonth: 0,
-            remainingQuestions: 50,
+            remainingQuestions: 100,
           },
         }),
         { status: 200 }
@@ -134,7 +134,7 @@ describe('useSubscription', () => {
     });
 
     expect(result.current.data?.tier).toBe('free');
-    expect(result.current.data?.monthlyLimit).toBe(50);
+    expect(result.current.data?.monthlyLimit).toBe(100);
   });
 
   it('handles API errors', async () => {
@@ -203,8 +203,8 @@ describe('useUsage', () => {
       new Response(
         JSON.stringify({
           usage: {
-            monthlyLimit: 50,
-            usedThisMonth: 55,
+            monthlyLimit: 100,
+            usedThisMonth: 105,
             remainingQuestions: 0,
             topUpCreditsRemaining: 0,
             warningLevel: 'exceeded',

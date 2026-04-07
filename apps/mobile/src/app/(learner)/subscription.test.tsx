@@ -296,7 +296,7 @@ describe('SubscriptionScreen', () => {
     mockCustomerInfoLoading = false;
     mockPurchaseIsPending = false;
     mockRestoreIsPending = false;
-    mockSubscription = { tier: 'free', status: 'trial' };
+    mockSubscription = { tier: 'free', status: 'active' };
     mockSubLoading = false;
     mockSubError = false;
     mockRefetchSub.mockReset();
@@ -782,9 +782,9 @@ describe('SubscriptionScreen', () => {
       'Waitlist',
       'You have been added to the BYOK waitlist.'
     );
-    expect(
-      screen.getByTestId('byok-waitlist-email-input').props.value
-    ).toBe('');
+    expect(screen.getByTestId('byok-waitlist-email-input').props.value).toBe(
+      ''
+    );
   });
 
   it('shows an error alert when joining the BYOK waitlist fails', async () => {
