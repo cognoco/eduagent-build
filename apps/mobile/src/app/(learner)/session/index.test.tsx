@@ -33,6 +33,7 @@ jest.mock('../../../components/session', () => ({
     subtitle,
     messages,
     inputAccessory,
+    belowInput,
     inputMode,
     onInputModeChange,
     onSend,
@@ -41,6 +42,7 @@ jest.mock('../../../components/session', () => ({
     subtitle?: string;
     messages?: Array<{ id: string; content: string }>;
     inputAccessory?: React.ReactNode;
+    belowInput?: React.ReactNode;
     inputMode?: 'text' | 'voice';
     onInputModeChange?: (mode: 'text' | 'voice') => void;
     onSend: (text: string) => void;
@@ -65,6 +67,7 @@ jest.mock('../../../components/session', () => ({
           </View>
         ))}
         {inputAccessory}
+        {belowInput}
         <Pressable
           testID="mock-set-voice-mode"
           onPress={() => onInputModeChange?.('voice')}
@@ -123,6 +126,16 @@ jest.mock('../../../hooks/use-sessions', () => ({
 jest.mock('../../../hooks/use-classify-subject', () => ({
   useClassifySubject: () => ({
     mutateAsync: mockClassifySubject,
+  }),
+}));
+
+jest.mock('../../../hooks/use-resolve-subject', () => ({
+  useResolveSubject: () => ({
+    mutateAsync: jest.fn().mockResolvedValue({
+      suggestions: [],
+      displayMessage: 'Pick a subject that fits, or create your own.',
+    }),
+    isPending: false,
   }),
 }));
 
@@ -380,13 +393,16 @@ describe('SessionScreen homework flow', () => {
     );
   }, 15000);
 
-  it('shows contextual learner-agency chips and session tools', () => {
+  it('hides contextual chips on greeting but shows session tools', () => {
     const screen = render(<SessionScreen />);
 
-    expect(screen.getByText('I know this')).toBeTruthy();
-    expect(screen.getByText('Explain differently')).toBeTruthy();
-    expect(screen.getByText('Too easy')).toBeTruthy();
-    expect(screen.getByText('Example')).toBeTruthy();
+    // Contextual quick chips should NOT appear before any user message
+    expect(screen.queryByText('I know this')).toBeNull();
+    expect(screen.queryByText('Explain differently')).toBeNull();
+    expect(screen.queryByText('Too easy')).toBeNull();
+    expect(screen.queryByText('Example')).toBeNull();
+
+    // Session tool chips should always be present
     expect(screen.getByText('Switch topic')).toBeTruthy();
     expect(screen.getByText('Park it')).toBeTruthy();
   });

@@ -125,8 +125,18 @@ export async function createSubjectWithStructure(
   profileId: string,
   input: SubjectCreateInput
 ): Promise<CreatedSubjectWithStructure> {
+  // Server-side focus inference: if rawInput ("tea") differs from name ("Botany"),
+  // the rawInput IS the focus even if the client didn't send it explicitly.
+  // This prevents falling through to the broad path and generating 8+ generic books.
+  const effectiveFocus =
+    input.focus ??
+    (input.rawInput && input.rawInput.toLowerCase() !== input.name.toLowerCase()
+      ? input.rawInput
+      : undefined);
+  const effectiveFocusDescription = input.focusDescription ?? undefined;
+
   // Focused book path: input combines a broad subject with a specific focus area
-  if (input.focus) {
+  if (effectiveFocus) {
     const existingSubject = await findExistingSubjectByName(
       db,
       profileId,
@@ -145,7 +155,7 @@ export async function createSubjectWithStructure(
     const existingBook = await db.query.curriculumBooks.findFirst({
       where: and(
         eq(curriculumBooks.subjectId, targetSubject.id),
-        sql`LOWER(${curriculumBooks.title}) = LOWER(${input.focus})`
+        sql`LOWER(${curriculumBooks.title}) = LOWER(${effectiveFocus})`
       ),
     });
     if (existingBook) {
@@ -171,8 +181,8 @@ export async function createSubjectWithStructure(
       .insert(curriculumBooks)
       .values({
         subjectId: targetSubject.id,
-        title: input.focus,
-        description: input.focusDescription ?? null,
+        title: effectiveFocus,
+        description: effectiveFocusDescription ?? null,
         emoji: null,
         sortOrder: nextOrder,
         topicsGenerated: false,
@@ -183,7 +193,7 @@ export async function createSubjectWithStructure(
       subject: targetSubject,
       structureType: 'focused_book',
       bookId: bookRow!.id,
-      bookTitle: input.focus,
+      bookTitle: effectiveFocus,
       bookCount: 1,
     };
   }

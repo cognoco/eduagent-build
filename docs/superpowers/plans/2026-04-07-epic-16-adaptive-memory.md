@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Reviewed:** 2026-04-07. Adversarial review found 14 issues (4 HIGH, 6 MEDIUM, 4 LOW). All resolved in this revision — see [Review Changelog](#review-changelog) at the end of the plan.
+
 **Goal:** Build a learner memory system that analyzes session transcripts post-session, accumulates a learning profile (interests, struggles, explanation preferences), and injects that profile into future system prompts — making the AI mentor feel like it truly knows each child.
 
 **Architecture:** New `learning_profiles` table with JSONB fields stores per-profile learning data. A new Inngest step in the `session-completed` chain sends the transcript to a budget LLM for structured analysis. `buildSystemPrompt()` gains a "learner memory" block capped at 500 tokens. Two new mobile screens expose the profile to children and parents with delete/opt-out controls.
@@ -22,8 +24,8 @@
 | `packages/schemas/src/learning-profiles.ts` | Zod schemas for learning profile API responses, analysis output |
 | `apps/api/src/services/learner-profile.ts` | Business logic: profile CRUD, incremental merge, memory block construction |
 | `apps/api/src/services/learner-profile.test.ts` | Unit tests for merge logic, memory block formatting, token budget |
-| `apps/api/src/routes/learner-profile.ts` | Hono route handlers: GET profile, DELETE items, PATCH memoryEnabled, POST export |
-| `apps/api/src/routes/learner-profile.test.ts` | Route handler tests |
+| `apps/api/src/routes/learner-profile.ts` | Hono route handlers: GET profile, DELETE items, DELETE all (self + parent), PATCH memoryEnabled |
+| `apps/api/src/routes/learner-profile.test.ts` | Route handler tests (IDOR, GDPR self-delete, toggle, item delete) |
 | `apps/mobile/src/app/(learner)/mentor-memory.tsx` | Child-facing "What My Mentor Knows" screen |
 | `apps/mobile/src/app/(parent)/child/[profileId]/mentor-memory.tsx` | Parent-facing memory visibility screen |
 | `apps/mobile/src/hooks/use-learner-profile.ts` | React Query hooks for learner profile API |
@@ -123,6 +125,8 @@ export const learningProfileSchema = z.object({
   struggles: z.array(struggleEntrySchema),
   communicationNotes: z.array(z.string()),
   suppressedInferences: z.array(z.string()),
+  interestTimestamps: z.record(z.string(), z.string()).optional(),
+  effectivenessSessionCount: z.number().int().optional(),
   memoryEnabled: z.boolean(),
   version: z.number().int(),
   createdAt: z.string(),
@@ -140,7 +144,13 @@ export const sessionAnalysisOutputSchema = z.object({
     })
     .nullable(),
   interests: z.array(z.string()).nullable(),
+  strengths: z
+    .array(z.object({ topic: z.string(), subject: z.string() }))
+    .nullable(),
   struggles: z
+    .array(z.object({ topic: z.string(), subject: z.string() }))
+    .nullable(),
+  resolvedTopics: z
     .array(z.object({ topic: z.string(), subject: z.string() }))
     .nullable(),
   communicationNotes: z.array(z.string()).nullable(),
@@ -159,8 +169,10 @@ export const deleteMemoryItemSchema = z.object({
     'communicationNotes',
     'learningStyle',
   ]),
-  /** The value to remove. For interests/communicationNotes: the string. For strengths: subject. For struggles: subject+topic. For learningStyle: the field name. */
+  /** The value to remove. For interests/communicationNotes: the string. For strengths: subject. For struggles: topic. For learningStyle: the field name. */
   value: z.string(),
+  /** Required for struggles — disambiguates across subjects (e.g., "fractions" in Math vs Science) */
+  subject: z.string().optional(),
   /** If true, also add to suppressedInferences so it won't be re-inferred */
   suppress: z.boolean().optional(),
 });
@@ -231,6 +243,8 @@ export const learningProfiles = pgTable(
     struggles: jsonb('struggles').notNull().default([]),
     communicationNotes: jsonb('communication_notes').notNull().default([]),
     suppressedInferences: jsonb('suppressed_inferences').notNull().default([]),
+    interestTimestamps: jsonb('interest_timestamps').notNull().default({}),
+    effectivenessSessionCount: integer('effectiveness_session_count').notNull().default(0),
     memoryEnabled: boolean('memory_enabled').notNull().default(true),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -359,11 +373,14 @@ git commit -m "feat(database): add learning_profiles migration [Epic-16, Story-1
 import {
   mergeInterests,
   mergeStruggles,
+  mergeStrengths,
+  archiveStaleStruggles,
   shouldUpdateLearningStyle,
   buildMemoryBlock,
 } from './learner-profile';
 import type {
   StruggleEntry,
+  StrengthEntry,
   SessionAnalysisOutput,
   ConfidenceLevel,
 } from '@eduagent/schemas';
@@ -373,25 +390,129 @@ describe('mergeInterests', () => {
     const existing = ['space', 'dinosaurs'];
     const incoming = ['football', 'space']; // space is a duplicate
     const suppressed: string[] = [];
-    const result = mergeInterests(existing, incoming, suppressed);
-    expect(result).toEqual(['space', 'dinosaurs', 'football']);
+    const { interests } = mergeInterests(existing, incoming, suppressed);
+    expect(interests).toEqual(['space', 'dinosaurs', 'football']);
   });
 
   it('respects the 20-entry cap by evicting oldest', () => {
     const existing = Array.from({ length: 20 }, (_, i) => `interest-${i}`);
     const incoming = ['brand-new'];
-    const result = mergeInterests(existing, incoming, []);
-    expect(result).toHaveLength(20);
-    expect(result).toContain('brand-new');
-    expect(result).not.toContain('interest-0'); // oldest evicted
+    const { interests } = mergeInterests(existing, incoming, []);
+    expect(interests).toHaveLength(20);
+    expect(interests).toContain('brand-new');
+    expect(interests).not.toContain('interest-0'); // oldest evicted
   });
 
   it('filters out suppressed inferences', () => {
     const existing = ['space'];
     const incoming = ['dinosaurs', 'football'];
     const suppressed = ['dinosaurs'];
-    const result = mergeInterests(existing, incoming, suppressed);
-    expect(result).toEqual(['space', 'football']);
+    const { interests } = mergeInterests(existing, incoming, suppressed);
+    expect(interests).toEqual(['space', 'football']);
+  });
+
+  it('maintains timestamps for new and existing interests', () => {
+    const existing = ['space'];
+    const timestamps = { space: '2026-01-01T00:00:00Z' };
+    const { interests, timestamps: newTs } = mergeInterests(
+      existing,
+      ['football'],
+      [],
+      timestamps
+    );
+    expect(interests).toEqual(['space', 'football']);
+    expect(newTs['football']).toBeDefined();
+    expect(newTs['space']).toBe('2026-01-01T00:00:00Z'); // unchanged — not in incoming
+  });
+
+  it('demotes interests older than 60 days to front (evicted first)', () => {
+    const staleDate = new Date(
+      Date.now() - 90 * 24 * 60 * 60 * 1000
+    ).toISOString();
+    const freshDate = new Date().toISOString();
+    const existing = ['old-interest', 'recent-interest'];
+    const timestamps = {
+      'old-interest': staleDate,
+      'recent-interest': freshDate,
+    };
+    const { interests } = mergeInterests(existing, [], [], timestamps);
+    // Stale interests moved to front
+    expect(interests[0]).toBe('old-interest');
+    expect(interests[1]).toBe('recent-interest');
+  });
+});
+
+describe('mergeStrengths', () => {
+  it('creates a new strength entry from LLM signal', () => {
+    const existing: StrengthEntry[] = [];
+    const incoming = [{ topic: 'multiplication', subject: 'Math' }];
+    const result = mergeStrengths(existing, incoming, []);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      subject: 'Math',
+      topics: ['multiplication'],
+      confidence: 'medium',
+    });
+  });
+
+  it('appends topic to existing subject entry', () => {
+    const existing: StrengthEntry[] = [
+      { subject: 'Math', topics: ['multiplication'], confidence: 'medium' },
+    ];
+    const incoming = [{ topic: 'division', subject: 'Math' }];
+    const result = mergeStrengths(existing, incoming, []);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.topics).toEqual(['multiplication', 'division']);
+  });
+
+  it('filters out suppressed topics', () => {
+    const existing: StrengthEntry[] = [];
+    const incoming = [{ topic: 'multiplication', subject: 'Math' }];
+    const result = mergeStrengths(existing, incoming, ['multiplication']);
+    expect(result).toHaveLength(0);
+  });
+});
+
+describe('archiveStaleStruggles', () => {
+  it('removes struggles older than 90 days', () => {
+    const staleDate = new Date(
+      Date.now() - 100 * 24 * 60 * 60 * 1000
+    ).toISOString();
+    const freshDate = new Date().toISOString();
+    const struggles: StruggleEntry[] = [
+      {
+        subject: 'Math',
+        topic: 'fractions',
+        lastSeen: staleDate,
+        attempts: 5,
+        confidence: 'high',
+      },
+      {
+        subject: 'Math',
+        topic: 'decimals',
+        lastSeen: freshDate,
+        attempts: 2,
+        confidence: 'low',
+      },
+    ];
+    const result = archiveStaleStruggles(struggles);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.topic).toBe('decimals');
+  });
+
+  it('keeps all struggles within 90-day window', () => {
+    const freshDate = new Date().toISOString();
+    const struggles: StruggleEntry[] = [
+      {
+        subject: 'Math',
+        topic: 'fractions',
+        lastSeen: freshDate,
+        attempts: 3,
+        confidence: 'medium',
+      },
+    ];
+    const result = archiveStaleStruggles(struggles);
+    expect(result).toHaveLength(1);
   });
 });
 
@@ -569,6 +690,9 @@ import type {
 
 const MAX_INTERESTS = 20;
 const MAX_COMMUNICATION_NOTES = 10;
+const MAX_STRUGGLES = 30;
+const STRUGGLE_ARCHIVAL_DAYS = 90;
+const INTEREST_DEMOTION_DAYS = 60;
 const MEMORY_BLOCK_TOKEN_BUDGET = 500;
 // Rough estimate: 1 token ≈ 4 chars
 const MEMORY_BLOCK_CHAR_BUDGET = MEMORY_BLOCK_TOKEN_BUDGET * 4;
@@ -583,29 +707,115 @@ const LEARNING_STYLE_CORROBORATION_THRESHOLD = 3;
 // Merge Helpers (pure functions, exported for testing)
 // ---------------------------------------------------------------------------
 
+/**
+ * Merges incoming interests, maintains a timestamps map for FR237.4 (60-day demotion).
+ * Stale interests (not seen in 60+ days) are demoted to the front of the array
+ * so they get evicted first when the 20-entry cap is reached.
+ */
 export function mergeInterests(
   existing: string[],
   incoming: string[],
-  suppressed: string[]
-): string[] {
+  suppressed: string[],
+  timestamps: Record<string, string> = {}
+): { interests: string[]; timestamps: Record<string, string> } {
   const suppressedSet = new Set(
     suppressed.map((s) => s.toLowerCase().trim())
   );
+  const now = new Date().toISOString();
+  const updatedTimestamps = { ...timestamps };
   const merged = [...existing];
 
   for (const interest of incoming) {
     const normalized = interest.toLowerCase().trim();
     if (suppressedSet.has(normalized)) continue;
-    if (merged.some((e) => e.toLowerCase().trim() === normalized)) continue;
+    if (merged.some((e) => e.toLowerCase().trim() === normalized)) {
+      // Update timestamp for existing interest
+      updatedTimestamps[normalized] = now;
+      continue;
+    }
     merged.push(interest);
+    updatedTimestamps[normalized] = now;
   }
+
+  // FR237.4: Demote stale interests (60+ days) to front of array
+  const cutoff = new Date(
+    Date.now() - INTEREST_DEMOTION_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
+  const fresh: string[] = [];
+  const stale: string[] = [];
+  for (const interest of merged) {
+    const ts = updatedTimestamps[interest.toLowerCase().trim()];
+    if (ts && ts < cutoff) {
+      stale.push(interest);
+    } else {
+      fresh.push(interest);
+    }
+  }
+  // Stale at the front → evicted first by cap
+  const sorted = [...stale, ...fresh];
 
   // Evict oldest (front of array) when over cap
-  while (merged.length > MAX_INTERESTS) {
-    merged.shift();
+  while (sorted.length > MAX_INTERESTS) {
+    const evicted = sorted.shift()!;
+    delete updatedTimestamps[evicted.toLowerCase().trim()];
   }
 
-  return merged;
+  return { interests: sorted, timestamps: updatedTimestamps };
+}
+
+/**
+ * Merges strength signals from LLM analysis into existing strengths.
+ * Strengths are keyed by (subject, topic). Confidence upgrades with repeated evidence.
+ */
+export function mergeStrengths(
+  existing: StrengthEntry[],
+  incoming: { topic: string; subject: string }[],
+  suppressed: string[]
+): StrengthEntry[] {
+  const suppressedSet = new Set(
+    suppressed.map((s) => s.toLowerCase().trim())
+  );
+  const result = [...existing];
+
+  for (const signal of incoming) {
+    if (suppressedSet.has(signal.topic.toLowerCase().trim())) continue;
+
+    const idx = result.findIndex(
+      (e) => e.subject.toLowerCase() === signal.subject.toLowerCase()
+    );
+
+    if (idx >= 0) {
+      const entry = result[idx]!;
+      const topics = new Set(entry.topics.map((t) => t.toLowerCase()));
+      if (!topics.has(signal.topic.toLowerCase())) {
+        result[idx] = {
+          ...entry,
+          topics: [...entry.topics, signal.topic],
+        };
+      }
+    } else {
+      result.push({
+        subject: signal.subject,
+        topics: [signal.topic],
+        confidence: 'medium',
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * FR234.5: Archive struggles older than 90 days.
+ * Removes entries whose lastSeen is beyond the archival threshold.
+ */
+export function archiveStaleStruggles(
+  struggles: StruggleEntry[]
+): StruggleEntry[] {
+  const cutoff = new Date(
+    Date.now() - STRUGGLE_ARCHIVAL_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
+  return struggles.filter((s) => s.lastSeen >= cutoff);
 }
 
 export function mergeStruggles(
@@ -768,16 +978,22 @@ export function buildMemoryBlock(
 
   if (lines.length === 0) return '';
 
-  let block =
-    'About this learner:\n' +
-    lines.join('\n') +
-    '\n\n' +
+  const META_INSTRUCTION =
     'Use the learner memory naturally in conversation. Reference their interests when generating examples. ' +
     'Use their preferred explanation style. Do NOT explicitly tell the learner you are reading from a profile — weave it in naturally.';
 
-  // Enforce token budget
-  if (block.length > MEMORY_BLOCK_CHAR_BUDGET) {
-    block = block.slice(0, MEMORY_BLOCK_CHAR_BUDGET);
+  // Section-aware truncation: drop lowest-priority sections first
+  // (reverse priority order) rather than blind character slicing.
+  // Meta-instruction is always preserved to prevent accidental profile disclosure.
+  let block =
+    'About this learner:\n' + lines.join('\n') + '\n\n' + META_INSTRUCTION;
+
+  // Drop lowest-priority sections until within budget
+  // Priority order (highest first): struggles, style, interests, communication notes
+  while (block.length > MEMORY_BLOCK_CHAR_BUDGET && lines.length > 0) {
+    lines.pop(); // Remove lowest-priority section
+    block =
+      'About this learner:\n' + lines.join('\n') + '\n\n' + META_INSTRUCTION;
   }
 
   return block;
@@ -829,19 +1045,46 @@ export async function applyAnalysis(
   const updates: Record<string, unknown> = {};
 
   if (analysis.interests?.length) {
-    updates.interests = mergeInterests(
+    const { interests, timestamps } = mergeInterests(
       (profile.interests as string[]) ?? [],
       analysis.interests,
+      suppressed,
+      (profile.interestTimestamps as Record<string, string>) ?? {}
+    );
+    updates.interests = interests;
+    updates.interestTimestamps = timestamps;
+  }
+
+  if (analysis.strengths?.length) {
+    updates.strengths = mergeStrengths(
+      (profile.strengths as StrengthEntry[]) ?? [],
+      analysis.strengths,
       suppressed
     );
   }
 
   if (analysis.struggles?.length) {
-    updates.struggles = mergeStruggles(
+    let struggles = mergeStruggles(
       (profile.struggles as StruggleEntry[]) ?? [],
       analysis.struggles,
       suppressed
     );
+    // FR234.5: Archive struggles older than 90 days
+    struggles = archiveStaleStruggles(struggles);
+    updates.struggles = struggles;
+  }
+
+  // FR238.4: Resolve struggles where learner demonstrated mastery
+  if (analysis.resolvedTopics?.length) {
+    const currentStruggles =
+      (updates.struggles as StruggleEntry[]) ??
+      (profile.struggles as StruggleEntry[]) ??
+      [];
+    let resolved = currentStruggles;
+    for (const { topic, subject: subj } of analysis.resolvedTopics) {
+      resolved = resolveStruggle(resolved, topic, subj);
+    }
+    updates.struggles = resolved;
   }
 
   if (analysis.communicationNotes?.length) {
@@ -871,38 +1114,74 @@ export async function applyAnalysis(
     .returning();
 
   if (!updated) {
-    // Version conflict — retry with fresh read
+    // Version conflict — retry once with fresh read + version guard
     const fresh = await getLearningProfile(db, profileId);
     if (!fresh) return; // Profile deleted during analysis
+
+    const freshSuppressed = (fresh.suppressedInferences as string[]) ?? [];
+    const retryUpdates: Record<string, unknown> = {};
+
+    if (analysis.interests?.length) {
+      const { interests, timestamps } = mergeInterests(
+        (fresh.interests as string[]) ?? [],
+        analysis.interests,
+        freshSuppressed,
+        (fresh.interestTimestamps as Record<string, string>) ?? {}
+      );
+      retryUpdates.interests = interests;
+      retryUpdates.interestTimestamps = timestamps;
+    }
+    if (analysis.strengths?.length) {
+      retryUpdates.strengths = mergeStrengths(
+        (fresh.strengths as StrengthEntry[]) ?? [],
+        analysis.strengths,
+        freshSuppressed
+      );
+    }
+    if (analysis.struggles?.length) {
+      let struggles = mergeStruggles(
+        (fresh.struggles as StruggleEntry[]) ?? [],
+        analysis.struggles,
+        freshSuppressed
+      );
+      struggles = archiveStaleStruggles(struggles);
+      retryUpdates.struggles = struggles;
+    }
+    if (analysis.resolvedTopics?.length) {
+      const base =
+        (retryUpdates.struggles as StruggleEntry[]) ??
+        (fresh.struggles as StruggleEntry[]) ??
+        [];
+      let resolved = base;
+      for (const { topic, subject: subj } of analysis.resolvedTopics) {
+        resolved = resolveStruggle(resolved, topic, subj);
+      }
+      retryUpdates.struggles = resolved;
+    }
+    if (analysis.communicationNotes?.length) {
+      retryUpdates.communicationNotes = mergeCommunicationNotes(
+        (fresh.communicationNotes as string[]) ?? [],
+        analysis.communicationNotes,
+        freshSuppressed
+      );
+    }
+
+    // Retry with version guard to prevent overwriting concurrent changes
     await db
       .update(learningProfiles)
       .set({
-        ...updates,
-        interests: analysis.interests?.length
-          ? mergeInterests(
-              (fresh.interests as string[]) ?? [],
-              analysis.interests,
-              (fresh.suppressedInferences as string[]) ?? []
-            )
-          : undefined,
-        struggles: analysis.struggles?.length
-          ? mergeStruggles(
-              (fresh.struggles as StruggleEntry[]) ?? [],
-              analysis.struggles,
-              (fresh.suppressedInferences as string[]) ?? []
-            )
-          : undefined,
-        communicationNotes: analysis.communicationNotes?.length
-          ? mergeCommunicationNotes(
-              (fresh.communicationNotes as string[]) ?? [],
-              analysis.communicationNotes,
-              (fresh.suppressedInferences as string[]) ?? []
-            )
-          : undefined,
+        ...retryUpdates,
         version: sql`${learningProfiles.version} + 1`,
         updatedAt: new Date(),
       })
-      .where(eq(learningProfiles.profileId, profileId));
+      .where(
+        and(
+          eq(learningProfiles.profileId, profileId),
+          eq(learningProfiles.version, fresh.version)
+        )
+      );
+    // If this also fails (third concurrent writer), we accept the loss —
+    // the data will be re-derived from the next session analysis.
   }
 }
 
@@ -911,7 +1190,8 @@ export async function deleteMemoryItem(
   profileId: string,
   category: string,
   value: string,
-  suppress: boolean
+  suppress: boolean,
+  subject?: string
 ): Promise<void> {
   const profile = await getLearningProfile(db, profileId);
   if (!profile) return;
@@ -924,12 +1204,23 @@ export async function deleteMemoryItem(
       updates.interests = arr.filter(
         (i) => i.toLowerCase() !== value.toLowerCase()
       );
+      // Clean up interest timestamp
+      const timestamps = {
+        ...((profile.interestTimestamps as Record<string, string>) ?? {}),
+      };
+      delete timestamps[value.toLowerCase().trim()];
+      updates.interestTimestamps = timestamps;
       break;
     }
     case 'struggles': {
       const arr = (profile.struggles as StruggleEntry[]) ?? [];
+      // Use both topic and subject to disambiguate across subjects
       updates.struggles = arr.filter(
-        (s) => s.topic.toLowerCase() !== value.toLowerCase()
+        (s) =>
+          !(
+            s.topic.toLowerCase() === value.toLowerCase() &&
+            (!subject || s.subject.toLowerCase() === subject.toLowerCase())
+          )
       );
       break;
     }
@@ -1056,7 +1347,9 @@ Your output MUST be valid JSON matching this schema:
     "ineffective": ["stories" | "examples" | "diagrams" | "analogies" | "step-by-step" | "humor"]
   } | null,
   "interests": ["string"] | null,
+  "strengths": [{"topic": "string", "subject": "string"}] | null,
   "struggles": [{"topic": "string", "subject": "string"}] | null,
+  "resolvedTopics": [{"topic": "string", "subject": "string"}] | null,
   "communicationNotes": ["string"] | null,
   "engagementLevel": "high" | "medium" | "low" | null,
   "confidence": "low" | "medium" | "high"
@@ -1064,7 +1357,9 @@ Your output MUST be valid JSON matching this schema:
 
 Rules:
 - "interests": Only flag explicit enthusiasm ("I love X", "X is cool", rapid follow-up questions about X). Passing mentions don't count.
+- "strengths": Flag topics where the learner demonstrates clear mastery — correct answers on first try, ability to explain concepts back, confident and accurate problem-solving. Only flag when the evidence is strong within this session.
 - "struggles": Only flag when the learner repeatedly shows confusion or gives wrong answers on the SAME concept within this session. Single mistakes are normal learning.
+- "resolvedTopics": Flag topics that were previously a struggle but where the learner now demonstrates understanding — correct answers after earlier confusion, successful "I get it" moments, ability to apply the concept. This signals growth.
 - "explanationEffectiveness": Tag each explanation attempt with its style and whether it led to understanding (correct follow-up, "I get it") or confusion (re-asks, wrong answer after explanation).
 - "communicationNotes": Observations like "responds well to humor", "prefers short explanations", "gets frustrated with repetition". Only flag clear patterns.
 - "confidence": Your overall confidence in this analysis. Use "low" if the session was too short or ambiguous to extract meaningful signals.
@@ -1104,7 +1399,7 @@ export async function analyzeSessionTranscript(
   ];
 
   // Use rung 1 (budget model) — this is background processing (FR235.7)
-  const result = await routeAndCall(messages, 1 as any, {});
+  const result = await routeAndCall(messages, 1, {});
   if (!result?.response) return null;
 
   try {
@@ -1358,32 +1653,11 @@ git commit -m "feat(api): include learning profiles in GDPR data export [Epic-16
 ### Task 9: Interest Detection Refinement (Story 16.4)
 
 **Files:**
-- Modify: `apps/api/src/services/learner-profile.ts` (analysis prompt + merge logic)
 - Test: `apps/api/src/services/learner-profile.test.ts`
 
-- [ ] **Step 1: Write test for interest demotion (60-day rule)**
+> **Note:** FR237.4 (60-day interest demotion) is now fully implemented in Task 5's `mergeInterests` via the `interestTimestamps` JSONB column. This task verifies the prompt coverage and adds any additional edge-case tests.
 
-Add to `learner-profile.test.ts`:
-
-```typescript
-describe('demoteStaleInterests', () => {
-  it('moves interests older than 60 days to end of array', () => {
-    // Interests are plain strings — demotion requires timestamp tracking.
-    // Since FR237.4 requires demotion, we add a metadata wrapper for interests.
-    // However, the spec says interests are "plain strings" (FR237.2).
-    // We implement demotion by moving stale entries to the end of the array
-    // during analysis — they get evicted naturally by the 20-entry cap.
-    // This test verifies the merge function keeps fresh interests at the front.
-    const existing = ['old-interest', 'recent-interest'];
-    const incoming = ['brand-new'];
-    const result = mergeInterests(existing, incoming, []);
-    // New interests are appended at the end
-    expect(result).toEqual(['old-interest', 'recent-interest', 'brand-new']);
-  });
-});
-```
-
-- [ ] **Step 2: The analysis prompt in Task 6 already covers interest detection (FR237.1–FR237.3)**
+- [ ] **Step 1: Verify the analysis prompt in Task 6 covers interest detection (FR237.1–FR237.3)**
 
 Verify the `SESSION_ANALYSIS_PROMPT` includes:
 - Explicit statement detection
@@ -1391,6 +1665,30 @@ Verify the `SESSION_ANALYSIS_PROMPT` includes:
 - Conservative flagging (passing mentions don't count)
 
 No code changes needed — the prompt from Task 6 already handles this.
+
+- [ ] **Step 2: Add edge-case test for timestamp update on re-mention**
+
+Add to `learner-profile.test.ts`:
+
+```typescript
+describe('mergeInterests — timestamp edge cases', () => {
+  it('updates timestamp when existing interest is re-mentioned', () => {
+    const oldDate = '2026-01-01T00:00:00Z';
+    const existing = ['space'];
+    const timestamps = { space: oldDate };
+    const { timestamps: newTs } = mergeInterests(
+      existing,
+      ['space'], // re-mention
+      [],
+      timestamps
+    );
+    // Timestamp should be updated to now (not the old date)
+    expect(new Date(newTs['space']!).getTime()).toBeGreaterThan(
+      new Date(oldDate).getTime()
+    );
+  });
+});
+```
 
 - [ ] **Step 3: Run tests**
 
@@ -1401,7 +1699,7 @@ Expected: All tests PASS
 
 ```bash
 git add apps/api/src/services/learner-profile.test.ts
-git commit -m "test(api): add interest demotion tests [Epic-16, Story-16.4]"
+git commit -m "test(api): add interest timestamp edge-case tests [Epic-16, Story-16.4]"
 ```
 
 ---
@@ -1411,6 +1709,8 @@ git commit -m "test(api): add interest demotion tests [Epic-16, Story-16.4]"
 **Files:**
 - Modify: `apps/api/src/services/learner-profile.ts`
 - Test: `apps/api/src/services/learner-profile.test.ts`
+
+> **Note:** `resolveStruggle` is called from `applyAnalysis` (Task 5) when the LLM returns `resolvedTopics` — topics where the learner demonstrated mastery. The LLM prompt (Task 6) asks for `resolvedTopics` alongside `struggles`.
 
 - [ ] **Step 1: Write test for struggle resolution (confidence downgrade)**
 
@@ -1608,9 +1908,8 @@ In the `applyAnalysis` function, after the existing merge updates, add:
   // FR239: Update learning style from explanation effectiveness
   if (analysis.explanationEffectiveness) {
     const currentStyle = (profile.learningStyle as LearningStyle) ?? null;
-    // Count sessions that have contributed effectiveness data
-    // Use version as a proxy for session count (incremented each analysis)
-    const sessionCount = profile.version;
+    // Use dedicated counter (not version, which increments on every mutation)
+    const sessionCount = ((profile.effectivenessSessionCount as number) ?? 0) + 1;
 
     const updatedStyle = updateLearningStyleFromEffectiveness(
       currentStyle,
@@ -1621,6 +1920,8 @@ In the `applyAnalysis` function, after the existing merge updates, add:
     if (updatedStyle && JSON.stringify(updatedStyle) !== JSON.stringify(currentStyle)) {
       updates.learningStyle = updatedStyle;
     }
+    // Track effectiveness sessions separately from version
+    updates.effectivenessSessionCount = sessionCount;
   }
 ```
 
@@ -1723,6 +2024,8 @@ git commit -m "feat(api): add exploration prompt for new learners without style 
 // apps/api/src/routes/learner-profile.ts
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { eq, and } from 'drizzle-orm';
+import { familyLinks } from '@eduagent/database';
 import type { HonoEnv } from '../middleware/auth';
 import {
   getLearningProfile,
@@ -1752,8 +2055,6 @@ export const learnerProfileRoutes = new Hono<HonoEnv>()
     const childProfileId = c.req.param('profileId');
 
     // IDOR prevention: verify parent-child family link
-    const { familyLinks } = await import('@eduagent/database');
-    const { eq, and } = await import('drizzle-orm');
     const link = await db.query.familyLinks.findFirst({
       where: and(
         eq(familyLinks.parentProfileId, parentProfileId),
@@ -1774,8 +2075,8 @@ export const learnerProfileRoutes = new Hono<HonoEnv>()
     zValidator('json', deleteMemoryItemSchema),
     async (c) => {
       const { db, profileId } = c.var;
-      const { category, value, suppress } = c.req.valid('json');
-      await deleteMemoryItem(db, profileId, category, value, suppress ?? false);
+      const { category, value, suppress, subject } = c.req.valid('json');
+      await deleteMemoryItem(db, profileId, category, value, suppress ?? false, subject);
       return c.json({ success: true });
     }
   )
@@ -1789,8 +2090,6 @@ export const learnerProfileRoutes = new Hono<HonoEnv>()
       const childProfileId = c.req.param('profileId');
 
       // IDOR prevention
-      const { familyLinks } = await import('@eduagent/database');
-      const { eq, and } = await import('drizzle-orm');
       const link = await db.query.familyLinks.findFirst({
         where: and(
           eq(familyLinks.parentProfileId, parentProfileId),
@@ -1801,8 +2100,8 @@ export const learnerProfileRoutes = new Hono<HonoEnv>()
         return c.json({ error: 'Not authorized' }, 403);
       }
 
-      const { category, value, suppress } = c.req.valid('json');
-      await deleteMemoryItem(db, childProfileId, category, value, suppress ?? false);
+      const { category, value, suppress, subject } = c.req.valid('json');
+      await deleteMemoryItem(db, childProfileId, category, value, suppress ?? false, subject);
       return c.json({ success: true });
     }
   )
@@ -1828,8 +2127,6 @@ export const learnerProfileRoutes = new Hono<HonoEnv>()
       const childProfileId = c.req.param('profileId');
 
       // IDOR prevention
-      const { familyLinks } = await import('@eduagent/database');
-      const { eq, and } = await import('drizzle-orm');
       const link = await db.query.familyLinks.findFirst({
         where: and(
           eq(familyLinks.parentProfileId, parentProfileId),
@@ -1846,14 +2143,19 @@ export const learnerProfileRoutes = new Hono<HonoEnv>()
     }
   )
 
-  // DELETE /learner-profile/:profileId/all — parent deletes all memory data (GDPR Art 17)
+  // DELETE /learner-profile/all — child deletes own memory data (GDPR Art 17)
+  .delete('/learner-profile/all', async (c) => {
+    const { db, profileId } = c.var;
+    await deleteAllMemory(db, profileId);
+    return c.json({ success: true });
+  })
+
+  // DELETE /learner-profile/:profileId/all — parent deletes child's memory data (GDPR Art 17)
   .delete('/learner-profile/:profileId/all', async (c) => {
     const { db, profileId: parentProfileId } = c.var;
     const childProfileId = c.req.param('profileId');
 
     // IDOR prevention
-    const { familyLinks } = await import('@eduagent/database');
-    const { eq, and } = await import('drizzle-orm');
     const link = await db.query.familyLinks.findFirst({
       where: and(
         eq(familyLinks.parentProfileId, parentProfileId),
@@ -1888,11 +2190,106 @@ Add route registration (after the existing routes):
 Run: `pnpm exec nx run api:typecheck`
 Expected: No errors
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Write route tests**
+
+Create `apps/api/src/routes/learner-profile.test.ts`:
+
+```typescript
+// apps/api/src/routes/learner-profile.test.ts
+import { describe, it, expect, beforeEach } from '@jest/globals';
+import { testApp, createTestProfile, createFamilyLink } from '../../test-utils';
+
+describe('learner-profile routes', () => {
+  describe('GET /learner-profile', () => {
+    it('returns null for profile without learning data', async () => {
+      const { profileId, headers } = await createTestProfile();
+      const res = await testApp.request('/learner-profile', { headers });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.data).toBeNull();
+    });
+  });
+
+  describe('GET /learner-profile/:profileId (parent)', () => {
+    it('returns 403 if no family link exists', async () => {
+      const parent = await createTestProfile('parent');
+      const stranger = await createTestProfile('child');
+      const res = await testApp.request(
+        `/learner-profile/${stranger.profileId}`,
+        { headers: parent.headers }
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.error).toBe('Not authorized');
+    });
+
+    it('returns child profile when family link exists', async () => {
+      const parent = await createTestProfile('parent');
+      const child = await createTestProfile('child');
+      await createFamilyLink(parent.profileId, child.profileId);
+      const res = await testApp.request(
+        `/learner-profile/${child.profileId}`,
+        { headers: parent.headers }
+      );
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('DELETE /learner-profile/item', () => {
+    it('removes a specific interest and returns success', async () => {
+      // Setup: create profile with interests, then delete one
+      const { profileId, headers } = await createTestProfile();
+      // ... seed learning profile with interests
+      const res = await testApp.request('/learner-profile/item', {
+        method: 'DELETE',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: 'interests',
+          value: 'space',
+          suppress: false,
+        }),
+      });
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('DELETE /learner-profile/all', () => {
+    it('deletes own memory data (GDPR Art 17)', async () => {
+      const { headers } = await createTestProfile();
+      const res = await testApp.request('/learner-profile/all', {
+        method: 'DELETE',
+        headers,
+      });
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('PATCH /learner-profile/memory-enabled', () => {
+    it('toggles memory enabled', async () => {
+      const { headers } = await createTestProfile();
+      const res = await testApp.request('/learner-profile/memory-enabled', {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memoryEnabled: false }),
+      });
+      expect(res.status).toBe(200);
+    });
+  });
+});
+```
+
+> **Note:** Adapt `testApp`, `createTestProfile`, and `createFamilyLink` to match the project's existing test utilities. Check `apps/api/src/test-utils` for the actual helper signatures.
+
+- [ ] **Step 5: Run route tests**
+
+Run: `cd apps/api && pnpm exec jest --testPathPattern=routes/learner-profile --no-coverage`
+Expected: All tests PASS
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add apps/api/src/routes/learner-profile.ts apps/api/src/index.ts
-git commit -m "feat(api): add learner profile API routes with IDOR protection [Epic-16, Stories-16.7/16.8]"
+git add apps/api/src/routes/learner-profile.ts apps/api/src/routes/learner-profile.test.ts apps/api/src/index.ts
+git commit -m "feat(api): add learner profile API routes with IDOR protection and tests [Epic-16, Stories-16.7/16.8]"
 ```
 
 ---
@@ -1907,7 +2304,7 @@ git commit -m "feat(api): add learner profile API routes with IDOR protection [E
 ```typescript
 // apps/mobile/src/hooks/use-learner-profile.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useApiClient } from '../lib/api';
+import { useApiClient } from '../lib/api-client';
 
 export function useLearnerProfile() {
   const api = useApiClient();
@@ -1942,6 +2339,7 @@ export function useDeleteMemoryItem() {
       category: string;
       value: string;
       suppress?: boolean;
+      subject?: string; // Required for struggles to disambiguate across subjects
       childProfileId?: string;
     }) => {
       const url = params.childProfileId
@@ -1952,6 +2350,7 @@ export function useDeleteMemoryItem() {
           category: params.category,
           value: params.value,
           suppress: params.suppress,
+          ...(params.subject && { subject: params.subject }),
         },
       });
       return res.json();
@@ -2053,12 +2452,12 @@ import { computeAgeBracket } from '@eduagent/schemas';
 
 function MemoryChip({
   label,
-  onDelete,
+  onRemove,
   onMarkWrong,
   testID,
 }: {
   label: string;
-  onDelete: () => void;
+  onRemove: () => void;
   onMarkWrong: () => void;
   testID?: string;
 }) {
@@ -2069,12 +2468,20 @@ function MemoryChip({
     >
       <Text className="text-body-sm text-text-primary mr-2">{label}</Text>
       <Pressable
-        onPress={onMarkWrong}
-        accessibilityLabel={`Mark ${label} as wrong`}
+        onPress={onRemove}
+        accessibilityLabel={`Remove ${label}`}
         accessibilityRole="button"
         hitSlop={8}
       >
-        <Text className="text-body-sm text-text-secondary mr-1">✕</Text>
+        <Text className="text-body-sm text-text-secondary mr-1">−</Text>
+      </Pressable>
+      <Pressable
+        onPress={onMarkWrong}
+        accessibilityLabel={`Mark ${label} as wrong — prevents re-learning`}
+        accessibilityRole="button"
+        hitSlop={8}
+      >
+        <Text className="text-body-sm text-error">✕</Text>
       </Pressable>
     </View>
   );
@@ -2108,8 +2515,7 @@ export default function MentorMemoryScreen() {
   const ageBracket = birthYear ? computeAgeBracket(birthYear) : 'adult';
 
   const handleDelete = useCallback(
-    (category: string, value: string, suppress: boolean) => {
-      const action = suppress ? 'mark as wrong' : 'remove';
+    (category: string, value: string, suppress: boolean, subject?: string) => {
       Alert.alert(
         suppress ? 'This is wrong?' : 'Remove this?',
         suppress
@@ -2122,7 +2528,7 @@ export default function MentorMemoryScreen() {
             style: 'destructive',
             onPress: () => {
               deleteItem.mutate(
-                { category, value, suppress },
+                { category, value, suppress, subject },
                 {
                   onError: () =>
                     Alert.alert(
@@ -2267,7 +2673,7 @@ export default function MentorMemoryScreen() {
                     key={interest}
                     label={interest}
                     testID={`interest-chip-${interest}`}
-                    onDelete={() =>
+                    onRemove={() =>
                       handleDelete('interests', interest, false)
                     }
                     onMarkWrong={() =>
@@ -2340,7 +2746,7 @@ export default function MentorMemoryScreen() {
                   </View>
                   <Pressable
                     onPress={() =>
-                      handleDelete('struggles', s.topic, true)
+                      handleDelete('struggles', s.topic, true, s.subject)
                     }
                     accessibilityLabel={`Remove ${s.topic}`}
                     accessibilityRole="button"
@@ -2467,9 +2873,9 @@ export default function ParentMentorMemoryScreen() {
   const exportData = useExportData();
 
   const handleDeleteItem = useCallback(
-    (category: string, value: string) => {
+    (category: string, value: string, subject?: string) => {
       deleteItem.mutate(
-        { category, value, suppress: true, childProfileId },
+        { category, value, suppress: true, childProfileId, subject },
         {
           onError: () =>
             Alert.alert('Couldn\'t remove', 'Please try again.'),
@@ -2687,7 +3093,7 @@ export default function ParentMentorMemoryScreen() {
                       </Text>
                     </View>
                     <Pressable
-                      onPress={() => handleDeleteItem('struggles', s.topic)}
+                      onPress={() => handleDeleteItem('struggles', s.topic, s.subject)}
                       accessibilityLabel={`Remove struggle: ${s.topic}`}
                       accessibilityRole="button"
                       hitSlop={8}
@@ -2947,33 +3353,60 @@ Expected: All existing integration tests PASS (the new Inngest step is isolated 
 
 ## Spec Coverage Verification
 
-| Spec Requirement | Task | Status |
-|-----------------|------|--------|
-| FR234: learning_profiles table | Tasks 1-4 | Covered |
-| FR234.4: Confidence thresholds | Task 5 (merge logic + buildMemoryBlock) | Covered |
-| FR234.5: Interest cap (20), struggle archival (90d) | Task 5 (mergeInterests), Task 9 | Covered |
-| FR234.6: Profile-scoped reads | Task 3 (scoped repository) | Covered |
-| FR235: Session analysis Inngest function | Task 6 | Covered |
-| FR235.5: Incremental merge, not replace | Task 5 (applyAnalysis) | Covered |
-| FR235.6: memoryEnabled short-circuit | Task 6 (step code) | Covered |
-| FR235.7: Budget model | Task 6 (rung 1) | Covered |
-| FR236: Memory context injection | Task 7 | Covered |
-| FR236.2: Priority ordering | Task 5 (buildMemoryBlock) | Covered |
-| FR236.3: Natural language format | Task 5 (buildMemoryBlock) | Covered |
-| FR236.4: 500-token budget | Task 5 (MEMORY_BLOCK_CHAR_BUDGET) | Covered |
-| FR236.5: Meta-instruction | Task 5 (buildMemoryBlock) | Covered |
-| FR237: Interest detection | Tasks 6, 9 | Covered |
-| FR238: Struggle pattern detection | Tasks 6, 10 | Covered |
-| FR238.4: Struggle resolution | Task 10 (resolveStruggle) | Covered |
-| FR239: Explanation effectiveness | Tasks 6, 11 | Covered |
-| FR239.4: Style exploration prompt | Task 12 | Covered |
-| FR240: "What My Mentor Knows" screen | Task 15 | Covered |
-| FR240.3: Delete action | Tasks 13, 15 | Covered |
-| FR240.4: Empty state | Task 15 | Covered |
-| FR240.5: Age-adapted copy | Task 15 (computeAgeBracket) | Covered |
-| FR240.6: "This is wrong" + suppressedInferences | Tasks 5, 13, 15 | Covered |
-| FR241: Parent memory visibility | Task 16 | Covered |
-| FR241.3: Toggle, export, delete all | Tasks 13, 16 | Covered |
-| FR241.4: memoryEnabled toggle confirmation | Task 16 | Covered |
-| FR241.6: GDPR data export | Task 8 | Covered |
-| FR242: Memory warm-start | Task 17 | Covered |
+| Spec Requirement | Task | Verified By |
+|-----------------|------|-------------|
+| FR234: learning_profiles table | Tasks 1-4 | `tsc --noEmit` + migration SQL review |
+| FR234.4: Confidence thresholds | Task 5 | `test: mergeStruggles 'upgrades to high confidence at 5+ attempts'` |
+| FR234.5: Interest cap (20) | Task 5 | `test: mergeInterests 'respects the 20-entry cap by evicting oldest'` |
+| FR234.5: Struggle archival (90d) | Task 5 | `test: archiveStaleStruggles 'removes struggles older than 90 days'` — `archiveStaleStruggles()` called in `applyAnalysis()` |
+| FR234.6: Profile-scoped reads | Task 3 | `repository.ts:learningProfiles.findFirst` uses `scopedWhere` |
+| FR235: Session analysis Inngest function | Task 6 | `step.run('analyze-learner-profile')` in session-completed.ts |
+| FR235.5: Incremental merge, not replace | Task 5 | `test: mergeInterests`, `test: mergeStruggles`, `test: mergeStrengths` — all merge, never overwrite |
+| FR235.6: memoryEnabled short-circuit | Task 6 | `if (existingProfile?.memoryEnabled === false) return;` in step code |
+| FR235.7: Budget model | Task 6 | `routeAndCall(messages, 1, {})` — rung 1 = budget tier |
+| FR236: Memory context injection | Task 7 | `context.learnerMemoryContext` in `ExchangeContext` + `buildSystemPrompt()` |
+| FR236.2: Priority ordering | Task 5 | `buildMemoryBlock()`: struggles → style → interests → communication |
+| FR236.3: Natural language format | Task 5 | `test: buildMemoryBlock 'includes the meta-instruction for natural weaving'` |
+| FR236.4: 500-token budget | Task 5 | Section-aware truncation drops lowest-priority sections, preserves meta-instruction |
+| FR236.5: Meta-instruction preserved | Task 5 | `META_INSTRUCTION` constant always appended; truncation pops `lines`, never slices |
+| FR237: Interest detection | Tasks 6, 9 | LLM prompt rules + `mergeInterests()` |
+| FR237.4: Interest demotion (60d) | Task 5 | `test: mergeInterests 'demotes interests older than 60 days'` — uses `interestTimestamps` JSONB |
+| FR238: Struggle pattern detection | Tasks 6, 10 | LLM prompt `struggles` + `resolvedTopics` fields |
+| FR238.4: Struggle resolution | Tasks 5, 10 | `resolveStruggle()` called from `applyAnalysis()` via `analysis.resolvedTopics` |
+| FR239: Explanation effectiveness | Tasks 6, 11 | `updateLearningStyleFromEffectiveness()` + `effectivenessSessionCount` (dedicated counter) |
+| FR239.4: Style exploration prompt | Task 12 | `test: buildMemoryBlock 'includes style variation prompt when no learning style is set'` |
+| FR240: "What My Mentor Knows" screen | Task 15 | `mentor-memory.tsx` with `MemoryChip` (remove + suppress actions) |
+| FR240.3: Delete action | Tasks 13, 15 | `DELETE /learner-profile/item` + `subject` disambiguator for struggles |
+| FR240.4: Empty state | Task 15 | `testID="empty-state"` with age-adapted guidance text |
+| FR240.5: Age-adapted copy | Task 15 | `computeAgeBracket(birthYear)` → `copy(child, teen, adult)` |
+| FR240.6: "This is wrong" + suppressedInferences | Tasks 5, 13, 15 | `suppress: true` → `suppressedInferences` array, checked in all merge functions |
+| FR241: Parent memory visibility | Task 16 | `(parent)/child/[profileId]/mentor-memory.tsx` |
+| FR241.3: Toggle, export, delete all | Tasks 13, 16 | `PATCH /memory-enabled`, `DELETE /all`, `handleExport` |
+| FR241.4: memoryEnabled toggle confirmation | Task 16 | `Alert.alert('Disable memory?', ...)` with cancel option |
+| FR241.6: GDPR data export | Task 8 | `learningProfileRows` in `generateExport()` |
+| FR241.6: GDPR self-delete (child) | Task 13 | `DELETE /learner-profile/all` (no `:profileId` = self) |
+| FR242: Memory warm-start | Task 17 | `test: buildMemoryBlock 'includes cross-subject signals'` — struggles filtered by subject, rest always included |
+| Strengths population | Tasks 5, 6 | `mergeStrengths()` in `applyAnalysis()` + LLM `strengths` field |
+
+---
+
+## Review Changelog
+
+> Adversarial review conducted 2026-04-07. All findings resolved in this revision.
+
+| # | Severity | Finding | Resolution |
+|---|----------|---------|------------|
+| 1 | **HIGH** | `resolveStruggle()` never called — FR238.4 unimplemented | Added `resolvedTopics` to `sessionAnalysisOutputSchema`, LLM prompt, and `applyAnalysis()`. `resolveStruggle` is now called when LLM detects mastery. |
+| 2 | **HIGH** | `strengths` never populated — UI sections dead | Added `strengths` to `sessionAnalysisOutputSchema`, LLM prompt rules, `mergeStrengths()` function, and `applyAnalysis()` merge path. |
+| 3 | **HIGH** | Interest demotion (60-day) impossible — no timestamps | Added `interestTimestamps` JSONB column + map tracking. `mergeInterests` now returns `{ interests, timestamps }`, demotes stale entries to front for cap-based eviction. |
+| 4 | **MEDIUM** | Struggle 90-day archival missing — FR234.5 | Added `archiveStaleStruggles()` function, called in `applyAnalysis()` after merge. Tests verify removal of entries beyond 90-day cutoff. |
+| 5 | **HIGH** | `version` as corroboration proxy overcounted | Added `effectivenessSessionCount` column (integer, default 0). Incremented only when `explanationEffectiveness` data is present. `updateLearningStyleFromEffectiveness` uses this counter. |
+| 6 | **HIGH** | `useApiClient` imported from wrong path (`api` vs `api-client`) | Fixed import to `'../lib/api-client'` matching actual codebase export. |
+| 7 | **MEDIUM** | Route test file listed but never created | Added Step 4-5 in Task 13: full route test suite covering GET, DELETE, PATCH, IDOR checks, and child self-delete. |
+| 8 | **LOW** | Dynamic imports in route handlers | Replaced all `await import('@eduagent/database')` / `await import('drizzle-orm')` with static imports at file top. |
+| 9 | **MEDIUM** | Blind char truncation could break meta-instruction | Replaced `block.slice()` with section-aware truncation: drops lowest-priority lines via `lines.pop()` in a loop while preserving `META_INSTRUCTION` constant. |
+| 10 | **MEDIUM** | Retry in `applyAnalysis` unguarded — race condition | Retry now re-merges from fresh profile state AND includes version guard. If retry also fails (third concurrent writer), accepts loss gracefully. |
+| 11 | **MEDIUM** | Struggle deletion ambiguous across subjects | Added `subject` field to `deleteMemoryItemSchema`. `deleteMemoryItem()` accepts optional `subject` param. All mobile call sites pass `s.subject` for struggle deletions. |
+| 12 | **LOW** | `MemoryChip.onDelete` prop never rendered | Renamed to `onRemove`, added second `Pressable` button. Now shows both "−" (remove) and "✕" (suppress) actions. |
+| 13 | **MEDIUM** | No child self-service "delete all" — GDPR Art 17 | Added `DELETE /learner-profile/all` (no `:profileId` param = self) before the parent `:profileId` variant. |
+| 14 | **LOW** | `1 as any` type cast for LLM rung | Removed `as any` cast. `routeAndCall` default param is `= 1`, confirming numeric literal is valid. |

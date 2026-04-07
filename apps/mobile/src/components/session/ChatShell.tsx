@@ -54,6 +54,8 @@ interface ChatShellProps {
   onInputModeChange?: (mode: 'text' | 'voice') => void;
   speechRecognitionLanguage?: string;
   textToSpeechLanguage?: string;
+  /** Compact controls rendered below the text input (e.g. Switch topic / Park it). */
+  belowInput?: React.ReactNode;
   /** Optional testID for the message scroll area (used by E2E flows). */
   messagesTestID?: string;
 }
@@ -119,6 +121,7 @@ export function ChatShell({
   onInputModeChange,
   speechRecognitionLanguage,
   textToSpeechLanguage,
+  belowInput,
   messagesTestID,
 }: ChatShellProps) {
   const router = useRouter();
@@ -550,6 +553,7 @@ export function ChatShell({
           </View>
         </View>
       )}
+      {belowInput}
     </KeyboardAvoidingView>
   );
 }

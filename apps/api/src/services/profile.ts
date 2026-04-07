@@ -241,8 +241,14 @@ export async function createProfileWithLimitCheck(
     // without blocking unrelated accounts. Released on commit/rollback.
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${accountId}))`);
 
-    const existingProfiles = await listProfiles(txDb, accountId);
-    const isFirstProfile = existingProfiles.length === 0;
+    // O(1) count instead of loading all profiles + N consent queries.
+    // Only need the count and the owner ID — keeps the lock window minimal.
+    const [countRow] = await txDb
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(profiles)
+      .where(eq(profiles.accountId, accountId));
+    const profileCount = countRow?.count ?? 0;
+    const isFirstProfile = profileCount === 0;
 
     // Enforce per-tier profile limits. First profile creation is always allowed.
     if (!isFirstProfile) {
@@ -258,7 +264,13 @@ export async function createProfileWithLimitCheck(
     // Security: verify the CALLER's active profile matches the owner profile.
     let parentProfileId: string | undefined;
     if (!isFirstProfile) {
-      const ownerProfile = existingProfiles.find((p) => p.isOwner);
+      const ownerProfile = await txDb.query.profiles.findFirst({
+        where: and(
+          eq(profiles.accountId, accountId),
+          eq(profiles.isOwner, true)
+        ),
+        columns: { id: true },
+      });
       if (ownerProfile && callerProfileId === ownerProfile.id) {
         parentProfileId = ownerProfile.id;
       }

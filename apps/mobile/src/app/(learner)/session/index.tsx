@@ -37,6 +37,7 @@ import {
   useAddParkingLotItem,
 } from '../../../hooks/use-sessions';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
+import { useResolveSubject } from '../../../hooks/use-resolve-subject';
 import { useStreaks } from '../../../hooks/use-streaks';
 import { useOverallProgress } from '../../../hooks/use-progress';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
@@ -134,6 +135,12 @@ interface PendingSubjectResolution {
   }>;
   /** When the classifier cannot match an enrolled subject, it suggests a new one */
   suggestedSubjectName?: string | null;
+  /** Rich suggestions from subjects.resolve — shown as tappable cards */
+  resolveSuggestions?: Array<{
+    name: string;
+    description: string;
+    focus?: string;
+  }>;
 }
 
 const CONFIRMATION_BY_CHIP: Partial<Record<ContextualQuickChipId, string>> = {
@@ -502,6 +509,7 @@ export default function SessionScreen() {
 
   const apiClient = useApiClient();
   const classifySubject = useClassifySubject();
+  const resolveSubject = useResolveSubject();
   const upsertNote = useUpsertNote(effectiveSubjectId || undefined, undefined);
   const startSession = useStartSession(effectiveSubjectId);
   const closeSession = useCloseSession(activeSessionId ?? '');
@@ -855,7 +863,12 @@ export default function SessionScreen() {
       text: string,
       prompt: string,
       candidates: Array<{ subjectId: string; subjectName: string }>,
-      suggestedSubjectName?: string | null
+      suggestedSubjectName?: string | null,
+      resolveSuggestions?: Array<{
+        name: string;
+        description: string;
+        focus?: string;
+      }>
     ) => {
       const dedupedCandidates = candidates.filter(
         (candidate, index, all) =>
@@ -871,18 +884,10 @@ export default function SessionScreen() {
         prompt,
         candidates: dedupedCandidates,
         suggestedSubjectName,
+        resolveSuggestions,
       });
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: createLocalMessageId('ai'),
-          role: 'ai',
-          content: prompt,
-          isSystemPrompt: true,
-        },
-      ]);
     },
-    [createLocalMessageId]
+    []
   );
 
   const continueWithMessage = useCallback(
@@ -1170,7 +1175,7 @@ export default function SessionScreen() {
         {
           id: createLocalMessageId('ai'),
           role: 'ai',
-          content: `Got it, we’re working on ${candidate.subjectName}.`,
+          content: `Got it, we're working on ${candidate.subjectName}.`,
           isSystemPrompt: true,
         },
       ]);
@@ -1245,7 +1250,7 @@ export default function SessionScreen() {
     async (text: string) => {
       if (isStreaming || pendingClassification) return;
       if (pendingSubjectResolution) {
-        showConfirmation('Pick the subject first, then I’ll keep going.');
+        showConfirmation("Pick the subject first, then I'll keep going.");
         return;
       }
 
@@ -1307,17 +1312,45 @@ export default function SessionScreen() {
                 .slice(0, 3)
                 .map((candidate) => candidate.subjectName)
                 .join(' or ')}. Which one are we working on?`;
-            } else if (
-              suggested &&
-              result.candidates.length === 0
-            ) {
+            } else if (suggested && result.candidates.length === 0) {
               promptMessage =
                 subjectCandidates.length > 0
                   ? `This sounds like ${suggested}. Pick a subject below, or tap "+ ${suggested}" to add it.`
                   : `This sounds like ${suggested}. Tap below to add it and start learning.`;
+            } else if (
+              result.candidates.length === 0 &&
+              subjectCandidates.length === 0
+            ) {
+              // BUG-233: No enrolled subjects AND classifier failed to suggest —
+              // fall back to subjects.resolve for rich LLM suggestions
+              try {
+                const resolveResult = await resolveSubject.mutateAsync({
+                  rawInput: text,
+                });
+                const suggestions = resolveResult.suggestions ?? [];
+                const resolvePrompt =
+                  resolveResult.displayMessage ||
+                  'Pick a subject that fits, or create your own.';
+                openSubjectResolution(
+                  text,
+                  resolvePrompt,
+                  subjectCandidates,
+                  null,
+                  suggestions
+                );
+              } catch {
+                openSubjectResolution(
+                  text,
+                  "I couldn't figure out the subject. You can create a new one below.",
+                  subjectCandidates
+                );
+              }
+              return;
             } else {
               promptMessage =
-                "I couldn't place that yet. Pick the closest subject and we'll get moving.";
+                subjectCandidates.length > 0
+                  ? 'Pick the subject that fits best:'
+                  : "I couldn't place that yet. Pick the closest subject and we'll get moving.";
             }
 
             openSubjectResolution(
@@ -1334,18 +1367,41 @@ export default function SessionScreen() {
             subjectName: candidate.name,
           }));
           setShowWrongSubjectChip(false);
-          setClassifyError(
-            fallbackCandidates.length > 0
-              ? "Could not identify the subject automatically. Pick one below and we'll keep going."
-              : 'Could not identify the subject. Create a new subject to get started.'
-          );
-          openSubjectResolution(
-            text,
-            fallbackCandidates.length > 0
-              ? "I couldn’t place that yet. Pick the closest subject and we’ll get moving."
-              : "I couldn’t figure out the subject. You can create a new one and we’ll pick up from there.",
-            fallbackCandidates
-          );
+
+          if (fallbackCandidates.length > 0) {
+            setClassifyError(
+              "Could not identify the subject automatically. Pick one below and we'll keep going."
+            );
+            openSubjectResolution(
+              text,
+              'Pick the subject that fits best:',
+              fallbackCandidates
+            );
+          } else {
+            // No enrolled subjects — try resolve for suggestions
+            try {
+              const resolveResult = await resolveSubject.mutateAsync({
+                rawInput: text,
+              });
+              openSubjectResolution(
+                text,
+                resolveResult.displayMessage ||
+                  'Pick a subject that fits, or create your own.',
+                [],
+                null,
+                resolveResult.suggestions ?? []
+              );
+            } catch {
+              setClassifyError(
+                'Could not identify the subject. Create a new subject to get started.'
+              );
+              openSubjectResolution(
+                text,
+                "I couldn't figure out the subject. You can create a new one below.",
+                []
+              );
+            }
+          }
           return;
         } finally {
           setPendingClassification(false);
@@ -1366,6 +1422,7 @@ export default function SessionScreen() {
       classifiedSubject,
       messages.length,
       classifySubject,
+      resolveSubject,
       availableSubjects,
       continueWithMessage,
       openSubjectResolution,
@@ -1826,11 +1883,11 @@ export default function SessionScreen() {
     : modeConfig.subtitle;
 
   const sessionToolAccessory = (
-    <View className="bg-surface border-t border-surface-elevated px-4 py-3">
+    <View className="bg-surface px-4 py-1.5">
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8 }}
+        contentContainerStyle={{ gap: 6 }}
         testID="session-quick-chips"
       >
         {(
@@ -1843,7 +1900,7 @@ export default function SessionScreen() {
             key={chip.id}
             onPress={() => void handleQuickChip(chip.id)}
             disabled={isStreaming}
-            className={`rounded-full px-4 py-2 ${
+            className={`rounded-full px-3 py-1 ${
               isStreaming ? 'bg-surface' : 'bg-surface-elevated'
             }`}
             accessibilityRole="button"
@@ -1851,7 +1908,7 @@ export default function SessionScreen() {
             accessibilityState={{ disabled: isStreaming }}
             testID={`quick-chip-${chip.id}`}
           >
-            <Text className="text-body-sm font-semibold text-text-primary">
+            <Text className="text-caption text-text-secondary">
               {chip.label}
             </Text>
           </Pressable>
@@ -1863,7 +1920,10 @@ export default function SessionScreen() {
   const subjectResolutionAccessory = pendingSubjectResolution ? (
     <View
       className="bg-surface border-t border-surface-elevated px-4 py-3"
-      style={{ paddingBottom: pendingSubjectResolution.candidates.length === 0 ? 16 : undefined }}
+      style={{
+        paddingBottom:
+          pendingSubjectResolution.candidates.length === 0 ? 16 : undefined,
+      }}
     >
       <Text className="text-body-sm font-semibold text-text-primary">
         Pick the subject
@@ -1900,12 +1960,17 @@ export default function SessionScreen() {
           {pendingSubjectResolution.suggestedSubjectName && (
             <Pressable
               onPress={() => void handleCreateSuggestedSubject()}
-              disabled={isStreaming || pendingClassification || createSubject.isPending}
+              disabled={
+                isStreaming || pendingClassification || createSubject.isPending
+              }
               className="rounded-full bg-primary/20 px-4 py-2"
               accessibilityRole="button"
               accessibilityLabel={`Add ${pendingSubjectResolution.suggestedSubjectName} as a new subject`}
               accessibilityState={{
-                disabled: isStreaming || pendingClassification || createSubject.isPending,
+                disabled:
+                  isStreaming ||
+                  pendingClassification ||
+                  createSubject.isPending,
               }}
               testID="subject-resolution-create-new"
             >
@@ -2049,7 +2114,6 @@ export default function SessionScreen() {
   const sessionAccessory = (
     <>
       {subjectResolutionAccessory}
-      {sessionToolAccessory}
       {homeworkModeChips}
     </>
   );
@@ -2080,6 +2144,7 @@ export default function SessionScreen() {
     const feedbackState = messageFeedback[message.id];
     const feedbackTestIdSuffix = message.eventId ?? message.id;
     const contextualQuickChips =
+      userMessageCount > 0 &&
       message.id === latestAiMessageId &&
       message.id !== consumedQuickChipMessageId
         ? getContextualQuickChips(message)
@@ -2213,6 +2278,7 @@ export default function SessionScreen() {
         onInputModeChange={handleInputModeChange}
         rightAction={headerRight}
         inputAccessory={sessionAccessory}
+        belowInput={sessionToolAccessory}
         onDraftChange={setDraftText}
         renderMessageActions={renderMessageActions}
         initialVoiceEnabled={inputMode === 'voice'}

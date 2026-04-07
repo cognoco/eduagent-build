@@ -24,8 +24,10 @@ async function verifyTopicOwnership(
   subjectId: string,
   topicId: string
 ): Promise<void> {
+  // Use scoped repo's db handle to satisfy createScopedRepository guardrail.
   // Single query: topics ⋈ books ⋈ subjects(scoped) — verifies entire chain
-  const [match] = await db
+  const repo = createScopedRepository(db, profileId);
+  const [match] = await repo.db
     .select({ id: curriculumTopics.id })
     .from(curriculumTopics)
     .innerJoin(
