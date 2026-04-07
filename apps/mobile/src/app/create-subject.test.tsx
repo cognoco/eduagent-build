@@ -237,8 +237,16 @@ describe('CreateSubjectScreen', () => {
       status: 'ambiguous',
       displayMessage: '**Easter** can be studied from different angles.',
       suggestions: [
-        { name: 'World History', description: 'History of Easter', focus: 'Easter Traditions' },
-        { name: 'Religious Studies', description: 'Easter theology', focus: 'Easter in Christianity' },
+        {
+          name: 'World History',
+          description: 'History of Easter',
+          focus: 'Easter Traditions',
+        },
+        {
+          name: 'Religious Studies',
+          description: 'Easter theology',
+          focus: 'Easter in Christianity',
+        },
       ],
     });
 
@@ -270,6 +278,64 @@ describe('CreateSubjectScreen', () => {
         focus: 'Easter Traditions',
         focusDescription: 'History of Easter',
       });
+    });
+  });
+
+  it('splits combined LLM names like "Biology — Botany" and derives focus', async () => {
+    // LLM returns combined name despite prompt instructions saying not to
+    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+      status: 'ambiguous',
+      displayMessage: '**Tea** can be studied from different angles.',
+      suggestions: [
+        {
+          name: 'Biology — Botany',
+          description: 'Study of tea plants and cultivation',
+        },
+        {
+          name: 'History',
+          description: 'Tea trade routes and cultural impact',
+        },
+      ],
+    });
+
+    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
+      subject: { id: 'subject-botany', name: 'Botany' },
+      structureType: 'focused_book',
+      bookId: 'book-tea',
+      bookTitle: 'tea',
+      bookCount: 1,
+    });
+
+    render(<CreateSubjectScreen />);
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'tea');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('subject-suggestion-option-0')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('subject-suggestion-option-0'));
+
+    await waitFor(() => {
+      // Should split "Biology — Botany" → subjectName "Botany", focus "tea"
+      expect(mockCreateSubjectMutateAsync).toHaveBeenCalledWith({
+        name: 'Botany',
+        rawInput: 'tea',
+        focus: 'tea',
+        focusDescription: 'Study of tea plants and cultivation',
+      });
+    });
+
+    // Should navigate to interview (focused_book path), not library
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(learner)/onboarding/interview',
+      params: {
+        subjectId: 'subject-botany',
+        subjectName: 'Botany',
+        bookId: 'book-tea',
+        bookTitle: 'tea',
+      },
     });
   });
 
@@ -370,10 +436,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />);
 
-    fireEvent.changeText(
-      screen.getByTestId('create-subject-name'),
-      'Biology'
-    );
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Biology');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
