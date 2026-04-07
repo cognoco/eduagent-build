@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,59 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile, isGuardianProfile } from '../lib/profile';
+import {
+  useSubscription,
+  useFamilySubscription,
+} from '../hooks/use-subscription';
 
 export default function ProfilesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
+  const { data: subscription } = useSubscription();
+  const { data: familyData } = useFamilySubscription(
+    subscription?.tier === 'family' || subscription?.tier === 'pro'
+  );
   const [isSwitching, setIsSwitching] = useState(false);
+
+  const handleAddProfile = useCallback(() => {
+    const tier = subscription?.tier;
+    if (tier === 'free' || tier === 'plus') {
+      Alert.alert(
+        'Upgrade required',
+        'Adding profiles requires a Family or Pro subscription.',
+        [
+          {
+            text: 'View plans',
+            onPress: () => router.push('/(learner)/subscription'),
+          },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+
+    if (familyData && familyData.profileCount >= familyData.maxProfiles) {
+      Alert.alert(
+        'Profile limit reached',
+        `Your ${tier === 'pro' ? 'Pro' : 'Family'} plan supports up to ${
+          familyData.maxProfiles
+        } profiles.`,
+        tier === 'family'
+          ? [
+              {
+                text: 'View plans',
+                onPress: () => router.push('/(learner)/subscription'),
+              },
+              { text: 'OK', style: 'cancel' },
+            ]
+          : [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    router.push('/create-profile');
+  }, [subscription, familyData, router]);
 
   const handleSwitch = async (profileId: string) => {
     if (isSwitching) return;
@@ -124,7 +171,7 @@ export default function ProfilesScreen() {
           })}
 
           <Pressable
-            onPress={() => router.push('/create-profile')}
+            onPress={handleAddProfile}
             className="flex-row items-center justify-center bg-surface rounded-card px-4 py-3.5 mt-4"
             testID="profiles-add-button"
           >

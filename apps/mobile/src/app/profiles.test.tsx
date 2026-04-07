@@ -49,6 +49,15 @@ const childProfile: Profile = {
   updatedAt: '2026-01-02T00:00:00Z',
 };
 
+const mockUseSubscription = jest.fn().mockReturnValue({ data: null });
+const mockUseFamilySubscription = jest.fn().mockReturnValue({ data: null });
+
+jest.mock('../hooks/use-subscription', () => ({
+  useSubscription: (...args: unknown[]) => mockUseSubscription(...args),
+  useFamilySubscription: (...args: unknown[]) =>
+    mockUseFamilySubscription(...args),
+}));
+
 jest.mock('../lib/profile', () => ({
   ...jest.requireActual('../lib/profile'),
   useProfile: jest.fn().mockReturnValue({
@@ -124,7 +133,13 @@ describe('ProfilesScreen', () => {
     });
   });
 
-  it('navigates to create-profile on add button', () => {
+  it('navigates to create-profile on add button for family tier', () => {
+    mockUseSubscription.mockReturnValue({
+      data: { tier: 'family' },
+    });
+    mockUseFamilySubscription.mockReturnValue({
+      data: { profileCount: 1, maxProfiles: 4 },
+    });
     useProfile.mockReturnValue({
       profiles: [ownerProfile],
       activeProfile: ownerProfile,

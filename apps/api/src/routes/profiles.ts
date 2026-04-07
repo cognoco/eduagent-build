@@ -17,6 +17,7 @@ import {
   switchProfile,
   ProfileValidationError,
 } from '../services/profile';
+import { getSubscriptionByAccountId, canAddProfile } from '../services/billing';
 
 type ProfileEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -36,6 +37,18 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const input = c.req.valid('json');
     const existingProfiles = await listProfiles(db, account.id);
     const isFirstProfile = existingProfiles.length === 0;
+
+    // Enforce per-tier profile limits: only Family/Pro can add extra profiles.
+    // First profile creation is always allowed (everyone gets their own profile).
+    if (!isFirstProfile) {
+      const subscription = await getSubscriptionByAccountId(db, account.id);
+      if (!subscription || !(await canAddProfile(db, subscription.id))) {
+        return forbidden(
+          c,
+          'Your subscription does not support additional profiles. Please upgrade to Family or Pro.'
+        );
+      }
+    }
 
     // BUG-239: When an owner (parent) creates a non-first profile (child),
     // pass the parent's profileId so consent can be granted immediately
