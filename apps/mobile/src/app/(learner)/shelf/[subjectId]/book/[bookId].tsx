@@ -68,12 +68,14 @@ export default function BookScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
-  const { subjectId, bookId } = useLocalSearchParams<{
+  const params = useLocalSearchParams<{
     subjectId: string;
     bookId: string;
   }>();
+  const subjectId = params.subjectId;
+  const bookId = params.bookId;
 
-  // --- Data queries ---
+  // --- Data queries (called unconditionally for rules-of-hooks) ---
   const bookQuery = useBookWithTopics(subjectId, bookId);
   const notesQuery = useBookNotes(subjectId, bookId);
   const generateMutation = useGenerateBookTopics(subjectId, bookId);
@@ -265,6 +267,30 @@ export default function BookScreen() {
 
   // --- Screen states ---
 
+  // 0. Missing route params
+  if (!subjectId || !bookId) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center px-5"
+        style={{ paddingTop: insets.top }}
+        testID="book-missing-param"
+      >
+        <Text className="text-body text-text-secondary text-center mb-4">
+          Missing book details. Please go back and try again.
+        </Text>
+        <Pressable
+          onPress={() => router.back()}
+          className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+          testID="book-missing-param-back"
+        >
+          <Text className="text-text-primary text-body font-semibold">
+            Go back
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   // 1. Loading
   if (bookQuery.isLoading) {
     return (
@@ -291,6 +317,11 @@ export default function BookScreen() {
 
   // 2. Error
   if (bookQuery.isError) {
+    const errorMessage =
+      bookQuery.error instanceof Error
+        ? bookQuery.error.message
+        : "Couldn't load this book.";
+
     return (
       <View
         className="flex-1 bg-background items-center justify-center px-5"
@@ -298,7 +329,7 @@ export default function BookScreen() {
         testID="book-error"
       >
         <Text className="text-body text-text-secondary text-center mb-4">
-          Couldn't load this book. Please try again.
+          {errorMessage}
         </Text>
         <Pressable
           onPress={() => void bookQuery.refetch()}

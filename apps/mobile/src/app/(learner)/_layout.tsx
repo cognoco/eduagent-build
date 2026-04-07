@@ -1095,6 +1095,7 @@ export default function LearnerLayout() {
           options={{
             href: null,
             tabBarItemStyle: { display: 'none' },
+            tabBarStyle: { display: 'none' },
           }}
         />
       </Tabs>

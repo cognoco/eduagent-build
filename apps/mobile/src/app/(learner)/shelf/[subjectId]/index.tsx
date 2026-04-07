@@ -15,7 +15,8 @@ export default function ShelfScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
-  const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
+  const params = useLocalSearchParams<{ subjectId: string }>();
+  const subjectId = params.subjectId;
 
   const booksQuery = useBooks(subjectId);
   const subjectsQuery = useSubjects();
@@ -38,6 +39,30 @@ export default function ShelfScreen() {
     }
   }, [booksQuery.data, subjectId, router]);
 
+  // Guard: param must exist — show error if navigation passed no subjectId
+  if (!subjectId) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center px-5"
+        style={{ paddingTop: insets.top }}
+        testID="shelf-missing-param"
+      >
+        <Text className="text-body text-text-secondary text-center mb-4">
+          Missing subject. Please go back and try again.
+        </Text>
+        <Pressable
+          onPress={() => router.back()}
+          className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+          testID="shelf-missing-param-back"
+        >
+          <Text className="text-text-primary text-body font-semibold">
+            Go back
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   // Return null while auto-redirecting to the single book
   if (booksQuery.data && booksQuery.data.length === 1) {
     return null;
@@ -46,8 +71,14 @@ export default function ShelfScreen() {
   const isLoading =
     booksQuery.isLoading || subjectsQuery.isLoading || progressQuery.isLoading;
 
-  const isError =
-    booksQuery.isError || subjectsQuery.isError || progressQuery.isError;
+  const failedQuery = booksQuery.isError
+    ? booksQuery
+    : subjectsQuery.isError
+    ? subjectsQuery
+    : progressQuery.isError
+    ? progressQuery
+    : null;
+  const isError = failedQuery !== null;
 
   const handleRetry = (): void => {
     void booksQuery.refetch();
@@ -101,6 +132,11 @@ export default function ShelfScreen() {
   }
 
   if (isError) {
+    const errorMessage =
+      failedQuery?.error instanceof Error
+        ? failedQuery.error.message
+        : 'Unable to load this shelf.';
+
     return (
       <View
         className="flex-1 bg-background items-center justify-center px-5"
@@ -108,7 +144,7 @@ export default function ShelfScreen() {
         testID="shelf-error"
       >
         <Text className="text-body text-text-secondary text-center mb-4">
-          Unable to load this shelf. Please try again.
+          {errorMessage}
         </Text>
         <Pressable
           onPress={handleRetry}
