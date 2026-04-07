@@ -232,7 +232,7 @@ export function ShelvesTab({
               {progressLabel}
             </Text>
             {progress?.lastSessionAt && (
-              <Text className="text-caption text-text-tertiary mt-2">
+              <Text className="text-caption text-text-secondary mt-2">
                 Last session: {formatLastPracticed(progress.lastSessionAt)}
               </Text>
             )}
