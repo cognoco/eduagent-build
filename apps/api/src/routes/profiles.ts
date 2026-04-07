@@ -35,11 +35,15 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const db = c.get('db');
     const account = c.get('account');
     const input = c.req.valid('json');
+
+    // Single read to determine existing profiles — used for both the
+    // isFirstProfile flag and the billing guard, eliminating the TOCTOU
+    // race where concurrent requests could both pass separate reads.
     const existingProfiles = await listProfiles(db, account.id);
     const isFirstProfile = existingProfiles.length === 0;
 
-    // Enforce per-tier profile limits: only Family/Pro can add extra profiles.
-    // First profile creation is always allowed (everyone gets their own profile).
+    // Enforce per-tier profile limits via canAddProfile as the single
+    // authoritative check. First profile creation is always allowed.
     if (!isFirstProfile) {
       const subscription = await getSubscriptionByAccountId(db, account.id);
       if (!subscription || !(await canAddProfile(db, subscription.id))) {

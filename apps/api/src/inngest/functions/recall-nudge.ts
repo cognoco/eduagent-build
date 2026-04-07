@@ -74,23 +74,30 @@ export const recallNudge = inngest.createFunction(
       return { status: 'completed', eligibleCount: 0, sentEvents: 0 };
     }
 
-    // Step 2: Fan out — one event per eligible profile for independent retries
-    await step.sendEvent(
-      'fan-out',
-      eligible.map((profile) => ({
-        name: 'app/recall-nudge.send' as const,
-        data: {
-          profileId: profile.profileId,
-          fadingCount: profile.overdueCount,
-          topTopicIds: profile.topTopicIds,
-        },
-      }))
-    );
+    // Step 2: Fan out — one event per eligible profile for independent retries.
+    // Batch in chunks of 500 to stay within Inngest sendEvent limits.
+    const BATCH_SIZE = 500;
+    let sentEvents = 0;
+    for (let i = 0; i < eligible.length; i += BATCH_SIZE) {
+      const chunk = eligible.slice(i, i + BATCH_SIZE);
+      await step.sendEvent(
+        `fan-out-${i}`,
+        chunk.map((profile) => ({
+          name: 'app/recall-nudge.send' as const,
+          data: {
+            profileId: profile.profileId,
+            fadingCount: profile.overdueCount,
+            topTopicIds: profile.topTopicIds,
+          },
+        }))
+      );
+      sentEvents += chunk.length;
+    }
 
     return {
       status: 'completed',
       eligibleCount: eligible.length,
-      sentEvents: eligible.length,
+      sentEvents,
     };
   }
 );

@@ -61,11 +61,18 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const { topicId } = c.req.valid('param');
+      const { subjectId, topicId } = c.req.valid('param');
       const { content, append } = c.req.valid('json');
 
-      const note = await upsertNote(db, profileId, topicId, content, append);
-      return c.json({ note });
+      try {
+        const note = await upsertNote(db, profileId, subjectId, topicId, content, append);
+        return c.json({ note });
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
+        }
+        throw error;
+      }
     }
   )
   // GET /notes/topic-ids — all topic IDs with notes for this profile
@@ -83,12 +90,19 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      const { topicId } = c.req.valid('param');
+      const { subjectId, topicId } = c.req.valid('param');
 
-      const deleted = await deleteNote(db, profileId, topicId);
-      if (!deleted) {
-        return notFound(c, 'Note not found');
+      try {
+        const deleted = await deleteNote(db, profileId, subjectId, topicId);
+        if (!deleted) {
+          return notFound(c, 'Note not found');
+        }
+        return c.body(null, 204);
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
+        }
+        throw error;
       }
-      return c.body(null, 204);
     }
   );

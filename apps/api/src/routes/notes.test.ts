@@ -186,6 +186,7 @@ describe('note routes', () => {
       expect(mockUpsertNote).toHaveBeenCalledWith(
         expect.anything(),
         'test-profile-id',
+        SUBJECT_ID,
         TOPIC_ID,
         'New note content',
         undefined
@@ -220,6 +221,7 @@ describe('note routes', () => {
       expect(mockUpsertNote).toHaveBeenCalledWith(
         expect.anything(),
         'test-profile-id',
+        SUBJECT_ID,
         TOPIC_ID,
         'Appended content',
         true
@@ -306,6 +308,7 @@ describe('note routes', () => {
       expect(mockDeleteNote).toHaveBeenCalledWith(
         expect.anything(),
         'test-profile-id',
+        SUBJECT_ID,
         TOPIC_ID
       );
     });

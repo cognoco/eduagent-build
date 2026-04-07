@@ -1,4 +1,4 @@
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import {
   topicNotes,
   curriculumTopics,
@@ -12,6 +12,42 @@ import { NotFoundError } from '../errors';
 // ---------------------------------------------------------------------------
 // Notes service — CRUD for per-topic, per-profile notes
 // ---------------------------------------------------------------------------
+
+/**
+ * Verify the topic belongs to a book that belongs to a subject owned by
+ * the profile. Returns the verified topic or throws NotFoundError.
+ * Prevents IDOR — callers cannot write/delete notes on arbitrary topics.
+ */
+async function verifyTopicOwnership(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  topicId: string
+): Promise<void> {
+  const repo = createScopedRepository(db, profileId);
+  const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
+  if (!subject) {
+    throw new NotFoundError('Subject');
+  }
+
+  // Verify topic → book → subject chain
+  const topic = await db.query.curriculumTopics.findFirst({
+    where: eq(curriculumTopics.id, topicId),
+  });
+  if (!topic) {
+    throw new NotFoundError('Topic');
+  }
+
+  const book = await db.query.curriculumBooks.findFirst({
+    where: and(
+      eq(curriculumBooks.id, topic.bookId),
+      eq(curriculumBooks.subjectId, subjectId)
+    ),
+  });
+  if (!book) {
+    throw new NotFoundError('Topic does not belong to this subject');
+  }
+}
 
 /**
  * Fetch all notes for a given book, scoped to the authenticated profile.
@@ -73,12 +109,15 @@ export async function getNotesForBook(
 
 /**
  * Upsert a note for a topic+profile pair.
- * When `append` is true, concatenates new content to existing.
+ * When `append` is true, concatenates new content atomically in SQL.
  * Uses onConflictDoUpdate on the (topicId, profileId) unique constraint.
+ *
+ * Verifies subject → book → topic ownership to prevent IDOR.
  */
 export async function upsertNote(
   db: Database,
   profileId: string,
+  subjectId: string,
   topicId: string,
   content: string,
   append?: boolean
@@ -88,32 +127,22 @@ export async function upsertNote(
   content: string;
   updatedAt: Date;
 }> {
-  let finalContent = content;
-
-  if (append) {
-    const existing = await db.query.topicNotes.findFirst({
-      where: and(
-        eq(topicNotes.topicId, topicId),
-        eq(topicNotes.profileId, profileId)
-      ),
-    });
-    if (existing) {
-      finalContent = existing.content + '\n' + content;
-    }
-  }
+  await verifyTopicOwnership(db, profileId, subjectId, topicId);
 
   const rows = await db
     .insert(topicNotes)
     .values({
       topicId,
       profileId,
-      content: finalContent,
+      content,
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
       target: [topicNotes.topicId, topicNotes.profileId],
       set: {
-        content: finalContent,
+        content: append
+          ? sql`${topicNotes.content} || E'\n' || ${content}`
+          : content,
         updatedAt: new Date(),
       },
     })
@@ -131,12 +160,17 @@ export async function upsertNote(
 /**
  * Delete a note for a specific topic+profile pair.
  * Returns true if a row was deleted, false if none existed.
+ *
+ * Verifies subject → book → topic ownership to prevent IDOR.
  */
 export async function deleteNote(
   db: Database,
   profileId: string,
+  subjectId: string,
   topicId: string
 ): Promise<boolean> {
+  await verifyTopicOwnership(db, profileId, subjectId, topicId);
+
   const result = await db
     .delete(topicNotes)
     .where(
