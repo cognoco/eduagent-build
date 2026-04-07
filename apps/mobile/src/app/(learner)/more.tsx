@@ -194,9 +194,10 @@ export default function MoreScreen() {
   }, [exportData]);
 
   const handleAddChild = useCallback(() => {
-    if (!subscription) return; // still loading — don't bypass billing gate
     const tier = subscription?.tier;
-    if (tier === 'free' || tier === 'plus') {
+    // Whitelist: only family/pro may add children. Blocks free, plus, and
+    // undefined (query still loading or failed) — never fall through.
+    if (tier !== 'family' && tier !== 'pro') {
       Alert.alert(
         'Upgrade required',
         'Adding child profiles requires a Family or Pro subscription.',

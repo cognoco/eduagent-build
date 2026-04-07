@@ -27,7 +27,9 @@ export default function ProfilesScreen() {
 
   const handleAddProfile = useCallback(() => {
     const tier = subscription?.tier;
-    if (tier === 'free' || tier === 'plus') {
+    // Whitelist: only family/pro may add profiles. Blocks free, plus, and
+    // undefined (query still loading or failed) — never fall through.
+    if (tier !== 'family' && tier !== 'pro') {
       Alert.alert(
         'Upgrade required',
         'Adding profiles requires a Family or Pro subscription.',
@@ -115,7 +117,7 @@ export default function ProfilesScreen() {
             Create your first profile to get started
           </Text>
           <Pressable
-            onPress={() => router.push('/create-profile')}
+            onPress={handleAddProfile}
             className="bg-primary rounded-button px-6 py-3"
             testID="profiles-create-first"
           >
