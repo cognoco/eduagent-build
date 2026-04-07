@@ -192,34 +192,7 @@ describe('LearnerScreen', () => {
       expect(screen.queryByTestId('coaching-cards')).toBeNull();
     });
 
-    it('dismisses card on tap and tracks interaction', () => {
-      mockHomeCards = {
-        cards: [
-          {
-            id: 'study',
-            title: 'Continue Math',
-            subtitle: 'Pick up where you left off',
-            primaryLabel: 'Continue',
-            priority: 80,
-          },
-        ],
-        coldStart: false,
-      };
-
-      render(<LearnerScreen {...defaultProps} />);
-
-      expect(screen.getByText('Continue Math')).toBeTruthy();
-
-      fireEvent.press(screen.getByTestId('coaching-card-study-dismiss'));
-
-      expect(screen.queryByText('Continue Math')).toBeNull();
-      expect(mockMutate).toHaveBeenCalledWith({
-        cardId: 'study',
-        interactionType: 'dismiss',
-      });
-    });
-
-    it('navigates on primary tap and tracks interaction', () => {
+    it('navigates on tap and tracks interaction', () => {
       mockHomeCards = {
         cards: [
           {
@@ -236,7 +209,7 @@ describe('LearnerScreen', () => {
 
       render(<LearnerScreen {...defaultProps} />);
 
-      fireEvent.press(screen.getByTestId('coaching-card-homework-primary'));
+      fireEvent.press(screen.getByTestId('coaching-card-homework'));
 
       expect(mockPush).toHaveBeenCalledWith('/(learner)/homework/camera');
       expect(mockMutate).toHaveBeenCalledWith({
@@ -266,7 +239,7 @@ describe('LearnerScreen', () => {
 
       render(<LearnerScreen {...defaultProps} />);
 
-      fireEvent.press(screen.getByTestId('coaching-card-study-primary'));
+      fireEvent.press(screen.getByTestId('coaching-card-study'));
 
       expect(mockPush).toHaveBeenCalledWith(
         expect.stringContaining('subjectName=Math')
@@ -295,7 +268,7 @@ describe('LearnerScreen', () => {
 
       render(<LearnerScreen {...defaultProps} />);
 
-      fireEvent.press(screen.getByTestId('coaching-card-study-primary'));
+      fireEvent.press(screen.getByTestId('coaching-card-study'));
 
       expect(mockPush).toHaveBeenCalledWith(
         expect.stringContaining('subjectName=Biology%20%E2%80%94%20Botany')

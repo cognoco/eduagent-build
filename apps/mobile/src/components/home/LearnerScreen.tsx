@@ -1,11 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { HomeCard, HomeCardId, Profile } from '@eduagent/schemas';
+import type { HomeCard, Profile } from '@eduagent/schemas';
 import { ProfileSwitcher } from '../common';
-import { HomeActionCard } from '../coaching/HomeActionCard';
 import { useSubjects } from '../../hooks/use-subjects';
 import {
   useHomeCards,
@@ -51,15 +50,6 @@ function getCardPrimaryRoute(card: HomeCard): string {
   }
 }
 
-function getCardSecondaryRoute(card: HomeCard): string | undefined {
-  switch (card.id) {
-    case 'curriculum_complete':
-      return '/(learner)/library';
-    default:
-      return undefined;
-  }
-}
-
 export interface LearnerScreenProps {
   profiles: Profile[];
   activeProfile: Profile | null;
@@ -81,23 +71,12 @@ export function LearnerScreen({
   const { data: subjects } = useSubjects();
   const { data: homeCardsData } = useHomeCards();
   const trackInteraction = useTrackHomeCardInteraction();
-  const [dismissedIds, setDismissedIds] = useState<Set<HomeCardId>>(new Set());
-
   const activeSubjects =
     subjects?.filter((subject) => subject.status === 'active') ?? [];
   const hasLibraryContent = activeSubjects.length > 0;
   const { title, subtitle } = getGreeting(activeProfile?.displayName ?? '');
 
-  const visibleCards =
-    homeCardsData?.cards.filter((card) => !dismissedIds.has(card.id)) ?? [];
-
-  const handleDismiss = useCallback(
-    (cardId: HomeCardId) => {
-      setDismissedIds((prev) => new Set(prev).add(cardId));
-      trackInteraction.mutate({ cardId, interactionType: 'dismiss' });
-    },
-    [trackInteraction]
-  );
+  const visibleCards = homeCardsData?.cards ?? [];
 
   const handleCardPrimary = useCallback(
     (card: HomeCard) => {
@@ -105,14 +84,6 @@ export function LearnerScreen({
       router.push(getCardPrimaryRoute(card) as never);
     },
     [trackInteraction, router]
-  );
-
-  const handleCardSecondary = useCallback(
-    (card: HomeCard) => {
-      const route = getCardSecondaryRoute(card);
-      if (route) router.push(route as never);
-    },
-    [router]
   );
 
   return (
@@ -157,23 +128,13 @@ export function LearnerScreen({
       </View>
 
       {visibleCards.length > 0 ? (
-        <View className="gap-3 mb-4" testID="coaching-cards">
+        <View className="gap-4" testID="coaching-cards">
           {visibleCards.map((card) => (
-            <HomeActionCard
+            <IntentCard
               key={card.id}
               title={card.title}
               subtitle={card.subtitle}
-              badge={card.badge}
-              primaryLabel={card.primaryLabel}
-              onPrimary={() => handleCardPrimary(card)}
-              secondaryLabel={card.secondaryLabel}
-              onSecondary={
-                card.secondaryLabel
-                  ? () => handleCardSecondary(card)
-                  : undefined
-              }
-              onDismiss={() => handleDismiss(card.id)}
-              compact={card.compact}
+              onPress={() => handleCardPrimary(card)}
               testID={`coaching-card-${card.id}`}
             />
           ))}
