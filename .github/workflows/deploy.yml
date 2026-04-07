@@ -175,10 +175,10 @@ jobs:
           pnpm exec wrangler deploy --env "${DEPLOY_ENV}"
 
       - name: Sync secrets from Doppler to Worker
-        if: ${{ secrets.DOPPLER_TOKEN != '' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        if: env.DOPPLER_TOKEN != ''
         run: |
           DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
           # Map wrangler env names to Doppler config short names

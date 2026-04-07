@@ -12,6 +12,7 @@ import {
   retentionCards,
   notificationPreferences,
   notificationLog,
+  consentStates,
 } from '@eduagent/database';
 
 export const recallNudge = inngest.createFunction(
@@ -58,10 +59,21 @@ export const recallNudge = inngest.createFunction(
             // when a profile has multiple consent_states rows (different consentType).
             or(
               exists(
-                sql`SELECT 1 FROM consent_states cs WHERE cs.profile_id = ${profiles.id} AND cs.status = 'CONSENTED'`
+                db
+                  .select({ _: sql`1` })
+                  .from(consentStates)
+                  .where(
+                    and(
+                      eq(consentStates.profileId, profiles.id),
+                      eq(consentStates.status, 'CONSENTED')
+                    )
+                  )
               ),
               notExists(
-                sql`SELECT 1 FROM consent_states cs WHERE cs.profile_id = ${profiles.id}`
+                db
+                  .select({ _: sql`1` })
+                  .from(consentStates)
+                  .where(eq(consentStates.profileId, profiles.id))
               )
             ),
             // Timezone bucketing: local time within 07:30–08:30 (single 1h window)

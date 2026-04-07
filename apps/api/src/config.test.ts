@@ -10,6 +10,7 @@ describe('validateProductionKeys', () => {
     ENVIRONMENT: 'development',
     DATABASE_URL: 'postgresql://localhost/test',
     APP_URL: 'https://www.mentomate.com',
+    API_ORIGIN: 'https://api.mentomate.com',
     LOG_LEVEL: 'info',
     EMAIL_FROM: 'noreply@mentomate.com',
   };
@@ -36,13 +37,14 @@ describe('validateProductionKeys', () => {
     expect(missing).toContain('VOYAGE_API_KEY');
     expect(missing).toContain('RESEND_API_KEY');
     expect(missing).toContain('REVENUECAT_WEBHOOK_SECRET');
-    expect(missing).toContain('API_ORIGIN');
+    // API_ORIGIN is provided by BASE_ENV (non-optional in schema)
+    expect(missing).not.toContain('API_ORIGIN');
     // Stripe secrets are optional — dormant until web client added
     expect(missing).not.toContain('STRIPE_SECRET_KEY');
     expect(missing).not.toContain('STRIPE_WEBHOOK_SECRET');
     // OPENAI_API_KEY is optional — alternative to GEMINI_API_KEY
     expect(missing).not.toContain('OPENAI_API_KEY');
-    expect(missing).toHaveLength(8);
+    expect(missing).toHaveLength(7);
   });
 
   it('returns empty array for production with all required secrets present', () => {
@@ -85,7 +87,8 @@ describe('validateProductionKeys', () => {
       CLERK_SECRET_KEY: 'sk_live_xxx',
       CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
       CLERK_AUDIENCE: 'eduagent-api',
-      // Missing: VOYAGE_API_KEY, RESEND_API_KEY, REVENUECAT_WEBHOOK_SECRET, API_ORIGIN
+      // Missing: VOYAGE_API_KEY, RESEND_API_KEY, REVENUECAT_WEBHOOK_SECRET
+      // API_ORIGIN is provided by BASE_ENV (non-optional in schema)
       GEMINI_API_KEY: 'gemini-key',
       // Stripe keys are optional — not in production required list
     });
@@ -94,7 +97,6 @@ describe('validateProductionKeys', () => {
       'VOYAGE_API_KEY',
       'RESEND_API_KEY',
       'REVENUECAT_WEBHOOK_SECRET',
-      'API_ORIGIN',
     ]);
   });
 });
@@ -108,6 +110,7 @@ describe('validateEnv', () => {
     const env = validateEnv({
       ENVIRONMENT: 'development',
       DATABASE_URL: 'postgresql://localhost/test',
+      API_ORIGIN: 'https://api.dev.mentomate.com',
     });
 
     expect(env.ENVIRONMENT).toBe('development');
@@ -115,9 +118,12 @@ describe('validateEnv', () => {
   });
 
   it('throws on missing DATABASE_URL', () => {
-    expect(() => validateEnv({ ENVIRONMENT: 'development' })).toThrow(
-      'Invalid environment'
-    );
+    expect(() =>
+      validateEnv({
+        ENVIRONMENT: 'development',
+        API_ORIGIN: 'https://api.dev.mentomate.com',
+      })
+    ).toThrow('Invalid environment');
   });
 
   it('throws when production env is missing required keys', () => {
@@ -125,6 +131,7 @@ describe('validateEnv', () => {
       validateEnv({
         ENVIRONMENT: 'production',
         DATABASE_URL: 'postgresql://prod/db',
+        API_ORIGIN: 'https://api.mentomate.com',
       })
     ).toThrow('Production environment missing required keys');
   });
