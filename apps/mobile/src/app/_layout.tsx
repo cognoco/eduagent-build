@@ -1,11 +1,5 @@
 import '../../global.css';
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-} from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Alert, View, useColorScheme } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { Stack } from 'expo-router';
@@ -33,7 +27,6 @@ import {
   ProfileProvider,
   useProfile,
   personaFromBirthYear,
-  isGuardianProfile,
 } from '../lib/profile';
 import { setOnAuthExpired, clearOnAuthExpired } from '../lib/api-client';
 import { ErrorBoundary, OfflineBanner } from '../components/common';
@@ -87,55 +80,31 @@ const queryClient = new QueryClient({
 
 const ACCENT_STORE_PREFIX = 'accentPreset_';
 
-function deriveThemeFromBirthYear(birthYear: number | null | undefined): {
-  persona: Persona;
-  colorScheme: ColorScheme;
-} {
-  const persona = personaFromBirthYear(birthYear);
-  return {
-    persona,
-    colorScheme: persona === 'parent' ? 'light' : 'dark',
-  };
+function derivePersonaFromBirthYear(
+  birthYear: number | null | undefined
+): Persona {
+  return personaFromBirthYear(birthYear);
 }
 
 function ThemedApp() {
-  const { activeProfile, profiles } = useProfile();
+  const { activeProfile } = useProfile();
   const { signOut } = useClerk();
   const [persona, setPersona] = useState<Persona>('teen');
+  // Always follow the phone's system color scheme (light/dark).
+  // Persona only controls accent colors and typography, not light/dark.
   const systemColorScheme = useColorScheme();
-  const [colorScheme, setColorScheme] = useState<ColorScheme>(
-    (systemColorScheme as ColorScheme) ?? 'light'
-  );
+  const colorScheme: ColorScheme =
+    (systemColorScheme as ColorScheme) ?? 'light';
   const [accentPresetId, setAccentPresetIdState] = useState<string | null>(
     null
   );
-  // Track whether the user has explicitly selected a persona/scheme.
-  // When true, system color scheme changes are ignored (Bug #1 fix).
-  const userExplicitChoice = useRef(false);
 
-  // Derive persona + color scheme from active profile.
-  // Persona uses birthYear (age-based visual theming).
-  // Color scheme uses guardian status (account owner with child profiles → light).
-  // Must set both together — raw setPersona without setColorScheme leaves
-  // the parent persona stuck in dark mode (themeKey mismatch).
+  // Derive persona from active profile birthYear (age-based visual theming).
   useEffect(() => {
     if (activeProfile) {
-      const derived = deriveThemeFromBirthYear(activeProfile.birthYear);
-      setPersona(derived.persona);
-      setColorScheme(
-        isGuardianProfile(activeProfile, profiles) ? 'light' : 'dark'
-      );
+      setPersona(derivePersonaFromBirthYear(activeProfile.birthYear));
     }
-  }, [activeProfile, profiles]);
-
-  // Sync system color scheme changes ONLY when user hasn't explicitly chosen.
-  // Bug #1: Previously this unconditionally overrode the scheme, causing
-  // "Parent (Light)" to render as dark when the system was in dark mode.
-  useEffect(() => {
-    if (systemColorScheme && !userExplicitChoice.current) {
-      setColorScheme(systemColorScheme as ColorScheme);
-    }
-  }, [systemColorScheme]);
+  }, [activeProfile]);
 
   // BM-08: Load accent preset from SecureStore when profile changes.
   // Reset to null immediately on switch to prevent the previous profile's
@@ -197,18 +166,15 @@ function ThemedApp() {
     [activeProfile?.id]
   );
 
-  // Wrap setPersona to also update the color scheme to the persona's
-  // designed default and mark that the user made an explicit choice.
-  const setPersonaWithScheme = useCallback((p: Persona) => {
-    userExplicitChoice.current = true;
-    setPersona(p);
-    setColorScheme(p === 'parent' ? 'light' : 'dark');
-  }, []);
+  // No-op setColorScheme — color scheme always follows system.
+  // Kept in context interface to avoid breaking consumers.
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const setColorScheme = useCallback((_cs: ColorScheme) => {}, []);
 
   const themeValue = useMemo(
     () => ({
       persona,
-      setPersona: setPersonaWithScheme,
+      setPersona,
       colorScheme,
       setColorScheme,
       accentPresetId,
@@ -216,8 +182,9 @@ function ThemedApp() {
     }),
     [
       persona,
-      setPersonaWithScheme,
+      setPersona,
       colorScheme,
+      setColorScheme,
       accentPresetId,
       setAccentPresetId,
     ]

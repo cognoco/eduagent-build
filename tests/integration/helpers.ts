@@ -6,6 +6,7 @@ type IntegrationEnvOverrides = Partial<{
   DATABASE_URL: string;
   CLERK_JWKS_URL: string;
   APP_URL: string;
+  API_ORIGIN: string;
 }>;
 
 export function requireDatabaseUrl(): string {
@@ -26,6 +27,7 @@ export function buildIntegrationEnv(
     DATABASE_URL: requireDatabaseUrl(),
     CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
     APP_URL: 'https://app.mentomate.test',
+    API_ORIGIN: 'https://api.integration.test',
     ...overrides,
   };
 }
