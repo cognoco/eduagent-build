@@ -11,7 +11,7 @@ tags:
   - consent
   - critical
 ---
-- runFlow: ../../_setup/launch-devclient.yaml
+- runFlow: ../_setup/launch-devclient.yaml
 
 # Navigate to a state where consent can be requested.
 # This flow verifies the consent request initiation does not error out,

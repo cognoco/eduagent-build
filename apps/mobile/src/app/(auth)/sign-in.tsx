@@ -355,6 +355,7 @@ export default function SignInScreen() {
 
   const onSSOPress = useCallback(
     async (strategy: SupportedSSOStrategy) => {
+      if (!isLoaded) return;
       clearVerificationFlow();
       setError('');
       setOauthLoading(strategy);
@@ -389,7 +390,7 @@ export default function SignInScreen() {
         const sessionId =
           createdSessionId ?? ssoSignUp?.createdSessionId ?? null;
 
-        if (sessionId && setActive) {
+        if (sessionId) {
           const activated = await activateSession(sessionId, 'oauth');
           if (!activated) {
             return;
@@ -438,7 +439,13 @@ export default function SignInScreen() {
         setOauthLoading(null);
       }
     },
-    [clearVerificationFlow, handleIncompleteSignIn, setActive, startSSOFlow]
+    [
+      clearVerificationFlow,
+      handleIncompleteSignIn,
+      isLoaded,
+      setActive,
+      startSSOFlow,
+    ]
   );
 
   const activateSession = useCallback(

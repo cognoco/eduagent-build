@@ -131,6 +131,7 @@ export default function SignUpScreen() {
 
   const onSSOPress = useCallback(
     async (strategy: SupportedSSOStrategy) => {
+      if (!isLoaded) return;
       clearActivationFailure();
       setError('');
       setOauthLoading(strategy);
@@ -165,7 +166,7 @@ export default function SignUpScreen() {
         const sessionId =
           createdSessionId ?? ssoSignUp?.createdSessionId ?? null;
 
-        if (sessionId && setActive) {
+        if (sessionId) {
           const activated = await activateCreatedSession(sessionId, 'oauth');
           if (!activated) {
             return;
@@ -188,7 +189,13 @@ export default function SignUpScreen() {
         setOauthLoading(null);
       }
     },
-    [activateCreatedSession, clearActivationFailure, setActive, startSSOFlow]
+    [
+      activateCreatedSession,
+      clearActivationFailure,
+      isLoaded,
+      setActive,
+      startSSOFlow,
+    ]
   );
 
   const onSignUpPress = useCallback(async () => {

@@ -10,7 +10,7 @@ tags:
 ---
 # 1. Seed & sign in as parent (has existing children)
 - runFlow:
-    file: ../../_setup/seed-and-sign-in.yaml
+    file: ../_setup/seed-and-sign-in.yaml
     env:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}

@@ -132,9 +132,13 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
   .post('/settings/notify-parent-subscribe', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
-    // BUG-240: Use trusted API_ORIGIN config to prevent Host header injection (OWASP A03).
-    // Falls back to request origin only for local dev where API_ORIGIN is unset.
-    const apiOrigin = c.env.API_ORIGIN || new URL(c.req.url).origin;
+    // API_ORIGIN must be set — falling back to c.req.url would allow Host header
+    // injection (OWASP A03) since Cloudflare Workers populate it from the
+    // attacker-supplied Host header.
+    const apiOrigin = c.env.API_ORIGIN;
+    if (!apiOrigin) {
+      throw new Error('API_ORIGIN env var is required');
+    }
     const result = await notifyParentToSubscribe(
       db,
       profileId,

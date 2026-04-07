@@ -141,6 +141,7 @@ import { app } from '../index';
 
 const TEST_ENV = {
   CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+  API_ORIGIN: 'https://api.test.mentomate.com',
 };
 
 const AUTH_HEADERS = {
@@ -256,7 +257,7 @@ describe('consent routes', () => {
       expect(mockRequestConsent).toHaveBeenCalledTimes(1);
       const passedAppUrl = mockRequestConsent.mock.calls[0][2] as string;
       // Must be the API origin, not the marketing site
-      expect(passedAppUrl).toBe('https://api.mentomate.com');
+      expect(passedAppUrl).toBe('https://api.test.mentomate.com');
       expect(passedAppUrl).not.toContain('www.mentomate.com');
       expect(passedAppUrl).not.toContain('app.mentomate.com');
     });

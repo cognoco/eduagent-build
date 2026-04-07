@@ -9,7 +9,7 @@ tags:
   - subject-creation
 ---
 # 1. Launch dev client and sign in
-- runFlow: ../../_setup/launch-devclient.yaml
+- runFlow: ../_setup/launch-devclient.yaml
 
 # 2. Navigate to create subject
 - tapOn:

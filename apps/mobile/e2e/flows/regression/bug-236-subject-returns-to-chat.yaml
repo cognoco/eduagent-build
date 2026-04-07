@@ -8,10 +8,10 @@ tags:
   - chat
   - navigation
 ---
-- runFlow: ../../_setup/launch-devclient.yaml
+- runFlow: ../_setup/launch-devclient.yaml
 
 # Sign in
-- runFlow: ../../_setup/seed-and-sign-in.yaml
+- runFlow: ../_setup/seed-and-sign-in.yaml
 
 # Navigate to Learn Something New
 - tapOn:

@@ -194,6 +194,7 @@ export default function MoreScreen() {
   }, [exportData]);
 
   const handleAddChild = useCallback(() => {
+    if (!subscription) return; // still loading — don't bypass billing gate
     const tier = subscription?.tier;
     if (tier === 'free' || tier === 'plus') {
       Alert.alert(

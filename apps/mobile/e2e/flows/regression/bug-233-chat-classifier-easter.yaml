@@ -20,7 +20,7 @@ tags:
 ---
 # 1. Seed & sign in
 - runFlow:
-    file: ../../_setup/seed-and-sign-in.yaml
+    file: ../_setup/seed-and-sign-in.yaml
     env:
       SEED_SCENARIO: "learning-active"
       API_URL: ${API_URL}

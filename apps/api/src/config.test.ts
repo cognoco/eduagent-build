@@ -36,12 +36,13 @@ describe('validateProductionKeys', () => {
     expect(missing).toContain('VOYAGE_API_KEY');
     expect(missing).toContain('RESEND_API_KEY');
     expect(missing).toContain('REVENUECAT_WEBHOOK_SECRET');
+    expect(missing).toContain('API_ORIGIN');
     // Stripe secrets are optional — dormant until web client added
     expect(missing).not.toContain('STRIPE_SECRET_KEY');
     expect(missing).not.toContain('STRIPE_WEBHOOK_SECRET');
     // OPENAI_API_KEY is optional — alternative to GEMINI_API_KEY
     expect(missing).not.toContain('OPENAI_API_KEY');
-    expect(missing).toHaveLength(7);
+    expect(missing).toHaveLength(8);
   });
 
   it('returns empty array for production with all required secrets present', () => {
@@ -55,6 +56,7 @@ describe('validateProductionKeys', () => {
       VOYAGE_API_KEY: 'voyage-key',
       RESEND_API_KEY: 're_xxx',
       REVENUECAT_WEBHOOK_SECRET: 'rc_webhook_secret',
+      API_ORIGIN: 'https://api.mentomate.com',
       // Stripe secrets omitted — optional (dormant until web client)
     });
 
@@ -83,7 +85,7 @@ describe('validateProductionKeys', () => {
       CLERK_SECRET_KEY: 'sk_live_xxx',
       CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
       CLERK_AUDIENCE: 'eduagent-api',
-      // Missing: VOYAGE_API_KEY, RESEND_API_KEY, REVENUECAT_WEBHOOK_SECRET
+      // Missing: VOYAGE_API_KEY, RESEND_API_KEY, REVENUECAT_WEBHOOK_SECRET, API_ORIGIN
       GEMINI_API_KEY: 'gemini-key',
       // Stripe keys are optional — not in production required list
     });
@@ -92,6 +94,7 @@ describe('validateProductionKeys', () => {
       'VOYAGE_API_KEY',
       'RESEND_API_KEY',
       'REVENUECAT_WEBHOOK_SECRET',
+      'API_ORIGIN',
     ]);
   });
 });
@@ -138,6 +141,7 @@ describe('validateEnv', () => {
       VOYAGE_API_KEY: 'voyage-key',
       RESEND_API_KEY: 're_xxx',
       REVENUECAT_WEBHOOK_SECRET: 'rc_webhook_secret',
+      API_ORIGIN: 'https://api.mentomate.com',
       // Stripe secrets omitted — optional (dormant until web client)
     });
 

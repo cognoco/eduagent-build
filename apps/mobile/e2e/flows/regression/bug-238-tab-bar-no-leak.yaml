@@ -16,7 +16,7 @@ tags:
 ---
 # ── Setup ────────────────────────────────────────────────────────────
 - runFlow:
-    file: ../../_setup/seed-and-sign-in.yaml
+    file: ../_setup/seed-and-sign-in.yaml
     env:
       SEED_SCENARIO: "basic"
       API_URL: ${API_URL}

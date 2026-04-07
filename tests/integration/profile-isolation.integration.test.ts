@@ -13,12 +13,7 @@
  */
 
 import { eq } from 'drizzle-orm';
-import {
-  subjects,
-  profiles,
-  subscriptions,
-  quotaPools,
-} from '@eduagent/database';
+import { subjects, profiles, subscriptions } from '@eduagent/database';
 
 import { jwtMock, configureValidJWT } from './mocks';
 import {
@@ -118,25 +113,12 @@ async function seedFamilySubscription(profileId: string) {
   });
   if (!profile) throw new Error('Profile not found for subscription seed');
 
-  const [subscription] = await db
-    .insert(subscriptions)
-    .values({
-      accountId: profile.accountId,
-      tier: 'family',
-      status: 'active',
-      currentPeriodStart: new Date('2026-04-01T00:00:00.000Z'),
-      currentPeriodEnd: new Date('2026-05-01T00:00:00.000Z'),
-    })
-    .returning();
-
-  await db.insert(quotaPools).values({
-    subscriptionId: subscription!.id,
-    monthlyLimit: 1500,
-    usedThisMonth: 0,
-    dailyLimit: null,
-    usedToday: 0,
-    cycleResetAt: new Date('2026-05-01T00:00:00.000Z'),
-  });
+  // Account creation auto-provisions a 'plus' trial subscription,
+  // so we UPDATE the existing row to 'family' tier instead of inserting.
+  await db
+    .update(subscriptions)
+    .set({ tier: 'family', status: 'active' })
+    .where(eq(subscriptions.accountId, profile.accountId));
 }
 
 async function listSubjectsForUser(input: {
